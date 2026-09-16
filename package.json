@@ -2,8 +2,12 @@
   "name": "domain-harness-monorepo",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["packages/*"],
-  "engines": {"node": ">=22"},
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "npm run typecheck -w @kaicreator/domain-harness",
@@ -11,6 +15,8 @@
     "lint": "node scripts/lint.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0"
   }
 }
