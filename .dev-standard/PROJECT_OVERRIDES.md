@@ -10,8 +10,9 @@
 
 ## Frozen authority
 
-- Product authority: `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`.
-- Architecture authority after Stage 2 freeze: `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
+- Product authority: user-supplied frozen artifact `DomainHarness_v0.1_PRD_FROZEN.md`, SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`. This exact artifact is the v0.1 product authority until it is imported unchanged into `docs/product/`.
+- Architecture authority: `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
+- Task authority: `docs/implementation/DomainHarness_v0.1_TASK_DAG.md`.
 - Frozen product scope and technology choices MUST NOT be reopened by implementation agents unless a documented architecture contradiction is found.
 
 ## Project-specific hard boundaries
