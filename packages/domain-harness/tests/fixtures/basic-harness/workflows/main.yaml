@@ -1,0 +1,21 @@
+initial: generate
+output: "steps.await_approval"
+states:
+  generate:
+    invoke:
+      skill: generate
+      input: "input"
+    on:
+      done:
+        - target: await_approval
+  await_approval:
+    on:
+      approve:
+        schema: schemas/approval.schema.json
+        target: completed
+      reject:
+        target: failed
+  completed:
+    final: true
+  failed:
+    final: true
