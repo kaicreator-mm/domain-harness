@@ -2,32 +2,38 @@
 
 ## Repository profile
 
-- Product: Domain Harness Runtime
-- Version target: v0.1
+- Product: DomainHarness Portable Interactive Domain Runtime
+- Version target: v0.2
 - Repository: `kaicreator-mm/domain-harness`
-- Project form: embedded TypeScript SDK/runtime; no server or generic admin UI in v0.1.
-- Structure: minimum monorepo-compatible layout; publishable runtime/contract SDK is `packages/domain-harness`.
+- Integration branch: `v0.2`; implementation task branches are created from the current validated `v0.2` head after all declared dependencies are merged.
+- Project form: embedded portable TypeScript Runtime SDK + build-time compiler + host bindings; no server or generic admin UI.
+- Structure: Git monorepo. Primary portable SDK remains `packages/domain-harness`; compiler and host-specific adapters are separate workspace packages per frozen v0.2 L2.
 
 ## Frozen authority
 
-- Product authority: `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`, SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`. Imported byte-for-byte via #54/#55; MUST NOT be reformatted or rewritten.
-- Architecture authority: `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
-- Task authority / historical execution plan: `docs/implementation/DomainHarness_v0.1_TASK_DAG.md`.
-- Release/validation authority: `docs/validation/DomainHarness_v0.1_VALIDATION_REPORT.md` plus exact-SHA GitHub Issue evidence.
-- Frozen product scope and technology choices MUST NOT be reopened by implementation agents unless a documented architecture contradiction is found.
+- Product authority: `docs/product/DomainHarness_v0.2_PRD_FROZEN.md`, SHA-256 `e95534773b0879a7e4892ba995ca90928d6029730f0de1e70c2915aa56679d9b`. Imported byte-for-byte from frozen R4; MUST NOT be reformatted or rewritten.
+- Architecture authority: `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md`.
+- Task authority: `docs/implementation/DomainHarness_v0.2_TASK_DAG.md` plus `docs/implementation/v0.2/task-packs/` and `TASK_PACKS.json`.
+- v0.1 remains a historical frozen baseline; v0.2 does not retroactively redefine v0.1 behavior.
+- Frozen product scope and frozen v0.2 architecture MUST NOT be reopened by implementation agents unless a documented architecture contradiction is found.
 
 ## Project-specific hard boundaries
 
-- Domain semantics stay outside DomainHarness.
-- XState v5 is internal implementation detail only; no XState API/type/snapshot leaks into public SDK or domain assets.
-- v0.1 is single-process and SQLite-backed; no distributed scheduler, multi-database abstraction, static parallel composition, generic DAG runtime, dynamic spawn, server, or generic admin console.
-- Tool is the only host/external I/O and side-effect boundary.
-- Script is trusted deterministic extension code, not a hostile-code security sandbox.
-- LLM output never owns workflow transition authority.
+- Runtime Core is platform-independent TypeScript and has no mandatory Node built-in dependency.
+- Raw Domain Package discovery/compilation is build-time; application startup consumes Target Compiled Domain Package + Runtime Resources only.
+- Domain semantics and authoritative User/Business Data remain outside DomainHarness Runtime authority.
+- XState, if retained internally, is never a public/persistence/domain contract.
+- One Workflow Instance serializes state-changing messages; different instances may execute concurrently; no global ordering is promised.
+- Durable Domain Message is not a generic event bus/broker.
+- RuntimeStore semantics are public-to-core; concrete SQLite drivers are host bindings.
+- Projection is deterministic, declared-input-only, derived and non-authoritative; no Tool/Skill/external I/O inside Projection.
+- Missing required host capability or pinned package fails closed; semantic substitution is prohibited.
+- Script code is trusted target-compiled package code, not a hostile-code security sandbox.
+- AI provider/model orchestration remains outside DomainHarness.
 
 ## Canonical commands
 
-From repository root:
+Until the v0.2 workspace-scaffold task updates scripts, the repository-root v0.1 commands remain the baseline smoke commands:
 
 ```text
 npm ci
@@ -37,38 +43,37 @@ npm test
 npm pack -w @kaicreator/domain-harness
 ```
 
-`npm test` is the canonical package regression command and builds first, so the plain-ESM host regression executes on a clean checkout rather than being silently skipped.
+T-001 is responsible for freezing the v0.2 monorepo-wide canonical commands without weakening the existing package regression.
 
 ## Validation execution profile
 
 - Architecture/document review: GitHub exact-SHA evidence + repository documents.
-- Node/SQLite/worker/runtime validation: real Node Build Host required for final truth.
-- Tally + City Atlas cross-domain visible gates PASSed on historical visible candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39`; a successor Runtime candidate must rerun materially affected gates.
-- Supplemental public validation #41–#48 is complete; #42 dual-OS durability finished 750/750 PASS.
-- Hidden Validation remains owner-held and must not be replaced by public supplemental tests.
+- Node host: real Node Build Host for final truth.
+- Non-Node host: real React Native / Expo Android profile using Hermes + `expo-sqlite`; Node-based mocks are insufficient for PRD AC-42.
+- RuntimeStore and runtime semantic conformance suites must be shared across Node/Expo bindings.
+- Process/device restart validation is required for durable ACK/recovery claims.
+- Hidden Validation remains owner-held and separate from visible CI.
 
 ## CI profile
 
-`minimal`
+`minimal-per-task + version-closure-full`
 
-Minimal CI runs only clean-checkout install/lint/typecheck/canonical tests on pull requests and pushes to `main`. Expensive cross-platform, crash, soak, Critical Journey, cross-domain and Hidden Validation suites remain outside per-PR CI.
+- Task/PR CI proves the changed concern and required local regression only.
+- Expensive Expo device/emulator, process-kill, cross-host conformance, migration, package-retention and Hidden Validation run at version integration/closure gates unless a task's acceptance explicitly requires them earlier.
+- CI PASS is not Release Qualification PASS.
 
-`.woodpecker/verify.yaml` was merged by #59/#63. Static validation is PASS, but actual Woodpecker execution/status context is ENV-BLOCKED in #57 because this repository is not currently connected to a Woodpecker instance. CI PASS is independent evidence and MUST NOT be treated as complete Validation or Release Qualification.
+## Branch / task execution protocol
 
-`main` branch protection/ruleset setup is tracked by #56 and must use the real status context emitted after #57 is unblocked; do not guess the context name.
+- Version integration branch: `v0.2`.
+- Task branch: `v0.2_tNNN` (one concern per branch/PR).
+- A task starts only after all `Depends On` tasks are merged into `v0.2`.
+- Tasks marked parallel MAY run in separate conversations concurrently from the same dependency-complete `v0.2` checkpoint.
+- Each task must stay within its declared write set where practical; shared-file edits are deferred to integration tasks to reduce merge conflicts.
+- Task PR target is `v0.2`, not `main`.
+- `v0.2` merges to `main` only after version closure/release-qualification evidence.
 
 ## Release gates
 
 Release gates are derived in authority order from Frozen PRD → Frozen Architecture → Task acceptance → pinned standard defaults.
 
-Current release rule:
-
-1. merge only validated concern PRs into the version line;
-2. merge documentation/process closure concerns;
-3. freeze one exact successor candidate SHA;
-4. rerun materially affected visible exact-SHA release gates (#60);
-5. execute owner-held Hidden Validation on that exact candidate;
-6. verify no unresolved P0/P1 Runtime blocker;
-7. only then record `READY` and create any tag/release baseline.
-
-No historical or speculative gate may be promoted to mandatory without changing the appropriate frozen authority.
+No v0.2 release/tag is allowed until required G1–G34 evidence, exact-SHA visible closure, owner-held Hidden Validation, and no unresolved P0/P1 Runtime blocker are recorded.
