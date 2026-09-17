@@ -8,6 +8,7 @@ import type { LoadedHarness, WorkflowAst } from '../src/loader/ast.js';
 import { SqliteStore } from '../src/persistence/sqlite-store.js';
 import {
   RecoveryCompatibilityError,
+  RecoveryContinuationError,
   RecoveryLifecycle,
 } from '../src/recovery/index.js';
 import {
@@ -265,19 +266,34 @@ test('send applies definition lock before mutating a persisted waiting Run', asy
   assert.equal(store.listSteps('waiting-mismatch').length, 0);
 });
 
-test('terminal resume remains idempotent even after Harness definition changes', async () => {
+test('public resume rejects waiting and terminal Runs without mutation', async () => {
+  const waitingStore = new SqliteStore({ path: ':memory:' });
+  const waitingCtx = lifecycleFor(harness(waitingWorkflow()), waitingStore, new ToolRegistry(), 'waiting-run');
+  await waitingCtx.inner.start({ workflowId: 'main', input: {} });
+  await waitingCtx.inner.wait('waiting-run', { timeoutMs: 1000 });
+  const waitingBefore = structuredClone(waitingStore.getRun('waiting-run'));
+  await assert.rejects(
+    waitingCtx.recovery.resume('waiting-run'),
+    (error: unknown) => error instanceof RecoveryContinuationError
+      && error.reason === 'resume_not_running'
+      && error.status === 'waiting',
+  );
+  assert.deepEqual(waitingStore.getRun('waiting-run'), waitingBefore);
+
   const workflow = toolWorkflow();
-  const store = new SqliteStore({ path: ':memory:' });
+  const terminalStore = new SqliteStore({ path: ':memory:' });
   const tools = new ToolRegistry();
   tools.register('work', { effect: 'none', async execute() { return { ok: true }; } });
-
-  const original = lifecycleFor(harness(workflow, 'definition-a'), store, tools, 'terminal-run');
-  await original.inner.start({ workflowId: 'main', input: {} });
-  const completed = await original.inner.wait('terminal-run', { timeoutMs: 1000 });
+  const terminalCtx = lifecycleFor(harness(workflow), terminalStore, tools, 'terminal-run');
+  await terminalCtx.inner.start({ workflowId: 'main', input: {} });
+  const completed = await terminalCtx.inner.wait('terminal-run', { timeoutMs: 1000 });
   assert.equal(completed.status, 'completed');
-
-  const changed = lifecycleFor(harness(workflow, 'definition-b'), store, tools, 'unused');
-  const resumed = await changed.recovery.resume('terminal-run');
-  assert.equal(resumed.status, 'completed');
-  assert.deepEqual(resumed.output, { ok: true });
+  const terminalBefore = structuredClone(terminalStore.getRun('terminal-run'));
+  await assert.rejects(
+    terminalCtx.recovery.resume('terminal-run'),
+    (error: unknown) => error instanceof RecoveryContinuationError
+      && error.reason === 'resume_not_running'
+      && error.status === 'completed',
+  );
+  assert.deepEqual(terminalStore.getRun('terminal-run'), terminalBefore);
 });

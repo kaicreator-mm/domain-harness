@@ -9,7 +9,7 @@ import type {
 import type { LoadedHarness } from '../loader/ast.js';
 import { SqliteStore } from '../persistence/sqlite-store.js';
 import type { StoredRun } from '../persistence/types.js';
-import { RunLifecycle, toHarnessRun } from '../runner/run-lifecycle.js';
+import { RunLifecycle } from '../runner/run-lifecycle.js';
 
 export const CURRENT_EXECUTION_ENGINE_MAJOR = 5 as const;
 
@@ -30,6 +30,22 @@ export class RecoveryCompatibilityError extends Error {
     this.name = 'RecoveryCompatibilityError';
     this.reason = reason;
     this.runId = runId;
+  }
+}
+
+export type RecoveryContinuationReason = 'resume_not_running';
+
+export class RecoveryContinuationError extends Error {
+  readonly reason: RecoveryContinuationReason;
+  readonly runId: string;
+  readonly status: StoredRun['status'];
+
+  constructor(run: StoredRun) {
+    super(`Run '${run.runId}' is '${run.status}'; resume() accepts only persisted running Runs`);
+    this.name = 'RecoveryContinuationError';
+    this.reason = 'resume_not_running';
+    this.runId = run.runId;
+    this.status = run.status;
   }
 }
 
@@ -84,7 +100,7 @@ export class RecoveryLifecycle implements DomainHarness {
 
   async send(runId: string, event: ExternalEvent): Promise<HarnessRun> {
     const run = this.store.getRun(runId);
-    if (run) assertRunCompatible(run, this.harness);
+    if (run?.status === 'waiting') assertRunCompatible(run, this.harness);
     return this.lifecycle.send(runId, event);
   }
 
@@ -95,8 +111,7 @@ export class RecoveryLifecycle implements DomainHarness {
   async resume(runId: string): Promise<HarnessRun> {
     const run = this.store.getRun(runId);
     if (!run) return this.lifecycle.resume(runId);
-
-    if (isTerminal(run)) return toHarnessRun(run);
+    if (run.status !== 'running') throw new RecoveryContinuationError(run);
     assertRunCompatible(run, this.harness);
     return this.lifecycle.resume(runId);
   }
@@ -112,8 +127,4 @@ export class RecoveryLifecycle implements DomainHarness {
   listRuns(query?: ListRunsQuery): Promise<HarnessRun[]> {
     return this.lifecycle.listRuns(query);
   }
-}
-
-function isTerminal(run: StoredRun): boolean {
-  return run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled';
 }
