@@ -91,4 +91,69 @@ test('SkillExecutor assembles provider-neutral request and validates output', as
   assert.equal(captured?.skillId, 'score');
   assert.equal(captured?.profile, 'quality');
   assert.equal('provider' in (captured as unknown as Record<string, unknown>), false);
+  assert.deepEqual(
+    Object.keys(captured ?? {}).sort(),
+    ['identity', 'input', 'instructions', 'outputSchema', 'profile', 'resources', 'signal', 'skillId'],
+  );
+});
+
+test('invalid Tool output maps to invalid_output', async () => {
+  const registry = new ToolRegistry();
+  registry.register('bad-out', {
+    effect: 'none',
+    output: { type: 'object', required: ['value'], properties: { value: { type: 'number' } }, additionalProperties: false },
+    async execute() { return { wrong: true }; },
+  });
+  await assert.rejects(
+    registry.execute('bad-out', null, toolContext),
+    (error: unknown) => error instanceof ExecutorError && error.code === 'invalid_output',
+  );
+});
+
+test('late Tool completion after timeout is discarded', async () => {
+  const registry = new ToolRegistry();
+  registry.register('late', {
+    effect: 'none',
+    async execute() {
+      await new Promise((resolve) => { setTimeout(resolve, 120); });
+      return { late: true };
+    },
+  });
+  await assert.rejects(
+    registry.execute('late', null, toolContext, { timeoutMs: 15 }),
+    (error: unknown) => error instanceof ExecutorError && error.code === 'timeout',
+  );
+});
+
+test('Skill timeout rejects as timeout and aborts the downstream AI signal', async () => {
+  let downstreamAborted = false;
+  const port: AIOperationPort = {
+    async execute(request) {
+      await new Promise<void>((resolve) => {
+        request.signal.addEventListener('abort', () => {
+          downstreamAborted = true;
+          resolve();
+        }, { once: true });
+      });
+      return {};
+    },
+  };
+  const skill: SkillAst = {
+    id: 'slow-skill',
+    directory: '/harness/skills/slow-skill',
+    instructions: 'Hang until aborted.',
+    sidecar: { output: { schema: 'out.json' }, resources: [] },
+    inputSchema: { type: 'object' },
+    outputSchema: { type: 'object' },
+    resources: [],
+  };
+  const executor = new SkillExecutor(port);
+  await assert.rejects(
+    executor.execute(skill, {}, { runId: 'run-1', workflowInstanceId: 'root', stepId: 'slow#1', attempt: 1 }, {
+      signal: new AbortController().signal,
+      timeoutMs: 15,
+    }),
+    (error: unknown) => error instanceof ExecutorError && error.code === 'timeout',
+  );
+  assert.equal(downstreamAborted, true);
 });
