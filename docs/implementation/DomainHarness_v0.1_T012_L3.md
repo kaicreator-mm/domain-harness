@@ -18,7 +18,7 @@ T-012 is accepted only when tests cover:
 8. `definitionHash` mismatch rejects continuation before any journal/control/status mutation;
 9. `executionEngineMajor` mismatch rejects continuation before any journal/control/status mutation;
 10. `send()` on a persisted waiting Run applies the same compatibility gate before event validation/mutation;
-11. terminal Runs remain observable and terminal `resume()` remains idempotent without requiring the current Harness definition to match;
+11. public `resume()` rejects Runs whose persisted status is `waiting`, `completed`, `failed`, or `cancelled` with zero mutation, because frozen L2 §11 reserves `resume()` for persisted `running` Runs only;
 12. forced-process termination tests exercise durable boundaries using the same SQLite file across process restart.
 
 ## 2. Contract / interface
@@ -34,18 +34,18 @@ assertRunCompatible(run, harness)
 RecoveryLifecycle implements DomainHarness
 ```
 
-Compatibility is required only before a non-terminal Run can continue execution:
+Continuation rules are:
 
 ```text
-running + resume  → compatibility gate
-waiting + resume  → compatibility gate
-waiting + send    → compatibility gate
-terminal + resume → return terminal Run unchanged
+running + resume  → compatibility gate → resume
+waiting + resume  → reject; use send() for event continuation
+terminal + resume → reject; use get()/wait()/listRuns() for observation
+waiting + send    → compatibility gate → event validation/mutation
 get/list/wait     → observation only; no compatibility mutation gate
 cancel            → remains allowed so an incompatible non-terminal Run can still be terminated safely
 ```
 
-Mismatch is an API-level recovery rejection. It does not rewrite the persisted Run into `failed` and does not mutate its journal.
+Mismatch or invalid continuation is an API-level rejection. It does not rewrite the persisted Run into `failed` and does not mutate its journal.
 
 ## 3. Core implementation
 
@@ -55,16 +55,16 @@ Mismatch is an API-level recovery rejection. It does not rewrite the persisted R
 
 ```text
 start → RunLifecycle.start
-resume → load Run → terminal? return → assert compatible → RunLifecycle.resume
-send → load Run → require compatibility → RunLifecycle.send
+resume → load Run → require status=running → assert compatible → RunLifecycle.resume
+send → load Run → if waiting assert compatible → RunLifecycle.send
 wait/get/list/cancel → delegate
 ```
 
-The façade owns only restart compatibility authority. Step replay, child reconciliation, event acceptance and cancellation remain owned by the already-frozen lower layers.
+The façade owns only public restart/compatibility authority. Step replay, child reconciliation, event acceptance and cancellation remain owned by the already-frozen lower layers.
 
 ### 3.2 Definition lock
 
-For a persisted non-terminal Run:
+For a persisted Run that is allowed to continue:
 
 ```text
 run.definitionHash === loadedHarness.definitionHash
@@ -81,10 +81,12 @@ T-012 does not duplicate journal logic. Restart uses this order:
 
 ```text
 load persisted Run
+→ require status=running
 → compatibility gate
-→ if running: RunCoordinator / RunLifecycle resume
-→ if waiting: remain waiting until send
+→ RunCoordinator / RunLifecycle resume
 ```
+
+A persisted `waiting` Run does not use `resume()`; it remains waiting until a compatible accepted `send()`.
 
 The lower layers reconcile the durable state already proven in T-009–T-011:
 
@@ -117,16 +119,17 @@ The parent test reopens the exact same SQLite file and resumes with the exact sa
 
 | Durable state at restart | Result |
 |---|---|
-| definition mismatch | reject continuation; zero mutation |
-| engine-major mismatch | reject continuation; zero mutation |
+| definition mismatch on allowed continuation | reject continuation; zero mutation |
+| engine-major mismatch on allowed continuation | reject continuation; zero mutation |
 | running + no journal for active Step | normal new Step execution |
 | running + Step started | T-009 effect/replay matrix |
 | running + Step completed + control lag | reuse output, deterministic route, no rerun |
 | running + active child frame | resume child frame |
 | running + terminal child frame | reconcile parent Step/pop child |
-| running + control at waiting state | persist `waiting` |
+| running + control at waiting state | resume reconciles and persists `waiting` |
+| waiting + `resume()` | reject; zero mutation |
 | waiting + compatible `send()` | T-011 atomic event acceptance |
-| cancelled/completed/failed | terminal; no replay/mutation |
+| cancelled/completed/failed + `resume()` | reject; zero mutation |
 
 ## 6. Reference invariants
 
@@ -134,9 +137,11 @@ The parent test reopens the exact same SQLite file and resumes with the exact sa
 - Runtime-owned control state remains the portable control recovery contract; raw XState snapshot is never persisted as authority.
 - XState remains private.
 - Definition migration is absent from v0.1.
+- Public `resume()` is recovery only for persisted `running` Runs.
+- Waiting continuation uses `send()`, not `resume()`.
 - No automatic domain-level retry policy is added.
 - No distributed recovery coordinator, queue, server or storage abstraction is introduced.
-- Compatibility rejection is not a product-scope expansion and does not rewrite historical Run evidence.
+- Compatibility/continuation rejection is not a product-scope expansion and does not rewrite historical Run evidence.
 
 ## Gate
 
