@@ -15,6 +15,16 @@ test('policy rejects nondeterministic and dynamic-eval functions', () => {
   assert.throws(() => assertExpressionPolicy('$eval("1 + 1")'), /\$eval is forbidden/);
 });
 
+test('runtime normalizes policy failures to expression_error', async () => {
+  await assert.rejects(
+    runtime.evaluate('$random()', {}, clock),
+    (error: unknown) =>
+      error instanceof ExpressionRuntimeError &&
+      error.code === 'expression_error' &&
+      /\$random is forbidden/.test(error.message),
+  );
+});
+
 test('deterministic clock returns persisted logical time', async () => {
   assert.equal(await runtime.evaluate('$now()', {}, clock), clock);
   assert.equal(await runtime.evaluate('$millis()', {}, clock), Date.parse(clock));
@@ -37,6 +47,17 @@ test('route evaluation requires strict boolean', async () => {
   assert.equal(await runtime.evaluateBoolean('input.ok = true', { input: { ok: true } }, clock), true);
   await assert.rejects(
     runtime.evaluateBoolean('"truthy"', {}, clock),
+    (error: unknown) => error instanceof ExpressionRuntimeError && error.code === 'expression_error',
+  );
+});
+
+test('invalid resource bounds are rejected before Worker creation', async () => {
+  await assert.rejects(
+    runtime.evaluate('1', {}, clock, { maxInputBytes: 0 }),
+    (error: unknown) => error instanceof ExpressionRuntimeError && error.code === 'expression_error',
+  );
+  await assert.rejects(
+    runtime.evaluate('1', {}, clock, { maxOutputBytes: 0 }),
     (error: unknown) => error instanceof ExpressionRuntimeError && error.code === 'expression_error',
   );
 });
