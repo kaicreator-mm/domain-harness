@@ -16,8 +16,13 @@ export function deriveIdempotencyKey(identity: StepIdentity): string {
   return `dh:v0.1:${digest}`;
 }
 
+/**
+ * Frozen L2 semantics define maxSteps as Run-wide logical journal identities.
+ * Accepted waiting-event visits count exactly like executable Step visits.
+ * Recovery attempts reuse the same identity and therefore do not increase this count.
+ */
 export function countExecutableSteps(store: SqliteStore, runId: string): number {
-  return store.listSteps(runId).filter((step) => step.kind !== 'event').length;
+  return store.listSteps(runId).length;
 }
 
 export function incrementStartedAttempt(store: SqliteStore, identity: StepIdentity): StoredStep {
