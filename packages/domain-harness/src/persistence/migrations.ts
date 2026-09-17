@@ -47,4 +47,37 @@ CREATE INDEX idx_steps_run_started_at
   ON steps(run_id, started_at);
 `,
   },
+  {
+    version: 2,
+    sql: `
+CREATE TRIGGER ignore_terminal_run_updates
+BEFORE UPDATE ON runs
+WHEN OLD.status IN ('completed','failed','cancelled')
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+
+CREATE TRIGGER ignore_step_inserts_after_run_terminal
+BEFORE INSERT ON steps
+WHEN EXISTS (
+  SELECT 1 FROM runs
+  WHERE run_id = NEW.run_id
+    AND status IN ('completed','failed','cancelled')
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+
+CREATE TRIGGER ignore_step_updates_after_run_terminal
+BEFORE UPDATE ON steps
+WHEN EXISTS (
+  SELECT 1 FROM runs
+  WHERE run_id = NEW.run_id
+    AND status IN ('completed','failed','cancelled')
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+`,
+  },
 ] as const;
