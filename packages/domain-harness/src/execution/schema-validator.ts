@@ -1,5 +1,5 @@
 import type { ErrorObject, ValidateFunction } from 'ajv';
-import Ajv2020 from 'ajv/dist/2020.js';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 
 import type { JsonSchema, JsonValue } from '../contracts/json.js';
 import { ExecutorError, type ExecutorErrorCode } from './executor-error.js';
