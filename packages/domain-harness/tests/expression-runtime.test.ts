@@ -70,3 +70,34 @@ test('abort maps to cancelled', async () => {
     (error: unknown) => error instanceof ExpressionRuntimeError && error.code === 'cancelled',
   );
 });
+
+test('oversized input is rejected before Worker execution', async () => {
+  await assert.rejects(
+    runtime.evaluate('1', { blob: 'x'.repeat(64) }, clock, { maxInputBytes: 32 }),
+    (error: unknown) =>
+      error instanceof ExpressionRuntimeError &&
+      error.code === 'expression_error' &&
+      /maxInputBytes/.test(error.message),
+  );
+});
+
+test('oversized output is rejected at the serialized JSON boundary', async () => {
+  await assert.rejects(
+    runtime.evaluate('"0123456789ABCDEF"', {}, clock, { maxOutputBytes: 8 }),
+    (error: unknown) =>
+      error instanceof ExpressionRuntimeError &&
+      error.code === 'expression_error' &&
+      /maxOutputBytes/.test(error.message),
+  );
+});
+
+test('hard Worker timeout terminates runaway evaluation', async () => {
+  const scope = { input: { items: Array.from({ length: 100000 }, (_, index) => index) } };
+  await assert.rejects(
+    runtime.evaluate('$reduce(input.items, function($acc, $v) { $acc & "x" })', scope, clock, {
+      timeoutMs: 50,
+      maxInputBytes: 2_000_000,
+    }),
+    (error: unknown) => error instanceof ExpressionRuntimeError && error.code === 'timeout',
+  );
+});
