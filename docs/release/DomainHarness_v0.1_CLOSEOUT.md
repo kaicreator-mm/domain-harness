@@ -4,87 +4,93 @@
 **Package:** `@kaicreator/domain-harness`  
 **Version:** v0.1  
 **Current verdict:** **BLOCKED**  
-**Reason:** final successor candidate has not completed its exact-SHA visible rerun or owner-held Hidden Validation
+**Reason:** final successor visible-gate rerun and owner-held Hidden Validation remain; Woodpecker runtime integration/branch protection are environment/admin follow-ups
 
 ## 1. Frozen authorities
 
-- Product authority: `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`.
-- Frozen PRD SHA-256: `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`.
-- Architecture: `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
+- Product authority: `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`, SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`.
+- Architecture authority: `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
 - Architecture baseline: `819e6587a5d4877b69a506f2259a0a35b4c38aff`.
 - Standard revision: `0446f04583f6cf464c835f26e2f657c8b703cb4e`.
 - Terminal Task DAG: `docs/implementation/DomainHarness_v0.1_TASK_DAG.md`.
 
-The PRD was imported byte-for-byte via #54/#55; closeout must not rewrite it or reopen scope.
+No closeout action may reopen the frozen product scope merely to simplify validation or packaging.
 
 ## 2. Implementation state
 
-T-001 through T-017 are complete. Frozen v0.1 functionality includes the embedded TypeScript SDK, private XState v5 control adapter, Harness asset loading/validation, five Step kinds, SQLite journal/recovery, waiting lifecycle, definition/engine lock and package-root SDK.
+T-001 through T-017 are complete. The v0.1 implementation includes the embedded SDK, private XState control adapter, Harness loading/validation, all five Step kinds, SQLite journal/recovery, lifecycle operations, definition/engine lock, packaging and cross-domain validation assets.
 
 ## 3. Historical visible-qualified candidate
 
-`edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates recorded in #39, including Tally, City Atlas, clean package/consumer regression, Critical Journey and focused recovery/Worker suites. It remains historical evidence, not the intended final candidate after the post-candidate hardening.
+`edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed Tally, City Atlas, clean package/consumer, Critical Journey, process-kill recovery and the visible exact-SHA regression/package gates.
 
-## 4. Post-candidate audit work completed
+Post-candidate review then found focused quality/test/process gaps, so that historical SHA is not the final release candidate.
 
-- **#49 / PR #50 / #51:** definitionHash relocation stability, frozen Script bytes and canonical asset containment — focused Build Host validation PASS; merged into `v0.1` as `1a4ad8ea17cc1e5ac81d138b41364ea95b5ac56e`.
-- **PR #52 / #53:** canonical `npm test` now builds first and executes the plain-ESM host regression — clean checkout 113/113 PASS, 0 skip; merged as `b930c1bd39aae933d25e59c1ed99b1534f9ea7c1`.
-- **#54 / PR #55:** frozen PRD imported byte-for-byte with checksum verified; merged as `3acacf447c4510733e38881310679c823061664f`.
+## 4. Post-candidate audit closure
 
-## 5. Documentation / CI / repository process
+Completed and merged into `v0.1`:
 
-- documentation reconciliation: #58 / `v0.1_docs_closure`;
-- minimal Woodpecker workflow: #59 / PR #63;
-- actual Woodpecker run + emitted GitHub status context: #57;
-- `main` branch protection/ruleset: #56, requires repository admin action after #57 establishes the real context.
+- #49 / PR #50 / #51 — definitionHash relocation stability, frozen Script bytes, canonical asset containment; focused Build Host validation PASS;
+- PR #52 / #53 — canonical `npm test` builds first and executes plain-ESM host regression; 113/113 PASS, 0 skipped;
+- #54 / PR #55 — frozen PRD imported byte-for-byte and checksum verified;
+- #42 — Windows NTFS 375/375 + Linux ext4 375/375 abrupt-kill matrix PASS, total 750/750;
+- #59 / PR #63 — minimal Woodpecker workflow merged to the version line.
 
-Minimal CI is intentionally limited to clean checkout install, lint, typecheck and canonical tests. Cross-platform crash/soak/cross-domain/Hidden Validation remain outside per-PR CI.
+Repository/process follow-ups:
 
-## 6. Remaining release gates
+- #57 — Woodpecker workflow static validation PASS, but actual execution is **ENV-BLOCKED** because the repository is not currently connected to a Woodpecker instance. The emitted status context is therefore unknown.
+- #56 — `main` branch protection/ruleset requires repository admin action after #57 establishes the real Woodpecker context.
 
-Before `READY`:
+These two process items do not change Runtime semantics, but they remain open repository-hardening tasks.
 
-1. merge docs/process concerns;
-2. freeze one exact successor `v0.1` SHA;
-3. execute #60 on that exact SHA, including clean package/consumer, quality/definition-lock, Script/Expression, recovery/process-crash and Tally/City Atlas affected gates;
-4. complete or explicitly disposition supplemental #42 without claiming a Linux/ext4 PASS until evidence exists;
-5. execute owner-held Hidden Validation on the exact successor candidate;
-6. verify no unresolved P0/P1 release blocker;
-7. update this file to `READY` only with exact evidence;
-8. then integrate/freeze the final baseline and create the release tag if authorized.
+## 5. Final successor candidate gates
 
-## 7. Hidden Validation
+After documentation closure merges, freeze one exact `v0.1` successor SHA and execute #60 against that SHA:
 
-```text
-NOT_RUN — owner-held case set
-```
+1. clean install, lint, typecheck, canonical tests and package;
+2. plain Node tarball consumer;
+3. quality/definition-lock and Loader regressions;
+4. Script/Expression Worker suites;
+5. recovery/process-crash suites;
+6. Tally runner;
+7. City Atlas runner;
+8. verify no unresolved P0/P1 Runtime blocker.
 
-Public supplemental tests are not substitutes. A Hidden Validation defect invalidates the candidate and requires a focused fix plus affected-gate reruns.
+Any product defect invalidates the candidate and creates another small fix/validation cycle.
 
-## 8. Supplemental durability status
+## 6. Hidden Validation
 
-#42 was reopened during audit because its own completion criterion requires both Windows and Linux. Recorded evidence currently proves Windows NTFS 375/375; Linux/ext4 must be appended before #42 may close as a two-OS PASS.
+Status: **NOT_RUN — owner-held case set**.
 
-## 9. Known v0.1 boundaries
+Run only after #60 passes on the final exact successor SHA. Public supplemental tests are not substitutes. A Hidden Validation defect invalidates the candidate and requires a new candidate plus affected-gate reruns.
 
-Intentional non-goals remain: Static Parallel Composition, generic DAG Runtime, dynamic spawn, full hierarchical XState DSL/history, distributed/server control plane, PostgreSQL/storage abstraction/ORM, generic Admin Console/visual designer, hostile-code Script sandbox; Child Workflow remains same-Harness only.
+## 7. Release artifacts / tag
 
-## 10. Current verdict
+No v0.1 release tag or publish authorization is recorded yet. The canonical release identity must be the exact final commit SHA; a human-friendly tag is an alias only.
+
+## 8. Known v0.1 boundaries
+
+Intentional non-goals remain unchanged: no Static Parallel Composition, generic DAG Runtime, dynamic spawn, full XState DSL/history, distributed execution/server, PostgreSQL/storage abstraction/ORM, generic Admin Console/visual designer or hostile-code Script sandbox. Child Workflow remains same-Harness only.
+
+## 9. Current closeout verdict
 
 ```text
 Product scope: FROZEN
-PRD provenance: COMPLETE / checksum verified
 Architecture: FROZEN
 Implementation T-001..T-017: COMPLETE
-Historical candidate edbe2b5: VISIBLE GATES PASS
-Post-candidate quality hardening: MERGED / focused PASS
-Canonical test-flow hardening: MERGED / PASS
-Docs/process closure: IN PROGRESS
+Historical visible candidate edbe2b5: VISIBLE GATES PASS
+Post-candidate quality/test hardening: COMPLETE / MERGED
+Frozen PRD provenance: COMPLETE / MERGED
+Supplemental durability #42: PASS 750/750
+Minimal Woodpecker configuration: MERGED
+Woodpecker actual run #57: ENV-BLOCKED
+Branch protection #56: PENDING ADMIN ACTION
+Documentation closure #58: IN PROGRESS
 Exact final successor candidate: NOT YET FROZEN
-Successor visible rerun: NOT_RUN
+Visible successor regression #60: NOT_RUN
 Hidden Validation: NOT_RUN
 Release Qualification: BLOCKED
 Tag/publish authorization: NO
 ```
 
-`BLOCKED` remains the only valid release verdict until the remaining gates complete.
+This document may change to `READY` only after the exact successor candidate passes #60 and owner-held Hidden Validation with no unresolved P0/P1 Runtime blocker.
