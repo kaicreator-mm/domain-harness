@@ -22,6 +22,7 @@ export interface ControlTransitionResult {
 }
 
 const ROUTE_EVENT_PREFIX = '@@domain-harness/route';
+const COMPILED_ROUTE_EVENTS = new WeakMap<AnyStateMachine, Map<string, Set<string>>>();
 
 export function routeEventType(selection: RouteSelection): string {
   if (!Number.isInteger(selection.routeIndex) || selection.routeIndex < 0) {
@@ -56,10 +57,12 @@ function addRoutes(
 
 export function compileControlMachine(workflow: WorkflowAst): AnyStateMachine {
   const states: Record<string, Record<string, unknown>> = {};
+  const compiledEvents = new Map<string, Set<string>>();
 
   for (const state of Object.values(workflow.states)) {
     if (state.final) {
       states[state.id] = { type: 'final' };
+      compiledEvents.set(state.id, new Set());
       continue;
     }
 
@@ -81,13 +84,16 @@ export function compileControlMachine(workflow: WorkflowAst): AnyStateMachine {
     }
 
     states[state.id] = Object.keys(on).length > 0 ? { on } : {};
+    compiledEvents.set(state.id, new Set(Object.keys(on)));
   }
 
-  return createMachine({
+  const machine = createMachine({
     id: `domain-harness:${workflow.id}`,
     initial: workflow.initial,
     states,
   });
+  COMPILED_ROUTE_EVENTS.set(machine, compiledEvents);
+  return machine;
 }
 
 export function initialControlState(machine: AnyStateMachine): ControlTransitionResult {
@@ -106,18 +112,16 @@ export function transitionControlState(
     );
   }
 
-  const snapshot = machine.resolveState({ value: currentStateId, context: undefined });
-  const [nextSnapshot] = transition(machine, snapshot, {
-    type: routeEventType(selection),
-  });
-
-  const result = normalizeSnapshot(nextSnapshot);
-  if (result.stateId === currentStateId) {
+  const eventType = routeEventType(selection);
+  if (!COMPILED_ROUTE_EVENTS.get(machine)?.get(currentStateId)?.has(eventType)) {
     throw new Error(
       `no compiled route for ${selection.routeClass} index ${selection.routeIndex} from ${currentStateId}`,
     );
   }
-  return result;
+
+  const snapshot = machine.resolveState({ value: currentStateId, context: undefined });
+  const [nextSnapshot] = transition(machine, snapshot, { type: eventType });
+  return normalizeSnapshot(nextSnapshot);
 }
 
 function normalizeSnapshot(snapshot: {
