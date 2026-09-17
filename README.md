@@ -74,6 +74,13 @@ v0.1 intentionally excludes static parallel composition, generic DAG execution, 
 
 ## Current release state
 
-Historical candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate definition-lock/Script hardening (#49/#50/#51), canonical test-flow hardening (#52/#53) and frozen PRD provenance (#54/#55) are now merged into the version line.
+The historical visible candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate quality hardening (#49/#50/#51), canonical test-flow hardening (#52/#53), frozen PRD provenance (#54/#55), supplemental dual-OS durability #42, and the minimal Woodpecker configuration (#59/#63) are complete.
 
-Documentation/CI process closure, the exact successor visible-gate rerun (#60), supplemental #42 Linux/ext4 completion/disposition and owner-held Hidden Validation remain before release qualification. v0.1 is therefore **not yet authorized for tag/publish/release**.
+Remaining before release qualification:
+
+- merge the documentation closure concern (#58);
+- freeze the exact successor SHA and execute visible rerun #60;
+- run owner-held Hidden Validation;
+- #57/#56 remain repository-process follow-ups because this repository is not yet connected to Woodpecker and `main` protection cannot require an unknown status context.
+
+Therefore v0.1 is **not yet authorized for tag/publish/release**.
