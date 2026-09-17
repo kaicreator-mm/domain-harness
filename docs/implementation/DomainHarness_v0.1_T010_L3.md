@@ -18,13 +18,13 @@ The implementation is accepted only when tests cover:
 5. completed child internal Steps are reused after recovery and are not replayed.
 6. crash after parent Step journal `started` but before child-frame push reconstructs/pushes the same deterministic child frame.
 7. crash while a child frame is active resumes the existing frame instead of creating a second child or restarting completed internal Steps.
-8. successful child terminal evaluates child `workflow.output`, completes the parent workflow Step with that output, pops the child frame, and advances the parent route.
-9. child `failed` terminal maps to parent `error.code=child_workflow_error` and follows parent `on.error`.
+8. successful child terminal evaluates child `workflow.output`, completes the parent workflow Step with that output, pops the child frame, then lets the normal T-009 lagging-control path advance the parent route.
+9. child `failed` terminal maps to parent `error.code=child_workflow_error` and follows parent `on.error` through the same T-009 path.
 10. child output-evaluation failure also fails the parent workflow Step as `child_workflow_error` with the child cause recorded in error details.
 11. parent workflow Step is one logical `maxSteps` entry while child internal executable Steps are independently journaled and counted.
 12. runtime recursion defence rejects a child workflow already present in the active frame stack even though loader cycle validation is the primary gate.
 13. runtime child-depth defence rejects a push beyond the internal v0.1 maximum.
-14. child-terminal reconciliation commits parent Step completion/failure + child-frame pop + parent control transition in one SQLite transaction.
+14. child-terminal reconciliation commits parent Step completion/failure + child-frame pop in one SQLite transaction; the parent frame intentionally remains at the invoking state until normal journal/control reconciliation advances it.
 
 ## 2. Contract / interface
 
@@ -88,15 +88,17 @@ so T-009 replay rules apply unchanged.
 ```text
 child reaches successful final
 → evaluate child workflow.output using child scope + child lastDecisionAt
-→ construct parent Step outcome(output)
-→ evaluate parent on.done route using parent Step startedAt
-→ compute parent XState transition
 → ONE SQLite transaction:
    - complete parent workflow Step with child output
    - pop child frame
-   - advance parent frame + visits + lastDecisionAt
-→ continue Runner loop
+   - leave parent frame at the invoking state
+→ outer Runner loop observes parent journal=completed + parent control still at source
+→ normal T-009 reconciliation reuses persisted child output
+→ evaluate parent on.done route using parent Step startedAt
+→ advance parent control state
 ```
+
+This intentionally reuses the same recovery path as every other completed Step instead of introducing a second parent-transition algorithm for Child Workflows.
 
 ### 3.4 Child terminal failure
 
@@ -104,11 +106,13 @@ child reaches successful final
 child reaches final state `failed`
 → create parent HarnessError(code=child_workflow_error)
 → include child workflow/instance and child cause in details when available
-→ evaluate parent on.error route using parent Step startedAt
 → ONE SQLite transaction:
    - fail parent workflow Step
    - pop child frame
-   - advance parent frame through selected error route
+   - leave parent frame at the invoking state
+→ outer Runner loop observes parent journal=failed
+→ normal T-009 error reconciliation evaluates parent on.error using parent Step startedAt
+→ advance parent control state
 ```
 
 A child output-expression failure follows the same parent `child_workflow_error` path.
@@ -121,10 +125,11 @@ A child output-expression failure follows the same parent `child_workflow_error`
 | after parent Step started, before frame push | parent started, no child frame | derive same child id and push child initial frame |
 | while child Step is started | parent started + child frame + child journal | T-009 replay matrix for child Step |
 | after child internal Step completed, before child control advance | child journal completed + child frame lagging | reuse child output and recompute deterministic route |
-| child terminal before reconciliation transaction | terminal child frame + parent started | deterministically recompute child result/parent route and commit reconciliation |
-| after reconciliation transaction | parent Step terminal + child popped + parent advanced | continue parent; child is not re-entered |
+| child terminal before reconciliation transaction | terminal child frame + parent started | deterministically recompute child result and retry reconciliation |
+| after reconciliation transaction, before parent route | parent Step terminal + child popped + parent control lagging | T-009 completed/failed journal reconciliation; child is not re-entered |
+| after parent route/control commit | parent Step terminal + parent advanced | continue parent normally |
 
-The child-terminal transaction MUST NOT include external Tool/AI/Worker execution. All route/output expression evaluation occurs before the transaction.
+The child-terminal transaction MUST NOT include external Tool/AI/Worker execution or route evaluation. Child `workflow.output` is evaluated before the transaction; parent route evaluation deliberately occurs after the transaction through T-009 reconciliation.
 
 ## 5. Depth and recursion defence
 
