@@ -8,7 +8,7 @@ This directory contains the formal product, architecture, implementation, SDK, v
 2. `architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
 3. `implementation/DomainHarness_v0.1_TASK_DAG.md` plus task-specific L3 evidence.
 4. Public contracts/tests under `packages/domain-harness/`.
-5. Consumer SDK documentation under `sdk/`, derived from the public contracts and current v0.1 source line.
+5. Consumer SDK documentation under `sdk/`, derived from the public contracts and current v0.1 implementation.
 6. Exact-SHA validation evidence in `validation/` and linked GitHub Issues.
 7. `release/DomainHarness_v0.1_CLOSEOUT.md` for the current release decision.
 
@@ -43,14 +43,16 @@ Until v0.1 is formally release-qualified/tagged, consumers should pin an exact D
 
 ## Current status
 
-Implementation tasks T-001..T-017 are complete. Historical candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate definition-lock/Script hardening, canonical test-flow hardening, frozen PRD repository provenance, dual-OS durability, documentation closure and minimal Woodpecker configuration are complete on the `v0.1` line.
+Implementation tasks T-001..T-017 are complete. Post-candidate definition-lock/Script hardening, canonical test-flow hardening, frozen PRD provenance, dual-OS durability, documentation/process closure, minimal Woodpecker configuration and SDK/Agent documentation are complete on the `v0.1` line.
 
-The repository is not yet connected to a Woodpecker instance, so actual CI execution/status context is ENV-BLOCKED (#57) and `main` branch protection remains an admin follow-up (#56).
+The executable/package tree at `1835f3f31ca483dc7bd997a545391f622d38be63` passed #60 with **117/117 tests, 0 skipped**, package/plain-Node consumer validation, focused recovery/Worker/definition-lock suites and both Tally/City Atlas external runners. Later SDK documentation-only commits have no Runtime/package/test/dependency changes; #60 and #39 record the explicit validation carry-forward based on Git diff/tree equivalence.
 
-After any consumer-documentation concern is merged, the exact successor candidate for #60 must be updated to the resulting `v0.1` SHA. Final successor visible regression #60 and owner-held Hidden Validation remain release gates.
+The repository is not yet connected to a Woodpecker instance, so actual CI execution/status context is ENV-BLOCKED (#57) and `main` branch protection remains an admin follow-up (#56). These are repository-process items, not Runtime failures.
 
-No document should describe v0.1 as `READY` until the final exact successor SHA passes required visible gates and Hidden Validation.
+Owner-held Hidden Validation remains the mandatory Release Qualification gate. #39 tracks the final intended version-line SHA and release decision.
+
+No document should describe v0.1 as `READY` until Hidden Validation passes and the final validated version line is integrated to `main` according to the release-closeout policy.
 
 ## Stale evidence policy
 
-Historical prompts/blocker files may describe the state at the time they were created. They do not override the terminal Task DAG, current Validation Report, GitHub Issue state or Release Closeout. One-off blocker/status files retained for audit must be clearly treated as superseded historical evidence.
+Historical prompts/blocker files may describe the state at the time they were created. They do not override the terminal Task DAG, current Validation Report, GitHub Issue state or Release Closeout. One-off blocker/status files retained for audit must be treated as superseded historical evidence when current records disagree.
