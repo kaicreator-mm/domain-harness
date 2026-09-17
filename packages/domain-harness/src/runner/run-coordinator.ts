@@ -316,7 +316,7 @@ export class RunCoordinator {
       if (!step) throw new Error('Step was not persisted after insert');
     } else {
       logicalTime = step.startedAt;
-      input = (step.input ?? this.frameInput(run, frame)) as JsonValue;
+      input = (step.input === undefined ? this.frameInput(run, frame) : step.input) as JsonValue;
       if (invoke.kind !== 'workflow') {
         step = incrementStartedAttempt(this.store, identity);
       }
