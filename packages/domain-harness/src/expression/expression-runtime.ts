@@ -1,7 +1,15 @@
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { Worker, type ResourceLimits } from 'node:worker_threads';
 
 import type { JsonValue } from '../contracts/json.js';
 import { assertExpressionPolicy } from './policy.js';
+
+const require = createRequire(import.meta.url);
+
+// Resolve through the SDK's own module context so eval Workers never depend
+// on the host process's working directory or its node_modules layout.
+const JSONATA_ENTRY_URL = pathToFileURL(require.resolve('jsonata')).href;
 
 export type ExpressionRuntimeErrorCode = 'expression_error' | 'timeout' | 'cancelled';
 
@@ -52,7 +60,7 @@ function jsonOnly(value) {
   // this eval'd source; a bare require() only works under CommonJS hosts.
   const { parentPort, workerData } = await import('node:worker_threads');
   try {
-    const module = await import('jsonata');
+    const module = await import(workerData.jsonataUrl);
     const jsonata = module.default ?? module;
     const expression = jsonata(workerData.expression, {
       timeout: workerData.timeoutMs,
@@ -136,6 +144,7 @@ export class ExpressionRuntime {
             clockIso,
             timeoutMs,
             maxOutputBytes,
+            jsonataUrl: JSONATA_ENTRY_URL,
           },
         });
       } catch (error) {

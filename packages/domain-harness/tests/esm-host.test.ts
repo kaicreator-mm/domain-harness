@@ -58,7 +58,9 @@ test('Expression and Script Workers run under a plain-ESM host process', async (
     const { stdout } = await execFileAsync(
       process.execPath,
       ['--input-type=module', '-e', childScript],
-      { timeout: 30_000 },
+      // Run from a directory with no node_modules so bare-specifier resolution
+      // inside eval Workers cannot accidentally depend on the host's layout.
+      { timeout: 30_000, cwd: dir },
     );
     assert.match(stdout, /ESM_HOST_OK/);
   } finally {
