@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -12,11 +11,7 @@ const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distEntry = join(packageRoot, 'dist', 'index.js');
 
-test('Expression and Script Workers run under a plain-ESM host process', async (t) => {
-  if (!existsSync(distEntry)) {
-    t.skip('dist/index.js is not built; run npm run build to execute this regression');
-    return;
-  }
+test('Expression and Script Workers run under a plain-ESM host process', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'domain-harness-esm-host-'));
   try {
     const root = join(dir, 'harness');
