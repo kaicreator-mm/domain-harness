@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { dirname, resolve } from 'node:path';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -67,4 +69,55 @@ test('pre-aborted signal maps to cancelled', async () => {
     executor.execute('tests/fixtures/scripts/echo.mjs', {}, options({ signal: controller.signal })),
     (error: unknown) => error instanceof ScriptExecutorError && error.code === 'cancelled',
   );
+});
+
+test('linked Scripts resolving outside Harness root are rejected', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'domain-harness-link-'));
+  try {
+    const outsideDir = join(dir, 'outside');
+    await mkdir(outsideDir);
+    await writeFile(join(outsideDir, 'script.mjs'), 'export default async () => ({ escaped: true });\n');
+    const root = join(dir, 'root');
+    await mkdir(root);
+
+    let fileLink = false;
+    let dirLink = false;
+    try {
+      await symlink(join(outsideDir, 'script.mjs'), join(root, 'file-link.mjs'), 'file');
+      fileLink = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
+    }
+    try {
+      await symlink(outsideDir, join(root, 'dir-link'), 'junction');
+      dirLink = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
+    }
+    if (!fileLink && !dirLink) {
+      t.skip('platform cannot create file symlinks or junctions');
+      return;
+    }
+
+    if (fileLink) {
+      await assert.rejects(
+        executor.execute('file-link.mjs', {}, options({ harnessRoot: root })),
+        (error: unknown) =>
+          error instanceof ScriptExecutorError &&
+          error.code === 'script_error' &&
+          /escapes Harness root/.test(error.message),
+      );
+    }
+    if (dirLink) {
+      await assert.rejects(
+        executor.execute('dir-link/script.mjs', {}, options({ harnessRoot: root })),
+        (error: unknown) =>
+          error instanceof ScriptExecutorError &&
+          error.code === 'script_error' &&
+          /escapes Harness root/.test(error.message),
+      );
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
