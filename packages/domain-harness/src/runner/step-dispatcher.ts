@@ -6,23 +6,6 @@ import { ExecutorError, SkillExecutor, ToolRegistry } from '../execution/index.j
 import type { InvokeAst } from '../loader/ast.js';
 import { ScriptExecutor, ScriptExecutorError } from '../script/index.js';
 
-export interface WorkflowStepExecution {
-  workflowId: string;
-  input: JsonValue;
-  runId: string;
-  parentWorkflowInstanceId: string;
-  parentStateId: string;
-  parentVisit: number;
-  attempt: number;
-  startedAt: string;
-  signal: AbortSignal;
-  timeoutMs?: number;
-}
-
-export interface WorkflowStepHandler {
-  execute(request: WorkflowStepExecution): Promise<JsonValue>;
-}
-
 export interface StepDispatchRequest {
   invoke: InvokeAst;
   input: JsonValue;
@@ -45,7 +28,6 @@ export class StepDispatcher {
     private readonly tools: ToolRegistry,
     private readonly skills: SkillExecutor,
     private readonly skillLookup: (skillId: string) => import('../loader/ast.js').SkillAst | undefined,
-    private readonly workflowHandler?: WorkflowStepHandler,
   ) {}
 
   async execute(request: StepDispatchRequest): Promise<JsonValue> {
@@ -110,22 +92,10 @@ export class StepDispatcher {
         );
       }
       case 'workflow': {
-        if (!invoke.ref) throw new Error('Workflow Step is missing ref');
-        if (!this.workflowHandler) {
-          throw new RunnerExecutionError('child_workflow_error', 'Child Workflow handler is not installed');
-        }
-        return this.workflowHandler.execute({
-          workflowId: invoke.ref,
-          input: request.input,
-          runId: request.runId,
-          parentWorkflowInstanceId: request.workflowInstanceId,
-          parentStateId: request.stateId,
-          parentVisit: request.visit,
-          attempt: request.attempt,
-          startedAt: request.startedAt,
-          signal: request.signal,
-          ...(invoke.timeoutMs !== undefined ? { timeoutMs: invoke.timeoutMs } : {}),
-        });
+        throw new RunnerExecutionError(
+          'child_workflow_error',
+          'Workflow Steps are coordinated by RunCoordinator and must not reach StepDispatcher',
+        );
       }
     }
   }
