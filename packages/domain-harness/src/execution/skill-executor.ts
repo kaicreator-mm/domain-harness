@@ -28,7 +28,10 @@ export class SkillExecutor {
     );
 
     const result = await runAbortable(
-      { signal: options.signal, timeoutMs: options.timeoutMs },
+      {
+        signal: options.signal,
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      },
       'ai_error',
       `Skill '${skill.id}'`,
       async (signal) => {
