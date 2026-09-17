@@ -1,5 +1,5 @@
 import { readFile, readdir, realpath, stat } from 'node:fs/promises';
-import { basename, extname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
+import { basename, extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import jsonata from 'jsonata';
 import { parse } from 'yaml';
@@ -36,7 +36,7 @@ export interface LoadHarnessOptions {
 
 function assertContained(root: string, candidate: string, ref: string): void {
   const rel = relative(root, candidate);
-  if (rel.startsWith('..') || isAbsolute(rel)) {
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
     throw new Error(`path escapes Harness root: ${ref}`);
   }
 }

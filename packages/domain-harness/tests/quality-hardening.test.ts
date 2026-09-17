@@ -7,10 +7,15 @@ import { fileURLToPath } from 'node:url';
 
 import { createDomainHarness } from '../src/index.js';
 import { loadHarness } from '../src/loader/index.js';
+import { HarnessDefinitionError } from '../src/loader/static-validation.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const basicFixture = join(here, 'fixtures', 'basic-harness');
 const noopAi = { async execute() { return {}; } };
+
+function hasDefinitionIssue(error: unknown, pattern: RegExp): boolean {
+  return error instanceof HarnessDefinitionError && error.issues.some((issue) => pattern.test(issue));
+}
 
 test('definitionHash is stable when identical Harness assets move to another root', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'domain-harness-hash-relocation-'));
@@ -103,7 +108,37 @@ test('Loader rejects a referenced Script whose real path escapes Harness root', 
 
     await assert.rejects(
       () => loadHarness({ root, registeredTools: new Set() }),
-      (error: unknown) => error instanceof Error && /path escapes Harness root/.test(error.message),
+      (error: unknown) => hasDefinitionIssue(error, /path escapes Harness root/),
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('Loader rejects Skill resources whose real path escapes the Skill directory', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'domain-harness-skill-link-'));
+  try {
+    const root = join(dir, 'harness');
+    await cp(basicFixture, root, { recursive: true });
+    const skillDir = join(root, 'skills', 'generate');
+    const outsideRefs = join(dir, 'outside-refs');
+    await mkdir(outsideRefs, { recursive: true });
+    await writeFile(join(outsideRefs, 'example.md'), 'outside root content\n', 'utf8');
+    await rm(join(skillDir, 'refs'), { recursive: true, force: true });
+
+    try {
+      await symlink(outsideRefs, join(skillDir, 'refs'), 'junction');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') {
+        t.skip('platform cannot create a junction/symlink for containment regression');
+        return;
+      }
+      throw error;
+    }
+
+    await assert.rejects(
+      () => loadHarness({ root, registeredTools: new Set() }),
+      (error: unknown) => hasDefinitionIssue(error, /path escapes Harness root/),
     );
   } finally {
     await rm(dir, { recursive: true, force: true });
