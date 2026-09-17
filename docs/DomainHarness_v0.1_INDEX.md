@@ -4,7 +4,7 @@
 **Architecture:** FROZEN  
 **Task DAG:** CLOSED — T-001..T-017 complete  
 **Version integration branch:** `v0.1`  
-**Release status:** BLOCKED — final successor visible rerun and Hidden Validation remain
+**Release status:** BLOCKED — owner-held Hidden Validation remains
 
 ## Authority order
 
@@ -52,7 +52,7 @@ XState, SQLite schema/store, Runner, recovery coordinator and internal module pa
 
 ### Downstream Agent rule
 
-Do not ask an Agent merely to “convert the project to DomainHarness”. Give it the exact DomainHarness SHA, SDK Reference, Agent Migration Guide, downstream project authority and one Critical Journey. Require a migration map and Tool effect classification before implementation.
+Do not ask an Agent merely to “convert the project to DomainHarness”. Give it an exact DomainHarness SHA, SDK Reference, Agent Migration Guide, downstream project authority and one Critical Journey. Require a migration map and Tool effect classification before implementation.
 
 Until release/tag authorization, downstream consumers should pin an exact DomainHarness SHA/tarball. A moving `v0.1` branch is not a released dependency.
 
@@ -77,19 +77,21 @@ Task completion is separate from Release Qualification.
 ## Validation and closeout
 
 - T-014 synthetic Critical Journey: PASS;
-- T-015 Tally external validation: PASS on historical visible candidate;
-- T-016 City Atlas external validation: PASS on historical visible candidate;
+- T-015 Tally external validation: PASS;
+- T-016 City Atlas external validation: PASS;
 - #42 dual-OS abrupt-kill durability: PASS 750/750;
 - post-candidate quality/test hardening #49/#50/#51 and #52/#53: COMPLETE / MERGED;
 - frozen PRD repository provenance #54/#55: COMPLETE / MERGED;
 - minimal Woodpecker config #59/#63: COMPLETE / MERGED;
 - documentation/process reconciliation #58/#64: COMPLETE / MERGED;
-- actual Woodpecker run #57: ENV-BLOCKED because the repository is not connected to Woodpecker;
-- branch protection #56: pending admin action after the real Woodpecker status context is known;
-- final successor visible rerun #60: must be pinned to the exact `v0.1` SHA after this SDK documentation concern merges;
+- complete SDK/Agent documentation PR #66: COMPLETE / MERGED;
+- #60 successor visible regression: PASS on executable/package tree `1835f3f31ca483dc7bd997a545391f622d38be63` — 117/117, 0 skipped, package consumer + Tally + City Atlas PASS;
+- subsequent documentation-only version-line commits: executable/package evidence carried forward only when Git diff proves no Runtime/package/test/dependency change; #60/#39 record that equivalence;
+- actual Woodpecker run #57: ENV-BLOCKED because repository is not connected to Woodpecker;
+- branch protection #56: pending admin action after real Woodpecker status context is known;
 - owner-held Hidden Validation: NOT_RUN.
 
-See `docs/validation/DomainHarness_v0.1_VALIDATION_REPORT.md` and `docs/release/DomainHarness_v0.1_CLOSEOUT.md` for exact release status.
+See `docs/validation/DomainHarness_v0.1_VALIDATION_REPORT.md` and `docs/release/DomainHarness_v0.1_CLOSEOUT.md` for the release decision. #39 tracks the exact intended final version-line SHA so the documentation does not become stale merely because a documentation-only commit changes the Git commit id.
 
 ## v0.1 known limitations
 
@@ -109,4 +111,4 @@ Current Script implementation executes Loader-frozen JavaScript ESM source in a 
 
 ## Release rule
 
-Repository integration, task completion, or SDK-document availability is not a Release PASS. After this SDK documentation concern merges, update #60 to the resulting exact successor SHA, execute the visible gates, then run owner-held Hidden Validation. Only after those gates PASS with no unresolved P0/P1 Runtime blocker may the closeout verdict change to `READY` and tag/publish/release be authorized.
+Repository integration, task completion, SDK-document availability and visible-gate PASS do not by themselves authorize release. Owner-held Hidden Validation must PASS on the final intended version-line head (or an explicitly documented equivalent executable/package tree). Only then may the validated `v0.1` line integrate to `main`, the closeout verdict become `READY`, and tag/publish/release be authorized.
