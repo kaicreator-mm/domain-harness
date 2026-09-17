@@ -17,7 +17,7 @@ The PRD copy was imported byte-for-byte and checksum-verified via #54/#55; it is
 
 - `product/` — exact frozen PRD artifact.
 - `architecture/` — frozen L2 architecture evidence and decisions.
-- `implementation/` — Task DAG, L3 evidence and historical task handoff material.
+- `implementation/` — terminal Task DAG, L3 evidence and historical task handoff material.
 - `operations/` — SQLite/storage/recovery operational contract.
 - `sdk/` — public SDK usage and embedding guidance.
 - `validation/` — Critical Journeys, cross-domain evidence, visible validation state and Hidden Validation preparation.
@@ -27,10 +27,12 @@ The PRD copy was imported byte-for-byte and checksum-verified via #54/#55; it is
 
 ## Current status
 
-Implementation tasks T-001..T-017 are complete. Historical visible candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed Tally, City Atlas and final visible exact-SHA/package gates. Post-candidate definition-lock/Script hardening (#49/#50/#51), canonical test-flow hardening (#52/#53) and PRD provenance (#54/#55) are complete and merged into the version line.
+Implementation tasks T-001..T-017 are complete. Historical candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate definition-lock/Script hardening, canonical test-flow hardening, frozen PRD repository provenance and the dual-OS durability matrix are complete. Minimal Woodpecker configuration is merged.
 
-Documentation/CI process closure and successor exact-SHA validation remain in progress. Owner-held Hidden Validation remains NOT_RUN. No document should describe v0.1 as `READY` until the final successor SHA passes its required visible gates and Hidden Validation.
+The repository is not yet connected to a Woodpecker instance, so actual CI execution/status context is ENV-BLOCKED (#57) and `main` branch protection remains an admin follow-up (#56). Final successor visible rerun #60 and owner-held Hidden Validation remain release gates.
+
+No document should describe v0.1 as `READY` until the final successor SHA passes required visible gates and Hidden Validation.
 
 ## Stale evidence policy
 
-Historical prompts/blocker files may describe the state at the time they were created. They must not override the current Task DAG, Validation Report, GitHub Issue state or Release Closeout. Obsolete one-off blocker/status files must be removed or clearly marked superseded.
+Historical prompts/blocker files may describe the state at the time they were created. They do not override the terminal Task DAG, current Validation Report, GitHub Issue state or Release Closeout. One-off blocker/status files retained for audit must be clearly treated as superseded historical evidence.
