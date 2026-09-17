@@ -44,11 +44,13 @@ export class StepDispatcher {
       }
       case 'script': {
         if (!invoke.ref) throw new Error('Script Step is missing ref');
-        return this.scripts.execute(
-          invoke.ref,
+        if (invoke.scriptSource === undefined) {
+          throw new Error(`Script '${invoke.ref}' was not frozen by Harness Loader`);
+        }
+        return this.scripts.executeSource(
+          invoke.scriptSource,
           request.input,
           {
-            harnessRoot: request.harnessRoot,
             signal: request.signal,
             ...(invoke.timeoutMs !== undefined ? { timeoutMs: invoke.timeoutMs } : {}),
           },
