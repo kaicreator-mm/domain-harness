@@ -1,89 +1,109 @@
 # DomainHarness v0.1 — Validation Report
 
-**Report stage:** Version Closure preparation  
-**Version integration baseline after T-017:** `bfbce9f11776d7e2c12af6f267b5012951e9c5f9`  
-**Release qualification:** BLOCKED / NOT COMPLETE
+**Report stage:** Successor-candidate preparation after post-candidate audit  
+**Last fully visible-qualified candidate:** `edbe2b53c936107ba4dfbb4eef7aef5408c26b39`  
+**Current version-line head before documentation closure:** `733e82ad65d70c98ceb1b43aeb4e67c8090c069e`  
+**Release qualification:** BLOCKED — final successor SHA not yet frozen; owner-held Hidden Validation has not run
 
-This report distinguishes repository integration from release qualification. No unexecuted gate is marked PASS.
+A PASS belongs to the exact SHA on which it was executed. Historical PASS evidence remains useful, but Runtime/package/process changes require a successor candidate and affected-gate reruns.
 
-## Executed evidence
+## 1. Implementation state
 
-### T-013 package / clean-consumer gate — PASS
+T-001 through T-017 are DONE. The terminal execution record is `docs/implementation/DomainHarness_v0.1_TASK_DAG.md`.
 
-GitHub Issue `kaicreator-mm/domain-harness#30` is closed after Build Host validation on descendant SHA `dd0bdd7`:
+Frozen Product authority is repository-local at `docs/product/DomainHarness_v0.1_PRD_FROZEN.md` with SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`.
 
-- clean `npm ci`: PASS;
-- `npm run typecheck`, `npm test`, `npm run build`: PASS;
-- 111/111 tests at that candidate;
-- `npm pack` artifact installed into a fresh consumer: PASS;
-- package-root TypeScript import/use: PASS;
-- public lifecycle consumer smoke: PASS;
-- internal module/subpath leakage checks: PASS;
-- invalid Harness startup-before-SQLite and missing Tool mapping negative paths: PASS.
+## 2. Historical visible candidate `edbe2b5` — PASS
 
-### T-014 synthetic Critical Journeys / crash recovery — PASS
+Recorded release-visible evidence includes:
 
-GitHub Issue `kaicreator-mm/domain-harness#32` is closed after Build Host validation on exact merged `v0.1` SHA `22969fcca156ab47dfafff259490affed9d82baa`:
+- T-013 clean package/consumer gate PASS (#30);
+- T-014 Critical Journey + real process-kill recovery PASS (#32);
+- Tally external validation PASS (`kaicreator-mm/tally#54`, external SHA `256e3daba951fa6e400c1c73de02221571aafc59`);
+- City Atlas external validation PASS (`kaicreator-mm/city-atlas#23`, external SHA `c58be0945acff58b02bee07c269cc28c8af61f76`);
+- clean install, lint, typecheck, test, build, package and plain-node tarball consumer PASS as recorded in #39;
+- Critical Journey, process-crash, recovery/lifecycle, Child Workflow, ExpressionRuntime and ScriptExecutor focused suites PASS.
 
-- clean `npm ci`: PASS, 0 vulnerabilities;
-- `npm run typecheck`: PASS;
-- `npm test`: PASS — 112/112;
-- `npm run build`: PASS;
-- `critical-journeys.test.ts`: 1/1;
-- `process-crash-recovery.test.ts`: 8/8 using real child-process kills across one SQLite file;
-- `recovery-lifecycle.test.ts`: 8/8;
-- `script-executor.test.ts`: 7/7;
-- `expression-runtime.test.ts`: 10/10;
-- CJ-01 `Skill -> Tool -> Expr -> Script -> Child Workflow -> Waiting Event -> completed`: PASS with AI/Tool each invoked exactly once;
-- idempotent replay, non-idempotent `interrupted`, completed-output reuse, definition-lock and running-only `resume()` behavior: PASS.
+Issue #40 was found on an earlier candidate during real plain-ESM/cross-domain execution, fixed, and the visible gates were rerun before `edbe2b5` became the historical visible-qualified candidate.
 
-T-013 and T-014 evidence prove their validated candidates. They do not substitute for the final closure candidate regression and cross-domain gates.
+## 3. Post-candidate audit hardening — COMPLETE ON VERSION LINE
 
-## Open mandatory validation
+### #49 / PR #50 — definition lock / frozen Script / canonical asset containment
 
-### T-015 Tally cross-repo validation — NOT_RUN
+Status: **MERGED / focused validation PASS**.
 
-External candidate: `kaicreator-mm/tally@256e3daba951fa6e400c1c73de02221571aafc59`  
-Tracking: `kaicreator-mm/tally#54`.
+#51 validated refreshed PR head `3fb39eface858abd60b42f09d63e2023358af100` on Windows 10, Node v26.8.1 / npm 11.19.0. Clean install/lint/typecheck/build passed; the focused quality, Loader, Script, Expression, recovery/process-crash and ESM-host suites passed. PR #50 merged into `v0.1` as `1a4ad8ea17cc1e5ac81d138b41364ea95b5ac56e`.
 
-Assets and executable runner exist. Required Build Host run must prove Skill + host Tool + Expr + Child Workflow + waiting event, stable DomainHarness public contracts, exactly-once fake AI/Tool calls for the validation run, and preservation of Tally Active TaskDAG / CompletionContract / verification / human-authority boundaries.
+### PR #52 / #53 — canonical test flow
 
-### T-016 City Atlas cross-repo validation — NOT_RUN
+Status: **MERGED / PASS**.
 
-External candidate: `kaicreator-mm/city-atlas@c58be0945acff58b02bee07c269cc28c8af61f76`  
-Tracking: `kaicreator-mm/city-atlas#23`.
+On exact PR SHA `c672c06f5b34219aacd599ef9e63765fbd9bae94`, clean `npm test` produced 113/113 PASS with 0 skipped, built before testing, and executed the plain-ESM host regression. PR #52 merged as `b930c1bd39aae933d25e59c1ed99b1534f9ea7c1`.
 
-Assets and executable runner exist. Required Build Host run must use the same DomainHarness candidate as T-015, prove the required primitive categories, and confirm City Atlas canonical-state, provenance, privacy and Task/API semantics remain outside Runtime.
+### #54 / PR #55 — frozen PRD provenance
 
-### Final closure-candidate full regression — NOT_RUN
+Status: **MERGED / checksum verified**.
 
-After version integration reaches `main`, freeze that exact repository candidate SHA and execute at minimum:
+The authoritative PRD was copied byte-for-byte into `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`; PR #55 merged as `3acacf447c4510733e38881310679c823061664f`.
+
+## 4. Supplemental public validation
+
+| Issue | Concern | Status |
+|---|---|---|
+| #41 | Node/OS/package-consumer compatibility | PASS |
+| #42 | WAL/FULL abrupt-kill durability Windows + Linux | PASS — Windows 375/375 + Linux 375/375 = 750/750, zero corruption and zero duplicate non-idempotent side effects |
+| #43 | waiting/send/cancel race stress | PASS — 8000/8000 |
+| #44 | Child Workflow stress | PASS |
+| #45 | Worker boundary/resource/timeout/cancel matrix | PASS |
+| #46 | definitionHash / engine-major lock | PASS on tested historical candidate scenarios |
+| #47 | non-idempotent side-effect-before-crash | PASS |
+| #48 | long-run soak / SQLite consistency | PASS |
+
+These public tests do not replace Hidden Validation.
+
+## 5. Documentation / CI / repository-process closure
+
+- Documentation reconciliation: #58 / `v0.1_docs_final` — in progress in this PR.
+- Minimal Woodpecker workflow: #59 / PR #63 — **MERGED** as `733e82ad65d70c98ceb1b43aeb4e67c8090c069e`.
+- Woodpecker workflow static validation: PASS. Actual pipeline execution/status context: #57 — **ENV-BLOCKED because this repository is not currently connected to a Woodpecker instance**. This is not a Runtime defect.
+- `main` branch protection/ruleset: #56 — repository-admin action required after #57 records the real emitted status context; do not guess the context name.
+
+## 6. Successor visible-gate rerun
+
+After this documentation concern merges, freeze one exact `v0.1` successor SHA and execute #60. Because quality hardening changed definition-lock and Script execution, rerun at minimum:
+
+- clean install/lint/typecheck/canonical tests/package;
+- plain-node package consumer;
+- quality/definition-lock focused suite;
+- Script/Expression focused suites;
+- recovery/process-crash coverage;
+- Tally and City Atlas runners against the same DomainHarness SHA.
+
+No dirty-worktree patching is allowed.
+
+## 7. Hidden Validation
+
+Status: **NOT_RUN / owner-held**.
+
+Run only after the final successor SHA passes its visible entry gates. Held-out case source/fixtures must remain unpublished. Public Issues #41–#48 are not substitutes.
+
+## 8. Current decision
 
 ```text
-npm ci
-npm run typecheck
-npm test
-npm run build
-npm pack -w @kaicreator/domain-harness
-```
-
-The final regression must include the clean package-consumer smoke, synthetic Critical Journeys, process-kill recovery, cancellation/event races, Child Workflow recovery, expression/script worker constraints, and successful execution of both cross-domain runners against the same DomainHarness candidate.
-
-### Hidden Validation — NOT_RUN
-
-Hidden Validation may run only after the visible candidate SHA is frozen and the visible entry conditions pass. Preparation rules are in `DomainHarness_v0.1_HIDDEN_VALIDATION_PREP.md`.
-
-## Current decision
-
-```text
-Task implementation aggregation: COMPLETE (T-001..T-017)
-Visible package/CJ validation: PASS through T-014
-Version branch integration to main: READY
-Cross-domain validation: NOT_RUN (Tally #54, City Atlas #23)
-Final exact-SHA regression: NOT_RUN
+Frozen PRD: FROZEN / repository-local / checksum verified
+Architecture: FROZEN / no contradiction
+Implementation T-001..T-017: DONE
+Historical visible candidate edbe2b5: VISIBLE GATES PASS
+Quality hardening #49/#50/#51: COMPLETE / MERGED
+Canonical test flow #52/#53: COMPLETE / MERGED
+PRD provenance #54/#55: COMPLETE / MERGED
+Supplemental #42: PASS 750/750
+Minimal Woodpecker config #59/#63: COMPLETE / MERGED
+Woodpecker actual run #57: ENV-BLOCKED — repository not connected
+Branch protection #56: PENDING ADMIN ACTION AFTER #57
+Docs reconciliation #58: IN PROGRESS
+Final successor visible rerun #60: NOT_RUN
 Hidden Validation: NOT_RUN
-Release qualification: NOT READY
-Tag/publish/release: BLOCKED BY MANDATORY VALIDATION
+Release Qualification: BLOCKED
+Tag/publish: NOT AUTHORIZED
 ```
-
-Merging the completed version branch into `main` establishes the repository integration baseline only; it does not certify or publish v0.1. No architecture contradiction has been identified, and no PRD scope or frozen technology choice was changed to reach this state.
