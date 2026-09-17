@@ -1,0 +1,135 @@
+import {
+  createMachine,
+  initialTransition,
+  transition,
+  type AnyStateMachine,
+} from 'xstate';
+
+import type { RouteAst, WorkflowAst } from '../loader/ast.js';
+
+export type RouteClass = 'done' | 'error' | 'event';
+
+export interface RouteSelection {
+  sourceStateId: string;
+  routeClass: RouteClass;
+  routeIndex: number;
+  eventType?: string;
+}
+
+export interface ControlTransitionResult {
+  stateId: string;
+  done: boolean;
+}
+
+const ROUTE_EVENT_PREFIX = '@@domain-harness/route';
+
+export function routeEventType(selection: RouteSelection): string {
+  if (!Number.isInteger(selection.routeIndex) || selection.routeIndex < 0) {
+    throw new Error('routeIndex must be a non-negative integer');
+  }
+
+  if (selection.routeClass === 'event') {
+    if (!selection.eventType) {
+      throw new Error('eventType is required for external-event routes');
+    }
+    return `${ROUTE_EVENT_PREFIX}/event/${encodeURIComponent(selection.eventType)}/${selection.routeIndex}`;
+  }
+
+  return `${ROUTE_EVENT_PREFIX}/${selection.routeClass}/${selection.routeIndex}`;
+}
+
+function addRoutes(
+  on: Record<string, { target: string }>,
+  routeClass: Exclude<RouteClass, 'event'>,
+  routes: RouteAst[],
+): void {
+  routes.forEach((route, index) => {
+    on[
+      routeEventType({
+        sourceStateId: '',
+        routeClass,
+        routeIndex: index,
+      })
+    ] = { target: route.target };
+  });
+}
+
+export function compileControlMachine(workflow: WorkflowAst): AnyStateMachine {
+  const states: Record<string, Record<string, unknown>> = {};
+
+  for (const state of Object.values(workflow.states)) {
+    if (state.final) {
+      states[state.id] = { type: 'final' };
+      continue;
+    }
+
+    const on: Record<string, { target: string }> = {};
+    addRoutes(on, 'done', state.done);
+    addRoutes(on, 'error', state.error);
+
+    for (const [eventType, event] of Object.entries(state.events)) {
+      event.routes.forEach((route, index) => {
+        on[
+          routeEventType({
+            sourceStateId: state.id,
+            routeClass: 'event',
+            routeIndex: index,
+            eventType,
+          })
+        ] = { target: route.target };
+      });
+    }
+
+    states[state.id] = Object.keys(on).length > 0 ? { on } : {};
+  }
+
+  return createMachine({
+    id: `domain-harness:${workflow.id}`,
+    initial: workflow.initial,
+    states,
+  });
+}
+
+export function initialControlState(machine: AnyStateMachine): ControlTransitionResult {
+  const [snapshot] = initialTransition(machine);
+  return normalizeSnapshot(snapshot);
+}
+
+export function transitionControlState(
+  machine: AnyStateMachine,
+  currentStateId: string,
+  selection: RouteSelection,
+): ControlTransitionResult {
+  if (selection.sourceStateId !== currentStateId) {
+    throw new Error(
+      `route source mismatch: expected ${currentStateId}, got ${selection.sourceStateId}`,
+    );
+  }
+
+  const snapshot = machine.resolveState({ value: currentStateId });
+  const [nextSnapshot] = transition(machine, snapshot, {
+    type: routeEventType(selection),
+  });
+
+  const result = normalizeSnapshot(nextSnapshot);
+  if (result.stateId === currentStateId) {
+    throw new Error(
+      `no compiled route for ${selection.routeClass} index ${selection.routeIndex} from ${currentStateId}`,
+    );
+  }
+  return result;
+}
+
+function normalizeSnapshot(snapshot: {
+  value: unknown;
+  status: string;
+}): ControlTransitionResult {
+  if (typeof snapshot.value !== 'string') {
+    throw new Error('v0.1 control machine must resolve to one flat state id');
+  }
+
+  return {
+    stateId: snapshot.value,
+    done: snapshot.status === 'done',
+  };
+}
