@@ -1,6 +1,6 @@
 # DomainHarness Documentation
 
-This directory contains the formal product, architecture, implementation, SDK, validation, operations and release evidence for DomainHarness v0.1.
+This directory contains the formal product, architecture, Domain Data, Harness, implementation, SDK, validation, operations and release documentation for DomainHarness v0.1.
 
 ## Authority order
 
@@ -8,51 +8,119 @@ This directory contains the formal product, architecture, implementation, SDK, v
 2. `architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
 3. `implementation/DomainHarness_v0.1_TASK_DAG.md` plus task-specific L3 evidence.
 4. Public contracts/tests under `packages/domain-harness/`.
-5. Consumer SDK documentation under `sdk/`, derived from the public contracts and current v0.1 implementation.
+5. Descriptive architecture / Domain Data / Harness / SDK documentation derived from those authorities and current implementation.
 6. Exact-SHA validation evidence in `validation/` and linked GitHub Issues.
-7. `release/DomainHarness_v0.1_CLOSEOUT.md` for the current release decision.
+7. `release/DomainHarness_v0.1_CLOSEOUT.md` and Release Closure issue #39 for the release decision.
 
-The PRD copy was imported byte-for-byte and checksum-verified via #54/#55; it is the repository-local Product authority and must not be reformatted or rewritten.
+The frozen PRD was imported byte-for-byte and checksum-verified via #54/#55. Descriptive technical documents do not override the frozen PRD/L2 or executable source/tests.
 
-## Directory map
+## Documentation map
 
 - `product/` — exact frozen PRD artifact.
-- `architecture/` — frozen L2 architecture evidence and decisions.
+- `architecture/` — frozen L2 evidence plus detailed system architecture and integration model.
+- `domain-data/` — Domain Data specification and authoring guide.
+- `harness/` — Harness technical specification and authoring guide.
 - `implementation/` — terminal Task DAG, L3 evidence and historical task handoff material.
-- `sdk/` — public SDK reference, short usage entry point and coding-Agent migration guide.
+- `sdk/` — public SDK reference, usage entry point and coding-Agent migration guide.
 - `operations/` — SQLite/storage/recovery operational contract.
-- `validation/` — Critical Journeys, cross-domain evidence, visible validation state and Hidden Validation preparation.
+- `validation/` — Critical Journeys, cross-domain evidence, validation state and Hidden Validation preparation.
 - `release/` — Version Closure / Release Qualification decision record.
 
 `DomainHarness_v0.1_INDEX.md` is the version-specific reading index.
+
+## Technical documentation — English / 中文
+
+### Architecture / 架构
+
+- English: `architecture/DomainHarness_ARCHITECTURE.md`
+- 中文：`architecture/DomainHarness_ARCHITECTURE.zh-CN.md`
+- English integration model: `architecture/DOMAINHARNESS_INTEGRATION_MODEL.md`
+- 中文集成模型：`architecture/DOMAINHARNESS_INTEGRATION_MODEL.zh-CN.md`
+
+### Domain Data
+
+Start at `domain-data/README.md`.
+
+- English spec: `domain-data/DOMAIN_DATA_SPEC.md`
+- 中文规范：`domain-data/DOMAIN_DATA_SPEC.zh-CN.md`
+- English authoring guide: `domain-data/DOMAIN_DATA_AUTHORING_GUIDE.md`
+- 中文编写指南：`domain-data/DOMAIN_DATA_AUTHORING_GUIDE.zh-CN.md`
+
+### Harness
+
+Start at `harness/README.md`.
+
+- English technical spec: `harness/HARNESS_TECHNICAL_SPEC.md`
+- 中文技术规范：`harness/HARNESS_TECHNICAL_SPEC.zh-CN.md`
+- English authoring guide: `harness/HARNESS_AUTHORING_GUIDE.md`
+- 中文编写指南：`harness/HARNESS_AUTHORING_GUIDE.zh-CN.md`
+
+## Recommended reading paths
+
+### Runtime implementer
+
+```text
+Frozen PRD
+→ Frozen L2 Architecture Evidence
+→ Detailed System Architecture
+→ Harness Technical Spec
+→ Storage/Recovery Notes
+→ source/tests
+```
+
+### Downstream application engineer
+
+```text
+Detailed System Architecture
+→ Integration Model
+→ SDK Reference
+→ Harness Technical Spec
+→ downstream project authority
+```
+
+### Coding Agent refactoring another project
+
+```text
+Downstream frozen authority
+→ Domain Data Spec
+→ Domain Data Authoring Guide
+→ Integration Model
+→ Harness Authoring Guide
+→ SDK Agent Migration Guide
+→ one Critical Journey
+```
+
+The Agent should produce a migration map and Tool effect classification before implementation. It must not infer domain authority from Runtime internals.
 
 ## SDK / downstream project entry point
 
 Start at `sdk/README.md`.
 
-For a coding Agent refactoring another project, provide all of the following from the **same exact DomainHarness SHA**:
+Core SDK documents:
 
 1. `sdk/DomainHarness_v0.1_SDK_REFERENCE.md`;
 2. `sdk/DomainHarness_v0.1_AGENT_MIGRATION_GUIDE.md`;
-3. the downstream project's own PRD/architecture/development standard;
-4. one Critical Journey to migrate first.
+3. `sdk/DomainHarness_v0.1_SDK_USAGE.md`.
 
-The downstream project must keep its own domain/business authority. DomainHarness supplies generic durable execution mechanics only.
+A downstream project remains authoritative for its domain/business state, API, database, authentication/authorization, credentials, external clients and AI provider/model strategy. DomainHarness provides generic durable execution mechanics only.
 
-Until v0.1 is formally release-qualified/tagged, consumers should pin an exact DomainHarness commit/tarball rather than depend on a moving branch.
+Until a formal release/tag is authorized, consumers should pin an exact DomainHarness commit/tarball instead of treating a moving branch as a released dependency.
 
-## Current status
+## Current project state
 
-Implementation tasks T-001..T-017 are complete. Post-candidate definition-lock/Script hardening, canonical test-flow hardening, frozen PRD provenance, dual-OS durability, documentation/process closure, minimal Woodpecker configuration and SDK/Agent documentation are complete on the `v0.1` line.
+Implementation tasks T-001..T-017 are complete. Quality hardening, canonical test-flow hardening, frozen PRD provenance, dual-OS durability, SDK documentation and repository documentation closure are complete.
 
-The executable/package tree at `1835f3f31ca483dc7bd997a545391f622d38be63` passed #60 with **117/117 tests, 0 skipped**, package/plain-Node consumer validation, focused recovery/Worker/definition-lock suites and both Tally/City Atlas external runners. Later SDK documentation-only commits have no Runtime/package/test/dependency changes; #60 and #39 record the explicit validation carry-forward based on Git diff/tree equivalence.
+The executable/package tree validated in #60 passed **117/117 tests with 0 skipped**, package/plain-Node consumer validation, focused recovery/Worker/definition-lock suites and Tally + City Atlas external runners. Later documentation-only changes carry that executable/package evidence only when Git diff/tree equivalence proves no Runtime/package/test/dependency change and that disposition is recorded.
 
-The repository is not yet connected to a Woodpecker instance, so actual CI execution/status context is ENV-BLOCKED (#57) and `main` branch protection remains an admin follow-up (#56). These are repository-process items, not Runtime failures.
+The v0.1.0 version line has been integrated to `main` through PR #65. Repository integration does not by itself assert formal Release Qualification.
 
-Owner-held Hidden Validation remains the mandatory Release Qualification gate. #39 tracks the final intended version-line SHA and release decision.
+Repository-process follow-ups remain separate:
 
-No document should describe v0.1 as `READY` until Hidden Validation passes and the final validated version line is integrated to `main` according to the release-closeout policy.
+- #57 — Woodpecker is connected and the emitted context is known, but execution is infrastructure-blocked because the agent is using a local backend instead of a container backend;
+- #56 — `main` branch protection/ruleset is an administrator follow-up after a green Woodpecker run.
+
+Owner-held Hidden Validation remains the outstanding formal Release Qualification gate tracked by #39. It is not a known Runtime defect.
 
 ## Stale evidence policy
 
-Historical prompts/blocker files may describe the state at the time they were created. They do not override the terminal Task DAG, current Validation Report, GitHub Issue state or Release Closeout. One-off blocker/status files retained for audit must be treated as superseded historical evidence when current records disagree.
+Historical prompts/blocker files may describe the state at the time they were created. They do not override the frozen authorities, terminal Task DAG, current source/tests, current Validation Report, GitHub Issue state or Release Closure. Retained historical records must be treated as superseded when current evidence disagrees.
