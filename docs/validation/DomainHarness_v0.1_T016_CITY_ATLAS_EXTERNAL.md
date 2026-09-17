@@ -1,11 +1,11 @@
 # T-016 — City Atlas External Domain Validation
 
 **Implementation status:** COMPLETE  
-**Required exact-SHA execution:** NOT_RUN (environment)  
+**Required exact-SHA execution:** PASS  
 **External repository:** `kaicreator-mm/city-atlas`  
 **External branch:** `domain-harness-v0.1-t16`  
 **External candidate SHA:** `c58be0945acff58b02bee07c269cc28c8af61f76`  
-**Build Host validation issue:** `kaicreator-mm/city-atlas#23`
+**Validation evidence:** `kaicreator-mm/city-atlas#23`
 
 ## External assets
 
@@ -19,14 +19,16 @@ Primitive coverage:
 - Child Workflow: privacy-review frame
 - Waiting event: explicit accept/reject event with JSON Schema
 
+## Validation result
+
+On DomainHarness candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39`, the external runner exited 0 and proved `start → waiting → accept → completed`; fake AI and Tool were each invoked exactly once for the validation run.
+
 ## Authority boundary
 
-City Atlas remains authoritative for canonical entity state, provenance, privacy rules and Task/API semantics. DomainHarness does not promote candidates, own provider behavior or weaken Atlas privacy boundaries; it only sequences portable execution primitives and waits for an external review event.
+City Atlas remains authoritative for canonical entity state, provenance, privacy rules and Task/API semantics. DomainHarness does not promote candidates, own provider behavior or weaken Atlas privacy boundaries.
 
 ## Contract-change check
 
-No DomainHarness public contract change was required to express the City Atlas domain flow. The external runner consumes `createDomainHarness`, injects an `AIOperationPort` and Host Tool, then executes the frozen lifecycle.
+No DomainHarness public contract change was required to express the City Atlas flow.
 
-## Remaining gate
-
-Build Host must execute City Atlas issue #23 against the same exact DomainHarness candidate used for T-015 and record both repository SHAs, build/test commands and lifecycle output. Until that evidence exists, T-016 MUST NOT be marked validation PASS or release-qualified.
+This PASS is candidate-specific historical evidence. Any successor candidate that materially changes Runtime behavior must rerun the affected cross-domain gate before release qualification.
