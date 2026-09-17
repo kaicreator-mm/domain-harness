@@ -1,0 +1,46 @@
+initial: skill_step
+output: '{"child": steps.child_step, "approval": steps.await_approval}'
+states:
+  skill_step:
+    invoke:
+      skill: draft
+      input: "input"
+    on:
+      done:
+        - target: tool_step
+  tool_step:
+    invoke:
+      tool: enrich_tool
+      input: "steps.skill_step"
+    on:
+      done:
+        - target: expr_step
+  expr_step:
+    invoke:
+      expr: '{"text": steps.tool_step.text & "-expr"}'
+    on:
+      done:
+        - target: script_step
+  script_step:
+    invoke:
+      script: scripts/enrich.mjs
+      input: "steps.expr_step"
+    on:
+      done:
+        - target: child_step
+  child_step:
+    invoke:
+      workflow: child
+      input: "steps.script_step"
+    on:
+      done:
+        - target: await_approval
+  await_approval:
+    on:
+      approve:
+        schema: schemas/approval.schema.json
+        target: completed
+  completed:
+    final: true
+  failed:
+    final: true
