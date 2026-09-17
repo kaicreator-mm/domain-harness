@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -27,6 +28,9 @@ function loaded(workflow: WorkflowAst, skills = new Map<string, SkillAst>()): Lo
 }
 
 function invokeWorkflow(ref: { kind: 'tool'; ref: string } | { kind: 'skill'; ref: string } | { kind: 'script'; ref: string }): WorkflowAst {
+  const scriptSource = ref.kind === 'script'
+    ? readFileSync(join(packageRoot, ref.ref), 'utf8')
+    : undefined;
   return {
     id: 'main',
     sourcePath: 'main.yaml',
@@ -35,7 +39,7 @@ function invokeWorkflow(ref: { kind: 'tool'; ref: string } | { kind: 'skill'; re
       work: {
         id: 'work',
         final: false,
-        invoke: ref,
+        invoke: { ...ref, ...(scriptSource !== undefined ? { scriptSource } : {}) },
         done: [{ target: 'ok' }],
         error: [{ target: 'failed' }],
         events: {},
@@ -175,9 +179,9 @@ test('Script Worker executes outside SQLite transaction', async () => {
   const store = new SqliteStore({ path: ':memory:' });
   let observedInTransaction = true;
   class ObservingScriptExecutor extends ScriptExecutor {
-    override async execute(...args: Parameters<ScriptExecutor['execute']>): ReturnType<ScriptExecutor['execute']> {
+    override async executeSource(...args: Parameters<ScriptExecutor['executeSource']>): ReturnType<ScriptExecutor['executeSource']> {
       observedInTransaction = store.db.inTransaction;
-      return super.execute(...args);
+      return super.executeSource(...args);
     }
   }
   const coordinator = new RunCoordinator({

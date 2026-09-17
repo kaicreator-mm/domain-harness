@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -201,6 +202,7 @@ test('started Script reruns using persisted input and increments attempt', async
   const workflow = singleStepWorkflow('main', {
     kind: 'script',
     ref: 'tests/fixtures/scripts/echo.mjs',
+    scriptSource: readFileSync(join(packageRoot, 'tests/fixtures/scripts/echo.mjs'), 'utf8'),
   });
   const { store, coordinator } = context(harness(workflow), tools);
   coordinator.createRootRun({ runId: 'r3s', workflowId: 'main', input: { value: 1 } });
@@ -355,6 +357,7 @@ test('timed-out Script fails the Run and replay reuses the persisted error', asy
   const workflow = singleStepWorkflow('main', {
     kind: 'script',
     ref: 'tests/fixtures/scripts/hang.mjs',
+    scriptSource: readFileSync(join(packageRoot, 'tests/fixtures/scripts/hang.mjs'), 'utf8'),
     timeoutMs: 50,
   });
   const { store, coordinator } = context(harness(workflow), tools);
