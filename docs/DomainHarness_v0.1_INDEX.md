@@ -70,4 +70,4 @@ The following are intentionally outside v0.1 and are not implementation gaps:
 - Host Tools own credentials and real side effects; Runtime does not provide a secret store;
 - active-run continuation is definition-locked by `definitionHash` and `executionEngineMajor`.
 
-`v0.1` must not be merged to `main` or tagged as release-qualified until the mandatory validation report reaches PASS for all release gates.
+After all v0.1 task concerns are merged, the version branch may be integrated into `main` as the repository baseline. That integration is not a Release PASS: tagging/publishing/release qualification remain blocked until every mandatory validation and Version Closure gate passes on the designated candidate.
