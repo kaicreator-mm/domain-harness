@@ -11,12 +11,12 @@ export const harnessManifestSchema = z.object({
   }).strict(),
 }).strict();
 
-export interface RawRoute { target: string; when?: string }
-export interface RawDirectEvent extends RawRoute { schema?: string }
-export type RawEventSpec = RawDirectEvent | RawRoute[] | { schema?: string; routes: RawRoute[] };
-export interface RawInvoke { skill?: string; tool?: string; script?: string; expr?: string; workflow?: string; input?: string; timeoutMs?: number }
-export interface RawState { final?: boolean; invoke?: RawInvoke; on?: Record<string, RawEventSpec> }
-export interface RawWorkflowFile { initial: string; output?: string; states: Record<string, RawState> }
+export interface RawRoute { target: string; when?: string | undefined }
+export interface RawDirectEvent extends RawRoute { schema?: string | undefined }
+export type RawEventSpec = RawDirectEvent | RawRoute[] | { schema?: string | undefined; routes: RawRoute[] };
+export interface RawInvoke { skill?: string | undefined; tool?: string | undefined; script?: string | undefined; expr?: string | undefined; workflow?: string | undefined; input?: string | undefined; timeoutMs?: number | undefined }
+export interface RawState { final?: boolean | undefined; invoke?: RawInvoke | undefined; on?: Record<string, RawEventSpec> | undefined }
+export interface RawWorkflowFile { initial: string; output?: string | undefined; states: Record<string, RawState> }
 
 const invokeSchema = z.object({
   skill: relativeRef.optional(),

@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
-import Ajv2020 from 'ajv/dist/2020.js';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 import jsonata from 'jsonata';
 import { parse } from 'yaml';
 import type { JsonSchema } from '../contracts/json.js';
@@ -49,7 +49,7 @@ async function readYaml(path: string): Promise<unknown> {
 
 function normalizeRoutes(spec: RawEventSpec): { schemaPath?: string; routes: RouteAst[] } {
   if (Array.isArray(spec)) {
-    return { routes: spec.map((route: { target: string; when?: string }) => ({ target: route.target, ...(route.when ? { when: route.when } : {}) })) };
+    return { routes: spec.map((route) => ({ target: route.target, ...(route.when ? { when: route.when } : {}) })) };
   }
   if ('routes' in spec) {
     return {
