@@ -296,6 +296,144 @@ test('parent journal completed after child pop does not re-enter child', async (
   assert.deepEqual(run.output, { persistedChild: true });
 });
 
+test('recovery reruns a started child internal Step inside an active child frame', async () => {
+  const tools = new ToolRegistry();
+  let calls = 0;
+  tools.register('childTool', {
+    effect: 'none',
+    async execute(input) {
+      calls += 1;
+      return { rerun: true, value: (input as { value: number }).value };
+    },
+  });
+  const parent = parentWorkflow();
+  const child = toolChild();
+  const { store, coordinator } = context([parent, child], tools);
+  const root = coordinator.createRootRun({ runId: 'child-started', workflowId: 'main', input: { value: 5 } });
+  const parentIdentity = {
+    runId: 'child-started',
+    workflowInstanceId: 'root',
+    stateId: 'work',
+    visit: 1,
+  };
+  store.insertStartedStep({
+    ...parentIdentity,
+    kind: 'workflow',
+    attempt: 1,
+    startedAt: '2026-09-17T01:00:00.000Z',
+    input: { value: 5 },
+    idempotencyKey: deriveIdempotencyKey(parentIdentity),
+  });
+  store.updateRun('child-started', {
+    controlState: {
+      schemaVersion: 1,
+      frames: [
+        root.controlState.frames[0]!,
+        {
+          workflowId: 'child',
+          workflowInstanceId: 'root/work#1',
+          stateId: 'calc',
+          visits: { calc: 1 },
+          lastDecisionAt: '2026-09-17T01:00:00.000Z',
+        },
+      ],
+    },
+    updatedAt: '2026-09-17T01:00:00.000Z',
+  });
+  const childIdentity = {
+    runId: 'child-started',
+    workflowInstanceId: 'root/work#1',
+    stateId: 'calc',
+    visit: 1,
+  };
+  store.insertStartedStep({
+    ...childIdentity,
+    kind: 'tool',
+    attempt: 1,
+    startedAt: '2026-09-17T01:00:01.000Z',
+    input: { value: 5 },
+    idempotencyKey: deriveIdempotencyKey(childIdentity),
+  });
+
+  const run = await coordinator.drive('child-started');
+  assert.equal(run.status, 'completed');
+  assert.equal(calls, 1, 'started child internal Step must rerun once on recovery');
+  assert.equal(store.getStep(childIdentity)?.attempt, 2);
+  assert.deepEqual(run.output, { rerun: true, value: 5 });
+});
+
+test('active child frame at a terminal state reconciles into the parent Step', async () => {
+  const tools = new ToolRegistry();
+  let calls = 0;
+  tools.register('childTool', {
+    effect: 'none',
+    async execute() {
+      calls += 1;
+      return { unexpected: true };
+    },
+  });
+  const parent = parentWorkflow();
+  const child = toolChild();
+  const { store, coordinator } = context([parent, child], tools);
+  const root = coordinator.createRootRun({ runId: 'child-terminal', workflowId: 'main', input: { value: 3 } });
+  const parentIdentity = {
+    runId: 'child-terminal',
+    workflowInstanceId: 'root',
+    stateId: 'work',
+    visit: 1,
+  };
+  store.insertStartedStep({
+    ...parentIdentity,
+    kind: 'workflow',
+    attempt: 1,
+    startedAt: '2026-09-17T01:00:00.000Z',
+    input: { value: 3 },
+    idempotencyKey: deriveIdempotencyKey(parentIdentity),
+  });
+  store.updateRun('child-terminal', {
+    controlState: {
+      schemaVersion: 1,
+      frames: [
+        root.controlState.frames[0]!,
+        {
+          workflowId: 'child',
+          workflowInstanceId: 'root/work#1',
+          stateId: 'ok',
+          visits: { calc: 1, ok: 1 },
+          lastDecisionAt: '2026-09-17T01:00:02.000Z',
+        },
+      ],
+    },
+    updatedAt: '2026-09-17T01:00:02.000Z',
+  });
+  const childIdentity = {
+    runId: 'child-terminal',
+    workflowInstanceId: 'root/work#1',
+    stateId: 'calc',
+    visit: 1,
+  };
+  store.insertStartedStep({
+    ...childIdentity,
+    kind: 'tool',
+    attempt: 1,
+    startedAt: '2026-09-17T01:00:01.000Z',
+    input: { value: 3 },
+    idempotencyKey: deriveIdempotencyKey(childIdentity),
+  });
+  store.completeStep(childIdentity, {
+    status: 'completed',
+    completedAt: '2026-09-17T01:00:02.000Z',
+    output: { childDone: true },
+  });
+
+  const run = await coordinator.drive('child-terminal');
+  assert.equal(run.status, 'completed');
+  assert.equal(calls, 0, 'terminal child frame must not replay its internal Step');
+  assert.deepEqual(run.output, { childDone: true });
+  assert.equal(store.getStep(parentIdentity)?.status, 'completed');
+  assert.equal(run.controlState.frames.length, 1, 'child frame must be popped after reconciliation');
+});
+
 test('child failed terminal becomes parent child_workflow_error', async () => {
   const tools = new ToolRegistry();
   tools.register('childTool', {
