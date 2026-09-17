@@ -33,6 +33,7 @@ function workflow(): WorkflowAst {
         error: [],
         events: {
           approve: { routes: [{ target: 'accepted' }] },
+          retry: { routes: [{ target: 'review' }] },
           reject: { routes: [{ target: 'failed' }] },
         },
       },
@@ -75,6 +76,19 @@ test('compiler exposes only precomputed indexed routes to XState', () => {
     routeIndex: 0,
   });
   assert.deepEqual(accepted, { stateId: 'accepted', done: true });
+});
+
+test('compiled route registry distinguishes a valid self-transition from an unknown route', () => {
+  const machine = compileControlMachine(workflow());
+  assert.deepEqual(
+    transitionControlState(machine, 'review', {
+      sourceStateId: 'review',
+      routeClass: 'event',
+      eventType: 'retry',
+      routeIndex: 0,
+    }),
+    { stateId: 'review', done: false },
+  );
 });
 
 test('error route reaches failed final without guard evaluation', () => {
