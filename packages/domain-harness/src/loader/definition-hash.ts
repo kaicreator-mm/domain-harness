@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { LoadedHarness } from './ast.js';
+import type { LoadedHarness, SkillAst, WorkflowAst } from './ast.js';
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -18,12 +18,27 @@ function sortedEntries<T>(map: ReadonlyMap<string, T>): Array<[string, T]> {
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
+function workflowDefinition(workflow: WorkflowAst): Omit<WorkflowAst, 'sourcePath'> {
+  const { sourcePath: _sourcePath, ...definition } = workflow;
+  return definition;
+}
+
+function skillDefinition(skill: SkillAst): Omit<SkillAst, 'directory'> {
+  const { directory: _directory, ...definition } = skill;
+  return definition;
+}
+
 export function buildDefinitionHash(harness: Omit<LoadedHarness, 'definitionHash'>): string {
   const payload = {
     manifest: harness.manifest,
-    workflows: sortedEntries(harness.workflows),
+    // Deployment paths are diagnostic metadata, not Runtime definition. Hash
+    // logical definitions and frozen asset contents so relocating an identical
+    // Harness does not invalidate active Runs.
+    workflows: sortedEntries(harness.workflows)
+      .map(([id, workflow]) => [id, workflowDefinition(workflow)] as const),
     childDependencies: sortedEntries(harness.childDependencies),
-    skills: sortedEntries(harness.skills),
+    skills: sortedEntries(harness.skills)
+      .map(([id, skill]) => [id, skillDefinition(skill)] as const),
     scripts: sortedEntries(harness.scripts),
     schemas: sortedEntries(harness.schemas),
   };

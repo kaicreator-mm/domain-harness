@@ -16,13 +16,16 @@ export class ScriptExecutorError extends Error {
   }
 }
 
-export interface ScriptExecutionOptions {
-  harnessRoot: string;
+export interface ScriptSourceExecutionOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   maxInputBytes?: number;
   maxOutputBytes?: number;
   resourceLimits?: ResourceLimits;
+}
+
+export interface ScriptExecutionOptions extends ScriptSourceExecutionOptions {
+  harnessRoot: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -81,10 +84,25 @@ function jsonOnly(value) {
 `;
 
 export class ScriptExecutor {
+  /**
+   * Compatibility/testing entry point for executing a Script file directly.
+   * Runtime workflow execution uses executeSource() with the source frozen by
+   * Loader so bytes cannot drift after definitionHash is established.
+   */
   async execute(
     scriptRef: string,
     input: JsonValue,
     options: ScriptExecutionOptions,
+  ): Promise<JsonValue> {
+    const source = await readScriptInsideRoot(options.harnessRoot, scriptRef);
+    const { harnessRoot: _harnessRoot, ...sourceOptions } = options;
+    return this.executeSource(source, input, sourceOptions);
+  }
+
+  async executeSource(
+    source: string,
+    input: JsonValue,
+    options: ScriptSourceExecutionOptions = {},
   ): Promise<JsonValue> {
     const timeoutMs = positiveLimit(options.timeoutMs ?? DEFAULT_TIMEOUT_MS, 'timeoutMs');
     const maxInputBytes = positiveLimit(options.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES, 'maxInputBytes');
@@ -94,7 +112,6 @@ export class ScriptExecutor {
       throw new ScriptExecutorError('cancelled', 'Script execution was cancelled');
     }
 
-    const source = await readScriptInsideRoot(options.harnessRoot, scriptRef);
     const inputJson = serializeInput(input);
     if (Buffer.byteLength(inputJson, 'utf8') > maxInputBytes) {
       throw new ScriptExecutorError('script_error', 'Script input exceeds maxInputBytes');
