@@ -1,5 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { basename, extname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
+import { readFile, readdir, realpath, stat } from 'node:fs/promises';
+import { basename, extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import jsonata from 'jsonata';
 import { parse } from 'yaml';
@@ -34,13 +34,20 @@ export interface LoadHarnessOptions {
   registeredTools?: ReadonlySet<string>;
 }
 
-function safePath(root: string, ref: string): string {
+function assertContained(root: string, candidate: string, ref: string): void {
+  const rel = relative(root, candidate);
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`path escapes Harness root: ${ref}`);
+  }
+}
+
+async function safeExistingPath(root: string, ref: string): Promise<string> {
   if (isAbsolute(ref)) throw new Error(`absolute path is not allowed: ${ref}`);
-  const resolvedRoot = resolve(root);
-  const resolved = resolve(root, normalize(ref));
-  const rel = relative(resolvedRoot, resolved);
-  if (rel.startsWith('..') || isAbsolute(rel)) throw new Error(`path escapes Harness root: ${ref}`);
-  return resolved;
+  const lexical = resolve(root, normalize(ref));
+  assertContained(root, lexical, ref);
+  const canonical = await realpath(lexical);
+  assertContained(root, canonical, ref);
+  return canonical;
 }
 
 async function readYaml(path: string): Promise<unknown> {
@@ -110,77 +117,80 @@ async function loadSkills(
   issues: string[],
 ): Promise<Map<string, SkillAst>> {
   const skills = new Map<string, SkillAst>();
-  const skillsDir = join(root, 'skills');
+  let skillsDir: string;
   try {
-    const entries = await readdir(skillsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const id = entry.name;
-      const directory = join(skillsDir, id);
-      const skillMd = join(directory, 'SKILL.md');
-      const sidecarPath = join(directory, 'skill.harness.yaml');
-      try {
-        const [instructions, rawSidecar] = await Promise.all([
-          readFile(skillMd, 'utf8'),
-          readYaml(sidecarPath),
-        ]);
-        const sidecar = skillSidecarSchema.parse(rawSidecar);
-        const resources: Array<{ path: string; content: string }> = [];
-        for (const resourceRef of sidecar.resources) {
-          const resourcePath = safePath(directory, resourceRef);
-          resources.push({ path: resourceRef, content: await readFile(resourcePath, 'utf8') });
-        }
-        const inputSchema = sidecar.input
-          ? await loadJsonSchema(
-            safePath(directory, sidecar.input.schema),
-            `skill:${id}:input:${sidecar.input.schema}`,
-            schemas,
-            ajv,
-            issues,
-          )
-          : undefined;
-        const outputSchema = await loadJsonSchema(
-          safePath(directory, sidecar.output.schema),
-          `skill:${id}:output:${sidecar.output.schema}`,
+    skillsDir = await safeExistingPath(root, 'skills');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return skills;
+    throw error;
+  }
+
+  const entries = await readdir(skillsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const id = entry.name;
+    const directory = join(skillsDir, id);
+    try {
+      const skillMd = await safeExistingPath(directory, 'SKILL.md');
+      const sidecarPath = await safeExistingPath(directory, 'skill.harness.yaml');
+      const [instructions, rawSidecar] = await Promise.all([
+        readFile(skillMd, 'utf8'),
+        readYaml(sidecarPath),
+      ]);
+      const sidecar = skillSidecarSchema.parse(rawSidecar);
+      const resources: Array<{ path: string; content: string }> = [];
+      for (const resourceRef of sidecar.resources) {
+        const resourcePath = await safeExistingPath(directory, resourceRef);
+        resources.push({ path: resourceRef, content: await readFile(resourcePath, 'utf8') });
+      }
+      const inputSchema = sidecar.input
+        ? await loadJsonSchema(
+          await safeExistingPath(directory, sidecar.input.schema),
+          `skill:${id}:input:${sidecar.input.schema}`,
           schemas,
           ajv,
           issues,
-        );
-        if (!outputSchema) continue;
-        skills.set(id, {
-          id,
-          directory,
-          instructions,
-          sidecar: {
-            ...(sidecar.input ? { input: sidecar.input } : {}),
-            output: sidecar.output,
-            resources: [...sidecar.resources],
-            ...(sidecar.profile ? { profile: sidecar.profile } : {}),
-          },
-          ...(inputSchema ? { inputSchema } : {}),
-          outputSchema,
-          resources,
-        });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-        issues.push(`skill:${id}: ${error instanceof Error ? error.message : String(error)}`);
-      }
+        )
+        : undefined;
+      const outputSchema = await loadJsonSchema(
+        await safeExistingPath(directory, sidecar.output.schema),
+        `skill:${id}:output:${sidecar.output.schema}`,
+        schemas,
+        ajv,
+        issues,
+      );
+      if (!outputSchema) continue;
+      skills.set(id, {
+        id,
+        directory,
+        instructions,
+        sidecar: {
+          ...(sidecar.input ? { input: sidecar.input } : {}),
+          output: sidecar.output,
+          resources: [...sidecar.resources],
+          ...(sidecar.profile ? { profile: sidecar.profile } : {}),
+        },
+        ...(inputSchema ? { inputSchema } : {}),
+        outputSchema,
+        resources,
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      issues.push(`skill:${id}: ${error instanceof Error ? error.message : String(error)}`);
     }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   return skills;
 }
 
 async function loadWorkflows(root: string, issues: string[]): Promise<Map<string, WorkflowAst>> {
   const workflows = new Map<string, WorkflowAst>();
-  const dir = join(root, 'workflows');
+  const dir = await safeExistingPath(root, 'workflows');
   const entries = (await readdir(dir, { withFileTypes: true }))
     .filter((entry) => entry.isFile() && ['.yaml', '.yml'].includes(extname(entry.name)))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const entry of entries) {
-    const sourcePath = join(dir, entry.name);
+    const sourcePath = await safeExistingPath(dir, entry.name);
     const id = basename(entry.name, extname(entry.name));
     try {
       const raw = workflowFileSchema.parse(await readYaml(sourcePath)) as RawWorkflowFile;
@@ -227,9 +237,10 @@ async function loadWorkflows(root: string, issues: string[]): Promise<Map<string
 }
 
 export async function loadHarness(options: LoadHarnessOptions): Promise<LoadedHarness> {
-  const root = resolve(options.root);
+  const root = await realpath(resolve(options.root));
   const issues: string[] = [];
-  const manifest = harnessManifestSchema.parse(await readYaml(join(root, 'harness.yaml'))) as HarnessManifestAst;
+  const manifestPath = await safeExistingPath(root, 'harness.yaml');
+  const manifest = harnessManifestSchema.parse(await readYaml(manifestPath)) as HarnessManifestAst;
   const ajv = new Ajv2020({ strict: true, allErrors: true });
   const schemas = new Map<string, JsonSchema>();
   const skills = await loadSkills(root, schemas, ajv, issues);
@@ -253,7 +264,7 @@ export async function loadHarness(options: LoadHarnessOptions): Promise<LoadedHa
       for (const [eventName, event] of Object.entries(state.events)) {
         if (event.schemaPath) {
           const eventSchema = await loadJsonSchema(
-            safePath(root, event.schemaPath),
+            await safeExistingPath(root, event.schemaPath),
             `event:${workflow.id}:${state.id}:${eventName}:${event.schemaPath}`,
             schemas,
             ajv,
@@ -276,10 +287,12 @@ export async function loadHarness(options: LoadHarnessOptions): Promise<LoadedHa
       }
       if (invoke.kind === 'script' && invoke.ref) {
         try {
-          const scriptPath = safePath(root, invoke.ref);
+          const scriptPath = await safeExistingPath(root, invoke.ref);
           const info = await stat(scriptPath);
           if (!info.isFile()) throw new Error('not a file');
-          scripts.set(invoke.ref, await readFile(scriptPath, 'utf8'));
+          const source = await readFile(scriptPath, 'utf8');
+          scripts.set(invoke.ref, source);
+          invoke.scriptSource = source;
         } catch (error) {
           issues.push(`${workflow.id}.${state.id}: referenced Script '${invoke.ref}' cannot be loaded: ${error instanceof Error ? error.message : String(error)}`);
         }

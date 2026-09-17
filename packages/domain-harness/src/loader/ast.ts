@@ -18,6 +18,8 @@ export interface InvokeAst {
   expression?: string;
   input?: string;
   timeoutMs?: number;
+  /** Loader-frozen Script bytes. Internal only; populated for kind='script'. */
+  scriptSource?: string;
 }
 
 export interface RouteAst {
