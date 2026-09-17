@@ -85,7 +85,14 @@ export class ExpressionRuntime {
     logicalTime: string,
     options: ExpressionEvaluationOptions = {},
   ): Promise<JsonValue> {
-    assertExpressionPolicy(expression);
+    try {
+      assertExpressionPolicy(expression);
+    } catch (error) {
+      throw new ExpressionRuntimeError(
+        'expression_error',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
 
     const clockMs = Date.parse(logicalTime);
     if (!Number.isFinite(clockMs)) {
@@ -95,6 +102,12 @@ export class ExpressionRuntime {
     const inputJson = serializeInput(scope);
     const maxInputBytes = options.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES;
     const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+    if (!Number.isFinite(maxInputBytes) || maxInputBytes <= 0) {
+      throw new ExpressionRuntimeError('expression_error', 'maxInputBytes must be greater than zero');
+    }
+    if (!Number.isFinite(maxOutputBytes) || maxOutputBytes <= 0) {
+      throw new ExpressionRuntimeError('expression_error', 'maxOutputBytes must be greater than zero');
+    }
     if (Buffer.byteLength(inputJson, 'utf8') > maxInputBytes) {
       throw new ExpressionRuntimeError('expression_error', 'expression input exceeds maxInputBytes');
     }
@@ -108,20 +121,31 @@ export class ExpressionRuntime {
     }
 
     return new Promise<JsonValue>((resolve, reject) => {
-      const worker = new Worker(WORKER_SOURCE, {
-        eval: true,
-        env: {},
-        name: 'domain-harness-expr',
-        resourceLimits: options.resourceLimits ?? DEFAULT_RESOURCE_LIMITS,
-        workerData: {
-          expression,
-          inputJson,
-          clockMs,
-          clockIso,
-          timeoutMs,
-          maxOutputBytes,
-        },
-      });
+      let worker: Worker;
+      try {
+        worker = new Worker(WORKER_SOURCE, {
+          eval: true,
+          env: {},
+          name: 'domain-harness-expr',
+          resourceLimits: options.resourceLimits ?? DEFAULT_RESOURCE_LIMITS,
+          workerData: {
+            expression,
+            inputJson,
+            clockMs,
+            clockIso,
+            timeoutMs,
+            maxOutputBytes,
+          },
+        });
+      } catch (error) {
+        reject(
+          new ExpressionRuntimeError(
+            'expression_error',
+            `expression Worker could not start: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        return;
+      }
 
       let settled = false;
       const cleanup = (): void => {
@@ -180,12 +204,12 @@ export class ExpressionRuntime {
       });
 
       worker.once('exit', (code) => {
-        if (!settled && code !== 0) {
+        if (!settled) {
           finish(() =>
             reject(
               new ExpressionRuntimeError(
                 'expression_error',
-                `expression Worker exited unexpectedly with code ${code}`,
+                `expression Worker exited before returning a result with code ${code}`,
               ),
             ),
           );
