@@ -1,0 +1,13 @@
+initial: child_expr
+output: "steps.child_expr"
+states:
+  child_expr:
+    invoke:
+      expr: '{"text": input.text & "-child"}'
+    on:
+      done:
+        - target: completed
+  completed:
+    final: true
+  failed:
+    final: true
