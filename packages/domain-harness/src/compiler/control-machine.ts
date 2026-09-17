@@ -106,7 +106,7 @@ export function transitionControlState(
     );
   }
 
-  const snapshot = machine.resolveState({ value: currentStateId });
+  const snapshot = machine.resolveState({ value: currentStateId, context: undefined });
   const [nextSnapshot] = transition(machine, snapshot, {
     type: routeEventType(selection),
   });
