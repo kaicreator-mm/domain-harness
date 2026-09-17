@@ -33,8 +33,6 @@ const DEFAULT_RESOURCE_LIMITS: ResourceLimits = {
 };
 
 const WORKER_SOURCE = String.raw`
-const { parentPort, workerData } = require('node:worker_threads');
-
 function jsonOnly(value) {
   if (value === null) return true;
   const type = typeof value;
@@ -50,6 +48,9 @@ function jsonOnly(value) {
 }
 
 (async () => {
+  // Dynamic import bootstraps under both CommonJS and ESM interpretation of
+  // this eval'd source; a bare require() only works under CommonJS hosts.
+  const { parentPort, workerData } = await import('node:worker_threads');
   try {
     const module = await import('jsonata');
     const jsonata = module.default ?? module;
