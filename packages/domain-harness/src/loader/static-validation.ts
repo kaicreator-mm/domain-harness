@@ -67,6 +67,9 @@ export function validateWorkflowStructure(workflow: WorkflowAst): string[] {
       if (Object.keys(state.events).length > 0) {
         issues.push(`${workflow.id}.${stateId}: external events are allowed only on waiting states`);
       }
+      if (state.done.length === 0) {
+        issues.push(`${workflow.id}.${stateId}: executable state must declare at least one on.done route`);
+      }
       validateRouteFallback(state.done, `${workflow.id}.${stateId}.on.done`, issues);
       validateRouteFallback(state.error, `${workflow.id}.${stateId}.on.error`, issues);
     } else if (!state.final) {
