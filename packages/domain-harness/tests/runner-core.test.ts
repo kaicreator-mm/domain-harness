@@ -8,7 +8,7 @@ import type { JsonValue } from '../src/contracts/json.js';
 import { ToolRegistry } from '../src/execution/index.js';
 import type { LoadedHarness, SkillAst, WorkflowAst } from '../src/loader/ast.js';
 import { SqliteStore } from '../src/persistence/sqlite-store.js';
-import { deriveIdempotencyKey, RunCoordinator, type WorkflowStepHandler } from '../src/runner/index.js';
+import { deriveIdempotencyKey, RunCoordinator } from '../src/runner/index.js';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const passthroughAi: AIOperationPort = { async execute(request) { return request.input; } };
@@ -49,7 +49,6 @@ function harness(workflow: WorkflowAst, maxSteps = 100, skills = new Map<string,
 function context(
   loaded: LoadedHarness,
   tools: ToolRegistry,
-  workflowHandler?: WorkflowStepHandler,
   ai: AIOperationPort = passthroughAi,
 ) {
   const store = new SqliteStore({ path: ':memory:' });
@@ -59,7 +58,6 @@ function context(
     store,
     tools,
     ai,
-    ...(workflowHandler ? { workflowHandler } : {}),
     now: () => new Date(Date.UTC(2026, 8, 17, 0, 0, tick++)),
   });
   return { store, coordinator };
@@ -245,7 +243,7 @@ test('started Skill reruns through AIOperationPort and increments attempt', asyn
   const skills = new Map([[skill.id, skill]]);
   const workflow = singleStepWorkflow('main', { kind: 'skill', ref: 'score' });
   const tools = new ToolRegistry();
-  const { store, coordinator } = context(harness(workflow, 100, skills), tools, undefined, ai);
+  const { store, coordinator } = context(harness(workflow, 100, skills), tools, ai);
   coordinator.createRootRun({ runId: 'r3a', workflowId: 'main', input: { score: 1 } });
   const identity = insertStarted(store, 'r3a', 'skill', { score: 90 });
 
@@ -328,22 +326,4 @@ test('self-transition creates a new visit instead of reusing prior journal ident
   assert.equal(calls, 2);
   assert.deepEqual(store.listSteps('r5loop').map((step) => step.visit), [1, 2]);
   assert.equal(run.controlState.frames[0]?.visits.work, 3);
-});
-
-test('workflow Step uses internal handler seam without exposing XState', async () => {
-  const tools = new ToolRegistry();
-  let childCalls = 0;
-  const handler: WorkflowStepHandler = {
-    async execute(request) {
-      childCalls += 1;
-      assert.equal(request.workflowId, 'child');
-      return { child: true } satisfies JsonValue;
-    },
-  };
-  const workflow = singleStepWorkflow('main', { kind: 'workflow', ref: 'child' });
-  const { coordinator } = context(harness(workflow), tools, handler);
-  const run = coordinator.createRootRun({ runId: 'r6', workflowId: 'main', input: {} });
-  assert.equal(run.status, 'running');
-  assert.equal((await coordinator.drive('r6')).status, 'completed');
-  assert.equal(childCalls, 1);
 });
