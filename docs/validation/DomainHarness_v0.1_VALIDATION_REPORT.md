@@ -1,10 +1,10 @@
 # DomainHarness v0.1 — Validation Report
 
-**Report stage:** T-017 closeout preparation  
-**Version integration baseline entering T-017:** `22969fcca156ab47dfafff259490affed9d82baa`  
+**Report stage:** Version Closure preparation  
+**Version integration baseline after T-017:** `bfbce9f11776d7e2c12af6f267b5012951e9c5f9`  
 **Release qualification:** BLOCKED / NOT COMPLETE
 
-This report distinguishes implemented evidence from actually executed validation. No unexecuted gate is marked PASS.
+This report distinguishes repository integration from release qualification. No unexecuted gate is marked PASS.
 
 ## Executed evidence
 
@@ -37,7 +37,7 @@ GitHub Issue `kaicreator-mm/domain-harness#32` is closed after Build Host valida
 - CJ-01 `Skill -> Tool -> Expr -> Script -> Child Workflow -> Waiting Event -> completed`: PASS with AI/Tool each invoked exactly once;
 - idempotent replay, non-idempotent `interrupted`, completed-output reuse, definition-lock and running-only `resume()` behavior: PASS.
 
-T-013 and T-014 evidence prove their validated candidates. They do not substitute for the final post-T-017 exact-SHA release regression and cross-domain gates.
+T-013 and T-014 evidence prove their validated candidates. They do not substitute for the final closure candidate regression and cross-domain gates.
 
 ## Open mandatory validation
 
@@ -55,9 +55,9 @@ Tracking: `kaicreator-mm/city-atlas#23`.
 
 Assets and executable runner exist. Required Build Host run must use the same DomainHarness candidate as T-015, prove the required primitive categories, and confirm City Atlas canonical-state, provenance, privacy and Task/API semantics remain outside Runtime.
 
-### Final post-T-017 exact-SHA full regression — NOT_RUN
+### Final closure-candidate full regression — NOT_RUN
 
-After T-017 is merged, freeze one `v0.1` candidate SHA and execute at minimum:
+After version integration reaches `main`, freeze that exact repository candidate SHA and execute at minimum:
 
 ```text
 npm ci
@@ -76,14 +76,14 @@ Hidden Validation may run only after the visible candidate SHA is frozen and the
 ## Current decision
 
 ```text
-Implementation aggregation: READY FOR T-017 CLOSEOUT MERGE
+Task implementation aggregation: COMPLETE (T-001..T-017)
 Visible package/CJ validation: PASS through T-014
+Version branch integration to main: READY
 Cross-domain validation: NOT_RUN (Tally #54, City Atlas #23)
 Final exact-SHA regression: NOT_RUN
 Hidden Validation: NOT_RUN
 Release qualification: NOT READY
-Merge v0.1 -> main: BLOCKED BY MANDATORY VALIDATION
-Tag/release: BLOCKED BY MANDATORY VALIDATION
+Tag/publish/release: BLOCKED BY MANDATORY VALIDATION
 ```
 
-No architecture contradiction has been identified. No PRD scope or frozen technology choice was changed to reach this state.
+Merging the completed version branch into `main` establishes the repository integration baseline only; it does not certify or publish v0.1. No architecture contradiction has been identified, and no PRD scope or frozen technology choice was changed to reach this state.
