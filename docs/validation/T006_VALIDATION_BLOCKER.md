@@ -1,17 +1,16 @@
-# T-006 Validation Blocker
+# T-006 Validation Blocker — RESOLVED / SUPERSEDED
 
-Status: BLOCKED only for real-package execution; implementation may continue.
+**Historical status:** this file originally tracked an environment-only blocker before real JSONata/Worker execution was available. It is retained only as validation history and is **not a current blocker**.
 
-The current ChatGPT execution environment cannot resolve GitHub/npm hosts, so the real `jsonata@2.2.2` and Worker integration suite cannot execute here.
+## Resolution
 
-Required Build Host checks on the exact merged descendant:
+Real Build Host validation later exercised the selected JSONata 2.2.2 / Worker implementation through the package suites and release qualification evidence. The verified behavior includes:
 
-1. install canonical npm dependencies and lockfile;
-2. run `npm run typecheck`, `npm test`, `npm run build`;
-3. prove expression-local registration shadows built-in `$now()` and `$millis()` with the persisted logical clock;
-4. prove `$random()` / `$eval()` are rejected and normalized to `expression_error`;
-5. prove strict-Boolean route evaluation;
-6. prove hard Worker timeout and AbortSignal termination;
-7. prove JSON-only + serialized-size boundaries and Worker resource limits.
+- deterministic `$now()` / `$millis()` binding from the Runtime logical clock;
+- `$random()` / `$eval()` rejection;
+- strict-Boolean route evaluation;
+- Worker timeout / AbortSignal termination;
+- JSON-only and serialized-size boundaries;
+- Script/Expression focused suites and plain-ESM host execution.
 
-If deterministic clock shadowing fails with the selected JSONata 2.2.2 implementation, do not fall back to wall-clock time. Treat it as an implementation blocker for T-006/recovery semantics and preserve the frozen JSONata language choice.
+Current validation truth belongs to `docs/validation/DomainHarness_v0.1_VALIDATION_REPORT.md` and exact-SHA GitHub Issue evidence. Do not use this historical blocker file to infer current release status.
