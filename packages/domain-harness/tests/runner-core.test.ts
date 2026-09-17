@@ -327,3 +327,47 @@ test('self-transition creates a new visit instead of reusing prior journal ident
   assert.deepEqual(store.listSteps('r5loop').map((step) => step.visit), [1, 2]);
   assert.equal(run.controlState.frames[0]?.visits.work, 3);
 });
+
+test('rerun keeps the persisted startedAt logical time across attempts', async () => {
+  const tools = new ToolRegistry();
+  tools.register('put', { effect: 'idempotent', async execute() { return { ok: true }; } });
+  const workflow = singleStepWorkflow('main', { kind: 'tool', ref: 'put' });
+  const { store, coordinator } = context(harness(workflow), tools);
+  coordinator.createRootRun({ runId: 'r-stable', workflowId: 'main', input: {} });
+  const identity = { runId: 'r-stable', workflowInstanceId: 'root', stateId: 'work', visit: 1 };
+  const persistedStartedAt = '2026-09-17T05:00:00.000Z';
+  store.insertStartedStep({
+    ...identity,
+    kind: 'tool',
+    attempt: 1,
+    startedAt: persistedStartedAt,
+    input: {},
+    idempotencyKey: deriveIdempotencyKey(identity),
+  });
+
+  assert.equal((await coordinator.drive('r-stable')).status, 'completed');
+  assert.equal(store.getStep(identity)?.attempt, 2);
+  assert.equal(store.getStep(identity)?.startedAt, persistedStartedAt);
+});
+
+test('timed-out Script fails the Run and replay reuses the persisted error', async () => {
+  const tools = new ToolRegistry();
+  const workflow = singleStepWorkflow('main', {
+    kind: 'script',
+    ref: 'tests/fixtures/scripts/hang.mjs',
+    timeoutMs: 50,
+  });
+  const { store, coordinator } = context(harness(workflow), tools);
+  coordinator.createRootRun({ runId: 'r-script-timeout', workflowId: 'main', input: {} });
+
+  const run = await coordinator.drive('r-script-timeout');
+  assert.equal(run.status, 'failed');
+  assert.equal(run.error?.code, 'timeout');
+  const identity = { runId: 'r-script-timeout', workflowInstanceId: 'root', stateId: 'work', visit: 1 };
+  assert.equal(store.getStep(identity)?.status, 'failed');
+
+  const replay = await coordinator.drive('r-script-timeout');
+  assert.equal(replay.status, 'failed');
+  assert.equal(replay.error?.code, 'timeout');
+  assert.equal(store.getStep(identity)?.status, 'failed');
+});

@@ -1,24 +1,48 @@
 import assert from 'node:assert/strict';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import type { AIOperationPort } from '../src/contracts/ai.js';
 import { ToolRegistry } from '../src/execution/index.js';
-import type { LoadedHarness, WorkflowAst } from '../src/loader/ast.js';
+import type { LoadedHarness, SkillAst, WorkflowAst } from '../src/loader/ast.js';
 import { SqliteStore } from '../src/persistence/sqlite-store.js';
+import { ScriptExecutor } from '../src/script/index.js';
 import { deriveIdempotencyKey, RunCoordinator } from '../src/runner/index.js';
 
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ai: AIOperationPort = { async execute(request) { return request.input; } };
 
-function loaded(workflow: WorkflowAst): LoadedHarness {
+function loaded(workflow: WorkflowAst, skills = new Map<string, SkillAst>()): LoadedHarness {
   return {
-    root: process.cwd(),
+    root: packageRoot,
     manifest: { schemaVersion: '0.1', id: 'recovery-test', limits: { maxSteps: 20 } },
     workflows: new Map([[workflow.id, workflow]]),
-    skills: new Map(),
+    skills,
     scripts: new Map(),
     schemas: new Map(),
     childDependencies: new Map([[workflow.id, []]]),
     definitionHash: 'recovery-test-definition',
+  };
+}
+
+function invokeWorkflow(ref: { kind: 'tool'; ref: string } | { kind: 'skill'; ref: string } | { kind: 'script'; ref: string }): WorkflowAst {
+  return {
+    id: 'main',
+    sourcePath: 'main.yaml',
+    initial: 'work',
+    states: {
+      work: {
+        id: 'work',
+        final: false,
+        invoke: ref,
+        done: [{ target: 'ok' }],
+        error: [{ target: 'failed' }],
+        events: {},
+      },
+      ok: { id: 'ok', final: true, done: [], error: [], events: {} },
+      failed: { id: 'failed', final: true, done: [], error: [], events: {} },
+    },
   };
 }
 
@@ -114,5 +138,57 @@ test('Host Tool executes outside SQLite transaction', async () => {
   coordinator.createRootRun({ runId: 'tx', workflowId: 'main', input: {} });
 
   assert.equal((await coordinator.drive('tx')).status, 'completed');
+  assert.equal(observedInTransaction, false);
+});
+
+test('AI operation executes outside SQLite transaction', async () => {
+  const store = new SqliteStore({ path: ':memory:' });
+  let observedInTransaction = true;
+  const observingAi: AIOperationPort = {
+    async execute() {
+      observedInTransaction = store.db.inTransaction;
+      return {};
+    },
+  };
+  const skill: SkillAst = {
+    id: 'observe',
+    directory: '/harness/skills/observe',
+    instructions: 'Observe transaction state.',
+    sidecar: { output: { schema: 'out.json' }, resources: [] },
+    inputSchema: { type: 'object' },
+    outputSchema: { type: 'object' },
+    resources: [],
+  };
+  const coordinator = new RunCoordinator({
+    harness: loaded(invokeWorkflow({ kind: 'skill', ref: 'observe' }), new Map([[skill.id, skill]])),
+    store,
+    tools: new ToolRegistry(),
+    ai: observingAi,
+  });
+  coordinator.createRootRun({ runId: 'tx-ai', workflowId: 'main', input: {} });
+
+  assert.equal((await coordinator.drive('tx-ai')).status, 'completed');
+  assert.equal(observedInTransaction, false);
+});
+
+test('Script Worker executes outside SQLite transaction', async () => {
+  const store = new SqliteStore({ path: ':memory:' });
+  let observedInTransaction = true;
+  class ObservingScriptExecutor extends ScriptExecutor {
+    override async execute(...args: Parameters<ScriptExecutor['execute']>): ReturnType<ScriptExecutor['execute']> {
+      observedInTransaction = store.db.inTransaction;
+      return super.execute(...args);
+    }
+  }
+  const coordinator = new RunCoordinator({
+    harness: loaded(invokeWorkflow({ kind: 'script', ref: 'tests/fixtures/scripts/echo.mjs' })),
+    store,
+    tools: new ToolRegistry(),
+    ai,
+    scripts: new ObservingScriptExecutor(),
+  });
+  coordinator.createRootRun({ runId: 'tx-script', workflowId: 'main', input: { value: 21 } });
+
+  assert.equal((await coordinator.drive('tx-script')).status, 'completed');
   assert.equal(observedInTransaction, false);
 });
