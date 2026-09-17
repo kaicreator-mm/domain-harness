@@ -54,7 +54,10 @@ export class ToolRegistry {
     );
 
     const result = await runAbortable(
-      { signal: context.signal, timeoutMs: options.timeoutMs },
+      {
+        signal: context.signal,
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      },
       'tool_error',
       `Tool '${id}'`,
       async (signal) => registered.tool.execute(normalizedInput, { ...context, signal }),
