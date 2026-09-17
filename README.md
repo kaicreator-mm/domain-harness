@@ -44,6 +44,18 @@ start / send / wait / resume / cancel / get / listRuns
 
 XState, SQLite store/Runner internals and engine snapshots are not public API.
 
+## SDK documentation for downstream projects
+
+Start with `docs/sdk/README.md`.
+
+- `docs/sdk/DomainHarness_v0.1_SDK_USAGE.md` — short integration entry point;
+- `docs/sdk/DomainHarness_v0.1_SDK_REFERENCE.md` — complete consumer API/DSL/lifecycle/recovery reference;
+- `docs/sdk/DomainHarness_v0.1_AGENT_MIGRATION_GUIDE.md` — coding-Agent migration workflow, acceptance checklist and handoff prompt.
+
+Until v0.1 is formally release-qualified/tagged, downstream projects should pin an **exact DomainHarness commit SHA/tarball** rather than consume a moving branch as though it were a release.
+
+A downstream project remains authoritative for its domain/business state, API, database, authentication/authorization, credentials, external clients and AI provider/model strategy. DomainHarness provides generic durable execution mechanics only.
+
 ## Canonical development commands
 
 ```bash
@@ -63,7 +75,7 @@ Start with `docs/README.md` and `docs/DomainHarness_v0.1_INDEX.md`.
 - frozen Product authority: `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`, SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`;
 - architecture: `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`;
 - terminal Task DAG: `docs/implementation/DomainHarness_v0.1_TASK_DAG.md`;
-- SDK usage: `docs/sdk/DomainHarness_v0.1_SDK_USAGE.md`;
+- SDK: `docs/sdk/README.md`;
 - storage/recovery: `docs/operations/DomainHarness_v0.1_STORAGE_RECOVERY.md`;
 - validation: `docs/validation/DomainHarness_v0.1_VALIDATION_REPORT.md`;
 - release closeout: `docs/release/DomainHarness_v0.1_CLOSEOUT.md`.
@@ -74,12 +86,14 @@ v0.1 intentionally excludes static parallel composition, generic DAG execution, 
 
 ## Current release state
 
-The historical visible candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate quality hardening (#49/#50/#51), canonical test-flow hardening (#52/#53), frozen PRD provenance (#54/#55), supplemental dual-OS durability #42, and the minimal Woodpecker configuration (#59/#63) are complete.
+The historical visible candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate quality hardening (#49/#50/#51), canonical test-flow hardening (#52/#53), frozen PRD provenance (#54/#55), supplemental dual-OS durability #42, documentation closure (#58/#64), and minimal Woodpecker configuration (#59/#63) are complete on the `v0.1` line.
+
+The SDK documentation may be used by downstream projects to begin exact-SHA integration/refactoring before formal release qualification. That does not authorize tag/publish/release.
 
 Remaining before release qualification:
 
-- merge the documentation closure concern (#58);
-- freeze the exact successor SHA and execute visible rerun #60;
+- freeze/update #60 to the exact `v0.1` SHA after all current documentation concerns merge;
+- execute visible rerun #60;
 - run owner-held Hidden Validation;
 - #57/#56 remain repository-process follow-ups because this repository is not yet connected to Woodpecker and `main` protection cannot require an unknown status context.
 
