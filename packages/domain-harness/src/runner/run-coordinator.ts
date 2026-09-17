@@ -15,6 +15,7 @@ import type {
   RuntimeControlState,
   StepIdentity,
   StoredRun,
+  StoredStep,
   WorkflowFrameState,
 } from '../persistence/types.js';
 import { ScriptExecutor } from '../script/index.js';
@@ -28,8 +29,8 @@ import {
 import { RouteEvaluator, type RouteScope } from './route-evaluator.js';
 import {
   normalizeStepError,
+  RunnerExecutionError,
   StepDispatcher,
-  type WorkflowStepHandler,
 } from './step-dispatcher.js';
 
 export interface CreateRootRunRequest {
@@ -46,8 +47,9 @@ export interface RunCoordinatorOptions {
   ai: AIOperationPort;
   expressions?: ExpressionRuntime;
   scripts?: ScriptExecutor;
-  workflowHandler?: WorkflowStepHandler;
   now?: () => Date;
+  /** Internal v0.1 defensive bound. Not part of the public Harness DSL. */
+  maxChildWorkflowDepth?: number;
 }
 
 interface StepOutcome {
@@ -57,11 +59,17 @@ interface StepOutcome {
   error?: HarnessError;
 }
 
+type StepExecutionResult =
+  | { kind: 'outcome'; outcome: StepOutcome }
+  | { kind: 'child-active' };
+
 interface BaseScope extends JsonObject {
   input: JsonValue;
   steps: Record<string, JsonValue>;
   run: { visits: Record<string, number> };
 }
+
+const DEFAULT_MAX_CHILD_WORKFLOW_DEPTH = 32;
 
 export class RunCoordinator {
   private readonly harness: LoadedHarness;
@@ -72,6 +80,7 @@ export class RunCoordinator {
   private readonly dispatcher: StepDispatcher;
   private readonly machines = new Map<string, ReturnType<typeof compileControlMachine>>();
   private readonly now: () => Date;
+  private readonly maxChildWorkflowDepth: number;
 
   constructor(options: RunCoordinatorOptions) {
     this.harness = options.harness;
@@ -87,9 +96,12 @@ export class RunCoordinator {
       this.tools,
       skills,
       (skillId) => this.harness.skills.get(skillId),
-      options.workflowHandler,
     );
     this.now = options.now ?? (() => new Date());
+    this.maxChildWorkflowDepth = options.maxChildWorkflowDepth ?? DEFAULT_MAX_CHILD_WORKFLOW_DEPTH;
+    if (!Number.isInteger(this.maxChildWorkflowDepth) || this.maxChildWorkflowDepth < 1) {
+      throw new TypeError('maxChildWorkflowDepth must be a positive integer');
+    }
 
     for (const [workflowId, workflow] of this.harness.workflows) {
       this.machines.set(workflowId, compileControlMachine(workflow));
@@ -150,9 +162,9 @@ export class RunCoordinator {
         return run;
       }
 
-      let outcome: StepOutcome;
+      let execution: StepExecutionResult;
       try {
-        outcome = await this.executeStep(run, frame, state, signal);
+        execution = await this.executeStep(run, frame, state, signal);
       } catch (error) {
         if (error instanceof StepLimitError) {
           return this.failRun(run, {
@@ -160,9 +172,18 @@ export class RunCoordinator {
             message: `Run exceeded maxSteps=${this.harness.manifest.limits.maxSteps}`,
           });
         }
-        return this.failRun(run, normalizeStepError(state.invoke.kind, error));
+        const normalized = normalizeStepError(state.invoke.kind, error);
+        if (frame.workflowInstanceId === 'root') return this.failRun(run, normalized);
+        run = this.failChildExecution(run, frame, normalized);
+        continue;
       }
 
+      if (execution.kind === 'child-active') {
+        run = this.requireRun(run.runId);
+        continue;
+      }
+
+      const outcome = execution.outcome;
       const routes = outcome.routeClass === 'done' ? state.done : state.error;
       const routeScope = this.buildRouteScope(run, frame, outcome);
       let selection;
@@ -179,7 +200,9 @@ export class RunCoordinator {
           code: 'expression_error',
           message: error instanceof Error ? error.message : String(error),
         };
-        return this.failRun(run, normalized);
+        if (frame.workflowInstanceId === 'root') return this.failRun(run, normalized);
+        run = this.failChildExecution(run, frame, normalized);
+        continue;
       }
 
       const transition = transitionControlState(
@@ -212,7 +235,7 @@ export class RunCoordinator {
     frame: WorkflowFrameState,
     state: StateAst,
     signal: AbortSignal,
-  ): Promise<StepOutcome> {
+  ): Promise<StepExecutionResult> {
     const invoke = state.invoke;
     if (!invoke) throw new Error('executeStep requires an invoke state');
     const visit = frame.visits[state.id] ?? 1;
@@ -230,16 +253,22 @@ export class RunCoordinator {
 
     if (step?.status === 'completed') {
       return {
-        routeClass: 'done',
-        logicalTime: step.startedAt,
-        output: (step.output ?? null) as JsonValue,
+        kind: 'outcome',
+        outcome: {
+          routeClass: 'done',
+          logicalTime: step.startedAt,
+          output: (step.output ?? null) as JsonValue,
+        },
       };
     }
     if (step?.status === 'failed') {
       return {
-        routeClass: 'error',
-        logicalTime: step.startedAt,
-        error: step.error ?? normalizeStepError(invoke.kind, new Error('persisted Step failed without error')),
+        kind: 'outcome',
+        outcome: {
+          routeClass: 'error',
+          logicalTime: step.startedAt,
+          error: step.error ?? normalizeStepError(invoke.kind, new Error('persisted Step failed without error')),
+        },
       };
     }
 
@@ -254,7 +283,10 @@ export class RunCoordinator {
           completedAt: this.now().toISOString(),
           error,
         });
-        return { routeClass: 'error', logicalTime: step.startedAt, error };
+        return {
+          kind: 'outcome',
+          outcome: { routeClass: 'error', logicalTime: step.startedAt, error },
+        };
       }
     }
 
@@ -268,8 +300,8 @@ export class RunCoordinator {
       }
       logicalTime = this.now().toISOString();
       const baseScope = this.buildBaseScope(run, frame);
-      input = state.invoke.input
-        ? await this.expressions.evaluate(state.invoke.input, baseScope, logicalTime)
+      input = invoke.input
+        ? await this.expressions.evaluate(invoke.input, baseScope, logicalTime)
         : this.frameInput(run, frame);
       const idempotencyKey = deriveIdempotencyKey(identity);
       this.store.insertStartedStep({
@@ -289,6 +321,38 @@ export class RunCoordinator {
         step = incrementStartedAttempt(this.store, identity);
       }
       attempt = step.attempt;
+    }
+
+    if (invoke.kind === 'workflow') {
+      try {
+        this.activateChildWorkflow(run, frame, state, step);
+        return { kind: 'child-active' };
+      } catch (error) {
+        const normalized = normalizeStepError('workflow', error);
+        const committed = this.store.completeStep(identity, {
+          status: 'failed',
+          completedAt: this.now().toISOString(),
+          error: normalized,
+        });
+        if (!committed) {
+          const terminal = this.store.getStep(identity);
+          if (terminal?.status === 'failed') {
+            return {
+              kind: 'outcome',
+              outcome: {
+                routeClass: 'error',
+                logicalTime: terminal.startedAt,
+                error: terminal.error ?? normalized,
+              },
+            };
+          }
+          throw new Error('Child Workflow activation lost journal race');
+        }
+        return {
+          kind: 'outcome',
+          outcome: { routeClass: 'error', logicalTime, error: normalized },
+        };
+      }
     }
 
     const expressionScope = this.buildExpressionStepScope(run, frame, input);
@@ -316,14 +380,20 @@ export class RunCoordinator {
         const terminal = this.store.getStep(identity);
         if (terminal?.status === 'completed') {
           return {
-            routeClass: 'done',
-            logicalTime: terminal.startedAt,
-            output: (terminal.output ?? null) as JsonValue,
+            kind: 'outcome',
+            outcome: {
+              routeClass: 'done',
+              logicalTime: terminal.startedAt,
+              output: (terminal.output ?? null) as JsonValue,
+            },
           };
         }
         throw new Error('Step completion lost journal race');
       }
-      return { routeClass: 'done', logicalTime, output };
+      return {
+        kind: 'outcome',
+        outcome: { routeClass: 'done', logicalTime, output },
+      };
     } catch (error) {
       const normalized = normalizeStepError(invoke.kind, error);
       this.store.completeStep(identity, {
@@ -331,8 +401,79 @@ export class RunCoordinator {
         completedAt: this.now().toISOString(),
         error: normalized,
       });
-      return { routeClass: 'error', logicalTime, error: normalized };
+      return {
+        kind: 'outcome',
+        outcome: { routeClass: 'error', logicalTime, error: normalized },
+      };
     }
+  }
+
+  private activateChildWorkflow(
+    run: StoredRun,
+    parentFrame: WorkflowFrameState,
+    parentState: StateAst,
+    parentStep: StoredStep,
+  ): void {
+    const targetWorkflowId = parentState.invoke?.ref;
+    if (!targetWorkflowId) {
+      throw new RunnerExecutionError('child_workflow_error', 'Workflow Step is missing child workflow ref');
+    }
+    const childWorkflow = this.harness.workflows.get(targetWorkflowId);
+    if (!childWorkflow) {
+      throw new RunnerExecutionError(
+        'child_workflow_error',
+        `Child Workflow '${targetWorkflowId}' is not loaded in this Harness`,
+      );
+    }
+
+    const frames = run.controlState.frames;
+    const top = frames.at(-1);
+    if (!top || top.workflowInstanceId !== parentFrame.workflowInstanceId) {
+      throw new RunnerExecutionError('child_workflow_error', 'Parent Workflow frame is not active');
+    }
+    if (frames.some((candidate) => candidate.workflowId === childWorkflow.id)) {
+      throw new RunnerExecutionError(
+        'child_workflow_error',
+        `Runtime recursion defence rejected active Workflow '${childWorkflow.id}'`,
+      );
+    }
+    const activeChildDepth = frames.length - 1;
+    if (activeChildDepth >= this.maxChildWorkflowDepth) {
+      throw new RunnerExecutionError(
+        'child_workflow_error',
+        `Child Workflow depth exceeds internal limit ${this.maxChildWorkflowDepth}`,
+      );
+    }
+
+    const childWorkflowInstanceId = deriveChildWorkflowInstanceId(
+      parentFrame.workflowInstanceId,
+      parentState.id,
+      parentStep.visit,
+    );
+    if (frames.some((candidate) => candidate.workflowInstanceId === childWorkflowInstanceId)) {
+      throw new RunnerExecutionError(
+        'child_workflow_error',
+        `Child Workflow instance '${childWorkflowInstanceId}' is already active`,
+      );
+    }
+
+    const initial = initialControlState(this.requireMachine(childWorkflow.id));
+    const childFrame: WorkflowFrameState = {
+      workflowId: childWorkflow.id,
+      workflowInstanceId: childWorkflowInstanceId,
+      stateId: initial.stateId,
+      visits: { [initial.stateId]: 1 },
+      lastDecisionAt: parentStep.startedAt,
+    };
+    const updatedAt = this.now().toISOString();
+    const updated = this.store.updateRun(run.runId, {
+      controlState: {
+        schemaVersion: 1,
+        frames: [...frames, childFrame],
+      },
+      updatedAt,
+    });
+    if (!updated) throw new Error(`Run '${run.runId}' disappeared while pushing Child Workflow frame`);
   }
 
   private async finishFinalState(
@@ -341,6 +482,10 @@ export class RunCoordinator {
     workflow: WorkflowAst,
     state: StateAst,
   ): Promise<StoredRun> {
+    if (frame.workflowInstanceId !== 'root') {
+      return this.finishChildFinalState(run, frame, workflow, state);
+    }
+
     if (state.id === 'failed') {
       return this.failRun(run, latestFrameError(this.store, run.runId, frame.workflowInstanceId));
     }
@@ -369,6 +514,148 @@ export class RunCoordinator {
       updatedAt,
     });
     return this.requireRun(run.runId);
+  }
+
+  private async finishChildFinalState(
+    run: StoredRun,
+    frame: WorkflowFrameState,
+    workflow: WorkflowAst,
+    state: StateAst,
+  ): Promise<StoredRun> {
+    if (state.id === 'failed') {
+      const cause = latestFrameError(this.store, run.runId, frame.workflowInstanceId);
+      return this.completeAndPopChild(
+        run,
+        frame,
+        undefined,
+        this.childWorkflowError(workflow.id, frame.workflowInstanceId, cause),
+      );
+    }
+
+    if (!workflow.output) {
+      return this.completeAndPopChild(
+        run,
+        frame,
+        undefined,
+        this.childWorkflowError(
+          workflow.id,
+          frame.workflowInstanceId,
+          { code: 'child_workflow_error', message: 'Child Workflow has no output expression' },
+        ),
+      );
+    }
+
+    try {
+      const output = await this.expressions.evaluate(
+        workflow.output,
+        this.buildBaseScope(run, frame),
+        frame.lastDecisionAt,
+      );
+      return this.completeAndPopChild(run, frame, output);
+    } catch (error) {
+      const cause: HarnessError = error instanceof ExpressionRuntimeError
+        ? { code: error.code, message: error.message }
+        : { code: 'expression_error', message: error instanceof Error ? error.message : String(error) };
+      return this.completeAndPopChild(
+        run,
+        frame,
+        undefined,
+        this.childWorkflowError(workflow.id, frame.workflowInstanceId, cause),
+      );
+    }
+  }
+
+  private failChildExecution(
+    run: StoredRun,
+    frame: WorkflowFrameState,
+    cause: HarnessError,
+  ): StoredRun {
+    return this.completeAndPopChild(
+      run,
+      frame,
+      undefined,
+      this.childWorkflowError(frame.workflowId, frame.workflowInstanceId, cause),
+    );
+  }
+
+  private completeAndPopChild(
+    run: StoredRun,
+    childFrame: WorkflowFrameState,
+    output?: JsonValue,
+    error?: HarnessError,
+  ): StoredRun {
+    const frames = run.controlState.frames;
+    const active = frames.at(-1);
+    const parentFrame = frames.at(-2);
+    if (!active || active.workflowInstanceId !== childFrame.workflowInstanceId || !parentFrame) {
+      throw new Error('Child Workflow terminal reconciliation requires active child and parent frames');
+    }
+
+    const parentWorkflow = this.requireWorkflow(parentFrame.workflowId);
+    const parentState = parentWorkflow.states[parentFrame.stateId];
+    const parentVisit = parentFrame.visits[parentFrame.stateId] ?? 0;
+    if (!parentState?.invoke || parentState.invoke.kind !== 'workflow' || parentVisit < 1) {
+      throw new Error('Parent frame does not point at a valid Workflow Step');
+    }
+    if (parentState.invoke.ref !== childFrame.workflowId) {
+      throw new Error(
+        `Parent Workflow Step expected child '${parentState.invoke.ref}', active child is '${childFrame.workflowId}'`,
+      );
+    }
+
+    const parentIdentity: StepIdentity = {
+      runId: run.runId,
+      workflowInstanceId: parentFrame.workflowInstanceId,
+      stateId: parentFrame.stateId,
+      visit: parentVisit,
+    };
+    const parentStep = this.store.getStep(parentIdentity);
+    if (!parentStep || parentStep.kind !== 'workflow' || parentStep.status !== 'started') {
+      throw new Error('Parent Workflow Step journal is not in started state during child reconciliation');
+    }
+
+    const completedAt = this.now().toISOString();
+    this.store.transaction(() => {
+      const committed = this.store.completeStep(parentIdentity, error
+        ? { status: 'failed', completedAt, error }
+        : { status: 'completed', completedAt, output: output ?? null });
+      if (!committed) throw new Error('Parent Workflow Step terminal commit lost journal race');
+
+      const updated = this.store.updateRun(run.runId, {
+        controlState: {
+          schemaVersion: 1,
+          frames: frames.slice(0, -1),
+        },
+        updatedAt: completedAt,
+      });
+      if (!updated) throw new Error(`Run '${run.runId}' disappeared during child reconciliation`);
+    });
+
+    return this.requireRun(run.runId);
+  }
+
+  private childWorkflowError(
+    workflowId: string,
+    workflowInstanceId: string,
+    cause?: HarnessError,
+  ): HarnessError {
+    const details: JsonObject = {
+      childWorkflowId: workflowId,
+      childWorkflowInstanceId: workflowInstanceId,
+    };
+    if (cause) {
+      const serializedCause: JsonObject = {
+        code: cause.code,
+        message: cause.message,
+      };
+      if (cause.details !== undefined) serializedCause.details = cause.details;
+      details.cause = serializedCause;
+    }
+    return {
+      code: 'child_workflow_error',
+      message: `Child Workflow '${workflowId}' failed`,
+      details,
+    };
   }
 
   private failRun(run: StoredRun, error?: HarnessError): StoredRun {
@@ -406,10 +693,28 @@ export class RunCoordinator {
   }
 
   private frameInput(run: StoredRun, frame: WorkflowFrameState): JsonValue {
-    if (frame.workflowInstanceId !== 'root') {
-      throw new Error('Child frame input resolution belongs to T-010');
+    if (frame.workflowInstanceId === 'root') return run.input as JsonValue;
+
+    const frameIndex = run.controlState.frames.findIndex(
+      (candidate) => candidate.workflowInstanceId === frame.workflowInstanceId,
+    );
+    if (frameIndex <= 0) {
+      throw new Error(`Child Workflow frame '${frame.workflowInstanceId}' has no persisted parent frame`);
     }
-    return run.input as JsonValue;
+    const parentFrame = run.controlState.frames[frameIndex - 1];
+    if (!parentFrame) throw new Error('Child Workflow parent frame disappeared');
+    const parentVisit = parentFrame.visits[parentFrame.stateId] ?? 0;
+    if (parentVisit < 1) throw new Error('Child Workflow parent visit is invalid');
+    const parentStep = this.store.getStep({
+      runId: run.runId,
+      workflowInstanceId: parentFrame.workflowInstanceId,
+      stateId: parentFrame.stateId,
+      visit: parentVisit,
+    });
+    if (!parentStep || parentStep.kind !== 'workflow' || parentStep.input === undefined) {
+      throw new Error(`Child Workflow '${frame.workflowInstanceId}' cannot recover its parent Step input`);
+    }
+    return parentStep.input as JsonValue;
   }
 
   private requireRun(runId: string): StoredRun {
@@ -429,6 +734,19 @@ export class RunCoordinator {
     if (!machine) throw new Error(`Workflow '${workflowId}' has no compiled control machine`);
     return machine;
   }
+}
+
+export function deriveChildWorkflowInstanceId(
+  parentWorkflowInstanceId: string,
+  parentStateId: string,
+  parentVisit: number,
+): string {
+  if (!parentWorkflowInstanceId) throw new TypeError('parentWorkflowInstanceId must be non-empty');
+  if (!parentStateId) throw new TypeError('parentStateId must be non-empty');
+  if (!Number.isInteger(parentVisit) || parentVisit < 1) {
+    throw new TypeError('parentVisit must be a positive integer');
+  }
+  return `${parentWorkflowInstanceId}/${parentStateId}#${parentVisit}`;
 }
 
 class StepLimitError extends Error {}
