@@ -4,7 +4,7 @@ DomainHarness is the shared **Domain Harness Runtime** and contract SDK used by 
 
 Package: `@kaicreator/domain-harness`  
 Target: v0.1  
-Status: implementation complete; final successor-candidate release qualification still in progress.
+Status: implementation and visible executable/package validation complete; owner-held Hidden Validation remains before formal Release Qualification.
 
 ## What belongs here
 
@@ -86,15 +86,16 @@ v0.1 intentionally excludes static parallel composition, generic DAG execution, 
 
 ## Current release state
 
-The historical visible candidate `edbe2b53c936107ba4dfbb4eef7aef5408c26b39` passed the visible release gates. Post-candidate quality hardening (#49/#50/#51), canonical test-flow hardening (#52/#53), frozen PRD provenance (#54/#55), supplemental dual-OS durability #42, documentation closure (#58/#64), and minimal Woodpecker configuration (#59/#63) are complete on the `v0.1` line.
+The post-audit executable/package tree at `1835f3f31ca483dc7bd997a545391f622d38be63` passed the full visible gate in #60: **117/117 tests, 0 skipped**, package/plain-Node consumer, focused recovery/Worker/definition-lock suites, and Tally + City Atlas runners.
 
-The SDK documentation may be used by downstream projects to begin exact-SHA integration/refactoring before formal release qualification. That does not authorize tag/publish/release.
+Subsequent SDK documentation changes do not modify `packages/domain-harness/**`, package/lock files, Runtime, tests or CI; their validation carry-forward is recorded in #60 and Release Closure #39 using explicit Git tree/diff equivalence.
 
-Remaining before release qualification:
+The SDK documentation may therefore be used by downstream projects for exact-SHA integration/refactoring now. This does not authorize tag/publish/release.
 
-- freeze/update #60 to the exact `v0.1` SHA after all current documentation concerns merge;
-- execute visible rerun #60;
-- run owner-held Hidden Validation;
-- #57/#56 remain repository-process follow-ups because this repository is not yet connected to Woodpecker and `main` protection cannot require an unknown status context.
+Remaining Release Qualification gate:
+
+- owner-held Hidden Validation on the final intended `v0.1` head tracked by #39.
+
+Repository-process follow-ups #57/#56 remain separate: the repository is not yet connected to Woodpecker, and `main` protection cannot require an unknown emitted status context.
 
 Therefore v0.1 is **not yet authorized for tag/publish/release**.
