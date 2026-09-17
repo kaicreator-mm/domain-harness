@@ -1,0 +1,1 @@
+Current ChatGPT execution environment cannot perform the repository clean npm install/build/test tuple. This is an environment validation gap only; it does not change T-014 implementation semantics or release criteria.
