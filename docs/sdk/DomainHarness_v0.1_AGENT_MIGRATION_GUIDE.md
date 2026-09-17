@@ -1,89 +1,89 @@
 # DomainHarness v0.1 — Agent Migration Guide
 
-> Purpose: give a coding Agent enough contract, boundaries and workflow to refactor an existing project onto DomainHarness without moving domain authority into the SDK or relying on private Runtime internals.
+> Purpose: give a coding Agent a safe, repeatable path for refactoring an existing project onto `@kaicreator/domain-harness` without moving domain authority into the SDK or depending on private Runtime internals.
 >
-> Use together with `DomainHarness_v0.1_SDK_REFERENCE.md`.
+> Read together with `DomainHarness_v0.1_SDK_REFERENCE.md`.
 
-## 1. Migration goal
+## 1. Migration objective
 
-A successful migration does **not** mean "rewrite the project as workflows".
+A successful migration does **not** mean “rewrite the project as workflows”. It means:
 
-It means:
+1. preserve the project’s existing domain model, APIs, database and business authority;
+2. move only durable orchestration/execution mechanics into DomainHarness;
+3. keep external I/O and side effects behind host Tools;
+4. keep provider/model routing behind the project’s AI Runtime adapter;
+5. keep deterministic calculations in Expr or Script where appropriate;
+6. use Waiting Events for durable external/human continuation points;
+7. migrate incrementally by Critical Journey rather than replacing the whole project at once.
 
-1. preserve the project's domain model, APIs, database and business authority;
-2. identify deterministic orchestration that currently lives in controllers/services/jobs/prompts;
-3. express only that orchestration through DomainHarness primitives;
-4. keep external I/O and side effects behind host Tools;
-5. keep AI provider/model routing behind the project's AI Runtime adapter;
-6. preserve application-facing contracts unless the project explicitly approves a contract change;
-7. migrate incrementally by Critical Journey rather than replacing the whole application at once.
+## 2. Boundary decision table
 
-## 2. First decision: should this logic move into DomainHarness?
+Before changing code, classify each current concern.
 
-Use this table before changing code.
-
-| Existing concern | DomainHarness mapping | Keep outside DomainHarness when... |
+| Existing concern | DomainHarness mapping | Ownership rule |
 |---|---|---|
-| LLM prompt + structured response | Skill | it is provider/runtime infrastructure rather than domain capability |
-| REST/DB/file/queue/payment/etc. call | Tool | never move credentials or client ownership into Harness assets |
-| JSON projection/filter/routing expression | Expr / route `when` | it requires external I/O |
-| deterministic trusted code | Script | it performs external side effects or needs secret-bearing host context |
-| reusable sequential sub-process | Child Workflow | it is actually independent parallel/DAG work |
-| human/system approval or external callback | Waiting state + event | the event is merely an implementation detail already resolved synchronously |
-| domain entity state machine | usually keep in domain | DomainHarness must not become the authoritative business data model |
-| provider/model selection | AI Runtime / host adapter | never encode provider routing in Workflow YAML |
-| secret/credential handling | host code | never place secrets in SKILL/resources/Workflow/Run input merely for convenience |
+| LLM prompt + structured result | Skill | provider/model routing stays in host AI Runtime |
+| REST / DB / file / queue / payment call | Tool | credentials/client ownership stays in host code |
+| compact JSON transform/query/routing logic | Expr | no external I/O |
+| deterministic trusted code | Script | JSON-in/JSON-out; no business side effects |
+| reusable sequential sub-process | Child Workflow | same Harness only in v0.1 |
+| approval/callback/external continuation | Waiting state + event | authentication/authorization stays in host API |
+| authoritative entity/business state | usually stays in project | DomainHarness must not become the domain database |
+| provider/model selection | AI Runtime adapter | never encode provider selection in Workflow YAML |
+| secrets/credentials | host code | never store in Harness assets merely for convenience |
 
-### Strong rule
+Rule of thumb:
 
-If the code answers **"what does this business entity mean / what is valid domain state?"**, it probably remains in the domain project.
-
-If the code answers **"what execution step comes next, what should be invoked, how do we wait/recover?"**, it is a candidate for DomainHarness.
+```text
+“What does this business entity mean?”      → domain project
+“What execution step happens next?”         → candidate for DomainHarness
+```
 
 ## 3. Required inputs for the Agent
 
-Before implementation, gather:
+Before implementation, the Agent must have:
 
-- exact DomainHarness commit SHA to integrate;
-- SDK Reference file from that SHA;
-- current project architecture and domain authority boundaries;
+- an exact DomainHarness commit SHA to integrate;
+- `DomainHarness_v0.1_SDK_REFERENCE.md` from that same SHA;
+- this migration guide from that same SHA;
+- the downstream project’s architecture/development standard;
+- the project’s domain-authority boundaries;
 - one Critical Journey to migrate first;
-- current tests for that journey;
-- existing AI abstraction/AI Runtime boundary;
-- existing external side-effect integrations;
-- persistence/transaction ownership rules;
-- project coding/CI standards.
+- current tests/fixtures for that journey;
+- current AI abstraction/AI Runtime boundary;
+- current external side-effect integrations;
+- persistence and transaction ownership rules.
 
-Do not start by generating Workflow YAML from source code automatically. First create a migration map and have it reviewed.
+Do not begin by auto-generating Workflow YAML from source code. First produce a migration map and review it.
 
-## 4. Phase A — inventory the current journey
+## 4. Phase A — inventory one Critical Journey
 
-For one journey, produce a table like:
+Create a table before implementation.
 
-| Current step | Current implementation | Side effect? | Retry/idempotency | Proposed primitive |
+| Current step | Existing implementation | Side effect? | Replay/idempotency | Proposed mapping |
 |---|---|---:|---|---|
-| classify request | prompt in service | no | replayable | Skill |
-| load customer | repository/API | read only | replayable | Tool `effect:none` |
-| calculate fields | utility function | no | replayable | Expr or Script |
-| create external order | API write | yes | provider supports key | Tool `effect:idempotent` |
-| charge legacy system | external irreversible call | yes | no safe dedupe | Tool `effect:non-idempotent` |
-| approval | controller polling | external event | n/a | Waiting Event |
+| classify request | prompt/service | no | replayable | Skill |
+| load customer | repository/API read | external read | replayable | Tool `effect:none` |
+| calculate fields | utility | no | replayable | Expr or Script |
+| create external order | API write | yes | provider supports dedupe key | Tool `effect:idempotent` |
+| legacy charge | irreversible API | yes | no safe dedupe | Tool `effect:non-idempotent` |
+| approval | callback/polling | external continuation | n/a | Waiting Event |
 
-The Agent must explicitly justify every Tool `effect` classification.
+The Agent must justify every Tool `effect` classification with real behavior of the external system.
 
-## 5. Phase B — define the Harness asset root
+## 5. Phase B — create the Harness boundary
 
-Recommended project layout:
+Recommended shape:
 
 ```text
 <project>/
 ├─ src/
-│  ├─ domain/                 # existing domain authority
-│  ├─ infrastructure/         # DB/API/queues/etc.
+│  ├─ domain/                  # existing domain authority
+│  ├─ infrastructure/          # existing DB/API/queue clients
 │  └─ harness/
-│     ├─ runtime.ts           # SDK assembly/adapters
-│     ├─ tools/               # host Tool implementations
-│     └─ ai-port.ts           # provider-neutral adapter
+│     ├─ runtime.ts            # SDK assembly
+│     ├─ ai-port.ts            # AIOperationPort adapter
+│     └─ tools/                # host Tool adapters
 ├─ harness/
 │  ├─ harness.yaml
 │  ├─ workflows/
@@ -93,23 +93,22 @@ Recommended project layout:
 └─ tests/
 ```
 
-The exact project layout may vary, but keep this ownership split:
+Ownership must stay clear:
 
 ```text
-Harness assets = declarative executable definition
-Host TypeScript = adapters, side effects, credentials, domain services
-Domain model = existing project authority
+Harness assets   = executable orchestration definition
+Host TypeScript  = adapters, credentials, external clients, domain services
+Domain model     = existing project authority
 ```
 
-Do not put `.env`, tokens, DB credentials or private client configuration under the Harness root.
+Do not put `.env`, API keys, DB credentials or secret-bearing configuration under the Harness root.
 
-## 6. Phase C — create the runtime adapter
+## 6. Phase C — create one application-owned Runtime assembly point
 
-Create exactly one application-owned assembly point.
-
-Example:
+Use a single host-owned factory module. On ESM projects, use `fileURLToPath()` instead of `URL.pathname` so the path is correct on Windows as well as Unix-like systems.
 
 ```ts
+import { fileURLToPath } from 'node:url';
 import {
   createDomainHarness,
   type AIOperationPort,
@@ -124,7 +123,7 @@ export async function createProjectHarness() {
   const tools: Record<string, HarnessTool> = buildProjectTools();
 
   return createDomainHarness({
-    root: new URL('../../harness', import.meta.url).pathname,
+    root: fileURLToPath(new URL('../../harness/', import.meta.url)),
     sqlitePath: process.env.DOMAIN_HARNESS_DB ?? './data/domain-harness.sqlite',
     ai,
     tools,
@@ -132,15 +131,14 @@ export async function createProjectHarness() {
 }
 ```
 
-This file is the integration seam. Application code should not instantiate Loader, SqliteStore, Runner, XState or other internals itself.
+Application code must not instantiate or import Loader, `SqliteStore`, Runner, XState, recovery internals or raw persistence types.
 
-## 7. Phase D — implement Tools as adapters, not new domain layers
+## 7. Phase D — adapt external behavior through Tools
 
-A Tool should be thin:
+A Tool should adapt an existing domain/infrastructure capability instead of becoming a new domain layer.
 
 ```ts
 import type { HarnessTool } from '@kaicreator/domain-harness';
-import { customerRepository } from '../../infrastructure/customer-repository.js';
 
 export const loadCustomerTool: HarnessTool<
   { customerId: string },
@@ -150,17 +148,12 @@ export const loadCustomerTool: HarnessTool<
   async execute(input, ctx) {
     ctx.signal.throwIfAborted();
     const customer = await customerRepository.get(input.customerId);
-    return {
-      customerId: customer.id,
-      name: customer.name,
-    };
+    return { customerId: customer.id, name: customer.name };
   },
 };
 ```
 
-Do not duplicate domain validation already owned by domain services unless the Tool boundary needs input/output schema validation.
-
-### Idempotent write example
+### Idempotent write
 
 ```ts
 export const createOrderTool: HarnessTool = {
@@ -174,7 +167,9 @@ export const createOrderTool: HarnessTool = {
 };
 ```
 
-### Non-idempotent write example
+Only classify a write as `idempotent` when the target system really honors an equivalent deduplication contract.
+
+### Non-idempotent write
 
 ```ts
 export const legacyChargeTool: HarnessTool = {
@@ -185,11 +180,11 @@ export const legacyChargeTool: HarnessTool = {
 };
 ```
 
-Do not add host-side automatic retries around `non-idempotent` Tools unless the domain integration itself provides a proven deduplication contract. Crash replay is deliberately blocked for this class.
+Do not wrap a `non-idempotent` Tool in automatic host retries. If the Runtime recovers a persisted `started` non-idempotent Tool Step, v0.1 deliberately refuses automatic replay.
 
-## 8. Phase E — adapt AI without leaking providers
+## 8. Phase E — adapt the project AI Runtime
 
-The project adapter receives a provider-neutral request and maps it to the project's existing AI Runtime.
+DomainHarness exposes a provider-neutral AI boundary:
 
 ```ts
 import type {
@@ -216,28 +211,27 @@ export class ProjectAIPort implements AIOperationPort {
 }
 ```
 
-The exact host AI Runtime API is project-specific. The invariant is:
+Invariant:
 
 ```text
-DomainHarness knows Skill intent and schema
-Host AI Runtime knows provider/model/routing/credentials
+DomainHarness → Skill intent/schema/orchestration
+Host AI Runtime → provider/model/routing/retry/cost/credentials
 ```
 
-Never add fields such as `model: gpt-*` or provider API keys to Workflow YAML just because a particular project currently uses that model.
+Do not add provider-specific fields or credentials to Workflow YAML or Skill assets.
 
-## 9. Phase F — move prompt assets into Skills
+## 9. Phase F — migrate AI prompt assets into Skills
 
-For each AI capability:
+Typical Skill layout:
 
 ```text
 harness/skills/<skill-id>/
 ├─ SKILL.md
 ├─ skill.harness.yaml
-├─ output.schema.json
-└─ refs/...
+├─ input.schema.json       # optional
+├─ output.schema.json      # required
+└─ refs/                   # optional resources
 ```
-
-A migration Agent should preserve domain prompt content before improving it. Separate "move to Skill" from "rewrite the prompt" into different concerns unless prompt change is explicitly required.
 
 Example sidecar:
 
@@ -251,17 +245,15 @@ resources:
 profile: default
 ```
 
-Skill output should be structured and schema-validatable. Avoid Skills whose only output is unstructured prose if downstream control flow depends on that prose.
+During the first migration, preserve prompt meaning. Moving a prompt into a Skill and rewriting the prompt are separate concerns unless the migration explicitly requires both.
 
-## 10. Phase G — convert orchestration to Workflow YAML
+## 10. Phase G — express orchestration in Workflow YAML
 
-Start with the simplest correct sequential flow.
-
-Example:
+Start with a sequential flow.
 
 ```yaml
 initial: analyze
-output: '{"decision": steps.decide, "approval": steps.await_approval}'
+output: '{"result": steps.decide, "approval": steps.await_approval}'
 
 states:
   analyze:
@@ -284,11 +276,7 @@ states:
 
   decide:
     invoke:
-      expr: >-
-        {
-          "requestId": input.requestId,
-          "approved": input.score >= 0.8
-        }
+      expr: '{"requestId": input.requestId, "approved": input.score >= 0.8}'
       input: "steps.load_context"
     on:
       done:
@@ -312,43 +300,23 @@ states:
     final: true
 ```
 
-Do not mechanically reproduce every old service method as a state. Workflow states should correspond to durable orchestration decisions/steps, not implementation trivia.
+Do not reproduce every existing service function as a Workflow state. States should represent durable orchestration steps and decisions.
 
-## 11. Phase H — choose Expr vs Script deliberately
+## 11. Expr vs Script vs Tool
 
-Use Expr when:
+Use **Expr** when the operation is compact, deterministic and naturally expressed over JSON.
 
-- transformation is compact;
-- data is JSON;
-- logic is naturally declarative;
-- no side effect exists.
+Use **Script** when deterministic JSON-in/JSON-out logic is clearer in code than JSONata.
 
-Use Script when:
+Use **Tool** when the step touches network, filesystem, database, queue, external state, credentials or irreversible business side effects.
 
-- deterministic logic is clearer in code;
-- JSONata would become difficult to review;
-- the operation remains pure/trusted and JSON-in/JSON-out.
+Current v0.1 Script execution loads the frozen Script source as JavaScript ESM inside a Worker. Downstream assets should therefore use executable JavaScript/ESM syntax (for example `.mjs`) unless the downstream build explicitly precompiles TypeScript to JavaScript before the Harness is loaded. Do not assume DomainHarness transpiles TypeScript Script assets at runtime.
 
-Use Tool when:
+Script is trusted extension code; it is not a hostile-code sandbox and must not be used as a side-effect escape hatch.
 
-- network/filesystem/DB/queue/external state is touched;
-- credentials are needed;
-- an irreversible business side effect occurs.
+## 12. Waiting Events
 
-### Anti-pattern
-
-Do not place `fetch()`, database clients or secrets inside Scripts to avoid writing a Tool. Script Worker isolation is not a business integration boundary.
-
-## 12. Phase I — convert callbacks/approvals to waiting events
-
-Old code often uses:
-
-- polling flags;
-- database "pending" jobs;
-- ad-hoc callback endpoints;
-- controller-level state booleans.
-
-After migration, the domain-facing callback may remain an HTTP endpoint, but its orchestration action should become:
+Host APIs continue to own authentication and authorization. After authorization, they may continue a waiting Run:
 
 ```ts
 await harness.send(runId, {
@@ -357,31 +325,36 @@ await harness.send(runId, {
 });
 ```
 
-The HTTP/API layer remains responsible for authentication and authorization **before** sending the event.
+The event must be declared by the current waiting state. If a schema is declared, DomainHarness validates the payload before accepting the event.
 
-DomainHarness validates the event declaration/schema and owns the durable workflow transition; it does not authenticate the human/system actor.
+Do not use `resume()` as a replacement for an external event.
 
-## 13. Phase J — Child Workflow extraction
+## 13. Child Workflows
 
-Extract a Child Workflow only when a sequence is genuinely reusable or independently understandable.
+Extract a Child Workflow only when the sequence is genuinely reusable or independently understandable.
 
 Good:
 
 ```text
-main → quality_check → await_approval
+main → quality_check → approval
 ```
 
-Bad:
+Avoid creating one Child Workflow for every old function call.
 
-```text
-main → child_for_every_single_function_call
-```
+v0.1 Child Workflows are:
 
-Child Workflows are sequential composition in v0.1. Do not simulate parallel fan-out/fan-in with multiple Child Workflows and hidden host coordination.
+- sequential;
+- same-Harness only;
+- isolated by `workflowInstanceId`;
+- statically cycle-checked;
+- independently journaled internally;
+- represented to the parent as one logical parent Step.
 
-## 14. Application API migration patterns
+Do not simulate generic DAG/parallel behavior in host wrappers.
 
-### Pattern A — synchronous caller that may reach waiting
+## 14. Application integration patterns
+
+### Request/response path
 
 ```ts
 const started = await harness.start({ workflowId: 'main', input });
@@ -394,11 +367,7 @@ return {
 };
 ```
 
-### Pattern B — async background process
-
-Store the `runId` in the project's domain/application record and observe with `get()`/`wait()`. Do not copy DomainHarness journal tables into project-owned tables.
-
-### Pattern C — external callback
+### External callback
 
 ```ts
 await authorizeCallback(actor, runId);
@@ -408,253 +377,187 @@ return harness.send(runId, {
 });
 ```
 
-### Pattern D — process restart
+### Process restart
 
-On startup, project recovery logic may identify persisted `running` Runs and call `resume(runId)` under the same compatible Harness definition. Do not call `resume()` on arbitrary waiting Runs as a substitute for an event.
+A project may identify persisted `running` Runs and call `resume(runId)` under the same compatible Harness definition. Waiting Runs require their declared event instead.
 
-## 15. Migration safety rules for Agents
+### Domain record linkage
 
-A coding Agent MUST NOT:
+Store the DomainHarness `runId` in an application record when needed for lookup. Do not duplicate the DomainHarness journal or directly update its SQLite tables.
 
-1. change DomainHarness public API to make one project migration easier without a separate upstream contract decision;
-2. import XState or internal DomainHarness store/runner/compiler classes in the consumer;
-3. write directly into DomainHarness SQLite tables;
+## 15. Definition-lock rule during project refactors
+
+Active Runs store `definitionHash` and `executionEngineMajor`. A changed Harness definition may therefore refuse continuation of an older active Run.
+
+Before deploying changed Harness assets, the downstream project must choose an explicit active-run policy, for example:
+
+- drain active Runs before switching definitions; or
+- keep the previous application/Harness deployment available until those Runs finish.
+
+Do not mutate assets in place and assume old active Runs will transparently continue.
+
+## 16. Agent prohibitions
+
+A migration Agent MUST NOT:
+
+1. change the DomainHarness public API merely to make one consumer easier to migrate;
+2. import DomainHarness internal files or XState types;
+3. write directly to DomainHarness SQLite tables;
 4. move provider/model routing into Harness assets;
-5. move project credentials into Harness assets;
-6. relabel unsafe writes as `idempotent` without evidence;
+5. put credentials/secrets into Harness assets or journal inputs for convenience;
+6. claim an unsafe write is idempotent without evidence;
 7. implement static parallelism, generic DAG or dynamic spawn in consumer wrappers;
-8. use Script as an unreviewed side-effect escape hatch;
-9. duplicate the project's authoritative domain state into Workflow YAML;
-10. delete the old implementation before equivalent tests/Critical Journey validation passes.
+8. use Script for external side effects;
+9. move authoritative domain state into Workflow YAML;
+10. delete the old path before equivalent validation passes.
 
-## 16. Incremental migration strategy
-
-Recommended order:
+## 17. Incremental migration sequence
 
 ### M0 — contract-only integration
 
-- add package/tarball dependency pinned to exact SHA;
-- add runtime assembly file;
-- add fake/adapter AI port;
-- no production path switched yet.
+- pin an exact DomainHarness SHA/tarball;
+- add one Runtime assembly point;
+- add AI adapter and Tool registry;
+- do not switch production behavior yet.
 
-### M1 — one low-risk journey
+### M1 — one low-risk Critical Journey
 
-Choose a sequential journey with:
-
-- limited external writes;
-- existing tests;
-- clear start/end;
-- at most one waiting boundary.
-
-Run old and new implementations against the same fixtures when possible.
+Choose a sequential journey with existing tests, clear start/end and limited side effects. Run old/new behavior against the same fixtures when practical.
 
 ### M2 — side-effect journey
 
-Add idempotent/non-idempotent Tool classification and crash/recovery tests.
+Add reviewed Tool effect classifications plus replay/crash tests.
 
 ### M3 — approval/callback journey
 
-Move existing callback/polling state to a waiting state + `send()` integration.
+Move ad-hoc polling/callback orchestration into a waiting state + `send()`.
 
-### M4 — reusable Child Workflows
+### M4 — reusable Child Workflow extraction
 
-Extract shared sequential subflows only after multiple migrated journeys prove the reuse boundary.
+Extract shared sequential subflows only after real reuse is demonstrated.
 
-Do not start by migrating the project's most complicated workflow.
+Do not start with the project’s most complicated journey.
 
-## 17. Required test matrix for a downstream migration
+## 18. Required migration tests
 
-At minimum, create tests for:
+At minimum, cover:
 
-### Definition load
-
-- valid Harness loads;
+- valid Harness load;
 - missing Tool registration fails startup;
-- invalid Skill schema/resource fails startup;
-- invalid target/unreachable state fails startup.
+- invalid Skill/resource/schema fails startup;
+- invalid transition/unreachable state fails startup;
+- `start → completed` happy path;
+- `start → waiting → send → completed` path;
+- invalid/undeclared waiting event rejection;
+- Tool effect behavior and stable idempotency key where applicable;
+- non-idempotent interruption without duplicate external effect;
+- Skill request construction and output-schema rejection;
+- Expr/Script deterministic output and error/timeout behavior;
+- persisted `running` Run recovery under same definition;
+- changed definition refusing continuation;
+- completed Step output not being duplicated;
+- existing domain invariants remaining authoritative outside DomainHarness.
 
-### Happy path
+## 19. Migration acceptance checklist
 
-- `start → completed` for a no-wait journey;
-- output matches existing application contract.
+A migrated concern is complete only when all applicable statements are true:
 
-### Waiting path
-
-- `start → waiting`;
-- invalid event rejected;
-- invalid payload rejected;
-- valid `send()` continues exactly once;
-- final output correct.
-
-### Tool effects
-
-- `none` Tool returns expected output;
-- idempotent Tool receives stable `idempotencyKey` during replay test;
-- non-idempotent interrupted case does not duplicate external effect.
-
-### AI
-
-- Skill request contains expected instructions/resources/input/schema;
-- fake AI output violating schema is rejected;
-- provider-specific configuration remains outside Harness assets.
-
-### Script/Expr
-
-- JSON boundary enforced;
-- deterministic output;
-- timeout/error route behavior.
-
-### Restart/recovery
-
-- persisted `running` Run resumes under same definition;
-- changed definition refuses continuation;
-- completed work is not duplicated.
-
-### Domain authority
-
-- existing domain invariants still pass outside DomainHarness;
-- no new DomainHarness table/Workflow file becomes the authoritative source for domain entities.
-
-## 18. Migration acceptance checklist
-
-A migration concern is complete only when all applicable statements are true:
-
-- [ ] Exact DomainHarness SHA is recorded.
-- [ ] Dependency is reproducible from clean checkout.
+- [ ] Exact DomainHarness SHA/tarball is recorded.
+- [ ] Clean dependency installation is reproducible.
 - [ ] One application-owned Runtime assembly point exists.
+- [ ] Domain authority remains in the downstream project.
 - [ ] AI provider/model routing remains outside DomainHarness.
 - [ ] Every external side effect is a Tool.
-- [ ] Every Tool has reviewed effect classification.
-- [ ] Credentials/secrets remain outside Harness assets/journal inputs.
-- [ ] Skills have output schemas.
+- [ ] Every Tool has reviewed `effect` classification.
+- [ ] Credentials/secrets remain outside Harness assets.
+- [ ] Skills have valid output schemas.
 - [ ] Workflow loads with no static-validation errors.
-- [ ] Conditional routes have unconditional fallback.
-- [ ] Waiting events have explicit schema where payload structure matters.
-- [ ] Child Workflows are same-Harness sequential subflows only.
-- [ ] No internal SDK import exists.
-- [ ] Old journey tests still pass or have equivalent replacements.
-- [ ] Crash/recovery behavior is tested for write paths.
-- [ ] Domain authority remains in the original project.
-- [ ] Migration evidence includes changed files, tests and Critical Journey result.
+- [ ] Conditional route sets end in an unconditional fallback.
+- [ ] Waiting events are authenticated/authorized by the host before `send()`.
+- [ ] Happy-path tests pass.
+- [ ] Waiting/event tests pass.
+- [ ] Crash/recovery tests pass for side-effecting journeys.
+- [ ] Old implementation is removed only after equivalent journey validation passes.
+- [ ] No downstream code imports DomainHarness internals.
 
-## 19. Recommended Git/Task structure for downstream projects
+## 20. What to do when DomainHarness appears insufficient
 
-For a substantial migration, do not use one giant branch.
+Do **not** immediately patch or fork the Runtime inside the consumer project.
 
-Suggested issue/PR sequence:
+Instead:
 
-```text
-DH-01 dependency + runtime assembly
-DH-02 AI port adapter
-DH-03 Tool adapters for journey A
-DH-04 Harness assets for journey A
-DH-05 application integration switch for journey A
-DH-06 recovery/negative tests
-DH-07 validation + old-path removal
-```
+1. capture the real scenario;
+2. record expected vs actual behavior;
+3. minimize reproduction assets;
+4. classify whether the gap is product scope, SDK contract, Runtime defect or documentation gap;
+5. open an upstream DomainHarness Issue;
+6. keep downstream workaround code explicit and temporary if one is unavoidable.
 
-Dependencies should be explicit in the downstream Task DAG/Issues.
+A consumer-specific convenience is not automatically a Runtime primitive.
 
-Keep each PR one concern. Do not combine SDK adoption with unrelated business feature work.
+## 21. Agent handoff prompt template
 
-## 20. Agent handoff prompt template
-
-Copy and adapt this prompt into the downstream project's coding-agent issue/task.
+Use this as the starting prompt for Codex/Claude Code/another coding Agent. Fill every placeholder before execution.
 
 ```text
-You are migrating <PROJECT>/<JOURNEY> to DomainHarness v0.1.
+You are refactoring <PROJECT> to consume @kaicreator/domain-harness.
 
-DomainHarness source of truth:
-- repository: https://github.com/kaicreator-mm/domain-harness
+DomainHarness source:
+- repo: https://github.com/kaicreator-mm/domain-harness
 - exact SHA: <DOMAIN_HARNESS_SHA>
 - SDK reference: docs/sdk/DomainHarness_v0.1_SDK_REFERENCE.md
 - migration guide: docs/sdk/DomainHarness_v0.1_AGENT_MIGRATION_GUIDE.md
 
-Project source of truth:
+Project authority:
 - repository: <PROJECT_REPO>
-- project development standard: <PINNED_STANDARD_OR_AGENTS_MD>
-- domain authority: <FILES/MODULES/SERVICES THAT MUST REMAIN AUTHORITATIVE>
+- development standard/version: <STANDARD>
+- frozen PRD/architecture authorities: <PATHS>
+- domain authority remains in: <MODULES/DB/SERVICES>
 
-Goal:
-Refactor only <JOURNEY> so DomainHarness owns execution orchestration while the project keeps domain semantics, persistence authority, credentials and external integrations.
+Migration target:
+- Critical Journey: <JOURNEY>
+- current entrypoint: <ENTRYPOINT>
+- current tests/fixtures: <TEST_PATHS>
 
-Required mapping before implementation:
-1. inventory current steps;
-2. classify each as Skill / Tool / Expr / Script / Child Workflow / Waiting Event / stays outside Harness;
-3. identify every external side effect;
-4. assign Tool effect none/idempotent/non-idempotent with evidence;
-5. identify AI provider/runtime boundary;
-6. identify current domain-authoritative state that must NOT move into Harness.
+Required process:
+1. Read the project authority and the two DomainHarness SDK documents before editing code.
+2. Produce a migration map: each current step → Skill / Tool / Expr / Script / Child Workflow / Waiting Event / stays outside Harness.
+3. Identify every external side effect and justify Tool effect classification.
+4. Preserve existing external API/domain contracts unless explicitly approved otherwise.
+5. Create one project-owned DomainHarness assembly point; do not import Runtime internals.
+6. Migrate only the named Critical Journey first.
+7. Keep provider/model routing and credentials outside Harness assets.
+8. Add tests for happy path, waiting/event behavior, schema failure, relevant crash/replay behavior and domain-authority preservation.
+9. Run the project’s required local/CI validation.
+10. If DomainHarness itself appears deficient, do not silently fork it. Open an upstream issue with reproduction/evidence.
 
-Hard constraints:
-- import only from @kaicreator/domain-harness package root;
-- no XState/Store/Runner/internal imports;
+Hard prohibitions:
+- no XState/internal DomainHarness imports;
 - no direct writes to DomainHarness SQLite tables;
-- no provider/model routing in Harness assets;
-- no credentials/secrets in Harness assets;
-- no static parallel/DAG/dynamic spawn in v0.1;
-- Script is deterministic trusted JSON-in/JSON-out code, not an external-I/O escape hatch;
-- all external I/O is through host Tools;
-- waiting states continue only through declared send() events;
-- preserve existing public/domain contracts unless this task explicitly authorizes a change;
-- do not delete the old path until equivalent validation passes.
+- no generic DAG/parallel emulation;
+- no Script side-effect escape hatch;
+- no unproven idempotent classification;
+- no deletion of the old path before equivalent validation passes.
 
-Implementation order:
-A. add/pin SDK dependency;
-B. create one Runtime assembly point;
-C. implement AI adapter;
-D. implement Tools;
-E. create Harness assets;
-F. integrate one application entry path;
-G. add happy/negative/recovery tests;
-H. run Critical Journey validation;
-I. only then remove superseded orchestration code.
-
-Required evidence in the PR/issue:
-- exact DomainHarness SHA;
-- mapping table;
-- changed files;
-- Tool effect classifications;
-- test commands/results;
-- recovery test result for side-effect journey;
-- confirmation that no SDK internal import exists;
-- confirmation that domain authority is unchanged;
-- any upstream DomainHarness contract gap as a separate issue rather than a local internal hack.
+Deliverables:
+- migration map;
+- changed-file summary;
+- Harness assets;
+- host Tool/AI adapters;
+- tests and execution evidence;
+- remaining risks/blockers;
+- upstream DomainHarness issue(s), if any.
 ```
 
-## 21. Upstream-gap rule
+## 22. Source of truth
 
-If the consumer project cannot implement a legitimate orchestration requirement using the public contract:
-
-1. stop before importing internals;
-2. create a focused issue in `kaicreator-mm/domain-harness`;
-3. include the concrete domain-neutral scenario;
-4. include expected vs actual public-contract behavior;
-5. include why Tool/Skill/Expr/Script/Child/waiting cannot express it;
-6. include downstream project/version and test evidence;
-7. continue unrelated migration work if the gap is not a dependency blocker.
-
-Do not solve an upstream contract gap by permanently forking Runtime internals inside the consuming project.
-
-## 22. Definition of a good downstream architecture
-
-After migration, the dependency direction should look like:
+For downstream integration behavior, use this precedence:
 
 ```text
-Domain Project
-  ├─ domain model / DB / APIs / permissions / business rules
-  ├─ Tool implementations ─────────────┐
-  ├─ AI Runtime adapter ───────────────┤
-  ├─ Harness assets                    │
-  │   ├─ workflows                     │
-  │   ├─ skills                        │
-  │   ├─ scripts                       │
-  │   └─ schemas                       │
-  └─ application lifecycle ───────┐    │
-                                  v    v
-                         @kaicreator/domain-harness
-                         execution / persistence / recovery
+exact pinned DomainHarness source/contracts/tests
+→ DomainHarness_v0.1_SDK_REFERENCE.md
+→ this Agent Migration Guide
+→ downstream project authority
 ```
 
-DomainHarness should make orchestration more explicit and recoverable while leaving the domain project recognizably in control of its own product semantics.
+The frozen DomainHarness PRD and architecture remain upstream product/architecture authority. A consumer must not reinterpret this migration guide as permission to expand v0.1 scope.
