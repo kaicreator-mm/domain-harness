@@ -1,2 +1,32 @@
-/** Node host-binding package scaffold. T-003/T-007/T-008 own implementation. */
+import {
+  createDomainRuntime,
+  type CreateDomainRuntimeOptions,
+  type DomainRuntime,
+} from '@kaicreator/domain-harness/v2';
+
 export const DOMAIN_HARNESS_NODE_PACKAGE = '@kaicreator/domain-harness-node' as const;
+
+/** Node host entry point. Runtime semantics remain owned by the portable core. */
+export function createNodeDomainRuntime(
+  options: CreateDomainRuntimeOptions,
+): Promise<DomainRuntime> {
+  return createDomainRuntime(options);
+}
+
+export * from './store/index.js';
+export {
+  NodeScriptExecutor,
+  NODE_SCRIPT_EXECUTION_CAPABILITY,
+  type NodeScriptExecutorOptions,
+} from './script/script-executor.js';
+export type {
+  NodeScriptModuleBinding,
+  ScriptExecutionRequest,
+  ScriptBindingDescriptor,
+} from './script/types.js';
+export {
+  createNodeHttpJsonRemoteTransport,
+  HttpJsonTransportError,
+  type HttpJsonRuntimeResource,
+  type NodeHttpJsonRemoteTransportOptions,
+} from './remote/http-json-transport.js';
