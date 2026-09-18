@@ -81,16 +81,24 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
 
   async openInstance(request: OpenInstanceRequest): Promise<InstanceObservation> {
     const snapshot = await this.runtime.openInstance({
-      address: request.address,
+      address: { ...request.address },
       correlationId: request.correlationId,
-      input: request.input,
+      input: runtimeJson(request.input),
     });
     return observeInstance(snapshot, this.fixture);
   }
 
   async send(message: ConformanceMessage): Promise<MessageAcceptanceObservation> {
     try {
-      const ack = await this.runtime.send(message);
+      const ack = await this.runtime.send({
+        messageId: message.messageId,
+        target: { ...message.target },
+        type: message.type,
+        payload: runtimeJson(message.payload),
+        ...(message.correlationId === undefined ? {} : { correlationId: message.correlationId }),
+        ...(message.causationId === undefined ? {} : { causationId: message.causationId }),
+        ...(message.contractVersion === undefined ? {} : { contractVersion: message.contractVersion }),
+      });
       this.sourceMessages.set(addressMessageKey(message.target, message.messageId), clone(message));
       if (ack.status === 'accepted') {
         this.accepted.set(addressMessageKey(message.target, message.messageId), {
@@ -121,16 +129,16 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
   }
 
   async emittedMessages(): Promise<readonly EmittedDomainMessageObservation[]> {
-    const audit = await this.runtime.query({ kind: 'instance', target: AUDIT_ADDRESS });
-    if (audit.kind !== 'instance' || audit.value === null || audit.value.stateRevision === 0) return [];
-    const raw = portableState(audit.value.state);
-    const payload = raw.lastMessage;
     const approve = [...this.sourceMessages.values()].find((message) => message.type === 'approve');
-    if (approve === undefined || payload === null) return [];
+    if (approve === undefined) return [];
+
+    const audit = await this.waitForAuditEmission();
+    const raw = portableState(audit.state);
+    if (raw.lastMessage === null) return [];
     return [{
       target: { ...AUDIT_ADDRESS },
       type: 'order.completed',
-      payload: clone(payload),
+      payload: clone(raw.lastMessage),
       correlationId: approve.correlationId,
       causationId: approve.messageId,
     }];
@@ -180,6 +188,51 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
 
       unsubscribe = this.runtime.subscribe(
         { kind: 'message', target, messageId },
+        () => { void check(); },
+      );
+      void check();
+    });
+  }
+
+  private async waitForAuditEmission(): Promise<WorkflowInstanceSnapshot> {
+    const initial = await this.runtime.query({ kind: 'instance', target: AUDIT_ADDRESS });
+    if (initial.kind !== 'instance' || initial.value === null) {
+      throw new Error('T-019 audit Workflow Instance disappeared');
+    }
+    if (initial.value.stateRevision > 0) return initial.value;
+
+    return new Promise<WorkflowInstanceSnapshot>((resolve, reject) => {
+      let finished = false;
+      let unsubscribe = () => {};
+      const timeout = setTimeout(() => finish(undefined, new Error(
+        'T-019 emitted Domain Message did not reach the audit Workflow Instance',
+      )), 15_000);
+
+      const finish = (value?: WorkflowInstanceSnapshot, error?: Error) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
+        unsubscribe();
+        if (error !== undefined) reject(error);
+        else if (value !== undefined) resolve(value);
+        else reject(new Error('T-019 audit observation finished without a value'));
+      };
+
+      const check = async () => {
+        try {
+          const current = await this.runtime.query({ kind: 'instance', target: AUDIT_ADDRESS });
+          if (current.kind !== 'instance' || current.value === null) {
+            finish(undefined, new Error('T-019 audit Workflow Instance disappeared'));
+            return;
+          }
+          if (current.value.stateRevision > 0) finish(current.value);
+        } catch (error) {
+          finish(undefined, error instanceof Error ? error : new Error(String(error)));
+        }
+      };
+
+      unsubscribe = this.runtime.subscribe(
+        { kind: 'instance', target: AUDIT_ADDRESS },
         () => { void check(); },
       );
       void check();
@@ -321,6 +374,10 @@ function portableState(value: JsonValue): { lastMessage: JsonValue } {
   if (value === null || Array.isArray(value) || typeof value !== 'object') return { lastMessage: null };
   const candidate = value as Record<string, JsonValue>;
   return { lastMessage: candidate.lastMessage ?? null };
+}
+
+function runtimeJson(value: unknown): JsonValue {
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
 function sameAddress(left: WorkflowAddress, right: WorkflowAddress): boolean {
