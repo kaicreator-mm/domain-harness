@@ -4,6 +4,7 @@
     "slug": "domain-harness-t019-conformance",
     "version": "0.0.1",
     "orientation": "portrait",
+    "jsEngine": "hermes",
     "newArchEnabled": true,
     "android": {
       "package": "mm.kaicreator.domainharness.t019"
