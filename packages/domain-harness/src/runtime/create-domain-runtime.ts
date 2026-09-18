@@ -1,3 +1,4 @@
+import type { AIOperationPort } from '../contracts/ai.js';
 import { WorkflowInstanceEngine } from '../engine/workflow-instance-engine.js';
 import { PerInstanceSerializedLane } from '../engine/per-instance-serialized-lane.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
@@ -37,6 +38,7 @@ import type {
 } from '../v2/contracts/workflow.js';
 import type { DomainMessage, MessageAcceptedAck } from '../v2/contracts/message.js';
 import { CompiledWorkflowRuntime } from './compiled-workflow-runtime.js';
+import { JournaledSkillRunner } from './journaled-skill-runner.js';
 import { createRuntimeToolExecutor } from './tool-executor.js';
 
 export interface CreateDomainRuntimeOptions {
@@ -44,6 +46,8 @@ export interface CreateDomainRuntimeOptions {
   store: RuntimeStore;
   bindings: RuntimeHostBindings;
   resources?: RuntimeResources;
+  /** Provider-neutral AI Runtime port used only by compiled AI Skill invokes. */
+  ai?: AIOperationPort;
   businessSnapshots?: BusinessSnapshotPort;
   domainData?: CompiledDomainDataPort;
   now?: () => string;
@@ -94,6 +98,14 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     sha256: options.bindings.sha256,
     now,
   });
+  const skillRunner = options.ai === undefined
+    ? undefined
+    : new JournaledSkillRunner({
+        store: options.store,
+        sha256: options.bindings.sha256,
+        ai: options.ai,
+        now,
+      });
   const messageEffect = new JournaledDomainMessageEffect({
     store: options.store,
     acceptance,
@@ -198,6 +210,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     expression: options.bindings.expression,
     toolRunner,
     toolExecutor: createRuntimeToolExecutor(options.bindings),
+    ...(skillRunner === undefined ? {} : { skillRunner }),
     messageEffect,
     onChildAccepted(target, messageId) {
       notifyTargetChanged(target, messageId);
