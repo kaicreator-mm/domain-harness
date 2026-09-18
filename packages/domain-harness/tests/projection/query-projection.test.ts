@@ -133,8 +133,12 @@ test('G22: DomainQuery dispatches only the frozen read-side query kinds', async 
       return {
         target,
         messageId,
-        status: 'processed' as const,
         targetSequence: 7,
+        packageId: 'pkg-a',
+        disposition: 'processed' as const,
+        correlationId: 'corr-1',
+        acceptedAt: '2026-09-18T00:00:00.000Z',
+        resolvedAt: '2026-09-18T00:00:01.000Z',
       };
     },
     async listPinnedPackageIds() {
@@ -240,13 +244,23 @@ test('G24/G25: Projection composes multiple workflow snapshots and business data
 });
 
 test('G25: Projection fails closed on undeclared selector/query behavior and invalid output', async () => {
-  const pkg = compiledPackage();
-  pkg.manifest.projections.dashboard = {
-    ...pkg.manifest.projections.dashboard!,
-    dependencies: [{ kind: 'workflow', selector: { workflowId: 'design', filter: 'active' } }],
+  const basePackage = compiledPackage();
+  const baseProjection = basePackage.manifest.projections.dashboard!;
+  const malformedPackage: TargetCompiledDomainPackage = {
+    ...basePackage,
+    manifest: {
+      ...basePackage.manifest,
+      projections: {
+        ...basePackage.manifest.projections,
+        dashboard: {
+          ...baseProjection,
+          dependencies: [{ kind: 'workflow', selector: { workflowId: 'design', filter: 'active' } }],
+        },
+      },
+    },
   };
   const service = new ProjectionService({
-    packageRegistry: registry(pkg),
+    packageRegistry: registry(malformedPackage),
     store: { async getInstance() { return instance('design', 1, {}); } },
     expression: { async evaluate() { return { ready: true }; } },
     sha256: sha256Port(),
