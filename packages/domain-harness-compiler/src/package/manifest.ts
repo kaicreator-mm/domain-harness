@@ -67,13 +67,20 @@ export type ManifestWithoutPackageId = Omit<CompiledPackageManifest, 'packageId'
 
 /**
  * Closed logical binding config schema: the complete set of compile-time fields
- * an executable Tool config may carry. Every field here is logical compile-time
- * metadata (a Runtime Resource *reference*, never a value). Anything outside
- * this set is rejected, so runtime/credential material cannot enter under any
- * key name. This is an allowlist of structure, not a secret-name denylist.
+ * an executable Tool config may carry, matching the logical binding fields of
+ * the v0.2 runtime binding contracts (remote HTTP/JSON). Every field is logical
+ * compile-time metadata (a Runtime Resource *reference*, never a value).
+ * Anything outside this set is rejected, so runtime/credential material cannot
+ * enter under any key name. This is an allowlist of structure, not a
+ * secret-name denylist.
  */
-const LOGICAL_CONFIG_FIELDS: ReadonlySet<string> = new Set(['resourceKey']);
-const RESOURCE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const LOGICAL_CONFIG_FIELDS: ReadonlySet<string> = new Set(['transport', 'resourceKey', 'path', 'method']);
+const LOGICAL_IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const LOGICAL_TRANSPORT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._@-]*$/;
+
+function isLogicalPath(value: string): boolean {
+  return value.startsWith('/') && !value.startsWith('//') && !/\s/u.test(value);
+}
 
 export class InvalidToolConfigError extends Error {
   readonly issues: readonly string[];
@@ -89,12 +96,12 @@ export class InvalidToolConfigError extends Error {
  * Structural validation of executable Tool config against the closed logical
  * binding schema. Runtime resources/secrets are unrepresentable by
  * construction: unknown keys, nested structures, arrays, scalars and
- * non-identifier `resourceKey` values are all rejected.
+ * non-logical field values are all rejected.
  */
 export function toolConfigIssues(config: unknown, path: string): string[] {
   const issues: string[] = [];
   if (Array.isArray(config) || config === null || typeof config !== 'object') {
-    issues.push(`${path} must be a closed logical binding object (resourceKey only); arrays, scalars and runtime values are rejected`);
+    issues.push(`${path} must be a closed logical binding object (transport/resourceKey/path/method only); arrays, scalars and runtime values are rejected`);
     return issues;
   }
   for (const key of Object.keys(config)) {
@@ -102,9 +109,22 @@ export function toolConfigIssues(config: unknown, path: string): string[] {
       issues.push(`${path}.${key} is outside the closed logical binding schema; runtime resources/secrets must never be compile-time Tool config`);
     }
   }
-  const resourceKey = (config as Record<string, unknown>).resourceKey;
-  if (resourceKey !== undefined && (typeof resourceKey !== 'string' || !RESOURCE_KEY_PATTERN.test(resourceKey))) {
-    issues.push(`${path}.resourceKey must be a logical identifier (pattern ${RESOURCE_KEY_PATTERN.source}); endpoint/credential/connection values are rejected`);
+  const source = config as Record<string, unknown>;
+  const transport = source.transport;
+  if (transport !== undefined && (typeof transport !== 'string' || !LOGICAL_TRANSPORT_PATTERN.test(transport))) {
+    issues.push(`${path}.transport must be a logical transport capability id (pattern ${LOGICAL_TRANSPORT_PATTERN.source}); endpoint/URL values are rejected`);
+  }
+  const resourceKey = source.resourceKey;
+  if (resourceKey !== undefined && (typeof resourceKey !== 'string' || !LOGICAL_IDENTIFIER_PATTERN.test(resourceKey))) {
+    issues.push(`${path}.resourceKey must be a logical identifier (pattern ${LOGICAL_IDENTIFIER_PATTERN.source}); endpoint/credential/connection values are rejected`);
+  }
+  const configPath = source.path;
+  if (configPath !== undefined && (typeof configPath !== 'string' || !isLogicalPath(configPath))) {
+    issues.push(`${path}.path must be a single-root logical path beginning with / (pattern of remote-http-json@1); absolute/protocol-relative URLs are rejected`);
+  }
+  const method = source.method;
+  if (method !== undefined && method !== 'POST') {
+    issues.push(`${path}.method must be the logical HTTP method 'POST' (remote HTTP/JSON v1); transport/auth values are rejected`);
   }
   return issues;
 }

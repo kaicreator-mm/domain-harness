@@ -84,17 +84,28 @@ export interface LoadedRawDomainPackage {
 /**
  * Closed compile-time logical binding configuration for Tool executables.
  *
- * `resourceKey` is the logical Runtime Resource reference from the frozen host
- * contract (`RuntimeResources` is keyed by `resourceKey`); the referenced
- * endpoint/token/session/handle value is injected only at activation/execution
- * time and never exists inside the compiled package.
+ * The field set is the union of logical binding fields defined by the v0.2
+ * runtime binding contracts (remote HTTP/JSON: transport/resourceKey/path/
+ * method). Every field is logical compile-time metadata — a Runtime Resource
+ * *reference*, a logical transport capability id, a logical request path —
+ * never a runtime value. `resourceKey` resolves through `RuntimeResources`
+ * (frozen host contract) only at activation/execution time.
  *
  * The schema is closed on purpose: no arbitrary keys, no nested structures,
- * identifier-shaped values only. Runtime resources, endpoints, credentials and
- * handles are structurally excluded from compilation, not filtered by name.
+ * value shapes validated per field. Runtime resources, endpoints, credentials
+ * and handles are structurally excluded from compilation, not filtered by name.
+ * Binding-kind-specific runtime contracts (e.g. remote-http-json@1) apply their
+ * own narrower validation on top of this closed set.
  */
 export interface LogicalToolBindingConfig {
+  /** Logical transport capability id selecting the transport binding, e.g. `http-transport@1`. */
+  transport?: string;
+  /** Logical Runtime Resource reference; the referenced value is injected at activation time only. */
   resourceKey?: string;
+  /** Logical single-root request path beginning with `/`; never an absolute or protocol-relative URL. */
+  path?: string;
+  /** Logical HTTP method; remote HTTP/JSON v1 supports POST only. */
+  method?: 'POST';
 }
 
 export interface RawToolDefinition {

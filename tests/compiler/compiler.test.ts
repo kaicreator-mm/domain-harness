@@ -132,9 +132,14 @@ function compileFixture(rawInput = raw(), bindingContents: Readonly<Record<strin
       },
       outputSchema: { type: 'object' },
       effect: 'idempotent',
-      executionKind: 'remote-http-json',
+      executionKind: 'remote-http-json@1',
       requiredCapabilities: [CAPS.http],
-      config: { resourceKey: 'remoteLookupService' },
+      config: {
+        transport: 'http-transport@1',
+        resourceKey: 'remoteLookupService',
+        path: '/v1/lookup',
+        method: 'POST',
+      },
     }],
     projections: [{
       projectionId: 'overview',
@@ -295,7 +300,7 @@ function toolWithConfig(toolId: string, config: unknown): RawToolDefinition {
     toolId,
     outputSchema: { type: 'object' },
     effect: 'none',
-    executionKind: 'remote-http-json',
+    executionKind: 'remote-http-json@1',
     requiredCapabilities: [CAPS.http],
     config: config as RawToolDefinition['config'],
   };
@@ -357,6 +362,20 @@ test('resourceKey accepts logical identifiers only, never runtime values', () =>
 });
 
 test('legitimate logical runtime-resource references stay compilable', () => {
+  const remote = manifestForTool(toolWithConfig('probe', {
+    transport: 'http-transport@1',
+    resourceKey: 'remote.echo.service',
+    path: '/v1/echo',
+    method: 'POST',
+  }));
+  assert.deepEqual(remote.tools.probe?.execution.config, {
+    transport: 'http-transport@1',
+    resourceKey: 'remote.echo.service',
+    path: '/v1/echo',
+    method: 'POST',
+  });
+  assert.doesNotThrow(() => assertCompiledPackageManifest(remote));
+
   const referenced = manifestForTool(toolWithConfig('probe', { resourceKey: 'remoteLookupService' }));
   assert.deepEqual(referenced.tools.probe?.execution.config, { resourceKey: 'remoteLookupService' });
   assert.doesNotThrow(() => assertCompiledPackageManifest(referenced));
@@ -364,6 +383,23 @@ test('legitimate logical runtime-resource references stay compilable', () => {
   const emptyConfig = manifestForTool(toolWithConfig('probe', {}));
   assert.deepEqual(emptyConfig.tools.probe?.execution.config, {});
   assert.doesNotThrow(() => assertCompiledPackageManifest(emptyConfig));
+});
+
+test('logical config fields reject runtime-valued shapes per field', () => {
+  const runtimeShaped: ReadonlyArray<readonly [string, unknown]> = [
+    ['absolute URL as path', { path: 'https://forbidden.example/v1/echo' }],
+    ['protocol-relative URL as path', { path: '//evil.example/v1/echo' }],
+    ['endpoint as transport', { transport: 'https://api.internal' }],
+    ['unsupported logical method', { method: 'GET' }],
+    ['credential value as transport', { transport: 'postgres://user:secret@db' }],
+  ];
+  for (const [label, override] of runtimeShaped) {
+    assert.throws(
+      () => manifestForTool(toolWithConfig('probe', { resourceKey: 'remoteLookupService', ...override as object })),
+      (error: unknown) => error instanceof Error && error.message.includes('closed logical binding'),
+      `${label} must fail compilation`,
+    );
+  }
 });
 
 test('manifest validation fails closed on non-closed execution config injected after compilation', () => {
