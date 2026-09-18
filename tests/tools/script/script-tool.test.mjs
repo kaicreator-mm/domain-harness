@@ -200,6 +200,36 @@ test('runtime bindings reject source/data execution and non-JSON outputs', async
     (error) => error?.code === 'invalid_binding' && /runtime source\/data URLs are forbidden/.test(error.message),
   );
 
+  const rawTypeScript = new NodeScriptExecutor({ rawTs: { moduleUrl: 'file:///tmp/raw-script.ts' } });
+  await assert.rejects(
+    rawTypeScript.execute({ binding: { kind: 'script', bindingId: 'rawTs' }, input: null }),
+    (error) => error?.code === 'invalid_binding' && /TypeScript\/source files are forbidden/.test(error.message),
+  );
+
+  const inheritedNode = new NodeScriptExecutor({});
+  const inheritedExpo = new ExpoScriptExecutor({});
+  await assert.rejects(
+    inheritedNode.execute({ binding: { kind: 'script', bindingId: 'toString' }, input: null }),
+    (error) => error?.code === 'binding_not_found',
+  );
+  await assert.rejects(
+    inheritedExpo.execute({ binding: { kind: 'script', bindingId: 'toString' }, input: null }),
+    (error) => error?.code === 'binding_not_found',
+  );
+
+  const cyclic = {};
+  cyclic.self = cyclic;
+  const nodeCycle = new NodeScriptExecutor({ unused: { moduleUrl: 'file:///tmp/unused.mjs' } });
+  const expoCycle = new ExpoScriptExecutor({ unused: (input) => input });
+  await assert.rejects(
+    nodeCycle.execute({ binding: { kind: 'script', bindingId: 'unused' }, input: cyclic }),
+    (error) => error?.code === 'invalid_json',
+  );
+  await assert.rejects(
+    expoCycle.execute({ binding: { kind: 'script', bindingId: 'unused' }, input: cyclic }),
+    (error) => error?.code === 'invalid_json',
+  );
+
   const directory = await mkdtemp(join(tmpdir(), 'domain-harness-t007-bad-'));
   try {
     const modulePath = join(directory, 'bad-output.mjs');
