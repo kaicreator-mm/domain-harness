@@ -6,7 +6,6 @@ import type {
 import { PackageActivationError } from './errors.js';
 import type { CompiledPackageValidationPolicy } from './validation.js';
 import { validateCompiledPackage } from './validation.js';
-import { resolveDefaultPackage, resolvePinnedPackage } from './registry.js';
 
 export type PackagePinStore = Pick<RuntimeStore, 'listPinnedPackageIds'>;
 
@@ -37,22 +36,54 @@ export async function listRetainedPackageIds(store: PackagePinStore): Promise<re
   return [...normalized].sort();
 }
 
-export async function preflightPackageActivation(
-  request: PackageActivationPreflightRequest,
-): Promise<PackageActivationPreflightResult> {
-  for (const packageId of request.registry.listPackageIds()) {
-    const compiledPackage = request.registry.get(packageId);
+async function validateRegistryPackages(
+  registry: PackageRegistry,
+  policy: CompiledPackageValidationPolicy,
+): Promise<ReadonlyMap<string, TargetCompiledDomainPackage>> {
+  const validated = new Map<string, TargetCompiledDomainPackage>();
+  for (const packageId of registry.listPackageIds()) {
+    if (typeof packageId !== 'string' || packageId.length === 0 || validated.has(packageId)) {
+      throw new PackageActivationError(
+        'INVALID_COMPILED_PACKAGE',
+        'PackageRegistry listPackageIds() must return unique non-empty package ids',
+      );
+    }
+    const compiledPackage = registry.get(packageId);
     if (compiledPackage === undefined) {
       throw new PackageActivationError(
         'INVALID_COMPILED_PACKAGE',
         `PackageRegistry listed package "${packageId}" but could not resolve it`,
       );
     }
-    await validateCompiledPackage(compiledPackage, request.validationPolicy);
+    if (compiledPackage.manifest.packageId !== packageId) {
+      throw new PackageActivationError(
+        'PACKAGE_ID_MISMATCH',
+        `PackageRegistry key "${packageId}" does not match resolved manifest packageId "${compiledPackage.manifest.packageId}"`,
+      );
+    }
+    validated.set(packageId, await validateCompiledPackage(compiledPackage, policy));
+  }
+  return validated;
+}
+
+export async function preflightPackageActivation(
+  request: PackageActivationPreflightRequest,
+): Promise<PackageActivationPreflightResult> {
+  const validatedPackages = await validateRegistryPackages(
+    request.registry,
+    request.validationPolicy,
+  );
+
+  const defaultPackage = validatedPackages.get(request.registry.defaultPackageId);
+  if (defaultPackage === undefined) {
+    throw new PackageActivationError(
+      'DEFAULT_PACKAGE_MISSING',
+      `PackageRegistry default package "${request.registry.defaultPackageId}" was not listed and validated`,
+    );
   }
 
   const retainedPackageIds = await listRetainedPackageIds(request.store);
-  const missingPins = retainedPackageIds.filter((packageId) => !request.registry.has(packageId));
+  const missingPins = retainedPackageIds.filter((packageId) => !validatedPackages.has(packageId));
   if (missingPins.length > 0) {
     throw new PackageActivationError(
       'MISSING_RETAINED_PIN',
@@ -61,12 +92,20 @@ export async function preflightPackageActivation(
     );
   }
 
-  const retainedPackages = retainedPackageIds.map((packageId) =>
-    resolvePinnedPackage(request.registry, packageId),
-  );
+  const retainedPackages = retainedPackageIds.map((packageId) => {
+    const compiledPackage = validatedPackages.get(packageId);
+    if (compiledPackage === undefined) {
+      throw new PackageActivationError(
+        'MISSING_RETAINED_PIN',
+        `retained Workflow Instance requires missing package "${packageId}"`,
+        [packageId],
+      );
+    }
+    return compiledPackage;
+  });
 
   return {
-    defaultPackage: resolveDefaultPackage(request.registry),
+    defaultPackage,
     retainedPackageIds,
     retainedPackages,
   };
