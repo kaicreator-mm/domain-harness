@@ -1,8 +1,10 @@
 import {
   createDomainRuntime,
+  STANDARD_CAPABILITIES,
   type CreateDomainRuntimeOptions,
   type DomainRuntime,
 } from '@kaicreator/domain-harness/v2';
+import { createExpoHttpJsonRemoteTransport } from './remote/http-json-transport.js';
 
 export const DOMAIN_HARNESS_EXPO_PACKAGE = '@kaicreator/domain-harness-expo' as const;
 
@@ -10,7 +12,26 @@ export const DOMAIN_HARNESS_EXPO_PACKAGE = '@kaicreator/domain-harness-expo' as 
 export function createExpoDomainRuntime(
   options: CreateDomainRuntimeOptions,
 ): Promise<DomainRuntime> {
-  return createDomainRuntime(options);
+  const capability = STANDARD_CAPABILITIES.httpTransport;
+  if (
+    !options.bindings.capabilities.includes(capability)
+    || options.bindings.remoteTransports?.[capability] !== undefined
+  ) {
+    return createDomainRuntime(options);
+  }
+  if (options.resources === undefined) {
+    throw new Error(`${capability} requires Runtime Resources or an explicit host transport`);
+  }
+  return createDomainRuntime({
+    ...options,
+    bindings: {
+      ...options.bindings,
+      remoteTransports: {
+        ...(options.bindings.remoteTransports ?? {}),
+        [capability]: createExpoHttpJsonRemoteTransport({ resources: options.resources }),
+      },
+    },
+  });
 }
 
 export * from './store/index.js';
