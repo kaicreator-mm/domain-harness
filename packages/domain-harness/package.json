@@ -11,8 +11,8 @@
       "import": "./dist/index.js"
     },
     "./v2": {
-      "types": "./dist/v2/index.d.ts",
-      "import": "./dist/v2/index.js"
+      "types": "./dist/public-v2/index.d.ts",
+      "import": "./dist/public-v2/index.js"
     }
   },
   "files": [
