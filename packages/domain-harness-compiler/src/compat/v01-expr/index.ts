@@ -37,8 +37,8 @@ export interface V01ExprWorkflowMigration {
  * Build-time compatibility translation for frozen v0.1 `invoke.expr` forms.
  *
  * The generated tool identity is content-addressed from workflow/state/source
- * identity. Filesystem location is intentionally excluded so relocating an
- * otherwise identical authoring package cannot change the synthetic Tool id.
+ * identity. Filesystem location and call-site input/timeout metadata are
+ * intentionally excluded from source identity.
  *
  * This compatibility layer does not mutate the input workflow and does not
  * alter non-expr invokes. Runtime wiring is deliberately outside T-020.
@@ -91,11 +91,7 @@ export function translateV01ExprInvoke(
     );
   }
 
-  const sourceIdentity = sha256Canonical({
-    expression,
-    input: invoke.input ?? null,
-    timeoutMs: invoke.timeoutMs ?? null,
-  });
+  const sourceIdentity = sha256Canonical({ expression });
   const toolId = `__v01_expr_${sha256Canonical({ workflowId, stateId, sourceIdentity })}`;
 
   return {

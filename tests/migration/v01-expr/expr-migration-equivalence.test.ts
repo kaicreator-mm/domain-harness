@@ -108,6 +108,18 @@ test('build-time translation deterministically replaces v0.1 expr with a synthet
   });
   assert.equal(source.states.evaluate?.invoke?.kind, 'expr', 'translation must not mutate frozen v0.1 input');
 
+  const callSiteChanged = referenceWorkflow();
+  callSiteChanged.states.evaluate!.invoke = {
+    ...callSiteChanged.states.evaluate!.invoke!,
+    input: 'other.payload',
+    timeoutMs: 999,
+  };
+  assert.equal(
+    translateV01ExprWorkflow(callSiteChanged).tools[0]?.toolId,
+    tool.toolId,
+    'call-site input/timeout metadata must not change expression source identity',
+  );
+
   const changed = referenceWorkflow();
   changed.states.evaluate!.invoke = {
     ...changed.states.evaluate!.invoke!,
@@ -116,7 +128,7 @@ test('build-time translation deterministically replaces v0.1 expr with a synthet
   assert.notEqual(
     translateV01ExprWorkflow(changed).tools[0]?.toolId,
     tool.toolId,
-    'changed source must produce a different synthetic Tool identity',
+    'changed expression source must produce a different synthetic Tool identity',
   );
 });
 
