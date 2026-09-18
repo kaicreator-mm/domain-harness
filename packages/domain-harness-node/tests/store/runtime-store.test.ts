@@ -187,6 +187,15 @@ test('G5 terminalization atomically abandons every unresolved accepted message',
   assert.equal((await store.getInstance(target))?.lifecycle, 'terminated');
   assert.equal((await store.getMessageDisposition(target, 'm-1'))?.disposition, 'abandoned');
   assert.equal((await store.getMessageDisposition(target, 'm-2'))?.disposition, 'abandoned');
+  const duplicateAfterTerminal = await store.acceptMessage({
+    messageId: 'm-1',
+    target,
+    type: 'one',
+    payload: null,
+  });
+  assert.equal(duplicateAfterTerminal.status, 'duplicate');
+  assert.equal(duplicateAfterTerminal.targetSequence, 1);
+
   await assert.rejects(
     store.acceptMessage({
       messageId: 'm-3',
@@ -252,9 +261,9 @@ test('G5 effect journal is durable, idempotent by effectId, and immutable after 
       effectKind: 'tool',
       effectSemantics: 'idempotent',
       status: 'started',
-      attempt: 1,
+      attempt: 2,
       input: { value: 1 },
-      startedAt: T1,
+      startedAt: T2,
     }),
     started,
   );

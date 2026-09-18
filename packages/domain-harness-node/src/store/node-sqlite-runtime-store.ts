@@ -245,8 +245,6 @@ function assertEffectIdentity(existing: EffectJournalRecord, request: BeginEffec
     existing.sourceMessageId !== request.sourceMessageId ||
     existing.effectKind !== request.effectKind ||
     existing.effectSemantics !== request.effectSemantics ||
-    existing.attempt !== request.attempt ||
-    existing.startedAt !== request.startedAt ||
     !sameJson(existing.input, request.input)
   ) {
     throw new Error(`Effect identity collision for effectId ${request.effectId}`);
@@ -263,10 +261,10 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
     }
 
     this.#db = new Database(options.path);
+    this.#db.pragma(`busy_timeout = ${busyTimeoutMs}`);
     this.#db.pragma('foreign_keys = ON');
     this.#db.pragma('journal_mode = WAL');
     this.#db.pragma('synchronous = FULL');
-    this.#db.pragma(`busy_timeout = ${busyTimeoutMs}`);
     this.#applyMigrations();
   }
 
@@ -350,13 +348,6 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
   async acceptMessage(message: DomainMessage): Promise<MessageAcceptedAck> {
     const transaction = this.#db.transaction((): MessageAcceptedAck => {
       const instance = this.#requireInstanceRow(message.target);
-
-      if (instance.lifecycle === 'recovery_required' || TERMINAL_LIFECYCLES.has(instance.lifecycle)) {
-        throw new Error(
-          `Workflow ${message.target.workflowId}/${message.target.instanceKey} does not accept new messages in lifecycle ${instance.lifecycle}`,
-        );
-      }
-
       const existing = this.#getMessageRow(instance.internal_id, message.messageId);
       if (existing !== null) {
         return {
@@ -367,6 +358,12 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
           packageId: existing.target_package_id,
           acceptedAt: existing.accepted_at,
         };
+      }
+
+      if (instance.lifecycle === 'recovery_required' || TERMINAL_LIFECYCLES.has(instance.lifecycle)) {
+        throw new Error(
+          `Workflow ${message.target.workflowId}/${message.target.instanceKey} does not accept new messages in lifecycle ${instance.lifecycle}`,
+        );
       }
 
       const targetSequence = instance.next_target_sequence;
@@ -866,6 +863,11 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
     for (const migration of NODE_SQLITE_RUNTIME_STORE_MIGRATIONS) {
       if (applied.has(migration.version)) continue;
       const apply = this.#db.transaction(() => {
+        const alreadyApplied = this.#db.prepare(
+          'SELECT 1 FROM dh_v2_schema_migrations WHERE version = ?',
+        ).get(migration.version);
+        if (alreadyApplied !== undefined) return;
+
         this.#db.exec(migration.sql);
         this.#db.prepare(`
           INSERT INTO dh_v2_schema_migrations(version, applied_at)
