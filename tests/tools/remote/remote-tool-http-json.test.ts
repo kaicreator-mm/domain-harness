@@ -60,7 +60,7 @@ function executionRequest(tool = descriptor(), input = { name: 'Ada' }): ToolExe
   };
 }
 
-test('compiled Remote Tool binding is logical only and rejects runtime secrets', () => {
+test('compiled Remote Tool binding is logical only and rejects runtime values', () => {
   const tool = descriptor();
   const serialized = JSON.stringify(tool.execution);
   assert.equal(serialized.includes('https://'), false);
@@ -75,12 +75,39 @@ test('compiled Remote Tool binding is logical only and rejects runtime secrets',
   assert.throws(
     () => parseRemoteHttpJsonBinding({
       kind: REMOTE_HTTP_JSON_BINDING_KIND,
-      bindingId: 'bad',
+      bindingId: 'bad-endpoint',
       config: {
         transport: REMOTE_HTTP_JSON_TRANSPORT,
         resourceKey: 'remote.echo.service',
         path: '/v1/echo',
         endpoint: 'https://forbidden.example',
+      },
+    }),
+    RemoteToolBindingError,
+  );
+
+  assert.throws(
+    () => parseRemoteHttpJsonBinding({
+      kind: REMOTE_HTTP_JSON_BINDING_KIND,
+      bindingId: 'bad-secret-alias',
+      config: {
+        transport: REMOTE_HTTP_JSON_TRANSPORT,
+        resourceKey: 'remote.echo.service',
+        path: '/v1/echo',
+        apiKey: 'secret-token',
+      },
+    }),
+    RemoteToolBindingError,
+  );
+
+  assert.throws(
+    () => parseRemoteHttpJsonBinding({
+      kind: REMOTE_HTTP_JSON_BINDING_KIND,
+      bindingId: 'bad-absolute-url',
+      config: {
+        transport: REMOTE_HTTP_JSON_TRANSPORT,
+        resourceKey: 'remote.echo.service',
+        path: 'https://forbidden.example/v1/echo',
       },
     }),
     RemoteToolBindingError,
