@@ -147,9 +147,19 @@ Start here:
 - `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md` — frozen architecture authority;
 - `docs/implementation/DomainHarness_v0.2_TASK_DAG.md` — executable task authority.
 
-### Compiler packaging note
+### Compiler build-time API
 
-At the current audited v0.2 integration baseline, compiler implementation functions such as `compileDomainPackage()` exist in compiler modules but are not re-exported from the `@kaicreator/domain-harness-compiler` package root. Do not invent a root import. The SDK/compiler guide records the exact build-time modules and this packaging limitation.
+Use the compiler package root. The merged public package explicitly exports the Raw Package loader, compiler, module emitter, and their public authoring/target/result types:
+
+```ts
+import {
+  loadRawDomainPackage,
+  compileDomainPackage,
+  emitTargetCompiledPackageModule,
+} from '@kaicreator/domain-harness-compiler';
+```
+
+Compiler deep paths such as `src/**` or `dist/**` are not the external API. Compilation stays in build/CI; application Runtime startup consumes only the generated Target Compiled Domain Package plus Runtime Resources.
 
 ## Node and Expo hosts
 
