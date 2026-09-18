@@ -47,7 +47,7 @@ function inspectNode(value: unknown): void {
       args.length > 0
     ) {
       throw new ExpressionPolicyError(
-        `$${procedure.value}(...) arguments are not supported by the v0.1 deterministic clock contract`,
+        `$${procedure.value}(...) arguments are not supported by the v0.2 deterministic clock contract`,
       );
     }
   }

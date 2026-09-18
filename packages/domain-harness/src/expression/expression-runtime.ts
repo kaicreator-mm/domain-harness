@@ -1,15 +1,8 @@
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
-import { Worker, type ResourceLimits } from 'node:worker_threads';
+import jsonata from 'jsonata';
 
 import type { JsonValue } from '../contracts/json.js';
+import { isPortableJsonValue, utf8ByteLength } from './json-boundary.js';
 import { assertExpressionPolicy } from './policy.js';
-
-const require = createRequire(import.meta.url);
-
-// Resolve through the SDK's own module context so eval Workers never depend
-// on the host process's working directory or its node_modules layout.
-const JSONATA_ENTRY_URL = pathToFileURL(require.resolve('jsonata')).href;
 
 export type ExpressionRuntimeErrorCode = 'expression_error' | 'timeout' | 'cancelled';
 
@@ -28,79 +21,25 @@ export interface ExpressionEvaluationOptions {
   signal?: AbortSignal;
   maxInputBytes?: number;
   maxOutputBytes?: number;
-  resourceLimits?: ResourceLimits;
+  stackLimit?: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 2_000;
+const DEFAULT_STACK_LIMIT = 256;
 const DEFAULT_MAX_INPUT_BYTES = 1_048_576;
 const DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
-const DEFAULT_RESOURCE_LIMITS: ResourceLimits = {
-  maxOldGenerationSizeMb: 64,
-  maxYoungGenerationSizeMb: 16,
-  stackSizeMb: 4,
-};
-
-const WORKER_SOURCE = String.raw`
-function jsonOnly(value) {
-  if (value === null) return true;
-  const type = typeof value;
-  if (type === 'string' || type === 'boolean') return true;
-  if (type === 'number') return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(jsonOnly);
-  if (type === 'object') {
-    const proto = Object.getPrototypeOf(value);
-    if (proto !== Object.prototype && proto !== null) return false;
-    return Object.values(value).every(jsonOnly);
-  }
-  return false;
-}
-
-(async () => {
-  // Dynamic import bootstraps under both CommonJS and ESM interpretation of
-  // this eval'd source; a bare require() only works under CommonJS hosts.
-  const { parentPort, workerData } = await import('node:worker_threads');
-  try {
-    const module = await import(workerData.jsonataUrl);
-    const jsonata = module.default ?? module;
-    const expression = jsonata(workerData.expression, {
-      timeout: workerData.timeoutMs,
-      stack: 256,
-    });
-    expression.registerFunction('now', () => workerData.clockIso, '<:s>');
-    expression.registerFunction('millis', () => workerData.clockMs, '<:n>');
-    const input = JSON.parse(workerData.inputJson);
-    const result = await expression.evaluate(input);
-    if (!jsonOnly(result)) {
-      throw new Error('expression result is not a portable JSON value');
-    }
-    const outputJson = JSON.stringify(result);
-    if (Buffer.byteLength(outputJson, 'utf8') > workerData.maxOutputBytes) {
-      throw new Error('expression result exceeds maxOutputBytes');
-    }
-    parentPort.postMessage({ ok: true, outputJson });
-  } catch (error) {
-    parentPort.postMessage({
-      ok: false,
-      message: error && typeof error.message === 'string' ? error.message : String(error),
-    });
-  }
-})();
-`;
 
 export class ExpressionRuntime {
   async evaluate(
-    expression: string,
+    expressionSource: string,
     scope: JsonValue,
     logicalTime: string,
     options: ExpressionEvaluationOptions = {},
   ): Promise<JsonValue> {
     try {
-      assertExpressionPolicy(expression);
+      assertExpressionPolicy(expressionSource);
     } catch (error) {
-      throw new ExpressionRuntimeError(
-        'expression_error',
-        error instanceof Error ? error.message : String(error),
-      );
+      throw normalizeExpressionError(error);
     }
 
     const clockMs = Date.parse(logicalTime);
@@ -108,124 +47,69 @@ export class ExpressionRuntime {
       throw new ExpressionRuntimeError('expression_error', 'logicalTime must be a valid ISO timestamp');
     }
     const clockIso = new Date(clockMs).toISOString();
-    const inputJson = serializeInput(scope);
-    const maxInputBytes = options.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES;
-    const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
-    if (!Number.isFinite(maxInputBytes) || maxInputBytes <= 0) {
-      throw new ExpressionRuntimeError('expression_error', 'maxInputBytes must be greater than zero');
+
+    const maxInputBytes = positiveFiniteOption(
+      options.maxInputBytes,
+      DEFAULT_MAX_INPUT_BYTES,
+      'maxInputBytes',
+    );
+    const maxOutputBytes = positiveFiniteOption(
+      options.maxOutputBytes,
+      DEFAULT_MAX_OUTPUT_BYTES,
+      'maxOutputBytes',
+    );
+    const timeoutMs = positiveFiniteOption(options.timeoutMs, DEFAULT_TIMEOUT_MS, 'timeoutMs');
+    const stackLimit = positiveFiniteOption(options.stackLimit, DEFAULT_STACK_LIMIT, 'stackLimit');
+
+    if (!isPortableJsonValue(scope)) {
+      throw new ExpressionRuntimeError(
+        'expression_error',
+        'expression input must be a portable JSON value',
+      );
     }
-    if (!Number.isFinite(maxOutputBytes) || maxOutputBytes <= 0) {
-      throw new ExpressionRuntimeError('expression_error', 'maxOutputBytes must be greater than zero');
-    }
-    if (Buffer.byteLength(inputJson, 'utf8') > maxInputBytes) {
+    const inputJson = JSON.stringify(scope);
+    if (utf8ByteLength(inputJson) > maxInputBytes) {
       throw new ExpressionRuntimeError('expression_error', 'expression input exceeds maxInputBytes');
     }
 
-    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-      throw new ExpressionRuntimeError('expression_error', 'timeoutMs must be greater than zero');
-    }
-    if (options.signal?.aborted) {
-      throw new ExpressionRuntimeError('cancelled', 'expression evaluation was cancelled');
+    assertNotCancelled(options.signal);
+
+    let expression: ReturnType<typeof jsonata>;
+    try {
+      expression = jsonata(expressionSource, { timeout: timeoutMs, stack: stackLimit });
+      expression.registerFunction('now', () => clockIso, '<:s>');
+      expression.registerFunction('millis', () => clockMs, '<:n>');
+    } catch (error) {
+      throw normalizeExpressionError(error);
     }
 
-    return new Promise<JsonValue>((resolve, reject) => {
-      let worker: Worker;
-      try {
-        worker = new Worker(WORKER_SOURCE, {
-          eval: true,
-          env: {},
-          name: 'domain-harness-expr',
-          resourceLimits: options.resourceLimits ?? DEFAULT_RESOURCE_LIMITS,
-          workerData: {
-            expression,
-            inputJson,
-            clockMs,
-            clockIso,
-            timeoutMs,
-            maxOutputBytes,
-            jsonataUrl: JSONATA_ENTRY_URL,
-          },
-        });
-      } catch (error) {
-        reject(
-          new ExpressionRuntimeError(
-            'expression_error',
-            `expression Worker could not start: ${error instanceof Error ? error.message : String(error)}`,
-          ),
+    let result: unknown;
+    try {
+      result = await expression.evaluate(scope);
+    } catch (error) {
+      if (isJsonataTimeout(error)) {
+        throw new ExpressionRuntimeError(
+          'timeout',
+          `expression evaluation exceeded ${timeoutMs}ms`,
         );
-        return;
       }
+      throw normalizeExpressionError(error);
+    }
 
-      let settled = false;
-      const cleanup = (): void => {
-        clearTimeout(timer);
-        options.signal?.removeEventListener('abort', onAbort);
-      };
-      const finish = (fn: () => void): void => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        fn();
-      };
-      const stopWith = (error: ExpressionRuntimeError): void => {
-        finish(() => {
-          void worker.terminate();
-          reject(error);
-        });
-      };
-      const onAbort = (): void => {
-        stopWith(new ExpressionRuntimeError('cancelled', 'expression evaluation was cancelled'));
-      };
-      const timer = setTimeout(() => {
-        stopWith(new ExpressionRuntimeError('timeout', `expression evaluation exceeded ${timeoutMs}ms`));
-      }, timeoutMs);
+    assertNotCancelled(options.signal);
 
-      options.signal?.addEventListener('abort', onAbort, { once: true });
+    if (!isPortableJsonValue(result)) {
+      throw new ExpressionRuntimeError(
+        'expression_error',
+        'expression result is not a portable JSON value',
+      );
+    }
+    const outputJson = JSON.stringify(result);
+    if (utf8ByteLength(outputJson) > maxOutputBytes) {
+      throw new ExpressionRuntimeError('expression_error', 'expression result exceeds maxOutputBytes');
+    }
 
-      worker.once('message', (message: unknown) => {
-        finish(() => {
-          void worker.terminate();
-          const response = message as { ok?: boolean; outputJson?: string; message?: string };
-          if (!response.ok || typeof response.outputJson !== 'string') {
-            reject(
-              new ExpressionRuntimeError(
-                'expression_error',
-                response.message ?? 'expression Worker returned an invalid response',
-              ),
-            );
-            return;
-          }
-          try {
-            resolve(JSON.parse(response.outputJson) as JsonValue);
-          } catch (error) {
-            reject(
-              new ExpressionRuntimeError(
-                'expression_error',
-                `expression Worker returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
-              ),
-            );
-          }
-        });
-      });
-
-      worker.once('error', (error) => {
-        finish(() => reject(new ExpressionRuntimeError('expression_error', error.message)));
-      });
-
-      worker.once('exit', (code) => {
-        if (!settled) {
-          finish(() =>
-            reject(
-              new ExpressionRuntimeError(
-                'expression_error',
-                `expression Worker exited before returning a result with code ${code}`,
-              ),
-            ),
-          );
-        }
-      });
-    });
+    return result;
   }
 
   async evaluateBoolean(
@@ -245,13 +129,33 @@ export class ExpressionRuntime {
   }
 }
 
-function serializeInput(value: JsonValue): string {
-  try {
-    return JSON.stringify(value);
-  } catch (error) {
-    throw new ExpressionRuntimeError(
-      'expression_error',
-      `expression input is not JSON-serializable: ${error instanceof Error ? error.message : String(error)}`,
-    );
+function positiveFiniteOption(value: number | undefined, fallback: number, label: string): number {
+  const resolved = value ?? fallback;
+  if (!Number.isFinite(resolved) || resolved <= 0) {
+    throw new ExpressionRuntimeError('expression_error', `${label} must be greater than zero`);
   }
+  return resolved;
+}
+
+function assertNotCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new ExpressionRuntimeError('cancelled', 'expression evaluation was cancelled');
+  }
+}
+
+function isJsonataTimeout(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  return (
+    candidate.code === 'D1012' ||
+    (typeof candidate.message === 'string' && /time(?:out| limit)/i.test(candidate.message))
+  );
+}
+
+function normalizeExpressionError(error: unknown): ExpressionRuntimeError {
+  if (error instanceof ExpressionRuntimeError) return error;
+  return new ExpressionRuntimeError(
+    'expression_error',
+    error instanceof Error ? error.message : String(error),
+  );
 }
