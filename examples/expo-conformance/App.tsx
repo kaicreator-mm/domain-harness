@@ -28,6 +28,7 @@ export default function App() {
   const execute = async (action: string, work: () => Promise<unknown>, prepared = false) => {
     setOutput({ status: 'RUNNING', action, environment });
     try {
+      assertTargetEnvironment(environment);
       const evidence = await work();
       const next: ValidationOutput = {
         status: prepared ? 'PREPARED' : 'PASS',
@@ -110,4 +111,13 @@ function environmentIdentity() {
     applicationId: 'mm.kaicreator.domainharness.t019',
     runtimeCoreNodeBuiltinsExpected: false,
   };
+}
+
+function assertTargetEnvironment(environment: ReturnType<typeof environmentIdentity>): void {
+  if (environment.platform !== 'android') {
+    throw new Error(`T-019 requires Android, received ${environment.platform}`);
+  }
+  if (!environment.hermes) {
+    throw new Error('T-019 requires Hermes; the current JavaScript engine is not Hermes');
+  }
 }
