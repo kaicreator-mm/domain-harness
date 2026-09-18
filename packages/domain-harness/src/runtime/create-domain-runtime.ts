@@ -264,6 +264,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
                 expectedTargetSequence: stored.ack.targetSequence,
                 failure: transition.recoveryFailure,
               });
+              notifyTargetChanged(target, stored.message.messageId);
               throw new RecoveryRecordedError(target);
             }
             return {
@@ -280,6 +281,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
               expectedTargetSequence: stored.ack.targetSequence,
               failure,
             });
+            notifyTargetChanged(target, stored.message.messageId);
             throw new RecoveryRecordedError(target);
           }
         },
