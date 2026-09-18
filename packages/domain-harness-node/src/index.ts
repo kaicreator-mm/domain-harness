@@ -13,7 +13,7 @@ export function createNodeDomainRuntime(
   options: CreateDomainRuntimeOptions,
 ): Promise<DomainRuntime> {
   const capability = STANDARD_CAPABILITIES.httpTransport;
-  const requiresHttp = options.packageRegistry.list().some((packageId) =>
+  const requiresHttp = options.packageRegistry.listPackageIds().some((packageId) =>
     options.packageRegistry.get(packageId)?.manifest.requiredCapabilities.includes(capability) ?? false,
   );
   if (
