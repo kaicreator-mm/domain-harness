@@ -104,7 +104,7 @@ test('G32/AC-44: frozen v0.1 Script and generated v0.2 Script Domain Tool have e
   assert.deepEqual(migratedState.done, [{ target: REFERENCE.doneTarget }]);
   assert.equal(migrated.tool.execution.kind, 'script');
   assert.equal(migrated.tool.execution.bindingId, migrated.bindingId);
-  assert.equal(migrated.tool.effect, 'idempotent');
+  assert.equal(migrated.tool.effect, 'none');
   assert.deepEqual(migrated.tool.requiredCapabilities, ['script-execution@1']);
 
   const artifact = await bundleScriptTool(migrated.bundleRequest, passthroughJavascriptBundler);
