@@ -8,13 +8,13 @@ import type {
   FailMessageProcessingRequest,
   RuntimeStore,
 } from '@kaicreator/domain-harness/v2';
-import { NodeSqliteRuntimeStore } from '../../../packages/domain-harness-node/src/store/node-sqlite-runtime-store.ts';
+import { NodeSqliteRuntimeStore } from '../../../packages/domain-harness-node/src/store/node-sqlite-runtime-store.js';
 
-import { PORTABLE_RUNTIME_FIXTURE } from '../../conformance/fixtures.ts';
+import { PORTABLE_RUNTIME_FIXTURE } from '../../conformance/fixtures.js';
 import {
   NODE_CONFORMANCE_PACKAGE_ID,
   createNodeFixtureRuntime,
-} from '../../hosts/node/runtime-fixture.ts';
+} from '../../hosts/node/runtime-fixture.js';
 
 type Scenario = 'durable-ack' | 'effect-journal' | 'poison-recovery';
 type Mode = 'crash' | 'resume';
@@ -35,7 +35,7 @@ const [mode, scenario, databasePath, tracePath, controlPath] = process.argv.slic
 ];
 
 if (!['crash', 'resume'].includes(mode) || !['durable-ack', 'effect-journal', 'poison-recovery'].includes(scenario)) {
-  throw new Error('Usage: process-kill-worker.ts <crash|resume> <durable-ack|effect-journal|poison-recovery> <db> <trace> <control>');
+  throw new Error('Usage: process-kill-worker.mts <crash|resume> <durable-ack|effect-journal|poison-recovery> <db> <trace> <control>');
 }
 
 if (mode === 'crash') {
@@ -117,6 +117,7 @@ async function runResumeScenario(
         control,
         before: {
           lifecycle: beforeInstance.lifecycle,
+          stateId: portableStateId(beforeInstance.state),
           stateRevision: beforeInstance.stateRevision,
           disposition: beforeDisposition.disposition,
           failureCode: beforeInstance.failure?.code ?? null,
@@ -144,6 +145,7 @@ async function runResumeScenario(
       control,
       before: {
         lifecycle: beforeInstance.lifecycle,
+        stateId: portableStateId(beforeInstance.state),
         stateRevision: beforeInstance.stateRevision,
         disposition: beforeDisposition.disposition,
       },
@@ -153,6 +155,7 @@ async function runResumeScenario(
       },
       after: {
         lifecycle: afterInstance.lifecycle,
+        stateId: portableStateId(afterInstance.state),
         stateRevision: afterInstance.stateRevision,
         disposition: afterDisposition.disposition,
       },
@@ -326,5 +329,16 @@ function errorCode(error: unknown): string {
 }
 
 function never<T = never>(): Promise<T> {
-  return new Promise<T>(() => {});
+  // Pending promises alone do not hold the Node event loop; the crash worker
+  // must stay alive after the durable boundary until the parent kills it.
+  const keepAlive = setInterval(() => {}, 60_000);
+  return new Promise<T>(() => {
+    keepAlive.ref();
+  });
+}
+
+function portableStateId(state: unknown): string {
+  if (state === null || Array.isArray(state) || typeof state !== 'object') return 'unknown';
+  const candidate = (state as Record<string, unknown>).stateId;
+  return typeof candidate === 'string' ? candidate : 'unknown';
 }

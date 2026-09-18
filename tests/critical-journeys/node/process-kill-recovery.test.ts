@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
-const WORKER = join(HERE, 'process-kill-worker.ts');
+const WORKER = join(HERE, 'process-kill-worker.mts');
 
 type Scenario = 'durable-ack' | 'effect-journal' | 'poison-recovery';
 
@@ -66,11 +66,13 @@ for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as c
       if (scenario === 'durable-ack') {
         assert.equal(result.control.stage, 'after-accepted-ack-before-processing');
         assert.equal(result.before.lifecycle, 'waiting');
+        assert.equal(result.before.stateId, 'draft');
         assert.equal(result.before.stateRevision, 0);
         assert.equal(result.before.disposition, 'accepted');
         assert.equal(result.duplicate?.status, 'duplicate');
         assert.equal(result.duplicate?.targetSequence, 1);
         assert.equal(result.after?.lifecycle, 'waiting');
+        assert.equal(result.after?.stateId, 'quoted');
         assert.equal(result.after?.stateRevision, 1);
         assert.equal(result.after?.disposition, 'processed');
         assert.equal(result.toolTraceCount, 1, 'accepted message must execute exactly one semantic Tool invocation');
@@ -81,11 +83,13 @@ for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as c
       if (scenario === 'effect-journal') {
         assert.equal(result.control.stage, 'after-effect-and-message-commit');
         assert.equal(result.before.lifecycle, 'waiting');
+        assert.equal(result.before.stateId, 'quoted');
         assert.equal(result.before.stateRevision, 1);
         assert.equal(result.before.disposition, 'processed');
         assert.equal(result.duplicate?.status, 'duplicate');
         assert.equal(result.duplicate?.targetSequence, 1);
         assert.equal(result.after?.stateRevision, 1, 'duplicate delivery after restart must not fabricate a transition');
+        assert.equal(result.after?.stateId, 'quoted');
         assert.equal(result.after?.disposition, 'processed');
         assert.equal(result.effect?.status, 'completed');
         assert.equal(result.effect?.attempt, 1);
@@ -97,7 +101,16 @@ for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as c
 
       assert.equal(result.control.stage, 'after-recovery-required-commit');
       assert.equal(result.before.lifecycle, 'recovery_required');
-      assert.equal(result.before.stateRevision, 0, 'poison message must not commit a semantic state transition');
+      assert.equal(
+        result.before.stateId,
+        'draft',
+        'poison message must not commit a semantic state transition',
+      );
+      assert.equal(
+        result.before.stateRevision,
+        1,
+        'the recovery_required commit consumes exactly one durable row revision; the G30 semantic revision reduction is documented in docs/validation/v0.2/node/',
+      );
       assert.equal(result.before.disposition, 'failed');
       assert.equal(result.before.failureSourceMessageId, 'msg-poison-kill');
       assert.equal(result.rejectedCode, 'target_not_accepting');
