@@ -20,6 +20,25 @@ function run(command: string, args: readonly string[], cwd: string): string {
   });
 }
 
+function runNpm(args: readonly string[], cwd: string): string {
+  if (process.platform !== 'win32') {
+    return run('npm', args, cwd);
+  }
+  // Windows resolves npm to npm.cmd and Node refuses to spawn batch files
+  // without a shell, so build one quoted command line for the shell; passing
+  // the quoted string directly (instead of spawn args) keeps paths with
+  // spaces intact without the deprecated args+shell combination.
+  const command = ['npm.cmd', ...args.map((arg) => `"${arg}"`)].join(' ');
+  return execFileSync(command, {
+    cwd,
+    encoding: 'utf8',
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 16 * 1024 * 1024,
+    shell: true,
+  });
+}
+
 test('packed compiler exposes the stable root build API to a clean consumer', () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-compiler-consumer-'));
   const packDirectory = join(root, 'packs');
@@ -29,7 +48,7 @@ test('packed compiler exposes the stable root build API to a clean consumer', ()
     mkdirSync(packDirectory, { recursive: true });
     mkdirSync(consumerDirectory, { recursive: true });
 
-    run('npm', ['pack', '--pack-destination', packDirectory], PACKAGE_ROOT);
+    runNpm(['pack', '--pack-destination', packDirectory], PACKAGE_ROOT);
     const tarballs = readdirSync(packDirectory)
       .filter((name) => name.endsWith('.tgz'))
       .sort()
@@ -42,8 +61,7 @@ test('packed compiler exposes the stable root build API to a clean consumer', ()
       type: 'module',
     }, null, 2));
 
-    run(
-      'npm',
+    runNpm(
       ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarballs[0] ?? ''],
       consumerDirectory,
     );
