@@ -1,32 +1,26 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../../..');
-const roots = [
-  path.join(repo, 'packages/domain-harness/src'),
-  path.join(repo, 'tests/hosts/expo'),
-  path.join(repo, 'examples/expo-conformance'),
-];
-const excluded = new Set([
-  path.join(repo, 'tests/hosts/expo/check-runtime-boundary.mjs'),
-  path.join(repo, 'examples/expo-conformance/metro.config.cjs'),
-]);
+const seeds = [
+  'packages/domain-harness/src/public-v2/index.ts',
+  'packages/domain-harness-expo/src/index.ts',
+  'tests/hosts/expo/compiled-fixture.ts',
+  'tests/hosts/expo/runtime-conformance-host.ts',
+  'tests/hosts/expo/restart-critical-journey.ts',
+  'examples/expo-conformance/App.tsx',
+].map((file) => path.join(repo, file));
+
 const nodeSpecifier = /(?:from\s+|import\s*\(|require\s*\()\s*['"]node:/;
-const referenceFake = /reference-host/;
+const staticSpecifier = /(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+const dynamicSpecifier = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+const referenceFake = /(?:\.\.\/)*\.\.\/conformance\/reference-host|conformance\/reference-host/;
+const visited = new Set();
 const violations = [];
 
-for (const root of roots) {
-  for (const file of await walk(root)) {
-    if (excluded.has(file) || !/\.(?:ts|tsx|js|mjs|cjs)$/.test(file)) continue;
-    const source = await readFile(file, 'utf8');
-    if (nodeSpecifier.test(source)) violations.push(`${relative(file)} imports a node: builtin on the Expo runtime path`);
-    if (file.includes(`${path.sep}tests${path.sep}hosts${path.sep}expo${path.sep}`) && referenceFake.test(source)) {
-      violations.push(`${relative(file)} imports the T-017 reference fake`);
-    }
-  }
-}
+for (const seed of seeds) await visit(seed);
 
 if (violations.length > 0) {
   console.error('T019_RUNTIME_BOUNDARY_FAIL');
@@ -34,18 +28,78 @@ if (violations.length > 0) {
   process.exitCode = 1;
 } else {
   console.log('T019_RUNTIME_BOUNDARY_PASS');
-  console.log('portable core + Expo runtime harness contain no node: imports; reference fake is not imported');
+  console.log(`checked ${visited.size} reachable source files from portable-v2 + Expo/T-019 entry points`);
+  console.log('no reachable node: builtin import and no T-017 reference fake import');
 }
 
-async function walk(root) {
-  const entries = await readdir(root, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const target = path.join(root, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(target));
-    else files.push(target);
+async function visit(file) {
+  const normalized = path.normalize(file);
+  if (visited.has(normalized)) return;
+  visited.add(normalized);
+
+  const source = await readFile(normalized, 'utf8');
+  if (nodeSpecifier.test(source)) {
+    violations.push(`${relative(normalized)} imports a node: builtin on the reachable Expo runtime path`);
   }
-  return files;
+  if (referenceFake.test(source)) {
+    violations.push(`${relative(normalized)} imports the T-017 reference fake`);
+  }
+
+  const specifiers = new Set([
+    ...matches(staticSpecifier, source),
+    ...matches(dynamicSpecifier, source),
+  ]);
+  for (const specifier of specifiers) {
+    if (!specifier.startsWith('.')) continue;
+    const dependency = await resolveSource(normalized, specifier);
+    if (dependency !== null) await visit(dependency);
+  }
+}
+
+async function resolveSource(importer, specifier) {
+  const target = path.resolve(path.dirname(importer), specifier);
+  const ext = path.extname(target);
+  const candidates = [];
+
+  if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
+    const base = target.slice(0, -ext.length);
+    candidates.push(`${base}.ts`, `${base}.tsx`, `${base}.mts`, `${base}.cts`, target);
+  } else if (ext.length > 0) {
+    candidates.push(target);
+  } else {
+    candidates.push(
+      target,
+      `${target}.ts`,
+      `${target}.tsx`,
+      `${target}.js`,
+      path.join(target, 'index.ts'),
+      path.join(target, 'index.tsx'),
+      path.join(target, 'index.js'),
+    );
+  }
+
+  for (const candidate of candidates) {
+    if (await exists(candidate)) return candidate;
+  }
+  throw new Error(`T-019 boundary checker could not resolve ${specifier} from ${relative(importer)}`);
+}
+
+function matches(regex, source) {
+  regex.lastIndex = 0;
+  const values = [];
+  for (let match = regex.exec(source); match !== null; match = regex.exec(source)) {
+    values.push(match[1]);
+  }
+  return values;
+}
+
+async function exists(file) {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function relative(file) {
