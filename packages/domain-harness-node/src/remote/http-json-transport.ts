@@ -59,10 +59,18 @@ function isJsonValue(value: unknown): value is JsonValue {
 }
 
 function readPath(binding: CompiledBindingDescriptor): string {
-  if (!isRecord(binding.config) || typeof binding.config.path !== 'string' || binding.config.path.length === 0) {
-    throw new HttpJsonTransportError('RESOURCE_INVALID', 'Remote HTTP/JSON binding requires a logical path');
+  if (
+    !isRecord(binding.config)
+    || typeof binding.config.path !== 'string'
+    || !binding.config.path.startsWith('/')
+    || binding.config.path.startsWith('//')
+  ) {
+    throw new HttpJsonTransportError(
+      'RESOURCE_INVALID',
+      'Remote HTTP/JSON binding requires a single-root logical path beginning with /',
+    );
   }
-  return binding.config.path.startsWith('/') ? binding.config.path : `/${binding.config.path}`;
+  return binding.config.path;
 }
 
 function readResource(resources: Readonly<Record<string, unknown>>, key: string): HttpJsonRuntimeResource {
