@@ -9,6 +9,8 @@ import { ExpoRuntimeConformanceHost } from './runtime-conformance-host.ts';
 export const T019_RESTART_DATABASE = 'domain-harness-t019-restart.db';
 export const T019_RESTART_ADDRESS = Object.freeze({ workflowId: 'order', instanceKey: 'restart-order-001' });
 
+let livePreparedSession: RuntimeConformanceSession | null = null;
+
 export interface RestartPreparedEvidence {
   phase: 'prepared';
   databaseName: string;
@@ -27,7 +29,13 @@ export interface RestartVerifiedEvidence {
 }
 
 export async function prepareRestartCriticalJourney(): Promise<RestartPreparedEvidence> {
+  if (livePreparedSession !== null) {
+    await livePreparedSession.dispose();
+    livePreparedSession = null;
+  }
+
   const session = await restartSession();
+  livePreparedSession = session;
   try {
     await session.openInstance({
       address: T019_RESTART_ADDRESS,
@@ -57,12 +65,20 @@ export async function prepareRestartCriticalJourney(): Promise<RestartPreparedEv
       beforeForceStop,
       quoteDisposition,
     };
-  } finally {
+  } catch (error) {
+    livePreparedSession = null;
     await session.dispose();
+    throw error;
   }
 }
 
 export async function verifyRestartCriticalJourney(): Promise<RestartVerifiedEvidence> {
+  if (livePreparedSession !== null) {
+    throw new Error(
+      'Restart verification requires a new app process. Force-stop Android and relaunch the installed app before VERIFY.',
+    );
+  }
+
   const session = await restartSession();
   try {
     const afterRelaunch = instance(await session.query({ kind: 'instance', target: T019_RESTART_ADDRESS }));
