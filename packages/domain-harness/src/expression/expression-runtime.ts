@@ -109,7 +109,8 @@ export class ExpressionRuntime {
       throw new ExpressionRuntimeError('expression_error', 'expression result exceeds maxOutputBytes');
     }
 
-    return result;
+    // JSONata builds result objects without Object.prototype; hand callers plain JSON.
+    return JSON.parse(outputJson) as JsonValue;
   }
 
   async evaluateBoolean(
