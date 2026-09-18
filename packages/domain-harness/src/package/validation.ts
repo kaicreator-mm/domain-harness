@@ -19,28 +19,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+function failInvalid(message: string): never {
+  throw new PackageActivationError('INVALID_COMPILED_PACKAGE', message);
 }
 
 function requireRecordField(record: Record<string, unknown>, field: string): Record<string, unknown> {
   const value = record[field];
-  if (!isRecord(value)) {
-    throw new PackageActivationError(
-      'INVALID_COMPILED_PACKAGE',
-      `compiled package manifest field "${field}" must be an object`,
-    );
-  }
+  if (!isRecord(value)) failInvalid(`compiled package manifest field "${field}" must be an object`);
   return value;
 }
 
 function requireStringField(record: Record<string, unknown>, field: string): string {
   const value = record[field];
   if (typeof value !== 'string' || value.length === 0) {
-    throw new PackageActivationError(
-      'INVALID_COMPILED_PACKAGE',
-      `compiled package manifest field "${field}" must be a non-empty string`,
-    );
+    failInvalid(`compiled package manifest field "${field}" must be a non-empty string`);
   }
   return value;
 }
@@ -48,63 +40,98 @@ function requireStringField(record: Record<string, unknown>, field: string): str
 function requireIntegerField(record: Record<string, unknown>, field: string): number {
   const value = record[field];
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-    throw new PackageActivationError(
-      'INVALID_COMPILED_PACKAGE',
-      `compiled package manifest field "${field}" must be a non-negative integer`,
-    );
+    failInvalid(`compiled package manifest field "${field}" must be a non-negative integer`);
   }
   return value;
 }
 
-function validateManifestShape(value: unknown): asserts value is CompiledPackageManifest {
-  if (!isRecord(value)) {
-    throw new PackageActivationError('INVALID_COMPILED_PACKAGE', 'compiled package manifest must be an object');
+function requireStringArray(value: unknown, path: string): readonly string[] {
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || entry.length === 0)) {
+    failInvalid(`${path} must be an array of non-empty strings`);
   }
+  return value;
+}
 
-  requireStringField(value, 'formatVersion');
-  requireIntegerField(value, 'runtimeContractMajor');
-  requireIntegerField(value, 'executionEngineMajor');
-  requireStringField(value, 'domainId');
-  requireStringField(value, 'domainVersion');
-  requireStringField(value, 'packageId');
-  requireStringField(value, 'targetProfileId');
-
-  if (!isStringArray(value.requiredCapabilities)) {
-    throw new PackageActivationError(
-      'INVALID_COMPILED_PACKAGE',
-      'compiled package manifest field "requiredCapabilities" must be a string array',
-    );
+function validateCapabilityIds(value: unknown, path: string): readonly CapabilityId[] {
+  const capabilities = requireStringArray(value, path);
+  for (const capability of capabilities) {
+    if (!/^.+@\d+$/.test(capability)) failInvalid(`${path} contains invalid capability id "${capability}"`);
   }
+  return capabilities as readonly CapabilityId[];
+}
 
-  requireRecordField(value, 'workflows');
-  const tools = requireRecordField(value, 'tools');
-  requireRecordField(value, 'projections');
-  requireRecordField(value, 'schemas');
-  const bindingDigests = requireRecordField(value, 'bindingDigests');
+function assertJsonSerializable(value: unknown, path: string, ancestors = new Set<object>()): void {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) failInvalid(`${path} contains a non-finite number`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    if (ancestors.has(value)) failInvalid(`${path} contains a circular reference`);
+    ancestors.add(value);
+    value.forEach((entry, index) => assertJsonSerializable(entry, `${path}[${index}]`, ancestors));
+    ancestors.delete(value);
+    return;
+  }
+  if (isRecord(value)) {
+    if (ancestors.has(value)) failInvalid(`${path} contains a circular reference`);
+    ancestors.add(value);
+    for (const [key, child] of Object.entries(value)) {
+      assertJsonSerializable(child, `${path}.${key}`, ancestors);
+    }
+    ancestors.delete(value);
+    return;
+  }
+  failInvalid(`${path} contains a non-JSON value`);
+}
 
-  for (const [bindingId, digest] of Object.entries(bindingDigests)) {
-    if (bindingId.length === 0 || typeof digest !== 'string' || digest.length === 0) {
-      throw new PackageActivationError(
-        'INVALID_COMPILED_PACKAGE',
-        'bindingDigests must map non-empty binding ids to non-empty digest strings',
-      );
+function validateWorkflows(workflows: Record<string, unknown>): void {
+  for (const [workflowKey, workflowValue] of Object.entries(workflows)) {
+    if (!isRecord(workflowValue)) failInvalid(`workflow "${workflowKey}" must be an object`);
+    requireStringField(workflowValue, 'workflowId');
+    const definition = requireRecordField(workflowValue, 'definition');
+    assertJsonSerializable(definition, `workflow "${workflowKey}" definition`);
+    const messageContracts = requireRecordField(workflowValue, 'messageContracts');
+    for (const [messageKey, messageValue] of Object.entries(messageContracts)) {
+      if (!isRecord(messageValue)) failInvalid(`workflow "${workflowKey}" message "${messageKey}" must be an object`);
+      requireStringField(messageValue, 'type');
+      if (
+        messageValue.version !== undefined &&
+        (typeof messageValue.version !== 'string' || messageValue.version.length === 0)
+      ) {
+        failInvalid(`workflow "${workflowKey}" message "${messageKey}" version must be a non-empty string`);
+      }
+      const payloadSchema = requireRecordField(messageValue, 'payloadSchema');
+      assertJsonSerializable(payloadSchema, `workflow "${workflowKey}" message "${messageKey}" payloadSchema`);
     }
   }
+}
 
+function validateTools(tools: Record<string, unknown>, bindingDigests: Record<string, unknown>): void {
   for (const [toolKey, toolValue] of Object.entries(tools)) {
-    if (!isRecord(toolValue)) {
-      throw new PackageActivationError('INVALID_COMPILED_PACKAGE', `tool "${toolKey}" must be an object`);
-    }
+    if (!isRecord(toolValue)) failInvalid(`tool "${toolKey}" must be an object`);
     requireStringField(toolValue, 'toolId');
-    const execution = requireRecordField(toolValue, 'execution');
-    const bindingId = requireStringField(execution, 'bindingId');
-    requireStringField(execution, 'kind');
-    if (!isStringArray(toolValue.requiredCapabilities)) {
-      throw new PackageActivationError(
-        'INVALID_COMPILED_PACKAGE',
-        `tool "${toolKey}" requiredCapabilities must be a string array`,
-      );
+    if (toolValue.inputSchema !== undefined) {
+      const inputSchema = requireRecordField(toolValue, 'inputSchema');
+      assertJsonSerializable(inputSchema, `tool "${toolKey}" inputSchema`);
     }
+    const outputSchema = requireRecordField(toolValue, 'outputSchema');
+    assertJsonSerializable(outputSchema, `tool "${toolKey}" outputSchema`);
+    if (!['none', 'idempotent', 'non-idempotent'].includes(String(toolValue.effect))) {
+      failInvalid(`tool "${toolKey}" effect is invalid`);
+    }
+    validateCapabilityIds(toolValue.requiredCapabilities, `tool "${toolKey}" requiredCapabilities`);
+
+    const execution = requireRecordField(toolValue, 'execution');
+    requireStringField(execution, 'kind');
+    const bindingId = requireStringField(execution, 'bindingId');
+    if (execution.digest !== undefined && (typeof execution.digest !== 'string' || execution.digest.length === 0)) {
+      failInvalid(`tool "${toolKey}" execution digest must be a non-empty string`);
+    }
+    if (execution.config !== undefined) {
+      assertJsonSerializable(execution.config, `tool "${toolKey}" execution config`);
+    }
+
     const manifestDigest = bindingDigests[bindingId];
     if (typeof manifestDigest !== 'string' || manifestDigest.length === 0) {
       throw new PackageActivationError(
@@ -119,6 +146,78 @@ function validateManifestShape(value: unknown): asserts value is CompiledPackage
       );
     }
   }
+}
+
+function validateProjections(projections: Record<string, unknown>): void {
+  for (const [projectionKey, projectionValue] of Object.entries(projections)) {
+    if (!isRecord(projectionValue)) failInvalid(`projection "${projectionKey}" must be an object`);
+    requireStringField(projectionValue, 'projectionId');
+    requireStringField(projectionValue, 'expression');
+    if (!Array.isArray(projectionValue.dependencies)) {
+      failInvalid(`projection "${projectionKey}" dependencies must be an array`);
+    }
+    for (const [index, dependency] of projectionValue.dependencies.entries()) {
+      if (!isRecord(dependency)) failInvalid(`projection "${projectionKey}" dependency ${index} must be an object`);
+      switch (dependency.kind) {
+        case 'workflow': {
+          const selector = requireRecordField(dependency, 'selector');
+          assertJsonSerializable(selector, `projection "${projectionKey}" dependency ${index} selector`);
+          break;
+        }
+        case 'business': {
+          requireStringField(dependency, 'source');
+          const selector = requireRecordField(dependency, 'selector');
+          assertJsonSerializable(selector, `projection "${projectionKey}" dependency ${index} selector`);
+          break;
+        }
+        case 'domain-data':
+          requireStringField(dependency, 'key');
+          break;
+        default:
+          failInvalid(`projection "${projectionKey}" dependency ${index} kind is invalid`);
+      }
+    }
+    const outputSchema = requireRecordField(projectionValue, 'outputSchema');
+    assertJsonSerializable(outputSchema, `projection "${projectionKey}" outputSchema`);
+  }
+}
+
+function validateManifestShape(value: unknown): asserts value is CompiledPackageManifest {
+  if (!isRecord(value)) failInvalid('compiled package manifest must be an object');
+
+  requireStringField(value, 'formatVersion');
+  requireIntegerField(value, 'runtimeContractMajor');
+  requireIntegerField(value, 'executionEngineMajor');
+  requireStringField(value, 'domainId');
+  requireStringField(value, 'domainVersion');
+  requireStringField(value, 'packageId');
+  requireStringField(value, 'targetProfileId');
+  validateCapabilityIds(value.requiredCapabilities, 'compiled package requiredCapabilities');
+
+  const workflows = requireRecordField(value, 'workflows');
+  const tools = requireRecordField(value, 'tools');
+  const projections = requireRecordField(value, 'projections');
+  const schemas = requireRecordField(value, 'schemas');
+  const bindingDigests = requireRecordField(value, 'bindingDigests');
+
+  for (const [bindingId, digest] of Object.entries(bindingDigests)) {
+    if (bindingId.length === 0 || typeof digest !== 'string' || digest.length === 0) {
+      failInvalid('bindingDigests must map non-empty binding ids to non-empty digest strings');
+    }
+  }
+  for (const [schemaId, schema] of Object.entries(schemas)) {
+    if (!isRecord(schema)) failInvalid(`schema "${schemaId}" must be an object`);
+    assertJsonSerializable(schema, `schema "${schemaId}"`);
+  }
+  if (value.compatibility !== undefined) {
+    if (!isRecord(value.compatibility)) failInvalid('compiled package compatibility must be an object');
+    assertJsonSerializable(value.compatibility, 'compiled package compatibility');
+  }
+
+  validateWorkflows(workflows);
+  validateTools(tools, bindingDigests);
+  validateProjections(projections);
+  assertJsonSerializable(value, 'compiled package manifest');
 }
 
 function validateBindings(
@@ -141,15 +240,10 @@ function validateBindings(
 }
 
 function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => canonicalize(entry));
-  }
+  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
   if (isRecord(value)) {
     const result: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) {
-      const child = value[key];
-      if (child !== undefined) result[key] = canonicalize(child);
-    }
+    for (const key of Object.keys(value).sort()) result[key] = canonicalize(value[key]);
     return result;
   }
   return value;
@@ -157,13 +251,9 @@ function canonicalize(value: unknown): unknown {
 
 export function canonicalPackageIdentityMaterial(manifest: CompiledPackageManifest): string {
   const { packageId: _packageId, ...identityMaterial } = manifest;
+  assertJsonSerializable(identityMaterial, 'compiled package identity material');
   const encoded = JSON.stringify(canonicalize(identityMaterial));
-  if (encoded === undefined) {
-    throw new PackageActivationError(
-      'INVALID_COMPILED_PACKAGE',
-      'compiled package identity material is not serializable',
-    );
-  }
+  if (encoded === undefined) failInvalid('compiled package identity material is not serializable');
   return encoded;
 }
 
