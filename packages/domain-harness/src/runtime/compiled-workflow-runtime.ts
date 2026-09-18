@@ -17,6 +17,10 @@ import type {
   WorkflowInstanceSnapshot,
   WorkflowLifecycle,
 } from '../v2/contracts/workflow.js';
+import {
+  JournaledSkillRunner,
+  type CompiledSkillDefinition,
+} from './journaled-skill-runner.js';
 
 interface CompiledRoute {
   target: string;
@@ -36,6 +40,8 @@ interface CompiledInvoke {
   ref?: string;
   expression?: string;
   input?: string;
+  timeoutMs?: number;
+  skill?: CompiledSkillDefinition;
 }
 
 interface CompiledState {
@@ -65,6 +71,7 @@ export interface CompiledWorkflowRuntimeOptions {
   expression: ExpressionExecutorPort;
   toolRunner: DurableToolRunner;
   toolExecutor: ToolExecutorPort;
+  skillRunner?: JournaledSkillRunner;
   messageEffect: JournaledDomainMessageEffect;
   onChildAccepted(target: WorkflowAddress, messageId: string): void;
 }
@@ -233,6 +240,34 @@ export class CompiledWorkflowRuntime {
       };
     }
 
+    if (invoke.kind === 'skill') {
+      if (invoke.ref === undefined || invoke.ref.length === 0) {
+        throw new Error(`Skill invoke in ${state.stateId} is missing Skill reference`);
+      }
+      if (invoke.skill === undefined || invoke.skill.skillId !== invoke.ref) {
+        throw new Error(`Compiled Skill '${invoke.ref}' is missing or has mismatched identity`);
+      }
+      if (this.options.skillRunner === undefined) {
+        throw new Error(
+          `Skill '${invoke.ref}' requires a provider-neutral AI operation port at Runtime activation`,
+        );
+      }
+      const input = invoke.input === undefined
+        ? state.data
+        : await this.options.expression.evaluate({
+            expression: invoke.input,
+            input: scope,
+            logicalTime,
+          });
+      const result = await this.options.skillRunner.run({
+        ...effectSeed(current.address, stored.message.messageId, state.stateId, step),
+        skill: invoke.skill,
+        input,
+        ...(invoke.timeoutMs === undefined ? {} : { timeoutMs: invoke.timeoutMs }),
+      });
+      return { value: result.output };
+    }
+
     if (invoke.kind === 'tool') {
       if (invoke.ref === undefined || invoke.ref.length === 0) {
         throw new Error(`Tool invoke in ${state.stateId} is missing tool reference`);
@@ -272,6 +307,17 @@ export class CompiledWorkflowRuntime {
         };
       }
       return { value: result.output };
+    }
+
+    if (invoke.kind === 'script') {
+      throw new Error(
+        'Top-level Script invoke is not a v0.2 Runtime primitive; use a target-compiled Script Domain Tool',
+      );
+    }
+    if (invoke.kind === 'workflow') {
+      throw new Error(
+        'Top-level child Workflow invoke is not a v0.2 Runtime primitive; use a durable Domain Message effect',
+      );
     }
 
     throw new Error(
