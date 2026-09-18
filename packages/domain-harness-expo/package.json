@@ -12,5 +12,8 @@
     "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run typecheck"
+  },
+  "dependencies": {
+    "@kaicreator/domain-harness": "0.2.0"
   }
 }
