@@ -1,6 +1,6 @@
 # Task DAG — DomainHarness v0.2
 
-**Status:** FROZEN EXECUTION PLAN — TODO  
+**Status:** FROZEN EXECUTION PLAN — DONE  
 **Created:** 2026-09-18  
 **Integration branch:** `v0.2`  
 **Task branch convention:** `v0.2_tNNN`
@@ -19,30 +19,30 @@
 
 | Task | Depends On | Parallel | Risk | Input / Reference | Output | Acceptance | Model | Required Validation | Status |
 |---|---|---:|---|---|---|---|---|---|---|
-| T-001 v0.2 workspace scaffold + frozen contract foundation | — | NO | H | Frozen PRD + L2 + task pack | four workspace package manifests and build/typecheck/test scripts | `@kaicreator/domain-harness` has no Node built-in/driver dependency | High | dependency inspection | TODO |
-| T-002 build-time compiler + Target Compiled Package generation | T-001 | YES | H | Frozen PRD + L2 + task pack | Raw Package loader migrated from v0.1 runtime code | missing required capability fails compilation | High | G1/G2 compiler fixtures | TODO |
-| T-003 Node SQLite RuntimeStore adapter | T-001 | YES | M | Frozen PRD + L2 + task pack | dh_v2_* migrations | shared RuntimeStore conformance suite passes | High | G5 store conformance | TODO |
-| T-004 Expo SQLite RuntimeStore adapter | T-001 | YES | H | Frozen PRD + L2 + task pack | Expo RuntimeStore adapter | same store conformance contract as Node | High | G4/G5 host-store subset | TODO |
-| T-005 compiled package validation + registry + pin retention | T-001 | YES | H | Frozen PRD + L2 + task pack | compiled manifest validator | malformed/incompatible package fails before execution | High | G27/G28/G29 unit + integration fixtures | TODO |
-| T-006 portable Expression Tool + deterministic expression runtime | T-001 | YES | M | Frozen PRD + L2 + task pack | portable JSONata executor | no node: imports/Buffer requirement in portable path | High | G6 expression CJ subset | TODO |
-| T-007 target-compiled Script Tool bindings for Node + Expo | T-001 | YES | H | Frozen PRD + L2 + task pack | script bundling pipeline | runtime never compiles TypeScript | High | G7 on Node | TODO |
-| T-008 Remote Tool HTTP/JSON binding | T-001 | YES | M | Frozen PRD + L2 + task pack | HTTP/JSON transport binding contract | compiled package contains logical binding only | High | G8 Remote Tool CJ | TODO |
-| T-009 durable effect journal + Tool recovery semantics | T-001 | YES | H | Frozen PRD + L2 + task pack | effectId derivation | Tool result commits before dependent state transition | High | G9/G10 | TODO |
-| T-010 persistent Workflow Instance engine + per-instance serialized lane | T-001 | YES | H | Frozen PRD + L2 + task pack | WorkflowAddress resolver | same instance continues after runtime restart | High | G3 instance subset | TODO |
-| T-011 durable mailbox acceptance + ACK/dedup/ordering | T-001 | YES | H | Frozen PRD + L2 + task pack | message validation service | ACK only after durable store acceptance | High | G12/G13/G14/G15/G16/G19/G21 acceptance-level tests | TODO |
-| T-012 workflow-to-workflow journaled Domain Message effect | T-011 | YES | H | Frozen PRD + L2 + task pack | SendDomainMessageEffect executor | crash after target acceptance does not duplicate target transition | High | G20 | TODO |
-| T-013 poison-message recovery + terminal disposition closure | T-009, T-010, T-011 | YES | H | Frozen PRD + L2 + task pack | recovery_required transition | later messages never pass unresolved failed message | High | G17/G18 | TODO |
-| T-014 Query + multi-workflow Projection + authoritative snapshot boundary | T-001 | YES | H | Frozen PRD + L2 + task pack | bounded DomainQuery dispatcher | Query is read-only | High | G22 query subset | TODO |
-| T-015 Subscription + coalescing + business invalidation | T-001 | YES | M | Frozen PRD + L2 + task pack | portable listener registry | no durable subscriber log | High | G22/G23 | TODO |
-| T-016 portable Runtime assembly + public v0.2 API | T-002, T-003, T-004, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012, T-013, T-014, T-015 | NO | H | Frozen PRD + L2 + task pack | createDomainRuntime portable assembly | Runtime startup uses compiled package + resources only | High | G3/G4/G11 smoke | TODO |
-| T-017 shared deterministic runtime conformance suite | T-016 | YES | M | Frozen PRD + L2 + task pack | host harness contract | suite asserts only product-level observable behavior, not row IDs/timestamps/internal engine state | High | G30 suite self-test | TODO |
-| T-018 Node host Critical Journeys + process-kill recovery | T-016, T-017 | YES | M | Frozen PRD + L2 + task pack | Node conformance runner | Node passes shared conformance | High | G3/G6-G20 relevant Node gates | TODO |
-| T-019 Expo Android/Hermes conformance + restart Critical Journeys | T-016, T-017 | YES | H | Frozen PRD + L2 + task pack | minimal Expo conformance app | real Hermes runtime executes without Node built-ins | High | G4/G30 + PRD AC-42 | TODO |
-| T-020 v0.1 expr → Expression Domain Tool migration equivalence | T-016 | YES | M | Frozen PRD + L2 + task pack | legacy expr translation | non-trivial branch/output scenario matches frozen equivalence definition | High | G31 / AC-43 | TODO |
-| T-021 v0.1 script → Script Domain Tool migration equivalence | T-016 | YES | M | Frozen PRD + L2 + task pack | legacy script translation | observable outputs/transitions match | High | G32 / AC-44 | TODO |
-| T-022 package upgrade + pin retention + cross-version compatibility validation | T-016 | YES | H | Frozen PRD + L2 + task pack | package A/B fixtures | old instance stays on A while new instance uses B | High | G21/G27/G28/G29 | TODO |
-| T-023 SDK docs + v0.1→v0.2 migration + host integration guides | T-016 | YES | M | Frozen PRD + L2 + task pack | compiler usage | examples use compiled package at startup, never Raw Package root | Low | docs review | TODO |
-| T-024 v0.2 visible closure + gate matrix + Hidden Validation handoff | T-018, T-019, T-020, T-021, T-022, T-023 | NO | H | Frozen PRD + L2 + task pack | gate evidence matrix | every required gate has PASS/BLOCKED with evidence identity | High | G1-G34 reconciliation | TODO |
+| T-001 v0.2 workspace scaffold + frozen contract foundation | — | NO | H | Frozen PRD + L2 + task pack | four workspace package manifests and build/typecheck/test scripts | `@kaicreator/domain-harness` has no Node built-in/driver dependency | High | dependency inspection | DONE |
+| T-002 build-time compiler + Target Compiled Package generation | T-001 | YES | H | Frozen PRD + L2 + task pack | Raw Package loader migrated from v0.1 runtime code | missing required capability fails compilation | High | G1/G2 compiler fixtures | DONE |
+| T-003 Node SQLite RuntimeStore adapter | T-001 | YES | M | Frozen PRD + L2 + task pack | dh_v2_* migrations | shared RuntimeStore conformance suite passes | High | G5 store conformance | DONE |
+| T-004 Expo SQLite RuntimeStore adapter | T-001 | YES | H | Frozen PRD + L2 + task pack | Expo RuntimeStore adapter | same store conformance contract as Node | High | G4/G5 host-store subset | DONE |
+| T-005 compiled package validation + registry + pin retention | T-001 | YES | H | Frozen PRD + L2 + task pack | compiled manifest validator | malformed/incompatible package fails before execution | High | G27/G28/G29 unit + integration fixtures | DONE |
+| T-006 portable Expression Tool + deterministic expression runtime | T-001 | YES | M | Frozen PRD + L2 + task pack | portable JSONata executor | no node: imports/Buffer requirement in portable path | High | G6 expression CJ subset | DONE |
+| T-007 target-compiled Script Tool bindings for Node + Expo | T-001 | YES | H | Frozen PRD + L2 + task pack | script bundling pipeline | runtime never compiles TypeScript | High | G7 on Node | DONE |
+| T-008 Remote Tool HTTP/JSON binding | T-001 | YES | M | Frozen PRD + L2 + task pack | HTTP/JSON transport binding contract | compiled package contains logical binding only | High | G8 Remote Tool CJ | DONE |
+| T-009 durable effect journal + Tool recovery semantics | T-001 | YES | H | Frozen PRD + L2 + task pack | effectId derivation | Tool result commits before dependent state transition | High | G9/G10 | DONE |
+| T-010 persistent Workflow Instance engine + per-instance serialized lane | T-001 | YES | H | Frozen PRD + L2 + task pack | WorkflowAddress resolver | same instance continues after runtime restart | High | G3 instance subset | DONE |
+| T-011 durable mailbox acceptance + ACK/dedup/ordering | T-001 | YES | H | Frozen PRD + L2 + task pack | message validation service | ACK only after durable store acceptance | High | G12/G13/G14/G15/G16/G19/G21 acceptance-level tests | DONE |
+| T-012 workflow-to-workflow journaled Domain Message effect | T-011 | YES | H | Frozen PRD + L2 + task pack | SendDomainMessageEffect executor | crash after target acceptance does not duplicate target transition | High | G20 | DONE |
+| T-013 poison-message recovery + terminal disposition closure | T-009, T-010, T-011 | YES | H | Frozen PRD + L2 + task pack | recovery_required transition | later messages never pass unresolved failed message | High | G17/G18 | DONE |
+| T-014 Query + multi-workflow Projection + authoritative snapshot boundary | T-001 | YES | H | Frozen PRD + L2 + task pack | bounded DomainQuery dispatcher | Query is read-only | High | G22 query subset | DONE |
+| T-015 Subscription + coalescing + business invalidation | T-001 | YES | M | Frozen PRD + L2 + task pack | portable listener registry | no durable subscriber log | High | G22/G23 | DONE |
+| T-016 portable Runtime assembly + public v0.2 API | T-002, T-003, T-004, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012, T-013, T-014, T-015 | NO | H | Frozen PRD + L2 + task pack | createDomainRuntime portable assembly | Runtime startup uses compiled package + resources only | High | G3/G4/G11 smoke | DONE |
+| T-017 shared deterministic runtime conformance suite | T-016 | YES | M | Frozen PRD + L2 + task pack | host harness contract | suite asserts only product-level observable behavior, not row IDs/timestamps/internal engine state | High | G30 suite self-test | DONE |
+| T-018 Node host Critical Journeys + process-kill recovery | T-016, T-017 | YES | M | Frozen PRD + L2 + task pack | Node conformance runner | Node passes shared conformance | High | G3/G6-G20 relevant Node gates | DONE |
+| T-019 Expo Android/Hermes conformance + restart Critical Journeys | T-016, T-017 | YES | H | Frozen PRD + L2 + task pack | minimal Expo conformance app | real Hermes runtime executes without Node built-ins | High | G4/G30 + PRD AC-42 | DONE |
+| T-020 v0.1 expr → Expression Domain Tool migration equivalence | T-016 | YES | M | Frozen PRD + L2 + task pack | legacy expr translation | non-trivial branch/output scenario matches frozen equivalence definition | High | G31 / AC-43 | DONE |
+| T-021 v0.1 script → Script Domain Tool migration equivalence | T-016 | YES | M | Frozen PRD + L2 + task pack | legacy script translation | observable outputs/transitions match | High | G32 / AC-44 | DONE |
+| T-022 package upgrade + pin retention + cross-version compatibility validation | T-016 | YES | H | Frozen PRD + L2 + task pack | package A/B fixtures | old instance stays on A while new instance uses B | High | G21/G27/G28/G29 | DONE |
+| T-023 SDK docs + v0.1→v0.2 migration + host integration guides | T-016 | YES | M | Frozen PRD + L2 + task pack | compiler usage | examples use compiled package at startup, never Raw Package root | Low | docs review | DONE |
+| T-024 v0.2 visible closure + gate matrix + Hidden Validation handoff | T-018, T-019, T-020, T-021, T-022, T-023 | NO | H | Frozen PRD + L2 + task pack | gate evidence matrix | every required gate has PASS/BLOCKED with evidence identity | High | G1-G34 reconciliation | DONE |
 
 Status values: `TODO / DOING / BLOCKED / DONE / DEFERRED / NOT_APPLICABLE`.
 
