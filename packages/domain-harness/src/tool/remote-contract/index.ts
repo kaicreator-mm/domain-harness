@@ -38,34 +38,24 @@ export class RemoteToolValidationError extends Error {
   }
 }
 
-const FORBIDDEN_RUNTIME_KEYS = new Set([
-  'endpoint',
-  'token',
-  'session',
-  'credential',
-  'credentials',
-  'authorization',
-  'cookie',
-  'headers',
-]);
+const LOGICAL_BINDING_KEYS = new Set(['transport', 'resourceKey', 'path', 'method']);
 
 function isJsonObject(value: JsonValue | undefined): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function assertLogicalBindingOnly(value: JsonValue, path = 'config'): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertLogicalBindingOnly(entry, `${path}[${index}]`));
-    return;
-  }
-  if (!isJsonObject(value)) return;
-
-  for (const [key, entry] of Object.entries(value)) {
-    if (FORBIDDEN_RUNTIME_KEYS.has(key.toLowerCase())) {
-      throw new RemoteToolBindingError(`${path}.${key} is a Runtime Resource and cannot be compiled into a Remote Tool binding`);
+function assertLogicalBindingOnly(config: JsonObject): void {
+  for (const key of Object.keys(config)) {
+    if (!LOGICAL_BINDING_KEYS.has(key)) {
+      throw new RemoteToolBindingError(
+        `Remote HTTP/JSON binding config.${key} is not a logical binding field; runtime values belong in Runtime Resources`,
+      );
     }
-    assertLogicalBindingOnly(entry, `${path}.${key}`);
   }
+}
+
+function isLogicalPath(value: string): boolean {
+  return value.startsWith('/') && !value.startsWith('//');
 }
 
 export function parseRemoteHttpJsonBinding(binding: CompiledBindingDescriptor): RemoteHttpJsonBindingConfig {
@@ -89,8 +79,8 @@ export function parseRemoteHttpJsonBinding(binding: CompiledBindingDescriptor): 
   if (typeof resourceKey !== 'string' || resourceKey.length === 0) {
     throw new RemoteToolBindingError('Remote HTTP/JSON binding requires a non-empty resourceKey');
   }
-  if (typeof path !== 'string' || path.length === 0) {
-    throw new RemoteToolBindingError('Remote HTTP/JSON binding requires a non-empty logical path');
+  if (typeof path !== 'string' || !isLogicalPath(path)) {
+    throw new RemoteToolBindingError('Remote HTTP/JSON binding path must be a single-root logical path beginning with /');
   }
   if (method !== undefined && method !== 'POST') {
     throw new RemoteToolBindingError('Remote HTTP/JSON v1 supports POST only');
