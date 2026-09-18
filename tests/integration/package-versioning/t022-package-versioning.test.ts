@@ -84,7 +84,49 @@ function packageA(): TargetCompiledDomainPackage {
 }
 
 function packageB(): TargetCompiledDomainPackage {
-  return compiledPackage(PACKAGE_B, '2.0.0', '2');
+  const compiled = compiledPackage(PACKAGE_B, '2.0.0', '2');
+  const counter = compiled.manifest.workflows.counter!;
+  return {
+    ...compiled,
+    manifest: {
+      ...compiled.manifest,
+      workflows: {
+        ...compiled.manifest.workflows,
+        counter: {
+          ...counter,
+          definition: {
+            initial: 'waiting',
+            states: {
+              waiting: {
+                final: false,
+                done: [],
+                error: [],
+                events: {
+                  ADVANCE: { routes: [{ target: 'send-to-retained-a' }] },
+                },
+              },
+              'send-to-retained-a': {
+                final: false,
+                done: [],
+                error: [],
+                events: {},
+                effects: [
+                  {
+                    kind: 'domain-message',
+                    targetExpression: 't022-retained-a-target',
+                    messageType: 'ADVANCE',
+                    payloadExpression: 't022-advance-payload',
+                    contractVersion: '2',
+                  },
+                ],
+              },
+            },
+            limits: { maxSteps: 32 },
+          },
+        },
+      },
+    },
+  };
 }
 
 function hostBindings(): RuntimeHostBindings {
@@ -92,9 +134,9 @@ function hostBindings(): RuntimeHostBindings {
     capabilities: [],
     sha256: {
       async digestUtf8(value) {
-        if (value.includes('"domainVersion":"1.0.0"')) return PACKAGE_A;
-        if (value.includes('"domainVersion":"2.0.0"')) return PACKAGE_B;
-        if (value.includes('"domainVersion":"99.0.0"')) return PACKAGE_BAD;
+        if (value.includes('\"domainVersion\":\"1.0.0\"')) return PACKAGE_A;
+        if (value.includes('\"domainVersion\":\"2.0.0\"')) return PACKAGE_B;
+        if (value.includes('\"domainVersion\":\"99.0.0\"')) return PACKAGE_BAD;
         return `t022-digest-${value.length}`;
       },
     },
@@ -105,6 +147,8 @@ function hostBindings(): RuntimeHostBindings {
     },
     expression: {
       async evaluate(request) {
+        if (request.expression === 't022-retained-a-target') return address('retained-a');
+        if (request.expression === 't022-advance-payload') return { amount: 1 };
         return request.input;
       },
     },
@@ -131,7 +175,7 @@ async function eventually<T>(read: () => Promise<T | null>, timeoutMs = 3_000): 
   throw new Error(`condition did not converge within ${timeoutMs}ms`);
 }
 
-test('G21/G27/G28: retained instance stays on A, new instance uses B, and incompatible B→A input rejects before ACK', async (t) => {
+test('G21/G27/G28: retained instance stays on A, new B instance rejects its incompatible B→A message before target ACK', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'domain-harness-t022-upgrade-'));
   const store = new NodeSqliteRuntimeStore({ path: join(directory, 'runtime.sqlite') });
   t.after(() => {
@@ -167,24 +211,28 @@ test('G21/G27/G28: retained instance stays on A, new instance uses B, and incomp
   assert.equal(pins.kind, 'package-pins');
   assert.deepEqual(pins.value, [PACKAGE_A, PACKAGE_B]);
 
-  await assert.rejects(
-    runtime.send({
-      messageId: 'b-v2-to-retained-a',
-      target: retainedTarget,
-      type: 'ADVANCE',
-      contractVersion: '2',
-      payload: { amount: 1 },
-    }),
-    /contract version 2 is incompatible with pinned version 1/,
-  );
-
-  const rejectedDisposition = await runtime.query({
-    kind: 'message-disposition',
-    target: retainedTarget,
-    messageId: 'b-v2-to-retained-a',
+  const sourceAck = await runtime.send({
+    messageId: 'trigger-b-to-a',
+    target: newTarget,
+    type: 'ADVANCE',
+    contractVersion: '2',
+    payload: { amount: 1 },
   });
-  assert.equal(rejectedDisposition.kind, 'message-disposition');
-  assert.equal(rejectedDisposition.value, null, 'rejected message must not receive durable acceptance');
+  assert.equal(sourceAck.status, 'accepted');
+  assert.equal(sourceAck.packageId, PACKAGE_B);
+
+  const sourceFailure = await eventually(async () => {
+    const failure = await runtime.query({ kind: 'runtime-failure', target: newTarget });
+    if (failure.kind !== 'runtime-failure') return null;
+    return failure.value;
+  });
+  assert.match(sourceFailure.message, /contract version 2 is incompatible with pinned version 1/);
+  assert.equal(sourceFailure.sourceMessageId, 'trigger-b-to-a');
+  assert.equal(
+    await store.getNextAcceptedMessage(retainedTarget),
+    null,
+    'incompatible B→A child message must be rejected before durable target acceptance',
+  );
 
   const compatibleAck = await runtime.send({
     messageId: 'explicit-v1-to-retained-a',
