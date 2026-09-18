@@ -3,6 +3,12 @@ when:
   - event: push
     branch: main
 
+clone:
+  - name: git
+    image: woodpeckerci/plugin-git
+    settings:
+      lfs: false
+
 steps:
   - name: verify
     image: node:22-bookworm
