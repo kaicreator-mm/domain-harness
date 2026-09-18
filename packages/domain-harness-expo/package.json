@@ -1,0 +1,14 @@
+{
+  "name": "@kaicreator/domain-harness-expo",
+  "version": "0.2.0",
+  "description": "React Native / Expo host bindings for DomainHarness",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run typecheck"
+  }
+}

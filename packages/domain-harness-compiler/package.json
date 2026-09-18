@@ -1,0 +1,17 @@
+{
+  "name": "@kaicreator/domain-harness-compiler",
+  "version": "0.2.0",
+  "description": "Build-time compiler for DomainHarness Target Compiled Domain Packages",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run typecheck"
+  }
+}

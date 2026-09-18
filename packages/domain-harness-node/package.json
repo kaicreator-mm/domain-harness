@@ -1,0 +1,17 @@
+{
+  "name": "@kaicreator/domain-harness-node",
+  "version": "0.2.0",
+  "description": "Node host bindings for DomainHarness",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run typecheck"
+  }
+}
