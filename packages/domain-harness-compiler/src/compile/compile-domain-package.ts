@@ -28,6 +28,12 @@ export interface CompileDomainPackageInput {
   raw: LoadedRawDomainPackage;
   domainVersion: string;
   target: TargetHostProfile;
+  /**
+   * Immutable target binding artifact content per bindingId. Required for every
+   * capability-bound binding the package uses; binding identity is content-addressed
+   * and compilation fails closed when content is missing.
+   */
+  bindingContents: Readonly<Record<string, string>>;
   requiredCapabilities?: readonly CapabilityId[];
   tools?: readonly RawToolDefinition[];
   projections?: readonly RawProjectionDefinition[];
@@ -190,7 +196,7 @@ export function compileDomainPackage(input: CompileDomainPackageInput): CompileD
   const projections = input.projections ?? [];
   const requiredCapabilities = collectRequiredCapabilities(input.raw, input.requiredCapabilities ?? [], tools);
   assertTargetCapabilities(input.target, requiredCapabilities);
-  const bindingDigests = buildBindingDigests(input.target, requiredCapabilities);
+  const bindingDigests = buildBindingDigests(input.target, requiredCapabilities, input.bindingContents);
   const workflows = Object.fromEntries(
     [...input.raw.workflows.keys()].sort().map((workflowId) => [workflowId, compileWorkflow(input.raw, workflowId)]),
   );

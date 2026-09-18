@@ -1,8 +1,10 @@
-import { assertCompiledPackageManifest, type CompiledPackageManifest } from './manifest.js';
+import { assertCompiledPackageManifest, bindingArtifactDigest, type CompiledPackageManifest } from './manifest.js';
 
 export interface BindingModuleReference {
   moduleSpecifier: string;
   exportName?: string;
+  /** Actual content of the target binding artifact placed at moduleSpecifier. Verified against the manifest binding digest. */
+  content: string;
 }
 
 export interface EmitTargetModuleInput {
@@ -23,6 +25,12 @@ export function emitTargetCompiledPackageModule(input: EmitTargetModuleInput): s
     const reference = input.bindingModules[bindingId];
     if (!reference) throw new Error(`no generated module reference supplied for binding '${bindingId}'`);
     if (!reference.moduleSpecifier || /[\r\n\0]/u.test(reference.moduleSpecifier) || /^[a-z][a-z0-9+.-]*:\/\//iu.test(reference.moduleSpecifier)) throw new Error(`invalid module specifier for binding '${bindingId}'`);
+    if (typeof reference.content !== 'string' || reference.content.length === 0) throw new Error(`no immutable content identity supplied for binding '${bindingId}'`);
+    const contentDigest = bindingArtifactDigest(bindingId, reference.content);
+    const manifestDigest = input.manifest.bindingDigests[bindingId];
+    if (manifestDigest !== contentDigest) {
+      throw new Error(`binding '${bindingId}' module content digest '${contentDigest}' does not match manifest bindingDigests['${bindingId}'] '${manifestDigest ?? '<missing>'}'`);
+    }
     const local = `__binding_${index}`;
     if (reference.exportName) {
       if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(reference.exportName)) throw new Error(`invalid export name '${reference.exportName}' for binding '${bindingId}'`);

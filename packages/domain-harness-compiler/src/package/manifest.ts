@@ -7,7 +7,7 @@ import type {
   TargetHostProfile,
   ToolEffectSemantics,
 } from '../raw/types.js';
-import { canonicalJson, sha256Canonical } from './canonical.js';
+import { canonicalJson, sha256Canonical, sha256Text } from './canonical.js';
 
 export interface CompiledMessageContract {
   type: string;
@@ -89,19 +89,47 @@ function inspectForbiddenRuntimeValues(value: unknown, path: string, issues: str
   }
 }
 
-export function buildBindingDigests(target: TargetHostProfile, required: readonly CapabilityId[]): Record<string, string> {
-  const groups = new Map<string, CapabilityId[]>();
-  for (const capability of [...required].sort()) {
-    const bindingId = target.bindings[capability];
-    if (!bindingId) continue;
-    const capabilities = groups.get(bindingId) ?? [];
-    capabilities.push(capability);
-    groups.set(bindingId, capabilities);
+export class MissingBindingContentError extends Error {
+  readonly missing: readonly string[];
+
+  constructor(missing: readonly string[]) {
+    super(`no immutable binding content identity supplied for target bindings: ${missing.join(', ')}`);
+    this.name = 'MissingBindingContentError';
+    this.missing = [...missing];
   }
+}
+
+/** Content identity of a target binding artifact. Path/location must never enter this value. */
+export function bindingContentDigest(content: string): string {
+  return sha256Text(content);
+}
+
+/** Digest recorded in `manifest.bindingDigests`: binds the binding slot to its artifact content identity. */
+export function bindingArtifactDigest(bindingId: string, content: string): string {
+  return sha256Canonical({ bindingId, contentDigest: bindingContentDigest(content) });
+}
+
+export function buildBindingDigests(
+  target: TargetHostProfile,
+  required: readonly CapabilityId[],
+  bindingContents: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const boundBindingIds = new Set<string>();
+  for (const capability of required) {
+    const bindingId = target.bindings[capability];
+    if (bindingId) boundBindingIds.add(bindingId);
+  }
+  const missing = [...boundBindingIds]
+    .filter((bindingId) => {
+      const content = bindingContents[bindingId];
+      return typeof content !== 'string' || content.length === 0;
+    })
+    .sort();
+  if (missing.length) throw new MissingBindingContentError(missing);
   return Object.fromEntries(
-    [...groups.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([bindingId, capabilities]) => [bindingId, sha256Canonical({ bindingId, capabilities: [...capabilities].sort() })]),
+    [...boundBindingIds]
+      .sort((a, b) => a.localeCompare(b))
+      .map((bindingId) => [bindingId, bindingArtifactDigest(bindingId, bindingContents[bindingId] as string)]),
   );
 }
 

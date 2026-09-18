@@ -12,7 +12,11 @@ import type {
   RawWorkflow,
   TargetHostProfile,
 } from '../../packages/domain-harness-compiler/src/raw/types.js';
-import { assertCompiledPackageManifest, CompiledManifestValidationError } from '../../packages/domain-harness-compiler/src/package/manifest.js';
+import {
+  assertCompiledPackageManifest,
+  CompiledManifestValidationError,
+  MissingBindingContentError,
+} from '../../packages/domain-harness-compiler/src/package/manifest.js';
 import { emitTargetCompiledPackageModule } from '../../packages/domain-harness-compiler/src/package/module-emitter.js';
 
 const CAPS = {
@@ -35,6 +39,25 @@ function target(capabilities: readonly CapabilityId[] = Object.values(CAPS)): Ta
       [CAPS.http]: '@host/http',
     },
   };
+}
+
+const SCRIPT_BINDING_V1 = 'export default function executeScript() { return 1; }\n';
+const SCRIPT_BINDING_V2 = 'export default function executeScript() { return 2; }\n';
+
+const BINDING_CONTENTS: Readonly<Record<string, string>> = {
+  '@host/hash': 'export default function hash(data) { return digest(data); }\n',
+  '@host/module': 'export default function loadModule(ref) { return import(ref); }\n',
+  '@host/expression': 'export default function evaluate(expression, input) { return jsonata(expression).evaluate(input); }\n',
+  '@host/script': SCRIPT_BINDING_V1,
+  '@host/http': 'export default function request(resource, payload) { return transport(resource, payload); }\n',
+};
+
+function bindingModulesFor(manifest: { bindingDigests: Readonly<Record<string, string>> }, contents: Readonly<Record<string, string>> = BINDING_CONTENTS) {
+  return Object.fromEntries(
+    Object.keys(manifest.bindingDigests)
+      .sort()
+      .map((bindingId, index) => [bindingId, { moduleSpecifier: `./bindings/b${index}.js`, exportName: 'binding', content: contents[bindingId] ?? '' }]),
+  );
 }
 
 function workflow(id: string, kind: 'expr' | 'script'): RawWorkflow {
@@ -89,11 +112,12 @@ function raw(order: 'normal' | 'reverse' = 'normal'): LoadedRawDomainPackage {
   };
 }
 
-function compileFixture(rawInput = raw()) {
+function compileFixture(rawInput = raw(), bindingContents: Readonly<Record<string, string>> = BINDING_CONTENTS) {
   return compileDomainPackage({
     raw: rawInput,
     domainVersion: '2.0.0-test',
     target: target(),
+    bindingContents,
     tools: [{
       toolId: 'remoteLookup',
       inputSchema: { type: 'object', properties: { endpoint: { type: 'string' } } },
@@ -116,6 +140,7 @@ test('G1/G2: semantic input ordering and authoring location do not change packag
   const first = compileFixture(raw('normal')).manifest;
   const second = compileFixture(raw('reverse')).manifest;
   assert.equal(first.packageId, second.packageId);
+  assert.deepEqual(first.bindingDigests, second.bindingDigests);
   assert.equal(first.targetProfileId, 'node-test@1');
   assert.deepEqual(first.requiredCapabilities, [...first.requiredCapabilities].sort());
   assertCompiledPackageManifest(first);
@@ -123,8 +148,96 @@ test('G1/G2: semantic input ordering and authoring location do not change packag
 
 test('G1/G2: missing required target capability fails compilation', () => {
   assert.throws(
-    () => compileDomainPackage({ raw: raw(), domainVersion: '2.0.0-test', target: target([CAPS.hash, CAPS.module, CAPS.expression]) }),
+    () => compileDomainPackage({
+      raw: raw(),
+      domainVersion: '2.0.0-test',
+      target: target([CAPS.hash, CAPS.module, CAPS.expression]),
+      bindingContents: BINDING_CONTENTS,
+    }),
     (error: unknown) => error instanceof MissingTargetCapabilityError && error.missing.includes(CAPS.script),
+  );
+});
+
+test('binding digest is content-addressed: unchanged binding content keeps identical digests and packageId', () => {
+  const first = compileFixture().manifest;
+  const relocatedRoot = compileFixture(raw('reverse')).manifest;
+  assert.deepEqual(first.bindingDigests, relocatedRoot.bindingDigests);
+  assert.equal(first.packageId, relocatedRoot.packageId);
+
+  const sameContentCopied: Record<string, string> = {};
+  for (const [bindingId, content] of Object.entries(BINDING_CONTENTS)) sameContentCopied[bindingId] = `${content}`;
+  const copied = compileFixture(raw(), sameContentCopied).manifest;
+  assert.deepEqual(copied.bindingDigests, first.bindingDigests);
+  assert.equal(copied.packageId, first.packageId);
+});
+
+test('binding digest is content-addressed: changed executable binding content changes digest and packageId', () => {
+  const before = compileFixture().manifest;
+  const mutatedContents: Record<string, string> = { ...BINDING_CONTENTS, '@host/script': SCRIPT_BINDING_V2 };
+  const after = compileFixture(raw(), mutatedContents).manifest;
+
+  assert.notEqual(after.bindingDigests['@host/script'], before.bindingDigests['@host/script']);
+  assert.equal(after.bindingDigests['@host/hash'], before.bindingDigests['@host/hash']);
+  assert.equal(after.bindingDigests['@host/expression'], before.bindingDigests['@host/expression']);
+  assert.notEqual(after.packageId, before.packageId);
+  assert.notDeepEqual(after.bindingDigests, before.bindingDigests);
+});
+
+test('binding content location is not identity: same bytes at different module paths keep digest and packageId stable', () => {
+  const manifest = compileFixture().manifest;
+
+  const nearPath = emitTargetCompiledPackageModule({
+    manifest,
+    bindingModules: bindingModulesFor(manifest),
+  });
+  const farPath = emitTargetCompiledPackageModule({
+    manifest,
+    bindingModules: Object.fromEntries(
+      Object.entries(bindingModulesFor(manifest))
+        .map(([bindingId, reference]) => [bindingId, { ...reference, moduleSpecifier: `../../generated/elsewhere/${reference.moduleSpecifier.slice('./bindings/'.length)}` }]),
+    ),
+  });
+
+  const extractManifestJson = /export const manifest = Object\.freeze\(([\s\S]*?)\);\nexport const bindings/u;
+  const nearManifest = JSON.parse(extractManifestJson.exec(nearPath)?.[1] ?? 'null') as { packageId: string; bindingDigests: Record<string, string> };
+  const farManifest = JSON.parse(extractManifestJson.exec(farPath)?.[1] ?? 'null') as { packageId: string; bindingDigests: Record<string, string> };
+  assert.equal(nearManifest.packageId, manifest.packageId);
+  assert.deepEqual(nearManifest.bindingDigests, manifest.bindingDigests);
+  assert.equal(farManifest.packageId, manifest.packageId);
+  assert.deepEqual(farManifest.bindingDigests, manifest.bindingDigests);
+  assert.notEqual(nearPath, farPath);
+});
+
+test('emitter fails closed when binding module content does not match manifest binding digest', () => {
+  const manifest = compileFixture().manifest;
+  const tamperedModules = bindingModulesFor(manifest, { ...BINDING_CONTENTS, '@host/script': SCRIPT_BINDING_V2 });
+  assert.throws(
+    () => emitTargetCompiledPackageModule({ manifest, bindingModules: tamperedModules }),
+    (error: unknown) => error instanceof Error
+      && error.message.includes('@host/script')
+      && error.message.includes('does not match'),
+  );
+
+  const emptyContentModules = bindingModulesFor(manifest, { ...BINDING_CONTENTS, '@host/http': '' });
+  assert.throws(
+    () => emitTargetCompiledPackageModule({ manifest, bindingModules: emptyContentModules }),
+    (error: unknown) => error instanceof Error && error.message.includes('@host/http'),
+  );
+
+  assert.doesNotThrow(() => emitTargetCompiledPackageModule({ manifest, bindingModules: bindingModulesFor(manifest) }));
+});
+
+test('compilation fails closed when a required binding has no immutable content identity', () => {
+  const { '@host/script': _omitted, ...withoutScript } = BINDING_CONTENTS;
+  assert.throws(
+    () => compileFixture(raw(), withoutScript),
+    (error: unknown) => error instanceof MissingBindingContentError && error.missing.includes('@host/script'),
+  );
+
+  const emptyScript: Record<string, string> = { ...BINDING_CONTENTS, '@host/script': '' };
+  assert.throws(
+    () => compileFixture(raw(), emptyScript),
+    (error: unknown) => error instanceof MissingBindingContentError && error.missing.includes('@host/script'),
   );
 });
 
@@ -153,6 +266,7 @@ test('runtime-only endpoint/credential material in executable config fails close
       raw: raw(),
       domainVersion: '2.0.0-test',
       target: target(),
+      bindingContents: BINDING_CONTENTS,
       tools: [{
         toolId: 'unsafe',
         outputSchema: { type: 'object' },
@@ -181,10 +295,7 @@ test('corrupt packageId and inconsistent descriptor keys fail manifest validatio
 
 test('generated target module contains only compiled manifest and static binding imports', () => {
   const manifest = compileFixture().manifest;
-  const bindingModules = Object.fromEntries(
-    Object.keys(manifest.bindingDigests).map((bindingId, index) => [bindingId, { moduleSpecifier: `./bindings/b${index}.js`, exportName: 'binding' }]),
-  );
-  const source = emitTargetCompiledPackageModule({ manifest, bindingModules });
+  const source = emitTargetCompiledPackageModule({ manifest, bindingModules: bindingModulesFor(manifest) });
   assert.match(source, /Generated by @kaicreator\/domain-harness-compiler/u);
   assert.doesNotMatch(source, /raw-script-secret-marker/u);
   assert.doesNotMatch(source, /\.ya?ml/u);
@@ -221,7 +332,12 @@ test('migrated build-time loader discovers and validates legacy YAML without exp
   const loaded = await loadRawDomainPackage({ root });
   assert.equal(loaded.domainId, 'loaded-domain');
   assert.equal(loaded.workflows.size, 1);
-  const result = compileDomainPackage({ raw: loaded, domainVersion: '2.0.0-test', target: target([CAPS.hash, CAPS.module, CAPS.expression]) });
+  const result = compileDomainPackage({
+    raw: loaded,
+    domainVersion: '2.0.0-test',
+    target: target([CAPS.hash, CAPS.module, CAPS.expression]),
+    bindingContents: BINDING_CONTENTS,
+  });
   assert.equal(result.manifest.domainId, 'loaded-domain');
   assert.doesNotMatch(JSON.stringify(result.manifest), /harness\.yaml|basic\.yaml/u);
 });
