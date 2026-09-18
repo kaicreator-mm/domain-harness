@@ -1,10 +1,10 @@
 # DomainHarness v0.2 — SDK and Compiler Guide
 
 **Status:** ACTIVE for the v0.2 integration line  
-**API audit baseline:** `7a5736a1deea6bc165da6b9e1d36fc3be4ccc2bf`  
+**API audit baseline:** `608d3e67c28d32381949b7fe1597b455147f3a3f`  
 **Authority:** Frozen v0.2 PRD, Frozen v0.2 L2, executable public contracts/tests  
 
-This guide documents the merged v0.2 build/runtime boundary. It does not redefine the Frozen PRD/L2 and it does not make internal engine, SQL, XState, journal, or Raw Package loader types part of the Runtime SDK.
+This guide documents the merged v0.2 build/runtime boundary. It does not redefine the Frozen PRD/L2 and it does not make internal engine, SQL, XState, journal, or Raw Package loader internals part of the Runtime SDK.
 
 ## 1. The boundary to remember
 
@@ -12,7 +12,7 @@ This guide documents the merged v0.2 build/runtime boundary. It does not redefin
 BUILD / CI
 Raw Domain Package + Target Host Profile
         ↓
-DomainHarness Compiler
+@kaicreator/domain-harness-compiler
         ↓
 Target Compiled Domain Package module
 
@@ -27,7 +27,7 @@ createDomainRuntime / host convenience factory
 DomainRuntime
 ```
 
-Application startup MUST NOT discover, parse, or recompile a Raw Domain Package. The runtime consumes already target-compiled package objects plus runtime-only host resources.
+Application startup MUST NOT discover, parse, or recompile a Raw Domain Package. Runtime consumes already target-compiled package objects plus runtime-only host resources.
 
 `Runtime Resources` are handles/values such as endpoints, credentials, sessions, database handles, and host connections. They are not Domain Data and must not become authoritative business truth inside DomainHarness.
 
@@ -67,23 +67,45 @@ invalidateBusinessSnapshot(request)
 
 ## 3. Compiler workflow
 
-The merged compiler implements three build-time steps:
+The compiler package root is the supported build-time API. At the audited baseline, its explicit package `exports` exposes:
+
+```ts
+import {
+  loadRawDomainPackage,
+  compileDomainPackage,
+  emitTargetCompiledPackageModule,
+  type BindingModuleReference,
+  type CompileDomainPackageInput,
+  type CompileDomainPackageResult,
+  type CompiledPackageManifest,
+  type EmitTargetModuleInput,
+  type LoadRawDomainPackageOptions,
+  type LoadedRawDomainPackage,
+  type TargetHostProfile,
+} from '@kaicreator/domain-harness-compiler';
+```
+
+Do not deep-import `dist/**` or repository `src/**` compiler paths. They are not the public consumer contract.
+
+The build flow is:
 
 1. `loadRawDomainPackage({ root, registeredTools? })`
 2. `compileDomainPackage({ raw, domainVersion, target, bindingContents, ... })`
 3. `emitTargetCompiledPackageModule({ manifest, bindingModules })`
+4. write/bundle the generated Target Compiled Domain Package module as an application build artifact.
 
 The Raw loader currently accepts the v0.1 authoring schema (`harness.yaml.schemaVersion: "0.1"`). This is an authoring/build compatibility path, not a runtime compatibility shim.
 
-### 3.1 Exact repository build example
-
-At the audited baseline, compiler implementation functions are exported by their source modules but are **not re-exported by the compiler package root**. Repository build tooling can therefore use the exact source modules directly:
+### 3.1 Package-root build example
 
 ```ts
 import { writeFile } from 'node:fs/promises';
-import { loadRawDomainPackage } from '../packages/domain-harness-compiler/src/raw/load-raw-package.js';
-import { compileDomainPackage } from '../packages/domain-harness-compiler/src/compile/compile-domain-package.js';
-import { emitTargetCompiledPackageModule } from '../packages/domain-harness-compiler/src/package/module-emitter.js';
+import {
+  compileDomainPackage,
+  emitTargetCompiledPackageModule,
+  loadRawDomainPackage,
+  type TargetHostProfile,
+} from '@kaicreator/domain-harness-compiler';
 
 const raw = await loadRawDomainPackage({
   root: './domain-package',
@@ -102,7 +124,7 @@ const target = {
     'compiled-package-module@1': '@app/bindings/module',
     'expression-jsonata@1': '@app/bindings/expression',
   },
-} as const;
+} satisfies TargetHostProfile;
 
 // Immutable build artifacts used to content-address target bindings.
 const bindingContents = {
@@ -142,14 +164,7 @@ const source = emitTargetCompiledPackageModule({
 await writeFile('./generated/domain-package.node.js', source, 'utf8');
 ```
 
-The example intentionally does not claim this import exists:
-
-```ts
-// NOT an exported root API at the audited baseline:
-// import { compileDomainPackage } from '@kaicreator/domain-harness-compiler';
-```
-
-The compiler package publishes `dist`, and currently has no package `exports` map, but consumers should not mistake a deep `dist/...` path for a frozen root API. If an application publishes reusable compiler tooling, pin the exact DomainHarness version/SHA and audit that path until a root compiler export is intentionally added.
+The package-root API and its exported public types are covered by a packed clean-consumer test. Deep compiler paths are intentionally not part of the external API.
 
 ### 3.2 Compiler failure model
 
@@ -191,7 +206,6 @@ const packageRegistry = new StaticPackageRegistry(
   targetPackage.manifest.packageId,
 );
 
-// Supplied by the selected host integration.
 declare const store: RuntimeStore;
 declare const bindings: RuntimeHostBindings;
 
@@ -207,7 +221,7 @@ const runtime = await createDomainRuntime({
 });
 ```
 
-For Node and Expo, prefer the host convenience factories described in `docs/integration/DomainHarness_v0.2_HOST_INTEGRATION.md` when they are useful. They preserve the same portable options contract.
+For Node and Expo, prefer the host convenience factories described in `docs/integration/DomainHarness_v0.2_HOST_INTEGRATION.md` when useful. They preserve the same portable options contract.
 
 ## 6. App/UI interaction examples
 
@@ -221,7 +235,7 @@ const target = {
   instanceKey: 'order:ORD-1001',
 };
 
-const instance = await runtime.openInstance({
+await runtime.openInstance({
   address: target,
   correlationId: 'order:ORD-1001',
   input: { orderId: 'ORD-1001' },
@@ -308,10 +322,11 @@ Before copying an example to another project:
 
 1. pin the exact DomainHarness package/repository revision;
 2. import portable Runtime contracts from `@kaicreator/domain-harness/v2`;
-3. import only documented Node/Expo host exports from their package roots;
-4. start Runtime from imported Target Compiled Packages, never a Raw Package root;
-5. keep Runtime Resources separate from compiled package identity and Domain Data;
-6. use a stable message id for caller retry/dedup semantics;
-7. treat `send()` ACK as acceptance, then Query/Subscribe for processing state;
-8. retain package modules required by pinned instances;
-9. fail closed on missing package/capability rather than substituting behavior.
+3. import compiler build APIs only from `@kaicreator/domain-harness-compiler` package root;
+4. import only documented Node/Expo host exports from their package roots;
+5. start Runtime from imported Target Compiled Packages, never a Raw Package root;
+6. keep Runtime Resources separate from compiled package identity and Domain Data;
+7. use a stable message id for caller retry/dedup semantics;
+8. treat `send()` ACK as acceptance, then Query/Subscribe for processing state;
+9. retain package modules required by pinned instances;
+10. fail closed on missing package/capability rather than substituting behavior.
