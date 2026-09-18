@@ -1,0 +1,12 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "../../src/store/**/*.ts",
+    "../../../domain-harness/src/contracts/json.ts",
+    "../../../domain-harness/src/v2/contracts/**/*.ts",
+    "./**/*.ts"
+  ]
+}
