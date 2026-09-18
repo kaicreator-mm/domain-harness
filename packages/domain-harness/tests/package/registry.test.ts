@@ -85,3 +85,27 @@ test('G27: PackageRegistry package id listing is deterministic across insertion 
   assert.deepEqual(first.listPackageIds(), second.listPackageIds());
   assert.deepEqual(first.listPackageIds(), [...first.listPackageIds()].sort());
 });
+
+test('G29: preflight validates supplied packages before retained-pin inspection', async () => {
+  const compiledPackage = await createCompiledPackage('2.0.0');
+  compiledPackage.manifest.packageId = 'corrupt-id';
+  const registry = new StaticPackageRegistry([compiledPackage], compiledPackage.manifest.packageId);
+  let pinRead = false;
+
+  await assert.rejects(
+    preflightPackageActivation({
+      registry,
+      store: {
+        async listPinnedPackageIds() {
+          pinRead = true;
+          return [];
+        },
+      },
+      validationPolicy: validationPolicy(),
+    }),
+    (error: unknown) =>
+      error instanceof PackageActivationError && error.code === 'PACKAGE_ID_MISMATCH',
+  );
+
+  assert.equal(pinRead, false);
+});
