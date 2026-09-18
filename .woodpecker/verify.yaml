@@ -7,6 +7,9 @@ clone:
   - name: git
     image: woodpeckerci/plugin-git
     settings:
+      partial: false
+      depth: 1
+      recursive: false
       lfs: false
 
 steps:
