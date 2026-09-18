@@ -13,10 +13,10 @@ export function createExpoDomainRuntime(
   options: CreateDomainRuntimeOptions,
 ): Promise<DomainRuntime> {
   const capability = STANDARD_CAPABILITIES.httpTransport;
-  if (
-    !options.bindings.capabilities.includes(capability)
-    || options.bindings.remoteTransports?.[capability] !== undefined
-  ) {
+  const requiresHttp = options.packageRegistry.list().some((packageId) =>
+    options.packageRegistry.get(packageId)?.manifest.requiredCapabilities.includes(capability) ?? false,
+  );
+  if (!requiresHttp || options.bindings.remoteTransports?.[capability] !== undefined) {
     return createDomainRuntime(options);
   }
   if (options.resources === undefined) {
