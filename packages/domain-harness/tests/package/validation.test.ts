@@ -78,11 +78,7 @@ test('G29: binding descriptor/digest mismatch fails closed', async () => {
     },
   };
   compiledPackage.manifest.bindingDigests = { 'binding-t': 'digest-b' };
-  compiledPackage.bindings['binding-t'] = () => undefined;
-  compiledPackage.manifest.packageId = await (async () => {
-    const { computeCompiledPackageId } = await import('../../src/package/index.js');
-    return computeCompiledPackageId(compiledPackage.manifest, createSha256Fake());
-  })();
+  (compiledPackage.bindings as Record<string, unknown>)['binding-t'] = () => undefined;
 
   await assert.rejects(
     validateCompiledPackage(compiledPackage, policy()),
