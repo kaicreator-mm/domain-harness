@@ -47,7 +47,7 @@ function requireStringField(record: Record<string, unknown>, field: string): str
 
 function requireIntegerField(record: Record<string, unknown>, field: string): number {
   const value = record[field];
-  if (!Number.isInteger(value) || typeof value !== 'number' || value < 0) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new PackageActivationError(
       'INVALID_COMPILED_PACKAGE',
       `compiled package manifest field "${field}" must be a non-negative integer`,
