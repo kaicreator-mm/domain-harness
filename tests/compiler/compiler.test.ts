@@ -214,6 +214,8 @@ test('migrated build-time loader discovers and validates legacy YAML without exp
     '        target: completed',
     '  completed:',
     '    final: true',
+    '  failed:',
+    '    final: true',
     '',
   ].join('\n'));
   const loaded = await loadRawDomainPackage({ root });
