@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "DomainHarness T-019 Conformance",
+    "slug": "domain-harness-t019-conformance",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "newArchEnabled": true,
+    "android": {
+      "package": "mm.kaicreator.domainharness.t019"
+    }
+  }
+}
