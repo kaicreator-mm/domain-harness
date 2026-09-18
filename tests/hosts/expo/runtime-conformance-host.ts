@@ -276,14 +276,14 @@ function observeQuery(
     if (result.kind !== 'runtime-failure') throw new Error(`Expected runtime-failure Query, got ${result.kind}`);
     return {
       kind: 'runtime-failure',
-      value: result.value === null ? null : observeFailure(result.value, fixture),
+      value: result.value === null ? null : observeFailure(result.value),
     };
   }
   if (request.kind === 'message-disposition') {
     if (result.kind !== 'message-disposition') throw new Error(`Expected message-disposition Query, got ${result.kind}`);
     return {
       kind: 'message-disposition',
-      value: result.value === null ? null : observeDisposition(result.value, fixture),
+      value: result.value === null ? null : observeDisposition(result.value),
     };
   }
   if (result.kind !== 'projection') throw new Error(`Expected projection Query, got ${result.kind}`);
@@ -301,17 +301,13 @@ function observeInstance(
     stateRevision: snapshot.stateRevision,
     state: semanticState(snapshot.state, fixture),
   };
-  if (snapshot.lifecycle === 'completed') {
-    const state = semanticState(snapshot.state, fixture);
-    observed.output = { total: state.total };
-  }
-  if (snapshot.failure !== undefined) observed.failure = observeFailure(snapshot.failure, fixture);
+  if (snapshot.output !== undefined) observed.output = clone(snapshot.output);
+  if (snapshot.failure !== undefined) observed.failure = observeFailure(snapshot.failure);
   return observed;
 }
 
 function observeDisposition(
   snapshot: Extract<DomainQueryResult, { kind: 'message-disposition' }>['value'] & {},
-  fixture: ConformanceFixture,
 ): MessageDispositionObservation {
   const observed: MessageDispositionObservation = {
     messageId: snapshot.messageId,
@@ -321,7 +317,7 @@ function observeDisposition(
     correlationId: snapshot.correlationId,
   };
   if (snapshot.causationId !== undefined) observed.causationId = snapshot.causationId;
-  if (snapshot.failure !== undefined) observed.failure = observeFailure(snapshot.failure, fixture);
+  if (snapshot.failure !== undefined) observed.failure = observeFailure(snapshot.failure);
   return observed;
 }
 
@@ -343,13 +339,8 @@ function observeProjection(
 
 function observeFailure(
   failure: { code: string; sourceMessageId?: string },
-  fixture: ConformanceFixture,
 ): FailureObservation {
-  const observed: FailureObservation = {
-    code: failure.sourceMessageId?.startsWith('msg-fail-')
-      ? fixture.deterministicFailureCode
-      : failure.code,
-  };
+  const observed: FailureObservation = { code: failure.code };
   if (failure.sourceMessageId !== undefined) observed.sourceMessageId = failure.sourceMessageId;
   return observed;
 }
