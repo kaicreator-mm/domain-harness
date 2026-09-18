@@ -8,10 +8,15 @@ import type { ExpoSqliteDatabaseLike, ExpoSqliteExecutorLike } from './expo-sqli
  */
 export class ExclusiveTransactionQueue {
   private tail: Promise<void> = Promise.resolve();
+  private sealed = false;
 
   public constructor(private readonly database: ExpoSqliteDatabaseLike) {}
 
   public async run<T>(work: (transaction: ExpoSqliteExecutorLike) => Promise<T>): Promise<T> {
+    if (this.sealed) {
+      throw new Error('Expo SQLite transaction queue is closed');
+    }
+
     let release: (() => void) | undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -36,7 +41,13 @@ export class ExclusiveTransactionQueue {
     }
   }
 
+  /**
+   * Seal the writer queue before draining it. This prevents a write from
+   * passing RuntimeStore.assertOpen() while close() is waiting on an earlier
+   * transaction and then enqueueing against a database that is about to close.
+   */
   public async idle(): Promise<void> {
+    this.sealed = true;
     await this.tail;
   }
 }

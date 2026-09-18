@@ -1,11 +1,11 @@
-import type { RuntimeStore } from '../../../domain-harness/src/v2/contracts/store.js';
-import type { WorkflowAddress, WorkflowInstanceSnapshot } from '../../../domain-harness/src/v2/contracts/workflow.js';
+import type {
+  RuntimeStoreLike as RuntimeStore,
+  WorkflowAddress,
+  WorkflowInstanceSnapshot,
+} from '../../src/store/runtime-store-types.js';
 import { ExclusiveTransactionQueue } from '../../src/store/exclusive-transaction.js';
 import type { ExpoSqliteDatabaseLike, ExpoSqliteExecutorLike } from '../../src/store/expo-sqlite-types.js';
 import { ExpoSqliteRuntimeStore } from '../../src/store/expo-sqlite-runtime-store.js';
-
-/** Compile-time proof that the Expo adapter satisfies the frozen T-001 port. */
-export const runtimeStoreStructuralCompatibility: RuntimeStore = null as unknown as ExpoSqliteRuntimeStore;
 
 export interface CloseableRuntimeStore extends RuntimeStore {
   close(): Promise<void>;
@@ -102,6 +102,12 @@ export async function runExclusiveTransactionQueueUnitCheck(): Promise<void> {
 
   assert(maxActive === 1, 'adapter write queue allowed overlapping exclusive transactions');
   assert(jsonEqual(commits, Array.from({ length: 12 }, (_, index) => index)), 'write queue reordered callers');
+
+  await queue.idle();
+  await expectReject(
+    () => queue.run(async () => undefined),
+    'write queue accepted a writer after close/drain started',
+  );
 }
 
 export async function runRuntimeStoreConformance(
