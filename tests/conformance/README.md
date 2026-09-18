@@ -8,7 +8,7 @@ suite self-test. T-018 and T-019 bind the same suite to Node and Expo/Hermes res
 
 The suite compares only PRD-observable behavior:
 
-- durable message acceptance, duplicate ACK and rejection classification;
+- durable message acceptance, concurrent duplicate ACK/dedup race and rejection classification;
 - Workflow Instance lifecycle, state revision and semantic state/output;
 - deterministic Domain Tool input/output/failure observations supplied by the test binding;
 - Query and Projection values plus declared workflow-source state;
