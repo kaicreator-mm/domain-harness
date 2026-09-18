@@ -16,7 +16,11 @@ export function createExpoDomainRuntime(
   const requiresHttp = options.packageRegistry.list().some((packageId) =>
     options.packageRegistry.get(packageId)?.manifest.requiredCapabilities.includes(capability) ?? false,
   );
-  if (!requiresHttp || options.bindings.remoteTransports?.[capability] !== undefined) {
+  if (
+    !requiresHttp
+    || !options.bindings.capabilities.includes(capability)
+    || options.bindings.remoteTransports?.[capability] !== undefined
+  ) {
     return createDomainRuntime(options);
   }
   if (options.resources === undefined) {
