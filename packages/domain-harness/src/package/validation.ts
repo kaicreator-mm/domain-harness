@@ -157,7 +157,14 @@ function canonicalize(value: unknown): unknown {
 
 export function canonicalPackageIdentityMaterial(manifest: CompiledPackageManifest): string {
   const { packageId: _packageId, ...identityMaterial } = manifest;
-  return JSON.stringify(canonicalize(identityMaterial));
+  const encoded = JSON.stringify(canonicalize(identityMaterial));
+  if (encoded === undefined) {
+    throw new PackageActivationError(
+      'INVALID_COMPILED_PACKAGE',
+      'compiled package identity material is not serializable',
+    );
+  }
+  return encoded;
 }
 
 export async function computeCompiledPackageId(
