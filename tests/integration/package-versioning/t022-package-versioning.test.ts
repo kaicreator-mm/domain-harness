@@ -258,7 +258,6 @@ test('G21/G27/G28: retained instance stays on A, new B instance rejects its inco
 test('G28: restart activation fails closed when a retained package pin is absent from the new registry', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'domain-harness-t022-retention-'));
   const databasePath = join(directory, 'runtime.sqlite');
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
 
   const firstStore = new NodeSqliteRuntimeStore({ path: databasePath });
   const firstRuntime = await createNodeDomainRuntime({
@@ -275,7 +274,10 @@ test('G28: restart activation fails closed when a retained package pin is absent
   firstStore.close();
 
   const restartedStore = new NodeSqliteRuntimeStore({ path: databasePath });
-  t.after(() => restartedStore.close());
+  t.after(() => {
+    restartedStore.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
   const bOnlyRegistry = new StaticPackageRegistry([packageB()], PACKAGE_B);
 
   await assert.rejects(
@@ -286,7 +288,7 @@ test('G28: restart activation fails closed when a retained package pin is absent
     }),
     (error: unknown) => {
       assert.equal(errorCode(error), 'MISSING_RETAINED_PIN');
-      assert.match(error instanceof Error ? error.message : String(error), /missing retained package pins/i);
+      assert.match(error instanceof Error ? error.message : String(error), /retained package pins are missing/i);
       return true;
     },
   );
