@@ -17,5 +17,9 @@
     "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --import tsx --test tests/store/*.test.ts"
+  },
+  "dependencies": {
+    "@kaicreator/domain-harness": "0.2.0",
+    "better-sqlite3": "^12.0.0"
   }
 }
