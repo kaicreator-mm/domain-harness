@@ -1,0 +1,28 @@
+{
+  "name": "domain-harness-t019-expo-conformance",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "preandroid": "npm --prefix ../.. run build",
+    "android": "expo run:android",
+    "prestart": "npm --prefix ../.. run build",
+    "start": "expo start",
+    "typecheck": "tsc --noEmit",
+    "boundary": "node ../../tests/hosts/expo/check-runtime-boundary.mjs"
+  },
+  "dependencies": {
+    "@kaicreator/domain-harness": "file:../../packages/domain-harness",
+    "@kaicreator/domain-harness-expo": "file:../../packages/domain-harness-expo",
+    "expo": "~55.0.31",
+    "expo-crypto": "~55.0.19",
+    "expo-sqlite": "~55.0.20",
+    "react": "19.2.0",
+    "react-native": "0.83.10"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "^5.8.3"
+  }
+}

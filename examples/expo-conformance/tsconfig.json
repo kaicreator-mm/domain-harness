@@ -1,0 +1,18 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "expo-crypto": ["./node_modules/expo-crypto"],
+      "expo-sqlite": ["./node_modules/expo-sqlite"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../../tests/conformance/**/*.ts",
+    "../../tests/hosts/expo/**/*.ts"
+  ]
+}
