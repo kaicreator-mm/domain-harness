@@ -51,7 +51,7 @@ function executionRequest(tool = descriptor(), input = { name: 'Ada' }): ToolExe
     input,
     context: {
       effectId: 'effect-1',
-      target: { domainId: 'demo', workflowId: 'hello', instanceKey: 'instance-1' },
+      target: { workflowId: 'hello', instanceKey: 'instance-1' },
       sourceMessageId: 'message-1',
       logicalTime: '2026-09-18T00:00:00.000Z',
       attempt: 1,
