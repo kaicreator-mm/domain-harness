@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from '../contracts/json.js';
 import { SchemaValidator } from '../execution/schema-validator.js';
+import type { CompiledDomainDataPort, CompiledDomainDataValue } from './compiled-domain-data.js';
 import type { ExpressionExecutorPort, Sha256Port } from '../v2/contracts/host.js';
 import type {
   CompiledProjectionDescriptor,
@@ -25,6 +26,8 @@ export type ProjectionErrorCode =
   | 'workflow_source_missing'
   | 'business_snapshot_port_missing'
   | 'business_snapshot_mismatch'
+  | 'domain_data_port_missing'
+  | 'domain_data_not_found'
   | 'unsupported_dependency'
   | 'evaluation_failed'
   | 'invalid_output';
@@ -50,6 +53,7 @@ export interface ProjectionServiceOptions {
   packageRegistry: PackageRegistry;
   store: Pick<RuntimeStore, 'getInstance'>;
   businessSnapshots?: BusinessSnapshotPort;
+  domainData?: CompiledDomainDataPort;
   expression: ExpressionExecutorPort;
   sha256: Sha256Port;
 }
@@ -57,9 +61,11 @@ export interface ProjectionServiceOptions {
 /**
  * Executes frozen v0.2 projections over declared snapshots only.
  *
- * BusinessSnapshotPort I/O occurs while assembling the snapshot. The expression
- * executor receives only portable JSON and therefore has no Tool, Skill,
- * Runtime Resource, transport, or authoritative-data handle to call through.
+ * BusinessSnapshotPort I/O occurs while assembling the snapshot. Compiled
+ * Domain Data is immutable package content read through a synchronous
+ * in-memory lookup. The expression executor receives only portable JSON and
+ * therefore has no Tool, Skill, Runtime Resource, transport, or
+ * authoritative-data handle to call through.
  */
 export class ProjectionService {
   private readonly validator = new SchemaValidator();
@@ -79,7 +85,7 @@ export class ProjectionService {
       );
     }
 
-    const assembled = await this.assembleDeclaredSnapshots(descriptor, request.key);
+    const assembled = await this.assembleDeclaredSnapshots(descriptor, request.key, compiledPackage.manifest.packageId);
     const projectionInput: JsonObject = {
       key: request.key,
       input: request.input ?? null,
@@ -96,6 +102,10 @@ export class ProjectionService {
         key: source.key,
         revision: source.revision,
         value: source.value,
+      })),
+      domainData: assembled.domainData.map((entry) => ({
+        key: entry.key,
+        value: entry.value,
       })),
     };
 
@@ -177,25 +187,37 @@ export class ProjectionService {
   private async assembleDeclaredSnapshots(
     descriptor: CompiledProjectionDescriptor,
     key: string,
+    packageId: string,
   ): Promise<{
     workflowSources: WorkflowProjectionInput[];
     businessSnapshots: BusinessSnapshot[];
+    domainData: CompiledDomainDataValue[];
   }> {
     const workflowSources: WorkflowProjectionInput[] = [];
     const businessSnapshots: BusinessSnapshot[] = [];
+    const domainData: CompiledDomainDataValue[] = [];
 
     for (const dependency of descriptor.dependencies) {
-      await this.assembleDependency(dependency, key, workflowSources, businessSnapshots);
+      await this.assembleDependency(
+        dependency,
+        key,
+        packageId,
+        workflowSources,
+        businessSnapshots,
+        domainData,
+      );
     }
 
-    return { workflowSources, businessSnapshots };
+    return { workflowSources, businessSnapshots, domainData };
   }
 
   private async assembleDependency(
     dependency: ProjectionDependencyDescriptor,
     key: string,
+    packageId: string,
     workflowSources: WorkflowProjectionInput[],
     businessSnapshots: BusinessSnapshot[],
+    domainData: CompiledDomainDataValue[],
   ): Promise<void> {
     if (dependency.kind === 'workflow') {
       const target = resolveWorkflowSelector(dependency.selector, key);
@@ -238,9 +260,28 @@ export class ProjectionService {
       return;
     }
 
+    if (dependency.kind === 'domain-data') {
+      assertNonEmpty(dependency.key, 'domain data key');
+      if (!this.options.domainData) {
+        throw new ProjectionError(
+          'domain_data_port_missing',
+          `Projection requires compiled domain data ${dependency.key}, but no CompiledDomainDataPort is configured`,
+        );
+      }
+      const value = this.options.domainData.get(packageId, dependency.key);
+      if (value === undefined) {
+        throw new ProjectionError(
+          'domain_data_not_found',
+          `Compiled domain data ${dependency.key} does not exist in package ${packageId}`,
+        );
+      }
+      domainData.push({ key: dependency.key, value });
+      return;
+    }
+
     throw new ProjectionError(
       'unsupported_dependency',
-      `Projection dependency ${dependency.kind} is outside the T-014 Workflow/Business snapshot boundary`,
+      `Projection dependency ${String((dependency as { kind?: unknown }).kind)} is outside the frozen Workflow/Business/Domain Data dependency kinds`,
     );
   }
 }
