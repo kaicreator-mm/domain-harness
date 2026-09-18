@@ -20,12 +20,18 @@ export function parsePortableJson(serialized: string, label: string): JsonValue 
   return value;
 }
 
-function isPortableJson(value: unknown): value is JsonValue {
+function isPortableJson(value: unknown, active = new WeakSet<object>()): value is JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(isPortableJson);
   if (typeof value !== 'object') return false;
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Object.values(value as Record<string, unknown>).every(isPortableJson);
+  if (active.has(value)) return false;
+  active.add(value);
+  try {
+    if (Array.isArray(value)) return value.every((item) => isPortableJson(item, active));
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    return Object.values(value as Record<string, unknown>).every((item) => isPortableJson(item, active));
+  } finally {
+    active.delete(value);
+  }
 }
