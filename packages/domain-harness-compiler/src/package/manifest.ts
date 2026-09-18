@@ -2,7 +2,7 @@ import type {
   CapabilityId,
   JsonObject,
   JsonSchema,
-  JsonValue,
+  LogicalToolBindingConfig,
   RawProjectionDependency,
   TargetHostProfile,
   ToolEffectSemantics,
@@ -25,7 +25,7 @@ export interface CompiledBindingDescriptor {
   kind: string;
   bindingId: string;
   digest?: string;
-  config?: JsonValue;
+  config?: LogicalToolBindingConfig;
 }
 
 export interface CompiledToolDescriptor {
@@ -65,7 +65,49 @@ export interface CompiledPackageManifest {
 
 export type ManifestWithoutPackageId = Omit<CompiledPackageManifest, 'packageId'>;
 
-const FORBIDDEN_RUNTIME_KEYS = /^(?:secret|secrets|token|accessToken|refreshToken|password|credential|credentials|session|sessionId|endpoint|database|databasePath|dbPath|connection|connectionString|handle|runtimeResources?)$/i;
+/**
+ * Closed logical binding config schema: the complete set of compile-time fields
+ * an executable Tool config may carry. Every field here is logical compile-time
+ * metadata (a Runtime Resource *reference*, never a value). Anything outside
+ * this set is rejected, so runtime/credential material cannot enter under any
+ * key name. This is an allowlist of structure, not a secret-name denylist.
+ */
+const LOGICAL_CONFIG_FIELDS: ReadonlySet<string> = new Set(['resourceKey']);
+const RESOURCE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+export class InvalidToolConfigError extends Error {
+  readonly issues: readonly string[];
+
+  constructor(toolId: string, issues: readonly string[]) {
+    super(`tool '${toolId}' executable config is not a closed logical binding descriptor:\n${issues.map((issue) => `- ${issue}`).join('\n')}`);
+    this.name = 'InvalidToolConfigError';
+    this.issues = [...issues];
+  }
+}
+
+/**
+ * Structural validation of executable Tool config against the closed logical
+ * binding schema. Runtime resources/secrets are unrepresentable by
+ * construction: unknown keys, nested structures, arrays, scalars and
+ * non-identifier `resourceKey` values are all rejected.
+ */
+export function toolConfigIssues(config: unknown, path: string): string[] {
+  const issues: string[] = [];
+  if (Array.isArray(config) || config === null || typeof config !== 'object') {
+    issues.push(`${path} must be a closed logical binding object (resourceKey only); arrays, scalars and runtime values are rejected`);
+    return issues;
+  }
+  for (const key of Object.keys(config)) {
+    if (!LOGICAL_CONFIG_FIELDS.has(key)) {
+      issues.push(`${path}.${key} is outside the closed logical binding schema; runtime resources/secrets must never be compile-time Tool config`);
+    }
+  }
+  const resourceKey = (config as Record<string, unknown>).resourceKey;
+  if (resourceKey !== undefined && (typeof resourceKey !== 'string' || !RESOURCE_KEY_PATTERN.test(resourceKey))) {
+    issues.push(`${path}.resourceKey must be a logical identifier (pattern ${RESOURCE_KEY_PATTERN.source}); endpoint/credential/connection values are rejected`);
+  }
+  return issues;
+}
 
 export class CompiledManifestValidationError extends Error {
   readonly issues: readonly string[];
@@ -74,18 +116,6 @@ export class CompiledManifestValidationError extends Error {
     super(`Compiled package manifest is invalid:\n${issues.map((issue) => `- ${issue}`).join('\n')}`);
     this.name = 'CompiledManifestValidationError';
     this.issues = [...issues];
-  }
-}
-
-function inspectForbiddenRuntimeValues(value: unknown, path: string, issues: string[]): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => inspectForbiddenRuntimeValues(item, `${path}[${index}]`, issues));
-    return;
-  }
-  if (!value || typeof value !== 'object') return;
-  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-    if (FORBIDDEN_RUNTIME_KEYS.test(key)) issues.push(`${path}.${key} is runtime-only and must not be compiled into the package`);
-    inspectForbiddenRuntimeValues(item, `${path}.${key}`, issues);
   }
 }
 
@@ -184,12 +214,12 @@ export function assertCompiledPackageManifest(manifest: CompiledPackageManifest)
     if (digest && manifest.bindingDigests[tool.execution.bindingId] !== digest) {
       issues.push(`tool '${key}' binding digest does not match bindingDigests['${tool.execution.bindingId}']`);
     }
+    if (tool.execution.config !== undefined) {
+      issues.push(...toolConfigIssues(tool.execution.config, `$.tools.${key}.execution.config`));
+    }
   }
   for (const [key, projection] of Object.entries(manifest.projections)) {
     if (key !== projection.projectionId) issues.push(`projection record key '${key}' does not match projectionId '${projection.projectionId}'`);
-  }
-  for (const [toolId, tool] of Object.entries(manifest.tools)) {
-    if (tool.execution.config !== undefined) inspectForbiddenRuntimeValues(tool.execution.config, `$.tools.${toolId}.execution.config`, issues);
   }
   const expectedId = sha256Canonical(manifestIdentityMaterial(manifest));
   if (manifest.packageId !== expectedId) issues.push(`packageId mismatch: expected '${expectedId}'`);

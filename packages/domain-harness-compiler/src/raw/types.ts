@@ -81,6 +81,22 @@ export interface LoadedRawDomainPackage {
   childDependencies: ReadonlyMap<string, readonly string[]>;
 }
 
+/**
+ * Closed compile-time logical binding configuration for Tool executables.
+ *
+ * `resourceKey` is the logical Runtime Resource reference from the frozen host
+ * contract (`RuntimeResources` is keyed by `resourceKey`); the referenced
+ * endpoint/token/session/handle value is injected only at activation/execution
+ * time and never exists inside the compiled package.
+ *
+ * The schema is closed on purpose: no arbitrary keys, no nested structures,
+ * identifier-shaped values only. Runtime resources, endpoints, credentials and
+ * handles are structurally excluded from compilation, not filtered by name.
+ */
+export interface LogicalToolBindingConfig {
+  resourceKey?: string;
+}
+
 export interface RawToolDefinition {
   toolId: string;
   inputSchema?: JsonSchema;
@@ -90,8 +106,8 @@ export interface RawToolDefinition {
   /** Capability whose target binding executes this Tool. Required when multiple capabilities are declared. */
   bindingCapability?: CapabilityId;
   requiredCapabilities?: readonly CapabilityId[];
-  /** Serializable logical binding configuration only. Runtime resources are forbidden. */
-  config?: JsonValue;
+  /** Closed logical binding configuration; runtime resources/secrets are structurally unrepresentable. */
+  config?: LogicalToolBindingConfig;
 }
 
 export type RawProjectionDependency =

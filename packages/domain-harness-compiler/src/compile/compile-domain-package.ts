@@ -16,11 +16,13 @@ import {
   assertCompiledPackageManifest,
   buildBindingDigests,
   buildCompiledPackageManifest,
+  InvalidToolConfigError,
   type CompiledMessageContract,
   type CompiledPackageManifest,
   type CompiledProjectionDescriptor,
   type CompiledToolDescriptor,
   type CompiledWorkflowDescriptor,
+  toolConfigIssues,
 } from '../package/manifest.js';
 import { assertTargetCapabilities, collectRequiredCapabilities } from './capabilities.js';
 
@@ -150,6 +152,10 @@ function compileTools(
     }
     const bindingId = bindingCapability ? target.bindings[bindingCapability] : `runtime:${tool.executionKind}`;
     if (!bindingId) throw new Error(`tool '${tool.toolId}' cannot resolve a target binding`);
+    if (tool.config !== undefined) {
+      const configIssues = toolConfigIssues(tool.config, `tool '${tool.toolId}' config`);
+      if (configIssues.length) throw new InvalidToolConfigError(tool.toolId, configIssues);
+    }
     result[tool.toolId] = {
       toolId: tool.toolId,
       ...(tool.inputSchema ? { inputSchema: tool.inputSchema } : {}),

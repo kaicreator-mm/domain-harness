@@ -9,6 +9,7 @@ import { loadRawDomainPackage } from '../../packages/domain-harness-compiler/src
 import type {
   CapabilityId,
   LoadedRawDomainPackage,
+  RawToolDefinition,
   RawWorkflow,
   TargetHostProfile,
 } from '../../packages/domain-harness-compiler/src/raw/types.js';
@@ -120,12 +121,20 @@ function compileFixture(rawInput = raw(), bindingContents: Readonly<Record<strin
     bindingContents,
     tools: [{
       toolId: 'remoteLookup',
-      inputSchema: { type: 'object', properties: { endpoint: { type: 'string' } } },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          endpoint: { type: 'string' },
+          token: { type: 'string' },
+          apiKey: { type: 'string' },
+          password: { type: 'string' },
+        },
+      },
       outputSchema: { type: 'object' },
       effect: 'idempotent',
       executionKind: 'remote-http-json',
       requiredCapabilities: [CAPS.http],
-      config: { runtimeResourceKey: 'remoteLookupService' },
+      config: { resourceKey: 'remoteLookupService' },
     }],
     projections: [{
       projectionId: 'overview',
@@ -257,26 +266,116 @@ test('compiler emits projection and message contracts without treating schema fi
   const manifest = compileFixture().manifest;
   assert.equal(manifest.projections.overview?.projectionId, 'overview');
   assert.equal(manifest.workflows.expr_flow?.messageContracts.ADVANCE?.type, 'ADVANCE');
+  assert.ok(manifest.tools.remoteLookup?.inputSchema?.properties?.token);
+  assert.ok(manifest.tools.remoteLookup?.inputSchema?.properties?.apiKey);
+  assert.ok(manifest.tools.remoteLookup?.inputSchema?.properties?.password);
   assert.doesNotThrow(() => assertCompiledPackageManifest(manifest));
 });
 
-test('runtime-only endpoint/credential material in executable config fails closed', () => {
+const RUNTIME_VALUED_CONFIG_ALIASES = [
+  'apiKey',
+  'authorization',
+  'token',
+  'credential',
+  'secret',
+  'baseUrl',
+  'endpoint',
+  'session',
+  'cookie',
+  'databaseHandle',
+  'databasePath',
+  'connection',
+  'connectionString',
+  'hostHandle',
+  'runtimeHandle',
+] as const;
+
+function toolWithConfig(toolId: string, config: unknown): RawToolDefinition {
+  return {
+    toolId,
+    outputSchema: { type: 'object' },
+    effect: 'none',
+    executionKind: 'remote-http-json',
+    requiredCapabilities: [CAPS.http],
+    config: config as RawToolDefinition['config'],
+  };
+}
+
+function manifestForTool(tool: RawToolDefinition) {
+  return compileDomainPackage({
+    raw: raw(),
+    domainVersion: '2.0.0-test',
+    target: target(),
+    bindingContents: BINDING_CONTENTS,
+    tools: [tool],
+  }).manifest;
+}
+
+test('executable Tool config is fail-closed: runtime-valued fields are rejected regardless of key name', () => {
+  for (const alias of RUNTIME_VALUED_CONFIG_ALIASES) {
+    assert.throws(
+      () => manifestForTool(toolWithConfig('probe', { [alias]: 'runtime-only-value' })),
+      (error: unknown) => error instanceof Error && error.message.includes('closed logical binding'),
+      `config { ${alias}: ... } must fail compilation`,
+    );
+  }
+});
+
+test('executable Tool config is closed: arbitrary unknown fields cannot smuggle runtime values', () => {
+  const arbitrarySmuggling: ReadonlyArray<readonly [string, unknown]> = [
+    ['unknown alias carrying a runtime value', { mySpecialProductionConnection: 'postgres://user:secret@db.internal:5432/prod' }],
+    ['unknown nested container', { settings: { token: 'bearer-secret' } }],
+    ['extra field beside a valid reference', { resourceKey: 'remoteLookupService', extra: 'https://example.invalid' }],
+    ['raw scalar config', 'postgres://user:secret@db.internal/prod'],
+    ['array config', ['https://example.invalid', 'secret-token']],
+    ['null config', null],
+  ];
+  for (const [label, config] of arbitrarySmuggling) {
+    assert.throws(
+      () => manifestForTool(toolWithConfig('probe', config)),
+      (error: unknown) => error instanceof Error && error.message.includes('closed logical binding'),
+      `${label} must fail compilation`,
+    );
+  }
+});
+
+test('resourceKey accepts logical identifiers only, never runtime values', () => {
+  const runtimeValues = [
+    'postgres://user:secret@db.internal:5432/prod',
+    'https://api.internal',
+    'user:password@host',
+    'op://vault/production/secret',
+    '',
+  ];
+  for (const runtimeValue of runtimeValues) {
+    assert.throws(
+      () => manifestForTool(toolWithConfig('probe', { resourceKey: runtimeValue })),
+      (error: unknown) => error instanceof Error && error.message.includes('resourceKey'),
+      `resourceKey '${runtimeValue}' must fail compilation`,
+    );
+  }
+});
+
+test('legitimate logical runtime-resource references stay compilable', () => {
+  const referenced = manifestForTool(toolWithConfig('probe', { resourceKey: 'remoteLookupService' }));
+  assert.deepEqual(referenced.tools.probe?.execution.config, { resourceKey: 'remoteLookupService' });
+  assert.doesNotThrow(() => assertCompiledPackageManifest(referenced));
+
+  const emptyConfig = manifestForTool(toolWithConfig('probe', {}));
+  assert.deepEqual(emptyConfig.tools.probe?.execution.config, {});
+  assert.doesNotThrow(() => assertCompiledPackageManifest(emptyConfig));
+});
+
+test('manifest validation fails closed on non-closed execution config injected after compilation', () => {
+  const manifest = compileFixture().manifest;
+  const smuggled = structuredClone(manifest);
+  const tool = smuggled.tools.remoteLookup;
+  assert.ok(tool);
+  tool.execution.config = { apiKey: 'injected-secret' } as unknown as typeof tool.execution.config;
   assert.throws(
-    () => compileDomainPackage({
-      raw: raw(),
-      domainVersion: '2.0.0-test',
-      target: target(),
-      bindingContents: BINDING_CONTENTS,
-      tools: [{
-        toolId: 'unsafe',
-        outputSchema: { type: 'object' },
-        effect: 'none',
-        executionKind: 'remote-http-json',
-        requiredCapabilities: [CAPS.http],
-        config: { endpoint: 'https://example.invalid', token: 'super-secret' },
-      }],
-    }),
-    (error: unknown) => error instanceof CompiledManifestValidationError && error.issues.some((issue) => issue.includes('runtime-only')),
+    () => assertCompiledPackageManifest(smuggled),
+    (error: unknown) => error instanceof CompiledManifestValidationError
+      && error.issues.some((issue) => issue.includes('closed logical binding') && issue.includes('apiKey')),
   );
 });
 
