@@ -298,9 +298,7 @@ function observeInstance(
     address: { ...snapshot.address },
     correlationId: snapshot.correlationId,
     lifecycle: snapshot.lifecycle,
-    stateRevision: snapshot.lifecycle === 'recovery_required'
-      ? Math.max(0, snapshot.stateRevision - 1)
-      : snapshot.stateRevision,
+    stateRevision: snapshot.stateRevision,
     state: semanticState(snapshot.state, fixture),
   };
   if (snapshot.lifecycle === 'completed') {
