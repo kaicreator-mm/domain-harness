@@ -34,7 +34,8 @@ export class NodeScriptExecutor {
 
   async execute(request: ScriptExecutionRequest): Promise<JsonValue> {
     assertBinding(request.binding.kind, request.binding.bindingId);
-    const compiledModule = this.modules[request.binding.bindingId];
+    const hasBinding = Object.prototype.hasOwnProperty.call(this.modules, request.binding.bindingId);
+    const compiledModule = hasBinding ? this.modules[request.binding.bindingId] : undefined;
     if (compiledModule === undefined) {
       throw new ScriptExecutorError(
         'binding_not_found',
@@ -77,16 +78,28 @@ interface RunWorkerOptions {
 
 function runWorker(options: RunWorkerOptions): Promise<JsonValue> {
   return new Promise<JsonValue>((resolvePromise, rejectPromise) => {
-    const worker = new Worker(new URL('./script-worker.js', import.meta.url), {
-      name: 'domain-harness-script',
-      resourceLimits: options.resourceLimits,
-      workerData: {
-        moduleUrl: options.compiledModule.moduleUrl,
-        exportName: options.compiledModule.exportName ?? 'default',
-        inputJson: options.inputJson,
-        maxOutputBytes: options.maxOutputBytes,
-      },
-    });
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./script-worker.js', import.meta.url), {
+        name: 'domain-harness-script',
+        resourceLimits: options.resourceLimits,
+        workerData: {
+          moduleUrl: options.compiledModule.moduleUrl,
+          exportName: options.compiledModule.exportName ?? 'default',
+          inputJson: options.inputJson,
+          maxOutputBytes: options.maxOutputBytes,
+        },
+      });
+    } catch (error) {
+      rejectPromise(
+        new ScriptExecutorError(
+          'script_error',
+          `Script worker could not start: ${error instanceof Error ? error.message : String(error)}`,
+          error,
+        ),
+      );
+      return;
+    }
 
     let settled = false;
     const cleanup = (): void => {
@@ -175,6 +188,12 @@ function validateCompiledModule(module: NodeScriptModuleBinding, bindingId: stri
     throw new ScriptExecutorError(
       'invalid_binding',
       `Script module '${bindingId}' must be a target-compiled file: URL; runtime source/data URLs are forbidden`,
+    );
+  }
+  if (!/\.(?:mjs|cjs|js)$/i.test(parsed.pathname)) {
+    throw new ScriptExecutorError(
+      'invalid_binding',
+      `Script module '${bindingId}' must reference compiled JavaScript (.js/.mjs/.cjs); TypeScript/source files are forbidden`,
     );
   }
 }
