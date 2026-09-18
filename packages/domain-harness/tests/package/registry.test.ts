@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { CapabilityId } from '../../src/v2/index.js';
+import type { CapabilityId, PackageRegistry } from '../../src/v2/index.js';
 import {
   PackageActivationError,
   StaticPackageRegistry,
@@ -107,5 +107,66 @@ test('G29: preflight validates supplied packages before retained-pin inspection'
       error instanceof PackageActivationError && error.code === 'PACKAGE_ID_MISMATCH',
   );
 
+  assert.equal(pinRead, false);
+});
+
+test('G29: inconsistent registry key cannot substitute a different package identity', async () => {
+  const packageA = await createCompiledPackage('1.0.0');
+  const alias = 'registry-alias-that-is-not-package-a';
+  const registry: PackageRegistry = {
+    defaultPackageId: alias,
+    listPackageIds: () => [alias],
+    get: (packageId) => (packageId === alias ? packageA : undefined),
+    has: (packageId) => packageId === alias,
+  };
+  let pinRead = false;
+
+  await assert.rejects(
+    preflightPackageActivation({
+      registry,
+      store: {
+        async listPinnedPackageIds() {
+          pinRead = true;
+          return [];
+        },
+      },
+      validationPolicy: validationPolicy(),
+    }),
+    (error: unknown) =>
+      error instanceof PackageActivationError && error.code === 'PACKAGE_ID_MISMATCH',
+  );
+  assert.equal(pinRead, false);
+});
+
+test('G29: default package must be part of the validated registry enumeration', async () => {
+  const packageA = await createCompiledPackage('1.0.0');
+  const packageB = await createCompiledPackage('2.0.0');
+  const registry: PackageRegistry = {
+    defaultPackageId: packageB.manifest.packageId,
+    listPackageIds: () => [packageA.manifest.packageId],
+    get: (packageId) => {
+      if (packageId === packageA.manifest.packageId) return packageA;
+      if (packageId === packageB.manifest.packageId) return packageB;
+      return undefined;
+    },
+    has: (packageId) =>
+      packageId === packageA.manifest.packageId || packageId === packageB.manifest.packageId,
+  };
+  let pinRead = false;
+
+  await assert.rejects(
+    preflightPackageActivation({
+      registry,
+      store: {
+        async listPinnedPackageIds() {
+          pinRead = true;
+          return [];
+        },
+      },
+      validationPolicy: validationPolicy(),
+    }),
+    (error: unknown) =>
+      error instanceof PackageActivationError && error.code === 'DEFAULT_PACKAGE_MISSING',
+  );
   assert.equal(pinRead, false);
 });
