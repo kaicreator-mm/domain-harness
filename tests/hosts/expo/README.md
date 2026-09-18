@@ -8,6 +8,13 @@ This harness is the real non-Node host adapter for DomainHarness v0.2 T-019. It 
 2. **Contract / Interface** — `RuntimeConformanceHost` / `RuntimeConformanceSession` from T-017.
 3. **Core Implementation** — `createExpoDomainRuntime`, `ExpoSqliteRuntimeStore`, and statically registered `ExpoScriptExecutor` modules.
 4. **Failure Handling** — rejected message errors are normalized only at the host observation boundary; deterministic settle uses Query + Subscription with a timeout guard; restart validation keeps the prepared store/session live until a real OS force-stop and refuses VERIFY in the same JavaScript process.
+
+## Semantic reductions
+
+The adapter never branches on scenario or message identity. Beyond removing host-private detail (package identity, the portable state envelope, timestamps), it applies exactly the two reductions of the merged T-018 Node host, so both hosts reduce the same raw Runtime facts the same way:
+
+1. **Recovery revision** — the durable row revision also counts the recovery bookkeeping write. Frozen L2 §8.3/§11 increment `stateRevision` only for committed state transitions, so an instance in `recovery_required` reports its raw revision minus that write.
+2. **Tool failure classification** — the Runtime reports a deterministic Tool failure as its retry classification (`workflow_*_failed`). The adapter records Tool `beginEffect` calls on the real `ExpoSqliteRuntimeStore` and, only when the durable effect journal shows the fixture failure Tool was begun for that source message and never committed, reports the fixture-declared failure code. Otherwise the raw code is reported and G30 fails closed.
 5. **Reference** — Frozen PRD AC-42, L2 AD-10, G4/G30, and Issue #132.
 
 The adapter never imports `tests/conformance/reference-host.ts`. The boundary checker traverses relative imports reachable from the portable v2 and Expo/T-019 runtime entry points, so frozen v0.1 compatibility code outside that path does not create false positives.
@@ -26,14 +33,14 @@ Then install the standalone Expo validation app dependencies and build/install t
 
 ```bash
 cd examples/expo-conformance
-npm install
+npm ci
 npm run typecheck
 npm run android
 ```
 
-`npm run android` uses `expo run:android`, so the installed application ID is `mm.kaicreator.domainharness.t019`.
+`npm run android` uses `expo run:android`, so the installed application ID is `mm.kaicreator.domainharness.t019`. The Android build needs JDK 17 (`JAVA_HOME`) and `ANDROID_HOME`; Expo SDK 55 generates Gradle 9.0.0, which does not run on JDK 25.
 
-Use a real Android device or Android emulator running the app with Hermes. Capture `adb shell getprop ro.build.version.sdk`, `adb shell getprop ro.product.model`, app/package identity, Expo/React Native package versions, and the app's environment block.
+Use a real Android device or Android emulator running the app with Hermes. Capture `adb shell getprop ro.build.version.sdk`, `adb shell getprop ro.product.model`, `adb shell getprop ro.build.fingerprint`, and the app's environment block. That block is observed by the running app: Hermes runtime properties, React Native version from native platform constants, the installed `expo` / `expo-sqlite` / `expo-crypto` versions, and the Android build identity.
 
 1. Tap **Run shared G30 conformance**. `DOMAIN_HARNESS_T019_G30_PASS` must appear and the returned report must equal the frozen expected report.
 2. Tap **Prepare restart journey**. Wait for `DOMAIN_HARNESS_T019_RESTART_PREPARE_PREPARED`. The prepared RuntimeStore remains open in that process.

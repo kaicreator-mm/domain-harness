@@ -19,6 +19,8 @@ import type { ConformanceFixture, ToolInvocationObservation } from '../../confor
 import { AUDIT_ADDRESS } from '../../conformance/fixtures.ts';
 
 export const EXPO_CONFORMANCE_TARGET_PROFILE = 'expo-android-hermes@1' as const;
+export const EXPO_QUOTE_TOOL_ID = 'quote-total';
+export const EXPO_FAILURE_TOOL_ID = 'fixture-failure';
 const QUOTE_BINDING_ID = 'expo.fixture.quote-total.v1';
 const FAILURE_BINDING_ID = 'expo.fixture.failure.v1';
 
@@ -116,7 +118,7 @@ function manifestFor(
             },
             'quote-tool': {
               final: false,
-              invoke: { kind: 'tool', ref: 'quote-total', input: 'fixture.message-input' },
+              invoke: { kind: 'tool', ref: EXPO_QUOTE_TOOL_ID, input: 'fixture.message-input' },
               done: [{ target: 'quoted' }],
               error: [],
               events: {},
@@ -153,7 +155,7 @@ function manifestFor(
             },
             'failure-tool': {
               final: false,
-              invoke: { kind: 'tool', ref: 'fixture-failure', input: 'fixture.message-input' },
+              invoke: { kind: 'tool', ref: EXPO_FAILURE_TOOL_ID, input: 'fixture.message-input' },
               done: [{ target: 'draft' }],
               error: [],
               events: {},
@@ -189,8 +191,8 @@ function manifestFor(
       },
     },
     tools: {
-      'quote-total': {
-        toolId: 'quote-total',
+      [EXPO_QUOTE_TOOL_ID]: {
+        toolId: EXPO_QUOTE_TOOL_ID,
         inputSchema: objectSchema,
         outputSchema: quoteOutputSchema,
         effect: 'none',
@@ -201,8 +203,8 @@ function manifestFor(
         },
         requiredCapabilities: [EXPO_SCRIPT_EXECUTION_CAPABILITY],
       },
-      'fixture-failure': {
-        toolId: 'fixture-failure',
+      [EXPO_FAILURE_TOOL_ID]: {
+        toolId: EXPO_FAILURE_TOOL_ID,
         inputSchema: objectSchema,
         outputSchema: objectSchema,
         effect: 'idempotent',
@@ -251,9 +253,9 @@ function tracingScriptExecutor(
   return {
     async execute(request) {
       const toolId = request.binding.bindingId === QUOTE_BINDING_ID
-        ? 'quote-total'
-        : 'fixture-failure';
-      const effect = toolId === 'quote-total' ? 'none' : 'idempotent';
+        ? EXPO_QUOTE_TOOL_ID
+        : EXPO_FAILURE_TOOL_ID;
+      const effect = toolId === EXPO_QUOTE_TOOL_ID ? 'none' : 'idempotent';
       try {
         const output = await executor.execute(request);
         trace.push({ toolId, effect, input: clone(request.input), output: clone(output) });

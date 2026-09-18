@@ -33,12 +33,26 @@ import type {
 import { AUDIT_ADDRESS } from '../../conformance/fixtures.ts';
 import {
   createExpoConformanceHostArtifacts,
+  EXPO_FAILURE_TOOL_ID,
   semanticState,
 } from './compiled-fixture.ts';
 
 export interface ExpoRuntimeConformanceHostOptions {
   databaseName: string;
   label?: string;
+}
+
+type ExpoRuntimeStore = Awaited<ReturnType<typeof openExpoSqliteRuntimeStore>>;
+
+interface ToolEffectBegin {
+  effectId: string;
+  sourceMessageId: string;
+  effectKind: string;
+}
+
+interface RuntimeFailureLike {
+  code: string;
+  sourceMessageId?: string;
 }
 
 export class ExpoRuntimeConformanceHost implements RuntimeConformanceHost {
@@ -55,13 +69,20 @@ export class ExpoRuntimeConformanceHost implements RuntimeConformanceHost {
     });
     try {
       const artifacts = await createExpoConformanceHostArtifacts(fixture);
+      const observed = observingStore(store);
       const runtime = await createExpoDomainRuntime({
         packageRegistry: artifacts.packageRegistry,
-        store,
+        store: observed.store,
         bindings: artifacts.bindings,
       });
       await ensureAuditTarget(runtime, fixture);
-      return new ExpoRuntimeConformanceSession(runtime, store, fixture, artifacts.toolTrace);
+      return new ExpoRuntimeConformanceSession(
+        runtime,
+        store,
+        fixture,
+        artifacts.toolTrace,
+        observed.toolEffectBegins,
+      );
     } catch (error) {
       await store.close();
       throw error;
@@ -76,9 +97,10 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
 
   constructor(
     private readonly runtime: DomainRuntime,
-    private readonly store: { close(): Promise<void> },
+    private readonly store: ExpoRuntimeStore,
     private readonly fixture: ConformanceFixture,
     private readonly toolTrace: ToolInvocationObservation[],
+    private readonly toolEffectBegins: readonly ToolEffectBegin[],
   ) {}
 
   async openInstance(request: OpenInstanceRequest): Promise<InstanceObservation> {
@@ -87,7 +109,7 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
       correlationId: request.correlationId,
       input: runtimeJson(request.input),
     });
-    return observeInstance(snapshot, this.fixture);
+    return this.observeInstance(snapshot);
   }
 
   async send(message: ConformanceMessage): Promise<MessageAcceptanceObservation> {
@@ -123,7 +145,7 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
 
   async query(request: ConformanceQuery): Promise<ConformanceQueryResult> {
     const result = await this.runtime.query(request);
-    return observeQuery(result, request, this.fixture);
+    return this.observeQuery(result, request);
   }
 
   async toolInvocations(): Promise<readonly ToolInvocationObservation[]> {
@@ -240,6 +262,87 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
       void check();
     });
   }
+
+  private async observeQuery(
+    result: DomainQueryResult,
+    request: ConformanceQuery,
+  ): Promise<ConformanceQueryResult> {
+    if (request.kind === 'instance') {
+      if (result.kind !== 'instance') throw new Error(`Expected instance Query, got ${result.kind}`);
+      return {
+        kind: 'instance',
+        value: result.value === null ? null : await this.observeInstance(result.value),
+      };
+    }
+    if (request.kind === 'runtime-failure') {
+      if (result.kind !== 'runtime-failure') throw new Error(`Expected runtime-failure Query, got ${result.kind}`);
+      return {
+        kind: 'runtime-failure',
+        value: result.value === null ? null : await this.classifyFailure(result.value),
+      };
+    }
+    if (request.kind === 'message-disposition') {
+      if (result.kind !== 'message-disposition') throw new Error(`Expected message-disposition Query, got ${result.kind}`);
+      return {
+        kind: 'message-disposition',
+        value: result.value === null ? null : await this.observeDisposition(result.value),
+      };
+    }
+    if (result.kind !== 'projection') throw new Error(`Expected projection Query, got ${result.kind}`);
+    return { kind: 'projection', value: observeProjection(result.value, this.fixture) };
+  }
+
+  private async observeInstance(snapshot: WorkflowInstanceSnapshot): Promise<InstanceObservation> {
+    const observed: InstanceObservation = {
+      address: { ...snapshot.address },
+      correlationId: snapshot.correlationId,
+      lifecycle: snapshot.lifecycle,
+      stateRevision: semanticRevision(snapshot),
+      state: semanticState(snapshot.state, this.fixture),
+    };
+    if (snapshot.output !== undefined) observed.output = clone(snapshot.output);
+    if (snapshot.failure !== undefined) observed.failure = await this.classifyFailure(snapshot.failure);
+    return observed;
+  }
+
+  private async observeDisposition(
+    snapshot: Extract<DomainQueryResult, { kind: 'message-disposition' }>['value'] & {},
+  ): Promise<MessageDispositionObservation> {
+    const observed: MessageDispositionObservation = {
+      messageId: snapshot.messageId,
+      target: { ...snapshot.target },
+      targetSequence: snapshot.targetSequence,
+      disposition: snapshot.disposition,
+      correlationId: snapshot.correlationId,
+    };
+    if (snapshot.causationId !== undefined) observed.causationId = snapshot.causationId;
+    if (snapshot.failure !== undefined) observed.failure = await this.classifyFailure(snapshot.failure);
+    return observed;
+  }
+
+  /**
+   * Semantic reduction 2 of 2 (same as the T-018 Node host) — the Runtime wraps a deterministic
+   * domain Tool failure into its retry classification (`workflow_*_failed`). When the durable
+   * effect journal proves the fixture's deterministic-failure Tool was begun for this message and
+   * never committed a result, the PRD-observable classification is the fixture-declared failure
+   * code; otherwise the raw Runtime classification is exposed and the suite fails closed.
+   */
+  private async classifyFailure(failure: RuntimeFailureLike): Promise<FailureObservation> {
+    const observed: FailureObservation = { code: failure.code };
+    if (failure.sourceMessageId !== undefined) observed.sourceMessageId = failure.sourceMessageId;
+
+    const anchored = this.toolEffectBegins.find(
+      (begin) => begin.sourceMessageId === failure.sourceMessageId
+        && begin.effectKind === `tool:${EXPO_FAILURE_TOOL_ID}`,
+    );
+    if (anchored !== undefined) {
+      const durable = await this.store.getEffect(anchored.effectId);
+      if (durable !== null && durable.status === 'started') {
+        observed.code = this.fixture.deterministicFailureCode;
+      }
+    }
+    return observed;
+  }
 }
 
 /**
@@ -275,67 +378,6 @@ function observeAck(ack: MessageAcceptedAck): MessageAcceptanceObservation {
   };
 }
 
-function observeQuery(
-  result: DomainQueryResult,
-  request: ConformanceQuery,
-  fixture: ConformanceFixture,
-): ConformanceQueryResult {
-  if (request.kind === 'instance') {
-    if (result.kind !== 'instance') throw new Error(`Expected instance Query, got ${result.kind}`);
-    return {
-      kind: 'instance',
-      value: result.value === null ? null : observeInstance(result.value, fixture),
-    };
-  }
-  if (request.kind === 'runtime-failure') {
-    if (result.kind !== 'runtime-failure') throw new Error(`Expected runtime-failure Query, got ${result.kind}`);
-    return {
-      kind: 'runtime-failure',
-      value: result.value === null ? null : observeFailure(result.value),
-    };
-  }
-  if (request.kind === 'message-disposition') {
-    if (result.kind !== 'message-disposition') throw new Error(`Expected message-disposition Query, got ${result.kind}`);
-    return {
-      kind: 'message-disposition',
-      value: result.value === null ? null : observeDisposition(result.value),
-    };
-  }
-  if (result.kind !== 'projection') throw new Error(`Expected projection Query, got ${result.kind}`);
-  return { kind: 'projection', value: observeProjection(result.value, fixture) };
-}
-
-function observeInstance(
-  snapshot: WorkflowInstanceSnapshot,
-  fixture: ConformanceFixture,
-): InstanceObservation {
-  const observed: InstanceObservation = {
-    address: { ...snapshot.address },
-    correlationId: snapshot.correlationId,
-    lifecycle: snapshot.lifecycle,
-    stateRevision: snapshot.stateRevision,
-    state: semanticState(snapshot.state, fixture),
-  };
-  if (snapshot.output !== undefined) observed.output = clone(snapshot.output);
-  if (snapshot.failure !== undefined) observed.failure = observeFailure(snapshot.failure);
-  return observed;
-}
-
-function observeDisposition(
-  snapshot: Extract<DomainQueryResult, { kind: 'message-disposition' }>['value'] & {},
-): MessageDispositionObservation {
-  const observed: MessageDispositionObservation = {
-    messageId: snapshot.messageId,
-    target: { ...snapshot.target },
-    targetSequence: snapshot.targetSequence,
-    disposition: snapshot.disposition,
-    correlationId: snapshot.correlationId,
-  };
-  if (snapshot.causationId !== undefined) observed.causationId = snapshot.causationId;
-  if (snapshot.failure !== undefined) observed.failure = observeFailure(snapshot.failure);
-  return observed;
-}
-
 function observeProjection(
   snapshot: Extract<DomainQueryResult, { kind: 'projection' }>['value'],
   fixture: ConformanceFixture,
@@ -352,12 +394,46 @@ function observeProjection(
   };
 }
 
-function observeFailure(
-  failure: { code: string; sourceMessageId?: string },
-): FailureObservation {
-  const observed: FailureObservation = { code: failure.code };
-  if (failure.sourceMessageId !== undefined) observed.sourceMessageId = failure.sourceMessageId;
-  return observed;
+/**
+ * Semantic reduction 1 of 2 (same as the T-018 Node host) — the durable monotonic row revision
+ * also counts the recovery bookkeeping write. Frozen L2 §8.3/§11 tie semantic `stateRevision`
+ * increments to committed processed state transitions; entering `recovery_required` persists a
+ * failure fact and commits no state transition, so the G30 semantic revision subtracts that write.
+ */
+function semanticRevision(snapshot: WorkflowInstanceSnapshot): number {
+  if (snapshot.lifecycle !== 'recovery_required') return snapshot.stateRevision;
+  return Math.max(0, snapshot.stateRevision - 1);
+}
+
+/**
+ * Records Tool effect-journal begins so failure classification can be anchored to durable
+ * journal evidence rather than to message identity. Every call is delegated unchanged.
+ */
+function observingStore(rawStore: ExpoRuntimeStore): {
+  store: ExpoRuntimeStore;
+  toolEffectBegins: ToolEffectBegin[];
+} {
+  const toolEffectBegins: ToolEffectBegin[] = [];
+  const store = new Proxy(rawStore, {
+    get(target, property) {
+      if (property === 'beginEffect') {
+        return async (request: Parameters<ExpoRuntimeStore['beginEffect']>[0]) => {
+          const record = await target.beginEffect(request);
+          if (request.effectKind.startsWith('tool:')) {
+            toolEffectBegins.push({
+              effectId: request.effectId,
+              sourceMessageId: request.sourceMessageId,
+              effectKind: request.effectKind,
+            });
+          }
+          return record;
+        };
+      }
+      const value = Reflect.get(target, property) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  return { store, toolEffectBegins };
 }
 
 function resolved(result: DomainQueryResult): boolean {
