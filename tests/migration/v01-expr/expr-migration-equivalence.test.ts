@@ -5,6 +5,7 @@ import { translateV01ExprWorkflow, V01ExprMigrationError } from '../../../packag
 import type { RawWorkflow } from '../../../packages/domain-harness-compiler/src/raw/types.js';
 import { ExpressionRuntime } from '../../../packages/domain-harness/src/expression/expression-runtime.js';
 import { ExpressionToolExecutor } from '../../../packages/domain-harness/src/expression/expression-tool.js';
+import { RouteEvaluator } from '../../../packages/domain-harness/src/runner/route-evaluator.js';
 import { StepDispatcher } from '../../../packages/domain-harness/src/runner/step-dispatcher.js';
 
 const LOGICAL_TIME = '2026-09-18T12:00:00.000Z';
@@ -25,12 +26,22 @@ function referenceWorkflow(sourcePath = 'workflows/decision.yaml'): RawWorkflow 
           input: 'message.payload',
           timeoutMs: 250,
         },
-        done: [{ target: 'complete' }],
+        done: [
+          { target: 'approved', when: 'output.route = "approved"' },
+          { target: 'review' },
+        ],
         error: [{ target: 'failed' }],
         events: {},
       },
-      complete: {
-        id: 'complete',
+      approved: {
+        id: 'approved',
+        final: true,
+        done: [],
+        error: [],
+        events: {},
+      },
+      review: {
+        id: 'review',
         final: true,
         done: [],
         error: [],
@@ -71,14 +82,30 @@ async function executeFrozenV01Expr(input: Record<string, string | number>) {
   });
 }
 
-function observableBranchAndOutput(result: unknown) {
+async function observableRouteAndOutput(
+  result: unknown,
+  input: Record<string, string | number>,
+) {
   assert.ok(result !== null && typeof result === 'object' && !Array.isArray(result));
   const output = result as Record<string, unknown>;
   assert.ok(output.route === 'approved' || output.route === 'review');
-  return {
-    state: output.route === 'approved' ? 'complete.approved' : 'complete.review',
-    output,
-  };
+
+  const routes = referenceWorkflow().states.evaluate!.done;
+  const selection = await new RouteEvaluator(new ExpressionRuntime()).select(
+    'evaluate',
+    'done',
+    routes,
+    {
+      input,
+      steps: {},
+      run: { visits: { evaluate: 1 } },
+      output: output as never,
+    },
+    LOGICAL_TIME,
+  );
+  const selectedRoute = routes[selection.routeIndex];
+  assert.ok(selectedRoute);
+  return { state: selectedRoute.target, output };
 }
 
 test('build-time translation deterministically replaces v0.1 expr with a synthetic Expression Domain Tool', () => {
@@ -132,7 +159,7 @@ test('build-time translation deterministically replaces v0.1 expr with a synthet
   );
 });
 
-test('G31/AC-43: non-trivial branch/output behavior is equivalent through the Expression Domain Tool', async () => {
+test('G31/AC-43: non-trivial route/output behavior is equivalent through the Expression Domain Tool', async () => {
   const migrated = translateV01ExprWorkflow(referenceWorkflow());
   const tool = migrated.tools[0];
   assert.ok(tool);
@@ -147,9 +174,9 @@ test('G31/AC-43: non-trivial branch/output behavior is equivalent through the Ex
     const legacyResult = await executeFrozenV01Expr(input);
     const migratedResult = await executor.execute(tool.descriptor, input, LOGICAL_TIME);
     assert.deepEqual(
-      observableBranchAndOutput(migratedResult),
-      observableBranchAndOutput(legacyResult),
-      `public branch/output mismatch for ${input.name}`,
+      await observableRouteAndOutput(migratedResult, input),
+      await observableRouteAndOutput(legacyResult, input),
+      `public route/output mismatch for ${input.name}`,
     );
   }
 });
