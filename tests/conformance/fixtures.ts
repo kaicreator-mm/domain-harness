@@ -20,6 +20,11 @@ export const FAILURE_ADDRESS: WorkflowAddress = Object.freeze({
   instanceKey: 'order-failure',
 });
 
+export const RACE_ADDRESS: WorkflowAddress = Object.freeze({
+  workflowId: PORTABLE_RUNTIME_FIXTURE.workflowId,
+  instanceKey: 'order-race',
+});
+
 export const AUDIT_ADDRESS: WorkflowAddress = Object.freeze({
   workflowId: PORTABLE_RUNTIME_FIXTURE.auditWorkflowId,
   instanceKey: 'audit-001',
