@@ -9,6 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"]
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "domain-harness-monorepo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "workspaces": [
     "packages/*"
   ],
@@ -9,15 +9,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build -w @kaicreator/domain-harness",
-    "typecheck": "npm run typecheck -w @kaicreator/domain-harness",
-    "test": "npm run test -w @kaicreator/domain-harness",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "lint": "node scripts/lint.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
+    "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
+    "better-sqlite3": "^12.0.0",
     "tsx": "^4.0.0",
-    "@types/better-sqlite3": "^7.6.0"
+    "typescript": "^5.8.3"
   }
 }
