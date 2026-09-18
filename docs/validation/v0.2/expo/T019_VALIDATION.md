@@ -16,6 +16,8 @@ T-019 must prove that the same frozen T-017 product-semantic conformance suite e
 
 The source harness is intentionally inside the T-019 write set. Runtime contracts and shared expected semantics are not modified.
 
+The Expo adapter applies only the two semantic reductions already used by the merged T-018 Node host (recovery bookkeeping revision; effect-journal-anchored Tool failure classification). They are documented in `tests/hosts/expo/README.md`. Without them the raw Runtime reports `stateRevision` 1 and code `workflow_retryable_tool_execution_failed` for the G30 failure path on both hosts.
+
 ## Source/static validation
 
 Run from repository root:
@@ -25,9 +27,11 @@ npm ci
 npm run build
 node tests/hosts/expo/check-runtime-boundary.mjs
 cd examples/expo-conformance
-npm install
+npm ci
 npm run typecheck
 ```
+
+The example app commits its own `package-lock.json`, so `npm ci` reproduces the exact Expo / React Native / `expo-sqlite` / `expo-crypto` versions that were validated. The app typecheck covers `tests/hosts/expo/**` and the shared `tests/conformance/**` sources it bundles.
 
 Expected static marker:
 
@@ -36,6 +40,12 @@ T019_RUNTIME_BOUNDARY_PASS
 ```
 
 This is necessary but **not sufficient** for G4/G30/AC-42.
+
+## Build Host prerequisites
+
+- Android SDK with `ANDROID_HOME` set; Gradle installs the pinned NDK/platform on first build.
+- JDK 17 (`JAVA_HOME`). Expo SDK 55 prebuild generates Gradle 9.0.0, which cannot run on JDK 25.
+- A real Android device or an Android emulator reachable through `adb`.
 
 ## Mandatory real Android evidence
 
@@ -46,13 +56,11 @@ candidate_sha=
 device_or_emulator=
 android_api_level=
 android_build_identity=
-expo_package=~55.0.31
-react_native_package=0.83.10
 hermes=true
-expo_sqlite_package=~55.0.20
-expo_crypto_package=~55.0.19
 application_id=mm.kaicreator.domainharness.t019
 ```
+
+The app's `environment` block reports what the running process observes rather than declared ranges: `platform`, Android API level / release / model / build fingerprint, `hermes` plus Hermes `getRuntimeProperties()`, `jsBuild` (`debug`/`release`), React Native version from the native platform constants, and the installed `expo`, `expo-sqlite` and `expo-crypto` package versions bundled into the app. Copy those values into the record above.
 
 Then attach/copy the complete JSON blocks emitted for:
 
