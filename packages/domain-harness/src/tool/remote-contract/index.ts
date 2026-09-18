@@ -1,4 +1,4 @@
-import Ajv from 'ajv';
+import { Ajv } from 'ajv';
 
 import type { JsonObject, JsonSchema, JsonValue } from '../../contracts/json.js';
 import { STANDARD_CAPABILITIES } from '../../v2/contracts/capability.js';
