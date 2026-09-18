@@ -9,6 +9,8 @@ import {
 import {
   createExpoDomainRuntime,
   openExpoSqliteRuntimeStore,
+  type ExpoSqliteDatabaseLike,
+  type ExpoSqliteModuleLike,
 } from '@kaicreator/domain-harness-expo';
 
 import type {
@@ -48,7 +50,7 @@ export class ExpoRuntimeConformanceHost implements RuntimeConformanceHost {
 
   async createSession(fixture: ConformanceFixture): Promise<RuntimeConformanceSession> {
     const store = await openExpoSqliteRuntimeStore({
-      sqlite: SQLite,
+      sqlite: expoSqliteModule(),
       databaseName: this.options.databaseName,
     });
     try {
@@ -238,6 +240,19 @@ class ExpoRuntimeConformanceSession implements RuntimeConformanceSession {
       void check();
     });
   }
+}
+
+/**
+ * Binds the real `expo-sqlite` module to the structural RuntimeStore port. The SDK declares
+ * overloaded (array + variadic) bind signatures that strict TypeScript does not narrow to the
+ * port's single optional-array form, so the narrowing is explicit here, as in the T-004 host.
+ */
+function expoSqliteModule(): ExpoSqliteModuleLike {
+  return {
+    async openDatabaseAsync(databaseName: string): Promise<ExpoSqliteDatabaseLike> {
+      return (await SQLite.openDatabaseAsync(databaseName)) as unknown as ExpoSqliteDatabaseLike;
+    },
+  };
 }
 
 async function ensureAuditTarget(runtime: DomainRuntime, fixture: ConformanceFixture): Promise<void> {
