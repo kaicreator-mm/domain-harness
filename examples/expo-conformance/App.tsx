@@ -1,4 +1,7 @@
+import expoPackage from 'expo/package.json';
+import expoCryptoPackage from 'expo-crypto/package.json';
 import * as SQLite from 'expo-sqlite';
+import expoSqlitePackage from 'expo-sqlite/package.json';
 import { useMemo, useState } from 'react';
 import { Button, Platform, ScrollView, Text, View } from 'react-native';
 
@@ -96,18 +99,41 @@ async function deleteDatabase(databaseName: string): Promise<void> {
   }
 }
 
+interface HermesInternalLike {
+  getRuntimeProperties?: () => Record<string, unknown>;
+}
+
+/** Identities observed by the running app, not copied from package.json ranges. */
 function environmentIdentity() {
-  const hermesInternal = (globalThis as { HermesInternal?: unknown }).HermesInternal;
+  const hermesInternal = (globalThis as { HermesInternal?: HermesInternalLike }).HermesInternal;
+  const android = Platform.OS === 'android'
+    ? Platform.constants as typeof Platform.constants & {
+        Release?: string;
+        Model?: string;
+        Brand?: string;
+        Manufacturer?: string;
+        Fingerprint?: string;
+      }
+    : null;
+  const rn = Platform.constants.reactNativeVersion;
   return {
     task: 'T-019',
     platform: Platform.OS,
     androidApiLevel: Platform.OS === 'android' ? Platform.Version : null,
+    androidRelease: android?.Release ?? null,
+    androidModel: android?.Model ?? null,
+    androidBrand: android?.Brand ?? null,
+    androidManufacturer: android?.Manufacturer ?? null,
+    androidBuildFingerprint: android?.Fingerprint ?? null,
     hermes: hermesInternal !== undefined,
-    expoSdk: '55 (expo package pin ~55.0.31)',
-    expoPackage: '~55.0.31',
-    expoSqlitePackage: '~55.0.20',
-    expoCryptoPackage: '~55.0.19',
-    reactNativePackage: '0.83.10',
+    hermesRuntimeProperties: hermesInternal?.getRuntimeProperties === undefined
+      ? null
+      : JSON.parse(JSON.stringify(hermesInternal.getRuntimeProperties())) as Record<string, unknown>,
+    jsBuild: __DEV__ ? 'debug' : 'release',
+    expoPackage: expoPackage.version,
+    expoSqlitePackage: expoSqlitePackage.version,
+    expoCryptoPackage: expoCryptoPackage.version,
+    reactNative: `${rn.major}.${rn.minor}.${rn.patch}${rn.prerelease ? `-${rn.prerelease}` : ''}`,
     applicationId: 'mm.kaicreator.domainharness.t019',
     runtimeCoreNodeBuiltinsExpected: false,
   };
