@@ -287,8 +287,11 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         },
       });
 
+      if (isTerminal(committed)) {
+        notifyTargetChanged(target);
+        return;
+      }
       notifyTargetChanged(target, stored.message.messageId);
-      if (isTerminal(committed)) return;
     }
   }
 
