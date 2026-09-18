@@ -184,6 +184,25 @@ export class JournaledDomainMessageEffect {
       ) {
         throw error;
       }
+
+      let reconciled: EffectJournalRecord | null = null;
+      try {
+        reconciled = await this.#store.getEffect(effectId);
+      } catch {
+        // The source-journal outcome is unknown. Recovery remains safe because the
+        // same effectId always derives the same child messageId and target dedup applies.
+      }
+
+      if (reconciled !== null) {
+        assertCompatibleEffectRecord(reconciled, expected);
+        if (reconciled.status === 'completed') {
+          return completedResult(reconciled, messageId, request.resolvedTarget, true);
+        }
+        if (reconciled.status === 'failed') {
+          throw new JournaledDomainMessageEffectFailureError(reconciled);
+        }
+      }
+
       throw new RetryableDomainMessageEffectError(effectId, activeRecord.attempt, error);
     }
   }
