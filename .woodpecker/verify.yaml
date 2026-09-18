@@ -5,7 +5,7 @@ when:
 
 clone:
   - name: git
-    image: woodpeckerci/plugin-git
+    image: /usr/local/bin/plugin-git
     settings:
       partial: false
       depth: 1
@@ -14,7 +14,7 @@ clone:
 
 steps:
   - name: verify
-    image: bash
+    image: /usr/bin/bash
     commands:
       - node --version
       - npm --version
