@@ -14,6 +14,7 @@ import {
   HAPPY_INPUT,
   PORTABLE_RUNTIME_FIXTURE,
   QUOTE_PAYLOAD,
+  RACE_ADDRESS,
 } from './fixtures.ts';
 import { assertSemanticEqual } from './semantic.ts';
 
@@ -22,6 +23,7 @@ export interface ConformanceReport {
   fixture: string;
   observations: {
     happy: unknown;
+    dedupRace: unknown;
     failure: unknown;
   };
 }
@@ -87,6 +89,36 @@ const EXPECTED_REPORT: ConformanceReport = {
         },
       ],
     },
+    dedupRace: {
+      opened: raceInstance({ lifecycle: 'waiting', stateRevision: 0, state: { phase: 'draft', total: null } }),
+      outcomes: [
+        raceAcceptance('accepted', 'msg-race-001', 1),
+        raceAcceptance('duplicate', 'msg-race-001', 1),
+      ],
+      afterSettle: raceInstance({
+        lifecycle: 'waiting',
+        stateRevision: 1,
+        state: { phase: 'quoted', total: 42 },
+      }),
+      disposition: {
+        kind: 'message-disposition',
+        value: {
+          messageId: 'msg-race-001',
+          target: RACE_ADDRESS,
+          targetSequence: 1,
+          disposition: 'processed',
+          correlationId: 'corr-race-001',
+        },
+      },
+      tools: [
+        {
+          toolId: 'quote-total',
+          effect: 'none',
+          input: QUOTE_PAYLOAD,
+          output: { total: 42 },
+        },
+      ],
+    },
     failure: {
       opened: failureInstance({ lifecycle: 'waiting', stateRevision: 0, state: { phase: 'draft', total: null } }),
       failAccepted: failureAcceptance('accepted', 'msg-fail-001', 1),
@@ -144,6 +176,7 @@ export async function collectConformanceReport(host: RuntimeConformanceHost): Pr
     fixture: PORTABLE_RUNTIME_FIXTURE.id,
     observations: {
       happy: await collectHappyPath(host),
+      dedupRace: await collectDedupRace(host),
       failure: await collectFailurePath(host),
     },
   };
@@ -234,6 +267,47 @@ async function collectHappyPath(host: RuntimeConformanceHost): Promise<unknown> 
   }
 }
 
+async function collectDedupRace(host: RuntimeConformanceHost): Promise<unknown> {
+  const session = await host.createSession(PORTABLE_RUNTIME_FIXTURE);
+  try {
+    const opened = await session.openInstance({
+      address: RACE_ADDRESS,
+      correlationId: 'corr-race-001',
+      input: HAPPY_INPUT,
+    });
+    const message = {
+      messageId: 'msg-race-001',
+      target: RACE_ADDRESS,
+      type: 'quote',
+      payload: QUOTE_PAYLOAD,
+      correlationId: 'corr-race-001',
+      contractVersion: PORTABLE_RUNTIME_FIXTURE.messageContractVersion,
+    } as const;
+
+    const outcomes = sortAcceptanceOutcomes(
+      await Promise.all([session.send(message), session.send(message)]),
+    );
+    await session.settle(RACE_ADDRESS);
+
+    const afterSettle = requireInstance(await session.query({ kind: 'instance', target: RACE_ADDRESS }));
+    const disposition = await session.query({
+      kind: 'message-disposition',
+      target: RACE_ADDRESS,
+      messageId: message.messageId,
+    });
+
+    return {
+      opened,
+      outcomes,
+      afterSettle,
+      disposition,
+      tools: await session.toolInvocations(),
+    };
+  } finally {
+    await session.dispose();
+  }
+}
+
 async function collectFailurePath(host: RuntimeConformanceHost): Promise<unknown> {
   const session = await host.createSession(PORTABLE_RUNTIME_FIXTURE);
   try {
@@ -299,6 +373,14 @@ function acceptance(
   return { status, messageId, target: HAPPY_ADDRESS, targetSequence };
 }
 
+function raceAcceptance(
+  status: 'accepted' | 'duplicate',
+  messageId: string,
+  targetSequence: number,
+): MessageAcceptanceObservation {
+  return { status, messageId, target: RACE_ADDRESS, targetSequence };
+}
+
 function failureAcceptance(
   status: 'accepted' | 'duplicate',
   messageId: string,
@@ -307,8 +389,19 @@ function failureAcceptance(
   return { status, messageId, target: FAILURE_ADDRESS, targetSequence };
 }
 
+function sortAcceptanceOutcomes(
+  outcomes: readonly MessageAcceptanceObservation[],
+): MessageAcceptanceObservation[] {
+  const order = { accepted: 0, duplicate: 1, rejected: 2 } as const;
+  return [...outcomes].sort((left, right) => order[left.status] - order[right.status]);
+}
+
 function instance(input: Omit<InstanceObservation, 'address' | 'correlationId'>): InstanceObservation {
   return { address: HAPPY_ADDRESS, correlationId: 'corr-happy-001', ...input };
+}
+
+function raceInstance(input: Omit<InstanceObservation, 'address' | 'correlationId'>): InstanceObservation {
+  return { address: RACE_ADDRESS, correlationId: 'corr-race-001', ...input };
 }
 
 function failureInstance(input: Omit<InstanceObservation, 'address' | 'correlationId'>): InstanceObservation {
