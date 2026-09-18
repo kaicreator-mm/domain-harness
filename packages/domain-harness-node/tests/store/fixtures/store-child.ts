@@ -8,6 +8,13 @@ if (!mode || !databasePath || !instanceKey) {
 
 const target = { workflowId: 'conformance', instanceKey };
 
+if (mode === 'open') {
+  const store = new NodeSqliteRuntimeStore({ path: databasePath, busyTimeoutMs: 10_000 });
+  process.stdout.write('opened\n');
+  store.close();
+  process.exit(0);
+}
+
 if (mode === 'accept') {
   if (!messageId) throw new Error('accept requires messageId');
   const store = new NodeSqliteRuntimeStore({ path: databasePath, busyTimeoutMs: 10_000 });
@@ -19,7 +26,7 @@ if (mode === 'accept') {
   });
   process.stdout.write(`${JSON.stringify(ack)}\n`);
   store.close();
-  process.exitCode = 0;
+  process.exit(0);
 }
 
 if (mode === 'accept-crash') {

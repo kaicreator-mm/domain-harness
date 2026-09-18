@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   makeConformanceInstance,
@@ -45,6 +48,23 @@ function parseAck(result: ChildResult): MessageAcceptedAck {
   assert.equal(result.code, 0, result.stderr);
   return JSON.parse(result.stdout.trim()) as MessageAcceptedAck;
 }
+
+test('G5 concurrent fresh-store initialization serializes migrations safely', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'domain-harness-t003-init-race-'));
+  const databasePath = join(directory, 'runtime.sqlite');
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+
+  const results = await Promise.all(
+    Array.from({ length: 8 }, (_, index) =>
+      runChild('open', databasePath, `unused-${index + 1}`, 'unused'),
+    ),
+  );
+
+  for (const result of results) {
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'opened');
+  }
+});
 
 test('G5 concurrency race deduplicates one messageId to one durable sequence', async (t) => {
   const { store, databasePath } = makeTestStore(t, 10_000);
