@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   makeConformanceInstance,
 } from '../../../domain-harness/tests/helpers/runtime-store-conformance.ts';
@@ -26,7 +27,7 @@ function runChild(
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--import', 'tsx', fixtureUrl.pathname, mode, databasePath, instanceKey, messageId],
+      ['--import', 'tsx', fileURLToPath(fixtureUrl), mode, databasePath, instanceKey, messageId],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let stdout = '';

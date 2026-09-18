@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   makeConformanceAddress,
   makeConformanceInstance,
@@ -23,7 +24,7 @@ function runCrashChild(
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--import', 'tsx', fixtureUrl.pathname, mode, databasePath, instanceKey, messageId],
+      ['--import', 'tsx', fileURLToPath(fixtureUrl), mode, databasePath, instanceKey, messageId],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let stdout = '';
