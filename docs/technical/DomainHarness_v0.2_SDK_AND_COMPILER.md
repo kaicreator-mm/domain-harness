@@ -96,7 +96,11 @@ The build flow is:
 
 The Raw loader currently accepts the v0.1 authoring schema (`harness.yaml.schemaVersion: "0.1"`). This is an authoring/build compatibility path, not a runtime compatibility shim.
 
+For a Raw Package with Tool invokes, use one authoritative build-time Tool-definition set: pass its Tool ids through `registeredTools` while loading, then pass the matching `RawToolDefinition[]` through `tools` when compiling. Registering a Tool name during Raw loading does not by itself create a compiled Tool descriptor.
+
 ### 3.1 Package-root build example
+
+The minimal example below assumes the Raw Package contains no Tool invokes. Packages with Tools must additionally follow the Tool-definition rule above.
 
 ```ts
 import { writeFile } from 'node:fs/promises';
@@ -109,7 +113,6 @@ import {
 
 const raw = await loadRawDomainPackage({
   root: './domain-package',
-  registeredTools: new Set(['save_record']),
 });
 
 const target = {
