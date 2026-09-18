@@ -18,7 +18,8 @@ export class ExpoScriptExecutor {
 
   async execute(request: ScriptExecutionRequest): Promise<JsonValue> {
     assertBinding(request.binding.kind, request.binding.bindingId);
-    const execute = this.modules[request.binding.bindingId];
+    const hasBinding = Object.prototype.hasOwnProperty.call(this.modules, request.binding.bindingId);
+    const execute = hasBinding ? this.modules[request.binding.bindingId] : undefined;
     if (execute === undefined) {
       throw new ScriptExecutorError(
         'binding_not_found',
