@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -19,24 +19,44 @@ function run(command: string, args: readonly string[], cwd: string): string {
   });
 }
 
+function runNpm(args: readonly string[], cwd: string): string {
+  if (process.platform !== 'win32') {
+    return run('npm', args, cwd);
+  }
+  // Windows resolves npm to npm.cmd and Node refuses to spawn batch files
+  // without a shell, so build one quoted command line for the shell; passing
+  // the quoted string directly (instead of spawn args) keeps paths with
+  // spaces intact without the deprecated args+shell combination.
+  const command = ['npm.cmd', ...args.map((arg) => `"${arg}"`)].join(' ');
+  return execFileSync(command, {
+    cwd,
+    encoding: 'utf8',
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 16 * 1024 * 1024,
+    shell: true,
+  });
+}
+
 test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-t016-consumer-'));
   const packDirectory = join(root, 'packs');
   const consumerDirectory = join(root, 'consumer');
 
   try {
-    run('mkdir', ['-p', packDirectory, consumerDirectory], REPO_ROOT);
+    mkdirSync(packDirectory, { recursive: true });
+    mkdirSync(consumerDirectory, { recursive: true });
 
-    run('npm', ['run', 'build', '-w', '@kaicreator/domain-harness'], REPO_ROOT);
-    run('npm', ['run', 'build', '-w', '@kaicreator/domain-harness-node'], REPO_ROOT);
-    run('npm', ['run', 'build', '-w', '@kaicreator/domain-harness-expo'], REPO_ROOT);
+    runNpm(['run', 'build', '-w', '@kaicreator/domain-harness'], REPO_ROOT);
+    runNpm(['run', 'build', '-w', '@kaicreator/domain-harness-node'], REPO_ROOT);
+    runNpm(['run', 'build', '-w', '@kaicreator/domain-harness-expo'], REPO_ROOT);
 
     for (const workspace of [
       '@kaicreator/domain-harness',
       '@kaicreator/domain-harness-node',
       '@kaicreator/domain-harness-expo',
     ]) {
-      run('npm', ['pack', '--workspace', workspace, '--pack-destination', packDirectory], REPO_ROOT);
+      runNpm(['pack', '--workspace', workspace, '--pack-destination', packDirectory], REPO_ROOT);
     }
 
     const tarballs = readdirSync(packDirectory)
@@ -51,8 +71,7 @@ test('T-016 package consumer: packed core/node/expo expose the public v0.2 API t
       type: 'module',
     }, null, 2));
 
-    run(
-      'npm',
+    runNpm(
       [
         'install',
         '--ignore-scripts',
