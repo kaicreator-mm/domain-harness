@@ -5,6 +5,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": ["dist"],
   "engines": {
     "node": ">=22"
@@ -12,6 +18,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run typecheck"
+    "test": "npm run build && node --import tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "jsonata": "^2.2.2",
+    "yaml": "^2.0.0"
   }
 }
