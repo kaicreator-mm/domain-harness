@@ -146,9 +146,9 @@ function translateScriptState(
   const tool: CompiledToolDescriptor = {
     toolId,
     outputSchema: {},
-    // v0.1 restarts unresolved Script Steps after a crash. `idempotent` preserves
-    // that retry contract without claiming the trusted Script is side-effect free.
-    effect: 'idempotent',
+    // Frozen v0.1 Script is deterministic trusted code with no external I/O.
+    // `none` preserves that contract while retaining replay after interruption.
+    effect: 'none',
     execution: {
       kind: 'script',
       bindingId,
