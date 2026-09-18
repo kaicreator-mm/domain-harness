@@ -121,6 +121,16 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
+async function eventually<T>(read: () => Promise<T | null>, timeoutMs = 3_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const value = await read();
+    if (value !== null) return value;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`condition did not converge within ${timeoutMs}ms`);
+}
+
 test('G21/G27/G28: retained instance stays on A, new instance uses B, and incompatible B→A input rejects before ACK', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'domain-harness-t022-upgrade-'));
   const store = new NodeSqliteRuntimeStore({ path: join(directory, 'runtime.sqlite') });
@@ -185,6 +195,16 @@ test('G21/G27/G28: retained instance stays on A, new instance uses B, and incomp
   });
   assert.equal(compatibleAck.status, 'accepted');
   assert.equal(compatibleAck.packageId, PACKAGE_A);
+
+  await eventually(async () => {
+    const disposition = await runtime.query({
+      kind: 'message-disposition',
+      target: retainedTarget,
+      messageId: 'explicit-v1-to-retained-a',
+    });
+    if (disposition.kind !== 'message-disposition') return null;
+    return disposition.value?.disposition === 'processed' ? disposition.value : null;
+  });
 });
 
 test('G28: restart activation fails closed when a retained package pin is absent from the new registry', async (t) => {
@@ -244,6 +264,40 @@ test('G29: incompatible target package fails activation before any workflow can 
     (error: unknown) => {
       assert.equal(errorCode(error), 'INCOMPATIBLE_PACKAGE');
       assert.match(error instanceof Error ? error.message : String(error), /incompatible with this runtime\/host/i);
+      return true;
+    },
+  );
+
+  assert.deepEqual(await store.listPinnedPackageIds(), []);
+});
+
+test('G29: corrupt package identity fails activation before any workflow can execute', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'domain-harness-t022-corrupt-'));
+  const store = new NodeSqliteRuntimeStore({ path: join(directory, 'runtime.sqlite') });
+  t.after(() => {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const validB = packageB();
+  const corrupt: TargetCompiledDomainPackage = {
+    ...validB,
+    manifest: {
+      ...validB.manifest,
+      packageId: PACKAGE_BAD,
+    },
+  };
+  const registry = new StaticPackageRegistry([corrupt], PACKAGE_BAD);
+
+  await assert.rejects(
+    createNodeDomainRuntime({
+      packageRegistry: registry,
+      store,
+      bindings: hostBindings(),
+    }),
+    (error: unknown) => {
+      assert.equal(errorCode(error), 'PACKAGE_ID_MISMATCH');
+      assert.match(error instanceof Error ? error.message : String(error), /identity does not match/i);
       return true;
     },
   );
