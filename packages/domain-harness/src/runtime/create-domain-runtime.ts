@@ -178,11 +178,17 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   });
 
   const drains = new Map<string, Promise<void>>();
+  const drainRequested = new Set<string>();
   let runtimeWorkflow: CompiledWorkflowRuntime;
 
   const scheduleDrain = (target: WorkflowAddress): void => {
     const key = addressKey(target);
-    if (drains.has(key)) return;
+    if (drains.has(key)) {
+      // Preserve the wake-up. The active drain may already have observed an empty
+      // mailbox; dropping this signal would strand an accepted message.
+      drainRequested.add(key);
+      return;
+    }
     const drain = Promise.resolve()
       .then(() => drainMailbox(target))
       .catch((error: unknown) => {
@@ -191,7 +197,9 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         }
       })
       .finally(() => {
-        if (drains.get(key) === drain) drains.delete(key);
+        if (drains.get(key) !== drain) return;
+        drains.delete(key);
+        if (drainRequested.delete(key)) scheduleDrain(target);
       });
     drains.set(key, drain);
   };
