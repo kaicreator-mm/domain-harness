@@ -6,7 +6,6 @@ import type {
 import type { Sha256Port } from '../../v2/contracts/host.js';
 import type { CompiledToolDescriptor } from '../../v2/contracts/package.js';
 import type { RuntimeStore } from '../../v2/contracts/store.js';
-import type { WorkflowAddress } from '../../v2/contracts/workflow.js';
 import {
   assertCompatibleEffectRecord,
   type ExpectedEffectJournalIdentity,
@@ -205,25 +204,28 @@ export class DurableToolRunner {
         throw new Error(`completeEffect returned ${completed.status} for ${effectId}`);
       }
       return completedResult(completed, replayed);
-    } catch (error) {
+    } catch (completeError) {
+      let reconciled: EffectJournalRecord | null = null;
       try {
-        const reconciled = await this.#store.getEffect(effectId);
-        if (reconciled !== null) {
-          assertCompatibleEffectRecord(reconciled, expected);
-          if (reconciled.status === 'completed') return completedResult(reconciled, true);
-          if (reconciled.status === 'failed') throw new JournaledToolFailureError(reconciled);
-          if (request.descriptor.effect === 'non-idempotent') {
-            return recoveryRequired(reconciled);
-          }
+        reconciled = await this.#store.getEffect(effectId);
+      } catch {
+        // The outcome of the journal commit is itself unknown. Fall through to the
+        // frozen recovery policy; never infer that a non-idempotent effect is safe.
+      }
+
+      if (reconciled !== null) {
+        assertCompatibleEffectRecord(reconciled, expected);
+        if (reconciled.status === 'completed') return completedResult(reconciled, true);
+        if (reconciled.status === 'failed') throw new JournaledToolFailureError(reconciled);
+        if (request.descriptor.effect === 'non-idempotent') {
+          return recoveryRequired(reconciled);
         }
-      } catch (reconcileError) {
-        if (reconcileError instanceof JournaledToolFailureError) throw reconcileError;
       }
 
       if (request.descriptor.effect === 'non-idempotent') {
         return recoveryRequired(activeRecord);
       }
-      throw new RetryableToolExecutionError(effectId, activeRecord.attempt, error);
+      throw new RetryableToolExecutionError(effectId, activeRecord.attempt, completeError);
     }
   }
 }
