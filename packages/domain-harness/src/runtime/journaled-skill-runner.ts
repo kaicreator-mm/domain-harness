@@ -75,9 +75,9 @@ export class JournaledSkillRunner {
       target: request.target,
       sourceMessageId: request.sourceMessageId,
       effectKind: `skill:${skill.skillId}`,
-      // Skill execution is semantically distinct from a Domain Tool side effect.
-      // A started-but-uncommitted AI operation is retryable, matching v0.1 Step
-      // recovery; a completed structured result is replayed from the durable journal.
+      // Skill execution remains semantically distinct from a Domain Tool side
+      // effect. A started-but-uncommitted AI operation is retryable, matching
+      // v0.1 Step recovery; a completed structured result is replayed durably.
       effectSemantics: 'none',
       input,
     };
@@ -122,7 +122,7 @@ export class JournaledSkillRunner {
       throw new Error(`Skill effect ${effectId} has a committed failed journal fact`);
     }
 
-    const output = await this.execute(skill, input, effectId, record.attempt, request.timeoutMs);
+    const output = await this.execute(skill, input, request, effectId, record.attempt);
 
     try {
       const completed = await this.#store.completeEffect({
@@ -158,21 +158,20 @@ export class JournaledSkillRunner {
   private async execute(
     skill: CompiledSkillDefinition,
     input: JsonValue,
+    request: RunSkillRequest,
     effectId: string,
     attempt: number,
-    timeoutMs: number | undefined,
   ): Promise<JsonValue> {
+    const timeoutMs = request.timeoutMs;
     if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
       throw new Error(`Skill '${skill.skillId}' timeoutMs must be greater than zero`);
     }
 
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let timeoutReject: ((reason?: unknown) => void) | undefined;
     const timeout = timeoutMs === undefined
       ? undefined
       : new Promise<never>((_resolve, reject) => {
-          timeoutReject = reject;
           timer = setTimeout(() => {
             const error = new Error(`Skill '${skill.skillId}' exceeded ${timeoutMs}ms`);
             controller.abort(error);
@@ -184,8 +183,11 @@ export class JournaledSkillRunner {
       const operation = this.#ai.execute({
         identity: {
           runId: effectId,
-          workflowInstanceId: `${requestAddressPart(effectId, 'workflow')}`,
-          stepId: effectId,
+          workflowInstanceId: JSON.stringify([
+            request.target.workflowId,
+            request.target.instanceKey,
+          ]),
+          stepId: request.workflowStepIdentity,
           attempt,
         },
         skillId: skill.skillId,
@@ -205,7 +207,6 @@ export class JournaledSkillRunner {
       );
     } finally {
       if (timer !== undefined) clearTimeout(timer);
-      timeoutReject = undefined;
     }
   }
 }
@@ -252,10 +253,4 @@ function validateCompiledSkill(skill: CompiledSkillDefinition): CompiledSkillDef
 
 function isSchema(value: unknown): value is JsonSchema {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-// AI Runtime treats identity as an opaque tracing/idempotency tuple. The durable
-// effectId is the stable operation identity; no Raw Package/run object is needed.
-function requestAddressPart(effectId: string, _part: 'workflow'): string {
-  return effectId;
 }
