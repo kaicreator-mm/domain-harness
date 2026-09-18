@@ -1,11 +1,11 @@
 # DomainHarness v0.1 → v0.2 Migration Guide
 
 **Status:** ACTIVE for the v0.2 integration line  
-**API audit baseline:** `7a5736a1deea6bc165da6b9e1d36fc3be4ccc2bf`
+**API audit baseline:** `608d3e67c28d32381949b7fe1597b455147f3a3f`
 
 v0.2 is not a rename of the v0.1 Run API. It changes the application boundary from a Node-only runtime that loads a Raw Harness at startup to a portable Runtime that activates an already Target Compiled Domain Package.
 
-This guide covers application API migration plus the two v0.1 authoring cases that most easily produce false assumptions: `expr` and `script`.
+This guide covers application API migration plus the two v0.1 authoring cases most likely to produce false assumptions: `expr` and `script`.
 
 ## 1. Migration in one picture
 
@@ -23,8 +23,8 @@ v0.2:
 ```text
 Build / CI
   Raw Domain Package
-  -> compiler + Target Host Profile
-  -> generated Target Compiled Domain Package
+  -> @kaicreator/domain-harness-compiler
+  -> Target Compiled Domain Package
 
 App startup
   generated package import
@@ -38,7 +38,23 @@ App startup
 
 The migration must not reintroduce a compatibility shim that recompiles a Raw Package at application startup.
 
-## 2. Application API map
+## 2. Compiler migration
+
+Use the merged compiler package root during build/CI:
+
+```ts
+import {
+  loadRawDomainPackage,
+  compileDomainPackage,
+  emitTargetCompiledPackageModule,
+} from '@kaicreator/domain-harness-compiler';
+```
+
+Do not import compiler `src/**` or `dist/**` paths. The public package root and its exported public types are the supported consumer contract.
+
+Compiler output is an application build artifact. Runtime startup imports that generated Target Compiled Domain Package and never receives a Raw Package root.
+
+## 3. Application API map
 
 | v0.1 | v0.2 | Migration note |
 | --- | --- | --- |
@@ -48,13 +64,13 @@ The migration must not reintroduce a compatibility shim that recompiles a Raw Pa
 | `send(runId, { type, payload })` | `send({ messageId, target, type, payload, ... })` | Message acceptance is durable and explicitly deduplicated by caller identity. |
 | `wait(runId)` | `query(...)` and/or `subscribe(...)+query(...)` | No blocking “wait until settled” interaction contract. |
 | `get(runId)` | `query({ kind: 'instance', target })` | Read by stable Workflow Address. |
-| `listRuns()` | no generic public instance-list API | Keep business collections/indexes in the application; DomainHarness is not a query database. |
-| `resume(runId)` | no general public resume equivalent | Durable runtime recovery/rehydration is internal; `recover()` is for explicit `recovery_required` handling. |
-| `cancel(runId)` | no general public cancel method | Model domain/application cancellation as a declared Durable Domain Message when required. `recover({ action: 'terminate' })` applies to recovery handling, not arbitrary active-instance cancellation. |
+| `listRuns()` | no generic public instance-list API | Keep business collections/indexes in the application. |
+| `resume(runId)` | no general public resume equivalent | `recover()` is for explicit `recovery_required` handling. |
+| `cancel(runId)` | no general public cancel method | Model business cancellation as a declared Durable Domain Message when required. |
 | `definitionHash` | `packageId` | v0.2 pins an immutable Target Compiled Package identity. |
-| `running/waiting/completed/failed/cancelled` | `active/waiting/recovery_required/completed/failed/cancelled/terminated` | Update UI/state handling; do not collapse `recovery_required` into ordinary failure. |
+| `running/waiting/completed/failed/cancelled` | `active/waiting/recovery_required/completed/failed/cancelled/terminated` | Handle `recovery_required` explicitly. |
 
-## 3. Factory migration
+## 4. Factory migration
 
 ### v0.1
 
@@ -71,7 +87,7 @@ const runtime = await createDomainHarness({
 
 ### v0.2 Node
 
-Compilation happens before this code runs. The application imports the generated module:
+Compilation happens before this code runs:
 
 ```ts
 import compiledPackage from './generated/domain-package.node.js';
@@ -107,9 +123,7 @@ const runtime = await createNodeDomainRuntime({
 
 For Expo, replace the host package/store/factory with `openExpoSqliteRuntimeStore()` + `createExpoDomainRuntime()`; the portable Runtime interaction API stays the same.
 
-## 4. Identity migration: `runId` → `WorkflowAddress`
-
-Do not replace an opaque `runId` with another random opaque id without considering the new addressing model.
+## 5. Identity migration: `runId` → `WorkflowAddress`
 
 Prefer a stable application-owned instance key:
 
@@ -128,7 +142,7 @@ await runtime.openInstance({
 
 The application/domain layer still owns what `orderId` means and where the authoritative order is stored.
 
-## 5. Event migration: v0.1 `send` → Durable Domain Message
+## 6. Event migration: v0.1 `send` → Durable Domain Message
 
 v0.1:
 
@@ -160,9 +174,7 @@ Migration rules:
 - Query message disposition or Workflow Instance state to observe the result;
 - do not recreate Durable Domain Message as a generic event bus/topic system.
 
-## 6. Read/wait migration
-
-v0.1 code often used `wait()` to block until waiting/terminal state. v0.2 separates observation from mutation.
+## 7. Read/wait migration
 
 One-time read:
 
@@ -183,13 +195,11 @@ const unsubscribe = runtime.subscribe(
 
 Subscription is a change signal and may coalesce. Never rebuild authoritative state by replaying subscription callbacks.
 
-## 7. v0.1 `expr` migration
+## 8. v0.1 `expr` migration
 
-### 7.1 What remains compatible
+### 8.1 What remains compatible
 
-The v0.2 build-time Raw loader still understands v0.1 authoring `invoke.expr`, and the compiler emits a compiled expression invoke. The portable Runtime executes that expression through `RuntimeHostBindings.expression`.
-
-Example authoring input:
+The v0.2 build-time Raw loader understands v0.1 authoring `invoke.expr`, and the compiler emits a compiled expression invoke. Runtime executes that expression through `RuntimeHostBindings.expression`.
 
 ```yaml
 normalize:
@@ -200,21 +210,21 @@ normalize:
       - target: completed
 ```
 
-This remains an expression invoke after target compilation; no Raw YAML is parsed at Runtime startup.
+No Raw YAML is parsed at Runtime startup.
 
-### 7.2 What must be reviewed: expression scope changed
+### 8.2 Expression scope must be reviewed
 
 Do **not** assume a syntactically valid v0.1 JSONata expression is semantically unchanged.
 
-v0.1 commonly exposed:
+Common v0.1 scope included:
 
 ```text
 input
 steps.<stateId>
 run.visits.<stateId>
-output       (done-route scope)
-error        (error-route scope)
-event        (waiting-event route scope)
+output
+event
+error
 ```
 
 The merged v0.2 Runtime scope is centered on the persistent Workflow Instance:
@@ -231,35 +241,24 @@ address.instanceKey
 correlationId
 packageId
 stateRevision
-message      (while processing a Domain Message)
-error        (error-route handling)
+message
+error
 ```
 
-Therefore migrate expressions such as:
+Audit and rewrite references such as `steps.*`, `run.visits.*`, `output.*`, and `event.*` against the v0.2 Workflow model. Do not mechanically rewrite `steps.*` to `result`; v0.2 does not expose the old accumulated Step-output map. If later states require earlier data, model that data explicitly.
 
-```text
-steps.normalize
-output.score
-event.payload.approvedBy
-run.visits.retry_state
-```
+Expression migration checklist:
 
-by rewriting them against the v0.2 scope/Workflow model. Typical replacements depend on domain intent, for example `result.score` for the latest invoke result or `message.approvedBy` for the current Domain Message payload.
+- expression parses during build-time validation;
+- every referenced scope name exists in v0.2;
+- route predicates still return strict booleans;
+- no external I/O is introduced into expression evaluation;
+- deterministic logical-time behavior is preserved;
+- representative message/route behavior is tested.
 
-Do not mechanically rewrite `steps.*` to `result`: v0.2 does not expose the old accumulated Step-output map. If later steps require earlier data, model the needed data explicitly in the Workflow/domain contract rather than relying on a removed incidental scope.
+## 9. v0.1 `script` migration
 
-### 7.3 Expression migration checklist
-
-- [ ] expression still parses during build-time compiler validation;
-- [ ] every referenced scope name exists in v0.2;
-- [ ] route predicates still return strict booleans;
-- [ ] no external I/O is introduced into expression evaluation;
-- [ ] deterministic logical-time behavior is preserved;
-- [ ] tests exercise at least one real message/route using the rewritten expression.
-
-## 8. v0.1 `script` migration
-
-### 8.1 No direct top-level Script compatibility
+### 9.1 No direct top-level Script runtime compatibility
 
 A v0.1 Workflow may contain:
 
@@ -273,24 +272,13 @@ normalize:
       - target: completed
 ```
 
-The v0.2 Raw loader can still read/freeze that source during build, but **the portable v0.2 Runtime explicitly does not execute top-level `kind: 'script'` invokes**. Script execution in v0.2 belongs behind a target-compiled **Domain Tool**.
+The v0.2 Raw loader can freeze that source during build, but the portable v0.2 Runtime does not execute top-level `kind: 'script'` invokes. Script execution belongs behind a target-compiled **Domain Tool**.
 
-Do not ship a compiled package that relies on a top-level Script invoke and expect Runtime compatibility.
+Do not ship a compiled package that relies on a top-level Script invoke and assume runtime compatibility.
 
-### 8.2 Convert the Script to a Domain Tool
+### 9.2 Convert the Script to a Domain Tool
 
-Define a build-time tool contract with:
-
-```text
-toolId
-input/output schema
-effect semantics
-executionKind: script
-required capability: script-execution@1
-binding capability: script-execution@1
-```
-
-Compiler-side shape:
+Compiler-side tool shape:
 
 ```ts
 const normalizeTool = {
@@ -304,7 +292,7 @@ const normalizeTool = {
 } as const;
 ```
 
-Then change the Workflow authoring from top-level `script` to `tool`:
+Change Workflow authoring from top-level `script` to `tool`:
 
 ```yaml
 normalize:
@@ -316,23 +304,19 @@ normalize:
       - target: completed
 ```
 
-Supply the tool definition to the compiler and provide the target's real script binding artifact/module. At Runtime, Node may use `NodeScriptExecutor`; Expo may use `ExpoScriptExecutor`. Both execute statically registered target-compiled code rather than compiling/evaluating Raw TypeScript source at startup.
+Supply the tool definition to the compiler and provide the target's actual script binding artifact/module. At Runtime, Node may use `NodeScriptExecutor`; Expo may use `ExpoScriptExecutor`. Both execute statically registered target-compiled code rather than compiling/evaluating Raw TypeScript source at startup.
 
-### 8.3 Choose effect semantics deliberately
-
-Do not copy `effect: none` from the example unless the script truly has no external side effect.
-
-Use:
+### 9.3 Choose effect semantics deliberately
 
 ```text
-none            -> no external side effect; safe to re-execute when required by recovery
-idempotent      -> may have an effect, but the external system can deduplicate the repeated logical invocation
-non-idempotent  -> ambiguous interruption must enter recovery_required; no blind retry
+none            -> no external side effect
+idempotent      -> repeated logical invocation can be externally deduplicated/repeated safely
+non-idempotent  -> ambiguous interruption enters recovery_required; no blind retry
 ```
 
-A Script Domain Tool must obey the same durable effect/recovery contract as any other Domain Tool.
+Do not copy `effect: none` unless it is true for the domain operation.
 
-## 9. v0.1 host Tool migration
+## 10. v0.1 host Tool migration
 
 v0.1 registered host functions directly in `createDomainHarness({ tools })`. v0.2 separates:
 
@@ -345,29 +329,29 @@ Runtime endpoint/credential/session
         -> Runtime Resources
 ```
 
-Migration should therefore move tool schemas/effect semantics into compile-time Domain Tool definitions while keeping live clients, tokens, database handles, and endpoints outside the compiled package.
+Move tool schemas/effect semantics into compile-time Domain Tool definitions while keeping live clients, tokens, database handles, and endpoints outside the compiled package.
 
-## 10. Child Workflow note
+## 11. Child Workflow note
 
-v0.1 supported top-level `invoke.workflow`. The merged portable v0.2 Runtime does not execute top-level child-Workflow invokes. Cross-Workflow interaction is modeled as a durable Domain Message effect to another addressed Workflow Instance.
+v0.1 supported top-level `invoke.workflow`. The portable v0.2 Runtime does not execute top-level child-Workflow invokes. Cross-Workflow interaction is modeled as a durable Domain Message effect to another addressed Workflow Instance.
 
-If a v0.1 package uses child workflows, treat that as an explicit workflow-model migration rather than assuming compiler output alone preserves behavior.
+Treat existing child workflows as an explicit workflow-model migration rather than assuming compiler output alone preserves behavior.
 
-## 11. Persistence/state migration
+## 12. Persistence/state migration
 
-The Frozen v0.2 product scope does not require arbitrary active v0.1 Run state to become an active v0.2 Workflow Instance.
+v0.2 does not require arbitrary active v0.1 Run state to become an active v0.2 Workflow Instance.
 
-Recommended migration:
+Recommended approach:
 
-1. keep v0.1 persisted data available for historical/audit needs according to the application retention policy;
-2. create new v0.2 storage through the selected host RuntimeStore;
-3. start new v0.2 Workflow Instances using stable addresses and compiled package pins;
-4. migrate business state in the authoritative business system, not by copying it into DomainHarness persistence;
-5. only add bespoke historical conversion tooling when the domain has a concrete requirement.
+1. retain v0.1 persisted data for historical/audit needs according to application policy;
+2. create v0.2 storage through the selected host RuntimeStore;
+3. start new v0.2 Workflow Instances with stable addresses and compiled package pins;
+4. migrate business state in the authoritative business system, not into DomainHarness persistence;
+5. add bespoke historical conversion tooling only for a concrete domain requirement.
 
 Do not make v0.2 startup read/upgrade a Raw v0.1 Harness as an implicit runtime migration step.
 
-## 12. Package pin migration/deployment
+## 13. Package pin migration/deployment
 
 v0.2 instances persist `packageId`. On upgrade:
 
@@ -376,31 +360,32 @@ v0.2 instances persist `packageId`. On upgrade:
 - fail closed if a retained package pin is missing;
 - do not reinterpret old instance state under the newest package automatically.
 
-## 13. Migration verification checklist
+## 14. Migration verification checklist
 
 ### Build
 
 - [ ] Raw Package is compiled during build/CI, not app startup.
-- [ ] target capabilities are checked and required binding artifact content is present.
+- [ ] compiler imports come from `@kaicreator/domain-harness-compiler` package root.
+- [ ] no compiler `src/**` or `dist/**` deep import is used as public API.
+- [ ] target capabilities and immutable binding artifact content are checked.
 - [ ] generated package contains no credentials/runtime handles.
-- [ ] external compiler imports match the exact pinned compiler packaging; do not invent root exports.
 
 ### Application API
 
-- [ ] `runId` usage replaced with a stable `WorkflowAddress` mapping.
+- [ ] `runId` usage is replaced with a stable `WorkflowAddress` mapping.
 - [ ] state changes use Durable Domain Messages with stable caller message ids.
-- [ ] `wait/get` flows replaced with Query/Subscription as appropriate.
+- [ ] `wait/get` flows are replaced with Query/Subscription as appropriate.
 - [ ] no fake v0.2 `listInstances`, general `resume`, or general `cancel` API was invented.
 - [ ] UI handles `recovery_required` explicitly.
 
 ### Expressions
 
-- [ ] all v0.1 `steps.*`, `run.visits.*`, `output`, and `event.*` references were audited against the v0.2 scope.
+- [ ] all v0.1 `steps.*`, `run.visits.*`, `output`, and `event.*` references were audited.
 - [ ] representative expressions/routes have executable tests.
 
 ### Scripts
 
-- [ ] every v0.1 top-level Script invoke was migrated to an explicit Script Domain Tool or otherwise redesigned.
+- [ ] every v0.1 top-level Script invoke was migrated to an explicit Script Domain Tool or redesigned.
 - [ ] effect semantics are correct.
 - [ ] target-compiled/static script module is registered for the selected host.
 - [ ] no runtime TypeScript compilation/Raw Script discovery remains.
@@ -411,9 +396,9 @@ v0.2 instances persist `packageId`. On upgrade:
 - [ ] Projection output is treated as derived/non-authoritative.
 - [ ] credentials/endpoints/sessions remain Runtime Resources or application-owned host state.
 
-## 14. Migration anti-patterns
+## 15. Migration anti-patterns
 
-Reject these patterns during review:
+Reject these patterns:
 
 ```text
 createDomainRuntime({ rawRoot: ... })
@@ -421,10 +406,11 @@ runtime.loadHarness(...)
 runtime.compile(...)
 startup -> scan workflows/*.yaml
 startup -> compile scripts/*.ts
+@kaicreator/domain-harness-compiler/dist/...
 subscription callbacks -> treated as durable ordered event history
 Projection -> writes authoritative business state
 latest package -> silently used for all retained instances
 v0.1 script invoke -> assumed executable in v0.2 without Domain Tool conversion
 ```
 
-The migration is complete when build-time compilation and runtime activation are cleanly separated, application interaction uses the v0.2 Instance/Message/Query/Subscription contracts, and no business-authority or generic-platform scope has leaked into DomainHarness.
+Migration is complete when build-time compilation and runtime activation are cleanly separated, application interaction uses the v0.2 Instance/Message/Query/Subscription contracts, and no business-authority or generic-platform scope leaks into DomainHarness.
