@@ -1,0 +1,38 @@
+{
+  "workflowId": "migration-script-reference",
+  "stateId": "score_band",
+  "scriptRef": "scripts/score-band.mjs",
+  "doneTarget": "completed",
+  "cases": [
+    {
+      "name": "review",
+      "input": {
+        "values": [1.25, 3.5, 2.75, 4],
+        "scale": 1.2,
+        "offset": 0.5,
+        "reviewAt": 16
+      },
+      "expectedOutput": {
+        "normalized": [2, 4.8, 4, 5.6],
+        "sum": 16.4,
+        "checksum": 4600,
+        "decision": "review"
+      }
+    },
+    {
+      "name": "auto",
+      "input": {
+        "values": [0.5, 1, 1.5],
+        "scale": 1.1,
+        "offset": 0.2,
+        "reviewAt": 8
+      },
+      "expectedOutput": {
+        "normalized": [0.75, 1.4, 2.05],
+        "sum": 4.2,
+        "checksum": 970,
+        "decision": "auto"
+      }
+    }
+  ]
+}
