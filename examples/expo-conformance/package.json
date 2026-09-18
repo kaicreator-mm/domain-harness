@@ -6,7 +6,7 @@
   "main": "index.ts",
   "scripts": {
     "preandroid": "npm --prefix ../.. run build",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "prestart": "npm --prefix ../.. run build",
     "start": "expo start",
     "typecheck": "tsc --noEmit",
