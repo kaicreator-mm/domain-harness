@@ -142,18 +142,29 @@ test('G32/AC-44: frozen v0.1 Script and generated v0.2 Script Domain Tool have e
   }
 });
 
-test('translation identity is deterministic, relocation-stable, and content-addressed', () => {
+test('translation identity is deterministic, relocation-stable, source-addressed, and independent of call-site metadata', () => {
   const first = translate();
   const second = translate();
   const relocated = translate(rawPackage(resolve(FIXTURE_ROOT, '..', 'relocated-fixture')));
   const changed = translate(rawPackage(FIXTURE_ROOT, `${SCRIPT_SOURCE}\n// content identity change\n`));
+  const callsiteChangedRaw = rawPackage();
+  const callsiteInvoke = callsiteChangedRaw.workflows.get(REFERENCE.workflowId).states[REFERENCE.stateId].invoke;
+  callsiteInvoke.input = 'input';
+  callsiteInvoke.timeoutMs = 9_999;
+  const callsiteChanged = translate(callsiteChangedRaw);
+  const migratedCallsiteInvoke = callsiteChanged.raw.workflows.get(REFERENCE.workflowId).states[REFERENCE.stateId].invoke;
 
   assert.equal(first.scripts[0].toolId, second.scripts[0].toolId);
   assert.equal(first.scripts[0].bindingId, second.scripts[0].bindingId);
   assert.equal(first.scripts[0].toolId, relocated.scripts[0].toolId);
+  assert.equal(first.scripts[0].toolId, callsiteChanged.scripts[0].toolId);
+  assert.equal(first.scripts[0].bindingId, callsiteChanged.scripts[0].bindingId);
   assert.notEqual(first.scripts[0].toolId, changed.scripts[0].toolId);
   assert.equal(first.scripts[0].sourceDigest, second.scripts[0].sourceDigest);
   assert.notEqual(first.scripts[0].sourceDigest, changed.scripts[0].sourceDigest);
+  assert.equal(migratedCallsiteInvoke.kind, 'tool');
+  assert.equal(migratedCallsiteInvoke.input, 'input');
+  assert.equal(migratedCallsiteInvoke.timeoutMs, 9_999);
 });
 
 test('translation fails closed for unfrozen/mismatched source and missing target capability', () => {
