@@ -2,7 +2,10 @@ import type { DomainMessage, MessageAcceptedAck } from '../../v2/contracts/messa
 import type { PackageRegistry } from '../../v2/contracts/package.js';
 import type { RuntimeStore } from '../../v2/contracts/store.js';
 
-export type MessageAcceptanceStore = Pick<RuntimeStore, 'getInstance' | 'acceptMessage'>;
+export type MessageAcceptanceStore = Pick<
+  RuntimeStore,
+  'getInstance' | 'acceptMessage' | 'getMessageDisposition'
+>;
 export type MessageAcceptancePackageRegistry = Pick<PackageRegistry, 'get'>;
 
 export interface MessageAcceptanceDependencies {

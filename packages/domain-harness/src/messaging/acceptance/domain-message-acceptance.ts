@@ -2,7 +2,11 @@ import type { ErrorObject, ValidateFunction } from 'ajv';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 
 import type { JsonSchema, JsonValue } from '../../contracts/json.js';
-import type { DomainMessage, MessageAcceptedAck } from '../../v2/contracts/message.js';
+import type {
+  DomainMessage,
+  MessageAcceptedAck,
+  MessageDispositionSnapshot,
+} from '../../v2/contracts/message.js';
 import type {
   CompiledMessageContract,
   TargetCompiledDomainPackage,
@@ -26,6 +30,17 @@ export class DomainMessageAcceptance implements DomainMessageAcceptanceBoundary 
 
   async accept(message: DomainMessage): Promise<MessageAcceptedAck> {
     validateEnvelope(message);
+
+    // A durable (target, messageId) identity wins before target lifecycle or pinned-contract
+    // validation. This preserves idempotent retry after the target becomes terminal or enters
+    // recovery_required. RuntimeStore.acceptMessage retains the atomic duplicate re-check for
+    // races between this read and the final acceptance transaction.
+    const existing = await this.store.getMessageDisposition(message.target, message.messageId);
+    if (existing) {
+      const ack = duplicateAck(existing);
+      assertAcceptedAck(ack, message, existing.packageId);
+      return ack;
+    }
 
     const target = await this.store.getInstance(message.target);
     if (!target) {
@@ -65,7 +80,26 @@ export class DomainMessageAcceptance implements DomainMessageAcceptanceBoundary 
 
     // RuntimeStore.acceptMessage is the frozen atomic boundary that re-checks target lifecycle,
     // deduplicates, durably persists and allocates the per-target sequence before it resolves.
-    const ack = await this.store.acceptMessage(persistedMessage);
+    // If an adapter rejects during the race window after our first lookup, reconcile once against
+    // the durable identity before surfacing the error. This preserves the public duplicate
+    // contract even for an adapter that observes lifecycle before its own duplicate read.
+    let ack: MessageAcceptedAck;
+    try {
+      ack = await this.store.acceptMessage(persistedMessage);
+    } catch (error) {
+      const racedDuplicate = await this.store.getMessageDisposition(
+        persistedMessage.target,
+        persistedMessage.messageId,
+      );
+      if (!racedDuplicate) throw error;
+
+      const duplicate = duplicateAck(racedDuplicate);
+      assertAcceptedAck(duplicate, persistedMessage, racedDuplicate.packageId);
+      return duplicate;
+    }
+
+    // Store contract violations must fail closed; they are not delivery races and therefore must
+    // never be converted into a duplicate result by the reconciliation path above.
     assertAcceptedAck(ack, persistedMessage, target.packageId);
     return ack;
   }
@@ -134,6 +168,17 @@ function validateEnvelope(message: DomainMessage): void {
       'contractVersion must be a non-empty string when provided',
     );
   }
+}
+
+function duplicateAck(existing: MessageDispositionSnapshot): MessageAcceptedAck {
+  return {
+    status: 'duplicate',
+    messageId: existing.messageId,
+    target: { ...existing.target },
+    targetSequence: existing.targetSequence,
+    packageId: existing.packageId,
+    acceptedAt: existing.acceptedAt,
+  };
 }
 
 function assertTargetSnapshot(target: WorkflowInstanceSnapshot, requested: WorkflowAddress): void {
@@ -208,6 +253,7 @@ function assertAcceptedAck(
     !validStatus ||
     ack.messageId !== message.messageId ||
     !sameAddress(ack.target, message.target) ||
+    !isNonEmptyString(ack.packageId) ||
     ack.packageId !== expectedPackageId ||
     !validSequence ||
     !isNonEmptyString(ack.acceptedAt)
