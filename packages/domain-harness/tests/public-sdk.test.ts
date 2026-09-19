@@ -6,8 +6,8 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import * as sdk from '../src/index.js';
-import type { AIOperationPort, DomainHarness } from '../src/index.js';
+import * as sdk from '../src/legacy-v1/index.js';
+import type { AIOperationPort, DomainHarness } from '../src/legacy-v1/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = join(here, 'fixtures', 'basic-harness');
@@ -19,7 +19,7 @@ const ai: AIOperationPort = {
   },
 };
 
-test('package root creates an embedded Runtime and executes public lifecycle operations', async () => {
+test('frozen v0.1 legacy regression surface creates an embedded Runtime and executes lifecycle operations', async () => {
   const runtime: DomainHarness = await sdk.createDomainHarness({
     root: fixture,
     sqlitePath: ':memory:',
@@ -44,7 +44,7 @@ test('package root creates an embedded Runtime and executes public lifecycle ope
   assert.equal((await runtime.wait(started.runId, { timeoutMs: 1000 })).status, 'completed');
 });
 
-test('package root does not expose Runtime implementation modules', () => {
+test('frozen v0.1 legacy regression surface does not expose implementation modules', () => {
   const exported = new Set(Object.keys(sdk));
   assert.equal(exported.has('createDomainHarness'), true);
   assert.equal(exported.has('DOMAIN_HARNESS_VERSION'), true);
