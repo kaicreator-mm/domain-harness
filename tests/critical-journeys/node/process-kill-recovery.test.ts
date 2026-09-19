@@ -10,7 +10,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
 const WORKER = join(HERE, 'process-kill-worker.mts');
 
-type Scenario = 'durable-ack' | 'effect-journal' | 'poison-recovery';
+type Scenario =
+  | 'durable-ack'
+  | 'effect-journal'
+  | 'poison-recovery'
+  | 'processing-interrupt'
+  | 'effect-started'
+  | 'effect-committed'
+  | 'accepted-idle';
 
 interface ScenarioResult {
   scenario: Scenario;
@@ -21,11 +28,13 @@ interface ScenarioResult {
   };
   before: {
     lifecycle: string;
+    stateId: string;
     stateRevision: number;
     disposition: string;
     failureCode?: string | null;
     failureSourceMessageId?: string | null;
   };
+  resent?: boolean;
   duplicate?: {
     status: string;
     targetSequence: number;
@@ -45,7 +54,18 @@ interface ScenarioResult {
   toolTraceCount: number;
 }
 
-for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as const) {
+const SCENARIOS: readonly Scenario[] = [
+  'durable-ack',
+  'effect-journal',
+  'poison-recovery',
+  // Issue #135 kill windows: restart must recover from activation alone (no resend).
+  'processing-interrupt',
+  'effect-started',
+  'effect-committed',
+  'accepted-idle',
+];
+
+for (const scenario of SCENARIOS) {
   test(`T-018 real process kill/restart: ${scenario}`, async () => {
     const directory = mkdtempSync(join(tmpdir(), `domain-harness-t018-${scenario}-`));
     const databasePath = join(directory, 'runtime.sqlite');
@@ -65,6 +85,7 @@ for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as c
 
       if (scenario === 'durable-ack') {
         assert.equal(result.control.stage, 'after-accepted-ack-before-processing');
+        assert.equal(result.resent, true);
         assert.equal(result.before.lifecycle, 'waiting');
         assert.equal(result.before.stateId, 'draft');
         assert.equal(result.before.stateRevision, 0);
@@ -82,6 +103,7 @@ for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as c
 
       if (scenario === 'effect-journal') {
         assert.equal(result.control.stage, 'after-effect-and-message-commit');
+        assert.equal(result.resent, true);
         assert.equal(result.before.lifecycle, 'waiting');
         assert.equal(result.before.stateId, 'quoted');
         assert.equal(result.before.stateRevision, 1);
@@ -91,13 +113,66 @@ for (const scenario of ['durable-ack', 'effect-journal', 'poison-recovery'] as c
         assert.equal(result.after?.stateRevision, 1, 'duplicate delivery after restart must not fabricate a transition');
         assert.equal(result.after?.stateId, 'quoted');
         assert.equal(result.after?.disposition, 'processed');
-        assert.equal(result.effect?.status, 'completed');
-        assert.equal(result.effect?.attempt, 1);
-        assert.equal(result.effect?.sourceMessageId, 'msg-effect-kill');
-        assert.deepEqual(result.effect?.output, { total: 42 });
-        assert.equal(result.toolTraceCount, 1, 'completed effect journal must prevent duplicate external execution');
+      assert.equal(result.effect?.status, 'completed');
+      assert.equal(result.effect?.attempt, 1);
+      assert.equal(result.effect?.sourceMessageId, 'msg-effect-kill');
+      assert.deepEqual(result.effect?.output, { total: 42 });
+      assert.equal(result.toolTraceCount, 1, 'completed effect journal must prevent duplicate external execution');
+      return;
+    }
+
+    if (
+      scenario === 'processing-interrupt'
+      || scenario === 'effect-started'
+      || scenario === 'effect-committed'
+      || scenario === 'accepted-idle'
+    ) {
+      // Issue #135: after the kill the message is durably accepted/processing and the
+      // instance looks healthy; the restart must reclaim and drain it from activation
+      // alone — no resend, no operator recovery, no silent wedge.
+      assert.equal(result.resent, false, 'the #135 windows must recover without any resend');
+      assert.equal(result.duplicate, undefined);
+      assert.equal(result.before.lifecycle, 'waiting');
+      assert.equal(result.before.stateId, 'draft');
+      assert.equal(result.before.stateRevision, 0);
+      assert.equal(result.after?.lifecycle, 'waiting');
+      assert.equal(result.after?.stateId, 'quoted');
+      assert.equal(result.after?.stateRevision, 1, 'exactly one committed transition across kill and restart');
+      assert.equal(result.after?.disposition, 'processed');
+      assert.equal(result.toolTraceCount, 1, 'exactly one semantic Tool execution across kill and restart');
+
+      if (scenario === 'processing-interrupt') {
+        assert.equal(result.control.stage, 'after-mark-processing-before-execution');
+        assert.equal(result.before.disposition, 'processing', 'the #135 wedge window must be durable');
+        assert.equal(result.effect, null, 'no effect fact existed at the kill window');
         return;
       }
+      if (scenario === 'accepted-idle') {
+        assert.equal(result.control.stage, 'after-accepted-ack-before-processing');
+        assert.equal(result.before.disposition, 'accepted');
+        assert.equal(result.effect, null, 'no effect fact existed at the kill window');
+        return;
+      }
+      if (scenario === 'effect-started') {
+        assert.equal(result.control.stage, 'after-effect-started-before-completion');
+        assert.equal(result.before.disposition, 'processing');
+        // started effect=none journal → replay re-executes once under the same identity.
+        assert.equal(result.effect?.status, 'completed');
+        assert.equal(result.effect?.attempt, 1);
+        assert.equal(result.effect?.sourceMessageId, 'msg-effect-start-kill');
+        assert.deepEqual(result.effect?.output, { total: 42 });
+        return;
+      }
+      assert.equal(result.control.stage, 'after-effect-completed-before-message-commit');
+      assert.equal(result.before.disposition, 'processing');
+      // committed effect journal → reused, never re-executed (trace stays 1).
+      assert.equal(result.effect?.status, 'completed');
+      assert.equal(result.effect?.attempt, 1);
+      assert.equal(result.effect?.sourceMessageId, 'msg-effect-commit-kill');
+      assert.deepEqual(result.effect?.output, { total: 42 });
+      return;
+    }
+
 
       assert.equal(result.control.stage, 'after-recovery-required-commit');
       assert.equal(result.before.lifecycle, 'recovery_required');

@@ -168,6 +168,95 @@ test('G5 failure enters recovery_required and blocks later messages until explic
   assert.equal((await store.getNextAcceptedMessage(target))?.message.messageId, 'm-1');
 });
 
+test('G5 head-of-queue blocking: a processing head hides later accepted messages', async (t) => {
+  const { store } = makeTestStore(t);
+  const target = makeConformanceAddress('head-blocking');
+  await store.createInstance(makeConformanceInstance('head-blocking', T0));
+
+  await store.acceptMessage({ messageId: 'm-1', target, type: 'advance', payload: null });
+  await store.acceptMessage({ messageId: 'm-2', target, type: 'advance', payload: null });
+  assert.equal(await store.markMessageProcessing(target, 'm-1', T1), true);
+
+  assert.equal(await store.getNextAcceptedMessage(target), null);
+  assert.equal(await store.markMessageProcessing(target, 'm-2', T2), false);
+});
+
+test('G5 reclaimInterruptedProcessing returns an interrupted head to accepted with identity intact', async (t) => {
+  const { store } = makeTestStore(t);
+  const target = makeConformanceAddress('reclaim');
+  await store.createInstance(makeConformanceInstance('reclaim', T0));
+
+  const first = await store.acceptMessage({ messageId: 'm-1', target, type: 'advance', payload: { value: 1 } });
+  await store.acceptMessage({ messageId: 'm-2', target, type: 'advance', payload: { value: 2 } });
+  assert.equal(await store.markMessageProcessing(target, 'm-1', T1), true);
+  assert.equal(await store.getNextAcceptedMessage(target), null);
+
+  const reclaimed = await store.reclaimInterruptedProcessing(target);
+  assert.deepEqual(reclaimed, ['m-1']);
+
+  const disposition = await store.getMessageDisposition(target, 'm-1');
+  assert.equal(disposition?.disposition, 'accepted');
+  assert.equal(disposition?.processingAt, undefined);
+  assert.equal(disposition?.targetSequence, first.targetSequence);
+
+  assert.equal((await store.getNextAcceptedMessage(target))?.message.messageId, 'm-1');
+  assert.equal(await store.markMessageProcessing(target, 'm-1', T2), true);
+  await store.commitProcessedMessage({
+    target,
+    messageId: 'm-1',
+    expectedTargetSequence: first.targetSequence,
+    nextState: { value: 1 },
+    nextLifecycle: 'active',
+    updatedAt: T3,
+  });
+  assert.equal((await store.getMessageDisposition(target, 'm-1'))?.disposition, 'processed');
+
+  assert.deepEqual(await store.reclaimInterruptedProcessing(target), []);
+  assert.equal((await store.getNextAcceptedMessage(target))?.message.messageId, 'm-2');
+});
+
+test('G5 listUnresolvedMessageTargets enumerates accepted and processing mailboxes only', async (t) => {
+  const { store } = makeTestStore(t);
+  const pending = makeConformanceAddress('pending');
+  const interrupted = makeConformanceAddress('interrupted');
+  const settled = makeConformanceAddress('settled');
+  await store.createInstance(makeConformanceInstance('pending', T0));
+  await store.createInstance(makeConformanceInstance('interrupted', T0));
+  await store.createInstance(makeConformanceInstance('settled', T0));
+
+  await store.acceptMessage({ messageId: 'm-pending', target: pending, type: 'advance', payload: null });
+  await store.acceptMessage({ messageId: 'm-interrupted', target: interrupted, type: 'advance', payload: null });
+  assert.equal(await store.markMessageProcessing(interrupted, 'm-interrupted', T1), true);
+  await store.acceptMessage({ messageId: 'm-settled', target: settled, type: 'advance', payload: null });
+  assert.equal(await store.markMessageProcessing(settled, 'm-settled', T1), true);
+  await store.commitProcessedMessage({
+    target: settled,
+    messageId: 'm-settled',
+    expectedTargetSequence: 1,
+    nextState: { done: true },
+    nextLifecycle: 'active',
+    updatedAt: T2,
+  });
+
+  assert.deepEqual(await store.listUnresolvedMessageTargets(), [interrupted, pending]);
+
+  assert.deepEqual(await store.reclaimInterruptedProcessing(interrupted), ['m-interrupted']);
+  assert.deepEqual(await store.listUnresolvedMessageTargets(), [interrupted, pending]);
+});
+
+test('G5 reclaimInterruptedProcessing on an unknown or settled target is a no-op', async (t) => {
+  const { store } = makeTestStore(t);
+  const target = makeConformanceAddress('reclaim-noop');
+  await store.createInstance(makeConformanceInstance('reclaim-noop', T0));
+
+  assert.deepEqual(await store.reclaimInterruptedProcessing(target), []);
+  assert.deepEqual(
+    await store.reclaimInterruptedProcessing(makeConformanceAddress('missing')),
+    [],
+  );
+  assert.deepEqual(await store.listUnresolvedMessageTargets(), []);
+});
+
 test('G5 terminalization atomically abandons every unresolved accepted message', async (t) => {
   const { store } = makeTestStore(t);
   const target = makeConformanceAddress('terminalize');

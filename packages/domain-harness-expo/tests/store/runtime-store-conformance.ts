@@ -282,6 +282,40 @@ export async function runRuntimeStoreConformance(
     assert((await store.getEffect('effect-1'))?.status === 'completed', 'completed effect was not readable');
     checks.push('effect-journal');
 
+    const replayed = await store.beginEffect({
+      effectId: 'effect-replay',
+      target: effects.address,
+      sourceMessageId: 'source-1',
+      effectKind: 'test',
+      effectSemantics: 'idempotent',
+      status: 'started',
+      attempt: 1,
+      input: { value: 7 },
+      startedAt: '2026-09-18T00:00:10.500Z',
+    });
+    const rebegun = await store.beginEffect({
+      effectId: 'effect-replay',
+      target: effects.address,
+      sourceMessageId: 'source-1',
+      effectKind: 'test',
+      effectSemantics: 'idempotent',
+      status: 'started',
+      attempt: 2,
+      input: { value: 7 },
+      startedAt: '2026-09-18T00:00:10.750Z',
+    });
+    assert(
+      rebegun.status === 'started' && rebegun.attempt === replayed.attempt,
+      're-begin of a still-started effect must return the durable record for same-identity re-execution',
+    );
+    await store.completeEffect({
+      effectId: 'effect-replay',
+      status: 'completed',
+      output: { value: 8 },
+      completedAt: '2026-09-18T00:00:11.000Z',
+    });
+    checks.push('effect-rebegin-identity');
+
     const stress = makeInstance('concurrent');
     await store.createInstance(stress);
     const concurrentAcceptanceCount = 32;
@@ -313,6 +347,53 @@ export async function runRuntimeStoreConformance(
     assert(duplicateAcks.every((ack) => ack.status === 'duplicate'), 'concurrent duplicate replay allocated new messages');
     checks.push('concurrent-acceptance-stress');
 
+    const reclaim = makeInstance('reclaim');
+    await store.createInstance(reclaim);
+    const reclaimFirst = await store.acceptMessage({
+      messageId: 'r-1',
+      target: reclaim.address,
+      type: 'increment',
+      payload: { delta: 1 },
+    });
+    await store.acceptMessage({
+      messageId: 'r-2',
+      target: reclaim.address,
+      type: 'increment',
+      payload: { delta: 1 },
+    });
+    assert(await store.markMessageProcessing(reclaim.address, 'r-1', '2026-09-18T00:00:12.000Z'), 'reclaim head message did not enter processing');
+    assert(
+      (await store.getNextAcceptedMessage(reclaim.address)) === null,
+      'processing head did not block later accepted messages',
+    );
+    const reclaimedIds = await store.reclaimInterruptedProcessing(reclaim.address);
+    assert(jsonEqual(reclaimedIds, ['r-1']), 'reclaim did not return the interrupted message identity');
+    const reclaimedDisposition = await store.getMessageDisposition(reclaim.address, 'r-1');
+    assert(reclaimedDisposition?.disposition === 'accepted', 'reclaimed message did not return to accepted');
+    assert(
+      reclaimedDisposition.targetSequence === reclaimFirst.targetSequence,
+      'reclaim changed the durable target sequence',
+    );
+    assert(reclaimedDisposition.processingAt === undefined, 'reclaim did not clear the processing marker');
+    assert(
+      (await store.getNextAcceptedMessage(reclaim.address))?.message.messageId === 'r-1',
+      'reclaimed message was not readable as the next accepted message',
+    );
+    assert(await store.markMessageProcessing(reclaim.address, 'r-1', '2026-09-18T00:00:13.000Z'), 'reclaimed message did not re-enter processing');
+    await store.commitProcessedMessage({
+      target: reclaim.address,
+      messageId: 'r-1',
+      expectedTargetSequence: reclaimFirst.targetSequence,
+      nextState: { count: 1 },
+      nextLifecycle: 'active',
+      updatedAt: '2026-09-18T00:00:14.000Z',
+    });
+    assert(
+      jsonEqual(await store.reclaimInterruptedProcessing(reclaim.address), []),
+      'reclaim with no interrupted processing must be a no-op',
+    );
+    checks.push('processing-reclaim');
+
     store = await harness.reopen(store);
     const persisted = await store.getInstance(stress.address);
     assert(persisted !== null, 'instance disappeared after database close/reopen');
@@ -321,6 +402,13 @@ export async function runRuntimeStoreConformance(
     const persistedEffect = await store.getEffect('effect-1');
     assert(persistedEffect?.status === 'completed', 'effect journal disappeared after database close/reopen');
     checks.push('restart-persistence');
+
+    const unresolved = await store.listUnresolvedMessageTargets();
+    assert(
+      jsonEqual(unresolved, [makeAddress('concurrent'), makeAddress('reclaim')]),
+      'unresolved mailbox enumeration included resolved/terminal instances or missed accepted ones',
+    );
+    checks.push('unresolved-mailbox-enumeration');
 
     return {
       checks,

@@ -68,6 +68,8 @@ Then attach/copy the complete JSON blocks emitted for:
 DOMAIN_HARNESS_T019_G30_PASS
 DOMAIN_HARNESS_T019_RESTART_PREPARE_PREPARED
 DOMAIN_HARNESS_T019_RESTART_VERIFY_PASS
+DOMAIN_HARNESS_T019_RECLAIM_PREPARE_PREPARED
+DOMAIN_HARNESS_T019_RECLAIM_VERIFY_PASS
 ```
 
 The restart evidence must include this exact lifecycle:
@@ -81,7 +83,20 @@ prepare revision 1
 → completed revision 2
 ```
 
-A Fast Refresh, Metro reload, test-process recreation, mock driver, or fresh database cannot satisfy the restart requirement.
+The processing-reclaim evidence (Issue #135) must include this exact lifecycle:
+
+```text
+prepare: quote message wedged `processing`, instance healthy (waiting, revision 0, no failure)
+→ real Android force-stop
+→ relaunch same installed app / same DB (`domain-harness-t019-reclaim.db`)
+→ pre-activation read still shows `processing` (durable wedge survived)
+→ activation reclaim + startup drain settle the message with NO resend
+  (disposition processed, revision 1, exactly one quote Tool execution)
+→ approve
+→ completed revision 2
+```
+
+A Fast Refresh, Metro reload, test-process recreation, mock driver, or fresh database cannot satisfy either restart requirement.
 
 ## Gate disposition rule
 

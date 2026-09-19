@@ -7,6 +7,7 @@ import type {
   DomainMessage,
   FailMessageProcessingRequest,
   RuntimeStore,
+  WorkflowAddress,
 } from '@kaicreator/domain-harness/v2';
 import { NodeSqliteRuntimeStore } from '../../../packages/domain-harness-node/src/store/node-sqlite-runtime-store.js';
 
@@ -16,7 +17,14 @@ import {
   createNodeFixtureRuntime,
 } from '../../hosts/node/runtime-fixture.js';
 
-type Scenario = 'durable-ack' | 'effect-journal' | 'poison-recovery';
+type Scenario =
+  | 'durable-ack'
+  | 'effect-journal'
+  | 'poison-recovery'
+  | 'processing-interrupt'
+  | 'effect-started'
+  | 'effect-committed'
+  | 'accepted-idle';
 type Mode = 'crash' | 'resume';
 
 interface BoundaryRecord {
@@ -26,6 +34,24 @@ interface BoundaryRecord {
   messageId?: string;
 }
 
+const SCENARIOS: readonly Scenario[] = [
+  'durable-ack',
+  'effect-journal',
+  'poison-recovery',
+  'processing-interrupt',
+  'effect-started',
+  'effect-committed',
+  'accepted-idle',
+];
+
+/** Scenarios whose resume must not send anything: activation reclaim + startup drain alone must settle the interrupted message (Issue #135). */
+const NO_RESEND_SCENARIOS: ReadonlySet<Scenario> = new Set([
+  'processing-interrupt',
+  'effect-started',
+  'effect-committed',
+  'accepted-idle',
+]);
+
 const [mode, scenario, databasePath, tracePath, controlPath] = process.argv.slice(2) as [
   Mode,
   Scenario,
@@ -34,8 +60,8 @@ const [mode, scenario, databasePath, tracePath, controlPath] = process.argv.slic
   string,
 ];
 
-if (!['crash', 'resume'].includes(mode) || !['durable-ack', 'effect-journal', 'poison-recovery'].includes(scenario)) {
-  throw new Error('Usage: process-kill-worker.mts <crash|resume> <durable-ack|effect-journal|poison-recovery> <db> <trace> <control>');
+if (!['crash', 'resume'].includes(mode) || !SCENARIOS.includes(scenario)) {
+  throw new Error(`Usage: process-kill-worker.mts <crash|resume> <${SCENARIOS.join('|')}> <db> <trace> <control>`);
 }
 
 if (mode === 'crash') {
@@ -85,18 +111,28 @@ async function runResumeScenario(
 ): Promise<void> {
   const rawStore = new NodeSqliteRuntimeStore({ path: databasePath });
   try {
+    const target = targetFor(scenario);
+    const message = messageFor(scenario);
+    const control = readBoundary(controlPath);
+
+    // The post-crash durable state must be captured BEFORE runtime creation:
+    // activation reclaim + startup drain (Issue #135) settle interrupted
+    // mailboxes on their own, so reading through a live runtime would race it.
+    const beforeInstance = await rawStore.getInstance(target);
+    if (beforeInstance === null) {
+      throw new Error(`T-018 resume could not load persisted instance ${target.instanceKey}`);
+    }
+    const beforeDisposition = await rawStore.getMessageDisposition(target, message.messageId);
+    if (beforeDisposition === null) {
+      throw new Error(`T-018 resume could not load persisted message ${message.messageId}`);
+    }
+    const effectBefore = control.effectId === undefined ? null : await rawStore.getEffect(control.effectId);
+
     const runtime = await createNodeFixtureRuntime({
       store: rawStore,
       fixture: PORTABLE_RUNTIME_FIXTURE,
       toolTraceFile: tracePath,
     });
-    const target = targetFor(scenario);
-    const message = messageFor(scenario);
-    const control = readBoundary(controlPath);
-
-    const beforeInstance = await requireInstance(runtime, target);
-    const beforeDisposition = await requireDisposition(runtime, target, message.messageId);
-    const effectBefore = control.effectId === undefined ? null : await rawStore.getEffect(control.effectId);
 
     if (scenario === 'poison-recovery') {
       let rejectedCode = 'NO_REJECTION';
@@ -123,6 +159,7 @@ async function runResumeScenario(
           failureCode: beforeInstance.failure?.code ?? null,
           failureSourceMessageId: beforeInstance.failure?.sourceMessageId ?? null,
         },
+        resent: false,
         effect: effectBefore === null ? null : {
           status: effectBefore.status,
           attempt: effectBefore.attempt,
@@ -134,7 +171,11 @@ async function runResumeScenario(
       return;
     }
 
-    const duplicate = await runtime.send(message);
+    // Issue #135 kill windows resume WITHOUT any new send: the runtime must make
+    // progress from activation alone. durable-ack keeps its historical duplicate
+    // resend to pin that the original ACK identity survives the auto-drain.
+    const resent = !NO_RESEND_SCENARIOS.has(scenario);
+    const duplicate = resent ? await runtime.send(message) : undefined;
     await settleMessage(runtime, target, message.messageId);
     const afterInstance = await requireInstance(runtime, target);
     const afterDisposition = await requireDisposition(runtime, target, message.messageId);
@@ -149,7 +190,8 @@ async function runResumeScenario(
         stateRevision: beforeInstance.stateRevision,
         disposition: beforeDisposition.disposition,
       },
-      duplicate: {
+      resent,
+      duplicate: duplicate === undefined ? undefined : {
         status: duplicate.status,
         targetSequence: duplicate.targetSequence,
       },
@@ -184,21 +226,55 @@ function crashBoundaryStore(
       if (property === 'beginEffect') {
         return async (request: BeginEffectRequest) => {
           lastEffectId = request.effectId;
-          return target.beginEffect(request);
+          const begun = await target.beginEffect(request);
+          if (scenario === 'effect-started') {
+            // Durable window: message processing, effect started, no committed result.
+            return boundary(controlPath, {
+              scenario,
+              stage: 'after-effect-started-before-completion',
+              effectId: request.effectId,
+              messageId: request.sourceMessageId,
+            });
+          }
+          return begun;
         };
       }
       if (property === 'completeEffect') {
         return async (request: CompleteEffectRequest) => {
           const completed = await target.completeEffect(request);
           lastEffectId = request.effectId;
+          if (scenario === 'effect-committed') {
+            // Durable window: effect result committed, message still processing.
+            return boundary(controlPath, {
+              scenario,
+              stage: 'after-effect-completed-before-message-commit',
+              effectId: request.effectId,
+            });
+          }
           return completed;
         };
       }
-      if (scenario === 'durable-ack' && property === 'markMessageProcessing') {
+      if ((scenario === 'durable-ack' || scenario === 'accepted-idle') && property === 'markMessageProcessing') {
         return async (_target: unknown, messageId: string): Promise<boolean> => {
           return boundary(controlPath, {
             scenario,
             stage: 'after-accepted-ack-before-processing',
+            messageId,
+          });
+        };
+      }
+      if (scenario === 'processing-interrupt' && property === 'markMessageProcessing') {
+        return async (
+          markTarget: WorkflowAddress,
+          messageId: string,
+          processingAt: string,
+        ): Promise<boolean> => {
+          // The mark commits durably first; the process then dies mid-processing
+          // with the mailbox head left in `processing` (the Issue #135 window).
+          await target.markMessageProcessing(markTarget, messageId, processingAt);
+          return boundary(controlPath, {
+            scenario,
+            stage: 'after-mark-processing-before-execution',
             messageId,
           });
         };
@@ -254,8 +330,16 @@ function messageFor(scenario: Scenario): DomainMessage {
       contractVersion: PORTABLE_RUNTIME_FIXTURE.messageContractVersion,
     };
   }
+  const messageId = {
+    'durable-ack': 'msg-ack-kill',
+    'effect-journal': 'msg-effect-kill',
+    'processing-interrupt': 'msg-processing-kill',
+    'effect-started': 'msg-effect-start-kill',
+    'effect-committed': 'msg-effect-commit-kill',
+    'accepted-idle': 'msg-idle-kill',
+  }[scenario];
   return {
-    messageId: scenario === 'durable-ack' ? 'msg-ack-kill' : 'msg-effect-kill',
+    messageId,
     target,
     type: 'quote',
     payload: { quantity: 2, unitPrice: 20 },

@@ -523,6 +523,8 @@ mark message processing
 commit instance state + processed message
 persist processing failure + recovery_required
 terminalize instance + abandon every accepted/unprocessed message
+list instances with unresolved accepted/processing mailbox messages
+reclaim interrupted processing (processing → accepted, same targetSequence)
 begin/complete/recover Tool invocation journal fact
 query message disposition/history
 recovery retry/reset transition
@@ -633,6 +635,24 @@ load next accepted message
 ```
 
 If the current message cannot resolve deterministically, the instance enters `recovery_required`; later accepted messages stay durable but unprocessed.
+
+### 11.1 Single writer per store and activation reclaim
+
+One logical Domain Runtime has exactly **one writer process per store**. Mailbox head transitions (`accepted → processing → processed/failed`) are not leased or fenced; the single-writer rule is what makes reclaiming an interrupted `processing` message safe. A deployment that cannot uphold it must not run two runtimes over the same store.
+
+Process death can leave a mailbox head durably `processing` (or `accepted` but never drained) while the instance itself stays healthy and unremarkable. Runtime activation therefore SHALL:
+
+```text
+after package preflight:
+→ enumerate instances with unresolved accepted/processing mailbox messages
+→ atomically reclaim every interrupted processing message
+   (processing → accepted, identity and targetSequence preserved, processing marker cleared)
+→ schedule a mailbox drain for each such instance
+```
+
+Re-execution after reclaim is decided by the durable effect-journal recovery matrix (§12.6): completed results are reused; started `none`/`idempotent` effects may re-execute under the same idempotency identity; started `non-idempotent` effects enter `recovery_required` instead of being blindly retried. Reclaim itself never executes effects and never drops, reorders, or renumbers messages.
+
+Drain failures — including a mailbox head that refuses to enter `processing` — SHALL surface through the runtime's background-error channel or equivalently observable state; they SHALL NOT be silently swallowed.
 
 ---
 
@@ -1032,6 +1052,8 @@ Host convenience constructors may exist in host packages, but they assemble the 
 11. Ambiguous non-idempotent started effect never auto-retries.
 12. Projection failure cannot mutate runtime/business state.
 13. Subscription loss cannot lose durable truth because subscription is not the truth store.
+14. A message interrupted in `processing` by process death is reclaimed to `accepted` at the next activation (same targetSequence) and re-enters the §12.6 recovery matrix; it never wedges its instance silently.
+15. Mailbox drain failures surface through the runtime background-error channel or equivalently observable state; a stuck mailbox is never silent.
 
 ---
 
@@ -1112,3 +1134,20 @@ Frozen v0.2 PRD R4
 **Architecture status:** **FROZEN / READY FOR TASK DAG**
 
 Implementation agents SHALL treat this document as architecture authority beneath the Frozen PRD. Any change to the decisions above requires explicit architecture-change evidence; ordinary implementation difficulty is not sufficient authority to broaden scope.
+
+---
+
+## 25. Architecture Amendments
+
+### A1 — Activation reclaim of interrupted processing (Issue #135, 2026-09-19)
+
+**Evidence:** design/implementation review of `v0.2@796f48c0d075a39326627712ac1d415187439802` (Issue #135) proved that a process dying while a Domain Message is `processing` left the target Workflow Instance wedged after restart with no signal: the store contract had no reclaim operation and no unresolved-mailbox enumeration, activation ran package preflight only, the Node and Expo adapters diverged on head-of-queue reads, and drain failures (including `ProcessingConflictError`) were swallowed.
+
+**Amendment (no product scope change, no frozen decision reversal):**
+
+1. §10.1 gains two required semantic operations: unresolved-mailbox enumeration and interrupted-processing reclaim.
+2. New §11.1 freezes the single-writer rule (one writer process per store) and the activation reclaim + startup-drain algorithm.
+3. §21 gains invariants 14–15 (reclaim at activation; drain failures surface).
+4. Adapter conformance consequence: `getNextAcceptedMessage` is head-of-queue blocking on both hosts, and effect re-begin identity excludes `attempt`/`startedAt` so a started `none`/`idempotent` effect may re-execute under the same idempotency identity after reclaim, per the §12.6 matrix.
+
+**Validation:** shared RuntimeStore conformance (Node + Expo), T-018 Node process-kill journeys extended with the new kill windows (interrupted `processing`; effect started-not-completed; effect committed-not-message-committed; accepted-at-crash with no resend), and the T-019 Expo restart reclaim journey.

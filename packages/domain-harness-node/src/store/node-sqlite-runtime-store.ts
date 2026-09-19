@@ -683,6 +683,47 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
     transaction.immediate();
   }
 
+  async listUnresolvedMessageTargets(): Promise<readonly WorkflowAddress[]> {
+    const rows = this.#db.prepare(`
+      SELECT i.workflow_id, i.instance_key
+      FROM dh_v2_messages m
+      JOIN dh_v2_instances i ON i.internal_id = m.target_internal_id
+      WHERE m.disposition IN ('accepted', 'processing')
+      GROUP BY i.internal_id
+      ORDER BY i.workflow_id, i.instance_key
+    `).all() as Array<{ workflow_id: string; instance_key: string }>;
+
+    return rows.map((row) => ({ workflowId: row.workflow_id, instanceKey: row.instance_key }));
+  }
+
+  async reclaimInterruptedProcessing(target: WorkflowAddress): Promise<readonly string[]> {
+    const transaction = this.#db.transaction((): string[] => {
+      const instance = this.#getInstanceRow(target);
+      if (instance === null) return [];
+
+      const interrupted = this.#db.prepare(`
+        SELECT message_id
+        FROM dh_v2_messages
+        WHERE target_internal_id = ? AND disposition = 'processing'
+        ORDER BY target_sequence
+      `).all(instance.internal_id) as Array<{ message_id: string }>;
+      if (interrupted.length === 0) return [];
+
+      const reclaimed = this.#db.prepare(`
+        UPDATE dh_v2_messages
+        SET disposition = 'accepted', processing_at = NULL
+        WHERE target_internal_id = ? AND disposition = 'processing'
+      `).run(instance.internal_id);
+      if (reclaimed.changes !== interrupted.length) {
+        throw new Error('Interrupted processing messages changed during reclaim');
+      }
+
+      return interrupted.map((row) => row.message_id);
+    });
+
+    return transaction.immediate();
+  }
+
   async getEffect(effectId: string): Promise<EffectJournalRecord | null> {
     const row = this.#getEffectRow(effectId);
     return row === null ? null : mapEffect(row);

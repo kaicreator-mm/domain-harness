@@ -192,7 +192,11 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     const drain = Promise.resolve()
       .then(() => drainMailbox(target))
       .catch((error: unknown) => {
-        if (!(error instanceof RecoveryRecordedError) && !(error instanceof ProcessingConflictError)) {
+        // RecoveryRecordedError is the durable poison-message path: the failure fact
+        // is already persisted and observable, so it is not reported again. Every
+        // other drain failure — including ProcessingConflictError — surfaces here so
+        // a stuck mailbox is never silent.
+        if (!(error instanceof RecoveryRecordedError)) {
           options.onBackgroundError?.(error, target);
         }
       })
@@ -225,6 +229,20 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
       scheduleDrain(target);
     },
   });
+
+  // Startup recovery: a previous writer process may have died with mailbox work
+  // still unresolved (accepted but never drained, or interrupted mid-processing).
+  // Under the single-writer rule (one logical Domain Runtime per store; L2 §11.1)
+  // activation is the safe point to reclaim interrupted processing back to
+  // accepted — preserving target sequence — and to schedule a drain per affected
+  // instance. Re-execution is then decided by the durable effect-journal recovery
+  // matrix (completed → reuse; started none/idempotent → re-run; started
+  // non-idempotent → recovery_required), never by blind retry.
+  const unresolvedTargets = await options.store.listUnresolvedMessageTargets();
+  for (const target of unresolvedTargets) {
+    await options.store.reclaimInterruptedProcessing(target);
+    scheduleDrain(target);
+  }
 
   async function drainMailbox(target: WorkflowAddress): Promise<void> {
     while (true) {

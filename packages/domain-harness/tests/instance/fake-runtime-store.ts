@@ -34,6 +34,8 @@ export class FakeInstanceRuntimeStore {
     commitProcessedMessage: async (request) => this.commitProcessedMessage(request),
     failMessageProcessing: unsupported,
     terminalizeInstance: unsupported,
+    listUnresolvedMessageTargets: unsupported,
+    reclaimInterruptedProcessing: unsupported,
     getEffect: unsupported,
     beginEffect: unsupported,
     completeEffect: unsupported,
