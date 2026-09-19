@@ -366,10 +366,21 @@ test('G5 effect journal is durable, idempotent by effectId, and immutable after 
   assert.equal(completed.status, 'completed');
   assert.deepEqual(completed.output, { value: 2 });
 
+  await assert.rejects(
+    store.completeEffect({
+      effectId: 'effect-1',
+      status: 'failed',
+      error: { shouldNotOverwrite: true },
+      completedAt: T3,
+    }),
+    /already completed/,
+    'conflicting completion status must fail closed',
+  );
+
   const repeated = await store.completeEffect({
     effectId: 'effect-1',
-    status: 'failed',
-    error: { shouldNotOverwrite: true },
+    status: 'completed',
+    output: { value: 999 },
     completedAt: T3,
   });
   assert.deepEqual(repeated, completed);

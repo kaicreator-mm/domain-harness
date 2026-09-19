@@ -38,10 +38,14 @@ export const runtimeStoreConformanceChecks: readonly string[] = [
   'lifecycle-duplicate-sequence-stability',
   'duplicate-before-terminal-rejection',
   'terminal-abandon-atomic',
+  'terminal-replay-immutable',
   'effect-journal',
+  'effect-completion-conflict',
   'effect-rebegin-identity',
   'concurrent-acceptance-stress',
   'processing-reclaim',
+  'commit-output-preserve',
+  'failure-evidence-preserve',
   'restart-persistence',
   'unresolved-mailbox-enumeration',
   'retained-package-pin-filter',
@@ -311,6 +315,33 @@ export async function runRuntimeStoreConformance(
     checks.push('duplicate-before-terminal-rejection');
     checks.push('terminal-abandon-atomic');
 
+    const terminalSnapshot = await store.getInstance(main.address);
+    await store.terminalizeInstance({
+      target: main.address,
+      lifecycle: 'completed',
+      output: { result: 'done' },
+      updatedAt: '2026-09-18T00:00:09.000Z',
+    });
+    const replayedTerminal = await store.getInstance(main.address);
+    assert(
+      replayedTerminal?.stateRevision === terminalSnapshot?.stateRevision,
+      'same-terminal replay was not idempotent (state revision changed)',
+    );
+    assert(
+      jsonEqual(replayedTerminal?.output, { result: 'done' }),
+      'same-terminal replay changed the durable output',
+    );
+    await expectReject(
+      () =>
+        store.terminalizeInstance({
+          target: main.address,
+          lifecycle: 'cancelled',
+          updatedAt: '2026-09-18T00:00:09.250Z',
+        }),
+      'terminal lifecycle was allowed to change to a different terminal state',
+    );
+    checks.push('terminal-replay-immutable');
+
     const effects = makeInstance('effects');
     await store.createInstance(effects);
     const started = await store.beginEffect({
@@ -345,6 +376,28 @@ export async function runRuntimeStoreConformance(
     assert(completed.status === 'completed', 'effect completion did not persist');
     assert((await store.getEffect('effect-1'))?.status === 'completed', 'completed effect was not readable');
     checks.push('effect-journal');
+
+    await expectReject(
+      () =>
+        store.completeEffect({
+          effectId: 'effect-1',
+          status: 'failed',
+          error: { shouldNotOverwrite: true },
+          completedAt: '2026-09-18T00:00:10.250Z',
+        }),
+      'completed effect accepted a conflicting completion status',
+    );
+    const replayedCompletion = await store.completeEffect({
+      effectId: 'effect-1',
+      status: 'completed',
+      output: { value: 999 },
+      completedAt: '2026-09-18T00:00:10.300Z',
+    });
+    assert(
+      jsonEqual(replayedCompletion.output, { value: 2 }),
+      'same-status completion replay overwrote the durable output',
+    );
+    checks.push('effect-completion-conflict');
 
     const replayed = await store.beginEffect({
       effectId: 'effect-replay',
@@ -457,6 +510,90 @@ export async function runRuntimeStoreConformance(
       'reclaim with no interrupted processing must be a no-op',
     );
     checks.push('processing-reclaim');
+
+    const preserved = makeInstance('output-preserve');
+    await store.createInstance(preserved);
+    const p1 = await store.acceptMessage({
+      messageId: 'p-1',
+      target: preserved.address,
+      type: 'increment',
+      payload: { delta: 1 },
+    });
+    assert(
+      await store.markMessageProcessing(preserved.address, 'p-1', '2026-09-18T00:00:15.000Z'),
+      'output-preserve head message did not enter processing',
+    );
+    await store.commitProcessedMessage({
+      target: preserved.address,
+      messageId: 'p-1',
+      expectedTargetSequence: p1.targetSequence,
+      nextState: { count: 1 },
+      nextLifecycle: 'active',
+      output: { result: 'kept' },
+      updatedAt: '2026-09-18T00:00:15.500Z',
+    });
+    const p2 = await store.acceptMessage({
+      messageId: 'p-2',
+      target: preserved.address,
+      type: 'increment',
+      payload: { delta: 1 },
+    });
+    assert(
+      await store.markMessageProcessing(preserved.address, 'p-2', '2026-09-18T00:00:16.000Z'),
+      'output-preserve second message did not enter processing',
+    );
+    await store.commitProcessedMessage({
+      target: preserved.address,
+      messageId: 'p-2',
+      expectedTargetSequence: p2.targetSequence,
+      nextState: { count: 2 },
+      nextLifecycle: 'active',
+      updatedAt: '2026-09-18T00:00:16.500Z',
+    });
+    assert(
+      jsonEqual((await store.getInstance(preserved.address))?.output, { result: 'kept' }),
+      'commit without output did not preserve the durable instance output',
+    );
+    checks.push('commit-output-preserve');
+
+    const forensic = makeInstance('failure-preserve');
+    await store.createInstance(forensic);
+    const f1 = await store.acceptMessage({
+      messageId: 'f-1',
+      target: forensic.address,
+      type: 'poison',
+      payload: null,
+    });
+    assert(
+      await store.markMessageProcessing(forensic.address, 'f-1', '2026-09-18T00:00:17.000Z'),
+      'failure-preserve message did not enter processing',
+    );
+    await store.failMessageProcessing({
+      target: forensic.address,
+      messageId: 'f-1',
+      expectedTargetSequence: f1.targetSequence,
+      failure: { code: 'FORENSIC_FAILURE', message: 'preserve me' },
+      updatedAt: '2026-09-18T00:00:17.500Z',
+    });
+    await store.terminalizeInstance({
+      target: forensic.address,
+      lifecycle: 'terminated',
+      updatedAt: '2026-09-18T00:00:18.000Z',
+    });
+    const forensicSnapshot = await store.getInstance(forensic.address);
+    assert(
+      forensicSnapshot?.lifecycle === 'terminated',
+      'failure-preserve instance did not terminalize',
+    );
+    assert(
+      forensicSnapshot?.failure?.code === 'FORENSIC_FAILURE',
+      'terminalization without reason erased the durable failure evidence',
+    );
+    assert(
+      (await store.getMessageDisposition(forensic.address, 'f-1'))?.disposition === 'abandoned',
+      'recovery termination did not give the failed poison message a terminal disposition',
+    );
+    checks.push('failure-evidence-preserve');
 
     store = await harness.reopen(store);
     const persisted = await store.getInstance(stress.address);

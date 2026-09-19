@@ -637,6 +637,19 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
   async terminalizeInstance(request: TerminalizeInstanceRequest): Promise<void> {
     const transaction = this.#db.transaction(() => {
       const instance = this.#requireInstanceRow(request.target);
+      // Terminal lifecycles are final, identical to the Expo adapter: a
+      // same-lifecycle replay is an idempotent no-op, and changing between
+      // terminal states is rejected instead of overwriting durable state.
+      if (TERMINAL_LIFECYCLES.has(instance.lifecycle)) {
+        if (instance.lifecycle === request.lifecycle) {
+          this.#abandonUnresolvedMessages(instance.internal_id, request.updatedAt);
+          return;
+        }
+        throw new Error(
+          `Cannot change terminal lifecycle ${instance.lifecycle} to ${request.lifecycle}`,
+        );
+      }
+
       const failure =
         request.reason === undefined
           ? undefined
@@ -794,7 +807,12 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
         throw new Error(`Unknown effect ${request.effectId}`);
       }
       if (existingRow.status !== 'started') {
-        return mapEffect(existingRow);
+        // Same-status completion replay is idempotent; a conflicting status
+        // fails closed, identical to the Expo adapter.
+        if (existingRow.status === request.status) {
+          return mapEffect(existingRow);
+        }
+        throw new Error(`Effect ${request.effectId} is already ${existingRow.status}`);
       }
 
       const update = this.#db.prepare(`
