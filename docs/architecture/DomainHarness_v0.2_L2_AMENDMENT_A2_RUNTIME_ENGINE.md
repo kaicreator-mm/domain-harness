@@ -63,9 +63,9 @@ The superseding implementation was established during **T-016 portable Runtime a
 - T-016 final reviewed PR #116 completed at `9ad6d46b49715f0a2f1422b8fb1bea24f321b507` and merged into `v0.2`;
 - subsequent Node and Expo/Hermes conformance, process/restart, migration, package-retention, and integration evidence validated the public/frozen semantics on that Runtime architecture rather than on a private XState reducer.
 
-The original L2 explicitly allowed later implementation evidence to supersede the XState-retention assumption. The implementation did so, but the architecture evidence was not amended at that time. Issue #153 closes that evidence gap.
+The frozen AD-03 wording anticipated that implementation evidence could reopen the XState-retention assumption, but it specifically mentioned a later-proven local incompatibility. The repository history reviewed for #153 does **not** preserve evidence proving that condition or a contemporaneous architecture rationale for the switch. A2 therefore does not invent one after the fact. What is independently established is that T-016 assembled the direct compiled-IR interpreter, later v0.2 validation exercised that implementation, and the architecture record was never reconciled to match it.
 
-No evidence was found that the shipped semantics require XState specifically, and replacing the validated interpreter now merely to restore agreement with the old wording would be an implementation rewrite without a product or contract justification.
+For release-closeout purposes, the reason to accept the implementation as the superseding v0.2 architecture is the current evidence: the interpreter is already the validated portable Runtime path, the engine choice is private, and no public/frozen semantic change results from recording the implementation truth. Replacing it with XState now merely to restore agreement with stale wording would be a Runtime rewrite without a product or contract justification.
 
 ---
 
@@ -131,7 +131,7 @@ The following current documentation surfaces were checked for an incorrect claim
 - `docs/validation/v0.2/migration-expr/G31_AC43.md`;
 - `docs/validation/v0.2/migration-script/G32_AC44.md`.
 
-**Result:** no reviewed README/validation document claims that XState is the v0.2 Runtime Core engine. No wording change to those files is required by Issue #153.
+**Result:** no reviewed README/validation document claims that XState is the v0.2 Runtime Core engine. The root README only gains an authority link to this A2 so readers do not stop at the superseded workflow-engine wording in the original L2; no validation record requires wording changes.
 
 ---
 
@@ -152,6 +152,7 @@ Issue #153 architecture contradiction
 → independently confirm shipped v0.2 Runtime path
 → CompiledWorkflowRuntime confirmed
 → original XState-retention decision superseded for shipped v0.2
+→ historical switch rationale beyond T-016 implementation evidence: NOT VERIFIED
 → public/frozen semantics changed: NO
 → Runtime code changed: NO
 → README/validation false-XState claims found: NO
