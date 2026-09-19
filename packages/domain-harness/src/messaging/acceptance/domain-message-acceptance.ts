@@ -2,7 +2,11 @@ import type { ErrorObject, ValidateFunction } from 'ajv';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 
 import type { JsonSchema, JsonValue } from '../../contracts/json.js';
-import type { DomainMessage, MessageAcceptedAck } from '../../v2/contracts/message.js';
+import type {
+  DomainMessage,
+  MessageAcceptedAck,
+  MessageDispositionSnapshot,
+} from '../../v2/contracts/message.js';
 import type {
   CompiledMessageContract,
   TargetCompiledDomainPackage,
@@ -26,6 +30,17 @@ export class DomainMessageAcceptance implements DomainMessageAcceptanceBoundary 
 
   async accept(message: DomainMessage): Promise<MessageAcceptedAck> {
     validateEnvelope(message);
+
+    // A durable (target, messageId) identity wins before target lifecycle or pinned-contract
+    // validation. This preserves idempotent retry after the target becomes terminal or enters
+    // recovery_required. RuntimeStore.acceptMessage retains the atomic duplicate re-check for
+    // races between this read and the final acceptance transaction.
+    const existing = await this.store.getMessageDisposition(message.target, message.messageId);
+    if (existing) {
+      const ack = duplicateAck(existing);
+      assertAcceptedAck(ack, message, existing.packageId);
+      return ack;
+    }
 
     const target = await this.store.getInstance(message.target);
     if (!target) {
@@ -136,6 +151,17 @@ function validateEnvelope(message: DomainMessage): void {
   }
 }
 
+function duplicateAck(existing: MessageDispositionSnapshot): MessageAcceptedAck {
+  return {
+    status: 'duplicate',
+    messageId: existing.messageId,
+    target: { ...existing.target },
+    targetSequence: existing.targetSequence,
+    packageId: existing.packageId,
+    acceptedAt: existing.acceptedAt,
+  };
+}
+
 function assertTargetSnapshot(target: WorkflowInstanceSnapshot, requested: WorkflowAddress): void {
   if (!sameAddress(target.address, requested)) {
     throw new MessageAcceptanceError(
@@ -208,6 +234,7 @@ function assertAcceptedAck(
     !validStatus ||
     ack.messageId !== message.messageId ||
     !sameAddress(ack.target, message.target) ||
+    !isNonEmptyString(ack.packageId) ||
     ack.packageId !== expectedPackageId ||
     !validSequence ||
     !isNonEmptyString(ack.acceptedAt)
