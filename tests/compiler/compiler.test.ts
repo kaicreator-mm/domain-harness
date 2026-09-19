@@ -19,6 +19,9 @@ import {
   MissingBindingContentError,
 } from '../../packages/domain-harness-compiler/src/package/manifest.js';
 import { emitTargetCompiledPackageModule } from '../../packages/domain-harness-compiler/src/package/module-emitter.js';
+import type { TargetCompiledDomainPackage } from '../../packages/domain-harness/src/v2/index.js';
+import { decodeCompiledWorkflowDefinition } from '../../packages/domain-harness/src/runtime/compiled-workflow-ir.js';
+import { translateV01ScriptInvokes } from '../../packages/domain-harness-compiler/src/compat/v01-script/index.js';
 
 const CAPS = {
   hash: 'crypto-hash-sha256@1',
@@ -42,14 +45,12 @@ function target(capabilities: readonly CapabilityId[] = Object.values(CAPS)): Ta
   };
 }
 
-const SCRIPT_BINDING_V1 = 'export default function executeScript() { return 1; }\n';
-const SCRIPT_BINDING_V2 = 'export default function executeScript() { return 2; }\n';
 
 const BINDING_CONTENTS: Readonly<Record<string, string>> = {
   '@host/hash': 'export default function hash(data) { return digest(data); }\n',
   '@host/module': 'export default function loadModule(ref) { return import(ref); }\n',
   '@host/expression': 'export default function evaluate(expression, input) { return jsonata(expression).evaluate(input); }\n',
-  '@host/script': SCRIPT_BINDING_V1,
+  '@host/script': 'export default function executeScript() { return 1; }\n',
   '@host/http': 'export default function request(resource, payload) { return transport(resource, payload); }\n',
 };
 
@@ -61,7 +62,7 @@ function bindingModulesFor(manifest: { bindingDigests: Readonly<Record<string, s
   );
 }
 
-function workflow(id: string, kind: 'expr' | 'script'): RawWorkflow {
+function workflow(id: string, kind: 'expr' | 'script' | 'workflow'): RawWorkflow {
   return {
     id,
     sourcePath: `/authoring/${id}.yaml`,
@@ -73,7 +74,9 @@ function workflow(id: string, kind: 'expr' | 'script'): RawWorkflow {
         final: false,
         invoke: kind === 'expr'
           ? { kind: 'expr', expression: '$.value * 2' }
-          : { kind: 'script', ref: `scripts/${id}.ts`, scriptSource: 'export default () => "raw-script-secret-marker";' },
+          : kind === 'script'
+            ? { kind: 'script', ref: `scripts/${id}.ts`, scriptSource: 'export default () => "raw-script-secret-marker";' }
+            : { kind: 'workflow', ref: `${id}_child` },
         done: [{ target: 'waiting' }],
         error: [{ target: 'failed' }],
         events: {},
@@ -97,7 +100,7 @@ function workflow(id: string, kind: 'expr' | 'script'): RawWorkflow {
 function raw(order: 'normal' | 'reverse' = 'normal'): LoadedRawDomainPackage {
   const entries: Array<[string, RawWorkflow]> = [
     ['expr_flow', workflow('expr_flow', 'expr')],
-    ['script_flow', workflow('script_flow', 'script')],
+    ['expr_flow_b', workflow('expr_flow_b', 'expr')],
   ];
   if (order === 'reverse') entries.reverse();
   return {
@@ -107,17 +110,49 @@ function raw(order: 'normal' | 'reverse' = 'normal'): LoadedRawDomainPackage {
     limits: { maxSteps: 50 },
     workflows: new Map(entries),
     skills: new Map(),
-    scripts: new Map([['scripts/script_flow.ts', 'export default () => "raw-script-secret-marker";']]),
+    scripts: new Map(),
     schemas: new Map(),
     childDependencies: new Map(entries.map(([id]) => [id, []])),
   };
 }
 
-function compileFixture(rawInput = raw(), bindingContents: Readonly<Record<string, string>> = BINDING_CONTENTS) {
+function rawScriptPackage(): LoadedRawDomainPackage {
+  return {
+    root: '/tmp/script',
+    schemaVersion: '0.1',
+    domainId: 'fixture-domain',
+    limits: { maxSteps: 50 },
+    workflows: new Map([['script_flow', workflow('script_flow', 'script')]]),
+    skills: new Map(),
+    scripts: new Map([['scripts/script_flow.ts', 'export default () => "raw-script-secret-marker";']]),
+    schemas: new Map(),
+    childDependencies: new Map([['script_flow', []]]),
+  };
+}
+
+function rawChildWorkflowPackage(): LoadedRawDomainPackage {
+  return {
+    root: '/tmp/child',
+    schemaVersion: '0.1',
+    domainId: 'fixture-domain',
+    limits: { maxSteps: 50 },
+    workflows: new Map([['parent_flow', workflow('parent_flow', 'workflow')]]),
+    skills: new Map(),
+    scripts: new Map(),
+    schemas: new Map(),
+    childDependencies: new Map([['parent_flow', ['parent_flow_child']]]),
+  };
+}
+
+function compileFixture(
+  rawInput = raw(),
+  bindingContents: Readonly<Record<string, string>> = BINDING_CONTENTS,
+  targetProfile: TargetHostProfile = target(),
+) {
   return compileDomainPackage({
     raw: rawInput,
     domainVersion: '2.0.0-test',
-    target: target(),
+    target: targetProfile,
     bindingContents,
     tools: [{
       toolId: 'remoteLookup',
@@ -162,13 +197,8 @@ test('G1/G2: semantic input ordering and authoring location do not change packag
 
 test('G1/G2: missing required target capability fails compilation', () => {
   assert.throws(
-    () => compileDomainPackage({
-      raw: raw(),
-      domainVersion: '2.0.0-test',
-      target: target([CAPS.hash, CAPS.module, CAPS.expression]),
-      bindingContents: BINDING_CONTENTS,
-    }),
-    (error: unknown) => error instanceof MissingTargetCapabilityError && error.missing.includes(CAPS.script),
+    () => compileFixture(raw(), BINDING_CONTENTS, target([CAPS.hash, CAPS.module, CAPS.expression])),
+    (error: unknown) => error instanceof MissingTargetCapabilityError && error.missing.includes(CAPS.http),
   );
 });
 
@@ -187,10 +217,13 @@ test('binding digest is content-addressed: unchanged binding content keeps ident
 
 test('binding digest is content-addressed: changed executable binding content changes digest and packageId', () => {
   const before = compileFixture().manifest;
-  const mutatedContents: Record<string, string> = { ...BINDING_CONTENTS, '@host/script': SCRIPT_BINDING_V2 };
+  const mutatedContents: Record<string, string> = {
+    ...BINDING_CONTENTS,
+    '@host/http': 'export default function http(request) { return request; } // v2\n',
+  };
   const after = compileFixture(raw(), mutatedContents).manifest;
 
-  assert.notEqual(after.bindingDigests['@host/script'], before.bindingDigests['@host/script']);
+  assert.notEqual(after.bindingDigests['@host/http'], before.bindingDigests['@host/http']);
   assert.equal(after.bindingDigests['@host/hash'], before.bindingDigests['@host/hash']);
   assert.equal(after.bindingDigests['@host/expression'], before.bindingDigests['@host/expression']);
   assert.notEqual(after.packageId, before.packageId);
@@ -224,11 +257,14 @@ test('binding content location is not identity: same bytes at different module p
 
 test('emitter fails closed when binding module content does not match manifest binding digest', () => {
   const manifest = compileFixture().manifest;
-  const tamperedModules = bindingModulesFor(manifest, { ...BINDING_CONTENTS, '@host/script': SCRIPT_BINDING_V2 });
+  const tamperedModules = bindingModulesFor(manifest, {
+    ...BINDING_CONTENTS,
+    '@host/expression': 'export default function expression() { return 2; } // tampered\n',
+  });
   assert.throws(
     () => emitTargetCompiledPackageModule({ manifest, bindingModules: tamperedModules }),
     (error: unknown) => error instanceof Error
-      && error.message.includes('@host/script')
+      && error.message.includes('@host/expression')
       && error.message.includes('does not match'),
   );
 
@@ -242,29 +278,114 @@ test('emitter fails closed when binding module content does not match manifest b
 });
 
 test('compilation fails closed when a required binding has no immutable content identity', () => {
-  const { '@host/script': _omitted, ...withoutScript } = BINDING_CONTENTS;
+  const { '@host/http': _omitted, ...withoutHttp } = BINDING_CONTENTS;
   assert.throws(
-    () => compileFixture(raw(), withoutScript),
-    (error: unknown) => error instanceof MissingBindingContentError && error.missing.includes('@host/script'),
+    () => compileFixture(raw(), withoutHttp),
+    (error: unknown) => error instanceof MissingBindingContentError && error.missing.includes('@host/http'),
   );
 
-  const emptyScript: Record<string, string> = { ...BINDING_CONTENTS, '@host/script': '' };
+  const emptyHttp: Record<string, string> = { ...BINDING_CONTENTS, '@host/http': '' };
   assert.throws(
-    () => compileFixture(raw(), emptyScript),
-    (error: unknown) => error instanceof MissingBindingContentError && error.missing.includes('@host/script'),
+    () => compileFixture(raw(), emptyHttp),
+    (error: unknown) => error instanceof MissingBindingContentError && error.missing.includes('@host/http'),
   );
 });
 
-test('compiled workflow IR contains domain-message effect and strips raw TypeScript source', () => {
+test('compiled workflow IR contains domain-message effect and never raw TypeScript source', () => {
   const manifest = compileFixture().manifest;
   const definition = manifest.workflows.expr_flow?.definition;
   assert.ok(definition);
   const serialized = JSON.stringify(definition);
   assert.match(serialized, /"kind":"domain-message"/u);
   assert.match(serialized, /"messageType":"CHANGED"/u);
-  const scriptDefinition = JSON.stringify(manifest.workflows.script_flow?.definition);
-  assert.match(scriptDefinition, /"sourceDigest":"[a-f0-9]{64}"/u);
-  assert.doesNotMatch(scriptDefinition, /raw-script-secret-marker/u);
+  assert.doesNotMatch(serialized, /raw-script-secret-marker/u);
+});
+
+test('public compile path fails closed on invoke kinds the Runtime cannot execute (#167)', () => {
+  assert.throws(
+    () => compileFixture(rawScriptPackage()),
+    /translateV01ScriptInvokes/u,
+    'legacy script invoke must fail closed with an actionable T-021 migration pointer',
+  );
+  assert.throws(
+    () => compileFixture(rawChildWorkflowPackage()),
+    /durable Domain Message effects/u,
+    'child workflow invoke must fail closed pointing at the durable message model',
+  );
+});
+
+test('T-021 translation produces executable tool IR through the public compile path (#167)', () => {
+  const translation = translateV01ScriptInvokes(rawScriptPackage(), {
+    target: 'node',
+    targetProfile: target(),
+  });
+  assert.equal(translation.tools.length, 1);
+  const migratedState = translation.raw.workflows.get('script_flow')?.states.execute;
+  assert.equal(migratedState?.invoke?.kind, 'tool');
+
+  const { manifest } = compileDomainPackage({
+    raw: translation.raw,
+    domainVersion: '2.0.0-test',
+    target: target(),
+    bindingContents: BINDING_CONTENTS,
+    tools: [],
+  });
+  const serialized = JSON.stringify(manifest.workflows.script_flow?.definition);
+  assert.doesNotMatch(serialized, /"kind":"script"/u);
+  assert.match(serialized, /"kind":"tool"/u);
+  assert.doesNotMatch(serialized, /raw-script-secret-marker/u);
+  const decoded = decodeCompiledWorkflowDefinition(
+    'script_flow',
+    manifest.workflows.script_flow?.definition,
+  );
+  assert.equal(decoded.initial, 'execute');
+});
+
+test('compiler rejects dangling routes, invalid JSONata and non-positive maxSteps at build time (#167/#168)', () => {
+  const dangling: LoadedRawDomainPackage = {
+    ...raw(),
+    workflows: new Map([['expr_flow', {
+      ...workflow('expr_flow', 'expr'),
+      states: {
+        ...workflow('expr_flow', 'expr').states,
+        execute: {
+          ...workflow('expr_flow', 'expr').states.execute!,
+          done: [{ target: 'nowhere' }],
+        },
+      },
+    }]]),
+  };
+  assert.throws(() => compileFixture(dangling), /unknown state 'nowhere'/u);
+
+  const badExpression: LoadedRawDomainPackage = {
+    ...raw(),
+    workflows: new Map([['expr_flow', {
+      ...workflow('expr_flow', 'expr'),
+      states: {
+        ...workflow('expr_flow', 'expr').states,
+        execute: {
+          ...workflow('expr_flow', 'expr').states.execute!,
+          invoke: { kind: 'expr', expression: '$.value *' },
+        },
+      },
+    }]]),
+  };
+  assert.throws(() => compileFixture(badExpression), /not valid JSONata/u);
+
+  assert.throws(
+    () => compileFixture({ ...raw(), limits: { maxSteps: 0 } }),
+    /maxSteps must be a positive safe integer/u,
+  );
+});
+
+test('every compiled workflow decodes through the authoritative runtime IR decoder (#168)', () => {
+  const { manifest } = compileFixture();
+  for (const [workflowId, workflowDescriptor] of Object.entries(manifest.workflows)) {
+    const decoded = decodeCompiledWorkflowDefinition(workflowId, workflowDescriptor.definition);
+    assert.equal(decoded.initial, 'execute');
+    assert.ok(Object.keys(decoded.states).length >= 4);
+    assert.equal(decoded.limits?.maxSteps, 50);
+  }
 });
 
 test('compiler emits projection and message contracts without treating schema field names as runtime secrets', () => {
@@ -475,4 +596,14 @@ test('migrated build-time loader discovers and validates legacy YAML without exp
   });
   assert.equal(result.manifest.domainId, 'loaded-domain');
   assert.doesNotMatch(JSON.stringify(result.manifest), /harness\.yaml|basic\.yaml/u);
+});
+
+test('compiled manifest is assignable to the authoritative core package contract without casts (#164)', () => {
+  const { manifest } = compileFixture();
+  // Type-level proof, evaluated by the TS compiler at test-typecheck time:
+  // the compiler's emitted manifest IS the core frozen artifact contract -
+  // producer and Runtime consumer share one source of truth, no adapter cast.
+  const compiledPackage: TargetCompiledDomainPackage = { manifest, bindings: {} };
+  assert.equal(compiledPackage.manifest.executionEngineMajor, 2);
+  assert.equal(compiledPackage.manifest.packageId, manifest.packageId);
 });

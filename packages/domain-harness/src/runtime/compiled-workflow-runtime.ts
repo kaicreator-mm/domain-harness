@@ -18,46 +18,19 @@ import type {
 } from '../v2/contracts/workflow.js';
 import {
   JournaledSkillRunner,
-  type CompiledSkillDefinition,
 } from './journaled-skill-runner.js';
+import {
+  decodeCompiledWorkflowDefinition,
+  type CompiledInvoke,
+  type CompiledRoute,
+  type CompiledState,
+  type CompiledWorkflowIRV2 as CompiledDefinition,
+} from './compiled-workflow-ir.js';
 
-interface CompiledRoute {
-  target: string;
-  when?: string;
-}
-
-interface CompiledMessageEffect {
-  kind: 'domain-message';
-  targetExpression: string;
-  messageType: string;
-  payloadExpression?: string;
-  contractVersion?: string;
-}
-
-interface CompiledInvoke {
-  kind: string;
-  ref?: string;
-  expression?: string;
-  input?: string;
-  timeoutMs?: number;
-  skill?: CompiledSkillDefinition;
-}
-
-interface CompiledState {
-  final: boolean;
-  invoke?: CompiledInvoke;
-  done: readonly CompiledRoute[];
-  error: readonly CompiledRoute[];
-  events: Readonly<Record<string, { routes: readonly CompiledRoute[] }>>;
-  effects?: readonly CompiledMessageEffect[];
-}
-
-interface CompiledDefinition {
-  initial: string;
-  output?: string;
-  states: Readonly<Record<string, CompiledState>>;
-  limits?: { maxSteps?: number };
-}
+// The compiled Workflow IR has one authoritative contract and decoder shared
+// with package activation (#168): ./compiled-workflow-ir.ts. This interpreter
+// consumes the decoded representation; artifacts are no longer force-cast at
+// the boundary, and activation rejects any IR this engine cannot execute.
 
 export interface PortableWorkflowState extends JsonObject {
   stateId: string;
@@ -308,19 +281,12 @@ export class CompiledWorkflowRuntime {
       return { value: result.output };
     }
 
-    if (invoke.kind === 'script') {
-      throw new Error(
-        'Top-level Script invoke is not a v0.2 Runtime primitive; use a target-compiled Script Domain Tool',
-      );
-    }
-    if (invoke.kind === 'workflow') {
-      throw new Error(
-        'Top-level child Workflow invoke is not a v0.2 Runtime primitive; use a durable Domain Message effect',
-      );
-    }
-
+    // Exhaustiveness guard: the shared decoder only admits invoke kinds
+    // supported by executionEngineMajor 2 ('expr' | 'tool' | 'skill'), and all
+    // of them are handled above. Legacy 'script'/'workflow' invokes now fail
+    // closed at compile time (#167) and at activation (#168), never here.
     throw new Error(
-      `Compiled invoke kind ${invoke.kind} is not executable by the portable v0.2 Runtime assembly`,
+      `Compiled invoke kind ${String(invoke.kind)} is not executable by the portable v0.2 Runtime assembly`,
     );
   }
 
@@ -395,11 +361,7 @@ export class CompiledWorkflowRuntime {
 }
 
 function parseDefinition(workflow: CompiledWorkflowDescriptor): CompiledDefinition {
-  const definition = workflow.definition as unknown as CompiledDefinition;
-  if (typeof definition.initial !== 'string' || definition.initial.length === 0 || !definition.states) {
-    throw new Error(`Workflow ${workflow.workflowId} contains an invalid compiled definition`);
-  }
-  return definition;
+  return decodeCompiledWorkflowDefinition(workflow.workflowId, workflow.definition);
 }
 
 function requireState(definition: CompiledDefinition, stateId: string): CompiledState {

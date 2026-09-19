@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Text } from 'react-native';
-import { runExpoStoreValidation, type ExpoStoreValidationResult } from './run-expo-store-validation';
+import {
+  runExpoStoreValidation,
+  runReadPathProbe,
+  type ExpoStoreValidationResult,
+} from './run-expo-store-validation';
 
 export default function App() {
   const [output, setOutput] = useState('RUNNING T-004 Expo RuntimeStore validation...');
 
   useEffect(() => {
-    void runExpoStoreValidation()
+    void runReadPathProbe()
+      .then((probe) => {
+        console.log('DOMAIN_HARNESS_T013_READPATH', JSON.stringify(probe));
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.error('DOMAIN_HARNESS_T013_READPATH_FAIL', message);
+      })
+      .then(() => runExpoStoreValidation())
       .then((result: ExpoStoreValidationResult) => {
         const serialized = JSON.stringify(result, null, 2);
         console.log('DOMAIN_HARNESS_T004_VALIDATION', serialized);

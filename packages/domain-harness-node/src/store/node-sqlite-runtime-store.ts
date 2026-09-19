@@ -232,7 +232,49 @@ function sameJson(left: JsonValue | undefined, right: JsonValue | undefined): bo
   if (left === undefined || right === undefined) {
     return left === right;
   }
-  return encodeJson(left, 'effect comparison') === encodeJson(right, 'effect comparison');
+  return jsonEquals(left, right);
+}
+
+/**
+ * Key-order-insensitive structural JSON equality: logically identical effect
+ * input must not become an identity collision because of serialization order.
+ * The core journal check canonicalizes keys (assertCompatibleEffectRecord);
+ * adapters must agree or re-begin would diverge per layer.
+ */
+function jsonEquals(left: JsonValue, right: JsonValue): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left === null || right === null || typeof left !== typeof right) {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+    return left.every((item, index) => {
+      const other = right[index];
+      return other !== undefined && jsonEquals(item, other);
+    });
+  }
+  if (typeof left === 'object' && typeof right === 'object') {
+    const leftRecord = left as Readonly<Record<string, JsonValue>>;
+    const rightRecord = right as Readonly<Record<string, JsonValue>>;
+    const leftKeys = Object.keys(leftRecord).sort();
+    const rightKeys = Object.keys(rightRecord).sort();
+    if (leftKeys.length !== rightKeys.length) {
+      return false;
+    }
+    return leftKeys.every((key, index) => {
+      if (key !== rightKeys[index]) {
+        return false;
+      }
+      const leftValue = leftRecord[key];
+      const rightValue = rightRecord[key];
+      return leftValue !== undefined && rightValue !== undefined && jsonEquals(leftValue, rightValue);
+    });
+  }
+  return false;
 }
 
 function assertEffectIdentity(existing: EffectJournalRecord, request: BeginEffectRequest): void {

@@ -1,22 +1,13 @@
-type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+import type {
+  CompiledBindingDescriptor,
+  JsonValue,
+  RemoteTransportPort,
+  RemoteTransportRequest,
+} from '@kaicreator/domain-harness/v2';
 
-interface CompiledBindingDescriptor {
-  kind: string;
-  bindingId: string;
-  config?: JsonValue;
-}
-
-export interface RemoteTransportRequest {
-  binding: CompiledBindingDescriptor;
-  input: JsonValue;
-  resourceKey: string;
-  signal?: AbortSignal;
-}
-
-export interface RemoteTransportPort {
-  execute(request: RemoteTransportRequest): Promise<JsonValue>;
-}
+// Transport request/port contracts are owned by the core v2 contracts (#164);
+// only the HTTP/JSON binding implementation and its resource shapes are local.
+export type { RemoteTransportPort, RemoteTransportRequest };
 
 export interface HttpJsonRuntimeResource {
   endpoint: string;

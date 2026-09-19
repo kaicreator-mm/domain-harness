@@ -4,6 +4,10 @@ import type {
   CompiledPackageManifest,
   TargetCompiledDomainPackage,
 } from '../v2/contracts/package.js';
+import {
+  CompiledWorkflowIrError,
+  decodeCompiledWorkflowDefinition,
+} from '../runtime/compiled-workflow-ir.js';
 import { PackageActivationError } from './errors.js';
 
 export interface CompiledPackageValidationPolicy {
@@ -91,6 +95,18 @@ function validateWorkflows(workflows: Record<string, unknown>): void {
     requireStringField(workflowValue, 'workflowId');
     const definition = requireRecordField(workflowValue, 'definition');
     assertJsonSerializable(definition, `workflow "${workflowKey}" definition`);
+    // Fail-closed executable-IR gate (#167/#168): the same authoritative decoder
+    // the runtime interpreter uses. Malformed states/routes/invokes/effects and
+    // unsupported invoke kinds are rejected at activation instead of surfacing
+    // mid-drain, satisfying the PRD R4 corrupt-package fail-closed criterion.
+    try {
+      decodeCompiledWorkflowDefinition(workflowKey, definition);
+    } catch (error) {
+      if (error instanceof CompiledWorkflowIrError) {
+        failInvalid(`workflow "${workflowKey}" definition is not executable compiled IR: ${error.message}`);
+      }
+      throw error;
+    }
     const messageContracts = requireRecordField(workflowValue, 'messageContracts');
     for (const [messageKey, messageValue] of Object.entries(messageContracts)) {
       if (!isRecord(messageValue)) failInvalid(`workflow "${workflowKey}" message "${messageKey}" must be an object`);

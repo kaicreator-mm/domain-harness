@@ -48,12 +48,20 @@ test('packed compiler exposes the stable root build API to a clean consumer', ()
     mkdirSync(packDirectory, { recursive: true });
     mkdirSync(consumerDirectory, { recursive: true });
 
+    // The compiler artifact depends on the authoritative core contracts (#164),
+    // so the clean consumer installs both packed tarballs. Type-only imports are
+    // erased in dist, but package.json dependencies must resolve for real.
+    runNpm(['run', 'build', '--workspace', '@kaicreator/domain-harness'], REPO_ROOT);
+    runNpm(
+      ['pack', '--workspace', '@kaicreator/domain-harness', '--pack-destination', packDirectory],
+      REPO_ROOT,
+    );
     runNpm(['pack', '--pack-destination', packDirectory], PACKAGE_ROOT);
     const tarballs = readdirSync(packDirectory)
       .filter((name) => name.endsWith('.tgz'))
       .sort()
       .map((name) => join(packDirectory, name));
-    assert.equal(tarballs.length, 1);
+    assert.equal(tarballs.length, 2);
 
     writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
       name: 'domain-harness-compiler-clean-consumer',
@@ -62,7 +70,10 @@ test('packed compiler exposes the stable root build API to a clean consumer', ()
     }, null, 2));
 
     runNpm(
-      ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarballs[0] ?? ''],
+      // @types/node mirrors the T-016 consumer: the compiler is a Node build-host
+      // tool and the authoritative core contracts it re-exports reference
+      // AbortSignal, which the consumer typechecks with skipLibCheck: false.
+      ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', ...tarballs],
       consumerDirectory,
     );
 

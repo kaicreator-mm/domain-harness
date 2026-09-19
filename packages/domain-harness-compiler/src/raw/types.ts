@@ -1,16 +1,27 @@
-export type JsonPrimitive = null | boolean | number | string;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
-export type JsonObject = { [key: string]: JsonValue };
-export type JsonSchema = JsonObject;
+import type {
+  CapabilityId,
+  JsonObject,
+  JsonPrimitive,
+  JsonSchema,
+  JsonValue,
+  TargetHostProfile,
+  ToolEffectSemantics,
+} from '@kaicreator/domain-harness/v2';
 
-export type CapabilityId = `${string}@${number}`;
-export type ToolEffectSemantics = 'none' | 'idempotent' | 'non-idempotent';
-
-export interface TargetHostProfile {
-  id: string;
-  capabilities: readonly CapabilityId[];
-  bindings: Readonly<Record<CapabilityId, string>>;
-}
+// Portable JSON/capability/host-profile primitives have exactly one
+// authoritative owner: the core v2 contracts (frozen L2 dependency rule
+// "compiler -> core contracts", issue #164). Re-exported here so authoring
+// code keeps its historical import path. Everything below (Raw*, the closed
+// LogicalToolBindingConfig) is compiler-specific build-time shape.
+export type {
+  CapabilityId,
+  JsonObject,
+  JsonPrimitive,
+  JsonSchema,
+  JsonValue,
+  TargetHostProfile,
+  ToolEffectSemantics,
+};
 
 export interface RawRoute {
   target: string;
