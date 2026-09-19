@@ -22,6 +22,7 @@ export class AcceptanceStoreFake implements MessageAcceptanceStore {
   snapshot: WorkflowInstanceSnapshot | null;
   readonly persisted: StoredAcceptedMessage[] = [];
   acceptCalls = 0;
+  lifecycleCheckBeforeDuplicate = false;
   afterGetInstance?: () => void;
   beforeCommit?: (message: DomainMessage) => Promise<void>;
 
@@ -80,6 +81,14 @@ export class AcceptanceStoreFake implements MessageAcceptanceStore {
       const current = this.snapshot;
       if (!current || !sameAddress(current.address, message.target)) {
         throw new Error('RuntimeStore atomic acceptance rejected: target not found');
+      }
+
+      if (
+        this.lifecycleCheckBeforeDuplicate &&
+        current.lifecycle !== 'active' &&
+        current.lifecycle !== 'waiting'
+      ) {
+        throw new Error(`RuntimeStore atomic acceptance rejected: target is ${current.lifecycle}`);
       }
 
       const existing = this.persisted.find(
