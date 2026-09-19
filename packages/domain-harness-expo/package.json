@@ -10,7 +10,7 @@
     "prebuild": "npm run build -w @kaicreator/domain-harness",
     "build": "tsc -p tsconfig.build.json",
     "pretypecheck": "npm run build -w @kaicreator/domain-harness",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tests/store/tsconfig.json",
     "test": "npm run typecheck"
   },
   "dependencies": {

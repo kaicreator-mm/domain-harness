@@ -1,4 +1,5 @@
 import type {
+  MessageAcceptedAck,
   RuntimeStoreLike as RuntimeStore,
   WorkflowAddress,
   WorkflowInstanceSnapshot,
@@ -21,6 +22,30 @@ export interface RuntimeStoreConformanceReport {
   concurrentAcceptanceCount: number;
   restartPersistence: true;
 }
+
+/**
+ * The full checklist a conforming RuntimeStore adapter must report, in execution
+ * order. The suite asserts its own report against this list, so both the Expo
+ * device validation and the Node binding run are held to the same contract.
+ */
+export const runtimeStoreConformanceChecks: readonly string[] = [
+  'instance-create-read-pin',
+  'pinned-package-list',
+  'accept-dedup-order',
+  'processing-atomic-commit',
+  'duplicate-before-recovery-rejection',
+  'failure-recovery-reset',
+  'lifecycle-duplicate-sequence-stability',
+  'duplicate-before-terminal-rejection',
+  'terminal-abandon-atomic',
+  'effect-journal',
+  'effect-rebegin-identity',
+  'concurrent-acceptance-stress',
+  'processing-reclaim',
+  'restart-persistence',
+  'unresolved-mailbox-enumeration',
+  'retained-package-pin-filter',
+];
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -58,6 +83,22 @@ async function expectReject(action: () => Promise<unknown>, message: string): Pr
     rejected = true;
   }
   assert(rejected, message);
+}
+
+function assertDurableDuplicateAck(
+  duplicate: MessageAcceptedAck,
+  original: MessageAcceptedAck,
+  context: string,
+): void {
+  assert(duplicate.status === 'duplicate', `${context}did not return duplicate`);
+  assert(
+    duplicate.targetSequence === original.targetSequence,
+    `${context}did not preserve the durable target sequence`,
+  );
+  assert(
+    duplicate.acceptedAt === original.acceptedAt,
+    `${context}did not preserve durable acceptance time`,
+  );
 }
 
 export async function runExclusiveTransactionQueueUnitCheck(): Promise<void> {
@@ -142,9 +183,7 @@ export async function runRuntimeStoreConformance(
       payload: { delta: 1 },
     });
     assert(first.status === 'accepted', 'first acceptance did not return accepted');
-    assert(duplicate.status === 'duplicate', 'duplicate acceptance did not return duplicate');
-    assert(duplicate.targetSequence === first.targetSequence, 'duplicate allocated a new target sequence');
-    assert(duplicate.acceptedAt === first.acceptedAt, 'duplicate did not preserve durable acceptance time');
+    assertDurableDuplicateAck(duplicate, first, 'duplicate acceptance ');
 
     const second = await store.acceptMessage({
       messageId: 'm-2',
@@ -197,15 +236,7 @@ export async function runRuntimeStoreConformance(
       type: 'increment',
       payload: { delta: 1 },
     });
-    assert(duplicateDuringRecovery.status === 'duplicate', 'recovery_required rejected an already durable duplicate');
-    assert(
-      duplicateDuringRecovery.targetSequence === second.targetSequence,
-      'duplicate during recovery_required changed the durable target sequence',
-    );
-    assert(
-      duplicateDuringRecovery.acceptedAt === second.acceptedAt,
-      'duplicate during recovery_required changed the durable acceptance time',
-    );
+    assertDurableDuplicateAck(duplicateDuringRecovery, second, 'duplicate during recovery_required ');
     await expectReject(
       () =>
         store.acceptMessage({
@@ -266,15 +297,7 @@ export async function runRuntimeStoreConformance(
       type: 'queued',
       payload: { ordinal: 3 },
     });
-    assert(duplicateAfterTerminal.status === 'duplicate', 'terminal instance rejected an already durable duplicate');
-    assert(
-      duplicateAfterTerminal.targetSequence === third.targetSequence,
-      'duplicate after terminalization changed the durable target sequence',
-    );
-    assert(
-      duplicateAfterTerminal.acceptedAt === third.acceptedAt,
-      'duplicate after terminalization changed the durable acceptance time',
-    );
+    assertDurableDuplicateAck(duplicateAfterTerminal, third, 'duplicate after terminalization ');
     await expectReject(
       () =>
         store.acceptMessage({
@@ -450,6 +473,27 @@ export async function runRuntimeStoreConformance(
       'unresolved mailbox enumeration included resolved/terminal instances or missed accepted ones',
     );
     checks.push('unresolved-mailbox-enumeration');
+
+    await store.createInstance({
+      ...makeInstance('terminal-pin'),
+      packageId: 'pkg-terminal-only',
+      lifecycle: 'completed',
+    });
+    const retainedPins = await store.listPinnedPackageIds();
+    assert(
+      !retainedPins.includes('pkg-terminal-only'),
+      'terminal-only package pin was still reported as retained',
+    );
+    assert(
+      retainedPins.includes(main.packageId),
+      'retained package pin disappeared while live instances still pin it',
+    );
+    checks.push('retained-package-pin-filter');
+
+    assert(
+      jsonEqual(checks, runtimeStoreConformanceChecks),
+      'conformance checklist drifted from the declared report contract',
+    );
 
     return {
       checks,
