@@ -9,7 +9,9 @@ import test from 'node:test';
 
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const legacyDistEntry = join(packageRoot, 'dist', 'legacy-v1', 'index.js');
+// Test-only legacy build (tsconfig.legacy-test.json); the published dist no
+// longer ships v0.1 internals (issue #166).
+const legacyDistEntry = join(packageRoot, 'dist-legacy-test', 'legacy-v1', 'index.js');
 
 test('frozen v0.1 Expression and Script Workers run under a plain-ESM host process', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'domain-harness-esm-host-'));

@@ -281,3 +281,188 @@ test('portable subscription implementation has no Node EventEmitter or durable-s
   assert.doesNotMatch(source, /better-sqlite3/u);
   assert.doesNotMatch(source, /RuntimeStore/u);
 });
+
+interface RecordedRetry {
+  task: () => void;
+  delayMs: number;
+}
+
+test('G23 a transient observation failure keeps the generation pending and converges on retry', async () => {
+  const scheduler = new ManualScheduler();
+  const retries: RecordedRetry[] = [];
+  let revision: string | null = null;
+  let failReads = 1;
+  let reads = 0;
+  let errors = 0;
+  const seen: string[] = [];
+  const registry = new SubscriptionRegistry({
+    scheduler,
+    retryScheduler: (task, delayMs) => {
+      retries.push({ task, delayMs });
+    },
+    observationSource: {
+      readRevision: async () => {
+        reads += 1;
+        if (failReads > 0) {
+          failReads -= 1;
+          throw new Error('transient observation failure');
+        }
+        return revision;
+      },
+    },
+    onObservationError: () => {
+      errors += 1;
+    },
+  });
+  const target = { workflowId: 'design', instanceKey: '77' };
+  registry.subscribe({ kind: 'instance', target }, (change) => seen.push(change.revision));
+
+  revision = 'i-1';
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await tick();
+
+  assert.deepEqual(seen, [], 'failed observation must not emit');
+  assert.equal(errors, 1, 'observation failure must be reported once');
+  assert.equal(retries.length, 1, 'failed observation must schedule exactly one retry, not a tight loop');
+  const first = retries.shift();
+  assert.ok(first !== undefined && first.delayMs > 0, 'retry must be deferred with a positive delay');
+
+  first.task();
+  await tick();
+
+  assert.deepEqual(seen, ['i-1'], 'connected subscriber must converge without a new signal');
+  assert.equal(reads, 2);
+  assert.equal(retries.length, 0, 'successful retry must not schedule further retries');
+});
+
+test('G23 repeated observation failures back off exponentially and success resets the delay', async () => {
+  const scheduler = new ManualScheduler();
+  const retries: RecordedRetry[] = [];
+  let revision: string | null = 'i-1';
+  let failReads = 2;
+  const seen: string[] = [];
+  const registry = new SubscriptionRegistry({
+    scheduler,
+    retryScheduler: (task, delayMs) => {
+      retries.push({ task, delayMs });
+    },
+    observationSource: {
+      readRevision: async () => {
+        if (failReads > 0) {
+          failReads -= 1;
+          throw new Error('transient observation failure');
+        }
+        return revision;
+      },
+    },
+  });
+  const target = { workflowId: 'design', instanceKey: '78' };
+  registry.subscribe({ kind: 'instance', target }, (change) => seen.push(change.revision));
+
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await tick();
+  const firstDelay = retries[0]?.delayMs;
+
+  retries.shift()?.task();
+  await tick();
+  const secondDelay = retries[0]?.delayMs;
+  assert.ok(
+    firstDelay !== undefined && secondDelay !== undefined && secondDelay > firstDelay,
+    'consecutive failures must increase the retry delay',
+  );
+
+  retries.shift()?.task();
+  await tick();
+  assert.deepEqual(seen, ['i-1'], 'third read succeeds and delivers the latest revision');
+
+  failReads = 1;
+  revision = 'i-2';
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await tick();
+  assert.equal(retries[0]?.delayMs, firstDelay, 'success must reset the retry backoff');
+
+  retries.shift()?.task();
+  await tick();
+  assert.deepEqual(seen, ['i-1', 'i-2']);
+});
+
+test('G23 unsubscribe before a pending observation retry prevents delivery', async () => {
+  const scheduler = new ManualScheduler();
+  const retries: RecordedRetry[] = [];
+  const seen: string[] = [];
+  const registry = new SubscriptionRegistry({
+    scheduler,
+    retryScheduler: (task, delayMs) => {
+      retries.push({ task, delayMs });
+    },
+    observationSource: {
+      readRevision: async () => {
+        throw new Error('persistent observation failure');
+      },
+    },
+  });
+  const target = { workflowId: 'design', instanceKey: '79' };
+  const stop = registry.subscribe(
+    { kind: 'instance', target },
+    (change) => seen.push(change.revision),
+  );
+
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await tick();
+  assert.equal(retries.length, 1);
+
+  stop();
+  retries.shift()?.task();
+  await tick();
+
+  assert.deepEqual(seen, [], 'unsubscribed listener must not receive the retried observation');
+  assert.equal(retries.length, 0, 'retry chain must stop after unsubscribe');
+});
+
+test('G23 signals arriving during a pending observation retry coalesce to the latest revision', async () => {
+  const scheduler = new ManualScheduler();
+  const retries: RecordedRetry[] = [];
+  let revision: string | null = null;
+  let failReads = 1;
+  let reads = 0;
+  const seen: string[] = [];
+  const registry = new SubscriptionRegistry({
+    scheduler,
+    retryScheduler: (task, delayMs) => {
+      retries.push({ task, delayMs });
+    },
+    observationSource: {
+      readRevision: async () => {
+        reads += 1;
+        if (failReads > 0) {
+          failReads -= 1;
+          throw new Error('transient observation failure');
+        }
+        return revision;
+      },
+    },
+  });
+  const target = { workflowId: 'design', instanceKey: '80' };
+  registry.subscribe({ kind: 'instance', target }, (change) => seen.push(change.revision));
+
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await tick();
+  assert.equal(retries.length, 1);
+
+  revision = 'i-2';
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await tick();
+  assert.equal(retries.length, 1, 'a signal during a pending retry must coalesce, not stack flushes');
+
+  retries.shift()?.task();
+  await tick();
+
+  assert.deepEqual(seen, ['i-2'], 'retry must observe the latest revision exactly once');
+  assert.equal(reads, 2);
+});

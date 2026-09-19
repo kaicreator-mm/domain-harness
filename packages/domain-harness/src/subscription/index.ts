@@ -3,5 +3,6 @@ export type {
   ProjectionSubscription,
   SubscriptionObservationSource,
   SubscriptionRegistryOptions,
+  SubscriptionRetryScheduler,
   SubscriptionScheduler,
 } from './subscription-registry.js';

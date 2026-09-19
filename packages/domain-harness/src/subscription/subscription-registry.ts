@@ -24,9 +24,18 @@ export interface SubscriptionScheduler {
   schedule(task: () => void): void;
 }
 
+/**
+ * Schedules a deferred observation retry after a failed read. Hosts may inject
+ * a policy (e.g. capped attempts or platform timers); the default uses the
+ * global setTimeout with exponential backoff and, where the platform supports
+ * it, unrefs the timer so a pending retry never keeps a Node process alive.
+ */
+export type SubscriptionRetryScheduler = (task: () => void, delayMs: number) => void;
+
 export interface SubscriptionRegistryOptions {
   observationSource: SubscriptionObservationSource;
   scheduler?: SubscriptionScheduler;
+  retryScheduler?: SubscriptionRetryScheduler;
   onObservationError?: (
     error: unknown,
     subscription: DomainSubscription,
@@ -40,6 +49,7 @@ interface SubscriptionEntry {
   scheduled: boolean;
   running: boolean;
   lastEmittedRevision: string | null;
+  retryDelayMs: number;
 }
 
 const microtaskScheduler: SubscriptionScheduler = {
@@ -48,10 +58,19 @@ const microtaskScheduler: SubscriptionScheduler = {
   },
 };
 
+const INITIAL_RETRY_DELAY_MS = 25;
+const MAX_RETRY_DELAY_MS = 5_000;
+
+const defaultRetryScheduler: SubscriptionRetryScheduler = (task, delayMs) => {
+  const handle = setTimeout(task, delayMs) as unknown as { unref?: () => void };
+  handle.unref?.();
+};
+
 export class SubscriptionRegistry {
   private readonly entries = new Map<string, SubscriptionEntry>();
   private readonly observationSource: SubscriptionObservationSource;
   private readonly scheduler: SubscriptionScheduler;
+  private readonly retryScheduler: SubscriptionRetryScheduler;
   private readonly onObservationError:
     | SubscriptionRegistryOptions['onObservationError']
     | undefined;
@@ -59,6 +78,7 @@ export class SubscriptionRegistry {
   constructor(options: SubscriptionRegistryOptions) {
     this.observationSource = options.observationSource;
     this.scheduler = options.scheduler ?? microtaskScheduler;
+    this.retryScheduler = options.retryScheduler ?? defaultRetryScheduler;
     this.onObservationError = options.onObservationError;
   }
 
@@ -78,6 +98,7 @@ export class SubscriptionRegistry {
         scheduled: false,
         running: false,
         lastEmittedRevision: null,
+        retryDelayMs: INITIAL_RETRY_DELAY_MS,
       };
       this.entries.set(key, entry);
     }
@@ -177,6 +198,31 @@ export class SubscriptionRegistry {
     });
   }
 
+  /**
+   * A failed observation must not consume the pending generation: the entry
+   * stays dirty and is re-observed through the retry scheduler with exponential
+   * backoff, so a connected subscriber still converges to the latest state
+   * after a transient read failure even if no further signal ever arrives.
+   * Signals arriving while a retry is pending coalesce into it.
+   */
+  private scheduleRetry(entry: SubscriptionEntry): void {
+    if (
+      entry.listeners.size === 0 ||
+      entry.scheduled ||
+      entry.running
+    ) {
+      return;
+    }
+
+    entry.scheduled = true;
+    const delayMs = entry.retryDelayMs;
+    entry.retryDelayMs = Math.min(delayMs * 2, MAX_RETRY_DELAY_MS);
+    this.retryScheduler(() => {
+      entry.scheduled = false;
+      void this.flush(entry);
+    }, delayMs);
+  }
+
   private async flush(entry: SubscriptionEntry): Promise<void> {
     if (entry.running || entry.listeners.size === 0) {
       return;
@@ -184,6 +230,7 @@ export class SubscriptionRegistry {
 
     entry.running = true;
     const observedGeneration = entry.generation;
+    let observationFailed = false;
 
     try {
       const revision = await this.observationSource.readRevision(
@@ -213,14 +260,19 @@ export class SubscriptionRegistry {
         }
       }
     } catch (error) {
+      observationFailed = true;
       this.reportObservationError(error, entry.subscription);
     } finally {
       entry.running = false;
-      if (
-        entry.listeners.size > 0 &&
-        entry.generation !== observedGeneration
-      ) {
-        this.enqueue(entry);
+      if (entry.listeners.size > 0) {
+        if (observationFailed) {
+          this.scheduleRetry(entry);
+        } else {
+          entry.retryDelayMs = INITIAL_RETRY_DELAY_MS;
+          if (entry.generation !== observedGeneration) {
+            this.enqueue(entry);
+          }
+        }
       }
     }
   }

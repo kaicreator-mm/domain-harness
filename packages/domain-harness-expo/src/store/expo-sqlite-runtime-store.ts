@@ -416,8 +416,13 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
 
   public async listPinnedPackageIds(): Promise<readonly string[]> {
     this.assertOpen();
+    // Retained pins cover live instances only, identical to the Node adapter:
+    // packages pinned solely by terminal instances can be removed from the build.
     const rows = await this.database.getAllAsync<{ package_id: string }>(
-      'SELECT DISTINCT package_id FROM dh_v2_instances ORDER BY package_id ASC',
+      `SELECT DISTINCT package_id
+         FROM dh_v2_instances
+        WHERE lifecycle IN ('active', 'waiting', 'recovery_required')
+        ORDER BY package_id ASC`,
     );
     return rows.map((row) => row.package_id);
   }
@@ -602,12 +607,17 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
       const instanceUpdate = await transaction.runAsync(
         `UPDATE dh_v2_instances
             SET lifecycle = ?, state_revision = state_revision + 1,
-                workflow_state_json = ?, output_json = ?, failure_json = NULL, updated_at = ?
+                workflow_state_json = ?,
+                output_json = CASE WHEN ? = 1 THEN ? ELSE output_json END,
+                failure_json = CASE WHEN ? = 1 THEN NULL ELSE failure_json END,
+                updated_at = ?
           WHERE internal_id = ? AND state_revision = ?`,
         params([
           request.nextLifecycle,
           stringifyJson(request.nextState),
+          request.output === undefined ? 0 : 1,
           optionalJson(request.output),
+          request.nextLifecycle === 'recovery_required' ? 0 : 1,
           request.updatedAt,
           instance.internal_id,
           instance.state_revision,
@@ -618,7 +628,7 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
       }
 
       if (TERMINAL_LIFECYCLES.has(request.nextLifecycle)) {
-        await abandonUnprocessedMessages(transaction, instance.internal_id, request.updatedAt, undefined);
+        await abandonUnprocessedMessages(transaction, instance.internal_id, request.updatedAt);
       }
     });
   }
@@ -680,7 +690,6 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
             transaction,
             instance.internal_id,
             request.updatedAt,
-            request.reason,
           );
           return;
         }
@@ -693,12 +702,21 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
       const update = await transaction.runAsync(
         `UPDATE dh_v2_instances
             SET lifecycle = ?, state_revision = state_revision + 1,
-                output_json = ?, failure_json = ?, updated_at = ?
+                output_json = CASE WHEN ? = 1 THEN ? ELSE output_json END,
+                failure_json = CASE
+                  WHEN ? = 1 THEN ?
+                  WHEN ? = 1 THEN NULL
+                  ELSE failure_json
+                END,
+                updated_at = ?
           WHERE internal_id = ? AND state_revision = ?`,
         params([
           request.lifecycle,
+          request.output === undefined ? 0 : 1,
           optionalJson(request.output),
+          request.reason === undefined ? 0 : 1,
           optionalJson(request.reason),
+          request.lifecycle === 'completed' ? 1 : 0,
           request.updatedAt,
           instance.internal_id,
           instance.state_revision,
@@ -712,7 +730,6 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
         transaction,
         instance.internal_id,
         request.updatedAt,
-        request.reason,
       );
     });
   }
@@ -917,13 +934,16 @@ async function abandonUnprocessedMessages(
   transaction: ExpoSqliteExecutorLike,
   internalId: number,
   resolvedAt: string,
-  reason: JsonValue | undefined,
 ): Promise<void> {
+  // Identical to the Node adapter and PRD R4 closure: every already-accepted
+  // but unprocessed message — including a `failed` poison message under
+  // recovery termination — receives the observable terminal disposition, and
+  // existing per-message error evidence is preserved.
   await transaction.runAsync(
     `UPDATE dh_v2_messages
-        SET disposition = 'abandoned', error_json = ?, resolved_at = ?
-      WHERE target_internal_id = ? AND disposition IN ('accepted', 'processing')`,
-    params([optionalJson(reason), resolvedAt, internalId]),
+        SET disposition = 'abandoned', resolved_at = ?
+      WHERE target_internal_id = ? AND disposition IN ('accepted', 'processing', 'failed')`,
+    params([resolvedAt, internalId]),
   );
 }
 

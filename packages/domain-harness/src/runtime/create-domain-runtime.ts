@@ -11,6 +11,7 @@ import { ProjectionService } from '../projection/projection-service.js';
 import { DomainQueryDispatcher } from '../query/domain-query-dispatcher.js';
 import { PoisonMessageRecoveryCoordinator } from '../recovery-v2/poison-message-recovery.js';
 import { SubscriptionRegistry, type ProjectionSubscription } from '../subscription/subscription-registry.js';
+import { MessageRevisionTracker } from './message-revision-tracker.js';
 import type { BusinessSnapshotPort } from '../v2/contracts/projection.js';
 import type { DomainQuery } from '../v2/contracts/query.js';
 import type {
@@ -122,7 +123,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   });
   const query = new DomainQueryDispatcher({ store: options.store, projection });
   const projectionSubscriptions = new Map<string, { request: ProjectionSubscription; count: number }>();
-  const messageRevisions = new Map<string, number>();
+  const messageRevisions = new MessageRevisionTracker();
 
   const subscriptions = new SubscriptionRegistry({
     observationSource: {
@@ -135,7 +136,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         }
         if (subscription.kind === 'message') {
           if (subscription.messageId === undefined) {
-            return String(messageRevisions.get(addressKey(subscription.target)) ?? 0);
+            return messageRevisions.read(addressKey(subscription.target));
           }
           const disposition = await options.store.getMessageDisposition(
             subscription.target,
@@ -197,7 +198,12 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         // other drain failure — including ProcessingConflictError — surfaces here so
         // a stuck mailbox is never silent.
         if (!(error instanceof RecoveryRecordedError)) {
-          options.onBackgroundError?.(error, target);
+          try {
+            options.onBackgroundError?.(error, target);
+          } catch {
+            // A throwing host error handler must not turn drain-error routing into
+            // an unhandled rejection on the floating drain promise chain.
+          }
         }
       })
       .finally(() => {
@@ -210,7 +216,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
 
   const notifyTargetChanged = (target: WorkflowAddress, messageId?: string): void => {
     const key = addressKey(target);
-    messageRevisions.set(key, (messageRevisions.get(key) ?? 0) + 1);
+    messageRevisions.bump(key);
     subscriptions.notifyInstanceChanged(target);
     subscriptions.notifyMessageChanged(target, messageId);
     for (const { request } of projectionSubscriptions.values()) {
@@ -406,6 +412,14 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         count: (existing?.count ?? 0) + 1,
       });
     }
+    // Target-wide message subscriptions are the only consumer of synthesized
+    // revisions; scoping retention to them keeps the tracker bounded by active
+    // subscriptions instead of address history (#170).
+    let revisionKey: string | undefined;
+    if (request.kind === 'message' && request.messageId === undefined) {
+      revisionKey = addressKey(request.target);
+      messageRevisions.retain(revisionKey);
+    }
     const unsubscribe = subscriptions.subscribe(request, listener);
     let active = true;
     return () => {
@@ -419,6 +433,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
           else projectionSubscriptions.set(projectionKey, { ...existing, count: existing.count - 1 });
         }
       }
+      if (revisionKey !== undefined) messageRevisions.release(revisionKey);
     };
   }
 

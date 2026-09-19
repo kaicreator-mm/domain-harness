@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { translateV01ScriptInvokes, V01ScriptTranslationError } from '../../../packages/domain-harness-compiler/dist/compat/v01-script/index.js';
 import { bundleScriptTool } from '../../../packages/domain-harness-compiler/dist/script/script-bundle.js';
-import { ScriptExecutor as V01ScriptExecutor } from '../../../packages/domain-harness/dist/script/script-executor.js';
+import { ScriptExecutor as V01ScriptExecutor } from '../../../packages/domain-harness/dist-legacy-test/script/script-executor.js';
 import { NodeScriptExecutor as V02NodeScriptExecutor } from '../../../packages/domain-harness-node/dist/script/script-executor.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

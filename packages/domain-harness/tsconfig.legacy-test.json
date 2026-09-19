@@ -1,0 +1,14 @@
+{
+  // Test-only build of the frozen v0.1 regression bridge (issue #166).
+  // The published artifact (tsconfig.build.json -> dist/) contains only the
+  // v0.2 production graph; this config compiles the legacy entry points that
+  // regression evidence tests (plain-ESM host journey, v0.1 script migration
+  // equivalence) execute, into a non-published, git-ignored directory.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-legacy-test",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src/legacy-v1/index.ts", "src/script/script-executor.ts"]
+}
