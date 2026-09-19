@@ -1,9 +1,16 @@
 {
+  // Production build graph (issue #166): emit only the transitive import
+  // closure of the public v0.2 entry point. Legacy v0.1 modules
+  // (loader/compiler/engine-runner/persistence/recovery/public/legacy-v1) stay
+  // in the repository as regression/migration evidence - they remain
+  // typechecked by tsconfig.json and runnable from source via tsx, but are no
+  // longer compiled into or shipped inside the published artifact.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
-  }
+  },
+  "include": ["src/index.ts"]
 }
