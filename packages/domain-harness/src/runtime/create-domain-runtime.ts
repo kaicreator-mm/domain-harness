@@ -197,7 +197,12 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         // other drain failure — including ProcessingConflictError — surfaces here so
         // a stuck mailbox is never silent.
         if (!(error instanceof RecoveryRecordedError)) {
-          options.onBackgroundError?.(error, target);
+          try {
+            options.onBackgroundError?.(error, target);
+          } catch {
+            // A throwing host error handler must not turn drain-error routing into
+            // an unhandled rejection on the floating drain promise chain.
+          }
         }
       })
       .finally(() => {
