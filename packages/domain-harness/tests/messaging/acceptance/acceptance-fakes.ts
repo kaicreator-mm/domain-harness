@@ -1,5 +1,9 @@
 import type { JsonSchema, JsonValue } from '../../../src/contracts/json.js';
-import type { DomainMessage, MessageAcceptedAck } from '../../../src/v2/contracts/message.js';
+import type {
+  DomainMessage,
+  MessageAcceptedAck,
+  MessageDispositionSnapshot,
+} from '../../../src/v2/contracts/message.js';
 import type {
   TargetCompiledDomainPackage,
 } from '../../../src/v2/contracts/package.js';
@@ -36,6 +40,30 @@ export class AcceptanceStoreFake implements MessageAcceptanceStore {
     return result;
   }
 
+  async getMessageDisposition(
+    target: WorkflowAddress,
+    messageId: string,
+  ): Promise<MessageDispositionSnapshot | null> {
+    const existing = this.persisted.find(
+      (record) => sameAddress(record.message.target, target) && record.message.messageId === messageId,
+    );
+    if (!existing) return null;
+
+    return {
+      messageId: existing.ack.messageId,
+      target: { ...existing.ack.target },
+      targetSequence: existing.ack.targetSequence,
+      packageId: existing.ack.packageId,
+      disposition: 'accepted',
+      correlationId:
+        existing.message.correlationId ?? this.snapshot?.correlationId ?? 'corr-acceptance-fake',
+      ...(existing.message.causationId === undefined
+        ? {}
+        : { causationId: existing.message.causationId }),
+      acceptedAt: existing.ack.acceptedAt,
+    };
+  }
+
   async acceptMessage(message: DomainMessage): Promise<MessageAcceptedAck> {
     this.acceptCalls += 1;
 
@@ -53,9 +81,6 @@ export class AcceptanceStoreFake implements MessageAcceptanceStore {
       if (!current || !sameAddress(current.address, message.target)) {
         throw new Error('RuntimeStore atomic acceptance rejected: target not found');
       }
-      if (current.lifecycle !== 'active' && current.lifecycle !== 'waiting') {
-        throw new Error(`RuntimeStore atomic acceptance rejected: target is ${current.lifecycle}`);
-      }
 
       const existing = this.persisted.find(
         (record) =>
@@ -68,6 +93,10 @@ export class AcceptanceStoreFake implements MessageAcceptanceStore {
           target: { ...existing.ack.target },
           status: 'duplicate',
         };
+      }
+
+      if (current.lifecycle !== 'active' && current.lifecycle !== 'waiting') {
+        throw new Error(`RuntimeStore atomic acceptance rejected: target is ${current.lifecycle}`);
       }
 
       const targetSequence = this.nextSequence;
