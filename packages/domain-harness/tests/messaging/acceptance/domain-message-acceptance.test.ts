@@ -181,6 +181,38 @@ test('G16: RuntimeStore atomic recheck closes lifecycle race after pre-validatio
   assert.equal(store.persisted.length, 0);
 });
 
+test('G15/G16: race reconciliation returns durable duplicate if adapter rejects lifecycle before dedup', async () => {
+  const store = new AcceptanceStoreFake(createSnapshot());
+  store.lifecycleCheckBeforeDuplicate = true;
+  store.afterGetInstance = () => {
+    store.persisted.push({
+      message: createMessage({ correlationId: 'corr-order-42' }),
+      ack: {
+        status: 'accepted',
+        messageId: 'message-1',
+        target: { workflowId: 'order', instanceKey: 'order-42' },
+        targetSequence: 1,
+        packageId: 'pkg-a',
+        acceptedAt: '2026-09-18T00:00:00.001Z',
+      },
+    });
+    store.setLifecycle('completed');
+  };
+  const boundary = new DomainMessageAcceptance({
+    store,
+    packages: createRegistry([createPackage({ packageId: 'pkg-a', contractVersion: '1' })]),
+  });
+
+  const duplicate = await boundary.accept(createMessage());
+
+  assert.equal(duplicate.status, 'duplicate');
+  assert.equal(duplicate.targetSequence, 1);
+  assert.equal(duplicate.packageId, 'pkg-a');
+  assert.equal(duplicate.acceptedAt, '2026-09-18T00:00:00.001Z');
+  assert.equal(store.acceptCalls, 1, 'race path must reach the store once before reconciliation');
+  assert.equal(store.persisted.length, 1);
+});
+
 test('G19: effective correlation and causation identities survive durable acceptance', async () => {
   const store = new AcceptanceStoreFake(createSnapshot({ correlationId: 'corr-instance' }));
   const boundary = new DomainMessageAcceptance({
