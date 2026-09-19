@@ -80,7 +80,12 @@ class FakeEffectStore implements DomainMessageEffectJournalStore {
 
   async beginEffect(request: BeginEffectRequest): Promise<EffectJournalRecord> {
     this.timeline.push(`journal:begin:${request.attempt}`);
-    if (this.record?.status === 'completed') return cloneRecord(this.record);
+    // Mirrors the real Node/Expo adapters (frozen L2 A1.4): an existing
+    // compatible record is returned unchanged — attempt/startedAt never
+    // advance on re-begin.
+    if (this.record !== null && this.record.effectId === request.effectId) {
+      return cloneRecord(this.record);
+    }
     this.record = cloneRecord(request);
     return cloneRecord(this.record);
   }
@@ -255,7 +260,9 @@ test('G20 crash window re-accepts the same child ID, receives duplicate ACK, and
 
   assert.equal(replay.status, 'completed');
   assert.equal(replay.ack.status, 'duplicate');
-  assert.equal(replay.attempt, 2);
+  // Frozen L2 A1.4: replay re-executes under the same idempotency identity;
+  // the durable attempt does not advance on re-begin.
+  assert.equal(replay.attempt, 1);
   assert.equal(acceptance.calls.length, 2);
   assert.equal(acceptance.calls[0]?.messageId, acceptance.calls[1]?.messageId);
   assert.equal(acceptance.accepted.size, 1, 'target dedup keeps one durable message');

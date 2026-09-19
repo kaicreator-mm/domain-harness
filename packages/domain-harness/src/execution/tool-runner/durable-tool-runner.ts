@@ -146,7 +146,10 @@ export class DurableToolRunner {
         effectKind: expected.effectKind,
         effectSemantics: request.descriptor.effect,
         status: 'started',
-        attempt: record.attempt + 1,
+        // Frozen L2 A1.4: re-begin identity excludes attempt/startedAt and
+        // adapters return the durable record unchanged, so carry the durable
+        // attempt instead of a fictional progression the store discards.
+        attempt: record.attempt,
         input: request.input,
         startedAt: this.#now(),
       });

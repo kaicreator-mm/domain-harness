@@ -70,7 +70,12 @@ class FakeEffectStore implements EffectJournalStore {
     this.inWrite = true;
     this.events.push(`begin:${request.attempt}`);
     try {
-      if (this.record?.status === 'completed') return this.record;
+      // Mirrors the real Node/Expo adapters (frozen L2 A1.4): an existing
+      // compatible record is returned unchanged — attempt/startedAt are
+      // excluded from identity and never advance on re-begin.
+      if (this.record !== null && this.record.effectId === request.effectId) {
+        return this.record;
+      }
       this.record = { ...request };
       return this.record;
     } finally {
@@ -206,16 +211,18 @@ for (const effect of ['none', 'idempotent'] as const) {
           invocations += 1;
           assert.equal(executionRequest.context.effectId, effectId);
           assert.equal(executionRequest.context.idempotencyKey, effectId);
-          assert.equal(executionRequest.context.attempt, 2);
+          // Frozen L2 A1.4: re-execution runs under the durable attempt (1);
+          // the journal attempt does not advance on re-begin.
+          assert.equal(executionRequest.context.attempt, 1);
           return { recovered: true };
         },
       }),
     );
 
     assert.equal(result.status, 'completed');
-    assert.equal(result.attempt, 2);
+    assert.equal(result.attempt, 1);
     assert.equal(invocations, 1);
-    assert.ok(store.events.includes('begin:2'));
+    assert.ok(store.events.includes('begin:1'));
     assert.ok(store.events.includes('complete'));
   });
 }
@@ -268,7 +275,7 @@ test('G10 crash after non-idempotent external success but before result commit n
   assert.equal(store.record?.status, 'started');
 });
 
-test('idempotent crash before result commit is retryable and advances the attempt', async () => {
+test('idempotent crash before result commit is retryable under the same durable attempt', async () => {
   const store = new FakeEffectStore();
   store.failComplete = true;
   let invocations = 0;
@@ -290,8 +297,10 @@ test('idempotent crash before result commit is retryable and advances the attemp
   store.failComplete = false;
   const replay = await runner(store).run(toolRequest);
   assert.equal(replay.status, 'completed');
-  assert.equal(replay.attempt, 2);
-  assert.deepEqual(replay.output, { attempt: 2 });
+  // The retry re-executes under the same idempotency identity; per frozen
+  // L2 A1.4 the durable attempt does not advance on re-begin.
+  assert.equal(replay.attempt, 1);
+  assert.deepEqual(replay.output, { attempt: 1 });
   assert.equal(invocations, 2);
 });
 

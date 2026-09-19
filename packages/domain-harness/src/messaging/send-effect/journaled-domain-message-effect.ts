@@ -118,7 +118,9 @@ export class JournaledDomainMessageEffect {
         effectKind: EFFECT_KIND,
         effectSemantics: EFFECT_SEMANTICS,
         status: 'started',
-        attempt: record.attempt + 1,
+        // Frozen L2 A1.4: re-begin returns the durable record unchanged; the
+        // request carries the durable attempt, not a fictional progression.
+        attempt: record.attempt,
         input,
         startedAt: this.#now(),
       });
