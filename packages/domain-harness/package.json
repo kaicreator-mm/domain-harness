@@ -8,11 +8,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./v2": {
       "types": "./dist/public-v2/index.d.ts",
-      "import": "./dist/public-v2/index.js"
+      "import": "./dist/public-v2/index.js",
+      "require": "./dist/public-v2/index.js"
     }
   },
   "files": [

@@ -11,7 +11,8 @@ import type {
   RawToolDefinition,
   TargetHostProfile,
 } from '../raw/types.js';
-import { canonicalJson, sha256Text } from '../package/canonical.js';
+import { SUPPORTED_COMPILED_INVOKE_KINDS_V2 } from '@kaicreator/domain-harness/v2';
+import { canonicalJson } from '../package/canonical.js';
 import {
   assertCompiledPackageManifest,
   buildBindingDigests,
@@ -46,25 +47,76 @@ export interface CompileDomainPackageResult {
   requiredBindingIds: readonly string[];
 }
 
-function jsonRoute(route: RawRoute): JsonObject {
+/**
+ * Executable-artifact invariant (#167): a successful public v0.2 compilation
+ * emits only workflow IR executable by executionEngineMajor 2. Legacy script
+ * invokes must pass through the T-021 translation (translateV01ScriptInvokes,
+ * L2 §18.1) before compilation; child workflow invokes must be modeled as
+ * durable Domain Message effects. Route targets must resolve, and every
+ * JSONata expression is syntax-checked at build time so invalid expressions
+ * fail closed here instead of mid-drain.
+ */
+function assertJsonataSyntax(expression: string, context: string): void {
+  try {
+    jsonata(expression);
+  } catch (error) {
+    throw new Error(
+      `${context} is not valid JSONata: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function jsonRoute(
+  workflowId: string,
+  stateId: string,
+  route: RawRoute,
+  stateIds: ReadonlySet<string>,
+  context: string,
+): JsonObject {
+  if (!stateIds.has(route.target)) {
+    throw new Error(
+      `workflow '${workflowId}' state '${stateId}' ${context} targets unknown state '${route.target}'`,
+    );
+  }
+  if (route.when) {
+    assertJsonataSyntax(route.when, `workflow '${workflowId}' state '${stateId}' ${context} route condition`);
+  }
   return { target: route.target, ...(route.when ? { when: route.when } : {}) };
 }
 
-function jsonInvoke(invoke: RawInvoke): JsonObject {
+function jsonInvoke(workflowId: string, stateId: string, invoke: RawInvoke): JsonObject {
   const common: Record<string, JsonValue> = {};
-  if (invoke.input) common.input = invoke.input;
-  if (invoke.timeoutMs !== undefined) common.timeoutMs = invoke.timeoutMs;
-  if (invoke.kind === 'expr') return { kind: 'expr', expression: invoke.expression ?? '', ...common };
-  if (invoke.kind === 'script') {
-    if (!invoke.ref || invoke.scriptSource === undefined) throw new Error('script invoke must have frozen build-time source');
-    return {
-      kind: 'script',
-      ref: invoke.ref,
-      sourceDigest: sha256Text(invoke.scriptSource),
-      ...common,
-    };
+  if (invoke.input) {
+    assertJsonataSyntax(invoke.input, `workflow '${workflowId}' state '${stateId}' invoke input`);
+    common.input = invoke.input;
   }
-  return { kind: invoke.kind, ref: invoke.ref ?? '', ...common };
+  if (invoke.timeoutMs !== undefined) common.timeoutMs = invoke.timeoutMs;
+  if (invoke.kind === 'script') {
+    throw new Error(
+      `workflow '${workflowId}' state '${stateId}': top-level 'script' invoke is not executable by the v0.2 Runtime (executionEngineMajor 2); translate legacy Script invokes into synthetic Script Domain Tools via translateV01ScriptInvokes (T-021 / L2 18.1) before compiling`,
+    );
+  }
+  if (invoke.kind === 'workflow') {
+    throw new Error(
+      `workflow '${workflowId}' state '${stateId}': top-level child 'workflow' invoke is not executable by the v0.2 Runtime (executionEngineMajor 2); model child workflows as durable Domain Message effects`,
+    );
+  }
+  if (!(SUPPORTED_COMPILED_INVOKE_KINDS_V2 as readonly string[]).includes(invoke.kind)) {
+    throw new Error(
+      `workflow '${workflowId}' state '${stateId}': invoke kind '${invoke.kind}' is outside the executable IR contract for executionEngineMajor 2`,
+    );
+  }
+  if (invoke.kind === 'expr') {
+    if (!invoke.expression) {
+      throw new Error(`workflow '${workflowId}' state '${stateId}': expr invoke must declare a non-empty expression`);
+    }
+    assertJsonataSyntax(invoke.expression, `workflow '${workflowId}' state '${stateId}' invoke expression`);
+    return { kind: 'expr', expression: invoke.expression, ...common };
+  }
+  if (!invoke.ref) {
+    throw new Error(`workflow '${workflowId}' state '${stateId}': ${invoke.kind} invoke must declare a non-empty ref`);
+  }
+  return { kind: invoke.kind, ref: invoke.ref, ...common };
 }
 
 function compiledSkill(raw: LoadedRawDomainPackage, ref: string): JsonObject {
@@ -87,6 +139,16 @@ function sameSchema(left: JsonSchema, right: JsonSchema): boolean {
 function compileWorkflow(raw: LoadedRawDomainPackage, workflowId: string): CompiledWorkflowDescriptor {
   const workflow = raw.workflows.get(workflowId);
   if (!workflow) throw new Error(`workflow '${workflowId}' does not exist`);
+  if (!Number.isSafeInteger(raw.limits.maxSteps) || raw.limits.maxSteps < 1) {
+    throw new Error(`workflow '${workflowId}': limits.maxSteps must be a positive safe integer`);
+  }
+  const stateIds = new Set(Object.keys(workflow.states));
+  if (!stateIds.has(workflow.initial)) {
+    throw new Error(`workflow '${workflowId}' initial state '${workflow.initial}' is not declared in states`);
+  }
+  if (workflow.output) {
+    assertJsonataSyntax(workflow.output, `workflow '${workflowId}' output`);
+  }
   const messageContracts: Record<string, CompiledMessageContract> = {};
   const states: Record<string, JsonValue> = {};
   for (const stateId of Object.keys(workflow.states).sort()) {
@@ -102,26 +164,42 @@ function compileWorkflow(raw: LoadedRawDomainPackage, workflowId: string): Compi
         throw new Error(`workflow '${workflowId}' message '${eventName}' declares inconsistent payload schemas across states`);
       }
       if (!existing) messageContracts[eventName] = { type: eventName, payloadSchema };
-      events[eventName] = { routes: event.routes.map(jsonRoute) };
+      events[eventName] = {
+        routes: event.routes.map((route) =>
+          jsonRoute(workflowId, stateId, route, stateIds, `event '${eventName}'`),
+        ),
+      };
     }
     states[stateId] = {
       final: state.final,
       ...(state.invoke ? {
         invoke: state.invoke.kind === 'skill' && state.invoke.ref
-          ? { ...jsonInvoke(state.invoke), skill: compiledSkill(raw, state.invoke.ref) }
-          : jsonInvoke(state.invoke),
+          ? { ...jsonInvoke(workflowId, stateId, state.invoke), skill: compiledSkill(raw, state.invoke.ref) }
+          : jsonInvoke(workflowId, stateId, state.invoke),
       } : {}),
-      done: state.done.map(jsonRoute),
-      error: state.error.map(jsonRoute),
+      done: state.done.map((route) => jsonRoute(workflowId, stateId, route, stateIds, 'done route')),
+      error: state.error.map((route) => jsonRoute(workflowId, stateId, route, stateIds, 'error route')),
       events,
       ...(state.effects?.length ? {
-        effects: state.effects.map((effect) => ({
-          kind: 'domain-message',
-          targetExpression: effect.targetExpression,
-          messageType: effect.messageType,
-          ...(effect.payloadExpression ? { payloadExpression: effect.payloadExpression } : {}),
-          ...(effect.contractVersion ? { contractVersion: effect.contractVersion } : {}),
-        })),
+        effects: state.effects.map((effect) => {
+          assertJsonataSyntax(
+            effect.targetExpression,
+            `workflow '${workflowId}' state '${stateId}' domain-message targetExpression`,
+          );
+          if (effect.payloadExpression) {
+            assertJsonataSyntax(
+              effect.payloadExpression,
+              `workflow '${workflowId}' state '${stateId}' domain-message payloadExpression`,
+            );
+          }
+          return {
+            kind: 'domain-message',
+            targetExpression: effect.targetExpression,
+            messageType: effect.messageType,
+            ...(effect.payloadExpression ? { payloadExpression: effect.payloadExpression } : {}),
+            ...(effect.contractVersion ? { contractVersion: effect.contractVersion } : {}),
+          };
+        }),
       } : {}),
     };
   }
