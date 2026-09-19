@@ -1,17 +1,15 @@
-export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+import type {
+  CompiledBindingDescriptor,
+  JsonPrimitive,
+  JsonValue,
+  ScriptExecutionRequest,
+} from '@kaicreator/domain-harness/v2';
 
-export interface ScriptBindingDescriptor {
-  readonly kind: string;
-  readonly bindingId: string;
-  readonly config?: JsonValue;
-}
-
-export interface ScriptExecutionRequest {
-  readonly binding: ScriptBindingDescriptor;
-  readonly input: JsonValue;
-  readonly signal?: AbortSignal;
-}
+// Script request/binding contracts are owned by the core v2 contracts (#164);
+// this module keeps only genuinely Expo-specific shapes. The alias preserves
+// the historical export name.
+export type { JsonPrimitive, JsonValue, ScriptExecutionRequest };
+export type ScriptBindingDescriptor = CompiledBindingDescriptor;
 
 export type ExpoCompiledScriptFunction = (input: JsonValue) => JsonValue | Promise<JsonValue>;
 

@@ -1,67 +1,33 @@
 import type {
   CapabilityId,
-  JsonObject,
-  JsonSchema,
-  LogicalToolBindingConfig,
-  RawProjectionDependency,
   TargetHostProfile,
-  ToolEffectSemantics,
 } from '../raw/types.js';
+import type {
+  CompiledBindingDescriptor,
+  CompiledMessageContract,
+  CompiledPackageManifest,
+  CompiledProjectionDescriptor,
+  CompiledToolDescriptor,
+  CompiledWorkflowDescriptor,
+  ProjectionDependencyDescriptor,
+} from '@kaicreator/domain-harness/v2';
 import { canonicalJson, sha256Canonical, sha256Text } from './canonical.js';
 
-export interface CompiledMessageContract {
-  type: string;
-  version?: string;
-  payloadSchema: JsonSchema;
-}
-
-export interface CompiledWorkflowDescriptor {
-  workflowId: string;
-  definition: JsonObject;
-  messageContracts: Readonly<Record<string, CompiledMessageContract>>;
-}
-
-export interface CompiledBindingDescriptor {
-  kind: string;
-  bindingId: string;
-  digest?: string;
-  config?: LogicalToolBindingConfig;
-}
-
-export interface CompiledToolDescriptor {
-  toolId: string;
-  inputSchema?: JsonSchema;
-  outputSchema: JsonSchema;
-  effect: ToolEffectSemantics;
-  execution: CompiledBindingDescriptor;
-  requiredCapabilities: readonly CapabilityId[];
-}
-
-export type ProjectionDependencyDescriptor = RawProjectionDependency;
-
-export interface CompiledProjectionDescriptor {
-  projectionId: string;
-  expression: string;
-  dependencies: readonly ProjectionDependencyDescriptor[];
-  outputSchema: JsonSchema;
-}
-
-export interface CompiledPackageManifest {
-  formatVersion: string;
-  runtimeContractMajor: number;
-  executionEngineMajor: number;
-  domainId: string;
-  domainVersion: string;
-  packageId: string;
-  targetProfileId: string;
-  requiredCapabilities: readonly CapabilityId[];
-  workflows: Readonly<Record<string, CompiledWorkflowDescriptor>>;
-  tools: Readonly<Record<string, CompiledToolDescriptor>>;
-  projections: Readonly<Record<string, CompiledProjectionDescriptor>>;
-  schemas: Readonly<Record<string, JsonSchema>>;
-  bindingDigests: Readonly<Record<string, string>>;
-  compatibility?: JsonObject;
-}
+// The compiled artifact contracts have exactly one authoritative owner: the
+// core v2 contracts consumed by activation and the Runtime (frozen L2
+// dependency rule "compiler -> core contracts", issue #164). The re-exports
+// keep historical compiler-side import paths working while producer and
+// consumer now share one TypeScript source of truth - a stale compiler can no
+// longer emit an artifact that only looks assignable.
+export type {
+  CompiledBindingDescriptor,
+  CompiledMessageContract,
+  CompiledPackageManifest,
+  CompiledProjectionDescriptor,
+  CompiledToolDescriptor,
+  CompiledWorkflowDescriptor,
+  ProjectionDependencyDescriptor,
+};
 
 export type ManifestWithoutPackageId = Omit<CompiledPackageManifest, 'packageId'>;
 

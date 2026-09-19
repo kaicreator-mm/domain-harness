@@ -165,7 +165,10 @@ function compileTools(
         kind: tool.executionKind,
         bindingId,
         ...(bindingDigests[bindingId] ? { digest: bindingDigests[bindingId] } : {}),
-        ...(tool.config !== undefined ? { config: tool.config } : {}),
+        // Copy into a plain record: the authoritative core CompiledBindingDescriptor
+        // types config as JsonValue, and the closed LogicalToolBindingConfig interface
+        // (validated above) carries no implicit index signature.
+        ...(tool.config !== undefined ? { config: { ...tool.config } } : {}),
       },
       requiredCapabilities,
     };

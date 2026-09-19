@@ -16,11 +16,14 @@
     "node": ">=22"
   },
   "scripts": {
+    "prebuild": "npm run build -w @kaicreator/domain-harness",
     "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@kaicreator/domain-harness": "0.2.0",
     "ajv": "^8.17.1",
     "jsonata": "^2.2.2",
     "yaml": "^2.0.0"

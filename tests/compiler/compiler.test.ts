@@ -19,6 +19,7 @@ import {
   MissingBindingContentError,
 } from '../../packages/domain-harness-compiler/src/package/manifest.js';
 import { emitTargetCompiledPackageModule } from '../../packages/domain-harness-compiler/src/package/module-emitter.js';
+import type { TargetCompiledDomainPackage } from '../../packages/domain-harness/src/v2/index.js';
 
 const CAPS = {
   hash: 'crypto-hash-sha256@1',
@@ -475,4 +476,14 @@ test('migrated build-time loader discovers and validates legacy YAML without exp
   });
   assert.equal(result.manifest.domainId, 'loaded-domain');
   assert.doesNotMatch(JSON.stringify(result.manifest), /harness\.yaml|basic\.yaml/u);
+});
+
+test('compiled manifest is assignable to the authoritative core package contract without casts (#164)', () => {
+  const { manifest } = compileFixture();
+  // Type-level proof, evaluated by the TS compiler at test-typecheck time:
+  // the compiler's emitted manifest IS the core frozen artifact contract -
+  // producer and Runtime consumer share one source of truth, no adapter cast.
+  const compiledPackage: TargetCompiledDomainPackage = { manifest, bindings: {} };
+  assert.equal(compiledPackage.manifest.executionEngineMajor, 2);
+  assert.equal(compiledPackage.manifest.packageId, manifest.packageId);
 });
