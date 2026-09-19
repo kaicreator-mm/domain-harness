@@ -80,9 +80,24 @@ export class DomainMessageAcceptance implements DomainMessageAcceptanceBoundary 
 
     // RuntimeStore.acceptMessage is the frozen atomic boundary that re-checks target lifecycle,
     // deduplicates, durably persists and allocates the per-target sequence before it resolves.
-    const ack = await this.store.acceptMessage(persistedMessage);
-    assertAcceptedAck(ack, persistedMessage, target.packageId);
-    return ack;
+    // If an adapter rejects during the race window after our first lookup, reconcile once against
+    // the durable identity before surfacing the error. This preserves the public duplicate
+    // contract even for an adapter that observes lifecycle before its own duplicate read.
+    try {
+      const ack = await this.store.acceptMessage(persistedMessage);
+      assertAcceptedAck(ack, persistedMessage, target.packageId);
+      return ack;
+    } catch (error) {
+      const racedDuplicate = await this.store.getMessageDisposition(
+        persistedMessage.target,
+        persistedMessage.messageId,
+      );
+      if (!racedDuplicate) throw error;
+
+      const ack = duplicateAck(racedDuplicate);
+      assertAcceptedAck(ack, persistedMessage, racedDuplicate.packageId);
+      return ack;
+    }
   }
 }
 
