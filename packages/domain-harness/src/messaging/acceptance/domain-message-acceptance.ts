@@ -83,10 +83,9 @@ export class DomainMessageAcceptance implements DomainMessageAcceptanceBoundary 
     // If an adapter rejects during the race window after our first lookup, reconcile once against
     // the durable identity before surfacing the error. This preserves the public duplicate
     // contract even for an adapter that observes lifecycle before its own duplicate read.
+    let ack: MessageAcceptedAck;
     try {
-      const ack = await this.store.acceptMessage(persistedMessage);
-      assertAcceptedAck(ack, persistedMessage, target.packageId);
-      return ack;
+      ack = await this.store.acceptMessage(persistedMessage);
     } catch (error) {
       const racedDuplicate = await this.store.getMessageDisposition(
         persistedMessage.target,
@@ -94,10 +93,15 @@ export class DomainMessageAcceptance implements DomainMessageAcceptanceBoundary 
       );
       if (!racedDuplicate) throw error;
 
-      const ack = duplicateAck(racedDuplicate);
-      assertAcceptedAck(ack, persistedMessage, racedDuplicate.packageId);
-      return ack;
+      const duplicate = duplicateAck(racedDuplicate);
+      assertAcceptedAck(duplicate, persistedMessage, racedDuplicate.packageId);
+      return duplicate;
     }
+
+    // Store contract violations must fail closed; they are not delivery races and therefore must
+    // never be converted into a duplicate result by the reconciliation path above.
+    assertAcceptedAck(ack, persistedMessage, target.packageId);
+    return ack;
   }
 }
 
