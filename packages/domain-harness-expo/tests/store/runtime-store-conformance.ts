@@ -406,7 +406,7 @@ export async function runRuntimeStoreConformance(
       effectSemantics: 'idempotent',
       status: 'started',
       attempt: 1,
-      input: { value: 7 },
+      input: { value: 7, ctx: 'replay' },
       startedAt: '2026-09-18T00:00:10.500Z',
     });
     const rebegun = await store.beginEffect({
@@ -417,12 +417,14 @@ export async function runRuntimeStoreConformance(
       effectSemantics: 'idempotent',
       status: 'started',
       attempt: 2,
-      input: { value: 7 },
+      // Same logical input, different key order: identity comparison must be
+      // structural, not serialization-order sensitive (#173).
+      input: { ctx: 'replay', value: 7 },
       startedAt: '2026-09-18T00:00:10.750Z',
     });
     assert(
       rebegun.status === 'started' && rebegun.attempt === replayed.attempt,
-      're-begin of a still-started effect must return the durable record for same-identity re-execution',
+      're-begin of a still-started effect must return the durable record for same-identity re-execution (input key order-insensitive)',
     );
     await store.completeEffect({
       effectId: 'effect-replay',

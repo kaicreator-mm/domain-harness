@@ -328,14 +328,59 @@ function sameEffectIdentity(row: EffectRow, request: BeginEffectRequest): boolea
   // Identity excludes attempt and startedAt, matching the Node adapter: a replayed
   // beginEffect for a still-started record (reclaim/recovery re-execution with the
   // same idempotency identity) returns the durable record instead of conflicting.
+  // Input comparison is key-order-insensitive structural equality, matching the
+  // Node adapter and the core canonical journal check.
   return (
     row.workflow_id === request.target.workflowId &&
     row.instance_key === request.target.instanceKey &&
     row.source_message_id === request.sourceMessageId &&
     row.effect_kind === request.effectKind &&
     row.effect_semantics === request.effectSemantics &&
-    row.input_json === optionalJson(request.input)
+    sameJson(parseOptionalJson(row.input_json), request.input)
   );
+}
+
+function sameJson(left: JsonValue | undefined, right: JsonValue | undefined): boolean {
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+  return jsonEquals(left, right);
+}
+
+function jsonEquals(left: JsonValue, right: JsonValue): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left === null || right === null || typeof left !== typeof right) {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+    return left.every((item, index) => {
+      const other = right[index];
+      return other !== undefined && jsonEquals(item, other);
+    });
+  }
+  if (typeof left === 'object' && typeof right === 'object') {
+    const leftRecord = left as Readonly<Record<string, JsonValue>>;
+    const rightRecord = right as Readonly<Record<string, JsonValue>>;
+    const leftKeys = Object.keys(leftRecord).sort();
+    const rightKeys = Object.keys(rightRecord).sort();
+    if (leftKeys.length !== rightKeys.length) {
+      return false;
+    }
+    return leftKeys.every((key, index) => {
+      if (key !== rightKeys[index]) {
+        return false;
+      }
+      const leftValue = leftRecord[key];
+      const rightValue = rightRecord[key];
+      return leftValue !== undefined && rightValue !== undefined && jsonEquals(leftValue, rightValue);
+    });
+  }
+  return false;
 }
 
 export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
