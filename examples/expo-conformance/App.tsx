@@ -9,8 +9,11 @@ import { runRuntimeConformanceSuite } from '../../tests/conformance/suite.ts';
 import { PORTABLE_RUNTIME_FIXTURE } from '../../tests/conformance/fixtures.ts';
 import { ExpoRuntimeConformanceHost } from '../../tests/hosts/expo/runtime-conformance-host.ts';
 import {
+  prepareReclaimCriticalJourney,
   prepareRestartCriticalJourney,
+  T019_RECLAIM_DATABASE,
   T019_RESTART_DATABASE,
+  verifyReclaimCriticalJourney,
   verifyRestartCriticalJourney,
 } from '../../tests/hosts/expo/restart-critical-journey.ts';
 
@@ -71,6 +74,13 @@ export default function App() {
 
   const verifyRestart = () => execute('RESTART_VERIFY', verifyRestartCriticalJourney);
 
+  const prepareReclaim = () => execute('RECLAIM_PREPARE', async () => {
+    await deleteDatabase(T019_RECLAIM_DATABASE);
+    return prepareReclaimCriticalJourney();
+  }, true);
+
+  const verifyReclaim = () => execute('RECLAIM_VERIFY', verifyReclaimCriticalJourney);
+
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>DomainHarness v0.2 — T-019</Text>
@@ -83,6 +93,11 @@ export default function App() {
           After PREPARED: force-stop the Android app from adb/device settings, then relaunch the same installed app. Do not use Fast Refresh or a Metro reload.
         </Text>
         <Button title="3. Verify after real relaunch" onPress={() => { void verifyRestart(); }} />
+        <Button title="4. Prepare processing-reclaim journey (#135)" onPress={() => { void prepareReclaim(); }} />
+        <Text>
+          After RECLAIM PREPARED: force-stop the Android app from adb/device settings, then relaunch the same installed app. Verification must reclaim and drain the interrupted message with no resend.
+        </Text>
+        <Button title="5. Verify reclaim after real relaunch" onPress={() => { void verifyReclaim(); }} />
       </View>
 
       <Text selectable>{JSON.stringify(output, null, 2)}</Text>

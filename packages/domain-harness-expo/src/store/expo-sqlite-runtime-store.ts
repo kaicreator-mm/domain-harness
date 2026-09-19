@@ -325,14 +325,15 @@ function assertAcceptingLifecycle(row: InstanceRow): void {
 }
 
 function sameEffectIdentity(row: EffectRow, request: BeginEffectRequest): boolean {
+  // Identity excludes attempt and startedAt, matching the Node adapter: a replayed
+  // beginEffect for a still-started record (reclaim/recovery re-execution with the
+  // same idempotency identity) returns the durable record instead of conflicting.
   return (
     row.workflow_id === request.target.workflowId &&
     row.instance_key === request.target.instanceKey &&
     row.source_message_id === request.sourceMessageId &&
     row.effect_kind === request.effectKind &&
     row.effect_semantics === request.effectSemantics &&
-    row.attempt === request.attempt &&
-    row.started_at === request.startedAt &&
     row.input_json === optionalJson(request.input)
   );
 }
@@ -510,17 +511,22 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
     if (instance === null) {
       return null;
     }
+    // Head-of-queue blocking, identical to the Node adapter: while the mailbox
+    // head is `processing` (or `failed`), no later accepted message is returned.
     const row = await this.database.getFirstAsync<MessageRow>(
       `SELECT target_sequence, message_id, type, payload_json, correlation_id, causation_id,
               contract_version, target_package_id, disposition, error_json,
               accepted_at, processing_at, resolved_at
          FROM dh_v2_messages
-        WHERE target_internal_id = ? AND disposition = 'accepted'
+        WHERE target_internal_id = ? AND disposition IN ('accepted', 'processing', 'failed')
         ORDER BY target_sequence ASC
         LIMIT 1`,
       params([instance.internal_id]),
     );
-    return row === null ? null : toStoredAcceptedMessage(target, row);
+    if (row === null || row.disposition !== 'accepted') {
+      return null;
+    }
+    return toStoredAcceptedMessage(target, row);
   }
 
   public async markMessageProcessing(
@@ -708,6 +714,55 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
         request.updatedAt,
         request.reason,
       );
+    });
+  }
+
+  public async listUnresolvedMessageTargets(): Promise<readonly WorkflowAddress[]> {
+    this.assertOpen();
+    const rows = await this.database.getAllAsync<{ workflow_id: string; instance_key: string }>(
+      `SELECT i.workflow_id, i.instance_key
+         FROM dh_v2_messages m
+         JOIN dh_v2_instances i ON i.internal_id = m.target_internal_id
+        WHERE m.disposition IN ('accepted', 'processing')
+        GROUP BY i.internal_id
+        ORDER BY i.workflow_id ASC, i.instance_key ASC`,
+    );
+    return rows.map((row) => ({ workflowId: row.workflow_id, instanceKey: row.instance_key }));
+  }
+
+  public async reclaimInterruptedProcessing(target: WorkflowAddress): Promise<readonly string[]> {
+    this.assertOpen();
+    return this.writes.run(async (transaction) => {
+      const instance = await transaction.getFirstAsync<Pick<InstanceRow, 'internal_id'>>(
+        'SELECT internal_id FROM dh_v2_instances WHERE workflow_id = ? AND instance_key = ?',
+        params([target.workflowId, target.instanceKey]),
+      );
+      if (instance === null) {
+        return [];
+      }
+      const interrupted = await transaction.getAllAsync<{ message_id: string }>(
+        `SELECT message_id
+           FROM dh_v2_messages
+          WHERE target_internal_id = ? AND disposition = 'processing'
+          ORDER BY target_sequence ASC`,
+        params([instance.internal_id]),
+      );
+      if (interrupted.length === 0) {
+        return [];
+      }
+      const reclaimed = await transaction.runAsync(
+        `UPDATE dh_v2_messages
+            SET disposition = 'accepted', processing_at = NULL
+          WHERE target_internal_id = ? AND disposition = 'processing'`,
+        params([instance.internal_id]),
+      );
+      if (reclaimed.changes !== interrupted.length) {
+        throw new ExpoRuntimeStoreError(
+          'MESSAGE_STATE_CONFLICT',
+          'Interrupted processing messages changed during reclaim',
+        );
+      }
+      return interrupted.map((row) => row.message_id);
     });
   }
 
