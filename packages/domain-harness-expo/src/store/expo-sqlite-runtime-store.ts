@@ -426,8 +426,6 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
     this.assertOpen();
     return this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, message.target);
-      assertAcceptingLifecycle(instance);
-
       const duplicate = await getMessageRow(transaction, instance.internal_id, message.messageId);
       if (duplicate !== null) {
         return {
@@ -439,6 +437,8 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
           acceptedAt: duplicate.accepted_at,
         };
       }
+
+      assertAcceptingLifecycle(instance);
 
       const targetSequence = instance.next_target_sequence;
       const acceptedAt = this.now();

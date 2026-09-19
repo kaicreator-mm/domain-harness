@@ -190,6 +190,22 @@ export async function runRuntimeStoreConformance(
     const recovery = await store.getInstance(main.address);
     assert(recovery?.lifecycle === 'recovery_required', 'processing failure did not enter recovery_required');
     assert((await store.getMessageDisposition(main.address, 'm-2'))?.disposition === 'failed', 'failed message disposition missing');
+
+    const duplicateDuringRecovery = await store.acceptMessage({
+      messageId: 'm-2',
+      target: main.address,
+      type: 'increment',
+      payload: { delta: 1 },
+    });
+    assert(duplicateDuringRecovery.status === 'duplicate', 'recovery_required rejected an already durable duplicate');
+    assert(
+      duplicateDuringRecovery.targetSequence === second.targetSequence,
+      'duplicate during recovery_required changed the durable target sequence',
+    );
+    assert(
+      duplicateDuringRecovery.acceptedAt === second.acceptedAt,
+      'duplicate during recovery_required changed the durable acceptance time',
+    );
     await expectReject(
       () =>
         store.acceptMessage({
@@ -200,6 +216,7 @@ export async function runRuntimeStoreConformance(
         }),
       'recovery_required instance accepted a new state-changing message',
     );
+    checks.push('duplicate-before-recovery-rejection');
 
     const reset = await store.resetRecovery(main.address, '2026-09-18T00:00:05.000Z');
     assert(reset.lifecycle === 'active', 'recovery reset did not reactivate instance');
@@ -215,18 +232,25 @@ export async function runRuntimeStoreConformance(
     });
     checks.push('failure-recovery-reset');
 
-    await store.acceptMessage({
+    const third = await store.acceptMessage({
       messageId: 'm-3',
       target: main.address,
       type: 'queued',
       payload: { ordinal: 3 },
     });
-    await store.acceptMessage({
+    assert(
+      third.targetSequence === second.targetSequence + 1,
+      'duplicate/rejection during recovery_required advanced the target sequence',
+    );
+    const fourth = await store.acceptMessage({
       messageId: 'm-4',
       target: main.address,
       type: 'queued',
       payload: { ordinal: 4 },
     });
+    assert(fourth.targetSequence === third.targetSequence + 1, 'post-recovery sequence allocation was not contiguous');
+    checks.push('lifecycle-duplicate-sequence-stability');
+
     await store.terminalizeInstance({
       target: main.address,
       lifecycle: 'completed',
@@ -235,6 +259,22 @@ export async function runRuntimeStoreConformance(
     });
     assert((await store.getMessageDisposition(main.address, 'm-3'))?.disposition === 'abandoned', 'terminalization did not abandon queued message m-3');
     assert((await store.getMessageDisposition(main.address, 'm-4'))?.disposition === 'abandoned', 'terminalization did not abandon queued message m-4');
+
+    const duplicateAfterTerminal = await store.acceptMessage({
+      messageId: 'm-3',
+      target: main.address,
+      type: 'queued',
+      payload: { ordinal: 3 },
+    });
+    assert(duplicateAfterTerminal.status === 'duplicate', 'terminal instance rejected an already durable duplicate');
+    assert(
+      duplicateAfterTerminal.targetSequence === third.targetSequence,
+      'duplicate after terminalization changed the durable target sequence',
+    );
+    assert(
+      duplicateAfterTerminal.acceptedAt === third.acceptedAt,
+      'duplicate after terminalization changed the durable acceptance time',
+    );
     await expectReject(
       () =>
         store.acceptMessage({
@@ -245,6 +285,7 @@ export async function runRuntimeStoreConformance(
         }),
       'terminal instance accepted a new message',
     );
+    checks.push('duplicate-before-terminal-rejection');
     checks.push('terminal-abandon-atomic');
 
     const effects = makeInstance('effects');
