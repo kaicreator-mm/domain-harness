@@ -416,8 +416,13 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
 
   public async listPinnedPackageIds(): Promise<readonly string[]> {
     this.assertOpen();
+    // Retained pins cover live instances only, identical to the Node adapter:
+    // packages pinned solely by terminal instances can be removed from the build.
     const rows = await this.database.getAllAsync<{ package_id: string }>(
-      'SELECT DISTINCT package_id FROM dh_v2_instances ORDER BY package_id ASC',
+      `SELECT DISTINCT package_id
+         FROM dh_v2_instances
+        WHERE lifecycle IN ('active', 'waiting', 'recovery_required')
+        ORDER BY package_id ASC`,
     );
     return rows.map((row) => row.package_id);
   }
