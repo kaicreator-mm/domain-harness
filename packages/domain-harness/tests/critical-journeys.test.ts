@@ -8,7 +8,7 @@ import {
   type AIOperationPort,
   type HarnessTool,
   type JsonSchema,
-} from '../src/index.js';
+} from '../src/legacy-v1/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = join(here, 'fixtures', 'critical-journey-harness');
@@ -22,7 +22,7 @@ const textSchema: JsonSchema = {
   additionalProperties: false,
 };
 
-test('CJ-01 executes Skill -> Tool -> Expr -> Script -> Child -> waiting event through the public SDK', async () => {
+test('frozen v0.1 CJ executes Skill -> Tool -> Expr -> Script -> Child -> waiting event through the legacy regression surface', async () => {
   let aiCalls = 0;
   let toolCalls = 0;
 

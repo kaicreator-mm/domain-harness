@@ -9,9 +9,9 @@ import test from 'node:test';
 
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const distEntry = join(packageRoot, 'dist', 'index.js');
+const legacyDistEntry = join(packageRoot, 'dist', 'legacy-v1', 'index.js');
 
-test('Expression and Script Workers run under a plain-ESM host process', async () => {
+test('frozen v0.1 Expression and Script Workers run under a plain-ESM host process', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'domain-harness-esm-host-'));
   try {
     const root = join(dir, 'harness');
@@ -31,7 +31,7 @@ test('Expression and Script Workers run under a plain-ESM host process', async (
 
     const childScript = [
       'import { pathToFileURL } from "node:url";',
-      `const sdk = await import(pathToFileURL(${JSON.stringify(distEntry)}).href);`,
+      `const sdk = await import(pathToFileURL(${JSON.stringify(legacyDistEntry)}).href);`,
       'const runtime = await sdk.createDomainHarness({',
       `  root: ${JSON.stringify(root)},`,
       '  sqlitePath: ":memory:",',

@@ -8,7 +8,7 @@ import {
   type JsonValue,
   type RunStatus,
   type ToolEffect,
-} from '../src/index.js';
+} from '../src/legacy-v1/index.js';
 
 const statuses: RunStatus[] = ['running', 'waiting', 'completed', 'failed', 'cancelled'];
 const effects: ToolEffect[] = ['none', 'idempotent', 'non-idempotent'];

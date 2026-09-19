@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { createDomainHarness } from '../src/index.js';
+import { createDomainHarness } from '../src/legacy-v1/index.js';
 import { loadHarness } from '../src/loader/index.js';
 import { HarnessDefinitionError } from '../src/loader/static-validation.js';
 
