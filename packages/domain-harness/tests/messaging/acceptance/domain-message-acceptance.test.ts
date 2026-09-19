@@ -63,6 +63,60 @@ test('G12/G15: boundary recreation returns original duplicate identity without a
   assert.equal(store.persisted.length, 2);
 });
 
+test('G15/G16: duplicate retry returns original ACK after target becomes non-accepting', async () => {
+  const nonAcceptingLifecycles: readonly WorkflowLifecycle[] = [
+    'recovery_required',
+    'completed',
+    'failed',
+    'cancelled',
+    'terminated',
+  ];
+
+  for (const lifecycle of nonAcceptingLifecycles) {
+    const store = new AcceptanceStoreFake(createSnapshot());
+    const boundary = new DomainMessageAcceptance({
+      store,
+      packages: createRegistry([createPackage({ packageId: 'pkg-a', contractVersion: '1' })]),
+    });
+    const original = await boundary.accept(createMessage());
+    store.setLifecycle(lifecycle);
+
+    const duplicate = await boundary.accept(createMessage());
+    assert.equal(duplicate.status, 'duplicate', lifecycle);
+    assert.equal(duplicate.messageId, original.messageId, lifecycle);
+    assert.equal(duplicate.targetSequence, original.targetSequence, lifecycle);
+    assert.equal(duplicate.packageId, original.packageId, lifecycle);
+    assert.equal(duplicate.acceptedAt, original.acceptedAt, lifecycle);
+    assert.equal(store.acceptCalls, 1, `duplicate lookup must precede lifecycle rejection for ${lifecycle}`);
+    assert.equal(store.persisted.length, 1, lifecycle);
+  }
+});
+
+test('G15: duplicate identity is keyed by target/messageId before current contract validation', async () => {
+  const store = new AcceptanceStoreFake(createSnapshot());
+  const boundary = new DomainMessageAcceptance({
+    store,
+    packages: createRegistry([createPackage({ packageId: 'pkg-a', contractVersion: '1' })]),
+  });
+  const original = await boundary.accept(createMessage());
+  store.setLifecycle('completed');
+
+  const duplicate = await boundary.accept(
+    createMessage({
+      type: 'not-declared-anymore',
+      contractVersion: '999',
+      payload: { changed: true },
+    }),
+  );
+
+  assert.equal(duplicate.status, 'duplicate');
+  assert.equal(duplicate.targetSequence, original.targetSequence);
+  assert.equal(duplicate.packageId, original.packageId);
+  assert.equal(duplicate.acceptedAt, original.acceptedAt);
+  assert.equal(store.acceptCalls, 1);
+  assert.equal(store.persisted.length, 1);
+});
+
 test('G14: concurrent accepts receive one durable per-target sequence each', async () => {
   const store = new AcceptanceStoreFake(createSnapshot());
   const boundary = new DomainMessageAcceptance({
