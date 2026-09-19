@@ -144,7 +144,7 @@ Start here:
 - `docs/integration/DomainHarness_v0.2_HOST_INTEGRATION.md` — Node and Expo host startup, stores/bindings, App/UI Message/Query/Subscription patterns;
 - `docs/migration/DomainHarness_v0.1_TO_v0.2.md` — v0.1 API migration plus expression/Script migration rules;
 - `docs/product/DomainHarness_v0.2_PRD_FROZEN.md` — frozen product authority;
-- `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md` — frozen architecture authority;
+- `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md` + `docs/architecture/DomainHarness_v0.2_L2_AMENDMENT_A2_RUNTIME_ENGINE.md` — frozen architecture authority plus the shipped-v0.2 Runtime-engine amendment;
 - `docs/implementation/DomainHarness_v0.2_TASK_DAG.md` — executable task authority.
 
 ### Compiler build-time API

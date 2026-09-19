@@ -12,7 +12,7 @@
 ## Frozen authority
 
 - Product authority: `docs/product/DomainHarness_v0.2_PRD_FROZEN.md`, SHA-256 `e95534773b0879a7e4892ba995ca90928d6029730f0de1e70c2915aa56679d9b`. Imported byte-for-byte from frozen R4; MUST NOT be reformatted or rewritten.
-- Architecture authority: `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md`.
+- Architecture authority: `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md`, as amended by `docs/architecture/DomainHarness_v0.2_L2_AMENDMENT_A2_RUNTIME_ENGINE.md` for the shipped v0.2 Runtime-engine reconciliation in Issue #153.
 - Task authority: `docs/implementation/DomainHarness_v0.2_TASK_DAG.md` plus `docs/implementation/v0.2/task-packs/` and `TASK_PACKS.json`.
 - v0.1 remains a historical frozen baseline; v0.2 does not retroactively redefine v0.1 behavior.
 - Frozen product scope and frozen v0.2 architecture MUST NOT be reopened by implementation agents unless a documented architecture contradiction is found.
