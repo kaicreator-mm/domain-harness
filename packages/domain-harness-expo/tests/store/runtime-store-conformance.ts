@@ -6,7 +6,6 @@ import type {
 } from '../../src/store/runtime-store-types.js';
 import { ExclusiveTransactionQueue } from '../../src/store/exclusive-transaction.js';
 import type { ExpoSqliteDatabaseLike, ExpoSqliteExecutorLike } from '../../src/store/expo-sqlite-types.js';
-import { ExpoSqliteRuntimeStore } from '../../src/store/expo-sqlite-runtime-store.js';
 
 export interface CloseableRuntimeStore extends RuntimeStore {
   close(): Promise<void>;

@@ -6,7 +6,6 @@ import type { SendDomainMessageEffect } from '../messaging/send-effect/contracts
 import type { ToolExecutorPort } from '../v2/contracts/effect.js';
 import type { ExpressionExecutorPort } from '../v2/contracts/host.js';
 import type {
-  CompiledToolDescriptor,
   CompiledWorkflowDescriptor,
   TargetCompiledDomainPackage,
 } from '../v2/contracts/package.js';
