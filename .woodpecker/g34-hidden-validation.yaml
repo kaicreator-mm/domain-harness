@@ -1,0 +1,33 @@
+when:
+  - event: push
+    branch: v0.2_g34_woodpecker
+
+clone:
+  - name: git
+    image: /usr/local/bin/plugin-git
+    settings:
+      remote: https://github.com/kaicreator-mm/hidden-validation.git
+      sha: bb920827bf797549278173ec888a129c3cbabce3
+      partial: false
+      depth: 1
+      recursive: false
+      lfs: false
+
+steps:
+  - name: g34-hidden-validation
+    image: /usr/bin/bash
+    commands:
+      - set -euo pipefail
+      - node --version
+      - npm --version
+      - python3 --version
+      - git --version
+      - test "$(git rev-parse HEAD)" = "bb920827bf797549278173ec888a129c3cbabce3"
+      - test "$(git rev-parse HEAD:domain-harness/v0.2)" = "660a06c1dd5b6b0c01898156b8a55993cafc9c5f"
+      - rm -rf .g34-domain-harness-candidate
+      - git clone https://github.com/kaicreator-mm/domain-harness.git .g34-domain-harness-candidate
+      - git -C .g34-domain-harness-candidate checkout --detach 3019b064faccbc5ede9ce4f8c67e23c8703996f6
+      - test "$(git -C .g34-domain-harness-candidate rev-parse HEAD)" = "3019b064faccbc5ede9ce4f8c67e23c8703996f6"
+      - test "$(git -C .g34-domain-harness-candidate rev-parse 'HEAD^{tree}')" = "7709db6d064926c09de66fd13f917eb57119e0c6"
+      - test -z "$(git -C .g34-domain-harness-candidate status --porcelain)"
+      - bash domain-harness/v0.2/run_hidden_validation.sh "$PWD/.g34-domain-harness-candidate"
