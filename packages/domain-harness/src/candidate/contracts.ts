@@ -1,5 +1,5 @@
+import type { ExactContentIdentity } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
-import type { GovernanceBaselineIdentity } from '../governance/contracts.js';
 
 export const CANDIDATE_ENVELOPE_SCHEMA_VERSION = 'candidate-envelope-v1' as const;
 export const CANDIDATE_VALIDATOR_CONTRACT_VERSION = 'candidate-validator-v1' as const;
@@ -70,8 +70,16 @@ export interface CandidateEnvelope {
   readonly control?: CandidateControlContract;
 }
 
-/** T-003 owns the canonical Governance Baseline identity. */
-export type CandidateValidationGovernanceBaseline = GovernanceBaselineIdentity;
+/**
+ * Narrow structural baseline reference for T-004. T-003 owns the canonical
+ * GovernanceBaselineIdentity; later integration replaces this seam with that
+ * canonical authority without giving T-004 registry/lifecycle ownership.
+ */
+export interface CandidateValidationGovernanceBaseline extends ExactContentIdentity {
+  readonly domainId: string;
+  readonly governanceId: string;
+  readonly version?: string;
+}
 
 export interface ValidatedCandidateIdentity {
   readonly candidateKind: CandidateKind;
@@ -186,19 +194,6 @@ export interface CandidateSpecializedValidator {
   readonly candidateKind: CandidateKind;
   /** Must be synchronous, deterministic, side-effect free and I/O free. */
   validate(candidate: CandidateEnvelope): readonly CandidateSpecializedIssue[];
-}
-
-/**
- * Reviewed compatibility record stored inside the exact retained target
- * Governance Baseline semantic body. The target is implicit from containment,
- * avoiding a target-content-digest self-reference inside its own digest body.
- */
-export interface ReviewedCandidateValidationCompatibility {
-  readonly kind: 'reviewed-exact-governance-compatibility';
-  readonly validatorContractVersion: typeof CANDIDATE_VALIDATOR_CONTRACT_VERSION;
-  readonly candidateKind: CandidateKind;
-  readonly from: CandidateValidationGovernanceBaseline;
-  readonly reviewDigest: string;
 }
 
 /**
