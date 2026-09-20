@@ -359,6 +359,48 @@ test('T-009: existing reclaim semantics require processing before a new commit a
   );
 });
 
+test('T-009: target-sequence mismatch fails closed before a processed-turn commit', () => {
+  assert.throws(
+    () =>
+      prepareProcessedCommandTurn(
+        { instance: instance(), disposition: disposition('processing'), existingOutcome: null },
+        {
+          target: TARGET,
+          messageId: 'cmd-1',
+          expectedTargetSequence: 8,
+          expectedStateRevision: 3,
+          nextState: { step: 'approved' },
+          nextProcessData: { cursor: 1 },
+          nextLifecycle: 'active',
+          resolution: { status: 'applied' },
+          updatedAt: '2026-09-21T00:00:05.000Z',
+        },
+      ),
+    assertContractError('TARGET_SEQUENCE_MISMATCH'),
+  );
+});
+
+test('T-009: state-revision mismatch fails closed before a processed-turn commit', () => {
+  assert.throws(
+    () =>
+      prepareProcessedCommandTurn(
+        { instance: instance({ stateRevision: 4 }), disposition: disposition('processing'), existingOutcome: null },
+        {
+          target: TARGET,
+          messageId: 'cmd-1',
+          expectedTargetSequence: 7,
+          expectedStateRevision: 3,
+          nextState: { step: 'approved' },
+          nextProcessData: { cursor: 1 },
+          nextLifecycle: 'active',
+          resolution: { status: 'applied' },
+          updatedAt: '2026-09-21T00:00:05.000Z',
+        },
+      ),
+    assertContractError('STATE_REVISION_MISMATCH'),
+  );
+});
+
 test('T-009: durable outcome must align with terminal mailbox identity and failure class', () => {
   const failure: RuntimeFailure = { code: 'TOOL_FAILED', message: 'tool failed' };
   const failedDisposition = disposition('failed', { failure });
