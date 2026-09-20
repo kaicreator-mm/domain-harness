@@ -205,10 +205,9 @@ function assertRequestTargetsRecord(
   }
 }
 
-function completedRecord(
+function timedOutRecord(
   current: ExternalWorkCorrelationRecord,
-  status: CompletedExternalWorkCorrelationRecord['status'],
-  terminalSource: DurableExternalWorkControlSource,
+  terminalSource: DeadlineControlSource,
   updatedAt: string,
 ): CompletedExternalWorkCorrelationRecord {
   return {
@@ -216,7 +215,7 @@ function completedRecord(
     target: current.target,
     deadlineTimerId: current.deadlineTimerId,
     dueAt: current.dueAt,
-    status,
+    status: 'timed_out',
     revision: current.revision + 1,
     terminalSource,
     createdAt: current.createdAt,
@@ -224,7 +223,25 @@ function completedRecord(
   };
 }
 
-function requireWaitingRevision(record: ExternalWorkCorrelationRecord): void {
+function callbackCompletedRecord(
+  current: ExternalWorkCorrelationRecord,
+  terminalSource: ExternalCallbackControlSource,
+  updatedAt: string,
+): CompletedExternalWorkCorrelationRecord {
+  return {
+    externalCorrelationId: current.externalCorrelationId,
+    target: current.target,
+    deadlineTimerId: current.deadlineTimerId,
+    dueAt: current.dueAt,
+    status: 'callback_received',
+    revision: current.revision + 1,
+    terminalSource,
+    createdAt: current.createdAt,
+    updatedAt,
+  };
+}
+
+function requireValidRevision(record: ExternalWorkCorrelationRecord): void {
   if (!Number.isSafeInteger(record.revision) || record.revision < 0) {
     throw new DurableControlError(
       'STORE_CONTRACT_VIOLATION',
@@ -282,7 +299,7 @@ export class DurableControlCoordinator {
       );
     }
     assertExternalWorkIdentity(request, result.record);
-    requireWaitingRevision(result.record);
+    requireValidRevision(result.record);
     return result.record;
   }
 
@@ -298,17 +315,17 @@ export class DurableControlCoordinator {
     for (let attempt = 0; attempt < MAX_COMPARE_AND_SET_ATTEMPTS; attempt += 1) {
       const current = await this.requireExternalWork(request.externalCorrelationId);
       assertRequestTargetsRecord(request.target, current);
-      requireWaitingRevision(current);
+      requireValidRevision(current);
 
       if (current.status === 'timed_out') {
         return {
           disposition: 'late_after_timeout',
-          controlSource: current.terminalSource as DeadlineControlSource,
+          controlSource: current.terminalSource,
         };
       }
 
       if (current.status === 'callback_received') {
-        const source = current.terminalSource as ExternalCallbackControlSource;
+        const source = current.terminalSource;
         if (
           source.callbackOrdinal === request.callbackOrdinal &&
           canonicalJsonStringify(source.payload) === canonicalJsonStringify(request.payload)
@@ -327,7 +344,7 @@ export class DurableControlCoordinator {
       const dueAtMillis = instantMillis(current.dueAt, 'stored dueAt');
       if (receivedAtMillis >= dueAtMillis) {
         const source = deadlineSource(current, 1, request.receivedAt);
-        const timedOut = completedRecord(current, 'timed_out', source, request.receivedAt);
+        const timedOut = timedOutRecord(current, source, request.receivedAt);
         const changed = await this.store.compareAndSetExternalWorkCorrelation({
           externalCorrelationId: current.externalCorrelationId,
           expectedRevision: current.revision,
@@ -345,12 +362,7 @@ export class DurableControlCoordinator {
         request.payload,
         request.receivedAt,
       );
-      const completed = completedRecord(
-        current,
-        'callback_received',
-        source,
-        request.receivedAt,
-      );
+      const completed = callbackCompletedRecord(current, source, request.receivedAt);
       const changed = await this.store.compareAndSetExternalWorkCorrelation({
         externalCorrelationId: current.externalCorrelationId,
         expectedRevision: current.revision,
@@ -382,7 +394,7 @@ export class DurableControlCoordinator {
     for (let attempt = 0; attempt < MAX_COMPARE_AND_SET_ATTEMPTS; attempt += 1) {
       const current = await this.requireExternalWork(request.externalCorrelationId);
       assertRequestTargetsRecord(request.target, current);
-      requireWaitingRevision(current);
+      requireValidRevision(current);
 
       if (current.deadlineTimerId !== request.timerId) {
         throw new DurableControlError(
@@ -394,13 +406,13 @@ export class DurableControlCoordinator {
       if (current.status === 'timed_out') {
         return {
           disposition: 'duplicate',
-          controlSource: current.terminalSource as DeadlineControlSource,
+          controlSource: current.terminalSource,
         };
       }
       if (current.status === 'callback_received') {
         return {
           disposition: 'callback_already_completed',
-          controlSource: current.terminalSource as ExternalCallbackControlSource,
+          controlSource: current.terminalSource,
         };
       }
 
@@ -413,7 +425,7 @@ export class DurableControlCoordinator {
       }
 
       const source = deadlineSource(current, request.fireOrdinal, request.firedAt);
-      const timedOut = completedRecord(current, 'timed_out', source, request.firedAt);
+      const timedOut = timedOutRecord(current, source, request.firedAt);
       const changed = await this.store.compareAndSetExternalWorkCorrelation({
         externalCorrelationId: current.externalCorrelationId,
         expectedRevision: current.revision,
@@ -441,7 +453,7 @@ export class DurableControlCoordinator {
     requireNonEmpty(externalCorrelationId, 'externalCorrelationId');
     const nowMillis = instantMillis(now, 'now');
     const current = await this.requireExternalWork(externalCorrelationId);
-    requireWaitingRevision(current);
+    requireValidRevision(current);
 
     if (current.status !== 'waiting') return current.terminalSource;
     if (nowMillis < instantMillis(current.dueAt, 'stored dueAt')) return null;
