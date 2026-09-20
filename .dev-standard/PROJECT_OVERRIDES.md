@@ -2,38 +2,58 @@
 
 ## Repository profile
 
-- Product: DomainHarness Portable Interactive Domain Runtime
-- Version target: v0.2
+- Product: DomainHarness Domain Application Runtime + Scoped AI Execution
+- Version target: v0.3
 - Repository: `kaicreator-mm/domain-harness`
-- Integration branch: `v0.2`; implementation task branches are created from the current validated `v0.2` head after all declared dependencies are merged.
+- Version integration branch: `v0.3`; implementation task branches are created from the current dependency-complete `v0.3` head.
 - Project form: embedded portable TypeScript Runtime SDK + build-time compiler + host bindings; no server or generic admin UI.
-- Structure: Git monorepo. Primary portable SDK remains `packages/domain-harness`; compiler and host-specific adapters are separate workspace packages per frozen v0.2 L2.
+- Structure: Git monorepo. Primary portable SDK remains `packages/domain-harness`; compiler and host-specific adapters remain separate workspace packages.
+- v0.3 is an incremental productionization of the shipped v0.2 runtime, not a rewrite.
 
 ## Frozen authority
 
-- Product authority: `docs/product/DomainHarness_v0.2_PRD_FROZEN.md`, SHA-256 `e95534773b0879a7e4892ba995ca90928d6029730f0de1e70c2915aa56679d9b`. Imported byte-for-byte from frozen R4; MUST NOT be reformatted or rewritten.
-- Architecture authority: `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md`, as amended by `docs/architecture/DomainHarness_v0.2_L2_AMENDMENT_A2_RUNTIME_ENGINE.md` for the shipped v0.2 Runtime-engine reconciliation in Issue #153.
-- Task authority: `docs/implementation/DomainHarness_v0.2_TASK_DAG.md` plus `docs/implementation/v0.2/task-packs/` and `TASK_PACKS.json`.
-- v0.1 remains a historical frozen baseline; v0.2 does not retroactively redefine v0.1 behavior.
-- Frozen product scope and frozen v0.2 architecture MUST NOT be reopened by implementation agents unless a documented architecture contradiction is found.
+Product authority is the complete frozen composition:
+
+1. `docs/product/DomainHarness_v0.3_PRD_FROZEN.md`;
+2. `docs/product/amendments/DomainHarness_v0.3_PRD_AMENDMENT_A1_ROUND2_REVIEW_CANDIDATE.md`, frozen by `docs/product/amendments/DomainHarness_v0.3_PRD_AMENDMENT_A1_FREEZE_RECORD.md`;
+3. `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_EVIDENCE_FROZEN.md`;
+4. `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1.md`, frozen by `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1_FREEZE_RECORD.md`.
+
+The L2 Amendment supersedes only explicitly mapped clauses. Every unaffected Frozen L2 contract remains authoritative.
+
+Task authority after planning freeze is `docs/implementation/DomainHarness_v0.3_TASK_DAG.md` plus v0.3 task packs / GitHub Execution Issues generated from that DAG.
+
+v0.1 and v0.2 remain historical frozen baselines. v0.3 does not retroactively redefine their persisted behavior.
+
+Frozen product scope and architecture MUST NOT be reopened by implementation agents unless a documented architecture contradiction is found.
 
 ## Project-specific hard boundaries
 
-- Runtime Core is platform-independent TypeScript and has no mandatory Node built-in dependency.
-- Raw Domain Package discovery/compilation is build-time; application startup consumes Target Compiled Domain Package + Runtime Resources only.
-- Domain semantics and authoritative User/Business Data remain outside DomainHarness Runtime authority.
-- XState, if retained internally, is never a public/persistence/domain contract.
-- One Workflow Instance serializes state-changing messages; different instances may execute concurrently; no global ordering is promised.
-- Durable Domain Message is not a generic event bus/broker.
-- RuntimeStore semantics are public-to-core; concrete SQLite drivers are host bindings.
-- Projection is deterministic, declared-input-only, derived and non-authoritative; no Tool/Skill/external I/O inside Projection.
-- Missing required host capability or pinned package fails closed; semantic substitution is prohibited.
-- Script code is trusted target-compiled package code, not a hostile-code security sandbox.
-- AI provider/model orchestration remains outside DomainHarness.
+- `Domain Data = Domain Facts + Compiled Domain Intelligence`.
+- Domain Facts remain mutable/external business reality; they are not implicitly promoted/versioned CDI.
+- Domain Governance Baseline is a separate exact authority: Hard Invariants and governance-critical promotion/activation/evaluation/exploration/fallback policy are not self-modifying CDI.
+- Domain Workflow / Domain Machine is the single product-level business control-flow authority.
+- XState is the selected v0.3 implementation engine, not product/public identity; no peer workflow runtime is allowed.
+- Business Harness / HarnessMachine is a bounded child capability for unresolved semantics. It may propose structured DomainDecision/DomainEvent output but cannot own transition, mutation, promotion, activation, governance or provider-routing authority.
+- Guard and Hard-Invariant predicates are synchronous for the admission decision, deterministic, side-effect-free and contain no LLM, Tool or external I/O.
+- Runtime Core remains portable TypeScript with no mandatory Node built-in dependency.
+- Raw Domain Package discovery/compilation is build-time; App startup consumes target compiled package + Runtime Resources only.
+- Business mutation stays behind durable effect authority.
+- One per-instance `DurableExecutionStore` ordering domain preserves journal-first committed-work truth, recursive control snapshots, `executionFactRevision`, package pin, `DynamicChildExecutionPin`, and v0.3 `GovernanceExecutionPin`.
+- Recovery uses exact package/governance/child-definition pins. `current`, `latest`, `active`, fuzzy or compatible substitution is not recovery authority.
+- Exact semantic cache is separate from execution replay. `ObservedDependencySet` and `SemanticRevisionPort` boundaries remain mandatory where cache reuse is enabled.
+- Promoted artifact bodies are immutable/content-addressed and retained by the Promoted Artifact Registry while active/recoverable references require them.
+- Executable Candidate validation is deterministic and baseline-bound. Candidate != validated != evaluated != promoted != activated.
+- Human/operator promotion remains at least as strict as Frozen L2 ADR-08; promotion never implies activation.
+- `DomainActivationBinding` is one exact package + CDI digest + Governance Baseline tuple for new-instance creation. Implementation must publish/read it as one non-torn logical binding revision; mixed package/governance tuples are forbidden.
+- Runtime Evidence is provenance/evaluation material, not Domain Facts, active CDI, snapshot or replay truth; tenant/privacy scope must not be weakened.
+- L4 is shadow/non-mutating by default. Any represented Experimental fallback is exact, never a floating alias.
+- AI provider/model orchestration remains outside DomainHarness behind ModelPort / AI Runtime.
+- v0.3 does not introduce autonomous Meta Harness runtime, automatic pattern mining, production experiment scheduling/canarying, automatic metric promotion, automatic activation, live mutating L4, generic RAG/memory/knowledge platform, or another workflow engine.
 
 ## Canonical commands
 
-Until the v0.2 workspace-scaffold task updates scripts, the repository-root v0.1 commands remain the baseline smoke commands:
+Repository-root baseline commands remain:
 
 ```text
 npm ci
@@ -43,37 +63,107 @@ npm test
 npm pack -w @kaicreator/domain-harness
 ```
 
-T-001 is responsible for freezing the v0.2 monorepo-wide canonical commands without weakening the existing package regression.
+Task packs may define a narrower focused command set, but may not weaken required repository regression for the concern being changed.
 
 ## Validation execution profile
 
-- Architecture/document review: GitHub exact-SHA evidence + repository documents.
-- Node host: real Node Build Host for final truth.
-- Non-Node host: real React Native / Expo Android profile using Hermes + `expo-sqlite`; Node-based mocks are insufficient for PRD AC-42.
-- RuntimeStore and runtime semantic conformance suites must be shared across Node/Expo bindings.
-- Process/device restart validation is required for durable ACK/recovery claims.
-- Hidden Validation remains owner-held and separate from visible CI.
+Validation is deliberately split so expensive local environments are concentrated rather than repeated across every parallel feature PR.
+
+### Task/PR portable validation
+
+Default for contract/core feature tasks:
+
+- TypeScript compile/typecheck;
+- focused deterministic unit/contract tests;
+- compiler/static fixtures where applicable;
+- portable in-memory/fake-store conformance where sufficient for the task concern;
+- exact-SHA review evidence.
+
+A feature task SHALL NOT claim host durability from mocks.
+
+### Dedicated Node / Build Host validation wave
+
+Real Node Build Host truth is grouped into dedicated integration tasks covering, in one environment/session where practical:
+
+- Node SQLite schema/storage migrations;
+- Promoted Artifact Registry persistence/retention;
+- semantic-cache persistence;
+- `DomainActivationBinding` non-torn publication/read;
+- `GovernanceExecutionPin` durability;
+- recursive snapshot + dynamic-child pin + journal ordering;
+- process-kill/reopen crash windows;
+- retained package/governance recovery;
+- persistent timers/deadlines;
+- no duplicate committed AI/query/effect/mutation;
+- package/alias/revocation movement during recovery.
+
+### Dedicated Expo / Hermes validation wave
+
+Real React Native / Expo Android using Hermes + `expo-sqlite` is grouped into one dedicated host task covering:
+
+- portable-runtime boundary/no Node built-ins;
+- logical persistence parity with Node;
+- GovernanceExecutionPin/registry/cache persistence;
+- force-stop/relaunch recovery;
+- timer/callback/process-data behavior required by the v0.3 product contract;
+- no duplicate committed external work.
+
+Node-based Expo mocks are not final truth for host durability.
+
+### Version closure
+
+Cross-host parity, migration/compatibility, critical journeys, full repository regression, packaging and owner-held Hidden Validation are version-closure concerns unless a task pack explicitly requires them earlier.
+
+CI PASS is not Release Qualification PASS.
 
 ## CI profile
 
-`minimal-per-task + version-closure-full`
+`minimal-per-task + concentrated-host-validation + version-closure-full`
 
-- Task/PR CI proves the changed concern and required local regression only.
-- Expensive Expo device/emulator, process-kill, cross-host conformance, migration, package-retention and Hidden Validation run at version integration/closure gates unless a task's acceptance explicitly requires them earlier.
-- CI PASS is not Release Qualification PASS.
+- Parallel feature PRs prove their local deterministic concern.
+- Expensive host validation is concentrated into dedicated Node and Expo waves after central runtime integration reaches a dependency-complete checkpoint.
+- A host-validation PASS applies only to the exact validated integration SHA and does not automatically transfer across later runtime changes.
+- CI/service unavailability may be recorded through the authorized waiver path, but unavailable CI is never reported as PASS.
+- Hidden Validation remains owner-held and separate from visible CI.
 
 ## Branch / task execution protocol
 
-- Version integration branch: `v0.2`.
-- Task branch: `v0.2_tNNN` (one concern per branch/PR).
-- A task starts only after all `Depends On` tasks are merged into `v0.2`.
-- Tasks marked parallel MAY run in separate conversations concurrently from the same dependency-complete `v0.2` checkpoint.
-- Each task must stay within its declared write set where practical; shared-file edits are deferred to integration tasks to reduce merge conflicts.
-- Task PR target is `v0.2`, not `main`.
-- `v0.2` merges to `main` only after version closure/release-qualification evidence.
+- Version integration branch: `v0.3`.
+- Task branch: `v0.3_tNNN`.
+- Task PR base: `v0.3`, not `main`.
+- A task starts only after every declared `Depends On` task is merged into `v0.3`.
+- Tasks marked parallel MAY run in separate conversations from the same dependency-complete `v0.3` checkpoint.
+- Parallel leaf tasks should avoid central barrels/root runtime assembly/shared exports. Central wiring is deferred to explicit integration tasks to reduce merge conflicts.
+- One concern → one task branch → one PR.
+- Every execution starts by recording exact base SHA and reading Frozen PRD + Amendment A1 + Frozen L2 + L2 Amendment A1 + its Task Pack/Issue.
+- If implementation evidence reveals a real architecture contradiction, stop that concern and record the contradiction rather than silently expanding scope.
 
-## Release gates
+## L3 / evidence order
 
-Release gates are derived in authority order from Frozen PRD → Frozen Architecture → Task acceptance → pinned standard defaults.
+Tasks marked `L3: REQUIRED` follow:
 
-No v0.2 release/tag is allowed until required G1–G34 evidence, exact-SHA visible closure, owner-held Hidden Validation, and no unresolved P0/P1 Runtime blocker are recorded.
+```text
+Tests
+→ Contract / Interface
+→ Core Implementation
+→ Failure Handling
+→ Reference
+```
+
+Existing architecture research #187/#194/#195/#196/#197/#201/#203/#204/#205 is consumed through frozen L2 authority and is not rerun unless a real contradiction requires it.
+
+## Release boundary
+
+Individual task completion, PR CI or a dedicated host-validation wave does not equal v0.3 release qualification.
+
+The final closure task must reconcile the exact v0.3 candidate against:
+
+- Frozen PRD + PRD Amendment A1 acceptance;
+- Frozen L2 + L2 Amendment A1 review vectors V1–V12 and existing architecture gates;
+- Node/Expo host evidence;
+- migration/compatibility evidence;
+- full repository regression/packaging;
+- owner-held Hidden Validation;
+- unresolved P0/P1 findings.
+
+`v0.3` merges to `main` only after release qualification/closure evidence is complete.
