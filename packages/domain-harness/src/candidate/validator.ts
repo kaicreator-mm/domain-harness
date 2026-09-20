@@ -1,9 +1,14 @@
+import Ajv, { type AnySchema } from 'ajv';
+
 import { canonicalJsonStringify, computeCanonicalJsonDigest, type Sha256Port } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
 import {
+  CANDIDATE_BODY_SCHEMA_VERSION,
   CANDIDATE_ENVELOPE_SCHEMA_VERSION,
   CANDIDATE_KINDS,
   CANDIDATE_VALIDATOR_CONTRACT_VERSION,
+  type CandidateBodySchemaArtifact,
+  type CandidateContractAuthorityPort,
   type CandidateControlContract,
   type CandidateEnvelope,
   type CandidateExactReference,
@@ -319,14 +324,32 @@ function material(candidate: CandidateEnvelope): unknown {
   };
 }
 
+function bodySchemaMaterial(schema: CandidateBodySchemaArtifact): unknown {
+  return {
+    schemaVersion: schema.schemaVersion,
+    candidateKind: schema.candidateKind,
+    schema: schema.schema,
+  };
+}
+
 function baselineValid(value: CandidateValidationGovernanceBaseline): boolean {
   return nonEmpty(value.domainId) && nonEmpty(value.governanceId) && nonEmpty(value.schemaVersion) && nonEmpty(value.contentDigest);
+}
+
+function exactRefValid(value: CandidateExactReference): boolean {
+  return nonEmpty(value.kind) && nonEmpty(value.artifactId) && nonEmpty(value.contentDigest);
 }
 
 function authorityFailures(value: CandidateValidationAuthority): CandidateRejection[] {
   const result: CandidateRejection[] = [];
   if (!baselineValid(value.governanceBaseline)) {
     result.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.governanceBaseline', 'exact Governance Baseline identity is required'));
+  }
+  for (const kind of CANDIDATE_KINDS) {
+    const bodyContract = value.bodyContracts[kind];
+    if (bodyContract !== undefined && !exactRefValid(bodyContract)) {
+      result.push(reject('VALIDATION_AUTHORITY_INVALID', `$authority.bodyContracts.${kind}`, 'body contract identity must be exact'));
+    }
   }
   if (
     !Number.isInteger(value.maxControlNodes)
@@ -345,10 +368,78 @@ function sortFailures(value: CandidateRejection[]): CandidateRejection[] {
   return value.sort((a, b) => `${a.code}\u0000${a.path}\u0000${a.message}`.localeCompare(`${b.code}\u0000${b.path}\u0000${b.message}`));
 }
 
+async function validateBodySchema(
+  candidate: CandidateEnvelope,
+  authority: CandidateValidationAuthority,
+  contractAuthority: CandidateContractAuthorityPort,
+  sha256: Sha256Port,
+): Promise<CandidateRejection[]> {
+  const expected = authority.bodyContracts[candidate.candidateKind];
+  if (expected === undefined) {
+    return [reject('BODY_VALIDATOR_REQUIRED', '$.bodyContract', `exact body-schema contract required for ${candidate.candidateKind}`)];
+  }
+  if (refKey(expected) !== refKey(candidate.bodyContract)) {
+    return [reject('BODY_CONTRACT_NOT_ALLOWED', '$.bodyContract', 'Candidate body contract is not the exact authority-allowed contract')];
+  }
+
+  let schemaArtifact: CandidateBodySchemaArtifact | undefined;
+  try {
+    schemaArtifact = await contractAuthority.resolveExactBodySchema(candidate.bodyContract);
+  } catch (error) {
+    return [reject(
+      'VALIDATION_AUTHORITY_INVALID',
+      '$authority.bodySchema',
+      error instanceof Error ? `exact body-schema resolution failed closed: ${error.message}` : 'exact body-schema resolution failed closed',
+    )];
+  }
+  if (schemaArtifact === undefined) {
+    return [reject('BODY_VALIDATOR_REQUIRED', '$.bodyContract', 'exact body-schema artifact is not resolvable from authority')];
+  }
+  if (
+    schemaArtifact.schemaVersion !== CANDIDATE_BODY_SCHEMA_VERSION
+    || schemaArtifact.candidateKind !== candidate.candidateKind
+    || refKey(schemaArtifact.identity) !== refKey(candidate.bodyContract)
+  ) {
+    return [reject('VALIDATION_AUTHORITY_INVALID', '$authority.bodySchema', 'resolved body-schema artifact identity/kind/version mismatch')];
+  }
+
+  let computedSchemaDigest: string;
+  try {
+    computedSchemaDigest = await computeCanonicalJsonDigest(bodySchemaMaterial(schemaArtifact), sha256);
+  } catch (error) {
+    return [reject(
+      'VALIDATION_AUTHORITY_INVALID',
+      '$authority.bodySchema',
+      error instanceof Error ? `body-schema digest validation failed closed: ${error.message}` : 'body-schema digest validation failed closed',
+    )];
+  }
+  if (computedSchemaDigest !== candidate.bodyContract.contentDigest) {
+    return [reject('VALIDATION_AUTHORITY_INVALID', '$authority.bodySchema', 'resolved body-schema bytes do not match the exact content digest')];
+  }
+
+  try {
+    const ajv = new Ajv({ allErrors: true, strict: true });
+    const validate = ajv.compile(schemaArtifact.schema as AnySchema);
+    if (validate(candidate.body)) return [];
+    return (validate.errors ?? []).map((error) => reject(
+      'BODY_SCHEMA_INVALID',
+      error.instancePath.length > 0 ? `$.body${error.instancePath}` : '$.body',
+      `${error.keyword}: ${error.message ?? 'body does not satisfy exact schema'}`,
+    ));
+  } catch (error) {
+    return [reject(
+      'VALIDATION_AUTHORITY_INVALID',
+      '$authority.bodySchema',
+      error instanceof Error ? `resolved body schema is invalid: ${error.message}` : 'resolved body schema is invalid',
+    )];
+  }
+}
+
 /** Deterministic Candidate -> Validated boundary. Never promotes, activates or executes. */
 export async function validateCandidate(
   value: unknown,
   authority: CandidateValidationAuthority,
+  contractAuthority: CandidateContractAuthorityPort,
   sha256: Sha256Port,
 ): Promise<CandidateValidationResult> {
   const authorityErrors = authorityFailures(authority);
@@ -371,23 +462,7 @@ export async function validateCandidate(
   const candidate = parsed;
   const failures: CandidateRejection[] = [];
 
-  const bodyValidator = authority.bodyValidators[candidate.candidateKind];
-  if (bodyValidator === undefined) {
-    failures.push(reject('BODY_VALIDATOR_REQUIRED', '$.body', `exact body-schema validator required for ${candidate.candidateKind}`));
-  } else if (bodyValidator.candidateKind !== candidate.candidateKind) {
-    failures.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.bodyValidators', 'body validator kind mismatch'));
-  } else if (refKey(bodyValidator.bodyContract) !== refKey(candidate.bodyContract)) {
-    failures.push(reject('BODY_CONTRACT_NOT_ALLOWED', '$.bodyContract', 'Candidate body contract is not the exact authority-owned contract'));
-  } else {
-    try {
-      for (const issue of bodyValidator.validate(candidate.body)) {
-        failures.push(reject('BODY_SCHEMA_INVALID', issue.path, `${issue.code}: ${issue.message}`));
-      }
-    } catch (error) {
-      failures.push(reject('BODY_SCHEMA_INVALID', '$.body', error instanceof Error ? `body validator failed closed: ${error.message}` : 'body validator failed closed'));
-    }
-  }
-
+  failures.push(...await validateBodySchema(candidate, authority, contractAuthority, sha256));
   failures.push(...refsAllowed(candidate.io.inputs, authority.allowedInputs, 'INPUT_CONTRACT_NOT_ALLOWED', '$.io.inputs'));
   failures.push(...refsAllowed(candidate.io.outputs, authority.allowedOutputs, 'OUTPUT_CONTRACT_NOT_ALLOWED', '$.io.outputs'));
   failures.push(...stringsAllowed(candidate.capabilities, authority.allowedCapabilities, 'CAPABILITY_NOT_ALLOWED', '$.capabilities'));
@@ -451,18 +526,29 @@ function sameBaseline(a: CandidateValidationGovernanceBaseline, b: CandidateVali
 
 /**
  * Reuse of validation evidence only; never promotion/activation/execution authority.
- * Cross-baseline reuse can only come from a reviewed rule owned by the exact
- * target Governance Baseline validation authority.
+ * Cross-baseline reuse requires an exact authority resolution from the retained
+ * target Governance Baseline body. No compatibility DTO is accepted from the
+ * call site.
  */
-export function canReuseValidationForGovernanceBaseline(
+export async function canReuseValidationForGovernanceBaseline(
   identity: ValidatedCandidateIdentity,
   target: CandidateValidationGovernanceBaseline,
-  targetAuthority: CandidateValidationAuthority,
-): boolean {
-  if (!baselineValid(target) || !sameBaseline(targetAuthority.governanceBaseline, target)) return false;
+  contractAuthority: CandidateContractAuthorityPort,
+): Promise<boolean> {
+  if (!baselineValid(target)) return false;
   if (sameBaseline(identity.governanceBaseline, target)) return true;
 
-  return (targetAuthority.reviewedValidationCompatibilities ?? []).some((compatibility) => (
+  let targetAuthority;
+  try {
+    targetAuthority = await contractAuthority.resolveExactGovernanceValidationAuthority(target);
+  } catch {
+    return false;
+  }
+  if (targetAuthority === undefined) return false;
+  if (!sameBaseline(targetAuthority.governanceBaseline, target)) return false;
+  if (targetAuthority.governanceContractContentDigest !== target.contentDigest) return false;
+
+  return targetAuthority.reviewedValidationCompatibilities.some((compatibility) => (
     nonEmpty(compatibility.reviewDigest)
     && compatibility.kind === 'reviewed-exact-governance-compatibility'
     && compatibility.validatorContractVersion === identity.validatorContractVersion
