@@ -189,16 +189,15 @@ export interface CandidateSpecializedValidator {
 }
 
 /**
- * Reviewed compatibility record stored inside the exact retained Governance
- * Baseline semantic body. Ownership comes from containment in that body; the
- * record therefore does not self-assert the target body's content digest.
+ * Reviewed compatibility record stored inside the exact retained target
+ * Governance Baseline semantic body. The target is implicit from containment,
+ * avoiding a target-content-digest self-reference inside its own digest body.
  */
 export interface ReviewedCandidateValidationCompatibility {
   readonly kind: 'reviewed-exact-governance-compatibility';
   readonly validatorContractVersion: typeof CANDIDATE_VALIDATOR_CONTRACT_VERSION;
   readonly candidateKind: CandidateKind;
   readonly from: CandidateValidationGovernanceBaseline;
-  readonly to: CandidateValidationGovernanceBaseline;
   readonly reviewDigest: string;
 }
 
