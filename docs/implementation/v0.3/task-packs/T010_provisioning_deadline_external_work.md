@@ -10,7 +10,7 @@
 **Parallel:** YES  
 **Risk:** H  
 **L3:** REQUIRED  
-**Status:** DOING
+**Status:** DONE
 
 ## 1. Frozen Inputs
 
@@ -61,39 +61,45 @@ Do not modify shared runtime barrels, central runtime assembly, Node/Expo adapte
 
 ## 5. Acceptance
 
-- [ ] duplicate provisioning key with identical semantic request resolves to one logical instance;
-- [ ] same provisioning key with different target/package/correlation/input fails closed;
-- [ ] duplicate external-work registration does not create a second logical correlation;
-- [ ] correlation reuse with different target/timer/deadline fails closed;
-- [ ] callback before `dueAt` settles once and replays the same callback turn identity on retry;
-- [ ] callback at/after `dueAt` cannot defeat the durable timeout boundary;
-- [ ] deadline firing after a completed callback cannot create a second logical resume;
-- [ ] late callback after timeout does not become a callback resume;
-- [ ] repeated/restarted timeout recovery returns the same timer-turn identity;
-- [ ] crash-after-settlement/before-submit can recover the stored terminal source;
-- [ ] unknown correlation, target mismatch, timer mismatch and early timer fail closed;
-- [ ] no Node built-ins, process APIs, device APIs or XState timer authority enter portable core;
-- [ ] no external job submit/cancel/poll API enters DomainHarness;
-- [ ] no second scheduler/runtime is introduced.
+- [x] duplicate provisioning key with identical semantic request resolves to one logical instance;
+- [x] same provisioning key with different target/package/correlation/input fails closed;
+- [x] duplicate external-work registration does not create a second logical correlation;
+- [x] correlation reuse with different target/timer/deadline fails closed;
+- [x] callback before `dueAt` settles once and replays the same callback turn identity on retry;
+- [x] callback at/after `dueAt` cannot defeat the durable timeout boundary;
+- [x] deadline firing after a completed callback cannot create a second logical resume;
+- [x] late callback after timeout does not become a callback resume;
+- [x] repeated/restarted timeout recovery returns the same timer-turn identity;
+- [x] crash-after-settlement/before-submit can recover the stored terminal source;
+- [x] unknown correlation, target mismatch, timer mismatch and early timer fail closed;
+- [x] no Node built-ins, process APIs, device APIs or XState timer authority enter portable core;
+- [x] no external job submit/cancel/poll API enters DomainHarness;
+- [x] no second scheduler/runtime is introduced.
 
 ## 6. Required Validation
 
-Focused deterministic test:
+Focused deterministic test source:
 
 ```text
 packages/domain-harness/tests/runtime/durable-control-coordinator.test.ts
 ```
 
-Repository commands when an executable Build Host/CI is available:
+Repository commands normally expected on executable Build Host/CI:
 
 ```text
 npm run typecheck -w @kaicreator/domain-harness
 npm test -w @kaicreator/domain-harness
 ```
 
-T-010 validation intentionally stops at portable deterministic fixtures. Real process restart, force-stop, app/device lifecycle, SQLite/host adapter durability, and Node/Expo parity are deferred to T-022/T-023 per the Task DAG and Issue #228.
+### CI waiver
 
-No mock/in-memory result may be reported as proof of host durability.
+The PR verification pipeline remained pending for the implementation HEAD. The task owner explicitly authorized completing T-010 without waiting for CI. Therefore CI/typecheck/test execution evidence is recorded as **WAIVED / NOT CLAIMED PASS** for this task closeout, rather than being represented as successful execution.
+
+This waiver does not weaken or replace T-022/T-023 host-validation requirements and does not count as Node/Expo durability evidence.
+
+T-010 validation intentionally stops at portable deterministic fake-store/fake-clock fixtures. Real process restart, force-stop, app/device lifecycle, SQLite/host adapter durability, and Node/Expo parity are deferred to T-022/T-023 per the Task DAG and Issue #228.
+
+No mock/in-memory result is reported as proof of host durability.
 
 ## 7. Failure Handling
 
@@ -148,3 +154,11 @@ This task SHALL NOT implement:
 - release qualification.
 
 Those host/integration concerns remain in later v0.3 tasks, with real Node/Expo validation specifically deferred to T-022/T-023.
+
+## 10. Closeout
+
+- Implementation PR: #255
+- Implementation HEAD before closeout evidence update: `e42cd1ae42d99928fe276dd7d0df6a35ee171e4a`
+- CI status at waiver decision: `ci/woodpecker/pr/verify` pending
+- CI disposition: explicitly waived by task owner; no PASS claim
+- Real host/device validation: deferred to T-022/T-023
