@@ -630,7 +630,7 @@ export async function validateCandidate(
     };
   }
   if (!nonEmpty(candidateContentDigest)) {
-    return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', 'Candidate digest must be non-empty'), grantsExecutionPermission: false } as never;
+    return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', 'Candidate digest must be non-empty')], grantsExecutionPermission: false };
   }
 
   const identity: ValidatedCandidateIdentity = {
