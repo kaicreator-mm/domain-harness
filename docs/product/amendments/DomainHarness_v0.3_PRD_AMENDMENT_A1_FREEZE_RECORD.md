@@ -21,11 +21,7 @@ Git blob:
 
 `3e7e463aa8c1510ae2ff8ee7da1490fa234b07ac`
 
-For convenience, the repository also exposes the exact same blob at:
-
-`docs/product/amendments/DomainHarness_v0.3_PRD_AMENDMENT_A1_FROZEN.md`
-
-No editorial changes were made after the reviewed SHA. This preserves exact-SHA review identity.
+No editorial changes are made to the reviewed body after `FREEZE_OK`; this preserves exact-SHA review identity. The filename remains the reviewed candidate filename, while this Freeze Record establishes its frozen authority status.
 
 ## Independent Adversarial Review
 
