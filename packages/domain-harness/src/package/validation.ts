@@ -1,5 +1,8 @@
+import {
+  canonicalJsonStringify,
+  type Sha256Port,
+} from '../contracts/identity.js';
 import type { CapabilityId } from '../v2/contracts/capability.js';
-import type { Sha256Port } from '../v2/contracts/host.js';
 import type {
   CompiledPackageManifest,
   TargetCompiledDomainPackage,
@@ -255,22 +258,10 @@ function validateBindings(
   }
 }
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
-  if (isRecord(value)) {
-    const result: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) result[key] = canonicalize(value[key]);
-    return result;
-  }
-  return value;
-}
-
 export function canonicalPackageIdentityMaterial(manifest: CompiledPackageManifest): string {
   const { packageId: _packageId, ...identityMaterial } = manifest;
   assertJsonSerializable(identityMaterial, 'compiled package identity material');
-  const encoded = JSON.stringify(canonicalize(identityMaterial));
-  if (encoded === undefined) failInvalid('compiled package identity material is not serializable');
-  return encoded;
+  return canonicalJsonStringify(identityMaterial);
 }
 
 export async function computeCompiledPackageId(
