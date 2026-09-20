@@ -139,6 +139,7 @@ A `referenceId` is a lifetime-unique authority identity. Its first binding is im
 - validate package/CDI binding independently from activation;
 - track explicit live retention references and block collection until live reference count is zero;
 - preserve immutable first-binding/tombstone identity for every `referenceId` after release;
+- make retain insertion/idempotence/tombstone checks one Store-owned atomic operation;
 - release retention through an exact expected-reference conditional store operation, never unconditional ID deletion;
 - provide a memory store only as deterministic portable store-contract evidence.
 
@@ -188,7 +189,8 @@ The correction keeps the T-003 boundary unchanged and adds only store-contract s
 - immutable first-binding/tombstone accounting survives release;
 - released IDs cannot be rebound or reactivated;
 - `deleteReference(referenceId)` is replaced by conditional `releaseReference(expectedReference)`;
+- retain delegates atomic insertion/idempotence/tombstone authority to the Store rather than using a read-then-return precheck;
 - deterministic regression tests cover release → attempted rebind and stale/different expected-reference release;
 - Task Pack status is closed from `DOING` to implementation-complete pending exact-HEAD independent re-review/merge.
 
-Configured CI and independent review must bind to the new final exact HEAD; no result from `6f1e28bd761f752ab48225d09485103f4ced963f` is reused as validation authority for the repaired source shape.
+Configured CI and independent review must bind to the repaired final exact HEAD recorded in PR/Issue evidence; no result from `6f1e28bd761f752ab48225d09485103f4ced963f` is reused as validation authority for the repaired source shape.
