@@ -34,14 +34,14 @@ jobs:
       - name: npm ci
         run: npm ci
 
-      - name: Lint
+      - name: Build bootstrap
+        run: npm run build
+
+      - name: Lint after build bootstrap
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
-
-      - name: Build
-        run: npm run build
 
       - name: Full test suite
         run: npm test
