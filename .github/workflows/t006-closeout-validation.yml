@@ -1,0 +1,53 @@
+name: T006 Closeout Exact Head
+
+on:
+  push:
+    branches:
+      - validation/t006-closeout-97b744c9
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 97b744c9b4589921cecec4f35928c5acb2d789ad
+          fetch-depth: 1
+
+      - name: Verify exact HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "97b744c9b4589921cecec4f35928c5acb2d789ad"
+          git rev-parse HEAD
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Full test suite
+        run: npm test
+
+      - name: T-006 focused predicate and XState tests
+        run: node --import tsx --test "packages/domain-harness/tests/workflow-v03/predicate-purity.test.ts" "packages/domain-harness/tests/workflow-v03/xstate-boundary.test.ts"
+
+      - name: Package smoke
+        run: npm pack -w @kaicreator/domain-harness
