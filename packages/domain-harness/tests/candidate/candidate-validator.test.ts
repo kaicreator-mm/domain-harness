@@ -2,13 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { canonicalJsonStringify, type Sha256Port } from '../../src/contracts/identity.js';
-import type { JsonObject } from '../../src/contracts/json.js';
-import {
-  createGovernanceBaselineBody,
-  GovernanceBaselineRegistry,
-  MemoryGovernanceBaselineStore,
-  type GovernanceBaselineBody,
-} from '../../src/governance/index.js';
 import {
   CANDIDATE_BODY_SCHEMA_VERSION,
   CANDIDATE_ENVELOPE_SCHEMA_VERSION,
@@ -36,14 +29,6 @@ const baseline: CandidateValidationGovernanceBaseline = {
   schemaVersion: '1',
   version: 'B1',
   contentDigest: 'gov-b1',
-};
-
-const baselineJson = {
-  domainId: baseline.domainId,
-  governanceId: baseline.governanceId,
-  schemaVersion: baseline.schemaVersion,
-  version: baseline.version ?? 'B1',
-  contentDigest: baseline.contentDigest,
 };
 
 const input = { kind: 'input-contract', artifactId: 'order-input', contentDigest: 'in-1' } as const;
@@ -165,21 +150,6 @@ async function validate(
 
 function hasCode(result: Awaited<ReturnType<typeof validateCandidate>>, code: string): boolean {
   return !result.ok && result.rejections.some((item) => item.code === code);
-}
-
-async function governanceRegistryWith(
-  semantics: JsonObject,
-): Promise<{ registry: GovernanceBaselineRegistry; body: GovernanceBaselineBody }> {
-  const body = await createGovernanceBaselineBody({
-    domainId: 'orders',
-    governanceId: 'orders-governance',
-    schemaVersion: '1',
-    version: 'B2',
-    semantics,
-  }, sha256);
-  const registry = new GovernanceBaselineRegistry(new MemoryGovernanceBaselineStore(), sha256);
-  await registry.register(body);
-  return { registry, body };
 }
 
 test('accepts a fully allowlisted candidate and grants no execution permission', async () => {
@@ -399,80 +369,23 @@ test('rejects unresolved exact references and incompatible Hard Invariants', asy
   assert.equal(hasCode(result, 'HARD_INVARIANT_INCOMPATIBLE'), true);
 });
 
-test('changed Governance Baseline only reuses validation from compatibility retained in the exact target body', async () => {
+test('Governance validation evidence is reusable only for the same exact baseline in T-004', async () => {
   const validated = await validate(workflowCandidate());
   assert.equal(validated.ok, true);
   if (!validated.ok) return;
 
-  const exact = await governanceRegistryWith({
-    candidateValidationCompatibilities: [{
-      kind: 'reviewed-exact-governance-compatibility',
-      validatorContractVersion: CANDIDATE_VALIDATOR_CONTRACT_VERSION,
-      candidateKind: 'workflow',
-      from: baselineJson,
-      reviewDigest: 'review-b1-b2',
-    }],
-  });
   assert.equal(
-    await canReuseValidationForGovernanceBaseline(validated.identity, exact.body.identity, exact.registry),
+    canReuseValidationForGovernanceBaseline(validated.identity, baseline),
     true,
   );
 
-  const noRule = await governanceRegistryWith({ policy: 'unchanged-but-not-reviewed' });
-  assert.equal(
-    await canReuseValidationForGovernanceBaseline(validated.identity, noRule.body.identity, noRule.registry),
-    false,
-  );
-});
-
-test('unretained, corrupt or malformed target Governance authority cannot self-attest compatibility', async () => {
-  const validated = await validate(workflowCandidate());
-  assert.equal(validated.ok, true);
-  if (!validated.ok) return;
-
-  const emptyRegistry = new GovernanceBaselineRegistry(new MemoryGovernanceBaselineStore(), sha256);
-  const unretainedTarget: CandidateValidationGovernanceBaseline = {
-    domainId: 'orders',
-    governanceId: 'orders-governance',
-    schemaVersion: '1',
+  const changed: CandidateValidationGovernanceBaseline = {
+    ...baseline,
     version: 'B2',
-    contentDigest: 'forged-target',
+    contentDigest: 'gov-b2',
   };
   assert.equal(
-    await canReuseValidationForGovernanceBaseline(validated.identity, unretainedTarget, emptyRegistry),
-    false,
-  );
-
-  const corruptStore = new MemoryGovernanceBaselineStore();
-  const corruptRegistry = new GovernanceBaselineRegistry(corruptStore, sha256);
-  const corruptBody: GovernanceBaselineBody = {
-    identity: unretainedTarget,
-    semantics: {
-      candidateValidationCompatibilities: [{
-        kind: 'reviewed-exact-governance-compatibility',
-        validatorContractVersion: CANDIDATE_VALIDATOR_CONTRACT_VERSION,
-        candidateKind: 'workflow',
-        from: baselineJson,
-        reviewDigest: 'forged-review',
-      }],
-    },
-  };
-  await corruptStore.putBody(corruptBody);
-  assert.equal(
-    await canReuseValidationForGovernanceBaseline(validated.identity, unretainedTarget, corruptRegistry),
-    false,
-  );
-
-  const malformed = await governanceRegistryWith({
-    candidateValidationCompatibilities: [{
-      kind: 'reviewed-exact-governance-compatibility',
-      candidateKind: 'workflow',
-      from: baselineJson,
-      reviewDigest: 'missing-validator-version',
-    }],
-  });
-  assert.equal(
-    await canReuseValidationForGovernanceBaseline(validated.identity, malformed.body.identity, malformed.registry),
+    canReuseValidationForGovernanceBaseline(validated.identity, changed),
     false,
   );
 });
