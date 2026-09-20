@@ -39,6 +39,12 @@ function failCanonical(path: string, reason: string): never {
   );
 }
 
+function assertNoSymbolKeys(value: object, path: string): void {
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    failCanonical(path, 'symbol-keyed properties are not JSON');
+  }
+}
+
 function canonicalize(value: unknown, path: string, ancestors: Set<object>): JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
 
@@ -49,14 +55,33 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): Jso
 
   if (Array.isArray(value)) {
     if (ancestors.has(value)) failCanonical(path, 'circular reference');
+    assertNoSymbolKeys(value, path);
     ancestors.add(value);
-    const result = value.map((entry, index) => canonicalize(entry, `${path}[${index}]`, ancestors));
+
+    const result: JsonValue[] = [];
+    for (let index = 0; index < value.length; index += 1) {
+      if (!Object.prototype.hasOwnProperty.call(value, index)) {
+        failCanonical(`${path}[${index}]`, 'sparse array entries are not canonical JSON');
+      }
+      result.push(canonicalize(value[index], `${path}[${index}]`, ancestors));
+    }
+
+    const unexpectedKeys = Object.keys(value).filter((key) => {
+      if (!/^(0|[1-9]\d*)$/.test(key)) return true;
+      const index = Number(key);
+      return !Number.isSafeInteger(index) || index < 0 || index >= value.length;
+    });
+    if (unexpectedKeys.length > 0) {
+      failCanonical(path, 'arrays may not carry extra object properties');
+    }
+
     ancestors.delete(value);
     return result;
   }
 
   if (typeof value === 'object' && value !== null) {
     if (ancestors.has(value)) failCanonical(path, 'circular reference');
+    assertNoSymbolKeys(value, path);
     ancestors.add(value);
 
     const result: Record<string, JsonValue> = {};
@@ -85,7 +110,9 @@ export function canonicalizeJson(value: unknown): JsonValue {
 
 /** Deterministic UTF-8 material used as input to content-addressed digests. */
 export function canonicalJsonStringify(value: unknown): string {
-  return JSON.stringify(canonicalizeJson(value));
+  const encoded = JSON.stringify(canonicalizeJson(value));
+  if (encoded === undefined) failCanonical('$', 'value did not produce JSON text');
+  return encoded;
 }
 
 /** Compute a canonical SHA-256 content digest through the portable host seam. */
