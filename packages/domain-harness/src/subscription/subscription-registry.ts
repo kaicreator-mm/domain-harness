@@ -74,6 +74,10 @@ export class SubscriptionRegistry {
   private readonly onObservationError:
     | SubscriptionRegistryOptions['onObservationError']
     | undefined;
+  private disposed = false;
+  private scheduledCount = 0;
+  private runningCount = 0;
+  private idleWaiters: Array<() => void> = [];
 
   constructor(options: SubscriptionRegistryOptions) {
     this.observationSource = options.observationSource;
@@ -82,10 +86,58 @@ export class SubscriptionRegistry {
     this.onObservationError = options.onObservationError;
   }
 
+  /**
+   * Resolves when no observation flush is scheduled, running, or pending
+   * retry. Persistent observation failures keep re-scheduling retries, so the
+   * registry is intentionally NOT idle until an observation succeeds (the
+   * convergence guarantee of #161) or dispose() is called.
+   */
+  idle(): Promise<void> {
+    if (this.disposed || (this.scheduledCount === 0 && this.runningCount === 0)) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.idleWaiters.push(resolve);
+    });
+  }
+
+  /**
+   * Stops all delivery and observation work: entries are dropped, pending
+   * scheduled/retry tasks become no-ops when they fire, and idle() waiters
+   * resolve. Idempotent.
+   */
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.entries.clear();
+    this.scheduledCount = 0;
+    this.runningCount = 0;
+    this.#resolveIdleWaiters();
+  }
+
+  #resolveIdleWaiters(): void {
+    const waiters = this.idleWaiters;
+    this.idleWaiters = [];
+    for (const resolve of waiters) {
+      resolve();
+    }
+  }
+
+  #checkIdle(): void {
+    if (this.scheduledCount === 0 && this.runningCount === 0) {
+      this.#resolveIdleWaiters();
+    }
+  }
+
   subscribe(
     request: DomainSubscription,
     listener: DomainChangeListener,
   ): Unsubscribe {
+    if (this.disposed) {
+      throw new Error('SubscriptionRegistry is disposed');
+    }
     const subscription = cloneSubscription(request);
     const key = subscriptionKey(subscription);
     let entry = this.entries.get(key);
@@ -120,10 +172,16 @@ export class SubscriptionRegistry {
   }
 
   notifyInstanceChanged(target: WorkflowAddress): void {
+    if (this.disposed) {
+      return;
+    }
     this.signal({ kind: 'instance', target });
   }
 
   notifyMessageChanged(target: WorkflowAddress, messageId?: string): void {
+    if (this.disposed) {
+      return;
+    }
     this.signal({ kind: 'message', target });
 
     if (messageId !== undefined) {
@@ -143,10 +201,16 @@ export class SubscriptionRegistry {
   }
 
   notifyProjectionChanged(projectionId: string, key: string): void {
+    if (this.disposed) {
+      return;
+    }
     this.signal({ kind: 'projection', projectionId, key });
   }
 
   invalidateBusinessSnapshot(invalidation: BusinessInvalidation): void {
+    if (this.disposed) {
+      return;
+    }
     for (const entry of this.entries.values()) {
       if (entry.subscription.kind !== 'projection') {
         continue;
@@ -184,6 +248,7 @@ export class SubscriptionRegistry {
 
   private enqueue(entry: SubscriptionEntry): void {
     if (
+      this.disposed ||
       entry.listeners.size === 0 ||
       entry.scheduled ||
       entry.running
@@ -192,8 +257,13 @@ export class SubscriptionRegistry {
     }
 
     entry.scheduled = true;
+    this.scheduledCount += 1;
     this.scheduler.schedule(() => {
+      if (this.disposed) {
+        return;
+      }
       entry.scheduled = false;
+      this.scheduledCount -= 1;
       void this.flush(entry);
     });
   }
@@ -215,20 +285,30 @@ export class SubscriptionRegistry {
     }
 
     entry.scheduled = true;
+    this.scheduledCount += 1;
     const delayMs = entry.retryDelayMs;
     entry.retryDelayMs = Math.min(delayMs * 2, MAX_RETRY_DELAY_MS);
     this.retryScheduler(() => {
+      if (this.disposed) {
+        return;
+      }
       entry.scheduled = false;
+      this.scheduledCount -= 1;
       void this.flush(entry);
     }, delayMs);
   }
 
   private async flush(entry: SubscriptionEntry): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
     if (entry.running || entry.listeners.size === 0) {
+      this.#checkIdle();
       return;
     }
 
     entry.running = true;
+    this.runningCount += 1;
     const observedGeneration = entry.generation;
     let observationFailed = false;
 
@@ -264,6 +344,7 @@ export class SubscriptionRegistry {
       this.reportObservationError(error, entry.subscription);
     } finally {
       entry.running = false;
+      this.runningCount -= 1;
       if (entry.listeners.size > 0) {
         if (observationFailed) {
           this.scheduleRetry(entry);
@@ -274,6 +355,7 @@ export class SubscriptionRegistry {
           }
         }
       }
+      this.#checkIdle();
     }
   }
 
