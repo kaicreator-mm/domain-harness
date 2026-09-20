@@ -125,16 +125,63 @@ export interface CandidateRejection {
 }
 
 /**
- * Immutable, declarative schema artifact for one executable Candidate body.
+ * Bounded declarative schema language for executable Candidate bodies.
+ * It intentionally has no callbacks, source code, regular expressions,
+ * external references, custom keywords or provider/runtime objects.
+ */
+export type CandidateBodySchemaNode =
+  | CandidateBodyStringSchema
+  | CandidateBodyNumberSchema
+  | CandidateBodyBooleanSchema
+  | CandidateBodyNullSchema
+  | CandidateBodyArraySchema
+  | CandidateBodyObjectSchema;
+
+export interface CandidateBodyStringSchema {
+  readonly type: 'string';
+  readonly minLength?: number;
+  readonly enum?: readonly string[];
+}
+
+export interface CandidateBodyNumberSchema {
+  readonly type: 'number';
+  readonly integer?: boolean;
+  readonly minimum?: number;
+  readonly maximum?: number;
+}
+
+export interface CandidateBodyBooleanSchema {
+  readonly type: 'boolean';
+}
+
+export interface CandidateBodyNullSchema {
+  readonly type: 'null';
+}
+
+export interface CandidateBodyArraySchema {
+  readonly type: 'array';
+  readonly items: CandidateBodySchemaNode;
+  readonly maxItems: number;
+}
+
+export interface CandidateBodyObjectSchema {
+  readonly type: 'object';
+  readonly properties: Readonly<Record<string, CandidateBodySchemaNode>>;
+  readonly required: readonly string[];
+  readonly additionalProperties: false;
+}
+
+/**
+ * Immutable declarative schema artifact for one executable Candidate body.
  * The validator verifies identity.contentDigest over schemaVersion,
- * candidateKind and schema before compiling the schema. No caller-provided
+ * candidateKind and schema before interpreting the schema. No caller-provided
  * executable validation callback is accepted as body-schema authority.
  */
 export interface CandidateBodySchemaArtifact {
   readonly schemaVersion: typeof CANDIDATE_BODY_SCHEMA_VERSION;
   readonly candidateKind: CandidateKind;
   readonly identity: CandidateExactReference;
-  readonly schema: JsonValue;
+  readonly schema: CandidateBodySchemaNode;
 }
 
 export interface CandidateSpecializedIssue {
