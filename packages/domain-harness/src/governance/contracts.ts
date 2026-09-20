@@ -71,10 +71,13 @@ export interface GovernanceBaselineRetentionReference {
  */
 export interface GovernanceBaselineStore {
   getBody(identity: GovernanceBaselineIdentity): Promise<GovernanceBaselineBody | undefined>;
+  /** Insert immutable-by-digest body; same-key mutation must fail atomically. */
   putBody(body: GovernanceBaselineBody): Promise<void>;
-  deleteBody(identity: GovernanceBaselineIdentity): Promise<void>;
+  /** Atomically delete only when no retention reference targets this exact body. */
+  collectBodyIfUnreferenced(identity: GovernanceBaselineIdentity): Promise<boolean>;
 
   getReference(referenceId: string): Promise<GovernanceBaselineRetentionReference | undefined>;
+  /** Insert-once/idempotent by referenceId; rebinding must fail atomically. */
   putReference(reference: GovernanceBaselineRetentionReference): Promise<void>;
   deleteReference(referenceId: string): Promise<void>;
   listReferences(
