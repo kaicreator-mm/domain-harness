@@ -16,6 +16,13 @@ steps:
   - name: verify
     image: /usr/bin/bash
     commands:
-      - NODE_BIN="$(find /usr /usr/local /opt /root /home -type f -name node -perm -111 2>/dev/null | head -n 1)"
-      - test -n "$NODE_BIN"
-      - "$NODE_BIN" --version
+      - node --version
+      - npm --version
+      - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
+      - npm ci
+      # Type-aware eslint resolves cross-workspace imports through built
+      # dist/*.d.ts, so workspaces must be built before lint.
+      - npm run build
+      - npm run lint
+      - npm run typecheck
+      - npm test
