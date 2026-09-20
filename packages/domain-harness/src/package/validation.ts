@@ -99,6 +99,10 @@ function validateWorkflows(workflows: Record<string, unknown>): void {
     requireStringField(workflowValue, 'workflowId');
     const definition = requireRecordField(workflowValue, 'definition');
     assertJsonSerializable(definition, `workflow "${workflowKey}" definition`);
+    // Fail-closed executable-IR gate (#167/#168): the same authoritative decoder
+    // the runtime interpreter uses. Malformed states/routes/invokes/effects and
+    // unsupported invoke kinds are rejected at activation instead of surfacing
+    // mid-drain, satisfying the PRD R4 corrupt-package fail-closed criterion.
     try {
       decodeCompiledWorkflowDefinition(workflowKey, definition);
     } catch (error) {
