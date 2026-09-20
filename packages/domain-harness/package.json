@@ -15,6 +15,11 @@
       "types": "./dist/public-v2/index.d.ts",
       "import": "./dist/public-v2/index.js",
       "require": "./dist/public-v2/index.js"
+    },
+    "./workflow": {
+      "types": "./dist/workflow/index.d.ts",
+      "import": "./dist/workflow/index.js",
+      "require": "./dist/workflow/index.js"
     }
   },
   "files": [
