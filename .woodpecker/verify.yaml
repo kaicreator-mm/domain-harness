@@ -17,5 +17,13 @@ steps:
     image: /usr/bin/bash
     commands:
       - export PATH="/usr/local/bin:$PATH"
+      - node --version
+      - npm --version
+      - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
       - npm ci
-      - npx eslint packages/domain-harness/src/candidate/validator.ts
+      # Type-aware eslint resolves cross-workspace imports through built
+      # dist/*.d.ts, so workspaces must be built before lint.
+      - npm run build
+      - npm run lint
+      - npm run typecheck
+      - npm test
