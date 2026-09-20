@@ -10,7 +10,7 @@
 **Parallel:** YES  
 **Risk:** H  
 **L3:** REQUIRED  
-**Status:** DOING
+**Status:** DONE — implementation complete; exact-HEAD independent re-review/merge pending
 
 ## 1. Frozen Inputs
 
@@ -74,7 +74,9 @@ Focused portable tests MUST prove:
 11. active/recoverable retention references require exact package/CDI binding;
 12. retained body collection is blocked while any active/recoverable/audit/validation/promotion reference remains;
 13. releasing the last exact reference permits collection;
-14. reference IDs cannot be rebound to another baseline/binding.
+14. reference IDs cannot be rebound to another baseline/binding while live;
+15. releasing a reference preserves an immutable reference-ID tombstone so the same ID cannot later bind another baseline/binding or reactivate the released reference;
+16. release is conditional on the exact live reference so a stale/different authority expectation cannot delete the retained reference.
 
 The in-memory store used by focused tests is a portable logical-store conformance model only. It MUST NOT be described as host persistence evidence.
 
@@ -124,6 +126,8 @@ promotion
 
 Active/recoverable references additionally carry the exact package/CDI tuple so retained authority is not detached from its execution definition.
 
+A `referenceId` is a lifetime-unique authority identity. Its first binding is immutable even after the live retention is released. Store implementations SHALL preserve enough durable tombstone/binding history to reject later rebinding or reactivation. Release SHALL be conditional on the exact currently-live reference rather than an unconditional delete by ID.
+
 ## 6. Core Implementation
 
 - reuse T-001 `computeCanonicalJsonDigest()` / canonical JSON seam and injected portable `Sha256Port`;
@@ -133,7 +137,9 @@ Active/recoverable references additionally carry the exact package/CDI tuple so 
 - make registry storage content-addressed and mutation-by-same-digest fail closed;
 - make exact body lookup keys use `domainId + governanceId + schemaVersion + contentDigest`, never lifecycle label alone;
 - validate package/CDI binding independently from activation;
-- track explicit retention references and block collection until reference count is zero;
+- track explicit live retention references and block collection until live reference count is zero;
+- preserve immutable first-binding/tombstone identity for every `referenceId` after release;
+- release retention through an exact expected-reference conditional store operation, never unconditional ID deletion;
 - provide a memory store only as deterministic portable store-contract evidence.
 
 ## 7. Failure Handling
@@ -146,7 +152,9 @@ Fail closed for:
 - same digest with different semantics;
 - invalid/non-exact package/CDI binding or domain mismatch;
 - active/recoverable reference without exact package/CDI binding;
-- duplicate reference ID attempting to point at different authority;
+- duplicate live reference ID attempting to point at different authority;
+- released/tombstoned reference ID attempting rebinding or reactivation;
+- conditional release whose expected reference differs from the immutable/live authority binding;
 - collection while retained references exist;
 - non-governance classification without explicit human/operator governance authority.
 
@@ -170,3 +178,17 @@ T-003 SHALL NOT implement:
 - promotion vs activation transitions (T-015);
 - central Runtime assembly (T-021);
 - Node SQLite/process-kill or Expo persistence claims (T-022/T-023).
+
+## 10. Independent Review Correction
+
+Independent Review of exact HEAD `6f1e28bd761f752ab48225d09485103f4ced963f` found one blocking P1: release removed the only record of a `referenceId` binding, permitting later rebinding and leaving an unconditional-delete race surface. That exact-HEAD PASS/CI evidence is obsolete for the corrected implementation.
+
+The correction keeps the T-003 boundary unchanged and adds only store-contract safety:
+
+- immutable first-binding/tombstone accounting survives release;
+- released IDs cannot be rebound or reactivated;
+- `deleteReference(referenceId)` is replaced by conditional `releaseReference(expectedReference)`;
+- deterministic regression tests cover release → attempted rebind and stale/different expected-reference release;
+- Task Pack status is closed from `DOING` to implementation-complete pending exact-HEAD independent re-review/merge.
+
+Configured CI and independent review must bind to the new final exact HEAD; no result from `6f1e28bd761f752ab48225d09485103f4ced963f` is reused as validation authority for the repaired source shape.
