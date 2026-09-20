@@ -2,7 +2,6 @@ import { canonicalJsonStringify } from '../contracts/identity.js';
 import type { Sha256Port } from '../contracts/identity.js';
 import {
   GovernanceContractError,
-  type GovernanceBaselineAuthorityBinding,
   type GovernanceBaselineBody,
   type GovernanceBaselineIdentity,
   type GovernanceBaselineRetentionReference,
@@ -253,18 +252,5 @@ export class MemoryGovernanceBaselineStore implements GovernanceBaselineStore {
       }
     }
     return result.sort((left, right) => left.referenceId.localeCompare(right.referenceId));
-  }
-}
-
-export function assertRetentionAuthorityBinding(
-  baseline: GovernanceBaselineIdentity,
-  binding: GovernanceBaselineAuthorityBinding,
-): void {
-  const checked = createGovernanceBaselineAuthorityBinding(binding, binding.governanceBaseline);
-  if (!sameGovernanceBaselineIdentity(baseline, checked.governanceBaseline)) {
-    throw new GovernanceContractError(
-      'INVALID_RETENTION_REFERENCE',
-      'authority binding does not target the retained Governance Baseline',
-    );
   }
 }
