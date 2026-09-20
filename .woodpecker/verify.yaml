@@ -18,6 +18,4 @@ steps:
     commands:
       - export PATH="/usr/local/bin:$PATH"
       - npm ci
-      - sed -i 's/Object.entries(value as Record<string, unknown>)/Object.entries(value)/' packages/domain-harness/src/candidate/validator.ts
-      - sed -i 's/? value as string\[\] : undefined/? value : undefined/' packages/domain-harness/src/candidate/validator.ts
       - npx eslint packages/domain-harness/src/candidate/validator.ts
