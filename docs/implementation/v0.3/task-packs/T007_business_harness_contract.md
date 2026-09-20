@@ -3,14 +3,16 @@
 **Version:** v0.3  
 **Wave:** A / portable contracts and capabilities  
 **Execution Issue:** #225  
-**Branch:** `v0.3_t007`  
+**Original Branch:** `v0.3_t007`  
+**Repair Branch:** `v0.3_t007_repair`  
 **PR Base:** `v0.3`  
-**Exact Base:** `be65e41e652d70c17ca10af66bc5f25abed2658a`  
+**Original Exact Base:** `be65e41e652d70c17ca10af66bc5f25abed2658a`  
+**Repair Exact Base:** `74514b07048ee62ce04d742a9685ae4804619d89`  
 **Depends On:** T-001  
 **Parallel:** YES  
 **Risk:** H  
 **L3:** REQUIRED  
-**Status:** DOING
+**Status:** DONE — repair closed at refreshed exact HEAD `12e2d72` (gates/CI/re-review evidence in §11)
 
 ## 1. Frozen Inputs
 
@@ -42,6 +44,8 @@ It SHALL NOT become a peer runtime or acquire parent Workflow, mutation, provide
 
 This task does not modify central Runtime assembly, package activation, Governance registry, Candidate promotion/activation, persistent journals, semantic cache, durable effect execution, provider routing or public v0.3 assembly barrels.
 
+The independent-review repair is intentionally narrower: it changes the harness contract type surface, focused tests, and this task evidence only.
+
 ## 4. Deliverables
 
 1. provider-neutral `ModelPort` request/response seam with no provider/model-selection fields;
@@ -66,6 +70,7 @@ Required scenarios:
 
 - query observation → bounded second model turn → exact structured decision/event success;
 - selected Facts/CDI dependencies plus successful query dependency returned as `ObservedDependencySet`;
+- selected invocation dependencies cannot pre-claim `kind: query` provenance at the public TypeScript contract;
 - mutation capability hidden from model-visible schemas;
 - direct mutation request rejected before executor invocation;
 - unknown capability rejected before executor invocation;
@@ -100,12 +105,14 @@ One invocation receives only selected execution inputs:
 Domain Facts
 + Compiled Domain Intelligence
 + current Workflow context
-+ exact selected dependency identities
++ exact selected Fact/CDI dependency identities
 + allowed decision outcomes / Domain Event types
 + capability registry
 + provider-neutral ModelPort
 + maxSteps
 ```
+
+`selectedDependencies` is restricted to preselected `domain-fact` / `compiled-intelligence` provenance. `kind: query` provenance is an output-only observation for this input surface and may appear in `ObservedDependencySet` only after a successful allowed query binding reports it.
 
 The model request exposes read/query schemas only. Mutation bindings may be present in the host registry solely so a malicious/invalid model request can be rejected explicitly; their schemas are never exposed to the model and their executors are never invoked by `HarnessMachine`.
 
@@ -217,3 +224,48 @@ This task SHALL NOT implement:
 - host durability claims;
 - autonomous Meta Harness or self-modifying production intelligence;
 - a second/peer Harness Runtime.
+
+## 11. Independent Review Repair Record
+
+Independent review of original exact HEAD `7520ca029a065471313044ce923c42b003fb2850` issued `VALIDATION_REQUEST` with `P0=0 / P1=0 / P2=2 / P3=0`.
+
+Repair actions on `v0.3_t007_repair`:
+
+1. split preselected Fact/CDI provenance from query provenance in the public contract so `BusinessHarnessInput.selectedDependencies` cannot claim `kind: query`;
+2. add a compile-time negative contract test using `@ts-expect-error` so typecheck fails if query provenance becomes pre-claimable again;
+3. fix the private-reasoning negative test's repeated `finalResponse()` union narrowing, which could fail TypeScript typecheck before runtime validation executed;
+4. reconcile this Task Pack with the reopened Issue #225 and repair branch.
+
+The repair starts from current integration baseline `v0.3@74514b07048ee62ce04d742a9685ae4804619d89`, because the original PR had already merged before independent review. The original implementation HEAD remains historical evidence only; all repair validation/review must bind to the new repair PR exact HEAD.
+
+### Refresh to current v0.3
+
+Before closeout, `v0.3` advanced to `09b9ce20c817cd3ad1721b7af6d39d3bd9b7eb73` (T-004 unified candidate validation, T-002/T-003 task packs, and CI gate repairs merged). The repair branch was refreshed by merging `v0.3@09b9ce2` into `v0.3_t007_repair`; the resulting tree differs from `v0.3` only by the three T-007 repair files (task pack, `src/harness/contract.ts`, focused harness test).
+
+The refresh produced one content conflict in `tests/harness/business-harness-machine.test.ts`: `v0.3@c28cba6` had independently fixed the same `finalResponse()` union-narrowing issue with an inline ternary. The merge keeps the T-007 repair resolution (explicit `kind` assertion plus early return), which subsumes the CI-fix variant for the identical underlying typecheck concern.
+
+Build Host old-HEAD evidence at `cda631c19a97bdbbc76cf17e581f6424d61306be`: repository `npm test` 425/425 PASS, focused BusinessHarness tests 21/21 PASS, build/typecheck/pack PASS, lint failures confirmed as stale-base inheritance with no lint error in T-007 touched files. This evidence is historical; all closeout gates re-run and re-bind to the refreshed repair PR exact HEAD.
+
+Closure rule:
+
+```text
+repair exact HEAD
+→ required typecheck/focused/package tests PASS
+→ configured CI PASS, or post-failure exact-gate waiver with evidence
+→ independent exact-HEAD re-review
+→ Status: DONE
+```
+
+Until those gates are satisfied, this Task Pack remains `DOING` and Issue #225 remains open.
+
+### Closeout evidence (refreshed exact HEAD)
+
+All closeout gates bind to refreshed repair exact HEAD `12e2d72d91325fb92022432ace45dd69d2a271d9` (refresh merge `a7a5ba8` + evidence record `12e2d72`; tree differs from `v0.3@09b9ce2` only by the three T-007 repair files):
+
+1. Repository full gates at `12e2d72`: `npm run lint` PASS (stale-base lint failures cleared by the refreshed baseline), `npm run typecheck` PASS, `npm test` 426/426 PASS (baseline grew from 425 via refreshed T-002/T-003/T-004 test merges).
+2. Focused BusinessHarness tests at `12e2d72`: 21/21 PASS.
+3. `npm pack -w @kaicreator/domain-harness` PASS (`kaicreator-domain-harness-0.2.0.tgz`, 422 files).
+4. Exact-head CI: Woodpecker pipeline #426 `ci/woodpecker/pr/verify` = success on commit `12e2d72` (PR #262).
+5. Independent exact-HEAD re-review at `12e2d72`: verdict APPROVE, `P0=0 / P1=0 / P2=1 / P3=0`. V1 Fact/CDI vs query provenance split verified at the type surface with the `@ts-expect-error` negative pin (`contract.ts` `BusinessHarnessSelectedDependency`/`HarnessQueryDependency`); V2 no fabricated query evidence verified by tracing both `context.dependencies` write sites (`initialContext` host Fact/CDI input; query `onDone` post-`requireQueryBinding` executor report) — model output has no reachable dependency field and failed/rejected queries append none; V3 structured decision/event-only surface with exact-key validation and `INVALID_STRUCTURED_RESULT`/`INVALID_MODEL_RESPONSE` rejection of smuggled authority and private reasoning; V4 no transition/mutation/promotion/activation authority — mutation capabilities never advertised to the model and rejected in `authorizeQuery` before any executor invocation. The single P2 (non-blocking, recorded for future hardening): runtime `normalizeDependency` on the input path accepts `kind: 'query'`, so a non-typechecked host caller could seed query provenance at runtime; the task pack scope fixes this guarantee at the public TypeScript contract, and a hostile host could fabricate evidence regardless of input validation. Recommended follow-up for the T-016 journal integration: add an input-side runtime validator restricted to Fact/CDI kinds for fail-closed symmetry.
+
+**Status: DONE** (this section records the satisfied closure rule; Issue #225 closes with this merge).
