@@ -1,6 +1,7 @@
 {
   // Production build graph (issue #166): emit only the transitive import
-  // closure of the public v0.2 entry point. Legacy v0.1 modules
+  // closure of the public v0.2 entry point plus the explicit v0.3 Workflow
+  // public seam and its internal selected-engine adapter. Legacy v0.1 modules
   // (loader/compiler/engine-runner/persistence/recovery/public/legacy-v1) stay
   // in the repository as regression/migration evidence - they remain
   // typechecked by tsconfig.json and runnable from source via tsx, but are no
@@ -12,5 +13,9 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/index.ts"]
+  "include": [
+    "src/index.ts",
+    "src/workflow/index.ts",
+    "src/workflow/internal/xstate-adapter.ts"
+  ]
 }
