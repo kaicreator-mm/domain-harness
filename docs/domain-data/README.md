@@ -8,11 +8,15 @@ Domain Data 是由领域项目拥有和版本化的资产层，包含 Domain Aut
 
 1. `DOMAIN_DATA_SPEC.md` — normative authoring/governance model, asset classes, authority levels, schemas/rules/Skills/Workflows/Tool policies, versioning and Runtime parsing boundary.
 2. `DOMAIN_DATA_AUTHORING_GUIDE.md` — step-by-step extraction/refactor process for humans and coding Agents.
+3. `DOMAIN_DATA_CONTRACT_ANALYSIS_v0.3.md` — analysis (v0.3 L2 input): the Domain Data contracts the SDK actually enforces at build time and runtime, the governance contract, and the G1–G10 gap matrix against the v0.3 PRD / General Design v0.2.
+4. `contract-drafts/` — per-project domain contract drafts for the screened kaicreator-mm domain apps, generated against the analysis above.
 
 ## 中文
 
 1. `DOMAIN_DATA_SPEC.zh-CN.md` — Domain Data 规范、资产分类、Authority Level、Schema/Rule/Skill/Workflow/Tool Policy、变更治理和 Runtime 解析边界。
 2. `DOMAIN_DATA_AUTHORING_GUIDE.zh-CN.md` — 面向人和 Coding Agent 的 Domain Data 提取、建模和重构指南。
+3. `DOMAIN_DATA_CONTRACT_ANALYSIS_v0.3.md` — 契约分析（v0.3 L2 输入）：SDK 在构建期与运行期实际强制的 Domain Data 契约、治理层契约，以及对照 v0.3 PRD / General Design v0.2 的 G1–G10 差距矩阵。
+4. `contract-drafts/` — 按上述契约为筛选出的 kaicreator-mm 领域 App 项目生成的逐项目领域契约草案。
 
 ## Important boundary / 重要边界
 
