@@ -54,7 +54,7 @@ function scan(value: unknown, path = '$', ancestors = new Set<object>()): Candid
   ancestors.add(value);
   const entries: ReadonlyArray<readonly [string, unknown]> = Array.isArray(value)
     ? value.map((child, index) => [String(index), child] as const)
-    : Object.entries(value as Record<string, unknown>);
+    : Object.entries(value);
   for (const [key, child] of entries) {
     const childPath = Array.isArray(value) ? `${path}[${key}]` : `${path}.${key}`;
     for (const [code, names] of FORBIDDEN) {
@@ -89,7 +89,7 @@ function refs(value: unknown): CandidateExactReference[] | undefined {
   return result;
 }
 function strings(value: unknown): string[] | undefined {
-  return Array.isArray(value) && value.every(nonEmpty) ? value as string[] : undefined;
+  return Array.isArray(value) && value.every(nonEmpty) ? value : undefined;
 }
 function tools(value: unknown): CandidateToolReference[] | undefined {
   if (!Array.isArray(value)) return undefined;
