@@ -1,5 +1,3 @@
-import Ajv, { type AnySchema } from 'ajv';
-
 import { canonicalJsonStringify, computeCanonicalJsonDigest, type Sha256Port } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
 import {
@@ -8,10 +6,12 @@ import {
   CANDIDATE_KINDS,
   CANDIDATE_VALIDATOR_CONTRACT_VERSION,
   type CandidateBodySchemaArtifact,
+  type CandidateBodySchemaNode,
   type CandidateContractAuthorityPort,
   type CandidateControlContract,
   type CandidateEnvelope,
   type CandidateExactReference,
+  type CandidateGovernanceValidationAuthoritySnapshot,
   type CandidateKind,
   type CandidateRejection,
   type CandidateRejectionCode,
@@ -46,6 +46,11 @@ const FORBIDDEN: ReadonlyArray<readonly [CandidateRejectionCode, ReadonlySet<str
   ['PRIVATE_REASONING_FORBIDDEN', new Set(['chainOfThought', 'privateReasoning'])],
 ];
 
+const MAX_SCHEMA_DEPTH = 16;
+const MAX_SCHEMA_PROPERTIES = 128;
+const MAX_SCHEMA_ENUM_VALUES = 256;
+const MAX_SCHEMA_ARRAY_ITEMS = 1024;
+
 const reject = (code: CandidateRejectionCode, path: string, message: string): CandidateRejection => ({ code, path, message });
 const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
@@ -59,6 +64,11 @@ function keysAre(value: Record<string, unknown>, expected: readonly string[]): b
   const actual = Object.keys(value).sort();
   const wanted = [...expected].sort();
   return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);
+}
+
+function keysOnly(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedSet = new Set(allowed);
+  return Object.keys(value).every((key) => allowedSet.has(key));
 }
 
 function scan(value: unknown, path = '$', ancestors = new Set<object>()): CandidateRejection | undefined {
@@ -368,6 +378,137 @@ function sortFailures(value: CandidateRejection[]): CandidateRejection[] {
   return value.sort((a, b) => `${a.code}\u0000${a.path}\u0000${a.message}`.localeCompare(`${b.code}\u0000${b.path}\u0000${b.message}`));
 }
 
+function schemaAuthorityFailure(path: string, message: string): CandidateRejection {
+  return reject('VALIDATION_AUTHORITY_INVALID', path, message);
+}
+
+function schemaDefinitionFailures(value: unknown, path: string, depth = 0): CandidateRejection[] {
+  if (depth > MAX_SCHEMA_DEPTH) return [schemaAuthorityFailure(path, 'body schema exceeds maximum nesting depth')];
+  if (!plain(value) || !nonEmpty(value.type)) return [schemaAuthorityFailure(path, 'body schema node must be a typed plain object')];
+
+  if (value.type === 'string') {
+    if (!keysOnly(value, ['type', 'minLength', 'enum'])) return [schemaAuthorityFailure(path, 'string schema has unknown fields')];
+    if (value.minLength !== undefined && (!Number.isInteger(value.minLength) || (value.minLength as number) < 0)) {
+      return [schemaAuthorityFailure(`${path}.minLength`, 'minLength must be a non-negative integer')];
+    }
+    if (value.enum !== undefined) {
+      if (!Array.isArray(value.enum) || !value.enum.every((item) => typeof item === 'string')) {
+        return [schemaAuthorityFailure(`${path}.enum`, 'string enum must contain only strings')];
+      }
+      if (value.enum.length > MAX_SCHEMA_ENUM_VALUES || new Set(value.enum).size !== value.enum.length) {
+        return [schemaAuthorityFailure(`${path}.enum`, 'string enum must be bounded and unique')];
+      }
+    }
+    return [];
+  }
+
+  if (value.type === 'number') {
+    if (!keysOnly(value, ['type', 'integer', 'minimum', 'maximum'])) return [schemaAuthorityFailure(path, 'number schema has unknown fields')];
+    if (value.integer !== undefined && typeof value.integer !== 'boolean') {
+      return [schemaAuthorityFailure(`${path}.integer`, 'integer must be boolean')];
+    }
+    if (value.minimum !== undefined && (typeof value.minimum !== 'number' || !Number.isFinite(value.minimum))) {
+      return [schemaAuthorityFailure(`${path}.minimum`, 'minimum must be finite')];
+    }
+    if (value.maximum !== undefined && (typeof value.maximum !== 'number' || !Number.isFinite(value.maximum))) {
+      return [schemaAuthorityFailure(`${path}.maximum`, 'maximum must be finite')];
+    }
+    if (
+      typeof value.minimum === 'number'
+      && typeof value.maximum === 'number'
+      && value.minimum > value.maximum
+    ) {
+      return [schemaAuthorityFailure(path, 'minimum cannot exceed maximum')];
+    }
+    return [];
+  }
+
+  if (value.type === 'boolean' || value.type === 'null') {
+    return keysAre(value, ['type']) ? [] : [schemaAuthorityFailure(path, `${value.type} schema has unknown fields`)];
+  }
+
+  if (value.type === 'array') {
+    if (!keysAre(value, ['type', 'items', 'maxItems'])) return [schemaAuthorityFailure(path, 'array schema requires only type/items/maxItems')];
+    if (!Number.isInteger(value.maxItems) || (value.maxItems as number) < 0 || (value.maxItems as number) > MAX_SCHEMA_ARRAY_ITEMS) {
+      return [schemaAuthorityFailure(`${path}.maxItems`, 'maxItems must be a bounded non-negative integer')];
+    }
+    return schemaDefinitionFailures(value.items, `${path}.items`, depth + 1);
+  }
+
+  if (value.type === 'object') {
+    if (!keysAre(value, ['type', 'properties', 'required', 'additionalProperties'])) {
+      return [schemaAuthorityFailure(path, 'object schema requires only type/properties/required/additionalProperties')];
+    }
+    if (value.additionalProperties !== false || !plain(value.properties) || !Array.isArray(value.required)) {
+      return [schemaAuthorityFailure(path, 'object schema must deny additional properties and declare properties/required')];
+    }
+    const propertyEntries = Object.entries(value.properties);
+    if (propertyEntries.length > MAX_SCHEMA_PROPERTIES) {
+      return [schemaAuthorityFailure(`${path}.properties`, 'object schema has too many properties')];
+    }
+    if (!value.required.every(nonEmpty) || new Set(value.required).size !== value.required.length) {
+      return [schemaAuthorityFailure(`${path}.required`, 'required properties must be unique non-empty strings')];
+    }
+    const propertyNames = new Set(propertyEntries.map(([name]) => name));
+    if (value.required.some((name) => !propertyNames.has(name as string))) {
+      return [schemaAuthorityFailure(`${path}.required`, 'required property must exist in properties')];
+    }
+    const failures: CandidateRejection[] = [];
+    for (const [name, child] of propertyEntries.sort(([a], [b]) => a.localeCompare(b))) {
+      if (!nonEmpty(name)) failures.push(schemaAuthorityFailure(`${path}.properties`, 'property names must be non-empty'));
+      failures.push(...schemaDefinitionFailures(child, `${path}.properties.${name}`, depth + 1));
+    }
+    return failures;
+  }
+
+  return [schemaAuthorityFailure(`${path}.type`, `unsupported body schema node type: ${String(value.type)}`)];
+}
+
+function bodySchemaFailure(path: string, message: string): CandidateRejection {
+  return reject('BODY_SCHEMA_INVALID', path, message);
+}
+
+function validateBodyAgainstSchema(value: JsonValue, schema: CandidateBodySchemaNode, path = '$.body'): CandidateRejection[] {
+  if (schema.type === 'string') {
+    if (typeof value !== 'string') return [bodySchemaFailure(path, 'expected string')];
+    if (schema.minLength !== undefined && value.length < schema.minLength) return [bodySchemaFailure(path, `string length must be at least ${schema.minLength}`)];
+    if (schema.enum !== undefined && !schema.enum.includes(value)) return [bodySchemaFailure(path, 'string value is not in the exact allowed enum')];
+    return [];
+  }
+
+  if (schema.type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return [bodySchemaFailure(path, 'expected finite number')];
+    if (schema.integer === true && !Number.isInteger(value)) return [bodySchemaFailure(path, 'expected integer')];
+    if (schema.minimum !== undefined && value < schema.minimum) return [bodySchemaFailure(path, `number must be >= ${schema.minimum}`)];
+    if (schema.maximum !== undefined && value > schema.maximum) return [bodySchemaFailure(path, `number must be <= ${schema.maximum}`)];
+    return [];
+  }
+
+  if (schema.type === 'boolean') return typeof value === 'boolean' ? [] : [bodySchemaFailure(path, 'expected boolean')];
+  if (schema.type === 'null') return value === null ? [] : [bodySchemaFailure(path, 'expected null')];
+
+  if (schema.type === 'array') {
+    if (!Array.isArray(value)) return [bodySchemaFailure(path, 'expected array')];
+    const failures: CandidateRejection[] = [];
+    if (value.length > schema.maxItems) failures.push(bodySchemaFailure(path, `array exceeds maxItems ${schema.maxItems}`));
+    value.forEach((item, index) => failures.push(...validateBodyAgainstSchema(item, schema.items, `${path}[${index}]`)));
+    return failures;
+  }
+
+  if (value === null || Array.isArray(value) || typeof value !== 'object') return [bodySchemaFailure(path, 'expected object')];
+  const record = value as Record<string, JsonValue>;
+  const failures: CandidateRejection[] = [];
+  for (const required of schema.required) {
+    if (!Object.prototype.hasOwnProperty.call(record, required)) failures.push(bodySchemaFailure(`${path}.${required}`, 'required property is missing'));
+  }
+  for (const key of Object.keys(record).sort()) {
+    const propertySchema = schema.properties[key];
+    if (propertySchema === undefined) failures.push(bodySchemaFailure(`${path}.${key}`, 'additional property is not allowed by exact body schema'));
+    else failures.push(...validateBodyAgainstSchema(record[key] as JsonValue, propertySchema, `${path}.${key}`));
+  }
+  return failures;
+}
+
 async function validateBodySchema(
   candidate: CandidateEnvelope,
   authority: CandidateValidationAuthority,
@@ -386,8 +527,7 @@ async function validateBodySchema(
   try {
     schemaArtifact = await contractAuthority.resolveExactBodySchema(candidate.bodyContract);
   } catch (error) {
-    return [reject(
-      'VALIDATION_AUTHORITY_INVALID',
+    return [schemaAuthorityFailure(
       '$authority.bodySchema',
       error instanceof Error ? `exact body-schema resolution failed closed: ${error.message}` : 'exact body-schema resolution failed closed',
     )];
@@ -400,39 +540,25 @@ async function validateBodySchema(
     || schemaArtifact.candidateKind !== candidate.candidateKind
     || refKey(schemaArtifact.identity) !== refKey(candidate.bodyContract)
   ) {
-    return [reject('VALIDATION_AUTHORITY_INVALID', '$authority.bodySchema', 'resolved body-schema artifact identity/kind/version mismatch')];
+    return [schemaAuthorityFailure('$authority.bodySchema', 'resolved body-schema artifact identity/kind/version mismatch')];
   }
 
   let computedSchemaDigest: string;
   try {
     computedSchemaDigest = await computeCanonicalJsonDigest(bodySchemaMaterial(schemaArtifact), sha256);
   } catch (error) {
-    return [reject(
-      'VALIDATION_AUTHORITY_INVALID',
+    return [schemaAuthorityFailure(
       '$authority.bodySchema',
       error instanceof Error ? `body-schema digest validation failed closed: ${error.message}` : 'body-schema digest validation failed closed',
     )];
   }
   if (computedSchemaDigest !== candidate.bodyContract.contentDigest) {
-    return [reject('VALIDATION_AUTHORITY_INVALID', '$authority.bodySchema', 'resolved body-schema bytes do not match the exact content digest')];
+    return [schemaAuthorityFailure('$authority.bodySchema', 'resolved body-schema bytes do not match the exact content digest')];
   }
 
-  try {
-    const ajv = new Ajv({ allErrors: true, strict: true });
-    const validate = ajv.compile(schemaArtifact.schema as AnySchema);
-    if (validate(candidate.body)) return [];
-    return (validate.errors ?? []).map((error) => reject(
-      'BODY_SCHEMA_INVALID',
-      error.instancePath.length > 0 ? `$.body${error.instancePath}` : '$.body',
-      `${error.keyword}: ${error.message ?? 'body does not satisfy exact schema'}`,
-    ));
-  } catch (error) {
-    return [reject(
-      'VALIDATION_AUTHORITY_INVALID',
-      '$authority.bodySchema',
-      error instanceof Error ? `resolved body schema is invalid: ${error.message}` : 'resolved body schema is invalid',
-    )];
-  }
+  const schemaFailures = schemaDefinitionFailures(schemaArtifact.schema, '$authority.bodySchema.schema');
+  if (schemaFailures.length > 0) return sortFailures(schemaFailures);
+  return sortFailures(validateBodyAgainstSchema(candidate.body, schemaArtifact.schema));
 }
 
 /** Deterministic Candidate -> Validated boundary. Never promotes, activates or executes. */
@@ -504,7 +630,7 @@ export async function validateCandidate(
     };
   }
   if (!nonEmpty(candidateContentDigest)) {
-    return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', 'Candidate digest must be non-empty')], grantsExecutionPermission: false };
+    return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', 'Candidate digest must be non-empty'), grantsExecutionPermission: false } as never;
   }
 
   const identity: ValidatedCandidateIdentity = {
@@ -538,7 +664,7 @@ export async function canReuseValidationForGovernanceBaseline(
   if (!baselineValid(target)) return false;
   if (sameBaseline(identity.governanceBaseline, target)) return true;
 
-  let targetAuthority;
+  let targetAuthority: CandidateGovernanceValidationAuthoritySnapshot | undefined;
   try {
     targetAuthority = await contractAuthority.resolveExactGovernanceValidationAuthority(target);
   } catch {
