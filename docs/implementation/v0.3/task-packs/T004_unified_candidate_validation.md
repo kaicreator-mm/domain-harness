@@ -39,9 +39,11 @@ Required vectors:
 | Vector | Expected result |
 |---|---|
 | Rule / DecisionProcedure / Skill / Workflow use the common envelope | deterministic accept when every authority reference is exact and allowlisted |
+| missing or mismatched exact Candidate body contract/schema authority | `BODY_VALIDATOR_REQUIRED` / `BODY_CONTRACT_NOT_ALLOWED` |
+| body violates its exact deterministic schema, including disguised executable material under a non-blacklisted field | `BODY_SCHEMA_INVALID` |
 | input/output contract mismatch | `INPUT_CONTRACT_NOT_ALLOWED` / `OUTPUT_CONTRACT_NOT_ALLOWED` |
 | capability/tool/event outside allowlist | fail closed |
-| arbitrary executable code field or function | `ARBITRARY_CODE_FORBIDDEN` |
+| arbitrary executable code field or actual function | `ARBITRARY_CODE_FORBIDDEN` |
 | provider secret/state | `PROVIDER_SECRET_OR_STATE_FORBIDDEN` |
 | actor/runtime object | `RUNTIME_OBJECT_FORBIDDEN` |
 | private reasoning authority | `PRIVATE_REASONING_FORBIDDEN` |
@@ -51,7 +53,7 @@ Required vectors:
 | incompatible Hard Invariant reference | `HARD_INVARIANT_INCOMPATIBLE` |
 | oversized/unreachable/cyclic control graph | bounded-control rejection; all executable Candidate cycles fail closed |
 | Workflow without #204 specialization | `SPECIALIZED_VALIDATOR_REQUIRED` |
-| changed Governance Baseline | prior validation is not reusable unless exact reviewed compatibility matches |
+| changed Governance Baseline | prior validation is not reusable unless the exact target Governance validation authority owns a reviewed compatibility rule bound to the target governance content digest |
 | promotion/activation fields injected into Candidate | invalid envelope; no authority transition occurs |
 | accepted Candidate | `grantsExecutionPermission === false` |
 
@@ -73,7 +75,7 @@ workflow
 The envelope contains only behaviorally relevant executable proposal material:
 
 - schema version, kind and proposal ID;
-- JSON semantic body;
+- exact body-contract identity plus JSON semantic body;
 - exact input/output contract references;
 - capability, query-tool and finite Domain Event declarations;
 - explicit mutation contract (`none` or `durable-effect` only);
@@ -89,6 +91,7 @@ Proposal provenance, metrics, evaluation, promotion and activation metadata are 
 `CandidateValidationAuthority` supplies the exact validation boundary:
 
 - exact Governance Baseline identity;
+- exact deterministic body-schema validators, one per accepted Candidate kind, each bound to an exact body-contract identity;
 - exact allowed I/O contracts;
 - capability/tool/event allowlists;
 - allowed durable-effect contracts;
@@ -96,9 +99,12 @@ Proposal provenance, metrics, evaluation, promotion and activation metadata are 
 - exact applicability/precondition references;
 - exact Hard Invariant references;
 - deterministic control bounds;
-- specialized validators.
+- Workflow specialization;
+- optional reviewed cross-baseline validation-compatibility rules owned by this exact target Governance Baseline authority.
 
 T-003 owns the canonical `GovernanceBaselineIdentity`. T-004 uses a narrow structurally compatible validation reference and does not create a competing registry/retention lifecycle.
+
+Cross-baseline compatibility is not accepted as an ad-hoc call-site object. `canReuseValidationForGovernanceBaseline()` receives the exact target validation authority and only consumes reviewed compatibility records contained in that authority, with `governanceContractContentDigest` equal to the target Governance Baseline `contentDigest`.
 
 ### 3.3 Validated identity
 
@@ -122,15 +128,21 @@ The API contains no promotion or activation transition.
 
 The unified validator does not replace or weaken WorkflowCandidate validation from #204/Frozen L2.
 
-For `candidateKind === 'workflow'`:
+For every Candidate kind:
 
 ```text
-common deterministic validation
+common deterministic envelope validation
 +
+exact deterministic body-schema validation
+```
+
+For `candidateKind === 'workflow'`, this is followed by:
+
+```text
 mandatory synchronous specialized Workflow validator
 ```
 
-No specialization means fail closed. Specialized rejection or exception also fails closed.
+Missing body-schema authority, body-schema rejection/exception, missing Workflow specialization, or Workflow specialization rejection/exception all fail closed.
 
 ## 4. Core Implementation
 
@@ -140,15 +152,16 @@ Validation order is deterministic:
 2. reject forbidden runtime/executable/provider/private-reasoning material;
 3. require canonical JSON material using the T-001 identity seam;
 4. parse the strict common envelope and reject unknown top-level authority fields;
-5. validate exact I/O, capability, tool and event declarations;
-6. validate mutation authority; business mutation is only an exact durable-effect contract;
-7. validate exact artifact, applicability and Hard-Invariant references;
-8. validate bounded control and reject cycles;
-9. run the required stricter specialization where applicable;
-10. if and only if all checks pass, compute the stable Candidate semantic digest through `Sha256Port`;
-11. bind the validation identity to the exact Governance Baseline.
+5. require an exact body-contract identity and run the exact authority-owned deterministic body-schema validator for the Candidate kind;
+6. validate exact I/O, capability, tool and event declarations;
+7. validate mutation authority; business mutation is only an exact durable-effect contract;
+8. validate exact artifact, applicability and Hard-Invariant references;
+9. validate bounded control, including limit, reachability and cycle rejection;
+10. run the required stricter Workflow specialization where applicable;
+11. if and only if all checks pass, compute the stable Candidate semantic digest through `Sha256Port`;
+12. bind the validation identity to the exact Governance Baseline.
 
-Set-like declarations are normalized before digesting. `candidateId` is proposal identity and is excluded from semantic content digest; behaviorally relevant body/contracts/allowlists/references/applicability/invariants/control remain digest material.
+Set-like declarations are normalized before digesting. `candidateId` is proposal identity and is excluded from semantic content digest; behaviorally relevant body contract/body/contracts/allowlists/references/applicability/invariants/control remain digest material.
 
 ## 5. Failure Handling
 
@@ -160,6 +173,10 @@ NON_CANONICAL_CONTENT
 ARBITRARY_CODE_FORBIDDEN
 PROVIDER_SECRET_OR_STATE_FORBIDDEN
 RUNTIME_OBJECT_FORBIDDEN
+PRIVATE_REASONING_FORBIDDEN
+BODY_CONTRACT_NOT_ALLOWED
+BODY_VALIDATOR_REQUIRED
+BODY_SCHEMA_INVALID
 INPUT_CONTRACT_NOT_ALLOWED
 OUTPUT_CONTRACT_NOT_ALLOWED
 CAPABILITY_NOT_ALLOWED
@@ -182,10 +199,10 @@ The validator never silently falls back to fuzzy, latest, compatible-by-name or 
 
 When the target Governance Baseline changes, `canReuseValidationForGovernanceBaseline()` returns false unless either:
 
-1. the exact semantic baseline identity is unchanged; or
-2. an explicit reviewed exact compatibility record matches validator version, Candidate kind, source baseline and target baseline.
+1. the exact semantic baseline identity is unchanged and the supplied target validation authority is itself bound to that exact target baseline; or
+2. the exact target Governance Baseline validation authority contains an explicit reviewed compatibility record matching validator version, Candidate kind, source baseline, target baseline, target governance content digest and non-empty review digest.
 
-This helper only determines whether deterministic validation evidence may be reused. It never promotes, activates or executes a Candidate.
+A call site cannot pass an independent compatibility object to bypass the target Governance authority. This helper only determines whether deterministic validation evidence may be reused. It never promotes, activates or executes a Candidate.
 
 ## 6. Reference
 
@@ -196,6 +213,8 @@ Frozen L2 Amendment A1 §12 keeps:
 ```text
 proposal != validation != evaluation != promotion != activation
 ```
+
+Frozen L2 A1 also requires changed Governance authority to trigger revalidation unless the governance contract itself contains a reviewed exact compatibility rule proving equivalence. The T-004 interface represents that rule only inside the exact target validation authority, never as caller-supplied evidence.
 
 #204 remains the stricter WorkflowCandidate reference: finite events, allowlisted tools/capabilities, no arbitrary code/provider state/actor authority, bounded acyclic control, fail-closed applicability and durable-effect mutation authority.
 
@@ -209,6 +228,7 @@ T-004 SHALL NOT implement:
 - automatic LLM/Business-Harness/Meta-Harness promotion or activation;
 - provider/model routing;
 - central package exports/runtime assembly;
+- root CI configuration changes;
 - Node/Expo persistence or host durability claims.
 
 Exact final implementation HEAD is recorded on PR/Issue execution evidence after the remote checkpoint is complete; it is intentionally not self-referential inside this committed document.
