@@ -248,7 +248,7 @@ function cloneDataOnly(value: unknown, path: string, seen = new WeakSet<object>(
       return result;
     }
 
-    const prototype = Object.getPrototypeOf(value);
+    const prototype = Object.getPrototypeOf(value) as object | null;
     if (prototype !== Object.prototype && prototype !== null) {
       throw new PredicateContractViolation(`${path} must use a plain object prototype`);
     }
