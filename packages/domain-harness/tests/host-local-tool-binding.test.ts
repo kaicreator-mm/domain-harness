@@ -42,7 +42,7 @@ function descriptor(overrides: Partial<CompiledToolDescriptor> = {}): CompiledTo
 function context(overrides: Partial<EffectExecutionContext> = {}): EffectExecutionContext {
   return {
     effectId: 'effect-1',
-    target: { workflowId: 'order', instanceId: 'order-1' },
+    target: { workflowId: 'order', instanceKey: 'order-1' },
     sourceMessageId: 'message-1',
     logicalTime: '2026-09-21T00:00:00.000Z',
     attempt: 1,
