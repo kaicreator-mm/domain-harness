@@ -20,3 +20,5 @@ The workflow also resolves the local-backend shell from `PATH` (`bash`) instead 
 ## Validation requirement
 
 The repair is complete only when Woodpecker executes the unchanged repository gates (`build`, `lint`, `typecheck`, `test`) successfully on the exact current PR HEAD. After merge to `v0.3`, PRs #256/#262/#263/#265/#266 must be refreshed onto the repaired base and revalidated at their new exact HEADs. Historical evidence bound to their old HEADs must not be reused after refresh.
+
+A pending run on the previous CI-only candidate is historical only. The current candidate must obtain a fresh terminal Woodpecker result; no pending/canceled/older-head status is inherited as validation evidence.
