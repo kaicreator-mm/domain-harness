@@ -218,7 +218,18 @@ Frozen L2 A1 also requires changed Governance authority to trigger revalidation 
 
 #204 remains the stricter WorkflowCandidate reference: finite events, allowlisted tools/capabilities, no arbitrary code/provider state/actor authority, bounded acyclic control, fail-closed applicability and durable-effect mutation authority.
 
-## 7. Scope Guard
+## 7. Review Remediation
+
+Independent Review on prior HEAD `5ad3aa8aa25a6a26218a08a7cdd53163e764125d` raised two P1 findings plus evidence/write-set gaps. This revision resolves them as follows:
+
+- cross-baseline reuse no longer accepts a caller-supplied compatibility object; reviewed compatibility is consumed only from the exact target Governance validation authority and must bind the target governance content digest;
+- every executable Candidate kind now requires an exact `bodyContract` plus deterministic authority-owned body-schema validator before validation can succeed;
+- focused tests now cover disguised executable material, actual function values, missing/mismatched body schema, oversized control, unreachable control, cycles, and governance-authority mismatch/compatibility cases;
+- `.woodpecker/verify.yaml` was restored byte-for-byte to the `v0.3` base version and is no longer part of the PR diff.
+
+Any validation evidence from earlier HEADs remains invalid after the remediation commits. Exact final HEAD evidence is recorded on the PR after CI settles.
+
+## 8. Scope Guard
 
 T-004 SHALL NOT implement:
 
