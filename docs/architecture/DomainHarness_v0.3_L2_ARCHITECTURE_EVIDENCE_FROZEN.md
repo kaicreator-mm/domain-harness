@@ -3,13 +3,13 @@
 **Project:** DomainHarness  
 **Version:** v0.3  
 **Document:** `DomainHarness_v0.3_L2_ARCHITECTURE_EVIDENCE_FROZEN.md`  
-**Status:** **FREEZE CANDIDATE — EXTERNAL ADVERSARIAL REVIEW PENDING**  
+**Status:** **FROZEN — INDEPENDENT ADVERSARIAL REVIEW PASSED (`FREEZE_OK`)**  
 **Prepared:** 2026-09-20  
 **Frozen Product Authority:** `docs/product/DomainHarness_v0.3_PRD_FROZEN.md`  
 **Pre-L2 Architecture Baseline:** `docs/architecture/DomainHarness_v0.3_ARCHITECTURE_BASELINE_FROZEN.md`  
 **Synthesis Baseline:** `main@a84fed0bfecc4c534a330844e6b6a4a76e3c67c2`  
 **Pinned Development Standard:** `kaicreator-mm/ai-development-standard@0446f04583f6cf464c835f26e2f657c8b703cb4e` (`2.0.0`)  
-**External Review Rule:** this file is intentionally not merged to `main` until independent adversarial review returns `FREEZE_OK` or all blocking findings are resolved.
+**External Review Result:** round-1 returned `CHANGES_REQUIRED` (1×P0, 6×P1); this revision closed all blocking findings by contract. Targeted independent re-review returned `FREEZE_OK` with no new P0/P1. Remaining non-blocking review notes are incorporated in this frozen revision.
 
 ---
 
@@ -28,7 +28,7 @@ It consumes the frozen v0.3 PRD and pre-L2 Architecture Baseline, then reconcile
 
 This synthesis is **not** a concatenation of those documents. It resolves their cross-contract boundaries into one production architecture.
 
-If external review accepts this candidate, this same file should be changed to `Status: FROZEN` and becomes the v0.3 architecture authority below the frozen PRD. Downstream Task DAG and L3 work SHALL preserve it unless executable evidence demonstrates a real contradiction with the frozen PRD.
+This file is now the **FROZEN v0.3 L2 architecture authority** below the frozen PRD. Downstream Task DAG and L3 work SHALL preserve it unless executable evidence demonstrates a real contradiction with the frozen PRD.
 
 The following architecture is explicitly superseded and must not return through implementation convenience:
 
@@ -69,7 +69,7 @@ Focused architecture evidence already completed:
 | Evidence | Focused result | CI status |
 | --- | ---: | --- |
 | #201 | 7 / 7 focused snapshot contract scenarios PASS | canonical CI unavailable; explicit waiver |
-| #205 | 6 / 6 focused Domain Data contract scenarios PASS | canonical CI unavailable; explicit waiver |
+| #205 | 6 / 6 executed focused tests PASS, covering 10 enumerated contract scenarios | canonical CI unavailable; explicit waiver |
 | #203 | 9 / 9 focused DecisionResolver/cache scenarios PASS | canonical CI unavailable; explicit waiver |
 | #204 | 13 / 13 focused subworkflow lifecycle scenarios PASS | canonical CI unavailable; explicit waiver |
 
@@ -84,6 +84,32 @@ The earlier research evidence remains part of the chain:
 | #195 | `419269f788de1d46e24af8bea19b041c8e36760f` | real SQLite + independent process + SIGKILL recovery and journal-first replay |
 | #196 | `7c6c7a63b643fbaa5051db8e403dd15f7721dce8` | constrained WorkflowCandidate, deterministic validation, explicit promotion, XState child reuse |
 | #197 | `0fb1a17a3f5a7d1e3b77de10bca76e613e1e7e2d` | integrated Rule → Cache → Subworkflow → Harness path and LLM avoidance |
+
+## 1.1 Independent adversarial review round 1
+
+The first external review targeted exact HEAD `77c97147a551f7e23d1d3ad685362e38e1a4715e` and returned:
+
+```text
+CHANGES_REQUIRED
+1 × P0
+6 × P1
+5 × P2
+1 × P3
+```
+
+The blocking findings were accepted as L2 contract defects rather than implementation details. This revision closes them by freezing:
+
+1. a single durability point and durable home for dynamically selected child-definition pins;
+2. one per-instance `DurableExecutionStore` durability domain for control snapshots, committed-work journals and child-definition pins;
+3. a durable **control-turn** abstraction that covers state-changing child/timer/internal macrosteps, not only external messages;
+4. one owner/lifecycle for promoted artifact bodies: the persistent Promoted Artifact Registry, outside immutable target-package contents;
+5. invoking-instance `packageId` scope for promoted-artifact compatibility/reference resolution;
+6. default-safe producer binding and scoped semantic-cache invalidation;
+7. pre-read plus post-execution cache eligibility, with observed dependencies required to be semantically versioned and already representable by the exact cache key.
+
+The same revision also folds in the non-blocking review items: one alias resolution per decision invocation, explicit revocation policy, exact `harness-config` identity for reasoned steps, unambiguous cache-row schema-failure handling, mandatory promoted-registry persistence on supported hosts, and evidence/status hygiene.
+
+These changes refine L2 contracts without reopening the frozen PRD.
 
 ---
 
@@ -225,28 +251,51 @@ The root Domain Machine definition is represented semantically by a `CompiledArt
 
 Promoted reusable children use `kind = promoted-subworkflow`.
 
-Static child definitions may be derived from the exact package pin and compiled workflow definition. A dynamically selected promoted child MUST additionally be pinned by its exact content digest before recovery can depend on it.
+Static child definitions are derived from the invoking instance's exact `packageId` plus compiled workflow definition. A dynamically selected promoted child is never derivable from the package pin alone; its exact `(kind, artifactId, contentDigest)` MUST be durably pinned for that invocation before the child is allowed to perform any journal-committed work or emit a state-changing terminal result.
 
-## S3 — dynamic child selection becomes a durable control-definition pin
+## S3 — dynamic child selection becomes a durable execution-definition pin
 
-A selection alias such as `stable` may be used to choose a promoted artifact for a new invocation, but recovery SHALL NOT re-resolve that alias.
+A selector such as an exact digest, exact lifecycle version or human-controlled alias is resolved **once per decision invocation** to one immutable promoted artifact identity.
 
-Before or atomically with the first durable control checkpoint that contains that invoked child, DomainHarness must durably retain the exact selected child definition identity:
+That single resolution object is reused by:
 
 ```text
-kind
-artifactId
-contentDigest
+semantic identity composition when relevant
+→ compatibility/applicability
+→ cache provenance
+→ child-definition pinning
+→ compiler input
+→ execution telemetry
 ```
 
-A control snapshot may carry this directly or reference another durable record, but the logical contract is mandatory.
+The runtime SHALL NOT resolve the alias a second time later in the same decision invocation.
+
+Before a dynamically selected promoted child may perform its first model/query/effect operation, commit any journal fact, or emit a state-changing terminal result, DomainHarness SHALL durably commit a `DynamicChildExecutionPin` in the same per-instance `DurableExecutionStore` durability domain as control snapshots and execution journals.
+
+The normative pin identity is:
+
+```text
+workflow target
++ parent actor identity
++ child actor identity
++ invocation ordinal
++ invoking exact packageId
++ kind = promoted-subworkflow
++ artifactId
++ contentDigest
+```
+
+The exact storage schema name is an implementation choice; the **durable home is not**. The pin is a first-class durable execution-definition record, not optional metadata hidden inside an arbitrary snapshot blob.
+
+A control snapshot that contains or resumes a dynamic child MUST reference the matching pin identity. Restore fails closed if the pin is absent, belongs to another package/actor/invocation, cannot resolve the exact artifact body, or the body re-hashes to a different digest.
 
 Consequences:
 
-- alias movement after invocation start cannot change an in-flight child's definition;
-- revocation cannot cause recovery to silently select a replacement;
-- exact selected promoted artifacts must be retained while active/recoverable instances reference them;
-- a revoked artifact is blocked for fresh selection but remains resolvable for exact recovery unless an explicit operator recovery/abort action says otherwise.
+- alias movement after selection cannot change the in-flight child;
+- revocation cannot silently replace an in-flight child;
+- exact selected promoted artifacts are retained while any recoverable execution pin references them;
+- a revoked artifact is blocked for fresh selection but remains resolvable for exact recovery unless an explicit operator abort/recovery action terminates that execution;
+- no journaled work may exist for a promoted child whose exact definition pin was never made durable.
 
 ## S4 — missing required semantic context is fail-closed, not merely cache bypass
 
@@ -269,7 +318,7 @@ Cache bypass is reserved for cases where the input exists but exact reusable sem
 
 The resolver SHALL NOT hide missing required decision data by skipping cache and asking a later resolver.
 
-## S5 — semantic dependency resolution may inspect registry identity before cache lookup
+## S5 — semantic dependency resolution is deterministic and has a bounded pre-read phase
 
 The frozen resolver **execution** order remains:
 
@@ -277,20 +326,35 @@ The frozen resolver **execution** order remains:
 Rule → Exact Cache → Promoted Subworkflow → HarnessMachine
 ```
 
-However, computing an exact cache identity may require knowing the exact content identity of a promoted artifact declared as behaviorally relevant.
+Exact-cache lookup may require dependency identity material before solver execution. A deterministic **semantic pre-read phase** may therefore resolve only:
 
-Therefore a deterministic, side-effect-free **identity-resolution phase** may resolve registry metadata (for example, an alias → exact artifact digest) before the cache read.
+1. the configured promoted selector once (`alias/version/digest → exact artifact digest`);
+2. declared semantic-context projections;
+3. declared read-only semantic revision tokens for live sources through a `SemanticRevisionPort`.
 
-This is not subworkflow execution and does not violate resolver ordering.
+A `SemanticRevisionPort` returns version/freshness identity only. It does not return the business observation itself, execute a mutation, call the model, or select new dependencies dynamically.
 
-Rules:
+The pre-read phase therefore permits:
 
-- no model call;
-- no Domain Tool/external I/O except the local durable metadata lookup required to resolve the registry identity;
-- no applicability execution with business side effects;
-- exact resolved digest becomes semantic dependency material only when the decision contract declares it behaviorally relevant.
+```text
+local/durable registry metadata lookup
+declared semantic-revision lookup
+deterministic projection evaluation
+```
 
-If the promoted solving method is semantically irrelevant to the reusable result, it is not included merely because it was available.
+and forbids:
+
+```text
+model calls
+arbitrary Domain Tool execution
+business mutation
+undeclared context discovery
+planner execution
+```
+
+If the complete behaviorally relevant dependency set cannot be represented before cache read, that invocation is **cache-read ineligible**. It may still continue to promoted-subworkflow/Harness execution, but it cannot pretend that an incomplete key is exact.
+
+The once-resolved promoted selection object, when one exists, is reused later; it is never resolved again at subworkflow execution time.
 
 ## S6 — resolver fallthrough and fail-closed errors use one taxonomy
 
@@ -299,12 +363,12 @@ Normal fallthrough:
 ```text
 rule no-match
 cache miss
-cache bypass
+cache bypass / read-ineligible
 cache store unavailable
 promoted artifact not found
-promoted artifact revoked for fresh selection
-promoted artifact incompatible with current host/runtime
+promoted artifact incompatible with the invoking instance's pinned package/runtime context
 promoted artifact not applicable
+promoted artifact revoked with explicit revocationPolicy = fallthrough
 ```
 
 Fail closed:
@@ -312,18 +376,20 @@ Fail closed:
 ```text
 rule contract/integrity error
 required semantic input/projection missing
-cache entry corrupt AND recomputation inputs are themselves invalid
-promoted artifact digest/integrity mismatch
+invalid semantic revision contract
 invalid applicability context
+promoted artifact digest/integrity mismatch
+promoted artifact revoked with revocationPolicy = deny
 compiler integrity/contract failure
 illegal/unknown executable capability that escaped validation
-Harness invalid structured result
-current schema violation that indicates a source contract bug
-snapshot/package/machine/child-definition incompatibility
-journal identity mismatch
+Harness/subworkflow/rule fresh result violates its declared current schema
+snapshot/package/machine/dynamic-child-pin incompatibility
+execution-journal slot collision / committed fact identity corruption
 ```
 
-A corrupt cache row whose current invocation is otherwise valid is an optimization failure: deny/quarantine that row and continue. The cache row itself does not make the invocation fail closed.
+A cache entry is never allowed to turn a current-schema mismatch into a source-contract fail-closed error. If a cached row fails integrity or current schema while the current invocation itself is valid, the row is denied/quarantined and resolution recomputes through later sources.
+
+A committed journal record found under the **same deterministic execution slot** but with a different required semantic contract or promoted-child digest is corruption and fails closed. A different full execution-operation identity is simply a different key and does not reuse the old record.
 
 ## S7 — current guard rejection never triggers hidden resolver retry
 
@@ -338,27 +404,68 @@ structured decision/event
 
 If the current guard rejects the decision, the resolver does not secretly try the next source. A later re-resolution must be an explicit Domain Machine state/event decision.
 
-## S8 — revocation and cache invalidation are separate concerns
+## S8 — revocation and semantic-cache invalidation are distinct but explicitly connected
 
-Artifact revocation controls **fresh subworkflow selection**.
+Artifact revocation controls fresh promoted-subworkflow authority. Semantic-cache validity is still content-addressed, but v0.3 uses a **default-safe producer rule**:
 
-Exact semantic cache invalidation is controlled by behaviorally relevant identity material.
+- every cache entry records an exact `producerIdentity`;
+- a result produced by a promoted subworkflow MUST include that promoted artifact's exact `CompiledArtifactIdentity` in semantic dependency material;
+- a result produced by HarnessMachine MUST include the exact behaviorally relevant `harness-config` identity;
+- observed live/query dependencies are cacheable only when their semantic revisions were representable in the exact key.
 
-Therefore:
+The cache store therefore supports scoped invalidation by exact producer/dependency identity and by namespace/scope. Revocation records include an explicit fresh-resolution policy and cache policy:
 
-- revocation alone does not automatically rewrite semantic history;
-- if a corrected promoted artifact changes behavior, the new artifact has a new `contentDigest`;
-- when that artifact is a declared semantic dependency, the new digest naturally produces a cache miss;
-- when a solving pattern is intentionally not part of semantic equivalence, changing only its lifecycle metadata does not invalidate otherwise equivalent cached results;
-- emergency invalidation of previously cached results must be expressed by changing a behaviorally relevant decision/dependency/semantic-policy identity or cache namespace, not by pretending lifecycle metadata was semantic content.
+```text
+revocationPolicy = deny | fallthrough
+cachePolicy = invalidate-produced-results | preserve
+```
 
-## S9 — cache eligibility is an explicit semantic safety declaration
+Safe defaults are:
 
-Exact semantic caching is not enabled merely because inputs can be hashed.
+```text
+revocationPolicy = deny
+cachePolicy = invalidate-produced-results
+```
 
-The domain/compiler must be able to account for all behaviorally relevant inputs and must declare reuse safe for equivalent semantics.
+An operator may explicitly choose `fallthrough` or `preserve` only when the domain contract justifies it.
 
-If intentional freshness/randomness/non-determinism is part of the product behavior, the invocation is non-cacheable unless that behavior is represented by an explicit semantic revision.
+Revocation does not mutate historical semantic content or silently rewrite an artifact digest. Instead, `invalidate-produced-results` uses the cache's producer/dependency index to make affected entries unreachable/removed without global namespace destruction.
+
+Changing behavior still creates a new `contentDigest`; the explicit invalidation path exists for correctness/security revocation where previously produced results must no longer be served.
+
+## S9 — cache eligibility is two-phase and must remain exact
+
+Exact semantic caching is not enabled merely because some inputs can be hashed.
+
+### Pre-read eligibility
+
+A cache read is allowed only when the runtime can construct a complete exact semantic key **before** the read:
+
+```text
+selected input
++ selected semantic projections
++ all declared behaviorally relevant artifact identities
++ all required live-source semantic revision tokens
+```
+
+If any behaviorally relevant dependency can only be discovered dynamically during reasoning, the invocation is cache-read ineligible.
+
+### Post-execution write eligibility
+
+Every rule/subworkflow/Harness computation returns an `ObservedDependencySet` describing the behaviorally relevant artifacts and query/live-source revisions actually used.
+
+A result may be written to the exact semantic cache only when:
+
+1. every observed dependency is already represented by the pre-read identity material with the same identity version and exact canonical semantic identity; representation-only aliases, labels, or object forms do not create an alternative equivalence rule;
+2. every observed live source has an explicit semantic revision/freshness identity;
+3. no undeclared behaviorally relevant dependency was discovered;
+4. the invocation remains cacheable under domain policy.
+
+If any condition fails, the write is downgraded to bypass and no cache entry is created.
+
+A dynamically chosen live tool/query that cannot provide a pre-bindable semantic revision therefore makes that reasoning path non-cacheable in v0.3. The runtime MUST NOT write a result under an incomplete key.
+
+Intentional freshness/randomness/non-determinism is likewise non-cacheable unless represented by an explicit semantic revision.
 
 ## S10 — control persistence never becomes semantic or provider authority
 
@@ -419,9 +526,14 @@ business-data truth
 │  └─ HarnessMachine fallback ───────────────→ ModelPort / AI Runtime                   │
 │                                                                                      │
 │  Durable Execution                                                                   │
-│  ├─ RuntimeStore / durable mailbox                                                    │
-│  ├─ recursive ControlSnapshotStore                                                    │
-│  ├─ AI/query/effect execution journals                                                │
+│  └─ DurableExecutionStore — one per-instance transaction/durability domain           │
+│      ├─ RuntimeStore / durable mailbox + control-turn receipts                        │
+│      ├─ Workflow Instance lifecycle / stateRevision                                   │
+│      ├─ recursive ControlSnapshot records                                             │
+│      ├─ DynamicChildExecutionPin records                                              │
+│      └─ AI/query/effect committed-work journals                                       │
+│                                                                                      │
+│  Adjacent Durable Services                                                           │
 │  ├─ command outcomes                                                                  │
 │  ├─ provisioning                                                                      │
 │  └─ persistent timer/deadline records                                                 │
@@ -450,19 +562,20 @@ The cache, registry, persistence adapters and AI Runtime are supporting authorit
 | Domain Machine / XState | business control state, current context, events, guards, transitions, actor lifecycle | provider routing, direct business mutation implementation |
 | Decision Resolver | resolver ordering, normal fallthrough, provenance/telemetry | XState transition authority, effect execution, provider policy |
 | Deterministic rule executor | validated deterministic decision computation | state transition, mutation |
-| Semantic dependency resolver | declared input/context/artifact identity material | arbitrary context discovery, model/tool execution |
-| Exact Semantic Result Cache | reusable structured computation under exact semantic identity | execution replay, guard result, mutation/effect completion |
-| Promoted Registry | immutable promoted artifacts, exact selection metadata, revocation/audit | planner execution, resolver order, mutation |
-| Subworkflow Compiler | promoted artifact → XState child definition | registry policy, provider routing, independent runtime |
+| Semantic dependency resolver | declared input/context/artifact identities and read-only semantic revision tokens | arbitrary context discovery, business observations, model/tool execution |
+| Exact Semantic Result Cache | reusable structured computation, producer/dependency provenance, scoped invalidation | execution replay, guard result, mutation/effect completion |
+| Promoted Artifact Registry | **sole durable owner of promoted artifact bodies**, exact selection metadata, revocation policy, retention/GC and audit | target-package mutation, planner execution, resolver order, business mutation |
+| Subworkflow Compiler | exact promoted artifact → XState child definition | registry policy, provider routing, independent runtime |
 | HarnessMachine | bounded unresolved reasoning and allowed query/tool observations | parent business flow, mutation authority, provider strategy |
-| RuntimeStore / execution journals | durable messages and committed execution facts | semantic equivalence, provider routing |
-| ControlSnapshotStore | recursive XState control position + definition pins | execution-result replay, mutation receipt |
+| DurableExecutionStore | one per-instance durability domain for messages/control turns, Workflow Instance revisions, control snapshots, dynamic-child pins, AI/query/effect committed-work journals | semantic equivalence, provider routing |
 | Durable effect path | effect identity, idempotency, mutation execution protocol | business transition policy |
 | Domain Facts source / Business Store | authoritative business facts | workflow control semantics |
-| Compiler | package/artifact validation, canonicalization, content identities, typed contracts | runtime business facts |
+| Package Compiler | target-package validation, package-bundled artifact canonicalization/content identities, typed contracts and promoted-selection declarations | runtime business facts, runtime-promoted artifact ownership |
 | AI Runtime / ModelPort | provider/model execution strategy | Domain Event/transition authority |
 
----
+The semantic cache and promoted registry remain separate authorities from `DurableExecutionStore`. They may be colocated physically, but they do not participate in execution replay authority.
+
+The control snapshot store/journals are **not** independent durability domains in v0.3. Host adapters expose them through one `DurableExecutionStore` transaction/durability boundary per workflow instance.
 
 # 7. Unified Identity Model
 
@@ -542,14 +655,24 @@ An excluded field may only enter semantic identity through an explicit reviewed 
 
 ## 7.4 Exact execution-operation identity
 
-Used by AI/query/effect journals:
+AI/query/effect journals use a deterministic execution-operation identity derived from:
 
 ```text
-workflow / instance / message / operation / effect identity
-+ operation semantic contract identity where required
+workflow target
++ durableControlTurnId
++ operation kind
++ operation ordinal / stable operation id
++ operation semantic contract digest
++ exact promoted-child contentDigest when executed inside a promoted child
 ```
 
-Its purpose is replay/idempotency of one execution, not cross-execution reuse.
+`sourceMessageId` may contribute to the `durableControlTurnId` for an external-message turn, but a message id is not required for child-completion/timer/internal control turns.
+
+For **every** operation executed inside a promoted child, the child's exact `contentDigest` is mandatory identity material. It is not optional "where required".
+
+Its purpose is replay/idempotency of one exact execution definition, not cross-execution semantic reuse.
+
+A lookup uses the complete identity. Records under a different promoted-child digest are different keys and are never reused. If the store detects the same deterministic operation slot committed with conflicting semantic identity, it fails closed as execution-history corruption.
 
 ## 7.5 Control snapshot identity
 
@@ -559,12 +682,13 @@ workflow target
 + root machine/workflow content identity
 + instanceStateRevision
 + controlRevision
-+ exact dynamic child definition pins where needed
++ executionFactRevision fence
++ exact DynamicChildExecutionPin references for every resumable dynamic child
 ```
 
 Its purpose is safe restoration of one control execution.
 
----
+A dynamic promoted child pin is never conditional or "where needed": if the child definition is not statically derivable from the pinned root package, its exact pin is mandatory.
 
 # 8. Domain Data Architecture
 
@@ -594,9 +718,11 @@ Examples:
 
 ## 8.2 Compiled Domain Intelligence
 
-Owned by the domain project and produced/validated by the DomainHarness compiler.
+Compiled Domain Intelligence is immutable by content identity but has two explicit materialization channels.
 
-It is immutable by content identity and may include:
+### Package-bundled Compiled Intelligence
+
+Owned by the domain project and emitted by the Package Compiler into the immutable target package:
 
 - deterministic rules;
 - knowledge slices;
@@ -605,9 +731,27 @@ It is immutable by content identity and may include:
 - output/event schemas;
 - workflow definitions;
 - Harness semantic configuration;
-- promoted solving-pattern artifacts.
+- promoted-subworkflow **selection declarations/references** where configured.
 
-A Harness output is not Compiled Domain Intelligence merely because it exists. Promotion is a separate authority transition.
+`DomainIntelligencePackageIdentity.contentDigest` covers this compiler-emitted package intelligence. It does **not** mutate when a runtime/operator later promotes a new artifact into the registry.
+
+### Registry-promoted Compiled Intelligence
+
+A `PromotedSubworkflowArtifact` body is owned durably by the **Promoted Artifact Registry**, outside immutable target-package contents.
+
+Promotion uses deterministic validation/canonicalization and creates an immutable content-addressed registry artifact. The package may refer to an exact digest/version/alias selector, but the package does not become the storage owner of the promoted body.
+
+Therefore:
+
+```text
+target package contentDigest
+!=
+aggregate of all runtime registry-promoted artifacts
+```
+
+A Harness output is not Compiled Domain Intelligence merely because it exists. It becomes registry-promoted Compiled Intelligence only after deterministic validation and explicit promotion.
+
+The registry is also the retention/GC authority for promoted bodies referenced by active/recoverable executions.
 
 ## 8.3 Semantic context projections
 
@@ -652,14 +796,17 @@ The resolver receives a provider-neutral semantic invocation context that concep
 
 - namespace/privacy/tenant cache scope where relevant;
 - domainId / decisionId;
-- current exact package execution pin for audit/recovery;
+- the invoking workflow instance's **exact pinned `packageId` runtime context**;
 - selected canonical input;
 - selected semantic context projections;
-- behaviorally relevant CompiledArtifactIdentity dependencies;
-- explicit cache eligibility;
-- explicit promoted-subworkflow selection declaration where configured.
+- behaviorally relevant `CompiledArtifactIdentity` dependencies;
+- pre-read cache eligibility;
+- declared semantic-revision requirements for live sources;
+- one explicit promoted-subworkflow selection declaration/resolution where configured.
 
-Execution IDs remain available for audit and durable execution but are excluded from semantic equivalence by default.
+The invoking `packageId` is not merely audit metadata. It is the execution scope used for promoted-artifact compatibility and exact referenced-artifact/tool resolution.
+
+Execution IDs remain available for durable execution/audit and are excluded from cross-execution semantic equivalence by default.
 
 ## 9.2 Resolver output
 
@@ -708,17 +855,27 @@ It never proves:
 
 ## 10.2 Eligibility
 
-Cache reuse requires explicit semantic safety.
+Cache eligibility is two-phase.
 
-Bypass read and write when:
+### Read eligibility
+
+Read is permitted only when a complete exact semantic identity can be constructed before lookup. Bypass read when:
 
 - explicitly non-cacheable;
 - intentionally fresh/random behavior is required;
-- time-sensitive input has no semantic freshness identity;
-- live dependency has no version/revision sufficient for exact reuse;
+- a time-sensitive/live source lacks a declared pre-readable semantic revision;
+- a behaviorally relevant dependency can only be discovered dynamically;
 - domain policy disables reuse.
 
-Fail closed instead of bypass when required declared decision input is missing or invalid.
+Fail closed instead of bypass when required declared decision input/projection/revision data is missing or invalid.
+
+### Write eligibility
+
+After computation, compare the returned `ObservedDependencySet` with the pre-read identity material.
+
+Write only when every behaviorally relevant observed dependency and live-source revision is represented exactly by that material.
+
+If reasoning observes an undeclared/unversioned dependency, the cache write is skipped even if the invocation was initially thought cacheable.
 
 ## 10.3 Store contract
 
@@ -726,29 +883,46 @@ Logical port:
 
 ```text
 read(exact key)
-putIfAbsent(exact entry)
-optional quarantine(exact key, reason)
+putIfAbsent(exact entry with producerIdentity + dependencyIdentities)
+quarantine(exact key, reason)
+invalidateByProducer(exact CompiledArtifactIdentity, reason)
+invalidateByDependency(exact CompiledArtifactIdentity, reason)
+invalidateNamespace(scope, reason)
 ```
 
 Required semantics:
 
-- persistent across ordinary process restart when the selected host adapter provides persistence;
+- persistent across ordinary process restart on every host that enables semantic caching;
 - atomic `putIfAbsent`;
 - first-writer-wins for one exact key;
 - no transaction held open across model/tool/subworkflow execution;
 - separate table/keyspace/API from execution journals even when physically colocated;
 - store unavailability is an optimization failure and may fall through;
-- corrupt/current-schema-invalid row has no authority and may be quarantined.
+- every entry records exact producer identity plus the behaviorally relevant dependency identities used to justify reuse;
+- producer/dependency indexes support scoped invalidation without requiring a global namespace bump;
+- corrupt/current-schema-invalid row has no authority and is quarantined/recomputed.
+
+A result produced by a promoted artifact MUST record that artifact as both producer and semantic dependency. A Harness-produced result MUST record the exact behaviorally relevant `harness-config` producer identity.
 
 v0.3 does not promise distributed single-flight or exactly-once model execution under concurrent cache misses.
 
 ## 10.4 Result validation
 
-A hit is checked for integrity/current output schema, then returned to the Domain Machine for current guard evaluation.
+A cache hit is checked for integrity and the **current output schema**, then returned to the Domain Machine for current guard evaluation.
+
+If a cached row fails integrity or current schema while the current invocation inputs/contracts are otherwise valid:
+
+```text
+deny row
+→ quarantine
+→ recompute through later resolver sources
+```
+
+A cache row never causes the source-contract fail-closed path merely because an old cached result no longer satisfies the current schema.
+
+Fresh rule/subworkflow/Harness output violating its own declared current schema is a source contract error and fails closed.
 
 A stale cached decision cannot force a transition.
-
----
 
 # 11. Promoted Reusable Subworkflow Architecture
 
@@ -804,13 +978,13 @@ Promotion recomputes semantic digest and rejects drift after validation.
 
 Promotion/audit metadata does not alter semantic content identity.
 
-## 11.4 Selection
+## 11.4 Selection, compatibility and package scope
 
-Supported:
+Supported selectors:
 
 - exact digest;
 - exact lifecycle version resolving unambiguously to one digest;
-- explicit human-controlled alias resolving to an exact digest.
+- explicit human-controlled alias resolving once to an exact digest.
 
 Not supported:
 
@@ -819,14 +993,44 @@ Not supported:
 - LLM-selected production version;
 - silent fallback to a different artifact.
 
+The selector is resolved **once per decision invocation**. The resulting exact artifact identity is reused by semantic identity, cache provenance, compatibility/applicability, pinning, compilation and telemetry.
+
+Compatibility and every referenced rule/knowledge/skill/tool identity are evaluated against the **invoking workflow instance's pinned `packageId` runtime context**, not the globally active package for new instances.
+
+For a fresh decision:
+
+```text
+promoted artifact references cannot be satisfied by invoking pinned package
+→ incompatible
+→ normal resolver fallthrough
+```
+
+For recovery of an already-started exact-pinned child, missing/mismatched required references are a fail-closed recovery error; recovery never switches the instance to the active package.
+
 ## 11.5 Revocation
 
-Revocation:
+Revocation is append-only audit/policy evidence attached to one exact promoted artifact.
 
-- is append-only audit evidence;
-- blocks fresh selection;
-- does not delete history;
-- does not silently select a replacement.
+A revocation record contains at least:
+
+```text
+exact artifact identity
+reason
+revocationPolicy = deny | fallthrough
+cachePolicy = invalidate-produced-results | preserve
+operator/evidence/timestamp
+```
+
+Safe defaults are `deny` plus `invalidate-produced-results`.
+
+Effects:
+
+- fresh exact/version/alias selection of the revoked artifact is blocked;
+- `deny` fails the decision closed rather than silently downgrading authority;
+- `fallthrough` permits the DecisionResolver to continue to HarnessMachine and MUST emit revocation-fallthrough telemetry;
+- `invalidate-produced-results` invokes semantic-cache invalidation by exact producer/dependency identity;
+- revocation never deletes the artifact body while an active/recoverable execution pin references it;
+- revocation never silently selects a replacement.
 
 For active/in-flight execution, exact selected artifact pins remain recoverable. If an operator must stop already-running instances for security reasons, that is an explicit recovery/abort action, not registry substitution.
 
@@ -834,11 +1038,18 @@ For active/in-flight execution, exact selected artifact pins remain recoverable.
 
 The v0.3 contract MAY represent an explicit bounded `reasoned` step that invokes the existing HarnessMachine and returns a finite declared outcome.
 
-Implementations may initially support only deterministic/query steps if the capability contract rejects unsupported reasoned steps fail-closed.
+Every reasoned step MUST reference an exact `harness-config` `CompiledArtifactIdentity` in the promoted artifact semantic material. That identity covers the behaviorally relevant Harness envelope, including:
+
+- allowed query/tool capability set;
+- hard execution bounds/max steps;
+- structured input/output/outcome contract;
+- any domain reasoning policy that changes the structured result semantics.
+
+The validator applies capability allowlists **transitively** to the referenced Harness configuration. A promoted artifact cannot widen its own tool/capability envelope indirectly through a reasoned step.
+
+Implementations may initially support only deterministic/query steps if unsupported reasoned steps fail closed at compatibility/validation.
 
 A reasoned step never embeds provider/model routing into the promoted artifact.
-
----
 
 # 12. HarnessMachine / AI Runtime Boundary
 
@@ -884,24 +1095,114 @@ Provider routing mechanics do not become Domain Machine business logic.
 
 ---
 
-# 13. Recursive XState Control Persistence
+# 13. Durable Control Turns, Recursive XState Persistence and Committed-Work Ordering
 
-## 13.1 Authority split
+## 13.1 One DurableExecutionStore durability domain
+
+v0.3 has one per-instance durable execution domain for correctness-critical execution facts:
 
 ```text
-XState recursive control snapshot
-→ control position / actor state / process-local control data / exact child definition pins
-
-RuntimeStore journals
-→ committed execution facts / replay / idempotency / recovery truth
-
-durable effect path
-→ business mutation execution truth
+DurableExecutionStore
+├─ durable external messages / control-turn receipts
+├─ Workflow Instance lifecycle + stateRevision
+├─ recursive XState ControlSnapshot
+├─ DynamicChildExecutionPin records
+└─ AI/query/effect committed-work journals
 ```
 
-## 13.2 Control snapshot envelope
+These are separate logical authorities/records but share one transaction manager and one durability ordering domain on a supported host.
 
-The exact TypeScript field names remain implementation choices, but the envelope semantics are frozen.
+The exact semantic cache and promoted artifact registry remain separate authorities; they do not prove execution progress.
+
+A host adapter MUST NOT acknowledge a newer control checkpoint as durable when a journal/pin fact that checkpoint depends on could still be lost independently.
+
+## 13.2 Durable Control Turn
+
+A **Durable Control Turn** is the atomic state-changing macrostep boundary. It is not limited to an external Domain Message.
+
+Turn sources include:
+
+```text
+external durable message
+promoted/Harness child onDone or onError
+persistent timer/deadline fire
+durable external-work callback
+recovery-resume event that changes authoritative control state
+```
+
+Each turn has a stable `durableControlTurnId`.
+
+Examples of deterministic source identity:
+
+```text
+message turn
+= target + sourceMessageId
+
+child terminal turn
+= target + parentActorId + childActorId + invocationOrdinal + terminalKind
+
+timer turn
+= target + timerId + fireOrdinal
+
+callback turn
+= target + externalCorrelationId + callbackOrdinal
+
+recovery-resume turn
+= target + durableRecoveryActionId + resumeOrdinal
+```
+
+`durableRecoveryActionId` is allocated/persisted by the explicit recovery/abort authority before the resume turn begins. Replaying the same recovery action reuses the same id and ordinal; a new operator recovery action receives a new durable identity.
+
+Synchronous XState microsteps such as `always` transitions and raised/internal events settle inside the current Durable Control Turn until a stable checkpoint; they do not invent new nondurable execution identities.
+
+Any effect/query/AI operation emitted during those microsteps derives from the containing `durableControlTurnId` plus a stable operation ordinal/id.
+
+## 13.3 Atomic control-turn publication
+
+At the end of every state-changing Durable Control Turn, the store atomically publishes the relevant set of:
+
+```text
+source turn disposition/receipt
++ next Workflow Instance lifecycle/stateRevision
++ matching recursive control snapshot
++ any DynamicChildExecutionPin created by that turn before child work becomes eligible
+```
+
+For an external message, the source disposition is the durable message disposition.
+
+For a child terminal/timer/callback turn, the source receipt is the durable idempotency record for that source identity.
+
+No observer may see the next committed instance revision with the previous control snapshot or source receipt.
+
+## 13.4 Journal-first work and durability ordering
+
+External/committed work follows:
+
+```text
+AI/query/effect work
+→ authoritative journal/effect commit in DurableExecutionStore
+→ control may advance past that work
+```
+
+The inverse is forbidden.
+
+The journal commit and later control checkpoint may be separate transactions, preserving the useful "journal committed / snapshot stale" crash window, but both use the **same durability domain**. A successfully durable later control transaction implies all earlier acknowledged journal/pin commits in that domain remain durably ordered before it.
+
+Every journal commit increments/advances a per-instance logical `executionFactRevision`. A control snapshot carries an `executionFactRevision` fence representing the committed-work facts it may rely on.
+
+On restore:
+
+```text
+snapshot executionFactRevision > store durable executionFactRevision
+→ DURABILITY_FENCE_VIOLATION
+→ fail closed
+```
+
+A control/process-data copy of an AI/query/effect result is never authoritative when the corresponding required journal fact is absent. The journal wins on divergence.
+
+## 13.5 Control snapshot envelope
+
+Exact field names remain implementation choices, but the envelope semantics are frozen.
 
 It contains at least:
 
@@ -912,54 +1213,45 @@ exact packageId
 root workflow/machine content identity
 instanceStateRevision
 controlRevision
+executionFactRevision fence
 recursive persisted XState snapshot
-exact dynamic child definition pins when not derivable from the pinned root definition
+references to exact DynamicChildExecutionPin records for resumable dynamic children
 ```
 
 If a target-package integrity digest is retained, it is named distinctly from Compiled Domain Intelligence `contentDigest`.
 
-## 13.3 Atomic durable message turn
-
-For a state-changing durable message, these publish atomically:
-
-```text
-message disposition = processed
-+ next durable Workflow Instance state/lifecycle/stateRevision
-+ matching recursive control snapshot
-```
-
-No observer may see the new durable state with an old control snapshot or vice versa.
-
-## 13.4 Journal-first external/committed work ordering
-
-```text
-AI/query/effect work
-→ authoritative execution journal commit
-→ control snapshot may advance past that work
-```
-
-The inverse is forbidden.
-
-## 13.5 Crash semantics
+## 13.6 Crash semantics
 
 Crash before a side-effect-free AI result commit:
 
 ```text
-retry may occur
-at-least-once
-no exactly-once claim
+no authoritative journal fact
+→ restore pending operation
+→ retry may occur
+→ at-least-once
 ```
 
-Crash after AI/query/effect commit but before control checkpoint:
+Crash after AI/query/effect journal commit but before control checkpoint:
 
 ```text
 restore stale control state
-→ resumed exact operation checks durable journal
+→ derive exact operation identity
+→ journal hit
 → reuse committed fact
 → do not repeat provider/query/mutation
 ```
 
-## 13.6 Restore validation
+Crash after child pin commit but before child work:
+
+```text
+restore prior control state / pending invocation
+→ exact pin is already durable
+→ resume/instantiate the same exact artifact only
+```
+
+A crash can therefore leave the control snapshot **behind** committed journals/pins. It may never leave a valid durable snapshot **ahead** of the durability facts it depends on.
+
+## 13.7 Restore validation
 
 Restore fails closed on:
 
@@ -969,53 +1261,102 @@ Restore fails closed on:
 - exact package pin mismatch;
 - root workflow/machine digest mismatch;
 - instanceStateRevision mismatch;
+- `executionFactRevision` fence ahead of durable store facts;
 - malformed/non-JSON snapshot;
 - required child missing;
-- dynamic child exact artifact pin unavailable;
+- required DynamicChildExecutionPin missing;
+- dynamic child pin package/actor/invocation mismatch;
+- exact promoted artifact body unavailable for a retained pin;
 - child definition digest mismatch;
 - incompatible runtime/engine major;
-- journal identity mismatch.
+- same deterministic execution slot containing conflicting committed semantic identity.
 
-No recovery path guesses a fresh child definition or substitutes a compatible-looking artifact.
+A stale snapshot in a **pending** operation with no journal fact may retry according to operation policy. A snapshot that claims/depends on progress past an operation while its required journal fact is absent fails closed rather than treating process-local XState data as completion truth.
+
+No recovery path guesses a fresh child definition, re-resolves an alias, substitutes the globally active package, or treats semantic cache state as replay truth.
 
 ---
 
-# 14. Dynamic Child Pin and Retention Contract
+# 14. Dynamic Child Pin, Registry Retention and Exact Recovery
 
-This synthesis adds the minimum cross-contract rule needed to combine #201 and #204.
-
-## 14.1 Selection-to-invocation boundary
+## 14.1 Selection-to-execution boundary
 
 ```text
-registry alias/version/digest selector
-→ exact PromotedSubworkflowArtifact identity
-→ persist/retain exact selected digest for this invocation
-→ compile/invoke child
+configured selector
+→ resolve once to exact PromotedSubworkflowArtifact
+→ evaluate against invoking pinned package context
+→ commit DynamicChildExecutionPin
+→ compile exact artifact
+→ invoke child
 ```
 
-The exact pin becomes part of the durable control definition before recovery can depend on that child.
+The child may be compiled before the pin commit as a pure in-memory operation, but it MUST NOT perform model/query/effect work or emit an authoritative terminal result until the exact pin is durably committed.
 
-## 14.2 Retention
+## 14.2 Durable pin home
 
-Any exact package or promoted artifact referenced by an active/recoverable workflow must remain resolvable.
+`DynamicChildExecutionPin` is stored in `DurableExecutionStore`. It has two related identities:
 
-Garbage collection may remove an artifact only after no retained instance/control snapshot/journal policy requires it.
+```text
+logical invocation slot
+= (target, parentActorId, childActorId, invocationOrdinal)
 
-## 14.3 Recovery
+exact durable pin key
+= logical invocation slot
++ invoking packageId
++ kind
++ artifactId
++ contentDigest
+```
 
-Recovery uses the exact selected digest.
+The logical invocation slot is **insert-once**. Once a digest has been committed for that slot, replay or retry attempting to commit a different digest for the same slot is `DYNAMIC_CHILD_DEFINITION_CONFLICT` and fails closed; it MUST NOT overwrite the existing pin or silently allocate a replacement slot.
+
+A transaction that does not durably commit publishes no pin. A pin that commits successfully but is followed by a crash before the child appears in a control snapshot remains a valid retained definition record for replay of that same invocation slot. It is not garbage-collected until the owning instance/turn is terminal or reference accounting proves that no active/recoverable execution can reference it.
+
+The pin contains the invoking `packageId` plus exact promoted `CompiledArtifactIdentity`. The first control snapshot that contains/resumes that child references the same exact durable pin.
+
+## 14.3 Registry retention / garbage collection authority
+
+The Promoted Artifact Registry is the sole durable owner and retention/GC authority for promoted artifact bodies.
+
+An exact promoted artifact body MUST remain resolvable while referenced by any:
+
+```text
+active DynamicChildExecutionPin
+recoverable control snapshot
+retained audit/recovery policy requiring exact execution reconstruction
+```
+
+Garbage collection may remove the body only after registry reference accounting proves no such retention exists.
+
+## 14.4 Recovery
+
+Recovery:
+
+```text
+load exact packageId
+→ load required DynamicChildExecutionPin
+→ load exact promoted artifact body by contentDigest
+→ validate body digest + pinned-package references
+→ compile/restore same exact child
+```
 
 It never re-runs:
 
 ```text
-alias -> current target
+alias/version selector → current target
 ```
 
 for an already-started child.
 
-This preserves deterministic durable control even if registry aliases change.
+Fresh revocation policy does not redefine exact recovery. A separate explicit operator abort/recovery action may terminate an in-flight child for security reasons, but it cannot silently substitute another artifact.
 
----
+## 14.5 Execution-operation identity inside the child
+
+Every AI/query/effect operation performed inside a promoted child includes the exact promoted artifact `contentDigest` in its execution-operation identity.
+
+Therefore committed work from `D1` cannot be consumed by `D2`.
+
+A lookup under a different full identity is a miss. A store-level collision where the same deterministic operation slot has conflicting committed semantic identity is corruption and fails closed.
 
 # 15. Mutation and Durable Effect Authority
 
@@ -1089,7 +1430,7 @@ The RuntimeStore/instance layer provides an atomic/idempotent ensure/open semant
 
 ## 16.5 Persistent timer/deadline
 
-A durable timer is a Runtime durable record that eventually produces a durable message/event.
+A durable timer is a Runtime durable record that eventually produces a durable timer-fire source for a Durable Control Turn.
 
 It is not a volatile XState-only timer and not a generic distributed scheduler.
 
@@ -1109,7 +1450,8 @@ Domain Machine
 → durable correlation identity
 → wait
 → callback or persistent deadline
-→ durable message/event
+→ durable callback/timer source
+→ Durable Control Turn
 → Domain Machine resumes
 ```
 
@@ -1122,7 +1464,7 @@ DomainHarness does not become the external job platform.
 ## 17.1 Deterministic rule
 
 ```text
-durable message
+Durable Control Turn
 → Domain Machine requests decision
 → selected Domain Facts + Compiled Intelligence
 → deterministic rule resolves
@@ -1130,7 +1472,7 @@ durable message
 → current schema
 → current guard
 → transition
-→ optional durable effect
+→ optional durable effect under the same turn identity
 ```
 
 Fresh model calls: zero.
@@ -1139,8 +1481,9 @@ Fresh model calls: zero.
 
 ```text
 decision request
+→ deterministic semantic pre-read
+→ complete exact semantic identity available
 → rule no-match
-→ resolve exact semantic identity
 → cache hit
 → validate cached result integrity/current schema
 → Domain Machine current guard
@@ -1152,41 +1495,49 @@ A guard rejection does not invoke a hidden fallback.
 ## 17.3 Promoted subworkflow
 
 ```text
-rule no-match
+decision request
+→ resolve configured promoted selector once when required for identity/selection
+→ rule no-match
 → cache miss/bypass
-→ resolve exact promoted artifact selection
+→ reuse the same exact promoted resolution
+→ validate against invoking instance's pinned package context
 → compatibility/applicability PASS
-→ pin exact artifact digest for invocation
-→ compile/reuse XState child
+→ durably commit DynamicChildExecutionPin
+→ compile/reuse exact XState child
+→ child may begin journaled work
 → child emits structured decision/event
+→ child terminal result enters a Durable Control Turn
 → parent current schema + guard
 → transition
 ```
 
-No planner reconstruction is required.
+No planner reconstruction or second alias resolution is required.
 
 ## 17.4 Harness fallback
 
 ```text
 rule no-match
-→ cache miss/bypass
-→ no applicable promoted child
+→ cache miss/bypass/read-ineligible
+→ no permitted promoted child
 → HarnessMachine
 → ModelPort / AI Runtime
 → allowed query observations
-→ structured result
-→ AI execution result committed where required
-→ best-effort semantic-cache write if eligible
+→ structured result + ObservedDependencySet
+→ AI/query execution facts committed where required
+→ compare observed dependencies with pre-read semantic identity
+→ cache write only if still exact/write-eligible
 → current schema + guard
 → transition
 ```
 
+If a live/dynamic observation lacks a pre-bound semantic revision, the result is not written to the exact semantic cache.
+
 ## 17.5 Crash after committed AI result
 
 ```text
-AI result committed in execution journal
+AI result committed in DurableExecutionStore journal
 → crash before control snapshot advances
-→ reopen exact package + exact child definition
+→ reopen exact package + exact child pin
 → restore stale child/model state
 → exact AI operation journal hit
 → provider not called again
@@ -1205,36 +1556,54 @@ provider may have returned externally
 
 This is explicitly at-least-once.
 
----
+## 17.7 Child completion without external message
+
+```text
+promoted/Harness child reaches terminal result
+→ derive stable child-terminal Durable Control Turn id
+→ parent consumes onDone/onError result
+→ synchronous always/internal microsteps settle
+→ any effect uses that turn id + stable operation id
+→ source receipt + next instance revision + matching control snapshot publish atomically
+```
+
+There is no message-id hole in effect/journal identity for child terminal transitions.
 
 # 18. Failure and Fallthrough Matrix
 
 | Condition | Required behavior |
 | --- | --- |
-| deterministic rule resolves | validate result; return |
+| deterministic rule resolves | validate fresh result; return |
 | deterministic rule no-match | continue |
 | deterministic rule contract/integrity error | fail closed |
 | exact cache hit + valid current result schema | return structured result |
 | cache miss | continue |
-| explicit non-cacheable/time-sensitive/unversioned dependency | bypass cache; continue |
+| cache read-ineligible / explicit non-cacheable | bypass read; continue |
+| post-execution observed dependency not representable/versioned | skip cache write; continue current fresh result |
 | cache store unavailable | record optimization error; continue |
-| corrupt cache row, invocation otherwise valid | deny/quarantine row; recompute |
-| required declared semantic selector missing | fail closed |
+| corrupt/current-schema-invalid cache row, invocation otherwise valid | deny/quarantine row; recompute |
+| required declared semantic selector/revision missing | fail closed |
 | promoted artifact not found | continue |
-| promoted artifact revoked for fresh selection | continue |
-| promoted artifact incompatible with host/runtime | continue |
+| promoted artifact revoked with `fallthrough` | invalidate cache per policy; emit telemetry; continue |
+| promoted artifact revoked with `deny` | invalidate cache per policy; fail closed |
+| promoted artifact incompatible with invoking pinned package/runtime | continue |
 | promoted artifact not applicable | continue |
 | invalid applicability context | fail closed |
-| promoted artifact digest/reference mismatch | fail closed |
+| promoted artifact digest/reference mismatch after selection | fail closed |
+| promoted referenced artifact unavailable in fresh invoking pinned-package context | incompatible; continue |
+| promoted referenced artifact unavailable during recovery of pinned child | fail closed / recovery-required |
 | compiler integrity/contract failure | fail closed |
-| Harness invalid structured output / unrecoverable failure | fail closed according to Domain Machine/runtime error contract |
+| fresh Harness/subworkflow/rule output violates declared current schema | fail closed |
+| cached result violates current schema | quarantine/recompute; cache row has no authority |
 | current parent guard rejects resolved result | no transition; no hidden resolver retry |
+| DynamicChildExecutionPin missing before promoted-child work | child work must not start; fail closed if observed during recovery |
 | control snapshot missing/corrupt/incompatible | fail closed / recovery-required |
-| execution journal identity mismatch | fail closed |
+| snapshot `executionFactRevision` ahead of durable facts | fail closed (`DURABILITY_FENCE_VIOLATION`) |
+| full execution-operation key not found for a pending operation | miss; execute/retry according to operation policy |
+| same deterministic execution slot has conflicting committed semantic identity | fail closed as history corruption |
 | completed durable effect found during recovery | reuse completion; do not mutate again |
-| dynamic child exact digest unavailable during recovery | fail closed; never re-resolve alias |
-
----
+| dynamic child exact body unavailable during recovery | fail closed; never re-resolve alias |
+| globally active package differs from retained instance pin | keep retained exact package; no substitution |
 
 # 19. Portability and Host Boundaries
 
@@ -1249,17 +1618,36 @@ Portable core must not require:
 
 Architecture fixtures may use `node:crypto` to demonstrate canonical SHA-256 behavior. Production must provide/reuse a portable digest seam with conformance vectors across supported hosts.
 
-## 19.2 Persistence adapters
+## 19.2 Persistence adapters and durability level
 
 Node and Expo/Hermes adapters implement the same logical contracts for:
 
-- RuntimeStore;
-- control snapshot CAS/atomicity;
-- persistent semantic cache where enabled;
-- promoted registry persistence where hosted locally;
-- timers/provisioning as applicable.
+- mandatory `DurableExecutionStore` durability domain;
+- RuntimeStore/message/control-turn receipts;
+- recursive control snapshot CAS/atomicity;
+- DynamicChildExecutionPin persistence;
+- AI/query/effect journals;
+- mandatory Promoted Artifact Registry persistence/retention;
+- persistent semantic cache when the feature is enabled;
+- timers/provisioning where the PRD capability is supported.
 
 Driver-specific transaction APIs may differ; logical guarantees may not.
+
+For v0.3, an acknowledged durable execution commit MUST survive:
+
+```text
+normal process restart
+hard process termination / kill
+mobile app force-stop and relaunch
+```
+
+on the supported host profile.
+
+Arbitrary hardware/filesystem power-loss durability is not claimed beyond the configured SQLite/host storage guarantee; each adapter must document its SQLite journaling/synchronous durability configuration. Version-closure validation must test the process/device termination guarantees above.
+
+The promoted registry is not optional on a supported host merely because no artifact is currently promoted: an empty registry is valid, absence of the persistence contract is not.
+
+A remote promoted-artifact service is not part of the v0.3 embedded-runtime contract. Runtime identity resolution cannot depend on an unbounded network lookup.
 
 ## 19.3 XState persistence
 
@@ -1331,13 +1719,19 @@ Recovery telemetry must identify:
 | Control runtime | independent Harness Runtime / agent runtime | one XState Actor System | one business control authority; research #187/#197 |
 | LLM output authority | model returns next XState state id | structured DomainDecision/Event → schema/guard | keeps transition authority deterministic |
 | Reuse | execution journal doubles as semantic cache | separate exact semantic cache | execution identity and semantic equivalence answer different questions |
-| Cache invalidation | whole package/version key | dependency-level content identity | avoids unrelated invalidation |
+| Cache invalidation | whole package/version key only | dependency-level identity + producer/dependency invalidation indexes | avoids unrelated invalidation while allowing revocation-for-cause |
+| Cache eligibility | declared once before execution | pre-read eligibility + post-execution observed-dependency validation | prevents incomplete keys for dynamically observed live data |
 | Package recovery | compatible package substitution | exact `packageId` retained pin | durable reproducibility; v0.2 invariant |
+| Promoted artifact body ownership | mutate immutable package / ambiguous package-or-registry | mandatory persistent Promoted Artifact Registry | promotion is runtime/operator lifecycle; package remains immutable |
+| Promoted compatibility scope | global active package | invoking instance's pinned `packageId` context | prevents cross-package semantic mixing |
 | Solving-pattern reuse | LLM regenerates plan every time | promoted content-addressed XState child | avoids planner call and constrains authority |
 | Promotion | automatic LLM/self promotion | deterministic validation + explicit human promotion | production governance and audit |
-| Subworkflow version selection | implicit latest/fuzzy | exact digest/version/explicit alias → exact digest | reproducibility |
+| Subworkflow version selection | implicit latest/fuzzy | resolve once: exact digest/version/explicit alias → exact digest | reproducibility and single-invocation consistency |
+| Dynamic child durability | checkpoint later / alias re-resolution | durable `DynamicChildExecutionPin` before child journaled work | deterministic crash recovery |
 | Subworkflow loops | generated bounded/unbounded loop engine | reject all promoted-IR cycles in v0.3 | no reviewed durable loop/counter contract yet |
 | Mutation | mutation tools inside Harness/subworkflow | parent durable effect authority | idempotency/recovery |
+| Control commit unit | external messages only | Durable Control Turn macrostep | child/timer/internal state changes gain deterministic durable identity |
+| Control/journal persistence | independent durability domains | one per-instance `DurableExecutionStore` ordering domain | prevents snapshot-ahead-of-journal completion authority |
 | Control recovery | snapshot is replay truth | snapshot for control + journals for committed work | proven by #195/#201 |
 | Cross-host persistence | adapter-specific semantics | shared logical contract + Node/Expo adapters | portability |
 | Provider routing | DomainHarness selects model/vendor | AI Runtime / ModelPort | boundary separation |
@@ -1362,21 +1756,21 @@ All decision sources return structured data/events.
 Rule → Exact Cache → Promoted Subworkflow → HarnessMachine
 ```
 
-Identity metadata may be resolved before cache lookup, but solver execution order does not change.
+Only deterministic semantic pre-read metadata/revision resolution may occur before cache lookup; solver execution order does not change.
 
 ## ADR-04 — Domain Data separates facts from compiled intelligence
 
-Facts remain authoritative outside the package; compiled intelligence is immutable/content-addressed.
+Facts remain authoritative outside DomainHarness. Package-bundled intelligence is immutable in the target package; promoted artifact bodies are immutable content-addressed registry intelligence with a separate runtime promotion lifecycle.
 
 ## ADR-05 — Exact package pin and semantic equivalence are independent
 
-`packageId` controls exact execution/recovery. Semantic dependency digests control cross-execution computation reuse.
+`packageId` controls exact execution/recovery and scopes promoted reference resolution. Semantic dependency digests control cross-execution computation reuse.
 
 ## ADR-06 — Semantic cache is never execution replay authority
 
 Cache rows do not prove transition/effect/mutation history.
 
-## ADR-07 — Required semantic projection failure is fatal
+## ADR-07 — Required semantic projection/revision failure is fatal
 
 No hidden widening to whole context, null substitution or LLM fallback.
 
@@ -1384,35 +1778,53 @@ No hidden widening to whole context, null substitution or LLM fallback.
 
 Candidate != validated != promoted != selected != executed.
 
-## ADR-09 — Dynamic promoted child definitions are exact-pinned per invocation
+## ADR-09 — Dynamic promoted child definitions are exact-pinned before journaled child work
 
-Aliases may select new work; they never redefine an in-flight/recovered child.
+Aliases may select new work once; they never redefine an in-flight/recovered child.
 
-## ADR-10 — Revocation blocks fresh selection, not exact recovery substitution
+## ADR-10 — Promoted Artifact Registry is the sole durable owner/retention authority for promoted bodies
 
-No automatic replacement.
+Target packages may reference promoted artifacts but do not mutate to contain runtime promotions.
 
 ## ADR-11 — Business mutation remains behind durable effect authority
 
 All reasoning paths converge before mutation.
 
-## ADR-12 — Committed external work is journal-first
+## ADR-12 — Every state-changing macrostep is a Durable Control Turn
 
-A control snapshot may advance past work only after the authoritative execution journal/effect commit.
+External messages, child terminal results, persistent timer fires and callbacks have stable durable source identity. Synchronous XState microsteps settle inside that turn.
 
-## ADR-13 — Control snapshot and execution journal remain separate
+## ADR-13 — Committed external work is journal-first within one durability domain
 
-Snapshot restores position; journal proves committed work.
+A control snapshot may advance past work only after the authoritative journal/effect commit is durably ordered in the same `DurableExecutionStore` domain.
 
-## ADR-14 — Provider/model strategy remains AI Runtime authority
+## ADR-14 — Control snapshot and execution journal remain separate logical authorities
+
+Snapshot restores position; journal proves committed work. On divergence, journal truth wins and impossible snapshot-ahead-of-journal state fails closed.
+
+## ADR-15 — Promoted compatibility/reference resolution uses the invoking instance's pinned package context
+
+The global active package cannot supply substitute dependencies to a retained instance.
+
+## ADR-16 — Cache producer binding and scoped invalidation are mandatory
+
+Promoted/Harness-produced cache entries record exact producer/dependency identities; revocation-for-cause can invalidate affected entries without global namespace destruction.
+
+## ADR-17 — Cache eligibility is two-phase
+
+Exact read requires a complete pre-read key; cache write additionally requires the observed dependency set to be exactly representable and semantically versioned.
+
+## ADR-18 — Reasoned promoted steps bind an exact harness-config identity
+
+Capability restrictions and bounds apply transitively.
+
+## ADR-19 — Provider/model strategy remains AI Runtime authority
 
 No vendor/model routing in DomainHarness business control.
 
-## ADR-15 — Portable core has no mandatory Node dependency
+## ADR-20 — Portable core has no mandatory Node dependency
 
 Host-specific crypto/storage bindings must satisfy shared conformance.
-
----
 
 # 24. Migration / Productionization Plan
 
@@ -1420,15 +1832,15 @@ This is an architecture migration from the shipped v0.2 runtime, not a rewrite.
 
 ## Phase 0 — Governance freeze
 
-After external adversarial review:
+After independent re-review:
 
-1. resolve blocking findings;
+1. obtain `FREEZE_OK` for the revised exact HEAD;
 2. mark this file `FROZEN`;
 3. merge it to the version authority branch;
 4. update `.dev-standard/PROJECT_OVERRIDES.md` from v0.2 metadata to v0.3 frozen authorities and integration branch;
 5. generate the v0.3 Task DAG.
 
-## Phase 1 — Shared identities and contracts
+## Phase 1 — Shared identities and semantic contracts
 
 Implement portable/common contracts first:
 
@@ -1436,71 +1848,89 @@ Implement portable/common contracts first:
 - `CompiledArtifactIdentity`;
 - Domain Intelligence package descriptors;
 - semantic context projection contracts;
+- semantic revision port contract;
 - semantic invocation contracts;
+- durable control-turn identity;
 - exact promoted artifact identity;
 - shared error taxonomy.
 
-This phase should not yet wire resolver execution into Domain Machine.
+No resolver/Domain Machine central wiring yet.
 
-## Phase 2 — Durable control persistence
+## Phase 2 — Promoted artifact lifecycle + mandatory registry
+
+Implement the authority needed by later control persistence:
+
+- strict candidate parser/validator;
+- exact `harness-config` references for reasoned steps;
+- explicit promotion/audit;
+- immutable Promoted Artifact Registry persistence on Node/Expo;
+- exact digest/version/alias resolution (one resolution per invocation);
+- revocation policy + producer-cache invalidation hook;
+- retention/reference accounting;
+- invoking-pinned-package compatibility/reference resolver.
+
+## Phase 3 — DurableExecutionStore + recursive control persistence
 
 Implement:
 
+- one per-instance execution durability domain;
+- Durable Control Turn/source receipts;
 - ControlSnapshotEnvelope/core validation;
-- dynamic child definition pins;
+- `DynamicChildExecutionPin`;
+- `executionFactRevision` fence;
 - CAS;
-- Node SQLite control persistence;
-- Expo SQLite control persistence;
-- atomic message-turn + snapshot commit;
+- Node SQLite implementation;
+- Expo SQLite implementation;
+- atomic control-turn publication;
+- journal-first ordered commits;
 - crash/reopen conformance.
 
-## Phase 3 — HarnessMachine production child
+## Phase 4 — HarnessMachine production child
 
 Productionize the bounded child-machine seam proven by #187:
 
 - ModelPort;
-- Tool/query observation registry;
+- allowed query/tool observation registry;
 - maxSteps/cancellation;
 - structured result validation;
+- `ObservedDependencySet`;
 - execution-journal integration.
 
 No provider routing is added.
-
-## Phase 4 — Promoted artifact lifecycle
-
-Implement:
-
-- strict candidate parser/validator;
-- explicit promotion/audit;
-- immutable registry storage;
-- exact selection/revocation/retention;
-- XState child compiler;
-- dynamic exact child pin integration.
 
 ## Phase 5 — Exact semantic cache
 
 Implement:
 
 - persistent cache port;
-- Node/Expo host adapters as required by supported feature parity;
-- exact eligibility;
+- Node/Expo adapters when semantic caching is enabled;
+- pre-read exact eligibility;
+- post-execution observed-dependency validation;
+- producer/dependency metadata indexes;
 - `putIfAbsent`;
 - corruption quarantine;
+- scoped invalidation;
 - retention/eviction policy;
 - no journal coupling.
 
-## Phase 6 — DecisionResolver integration
+## Phase 6 — Promoted child compiler + DecisionResolver integration
 
-Wire:
+Implement:
 
 ```text
 Rule
 → Cache
-→ Promoted child
+→ exact once-resolved promoted child
 → HarnessMachine
 ```
 
-then hand structured result to current Domain Machine schema/guard/transition.
+with:
+
+- compiler accepts exact promoted registry artifacts only;
+- dynamic child pin committed before child journaled work;
+- invoking pinned-package compatibility;
+- current Domain Machine schema/guard/transition handoff;
+- no hidden retry after guard rejection.
 
 ## Phase 7 — retained Domain App v0.3 capabilities
 
@@ -1520,8 +1950,10 @@ Validate:
 
 - resolver telemetry / LLM avoidance;
 - package-pin independence from semantic reuse;
-- registry alias movement vs in-flight exact pin;
-- revocation + recovery;
+- alias movement vs once-resolved/in-flight exact pin;
+- revocation policy + cache invalidation;
+- promoted reference resolution against retained package pins;
+- child terminal/timer/control-turn crash windows;
 - real Node kill/restart;
 - real Expo/Hermes force-stop/relaunch;
 - semantic cache restart persistence;
@@ -1529,44 +1961,48 @@ Validate:
 - full repository CI when service is available;
 - hidden validation / critical journeys at version closure.
 
----
-
 # 25. Task DAG Derivation Seeds
 
 This is not the final Task DAG, but L2 establishes these dependency groups.
 
 ```text
-A. shared identity / canonical digest / error taxonomy
+A. shared identity / canonical digest / control-turn identity / error taxonomy
    │
    ├── B. Domain Data package contracts
-   │      ├── E. semantic invocation + cache
-   │      └── F. promoted artifact lifecycle
+   │      └── E. semantic invocation / revision / cache contracts
    │
-   ├── C. recursive control snapshot core
-   │      ├── C-node adapter
-   │      ├── C-expo adapter
-   │      └── C-xstate integration
+   ├── F. promoted artifact lifecycle + mandatory registry
+   │      ├── F-selection / revocation / retention
+   │      └── F-pinned-package compatibility
    │
    └── D. HarnessMachine production child
 
-E + F + D
+A + F
    ↓
-G. DecisionResolver integration
-   ↓
-H. Domain Machine handoff + telemetry
+C. DurableExecutionStore + recursive control snapshot core
+   ├── C-node adapter
+   ├── C-expo adapter
+   ├── C-control-turn integration
+   └── C-dynamic-child-pin integration
 
-C + F
+B + E + F + D + C
    ↓
-I. dynamic promoted-child recovery/retention validation
+G. DecisionResolver + promoted child compiler integration
+   ↓
+H. Domain Machine schema/guard handoff + telemetry
+
+C + F + G
+   ↓
+I. dynamic promoted-child / alias / revocation / retained-package recovery validation
 
 C + G + retained app capabilities
    ↓
 J. version integration / cross-host closure
 ```
 
-One-concern PRs should preserve these boundaries. Shared-file central wiring should be deferred to integration tasks where practical.
+The dependency `F → C` is intentional: recursive control persistence cannot freeze/implement a dynamic-child pin without first having the promoted artifact identity/registry contract it must persist.
 
----
+One-concern PRs should preserve these boundaries. Shared-file central wiring is deferred to integration tasks where practical.
 
 # 26. Architecture Risks and Non-blocking Open Implementation Questions
 
@@ -1582,84 +2018,96 @@ Engine upgrades can make persisted internal state incompatible. `schemaVersion`,
 
 ## R3 — concurrent cache misses
 
-Two equivalent invocations may call the model concurrently before one cache write wins. v0.3 accepts this; distributed single-flight is not required.
+Two equivalent eligible invocations may call the model concurrently before one cache write wins. v0.3 accepts this; distributed single-flight is not required.
 
-## R4 — promoted artifact retention
+## R4 — promoted artifact retention accounting
 
-Registry garbage collection must not remove an exact artifact referenced by an active/recoverable control snapshot. Implementation needs retention/reference accounting.
+The retention rule is frozen; implementation still needs efficient reference accounting across active `DynamicChildExecutionPin`s, recoverable snapshots and audit policy.
 
 ## R5 — alias changes during long-lived instances
 
-New decision invocations may intentionally resolve a changed alias; in-flight invocations remain pinned. Projects requiring whole-instance solving-pattern stability should use exact digest/version selection or persist a chosen digest in process data. No implicit policy should be invented.
+Each decision invocation resolves an alias once. New future decisions may intentionally resolve a changed alias; already-started children remain pinned. Projects requiring whole-instance solving-pattern stability should configure exact digest/version selection or persist a chosen exact selector in process data.
 
-## R6 — revocation reason versus semantic invalidation
+## R6 — semantic revision availability
 
-Revocation blocks fresh selection. If prior cached results must also be invalidated, the operator/domain must change an actual semantic dependency/policy identity or cache namespace. Implementation/UI must make this distinction clear.
+Live external/domain sources can only participate in exact cache reuse when a pre-readable semantic revision/freshness token exists. Some integrations may therefore remain non-cacheable until their source exposes a trustworthy revision contract.
 
 ## R7 — persistent timer semantics across hosts
 
-The timer/deadline implementation must use durable records and message deduplication rather than volatile XState timers alone.
+The timer/deadline implementation must use durable records/source identities and message/control-turn deduplication rather than volatile XState timers alone.
 
 ## R8 — repository governance drift
 
-Project overrides still describe v0.2. Update them only after this L2 review/freeze so there is one authority transition rather than parallel inconsistent baselines.
+Project overrides still describe v0.2. Update them only after this L2 re-review/freeze so there is one authority transition rather than parallel inconsistent baselines.
 
----
+## R9 — storage durability configuration
 
-# 27. Adversarial Review Targets
+The logical kill/force-stop durability contract is frozen, but SQLite journal/synchronous settings and documented power-loss guarantees must be validated per Node/Expo adapter.
 
-External review should explicitly attempt to break these synthesis decisions:
+# 27. Adversarial Re-review Targets
 
-1. Can exact semantic cache accidentally become same-execution replay authority?
-2. Can a package/version change cause either unsafe cache reuse or meaningless global invalidation?
-3. Can a registry alias move between crash and recovery and change an in-flight child?
-4. Can revocation make a retained instance unrecoverable or silently switch versions?
-5. Can missing declared semantic context fall through to LLM instead of failing closed?
-6. Can a cache hit bypass current schema/guard authority?
-7. Can a promoted workflow execute mutation directly?
-8. Can a stale control snapshot duplicate committed model/query/mutation work?
-9. Can an incompatible XState snapshot restore under a new package/machine definition?
-10. Can Node and Expo adapters satisfy nominally the same API while weakening durability semantics?
-11. Can provider/model routing leak into DomainHarness semantic/business control?
-12. Can a `version` label or alias accidentally become semantic identity instead of exact content digest?
-13. Can a promoted artifact be garbage-collected while an active instance still pins it?
-14. Can reasoned child steps create a hidden Harness-to-Harness business flow bypassing the parent Domain Machine?
-15. Can concurrent exact-cache misses produce a correctness violation rather than merely duplicate computation?
+Independent re-review should explicitly attempt to break the **revised** contracts:
+
+1. Can any dynamic promoted child perform journaled work before its exact `DynamicChildExecutionPin` is durable?
+2. Can a registry alias resolve to one digest for cache identity and another for execution in the same decision invocation?
+3. Can a control snapshot become durable ahead of a required journal/pin fact under the shared `DurableExecutionStore` ordering?
+4. Can child `onDone`/`onError`, timer or synchronous internal transitions mutate durable state without a stable Durable Control Turn identity?
+5. Can an operation inside promoted child `D2` replay work committed under `D1`?
+6. Can the globally active package leak dependencies into an instance pinned to an older exact `packageId`?
+7. Can registry promotion mutate target-package `contentDigest`, or can a promoted body exist without a single retention/GC owner?
+8. Can a revoked-for-cause promoted artifact continue serving cached results under default policy?
+9. Can a cache entry be written after Harness/query execution when an observed live dependency lacked a pre-bound semantic revision?
+10. Can a cached current-schema failure incorrectly fail the workflow closed instead of quarantine/recompute?
+11. Can a `reasoned` step escape the parent artifact's capability policy through an unpinned Harness configuration?
+12. Can a retained promoted artifact be garbage-collected while a DynamicChildExecutionPin still references it?
+13. Can Node and Expo satisfy nominal APIs while one adapter acknowledges a commit that does not survive the required kill/force-stop profile?
+14. Can exact semantic cache accidentally become same-execution replay authority?
+15. Can a cache hit bypass current schema/guard authority?
+16. Can a promoted workflow execute mutation directly?
+17. Can provider/model routing leak into DomainHarness semantic/business control?
+18. Can concurrent exact-cache misses produce a correctness violation rather than merely duplicate computation?
 
 A blocking finding must identify the frozen PRD requirement or L2 invariant violated and provide a concrete failure scenario.
 
----
-
 # 28. L2 Acceptance Criteria
 
-This L2 candidate is acceptable only if independent review confirms all of the following.
+This L2 candidate is acceptable only if independent re-review confirms all of the following.
 
 1. One XState Actor System remains the single business control-flow foundation.
 2. Domain Machine remains current schema/guard/transition authority.
 3. HarnessMachine remains a bounded child, not a peer runtime.
 4. Rule → Cache → Promoted Subworkflow → Harness order is preserved.
 5. semantic identity uses selected behaviorally relevant content rather than whole execution/package identity.
-6. exact package recovery pin remains independent from semantic equivalence.
-7. required semantic context missing fails closed.
+6. exact package recovery pin remains independent from semantic equivalence and scopes promoted dependency resolution.
+7. required semantic context/revision missing fails closed.
 8. exact semantic cache cannot prove execution/effect/mutation history.
 9. cache hit still passes current schema and parent guard.
-10. candidate cannot become executable without deterministic validation and explicit promotion.
-11. selection resolves to exact promoted artifact identity; no implicit latest/fuzzy/LLM selection.
-12. in-flight dynamic child recovery uses the originally selected exact digest.
-13. revoked artifacts cannot be freshly selected and cannot silently substitute a replacement.
-14. promoted child mutation remains impossible except through parent durable effect authority.
-15. recursive control snapshot does not become committed-work replay authority.
-16. committed AI/query/effect work is journal-first before control advances.
-17. stale snapshot recovery does not duplicate committed work.
-18. crash-before-uncommitted AI result is documented as at-least-once.
-19. Node/Expo persistence contracts have the same logical guarantees.
-20. provider/model routing remains AI Runtime authority.
-21. portable core gains no mandatory Node dependency.
-22. retained Domain App capabilities have an architectural home without creating a second runtime/platform.
-23. implementation can be decomposed into a Task DAG without reopening product scope.
-24. no unresolved architecture contradiction with `DomainHarness_v0.3_PRD_FROZEN.md` remains.
-
----
+10. cached schema failure is quarantine/recompute, not source-contract fail closed.
+11. cache read requires a complete pre-read key.
+12. cache write requires post-execution `ObservedDependencySet` to be exactly representable/versioned.
+13. cache entries bind exact producer/dependency identities and support scoped invalidation.
+14. candidate cannot become executable without deterministic validation and explicit promotion.
+15. Promoted Artifact Registry is the sole durable owner/retention authority for promoted artifact bodies.
+16. selection resolves once per decision invocation to an exact promoted artifact identity.
+17. promoted compatibility/reference resolution uses the invoking instance's pinned package context.
+18. revocation has explicit deny/fallthrough and cache invalidation policy with safe defaults.
+19. reasoned promoted steps bind exact `harness-config` identity and transitive capability restrictions.
+20. dynamic child pin is durable before any child journaled work/terminal authority.
+21. every promoted-child operation identity includes the exact child `contentDigest`.
+22. recovery uses the original dynamic child pin and never re-resolves alias/version.
+23. every state-changing macrostep has a stable Durable Control Turn identity.
+24. recursive control snapshot, dynamic child pins and execution journals share one per-instance durability ordering domain.
+25. committed AI/query/effect work is journal-first before control advances.
+26. stale snapshot recovery does not duplicate committed work.
+27. snapshot-ahead-of-journal/pin divergence fails closed; process-local result copies do not become completion truth.
+28. crash-before-uncommitted AI result is documented as at-least-once.
+29. promoted child mutation remains impossible except through parent durable effect authority.
+30. Node/Expo persistence contracts have the same logical kill/force-stop durability guarantees.
+31. provider/model routing remains AI Runtime authority.
+32. portable core gains no mandatory Node dependency.
+33. retained Domain App capabilities have an architectural home without creating a second runtime/platform.
+34. implementation can be decomposed into a Task DAG without reopening product scope.
+35. no unresolved architecture contradiction with `DomainHarness_v0.3_PRD_FROZEN.md` remains.
 
 # 29. Evidence Ledger
 
@@ -1688,9 +2136,39 @@ Every L2 branch was created from the same frozen baseline and changed only its d
 
 Canonical CI was unavailable during these L2 tasks. Explicit task waivers are part of the evidence. No unavailable CI PASS is inferred.
 
+## Independent external review
+
+- Round-1 reviewed exact HEAD: `77c97147a551f7e23d1d3ad685362e38e1a4715e`
+- Round-1 verdict: `CHANGES_REQUIRED`
+- Blocking findings: `1 × P0`, `6 × P1`
+- Non-blocking findings: `5 × P2`, `1 × P3`
+- This revision explicitly supersedes the #203 proposal-only `missing-semantic-input` cache-bypass reason: required declared semantic input/projection/revision failure is now fail-closed.
+- This document remains a freeze candidate until the **revised exact HEAD** receives independent `FREEZE_OK`.
+
+
 ---
 
-# 30. Final Recommended Architecture
+# 30. External Adversarial Review Closeout
+
+Round-1 independent review of synthesis HEAD `77c97147a551f7e23d1d3ad685362e38e1a4715e` returned `CHANGES_REQUIRED` with 1×P0 and 6×P1. The blocking areas were dynamic-child pin durability/recovery identity, snapshot/journal durability domain, non-message control turns, promoted-artifact ownership, pinned-package execution scope, cache producer invalidation, and post-execution cache eligibility.
+
+The revised contract closes all seven blockers. Targeted independent re-review returned:
+
+```text
+FREEZE_OK
+```
+
+with no new P0/P1. The remaining non-blocking notes were folded into this frozen revision:
+
+- dynamic child pin slot collision/overwrite semantics are explicit and insert-once;
+- recovery-resume turns have a deterministic durable source identity;
+- the runtime map shows RuntimeStore/snapshot/journals inside the single `DurableExecutionStore` domain;
+- post-execution cache write eligibility requires exact identity equality rather than an undefined representation-equivalence rule;
+- status hygiene is finalized as `FROZEN`.
+
+---
+
+# 31. Final Recommended Architecture
 
 ```text
 DomainHarness v0.3
@@ -1720,4 +2198,4 @@ The core execution rule is:
 
 No product-level contradiction was found while synthesizing #201/#205/#203/#204.
 
-If external adversarial review returns `FREEZE_OK`, this candidate is ready to become the formal **DomainHarness v0.3 L2 Architecture Evidence FROZEN** baseline and the direct input to the v0.3 Task DAG.
+If independent re-review of the **revised exact HEAD** returns `FREEZE_OK`, this candidate is ready to become the formal **DomainHarness v0.3 L2 Architecture Evidence FROZEN** baseline and the direct input to the v0.3 Task DAG.
