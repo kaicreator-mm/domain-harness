@@ -53,7 +53,7 @@ function requireStringArray(value: unknown, path: string): readonly string[] {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || entry.length === 0)) {
     failInvalid(`${path} must be an array of non-empty strings`);
   }
-  return value;
+  return value as readonly string[];
 }
 
 function validateCapabilityIds(value: unknown, path: string): readonly CapabilityId[] {

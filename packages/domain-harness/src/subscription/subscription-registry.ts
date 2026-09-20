@@ -216,7 +216,7 @@ export class SubscriptionRegistry {
         continue;
       }
 
-      let affected = true;
+      let affected: boolean;
       try {
         affected =
           this.observationSource.isProjectionAffectedByBusinessInvalidation?.(

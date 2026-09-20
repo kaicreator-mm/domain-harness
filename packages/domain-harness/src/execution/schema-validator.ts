@@ -46,7 +46,7 @@ function isJsonValue(value: unknown): value is JsonValue {
   if (Array.isArray(value)) return value.every(isJsonValue);
   if (typeof value !== 'object') return false;
 
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = Object.getPrototypeOf(value) as object | null;
   if (prototype !== Object.prototype && prototype !== null) return false;
   return Object.values(value as Record<string, unknown>).every(isJsonValue);
 }

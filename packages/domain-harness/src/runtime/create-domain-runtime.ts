@@ -143,7 +143,6 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         }),
   });
 
-  let runtimeWorkflow: CompiledWorkflowRuntime;
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
 
@@ -176,7 +175,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     }
   };
 
-  runtimeWorkflow = new CompiledWorkflowRuntime({
+  const runtimeWorkflow = new CompiledWorkflowRuntime({
     expression: options.bindings.expression,
     toolRunner,
     toolExecutor: createRuntimeToolExecutor(options.bindings),

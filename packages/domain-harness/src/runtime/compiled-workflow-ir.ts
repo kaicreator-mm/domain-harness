@@ -111,7 +111,7 @@ function decodeRoutes(
     if (!stateIds.has(target)) {
       fail(workflowId, `${routePath}.target`, `route targets unknown state "${target}"`);
     }
-    const when = asOptionalString(workflowId, `${routePath}.when`, route.when as JsonValue | undefined);
+    const when = asOptionalString(workflowId, `${routePath}.when`, route.when);
     return when === undefined ? { target } : { target, when };
   });
 }
@@ -132,7 +132,7 @@ function decodeInvoke(workflowId: string, path: string, value: JsonValue): Compi
     );
   }
   const decodedKind = kind as SupportedCompiledInvokeKind;
-  const input = asOptionalString(workflowId, `${path}.input`, invoke.input as JsonValue | undefined);
+  const input = asOptionalString(workflowId, `${path}.input`, invoke.input);
   let timeoutMs: number | undefined;
   if (invoke.timeoutMs !== undefined) {
     if (
@@ -213,12 +213,12 @@ function decodeEffects(
     const payloadExpression = asOptionalString(
       workflowId,
       `${effectPath}.payloadExpression`,
-      effect.payloadExpression as JsonValue | undefined,
+      effect.payloadExpression,
     );
     const contractVersion = asOptionalString(
       workflowId,
       `${effectPath}.contractVersion`,
-      effect.contractVersion as JsonValue | undefined,
+      effect.contractVersion,
     );
     return {
       kind: 'domain-message' as const,
@@ -247,7 +247,7 @@ export function decodeCompiledWorkflowDefinition(
   if (!stateIds.has(initial)) {
     fail(workflowId, 'initial', `initial state "${initial}" is not declared in states`);
   }
-  const output = asOptionalString(workflowId, 'output', root.output as JsonValue | undefined);
+  const output = asOptionalString(workflowId, 'output', root.output);
 
   const states: Record<string, CompiledState> = {};
   for (const [stateId, stateValue] of Object.entries(statesRecord)) {
@@ -268,18 +268,18 @@ export function decodeCompiledWorkflowDefinition(
     for (const [eventName, eventValue] of Object.entries(eventsRecord ?? {})) {
       const event = asRecord(workflowId, `${statePath}.events.${eventName}`, eventValue);
       events[eventName] = {
-        routes: decodeRoutes(workflowId, `${statePath}.events.${eventName}.routes`, event.routes as JsonValue | undefined, stateIds),
+        routes: decodeRoutes(workflowId, `${statePath}.events.${eventName}.routes`, event.routes, stateIds),
       };
     }
 
-    const effects = decodeEffects(workflowId, `${statePath}.effects`, state.effects as JsonValue | undefined);
+    const effects = decodeEffects(workflowId, `${statePath}.effects`, state.effects);
     states[stateId] = {
       final,
       ...(state.invoke === undefined
         ? {}
         : { invoke: decodeInvoke(workflowId, `${statePath}.invoke`, state.invoke) }),
-      done: decodeRoutes(workflowId, `${statePath}.done`, state.done as JsonValue | undefined, stateIds),
-      error: decodeRoutes(workflowId, `${statePath}.error`, state.error as JsonValue | undefined, stateIds),
+      done: decodeRoutes(workflowId, `${statePath}.done`, state.done, stateIds),
+      error: decodeRoutes(workflowId, `${statePath}.error`, state.error, stateIds),
       events,
       ...(effects === undefined ? {} : { effects }),
     };

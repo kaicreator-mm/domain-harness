@@ -150,7 +150,9 @@ export class JournaledSkillRunner {
         assertCompatibleEffectRecord(reconciled, expected);
         if (reconciled.status === 'completed') return completedResult(reconciled, true);
         if (reconciled.status === 'failed') {
-          throw new Error(`Skill effect ${effectId} has a committed failed journal fact`);
+          throw new Error(`Skill effect ${effectId} has a committed failed journal fact`, {
+            cause: completeError,
+          });
         }
       }
       throw completeError;
@@ -236,7 +238,8 @@ function validateCompiledSkill(skill: CompiledSkillDefinition): CompiledSkillDef
   if (!Array.isArray(skill.resources)) {
     throw new Error(`Compiled Skill '${skill.skillId}' resources must be an array`);
   }
-  for (const resource of skill.resources) {
+  for (const entry of skill.resources as readonly unknown[]) {
+    const resource = entry as { path?: unknown; content?: unknown } | null;
     if (
       resource === null ||
       typeof resource !== 'object' ||

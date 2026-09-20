@@ -134,9 +134,9 @@ function hostBindings(): RuntimeHostBindings {
     capabilities: [],
     sha256: {
       async digestUtf8(value) {
-        if (value.includes('\"domainVersion\":\"1.0.0\"')) return PACKAGE_A;
-        if (value.includes('\"domainVersion\":\"2.0.0\"')) return PACKAGE_B;
-        if (value.includes('\"domainVersion\":\"99.0.0\"')) return PACKAGE_BAD;
+        if (value.includes('"domainVersion":"1.0.0"')) return PACKAGE_A;
+        if (value.includes('"domainVersion":"2.0.0"')) return PACKAGE_B;
+        if (value.includes('"domainVersion":"99.0.0"')) return PACKAGE_BAD;
         return `t022-digest-${value.length}`;
       },
     },
