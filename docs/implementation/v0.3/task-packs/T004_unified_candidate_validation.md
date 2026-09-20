@@ -5,7 +5,7 @@
 **Execution Issue:** #222  
 **Branch:** `v0.3_t004`  
 **PR Base:** `v0.3`  
-**Exact Base:** `be65e41e652d70c17ca10af66bc5f25abed2658a`  
+**Original Task Base:** `be65e41e652d70c17ca10af66bc5f25abed2658a`  
 **Depends On:** T-001  
 **Parallel:** YES  
 **Risk:** H  
@@ -22,13 +22,13 @@
 - `.dev-standard/PROJECT_OVERRIDES.md`
 - pinned `ai-development-standard@0446f04583f6cf464c835f26e2f657c8b703cb4e`
 - GitHub Issue #222
-- #204 final architecture evidence, consumed through Frozen L2; its WorkflowCandidate validator remains the stricter specialization.
+- #204/Frozen-L2 WorkflowCandidate validation semantics as the stricter specialization.
 
 This task does not reopen frozen product or architecture semantics.
 
 ## 2. Tests
 
-Focused deterministic contract/unit coverage lives in:
+Focused deterministic coverage lives in:
 
 ```text
 packages/domain-harness/tests/candidate/candidate-validator.test.ts
@@ -38,24 +38,28 @@ Required vectors:
 
 | Vector | Expected result |
 |---|---|
-| Rule / DecisionProcedure / Skill / Workflow use the common envelope | deterministic accept when every authority reference is exact and allowlisted |
-| missing/mismatched/unresolvable/tampered exact Candidate body schema | fail closed; no validated identity |
-| body violates its exact deterministic schema, including disguised executable material under a non-blacklisted field | `BODY_SCHEMA_INVALID` |
+| Rule / DecisionProcedure / Skill / Workflow use the common envelope | deterministic accept when every exact authority reference is allowed |
+| missing configured body contract | `BODY_VALIDATOR_REQUIRED` |
+| Candidate body contract differs from authority contract | `BODY_CONTRACT_NOT_ALLOWED` |
+| exact body-schema artifact cannot be resolved | `BODY_VALIDATOR_REQUIRED` |
+| resolved body-schema bytes do not match their exact content digest | `VALIDATION_AUTHORITY_INVALID` |
+| body violates the exact bounded declarative schema, including disguised executable material under an otherwise ordinary field name | `BODY_SCHEMA_INVALID` |
+| actual function value | `ARBITRARY_CODE_FORBIDDEN` |
 | input/output contract mismatch | `INPUT_CONTRACT_NOT_ALLOWED` / `OUTPUT_CONTRACT_NOT_ALLOWED` |
 | capability/tool/event outside allowlist | fail closed |
-| arbitrary executable code field or actual function | `ARBITRARY_CODE_FORBIDDEN` |
 | provider secret/state | `PROVIDER_SECRET_OR_STATE_FORBIDDEN` |
 | actor/runtime object | `RUNTIME_OBJECT_FORBIDDEN` |
 | private reasoning authority | `PRIVATE_REASONING_FORBIDDEN` |
 | direct/implicit mutation or unapproved effect | `MUTATION_PATH_INVALID` |
-| unresolved/digest-mismatched exact reference | `EXACT_REFERENCE_UNRESOLVED` |
-| unknown applicability/precondition identity | `APPLICABILITY_NOT_ALLOWED` |
-| incompatible Hard Invariant reference | `HARD_INVARIANT_INCOMPATIBLE` |
-| oversized/unreachable/cyclic control graph | bounded-control rejection; all executable Candidate cycles fail closed |
-| Workflow specialization missing/rejecting/throwing | fail closed with specialization rejection taxonomy |
+| unresolved exact artifact reference | `EXACT_REFERENCE_UNRESOLVED` |
+| unknown applicability/precondition | `APPLICABILITY_NOT_ALLOWED` |
+| incompatible Hard Invariant | `HARD_INVARIANT_INCOMPATIBLE` |
+| oversized/unreachable/cyclic control graph | bounded-control rejection; executable cycles fail closed |
+| Workflow without #204 specialization | `SPECIALIZED_VALIDATOR_REQUIRED` |
+| specialized validator rejects or throws | `SPECIALIZED_REJECTED` |
 | invalid validation authority | `VALIDATION_AUTHORITY_INVALID` |
-| changed Governance Baseline | prior validation is not reusable unless exact retained-governance authority resolution yields a reviewed compatibility rule bound to the target governance content digest |
-| governance resolver unavailable/mismatched | reuse fails closed; caller data cannot self-attest compatibility |
+| same exact Governance Baseline | validation evidence may be reused |
+| changed exact Governance Baseline | T-004 returns false and requires revalidation |
 | promotion/activation fields injected into Candidate | invalid envelope; no authority transition occurs |
 | accepted Candidate | `grantsExecutionPermission === false` |
 
@@ -76,57 +80,71 @@ workflow
 
 The envelope contains only behaviorally relevant executable proposal material:
 
-- schema version, kind and proposal ID;
-- exact body-contract identity plus JSON semantic body;
+- schema version, Candidate kind and proposal ID;
+- exact body-contract identity plus canonical JSON semantic body;
 - exact input/output contract references;
 - capability, query-tool and finite Domain Event declarations;
 - explicit mutation contract (`none` or `durable-effect` only);
 - exact artifact references;
 - exact applicability/precondition references;
 - exact Hard Invariant references;
-- optional bounded control graph; mandatory for WorkflowCandidate.
+- optional bounded control graph, mandatory for WorkflowCandidate.
 
-Proposal provenance, metrics, evaluation, promotion and activation metadata are not part of executable Candidate semantics and cannot become authority through this envelope.
+Proposal provenance, metrics, evaluation, promotion and activation metadata are outside executable Candidate semantics and cannot become authority through the envelope.
 
-### 3.2 Validation authority
+### 3.2 Exact executable body contract authority
 
-`CandidateValidationAuthority` contains only the validation configuration bound to one exact Governance Baseline:
+Every executable Candidate kind has an exact `bodyContract` identity in `CandidateValidationAuthority.bodyContracts`.
+
+The body contract resolves through `CandidateContractAuthorityPort` to an immutable `CandidateBodySchemaArtifact` containing:
+
+```text
+schemaVersion
+candidateKind
+identity { kind, artifactId, contentDigest }
+schema
+```
+
+The schema is a deliberately bounded declarative language owned by DomainHarness validation. It supports only finite JSON-shape constraints needed by v0.3:
+
+- object properties + required set + `additionalProperties: false`;
+- arrays with bounded `maxItems`;
+- string with optional `minLength` / finite enum;
+- finite number/integer bounds;
+- boolean/null.
+
+It contains no executable callback, arbitrary source, regular expression, external reference, custom keyword, provider state or runtime object.
+
+A resolved artifact is not trusted by TypeScript shape alone. T-004 recomputes the canonical digest of:
+
+```text
+schemaVersion + candidateKind + schema
+```
+
+and requires that digest to equal the exact `bodyContract.contentDigest`. Only then does the framework-owned deterministic interpreter validate the Candidate body.
+
+Therefore a caller cannot establish executable-body validity merely by providing a permissive `validate() => []` function; no such callback exists in the contract.
+
+### 3.3 Validation authority
+
+`CandidateValidationAuthority` supplies the remaining exact validation boundary:
 
 - exact Governance Baseline identity;
-- exact body-schema contract identity allowed for each Candidate kind;
+- exact allowed body-contract identities per Candidate kind;
 - exact allowed I/O contracts;
 - capability/tool/event allowlists;
-- allowed durable-effect contracts;
+- exact allowed durable-effect contracts;
 - exact available artifact references;
 - exact applicability/precondition references;
 - exact Hard Invariant references;
 - deterministic control bounds;
-- mandatory Workflow specialization seam.
+- optional specialized validators, with Workflow specialization mandatory.
 
-Executable body-schema bytes and cross-baseline Governance compatibility are **not** accepted as ad-hoc caller objects or callbacks. They are resolved through `CandidateContractAuthorityPort`:
+T-003 owns the canonical Governance Baseline registry/retention lifecycle. T-004 keeps only a narrow structurally compatible baseline identity reference and does not own that registry.
 
-```text
-Candidate bodyContract exact ref
-→ immutable content-addressed body-schema authority
-→ exact schema artifact
-→ recompute schema semantic digest
-→ deterministic JSON Schema validation
+### 3.4 Validated identity
 
-Target GovernanceBaselineIdentity
-→ exact retained Governance Baseline authority/registry
-→ governance validation snapshot
-→ reviewed compatibility records owned by that exact target body
-```
-
-For body schemas, the resolved artifact identity, Candidate kind and schema version must match the requested exact reference, and its canonical semantic bytes must recompute to the requested `contentDigest`. The body validator itself is framework-owned deterministic JSON Schema evaluation; arbitrary caller-provided `validate()` functions are not schema authority.
-
-For Governance compatibility, `canReuseValidationForGovernanceBaseline()` receives only the target exact baseline plus the authority resolver. The resolved Governance snapshot must bind the same exact target baseline and `governanceContractContentDigest`; no caller-supplied compatibility DTO can enable reuse.
-
-T-003 owns the canonical Governance Baseline registry/body retention. T-004 defines and consumes the narrow exact resolver seam without creating a competing registry lifecycle.
-
-### 3.3 Validated identity
-
-A successful validation produces only:
+Successful validation produces only:
 
 ```ts
 ValidatedCandidateIdentity {
@@ -138,55 +156,71 @@ ValidatedCandidateIdentity {
 }
 ```
 
-`CandidateValidationResult.grantsExecutionPermission` is always `false` on both success and failure.
+`CandidateValidationResult.grantsExecutionPermission` is always `false` on success and failure. There is no promotion or activation transition in this API.
 
-The API contains no promotion or activation transition.
+### 3.5 Governance change boundary
 
-### 3.4 #204 specialization
+T-004 validation evidence is reusable only when the target Governance Baseline has the same exact semantic identity:
 
-The unified validator does not replace or weaken WorkflowCandidate validation from #204/Frozen L2.
+```text
+domainId
+governanceId
+schemaVersion
+contentDigest
+```
+
+A lifecycle `version` label does not substitute for exact semantic identity.
+
+For any changed exact Governance Baseline, T-004 returns **not reusable** and requires deterministic revalidation. It accepts no compatibility DTO, callback, target-authority wrapper or caller-supplied compatibility proof.
+
+The Frozen L2 exception for an exact reviewed cross-baseline compatibility rule is intentionally resolved later by **T-015**, whose formal DAG dependencies include T-003 + T-004 + T-012 and therefore can consult the retained Governance contract itself. This keeps T-004 fail-closed and within its original T-001 dependency boundary.
+
+### 3.6 #204 specialization
+
+The common validator does not replace or weaken the Frozen-L2 WorkflowCandidate validator.
 
 For every Candidate kind:
 
 ```text
 common deterministic envelope validation
 +
-exact authority-resolved declarative body-schema validation
+exact content-addressed body-schema validation
 ```
 
-For `candidateKind === 'workflow'`, this is followed by:
+For `candidateKind === 'workflow'` this is followed by:
 
 ```text
 mandatory synchronous specialized Workflow validator
 ```
 
-Missing schema authority, schema identity/digest mismatch, body-schema rejection, missing Workflow specialization, specialized rejection, or specialized exception all fail closed.
+Missing specialization, rejection or exception fails closed.
 
 ## 4. Core Implementation
 
 Validation order is deterministic:
 
-1. validate the validation authority baseline, exact body-contract references and control bounds;
-2. reject forbidden runtime/executable/provider/private-reasoning material;
-3. require canonical JSON Candidate material using the T-001 identity seam;
+1. validate Governance identity and validation bounds;
+2. reject function/runtime/provider/private-reasoning material before canonicalization;
+3. canonicalize Candidate JSON through the T-001 identity seam;
 4. parse the strict common envelope and reject unknown top-level authority fields;
-5. require the exact allowed body-contract identity for the Candidate kind;
-6. resolve the exact immutable schema artifact through `CandidateContractAuthorityPort`;
-7. verify schema artifact identity/kind/version and recompute its canonical content digest;
-8. compile/evaluate that exact declarative JSON Schema deterministically; invalid/corrupt schema authority fails closed;
-9. validate exact I/O, capability, tool and event declarations;
-10. validate mutation authority; business mutation is only an exact durable-effect contract;
-11. validate exact artifact, applicability and Hard-Invariant references;
-12. validate bounded control, including limit, reachability and cycle rejection;
-13. run the required stricter Workflow specialization where applicable;
-14. if and only if all checks pass, compute the stable Candidate semantic digest through `Sha256Port`;
-15. bind the validation identity to the exact Governance Baseline.
+5. require the exact allowed body-contract identity;
+6. resolve the exact body-schema artifact;
+7. recompute and compare its semantic content digest;
+8. parse the bounded declarative schema fail-closed;
+9. validate Candidate body using the framework-owned schema interpreter;
+10. validate exact I/O, capability, tool and event declarations;
+11. validate mutation authority; business mutation is only an exact durable-effect contract;
+12. validate exact artifact, applicability and Hard-Invariant references;
+13. validate bounded control, including limit, reachability and cycle rejection;
+14. run the required stricter Workflow specialization where applicable;
+15. if and only if every check passes, compute the stable Candidate semantic digest;
+16. bind the result to the exact validation Governance Baseline.
 
-Set-like declarations are normalized before digesting. `candidateId` is proposal identity and is excluded from semantic content digest; behaviorally relevant body contract/body/contracts/allowlists/references/applicability/invariants/control remain digest material.
+Set-like declarations are normalized before Candidate digest generation. `candidateId` is proposal identity and is excluded from semantic content digest; behaviorally relevant body contract/body/contracts/allowlists/references/applicability/invariants/control remain digest material.
 
 ## 5. Failure Handling
 
-The common rejection taxonomy is explicit and fail closed. Important classes include:
+The common rejection taxonomy includes:
 
 ```text
 INVALID_ENVELOPE
@@ -216,54 +250,59 @@ VALIDATION_AUTHORITY_INVALID
 CONTENT_DIGEST_INVALID
 ```
 
-The validator never silently falls back to fuzzy, latest, compatible-by-name or implicit authority.
+Important fail-closed rules:
 
-Body schema authority fails closed when:
-
-- the configured exact body contract is absent or mismatched;
-- the exact schema artifact cannot be resolved;
-- resolver errors occur;
-- resolved kind/version/reference is inconsistent;
-- recomputed schema semantic digest differs from the exact reference;
-- the resolved declarative schema itself is invalid;
-- the Candidate body fails that schema.
-
-When the target Governance Baseline changes, `canReuseValidationForGovernanceBaseline()` returns false unless exact retained-governance resolution succeeds and the resolved target authority contains an explicit reviewed compatibility record matching validator version, Candidate kind, source baseline, target baseline, target governance content digest and non-empty review digest. Missing, throwing, stale or digest-mismatched Governance authority resolution fails closed.
-
-The helper determines validation-evidence reuse only. It never promotes, activates or executes a Candidate.
+- missing body contract/resolver result never falls back to arbitrary JSON acceptance;
+- schema identity/kind/version mismatch fails;
+- schema bytes/digest mismatch fails;
+- malformed/unbounded schema definition fails;
+- schema resolution exceptions fail;
+- specialized validation exceptions fail;
+- changed Governance Baseline never accepts caller-supplied compatibility evidence in T-004;
+- no fuzzy/latest/compatible-by-name fallback exists;
+- validation never promotes, activates or executes a Candidate.
 
 ## 6. Reference
 
 Frozen L2 Amendment A1 §11 requires one deterministic baseline-bound Candidate validation contract covering schema/contract validity, canonical content identity, I/O compatibility, capability/tool/event allowlists, arbitrary-code/provider-secret/runtime-object rejection, bounded control, mutation path, exact reference identity, Hard-Invariant compatibility, applicability and stable digest generation.
 
-Frozen L2 Amendment A1 §12 keeps:
+Frozen L2 Amendment A1 also requires revalidation after behaviorally relevant Governance change unless the governance contract itself contains an exact reviewed compatibility rule. T-004 implements the safe default: any changed exact baseline revalidates. The exception is not represented by caller data here; T-015 owns the registry-backed integration point.
+
+Frozen L2 Amendment A1 §12 preserves:
 
 ```text
 proposal != validation != evaluation != promotion != activation
 ```
 
-Frozen L2 A1 also requires changed Governance authority to trigger revalidation unless the governance contract itself contains a reviewed exact compatibility rule proving equivalence. T-004 therefore exposes an exact retained-governance resolver seam rather than accepting compatibility evidence from the ordinary validation caller.
-
 #204 remains the stricter WorkflowCandidate reference: finite events, allowlisted tools/capabilities, no arbitrary code/provider state/actor authority, bounded acyclic control, fail-closed applicability and durable-effect mutation authority.
 
-## 7. Review Remediation
+## 7. Re-review Remediation
 
-Independent Review on prior HEAD `5ad3aa8aa25a6a26218a08a7cdd53163e764125d`, followed by re-review on `3f787f805363651e1b6bf58b4842cab044a123ad`, raised authority and evidence findings. Current remediation closes them as follows:
+Prior Independent Review found that:
 
-- cross-baseline reuse no longer accepts `CandidateValidationAuthority.reviewedValidationCompatibilities` or any free-standing compatibility object; the helper can consume compatibility only after exact retained-governance authority resolution;
-- executable Candidate body validation no longer trusts caller-supplied validation callbacks; each kind binds an exact schema reference whose immutable declarative schema is resolved, canonical-digest verified, then evaluated by framework-owned deterministic JSON Schema validation;
-- focused tests prove schema bytes cannot be swapped under a trusted digest, unresolvable schema authority fails closed, disguised executable material and actual functions are rejected, and oversized/unreachable/cyclic control is rejected;
-- focused tests now cover missing, rejecting and throwing Workflow specialization plus invalid validation authority;
-- governance tests cover missing resolver evidence, mismatched target authority/digest, exact reviewed compatibility success, and resolver failure;
-- `.woodpecker/verify.yaml` remains absent from the PR diff.
+1. a caller could still manufacture Governance compatibility authority;
+2. body validation authority was represented by caller-supplied executable callbacks;
+3. several declared failure-path fixtures were missing;
+4. `.woodpecker/verify.yaml` was outside the T-004 write set.
 
-Any validation evidence from earlier HEADs is invalid after these remediation commits. Exact final HEAD evidence is recorded on PR/Issue after the remote checkpoint settles.
+Current remediation:
+
+- cross-baseline compatibility input is removed from T-004 entirely; changed exact baseline always revalidates and T-015 owns the reviewed exception;
+- body validation uses exact content-addressed declarative schema artifacts plus a framework-owned deterministic interpreter;
+- tampered schema bytes fail digest verification;
+- disguised executable material and actual function values are covered;
+- oversized, unreachable and cyclic control are covered;
+- specialized rejection/exception and invalid validation-authority cases are covered;
+- `.woodpecker/verify.yaml` is not part of the PR diff.
+
+Any validation evidence from earlier HEADs is stale after these remediation commits. Exact final HEAD evidence is recorded on PR/Issue only after CI settles.
 
 ## 8. Scope Guard
 
 T-004 SHALL NOT implement:
 
 - Governance Baseline registry/retention/activation (T-003);
+- reviewed cross-baseline governance compatibility resolution/promotion audit (T-015);
 - CDI/package identity ownership (T-002);
 - promotion, registry selection, activation or revocation lifecycle;
 - automatic LLM/Business-Harness/Meta-Harness promotion or activation;
@@ -272,4 +311,4 @@ T-004 SHALL NOT implement:
 - root CI configuration changes;
 - Node/Expo persistence or host durability claims.
 
-Exact final implementation HEAD is recorded on PR/Issue execution evidence after the remote checkpoint is complete; it is intentionally not self-referential inside this committed document.
+Exact final implementation HEAD is recorded externally after required exact-HEAD validation; the committed L3 intentionally avoids a self-referential final SHA.
