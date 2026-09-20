@@ -1,0 +1,144 @@
+[
+  {
+    "toolId": "approveDesign",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": {
+      "transport": "http-transport@1",
+      "resourceKey": "businessDb",
+      "path": "/tools/approveDesign",
+      "method": "POST"
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": ["designId", "commandId"],
+      "properties": {
+        "designId": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "reason": { "type": "string" },
+        "commandId": { "type": "string" },
+        "approvedVersionId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "toolId": "recordQualityReview",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": {
+      "transport": "http-transport@1",
+      "resourceKey": "businessDb",
+      "path": "/tools/recordQualityReview",
+      "method": "POST"
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": ["designId", "review"],
+      "properties": {
+        "designId": { "type": "string" },
+        "commandId": { "type": "string" },
+        "review": {
+          "type": "object",
+          "required": ["verdict", "score", "findings"],
+          "properties": {
+            "verdict": { "type": "string", "enum": ["certified", "needs_work"] },
+            "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "findings": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["recorded", "reviewId", "verdict"],
+      "properties": {
+        "recorded": { "type": "boolean" },
+        "reviewId": { "type": "string" },
+        "verdict": { "type": "string", "enum": ["certified", "needs_work"] }
+      }
+    }
+  },
+  {
+    "toolId": "startGeneration",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": {
+      "transport": "http-transport@1",
+      "resourceKey": "businessDb",
+      "path": "/tools/startGeneration",
+      "method": "POST"
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": ["designId", "prompt", "commandId"],
+      "properties": {
+        "designId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["jobId", "created"],
+      "properties": {
+        "jobId": { "type": "string" },
+        "created": { "type": "boolean" },
+        "supersededCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  {
+    "toolId": "recordArtifact",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": {
+      "transport": "http-transport@1",
+      "resourceKey": "businessDb",
+      "path": "/tools/recordArtifact",
+      "method": "POST"
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": ["designId", "jobId", "artifact", "commandId"],
+      "properties": {
+        "designId": { "type": "string" },
+        "jobId": { "type": "string" },
+        "commandId": { "type": "string" },
+        "artifact": {
+          "type": "object",
+          "required": ["contentHash", "format"],
+          "properties": {
+            "contentHash": { "type": "string" },
+            "format": { "type": "string", "enum": ["png", "svg", "jpeg"] }
+          }
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "artifactId": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    }
+  }
+]

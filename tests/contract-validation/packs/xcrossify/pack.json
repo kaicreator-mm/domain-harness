@@ -1,0 +1,13 @@
+{
+  "project": "xcrossify",
+  "tier": "data-only",
+  "domainId": "xcrossify",
+  "domainVersion": "0.2.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/xcrossify.md",
+  "blockers": [
+    "仓库政策：v0.2.0 禁止引入通用 Workflow Engine——本包是外部契约镜像（P2 包 @xcrossify/domain-runtime 消费），不进仓库依赖",
+    "RuntimeStore PG 适配器缺口（SoR=PostgreSQL；临时以独立 SQLite 执行态库落地）",
+    "多项上游契约 IN_REVIEW（P0-04/P0-07/P1-03/P1-05/P3-04/P3-06）——语义以评审定稿为准"
+  ],
+  "notes": "xcrossify 模拟数据包：First 72 Hours 任务包（五步同构定义）、证据四态、抓取台账（ProcessingRecord）。核心纪律：进度是投影不是事件流（无 status 列，读时现算）；新鲜度是 now 的函数绝不落库；交接不代执行。"
+}

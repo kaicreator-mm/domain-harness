@@ -1,0 +1,144 @@
+[
+  {
+    "source": "xcrossify.taskpack",
+    "notes": "TaskPack 无 status/progress 列——progress 是读时现算投影（本 seed 中的 progress 字段是 Provider 在读取时计算的快照，绝不回写）。复合键 (userId,packId)。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "packId",
+        "userId",
+        "definitionVersion",
+        "steps"
+      ],
+      "properties": {
+        "packId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "definitionVersion": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "order",
+              "state"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "TODO",
+                  "IN_PROGRESS",
+                  "DONE",
+                  "BLOCKED"
+                ]
+              },
+              "titleKey": {
+                "type": "string"
+              },
+              "blockedReason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "progress": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "source": "xcrossify.context",
+    "notes": "UserContext 单行整行替换（最后写入胜出）；无自由文本字段（防敏感走私）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "userId"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "arrivalWindowDays": {
+          "type": "integer"
+        },
+        "nationality": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "housingStatus": {
+          "type": "string"
+        },
+        "hasLocalSim": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  {
+    "source": "xcrossify.jobs",
+    "notes": "ProcessingRecord 台账（幂等键 sourceId|rawHash；RECEIVED/PROCESSING/STORED/SKIPPED/FAILED_RETRYABLE/FAILED_TERMINAL；崩溃遗留由下次 begin 认领恢复）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "records"
+      ],
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "sourceId",
+              "rawHash",
+              "status"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "rawHash": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "RECEIVED",
+                  "PROCESSING",
+                  "STORED",
+                  "SKIPPED",
+                  "FAILED_RETRYABLE",
+                  "FAILED_TERMINAL"
+                ]
+              },
+              "attempts": {
+                "type": "integer"
+              },
+              "clientRef": {
+                "type": "string"
+              },
+              "deadline": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

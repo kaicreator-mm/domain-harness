@@ -1,0 +1,32 @@
+[
+  {
+    "key": "shop_042",
+    "revision": "rev-requests-042-0031",
+    "value": {
+      "requests": [
+        {
+          "requestId": "evt_01J8ZK4M",
+          "itemKey": "component:brake-pad-front-dn150",
+          "qty": 1,
+          "status": "prepared",
+          "qualificationSource": "diagnosis-confirmed",
+          "promisedDate": "2026-09-21",
+          "basis": {
+            "policyRevision": 7,
+            "cutoffLocalTime": "15:00",
+            "transportMode": "regular"
+          },
+          "reservedEventId": "rsv-c-evt_01J8ZK4M"
+        },
+        {
+          "requestId": "evt_01J8ZP7Q",
+          "itemKey": "freeText:ကားဘီးအောက်ခံ",
+          "qty": 2,
+          "status": "open",
+          "qualificationSource": null,
+          "note": "freeText 永不成为 qualified demand——已同步落 inquiry_log"
+        }
+      ]
+    }
+  }
+]

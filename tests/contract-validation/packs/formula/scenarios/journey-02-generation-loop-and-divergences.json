@@ -1,0 +1,56 @@
+{
+  "id": "journey-02-generation-loop-and-divergences",
+  "description": "Formula 生成 E 循环（跨 workflow durable message、作业表 S2、过期回调拒绝、messageId 去重）+ 三组平台差距复现：#137 毒化（W3 违例状态收到不适用消息）、G1 domain-data key 编译期不校验、L2-4 idempotencyKey 不到执行端、G2 业务源无包内声明。",
+  "steps": [
+    { "action": "open", "workflowId": "formula.design", "instanceKey": "design_b17c", "input": { "designId": "design_b17c" } },
+    { "action": "send", "to": { "workflowId": "formula.design", "instanceKey": "design_b17c" }, "messageId": "restore:formula.design:design_b17c", "type": "Restore", "payload": { "snapshot": { "approvalStatus": "drafting", "headVersionId": "ver_0002" } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_b17c" }, "expect": { "stateId": "drafting" } },
+    { "action": "open", "workflowId": "formula.generation", "instanceKey": "design_b17c", "input": { "designId": "design_b17c" } },
+    { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "messageId": "restore:formula.generation:design_b17c", "type": "Restore", "payload": { "snapshot": { "activeJobId": null } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "expect": { "stateId": "idle" } },
+
+    { "action": "send", "to": { "workflowId": "formula.design", "instanceKey": "design_b17c" }, "messageId": "cmd_gen_b1", "type": "GenerateVariant", "payload": { "commandId": "cmd_gen_b1", "prompt": "夜景工业风变体，保持主体与栅格系统" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_b17c" }, "expect": { "stateId": "drafting", "lastResult": { "commandId": "cmd_gen_b1" } } },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "expect": { "stateId": "awaiting" } },
+    { "action": "expect-business", "source": "formula.jobs", "key": "design_b17c", "expect": { "jobs": [ { "jobId": "job_gen_012", "status": "running", "commandId": "cmd_gen_b1" } ] } },
+    { "action": "finding", "id": "G3-local-tool-via-remote-workaround", "severity": "divergence", "summary": "写本地业务库的 startGeneration/recordArtifact/approveDesign 只能声明为 remote-http-json@1 并由进程内 transport 伪装承接（G3/PRD-CR-1 临时方案 A）：createRuntimeToolExecutor 对 script/remote 之外的 execution kind 一律抛 Unsupported Tool binding kind，registered/local 绑定无一等公民。", "related": "v0.3 PRD §6.1 / 分析文档 G3" },
+    { "action": "expect-transport-context", "minInvocations": 1, "findingId": "L2-4-idempotency-key-not-transported", "summary": "冻结的 RemoteTransportRequest 只携带 {binding, input, resourceKey, signal}：EffectExecutionContext.idempotencyKey 停在 journal 层，永远到不了执行端——写业务 Tool 的幂等只能靠 payload 里的 commandId 约定（design doc v0.2 §9.4 [L2-4]）。", "related": "design doc v0.2 §9.4 [L2-4]" },
+
+    { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "messageId": "job:job_gen_012:finished", "type": "JobFinished", "payload": { "jobId": "job_gen_012", "artifact": { "contentHash": "sha256:7b1e4f2a9c03d5e6f718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e", "format": "png" }, "commandId": "cmd_gen_b1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "expect": { "stateId": "idle", "lastResult": { "outcome": "applied", "artifactId": "art_0001" } } },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_b17c" }, "expect": { "stateId": "drafting", "lastResult": { "designId": "design_b17c", "artifactId": "art_0001", "jobId": "job_gen_012" } } },
+    { "action": "expect-business", "source": "formula.artifacts", "key": "design_b17c", "expect": { "artifacts": [ { "artifactId": "art_0001", "frozenHash": "sha256:7b1e4f2a9c03d5e6f718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e", "format": "png", "jobId": "job_gen_012" } ] } },
+    { "action": "expect-business", "source": "formula.jobs", "key": "design_b17c", "expect": { "jobs": [ { "jobId": "job_gen_012", "status": "done" } ] } },
+
+    { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "messageId": "job:job_gen_012:finished:late", "type": "JobFinished", "payload": { "jobId": "job_gen_012", "artifact": { "contentHash": "sha256:7b1e4f2a9c03d5e6f718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e", "format": "png" }, "commandId": "cmd_gen_b1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "expect": { "stateId": "idle", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "not_applicable_in_idle" } } },
+    { "action": "finding", "id": "stale-callback-rejected-without-poisoning", "severity": "info", "summary": "迟到/重复的作业回调在 idle 静止状态被 W3 拒绝路径吸收：结构化 rejected(not_applicable_in_idle)，实例保持 waiting 健康，后续消息不被阻塞（design doc v0.2 §9.5 先到者生效语义）。" },
+    { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_b17c" }, "messageId": "job:job_gen_012:finished", "type": "JobFinished", "payload": { "jobId": "job_gen_012", "artifact": { "contentHash": "sha256:7b1e4f2a9c03d5e6f718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e", "format": "png" }, "commandId": "cmd_gen_b1" }, "expectAck": { "status": "duplicate" } },
+    { "action": "finding", "id": "message-dedup-by-message-id", "severity": "info", "summary": "同 messageId 重发返回 duplicate ACK（PRD §12.3 去重）；回调与超时共用确定性 messageId『job:{jobId}:finished』的约定在 SDK 层成立。" },
+
+    { "action": "open", "workflowId": "formula.generation", "instanceKey": "design_d000", "input": { "designId": "design_d000" } },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "expect": { "stateId": "init", "lifecycle": "waiting" } },
+    { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "messageId": "job:late:finished", "type": "JobFinished", "payload": { "jobId": "job_unknown", "artifact": { "contentHash": "sha256:deadbeefcafebabe0123456789abcdef", "format": "png" }, "commandId": "cmd_late" } },
+    { "action": "settle" },
+    { "action": "expect-disposition", "target": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "messageId": "job:late:finished", "expect": { "disposition": "failed" } },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "expect": { "lifecycle": "recovery_required", "stateId": "init" } },
+    { "action": "finding", "id": "137-inapplicable-message-poisons-instance", "severity": "divergence", "summary": "复现 #137：契约合法但在当前状态不适用的消息（Restore 之前到达的 JobFinished，即 provisioning 竞态窗口）→ 处理抛错 → disposition=failed → 实例 recovery_required → 整个 mailbox 被阻塞。长寿命实例会因一次时序竞态被冻结直到人工恢复；v0.3 §6.3–6.4 要求一等 rejected(not_applicable) 处置。W3 全事件覆盖约定只能缓解、不能消除该窗口（init 状态按 W4 只接受 Restore）。", "related": "issue #137 / PRD-CR-2 / v0.3 PRD §6.3-6.4" },
+    { "action": "expect-throw", "step": { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "messageId": "restore:formula.generation:design_d000", "type": "Restore", "payload": { "snapshot": { "activeJobId": null } } }, "errorMatch": "cannot accept" },
+    { "action": "recover", "target": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "op": "retry", "reason": "validation: authorize retry to demonstrate that retrying an inapplicable message cannot succeed" },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "expect": { "lifecycle": "recovery_required" } },
+    { "action": "finding", "id": "137-retry-cannot-resolve-inapplicable-message", "severity": "divergence", "summary": "对『不适用消息』型毒化，recovery retry 只会重放同一条消息并再次失败（recovery_required → retry → recovery_required）；唯一出路是 resolve/terminate 放弃该消息。这证明 rejected 处置必须在平台层解决，恢复原语无法替代。", "related": "issue #137" },
+    { "action": "recover", "target": { "workflowId": "formula.generation", "instanceKey": "design_d000" }, "op": "terminate", "reason": "validation: terminate poisoned validation instance", "expect": { "lifecycle": "terminated" } },
+
+    { "action": "expect-throw", "step": { "action": "expect-projection", "projectionId": "formula.design-state-v2", "key": "design_8f3a" }, "errorMatch": "does not exist in package" },
+    { "action": "finding", "id": "G1-domain-data-key-unchecked-at-compile-time", "severity": "divergence", "summary": "projection 依赖 domain-data key 'creative-policy' 在包内不存在，但 loadRawDomainPackage → compileDomainPackage → validateCompiledPackage 全部通过（manifest 无 domainData 字段，编译器无 key 清单可校验）；错误延迟到查询期 domain_data_not_found。Compiled Domain Data 需要包内一等声明（分析文档 §5 G1；xlearn domain-packages 与 audio-platform HarnessSnapshot 是参照实现）。", "related": "分析文档 G1 / v0.3 PRD §6.7" },
+    { "action": "expect-throw", "step": { "action": "expect-business", "source": "formula.undeclared", "key": "design_8f3a" }, "errorMatch": "business_source_missing" },
+    { "action": "finding", "id": "G2-business-source-has-no-package-declaration", "severity": "divergence", "summary": "business 依赖在包内只有 {source, selector}，没有 value schema 与存在性声明；Provider 返回值的形状校验完全靠项目自律（本验证包以 business-sources.json 模拟了 [L2-8] 提案的声明形态并由结构校验执行）。", "related": "design doc v0.2 §11.4 [L2-8] / 分析文档 G2" },
+    { "action": "finding", "id": "W3-authoring-cost", "severity": "info", "summary": "W3『每个静止状态接受全部入站消息类型』的编写成本实测：formula.design 仅 7 种消息 × 4 个静止相位就需要 15 个状态（含 4 个 __reject 瞬态与 3 个 noting/announcing 瞬态）。design doc v0.2 §7.2 R5 的 otherwise:reject 语法糖（[L2-10]）与 PRD-CR-2 的 rejected 处置是消除该成本的正解。", "related": "design doc v0.2 R5 [L2-10] / issue #137" }
+  ]
+}

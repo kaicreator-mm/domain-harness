@@ -1,0 +1,38 @@
+[
+  {
+    "key": "proj_talk_01",
+    "revision": "rev-runstate-talk01-0004",
+    "value": {
+      "executionCursor": {
+        "stage": "t2t",
+        "nodeIndex": 3,
+        "nodeId": "t2t_translate_zh_my"
+      },
+      "status": "AWAITING_REVIEW",
+      "pendingReview": {
+        "reviewCaseId": "review_7d8e9f0a1b2c",
+        "nodeId": "t2t_translate_zh_my",
+        "nextIndex": 4,
+        "checkpoint": "checkpoint_t2t_review"
+      },
+      "compiledPlanRevision": 1,
+      "operationRefs": [
+        {
+          "ref": "media:asr:op_0101",
+          "kind": "asr",
+          "status": "succeeded"
+        },
+        {
+          "ref": "llm:t2t:op_0107",
+          "kind": "llm-turn",
+          "status": "succeeded",
+          "idempotencyKey": "llm:proj_talk_01:t2t_translate_zh_my:chunk_3:9f2c"
+        }
+      ],
+      "lastDurableEvent": {
+        "type": "review_required",
+        "at": "2026-09-20T05:41:00.000Z"
+      }
+    }
+  }
+]

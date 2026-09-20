@@ -1,0 +1,14 @@
+[
+  {
+    "key": "u_mg_001",
+    "revision": "rev-context-0002",
+    "value": {
+      "userId": "u_mg_001",
+      "arrivalWindowDays": 3,
+      "nationality": "CN",
+      "purpose": "business",
+      "housingStatus": "rented_long_term",
+      "hasLocalSim": false
+    }
+  }
+]

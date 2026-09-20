@@ -1,0 +1,13 @@
+{
+  "project": "citechain",
+  "tier": "data-only",
+  "domainId": "citechain",
+  "domainVersion": "0.3.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/citechain.md",
+  "blockers": [
+    "Kernel 信任边界宿主化决策未定（方案 A: Rust kernel sidecar RPC / B: TS 重实现+加载时重验证 / C: 混合）——Confirmed<T> 不可伪造保证只在 A/C 下完整保留",
+    "DeliveryGate 现为空壳（恒返回 []）——实装 legacy LicenseGate 前 deliver 闸不可信",
+    "Tauri 桌面宿主需 Node sidecar 形态（业务逻辑纯 TS 零 native，node:sqlite 已验证可行）"
+  ],
+  "notes": "Citechain 模拟数据包：KnowledgeTask 相位机（latest-wins append）、hard_gate usage pin、修订闭环（delivered→stale→revising，本契约新增的 deliverable E 实例）、canonical truth 内容寻址。"
+}

@@ -1,0 +1,49 @@
+[
+  {
+    "key": "hsk",
+    "revision": "rev-install-hsk-0003",
+    "value": {
+      "domainId": "hsk",
+      "domainVersion": "2026.09-baseline.1",
+      "status": "ACTIVE",
+      "algorithmVersion": "v2.3-local-baseline.1",
+      "minimumRuntimeVersion": "2.3.0",
+      "artifacts": [
+        {
+          "path": "harness/concepts.json",
+          "digest": "sha256:5f2ab9c417e8d3061b9c4e7f0a2d5b8c1e4f7a0b3c6d9e2f5a8b1c4d7e0f3a6b",
+          "size": 184320
+        },
+        {
+          "path": "harness/recipes.json",
+          "digest": "sha256:9c1e4b7a0d3f6c9e2b5a8d1f4c7e0b3a6d9f2c5e8b1a4d7f0c3e6b9a2d5f8c1e",
+          "size": 421888
+        },
+        {
+          "path": "harness/evaluation.json",
+          "digest": "sha256:2b5e8a1d4f7c0b3e6a9d2f5c8b1e4a7d0f3c6b9e2a5d8f1c4b7e0a3d6f9c2b5e",
+          "size": 32768
+        },
+        {
+          "path": "harness/algorithm-defaults.json",
+          "digest": "sha256:7a0d3f6c9b2e5a8d1f4c7b0e3a6d9f2c5b8e1a4d7f0c3b6e9a2d5f8c1b4e7a0d",
+          "size": 2048
+        }
+      ],
+      "installedAt": "2026-09-18T02:11:09.000Z"
+    }
+  },
+  {
+    "key": "jlpt",
+    "revision": "rev-install-jlpt-0001",
+    "value": {
+      "domainId": "jlpt",
+      "domainVersion": "n5-2026.09-baseline.1",
+      "status": "INSTALLED",
+      "algorithmVersion": "v2.3-local-baseline.1",
+      "minimumRuntimeVersion": "2.3.0",
+      "artifacts": [],
+      "installedAt": "2026-09-19T08:40:00.000Z"
+    }
+  }
+]

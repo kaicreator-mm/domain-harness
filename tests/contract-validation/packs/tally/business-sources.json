@@ -1,0 +1,66 @@
+[
+  {
+    "source": "tally.project",
+    "notes": "ProjectSnapshot 摘要（stage/dagRevision/阶段工件 id）。revision=snapshot 乐观并发号，天然单调（B1/B2）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["projectId", "stage", "dagRevision"],
+      "properties": {
+        "projectId": { "type": "string" },
+        "stage": { "type": "string", "enum": ["requirements", "plan", "architecture", "dag_active", "closed"] },
+        "dagRevision": { "type": "string" },
+        "requirementsId": { "type": "string" },
+        "planId": { "type": "string" },
+        "architectureId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "source": "tally.taskGraph",
+    "notes": "全部 TaskNode 状态+依赖边（General Design v0.2 §17 既有映射）。DAG 是业务权威，workflow 只引用 dagRevision（S3）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["dagRevision", "nodes"],
+      "properties": {
+        "dagRevision": { "type": "string" },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["taskId", "status", "deps"],
+            "properties": {
+              "taskId": { "type": "string" },
+              "status": { "type": "string", "enum": ["pending", "ready", "running", "blocked", "interrupted", "accepted", "done"] },
+              "deps": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "tally.authority",
+    "notes": "人类授权决定 append 列表 + pending merge/tag/release 审批（git-authority-policy）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["decisions"],
+      "properties": {
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["taskId", "decision", "actor"],
+            "properties": {
+              "taskId": { "type": "string" },
+              "decision": { "type": "string" },
+              "actor": { "type": "string" },
+              "reason": { "type": "string" },
+              "at": { "type": "string" }
+            }
+          }
+        },
+        "pendingMergeApprovals": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+]

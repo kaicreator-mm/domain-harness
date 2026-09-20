@@ -1,0 +1,7 @@
+{
+  "/tools/confirmCandidates": "handlers/confirm-candidates.mjs",
+  "/tools/saveDraft": "handlers/save-draft.mjs",
+  "/tools/publishPreview": "handlers/publish-preview.mjs",
+  "/tools/publishConfig": "handlers/publish-config.mjs",
+  "/tools/rollbackConfig": "handlers/rollback-config.mjs"
+}

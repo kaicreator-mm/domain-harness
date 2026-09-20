@@ -1,0 +1,90 @@
+[
+  {
+    "toolId": "changeLifecycle",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "journeyStore", "path": "/tools/changeLifecycle", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["journeyId", "target", "commandId"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "target": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "reason": { "type": "string" },
+        "lifecycle": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "toolId": "quoteProvider",
+    "effect": "none",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "fulfillment", "path": "/tools/quoteProvider", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["journeyId", "itemId", "commandId"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "quoteId": { "type": "string" },
+        "totalMinor": { "type": "integer" },
+        "currency": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "toolId": "commitBooking",
+    "effect": "non-idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "fulfillment", "path": "/tools/commitBooking", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["journeyId", "quoteId", "commandId"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "quoteId": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "providerRef": { "type": "string" },
+        "totalMinor": { "type": "integer" },
+        "currency": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    }
+  }
+]

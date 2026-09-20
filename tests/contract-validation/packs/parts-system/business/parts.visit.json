@@ -1,0 +1,16 @@
+[
+  {
+    "key": "visit_2026_09_20_s042",
+    "revision": "rev-visit-0002",
+    "value": {
+      "visitId": "visit_2026_09_20_s042",
+      "shopId": "shop_042",
+      "batchId": "batch_2026_09_20_south",
+      "status": "open",
+      "scheduledDate": "2026-09-20",
+      "routeOrder": 3,
+      "notes": [],
+      "pendingOfflineEvents": 4
+    }
+  }
+]

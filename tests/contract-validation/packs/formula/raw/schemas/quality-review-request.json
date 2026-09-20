@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["commandId", "brief", "headVersionId"],
+  "properties": {
+    "commandId": { "type": "string", "minLength": 1 },
+    "brief": { "type": "string" },
+    "headVersionId": { "type": "string" }
+  }
+}

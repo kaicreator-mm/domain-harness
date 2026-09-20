@@ -1,0 +1,15 @@
+[
+  {
+    "key": "proj_atlas",
+    "revision": "rev-taskgraph-atlas-0001",
+    "value": {
+      "dagRevision": "dag_rev_7",
+      "nodes": [
+        { "taskId": "T001", "status": "done", "deps": [] },
+        { "taskId": "T002", "status": "ready", "deps": ["T001"] },
+        { "taskId": "T003", "status": "pending", "deps": ["T002"] },
+        { "taskId": "T004", "status": "pending", "deps": ["T002"] }
+      ]
+    }
+  }
+]

@@ -1,0 +1,72 @@
+[
+  {
+    "toolId": "dispatchTask",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": {
+      "transport": "http-transport@1",
+      "resourceKey": "controlPlane",
+      "path": "/tools/dispatchTask",
+      "method": "POST"
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": ["projectId", "taskId", "commandId"],
+      "properties": {
+        "projectId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "commandId": { "type": "string" },
+        "runtime": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "commandId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "runId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "toolId": "recordAuthority",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": {
+      "transport": "http-transport@1",
+      "resourceKey": "controlPlane",
+      "path": "/tools/recordAuthority",
+      "method": "POST"
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": ["projectId", "taskId", "decision", "actor", "commandId"],
+      "properties": {
+        "projectId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "decision": { "type": "string", "enum": ["accept", "reject", "rework"] },
+        "actor": { "type": "string" },
+        "reason": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "commandId": { "type": "string" },
+        "recorded": { "type": "integer" },
+        "replayed": { "type": "boolean" }
+      }
+    }
+  }
+]

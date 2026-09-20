@@ -1,0 +1,4 @@
+{
+  "/tools/dispatchTask": "handlers/dispatch-task.mjs",
+  "/tools/recordAuthority": "handlers/record-authority.mjs"
+}

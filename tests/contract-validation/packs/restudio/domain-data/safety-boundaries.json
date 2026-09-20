@@ -1,0 +1,6 @@
+{
+  "neverInferTargetLanguageFromNationality": true,
+  "keyTargetDecisionsMustBeExplicit": true,
+  "llmProposeOnly": "QualityJudge 从不改文本；Target Design 关键决策显式确认",
+  "mockSpineMustStayGreen": true
+}

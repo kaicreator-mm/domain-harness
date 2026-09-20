@@ -1,0 +1,63 @@
+{
+  "id": "journey-01-project-coordination",
+  "description": "Tally E2E（契约草案 §2 tally.project 裁剪切片）：Restore→coordinating；DispatchTask applied/not_ready/already_running 三态结构化结论（R3）；TaskAccepted 经包内确定性 CompletionContract expression gate 评估，verification_passed=false → Missing[] → awaiting_authority（人类权威长期阻塞态）；restart 后等待保持；AuthorityDecision 经 Tool append（commandId 幂等）；Close 终态。",
+  "steps": [
+    { "action": "open", "workflowId": "tally.project", "instanceKey": "proj_atlas", "input": { "projectId": "proj_atlas" }, "expect": { "stateId": "init", "lifecycle": "waiting" } },
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "restore:tally.project:proj_atlas", "type": "Restore", "payload": { "snapshot": { "stage": "dag_active", "dagRevision": "dag_rev_7" } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "coordinating", "lifecycle": "waiting" } },
+    { "action": "expect-projection", "projectionId": "tally.project-state", "key": "proj_atlas", "expect": {
+      "phase": "coordinating",
+      "availableActions": [ { "type": "DispatchTask", "enabled": true } ],
+      "body": { "stage": "dag_active", "dagRevision": "dag_rev_7", "nodeCounts": { "ready": 1, "running": 0, "done": 1 }, "pendingMergeApprovals": ["PR-42"], "decisionCount": 0 }
+    } },
+
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_disp_2", "type": "DispatchTask", "payload": { "commandId": "cmd_disp_2", "taskId": "T002", "runtime": "fake" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "coordinating", "lastResult": { "outcome": "applied", "taskId": "T002", "runId": "run_cmd_disp_2" } } },
+    { "action": "expect-business", "source": "tally.taskGraph", "key": "proj_atlas", "expect": { "nodes": [
+      { "taskId": "T001", "status": "done" },
+      { "taskId": "T002", "status": "running" },
+      { "taskId": "T003", "status": "pending" },
+      { "taskId": "T004", "status": "pending" }
+    ] } },
+
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_disp_3", "type": "DispatchTask", "payload": { "commandId": "cmd_disp_3", "taskId": "T003", "runtime": "fake" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "coordinating", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "not_ready", "commandId": "cmd_disp_3" } } },
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_disp_2b", "type": "DispatchTask", "payload": { "commandId": "cmd_disp_2b", "taskId": "T002", "runtime": "fake" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "lastResult": { "outcome": "rejected", "code": "already_running" } } },
+    { "action": "finding", "id": "R3-dispatch-conflicts-structured", "severity": "info", "summary": "dispatch 冲突（not_ready / already_running）以结构化 rejected 返回，实例保持健康——两阶段提交 claim 段的领域结论不经异常表达（R3），ErrDispatchConflict 语义在契约层成立。" },
+
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_acc_1", "type": "TaskAccepted", "payload": { "commandId": "cmd_acc_1", "taskId": "T002", "facts": { "verification_passed": false, "changeset_frozen": true } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "awaiting_authority", "lastResult": { "satisfied": false, "missing": ["verification_passed"], "taskId": "T002" } } },
+    { "action": "finding", "id": "completion-contract-expression-gate", "severity": "info", "summary": "确定性 CompletionContract 评估以包内 JSONata expression 落地：required facts 字面为 true 才 satisfied，缺失项进 Missing[]，完成永不推断（DD-P4 确定性知识先于 AI）。注意：expression invoke 的 scope 不含 business/domainData——规则只能编译进表达式源码（包内容）或经 Tool；这是 authoring 指南需要写明的边界。" },
+    { "action": "expect-projection", "projectionId": "tally.project-state", "key": "proj_atlas", "expect": {
+      "phase": "awaiting_authority",
+      "availableActions": [ { "type": "AuthorityDecision", "enabled": true } ],
+      "pending": [ { "kind": "human-authority" } ],
+      "lastOutcome": { "satisfied": false }
+    } },
+
+    { "action": "restart" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "awaiting_authority", "lifecycle": "waiting" } },
+    { "action": "finding", "id": "human-authority-wait-survives-restart", "severity": "info", "summary": "长期人工权威阻塞态（awaiting_authority）跨 Runtime 重启保持——『自动化流程必须能长期挂起等待人类决定』的 Tally 硬约束在 Workflow Instance 语义下天然成立。" },
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_disp_9", "type": "DispatchTask", "payload": { "commandId": "cmd_disp_9", "taskId": "T003" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "awaiting_authority", "lastResult": { "outcome": "rejected", "code": "blocked_awaiting_human_authority" } } },
+
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_auth_1", "type": "AuthorityDecision", "payload": { "commandId": "cmd_auth_1", "taskId": "T002", "decision": "rework", "actor": "owner", "reason": "verification evidence insufficient" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "coordinating", "lastResult": { "outcome": "applied", "recorded": 1 } } },
+    { "action": "expect-business", "source": "tally.authority", "key": "proj_atlas", "expect": { "decisions": [ { "taskId": "T002", "decision": "rework", "actor": "owner", "reason": "verification evidence insufficient", "commandId": "cmd_auth_1" } ] } },
+    { "action": "expect-projection", "projectionId": "tally.project-state", "key": "proj_atlas", "expect": { "body": { "decisionCount": 1 } } },
+
+    { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_close_1", "type": "Close", "payload": { "commandId": "cmd_close_1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "expect": { "stateId": "closed", "lifecycle": "completed" } },
+    { "action": "expect-throw", "step": { "action": "send", "to": { "workflowId": "tally.project", "instanceKey": "proj_atlas" }, "messageId": "cmd_after_close", "type": "AuthorityDecision", "payload": { "commandId": "cmd_after_close", "taskId": "T002", "decision": "accept", "actor": "owner" } }, "errorMatch": "cannot accept" },
+    { "action": "finding", "id": "terminal-instance-rejects-new-messages", "severity": "info", "summary": "Close（W5）后实例 completed，新消息在 acceptance 层被拒（target_not_accepting）——实体删除/换代流程（design doc §10.6）的前半段语义可用；terminal 地址复用仍受 [L2-5] 限制。" }
+  ]
+}

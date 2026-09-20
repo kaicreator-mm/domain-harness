@@ -1,0 +1,147 @@
+[
+  {
+    "source": "xlearn.learner",
+    "notes": "learner_state + runtime_metadata（current_task_id 指针恢复校验：status=ISSUED 且 domain/version 仍 active，否则清指针）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "learnerId",
+        "activeDomainId",
+        "activeDomainVersion",
+        "algorithmVersion",
+        "plannerMeta"
+      ],
+      "properties": {
+        "learnerId": {
+          "type": "string"
+        },
+        "activeDomainId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "activeDomainVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "algorithmVersion": {
+          "type": "string"
+        },
+        "currentTaskId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plannerMeta": {
+          "type": "object",
+          "properties": {
+            "dailyNewLimit": {
+              "type": "integer"
+            },
+            "earlyReviewEnabled": {
+              "type": "boolean"
+            },
+            "recentConceptWindow": {
+              "type": "integer"
+            },
+            "todayNewCount": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "xlearn.queue",
+    "notes": "PlannerInput 有界集合（P1 forced→P2 due→P3 new→P4 early）；有界索引查询强制（mobile resource gate，禁全域扫描）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "computedAt",
+        "forced",
+        "due",
+        "dueCount",
+        "newAvailable",
+        "todayNewCount"
+      ],
+      "properties": {
+        "computedAt": {
+          "type": "string"
+        },
+        "forced": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "due": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "dueCount": {
+          "type": "integer"
+        },
+        "newAvailable": {
+          "type": "integer"
+        },
+        "earlyReview": {
+          "type": "integer"
+        },
+        "todayNewCount": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "source": "xlearn.installation",
+    "notes": "domain_package_installation（INSTALLED/ACTIVE/SUPERSEDED；每 domain 至多一个 ACTIVE——部分唯一索引）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "domainId",
+        "domainVersion",
+        "status",
+        "algorithmVersion"
+      ],
+      "properties": {
+        "domainId": {
+          "type": "string"
+        },
+        "domainVersion": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "INSTALLED",
+            "ACTIVE",
+            "SUPERSEDED"
+          ]
+        },
+        "algorithmVersion": {
+          "type": "string"
+        },
+        "minimumRuntimeVersion": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "installedAt": {
+          "type": "string"
+        }
+      }
+    }
+  }
+]

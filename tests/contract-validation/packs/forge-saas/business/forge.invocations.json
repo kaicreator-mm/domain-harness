@@ -1,0 +1,25 @@
+[
+  {
+    "key": "tenant_myanmar_teak",
+    "revision": "rev-inv-0042",
+    "value": {
+      "invocations": [
+        {
+          "invocationId": "inv_gen_501",
+          "kind": "ai-runtime.generate",
+          "status": "unknown",
+          "idempotencyKey": "idem-tenant_myanmar_teak-generation-fp_v28_77a1",
+          "observedAt": "2026-09-20T06:12:44.000Z",
+          "note": "TIMEOUT after accept — 可能已计费；只经 reconcile probe 决定性证据收敛，绝不 blind retry"
+        },
+        {
+          "invocationId": "inv_formula_233",
+          "kind": "formula.image.generate",
+          "status": "succeeded",
+          "idempotencyKey": "fp_v1_0b3e6a9d2f5c8b1e",
+          "observedAt": "2026-09-20T05:40:10.000Z"
+        }
+      ]
+    }
+  }
+]

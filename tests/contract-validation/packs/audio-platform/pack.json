@@ -1,0 +1,14 @@
+{
+  "project": "audio-platform",
+  "tier": "data-only",
+  "domainId": "audio-platform",
+  "domainVersion": "1.6.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/audio-platform.md",
+  "blockers": [
+    "ADR-0005/0028 立场冲突：长寿命 workflow 引擎被明确否定（长状态放 DB，引擎只跑机器尺度短阶段；禁新 job 走 Temporal）——DH 实例严格限定短阶段+信号投递，扩张须新 ADR",
+    "audio-harness 契约冻结（ADR-0033：改冻结面=CONTRACTS_VERSION bump+新 ADR，never a refactor）+ 零第三方依赖——SDK 只能落 packages/ 新包或 apps/ 组合根",
+    "AudioOperation/ActionPlan/DecisionPacket 无持久化（contracts 冻结但零 app 接线）——先补 Run/Step 表；ffmpeg 直写族需内容寻址改造后才可暴露给重试/AI",
+    "Python 宿主：Node sidecar 回环（复用 ops-api TokenVerifier/Idempotency-Key 机制）"
+  ],
+  "notes": "Audio Platform 模拟数据包：自建 Harness（Registry/Compiler/Snapshot/Alias pin）与 SDK 契约的同构映射素材；jobs=执行机制/AudioOperation=产品语义双层纪律；付费副作用 fail-closed（provider_outcome_unknown 不自动重试）。"
+}

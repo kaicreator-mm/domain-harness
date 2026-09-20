@@ -1,0 +1,50 @@
+[
+  {
+    "projectionId": "yishu.knowledge-state",
+    "expression": "( $w := workflows[address.workflowId = 'yishu.knowledge']; $gov := business[source = 'yishu.governance'].value; $cand := business[source = 'yishu.candidates'].value; $last := $w.state.lastResult; { 'key': key, 'phase': $w.state.stateId, 'availableActions': $w.state.stateId = 'curating' ? [ { 'type': 'CandidateConfirmed', 'enabled': $count($cand.candidates) > 0 }, { 'type': 'SaveDraft', 'enabled': true }, { 'type': 'RequestPublish', 'enabled': $gov.draftCount > 0 } ] : $w.state.stateId = 'publish_ready' ? [ { 'type': 'ApprovePublish', 'enabled': true } ] : $w.state.stateId = 'publish_blocked' ? [ { 'type': 'SaveDraft', 'enabled': true }, { 'type': 'RequestPublish', 'enabled': true }, { 'type': 'ApprovePublish', 'enabled': false } ] : [], 'pending': $gov.openReviews > 0 ? [ { 'kind': 'open-reviews' } ] : [], 'lastOutcome': $last.commandId ? $last : null, 'body': { 'activeTag': $gov.activeTag, 'activeRevision': $gov.activeRevision, 'draftCount': $gov.draftCount, 'draftsFingerprint': $gov.draftsFingerprint, 'queueCounts': $gov.queueCounts, 'candidateCount': $count($cand.candidates), 'previewGate': $gov.previewGate, 'previewNewFailures': $gov.previewNewFailures } } )",
+    "dependencies": [
+      { "kind": "workflow", "selector": { "workflowId": "yishu.knowledge" } },
+      { "kind": "business", "source": "yishu.governance", "selector": {} },
+      { "kind": "business", "source": "yishu.candidates", "selector": {} },
+      { "kind": "domain-data", "key": "sampling-policy" }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": ["key", "phase", "availableActions", "pending", "body"],
+      "properties": {
+        "key": { "type": "string" },
+        "phase": { "type": "string" },
+        "availableActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "enabled"],
+            "properties": { "type": { "type": "string" }, "enabled": { "type": "boolean" } }
+          }
+        },
+        "pending": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": { "kind": { "type": "string" }, "since": { "type": "string" } }
+          }
+        },
+        "lastOutcome": { "type": ["object", "null"] },
+        "body": {
+          "type": "object",
+          "properties": {
+            "activeTag": { "type": "string" },
+            "activeRevision": { "type": "number" },
+            "draftCount": { "type": "number" },
+            "draftsFingerprint": { "type": "string" },
+            "queueCounts": { "type": "object" },
+            "candidateCount": { "type": "number" },
+            "previewGate": { "type": ["string", "null"] },
+            "previewNewFailures": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+]

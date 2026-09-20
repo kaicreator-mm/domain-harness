@@ -1,0 +1,19 @@
+{
+  "forbiddenCategories": [
+    "exchange_rate",
+    "military_police",
+    "checkpoints",
+    "conscription",
+    "border_entry_exit"
+  ],
+  "appliesTo": [
+    "api",
+    "fixtures",
+    "correction_channel",
+    "skill_output"
+  ],
+  "hrRefs": [
+    "HR-5",
+    "HR-15"
+  ]
+}

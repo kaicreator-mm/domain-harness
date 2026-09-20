@@ -1,0 +1,7 @@
+{
+  "order": ["zawgyi_encoding", "target_script", "protected_spans", "quantities", "terms", "names"],
+  "zawgyiFailureSkipsRest": true,
+  "noThresholds": true,
+  "appliesToAllResultSources": ["ai", "tm", "cache", "enum", "phrase", "human", "repair"],
+  "machineUsageFailureReturnsSourceBytes": true
+}

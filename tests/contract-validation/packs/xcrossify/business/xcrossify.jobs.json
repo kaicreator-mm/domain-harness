@@ -1,0 +1,18 @@
+[
+  {
+    "key": "u_mg_001:pack_first72",
+    "revision": "rev-jobs-0003",
+    "value": {
+      "records": [
+        {
+          "sourceId": "crawlkit",
+          "rawHash": "sha256:3c7f9a1e5b8d2046c9e1f3a5b7d902468ace13579bdf2468ace13579bdf02468",
+          "status": "PROCESSING",
+          "attempts": 1,
+          "clientRef": "crawl:u_mg_001:step_sim_card:9f2c",
+          "deadline": "2026-09-20T09:30:00.000Z"
+        }
+      ]
+    }
+  }
+]

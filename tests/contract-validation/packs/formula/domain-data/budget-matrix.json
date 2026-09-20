@@ -1,0 +1,9 @@
+{
+  "cells": {
+    "GENERATE": { "imageGen": 3, "llmTurn": 3 },
+    "ADAPT": { "imageGen": 0, "llmTurn": 1 },
+    "LOCAL_EDIT": { "imageGen": 0, "llmTurn": 1 }
+  },
+  "maxLlmAttemptsPerDirection": 3,
+  "zeroCellMeansNeverGenerate": true
+}

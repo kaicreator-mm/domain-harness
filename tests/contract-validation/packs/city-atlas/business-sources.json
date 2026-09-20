@@ -1,0 +1,142 @@
+[
+  {
+    "source": "atlas.taskState",
+    "notes": "设备携带的不可变值对象（服务端刻意不落 Task 表，HR-2）；stage 单向、终态不复活、重做=新 taskToken。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "taskToken",
+        "taskId",
+        "taskVersion",
+        "stage",
+        "history"
+      ],
+      "properties": {
+        "taskToken": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskVersion": {
+          "type": "integer"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "interpreted",
+            "evidence_ready",
+            "evaluated",
+            "action_ready",
+            "handed_off",
+            "user_confirmed",
+            "failed",
+            "corrected"
+          ]
+        },
+        "answers": {
+          "type": "object"
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "evaluation": {
+          "type": "object"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "atlas.proposal",
+    "notes": "ops 信任域提案（base_snapshot 乐观并发；apply 是生产唯一写 main 路径，audit 同事务）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "proposalId",
+        "kind",
+        "state"
+      ],
+      "properties": {
+        "proposalId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "pending_review",
+            "approved",
+            "rejected",
+            "applied"
+          ]
+        },
+        "poiId": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "object"
+        },
+        "baseSnapshot": {
+          "type": "string"
+        },
+        "licenseClass": {
+          "type": "string",
+          "enum": [
+            "main",
+            "odbl"
+          ]
+        },
+        "proposedBy": {
+          "type": "string"
+        },
+        "proposedAt": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "source": "atlas.taskdef",
+    "notes": "已发布 TaskDefinition 快照目录（(task_id,version) 不可变，唯一约束天然幂等）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "latestVersion",
+        "versions"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "latestVersion": {
+          "type": "integer"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "sixPieceSet": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+]

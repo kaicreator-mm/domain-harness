@@ -1,0 +1,19 @@
+{
+  "outcomes": [
+    "SUCCESS",
+    "TIMEOUT",
+    "UNAVAILABLE",
+    "UPSTREAM_REJECTED",
+    "INVALID_RESPONSE",
+    "UNKNOWN"
+  ],
+  "timeoutMapsTo": "unknown（可能已计费，绝不映射 failed/success）",
+  "consumerJobErrorTrichotomy": [
+    "RetryableConsumerError",
+    "TerminalConsumerError",
+    "UnknownOutcomeConsumerError"
+  ],
+  "effectKeyDerivation": "deriveConsumerEffectKey{domain,tenantId,businessKey,inputFingerprint}",
+  "compareBeforeApply": true,
+  "reconcile": "durable scan status=unknown；probe 只读观测；决定性证据（SUCCESS/UPSTREAM_REJECTED/INVALID_RESPONSE）才收敛；TIMEOUT/UNKNOWN 无限期等待；结构上无 blind retry 路径"
+}

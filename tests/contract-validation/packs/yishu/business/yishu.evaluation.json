@@ -1,0 +1,12 @@
+[
+  {
+    "key": "zh-my/medical",
+    "revision": "rev-eval-medical-0001",
+    "value": {
+      "cases": [
+        { "caseId": "case_clinic_term", "requiresTerm": "ဆေးခန်း", "lastPublishedResult": "pass" },
+        { "caseId": "case_ultrasound_term", "requiresTerm": "အာထရာဆောင်း", "lastPublishedResult": "pass" }
+      ]
+    }
+  }
+]

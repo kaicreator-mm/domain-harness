@@ -1,0 +1,16 @@
+{
+  "id": "formula-sim-node",
+  "capabilities": [
+    "crypto-hash-sha256@1",
+    "compiled-package-module@1",
+    "expression-jsonata@1",
+    "http-transport@1",
+    "secure-random@1"
+  ],
+  "bindings": {
+    "crypto-hash-sha256@1": "sim-sha256-binding",
+    "compiled-package-module@1": "sim-package-module-binding",
+    "expression-jsonata@1": "sim-expression-binding",
+    "http-transport@1": "sim-http-binding"
+  }
+}

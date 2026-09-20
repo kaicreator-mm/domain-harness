@@ -1,0 +1,67 @@
+{
+  "id": "journey-01-approval-loop",
+  "description": "Formula E2E（契约草案 §2/§12）：Restore→reviewing；过期审批以结构化 rejected(quality_not_passed) 返回且实例保持健康（R3/R4）；Skill 评审经 Tool 落业务库；restart 后恢复；审批 applied；投影信封（phase/availableActions/pending/lastOutcome/body）与订阅信号。",
+  "steps": [
+    { "action": "open", "workflowId": "formula.design", "instanceKey": "design_8f3a", "input": { "designId": "design_8f3a" }, "expect": { "lifecycle": "waiting", "stateId": "init" } },
+    { "action": "finding", "id": "open-does-not-run-initial-state", "severity": "divergence", "summary": "openInstance 只把实例写在初始状态并标记 waiting，不执行初始状态；实例必须等第一条消息（Restore）才前进——『开通 + Restore』约定（design doc v0.2 §10.4 [L2-5]）是当前唯一可用形态。", "related": "v0.3 PRD §6.5 / design doc L2-5" },
+    { "action": "expect-throw", "step": { "action": "open", "workflowId": "formula.design", "instanceKey": "design_8f3a", "input": { "designId": "design_8f3a" } }, "errorMatch": "duplicate" },
+    { "action": "finding", "id": "open-not-idempotent", "severity": "divergence", "summary": "openInstance 非幂等：重复 ensure/open 抛 duplicate workflow instance 而不是返回既有快照，项目被迫实现先查后开的竞态协议（v0.3 §6.5 要求幂等 provisioning；验收标准 7）。", "related": "v0.3 PRD §6.5 / design doc L2-5" },
+    { "action": "send", "to": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "messageId": "restore:formula.design:design_8f3a", "type": "Restore", "payload": { "snapshot": { "approvalStatus": "reviewing", "headVersionId": "ver_0007", "brief": "Aurora 工业传感器推广落地页主视觉" } }, "expectAck": { "status": "accepted" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "expect": { "stateId": "reviewing", "lifecycle": "waiting" } },
+    { "action": "open", "workflowId": "formula.generation", "instanceKey": "design_8f3a", "input": { "designId": "design_8f3a" } },
+    { "action": "send", "to": { "workflowId": "formula.generation", "instanceKey": "design_8f3a" }, "messageId": "restore:formula.generation:design_8f3a", "type": "Restore", "payload": { "snapshot": { "activeJobId": "job_gen_011" } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.generation", "instanceKey": "design_8f3a" }, "expect": { "stateId": "idle" } },
+    { "action": "watch-projection", "as": "designWatch", "projectionId": "formula.design-state", "key": "design_8f3a" },
+    { "action": "expect-projection", "projectionId": "formula.design-state", "key": "design_8f3a", "expect": {
+      "key": "design_8f3a",
+      "phase": "reviewing",
+      "availableActions": [
+        { "type": "RequestQualityReview", "enabled": true },
+        { "type": "ApproveDesign", "enabled": false }
+      ],
+      "pending": [ { "kind": "generation", "since": "2026-09-20T07:41:00.000Z" } ],
+      "body": {
+        "approvalStatus": "reviewing",
+        "title": "Aurora B2B 落地页主视觉",
+        "headVersionId": "ver_0007",
+        "artifactCount": 3,
+        "latestReview": { "verdict": "needs_work", "score": 71 },
+        "generationPhase": "idle",
+        "qualityLadder": ["schema", "layout", "deterministic-visual", "opencv", "light-vision", "llm-critic"]
+      }
+    } },
+    { "action": "send", "to": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "messageId": "cmd_appr_1", "type": "ApproveDesign", "payload": { "commandId": "cmd_appr_1" } },
+    { "action": "settle" },
+    { "action": "expect-disposition", "target": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "messageId": "cmd_appr_1", "expect": { "disposition": "processed" } },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "expect": { "stateId": "reviewing", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "quality_not_passed", "commandId": "cmd_appr_1" } } },
+    { "action": "finding", "id": "R3-R4-rejection-pattern-works", "severity": "info", "summary": "领域拒绝无毒化：approveDesign Tool 事务内重校验最新评审（needs_work）→ 返回结构化 rejected(quality_not_passed)；done 路由按 outcome 分流回 reviewing，lastResult 保留拒绝结果供 facade outcome() 映射（design doc v0.2 §7.2 R1–R4 编写约定在冻结 SDK 上验证通过）。" },
+    { "action": "expect-projection", "projectionId": "formula.design-state", "key": "design_8f3a", "expect": { "lastOutcome": { "outcome": "rejected", "code": "quality_not_passed", "commandId": "cmd_appr_1" } } },
+    { "action": "send", "to": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "messageId": "cmd_qr_1", "type": "RequestQualityReview", "payload": { "commandId": "cmd_qr_1", "brief": "Aurora 工业传感器推广落地页主视觉；受众为采购工程师", "headVersionId": "ver_0007" } },
+    { "action": "settle" },
+    { "action": "expect-ai-calls", "skillId": "design-critique", "count": 1 },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "expect": { "stateId": "reviewing" } },
+    { "action": "expect-business", "source": "formula.reviews", "key": "design_8f3a", "expect": { "reviews": [
+      { "reviewId": "rev_0009", "verdict": "needs_work", "score": 71 },
+      { "reviewId": "rev_0011", "verdict": "certified", "score": 92 }
+    ] } },
+    { "action": "finding", "id": "skill-result-only-via-tool", "severity": "info", "summary": "Domain AI produce-result-only 验证通过：design-critique Skill 的结构化输出（verdict/score/findings，outputSchema 强校验+journal）只经 recordQualityReview Tool 进入业务库；AI 调用次数=1，Skill 无业务写路径。" },
+    { "action": "expect-projection", "projectionId": "formula.design-state", "key": "design_8f3a", "expect": {
+      "availableActions": [
+        { "type": "RequestQualityReview", "enabled": true },
+        { "type": "ApproveDesign", "enabled": true }
+      ],
+      "body": { "latestReview": { "verdict": "certified", "score": 92 } }
+    } },
+    { "action": "restart" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "expect": { "stateId": "reviewing", "lifecycle": "waiting" } },
+    { "action": "expect-ai-calls", "skillId": "design-critique", "count": 1 },
+    { "action": "send", "to": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "messageId": "cmd_appr_2", "type": "ApproveDesign", "payload": { "commandId": "cmd_appr_2" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "formula.design", "instanceKey": "design_8f3a" }, "expect": { "stateId": "approved_st", "lastResult": { "outcome": "applied", "commandId": "cmd_appr_2", "approvedVersionId": "ver_0007" } } },
+    { "action": "expect-business", "source": "formula.design", "key": "design_8f3a", "expect": { "approvalStatus": "approved", "approvedVersionId": "ver_0007" } },
+    { "action": "expect-projection", "projectionId": "formula.design-state", "key": "design_8f3a", "expect": { "phase": "approved_st", "lastOutcome": { "outcome": "applied", "commandId": "cmd_appr_2" }, "body": { "approvalStatus": "approved" } } },
+    { "action": "expect-watch", "as": "designWatch", "minSignals": 1 }
+  ]
+}

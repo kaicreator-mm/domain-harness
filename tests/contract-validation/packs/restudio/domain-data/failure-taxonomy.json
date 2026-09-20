@@ -1,0 +1,22 @@
+{
+  "classes": [
+    "transient",
+    "unavailable",
+    "invalid_request",
+    "policy_rejection",
+    "quality_failure",
+    "unsupported_capability",
+    "human_action_required"
+  ],
+  "operationResult": [
+    "Completed",
+    "Pending(operation_ref)",
+    "Failed(error_class)"
+  ],
+  "mapping": {
+    "transient": "可重试（同幂等键）",
+    "quality_failure": "回评审/设计相位",
+    "human_action_required": "静止等待",
+    "unavailable": "blocked 相位（不换路重试——单 provider 无 fallback）"
+  }
+}

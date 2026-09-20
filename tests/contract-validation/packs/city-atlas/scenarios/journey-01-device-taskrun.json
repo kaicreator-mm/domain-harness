@@ -1,0 +1,186 @@
+{
+  "id": "journey-01-device-taskrun",
+  "description": "City Atlas 目标旅程（data-only）：设备 R 实例 task_7f3k9x 从 evaluated 推进；VERIFY_FIRST+OPENING_EVIDENCE_STALE 五元组全部可见；Handoff 只记 launched；终局仅由用户显式 ReportOutcome；治理面 applyProposal base_snapshot CAS。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "atlas.taskrun",
+      "instanceKey": "task_7f3k9x",
+      "input": {
+        "taskToken": "task_7f3k9x"
+      },
+      "expect": {
+        "stateId": "init"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "messageId": "restore:atlas.taskrun:task_7f3k9x",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "stage": "evaluated"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "expect": {
+        "stateId": "evaluated"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "atlas.taskrun-state",
+      "key": "task_7f3k9x",
+      "expect": {
+        "phase": "evaluated",
+        "body": {
+          "decision": "VERIFY_FIRST",
+          "reasonCodes": [
+            "OPENING_EVIDENCE_STALE"
+          ],
+          "missingFacts": [
+            "availability_today"
+          ]
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "five-tuple-visible",
+      "severity": "info",
+      "summary": "决策+原因码+动作+缺失事实+降级五元组必须在 UI 可见（PRD v0.4 §5.1）——投影 body 原样携带，不折叠不美化。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "messageId": "cmd_actions_1",
+      "type": "RequestActions",
+      "payload": {
+        "commandId": "cmd_actions_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "expect": {
+        "stateId": "action_ready"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "messageId": "cmd_handoff_1",
+      "type": "Handoff",
+      "payload": {
+        "commandId": "cmd_handoff_1",
+        "cardId": "call_clinic"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "expect": {
+        "stateId": "handed_off"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "launched-is-not-completed",
+      "severity": "info",
+      "summary": "Handoff 只记录 launched（外部世界无回调）；实例停在 handed_off 静止态等待用户显式 ReportOutcome——绝不自动推进终局（AD-05）。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "messageId": "outcome:user_confirmed",
+      "type": "ReportOutcome",
+      "payload": {
+        "outcome": "user_confirmed",
+        "commandId": "outcome_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "atlas.taskrun",
+        "instanceKey": "task_7f3k9x"
+      },
+      "expect": {
+        "lifecycle": "completed"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "atlas.proposal",
+        "instanceKey": "prop_2041"
+      },
+      "messageId": "cmd_apply_1",
+      "type": "ApplyApproved",
+      "payload": {
+        "commandId": "cmd_apply_1",
+        "baseSnapshot": "snap_STALE"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "atlas.proposal",
+        "instanceKey": "prop_2041"
+      },
+      "expect": {
+        "lastResult": {
+          "outcome": "rejected",
+          "code": "stale_base"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "privacy-no-server-user-instance",
+      "severity": "divergence",
+      "summary": "HR-2 结构性约束：public API 零身份，atlas.taskrun 实例只能活在设备（SQLCipher kv）；治理面实例（atlas.proposal/atlas.taskdef/atlas.batch）只能在 ops 信任域（化名员工账号）。任何「服务端用户维度 Entity」设计在此项目不可行——双 host profile 是契约的一部分。",
+      "related": "契约草案 §10"
+    }
+  ]
+}

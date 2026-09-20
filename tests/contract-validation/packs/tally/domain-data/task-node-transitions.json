@@ -1,0 +1,12 @@
+{
+  "transitions": {
+    "pending": ["ready"],
+    "ready": ["running"],
+    "running": ["blocked", "interrupted", "accepted"],
+    "blocked": ["ready", "interrupted"],
+    "interrupted": ["ready"],
+    "accepted": ["done"],
+    "done": []
+  },
+  "restartNeverAutoReady": true
+}

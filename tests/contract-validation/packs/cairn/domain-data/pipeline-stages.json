@@ -1,0 +1,22 @@
+{
+  "stages": [
+    "ASSESS_GAPS",
+    "PLAN",
+    "EXECUTE_OPERATION",
+    "OBSERVE",
+    "COMPILE",
+    "PROPOSE",
+    "REVIEW_GATE"
+  ],
+  "closedSet": true,
+  "noRegistrableStepMechanism": "明确「不是 generic workflow engine，没有任何可注册/可反射的步骤机制」",
+  "reviewGateSpecial": "唯一不带 durable 副作用的步骤；APPROVE→SETTLED（outcome 由 deriveGateOutcome 确定性推导：zero knowledge⇒EMPTY、FAILED effect⇒PARTIAL）；ESCALATE→WAITING_HUMAN",
+  "boundedAdvance": {
+    "maxSteps": 64,
+    "stopReasons": [
+      "WAITING",
+      "TERMINAL",
+      "STEP_LIMIT"
+    ]
+  }
+}

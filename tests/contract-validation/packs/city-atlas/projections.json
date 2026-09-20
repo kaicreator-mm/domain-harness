@@ -1,0 +1,50 @@
+[
+  {
+    "projectionId": "atlas.taskrun-state",
+    "expression": "( $t := business[source = 'atlas.taskState'].value; { 'key': key, 'phase': $t.stage, 'availableActions': $t.stage = 'evaluated' ? [ { 'type': 'RequestActions', 'enabled': true } ] : $t.stage = 'action_ready' ? [ { 'type': 'Handoff', 'enabled': true } ] : $t.stage = 'handed_off' ? [ { 'type': 'ReportOutcome', 'enabled': true } ] : [], 'pending': [], 'lastOutcome': null, 'body': { 'decision': $t.evaluation.decision, 'reasonCodes': $t.evaluation.reasonCodes, 'missingFacts': $t.evaluation.missingFacts, 'answers': $t.answers } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "atlas.taskState",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "task-stage-rules"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

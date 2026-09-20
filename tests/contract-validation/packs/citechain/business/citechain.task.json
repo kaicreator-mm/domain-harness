@@ -1,0 +1,15 @@
+[
+  {
+    "key": "task_4c1e",
+    "revision": "rev-task-4c1e-0006",
+    "value": {
+      "taskId": "task_4c1e",
+      "title": "缅甸投资法修订对合资条款的影响简报",
+      "harnessId": "structured-comparison",
+      "phase": "reviewing",
+      "intent": "为法务团队产出可追溯的对比简报",
+      "createdAtMs": 1789000000000,
+      "latestConfirmedAtMs": 1789600000000
+    }
+  }
+]

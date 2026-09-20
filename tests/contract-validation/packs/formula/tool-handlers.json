@@ -1,0 +1,6 @@
+{
+  "/tools/approveDesign": "handlers/approve-design.mjs",
+  "/tools/recordQualityReview": "handlers/record-quality-review.mjs",
+  "/tools/startGeneration": "handlers/start-generation.mjs",
+  "/tools/recordArtifact": "handlers/record-artifact.mjs"
+}

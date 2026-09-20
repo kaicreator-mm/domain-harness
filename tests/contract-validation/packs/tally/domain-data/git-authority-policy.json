@@ -1,0 +1,5 @@
+{
+  "humanAuthorityRequired": ["merge", "tag", "release"],
+  "replayKeyMandatory": true,
+  "note": "GitHub state never becomes a second workflow authority; results flow back as GitActionRecord facts."
+}

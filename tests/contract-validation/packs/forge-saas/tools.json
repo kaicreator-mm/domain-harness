@@ -1,0 +1,150 @@
+[
+  {
+    "toolId": "runGeneration",
+    "effect": "non-idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "tenantId",
+        "inputFingerprint",
+        "requestedChannels",
+        "requestedLocales"
+      ],
+      "properties": {
+        "tenantId": {
+          "type": "string"
+        },
+        "inputFingerprint": {
+          "type": "string"
+        },
+        "requestedChannels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedLocales": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "SUCCESS",
+            "TIMEOUT",
+            "UNAVAILABLE",
+            "UPSTREAM_REJECTED",
+            "INVALID_RESPONSE",
+            "UNKNOWN"
+          ]
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "operationId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "AI Runtime generate；域校验 validateCanonicalOutput（白名单字段+完整覆盖 channels×locales+结构性拒绝 provider/model/tier 字段 INV-22）；重试复用同 idempotencyKey；deriveExecutionEventId={tenantId}-generation-{inputFingerprint} 收敛身份。"
+  },
+  {
+    "toolId": "deploySnapshot",
+    "effect": "non-idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "siteId",
+        "snapshotId"
+      ],
+      "properties": {
+        "siteId": {
+          "type": "string"
+        },
+        "snapshotId": {
+          "type": "string"
+        },
+        "cfProject": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "SUCCESS",
+            "FAILED",
+            "UNKNOWN"
+          ]
+        },
+        "deploymentUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "renderSite→validateHreflangCluster→CF Pages（snapshotId 回显 compare-before-apply INV-21）；成功后 PublishLog+Page.published+Audit 单事务（INV-28/30）。"
+  },
+  {
+    "toolId": "compileTradeCreativeBrief",
+    "effect": "none",
+    "executionKind": "expression",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "approvedFacts",
+        "intentPolicies"
+      ],
+      "properties": {
+        "approvedFacts": {
+          "type": "array"
+        },
+        "intentPolicies": {
+          "type": "object"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "version",
+        "source"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": [
+            "forge-trade-creative-brief-v2952"
+          ]
+        },
+        "source": {
+          "type": "object"
+        },
+        "sections": {
+          "type": "array"
+        }
+      }
+    },
+    "notes": "编译即批准（Object.freeze 纯数据）；证据不足直接 throw TRADE_CREATIVE_EVIDENCE_INSUFFICIENT；同 pin ⇒ 字节相同 + fingerprint 相等（INV-20/21，Projection-not-invention）。"
+  }
+]

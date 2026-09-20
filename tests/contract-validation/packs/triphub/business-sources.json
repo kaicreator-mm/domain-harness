@@ -1,0 +1,84 @@
+[
+  {
+    "source": "triphub.journey",
+    "notes": "JourneyDto（三维正交状态 + items；schemaVersion 语义）。lifecycle/commitment/publication 绝不合并为单一枚举。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["journeyId", "title", "lifecycle", "commitment", "publication", "items"],
+      "properties": {
+        "journeyId": { "type": "string" },
+        "title": { "type": "string" },
+        "destinationSummary": { "type": "string" },
+        "lifecycle": { "type": "string", "enum": ["draft", "planned", "active", "completed", "archived"] },
+        "commitment": { "type": "string", "enum": ["idea", "tentative", "committed"] },
+        "publication": { "type": "string", "enum": ["private", "unlisted", "shared", "public"] },
+        "shareTruthMode": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["itemId", "title", "state"],
+            "properties": {
+              "itemId": { "type": "string" },
+              "title": { "type": "string" },
+              "state": { "type": "string", "enum": ["wish", "bookable", "locked", "booked", "in_trip", "completed", "cancelled"] }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "triphub.jobs",
+    "notes": "报价/交易运行数据（S2：流程数据进业务库；deadline 供 P2 超时调度器扫描，[G6] 临时约定）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["quotes"],
+      "properties": {
+        "quotes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["quoteId", "itemId", "status"],
+            "properties": {
+              "quoteId": { "type": "string" },
+              "itemId": { "type": "string" },
+              "status": { "type": "string", "enum": ["active", "expired", "consumed"] },
+              "totalMinor": { "type": "integer" },
+              "currency": { "type": "string" },
+              "issuedAt": { "type": "string" },
+              "expiresAt": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "triphub.bookings",
+    "notes": "交易凭据（TxnReceipt 语义：provider_ref + 精确 minor units；费用归一化发生在事实平面）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["bookings"],
+      "properties": {
+        "bookings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["bookingId", "itemId", "quoteId", "status"],
+            "properties": {
+              "bookingId": { "type": "string" },
+              "itemId": { "type": "string" },
+              "quoteId": { "type": "string" },
+              "status": { "type": "string", "enum": ["committed", "cancelled"] },
+              "providerRef": { "type": "string" },
+              "totalMinor": { "type": "integer" },
+              "currency": { "type": "string" },
+              "committedAt": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+]

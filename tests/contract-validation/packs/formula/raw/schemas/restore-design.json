@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "required": ["snapshot"],
+  "properties": {
+    "snapshot": {
+      "type": "object",
+      "required": ["approvalStatus"],
+      "properties": {
+        "approvalStatus": { "type": "string", "enum": ["drafting", "reviewing", "approved"] },
+        "headVersionId": { "type": "string" },
+        "brief": { "type": "string" }
+      }
+    }
+  }
+}

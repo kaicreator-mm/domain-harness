@@ -1,0 +1,55 @@
+[
+  {
+    "projectionId": "xcrossify.taskpack-state",
+    "expression": "( $p := business[source = 'xcrossify.taskpack'].value; $j := business[source = 'xcrossify.jobs'].value; { 'key': key, 'phase': $p.progress.isComplete ? 'complete' : 'in_progress', 'availableActions': [ { 'type': 'TransitionStep', 'enabled': true } ], 'pending': [ $j.records[status = 'PROCESSING' or status = 'RECEIVED'].{ 'kind': 'crawl', 'since': deadline } ], 'lastOutcome': null, 'body': { 'progress': $p.progress, 'currentStepId': $p.progress.currentStepId, 'definitionVersion': $p.definitionVersion } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "xcrossify.taskpack",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "xcrossify.jobs",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "first-72-hours-definition"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

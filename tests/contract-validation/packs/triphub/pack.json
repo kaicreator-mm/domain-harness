@@ -1,0 +1,8 @@
+{
+  "project": "triphub",
+  "tier": "executable",
+  "domainId": "triphub",
+  "domainVersion": "0.3.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/triphub.md",
+  "notes": "Executable validation of the TripHub contract draft (trimmed slice): triphub.journey E workflow with the frozen three-dimensional lifecycle transition table enforced by a project-bound Tool, a transaction preview/confirm loop with business-side quote deadlines (S2), QuoteExpired ingress, and restart across the loop. Invariants respected: zero-LLM transaction path, frozen transition table, quote never cached as fact."
+}

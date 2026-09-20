@@ -1,0 +1,60 @@
+[
+  {
+    "projectionId": "restudio.workspace-state",
+    "expression": "( $p := business[source = 'restudio.project'].value; $r := business[source = 'restudio.runState'].value; $d := business[source = 'restudio.design'].value; { 'key': key, 'phase': $p.productPhase, 'availableActions': $r.status = 'AWAITING_REVIEW' ? [ { 'type': 'ResolveReview', 'enabled': true } ] : $p.productPhase = 'PLAN_COMPILED' ? [ { 'type': 'StartProduction', 'enabled': true } ] : $p.productPhase = 'READY' ? [ { 'type': 'Deliver', 'enabled': true } ] : [], 'pending': $r.status = 'AWAITING_REVIEW' ? [ { 'kind': 't2t-review', 'since': $r.lastDurableEvent.at } ] : [], 'lastOutcome': null, 'body': { 'title': $p.title, 'runStatus': $r.status, 'cursor': $r.executionCursor, 'specAccepted': $d.spec.accepted, 'pins': $p.pins, 'stageOutputs': $p.stageOutputs, 'artifactCount': $count($p.artifacts) } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "restudio.project",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "restudio.runState",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "restudio.design",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "evidence-policy"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

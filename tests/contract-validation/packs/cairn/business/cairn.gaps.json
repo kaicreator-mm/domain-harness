@@ -1,0 +1,20 @@
+[
+  {
+    "key": "run_9f3a",
+    "revision": "rev-gaps-9f3a-0004",
+    "value": {
+      "gaps": [
+        {
+          "gapId": "gap:run_9f3a:dosage-interaction",
+          "topic": "dosage-interaction",
+          "status": "OPEN"
+        },
+        {
+          "gapId": "gap:run_9f3a:preparation-method",
+          "topic": "preparation-method",
+          "status": "RESOLVED"
+        }
+      ]
+    }
+  }
+]

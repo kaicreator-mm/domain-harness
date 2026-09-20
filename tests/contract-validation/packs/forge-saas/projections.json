@@ -1,0 +1,57 @@
+[
+  {
+    "projectionId": "forge.page-state",
+    "expression": "( $pg := business[source = 'forge.page'].value; $inv := business[source = 'forge.invocations'].value; { 'key': key, 'phase': $pg.status, 'availableActions': $pg.status = 'gated' ? [ { 'type': 'RequestPublish', 'enabled': $pg.publishThrottle.used < $pg.publishThrottle.limit } ] : [], 'pending': [ $inv.invocations[status = 'unknown'].{ 'kind': 'unknown-invocation', 'since': observedAt } ], 'lastOutcome': null, 'body': { 'status': $pg.status, 'throttleUsed': $pg.publishThrottle.used, 'throttleLimit': $pg.publishThrottle.limit, 'pinnedRelease': $pg.pinnedRelease, 'unknownInvocations': $count($inv.invocations[status = 'unknown']) } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "forge.page",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "forge.invocations",
+        "selector": {
+          "key": "tenant_myanmar_teak"
+        }
+      },
+      {
+        "kind": "domain-data",
+        "key": "throttle-policy"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

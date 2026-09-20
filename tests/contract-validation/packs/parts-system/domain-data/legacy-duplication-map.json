@@ -1,0 +1,14 @@
+{
+  "excludeFromTruthExtraction": [
+    "consignment_balances(itemKey 级) 与 consignment_stock(SKU 级) 并存",
+    "sku_inventory.inbound 是死桶（never read）",
+    "skus.stockStatus 是可售性 gate 而非数量",
+    "purchase_orders 是 legacy/候选件组，与 delivery_notes 经 DeliveryFact 双读去重"
+  ],
+  "documentsClientAuthoritative": [
+    "Quote",
+    "WorkOrder",
+    "Receipt"
+  ],
+  "note": "维修事实/装机基础由客户端权威文档派生——DH 不得假设服务端=唯一真相。"
+}

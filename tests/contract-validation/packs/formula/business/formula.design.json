@@ -1,0 +1,28 @@
+[
+  {
+    "key": "design_8f3a",
+    "revision": "rev-design-8f3a-0001",
+    "value": {
+      "designId": "design_8f3a",
+      "title": "Aurora B2B 落地页主视觉",
+      "brief": "Aurora 工业传感器推广落地页主视觉；受众为采购工程师；强调精度与可靠性；品牌主色 #0B3D91；需包含 CTA『索取选型手册』。",
+      "headVersionId": "ver_0007",
+      "docHash": "sha256:9f2c41ae77e5d3c19b0f4a2e8d6c3b5a7f9e1d2c4b6a8f0e1d3c5b7a9f2e4d6c",
+      "selectedArtifactId": "art_0003",
+      "approvalStatus": "reviewing"
+    }
+  },
+  {
+    "key": "design_b17c",
+    "revision": "rev-design-b17c-0001",
+    "value": {
+      "designId": "design_b17c",
+      "title": "Aurora 夜景工业风变体",
+      "brief": "在 design_8f3a 已批准构图基础上探索夜景工业风格变体；保持主体与栅格系统不变。",
+      "headVersionId": "ver_0002",
+      "docHash": "sha256:4d1e8a2b6c9f0357e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708",
+      "selectedArtifactId": null,
+      "approvalStatus": "drafting"
+    }
+  }
+]

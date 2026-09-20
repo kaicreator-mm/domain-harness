@@ -1,0 +1,55 @@
+[
+  {
+    "projectionId": "parts.shop-state",
+    "expression": "( $s := business[source = 'parts.shopState'].value; $r := business[source = 'parts.requests'].value; { 'key': key, 'phase': 'operational', 'availableActions': [ { 'type': 'PrepareRequest', 'enabled': $count($r.requests[status = 'open']) > 0 } ], 'pending': [ $r.requests[status = 'prepared'].{ 'kind': 'awaiting-delivery', 'since': promisedDate } ], 'lastOutcome': null, 'body': { 'throughServerSeq': $s.throughServerSeq, 'receivable': $s.ourReceivable, 'waitingPartCount': $count($r.requests[status != 'fulfilled' and status != 'cancelled' and status != 'expired']), 'negativeStockSignals': $count($s.parts[qtyOnHand < 0]) } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "parts.shopState",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "parts.requests",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "offer-rules"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "required": ["snapshot"],
+  "properties": {
+    "snapshot": {
+      "type": "object",
+      "required": ["lifecycle", "commitment", "publication"],
+      "properties": {
+        "lifecycle": { "type": "string", "enum": ["draft", "planned", "active", "completed", "archived"] },
+        "commitment": { "type": "string", "enum": ["idea", "tentative", "committed"] },
+        "publication": { "type": "string", "enum": ["private", "unlisted", "shared", "public"] }
+      }
+    }
+  }
+}

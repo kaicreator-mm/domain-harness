@@ -1,0 +1,62 @@
+[
+  {
+    "projectionId": "audio.operation-state",
+    "expression": "( $op := business[source = 'audio.operation'].value; $job := business[source = 'audio.jobs'].value; $reg := business[source = 'audio.harnessRegistry'].value; { 'key': key, 'phase': $op.state, 'availableActions': $op.state = 'planned' ? [ { 'type': 'ApprovePlan', 'enabled': true }, { 'type': 'Execute', 'enabled': true } ] : $op.state = 'running' ? [ { 'type': 'RequestCancel', 'enabled': true } ] : [], 'pending': $job.state = 'running' or $job.state = 'queued' ? [ { 'kind': 'job', 'since': $job.queuedAt } ] : [], 'lastOutcome': null, 'body': { 'operationKind': $op.kind, 'planSteps': $count($op.plan.steps), 'approvalRequiredSteps': $count($op.plan.steps[requiresApproval = true]), 'harnessSnapshotId': $op.harnessPin.snapshotId, 'aliasActive': $reg.aliases[kind = 'active'].versionId, 'jobState': $job.state, 'cancelRequested': $job.cancelRequested } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "audio.operation",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "audio.jobs",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "audio.harnessRegistry",
+        "selector": {
+          "key": "delivery-qc"
+        }
+      },
+      {
+        "kind": "domain-data",
+        "key": "capability-catalog"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

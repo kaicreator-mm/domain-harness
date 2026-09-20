@@ -1,0 +1,49 @@
+[
+  {
+    "key": "task_7f3k9x",
+    "revision": "rev-taskstate-7f3k9x-0004",
+    "value": {
+      "taskToken": "task_7f3k9x",
+      "taskId": "find_pharmacy_or_clinic",
+      "taskVersion": 3,
+      "stage": "evaluated",
+      "answers": {
+        "need": "children_fever",
+        "urgency": "today",
+        "area": "Insein"
+      },
+      "evidenceRefs": [
+        {
+          "kind": "poi",
+          "providerId": "clp",
+          "ref": "clp:poi:9912",
+          "observedAt": "2026-09-20T01:10:00.000Z",
+          "expiresAt": "2026-09-20T07:10:00.000Z"
+        }
+      ],
+      "evaluation": {
+        "decision": "VERIFY_FIRST",
+        "reasonCodes": [
+          "OPENING_EVIDENCE_STALE"
+        ],
+        "actions": [
+          {
+            "actionId": "call_clinic",
+            "kind": "CALL",
+            "labelKey": "action.call"
+          }
+        ],
+        "missingFacts": [
+          "availability_today"
+        ],
+        "degradations": []
+      },
+      "history": [
+        "draft",
+        "interpreted",
+        "evidence_ready",
+        "evaluated"
+      ]
+    }
+  }
+]

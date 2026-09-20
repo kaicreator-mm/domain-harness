@@ -1,0 +1,5 @@
+{
+  "/tools/changeLifecycle": "handlers/change-lifecycle.mjs",
+  "/tools/quoteProvider": "handlers/quote-provider.mjs",
+  "/tools/commitBooking": "handlers/commit-booking.mjs"
+}

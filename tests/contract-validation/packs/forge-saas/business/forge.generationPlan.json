@@ -1,0 +1,38 @@
+[
+  {
+    "key": "tenant_myanmar_teak",
+    "revision": "rev-plan-fingerprint-9c1e",
+    "value": {
+      "harnessPlanFingerprint": "fp_v29_9c1e4b7a0d3f6c9e",
+      "generationState": "needs_input",
+      "requiredFacts": [
+        {
+          "path": "supplier.certifications.fsc",
+          "state": "confirmed"
+        },
+        {
+          "path": "product.material.moisture_content",
+          "state": "confirmed"
+        },
+        {
+          "path": "supplier.trade_terms.moq",
+          "state": "candidate"
+        },
+        {
+          "path": "product.lead_time_days",
+          "state": "unknown"
+        }
+      ],
+      "missingFields": [
+        "product.lead_time_days",
+        "supplier.trade_terms.moq"
+      ],
+      "templateRelease": {
+        "templateKey": "b2b-product-page",
+        "version": 12,
+        "releaseHash": "sha256:ae37c9f10b5d2e8467a1c3f5b7d90e2468ac1357b9df2468ac1357b9df0e2468",
+        "status": "current"
+      }
+    }
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "key": "task_4c1e",
+    "revision": "rev-usages-4c1e-0003",
+    "value": {
+      "usages": [
+        {
+          "id": "usage_01",
+          "mode": "hard_gate",
+          "providerId": "cairn",
+          "knowledgeRef": "fact:sha256-a17f3c9e",
+          "snapshotRef": "snap:sha256-77b2e0f1",
+          "provenanceRef": "prov:2026-09-18T04:00:00Z",
+          "owner": {
+            "kind": "segment",
+            "id": "seg_02"
+          }
+        },
+        {
+          "id": "usage_02",
+          "mode": "context",
+          "providerId": "crawlkit",
+          "knowledgeRef": "doc:mical-2026-amendment",
+          "owner": {
+            "kind": "task",
+            "id": "task_4c1e"
+          }
+        }
+      ]
+    }
+  }
+]

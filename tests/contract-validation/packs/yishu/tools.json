@@ -1,0 +1,143 @@
+[
+  {
+    "toolId": "confirmCandidates",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "yishuStore", "path": "/tools/confirmCandidates", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["scopeKey", "candidateIds", "commandId"],
+      "properties": {
+        "scopeKey": { "type": "string" },
+        "candidateIds": { "type": "array", "items": { "type": "string" } },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "commandId": { "type": "string" },
+        "confirmed": { "type": "integer" },
+        "draftsFingerprint": { "type": "string" },
+        "replayed": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "toolId": "saveDraft",
+    "effect": "idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "yishuStore", "path": "/tools/saveDraft", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["scopeKey", "path", "content", "commandId"],
+      "properties": {
+        "scopeKey": { "type": "string" },
+        "path": { "type": "string" },
+        "content": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "commandId": { "type": "string" },
+        "draftsFingerprint": { "type": "string" },
+        "draftCount": { "type": "integer" }
+      }
+    }
+  },
+  {
+    "toolId": "publishPreview",
+    "effect": "none",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "yishuStore", "path": "/tools/publishPreview", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["scopeKey", "commandId"],
+      "properties": {
+        "scopeKey": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "gate", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "gate": { "type": "string", "enum": ["pass", "blocked"] },
+        "newFailures": { "type": "array", "items": { "type": "string" } },
+        "draftsFingerprint": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "toolId": "publishConfig",
+    "effect": "non-idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "gitStore", "path": "/tools/publishConfig", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["scopeKey", "expectedFingerprint", "commandId"],
+      "properties": {
+        "scopeKey": { "type": "string" },
+        "expectedFingerprint": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "reason": { "type": "string" },
+        "tag": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "toolId": "rollbackConfig",
+    "effect": "non-idempotent",
+    "executionKind": "remote-http-json@1",
+    "bindingCapability": "http-transport@1",
+    "requiredCapabilities": ["http-transport@1"],
+    "config": { "transport": "http-transport@1", "resourceKey": "gitStore", "path": "/tools/rollbackConfig", "method": "POST" },
+    "inputSchema": {
+      "type": "object",
+      "required": ["scopeKey", "tag", "commandId"],
+      "properties": {
+        "scopeKey": { "type": "string" },
+        "tag": { "type": "string" },
+        "commandId": { "type": "string" }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": ["outcome", "commandId"],
+      "properties": {
+        "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+        "code": { "type": "string" },
+        "tag": { "type": "string" },
+        "activeRevision": { "type": "integer" },
+        "commandId": { "type": "string" }
+      }
+    }
+  }
+]

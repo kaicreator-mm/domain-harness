@@ -1,0 +1,35 @@
+[
+  {
+    "key": "local-default",
+    "revision": "rev-queue-0119",
+    "value": {
+      "computedAt": "2026-09-20T06:30:00.000Z",
+      "forced": [
+        {
+          "taskId": "local:hsk:2026.09-baseline.1:recipe-hsk3-listen-07:r3",
+          "conceptId": "c_hsk3_listen_07",
+          "skillType": "LISTENING",
+          "runtimeState": "REINTEGRATING"
+        }
+      ],
+      "due": [
+        {
+          "taskId": "local:hsk:2026.09-baseline.1:recipe-hsk1-reading-02:r8",
+          "conceptId": "c_hsk1_reading_02",
+          "skillType": "READING",
+          "dueAt": "2026-09-20"
+        },
+        {
+          "taskId": "local:hsk:2026.09-baseline.1:recipe-hsk2-listen-05:r4",
+          "conceptId": "c_hsk2_listen_05",
+          "skillType": "LISTENING",
+          "dueAt": "2026-09-20"
+        }
+      ],
+      "dueCount": 12,
+      "newAvailable": 20,
+      "earlyReview": 3,
+      "todayNewCount": 7
+    }
+  }
+]

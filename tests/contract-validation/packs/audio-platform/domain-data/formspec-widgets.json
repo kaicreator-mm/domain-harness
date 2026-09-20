@@ -1,0 +1,28 @@
+{
+  "widgetClosedSet": 15,
+  "presentationRule": "只允许 inert lowercase snake_case 标量",
+  "forbiddenPresentationKeys": [
+    "html",
+    "script",
+    "javascript",
+    "js",
+    "code",
+    "eval",
+    "expression",
+    "template",
+    "style",
+    "src",
+    "href",
+    "url",
+    "action",
+    "formaction",
+    "iframe",
+    "object",
+    "embed",
+    "link",
+    "meta"
+  ],
+  "valueTypesExcludeObject": "结构化决策走 decision_table/comparison widget",
+  "serverIsSubmissionAuthority": true,
+  "plannerFallback": "FormPlanner 任何失败（异常或非法输出）降级确定性 form.fallback.confirm-goal；服务端永不崩、永不渲染未验证 planner 数据"
+}

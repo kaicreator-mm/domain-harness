@@ -1,0 +1,19 @@
+[
+  {
+    "key": "local-default",
+    "revision": "rev-learner-0042",
+    "value": {
+      "learnerId": "local-default",
+      "activeDomainId": "hsk",
+      "activeDomainVersion": "2026.09-baseline.1",
+      "algorithmVersion": "v2.3-local-baseline.1",
+      "currentTaskId": "local:hsk:2026.09-baseline.1:recipe-hsk3-listen-07:r3",
+      "plannerMeta": {
+        "dailyNewLimit": 20,
+        "earlyReviewEnabled": true,
+        "recentConceptWindow": 3,
+        "todayNewCount": 7
+      }
+    }
+  }
+]

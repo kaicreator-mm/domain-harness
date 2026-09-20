@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["commandId", "taskId"],
+  "properties": {
+    "commandId": { "type": "string" },
+    "taskId": { "type": "string" },
+    "runtime": { "type": "string", "enum": ["fake", "codex", "dsh"] }
+  }
+}

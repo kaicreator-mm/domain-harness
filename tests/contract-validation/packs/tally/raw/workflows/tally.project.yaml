@@ -1,0 +1,116 @@
+# tally.project — 项目级命令入口 E workflow（契约草案 §2 的裁剪切片）
+# 宪法映射：Active TaskDAG 保持业务权威（tally.taskGraph 业务源），
+# workflow 只承载推进/执行语义（S3）。CompletionContract 评估是包内
+# 确定性 expression gate（DD-P4：确定性知识先于 AI）。awaiting_authority
+# 是可跨重启的长期人工阻塞态（人类权威不可绕过）。
+# 裁剪说明：stage 推进（requirements/plan/architecture accept）与 replan
+# 相位未纳入本验证切片；Restore 固定路由 coordinating（dag_active）。
+initial: init
+states:
+  init:
+    on:
+      Restore:
+        schema: schemas/restore-project.json
+        routes:
+          - target: coordinating
+
+  coordinating:
+    on:
+      Restore:
+        schema: schemas/restore-project.json
+        routes: [{ target: coordinating__reject }]
+      DispatchTask:
+        schema: schemas/dispatch-task.json
+        routes: [{ target: dispatching }]
+      TaskAccepted:
+        schema: schemas/task-accepted.json
+        routes: [{ target: evaluating }]
+      AuthorityDecision:
+        schema: schemas/authority-decision.json
+        routes: [{ target: recording_authority }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  coordinating__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_coordinating", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: coordinating }]
+
+  dispatching:
+    invoke:
+      tool: dispatchTask
+      input: '{ "projectId": address.instanceKey, "taskId": state.lastMessage.taskId, "runtime": state.lastMessage.runtime, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: coordinating }]
+      error: [{ target: failed }]
+
+  evaluating:
+    # 确定性 CompletionContract 评估：required facts 必须字面为 true；
+    # 缺失/为 false 进 Missing[]；完成永不推断（completion-contract-rules）。
+    invoke:
+      expr: >-
+        ( $f := state.lastMessage.facts;
+          $missing := $append(
+            $not($f.verification_passed = true) ? ['verification_passed'] : [],
+            $not($f.changeset_frozen = true) ? ['changeset_frozen'] : []);
+          { "taskId": state.lastMessage.taskId,
+            "commandId": state.lastMessage.commandId,
+            "satisfied": $count($missing) = 0,
+            "missing": $missing } )
+    on:
+      done:
+        - target: announcing_accepted
+          when: "result.satisfied = true"
+        - target: awaiting_authority
+      error: [{ target: failed }]
+
+  announcing_accepted:
+    # 裁剪说明：完整契约中此状态经 appendOutcome Tool 落 CompletionFacts
+    # （M4 证据），再发 DAGAdvanced 通知；验证切片只保留结构化 applied 结果。
+    invoke:
+      expr: '{ "outcome": "applied", "taskId": state.lastMessage.taskId, "commandId": state.lastMessage.commandId, "completion": "satisfied" }'
+    on:
+      done: [{ target: coordinating }]
+
+  awaiting_authority:
+    on:
+      Restore:
+        schema: schemas/restore-project.json
+        routes: [{ target: awaiting_authority__reject }]
+      DispatchTask:
+        schema: schemas/dispatch-task.json
+        routes: [{ target: awaiting_authority__reject }]
+      TaskAccepted:
+        schema: schemas/task-accepted.json
+        routes: [{ target: awaiting_authority__reject }]
+      AuthorityDecision:
+        schema: schemas/authority-decision.json
+        routes: [{ target: recording_authority }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  awaiting_authority__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "blocked_awaiting_human_authority", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: awaiting_authority }]
+
+  recording_authority:
+    invoke:
+      tool: recordAuthority
+      input: '{ "projectId": address.instanceKey, "taskId": state.lastMessage.taskId, "decision": state.lastMessage.decision, "actor": state.lastMessage.actor, "reason": state.lastMessage.reason, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: coordinating }]
+      error: [{ target: failed }]
+
+  failed:
+    on:
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  closed:
+    final: true

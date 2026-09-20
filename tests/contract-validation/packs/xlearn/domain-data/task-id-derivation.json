@@ -1,0 +1,5 @@
+{
+  "localTaskId": "local:<domainId>:<domainVersion>:<recipeId>:r<reviewCount>",
+  "remoteTaskId": "remote:<uuid>",
+  "note": "本地任务 ID 确定性可重算（materialization 幂等的根基）；远程任务注入前经三重 re-check（active domain/version、concept algorithm_version、current_task_id 空闲）。"
+}

@@ -1,0 +1,13 @@
+{
+  "project": "parts-system",
+  "tier": "data-only",
+  "domainId": "parts",
+  "domainVersion": "1.0.3-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/parts-system.md",
+  "blockers": [
+    "仓库宪法：反框架不变量（无新 ADR 不引入新引擎/第二聚合）——落地前须走 SOURCE_CONFLICT/ADR 流程",
+    "单写进程硬约束：Runtime 宿主必须与 NestJS API 同进程（TS 进程内 [G3] 绑定是理想场景，但 runner 需 node 宿主进程内组装模式）",
+    "设备端（Capacitor）第一阶段不接 DH：expo 适配器不覆盖 Capacitor；packages/offline 四性质钱/量代码不动"
+  ],
+  "notes": "Parts System 模拟数据包：事件脊柱之上的 shop fold 余额、PartRequest（承诺基线冻结）、配送 visit/note（离线迟到）。domain-data 含 trust gate 冻结词表、Offer 六类、寄售结算公式与遗留重复警戒清单。"
+}

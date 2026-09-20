@@ -1,0 +1,159 @@
+{
+  "id": "journey-01-first-72-hours",
+  "description": "xcrossify 目标旅程（data-only，外部运行时形态）：Restore→stepping；步骤转移冻结表拒绝非法转移；crawl 提交→awaiting_crawl→台账恢复→抽卡（Skill propose+确定性校验）；新鲜度只携带原始时间戳。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "xcrossify.taskpack",
+      "instanceKey": "u_mg_001:pack_first72",
+      "input": {
+        "userId": "u_mg_001",
+        "packId": "pack_first72"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "messageId": "restore:taskpack:u_mg_001:first72",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "currentStepId": "step_sim_card",
+          "pendingCrawl": true
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "expect": {
+        "stateId": "awaiting_crawl"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "xcrossify.taskpack-state",
+      "key": "u_mg_001:pack_first72",
+      "expect": {
+        "body": {
+          "currentStepId": "step_sim_card",
+          "definitionVersion": "first-72-hours@1"
+        },
+        "pending": [
+          {
+            "kind": "crawl"
+          }
+        ]
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "messageId": "cmd_trans_1",
+      "type": "TransitionStep",
+      "payload": {
+        "commandId": "cmd_trans_1",
+        "stepId": "step_visa_ready",
+        "target": "IN_PROGRESS"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "expect": {
+        "lastResult": {
+          "outcome": "rejected",
+          "code": "ILLEGAL_TRANSITION"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "done-not-implicitly-reopened",
+      "severity": "info",
+      "summary": "DONE 步骤不可隐式重开（ILLEGAL_TRANSITION）——重开只能走纠错闭环（TaskCorrection append-only + 一次性复核），转移表冻结语义在契约层成立。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "messageId": "crawl:u_mg_001:step_sim_card:9f2c",
+      "type": "CrawlCompleted",
+      "payload": {
+        "clientRef": "crawl:u_mg_001:step_sim_card:9f2c",
+        "rawHash": "sha256:3c7f9a1e5b8d2046c9e1f3a5b7d902468ace13579bdf2468ace13579bdf02468",
+        "items": 3
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "expect": {
+        "stateId": "stepping"
+      }
+    },
+    {
+      "action": "expect-business",
+      "source": "xcrossify.jobs",
+      "key": "u_mg_001:pack_first72",
+      "expect": {
+        "records": [
+          {
+            "status": "STORED"
+          }
+        ]
+      }
+    },
+    {
+      "action": "finding",
+      "id": "ledger-crash-recovery",
+      "severity": "info",
+      "summary": "ProcessingRecord 台账语义保留：持久化意图（receive）→干活（begin 认领崩溃遗留）→持久化结论；可重试失败永不变成 UNCHANGED；终态短路按既有结论应答——这是仓库内唯一现成的 durable 可恢复执行骨架，DH 迁移直接复用。"
+    },
+    {
+      "action": "finding",
+      "id": "freshness-never-persisted",
+      "severity": "info",
+      "summary": "投影 pending 只携带 deadline/observedAt/expiresAt 原始值；SATISFIED/MISSING/STALE/UNKNOWN_FRESHNESS 四态判定发生在读路径（now 的函数）——「存下来的新鲜度必然会说谎」纪律进契约。"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xcrossify.taskpack",
+        "instanceKey": "u_mg_001:pack_first72"
+      },
+      "expect": {
+        "stateId": "stepping"
+      }
+    }
+  ]
+}

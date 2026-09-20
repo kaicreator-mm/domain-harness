@@ -1,0 +1,27 @@
+{
+  "fixedThreeStage": [
+    "X2T",
+    "T2T",
+    "T2X"
+  ],
+  "allowedShape": "1 X2T + 有序 T2T 链 + 受控 fork/merge + 并行 T2X 扇出",
+  "forbidden": [
+    "任意拓扑/DAG 编辑器",
+    "用户可执行代码进 Harness"
+  ],
+  "compileRules": {
+    "exactlyOneEnabledX2T": true,
+    "sourceKindSupported": true,
+    "targetMatch": true,
+    "targetLanguageSinksToNodeParams": true,
+    "reviewModeHumanApprovalPromotesToNodeReview": true,
+    "pauseAfterX2TDefault": false
+  },
+  "pinDiscipline": [
+    "harnessId",
+    "harnessVersion",
+    "specRevision",
+    "contentIrVersion",
+    "productionRuleRefs"
+  ]
+}

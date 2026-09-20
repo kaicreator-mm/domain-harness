@@ -1,0 +1,39 @@
+[
+  {
+    "key": "proj_talk_01",
+    "revision": "rev-project-talk01-0008",
+    "value": {
+      "projectId": "proj_talk_01",
+      "status": "paused",
+      "productPhase": "PLAN_COMPILED",
+      "title": "创始人访谈视频 → 双语文章 + 精华短视频",
+      "sourceX": {
+        "type": "video",
+        "path": "D:/sources/interview_2026_09.mp4",
+        "contentHash": "sha256:1a2b3c4d5e6f708192a3b4c5d6e7f80192a3b4c5d6e7f80192a3b4c5d6e7f801",
+        "registeredAt": "2026-09-19T03:00:00.000Z"
+      },
+      "stageOutputs": {
+        "x2t": {
+          "present": true,
+          "segments": 148,
+          "durationMs": 2874000
+        },
+        "t2t": {
+          "present": false
+        },
+        "t2x": {
+          "present": false
+        }
+      },
+      "artifacts": [],
+      "pins": {
+        "harnessId": "technical-video-localization",
+        "harnessVersion": "1.0.0",
+        "specId": "spec_9a1b2c3d4e5f",
+        "specRevision": 2,
+        "planId": "plan_5f6e7d8c9b0a"
+      }
+    }
+  }
+]

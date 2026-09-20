@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["snapshot"],
+  "properties": {
+    "snapshot": {
+      "type": "object",
+      "required": ["activeJobId"],
+      "properties": {
+        "activeJobId": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

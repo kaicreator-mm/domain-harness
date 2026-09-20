@@ -1,0 +1,7 @@
+{
+  "zeroLlmInTransactionPath": true,
+  "confirmRequiredBeforeCommit": true,
+  "quoteTtlSeconds": 900,
+  "quoteNeverCachedAsFact": true,
+  "commitIsHighImpact": "Intent -> Quote -> Preview -> Validate -> User Confirm -> Commit -> Result"
+}

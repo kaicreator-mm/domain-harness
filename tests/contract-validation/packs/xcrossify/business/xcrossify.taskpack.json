@@ -1,0 +1,53 @@
+[
+  {
+    "key": "u_mg_001:pack_first72",
+    "revision": "rev-pack-first72-0006",
+    "value": {
+      "packId": "pack_first72",
+      "userId": "u_mg_001",
+      "definitionVersion": "first-72-hours@1",
+      "steps": [
+        {
+          "id": "step_visa_ready",
+          "order": 1,
+          "state": "DONE",
+          "titleKey": "first72.visa.title"
+        },
+        {
+          "id": "step_sim_card",
+          "order": 2,
+          "state": "IN_PROGRESS",
+          "titleKey": "first72.sim.title"
+        },
+        {
+          "id": "step_currency_basics",
+          "order": 3,
+          "state": "TODO",
+          "titleKey": "first72.currency.title"
+        },
+        {
+          "id": "step_transport_card",
+          "order": 4,
+          "state": "TODO",
+          "titleKey": "first72.transport.title"
+        },
+        {
+          "id": "step_emergency_contacts",
+          "order": 5,
+          "state": "BLOCKED",
+          "blockedReason": "EVIDENCE_MISSING",
+          "titleKey": "first72.emergency.title"
+        }
+      ],
+      "progress": {
+        "total": 5,
+        "todo": 2,
+        "inProgress": 1,
+        "done": 1,
+        "blocked": 1,
+        "isComplete": false,
+        "currentStepId": "step_sim_card"
+      }
+    }
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "project": "city-atlas",
+  "tier": "data-only",
+  "domainId": "atlas",
+  "domainVersion": "0.4.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/city-atlas.md",
+  "blockers": [
+    "双宿主切分：设备面（RN/expo）+ 治理面（Python FastAPI 需 Node sidecar [G3 回环]）——runner 单宿主暂不覆盖",
+    "HR-2 隐私红线：服务端不得持有用户维度实例；设备实例 RuntimeStore 需 SQLCipher 加密方案确认",
+    "上游 CLP/AI Runtime/CrawlKit 全部 BLOCKED_EXTERNAL（binding 缺失 fail-closed，不得以 fixture 冒充交付）"
+  ],
+  "notes": "City Atlas 模拟数据包：设备侧 TaskState 值对象（9 态单向、客户端携带）+ 治理侧提案/发布数据。domain-data 取自 v2 阶段决策表、FRESHNESS_POLICIES_V1 与内容红线（HR-5/15）。"
+}

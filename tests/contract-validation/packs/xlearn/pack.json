@@ -1,0 +1,13 @@
+{
+  "project": "xlearn",
+  "tier": "data-only",
+  "domainId": "xlearn",
+  "domainVersion": "2.3.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/xlearn.md",
+  "blockers": [
+    "G3: packageStore/learningStore 设备本地写需要 expo 注册绑定（本 runner 为 node 宿主）",
+    "G1: domain-packages 的 harness artifacts 是 Compiled Domain Data 参照实现——等待 manifest domainData 声明后升级 executable",
+    "generation jobs 持久化在 Go 后端缺失（[G6] 前保持同步 + UNCERTAIN 拒绝语义）"
+  ],
+  "notes": "XLearn 模拟数据包：设备侧学习运行时（learner/queue/installation）+ domain-package 治理数据。domain-data 取自仓库 domain-packages/hsk/2026.09-baseline.1 的真实结构（algorithm-defaults/planner 规则/任务 id 派生）。"
+}

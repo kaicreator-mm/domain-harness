@@ -1,0 +1,73 @@
+{
+  "id": "journey-01-lifecycle-and-txn",
+  "description": "TripHub E2E（契约草案 §2/§9.5 裁剪切片）：Restore→drafting；冻结转移表拒绝非法 jump（draft→active）；lifecycle 推进；交易循环 quote→preview→QuoteExpired(Ingress)→重新报价→过期报价 commit 被 Tool 重校验拒绝→新报价 commit applied（booking+item state）；restart；in-trip 拒绝交易命令；completed→Close 终态。",
+  "steps": [
+    { "action": "open", "workflowId": "triphub.journey", "instanceKey": "journey_01", "input": { "journeyId": "journey_01" }, "expect": { "stateId": "init" } },
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "restore:triphub.journey:journey_01", "type": "Restore", "payload": { "snapshot": { "lifecycle": "draft", "commitment": "idea", "publication": "private" } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "drafting", "lifecycle": "waiting" } },
+    { "action": "expect-projection", "projectionId": "triphub.journey-state", "key": "journey_01", "expect": {
+      "phase": "drafting",
+      "availableActions": [ { "type": "ChangeLifecycle", "enabled": true } ],
+      "pending": [],
+      "body": { "lifecycle": "draft", "commitment": "idea", "publication": "private", "itemCount": 3, "bookedCount": 0, "bookingCount": 0, "activeQuoteCount": 0 }
+    } },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_lc_1", "type": "ChangeLifecycle", "payload": { "commandId": "cmd_lc_1", "target": "active" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "drafting", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "illegal_transition", "commandId": "cmd_lc_1" } } },
+    { "action": "finding", "id": "frozen-transition-table-rejection", "severity": "info", "summary": "draft→active 的非法 lifecycle jump 被冻结转移表（compiled domain data）拒绝为结构化 rejected(illegal_transition)，实例保持健康——invariant #5 与 R3 在契约层同时成立。" },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_lc_2", "type": "ChangeLifecycle", "payload": { "commandId": "cmd_lc_2", "target": "planned" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "planned_st" } },
+    { "action": "expect-business", "source": "triphub.journey", "key": "journey_01", "expect": { "lifecycle": "planned" } },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_txn_1", "type": "TxnIntent", "payload": { "commandId": "cmd_txn_1", "itemId": "item_hotel_1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "txn_previewing" } },
+    { "action": "expect-business", "source": "triphub.jobs", "key": "journey_01", "expect": { "quotes": [ { "quoteId": "quote_001", "itemId": "item_hotel_1", "status": "active", "totalMinor": 45000, "currency": "MMK" } ] } },
+    { "action": "expect-projection", "projectionId": "triphub.journey-state", "key": "journey_01", "expect": { "phase": "txn_previewing", "availableActions": [ { "type": "TxnConfirm", "enabled": true }, { "type": "TxnIntent", "enabled": true } ], "pending": [ { "kind": "txn-preview" } ], "body": { "activeQuoteCount": 1 } } },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "quote:quote_001:expired", "type": "QuoteExpired", "payload": { "quoteId": "quote_001" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "planned_st" } },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_txn_2", "type": "TxnIntent", "payload": { "commandId": "cmd_txn_2", "itemId": "item_hotel_1" } },
+    { "action": "settle" },
+    { "action": "expect-business", "source": "triphub.jobs", "key": "journey_01", "expect": { "quotes": [ { "quoteId": "quote_001", "status": "expired" }, { "quoteId": "quote_002", "status": "active", "totalMinor": 45500 } ] } },
+    { "action": "advance-clock", "seconds": 1000 },
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_txnc_2", "type": "TxnConfirm", "payload": { "commandId": "cmd_txnc_2", "quoteId": "quote_002" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "planned_st", "lastResult": { "outcome": "rejected", "code": "quote_expired", "commandId": "cmd_txnc_2" } } },
+    { "action": "expect-business", "source": "triphub.bookings", "key": "journey_01", "expect": { "bookings": [] } },
+    { "action": "finding", "id": "quote-deadline-revalidated-in-tool", "severity": "info", "summary": "过期报价的 TxnConfirm 在 commitBooking Tool 事务内重校验 deadline 后被结构化拒绝（quote_expired），不产生任何商业效果——§16『mutation 前重校验权威事实』成立。注意 deadline 目前是业务数据+Tool 校验（[G6] 持久定时器缺失的临时约定）；QuoteExpired 消息由 P2 超时调度器投递的约定在场景中以显式 send 模拟。" },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_txn_3", "type": "TxnIntent", "payload": { "commandId": "cmd_txn_3", "itemId": "item_hotel_1" } },
+    { "action": "settle" },
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_txnc_3", "type": "TxnConfirm", "payload": { "commandId": "cmd_txnc_3", "quoteId": "quote_003" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "planned_st", "lastResult": { "outcome": "applied", "bookingId": "bk_001", "providerRef": "liteapi-sim-quote_003", "totalMinor": 46000 } } },
+    { "action": "expect-business", "source": "triphub.bookings", "key": "journey_01", "expect": { "bookings": [ { "bookingId": "bk_001", "itemId": "item_hotel_1", "quoteId": "quote_003", "status": "committed", "totalMinor": 46000, "currency": "MMK" } ] } },
+    { "action": "expect-business", "source": "triphub.journey", "key": "journey_01", "expect": { "items": [ { "itemId": "item_hotel_1", "state": "booked" }, { "itemId": "item_flight_1", "state": "wish" }, { "itemId": "item_boat_1", "state": "wish" } ] } },
+    { "action": "expect-projection", "projectionId": "triphub.journey-state", "key": "journey_01", "expect": { "body": { "bookedCount": 1, "bookingCount": 1, "activeQuoteCount": 0 } } },
+
+    { "action": "restart" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "planned_st", "lifecycle": "waiting" } },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_lc_3", "type": "ChangeLifecycle", "payload": { "commandId": "cmd_lc_3", "target": "active" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "experiencing" } },
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_txn_9", "type": "TxnIntent", "payload": { "commandId": "cmd_txn_9", "itemId": "item_boat_1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "experiencing", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "not_applicable_in_experiencing" } } },
+
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_lc_4", "type": "ChangeLifecycle", "payload": { "commandId": "cmd_lc_4", "target": "completed" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "completed_st" } },
+    { "action": "send", "to": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "messageId": "cmd_close_1", "type": "Close", "payload": { "commandId": "cmd_close_1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "triphub.journey", "instanceKey": "journey_01" }, "expect": { "stateId": "closed", "lifecycle": "completed" } },
+    { "action": "finding", "id": "zero-llm-txn-path", "severity": "info", "summary": "交易全路径（quote→preview→confirm→commit）零 Skill/零 LLM：只有确定性 Tool 与业务数据校验——invariant #1（交易平面零 LLM）在契约结构上成立；Skill 仅存在于规划/修复/记忆相位（契约草案 §8，本切片未含）。" }
+  ]
+}

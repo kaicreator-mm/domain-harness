@@ -1,0 +1,17 @@
+{
+  "cityLocation": {
+    "contractMajor": 1,
+    "freshnessPolicyRecheck": "provider 未报新鲜度即拒收"
+  },
+  "yishu": {
+    "contractDate": "2026-09-01",
+    "integrityRecheck": "交付前本地独立重算（占位符残留/受保护值逐字节/数字多重集），失败 502 不编造兜底"
+  },
+  "crawlkit": {
+    "contractVersion": "1.0.0",
+    "clientRefIdempotent": true,
+    "asyncSemantics": "202/QUEUED/RUNNING = 尚未产生结果（null），暂无结果不是失败"
+  },
+  "errorNormalizationClasses": 9,
+  "retryPolicy": "仅瞬时三类有界重试（3 次 200ms→2s）+ 失败限流器（5 次短路 30s）"
+}

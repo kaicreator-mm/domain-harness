@@ -1,0 +1,55 @@
+[
+  {
+    "projectionId": "cairn.run-state",
+    "expression": "( $r := business[source = 'cairn.run'].value; $g := business[source = 'cairn.gaps'].value; { 'key': key, 'phase': $r.status, 'availableActions': $r.status = 'WAITING_HUMAN' ? [ { 'type': 'ReviewDecide', 'enabled': true } ] : $r.status = 'PLANNING' or $r.status = 'RUNNING' ? [ { 'type': 'ContinueRun', 'enabled': true } ] : [], 'pending': $r.status = 'WAITING_HUMAN' ? [ { 'kind': 'human-review' } ] : $r.status = 'WAITING_MODEL' ? [ { 'kind': 'model-release' } ] : [], 'lastOutcome': null, 'body': { 'goal': $r.goal, 'stage': $r.stage, 'planRound': $r.planRound, 'outcome': $r.outcome, 'unresolvedGaps': $count($g.gaps[status = 'OPEN' or status = 'PLANNED' or status = 'IN_PROGRESS']), 'progressCounters': $r.progressCounters, 'waitingReason': $r.waitingReason, 'pins': $r.pins } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "cairn.run",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "cairn.gaps",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "run-fsm"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

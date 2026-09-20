@@ -1,0 +1,176 @@
+[
+  {
+    "source": "parts.shopState",
+    "notes": "per-shop 确定性账本 fold（packages/offline 同一代码设备/服务端共用）；qtyOnHand 可为负=信号不是错误，永不 clamp；throughServerSeq=checkpoint 边界。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "shopId",
+        "throughServerSeq",
+        "parts",
+        "ledger"
+      ],
+      "properties": {
+        "shopId": {
+          "type": "string"
+        },
+        "throughServerSeq": {
+          "type": "integer"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "itemKey",
+              "qtyOnHand"
+            ],
+            "properties": {
+              "itemKey": {
+                "type": "string"
+              },
+              "qtyOnHand": {
+                "type": "integer"
+              },
+              "reserved": {
+                "type": "integer"
+              },
+              "waitingPlates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "ledger": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "consignment": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "ourReceivable": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "source": "parts.requests",
+    "notes": "PartRequest 摘要（≠Order：不产生应收不动库存）；承诺基线 promisedDate/basis/policyRevision 在 markPrepared 同事务冻结永不重写（DOM-001）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "requests"
+      ],
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "requestId",
+              "itemKey",
+              "qty",
+              "status"
+            ],
+            "properties": {
+              "requestId": {
+                "type": "string"
+              },
+              "itemKey": {
+                "type": "string"
+              },
+              "qty": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "prepared",
+                  "fulfilled",
+                  "cancelled",
+                  "expired"
+                ]
+              },
+              "qualificationSource": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "technician-confirmed",
+                  "diagnosis-confirmed",
+                  "fitment-session",
+                  null
+                ]
+              },
+              "promisedDate": {
+                "type": "string"
+              },
+              "basis": {
+                "type": "object"
+              },
+              "reservedEventId": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "parts.visit",
+    "notes": "ShopVisit（open→completed；由 visit.started/completed 事件物化；离线 note 迟到抵达经宽限窗判定）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "visitId",
+        "shopId",
+        "status"
+      ],
+      "properties": {
+        "visitId": {
+          "type": "string"
+        },
+        "shopId": {
+          "type": "string"
+        },
+        "batchId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "completed"
+          ]
+        },
+        "scheduledDate": {
+          "type": "string"
+        },
+        "routeOrder": {
+          "type": "integer"
+        },
+        "notes": {
+          "type": "array"
+        },
+        "pendingOfflineEvents": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "key": "design_8f3a",
+    "revision": "rev-artifacts-8f3a-0001",
+    "value": {
+      "artifacts": [
+        { "artifactId": "art_0001", "frozenHash": "sha256:a11f0c9e7d2b46358091acdef02134556789abcdef0123456789abcdef01", "format": "png", "createdAt": "2026-09-19T09:12:00.000Z", "jobId": "job_gen_008" },
+        { "artifactId": "art_0002", "frozenHash": "sha256:b22e1d0f8e3c57469102bdfe0132456678901bcdef2345678901cdef2", "format": "png", "createdAt": "2026-09-19T14:40:00.000Z", "jobId": "job_gen_009" },
+        { "artifactId": "art_0003", "frozenHash": "sha256:c33f2e1a9f4d6857a213ce0f12435677890123cdef3456789012def3", "format": "svg", "createdAt": "2026-09-20T07:05:00.000Z", "jobId": "job_gen_010" }
+      ]
+    }
+  },
+  {
+    "key": "design_b17c",
+    "revision": "rev-artifacts-b17c-0001",
+    "value": { "artifacts": [] }
+  }
+]

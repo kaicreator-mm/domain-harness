@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": ["commandId", "prompt"],
+  "properties": {
+    "commandId": { "type": "string", "minLength": 1 },
+    "prompt": { "type": "string", "minLength": 1 }
+  }
+}

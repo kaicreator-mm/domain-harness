@@ -1,0 +1,20 @@
+[
+  {
+    "key": "journey_01",
+    "revision": "rev-journey-01-0001",
+    "value": {
+      "journeyId": "journey_01",
+      "title": "仰光-茵莱湖 10 日行程",
+      "destinationSummary": "Yangon → Inle Lake",
+      "lifecycle": "draft",
+      "commitment": "idea",
+      "publication": "private",
+      "shareTruthMode": "planned",
+      "items": [
+        { "itemId": "item_hotel_1", "title": "茵莱湖观景酒店 2 晚", "state": "wish" },
+        { "itemId": "item_flight_1", "title": "仰光-黑海航班", "state": "wish" },
+        { "itemId": "item_boat_1", "title": "茵莱湖包船一日游", "state": "wish" }
+      ]
+    }
+  }
+]

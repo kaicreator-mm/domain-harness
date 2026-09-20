@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["commandId", "path", "content"],
+  "properties": {
+    "commandId": { "type": "string" },
+    "path": { "type": "string", "minLength": 1 },
+    "content": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "required": ["verdict", "score", "findings"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["certified", "needs_work"] },
+    "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "findings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": ["commandId", "expectedFingerprint"],
+  "properties": {
+    "commandId": { "type": "string" },
+    "expectedFingerprint": { "type": "string" }
+  }
+}

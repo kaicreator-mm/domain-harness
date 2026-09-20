@@ -1,0 +1,170 @@
+[
+  {
+    "source": "forge.page",
+    "notes": "Page/Translation/GateRun/节流账本聚合；PageStatus 七态由 transitionStatus 单一实现推进（BLK-003 单一属主）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "pageId",
+        "siteId",
+        "slug",
+        "status"
+      ],
+      "properties": {
+        "pageId": {
+          "type": "string"
+        },
+        "siteId": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "translated",
+            "gated",
+            "needs_review",
+            "blocked",
+            "queued",
+            "published"
+          ]
+        },
+        "translations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "publishThrottle": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string"
+            },
+            "used": {
+              "type": "integer"
+            },
+            "limit": {
+              "type": "integer"
+            }
+          }
+        },
+        "pinnedRelease": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "source": "forge.generationPlan",
+    "notes": "HarnessExecutionPlanV29（UI 与执行边界消费同一投影——One semantic source）；generationState 四值 + requiredFactStates（confirmed/candidate/unknown/conflicted）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "harnessPlanFingerprint",
+        "generationState",
+        "requiredFacts"
+      ],
+      "properties": {
+        "harnessPlanFingerprint": {
+          "type": "string"
+        },
+        "generationState": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "needs_input",
+            "needs_review",
+            "blocked"
+          ]
+        },
+        "requiredFacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "state"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "confirmed",
+                  "candidate",
+                  "unknown",
+                  "conflicted"
+                ]
+              }
+            }
+          }
+        },
+        "missingFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "templateRelease": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "source": "forge.invocations",
+    "notes": "ExternalInvocation 台账（idempotencyKey unique INV-20；succeeded 终态；history-rewrite 拒绝；unknown 只能经 reconcile 收敛；UNAVAILABLE=live-blocked≠terminal failure）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "invocations"
+      ],
+      "properties": {
+        "invocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "invocationId",
+              "kind",
+              "status",
+              "idempotencyKey"
+            ],
+            "properties": {
+              "invocationId": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "succeeded",
+                  "failed",
+                  "unknown"
+                ]
+              },
+              "idempotencyKey": {
+                "type": "string"
+              },
+              "observedAt": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

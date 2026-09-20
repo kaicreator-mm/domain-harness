@@ -1,0 +1,1 @@
+simulated expression-jsonata binding for contract validation v1

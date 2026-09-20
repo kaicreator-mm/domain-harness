@@ -1,0 +1,232 @@
+[
+  {
+    "source": "audio.song",
+    "notes": "Song「holds a pointer, not a status」：active_version_id+revision 乐观锁；lineage 唯一真相=operation graph（version 刻意无 parent_version_id/source_operation_id 列）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "songId",
+        "ownerId",
+        "activeVersionId",
+        "revision",
+        "versions"
+      ],
+      "properties": {
+        "songId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "activeVersionId": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "versionId",
+              "lifecycle"
+            ],
+            "properties": {
+              "versionId": {
+                "type": "string"
+              },
+              "lifecycle": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "final"
+                ]
+              },
+              "producedBy": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "audio.operation",
+    "notes": "AudioOperation（产品语义层）：state draft/planned/running/succeeded/failed/cancelled + HarnessPin（按值持有，无 alias 重入路径）+ ActionPlan + DecisionPacket + evidence。现状无持久化表——本 source 即补表后的形状。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "operationId",
+        "kind",
+        "state",
+        "harnessPin"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "planned",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "harnessPin": {
+          "type": "object",
+          "required": [
+            "snapshotId",
+            "contentHash"
+          ],
+          "properties": {
+            "packageId": {
+              "type": "string"
+            },
+            "alias": {
+              "type": "string"
+            },
+            "aliasRevision": {
+              "type": "integer"
+            },
+            "versionId": {
+              "type": "string"
+            },
+            "snapshotId": {
+              "type": "string"
+            },
+            "contentHash": {
+              "type": "string"
+            },
+            "executionMode": {
+              "type": "string"
+            },
+            "riskLevel": {
+              "type": "string"
+            },
+            "resolvedAt": {
+              "type": "string"
+            }
+          }
+        },
+        "plan": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "decisionPacket": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "evidence": {
+          "type": "array"
+        }
+      }
+    }
+  },
+  {
+    "source": "audio.jobs",
+    "notes": "Job（执行机制层，「Jobs are execution mechanics」）：idempotency_key UNIQUE、claim CAS、lease heartbeat、durable cancel_requested；付费副作用 provider_outcome_unknown→不自动重试。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "jobId",
+        "idempotencyKey",
+        "kind",
+        "state"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "created",
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "attemptCount": {
+          "type": "integer"
+        },
+        "maxAttempts": {
+          "type": "integer"
+        },
+        "correlationId": {
+          "type": "string"
+        },
+        "cancelRequested": {
+          "type": "boolean"
+        },
+        "heartbeatAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "queuedAt": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "source": "audio.harnessRegistry",
+    "notes": "Harness 注册态势（三 alias 指针+versions+lastReplay decision-diff）；alias 移动 CAS+审计；ACTIVE 只能从 SHADOW 到达（proposal 永不直接 ACTIVE）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "packageId",
+        "aliases",
+        "versions"
+      ],
+      "properties": {
+        "packageId": {
+          "type": "string"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "lastReplay": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "required": ["jobId", "artifact", "commandId"],
+  "properties": {
+    "jobId": { "type": "string" },
+    "commandId": { "type": "string" },
+    "artifact": {
+      "type": "object",
+      "required": ["contentHash", "format"],
+      "properties": {
+        "contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{8,}$" },
+        "format": { "type": "string", "enum": ["png", "svg", "jpeg"] }
+      }
+    }
+  }
+}

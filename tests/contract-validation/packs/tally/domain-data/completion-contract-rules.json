@@ -1,0 +1,4 @@
+{
+  "requiredFacts": ["verification_passed", "changeset_frozen"],
+  "semantics": "CompletionContract.Evaluate is deterministic; every required fact must be literally true. Missing or false facts produce the Missing[] list; completion is never inferred."
+}

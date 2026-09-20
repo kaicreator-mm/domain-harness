@@ -1,0 +1,17 @@
+{
+  "algorithmVersion": "v2.3-local-baseline.1",
+  "planner": {
+    "dailyNewLimit": 20,
+    "earlyReviewEnabled": true,
+    "prerequisiteMasteryThreshold": 0.85
+  },
+  "initialState": {
+    "mastery": 0.1,
+    "stability": 0.5,
+    "difficulty": 5,
+    "retrievability": 1,
+    "box": 1,
+    "reviewCount": 0
+  },
+  "failCloseGate": "新包 algorithmVersion 与既有 concept_state.algorithm_version 不一致时，materialization 在任何写入前拒绝并要求显式迁移（v2.3 不定义跨算法状态迁移）。"
+}

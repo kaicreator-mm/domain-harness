@@ -1,0 +1,59 @@
+{
+  "stages": [
+    "draft",
+    "interpreted",
+    "evidence_ready",
+    "evaluated",
+    "action_ready",
+    "handed_off",
+    "user_confirmed",
+    "failed",
+    "corrected"
+  ],
+  "oneWay": true,
+  "stageRules": {
+    "interpret": {
+      "from": [
+        "draft"
+      ],
+      "to": "interpreted"
+    },
+    "evaluate": {
+      "from": [
+        "interpreted",
+        "evidence_ready"
+      ],
+      "to": "evaluated",
+      "requiresEvidence": true
+    },
+    "actions": {
+      "from": [
+        "evaluated"
+      ],
+      "to": "action_ready"
+    },
+    "outcome": {
+      "from": [
+        "action_ready",
+        "handed_off"
+      ],
+      "to": [
+        "user_confirmed",
+        "failed",
+        "corrected"
+      ]
+    }
+  },
+  "launchedIsNotCompleted": true,
+  "failureCodes": [
+    "INVALID_REQUEST",
+    "INVALID_TRANSITION",
+    "PROJECTION_PURPOSE_MISMATCH",
+    "CONTEXT_EXPIRED",
+    "EVIDENCE_UNAVAILABLE",
+    "HARNESS_UNAVAILABLE"
+  ],
+  "noPartialAdvance": true,
+  "entryStateClosedSet": true,
+  "noResetBackdoor": "重做必须新建 TaskState"
+}

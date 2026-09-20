@@ -1,0 +1,102 @@
+[
+  {
+    "source": "yishu.governance",
+    "notes": "治理态势聚合（双 SoR：Git activeTag + Store 运营态）。draftsFingerprint 是 TOCTOU 守卫的锚点；appliedCommands 模拟 applied_effects 幂等账本。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["activeTag", "activeRevision", "draftsFingerprint", "draftCount", "queueCounts"],
+      "properties": {
+        "activeTag": { "type": "string" },
+        "activeRevision": { "type": "integer", "minimum": 0 },
+        "draftsFingerprint": { "type": "string" },
+        "draftCount": { "type": "integer", "minimum": 0 },
+        "previewGate": { "type": ["string", "null"], "enum": ["pass", "blocked", null] },
+        "previewOfFingerprint": { "type": ["string", "null"] },
+        "previewNewFailures": { "type": "array", "items": { "type": "string" } },
+        "queueCounts": {
+          "type": "object",
+          "properties": {
+            "manual": { "type": "integer" },
+            "import": { "type": "integer" },
+            "llm": { "type": "integer" }
+          }
+        },
+        "openReviews": { "type": "integer" },
+        "appliedCommands": { "type": "array", "items": { "type": "string" } },
+        "previousTags": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  {
+    "source": "yishu.candidates",
+    "notes": "候选队列（manual/import/llm 三源合流；位置就是状态——confirm 后离开队列进入 drafts）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["candidates"],
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["candidateId", "kind", "source", "key", "sourceText", "targetText"],
+            "properties": {
+              "candidateId": { "type": "string" },
+              "kind": { "type": "string", "enum": ["term", "phrase", "enum", "case"] },
+              "source": { "type": "string", "enum": ["manual", "import", "llm"] },
+              "sampled": { "type": "boolean" },
+              "key": { "type": "string" },
+              "sourceText": { "type": "string" },
+              "targetText": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "yishu.drafts",
+    "notes": "草稿集（publish 成功后清空；DraftRow 语义）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["drafts"],
+      "properties": {
+        "drafts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "content"],
+            "properties": {
+              "path": { "type": "string" },
+              "content": { "type": "string" },
+              "origin": { "type": "string" },
+              "confirmedBy": { "type": "string" },
+              "at": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "yishu.evaluation",
+    "notes": "回归案例基线（CaseRun/EvaluationSnapshot 语义；publish preview 用其判定新失败）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["cases"],
+      "properties": {
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["caseId", "lastPublishedResult"],
+            "properties": {
+              "caseId": { "type": "string" },
+              "requiresTerm": { "type": "string" },
+              "lastPublishedResult": { "type": "string", "enum": ["pass", "fail"] }
+            }
+          }
+        }
+      }
+    }
+  }
+]

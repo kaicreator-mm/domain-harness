@@ -11,7 +11,8 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:contracts",
+    "test:contracts": "node --import tsx --test tests/contract-validation/contract-validation.test.ts",
     "lint": "node scripts/lint.mjs"
   },
   "devDependencies": {

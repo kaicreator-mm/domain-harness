@@ -1,0 +1,58 @@
+[
+  {
+    "projectionId": "tally.project-state",
+    "expression": "( $p := workflows[address.workflowId = 'tally.project']; $proj := business[source = 'tally.project'].value; $graph := business[source = 'tally.taskGraph'].value; $auth := business[source = 'tally.authority'].value; $last := $p.state.lastResult; { 'key': key, 'phase': $p.state.stateId, 'availableActions': $p.state.stateId = 'coordinating' ? [ { 'type': 'DispatchTask', 'enabled': $count($graph.nodes[status = 'ready']) > 0 } ] : $p.state.stateId = 'awaiting_authority' ? [ { 'type': 'AuthorityDecision', 'enabled': true } ] : [], 'pending': $p.state.stateId = 'awaiting_authority' ? [ { 'kind': 'human-authority' } ] : [], 'lastOutcome': $last.commandId ? $last : null, 'body': { 'stage': $proj.stage, 'dagRevision': $proj.dagRevision, 'nodeCounts': { 'ready': $count($graph.nodes[status = 'ready']), 'running': $count($graph.nodes[status = 'running']), 'done': $count($graph.nodes[status = 'done']) }, 'pendingMergeApprovals': $auth.pendingMergeApprovals, 'decisionCount': $count($auth.decisions) } } )",
+    "dependencies": [
+      { "kind": "workflow", "selector": { "workflowId": "tally.project" } },
+      { "kind": "business", "source": "tally.project", "selector": {} },
+      { "kind": "business", "source": "tally.taskGraph", "selector": {} },
+      { "kind": "business", "source": "tally.authority", "selector": {} },
+      { "kind": "domain-data", "key": "task-node-transitions" }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": ["key", "phase", "availableActions", "pending", "body"],
+      "properties": {
+        "key": { "type": "string" },
+        "phase": { "type": "string" },
+        "availableActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "enabled"],
+            "properties": {
+              "type": { "type": "string" },
+              "enabled": { "type": "boolean" }
+            }
+          }
+        },
+        "pending": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": { "kind": { "type": "string" }, "since": { "type": "string" } }
+          }
+        },
+        "lastOutcome": { "type": ["object", "null"] },
+        "body": {
+          "type": "object",
+          "properties": {
+            "stage": { "type": "string" },
+            "dagRevision": { "type": "string" },
+            "nodeCounts": {
+              "type": "object",
+              "properties": {
+                "ready": { "type": "number" },
+                "running": { "type": "number" },
+                "done": { "type": "number" }
+              }
+            },
+            "pendingMergeApprovals": { "type": "array", "items": { "type": "string" } },
+            "decisionCount": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+]

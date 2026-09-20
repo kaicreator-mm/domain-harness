@@ -1,0 +1,23 @@
+{
+  "neverInvent": [
+    "supplier_certifications",
+    "trade_terms",
+    "production_capacity",
+    "quality_metrics",
+    "customer_references"
+  ],
+  "minApprovedItems": 3,
+  "buyerStages": [
+    "DISCOVER",
+    "EVALUATE",
+    "INQUIRE",
+    "QUALIFY"
+  ],
+  "answerPolicies": [
+    "ALL_CONFIRMED",
+    "ANY_CONFIRMED",
+    "MANUAL_ONLY"
+  ],
+  "candidateNeverEqualsSupplierFact": true,
+  "insufficientEvidenceBehavior": "compileTradeCreativeBrief 直接 throw TRADE_CREATIVE_EVIDENCE_INSUFFICIENT（编译即批准，无静默降级）"
+}

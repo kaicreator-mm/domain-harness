@@ -1,0 +1,16 @@
+[
+  {
+    "key": "design_8f3a",
+    "revision": "rev-jobs-8f3a-0001",
+    "value": {
+      "jobs": [
+        { "jobId": "job_gen_011", "kind": "image-generation", "status": "running", "promptHash": "ph_aurora_hero_v3", "prompt": "主视觉第三轮微调：增强传感器金属质感", "submittedAt": "2026-09-20T07:41:00.000Z", "deadline": "2026-09-20T08:11:00.000Z", "commandId": "cmd_gen_010" }
+      ]
+    }
+  },
+  {
+    "key": "design_b17c",
+    "revision": "rev-jobs-b17c-0001",
+    "value": { "jobs": [] }
+  }
+]

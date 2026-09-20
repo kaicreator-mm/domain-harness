@@ -1,0 +1,17 @@
+[
+  {
+    "key": "singleton",
+    "revision": "rev-govref-0009",
+    "value": {
+      "activeRuleRefs": [
+        "governance-rule:sha256-a17f3c9e",
+        "governance-rule:sha256-b28e4d0f"
+      ],
+      "activeSetRevision": 9,
+      "governancePersistenceCapability": true,
+      "flaggedConflicts": [],
+      "lastActivatedBy": "operator_khine",
+      "lastActivatedAt": "2026-09-18T10:02:00.000Z"
+    }
+  }
+]

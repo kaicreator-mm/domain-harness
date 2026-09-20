@@ -1,0 +1,1 @@
+simulated sha256 binding for contract validation v1

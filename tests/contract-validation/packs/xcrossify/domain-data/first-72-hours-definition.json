@@ -1,0 +1,94 @@
+{
+  "definitionId": "first-72-hours@1",
+  "steps": [
+    {
+      "id": "step_visa_ready",
+      "order": 1,
+      "prerequisites": [],
+      "evidenceRequirements": [
+        {
+          "kind": "document",
+          "ttlDays": 30
+        }
+      ],
+      "claimKeys": [
+        "visa.entry"
+      ],
+      "cardTemplates": [
+        "copy_embassy_notice",
+        "open_url_immigration"
+      ]
+    },
+    {
+      "id": "step_sim_card",
+      "order": 2,
+      "prerequisites": [
+        "step_visa_ready"
+      ],
+      "evidenceRequirements": [
+        {
+          "kind": "purchase_receipt",
+          "ttlDays": 90
+        }
+      ],
+      "claimKeys": [
+        "sim.activated"
+      ],
+      "cardTemplates": [
+        "open_map_mpt",
+        "call_hotline",
+        "translate_faq"
+      ]
+    },
+    {
+      "id": "step_currency_basics",
+      "order": 3,
+      "prerequisites": [],
+      "evidenceRequirements": [],
+      "claimKeys": [
+        "currency.rate_awareness"
+      ],
+      "cardTemplates": [
+        "copy_rate_disclaimer"
+      ]
+    },
+    {
+      "id": "step_transport_card",
+      "order": 4,
+      "prerequisites": [
+        "step_currency_basics"
+      ],
+      "evidenceRequirements": [
+        {
+          "kind": "photo",
+          "ttlDays": 30
+        }
+      ],
+      "claimKeys": [
+        "transport.card_ready"
+      ],
+      "cardTemplates": [
+        "open_map_grab"
+      ]
+    },
+    {
+      "id": "step_emergency_contacts",
+      "order": 5,
+      "prerequisites": [],
+      "evidenceRequirements": [
+        {
+          "kind": "contact_saved",
+          "ttlDays": 180
+        }
+      ],
+      "claimKeys": [
+        "emergency.contacts_saved"
+      ],
+      "cardTemplates": [
+        "call_emergency",
+        "copy_contact_card"
+      ]
+    }
+  ],
+  "contentGuard": "step_currency_basics 只提供官方渠道说明——汇率数字内容红线（HR 同族），卡片只给 disclaimer 不给数值。"
+}

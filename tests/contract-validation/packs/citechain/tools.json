@@ -1,0 +1,166 @@
+[
+  {
+    "toolId": "commitTask",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "task",
+        "confirmation"
+      ],
+      "properties": {
+        "task": {
+          "type": "object"
+        },
+        "confirmation": {
+          "type": "object",
+          "required": [
+            "actor"
+          ],
+          "properties": {
+            "actor": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "committed",
+            "skipped_identical",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "recordHash": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "Kernel 桥 [G3]：内容级幂等（同记录+同 actor+同 confirmedAtMs→同 hash→跳过写）；append 时 validate+owner-scope；actor 取 session 不可客户端自报（审计问责链前提）；schema manifest 不符→read_only fail-closed。"
+  },
+  {
+    "toolId": "validateHarness",
+    "effect": "none",
+    "executionKind": "expression",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "harnessId",
+        "task",
+        "snapshotFingerprint"
+      ],
+      "properties": {
+        "harnessId": {
+          "type": "string"
+        },
+        "task": {
+          "type": "object"
+        },
+        "snapshotFingerprint": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "findings"
+      ],
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "code",
+              "severity"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warning",
+                  "info"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "subjectRef": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "notes": "纯函数（required inputs + 按 mode 的 usage 计数≥minItems，latest-wins by confirmedAtMs）；同一 Harness 双用（Prepare/Create 引导 + Review 验证）。"
+  },
+  {
+    "toolId": "markDeliverableStale",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "deliverableId",
+        "providerId",
+        "knowledgeRef",
+        "toHash"
+      ],
+      "properties": {
+        "deliverableId": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "knowledgeRef": {
+          "type": "string"
+        },
+        "toHash": {
+          "type": "string"
+        },
+        "grade": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "marked",
+            "already_stale",
+            "not_affected"
+          ]
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "修订闭环新增 Tool（契约草案 §2 citechain.deliverable）：KnowledgeChanged 命中 findAffectedDeliverables 才标记；stale 边必须可解释（grade+fromHash/toHash 入 lineage）。"
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "priorityOrder": [
+    "P1_FORCED",
+    "P2_DUE",
+    "P3_NEW",
+    "P4_EARLY_REVIEW"
+  ],
+  "p3LimitedByDailyNewLimit": true,
+  "filters": [
+    "WRITING_excluded_from_auto_queue",
+    "recentConceptWindow=3"
+  ],
+  "semantics": "FSRS=何时复习（due_at），BKT/DST=是否学会（mastery/runtime_state）；语义不得合并。REINTEGRATING 概念进入 P1 forced。"
+}

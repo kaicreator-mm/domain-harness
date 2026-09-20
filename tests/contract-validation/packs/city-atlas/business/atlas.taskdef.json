@@ -1,0 +1,28 @@
+[
+  {
+    "key": "find_pharmacy_or_clinic",
+    "revision": "rev-taskdef-fpc-0003",
+    "value": {
+      "taskId": "find_pharmacy_or_clinic",
+      "latestVersion": 3,
+      "versions": [
+        {
+          "version": 2,
+          "publishedAt": "2026-08-02T04:00:00.000Z"
+        },
+        {
+          "version": 3,
+          "publishedAt": "2026-09-10T04:00:00.000Z"
+        }
+      ],
+      "sixPieceSet": [
+        "TaskDefinition",
+        "EvidenceProfile",
+        "Primitive",
+        "Workflow",
+        "ActionPolicy",
+        "Presentation"
+      ]
+    }
+  }
+]

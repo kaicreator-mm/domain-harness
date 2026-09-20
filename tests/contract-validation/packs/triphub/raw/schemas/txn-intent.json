@@ -1,0 +1,5 @@
+{
+  "type": "object",
+  "required": ["commandId", "itemId"],
+  "properties": { "commandId": { "type": "string" }, "itemId": { "type": "string" } }
+}

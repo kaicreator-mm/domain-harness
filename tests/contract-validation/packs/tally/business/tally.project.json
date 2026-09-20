@@ -1,0 +1,14 @@
+[
+  {
+    "key": "proj_atlas",
+    "revision": "rev-project-atlas-0001",
+    "value": {
+      "projectId": "proj_atlas",
+      "stage": "dag_active",
+      "dagRevision": "dag_rev_7",
+      "requirementsId": "req_baseline_3",
+      "planId": "plan_rev_2",
+      "architectureId": "arch_rev_1"
+    }
+  }
+]

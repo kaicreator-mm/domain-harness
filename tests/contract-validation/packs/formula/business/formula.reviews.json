@@ -1,0 +1,16 @@
+[
+  {
+    "key": "design_8f3a",
+    "revision": "rev-reviews-8f3a-0001",
+    "value": {
+      "reviews": [
+        { "reviewId": "rev_0009", "verdict": "needs_work", "score": 71, "findings": ["CTA 区域对比度不足（3.1:1，低于 WCAG AA）", "正文字号低于可读性下限"], "at": "2026-09-20T07:52:00.000Z" }
+      ]
+    }
+  },
+  {
+    "key": "design_b17c",
+    "revision": "rev-reviews-b17c-0001",
+    "value": { "reviews": [] }
+  }
+]

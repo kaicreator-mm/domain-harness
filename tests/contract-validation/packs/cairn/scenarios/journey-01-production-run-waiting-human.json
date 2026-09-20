@@ -1,0 +1,160 @@
+{
+  "id": "journey-01-production-run-waiting-human",
+  "description": "Cairn 目标旅程（data-only，J1 切边）：Restore→WAITING_HUMAN（REVIEW_GATE 升级）；ContinueRun 在等待态是显式 no-op；ReviewDecide 解除等待→advancing（有界 maxSteps）；restart 扫描绝不代行解除等待；治理保持 Tools+Projection 不建 workflow。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "cairn.production-run",
+      "instanceKey": "run_9f3a",
+      "input": {
+        "runId": "run_9f3a"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "messageId": "restore:cairn.run:run_9f3a",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "status": "WAITING_HUMAN",
+          "stage": "REVIEW_GATE",
+          "planVersion": 2
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "expect": {
+        "stateId": "awaiting_human"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "cairn.run-state",
+      "key": "run_9f3a",
+      "expect": {
+        "phase": "WAITING_HUMAN",
+        "pending": [
+          {
+            "kind": "human-review"
+          }
+        ],
+        "body": {
+          "stage": "REVIEW_GATE",
+          "planRound": 2,
+          "unresolvedGaps": 1
+        }
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "messageId": "cmd_cont_1",
+      "type": "ContinueRun",
+      "payload": {
+        "commandId": "cmd_cont_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "expect": {
+        "stateId": "awaiting_human",
+        "lastResult": {
+          "outcome": "applied",
+          "noOp": true
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "waiting-noop-not-rejection",
+      "severity": "divergence",
+      "summary": "等待态上的 runNext/Continue 是显式 no-op（既有语义），但 v0.3 命令结果词表（applied/rejected/failed/abandoned）没有 no-op 一档——契约需要 applied(no_op) 或第五种结果来表达「合法但无效果」，否则 facade 会把它误报为推进。",
+      "related": "v0.3 PRD §6.3 / 分析文档 G4"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "messageId": "cmd_review_1",
+      "type": "ReviewDecide",
+      "payload": {
+        "commandId": "cmd_review_1",
+        "decision": "APPROVE",
+        "actor": "operator_khine"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "expect": {
+        "stateId": "settled",
+        "lastResult": {
+          "outcome": "SETTLED",
+          "derivedOutcome": "PARTIAL"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "gate-outcome-deterministic",
+      "severity": "info",
+      "summary": "REVIEW_GATE APPROVE→SETTLED 且 outcome 由 deriveGateOutcome 确定性推导（存在 FAILED effect ⇒ PARTIAL，zero knowledge ⇒ EMPTY）——outcome 与生命周期解耦、绝不推断 SATISFIED 的冻结语义在契约层保持。"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "cairn.production-run",
+        "instanceKey": "run_9f3a"
+      },
+      "expect": {
+        "stateId": "settled"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "restart-scan-never-unwaits",
+      "severity": "info",
+      "summary": "restart 扫描分区语义保留：runnable→resume、WAITING_*→纯 bookkeeping（绝不代行解除等待）、SUSPENDED→跳过、终态→只计数；单 run 失败隔离进 failures。映射为 Runtime activation recovery + 投影诚实呈现崩溃残留 IN_PROGRESS。"
+    },
+    {
+      "action": "finding",
+      "id": "single-instance-execution-constraint",
+      "severity": "divergence",
+      "summary": "部署约束：一个 canonical store 恰好一个 Runtime 进程（第二 executor 会重发同一逻辑 AI effect→重复 Observation/双份计费，有 SPIKE 证据）。DH 的 per-instance serialized lane 与之一致，但多副本宿主扩容会击穿该约束——必须写入 host profile 部署纪律并进 §22 检查清单。",
+      "related": "契约草案 §1/§10"
+    }
+  ]
+}

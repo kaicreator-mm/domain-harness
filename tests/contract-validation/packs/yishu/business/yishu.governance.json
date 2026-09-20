@@ -1,0 +1,18 @@
+[
+  {
+    "key": "zh-my/medical",
+    "revision": "rev-gov-medical-0001",
+    "value": {
+      "activeTag": "v2026.08.13-1",
+      "activeRevision": 7,
+      "draftsFingerprint": "fp_0",
+      "draftCount": 0,
+      "previewGate": null,
+      "previewOfFingerprint": null,
+      "queueCounts": { "manual": 3, "import": 1, "llm": 2 },
+      "openReviews": 1,
+      "appliedCommands": [],
+      "previousTags": ["v2026.07.02-1", "v2026.08.13-1"]
+    }
+  }
+]

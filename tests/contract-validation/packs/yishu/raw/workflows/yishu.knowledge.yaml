@@ -1,0 +1,120 @@
+# yishu.knowledge — 知识治理 S 实例（契约草案 §2；key = {direction}/{domain}）
+# 冻结语义映射：发布回归 gate 新失败即阻断且**无强制发布入口**；
+# ApprovePublish 携带 expectedFingerprint（TOCTOU 守卫，preview 与 publish
+# 之间草稿集变化 → rejected(stale_drafts)）；LLM 来源候选禁批量确认
+# （AI 无批准权 INVARIANTS #1/#3/#12）；回滚=指针移动非破坏；
+# Git 单写者由 per-instance serialized lane 天然满足。
+initial: init
+states:
+  init:
+    on:
+      Restore:
+        schema: schemas/restore-knowledge.json
+        routes:
+          - target: publish_blocked
+            when: "message.snapshot.publishState = 'blocked'"
+          - target: publish_ready
+            when: "message.snapshot.publishState = 'ready'"
+          - target: curating
+
+  curating:
+    on:
+      Restore: { schema: schemas/restore-knowledge.json, routes: [{ target: curating__reject }] }
+      CandidateConfirmed: { schema: schemas/candidate-confirmed.json, routes: [{ target: confirming }] }
+      SaveDraft: { schema: schemas/save-draft.json, routes: [{ target: saving_draft }] }
+      RequestPublish: { schema: schemas/command.json, routes: [{ target: previewing }] }
+      ApprovePublish: { schema: schemas/approve-publish.json, routes: [{ target: curating__reject }] }
+      Rollback: { schema: schemas/rollback.json, routes: [{ target: rollbacking }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  curating__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_curating", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: curating }]
+
+  confirming:
+    invoke:
+      tool: confirmCandidates
+      input: '{ "scopeKey": address.instanceKey, "candidateIds": state.lastMessage.candidateIds, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: curating }]
+      error: [{ target: failed }]
+
+  saving_draft:
+    invoke:
+      tool: saveDraft
+      input: '{ "scopeKey": address.instanceKey, "path": state.lastMessage.path, "content": state.lastMessage.content, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: curating }]
+      error: [{ target: failed }]
+
+  previewing:
+    invoke:
+      tool: publishPreview
+      input: '{ "scopeKey": address.instanceKey, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: publish_ready
+          when: "result.gate = 'pass'"
+        - target: publish_blocked
+      error: [{ target: failed }]
+
+  publish_ready:
+    on:
+      Restore: { schema: schemas/restore-knowledge.json, routes: [{ target: publish_ready__reject }] }
+      CandidateConfirmed: { schema: schemas/candidate-confirmed.json, routes: [{ target: confirming }] }
+      SaveDraft: { schema: schemas/save-draft.json, routes: [{ target: saving_draft }] }
+      RequestPublish: { schema: schemas/command.json, routes: [{ target: previewing }] }
+      ApprovePublish: { schema: schemas/approve-publish.json, routes: [{ target: publishing }] }
+      Rollback: { schema: schemas/rollback.json, routes: [{ target: rollbacking }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  publish_ready__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_publish_ready", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: publish_ready }]
+
+  publishing:
+    invoke:
+      tool: publishConfig
+      input: '{ "scopeKey": address.instanceKey, "expectedFingerprint": state.lastMessage.expectedFingerprint, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: curating
+          when: "result.outcome = 'applied'"
+        - target: publish_ready
+      error: [{ target: failed }]
+
+  publish_blocked:
+    on:
+      Restore: { schema: schemas/restore-knowledge.json, routes: [{ target: publish_blocked__reject }] }
+      CandidateConfirmed: { schema: schemas/candidate-confirmed.json, routes: [{ target: confirming }] }
+      SaveDraft: { schema: schemas/save-draft.json, routes: [{ target: saving_draft }] }
+      RequestPublish: { schema: schemas/command.json, routes: [{ target: previewing }] }
+      ApprovePublish: { schema: schemas/approve-publish.json, routes: [{ target: publish_blocked__reject }] }
+      Rollback: { schema: schemas/rollback.json, routes: [{ target: rollbacking }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  publish_blocked__reject:
+    # ApprovePublish 在 blocked 相位被拒绝 = 『无强制发布入口』的契约化表达
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "no_force_publish_while_blocked", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: publish_blocked }]
+
+  rollbacking:
+    invoke:
+      tool: rollbackConfig
+      input: '{ "scopeKey": address.instanceKey, "tag": state.lastMessage.tag, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: curating }]
+      error: [{ target: failed }]
+
+  failed:
+    on:
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  closed:
+    final: true

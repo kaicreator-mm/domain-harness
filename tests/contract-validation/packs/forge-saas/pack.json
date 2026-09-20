@@ -1,0 +1,13 @@
+{
+  "project": "forge-saas",
+  "tier": "data-only",
+  "domainId": "forge",
+  "domainVersion": "2.9.5.2-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/forge-saas.md",
+  "blockers": [
+    "RuntimeStore PG 适配器缺口（SoR=PostgreSQL/RLS；与 xcrossify 共建 conformance 实现）",
+    "双身份域：租户实例与平台（operator）治理严格分离，Scope 建模不得跨域 FK",
+    "图片同步路径未接 ExternalInvocation 台账——迁移时必须并入 forge.execution R 实例（契约缺口修复项）"
+  ],
+  "notes": "Forge 模拟数据包：内容执行 pin 契约（TemplateRelease+FactSnapshot+harnessPlanFingerprint）、ExternalInvocation 三值台账（含 UNKNOWN）、发布节流与 approved-only immutable snapshot。effect 三值/幂等键/compare-before-apply 全部沿用仓库既有 runConsumerEffect 纪律。"
+}

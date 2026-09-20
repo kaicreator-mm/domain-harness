@@ -1,0 +1,8 @@
+{
+  "deliveryNote": "一 note ⇄ 一应收 ⇄ 一次库存 commit；只记「实际留下」的 SKU；unitPriceSnapshot 冻结永不回读",
+  "hardInvariant": "重复离线同步最多产生一次权威商业效果；offline conflict 不得静默毁掉 authority facts",
+  "consignment": "consumed = 上次在架 − 本次绝对盘点，按放置时快照价计费；盘点高于在架 = ops exception 不是免费货",
+  "fifoAttribution": "服务端 FIFO 自动批次归因，配送员从不挑选",
+  "singleNoteSingleLegacyPo": "混两个 legacy PO 的 note 在记账前硬拒",
+  "reconcile": "夜间从事件日志重导应收，只读只告警绝不回写"
+}

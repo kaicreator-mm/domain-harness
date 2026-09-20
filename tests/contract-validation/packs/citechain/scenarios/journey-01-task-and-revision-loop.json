@@ -1,0 +1,195 @@
+{
+  "id": "journey-01-task-and-revision-loop",
+  "description": "Citechain 目标旅程（data-only）：Restore→reviewing；Deliver 经 validateHarness+DeliveryGate（实装后）→delivered；KnowledgeChanged（monitor 复活后的 Ingress）命中 hard_gate usage→deliverable stale→revising→re-deliver(v2)；AI assist 仅 advisory。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "citechain.task",
+      "instanceKey": "task_4c1e",
+      "input": {
+        "taskId": "task_4c1e"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "citechain.task",
+        "instanceKey": "task_4c1e"
+      },
+      "messageId": "restore:citechain.task:task_4c1e",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "phase": "reviewing"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "citechain.task",
+        "instanceKey": "task_4c1e"
+      },
+      "expect": {
+        "stateId": "reviewing"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "citechain.task-workbench",
+      "key": "task_4c1e",
+      "expect": {
+        "phase": "reviewing",
+        "availableActions": [
+          {
+            "type": "Deliver",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "hardGateCount": 1,
+          "usageCount": 2
+        }
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "citechain.task",
+        "instanceKey": "task_4c1e"
+      },
+      "messageId": "cmd_deliver_1",
+      "type": "Deliver",
+      "payload": {
+        "commandId": "cmd_deliver_1",
+        "deliverableId": "deliv_01",
+        "actor": "analyst_su"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "citechain.task",
+        "instanceKey": "task_4c1e"
+      },
+      "expect": {
+        "stateId": "delivered",
+        "lastResult": {
+          "outcome": "applied"
+        }
+      }
+    },
+    {
+      "action": "open",
+      "workflowId": "citechain.deliverable",
+      "instanceKey": "deliv_01",
+      "input": {
+        "deliverableId": "deliv_01"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "citechain.deliverable",
+        "instanceKey": "deliv_01"
+      },
+      "messageId": "kc:cairn:fact:sha256-a17f3c9e:b28e4d0f",
+      "type": "KnowledgeChanged",
+      "payload": {
+        "providerId": "cairn",
+        "knowledgeRef": "fact:sha256-a17f3c9e",
+        "fromHash": "sha256-a17f3c9e",
+        "toHash": "sha256-b28e4d0f",
+        "grade": "substantive"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "citechain.deliverable",
+        "instanceKey": "deliv_01"
+      },
+      "expect": {
+        "stateId": "stale",
+        "lastResult": {
+          "outcome": "applied",
+          "via": "hard_gate_usage"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "revision-loop-fills-c3-gap",
+      "severity": "info",
+      "summary": "修订闭环补全仓库 C3 缺口：delivered 现状是终态（无 reopen），知识变更→交付物修订只有反查没有流程；citechain.deliverable E 实例（delivered→stale→revising→delivered v+1）承接该流程，impact 判定保持确定性派生（hard_gate usage JOIN），cosmetic 变更不触发（changeGrade 闸）。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "citechain.deliverable",
+        "instanceKey": "deliv_01"
+      },
+      "messageId": "kc:cairn:fact:sha256-c39f5e1a",
+      "type": "KnowledgeChanged",
+      "payload": {
+        "providerId": "cairn",
+        "knowledgeRef": "fact:sha256-c39f5e1a",
+        "fromHash": "sha256-c39f5e1a",
+        "toHash": "sha256-d40a6f2b",
+        "grade": "cosmetic"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "citechain.deliverable",
+        "instanceKey": "deliv_01"
+      },
+      "expect": {
+        "stateId": "stale",
+        "lastResult": {
+          "outcome": "rejected",
+          "code": "cosmetic_grade_not_notified"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "monitor-cost-gate",
+      "severity": "info",
+      "summary": "monitor 成本闸语义入契约：hash 未变→只更新 fetched_at（零 LLM 零快照）；cosmetic 级变更→不通知不触发修订；单来源失败降级不中断整轮（ADR-0009）。"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "citechain.task",
+        "instanceKey": "task_4c1e"
+      },
+      "expect": {
+        "stateId": "delivered"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "kernel-trust-boundary-hosting",
+      "severity": "divergence",
+      "summary": "Kernel 信任边界宿主化是实质决策点：Confirmed<T> 不可 Deserialize 伪造（Rust 类型级+compile_fail doctest）、write_atomic、hard_gate 不可绕过三条保证在 TS 重实现下降级为运行时约定——方案 A（Rust sidecar RPC）保留全部保证，方案 B 必须补加载时重验证+content-hash 校验+contract suite。",
+      "related": "契约草案 §10"
+    }
+  ]
+}

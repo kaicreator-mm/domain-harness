@@ -1,0 +1,12 @@
+{
+  "dimensions": ["lifecycle", "commitment", "publication"],
+  "mustNotCollapseIntoSingleEnum": true,
+  "transitions": {
+    "draft": ["planned"],
+    "planned": ["draft", "active"],
+    "active": ["completed"],
+    "completed": ["archived"],
+    "archived": []
+  },
+  "terminal": "archived"
+}

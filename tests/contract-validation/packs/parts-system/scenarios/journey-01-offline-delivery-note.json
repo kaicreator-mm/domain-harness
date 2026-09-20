@@ -1,0 +1,175 @@
+{
+  "id": "journey-01-offline-delivery-note",
+  "description": "Parts System 目标旅程（data-only，落地前须过 ADR）：离线设备迟到提交 delivery note → 五步单事务物化恰好一次商业效果；重复同步重放返回原 note；请求 prepare 冻结承诺基线；freeText/ai-proposal 在 trust gate 处转入 inquiry。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "parts.visit",
+      "instanceKey": "visit_2026_09_20_s042",
+      "input": {
+        "visitId": "visit_2026_09_20_s042"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "parts.visit",
+        "instanceKey": "visit_2026_09_20_s042"
+      },
+      "messageId": "restore:parts.visit:s042",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "status": "open"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "parts.visit",
+        "instanceKey": "visit_2026_09_20_s042"
+      },
+      "expect": {
+        "stateId": "open"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "parts.visit",
+        "instanceKey": "visit_2026_09_20_s042"
+      },
+      "messageId": "sync:shop_042:evt_01J9NOTE",
+      "type": "NoteSubmitted",
+      "payload": {
+        "clientNoteId": "note_c_77",
+        "lines": [
+          {
+            "itemKey": "component:brake-pad-front-dn150",
+            "qty": 1,
+            "unitPriceSnapshot": 45000
+          }
+        ]
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-business",
+      "source": "parts.requests",
+      "key": "shop_042",
+      "expect": {
+        "requests": [
+          {
+            "requestId": "evt_01J8ZK4M",
+            "status": "fulfilled"
+          },
+          {
+            "requestId": "evt_01J8ZP7Q",
+            "status": "open"
+          }
+        ]
+      }
+    },
+    {
+      "action": "expect-business",
+      "source": "parts.shopState",
+      "key": "shop_042",
+      "expect": {
+        "ledger": [
+          {
+            "partyRef": "plate:9A-1234",
+            "receivable": 173500
+          }
+        ]
+      }
+    },
+    {
+      "action": "finding",
+      "id": "single-authoritative-commercial-effect",
+      "severity": "info",
+      "summary": "note 物化=五步单事务（fulfil+reservation 消费+库存 commit+FIFO 归因+恰好一条应收事件）；重复离线同步最多产生一次权威商业效果（clientNoteId 幂等，重放返回原 note）。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "parts.visit",
+        "instanceKey": "visit_2026_09_20_s042"
+      },
+      "messageId": "sync:shop_042:evt_01J9NOTE",
+      "type": "NoteSubmitted",
+      "payload": {
+        "clientNoteId": "note_c_77",
+        "lines": [
+          {
+            "itemKey": "component:brake-pad-front-dn150",
+            "qty": 1,
+            "unitPriceSnapshot": 45000
+          }
+        ]
+      },
+      "expectAck": {
+        "status": "duplicate"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "parts.partrequest",
+        "instanceKey": "evt_01J8ZP7Q"
+      },
+      "messageId": "cmd_prep_1",
+      "type": "PrepareRequested",
+      "payload": {
+        "commandId": "cmd_prep_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "parts.partrequest",
+        "instanceKey": "evt_01J8ZP7Q"
+      },
+      "expect": {
+        "lastResult": {
+          "outcome": "rejected",
+          "code": "qualification_blocked"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "trust-gate-freetext-and-ai",
+      "severity": "info",
+      "summary": "freeText 与 ai-proposal 资格来源在唯一物化路径被 gate：freeText 永不成为 PartRequest（落 inquiry_log）；ai-proposal 永久禁资格化（即使带 componentCode）——「UI 隐藏按钮不等于 domain protection」的 Tool 层落实。"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "parts.visit",
+        "instanceKey": "visit_2026_09_20_s042"
+      },
+      "expect": {
+        "stateId": "open"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "materialize-durable-retry-gap",
+      "severity": "divergence",
+      "summary": "现状缺口（DH 的增量价值）：ingest hook 在事件事务提交后运行，物化失败=终态 exception 并依赖设备重推——设备丢失则回执永久未物化（钱与库存缺一边）。迁移后由 durable message retry 承接，exception 去重纪律保留。",
+      "related": "契约草案 §11 / §12.3"
+    }
+  ]
+}

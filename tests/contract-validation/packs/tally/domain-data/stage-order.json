@@ -1,0 +1,5 @@
+{
+  "order": ["requirements", "plan", "architecture", "dag_active"],
+  "immutableAfterAccept": true,
+  "errorCodes": { "outOfOrder": "stage_order_violation", "alreadyAccepted": "stage_immutable" }
+}

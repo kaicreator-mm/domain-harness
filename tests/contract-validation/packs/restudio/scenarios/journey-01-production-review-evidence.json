@@ -1,0 +1,199 @@
+{
+  "id": "journey-01-production-review-evidence",
+  "description": "Restudio 目标旅程（data-only）：Restore→AWAITING_REVIEW（T2T 评审暂停，checkpoint+ReviewCase 既有 HITL 范式）；ResolveReview 同事务→RUNNING 续跑 next_index；T2X per-output 失败态；validating 相位 Evidence-first（7 项 checks）→READY→DELIVERED；媒体作业 operation_ref+deadline。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "restudio.project",
+      "instanceKey": "proj_talk_01",
+      "input": {
+        "projectId": "proj_talk_01"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "messageId": "restore:restudio.project:proj_talk_01",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "productPhase": "PLAN_COMPILED",
+          "runStatus": "AWAITING_REVIEW"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "expect": {
+        "stateId": "awaiting_review"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "restudio.workspace-state",
+      "key": "proj_talk_01",
+      "expect": {
+        "pending": [
+          {
+            "kind": "t2t-review"
+          }
+        ],
+        "body": {
+          "runStatus": "AWAITING_REVIEW",
+          "specAccepted": true
+        }
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "messageId": "cmd_resolve_1",
+      "type": "ResolveReview",
+      "payload": {
+        "commandId": "cmd_resolve_1",
+        "reviewCaseId": "review_7d8e9f0a1b2c",
+        "resolution": "edit",
+        "correction": {
+          "segmentId": "seg_0093",
+          "text": "ပြင်ဆင်ထားသော စာသား"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "expect": {
+        "stateId": "running",
+        "lastResult": {
+          "outcome": "applied",
+          "resumedFromIndex": 4
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "hitl-checkpoint-pattern-reused",
+      "severity": "info",
+      "summary": "review=True → durable checkpoint + ReviewCase + REVIEW_REQUIRED 的 HITL 范式原样进 awaiting_review 相位（该模式修复过评审恢复死循环，是 restudio 反向输入 DomainHarness 的四件素材之一）；恢复从 next_index 续跑、链尾 clear_checkpoint。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "messageId": "media:llm:t2x_blog:op_0201",
+      "type": "StageOutputRecorded",
+      "payload": {
+        "stage": "t2x",
+        "outputs": [
+          {
+            "format": "article_my",
+            "status": "succeeded"
+          },
+          {
+            "format": "short_video",
+            "status": "failed",
+            "errorClass": "unavailable"
+          }
+        ]
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "expect": {
+        "lastResult": {
+          "partial": true,
+          "failedOutputs": [
+            "short_video"
+          ]
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "per-output-failure-state",
+      "severity": "divergence",
+      "summary": "现状缺口修复验证：T2X 并行扇出单输出异常被捕获成 ERROR 事件但 run 仍 completed（无 per-output 重试/补偿/失败态）——契约要求每输出独立 StepOutcome 落 RunState.operation_refs，partial 结果+显式失败清单进 evidence，重试=per-output 命令。",
+      "related": "契约草案 §2"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "messageId": "cmd_evidence_1",
+      "type": "ValidateOutputs",
+      "payload": {
+        "commandId": "cmd_evidence_1",
+        "runId": "run_0007"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "expect": {
+        "stateId": "failed_phase",
+        "lastResult": {
+          "outcome": "rejected",
+          "code": "evidence_incomplete",
+          "missingChecks": [
+            "has_artifacts"
+          ]
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "evidence-first-completion",
+      "severity": "info",
+      "summary": "Evidence-first 完成判定（DONE≠完成）：7 项 checks（execution_completed/no_open_reviews/has_artifacts/quality_score/acceptance[]/pins/provenance）任一缺失→READY 不可达，failed_phase 可见可重试——修复现状 3 项弱 checks + per-project 覆盖式 evidence。"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "restudio.project",
+        "instanceKey": "proj_talk_01"
+      },
+      "expect": {
+        "stateId": "failed_phase"
+      }
+    }
+  ]
+}

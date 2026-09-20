@@ -1,0 +1,18 @@
+[
+  {
+    "key": "operation_job_2140",
+    "revision": "rev-job-2140-0005",
+    "value": {
+      "jobId": "job_2140",
+      "idempotencyKey": "idem-mastering-song014-v3",
+      "kind": "audio.mastering",
+      "state": "queued",
+      "attemptCount": 0,
+      "maxAttempts": 2,
+      "correlationId": "corr_song_014_mastering",
+      "cancelRequested": false,
+      "heartbeatAt": null,
+      "queuedAt": "2026-09-20T06:00:00.000Z"
+    }
+  }
+]

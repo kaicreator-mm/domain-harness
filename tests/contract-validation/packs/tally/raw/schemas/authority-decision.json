@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["commandId", "taskId", "decision", "actor"],
+  "properties": {
+    "commandId": { "type": "string" },
+    "taskId": { "type": "string" },
+    "decision": { "type": "string", "enum": ["accept", "reject", "rework"] },
+    "actor": { "type": "string" },
+    "reason": { "type": "string" }
+  }
+}

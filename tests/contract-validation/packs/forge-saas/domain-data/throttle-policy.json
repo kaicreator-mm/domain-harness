@@ -1,0 +1,6 @@
+{
+  "perSitePerDay": 2,
+  "uniqueKey": "(siteId, date)",
+  "exceedBehavior": "不失败——自动排期下一槽位并延迟重入队（红线#2）",
+  "snapshotDiscipline": "approved-only immutable snapshot 首建持久化；retry 按「最新 publish 观察是否晚于 snapshot」判定复用（S08）"
+}

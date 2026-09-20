@@ -1,0 +1,161 @@
+[
+  {
+    "toolId": "appendEvents",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "shopId",
+        "events"
+      ],
+      "properties": {
+        "shopId": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "principalType": {
+          "type": "string",
+          "enum": [
+            "shop",
+            "delivery",
+            "admin"
+          ]
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "accepted",
+        "rejected"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "integer"
+        },
+        "rejected": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "headServerSeq": {
+          "type": "integer"
+        }
+      }
+    },
+    "notes": "sync/push 主入口（≤500/批逐事件 accept/reject）；unique(shopId,eventId)；serverSeq 同事务分配；非法 urgent 事件永不进日志；admin 禁 push。"
+  },
+  {
+    "toolId": "submitDeliveryNote",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "visitId",
+        "clientNoteId",
+        "lines"
+      ],
+      "properties": {
+        "visitId": {
+          "type": "string"
+        },
+        "clientNoteId": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "legacyPurchaseOrderId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "noteId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "replayed",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        },
+        "receivableEventId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "五步单事务：幂等检查→note+lines 冻结价→匹配 fulfil（prepared 优先，reference-aware 消费恰好这些 reservation）→逐行库存 commit+FIFO 归因→恰好一条 purchase.delivered。任何失败整体回滚。"
+  },
+  {
+    "toolId": "prepareRequest",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "requestId",
+        "commandId"
+      ],
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commandId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "promisedDate": {
+          "type": "string"
+        },
+        "reservedEventId": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "单事务：条件 UPDATE WHERE status=open→读政策/SKU 价→冻结 basis/promisedDate/policyRevision→发 reserve.created（确定性 eventId rsv-c-<requestId>，重放 no-op）。"
+  }
+]

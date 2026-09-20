@@ -1,0 +1,20 @@
+{
+  "context": {
+    "pinRequired": false,
+    "note": "自由引用，只进血缘"
+  },
+  "hard_gate": {
+    "pinRequired": true,
+    "requiredRefs": [
+      "snapshotRef",
+      "provenanceRef"
+    ],
+    "missingRefsBehavior": "拒绝（TS application 层 + Rust kernel 双重校验）"
+  },
+  "llmBoundary": "LLM 输出未经 Kernel 人工确认不得成为 confirmed truth；AI client 结构上无 commit 路径（HV-08）",
+  "humanDecisionPoints": [
+    "确认来源",
+    "裁决矛盾",
+    "决定发布"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "project": "tally",
+  "tier": "executable",
+  "domainId": "tally",
+  "domainVersion": "1.5.5-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/tally.md",
+  "notes": "Executable validation of the Tally contract draft (trimmed slice): tally.project E workflow with stage coordination, deterministic CompletionContract evaluation as a pure expression gate, human-authority waiting state, structured rejection for dispatch conflicts, and restart across an awaiting-authority wait. Constitution respected: the Active TaskDAG stays the business authority (business source), the workflow only carries progression/execution semantics (S3)."
+}

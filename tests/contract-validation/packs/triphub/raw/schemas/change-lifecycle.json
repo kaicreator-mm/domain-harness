@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": ["commandId", "target"],
+  "properties": {
+    "commandId": { "type": "string" },
+    "target": { "type": "string", "enum": ["draft", "planned", "active", "completed", "archived"] }
+  }
+}

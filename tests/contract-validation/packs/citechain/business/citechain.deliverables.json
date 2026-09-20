@@ -1,0 +1,18 @@
+[
+  {
+    "key": "task_4c1e",
+    "revision": "rev-deliv-4c1e-0002",
+    "value": {
+      "deliverables": [
+        {
+          "deliverableId": "deliv_01",
+          "title": "合资条款影响对比表",
+          "delivered": true,
+          "revision": 1,
+          "deliveredAtMs": 1789600000000,
+          "staleReason": null
+        }
+      ]
+    }
+  }
+]

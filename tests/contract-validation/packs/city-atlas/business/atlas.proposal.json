@@ -1,0 +1,19 @@
+[
+  {
+    "key": "prop_2041",
+    "revision": "rev-prop-2041-0002",
+    "value": {
+      "proposalId": "prop_2041",
+      "kind": "poi_update",
+      "state": "pending_review",
+      "poiId": "clp:poi:9912",
+      "fields": {
+        "opening_hours": "08:00-20:00 (Mon-Sat)"
+      },
+      "baseSnapshot": "snap_9f2c",
+      "licenseClass": "main",
+      "proposedBy": "collector_batch_B-2041-0037-04",
+      "proposedAt": "2026-09-19T09:12:00.000Z"
+    }
+  }
+]

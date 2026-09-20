@@ -1,0 +1,165 @@
+[
+  {
+    "source": "restudio.project",
+    "notes": "project.json + SourceX 登记（补 PRD SourceX 实体：哈希登记+存在性校验）+ stage 载荷存在性 + pins（重放/审计可强制的前提）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "projectId",
+        "status",
+        "productPhase",
+        "sourceX",
+        "stageOutputs",
+        "pins"
+      ],
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "created",
+            "running",
+            "paused",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "productPhase": {
+          "type": "string",
+          "enum": [
+            "DRAFT",
+            "SOURCE_UNDERSTOOD",
+            "TARGET_DESIGNING",
+            "TARGET_CONFIRMED",
+            "PLAN_COMPILED",
+            "RUNNING",
+            "AWAITING_REVIEW",
+            "VALIDATING",
+            "READY",
+            "DELIVERED"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "sourceX": {
+          "type": "object"
+        },
+        "stageOutputs": {
+          "type": "object"
+        },
+        "artifacts": {
+          "type": "array"
+        },
+        "pins": {
+          "type": "object",
+          "required": [
+            "harnessId",
+            "harnessVersion",
+            "specId"
+          ],
+          "properties": {
+            "harnessId": {
+              "type": "string"
+            },
+            "harnessVersion": {
+              "type": "string"
+            },
+            "specId": {
+              "type": "string"
+            },
+            "specRevision": {
+              "type": "integer"
+            },
+            "planId": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "restudio.runState",
+    "notes": "ProductionRunState（L2 §8 字段原样：execution_cursor/status/pending_review/compiled_plan_revision/operation_refs/last_durable_event）——workflow 跨消息只存控制相位，运行数据在此（S2/[G5] 临时约定）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "executionCursor",
+        "status"
+      ],
+      "properties": {
+        "executionCursor": {
+          "type": "object"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "IDLE",
+            "RUNNING",
+            "AWAITING_REVIEW",
+            "PAUSED",
+            "FAILED",
+            "DONE"
+          ]
+        },
+        "pendingReview": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "compiledPlanRevision": {
+          "type": "integer"
+        },
+        "operationRefs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "lastDurableEvent": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "source": "restudio.design",
+    "notes": "当前设计会话（收敛为每项目单一活跃会话——修复 UI 挂载即新建的增生缺陷）+ spec（accepted 端点补齐后）+ plan pins。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "sessionId",
+        "revision"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "intent": {
+          "type": "object"
+        },
+        "spec": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "plan": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "phases": [
+    "intent",
+    "preparing",
+    "creating",
+    "reviewing",
+    "delivered"
+  ],
+  "transitions": {
+    "intent": [
+      "preparing"
+    ],
+    "preparing": [
+      "creating"
+    ],
+    "creating": [
+      "reviewing"
+    ],
+    "reviewing": [
+      "creating",
+      "delivered"
+    ],
+    "delivered": []
+  },
+  "appendLatestWins": true,
+  "deliverSubflow": [
+    "归属校验",
+    "phase==reviewing",
+    "read snapshot",
+    "harness.validate",
+    "deliveryGate.validateDelivery",
+    "有 error 即拒（HV-13 空 findings 无法绕过）",
+    "commit deliverable + task"
+  ],
+  "revisionLoopAddedByContract": "delivered→stale→revising→delivered(v+1)（补仓库 C3 缺口；delivered 现状无 reopen）"
+}

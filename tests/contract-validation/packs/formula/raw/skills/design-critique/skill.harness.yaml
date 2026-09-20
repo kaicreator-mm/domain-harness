@@ -1,0 +1,4 @@
+output:
+  schema: output.schema.json
+resources:
+  - refs/quality-ladder.md

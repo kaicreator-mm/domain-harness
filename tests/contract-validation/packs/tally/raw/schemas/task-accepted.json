@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "required": ["taskId", "facts", "commandId"],
+  "properties": {
+    "taskId": { "type": "string" },
+    "commandId": { "type": "string" },
+    "facts": {
+      "type": "object",
+      "required": ["verification_passed", "changeset_frozen"],
+      "properties": {
+        "verification_passed": { "type": "boolean" },
+        "changeset_frozen": { "type": "boolean" },
+        "review_completed": { "type": "boolean" }
+      }
+    }
+  }
+}

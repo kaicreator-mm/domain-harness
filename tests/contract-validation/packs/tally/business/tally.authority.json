@@ -1,0 +1,7 @@
+[
+  {
+    "key": "proj_atlas",
+    "revision": "rev-authority-atlas-0001",
+    "value": { "decisions": [], "pendingMergeApprovals": ["PR-42"] }
+  }
+]

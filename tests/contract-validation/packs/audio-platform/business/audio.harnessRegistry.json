@@ -1,0 +1,48 @@
+[
+  {
+    "key": "delivery-qc",
+    "revision": "rev-registry-dq-0011",
+    "value": {
+      "packageId": "delivery-qc",
+      "aliases": [
+        {
+          "kind": "active",
+          "versionId": "hv_delivery_qc_7",
+          "revision": 4,
+          "updatedBy": "reviewer_kyaw"
+        },
+        {
+          "kind": "shadow",
+          "versionId": "hv_delivery_qc_8",
+          "revision": 2,
+          "updatedBy": "operator_nyein"
+        },
+        {
+          "kind": "candidate",
+          "set": false
+        }
+      ],
+      "versions": [
+        {
+          "versionId": "hv_delivery_qc_7",
+          "status": "ACTIVE",
+          "semver": "1.4.0"
+        },
+        {
+          "versionId": "hv_delivery_qc_8",
+          "status": "SHADOW",
+          "semver": "1.5.0-rc.1"
+        }
+      ],
+      "lastReplay": {
+        "replayId": "replay_0031",
+        "baseline": "hv_delivery_qc_7",
+        "candidate": "hv_delivery_qc_8",
+        "outcomeChanged": 0,
+        "ruleAdded": 2,
+        "ruleRemoved": 0,
+        "reportHash": "sha256:77e1"
+      }
+    }
+  }
+]

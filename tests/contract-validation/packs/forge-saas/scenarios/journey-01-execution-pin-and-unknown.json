@@ -1,0 +1,162 @@
+{
+  "id": "journey-01-execution-pin-and-unknown",
+  "description": "Forge 目标旅程（data-only）：内容执行 R 实例以 deriveExecutionEventId 收敛身份开通；verifyPinnedRelease compare-before-start；AI TIMEOUT→UNKNOWN hold（不映射 failed/success）；reconcile probe 决定性证据收敛；in-flight pin 被 promotion 取代→永不重定向按 pin 完成（INV-11）；页面发布节流超限→自动排期下一槽（不失败）。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "forge.execution",
+      "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1",
+      "input": {
+        "tenantId": "tenant_myanmar_teak",
+        "inputFingerprint": "fp_v28_77a1"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "messageId": "restore:execution:77a1",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "pin": "trade-site-harness-v2952-r7"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "expect": {
+        "stateId": "dispatched"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "messageId": "exec:77a1:timeout",
+      "type": "GenerationObserved",
+      "payload": {
+        "status": "TIMEOUT",
+        "commandId": "obs_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "expect": {
+        "stateId": "unknown_hold"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "unknown-is-first-class",
+      "severity": "divergence",
+      "summary": "TIMEOUT→UNKNOWN 是合法驻留态（可能已计费）：绝不映射 failed/success，只经 reconcile probe 的决定性证据收敛，结构上无 blind retry。当前 SDK 的 disposition 词表（processed/failed/abandoned）没有 unknown 驻留语义——v0.3 effect/journal 设计应把「语义不明」建为一等公民（Cairn RECOVERY_REQUIRED、Audio paid_retry_policy、Tally UNCERTAIN 同族证据）。",
+      "related": "分析文档 §3.5 / v0.3 PRD §14"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "messageId": "reconcile:inv_gen_501:SUCCESS",
+      "type": "ReconciliationResolved",
+      "payload": {
+        "invocationId": "inv_gen_501",
+        "evidence": "SUCCESS",
+        "commandId": "rec_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "expect": {
+        "stateId": "validating"
+      }
+    },
+    {
+      "action": "expect-business",
+      "source": "forge.invocations",
+      "key": "tenant_myanmar_teak",
+      "expect": {
+        "invocations": [
+          {
+            "invocationId": "inv_gen_501",
+            "status": "succeeded"
+          }
+        ]
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "forge.page",
+        "instanceKey": "page_furniture_th_01"
+      },
+      "messageId": "cmd_pub_1",
+      "type": "RequestPublish",
+      "payload": {
+        "commandId": "cmd_pub_1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "forge.page",
+        "instanceKey": "page_furniture_th_01"
+      },
+      "expect": {
+        "lastResult": {
+          "outcome": "applied",
+          "rescheduledToSlot": "2026-09-21"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "throttle-reschedules-not-fails",
+      "severity": "info",
+      "summary": "发布节流超限不失败：自动排期下一槽位并延迟重入队（红线#2）——映射为 applied(rescheduled) 而非 rejected；[G6] 持久定时器承接延迟重入队。"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "forge.execution",
+        "instanceKey": "tenant_myanmar_teak-generation-fp_v28_77a1"
+      },
+      "expect": {
+        "stateId": "validating"
+      }
+    }
+  ]
+}

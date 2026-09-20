@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "required": ["snapshot"],
+  "properties": {
+    "snapshot": {
+      "type": "object",
+      "required": ["activeTag", "draftCount", "publishState"],
+      "properties": {
+        "activeTag": { "type": "string" },
+        "draftCount": { "type": "integer", "minimum": 0 },
+        "publishState": { "type": "string", "enum": ["none", "ready", "blocked"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,172 @@
+[
+  {
+    "toolId": "runStageT2T",
+    "effect": "non-idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "projectId",
+        "nodeId",
+        "chunkIndex",
+        "idempotencyKey"
+      ],
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "chunkIndex": {
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "targetLang": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "Completed",
+            "Pending",
+            "Failed"
+          ]
+        },
+        "errorClass": {
+          "type": "string",
+          "enum": [
+            "transient",
+            "unavailable",
+            "invalid_request",
+            "policy_rejection",
+            "quality_failure",
+            "unsupported_capability",
+            "human_action_required"
+          ]
+        },
+        "segments": {
+          "type": "array"
+        },
+        "operationRef": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "LLM 回合幂等键 {projectId}:{nodeId}:{chunkIndex}:{inputHash}（修复「任何异常重试 3 次且无幂等键」的重复计费缺陷）；committed result 入 journal，replay 复用不重新计费。"
+  },
+  {
+    "toolId": "resolveReview",
+    "effect": "idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "reviewCaseId",
+        "resolution",
+        "commandId"
+      ],
+      "properties": {
+        "reviewCaseId": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "accept",
+            "edit",
+            "reject"
+          ]
+        },
+        "correction": {
+          "type": "object"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commandId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "ReviewCase+Memory.corrections 同事务（修复两步非事务）；already_resolved→rejected；恢复从 checkpoint next_index 续跑，链尾 clear_checkpoint（既有语义）。"
+  },
+  {
+    "toolId": "buildEvidence",
+    "effect": "idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "projectId",
+        "runId"
+      ],
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "checks"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "evidenceId": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "按 run 归档（替代 per-project 覆盖式单份+GET 即写）；7 项 checks 含 quality_score 汇总+acceptance[] 逐项+pins 校验+provenance。"
+  }
+]

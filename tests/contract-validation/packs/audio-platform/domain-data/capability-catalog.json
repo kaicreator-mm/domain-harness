@@ -1,0 +1,36 @@
+{
+  "categories": [
+    "probe",
+    "decode",
+    "measure",
+    "analyze",
+    "transform",
+    "model"
+  ],
+  "availabilityVocabulary": [
+    "available",
+    "missing_dependency",
+    "missing_binary",
+    "requires_model",
+    "license_gated",
+    "disabled"
+  ],
+  "failClosed": "未注册→CapabilityNotRegistered；availability≠available→CapabilityUnavailable；LLM 只能选注册 capability，不能发明 provider 调用",
+  "notAdopted": [
+    {
+      "id": "pedalboard",
+      "license": "GPL-3.0-only"
+    },
+    {
+      "id": "essentia",
+      "license": "AGPL-3.0-only",
+      "optIn": false
+    }
+  ],
+  "requiresModelNoSyntheticPromotion": [
+    "demucs",
+    "torchcrepe",
+    "basic-pitch"
+  ],
+  "effectAnnotationGap": "现状 destructive 几乎全 False（连 audio.transform.ffmpeg 也是）——迁移必须补 effect∈none|idempotent|non-idempotent 标注，审批权从 plan 数据移到 Tool 声明（AIRuntimePlanner 现状允许模型输出覆盖 requires_approval）"
+}

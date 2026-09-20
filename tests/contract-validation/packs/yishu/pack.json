@@ -1,0 +1,8 @@
+{
+  "project": "yishu",
+  "tier": "executable",
+  "domainId": "yishu",
+  "domainVersion": "2.8.2-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/yishu.md",
+  "notes": "Executable validation of the YISHU contract draft (trimmed slice): yishu.knowledge S-instance governing the candidate→draft→publish pipeline with the regression gate (new failures block, no force-publish entry), TOCTOU drafts-fingerprint revalidation at publish, LLM-candidate batch-confirm prohibition (AI has no approval authority), pointer-move rollback, and restart across the governance flow. Translation execution itself stays a synchronous Tool/API in this slice (workflow per Document/Scope, never per segment)."
+}

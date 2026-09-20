@@ -1,0 +1,119 @@
+[
+  {
+    "source": "formula.design",
+    "notes": "Design 聚合摘要（head 指针为唯一可变状态；契约草案 §4）。revision=行版本，B1/B2 由 SimBusinessStore 内容哈希保证。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["designId", "title", "headVersionId", "docHash", "approvalStatus"],
+      "properties": {
+        "designId": { "type": "string" },
+        "title": { "type": "string" },
+        "brief": { "type": "string" },
+        "headVersionId": { "type": "string" },
+        "docHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "selectedArtifactId": { "type": ["string", "null"] },
+        "approvalStatus": { "type": "string", "enum": ["drafting", "reviewing", "approved", "exported"] },
+        "approvedAt": { "type": "string" },
+        "approvedVersionId": { "type": "string" }
+      }
+    }
+  },
+  {
+    "source": "formula.artifacts",
+    "notes": "FrozenAsset 摘要（内容寻址 frozenHash）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["artifacts"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["artifactId", "frozenHash", "format"],
+            "properties": {
+              "artifactId": { "type": "string" },
+              "frozenHash": { "type": "string" },
+              "format": { "type": "string" },
+              "createdAt": { "type": "string" },
+              "jobId": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "formula.jobs",
+    "notes": "生成作业表（S2：流程数据进业务库；deadline 供 P2 超时调度器扫描）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["jobs"],
+      "properties": {
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["jobId", "kind", "status"],
+            "properties": {
+              "jobId": { "type": "string" },
+              "kind": { "type": "string" },
+              "status": { "type": "string", "enum": ["running", "superseded", "done", "failed"] },
+              "promptHash": { "type": "string" },
+              "prompt": { "type": "string" },
+              "submittedAt": { "type": "string" },
+              "deadline": { "type": "string" },
+              "finishedAt": { "type": "string" },
+              "commandId": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "formula.reviews",
+    "notes": "质量评审记录（append；latest 决定审批闸）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["reviews"],
+      "properties": {
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["reviewId", "verdict", "score"],
+            "properties": {
+              "reviewId": { "type": "string" },
+              "verdict": { "type": "string", "enum": ["certified", "needs_work"] },
+              "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "findings": { "type": "array", "items": { "type": "string" } },
+              "at": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "formula.appliedEffects",
+    "notes": "applied_effects(command_id, result) 幂等账本（契约草案 §3：写业务 Tool 的幂等机制）。",
+    "valueSchema": {
+      "type": "object",
+      "required": ["effects"],
+      "properties": {
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["commandId", "result"],
+            "properties": {
+              "commandId": { "type": "string" },
+              "at": { "type": "string" },
+              "result": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  }
+]

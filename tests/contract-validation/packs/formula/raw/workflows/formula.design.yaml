@@ -1,0 +1,167 @@
+# formula.design — 命令入口 E workflow（契约草案 §2）
+# 约定落实：W1 实例只停在静止状态；W2 静止状态无 invoke/effect；
+# W3 每个静止状态接受全部入站消息类型（approved_st 对 ApproveDesign 的
+# 缺失是**刻意保留的 W3 违例**，用于 journey-02 复现 #137 毒化行为）；
+# W4 init 只经 Restore 离开；W5 每个静止状态接受 Close；
+# R2 条件路由以无条件兜底结尾；R3 业务结论以结构化 outcome 返回；
+# R4 拒绝路径是瞬时状态，expression 产出 rejected 后无条件回原静止状态。
+initial: init
+states:
+  init:
+    on:
+      Restore:
+        schema: schemas/restore-design.json
+        routes:
+          - target: approved_st
+            when: "message.snapshot.approvalStatus = 'approved'"
+          - target: reviewing
+            when: "message.snapshot.approvalStatus = 'reviewing'"
+          - target: drafting
+
+  drafting:
+    on:
+      Restore:
+        schema: schemas/restore-design.json
+        routes: [{ target: drafting__reject }]
+      GenerateVariant:
+        schema: schemas/generate-variant.json
+        routes: [{ target: announcing_generation }]
+      SubmitForReview:
+        schema: schemas/command.json
+        routes: [{ target: reviewing }]
+      RequestQualityReview:
+        schema: schemas/quality-review-request.json
+        routes: [{ target: drafting__reject }]
+      ApproveDesign:
+        schema: schemas/command.json
+        routes: [{ target: drafting__reject }]
+      GenerationCompleted:
+        schema: schemas/generation-completed.json
+        routes: [{ target: noting_generation_draft }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  drafting__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_drafting", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: drafting }]
+
+  announcing_generation:
+    effects:
+      - kind: domain-message
+        targetExpression: '{ "workflowId": "formula.generation", "instanceKey": address.instanceKey }'
+        messageType: StartGeneration
+        payloadExpression: '{ "designId": address.instanceKey, "prompt": state.lastMessage.prompt, "commandId": state.lastMessage.commandId }'
+    invoke:
+      expr: 'state.lastMessage'
+    on:
+      done: [{ target: drafting }]
+
+  noting_generation_draft:
+    invoke:
+      expr: 'state.lastMessage'
+    on:
+      done: [{ target: drafting }]
+
+  reviewing:
+    on:
+      Restore:
+        schema: schemas/restore-design.json
+        routes: [{ target: reviewing__reject }]
+      GenerateVariant:
+        schema: schemas/generate-variant.json
+        routes: [{ target: reviewing__reject }]
+      SubmitForReview:
+        schema: schemas/command.json
+        routes: [{ target: reviewing__reject }]
+      RequestQualityReview:
+        schema: schemas/quality-review-request.json
+        routes: [{ target: critiquing }]
+      ApproveDesign:
+        schema: schemas/command.json
+        routes: [{ target: approving }]
+      GenerationCompleted:
+        schema: schemas/generation-completed.json
+        routes: [{ target: noting_generation_review }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  reviewing__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_reviewing", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: reviewing }]
+
+  noting_generation_review:
+    invoke:
+      expr: 'state.lastMessage'
+    on:
+      done: [{ target: reviewing }]
+
+  critiquing:
+    invoke:
+      skill: design-critique
+      input: '{ "designId": address.instanceKey, "brief": state.lastMessage.brief, "headVersionId": state.lastMessage.headVersionId }'
+    on:
+      done: [{ target: recording_review }]
+      error: [{ target: failed }]
+
+  recording_review:
+    invoke:
+      tool: recordQualityReview
+      input: '{ "designId": address.instanceKey, "review": result, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: reviewing }]
+      error: [{ target: failed }]
+
+  approving:
+    invoke:
+      tool: approveDesign
+      input: '{ "designId": address.instanceKey, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: approved_st
+          when: "result.outcome = 'applied'"
+        - target: reviewing
+      error: [{ target: failed }]
+
+  approved_st:
+    on:
+      Restore:
+        schema: schemas/restore-design.json
+        routes: [{ target: approved_st__reject }]
+      GenerateVariant:
+        schema: schemas/generate-variant.json
+        routes: [{ target: approved_st__reject }]
+      SubmitForReview:
+        schema: schemas/command.json
+        routes: [{ target: approved_st__reject }]
+      RequestQualityReview:
+        schema: schemas/quality-review-request.json
+        routes: [{ target: approved_st__reject }]
+      GenerationCompleted:
+        schema: schemas/generation-completed.json
+        routes: [{ target: approved_st__reject }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+      # 刻意不声明 ApproveDesign（W3 违例）：用于 journey-02 复现
+      # “已批准的 design 上重复点击审批”毒化实例的现状行为（issue #137）。
+
+  approved_st__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "locked_after_approval", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: approved_st }]
+
+  failed:
+    on:
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  closed:
+    final: true

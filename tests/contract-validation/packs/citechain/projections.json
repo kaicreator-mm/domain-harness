@@ -1,0 +1,60 @@
+[
+  {
+    "projectionId": "citechain.task-workbench",
+    "expression": "( $t := business[source = 'citechain.task'].value; $u := business[source = 'citechain.usages'].value; $d := business[source = 'citechain.deliverables'].value; { 'key': key, 'phase': $t.phase, 'availableActions': $t.phase = 'reviewing' ? [ { 'type': 'Deliver', 'enabled': $count($u.usages[mode = 'hard_gate']) > 0 }, { 'type': 'BackToCreating', 'enabled': true } ] : $t.phase = 'creating' ? [ { 'type': 'SaveSegments', 'enabled': true }, { 'type': 'RequestReview', 'enabled': true } ] : [], 'pending': [ $d.deliverables[staleReason != null].{ 'kind': 'stale-deliverable' } ], 'lastOutcome': null, 'body': { 'title': $t.title, 'harnessId': $t.harnessId, 'usageCount': $count($u.usages), 'hardGateCount': $count($u.usages[mode = 'hard_gate']), 'deliverables': $d.deliverables } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "citechain.task",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "citechain.usages",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "citechain.deliverables",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "phase-transitions"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

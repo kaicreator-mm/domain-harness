@@ -1,0 +1,51 @@
+[
+  {
+    "projectionId": "triphub.journey-state",
+    "expression": "( $j := workflows[address.workflowId = 'triphub.journey']; $bj := business[source = 'triphub.journey'].value; $jobs := business[source = 'triphub.jobs'].value; $bk := business[source = 'triphub.bookings'].value; $last := $j.state.lastResult; { 'key': key, 'phase': $j.state.stateId, 'availableActions': $j.state.stateId = 'txn_previewing' ? [ { 'type': 'TxnConfirm', 'enabled': true }, { 'type': 'TxnIntent', 'enabled': true } ] : $j.state.stateId = 'planned_st' ? [ { 'type': 'TxnIntent', 'enabled': true }, { 'type': 'ChangeLifecycle', 'enabled': true } ] : $j.state.stateId = 'drafting' ? [ { 'type': 'ChangeLifecycle', 'enabled': true } ] : $j.state.stateId = 'experiencing' ? [ { 'type': 'ChangeLifecycle', 'enabled': true } ] : [], 'pending': [ $jobs.quotes[status = 'active'].{ 'kind': 'txn-preview', 'since': issuedAt } ], 'lastOutcome': $last.commandId ? $last : null, 'body': { 'lifecycle': $bj.lifecycle, 'commitment': $bj.commitment, 'publication': $bj.publication, 'shareTruthMode': $bj.shareTruthMode, 'itemCount': $count($bj.items), 'bookedCount': $count($bj.items[state = 'booked']), 'bookingCount': $count($bk.bookings), 'activeQuoteCount': $count($jobs.quotes[status = 'active']) } } )",
+    "dependencies": [
+      { "kind": "workflow", "selector": { "workflowId": "triphub.journey" } },
+      { "kind": "business", "source": "triphub.journey", "selector": {} },
+      { "kind": "business", "source": "triphub.jobs", "selector": {} },
+      { "kind": "business", "source": "triphub.bookings", "selector": {} },
+      { "kind": "domain-data", "key": "lifecycle-transitions" }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": ["key", "phase", "availableActions", "pending", "body"],
+      "properties": {
+        "key": { "type": "string" },
+        "phase": { "type": "string" },
+        "availableActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "enabled"],
+            "properties": { "type": { "type": "string" }, "enabled": { "type": "boolean" } }
+          }
+        },
+        "pending": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": { "kind": { "type": "string" }, "since": { "type": "string" } }
+          }
+        },
+        "lastOutcome": { "type": ["object", "null"] },
+        "body": {
+          "type": "object",
+          "properties": {
+            "lifecycle": { "type": "string" },
+            "commitment": { "type": "string" },
+            "publication": { "type": "string" },
+            "shareTruthMode": { "type": "string" },
+            "itemCount": { "type": "number" },
+            "bookedCount": { "type": "number" },
+            "bookingCount": { "type": "number" },
+            "activeQuoteCount": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+]

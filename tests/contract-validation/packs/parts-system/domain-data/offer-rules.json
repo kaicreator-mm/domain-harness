@@ -1,0 +1,25 @@
+{
+  "classes": [
+    "IN_STOCK",
+    "NEXT_DELIVERY",
+    "ORDER_AIR",
+    "ORDER_SEA",
+    "CONSOLIDATE_MOQ",
+    "NOT_SUPPORTED"
+  ],
+  "threeLayerSeparation": [
+    "Capability/Constraint",
+    "Offer",
+    "Commitment"
+  ],
+  "offerIsReadTimePureFunction": true,
+  "neverPersisted": true,
+  "allDatesDerived": "政策数学或 lead-time 算术；无任何自由文本 ETA",
+  "commitment": "PartRequest.basis 冻结列",
+  "demandQueueWeights": {
+    "waiting": 4,
+    "dimensionMiss": 3,
+    "quoteExternal": 2,
+    "searchMiss": 1
+  }
+}

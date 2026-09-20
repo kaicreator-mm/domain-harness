@@ -1,0 +1,9 @@
+{
+  "name": "TASK_SCOPED_NON_IDENTIFYING_PROFILE",
+  "coordinateQuantizationMeters": 110,
+  "taskTtlHours": 4,
+  "sessionTtlHours": 24,
+  "capabilityListNeverLeavesDevice": true,
+  "noAbsoluteTimestampsInCaptures": true,
+  "note": "AI intent 解释的唯一允许上下文（v0.3 §13 declared-context-only 的既有实现）；任何快照不得聚合出「某人某时在某地」。"
+}

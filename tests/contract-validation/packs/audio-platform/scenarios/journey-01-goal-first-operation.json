@@ -1,0 +1,190 @@
+{
+  "id": "journey-01-goal-first-operation",
+  "description": "Audio Platform 目标旅程（data-only，ADR-0005 短阶段限定）：goal-first 八步流程（PRD §9）的 workflow 化——Restore(planned+pinned snapshot)→ApprovePlan（高风险步显式审批）→Execute（Registry fail-closed+前后测量 Evidence）→DecisionPacket 落盘；媒体作业 Ingress 化（替代 worker 阻塞轮询）；付费 unknown 不自动重试。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "audio.operation",
+      "instanceKey": "operation_job_2140",
+      "input": {
+        "operationId": "operation_job_2140"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "messageId": "restore:audio.operation:job_2140",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "state": "planned",
+          "snapshotId": "snap_sha256_c3d4e5f6"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "expect": {
+        "stateId": "planned"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "audio.operation-state",
+      "key": "operation_job_2140",
+      "expect": {
+        "phase": "planned",
+        "body": {
+          "operationKind": "audio.mastering",
+          "approvalRequiredSteps": 1,
+          "aliasActive": "hv_delivery_qc_7",
+          "jobState": "queued"
+        }
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "messageId": "cmd_approve_1",
+      "type": "ApprovePlan",
+      "payload": {
+        "commandId": "cmd_approve_1",
+        "approvedSteps": [
+          "audio.effect.limiter.ffmpeg"
+        ],
+        "actor": "reviewer_kyaw"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "expect": {
+        "stateId": "executing"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "approval-in-tool-declaration",
+      "severity": "divergence",
+      "summary": "审批权必须在宿主/Tool 声明：AIRuntimePlanner 现状允许模型输出的 raw requires_approval 覆盖默认（模型可自标不需审批）——契约要求 requires_approval 由 capability 风险等级+Tool 声明决定，plan 数据只读。",
+      "related": "契约草案 §3/J7"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "messageId": "media:job_2140:done",
+      "type": "JobObserved",
+      "payload": {
+        "jobId": "job_2140",
+        "status": "succeeded",
+        "outputs": [
+          {
+            "assetHash": "sha256:d4e5f6a7"
+          }
+        ]
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "expect": {
+        "stateId": "recording_decision",
+        "lastResult": {
+          "outcome": "applied"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "media-job-ingress-replaces-blocking-poll",
+      "severity": "info",
+      "summary": "MiniMax _poll_gmi 现状把外部异步作业变成 worker 线程阻塞轮询（deadline 120s 循环）——最高价值 Ingress 化点：提交+jobId→静止等待→完成/超时共用 messageId 先到者生效；心跳租约过期（1200s）作为纯超时事件由 [G6] 定时器承接。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "messageId": "cmd_gen_paid_1",
+      "type": "RunGeneration",
+      "payload": {
+        "commandId": "cmd_gen_paid_1",
+        "prompt": {
+          "style": "traditional_burmese"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "expect": {
+        "stateId": "unknown_hold",
+        "lastResult": {
+          "status": "unknown",
+          "code": "provider_outcome_unknown"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "paid-unknown-no-auto-retry",
+      "severity": "divergence",
+      "summary": "付费副作用 fail-closed：provider_outcome_unknown→不自动重试（任何路径），驻留 unknown_hold 直到 reconcile 决定性证据——与 Forge UNKNOWN 收敛、Cairn RECOVERY_REQUIRED、Tally UNCERTAIN 同族。SDK 的 attempt/重试策略必须支持 per-Tool「预算=1+人工恢复」配置，否则违反该项目已接受决策。",
+      "related": "ADR-0028 / 分析文档 §3.5"
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "audio.operation",
+        "instanceKey": "operation_job_2140"
+      },
+      "expect": {
+        "stateId": "unknown_hold"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "short-stage-only-scope",
+      "severity": "info",
+      "summary": "ADR-0005 限定保持：本 workflow 是机器尺度短阶段+人工审批点，长寿命业务态（PerformanceOrder 三天级）仍在 DB 表；不存在跨月 SongProductionWorkflow——DH 实例语义与仓库两条已接受决策兼容。"
+    }
+  ]
+}

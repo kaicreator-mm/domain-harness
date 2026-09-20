@@ -1,0 +1,89 @@
+[
+  {
+    "projectionId": "formula.design-state",
+    "expression": "( $design := workflows[address.workflowId = 'formula.design']; $gen := workflows[address.workflowId = 'formula.generation']; $bd := business[source = 'formula.design'].value; $ba := business[source = 'formula.artifacts'].value; $bj := business[source = 'formula.jobs'].value; $br := business[source = 'formula.reviews'].value; $ladder := domainData[key = 'quality-ladder'].value; $latest := $reverse($br.reviews)[0]; $last := $design.state.lastResult; { 'key': key, 'phase': $design.state.stateId, 'availableActions': $design.state.stateId = 'drafting' ? [ { 'type': 'GenerateVariant', 'enabled': true }, { 'type': 'SubmitForReview', 'enabled': true } ] : $design.state.stateId = 'reviewing' ? [ { 'type': 'RequestQualityReview', 'enabled': true }, { 'type': 'ApproveDesign', 'enabled': $latest.verdict = 'certified' } ] : $design.state.stateId = 'approved_st' ? [ { 'type': 'ExportDesign', 'enabled': true } ] : [], 'pending': [ $bj.jobs[status = 'running'].{ 'kind': 'generation', 'since': submittedAt } ], 'lastOutcome': $last.commandId ? $last : null, 'body': { 'approvalStatus': $bd.approvalStatus, 'title': $bd.title, 'headVersionId': $bd.headVersionId, 'artifactCount': $count($ba.artifacts), 'latestReview': $latest, 'generationPhase': $gen.state.stateId, 'qualityLadder': $ladder.order } } )",
+    "dependencies": [
+      { "kind": "workflow", "selector": { "workflowId": "formula.design" } },
+      { "kind": "workflow", "selector": { "workflowId": "formula.generation" } },
+      { "kind": "business", "source": "formula.design", "selector": {} },
+      { "kind": "business", "source": "formula.artifacts", "selector": {} },
+      { "kind": "business", "source": "formula.jobs", "selector": {} },
+      { "kind": "business", "source": "formula.reviews", "selector": {} },
+      { "kind": "domain-data", "key": "quality-ladder" }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": ["key", "phase", "availableActions", "pending", "body"],
+      "properties": {
+        "key": { "type": "string" },
+        "phase": { "type": "string" },
+        "availableActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "enabled"],
+            "properties": {
+              "type": { "type": "string" },
+              "enabled": { "type": "boolean" }
+            }
+          }
+        },
+        "pending": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "type": "string" },
+              "since": { "type": "string" }
+            }
+          }
+        },
+        "lastOutcome": {
+          "type": ["object", "null"],
+          "properties": {
+            "outcome": { "type": "string", "enum": ["applied", "rejected"] },
+            "code": { "type": "string" },
+            "reason": { "type": "string" },
+            "commandId": { "type": "string" },
+            "approvedVersionId": { "type": "string" }
+          }
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "approvalStatus": { "type": "string" },
+            "title": { "type": "string" },
+            "headVersionId": { "type": "string" },
+            "artifactCount": { "type": "number" },
+            "latestReview": { "type": "object" },
+            "generationPhase": { "type": "string" },
+            "qualityLadder": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  {
+    "projectionId": "formula.design-state-v2",
+    "expression": "( $design := workflows[address.workflowId = 'formula.design']; { 'key': key, 'phase': $design.state.stateId, 'availableActions': [], 'pending': [], 'lastOutcome': null, 'body': { 'approvalStatus': business[source = 'formula.design'].value.approvalStatus, 'creativePolicy': domainData[key = 'creative-policy'].value } } )",
+    "dependencies": [
+      { "kind": "workflow", "selector": { "workflowId": "formula.design" } },
+      { "kind": "business", "source": "formula.design", "selector": {} },
+      { "kind": "domain-data", "key": "creative-policy" }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": ["key", "phase", "availableActions", "pending", "body"],
+      "properties": {
+        "key": { "type": "string" },
+        "phase": { "type": "string" },
+        "availableActions": { "type": "array" },
+        "pending": { "type": "array" },
+        "lastOutcome": { "type": ["object", "null"] },
+        "body": { "type": "object" }
+      }
+    },
+    "$comment": "G1 evidence: references domain-data key 'creative-policy' that the pack deliberately does NOT provide. Compilation and package validation both succeed (no compile-time key check exists); the failure only surfaces at query time as domain_data_not_found."
+  }
+]

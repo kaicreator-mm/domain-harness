@@ -1,0 +1,13 @@
+{
+  "perFieldTtlDays": {
+    "name": 365,
+    "address": 180,
+    "opening_hours": 30,
+    "contact_channel": 90,
+    "payment": 90
+  },
+  "availabilityTodayTtlHours": 6,
+  "noWildcardFallback": true,
+  "unknownIsNotFresh": true,
+  "producerTtlCanOnlyShorten": true
+}

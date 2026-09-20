@@ -1,0 +1,16 @@
+[
+  {
+    "key": "zh-my/medical",
+    "revision": "rev-cand-medical-0001",
+    "value": {
+      "candidates": [
+        { "candidateId": "cand_manual_1", "kind": "term", "source": "manual", "sampled": false, "key": "clinic", "sourceText": "诊所", "targetText": "ဆေးခန်း" },
+        { "candidateId": "cand_manual_2", "kind": "term", "source": "manual", "sampled": false, "key": "pharmacy", "sourceText": "药房", "targetText": "ဆေးဆိုင်" },
+        { "candidateId": "cand_manual_3", "kind": "phrase", "source": "manual", "sampled": false, "key": "take-medicine", "sourceText": "按时服药", "targetText": "ဆေးကို အချိန်မှန် သောက်ပါ" },
+        { "candidateId": "cand_import_1", "kind": "term", "source": "import", "sampled": true, "key": "xray", "sourceText": "X光", "targetText": "ဓာတ်မှန်ရိုက်ခြင်း" },
+        { "candidateId": "cand_llm_1", "kind": "term", "source": "llm", "sampled": false, "key": "mri", "sourceText": "核磁共振", "targetText": "ဓာတ်မှန်ခြင်း (MRI)" },
+        { "candidateId": "cand_llm_2", "kind": "term", "source": "llm", "sampled": false, "key": "ultrasound", "sourceText": "超声检查", "targetText": "အာထရာဆောင်း ပုံရိပ်ဖော်ခြင်း" }
+      ]
+    }
+  }
+]

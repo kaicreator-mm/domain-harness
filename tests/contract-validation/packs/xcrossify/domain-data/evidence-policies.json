@@ -1,0 +1,11 @@
+{
+  "states": [
+    "SATISFIED",
+    "MISSING",
+    "STALE",
+    "UNKNOWN_FRESHNESS"
+  ],
+  "failClosed": true,
+  "freshnessIsFunctionOfNow": "存下来的新鲜度必然会说谎——投影只携带 observedAt/expiresAt 原始值，判定发生在读路径",
+  "groupReplacement": "putStepEvidence 整组替换；同内容重放幂等（sameEvidenceContent）"
+}

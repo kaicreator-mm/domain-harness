@@ -1,0 +1,36 @@
+{
+  "multiSourceAdmission": {
+    "default": "EXTERNAL_EVIDENCE >= 1",
+    "silentConflictResolutionForbidden": true,
+    "qualifiesMustBeHandled": true
+  },
+  "epistemicInvariants": [
+    "LLM 输出绝不直接创建权威 Fact",
+    "MODEL_PRIOR ≠ EXTERNAL_EVIDENCE（结构上禁带 evidence locator）",
+    "多模型一致不是外部证据",
+    "Fusion 默认 ABSTAIN",
+    "未测维度 UNKNOWN 绝不隐式 PASS",
+    "graph/RDF/vector/search/CKEL 只是可重建投影"
+  ],
+  "approveIdempotentReplay": "status=promoted 直接返回 already_promoted（零写入）",
+  "aiEnvelope": {
+    "requestFields": [
+      "operation",
+      "intent",
+      "input",
+      "budget"
+    ],
+    "structurallyAbsent": [
+      "provider",
+      "model",
+      "tier"
+    ],
+    "runtimeExactKeysReject": true,
+    "backends": [
+      "runtime",
+      "direct",
+      "fake"
+    ],
+    "productionRuntimeFailureFailClosed": true
+  }
+}

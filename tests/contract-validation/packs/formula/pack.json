@@ -1,0 +1,8 @@
+{
+  "project": "formula",
+  "tier": "executable",
+  "domainId": "formula",
+  "domainVersion": "2.4.2-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/formula.md",
+  "notes": "Executable validation of the Formula contract draft: design E workflow (drafting/reviewing/approved) + generation E-loop, project-bound Tools simulated through the remote-http-json workaround (G3), deterministic fake AI skill, business writes through the simulated P4 with B1/B2 revisions, restart recovery, and deliberate divergence reproductions (#137 poisoning, G1 missing domain-data key, L2-4 idempotencyKey)."
+}

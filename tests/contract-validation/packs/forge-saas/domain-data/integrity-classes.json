@@ -1,0 +1,16 @@
+{
+  "classes": [
+    "exact_token",
+    "formatted_identifier",
+    "numeric",
+    "numeric_with_unit"
+  ],
+  "silentUnitConversionForbidden": true,
+  "ambiguityFailClosed": true,
+  "verdicts": [
+    "PASS",
+    "NEEDS_REVIEW",
+    "FAIL"
+  ],
+  "verdictOnlyFromMakeQualityGateResult": "夹带 verdict/score 的输入一律拒绝——LLM 不是完整性预言机"
+}

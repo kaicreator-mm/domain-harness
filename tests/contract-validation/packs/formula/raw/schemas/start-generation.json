@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["designId", "prompt", "commandId"],
+  "properties": {
+    "designId": { "type": "string" },
+    "prompt": { "type": "string" },
+    "commandId": { "type": "string" }
+  }
+}

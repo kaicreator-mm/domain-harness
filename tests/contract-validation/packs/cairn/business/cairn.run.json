@@ -1,0 +1,33 @@
+[
+  {
+    "key": "run_9f3a",
+    "revision": "rev-run-9f3a-0017",
+    "value": {
+      "runId": "run_9f3a",
+      "goal": "为缅医草药条目构建可执行知识（source: 已发布药典节选）",
+      "strategy": "coverage-driven",
+      "status": "WAITING_HUMAN",
+      "outcome": null,
+      "stage": "REVIEW_GATE",
+      "planRound": 2,
+      "planVersion": 2,
+      "progressCounters": {
+        "stepsDone": 11,
+        "stepsFailed": 1,
+        "conflicts": 1,
+        "modelGaps": 0,
+        "waitingHuman": 1
+      },
+      "waitingReason": "HUMAN_REVIEW",
+      "lastError": null,
+      "pins": {
+        "modelReleaseId": "model-release:herb-taxonomy-v3",
+        "sourceBindings": [
+          "doc:sha256-9c1e4b7a",
+          "doc:sha256-0b3e6a9d"
+        ],
+        "planVersion": 2
+      }
+    }
+  }
+]

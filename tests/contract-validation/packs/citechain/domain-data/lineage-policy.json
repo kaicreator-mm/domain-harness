@@ -1,0 +1,21 @@
+{
+  "impactEdges": "只允许显式 lineage（LinkRecord）或确定性派生（usage JOIN deliverable）",
+  "findAffectedDeliverables": "task 级 usage 命中该任务全部 deliverable；deliverable 级 usage 精确命中",
+  "humanVsDerivedRelations": {
+    "human": [
+      "Contradicts",
+      "Supports",
+      "Corrects",
+      "Cites",
+      "UsedIn",
+      "DerivedFrom"
+    ],
+    "derived": [
+      "SharesSource",
+      "CoOccurs",
+      "Precedes",
+      "PropagatedFrom"
+    ]
+  },
+  "changeGradeToPriority": "命中被引 claim=最高（沿引用链反查）；cosmetic 不通知（ADR-0009：监测是缓存失效机制不是商品）"
+}

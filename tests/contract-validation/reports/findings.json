@@ -1,0 +1,421 @@
+{
+  "generatedBy": "tests/contract-validation",
+  "packs": [
+    {
+      "project": "audio-platform",
+      "tier": "data-only",
+      "domainVersion": "1.6.0-sim.1",
+      "blockers": [
+        "ADR-0005/0028 立场冲突：长寿命 workflow 引擎被明确否定（长状态放 DB，引擎只跑机器尺度短阶段；禁新 job 走 Temporal）——DH 实例严格限定短阶段+信号投递，扩张须新 ADR",
+        "audio-harness 契约冻结（ADR-0033：改冻结面=CONTRACTS_VERSION bump+新 ADR，never a refactor）+ 零第三方依赖——SDK 只能落 packages/ 新包或 apps/ 组合根",
+        "AudioOperation/ActionPlan/DecisionPacket 无持久化（contracts 冻结但零 app 接线）——先补 Run/Step 表；ffmpeg 直写族需内容寻址改造后才可暴露给重试/AI",
+        "Python 宿主：Node sidecar 回环（复用 ops-api TokenVerifier/Idempotency-Key 机制）"
+      ]
+    },
+    {
+      "project": "cairn",
+      "tier": "data-only",
+      "domainVersion": "1.3.1-sim.1",
+      "blockers": [
+        "J1 切边：存储本体（Fact 哈希链/StoreDriver/ContentStore）是 SoR 不进 workflow；durable governance 生命周期保持 Tools+Projection（不建 workflow，避免伪造自动推进语义）",
+        "J3 单实例执行保证：一个 canonical store 恰好一个 Runtime 进程（幂等键收敛重放但不阻止并发双执行）",
+        "J4/J10 effect 三值必须含 RECOVERY_REQUIRED 且自动 retry 必须可关闭（attempt 预算=1；显式重试换新 logical identity 链接旧 executionId）"
+      ]
+    },
+    {
+      "project": "citechain",
+      "tier": "data-only",
+      "domainVersion": "0.3.0-sim.1",
+      "blockers": [
+        "Kernel 信任边界宿主化决策未定（方案 A: Rust kernel sidecar RPC / B: TS 重实现+加载时重验证 / C: 混合）——Confirmed<T> 不可伪造保证只在 A/C 下完整保留",
+        "DeliveryGate 现为空壳（恒返回 []）——实装 legacy LicenseGate 前 deliver 闸不可信",
+        "Tauri 桌面宿主需 Node sidecar 形态（业务逻辑纯 TS 零 native，node:sqlite 已验证可行）"
+      ]
+    },
+    {
+      "project": "city-atlas",
+      "tier": "data-only",
+      "domainVersion": "0.4.0-sim.1",
+      "blockers": [
+        "双宿主切分：设备面（RN/expo）+ 治理面（Python FastAPI 需 Node sidecar [G3 回环]）——runner 单宿主暂不覆盖",
+        "HR-2 隐私红线：服务端不得持有用户维度实例；设备实例 RuntimeStore 需 SQLCipher 加密方案确认",
+        "上游 CLP/AI Runtime/CrawlKit 全部 BLOCKED_EXTERNAL（binding 缺失 fail-closed，不得以 fixture 冒充交付）"
+      ]
+    },
+    {
+      "project": "forge-saas",
+      "tier": "data-only",
+      "domainVersion": "2.9.5.2-sim.1",
+      "blockers": [
+        "RuntimeStore PG 适配器缺口（SoR=PostgreSQL/RLS；与 xcrossify 共建 conformance 实现）",
+        "双身份域：租户实例与平台（operator）治理严格分离，Scope 建模不得跨域 FK",
+        "图片同步路径未接 ExternalInvocation 台账——迁移时必须并入 forge.execution R 实例（契约缺口修复项）"
+      ]
+    },
+    {
+      "project": "formula",
+      "tier": "executable",
+      "domainVersion": "2.4.2-sim.1",
+      "packageId": "108d70a8374c15f2b9dbbfde3c147af627784ae6c742fec6235066c993e18318"
+    },
+    {
+      "project": "parts-system",
+      "tier": "data-only",
+      "domainVersion": "1.0.3-sim.1",
+      "blockers": [
+        "仓库宪法：反框架不变量（无新 ADR 不引入新引擎/第二聚合）——落地前须走 SOURCE_CONFLICT/ADR 流程",
+        "单写进程硬约束：Runtime 宿主必须与 NestJS API 同进程（TS 进程内 [G3] 绑定是理想场景，但 runner 需 node 宿主进程内组装模式）",
+        "设备端（Capacitor）第一阶段不接 DH：expo 适配器不覆盖 Capacitor；packages/offline 四性质钱/量代码不动"
+      ]
+    },
+    {
+      "project": "restudio",
+      "tier": "data-only",
+      "domainVersion": "0.2.0-sim.1",
+      "blockers": [
+        "Python 宿主：Node sidecar + 本地回环 HTTP（restudio API 现状无鉴权——先补本地 token，参照 formula session-token 模式）",
+        "前置修复（不依赖 DH）：Run 持久化（ProductionRunState 落 vnext_objects）、spec.accepted 端点、approveRuleProposal 幂等、resolveReview 事务化、design session 收敛（UI 挂载即新建缺陷）、run 超时",
+        "model-api 异步化（operation_ref+回调）是媒体作业 Ingress/deadline 的前提"
+      ]
+    },
+    {
+      "project": "tally",
+      "tier": "executable",
+      "domainVersion": "1.5.5-sim.1",
+      "packageId": "e8ee66ae7811e24f07468b032e68e1777e305e0f6682d0861c34f38bd2e0e2cd"
+    },
+    {
+      "project": "triphub",
+      "tier": "executable",
+      "domainVersion": "0.3.0-sim.1",
+      "packageId": "86740738561759c36e36affe673c14e4e92ba4b1d22b07c846a4aa5b61d65a7e"
+    },
+    {
+      "project": "xcrossify",
+      "tier": "data-only",
+      "domainVersion": "0.2.0-sim.1",
+      "blockers": [
+        "仓库政策：v0.2.0 禁止引入通用 Workflow Engine——本包是外部契约镜像（P2 包 @xcrossify/domain-runtime 消费），不进仓库依赖",
+        "RuntimeStore PG 适配器缺口（SoR=PostgreSQL；临时以独立 SQLite 执行态库落地）",
+        "多项上游契约 IN_REVIEW（P0-04/P0-07/P1-03/P1-05/P3-04/P3-06）——语义以评审定稿为准"
+      ]
+    },
+    {
+      "project": "xlearn",
+      "tier": "data-only",
+      "domainVersion": "2.3.0-sim.1",
+      "blockers": [
+        "G3: packageStore/learningStore 设备本地写需要 expo 注册绑定（本 runner 为 node 宿主）",
+        "G1: domain-packages 的 harness artifacts 是 Compiled Domain Data 参照实现——等待 manifest domainData 声明后升级 executable",
+        "generation jobs 持久化在 Go 后端缺失（[G6] 前保持同步 + UNCERTAIN 拒绝语义）"
+      ]
+    },
+    {
+      "project": "yishu",
+      "tier": "executable",
+      "domainVersion": "2.8.2-sim.1",
+      "packageId": "dac68c54f770413d0f51218c2267b84702265bb185146bc588c475bc6affc8dc"
+    }
+  ],
+  "runs": [
+    {
+      "pack": "formula",
+      "packageId": "108d70a8374c15f2b9dbbfde3c147af627784ae6c742fec6235066c993e18318",
+      "requiredCapabilities": [
+        "compiled-package-module@1",
+        "crypto-hash-sha256@1",
+        "expression-jsonata@1",
+        "http-transport@1"
+      ],
+      "scenariosRun": 2,
+      "stepsRun": 80,
+      "findings": 14
+    },
+    {
+      "pack": "tally",
+      "packageId": "e8ee66ae7811e24f07468b032e68e1777e305e0f6682d0861c34f38bd2e0e2cd",
+      "requiredCapabilities": [
+        "compiled-package-module@1",
+        "crypto-hash-sha256@1",
+        "expression-jsonata@1",
+        "http-transport@1"
+      ],
+      "scenariosRun": 1,
+      "stepsRun": 37,
+      "findings": 5
+    },
+    {
+      "pack": "triphub",
+      "packageId": "86740738561759c36e36affe673c14e4e92ba4b1d22b07c846a4aa5b61d65a7e",
+      "requiredCapabilities": [
+        "compiled-package-module@1",
+        "crypto-hash-sha256@1",
+        "expression-jsonata@1",
+        "http-transport@1"
+      ],
+      "scenariosRun": 1,
+      "stepsRun": 53,
+      "findings": 4
+    },
+    {
+      "pack": "yishu",
+      "packageId": "dac68c54f770413d0f51218c2267b84702265bb185146bc588c475bc6affc8dc",
+      "requiredCapabilities": [
+        "compiled-package-module@1",
+        "crypto-hash-sha256@1",
+        "expression-jsonata@1",
+        "http-transport@1"
+      ],
+      "scenariosRun": 1,
+      "stepsRun": 59,
+      "findings": 5
+    }
+  ],
+  "findings": [
+    {
+      "id": "open-does-not-run-initial-state",
+      "severity": "divergence",
+      "summary": "openInstance 只把实例写在初始状态并标记 waiting，不执行初始状态；实例必须等第一条消息（Restore）才前进——『开通 + Restore』约定（design doc v0.2 §10.4 [L2-5]）是当前唯一可用形态。",
+      "related": "v0.3 PRD §6.5 / design doc L2-5",
+      "pack": "formula",
+      "scenario": "journey-01-approval-loop",
+      "step": 1
+    },
+    {
+      "id": "open-not-idempotent",
+      "severity": "divergence",
+      "summary": "openInstance 非幂等：重复 ensure/open 抛 duplicate workflow instance 而不是返回既有快照，项目被迫实现先查后开的竞态协议（v0.3 §6.5 要求幂等 provisioning；验收标准 7）。",
+      "related": "v0.3 PRD §6.5 / design doc L2-5",
+      "pack": "formula",
+      "scenario": "journey-01-approval-loop",
+      "step": 3
+    },
+    {
+      "id": "R3-R4-rejection-pattern-works",
+      "severity": "info",
+      "summary": "领域拒绝无毒化：approveDesign Tool 事务内重校验最新评审（needs_work）→ 返回结构化 rejected(quality_not_passed)；done 路由按 outcome 分流回 reviewing，lastResult 保留拒绝结果供 facade outcome() 映射（design doc v0.2 §7.2 R1–R4 编写约定在冻结 SDK 上验证通过）。",
+      "pack": "formula",
+      "scenario": "journey-01-approval-loop",
+      "step": 17
+    },
+    {
+      "id": "skill-result-only-via-tool",
+      "severity": "info",
+      "summary": "Domain AI produce-result-only 验证通过：design-critique Skill 的结构化输出（verdict/score/findings，outputSchema 强校验+journal）只经 recordQualityReview Tool 进入业务库；AI 调用次数=1，Skill 无业务写路径。",
+      "pack": "formula",
+      "scenario": "journey-01-approval-loop",
+      "step": 24
+    },
+    {
+      "id": "restart-recovery-ok",
+      "severity": "info",
+      "summary": "Runtime restart reclaimed unresolved mailboxes and resumed instances from the durable store (activation recovery path).",
+      "pack": "formula",
+      "scenario": "journey-01-approval-loop",
+      "step": 26
+    },
+    {
+      "id": "G3-local-tool-via-remote-workaround",
+      "severity": "divergence",
+      "summary": "写本地业务库的 startGeneration/recordArtifact/approveDesign 只能声明为 remote-http-json@1 并由进程内 transport 伪装承接（G3/PRD-CR-1 临时方案 A）：createRuntimeToolExecutor 对 script/remote 之外的 execution kind 一律抛 Unsupported Tool binding kind，registered/local 绑定无一等公民。",
+      "related": "v0.3 PRD §6.1 / 分析文档 G3",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 13
+    },
+    {
+      "id": "L2-4-idempotency-key-not-transported",
+      "severity": "divergence",
+      "summary": "冻结的 RemoteTransportRequest 只携带 {binding, input, resourceKey, signal}：EffectExecutionContext.idempotencyKey 停在 journal 层，永远到不了执行端——写业务 Tool 的幂等只能靠 payload 里的 commandId 约定（design doc v0.2 §9.4 [L2-4]）。",
+      "evidence": {
+        "invocations": 4,
+        "sample": {
+          "path": "/tools/approveDesign",
+          "resourceKey": "businessDb",
+          "bindingId": "sim-http-binding",
+          "input": {
+            "designId": "design_8f3a",
+            "commandId": "cmd_appr_1"
+          }
+        }
+      },
+      "related": "design doc v0.2 §9.4 [L2-4]",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 14
+    },
+    {
+      "id": "stale-callback-rejected-without-poisoning",
+      "severity": "info",
+      "summary": "迟到/重复的作业回调在 idle 静止状态被 W3 拒绝路径吸收：结构化 rejected(not_applicable_in_idle)，实例保持 waiting 健康，后续消息不被阻塞（design doc v0.2 §9.5 先到者生效语义）。",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 24
+    },
+    {
+      "id": "message-dedup-by-message-id",
+      "severity": "info",
+      "summary": "同 messageId 重发返回 duplicate ACK（PRD §12.3 去重）；回调与超时共用确定性 messageId『job:{jobId}:finished』的约定在 SDK 层成立。",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 26
+    },
+    {
+      "id": "137-inapplicable-message-poisons-instance",
+      "severity": "divergence",
+      "summary": "复现 #137：契约合法但在当前状态不适用的消息（Restore 之前到达的 JobFinished，即 provisioning 竞态窗口）→ 处理抛错 → disposition=failed → 实例 recovery_required → 整个 mailbox 被阻塞。长寿命实例会因一次时序竞态被冻结直到人工恢复；v0.3 §6.3–6.4 要求一等 rejected(not_applicable) 处置。W3 全事件覆盖约定只能缓解、不能消除该窗口（init 状态按 W4 只接受 Restore）。",
+      "related": "issue #137 / PRD-CR-2 / v0.3 PRD §6.3-6.4",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 33
+    },
+    {
+      "id": "137-retry-cannot-resolve-inapplicable-message",
+      "severity": "divergence",
+      "summary": "对『不适用消息』型毒化，recovery retry 只会重放同一条消息并再次失败（recovery_required → retry → recovery_required）；唯一出路是 resolve/terminate 放弃该消息。这证明 rejected 处置必须在平台层解决，恢复原语无法替代。",
+      "related": "issue #137",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 38
+    },
+    {
+      "id": "G1-domain-data-key-unchecked-at-compile-time",
+      "severity": "divergence",
+      "summary": "projection 依赖 domain-data key 'creative-policy' 在包内不存在，但 loadRawDomainPackage → compileDomainPackage → validateCompiledPackage 全部通过（manifest 无 domainData 字段，编译器无 key 清单可校验）；错误延迟到查询期 domain_data_not_found。Compiled Domain Data 需要包内一等声明（分析文档 §5 G1；xlearn domain-packages 与 audio-platform HarnessSnapshot 是参照实现）。",
+      "related": "分析文档 G1 / v0.3 PRD §6.7",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 41
+    },
+    {
+      "id": "G2-business-source-has-no-package-declaration",
+      "severity": "divergence",
+      "summary": "business 依赖在包内只有 {source, selector}，没有 value schema 与存在性声明；Provider 返回值的形状校验完全靠项目自律（本验证包以 business-sources.json 模拟了 [L2-8] 提案的声明形态并由结构校验执行）。",
+      "related": "design doc v0.2 §11.4 [L2-8] / 分析文档 G2",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 43
+    },
+    {
+      "id": "W3-authoring-cost",
+      "severity": "info",
+      "summary": "W3『每个静止状态接受全部入站消息类型』的编写成本实测：formula.design 仅 7 种消息 × 4 个静止相位就需要 15 个状态（含 4 个 __reject 瞬态与 3 个 noting/announcing 瞬态）。design doc v0.2 §7.2 R5 的 otherwise:reject 语法糖（[L2-10]）与 PRD-CR-2 的 rejected 处置是消除该成本的正解。",
+      "related": "design doc v0.2 R5 [L2-10] / issue #137",
+      "pack": "formula",
+      "scenario": "journey-02-generation-loop-and-divergences",
+      "step": 44
+    },
+    {
+      "id": "R3-dispatch-conflicts-structured",
+      "severity": "info",
+      "summary": "dispatch 冲突（not_ready / already_running）以结构化 rejected 返回，实例保持健康——两阶段提交 claim 段的领域结论不经异常表达（R3），ErrDispatchConflict 语义在契约层成立。",
+      "pack": "tally",
+      "scenario": "journey-01-project-coordination",
+      "step": 15
+    },
+    {
+      "id": "completion-contract-expression-gate",
+      "severity": "info",
+      "summary": "确定性 CompletionContract 评估以包内 JSONata expression 落地：required facts 字面为 true 才 satisfied，缺失项进 Missing[]，完成永不推断（DD-P4 确定性知识先于 AI）。注意：expression invoke 的 scope 不含 business/domainData——规则只能编译进表达式源码（包内容）或经 Tool；这是 authoring 指南需要写明的边界。",
+      "pack": "tally",
+      "scenario": "journey-01-project-coordination",
+      "step": 19
+    },
+    {
+      "id": "restart-recovery-ok",
+      "severity": "info",
+      "summary": "Runtime restart reclaimed unresolved mailboxes and resumed instances from the durable store (activation recovery path).",
+      "pack": "tally",
+      "scenario": "journey-01-project-coordination",
+      "step": 21
+    },
+    {
+      "id": "human-authority-wait-survives-restart",
+      "severity": "info",
+      "summary": "长期人工权威阻塞态（awaiting_authority）跨 Runtime 重启保持——『自动化流程必须能长期挂起等待人类决定』的 Tally 硬约束在 Workflow Instance 语义下天然成立。",
+      "pack": "tally",
+      "scenario": "journey-01-project-coordination",
+      "step": 23
+    },
+    {
+      "id": "terminal-instance-rejects-new-messages",
+      "severity": "info",
+      "summary": "Close（W5）后实例 completed，新消息在 acceptance 层被拒（target_not_accepting）——实体删除/换代流程（design doc §10.6）的前半段语义可用；terminal 地址复用仍受 [L2-5] 限制。",
+      "pack": "tally",
+      "scenario": "journey-01-project-coordination",
+      "step": 36
+    },
+    {
+      "id": "frozen-transition-table-rejection",
+      "severity": "info",
+      "summary": "draft→active 的非法 lifecycle jump 被冻结转移表（compiled domain data）拒绝为结构化 rejected(illegal_transition)，实例保持健康——invariant #5 与 R3 在契约层同时成立。",
+      "pack": "triphub",
+      "scenario": "journey-01-lifecycle-and-txn",
+      "step": 8
+    },
+    {
+      "id": "quote-deadline-revalidated-in-tool",
+      "severity": "info",
+      "summary": "过期报价的 TxnConfirm 在 commitBooking Tool 事务内重校验 deadline 后被结构化拒绝（quote_expired），不产生任何商业效果——§16『mutation 前重校验权威事实』成立。注意 deadline 目前是业务数据+Tool 校验（[G6] 持久定时器缺失的临时约定）；QuoteExpired 消息由 P2 超时调度器投递的约定在场景中以显式 send 模拟。",
+      "pack": "triphub",
+      "scenario": "journey-01-lifecycle-and-txn",
+      "step": 29
+    },
+    {
+      "id": "restart-recovery-ok",
+      "severity": "info",
+      "summary": "Runtime restart reclaimed unresolved mailboxes and resumed instances from the durable store (activation recovery path).",
+      "pack": "triphub",
+      "scenario": "journey-01-lifecycle-and-txn",
+      "step": 38
+    },
+    {
+      "id": "zero-llm-txn-path",
+      "severity": "info",
+      "summary": "交易全路径（quote→preview→confirm→commit）零 Skill/零 LLM：只有确定性 Tool 与业务数据校验——invariant #1（交易平面零 LLM）在契约结构上成立；Skill 仅存在于规划/修复/记忆相位（契约草案 §8，本切片未含）。",
+      "pack": "triphub",
+      "scenario": "journey-01-lifecycle-and-txn",
+      "step": 52
+    },
+    {
+      "id": "ai-no-approval-authority",
+      "severity": "info",
+      "summary": "LLM 来源候选禁止批量确认（sampling-policy compiled domain data 强制）：AI 产物只能经逐条人工确认进入 draft 通道——INVARIANTS #1/#3/#12『AI 无批准权』在 Tool 闸内成立，且拒绝是结构化的（实例健康）。",
+      "pack": "yishu",
+      "scenario": "journey-01-governance-publish",
+      "step": 12
+    },
+    {
+      "id": "no-force-publish-entry",
+      "severity": "info",
+      "summary": "regression gate blocked 时 ApprovePublish 被相位级拒绝（no_force_publish_while_blocked）——『新失败即阻断、无强制发布入口』（API/UI 均无）被提升为 workflow 结构性质：publish_blocked 相位根本没有通往 publishing 的路由。",
+      "pack": "yishu",
+      "scenario": "journey-01-governance-publish",
+      "step": 24
+    },
+    {
+      "id": "toctou-stale-drafts-rejected",
+      "severity": "info",
+      "summary": "TOCTOU 守卫成立：preview 与 publish 之间草稿集变化（fp_3→fp_4）后，携带旧指纹的 ApprovePublish 在 publishConfig Tool 内被结构化拒绝（stale_drafts），实例健康、可携带新指纹重试——服务层 TOCTOU 检查（services/publish.ts）的契约化等价物。",
+      "pack": "yishu",
+      "scenario": "journey-01-governance-publish",
+      "step": 40
+    },
+    {
+      "id": "restart-recovery-ok",
+      "severity": "info",
+      "summary": "Runtime restart reclaimed unresolved mailboxes and resumed instances from the durable store (activation recovery path).",
+      "pack": "yishu",
+      "scenario": "journey-01-governance-publish",
+      "step": 46
+    },
+    {
+      "id": "rollback-is-pointer-move",
+      "severity": "info",
+      "summary": "回滚=active 指针移动（非破坏，历史 tag 保留，revision 单调 +1）；未知 tag 被 rejected(unknown_tag)。Git 单写者约束由 per-instance serialized lane 天然满足（同一 scope 的 publish/rollback 严格串行）。",
+      "pack": "yishu",
+      "scenario": "journey-01-governance-publish",
+      "step": 52
+    }
+  ]
+}

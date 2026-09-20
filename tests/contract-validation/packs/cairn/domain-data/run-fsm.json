@@ -1,0 +1,32 @@
+{
+  "states": [
+    "PLANNING",
+    "RUNNING",
+    "WAITING_HUMAN",
+    "WAITING_MODEL",
+    "SUSPENDED",
+    "SETTLED",
+    "COMPLETED",
+    "FAILED"
+  ],
+  "terminalOnlyIdempotentSelfTransition": true,
+  "outcomeRules": {
+    "requiredOnlyWhen": "SETTLED",
+    "carriedElsewhere": "rejected",
+    "legacyCompletedProjectsTo": "LEGACY_UNASSESSED",
+    "neverInferSatisfied": true
+  },
+  "waitingSemantics": {
+    "runNextOnWaiting": "explicit no-op",
+    "suspendedRejectsAutoResume": true,
+    "restartScanNeverUnwaits": true
+  },
+  "durableStepProtocol": [
+    "账本无记录→追加 PENDING→IN_PROGRESS（崩溃残留不重写）",
+    "外部副作用携带稳定幂等键 kp:<runId>:<stepId>",
+    "run 聚合先 saveRun",
+    "最后追加步骤 DONE"
+  ],
+  "crashWindow": "③④ 之间；resume 按 ①② 收敛",
+  "failureReceipt": "执行子步骤 succeeded=false 唯一合法落账=FAILED 终态；重跑必须经显式新计划步骤"
+}

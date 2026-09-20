@@ -1,0 +1,159 @@
+[
+  {
+    "toolId": "materializeHarness",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "domainId",
+        "domainVersion"
+      ],
+      "properties": {
+        "domainId": {
+          "type": "string"
+        },
+        "domainVersion": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commandId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "materializedTasks": {
+          "type": "integer"
+        },
+        "invalidatedTasks": {
+          "type": "integer"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "单排他事务 8 步确定性重建（upsert/INSERT OR IGNORE），可中断重跑；旧 ISSUED LOCAL 任务置 INVALIDATED。[G3] 需 expo 注册绑定。"
+  },
+  {
+    "toolId": "activatePackage",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "domainId",
+        "domainVersion",
+        "commandId"
+      ],
+      "properties": {
+        "domainId": {
+          "type": "string"
+        },
+        "domainVersion": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commandId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "algorithm gate 在写入前拒绝（rejected: algorithm_migration_required）；原子 SQLite 激活：旧 ACTIVE→SUPERSEDED；失败路径 committed.remove() 回滚。"
+  },
+  {
+    "toolId": "answerTask",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "response",
+        "commandId"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "response": {
+          "type": "object"
+        },
+        "rating": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "correct"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "correct": {
+          "type": "boolean"
+        },
+        "dueAt": {
+          "type": "string"
+        },
+        "mastery": {
+          "type": "number"
+        }
+      }
+    },
+    "notes": "Direct 路径复用同一 Tool 实现：evaluation 先于任何写入；appendEvent+saveState+markTaskAnswered+planNext 同事务；status=ISSUED guard 防重复消费。"
+  }
+]

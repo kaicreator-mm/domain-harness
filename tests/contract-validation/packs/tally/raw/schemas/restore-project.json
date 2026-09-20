@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "required": ["snapshot"],
+  "properties": {
+    "snapshot": {
+      "type": "object",
+      "required": ["stage"],
+      "properties": {
+        "stage": { "type": "string", "enum": ["requirements", "plan", "architecture", "dag_active", "closed"] },
+        "dagRevision": { "type": "string" }
+      }
+    }
+  }
+}

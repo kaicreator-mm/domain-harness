@@ -1,0 +1,141 @@
+[
+  {
+    "toolId": "executeCapability",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "capabilityId",
+        "operationId",
+        "parameters"
+      ],
+      "properties": {
+        "capabilityId": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "approvalRef": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "succeeded",
+            "failed",
+            "approval_required",
+            "capability_unavailable"
+          ]
+        },
+        "artifactHash": {
+          "type": "string"
+        },
+        "errorType": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "Capability Registry 是唯一工具调用面（validate_parameters+availability fail-closed）；写文件族必须内容寻址输出键（asset_key(hash)）后才可标 idempotent——ffmpeg -y 直写族先改造（J5）；requires_approval 由 Tool 声明决定，不从模型 plan 采纳（J7）。"
+  },
+  {
+    "toolId": "runGeneration",
+    "effect": "non-idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "operationId",
+        "prompt"
+      ],
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "object"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "succeeded",
+            "failed",
+            "unknown"
+          ]
+        },
+        "candidates": {
+          "type": "array"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "付费生成（MiniMax 等）：provider_outcome_unknown→不自动重试（paid_retry_policy fail-closed）；provider 返回 hash 与本地重算不符→integrity conflict；human_gates_enabled=False→failed/human_gate_missing；确定性 version/operation id（operation_{job_id}[_{index}]）+单输出不变量（3 候选=3 operation 共享 1 ExecutionRecord）。"
+  },
+  {
+    "toolId": "runCanonicalization",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "jobId",
+        "sourceAssetId"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "sourceAssetId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "succeeded",
+            "failed"
+          ]
+        },
+        "assetId": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "强幂等既有实现：ffmpeg(timeout 300)→canonical wav→sha256→put(PRIMARY, asset_key(hash))→get-before-create asset/version/operation/activity；非 48kHz→content_conflict。"
+  }
+]

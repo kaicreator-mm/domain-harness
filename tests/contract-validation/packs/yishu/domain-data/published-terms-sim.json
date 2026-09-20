@@ -1,0 +1,4 @@
+{
+  "content": "ဆေးရုံ = 医院\nသွားကုဆေးခန်း = 牙科诊所",
+  "note": "模拟 activeTag 下已发布术语内容（真实实现 = git show <tag>:terms/…）。注意：သွားကုဆေးခန်း（牙科诊所）包含子串 ဆေးခန်း（诊所），因此 case_clinic_term 由已发布内容即可通过；而 အာထရာဆောင်း（超声）未发布——确认或起草对应草稿前，回归 gate 对 case_ultrasound_term 报新失败并 blocked。"
+}

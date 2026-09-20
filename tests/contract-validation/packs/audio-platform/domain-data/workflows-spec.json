@@ -1,0 +1,49 @@
+{
+  "workflows": [
+    {
+      "operationKind": "source_inspection",
+      "capabilities": [
+        "media.probe",
+        "audio.loudness.ebur128"
+      ],
+      "validationCapabilities": [
+        "media.probe"
+      ]
+    },
+    {
+      "operationKind": "delivery_qc",
+      "capabilities": [
+        "media.probe",
+        "audio.loudness.ebur128",
+        "audio.integrity.container"
+      ],
+      "validationCapabilities": [
+        "audio.loudness.ebur128"
+      ]
+    },
+    {
+      "operationKind": "mastering",
+      "capabilities": [
+        "audio.loudness.ebur128",
+        "audio.effect.limiter.ffmpeg",
+        "audio.effect.compressor.ffmpeg"
+      ],
+      "validationCapabilities": [
+        "audio.loudness.ebur128"
+      ]
+    },
+    {
+      "operationKind": "vocal_processing",
+      "capabilities": [
+        "audio.transform.ffmpeg",
+        "model.vocal.separation"
+      ],
+      "validationCapabilities": [
+        "media.probe"
+      ]
+    }
+  ],
+  "conservativeBias": "分析/测量步骤可自动运行；变换类默认显式人工审批（intentionally conservative）",
+  "status": "analysis-first foundations（Known debt #2）——不是校准配方，不当作成熟领域流程迁移",
+  "tokenToCapabilityIdMappingRequired": "seed tool token（loudness_meter/media_probe）与真实 capability id（audio.loudness.ebur128/media.probe）不同源——入包必须补映射表，否则声明与可执行工具脱节"
+}

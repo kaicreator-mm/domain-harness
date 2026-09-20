@@ -1,0 +1,7 @@
+{
+  "newFailureBlocks": true,
+  "noForcePublishEntry": true,
+  "toctouDraftsFingerprint": true,
+  "rollbackIsPointerMove": true,
+  "singleWriterGit": true
+}

@@ -1,0 +1,18 @@
+{
+  "qualificationVocabulary": [
+    "technician-confirmed",
+    "diagnosis-confirmed",
+    "fitment-session"
+  ],
+  "unattested": null,
+  "blockedQualificationSources": [
+    "fallback",
+    "insufficient_information",
+    "ai-proposal"
+  ],
+  "freeTextNeverBecomesPartRequest": true,
+  "freeTextRoutesTo": "inquiry_log(entryType=freeTextRequest)",
+  "unknownDeclaration": "unattested（标记而非拒绝）",
+  "cancelBeforeRequest": "行直接以 cancelled 落地，后到的 requested 不得复活",
+  "gateLocation": "服务端唯一物化路径（只有投影被 gate，任何后端路径无法绕过）"
+}

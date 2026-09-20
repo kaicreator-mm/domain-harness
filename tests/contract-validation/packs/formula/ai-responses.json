@@ -1,0 +1,13 @@
+{
+  "design-critique": {
+    "output": {
+      "verdict": "certified",
+      "score": 92,
+      "findings": [
+        "对比度满足 WCAG AA（CTA 区域 4.8:1）",
+        "字体覆盖完整，无缺字回退",
+        "构图与已批准创意方向 creative.direction#2 一致"
+      ]
+    }
+  }
+}

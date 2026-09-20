@@ -1,0 +1,161 @@
+[
+  {
+    "toolId": "transitionTaskStep",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "userId",
+        "packId",
+        "stepId",
+        "target",
+        "commandId"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "packId": {
+          "type": "string"
+        },
+        "stepId": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "TODO",
+            "IN_PROGRESS",
+            "DONE",
+            "BLOCKED"
+          ]
+        },
+        "blockedReason": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commandId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "UNKNOWN_STATE",
+            "ILLEGAL_TRANSITION",
+            "BLOCKING_REASON_REQUIRED",
+            "no_change"
+          ]
+        },
+        "changed": {
+          "type": "boolean"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "冻结转移表 + 条件更新（状态即并发闸门）+ count=0 重读重判 + 有界重试 5 次；幂等自转移 changed=false；DONE 不可隐式重开（重开走纠错）。"
+  },
+  {
+    "toolId": "submitCrawl",
+    "effect": "idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "query",
+        "clientRef"
+      ],
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "clientRef": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "SUBMITTED",
+            "ALREADY_QUEUED",
+            "RESULT_READY"
+          ]
+        },
+        "jobId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "clientRef 幂等去重（CK-01）+ correlation id 贯穿重试；台账 receive→begin 持久化意图先行。"
+  },
+  {
+    "toolId": "translateText",
+    "effect": "non-idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "text",
+        "clientRef"
+      ],
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "clientRef": {
+          "type": "string"
+        },
+        "scene": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "DELIVERED",
+            "HANDED_TO_HUMAN",
+            "REJECTED"
+          ]
+        },
+        "translation": {
+          "type": "string"
+        },
+        "reviewReason": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "交付前本地独立重算 verifyIntegrity + assertDeliverable；失败=TranslationRejectedError(502) 不编造兜底。"
+  }
+]

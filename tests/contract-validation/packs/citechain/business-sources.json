@@ -1,0 +1,163 @@
+[
+  {
+    "source": "citechain.task",
+    "notes": "KnowledgeTask latest-wins（每次相位转移 append 新 record，按 confirmedAtMs 取最新）；相位冻结转移表 intent→preparing→creating→reviewing→delivered（reviewing 可回退 creating）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "harnessId",
+        "phase"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "harnessId": {
+          "type": "string",
+          "enum": [
+            "explainer",
+            "structured-comparison"
+          ]
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "intent",
+            "preparing",
+            "creating",
+            "reviewing",
+            "delivered"
+          ]
+        },
+        "intent": {
+          "type": "string"
+        },
+        "createdAtMs": {
+          "type": "integer"
+        },
+        "latestConfirmedAtMs": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "source": "citechain.usages",
+    "notes": "KnowledgeUsage（context 自由 / hard_gate 必须 snapshotRef+provenanceRef，缺失即拒——TS+Rust 双重校验）；跨 task owner 引用被 kernel validate_owner_scope 拒绝。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "usages"
+      ],
+      "properties": {
+        "usages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "mode",
+              "providerId",
+              "knowledgeRef",
+              "owner"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "context",
+                  "hard_gate"
+                ]
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "knowledgeRef": {
+                "type": "string"
+              },
+              "snapshotRef": {
+                "type": "string"
+              },
+              "provenanceRef": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "id"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "task",
+                      "segment",
+                      "deliverable"
+                    ]
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "citechain.deliverables",
+    "notes": "Deliverable（delivered 标志 + 修订版本；staleReason 由 KnowledgeChanged 确定性派生——显式 lineage 或 usage JOIN，禁猜测）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "deliverables"
+      ],
+      "properties": {
+        "deliverables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "deliverableId",
+              "delivered",
+              "revision"
+            ],
+            "properties": {
+              "deliverableId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "delivered": {
+                "type": "boolean"
+              },
+              "revision": {
+                "type": "integer"
+              },
+              "deliveredAtMs": {
+                "type": "integer"
+              },
+              "staleReason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

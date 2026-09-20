@@ -1,0 +1,173 @@
+{
+  "id": "journey-01-device-learning-loop",
+  "description": "XLearn 目标旅程（data-only：结构校验，待 expo 绑定后升级 executable）：Restore→idle；SelectDomain 触发 domainpackage 激活链（algorithm gate fail-close）；materialize 幂等重建；答题 Direct 事务；远程练习 E 循环 awaiting；重启恢复 current_task 指针校验。",
+  "steps": [
+    {
+      "action": "open",
+      "workflowId": "xlearn.learner",
+      "instanceKey": "local-default",
+      "input": {
+        "learnerId": "local-default"
+      },
+      "expect": {
+        "stateId": "init"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "messageId": "restore:xlearn.learner:local-default",
+      "type": "Restore",
+      "payload": {
+        "snapshot": {
+          "activeDomainId": "hsk",
+          "activeDomainVersion": "2026.09-baseline.1",
+          "currentTaskId": "local:hsk:2026.09-baseline.1:recipe-hsk3-listen-07:r3"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "expect": {
+        "stateId": "idle"
+      }
+    },
+    {
+      "action": "expect-projection",
+      "projectionId": "xlearn.learner-state",
+      "key": "local-default",
+      "expect": {
+        "phase": "in_session",
+        "body": {
+          "activeDomainId": "hsk",
+          "dueCount": 12,
+          "forcedCount": 1,
+          "todayNewCount": 7
+        }
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xlearn.domainpackage",
+        "instanceKey": "hsk"
+      },
+      "messageId": "cmd_activate_1",
+      "type": "ActivateRequested",
+      "payload": {
+        "commandId": "cmd_activate_1",
+        "domainVersion": "2026.10-baseline.1"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xlearn.domainpackage",
+        "instanceKey": "hsk"
+      },
+      "expect": {
+        "lastResult": {
+          "outcome": "rejected",
+          "code": "algorithm_migration_required"
+        }
+      }
+    },
+    {
+      "action": "finding",
+      "id": "algorithm-gate-fail-close",
+      "severity": "info",
+      "summary": "新包 algorithmVersion 与既有 concept_state 不一致时，激活在任何写入前被拒绝（fail-close gate）——映射为结构化 rejected，包回滚路径保持（契约草案 §2 gate 相位）。"
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "messageId": "cmd_practice_1",
+      "type": "RequestRemotePractice",
+      "payload": {
+        "commandId": "cmd_practice_1",
+        "purpose": "practice-item"
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "expect": {
+        "stateId": "awaiting_remote"
+      }
+    },
+    {
+      "action": "send",
+      "to": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "messageId": "gen:practice-req-0001",
+      "type": "RemoteTaskReady",
+      "payload": {
+        "requestId": "practice-req-0001",
+        "candidate": {
+          "conceptId": "c_hsk3_listen_07",
+          "contentType": "LEARNING_TASK"
+        }
+      }
+    },
+    {
+      "action": "settle"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "expect": {
+        "stateId": "idle",
+        "lastResult": {
+          "outcome": "applied",
+          "injected": "remote"
+        }
+      }
+    },
+    {
+      "action": "restart"
+    },
+    {
+      "action": "expect-instance",
+      "target": {
+        "workflowId": "xlearn.learner",
+        "instanceKey": "local-default"
+      },
+      "expect": {
+        "stateId": "idle"
+      }
+    },
+    {
+      "action": "finding",
+      "id": "pull-based-scheduling-preserved",
+      "severity": "info",
+      "summary": "复习到期保持拉取式（due_at 数据 + 打开 App 时 planner），不引入 push/timer——v2.3 冻结哲学；[G6] 定时器仅用于远程练习请求的 deadline。"
+    }
+  ]
+}

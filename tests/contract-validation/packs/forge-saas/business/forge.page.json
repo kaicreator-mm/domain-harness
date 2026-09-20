@@ -1,0 +1,38 @@
+[
+  {
+    "key": "page_furniture_th_01",
+    "revision": "rev-page-0011",
+    "value": {
+      "pageId": "page_furniture_th_01",
+      "siteId": "site_aurora_furniture",
+      "slug": "solid-teak-dining-th",
+      "status": "gated",
+      "translations": [
+        {
+          "locale": "th",
+          "status": "gated",
+          "gateRuns": [
+            {
+              "gate": "llm-judge",
+              "verdict": "PASS"
+            },
+            {
+              "gate": "backtranslate",
+              "verdict": "PASS"
+            },
+            {
+              "gate": "publication-integrity",
+              "verdict": "NEEDS_REVIEW"
+            }
+          ]
+        }
+      ],
+      "publishThrottle": {
+        "date": "2026-09-20",
+        "used": 1,
+        "limit": 2
+      },
+      "pinnedRelease": "trade-site-harness-v2952-r7"
+    }
+  }
+]

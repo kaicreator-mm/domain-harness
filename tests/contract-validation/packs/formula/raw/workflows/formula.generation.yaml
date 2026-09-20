@@ -1,0 +1,92 @@
+# formula.generation — 生成 E 循环（契约草案 §2，General Design v0.2 §9.5 长耗时作业模式）
+# idle → starting(Tool 登记作业) → awaiting(静止，jobId 在业务 jobs 表)
+#      → recording(Tool 事务内核对当前作业) → announcing(message effect 回流 design) → idle
+# 过期/被取代回调以结构化 rejected 返回 awaiting/idle，不毒化实例。
+initial: init
+states:
+  init:
+    on:
+      Restore:
+        schema: schemas/restore-generation.json
+        routes: [{ target: idle }]
+
+  idle:
+    on:
+      Restore:
+        schema: schemas/restore-generation.json
+        routes: [{ target: idle__reject }]
+      StartGeneration:
+        schema: schemas/start-generation.json
+        routes: [{ target: starting }]
+      JobFinished:
+        schema: schemas/job-finished.json
+        routes: [{ target: idle__reject }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  idle__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_idle", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: idle }]
+
+  starting:
+    invoke:
+      tool: startGeneration
+      input: '{ "designId": address.instanceKey, "prompt": state.lastMessage.prompt, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: awaiting }]
+      error: [{ target: failed }]
+
+  awaiting:
+    on:
+      Restore:
+        schema: schemas/restore-generation.json
+        routes: [{ target: awaiting__reject }]
+      StartGeneration:
+        schema: schemas/start-generation.json
+        routes: [{ target: starting }]
+      JobFinished:
+        schema: schemas/job-finished.json
+        routes: [{ target: recording }]
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  awaiting__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_awaiting", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: awaiting }]
+
+  recording:
+    invoke:
+      tool: recordArtifact
+      input: '{ "designId": address.instanceKey, "jobId": state.lastMessage.jobId, "artifact": state.lastMessage.artifact, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: announcing
+          when: "result.outcome = 'applied'"
+        - target: awaiting
+      error: [{ target: failed }]
+
+  announcing:
+    effects:
+      - kind: domain-message
+        targetExpression: '{ "workflowId": "formula.design", "instanceKey": address.instanceKey }'
+        messageType: GenerationCompleted
+        payloadExpression: '{ "designId": address.instanceKey, "artifactId": result.artifactId, "jobId": state.lastMessage.jobId, "commandId": result.commandId }'
+    invoke:
+      expr: 'result'
+    on:
+      done: [{ target: idle }]
+
+  failed:
+    on:
+      Close:
+        schema: schemas/command.json
+        routes: [{ target: closed }]
+
+  closed:
+    final: true

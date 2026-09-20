@@ -1,0 +1,13 @@
+{
+  "project": "restudio",
+  "tier": "data-only",
+  "domainId": "restudio",
+  "domainVersion": "0.2.0-sim.1",
+  "contractDraft": "docs/domain-data/contract-drafts/restudio.md",
+  "blockers": [
+    "Python 宿主：Node sidecar + 本地回环 HTTP（restudio API 现状无鉴权——先补本地 token，参照 formula session-token 模式）",
+    "前置修复（不依赖 DH）：Run 持久化（ProductionRunState 落 vnext_objects）、spec.accepted 端点、approveRuleProposal 幂等、resolveReview 事务化、design session 收敛（UI 挂载即新建缺陷）、run 超时",
+    "model-api 异步化（operation_ref+回调）是媒体作业 Ingress/deadline 的前提"
+  ],
+  "notes": "Restudio 模拟数据包：L2 已设计未实现的 ProductionRunState 与产品状态机（DRAFT→…→DELIVERED）正是 workflow 落点；固定三段拓扑（X2T→T2T→T2X）为领域受限编译目标；Evidence-first 完成判定（DONE≠完成）。"
+}

@@ -1,0 +1,167 @@
+# triphub.journey — Journey E workflow（契约草案 §2 裁剪切片）
+# 不变量映射：三维正交状态（lifecycle/commitment/publication）由业务源承载，
+# workflow 只推进 lifecycle 相位；冻结转移表在 changeLifecycle Tool 内经
+# compiled domain data 校验（invariant #5）；交易路径零 LLM（invariant #1）；
+# 报价 deadline 存业务 jobs 表（S2），commit 前 Tool 重校验（§16）。
+# W3：每个静止状态接受全部 6 种入站消息类型；R2：条件路由以无条件兜底结尾。
+initial: init
+states:
+  init:
+    on:
+      Restore:
+        schema: schemas/restore-journey.json
+        routes:
+          - target: planned_st
+            when: "message.snapshot.lifecycle = 'planned'"
+          - target: experiencing
+            when: "message.snapshot.lifecycle = 'active'"
+          - target: completed_st
+            when: "message.snapshot.lifecycle = 'completed'"
+          - target: drafting
+
+  drafting:
+    on:
+      Restore: { schema: schemas/restore-journey.json, routes: [{ target: drafting__reject }] }
+      ChangeLifecycle: { schema: schemas/change-lifecycle.json, routes: [{ target: lc_from_draft }] }
+      TxnIntent: { schema: schemas/txn-intent.json, routes: [{ target: drafting__reject }] }
+      TxnConfirm: { schema: schemas/txn-confirm.json, routes: [{ target: drafting__reject }] }
+      QuoteExpired: { schema: schemas/quote-expired.json, routes: [{ target: drafting__reject }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  drafting__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_drafting", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: drafting }]
+
+  lc_from_draft:
+    invoke:
+      tool: changeLifecycle
+      input: '{ "journeyId": address.instanceKey, "target": state.lastMessage.target, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: planned_st
+          when: "result.outcome = 'applied'"
+        - target: drafting
+      error: [{ target: failed }]
+
+  planned_st:
+    on:
+      Restore: { schema: schemas/restore-journey.json, routes: [{ target: planned__reject }] }
+      ChangeLifecycle: { schema: schemas/change-lifecycle.json, routes: [{ target: lc_from_planned }] }
+      TxnIntent: { schema: schemas/txn-intent.json, routes: [{ target: txn_quoting }] }
+      TxnConfirm: { schema: schemas/txn-confirm.json, routes: [{ target: planned__reject }] }
+      QuoteExpired: { schema: schemas/quote-expired.json, routes: [{ target: planned__reject }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  planned__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_planned", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: planned_st }]
+
+  lc_from_planned:
+    invoke:
+      tool: changeLifecycle
+      input: '{ "journeyId": address.instanceKey, "target": state.lastMessage.target, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: drafting
+          when: "result.outcome = 'applied' and result.lifecycle = 'draft'"
+        - target: experiencing
+          when: "result.outcome = 'applied' and result.lifecycle = 'active'"
+        - target: planned_st
+      error: [{ target: failed }]
+
+  txn_quoting:
+    invoke:
+      tool: quoteProvider
+      input: '{ "journeyId": address.instanceKey, "itemId": state.lastMessage.itemId, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: txn_previewing
+          when: "result.outcome = 'applied'"
+        - target: planned_st
+      error: [{ target: failed }]
+
+  txn_previewing:
+    on:
+      Restore: { schema: schemas/restore-journey.json, routes: [{ target: txn_previewing__reject }] }
+      ChangeLifecycle: { schema: schemas/change-lifecycle.json, routes: [{ target: txn_previewing__reject }] }
+      TxnIntent: { schema: schemas/txn-intent.json, routes: [{ target: txn_quoting }] }
+      TxnConfirm: { schema: schemas/txn-confirm.json, routes: [{ target: txn_committing }] }
+      QuoteExpired: { schema: schemas/quote-expired.json, routes: [{ target: planned_st }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  txn_previewing__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_txn_preview", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: txn_previewing }]
+
+  txn_committing:
+    invoke:
+      tool: commitBooking
+      input: '{ "journeyId": address.instanceKey, "quoteId": state.lastMessage.quoteId, "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: planned_st }]
+      error: [{ target: failed }]
+
+  experiencing:
+    on:
+      Restore: { schema: schemas/restore-journey.json, routes: [{ target: experiencing__reject }] }
+      ChangeLifecycle: { schema: schemas/change-lifecycle.json, routes: [{ target: lc_from_experiencing }] }
+      TxnIntent: { schema: schemas/txn-intent.json, routes: [{ target: experiencing__reject }] }
+      TxnConfirm: { schema: schemas/txn-confirm.json, routes: [{ target: experiencing__reject }] }
+      QuoteExpired: { schema: schemas/quote-expired.json, routes: [{ target: experiencing__reject }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  experiencing__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_experiencing", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: experiencing }]
+
+  lc_from_experiencing:
+    invoke:
+      tool: changeLifecycle
+      input: '{ "journeyId": address.instanceKey, "target": state.lastMessage.target, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: completed_st
+          when: "result.outcome = 'applied'"
+        - target: experiencing
+      error: [{ target: failed }]
+
+  completed_st:
+    on:
+      Restore: { schema: schemas/restore-journey.json, routes: [{ target: completed__reject }] }
+      ChangeLifecycle: { schema: schemas/change-lifecycle.json, routes: [{ target: lc_from_completed }] }
+      TxnIntent: { schema: schemas/txn-intent.json, routes: [{ target: completed__reject }] }
+      TxnConfirm: { schema: schemas/txn-confirm.json, routes: [{ target: completed__reject }] }
+      QuoteExpired: { schema: schemas/quote-expired.json, routes: [{ target: completed__reject }] }
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  completed__reject:
+    invoke:
+      expr: '{ "outcome": "rejected", "code": "not_applicable_in_completed", "commandId": state.lastMessage.commandId }'
+    on:
+      done: [{ target: completed_st }]
+
+  lc_from_completed:
+    invoke:
+      tool: changeLifecycle
+      input: '{ "journeyId": address.instanceKey, "target": state.lastMessage.target, "commandId": state.lastMessage.commandId }'
+    on:
+      done:
+        - target: closed
+          when: "result.outcome = 'applied' and result.lifecycle = 'archived'"
+        - target: completed_st
+      error: [{ target: failed }]
+
+  failed:
+    on:
+      Close: { schema: schemas/command.json, routes: [{ target: closed }] }
+
+  closed:
+    final: true

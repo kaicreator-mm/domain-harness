@@ -1,0 +1,30 @@
+[
+  {
+    "key": "proj_talk_01",
+    "revision": "rev-design-talk01-0003",
+    "value": {
+      "sessionId": "design_4b5c6d7e8f9a",
+      "revision": 4,
+      "intent": {
+        "purpose": "knowledge_sharing",
+        "audience": "myanmar_market",
+        "usageContext": "website_blog",
+        "targetLanguage": "my",
+        "certainty": 0.85
+      },
+      "spec": {
+        "specId": "spec_9a1b2c3d4e5f",
+        "revision": 2,
+        "accepted": true,
+        "targetType": "article+short_video",
+        "targetLanguage": "my"
+      },
+      "plan": {
+        "planId": "plan_5f6e7d8c9b0a",
+        "harnessId": "technical-video-localization",
+        "harnessVersion": "1.0.0",
+        "steps": 4
+      }
+    }
+  }
+]

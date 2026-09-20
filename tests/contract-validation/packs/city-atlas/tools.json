@@ -1,0 +1,173 @@
+[
+  {
+    "toolId": "evaluateStage",
+    "effect": "none",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "taskState"
+      ],
+      "properties": {
+        "taskState": {
+          "type": "object"
+        },
+        "contextCapsule": {
+          "type": "object"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "decision",
+        "reasonCodes"
+      ],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "READY",
+            "VERIFY_FIRST",
+            "UNCERTAIN",
+            "NOT_RECOMMENDED"
+          ]
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "actions": {
+          "type": "array"
+        },
+        "missingFacts": {
+          "type": "array"
+        },
+        "degradations": {
+          "type": "array"
+        }
+      }
+    },
+    "notes": "v2/v3 服务端纯函数（无状态可重入 AC-1，天然幂等）；评估路径结构上不 import AI（门禁测试锁死）；LLM=0 红线。"
+  },
+  {
+    "toolId": "launchAction",
+    "effect": "non-idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "cardId"
+      ],
+      "properties": {
+        "cardId": {
+          "type": "string"
+        },
+        "fallbackChain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "launched"
+      ],
+      "properties": {
+        "launched": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "string"
+        },
+        "usedFallback": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "设备外部效果（tel:/地图/分享/剪贴板）——只报告 launched，绝不改任务状态（launched≠completed）；[G3] expo 注册绑定。"
+  },
+  {
+    "toolId": "applyProposal",
+    "effect": "idempotent",
+    "executionKind": "remote",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "proposalId",
+        "baseSnapshot",
+        "commandId"
+      ],
+      "properties": {
+        "proposalId": {
+          "type": "string"
+        },
+        "baseSnapshot": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commandId"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "生产唯一写 main 路径；base_snapshot 不符→rejected(stale_base)；audit_log 同事务；odbl→main CHECK 兜底（HR-1）。"
+  },
+  {
+    "toolId": "syncAvailability",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "date"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "outcome"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "integer"
+        }
+      }
+    },
+    "notes": "「任何时间点重跑一遍就是最终状态」（源码自证的显式幂等）；按 reason 增删，自定义闭店不覆盖；[G6] 前进程内 cron。"
+  }
+]

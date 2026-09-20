@@ -1,0 +1,55 @@
+[
+  {
+    "projectionId": "xlearn.learner-state",
+    "expression": "( $l := business[source = 'xlearn.learner'].value; $q := business[source = 'xlearn.queue'].value; { 'key': key, 'phase': $l.currentTaskId ? 'in_session' : 'idle', 'availableActions': [ { 'type': 'Answer', 'enabled': $l.currentTaskId != null }, { 'type': 'SelectDomain', 'enabled': true } ], 'pending': [], 'lastOutcome': null, 'body': { 'activeDomainId': $l.activeDomainId, 'activeDomainVersion': $l.activeDomainVersion, 'currentTaskId': $l.currentTaskId, 'dueCount': $q.dueCount, 'forcedCount': $count($q.forced), 'todayNewCount': $q.todayNewCount, 'dailyNewLimit': $l.plannerMeta.dailyNewLimit } } )",
+    "dependencies": [
+      {
+        "kind": "business",
+        "source": "xlearn.learner",
+        "selector": {}
+      },
+      {
+        "kind": "business",
+        "source": "xlearn.queue",
+        "selector": {}
+      },
+      {
+        "kind": "domain-data",
+        "key": "planner-priority"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "key",
+        "phase",
+        "availableActions",
+        "pending",
+        "body"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "availableActions": {
+          "type": "array"
+        },
+        "pending": {
+          "type": "array"
+        },
+        "lastOutcome": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "body": {
+          "type": "object"
+        }
+      }
+    }
+  }
+]

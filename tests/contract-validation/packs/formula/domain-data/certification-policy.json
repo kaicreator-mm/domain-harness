@@ -1,0 +1,6 @@
+{
+  "exportDefault": "certified-only",
+  "variantAxes": ["frozenDesign", "target", "locale", "format"],
+  "overrideRequiresCurrentSnapshot": true,
+  "revalidateInvalidatesOldOverride": true
+}

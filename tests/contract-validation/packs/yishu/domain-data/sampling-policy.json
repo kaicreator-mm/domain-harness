@@ -1,0 +1,6 @@
+{
+  "importSamplingRate": 0.1,
+  "llmBatchConfirmForbidden": true,
+  "sampledGroupBatchConfirmForbidden": true,
+  "note": "LLM 来源与抽样组候选禁止批量确认；AI 无批准权（INVARIANTS #1/#3/#12/#13/#14）。"
+}

@@ -1,0 +1,137 @@
+[
+  {
+    "toolId": "writeFact",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "subgraphId",
+        "fact",
+        "idempotencyKey"
+      ],
+      "properties": {
+        "subgraphId": {
+          "type": "string"
+        },
+        "fact": {
+          "type": "object"
+        },
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "locator": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "written",
+            "replayed"
+          ]
+        },
+        "factHash": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "Idempotency-Key 头语义：同 key 第二次起返回首次结果、不写链不审计；compute 抛错不缓存；per-key 串行有界 1024 FIFO；写前 I44 locator→admitted bundle 检查；审计 I48 同败同成。"
+  },
+  {
+    "toolId": "advanceRun",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "runId",
+        "maxSteps"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "maxSteps": {
+          "type": "integer"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "stopReason"
+      ],
+      "properties": {
+        "stopReason": {
+          "type": "string",
+          "enum": [
+            "WAITING",
+            "TERMINAL",
+            "STEP_LIMIT"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": "七个 effect ports 经 [G3] 绑定承接（签名/分组不变，EFFECT_PORTS_MATCH_ORCHESTRATOR 编译期断言继续成立）；planning/execution 端口的 AI 调用走 DirectExecutionLedger 三终态，attempt 预算=1（J10：自动 retry 关闭）。"
+  },
+  {
+    "toolId": "activateGovernance",
+    "effect": "idempotent",
+    "executionKind": "project",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "ruleRefs",
+        "approvalRef"
+      ],
+      "properties": {
+        "ruleRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "approvalRef": {
+          "type": "string"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "activated",
+            "replayed",
+            "rejected"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "activeSetRevision": {
+          "type": "integer"
+        }
+      }
+    },
+    "notes": "指针切换幂等重放；durability 缺失⇒GOVERNANCE_PERSISTENCE_UNAVAILABLE(503) fail-closed（无 ephemeral active rules）；同 exact-scope 冲突 flagged⇒激活硬拒，绝不任意选赢家；批准与激活是两个独立权威步骤。"
+  }
+]

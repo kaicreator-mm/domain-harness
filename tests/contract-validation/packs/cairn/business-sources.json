@@ -1,0 +1,169 @@
+[
+  {
+    "source": "cairn.run",
+    "notes": "KnowledgeRunView 数据面（诚实投影：不伪造百分比进度；崩溃残留 IN_PROGRESS 原样呈现；outcome 仅 SETTLED 时存在，legacy COMPLETED→LEGACY_UNASSESSED）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "runId",
+        "goal",
+        "status",
+        "stage",
+        "planRound"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "strategy": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PLANNING",
+            "RUNNING",
+            "WAITING_HUMAN",
+            "WAITING_MODEL",
+            "SUSPENDED",
+            "SETTLED",
+            "COMPLETED",
+            "FAILED"
+          ]
+        },
+        "outcome": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "SATISFIED",
+            "PARTIAL",
+            "ABSTAINED",
+            "CONFLICTED",
+            "BLOCKED",
+            "EMPTY",
+            "LEGACY_UNASSESSED",
+            null
+          ]
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "ASSESS_GAPS",
+            "PLAN",
+            "EXECUTE_OPERATION",
+            "OBSERVE",
+            "COMPILE",
+            "PROPOSE",
+            "REVIEW_GATE",
+            "DONE"
+          ]
+        },
+        "planRound": {
+          "type": "integer"
+        },
+        "planVersion": {
+          "type": "integer"
+        },
+        "progressCounters": {
+          "type": "object"
+        },
+        "waitingReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastError": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pins": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "source": "cairn.gaps",
+    "notes": "KnowledgeGap（确定 id gap:<runId>:<topic>；OPEN→PLANNED→IN_PROGRESS→{RESOLVED,DISMISSED}，终态仅幂等自转换）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "gaps"
+      ],
+      "properties": {
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "gapId",
+              "topic",
+              "status"
+            ],
+            "properties": {
+              "gapId": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "PLANNED",
+                  "IN_PROGRESS",
+                  "RESOLVED",
+                  "DISMISSED"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "source": "cairn.governance",
+    "notes": "治理态势（ActiveGovernanceRuleRef 单例指针+capability 探测结果：governancePersistenceCapability 查方法面不查 driver.name——「名字可伪造，方法面不可伪造」）。",
+    "valueSchema": {
+      "type": "object",
+      "required": [
+        "activeRuleRefs",
+        "activeSetRevision",
+        "governancePersistenceCapability"
+      ],
+      "properties": {
+        "activeRuleRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "activeSetRevision": {
+          "type": "integer"
+        },
+        "governancePersistenceCapability": {
+          "type": "boolean"
+        },
+        "flaggedConflicts": {
+          "type": "array"
+        },
+        "lastActivatedBy": {
+          "type": "string"
+        },
+        "lastActivatedAt": {
+          "type": "string"
+        }
+      }
+    }
+  }
+]

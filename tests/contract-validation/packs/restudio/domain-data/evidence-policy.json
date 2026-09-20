@@ -1,0 +1,14 @@
+{
+  "evidenceFirst": "DONE ≠ 完成：READY 需 EvidencePackage 全项通过",
+  "checks": [
+    "execution_completed",
+    "no_open_reviews",
+    "has_artifacts",
+    "quality_score_aggregated",
+    "acceptance_items_checked",
+    "pins_verified",
+    "provenance_recorded"
+  ],
+  "perRunArchive": true,
+  "note": "现状 checks 仅前 3 项且 per-project 覆盖式、GET 即重算即写——契约要求扩展为 7 项并按 run 归档（修复 J8 缺口）"
+}

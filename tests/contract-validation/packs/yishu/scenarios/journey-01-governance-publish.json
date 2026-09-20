@@ -1,0 +1,83 @@
+{
+  "id": "journey-01-governance-publish",
+  "description": "YISHU E2E（契约草案 §2 yishu.knowledge S 实例）：Restore→curating；批量确认（人工候选）；LLM 候选批量确认被拒（AI 无批准权）；逐条确认放行；发布预览 regression gate blocked（超声术语缺失）→ publish_blocked；blocked 相位 ApprovePublish 被拒（无强制发布入口）；补草稿后 preview pass→publish_ready；TOCTOU（草稿变更→旧指纹 ApprovePublish rejected(stale_drafts)）；正确指纹发布 applied（tag+revision+清 draft）；restart；回滚=指针移动；未知 tag 拒绝；Close 终态。",
+  "steps": [
+    { "action": "open", "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical", "input": { "scopeKey": "zh-my/medical" }, "expect": { "stateId": "init" } },
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "restore:yishu.knowledge:zh-my-medical", "type": "Restore", "payload": { "snapshot": { "activeTag": "v2026.08.13-1", "draftCount": 0, "publishState": "none" } } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lifecycle": "waiting" } },
+    { "action": "expect-projection", "projectionId": "yishu.knowledge-state", "key": "zh-my/medical", "expect": {
+      "phase": "curating",
+      "availableActions": [ { "type": "CandidateConfirmed", "enabled": true }, { "type": "SaveDraft", "enabled": true }, { "type": "RequestPublish", "enabled": false } ],
+      "pending": [ { "kind": "open-reviews" } ],
+      "body": { "activeTag": "v2026.08.13-1", "activeRevision": 7, "draftCount": 0, "draftsFingerprint": "fp_0", "queueCounts": { "manual": 3, "import": 1, "llm": 2 }, "candidateCount": 6, "previewGate": null }
+    } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_c1", "type": "CandidateConfirmed", "payload": { "commandId": "cmd_c1", "candidateIds": ["cand_manual_1", "cand_manual_2"] } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lastResult": { "outcome": "applied", "confirmed": 2, "draftsFingerprint": "fp_1" } } },
+    { "action": "expect-business", "source": "yishu.drafts", "key": "zh-my/medical", "expect": { "drafts": [ { "path": "terms/zh-my/medical/clinic.md", "content": "ဆေးခန်း" }, { "path": "terms/zh-my/medical/pharmacy.md", "content": "ဆေးဆိုင်" } ] } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_c2", "type": "CandidateConfirmed", "payload": { "commandId": "cmd_c2", "candidateIds": ["cand_llm_1", "cand_llm_2"] } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "llm_batch_confirm_forbidden", "commandId": "cmd_c2" } } },
+    { "action": "finding", "id": "ai-no-approval-authority", "severity": "info", "summary": "LLM 来源候选禁止批量确认（sampling-policy compiled domain data 强制）：AI 产物只能经逐条人工确认进入 draft 通道——INVARIANTS #1/#3/#12『AI 无批准权』在 Tool 闸内成立，且拒绝是结构化的（实例健康）。" },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_c3", "type": "CandidateConfirmed", "payload": { "commandId": "cmd_c3", "candidateIds": ["cand_llm_1"] } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "lastResult": { "outcome": "applied", "confirmed": 1, "draftsFingerprint": "fp_2" } } },
+    { "action": "expect-projection", "projectionId": "yishu.knowledge-state", "key": "zh-my/medical", "expect": { "body": { "draftCount": 3, "candidateCount": 3 } } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_p1", "type": "RequestPublish", "payload": { "commandId": "cmd_p1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "publish_blocked", "lastResult": { "gate": "blocked", "newFailures": ["case_ultrasound_term"] } } },
+    { "action": "expect-projection", "projectionId": "yishu.knowledge-state", "key": "zh-my/medical", "expect": { "phase": "publish_blocked", "body": { "previewGate": "blocked", "previewNewFailures": ["case_ultrasound_term"] }, "availableActions": [ { "type": "SaveDraft", "enabled": true }, { "type": "RequestPublish", "enabled": true }, { "type": "ApprovePublish", "enabled": false } ] } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_a0", "type": "ApprovePublish", "payload": { "commandId": "cmd_a0", "expectedFingerprint": "fp_2" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "publish_blocked", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "no_force_publish_while_blocked", "commandId": "cmd_a0" } } },
+    { "action": "finding", "id": "no-force-publish-entry", "severity": "info", "summary": "regression gate blocked 时 ApprovePublish 被相位级拒绝（no_force_publish_while_blocked）——『新失败即阻断、无强制发布入口』（API/UI 均无）被提升为 workflow 结构性质：publish_blocked 相位根本没有通往 publishing 的路由。" },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_d1", "type": "SaveDraft", "payload": { "commandId": "cmd_d1", "path": "terms/zh-my/medical/ultrasound.md", "content": "အာထရာဆောင်း ပုံရိပ်ဖော်ခြင်း = 超声影像检查" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lastResult": { "outcome": "applied", "draftsFingerprint": "fp_3", "draftCount": 4 } } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_p2", "type": "RequestPublish", "payload": { "commandId": "cmd_p2" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "publish_ready", "lastResult": { "gate": "pass", "newFailures": [] } } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_d2", "type": "SaveDraft", "payload": { "commandId": "cmd_d2", "path": "terms/zh-my/medical/mri.md", "content": "ဓာတ်မှန်ခြင်း (MRI) = 磁共振（复核后修订）" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lastResult": { "draftsFingerprint": "fp_4" } } },
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_p3", "type": "RequestPublish", "payload": { "commandId": "cmd_p3" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "publish_ready" } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_a1", "type": "ApprovePublish", "payload": { "commandId": "cmd_a1", "expectedFingerprint": "fp_3" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "publish_ready", "lifecycle": "waiting", "lastResult": { "outcome": "rejected", "code": "stale_drafts", "commandId": "cmd_a1" } } },
+    { "action": "finding", "id": "toctou-stale-drafts-rejected", "severity": "info", "summary": "TOCTOU 守卫成立：preview 与 publish 之间草稿集变化（fp_3→fp_4）后，携带旧指纹的 ApprovePublish 在 publishConfig Tool 内被结构化拒绝（stale_drafts），实例健康、可携带新指纹重试——服务层 TOCTOU 检查（services/publish.ts）的契约化等价物。" },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_a2", "type": "ApprovePublish", "payload": { "commandId": "cmd_a2", "expectedFingerprint": "fp_4" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lastResult": { "outcome": "applied", "commandId": "cmd_a2" } } },
+    { "action": "expect-business", "source": "yishu.governance", "key": "zh-my/medical", "expect": { "activeRevision": 8, "draftCount": 0, "previewGate": null } },
+    { "action": "expect-business", "source": "yishu.drafts", "key": "zh-my/medical", "expect": { "drafts": [] } },
+
+    { "action": "restart" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lifecycle": "waiting" } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_r1", "type": "Rollback", "payload": { "commandId": "cmd_r1", "tag": "v2026.08.13-1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "curating", "lastResult": { "outcome": "applied", "tag": "v2026.08.13-1", "activeRevision": 9 } } },
+    { "action": "expect-business", "source": "yishu.governance", "key": "zh-my/medical", "expect": { "activeTag": "v2026.08.13-1", "activeRevision": 9 } },
+    { "action": "finding", "id": "rollback-is-pointer-move", "severity": "info", "summary": "回滚=active 指针移动（非破坏，历史 tag 保留，revision 单调 +1）；未知 tag 被 rejected(unknown_tag)。Git 单写者约束由 per-instance serialized lane 天然满足（同一 scope 的 publish/rollback 严格串行）。" },
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_r2", "type": "Rollback", "payload": { "commandId": "cmd_r2", "tag": "v1999.01.01-1" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "lastResult": { "outcome": "rejected", "code": "unknown_tag" } } },
+
+    { "action": "send", "to": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "messageId": "cmd_close", "type": "Close", "payload": { "commandId": "cmd_close" } },
+    { "action": "settle" },
+    { "action": "expect-instance", "target": { "workflowId": "yishu.knowledge", "instanceKey": "zh-my/medical" }, "expect": { "stateId": "closed", "lifecycle": "completed" } }
+  ]
+}

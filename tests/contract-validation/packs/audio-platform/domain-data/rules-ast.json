@@ -1,0 +1,22 @@
+{
+  "operatorsClosedSet": 12,
+  "variableForm": "{ \"var\": \"<path>\" }",
+  "budgets": {
+    "maxAstDepth": 16,
+    "maxAstNodes": 128
+  },
+  "outcomes": [
+    "pass",
+    "fail",
+    "unknown",
+    "not_applicable",
+    "error"
+  ],
+  "missingInputPolicy": [
+    "unknown",
+    "not_applicable",
+    "fail"
+  ],
+  "passNotRepresentableForMissing": "PASS 对缺失测量结构上不可表示（缺失测量≠PASS——ADR-0033 #5）",
+  "translationRequirement": "若转译为 SDK expression 必须保留三值语义+预算+RuleTraceEntry；转译前 rules_eval 仍是唯一 evaluator"
+}

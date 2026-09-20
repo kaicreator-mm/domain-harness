@@ -1,0 +1,46 @@
+[
+  {
+    "key": "shop_042",
+    "revision": "rev-shopstate-042-seq-1877",
+    "value": {
+      "shopId": "shop_042",
+      "throughServerSeq": 1877,
+      "parts": [
+        {
+          "itemKey": "component:brake-pad-front-dn150",
+          "qtyOnHand": 4,
+          "reserved": 1,
+          "waitingPlates": [
+            "9A-1234"
+          ]
+        },
+        {
+          "itemKey": "component:alternator-24v-dn280",
+          "qtyOnHand": -1,
+          "reserved": 0,
+          "waitingPlates": [
+            "9B-5678",
+            "7C-9012"
+          ]
+        }
+      ],
+      "ledger": [
+        {
+          "partyRef": "plate:9A-1234",
+          "receivable": 128500,
+          "payable": 0,
+          "currency": "MMK"
+        }
+      ],
+      "consignment": [
+        {
+          "consignmentId": "csn_017",
+          "itemKey": "component:battery-70ah",
+          "qtyOnShelf": 2,
+          "unitPriceSnapshot": 185000
+        }
+      ],
+      "ourReceivable": 402300
+    }
+  }
+]
