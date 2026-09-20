@@ -16,9 +16,16 @@ export type {
 } from './contract.js';
 export {
   PredicateContractViolation,
+  createPreparedDomainPredicateEvaluationInput,
   evaluateDomainHardInvariantPredicate,
   evaluateDomainPredicate,
   evaluateDomainWorkflowGuard,
+  prepareDomainHardInvariantPredicate,
+  prepareDomainPredicate,
+  prepareDomainPredicateContext,
+  prepareDomainPredicateEvaluationInput,
+  prepareDomainPredicateEvent,
+  prepareDomainWorkflowGuard,
 } from './predicate.js';
 export type {
   DomainHardInvariantPredicate,
