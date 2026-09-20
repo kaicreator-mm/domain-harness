@@ -126,6 +126,60 @@ test('T-003: retention reference IDs cannot be rebound to different authority', 
   );
 });
 
+test('T-003: released reference IDs remain tombstoned and cannot bind another baseline', async () => {
+  const { baseline, registry } = await fixture();
+  const next = await createGovernanceBaselineBody({
+    domainId: 'orders',
+    governanceId: 'orders-governance',
+    schemaVersion: '1',
+    version: 'B2',
+    semantics: {
+      hardInvariants: [{ id: 'no-negative-total', min: 1 }],
+      promotionPolicy: { role: 'security-operator' },
+    },
+  }, sha256);
+  await registry.register(next);
+
+  await registry.retain({
+    referenceId: 'audit:stable-id',
+    reason: 'audit',
+    baseline: baseline.identity,
+  });
+  await registry.release('audit:stable-id', baseline.identity);
+
+  await assert.rejects(
+    registry.retain({
+      referenceId: 'audit:stable-id',
+      reason: 'audit',
+      baseline: next.identity,
+    }),
+    (error: unknown) => error instanceof GovernanceContractError
+      && error.code === 'RETENTION_REFERENCE_CONFLICT',
+  );
+  assert.equal(await registry.referenceCount(baseline.identity), 0);
+  assert.equal(await registry.referenceCount(next.identity), 0);
+});
+
+test('T-003: store release is conditional on the exact live authority reference', async () => {
+  const { baseline, store, registry } = await fixture();
+  const live = {
+    referenceId: 'audit:conditional',
+    reason: 'audit' as const,
+    baseline: baseline.identity,
+  };
+  await registry.retain(live);
+
+  await assert.rejects(
+    store.releaseReference({ ...live, reason: 'validation' }),
+    (error: unknown) => error instanceof GovernanceContractError
+      && error.code === 'RETENTION_REFERENCE_CONFLICT',
+  );
+  assert.deepEqual(await store.getReference(live.referenceId), live);
+
+  assert.equal(await store.releaseReference(live), 'released');
+  assert.equal(await store.releaseReference(live), 'absent');
+});
+
 test('T-003: digest mismatch and same-digest body mutation fail closed', async () => {
   const { baseline, registry } = await fixture();
   await assert.rejects(
