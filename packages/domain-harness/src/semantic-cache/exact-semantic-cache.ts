@@ -75,7 +75,7 @@ export interface ExactSemanticInvocationRequest {
   readonly dependencies: BehaviorallyRelevantSemanticDependencies;
   /** Preferred exact selector; source is part of T-002 projection identity. */
   readonly requiredProjections?: readonly RequiredSemanticProjection[];
-  /** Compatibility seam for the initial T-013 focused fixture; prefer requiredProjections. */
+  /** Compatibility seam for the initial T-013 focused fixture; input-source only. Prefer requiredProjections. */
   readonly requiredProjectionIds?: readonly string[];
   readonly requiredRevisionSourceIds?: readonly string[];
   readonly allBehaviorallyRelevantDependenciesPrebound?: boolean;
@@ -186,8 +186,8 @@ function requireProjections(request: ExactSemanticInvocationRequest, deps: Behav
   }
   for (const projectionId of request.requiredProjectionIds ?? []) {
     nonEmpty(projectionId, 'required projection id');
-    if (!projections.some((value) => value.projectionId === projectionId)) {
-      throw new SemanticCacheContractError('MISSING_REQUIRED_SEMANTIC_INPUT', `required semantic projection ${projectionId} is missing`);
+    if (!projections.some((value) => value.source === 'input' && value.projectionId === projectionId)) {
+      throw new SemanticCacheContractError('MISSING_REQUIRED_SEMANTIC_INPUT', `required semantic projection input:${projectionId} is missing`);
     }
   }
 }
