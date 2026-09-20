@@ -16,7 +16,6 @@ steps:
   - name: verify
     image: /usr/bin/bash
     commands:
-      - export PATH="/usr/local/bin:$PATH"
       - node --version
       - npm --version
       - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
