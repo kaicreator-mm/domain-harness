@@ -2,12 +2,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import type { JsonObject } from '../../src/contracts/json.js';
 import {
   evaluateDomainHardInvariantPredicate,
   evaluateDomainPredicate,
   evaluateDomainWorkflowGuard,
+  prepareDomainHardInvariantPredicate,
+  prepareDomainPredicate,
+  prepareDomainPredicateEvaluationInput,
+  prepareDomainWorkflowGuard,
   type DomainPredicate,
+  type DomainPredicateEvaluationInput,
+  type DomainWorkflowGuard,
 } from '../../src/workflow/index.js';
 
 const amountPredicate: DomainPredicate = {
@@ -26,13 +31,16 @@ const amountPredicate: DomainPredicate = {
   ],
 };
 
-test('Guard and Hard Invariant predicates are synchronous and deterministic for declared data', () => {
-  const input = {
+test('Guard and Hard Invariant predicates are synchronous and deterministic for prepared declared data', () => {
+  const input = prepareDomainPredicateEvaluationInput({
     context: { limit: 100 },
     event: { type: 'SUBMIT', payload: { amount: 25 } },
-  };
-  const guard = { guardId: 'amount-within-limit', predicate: amountPredicate };
-  const invariant = { invariantId: 'amount-within-limit', predicate: amountPredicate };
+  });
+  const guard = prepareDomainWorkflowGuard({ guardId: 'amount-within-limit', predicate: amountPredicate });
+  const invariant = prepareDomainHardInvariantPredicate({
+    invariantId: 'amount-within-limit',
+    predicate: amountPredicate,
+  });
 
   const first = evaluateDomainWorkflowGuard(guard, input);
   for (let index = 0; index < 100; index += 1) {
@@ -42,7 +50,7 @@ test('Guard and Hard Invariant predicates are synchronous and deterministic for 
   assert.equal(first, true);
 });
 
-test('predicate path is a closed data interpreter with no AI, Tool, Promise, or external I/O seam', async () => {
+test('authoritative predicate path is a closed data interpreter with no AI, Tool, Promise, or external I/O seam', async () => {
   const source = await readFile(new URL('../../src/workflow/predicate.ts', import.meta.url), 'utf8');
   const executableSource = source
     .split('\n')
@@ -52,13 +60,21 @@ test('predicate path is a closed data interpreter with no AI, Tool, Promise, or 
   for (const forbidden of ['fetch(', 'http:', 'https:', 'Promise<', 'async ', 'tool(', 'llm(']) {
     assert.equal(executableSource.toLowerCase().includes(forbidden.toLowerCase()), false, `${forbidden} in predicate path`);
   }
-  assert.match(source, /import type \{ JsonObject, JsonValue \} from '\.\.\/contracts\/json\.js';/);
+  assert.match(source, /preparedInputs\.has/);
+  assert.match(source, /preparedWorkflowGuards\.has/);
 });
 
-test('capability-shaped or accessor data fails closed without invoking hidden work', () => {
+test('unprepared accessor/capability-shaped values fail closed without invoking hidden work', () => {
   let getterCalls = 0;
   let callbackCalls = 0;
-  const context = { limit: 100 } as JsonObject;
+  const guard = prepareDomainWorkflowGuard({
+    guardId: 'no-accessors',
+    predicate: {
+      op: 'exists',
+      operand: { source: 'context', path: ['externalObservation'] },
+    },
+  });
+  const context: Record<string, unknown> = { limit: 100 };
   Object.defineProperty(context, 'externalObservation', {
     enumerable: true,
     get() {
@@ -66,15 +82,12 @@ test('capability-shaped or accessor data fails closed without invoking hidden wo
       return 42;
     },
   });
+  const unpreparedInput = {
+    context,
+    event: { type: 'CHECK' },
+  } as unknown as DomainPredicateEvaluationInput;
 
-  const accessorGuard = {
-    guardId: 'no-accessors',
-    predicate: {
-      op: 'exists',
-      operand: { source: 'context', path: ['externalObservation'] },
-    },
-  } as const;
-  assert.equal(evaluateDomainWorkflowGuard(accessorGuard, { context, event: { type: 'CHECK' } }), false);
+  assert.equal(evaluateDomainWorkflowGuard(guard, unpreparedInput), false);
   assert.equal(getterCalls, 0);
 
   const callbackPredicate = {
@@ -85,27 +98,79 @@ test('capability-shaped or accessor data fails closed without invoking hidden wo
       return true;
     },
   } as unknown as DomainPredicate;
-  assert.equal(
-    evaluateDomainWorkflowGuard(
-      { guardId: 'no-callbacks', predicate: callbackPredicate },
-      { context: {}, event: { type: 'CHECK' } },
-    ),
-    false,
-  );
+  const rawGuard = { guardId: 'no-callbacks', predicate: callbackPredicate } as DomainWorkflowGuard;
+  const preparedInput = prepareDomainPredicateEvaluationInput({ context: {}, event: { type: 'CHECK' } });
+
+  assert.equal(evaluateDomainWorkflowGuard(rawGuard, preparedInput), false);
+  assert.equal(callbackCalls, 0);
+  assert.throws(() => prepareDomainWorkflowGuard(rawGuard), /JSON data only/);
   assert.equal(callbackCalls, 0);
 });
 
-test('malformed predicate evaluation throws at the primitive layer while guard wrappers fail closed', () => {
+test('Proxy-backed guard/input references are rejected by trap-free identity checks', () => {
+  const preparedGuard = prepareDomainWorkflowGuard({
+    guardId: 'safe',
+    predicate: { op: 'constant', value: true },
+  });
+  const preparedInput = prepareDomainPredicateEvaluationInput({ context: {}, event: { type: 'CHECK' } });
+  let trapCalls = 0;
+  const traps: ProxyHandler<object> = {
+    get(target, property, receiver) {
+      trapCalls += 1;
+      return Reflect.get(target, property, receiver);
+    },
+    getOwnPropertyDescriptor(target, property) {
+      trapCalls += 1;
+      return Reflect.getOwnPropertyDescriptor(target, property);
+    },
+    getPrototypeOf(target) {
+      trapCalls += 1;
+      return Reflect.getPrototypeOf(target);
+    },
+    ownKeys(target) {
+      trapCalls += 1;
+      return Reflect.ownKeys(target);
+    },
+  };
+
+  const proxyGuard = new Proxy(preparedGuard as object, traps) as DomainWorkflowGuard;
+  const proxyInput = new Proxy(preparedInput as object, traps) as DomainPredicateEvaluationInput;
+
+  assert.equal(evaluateDomainWorkflowGuard(proxyGuard, preparedInput), false);
+  assert.equal(evaluateDomainWorkflowGuard(preparedGuard, proxyInput), false);
+  assert.equal(trapCalls, 0, 'authoritative predicate evaluation must not trigger Proxy traps');
+});
+
+test('malformed prepared predicate throws at primitive layer while Guard wrapper fails closed', () => {
   const malformed = { op: 'remote_lookup' } as unknown as DomainPredicate;
-  assert.throws(
-    () => evaluateDomainPredicate(malformed, { context: {}, event: { type: 'CHECK' } }),
-    /unknown predicate operator/,
-  );
-  assert.equal(
-    evaluateDomainWorkflowGuard(
-      { guardId: 'malformed', predicate: malformed },
-      { context: {}, event: { type: 'CHECK' } },
-    ),
-    false,
-  );
+  const preparedMalformed = prepareDomainPredicate(malformed);
+  const input = prepareDomainPredicateEvaluationInput({ context: {}, event: { type: 'CHECK' } });
+
+  assert.throws(() => evaluateDomainPredicate(preparedMalformed, input), /unknown predicate operator/);
+
+  const malformedGuard = prepareDomainWorkflowGuard({ guardId: 'malformed', predicate: malformed });
+  assert.equal(evaluateDomainWorkflowGuard(malformedGuard, input), false);
+});
+
+test('preparation treats __proto__ as own JSON data and cannot inherit predicate authority', () => {
+  const inheritedOperator = JSON.parse(
+    '{"__proto__":{"op":"constant","value":true}}',
+  ) as unknown as DomainPredicate;
+  const protoContext = JSON.parse(
+    '{"__proto__":{"allowed":true}}',
+  ) as unknown as DomainPredicateEvaluationInput['context'];
+  const input = prepareDomainPredicateEvaluationInput({ context: protoContext, event: { type: 'CHECK' } });
+
+  const preparedMalformed = prepareDomainPredicate(inheritedOperator);
+  assert.throws(() => evaluateDomainPredicate(preparedMalformed, input), /unknown predicate operator/);
+
+  const malformedGuard = prepareDomainWorkflowGuard({ guardId: 'proto-smuggle', predicate: inheritedOperator });
+  assert.equal(evaluateDomainWorkflowGuard(malformedGuard, input), false);
+
+  const explicitDataPredicate = prepareDomainPredicate({
+    op: 'eq',
+    left: { source: 'context', path: ['__proto__', 'allowed'] },
+    right: { source: 'literal', value: true },
+  });
+  assert.equal(evaluateDomainPredicate(explicitDataPredicate, input), true);
 });
