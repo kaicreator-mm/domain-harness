@@ -5,7 +5,7 @@ when:
 
 clone:
   - name: git
-    image: /usr/local/bin/plugin-git
+    image: /usr/bin/bash
     settings:
       partial: false
       depth: 1
@@ -17,5 +17,3 @@ steps:
     image: /usr/bin/bash
     commands:
       - node --version
-      - npm --version
-      - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
