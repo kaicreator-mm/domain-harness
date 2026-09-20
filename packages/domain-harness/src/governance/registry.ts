@@ -135,17 +135,6 @@ export class GovernanceBaselineRegistry {
   async retain(reference: GovernanceBaselineRetentionReference): Promise<void> {
     validateReference(reference);
     await this.resolveExact(reference.baseline);
-
-    const existing = await this.#store.getReference(reference.referenceId);
-    if (existing !== undefined) {
-      if (!referencesEquivalent(existing, reference)) {
-        throw new GovernanceContractError(
-          'RETENTION_REFERENCE_CONFLICT',
-          `retention reference ${reference.referenceId} is already bound to different authority`,
-        );
-      }
-      return;
-    }
     await this.#store.putReference(cloneCanonical(reference));
   }
 
