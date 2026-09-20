@@ -151,6 +151,15 @@ test('structured decision/event succeeds after a query and returns structured tr
   assert.equal(JSON.stringify(result.trace).includes('privateReasoning'), false);
 });
 
+test('selected dependency contract cannot pre-claim query provenance', () => {
+  const selectedDependencies: NonNullable<BusinessHarnessInput['selectedDependencies']> = [
+    // @ts-expect-error query provenance is emitted only after a successful allowed query binding
+    { kind: 'query', identity: 'catalog:P-1', revision: 'r7' },
+  ];
+
+  assert.equal(selectedDependencies[0]?.identity, 'catalog:P-1');
+});
+
 test('model cannot smuggle transition, mutation, promotion, activation, or governance authority in final output', async (t) => {
   const illegalFields = [
     'nextState',
@@ -179,10 +188,14 @@ test('model cannot smuggle transition, mutation, promotion, activation, or gover
 });
 
 test('private/free-form model reasoning fields are not an executable response surface', async () => {
+  const valid = finalResponse();
+  assert.equal(valid.kind, 'final');
+  if (valid.kind !== 'final') return;
+
   const model = new ScriptedModel([
     {
       kind: 'final',
-      result: finalResponse().kind === 'final' ? finalResponse().result : {},
+      result: valid.result,
       privateReasoning: 'hidden plan that must never become authority',
     } as unknown as BusinessHarnessModelResponse,
   ]);
