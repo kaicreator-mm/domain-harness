@@ -53,7 +53,7 @@ function bodySchemaArtifact(candidateKind: CandidateKind, artifactId: string): C
     properties: {
       operation: { type: 'string', minLength: 1 },
     },
-  };
+  } as const;
   const semanticMaterial = {
     schemaVersion: CANDIDATE_BODY_SCHEMA_VERSION,
     candidateKind,
