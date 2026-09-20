@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { canonicalJsonStringify, type Sha256Port } from '../../src/contracts/identity.js';
+import type { JsonObject } from '../../src/contracts/json.js';
 import {
   createGovernanceBaselineBody,
   GovernanceBaselineRegistry,
@@ -47,12 +48,7 @@ const baselineJson = {
 
 const input = { kind: 'input-contract', artifactId: 'order-input', contentDigest: 'in-1' } as const;
 const output = { kind: 'output-contract', artifactId: 'decision-output', contentDigest: 'out-1' } as const;
-const tool = {
-  kind: 'tool',
-  artifactId: 'catalog-query',
-  contentDigest: 'tool-1',
-  capability: 'query',
-} as const;
+const tool = { kind: 'tool', artifactId: 'catalog-query', contentDigest: 'tool-1', capability: 'query' } as const;
 const reference = { kind: 'rule', artifactId: 'pricing-rule', contentDigest: 'rule-1' } as const;
 const applicability = { kind: 'precondition', artifactId: 'domestic-order', contentDigest: 'pre-1' } as const;
 const invariant = { kind: 'hard-invariant', artifactId: 'no-negative-total', contentDigest: 'inv-1' } as const;
@@ -63,15 +59,9 @@ function bodySchemaArtifact(candidateKind: CandidateKind, artifactId: string): C
     type: 'object',
     additionalProperties: false,
     required: ['operation'],
-    properties: {
-      operation: { type: 'string', minLength: 1 },
-    },
+    properties: { operation: { type: 'string', minLength: 1 } },
   } as const;
-  const semanticMaterial = {
-    schemaVersion: CANDIDATE_BODY_SCHEMA_VERSION,
-    candidateKind,
-    schema,
-  };
+  const semanticMaterial = { schemaVersion: CANDIDATE_BODY_SCHEMA_VERSION, candidateKind, schema };
   return {
     ...semanticMaterial,
     identity: {
@@ -178,7 +168,7 @@ function hasCode(result: Awaited<ReturnType<typeof validateCandidate>>, code: st
 }
 
 async function governanceRegistryWith(
-  semantics: Record<string, unknown>,
+  semantics: JsonObject,
 ): Promise<{ registry: GovernanceBaselineRegistry; body: GovernanceBaselineBody }> {
   const body = await createGovernanceBaselineBody({
     domainId: 'orders',
@@ -216,8 +206,7 @@ test('uses one envelope with exact body contracts for Rule, DecisionProcedure, S
     assert.equal(result.ok, true, `${candidateKind} should pass the common validator`);
     assert.equal(result.grantsExecutionPermission, false);
   }
-  const workflow = await validate(workflowCandidate());
-  assert.equal(workflow.ok, true);
+  assert.equal((await validate(workflowCandidate())).ok, true);
 });
 
 test('semantic digest is stable across set-like declaration ordering and candidate ids', async () => {
@@ -225,21 +214,15 @@ test('semantic digest is stable across set-like declaration ordering and candida
     allowedCapabilities: ['catalog-read', 'audit-read'],
     allowedEvents: ['ORDER_APPROVED', 'ORDER_AUDITED'],
   });
-  const first = await validate(
-    workflowCandidate({
-      capabilities: ['catalog-read', 'audit-read'],
-      events: ['ORDER_APPROVED', 'ORDER_AUDITED'],
-    }),
-    digestAuthority,
-  );
-  const second = await validate(
-    workflowCandidate({
-      candidateId: 'different-proposal-id',
-      capabilities: ['audit-read', 'catalog-read'],
-      events: ['ORDER_AUDITED', 'ORDER_APPROVED'],
-    }),
-    digestAuthority,
-  );
+  const first = await validate(workflowCandidate({
+    capabilities: ['catalog-read', 'audit-read'],
+    events: ['ORDER_APPROVED', 'ORDER_AUDITED'],
+  }), digestAuthority);
+  const second = await validate(workflowCandidate({
+    candidateId: 'different-proposal-id',
+    capabilities: ['audit-read', 'catalog-read'],
+    events: ['ORDER_AUDITED', 'ORDER_APPROVED'],
+  }), digestAuthority);
   assert.equal(first.ok, true);
   assert.equal(second.ok, true);
   if (first.ok && second.ok) {
@@ -259,15 +242,9 @@ test('fails closed when exact body-schema authority is missing, mismatched, corr
   const missingResolvedSchema = await validate(workflowCandidate(), authority(), contractAuthority([]));
   assert.equal(hasCode(missingResolvedSchema, 'BODY_VALIDATOR_REQUIRED'), true);
 
-  const trusted = bodySchemas.workflow;
   const tampered = {
-    ...trusted,
-    schema: {
-      type: 'object',
-      additionalProperties: true,
-      required: [],
-      properties: {},
-    },
+    ...bodySchemas.workflow,
+    schema: { type: 'object', additionalProperties: true, required: [], properties: {} },
   } as unknown as CandidateBodySchemaArtifact;
   const tamperedSchema = await validate(
     workflowCandidate(),
@@ -290,26 +267,28 @@ test('body schema rejects disguised executable material and actual functions', a
 });
 
 test('fails closed on illegal I/O, capability, event, tool, applicability and mutation effect', async () => {
-  const result = await validate(
-    workflowCandidate({
-      io: {
-        inputs: [{ ...input, contentDigest: 'in-unknown' }],
-        outputs: [{ ...output, contentDigest: 'out-unknown' }],
-      },
-      capabilities: ['illegal-capability'],
-      events: ['ILLEGAL_EVENT'],
-      tools: [{ ...tool, contentDigest: 'tool-unknown' }],
-      applicability: [{ ...applicability, contentDigest: 'pre-unknown' }],
-      mutation: { kind: 'durable-effect', effects: [{ ...effect, contentDigest: 'effect-unknown' }] },
-    }),
-  );
-  assert.equal(hasCode(result, 'INPUT_CONTRACT_NOT_ALLOWED'), true);
-  assert.equal(hasCode(result, 'OUTPUT_CONTRACT_NOT_ALLOWED'), true);
-  assert.equal(hasCode(result, 'CAPABILITY_NOT_ALLOWED'), true);
-  assert.equal(hasCode(result, 'EVENT_NOT_ALLOWED'), true);
-  assert.equal(hasCode(result, 'TOOL_NOT_ALLOWED'), true);
-  assert.equal(hasCode(result, 'APPLICABILITY_NOT_ALLOWED'), true);
-  assert.equal(hasCode(result, 'MUTATION_PATH_INVALID'), true);
+  const result = await validate(workflowCandidate({
+    io: {
+      inputs: [{ ...input, contentDigest: 'in-unknown' }],
+      outputs: [{ ...output, contentDigest: 'out-unknown' }],
+    },
+    capabilities: ['illegal-capability'],
+    events: ['ILLEGAL_EVENT'],
+    tools: [{ ...tool, contentDigest: 'tool-unknown' }],
+    applicability: [{ ...applicability, contentDigest: 'pre-unknown' }],
+    mutation: { kind: 'durable-effect', effects: [{ ...effect, contentDigest: 'effect-unknown' }] },
+  }));
+  for (const code of [
+    'INPUT_CONTRACT_NOT_ALLOWED',
+    'OUTPUT_CONTRACT_NOT_ALLOWED',
+    'CAPABILITY_NOT_ALLOWED',
+    'EVENT_NOT_ALLOWED',
+    'TOOL_NOT_ALLOWED',
+    'APPLICABILITY_NOT_ALLOWED',
+    'MUTATION_PATH_INVALID',
+  ]) {
+    assert.equal(hasCode(result, code), true, code);
+  }
   assert.equal(result.grantsExecutionPermission, false);
 
   const directResult = await validate({ ...workflowCandidate(), mutation: { kind: 'direct' } });
@@ -323,12 +302,12 @@ test('rejects arbitrary code, provider secrets, private reasoning and runtime ob
     [{ actorRef: 'actor-123' }, 'RUNTIME_OBJECT_FORBIDDEN'],
     [{ chainOfThought: 'private' }, 'PRIVATE_REASONING_FORBIDDEN'],
   ] as const) {
-    const result = await validate(workflowCandidate({ body }));
-    assert.equal(hasCode(result, expected), true);
+    assert.equal(hasCode(await validate(workflowCandidate({ body })), expected), true);
   }
-
-  const runtimeObject = await validate(workflowCandidate({ body: new Date() }));
-  assert.equal(hasCode(runtimeObject, 'RUNTIME_OBJECT_FORBIDDEN'), true);
+  assert.equal(
+    hasCode(await validate(workflowCandidate({ body: new Date() })), 'RUNTIME_OBJECT_FORBIDDEN'),
+    true,
+  );
 });
 
 test('rejects cyclic, oversized and unreachable control graphs', async () => {
@@ -369,8 +348,10 @@ test('rejects cyclic, oversized and unreachable control graphs', async () => {
 });
 
 test('preserves mandatory Workflow specialization and fails closed on specialized rejection/exception', async () => {
-  const missing = await validate(workflowCandidate(), authority({ specializedValidators: {} }));
-  assert.equal(hasCode(missing, 'SPECIALIZED_VALIDATOR_REQUIRED'), true);
+  assert.equal(
+    hasCode(await validate(workflowCandidate(), authority({ specializedValidators: {} })), 'SPECIALIZED_VALIDATOR_REQUIRED'),
+    true,
+  );
 
   const rejecting: CandidateSpecializedValidator = {
     candidateKind: 'workflow',
@@ -378,11 +359,10 @@ test('preserves mandatory Workflow specialization and fails closed on specialize
       return [{ code: 'WORKFLOW_DENIED', path: '$.body', message: 'denied by #204 specialization' }];
     },
   };
-  const rejected = await validate(
-    workflowCandidate(),
-    authority({ specializedValidators: { workflow: rejecting } }),
+  assert.equal(
+    hasCode(await validate(workflowCandidate(), authority({ specializedValidators: { workflow: rejecting } })), 'SPECIALIZED_REJECTED'),
+    true,
   );
-  assert.equal(hasCode(rejected, 'SPECIALIZED_REJECTED'), true);
 
   const throwing: CandidateSpecializedValidator = {
     candidateKind: 'workflow',
@@ -390,22 +370,24 @@ test('preserves mandatory Workflow specialization and fails closed on specialize
       throw new Error('specialized validator unavailable');
     },
   };
-  const exception = await validate(
-    workflowCandidate(),
-    authority({ specializedValidators: { workflow: throwing } }),
+  assert.equal(
+    hasCode(await validate(workflowCandidate(), authority({ specializedValidators: { workflow: throwing } })), 'SPECIALIZED_REJECTED'),
+    true,
   );
-  assert.equal(hasCode(exception, 'SPECIALIZED_REJECTED'), true);
 });
 
 test('invalid validation authority fails closed before candidate validation', async () => {
-  const invalidBounds = await validate(workflowCandidate(), authority({ maxControlNodes: 0 }));
-  assert.equal(hasCode(invalidBounds, 'VALIDATION_AUTHORITY_INVALID'), true);
-
-  const invalidBaseline = await validate(
-    workflowCandidate(),
-    authority({ governanceBaseline: { ...baseline, contentDigest: '' } }),
+  assert.equal(
+    hasCode(await validate(workflowCandidate(), authority({ maxControlNodes: 0 })), 'VALIDATION_AUTHORITY_INVALID'),
+    true,
   );
-  assert.equal(hasCode(invalidBaseline, 'VALIDATION_AUTHORITY_INVALID'), true);
+  assert.equal(
+    hasCode(
+      await validate(workflowCandidate(), authority({ governanceBaseline: { ...baseline, contentDigest: '' } })),
+      'VALIDATION_AUTHORITY_INVALID',
+    ),
+    true,
+  );
 });
 
 test('rejects unresolved exact references and incompatible Hard Invariants', async () => {
