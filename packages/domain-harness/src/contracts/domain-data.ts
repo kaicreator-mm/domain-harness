@@ -149,7 +149,9 @@ function artifactSortKey(identity: CompiledArtifactIdentity): string {
   return `${identity.kind}\u0000${identity.artifactId}\u0000${identity.contentDigest}`;
 }
 
-function projectionSortKey(projection: SemanticContextProjectionDescriptor | ResolvedSemanticContextProjection): string {
+function projectionSortKey(
+  projection: SemanticContextProjectionDescriptor | ResolvedSemanticContextProjection,
+): string {
   return `${projection.source}\u0000${projection.projectionId}\u0000${projection.descriptorDigest}`;
 }
 
@@ -189,9 +191,20 @@ function validateArtifactIdentity(identity: CompiledArtifactIdentity): void {
   requireDigest(identity.contentDigest, `artifact ${identity.artifactId} contentDigest`);
 }
 
-function validateProjectionDescriptor(descriptor: SemanticContextProjectionDescriptor): void {
-  normalizeProjectionDefinition(descriptor);
+async function verifyProjectionDescriptor(
+  descriptor: SemanticContextProjectionDescriptor,
+  sha256: Sha256Port,
+): Promise<SemanticContextProjectionDefinition> {
+  const normalized = normalizeProjectionDefinition(descriptor);
   requireDigest(descriptor.descriptorDigest, `projection ${descriptor.projectionId} descriptorDigest`);
+  const actualDescriptorDigest = await computeCanonicalJsonDigest(normalized, sha256);
+  if (actualDescriptorDigest !== descriptor.descriptorDigest) {
+    throw new DomainDataContractError(
+      'INVALID_SEMANTIC_PROJECTION',
+      `projection ${descriptor.projectionId} descriptorDigest does not match its definition`,
+    );
+  }
+  return normalized;
 }
 
 function compareBy<T>(key: (value: T) => string): (left: T, right: T) => number {
@@ -232,7 +245,12 @@ export async function compileCompiledArtifactIdentity(
 
   return descriptor.version === undefined
     ? { kind: descriptor.kind, artifactId: descriptor.artifactId, contentDigest }
-    : { kind: descriptor.kind, artifactId: descriptor.artifactId, version: descriptor.version, contentDigest };
+    : {
+        kind: descriptor.kind,
+        artifactId: descriptor.artifactId,
+        version: descriptor.version,
+        contentDigest,
+      };
 }
 
 export async function compileSemanticContextProjectionDescriptor(
@@ -244,11 +262,20 @@ export async function compileSemanticContextProjectionDescriptor(
   return { ...normalized, descriptorDigest };
 }
 
-function readPath(root: unknown, path: readonly SemanticPathSegment[], projectionId: string): unknown {
+function readPath(
+  root: unknown,
+  path: readonly SemanticPathSegment[],
+  projectionId: string,
+): unknown {
   let current = root;
   for (const segment of path) {
     if (typeof segment === 'number') {
-      if (!Number.isSafeInteger(segment) || segment < 0 || !Array.isArray(current) || segment >= current.length) {
+      if (
+        !Number.isSafeInteger(segment) ||
+        segment < 0 ||
+        !Array.isArray(current) ||
+        segment >= current.length
+      ) {
         throw new DomainDataContractError(
           'MISSING_SEMANTIC_INPUT',
           `projection ${projectionId} is missing required path ${pathSortKey(path)}`,
@@ -271,6 +298,7 @@ function readPath(root: unknown, path: readonly SemanticPathSegment[], projectio
     }
     current = (current as Record<string, unknown>)[segment];
   }
+
   if (current === undefined) {
     throw new DomainDataContractError(
       'MISSING_SEMANTIC_INPUT',
@@ -285,16 +313,7 @@ export async function resolveSemanticContextProjection(
   sourceValue: unknown,
   sha256: Sha256Port,
 ): Promise<ResolvedSemanticContextProjection> {
-  validateProjectionDescriptor(descriptor);
-  const normalized = normalizeProjectionDefinition(descriptor);
-  const actualDescriptorDigest = await computeCanonicalJsonDigest(normalized, sha256);
-  if (actualDescriptorDigest !== descriptor.descriptorDigest) {
-    throw new DomainDataContractError(
-      'INVALID_SEMANTIC_PROJECTION',
-      `projection ${descriptor.projectionId} descriptorDigest does not match its definition`,
-    );
-  }
-
+  const normalized = await verifyProjectionDescriptor(descriptor, sha256);
   const selected = normalized.selectors.map((selector) => ({
     path: selector.path,
     value: readPath(sourceValue, selector.path, descriptor.projectionId),
@@ -316,8 +335,12 @@ export async function compileDomainIntelligencePackageIdentity(
   requireNonEmpty(descriptor.version, 'version');
   requireNonEmpty(descriptor.packageId, 'packageId');
   requireNonEmpty(descriptor.formatVersion, 'formatVersion');
+
   for (const artifact of descriptor.artifacts) validateArtifactIdentity(artifact);
-  for (const projection of descriptor.semanticContextProjections) validateProjectionDescriptor(projection);
+  for (const projection of descriptor.semanticContextProjections) {
+    await verifyProjectionDescriptor(projection, sha256);
+  }
+
   ensureUnique(descriptor.artifacts, (artifact) => `${artifact.kind}:${artifact.artifactId}`, 'artifacts');
   ensureUnique(
     descriptor.semanticContextProjections,
@@ -330,7 +353,11 @@ export async function compileDomainIntelligencePackageIdentity(
     .map(({ kind, artifactId, contentDigest }) => ({ kind, artifactId, contentDigest }));
   const projections = [...descriptor.semanticContextProjections]
     .sort(compareBy(projectionSortKey))
-    .map(({ projectionId, source, descriptorDigest }) => ({ projectionId, source, descriptorDigest }));
+    .map(({ projectionId, source, descriptorDigest }) => ({
+      projectionId,
+      source,
+      descriptorDigest,
+    }));
 
   const contentDigest = await computeCanonicalJsonDigest(
     { domainId: descriptor.domainId, artifacts, semanticContextProjections: projections },
