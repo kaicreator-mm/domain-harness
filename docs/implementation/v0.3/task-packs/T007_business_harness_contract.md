@@ -238,6 +238,14 @@ Repair actions on `v0.3_t007_repair`:
 
 The repair starts from current integration baseline `v0.3@74514b07048ee62ce04d742a9685ae4804619d89`, because the original PR had already merged before independent review. The original implementation HEAD remains historical evidence only; all repair validation/review must bind to the new repair PR exact HEAD.
 
+### Refresh to current v0.3
+
+Before closeout, `v0.3` advanced to `09b9ce20c817cd3ad1721b7af6d39d3bd9b7eb73` (T-004 unified candidate validation, T-002/T-003 task packs, and CI gate repairs merged). The repair branch was refreshed by merging `v0.3@09b9ce2` into `v0.3_t007_repair`; the resulting tree differs from `v0.3` only by the three T-007 repair files (task pack, `src/harness/contract.ts`, focused harness test).
+
+The refresh produced one content conflict in `tests/harness/business-harness-machine.test.ts`: `v0.3@c28cba6` had independently fixed the same `finalResponse()` union-narrowing issue with an inline ternary. The merge keeps the T-007 repair resolution (explicit `kind` assertion plus early return), which subsumes the CI-fix variant for the identical underlying typecheck concern.
+
+Build Host old-HEAD evidence at `cda631c19a97bdbbc76cf17e581f6424d61306be`: repository `npm test` 425/425 PASS, focused BusinessHarness tests 21/21 PASS, build/typecheck/pack PASS, lint failures confirmed as stale-base inheritance with no lint error in T-007 touched files. This evidence is historical; all closeout gates re-run and re-bind to the refreshed repair PR exact HEAD.
+
 Closure rule:
 
 ```text
