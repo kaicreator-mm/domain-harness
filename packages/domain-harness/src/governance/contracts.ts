@@ -76,7 +76,10 @@ export interface GovernanceBaselineStore {
   collectBodyIfUnreferenced(identity: GovernanceBaselineIdentity): Promise<boolean>;
 
   getReference(referenceId: string): Promise<GovernanceBaselineRetentionReference | undefined>;
-  /** Insert-once/idempotent by referenceId; rebinding must fail atomically. */
+  /**
+   * Atomically require the exact body to exist, then insert-once/idempotently by
+   * referenceId. Rebinding or retaining a collected body must fail.
+   */
   putReference(reference: GovernanceBaselineRetentionReference): Promise<void>;
   deleteReference(referenceId: string): Promise<void>;
   listReferences(
