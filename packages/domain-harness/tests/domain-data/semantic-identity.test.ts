@@ -133,6 +133,41 @@ test('T-002: projection descriptor integrity fails closed', async () => {
   );
 });
 
+test('T-002: CDI package identity rejects a tampered projection descriptor body', async () => {
+  const descriptor = await compileSemanticContextProjectionDescriptor(
+    {
+      projectionId: 'quote.input',
+      source: 'input',
+      selectors: [{ path: ['amount'] }],
+    },
+    sha256,
+  );
+
+  await assert.rejects(
+    compileDomainIntelligencePackageIdentity(
+      {
+        domainId: 'quote',
+        version: '3.0.0',
+        packageId: 'package-a',
+        formatVersion: '3',
+        runtimeContractMajor: 3,
+        executionEngineMajor: 2,
+        requiredCapabilities: [],
+        artifacts: [],
+        semanticContextProjections: [
+          {
+            ...descriptor,
+            selectors: [{ path: ['customer', 'tier'] }],
+          },
+        ],
+      },
+      sha256,
+    ),
+    (error: unknown) =>
+      error instanceof DomainDataContractError && error.code === 'INVALID_SEMANTIC_PROJECTION',
+  );
+});
+
 test('T-002: CDI digest follows semantic table, not packageId or lifecycle version', async () => {
   const rule = await compileCompiledArtifactIdentity(
     { kind: 'rule', artifactId: 'quote.rule', semanticMaterial: { min: 10 } },
@@ -245,7 +280,11 @@ test('T-002: required semantic revision is exact and fails closed when missing o
   await assert.rejects(
     requireSemanticRevision(
       { sourceId: 'catalog.live' },
-      { async resolveRevision() { return undefined; } },
+      {
+        async resolveRevision() {
+          return undefined;
+        },
+      },
     ),
     (error: unknown) =>
       error instanceof DomainDataContractError && error.code === 'MISSING_SEMANTIC_REVISION',
@@ -253,7 +292,11 @@ test('T-002: required semantic revision is exact and fails closed when missing o
   await assert.rejects(
     requireSemanticRevision(
       { sourceId: 'catalog.live' },
-      { async resolveRevision() { return { sourceId: 'other', revision: '42' }; } },
+      {
+        async resolveRevision() {
+          return { sourceId: 'other', revision: '42' };
+        },
+      },
     ),
     (error: unknown) =>
       error instanceof DomainDataContractError && error.code === 'INVALID_SEMANTIC_REVISION',
