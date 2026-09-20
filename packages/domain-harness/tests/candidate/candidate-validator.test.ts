@@ -7,7 +7,9 @@ import {
   CANDIDATE_VALIDATOR_CONTRACT_VERSION,
   canReuseValidationForGovernanceBaseline,
   validateCandidate,
+  type CandidateBodyValidator,
   type CandidateEnvelope,
+  type CandidateKind,
   type CandidateSpecializedValidator,
   type CandidateValidationAuthority,
   type CandidateValidationGovernanceBaseline,
@@ -40,6 +42,43 @@ const applicability = { kind: 'precondition', artifactId: 'domestic-order', cont
 const invariant = { kind: 'hard-invariant', artifactId: 'no-negative-total', contentDigest: 'inv-1' } as const;
 const effect = { kind: 'effect-contract', artifactId: 'reserve-stock', contentDigest: 'effect-1' } as const;
 
+const ruleBodyContract = { kind: 'candidate-body-schema', artifactId: 'rule-body-v1', contentDigest: 'body-rule-1' } as const;
+const procedureBodyContract = { kind: 'candidate-body-schema', artifactId: 'procedure-body-v1', contentDigest: 'body-procedure-1' } as const;
+const skillBodyContract = { kind: 'candidate-body-schema', artifactId: 'skill-body-v1', contentDigest: 'body-skill-1' } as const;
+const workflowBodyContract = { kind: 'candidate-body-schema', artifactId: 'workflow-body-v1', contentDigest: 'body-workflow-1' } as const;
+
+const bodyContracts: Record<CandidateKind, typeof workflowBodyContract | typeof ruleBodyContract | typeof procedureBodyContract | typeof skillBodyContract> = {
+  rule: ruleBodyContract,
+  'decision-procedure': procedureBodyContract,
+  skill: skillBodyContract,
+  workflow: workflowBodyContract,
+};
+
+function operationBodyValidator(candidateKind: CandidateKind): CandidateBodyValidator {
+  return {
+    candidateKind,
+    bodyContract: bodyContracts[candidateKind],
+    validate(body) {
+      if (body === null || Array.isArray(body) || typeof body !== 'object') {
+        return [{ code: 'BODY_OBJECT_REQUIRED', path: '$.body', message: 'body must be an object' }];
+      }
+      const record = body as Record<string, unknown>;
+      const keys = Object.keys(record).sort();
+      if (keys.length !== 1 || keys[0] !== 'operation' || typeof record.operation !== 'string' || record.operation.length === 0) {
+        return [{ code: 'BODY_SCHEMA', path: '$.body', message: 'body must contain only a non-empty operation string' }];
+      }
+      return [];
+    },
+  };
+}
+
+const bodyValidators: CandidateValidationAuthority['bodyValidators'] = {
+  rule: operationBodyValidator('rule'),
+  'decision-procedure': operationBodyValidator('decision-procedure'),
+  skill: operationBodyValidator('skill'),
+  workflow: operationBodyValidator('workflow'),
+};
+
 const workflowSpecialization: CandidateSpecializedValidator = {
   candidateKind: 'workflow',
   validate(candidate) {
@@ -52,6 +91,7 @@ const workflowSpecialization: CandidateSpecializedValidator = {
 function authority(overrides: Partial<CandidateValidationAuthority> = {}): CandidateValidationAuthority {
   return {
     governanceBaseline: baseline,
+    bodyValidators,
     allowedInputs: [input],
     allowedOutputs: [output],
     allowedCapabilities: ['catalog-read'],
@@ -65,6 +105,7 @@ function authority(overrides: Partial<CandidateValidationAuthority> = {}): Candi
     maxControlEdges: 12,
     maxControlSteps: 8,
     specializedValidators: { workflow: workflowSpecialization },
+    reviewedValidationCompatibilities: [],
     ...overrides,
   };
 }
@@ -74,6 +115,7 @@ function workflowCandidate(overrides: Record<string, unknown> = {}): CandidateEn
     schemaVersion: CANDIDATE_ENVELOPE_SCHEMA_VERSION,
     candidateKind: 'workflow',
     candidateId: 'candidate-1',
+    bodyContract: workflowBodyContract,
     body: { operation: 'approve-order' },
     io: { inputs: [input], outputs: [output] },
     capabilities: ['catalog-read'],
@@ -108,11 +150,12 @@ test('accepts a fully allowlisted candidate and grants no execution permission',
   assert.equal('active' in result.identity, false);
 });
 
-test('uses one envelope for Rule, DecisionProcedure, Skill and Workflow Candidates', async () => {
+test('uses one envelope with exact body contracts for Rule, DecisionProcedure, Skill and Workflow Candidates', async () => {
   for (const candidateKind of ['rule', 'decision-procedure', 'skill'] as const) {
     const raw = {
       ...workflowCandidate(),
       candidateKind,
+      bodyContract: bodyContracts[candidateKind],
       mutation: { kind: 'none' },
     } as Record<string, unknown>;
     delete raw.control;
@@ -152,6 +195,34 @@ test('semantic digest is stable across set-like declaration ordering and candida
   if (first.ok && second.ok) assert.equal(first.identity.candidateContentDigest, second.identity.candidateContentDigest);
 });
 
+test('fails closed on missing or mismatched body-schema authority', async () => {
+  const missing = await validateCandidate(workflowCandidate(), authority({ bodyValidators: {} }), sha256);
+  assert.equal(hasCode(missing, 'BODY_VALIDATOR_REQUIRED'), true);
+
+  const mismatched = await validateCandidate(
+    workflowCandidate({ bodyContract: { ...workflowBodyContract, contentDigest: 'untrusted-body-contract' } }),
+    authority(),
+    sha256,
+  );
+  assert.equal(hasCode(mismatched, 'BODY_CONTRACT_NOT_ALLOWED'), true);
+});
+
+test('body schema rejects arbitrary executable material even under non-blacklisted field names', async () => {
+  const disguised = await validateCandidate(
+    workflowCandidate({ body: { operation: 'approve-order', handler: 'return process.exit(0)' } }),
+    authority(),
+    sha256,
+  );
+  assert.equal(hasCode(disguised, 'BODY_SCHEMA_INVALID'), true);
+
+  const executable = await validateCandidate(
+    workflowCandidate({ body: { operation: 'approve-order', handler: () => true } }),
+    authority(),
+    sha256,
+  );
+  assert.equal(hasCode(executable, 'ARBITRARY_CODE_FORBIDDEN'), true);
+});
+
 test('fails closed on illegal I/O, capability, event, tool, applicability and mutation effect', async () => {
   const illegalTool = { ...tool, contentDigest: 'tool-unknown' };
   const illegalApplicability = { ...applicability, contentDigest: 'pre-unknown' };
@@ -185,7 +256,7 @@ test('fails closed on illegal I/O, capability, event, tool, applicability and mu
   assert.equal(hasCode(directResult, 'MUTATION_PATH_INVALID'), true);
 });
 
-test('rejects arbitrary code, provider secrets and runtime objects before validation', async () => {
+test('rejects arbitrary code, provider secrets, private reasoning and runtime objects before validation', async () => {
   for (const [body, expected] of [
     [{ code: 'return true' }, 'ARBITRARY_CODE_FORBIDDEN'],
     [{ providerSecret: 'do-not-store' }, 'PROVIDER_SECRET_OR_STATE_FORBIDDEN'],
@@ -200,7 +271,7 @@ test('rejects arbitrary code, provider secrets and runtime objects before valida
   assert.equal(hasCode(result, 'RUNTIME_OBJECT_FORBIDDEN'), true);
 });
 
-test('rejects control cycles and preserves mandatory Workflow specialization', async () => {
+test('rejects cyclic, oversized and unreachable control graphs', async () => {
   const cyclic = workflowCandidate({
     control: {
       startNode: 'a',
@@ -215,6 +286,39 @@ test('rejects control cycles and preserves mandatory Workflow specialization', a
   const cycleResult = await validateCandidate(cyclic, authority(), sha256);
   assert.equal(hasCode(cycleResult, 'CONTROL_CYCLE_FORBIDDEN'), true);
 
+  const oversized = workflowCandidate({
+    control: {
+      startNode: 'n0',
+      nodes: ['n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8'],
+      edges: [
+        { from: 'n0', to: 'n1' },
+        { from: 'n1', to: 'n2' },
+        { from: 'n2', to: 'n3' },
+        { from: 'n3', to: 'n4' },
+        { from: 'n4', to: 'n5' },
+        { from: 'n5', to: 'n6' },
+        { from: 'n6', to: 'n7' },
+        { from: 'n7', to: 'n8' },
+      ],
+      maxSteps: 9,
+    },
+  });
+  const oversizedResult = await validateCandidate(oversized, authority(), sha256);
+  assert.equal(hasCode(oversizedResult, 'CONTROL_LIMIT_EXCEEDED'), true);
+
+  const unreachable = workflowCandidate({
+    control: {
+      startNode: 'a',
+      nodes: ['a', 'b', 'orphan'],
+      edges: [{ from: 'a', to: 'b' }],
+      maxSteps: 3,
+    },
+  });
+  const unreachableResult = await validateCandidate(unreachable, authority(), sha256);
+  assert.equal(hasCode(unreachableResult, 'CONTROL_INVALID'), true);
+});
+
+test('preserves mandatory Workflow specialization', async () => {
   const noSpecialization = await validateCandidate(
     workflowCandidate(),
     authority({ specializedValidators: {} }),
@@ -236,24 +340,45 @@ test('rejects unresolved exact references and incompatible Hard Invariants', asy
   assert.equal(hasCode(result, 'HARD_INVARIANT_INCOMPATIBLE'), true);
 });
 
-test('changed Governance Baseline requires revalidation unless exact reviewed compatibility matches', async () => {
+test('changed Governance Baseline requires target-governance-owned reviewed compatibility', async () => {
   const result = await validateCandidate(workflowCandidate(), authority(), sha256);
   assert.equal(result.ok, true);
   if (!result.ok) return;
 
-  const b2 = { ...baseline, version: 'B2', contentDigest: 'gov-b2' };
-  assert.equal(canReuseValidationForGovernanceBaseline(result.identity, b2), false);
-  assert.equal(
-    canReuseValidationForGovernanceBaseline(result.identity, b2, {
+  const b2: CandidateValidationGovernanceBaseline = { ...baseline, version: 'B2', contentDigest: 'gov-b2' };
+  const noCompatibility = authority({ governanceBaseline: b2, reviewedValidationCompatibilities: [] });
+  assert.equal(canReuseValidationForGovernanceBaseline(result.identity, b2, noCompatibility), false);
+
+  const wrongAuthority = authority({ governanceBaseline: baseline });
+  assert.equal(canReuseValidationForGovernanceBaseline(result.identity, b2, wrongAuthority), false);
+
+  const mismatchedGovernanceDigest = authority({
+    governanceBaseline: b2,
+    reviewedValidationCompatibilities: [{
       kind: 'reviewed-exact-governance-compatibility',
       validatorContractVersion: CANDIDATE_VALIDATOR_CONTRACT_VERSION,
       candidateKind: 'workflow',
       from: baseline,
       to: b2,
+      governanceContractContentDigest: 'not-b2',
       reviewDigest: 'review-b1-b2',
-    }),
-    true,
-  );
+    }],
+  });
+  assert.equal(canReuseValidationForGovernanceBaseline(result.identity, b2, mismatchedGovernanceDigest), false);
+
+  const reviewedTargetAuthority = authority({
+    governanceBaseline: b2,
+    reviewedValidationCompatibilities: [{
+      kind: 'reviewed-exact-governance-compatibility',
+      validatorContractVersion: CANDIDATE_VALIDATOR_CONTRACT_VERSION,
+      candidateKind: 'workflow',
+      from: baseline,
+      to: b2,
+      governanceContractContentDigest: b2.contentDigest,
+      reviewDigest: 'review-b1-b2',
+    }],
+  });
+  assert.equal(canReuseValidationForGovernanceBaseline(result.identity, b2, reviewedTargetAuthority), true);
 });
 
 test('unknown promotion/activation authority fields are rejected instead of being acted on', async () => {
