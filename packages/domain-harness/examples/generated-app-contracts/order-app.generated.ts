@@ -57,3 +57,4 @@ export type AppDomainEvent<T extends AppDomainEventId = AppDomainEventId> = T ex
   readonly type: T;
   readonly payload: AppDomainEventMap[T];
 } : never;
+
