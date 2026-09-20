@@ -14,25 +14,42 @@ import {
   type CandidateValidationAuthority,
   type CandidateValidationGovernanceBaseline,
   type CandidateValidationResult,
-  type ReviewedCandidateValidationCompatibility,
   type ValidatedCandidateIdentity,
 } from './contracts.js';
 
-const TOP_LEVEL = ['applicability','body','candidateId','candidateKind','capabilities','control','events','hardInvariants','io','mutation','references','schemaVersion','tools'] as const;
+const TOP_LEVEL = [
+  'applicability',
+  'body',
+  'bodyContract',
+  'candidateId',
+  'candidateKind',
+  'capabilities',
+  'control',
+  'events',
+  'hardInvariants',
+  'io',
+  'mutation',
+  'references',
+  'schemaVersion',
+  'tools',
+] as const;
+
 const FORBIDDEN: ReadonlyArray<readonly [CandidateRejectionCode, ReadonlySet<string>]> = [
-  ['ARBITRARY_CODE_FORBIDDEN', new Set(['code','eval','functionBody','moduleSource','script','sourceCode'])],
-  ['PROVIDER_SECRET_OR_STATE_FORBIDDEN', new Set(['accessToken','apiKey','credentials','modelState','providerSecret','providerState','refreshToken'])],
-  ['RUNTIME_OBJECT_FORBIDDEN', new Set(['actorRef','actorReference','machineRef','runtimeObject','xstateActor'])],
-  ['PRIVATE_REASONING_FORBIDDEN', new Set(['chainOfThought','privateReasoning'])],
+  ['ARBITRARY_CODE_FORBIDDEN', new Set(['code', 'eval', 'functionBody', 'moduleSource', 'script', 'sourceCode'])],
+  ['PROVIDER_SECRET_OR_STATE_FORBIDDEN', new Set(['accessToken', 'apiKey', 'credentials', 'modelState', 'providerSecret', 'providerState', 'refreshToken'])],
+  ['RUNTIME_OBJECT_FORBIDDEN', new Set(['actorRef', 'actorReference', 'machineRef', 'runtimeObject', 'xstateActor'])],
+  ['PRIVATE_REASONING_FORBIDDEN', new Set(['chainOfThought', 'privateReasoning'])],
 ];
 
 const reject = (code: CandidateRejectionCode, path: string, message: string): CandidateRejection => ({ code, path, message });
 const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+
 function plain(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value) as object | null;
   return proto === Object.prototype || proto === null;
 }
+
 function keysAre(value: Record<string, unknown>, expected: readonly string[]): boolean {
   const actual = Object.keys(value).sort();
   const wanted = [...expected].sort();
@@ -74,10 +91,11 @@ function scan(value: unknown, path = '$', ancestors = new Set<object>()): Candid
 }
 
 function ref(value: unknown): CandidateExactReference | undefined {
-  if (!plain(value) || !keysAre(value, ['kind','artifactId','contentDigest'])) return undefined;
+  if (!plain(value) || !keysAre(value, ['kind', 'artifactId', 'contentDigest'])) return undefined;
   if (!nonEmpty(value.kind) || !nonEmpty(value.artifactId) || !nonEmpty(value.contentDigest)) return undefined;
   return { kind: value.kind, artifactId: value.artifactId, contentDigest: value.contentDigest };
 }
+
 function refs(value: unknown): CandidateExactReference[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const result: CandidateExactReference[] = [];
@@ -88,26 +106,29 @@ function refs(value: unknown): CandidateExactReference[] | undefined {
   }
   return result;
 }
+
 function strings(value: unknown): string[] | undefined {
   return Array.isArray(value) && value.every(nonEmpty) ? value : undefined;
 }
+
 function tools(value: unknown): CandidateToolReference[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const result: CandidateToolReference[] = [];
   for (const item of value) {
-    if (!plain(item) || !keysAre(item, ['kind','artifactId','contentDigest','capability'])) return undefined;
+    if (!plain(item) || !keysAre(item, ['kind', 'artifactId', 'contentDigest', 'capability'])) return undefined;
     if (item.kind !== 'tool' || item.capability !== 'query' || !nonEmpty(item.artifactId) || !nonEmpty(item.contentDigest)) return undefined;
     result.push({ kind: 'tool', artifactId: item.artifactId, contentDigest: item.contentDigest, capability: 'query' });
   }
   return result;
 }
+
 function control(value: unknown): CandidateControlContract | undefined {
-  if (!plain(value) || !keysAre(value, ['startNode','nodes','edges','maxSteps'])) return undefined;
+  if (!plain(value) || !keysAre(value, ['startNode', 'nodes', 'edges', 'maxSteps'])) return undefined;
   const nodes = strings(value.nodes);
   if (!nonEmpty(value.startNode) || nodes === undefined || !Number.isInteger(value.maxSteps) || (value.maxSteps as number) <= 0 || !Array.isArray(value.edges)) return undefined;
   const edges: { from: string; to: string }[] = [];
   for (const item of value.edges) {
-    if (!plain(item) || !keysAre(item, ['from','to']) || !nonEmpty(item.from) || !nonEmpty(item.to)) return undefined;
+    if (!plain(item) || !keysAre(item, ['from', 'to']) || !nonEmpty(item.from) || !nonEmpty(item.to)) return undefined;
     edges.push({ from: item.from, to: item.to });
   }
   return { startNode: value.startNode, nodes, edges, maxSteps: value.maxSteps as number };
@@ -120,19 +141,27 @@ function parse(value: unknown): CandidateEnvelope | CandidateRejection {
   if (value.schemaVersion !== CANDIDATE_ENVELOPE_SCHEMA_VERSION) return reject('INVALID_ENVELOPE', '$.schemaVersion', 'unsupported Candidate envelope schemaVersion');
   if (!CANDIDATE_KINDS.includes(value.candidateKind as CandidateKind)) return reject('INVALID_ENVELOPE', '$.candidateKind', 'unsupported Candidate kind');
   if (!nonEmpty(value.candidateId)) return reject('INVALID_ENVELOPE', '$.candidateId', 'candidateId must be non-empty');
-  if (!plain(value.io) || !keysAre(value.io, ['inputs','outputs'])) return reject('INVALID_ENVELOPE', '$.io', 'io must contain only inputs/outputs');
 
-  const inputs = refs(value.io.inputs); const outputs = refs(value.io.outputs);
-  const capabilities = strings(value.capabilities); const declaredTools = tools(value.tools); const events = strings(value.events);
-  const references = refs(value.references); const applicability = refs(value.applicability); const hardInvariants = refs(value.hardInvariants);
-  if ([inputs,outputs,capabilities,declaredTools,events,references,applicability,hardInvariants].some((item) => item === undefined)) {
+  const bodyContract = ref(value.bodyContract);
+  if (bodyContract === undefined) return reject('INVALID_ENVELOPE', '$.bodyContract', 'bodyContract must be an exact reference');
+  if (!plain(value.io) || !keysAre(value.io, ['inputs', 'outputs'])) return reject('INVALID_ENVELOPE', '$.io', 'io must contain only inputs/outputs');
+
+  const inputs = refs(value.io.inputs);
+  const outputs = refs(value.io.outputs);
+  const capabilities = strings(value.capabilities);
+  const declaredTools = tools(value.tools);
+  const events = strings(value.events);
+  const references = refs(value.references);
+  const applicability = refs(value.applicability);
+  const hardInvariants = refs(value.hardInvariants);
+  if ([inputs, outputs, capabilities, declaredTools, events, references, applicability, hardInvariants].some((item) => item === undefined)) {
     return reject('INVALID_ENVELOPE', '$', 'Candidate declarations contain invalid shapes');
   }
 
   if (!plain(value.mutation) || !nonEmpty(value.mutation.kind)) return reject('INVALID_ENVELOPE', '$.mutation', 'mutation contract is invalid');
   let mutation: CandidateEnvelope['mutation'];
   if (value.mutation.kind === 'none' && keysAre(value.mutation, ['kind'])) mutation = { kind: 'none' };
-  else if (value.mutation.kind === 'durable-effect' && keysAre(value.mutation, ['kind','effects'])) {
+  else if (value.mutation.kind === 'durable-effect' && keysAre(value.mutation, ['kind', 'effects'])) {
     const effects = refs(value.mutation.effects);
     if (effects === undefined) return reject('INVALID_ENVELOPE', '$.mutation.effects', 'mutation effects must be exact references');
     mutation = { kind: 'durable-effect', effects };
@@ -145,66 +174,115 @@ function parse(value: unknown): CandidateEnvelope | CandidateRejection {
   if (value.candidateKind === 'workflow' && bounded === undefined) return reject('CONTROL_INVALID', '$.control', 'WorkflowCandidate requires bounded control');
 
   let body: JsonValue;
-  try { body = JSON.parse(canonicalJsonStringify(value.body)) as JsonValue; }
-  catch (error) { return reject('NON_CANONICAL_CONTENT', '$.body', error instanceof Error ? error.message : 'body is not canonical JSON'); }
+  try {
+    body = JSON.parse(canonicalJsonStringify(value.body)) as JsonValue;
+  } catch (error) {
+    return reject('NON_CANONICAL_CONTENT', '$.body', error instanceof Error ? error.message : 'body is not canonical JSON');
+  }
 
   const envelope: CandidateEnvelope = {
     schemaVersion: CANDIDATE_ENVELOPE_SCHEMA_VERSION,
     candidateKind: value.candidateKind as CandidateKind,
     candidateId: value.candidateId,
+    bodyContract,
     body,
     io: { inputs: inputs as CandidateExactReference[], outputs: outputs as CandidateExactReference[] },
-    capabilities: capabilities as string[], tools: declaredTools as CandidateToolReference[], events: events as string[], mutation,
-    references: references as CandidateExactReference[], applicability: applicability as CandidateExactReference[], hardInvariants: hardInvariants as CandidateExactReference[],
+    capabilities: capabilities as string[],
+    tools: declaredTools as CandidateToolReference[],
+    events: events as string[],
+    mutation,
+    references: references as CandidateExactReference[],
+    applicability: applicability as CandidateExactReference[],
+    hardInvariants: hardInvariants as CandidateExactReference[],
   };
   return bounded === undefined ? envelope : { ...envelope, control: bounded };
 }
 
 const refKey = (value: CandidateExactReference): string => `${value.kind}\u0000${value.artifactId}\u0000${value.contentDigest}`;
 const toolKey = (value: CandidateToolReference): string => `${refKey(value)}\u0000${value.capability}`;
-const sortedRefs = (value: readonly CandidateExactReference[]): CandidateExactReference[] => [...value].sort((a,b) => refKey(a).localeCompare(refKey(b)));
-const sortedTools = (value: readonly CandidateToolReference[]): CandidateToolReference[] => [...value].sort((a,b) => toolKey(a).localeCompare(toolKey(b)));
+const sortedRefs = (value: readonly CandidateExactReference[]): CandidateExactReference[] => [...value].sort((a, b) => refKey(a).localeCompare(refKey(b)));
+const sortedTools = (value: readonly CandidateToolReference[]): CandidateToolReference[] => [...value].sort((a, b) => toolKey(a).localeCompare(toolKey(b)));
+
 function duplicates(values: readonly string[]): string[] {
-  const seen = new Set<string>(); const dup = new Set<string>();
-  for (const value of values) { if (seen.has(value)) dup.add(value); seen.add(value); }
-  return [...dup].sort();
+  const seen = new Set<string>();
+  const duplicate = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicate.add(value);
+    seen.add(value);
+  }
+  return [...duplicate].sort();
 }
-function refsAllowed(declared: readonly CandidateExactReference[], allowed: readonly CandidateExactReference[], code: CandidateRejectionCode, path: string): CandidateRejection[] {
-  const allowedSet = new Set(allowed.map(refKey)); const result: CandidateRejection[] = [];
+
+function refsAllowed(
+  declared: readonly CandidateExactReference[],
+  allowed: readonly CandidateExactReference[],
+  code: CandidateRejectionCode,
+  path: string,
+): CandidateRejection[] {
+  const allowedSet = new Set(allowed.map(refKey));
+  const result: CandidateRejection[] = [];
   for (const key of duplicates(declared.map(refKey))) result.push(reject(code, path, `duplicate exact reference ${key}`));
-  for (const item of sortedRefs(declared)) if (!allowedSet.has(refKey(item))) result.push(reject(code, path, `exact reference is not allowed/resolvable: ${refKey(item)}`));
+  for (const item of sortedRefs(declared)) {
+    if (!allowedSet.has(refKey(item))) result.push(reject(code, path, `exact reference is not allowed/resolvable: ${refKey(item)}`));
+  }
   return result;
 }
+
 function stringsAllowed(declared: readonly string[], allowed: readonly string[], code: CandidateRejectionCode, path: string): CandidateRejection[] {
-  const allowedSet = new Set(allowed); const result: CandidateRejection[] = [];
+  const allowedSet = new Set(allowed);
+  const result: CandidateRejection[] = [];
   for (const value of duplicates(declared)) result.push(reject(code, path, `duplicate declaration ${value}`));
-  for (const value of [...declared].sort()) if (!allowedSet.has(value)) result.push(reject(code, path, `declaration is not allowlisted: ${value}`));
+  for (const value of [...declared].sort()) {
+    if (!allowedSet.has(value)) result.push(reject(code, path, `declaration is not allowlisted: ${value}`));
+  }
   return result;
 }
+
 function toolsAllowed(declared: readonly CandidateToolReference[], allowed: readonly CandidateToolReference[]): CandidateRejection[] {
-  const allowedSet = new Set(allowed.map(toolKey)); const result: CandidateRejection[] = [];
+  const allowedSet = new Set(allowed.map(toolKey));
+  const result: CandidateRejection[] = [];
   for (const key of duplicates(declared.map(toolKey))) result.push(reject('TOOL_NOT_ALLOWED', '$.tools', `duplicate tool declaration ${key}`));
-  for (const item of sortedTools(declared)) if (!allowedSet.has(toolKey(item))) result.push(reject('TOOL_NOT_ALLOWED', '$.tools', `tool is not allowlisted: ${toolKey(item)}`));
+  for (const item of sortedTools(declared)) {
+    if (!allowedSet.has(toolKey(item))) result.push(reject('TOOL_NOT_ALLOWED', '$.tools', `tool is not allowlisted: ${toolKey(item)}`));
+  }
   return result;
 }
+
 function validateControl(value: CandidateControlContract, authority: CandidateValidationAuthority): CandidateRejection[] {
-  const result: CandidateRejection[] = []; const nodes = new Set(value.nodes);
+  const result: CandidateRejection[] = [];
+  const nodes = new Set(value.nodes);
   if (nodes.size !== value.nodes.length) result.push(reject('CONTROL_INVALID', '$.control.nodes', 'control nodes must be unique'));
   if (!nodes.has(value.startNode)) result.push(reject('CONTROL_INVALID', '$.control.startNode', 'startNode must be declared'));
-  if (value.nodes.length > authority.maxControlNodes || value.edges.length > authority.maxControlEdges || value.maxSteps > authority.maxControlSteps || value.nodes.length > value.maxSteps) {
+  if (
+    value.nodes.length > authority.maxControlNodes
+    || value.edges.length > authority.maxControlEdges
+    || value.maxSteps > authority.maxControlSteps
+    || value.nodes.length > value.maxSteps
+  ) {
     result.push(reject('CONTROL_LIMIT_EXCEEDED', '$.control', 'control graph exceeds validation bounds'));
   }
-  const adjacency = new Map<string,string[]>(); for (const node of value.nodes) adjacency.set(node, []);
+
+  const adjacency = new Map<string, string[]>();
+  for (const node of value.nodes) adjacency.set(node, []);
   for (const edge of value.edges) {
     if (!nodes.has(edge.from) || !nodes.has(edge.to)) result.push(reject('CONTROL_INVALID', '$.control.edges', `unknown node in ${edge.from}->${edge.to}`));
     else adjacency.get(edge.from)?.push(edge.to);
   }
   if (result.some((item) => item.code === 'CONTROL_INVALID')) return result;
-  const visiting = new Set<string>(); const visited = new Set<string>(); let cycle = false;
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  let cycle = false;
   const visit = (node: string): void => {
     if (cycle || visited.has(node)) return;
-    if (visiting.has(node)) { cycle = true; return; }
-    visiting.add(node); for (const next of [...(adjacency.get(node) ?? [])].sort()) visit(next); visiting.delete(node); visited.add(node);
+    if (visiting.has(node)) {
+      cycle = true;
+      return;
+    }
+    visiting.add(node);
+    for (const next of [...(adjacency.get(node) ?? [])].sort()) visit(next);
+    visiting.delete(node);
+    visited.add(node);
   };
   visit(value.startNode);
   if (cycle) result.push(reject('CONTROL_CYCLE_FORBIDDEN', '$.control.edges', 'v0.3 executable Candidate cycles are forbidden'));
@@ -216,67 +294,143 @@ function material(candidate: CandidateEnvelope): unknown {
   const bounded = candidate.control === undefined ? null : {
     startNode: candidate.control.startNode,
     nodes: [...candidate.control.nodes].sort(),
-    edges: [...candidate.control.edges].map((edge) => ({ from: edge.from, to: edge.to })).sort((a,b) => `${a.from}\u0000${a.to}`.localeCompare(`${b.from}\u0000${b.to}`)),
+    edges: [...candidate.control.edges]
+      .map((edge) => ({ from: edge.from, to: edge.to }))
+      .sort((a, b) => `${a.from}\u0000${a.to}`.localeCompare(`${b.from}\u0000${b.to}`)),
     maxSteps: candidate.control.maxSteps,
   };
-  const mutation = candidate.mutation.kind === 'none' ? { kind: 'none' as const } : { kind: 'durable-effect' as const, effects: sortedRefs(candidate.mutation.effects) };
+  const mutation = candidate.mutation.kind === 'none'
+    ? { kind: 'none' as const }
+    : { kind: 'durable-effect' as const, effects: sortedRefs(candidate.mutation.effects) };
   return {
-    schemaVersion: candidate.schemaVersion, candidateKind: candidate.candidateKind, body: candidate.body,
+    schemaVersion: candidate.schemaVersion,
+    candidateKind: candidate.candidateKind,
+    bodyContract: candidate.bodyContract,
+    body: candidate.body,
     io: { inputs: sortedRefs(candidate.io.inputs), outputs: sortedRefs(candidate.io.outputs) },
-    capabilities: [...candidate.capabilities].sort(), tools: sortedTools(candidate.tools), events: [...candidate.events].sort(), mutation,
-    references: sortedRefs(candidate.references), applicability: sortedRefs(candidate.applicability), hardInvariants: sortedRefs(candidate.hardInvariants), control: bounded,
+    capabilities: [...candidate.capabilities].sort(),
+    tools: sortedTools(candidate.tools),
+    events: [...candidate.events].sort(),
+    mutation,
+    references: sortedRefs(candidate.references),
+    applicability: sortedRefs(candidate.applicability),
+    hardInvariants: sortedRefs(candidate.hardInvariants),
+    control: bounded,
   };
 }
+
 function baselineValid(value: CandidateValidationGovernanceBaseline): boolean {
   return nonEmpty(value.domainId) && nonEmpty(value.governanceId) && nonEmpty(value.schemaVersion) && nonEmpty(value.contentDigest);
 }
+
 function authorityFailures(value: CandidateValidationAuthority): CandidateRejection[] {
   const result: CandidateRejection[] = [];
-  if (!baselineValid(value.governanceBaseline)) result.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.governanceBaseline', 'exact Governance Baseline identity is required'));
-  if (!Number.isInteger(value.maxControlNodes) || value.maxControlNodes <= 0 || !Number.isInteger(value.maxControlEdges) || value.maxControlEdges < 0 || !Number.isInteger(value.maxControlSteps) || value.maxControlSteps <= 0) {
+  if (!baselineValid(value.governanceBaseline)) {
+    result.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.governanceBaseline', 'exact Governance Baseline identity is required'));
+  }
+  if (
+    !Number.isInteger(value.maxControlNodes)
+    || value.maxControlNodes <= 0
+    || !Number.isInteger(value.maxControlEdges)
+    || value.maxControlEdges < 0
+    || !Number.isInteger(value.maxControlSteps)
+    || value.maxControlSteps <= 0
+  ) {
     result.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority', 'control bounds must be finite non-negative integers'));
   }
   return result;
 }
+
 function sortFailures(value: CandidateRejection[]): CandidateRejection[] {
-  return value.sort((a,b) => `${a.code}\u0000${a.path}\u0000${a.message}`.localeCompare(`${b.code}\u0000${b.path}\u0000${b.message}`));
+  return value.sort((a, b) => `${a.code}\u0000${a.path}\u0000${a.message}`.localeCompare(`${b.code}\u0000${b.path}\u0000${b.message}`));
 }
 
 /** Deterministic Candidate -> Validated boundary. Never promotes, activates or executes. */
-export async function validateCandidate(value: unknown, authority: CandidateValidationAuthority, sha256: Sha256Port): Promise<CandidateValidationResult> {
+export async function validateCandidate(
+  value: unknown,
+  authority: CandidateValidationAuthority,
+  sha256: Sha256Port,
+): Promise<CandidateValidationResult> {
   const authorityErrors = authorityFailures(authority);
   if (authorityErrors.length > 0) return { ok: false, rejections: sortFailures(authorityErrors), grantsExecutionPermission: false };
-  const forbidden = scan(value); if (forbidden !== undefined) return { ok: false, rejections: [forbidden], grantsExecutionPermission: false };
-  try { canonicalJsonStringify(value); }
-  catch (error) { return { ok: false, rejections: [reject('NON_CANONICAL_CONTENT', '$', error instanceof Error ? error.message : 'Candidate is not canonical JSON')], grantsExecutionPermission: false }; }
+
+  const forbidden = scan(value);
+  if (forbidden !== undefined) return { ok: false, rejections: [forbidden], grantsExecutionPermission: false };
+  try {
+    canonicalJsonStringify(value);
+  } catch (error) {
+    return {
+      ok: false,
+      rejections: [reject('NON_CANONICAL_CONTENT', '$', error instanceof Error ? error.message : 'Candidate is not canonical JSON')],
+      grantsExecutionPermission: false,
+    };
+  }
 
   const parsed = parse(value);
   if ('code' in parsed) return { ok: false, rejections: [parsed], grantsExecutionPermission: false };
-  const candidate = parsed; const failures: CandidateRejection[] = [];
+  const candidate = parsed;
+  const failures: CandidateRejection[] = [];
+
+  const bodyValidator = authority.bodyValidators[candidate.candidateKind];
+  if (bodyValidator === undefined) {
+    failures.push(reject('BODY_VALIDATOR_REQUIRED', '$.body', `exact body-schema validator required for ${candidate.candidateKind}`));
+  } else if (bodyValidator.candidateKind !== candidate.candidateKind) {
+    failures.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.bodyValidators', 'body validator kind mismatch'));
+  } else if (refKey(bodyValidator.bodyContract) !== refKey(candidate.bodyContract)) {
+    failures.push(reject('BODY_CONTRACT_NOT_ALLOWED', '$.bodyContract', 'Candidate body contract is not the exact authority-owned contract'));
+  } else {
+    try {
+      for (const issue of bodyValidator.validate(candidate.body)) {
+        failures.push(reject('BODY_SCHEMA_INVALID', issue.path, `${issue.code}: ${issue.message}`));
+      }
+    } catch (error) {
+      failures.push(reject('BODY_SCHEMA_INVALID', '$.body', error instanceof Error ? `body validator failed closed: ${error.message}` : 'body validator failed closed'));
+    }
+  }
+
   failures.push(...refsAllowed(candidate.io.inputs, authority.allowedInputs, 'INPUT_CONTRACT_NOT_ALLOWED', '$.io.inputs'));
   failures.push(...refsAllowed(candidate.io.outputs, authority.allowedOutputs, 'OUTPUT_CONTRACT_NOT_ALLOWED', '$.io.outputs'));
   failures.push(...stringsAllowed(candidate.capabilities, authority.allowedCapabilities, 'CAPABILITY_NOT_ALLOWED', '$.capabilities'));
   failures.push(...toolsAllowed(candidate.tools, authority.allowedTools));
   failures.push(...stringsAllowed(candidate.events, authority.allowedEvents, 'EVENT_NOT_ALLOWED', '$.events'));
-  if (candidate.mutation.kind === 'durable-effect') failures.push(...refsAllowed(candidate.mutation.effects, authority.allowedMutationEffects, 'MUTATION_PATH_INVALID', '$.mutation.effects'));
+  if (candidate.mutation.kind === 'durable-effect') {
+    failures.push(...refsAllowed(candidate.mutation.effects, authority.allowedMutationEffects, 'MUTATION_PATH_INVALID', '$.mutation.effects'));
+  }
   failures.push(...refsAllowed(candidate.references, authority.availableReferences, 'EXACT_REFERENCE_UNRESOLVED', '$.references'));
   failures.push(...refsAllowed(candidate.applicability, authority.allowedApplicability, 'APPLICABILITY_NOT_ALLOWED', '$.applicability'));
   failures.push(...refsAllowed(candidate.hardInvariants, authority.hardInvariants, 'HARD_INVARIANT_INCOMPATIBLE', '$.hardInvariants'));
   if (candidate.control !== undefined) failures.push(...validateControl(candidate.control, authority));
 
   const specialized = authority.specializedValidators?.[candidate.candidateKind];
-  if (candidate.candidateKind === 'workflow' && specialized === undefined) failures.push(reject('SPECIALIZED_VALIDATOR_REQUIRED', '$.candidateKind', 'WorkflowCandidate requires the stricter #204/Frozen-L2 validator'));
-  else if (specialized !== undefined && specialized.candidateKind !== candidate.candidateKind) failures.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.specializedValidators', 'specialized validator kind mismatch'));
-  else if (specialized !== undefined) {
-    try { for (const issue of specialized.validate(candidate)) failures.push(reject('SPECIALIZED_REJECTED', issue.path, `${issue.code}: ${issue.message}`)); }
-    catch (error) { failures.push(reject('SPECIALIZED_REJECTED', '$.candidateKind', error instanceof Error ? `specialized validator failed closed: ${error.message}` : 'specialized validator failed closed')); }
+  if (candidate.candidateKind === 'workflow' && specialized === undefined) {
+    failures.push(reject('SPECIALIZED_VALIDATOR_REQUIRED', '$.candidateKind', 'WorkflowCandidate requires the stricter #204/Frozen-L2 validator'));
+  } else if (specialized !== undefined && specialized.candidateKind !== candidate.candidateKind) {
+    failures.push(reject('VALIDATION_AUTHORITY_INVALID', '$authority.specializedValidators', 'specialized validator kind mismatch'));
+  } else if (specialized !== undefined) {
+    try {
+      for (const issue of specialized.validate(candidate)) {
+        failures.push(reject('SPECIALIZED_REJECTED', issue.path, `${issue.code}: ${issue.message}`));
+      }
+    } catch (error) {
+      failures.push(reject('SPECIALIZED_REJECTED', '$.candidateKind', error instanceof Error ? `specialized validator failed closed: ${error.message}` : 'specialized validator failed closed'));
+    }
   }
+
   if (failures.length > 0) return { ok: false, rejections: sortFailures(failures), grantsExecutionPermission: false };
 
   let candidateContentDigest: string;
-  try { candidateContentDigest = await computeCanonicalJsonDigest(material(candidate), sha256); }
-  catch (error) { return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', error instanceof Error ? error.message : 'Candidate digest generation failed')], grantsExecutionPermission: false }; }
-  if (!nonEmpty(candidateContentDigest)) return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', 'Candidate digest must be non-empty')], grantsExecutionPermission: false };
+  try {
+    candidateContentDigest = await computeCanonicalJsonDigest(material(candidate), sha256);
+  } catch (error) {
+    return {
+      ok: false,
+      rejections: [reject('CONTENT_DIGEST_INVALID', '$', error instanceof Error ? error.message : 'Candidate digest generation failed')],
+      grantsExecutionPermission: false,
+    };
+  }
+  if (!nonEmpty(candidateContentDigest)) {
+    return { ok: false, rejections: [reject('CONTENT_DIGEST_INVALID', '$', 'Candidate digest must be non-empty')], grantsExecutionPermission: false };
+  }
 
   const identity: ValidatedCandidateIdentity = {
     candidateKind: candidate.candidateKind,
@@ -289,16 +443,32 @@ export async function validateCandidate(value: unknown, authority: CandidateVali
 }
 
 function sameBaseline(a: CandidateValidationGovernanceBaseline, b: CandidateValidationGovernanceBaseline): boolean {
-  return a.domainId === b.domainId && a.governanceId === b.governanceId && a.schemaVersion === b.schemaVersion && a.contentDigest === b.contentDigest;
+  return a.domainId === b.domainId
+    && a.governanceId === b.governanceId
+    && a.schemaVersion === b.schemaVersion
+    && a.contentDigest === b.contentDigest;
 }
-/** Reuse of validation evidence only; never promotion/activation/execution authority. */
-export function canReuseValidationForGovernanceBaseline(identity: ValidatedCandidateIdentity, target: CandidateValidationGovernanceBaseline, compatibility?: ReviewedCandidateValidationCompatibility): boolean {
-  if (!baselineValid(target)) return false;
+
+/**
+ * Reuse of validation evidence only; never promotion/activation/execution authority.
+ * Cross-baseline reuse can only come from a reviewed rule owned by the exact
+ * target Governance Baseline validation authority.
+ */
+export function canReuseValidationForGovernanceBaseline(
+  identity: ValidatedCandidateIdentity,
+  target: CandidateValidationGovernanceBaseline,
+  targetAuthority: CandidateValidationAuthority,
+): boolean {
+  if (!baselineValid(target) || !sameBaseline(targetAuthority.governanceBaseline, target)) return false;
   if (sameBaseline(identity.governanceBaseline, target)) return true;
-  return compatibility !== undefined && nonEmpty(compatibility.reviewDigest)
+
+  return (targetAuthority.reviewedValidationCompatibilities ?? []).some((compatibility) => (
+    nonEmpty(compatibility.reviewDigest)
     && compatibility.kind === 'reviewed-exact-governance-compatibility'
     && compatibility.validatorContractVersion === identity.validatorContractVersion
     && compatibility.candidateKind === identity.candidateKind
+    && compatibility.governanceContractContentDigest === target.contentDigest
     && sameBaseline(compatibility.from, identity.governanceBaseline)
-    && sameBaseline(compatibility.to, target);
+    && sameBaseline(compatibility.to, target)
+  ));
 }
