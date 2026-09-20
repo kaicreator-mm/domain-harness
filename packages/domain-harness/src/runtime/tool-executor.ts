@@ -38,6 +38,8 @@ export function createRuntimeToolExecutor(host: RuntimeHostBindings): ToolExecut
         output = await host.script.execute({
           binding: request.descriptor.execution,
           input,
+          // [L2-4]: the durable effect context reaches every execution kind.
+          context: request.context,
           ...(request.context.signal === undefined ? {} : { signal: request.context.signal }),
         });
       } else {

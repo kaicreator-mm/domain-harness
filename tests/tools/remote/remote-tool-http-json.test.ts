@@ -124,6 +124,12 @@ test('Remote Tool executor uses the frozen ToolExecutorPort seam and validates r
             calls += 1;
             assert.equal(request.resourceKey, 'remote.echo.service');
             assert.deepEqual(request.input, { name: 'Ada' });
+            // [L2-4/#181]: the durable effect context must reach the transport
+            // edge, not stop at the journal layer.
+            assert.equal(request.context?.idempotencyKey, 'effect-1');
+            assert.equal(request.context?.attempt, 1);
+            assert.equal(request.context?.effectId, 'effect-1');
+            assert.equal(request.context?.sourceMessageId, 'message-1');
             return { greeting: 'Hello Ada' };
           },
         },
@@ -181,7 +187,19 @@ test('G8 deterministic HTTP stub behaves equivalently for Node and Expo host bin
   const nodeTransport = createNodeHttpJsonRemoteTransport({ resources, fetchImpl: makeFetch(nodeCaptured) });
   const expoTransport = createExpoHttpJsonRemoteTransport({ resources, fetchImpl: makeFetch(expoCaptured) });
   const binding = descriptor().execution;
-  const request = { binding, input: { name: 'Ada' }, resourceKey: 'remote.echo.service' } as const;
+  const request = {
+    binding,
+    input: { name: 'Ada' },
+    resourceKey: 'remote.echo.service',
+    context: {
+      effectId: 'effect-g8',
+      target: { workflowId: 'hello', instanceKey: 'instance-g8' },
+      sourceMessageId: 'message-g8',
+      logicalTime: '2026-09-18T00:00:00.000Z',
+      attempt: 1,
+      idempotencyKey: 'effect-key-g8',
+    },
+  } as const;
 
   assert.deepEqual(await nodeTransport.execute(request), { greeting: 'Hello Ada' });
   assert.deepEqual(await expoTransport.execute(request), { greeting: 'Hello Ada' });
@@ -195,6 +213,9 @@ test('G8 deterministic HTTP stub behaves equivalently for Node and Expo host bin
     const headers = captured.init.headers as Record<string, string>;
     assert.equal(headers.authorization, 'Bearer secret-token');
     assert.equal(headers['x-domain-harness-session'], 'session-value');
+    // [L2-4/#181]: both host transports map the durable idempotency key onto
+    // the standard header so upstream services can deduplicate retries.
+    assert.equal(headers['idempotency-key'], 'effect-key-g8');
   }
 
   assert.equal(JSON.stringify(binding).includes('secret-token'), false);

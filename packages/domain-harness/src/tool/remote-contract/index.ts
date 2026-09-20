@@ -138,6 +138,10 @@ export function createRemoteHttpJsonToolExecutor(options: RemoteHttpJsonExecutor
         binding: request.descriptor.execution,
         input: request.input,
         resourceKey: config.resourceKey,
+        // [L2-4]: the durable effect context (idempotency key, attempt, effect
+        // and source identity) must reach the execution edge, not stop at the
+        // journal layer.
+        context: request.context,
         ...(request.context.signal === undefined ? {} : { signal: request.context.signal }),
       });
 
