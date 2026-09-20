@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createActor, createMachine } from 'xstate';
 
 import type { JsonObject } from '../../src/contracts/json.js';
 import type { DomainWorkflowDefinition } from '../../src/workflow/index.js';
@@ -66,6 +67,16 @@ test('internal adapter maps Domain Workflow control semantics while keeping Effe
     pending.meta.domainHarness.state.transitions?.[0]?.effectIntents?.[0]?.effectType,
     'audit.approved',
   );
+});
+
+test('mapped config executes inside the selected XState engine without exposing engine identity publicly', () => {
+  const config = adaptDomainWorkflowToXState(workflow);
+  const machine = createMachine(config as unknown as Parameters<typeof createMachine>[0]);
+  const actor = createActor(machine).start();
+
+  actor.send({ type: 'APPROVE', payload: { score: 12 } });
+  assert.equal(actor.getSnapshot().value, 'approved');
+  actor.stop();
 });
 
 test('adapter guard fails closed on accessor-backed engine event without invoking the accessor', () => {
