@@ -7,7 +7,7 @@
 
 ## Frozen normative body
 
-The authoritative Amendment body is preserved exactly as independently verified:
+The authoritative Amendment body is preserved exactly as independently reviewed:
 
 ```text
 docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1.md
@@ -33,30 +33,50 @@ main@466a5196a8b29194b50eb4641d6cf988d38b4da8
 
 The normative Amendment body is **not editorially changed after review**. Its retained header may still say `REVIEW CANDIDATE`; this Freeze Record establishes frozen authority while preserving exact reviewed-body identity, following the same exact-body freeze pattern used by PRD Amendment A1.
 
-## Review / verification evidence
+## Primary external adversarial review evidence
 
 Repository evidence:
 
 ```text
-docs/architecture/reviews/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1_SECONDARY_VERIFICATION.md
+docs/architecture/reviews/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1_ADVERSARIAL_REVIEW.md
 ```
 
-Exact-head secondary verification result:
+External reviewer: Claude.
+
+Exact review disposition supplied and archived:
 
 ```text
 FREEZE_OK
 P0 = 0
 P1 = 0
-P2 = 2
-P3 = 0
 ```
 
-The operator reported that the requested Claude targeted adversarial review had completed. The original Claude transcript/verdict was not retrievable in the current GitHub/Drive/Project context, so it is not reconstructed or quoted. Under the explicit operator instruction to continue, the missing transcript is an acknowledged review-provenance waiver; the repository freeze decision is supported by the archived fresh exact-HEAD secondary verification above.
+The review also confirmed that the previously frozen PRD Amendment A1 identity remained consistent, including SHA-256 `1aaea27bed59515a10d54101c917ed1db6fadc33434f5fdfefad4a9e9fe1be01`, and that the authority references used by this Amendment matched the prior reviewed PRD/L2 baseline.
 
-The two non-blocking P2 items are carried forward into implementation planning:
+No review-provenance waiver is required: the external verdict and detailed blocker/P2/P3 disposition are now archived in the engineering Source of Truth.
 
-1. `DomainActivationBinding` must be implemented as a single non-torn immutable/atomic logical binding revision/read; concurrent package/governance activation must never synthesize a mixed tuple.
-2. future external review transcripts should be archived directly in the engineering Source of Truth before freeze when practical.
+A separate fresh exact-HEAD secondary verification is retained as supplemental evidence:
+
+```text
+docs/architecture/reviews/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1_SECONDARY_VERIFICATION.md
+```
+
+It does not replace or impersonate the primary external review.
+
+## Non-blocking findings carried into implementation
+
+The external review's accepted P2/P3 observations are already absorbed by the Amendment and/or must remain explicit implementation acceptance criteria:
+
+1. governance-critical classification defaults fail-safe: unknown classification is governance-critical unless explicit human/operator governance authority classifies it otherwise;
+2. activation authority is tied to concrete target-package and Promoted Artifact Registry activation/selection mechanisms, not a generic automatic-activation exception;
+3. Governance Baseline identity is exact and content-addressed, is bound to package/CDI authority, is retained, is execution-pinned, and is reused exactly across crash/recovery;
+4. Frozen PRD Non-Goals and L2-deferred scope remain closed;
+5. supersession is narrow: only explicitly mapped conflicts are replaced;
+6. human/operator promotion remains at least as strict as Frozen L2 ADR-08;
+7. Experimental/L4 obligations are conditional on representation, shadow/non-mutating by default, and any stable fallback identity is exact rather than floating;
+8. implementation of `DomainActivationBinding` SHALL preserve the already-frozen one-exact-binding semantic as a non-torn immutable/atomic logical publication/read: concurrent package/governance activation must yield either the old complete tuple or the new complete tuple, never a mixed authority tuple.
+
+Items 1–7 are reflected directly in the frozen Amendment body. Item 8 is an implementation atomicity acceptance condition derived from the Amendment's requirement to resolve one exact `DomainActivationBinding` for new-instance creation.
 
 ## Frozen authority composition
 
