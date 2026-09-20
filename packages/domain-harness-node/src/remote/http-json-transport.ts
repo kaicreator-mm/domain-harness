@@ -109,6 +109,12 @@ export function createNodeHttpJsonRemoteTransport(options: NodeHttpJsonRemoteTra
       };
       if (resource.token !== undefined) headers.authorization = `Bearer ${resource.token}`;
       if (resource.session !== undefined) headers['x-domain-harness-session'] = resource.session;
+      // [L2-4]: map the durable effect idempotency key onto the standard
+      // header so upstream services can deduplicate retried side effects.
+      // Set after resource headers: the effect fact wins over static config.
+      if (request.context?.idempotencyKey !== undefined) {
+        headers['idempotency-key'] = request.context.idempotencyKey;
+      }
 
       let response: Response;
       try {
