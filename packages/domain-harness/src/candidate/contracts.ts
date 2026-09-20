@@ -3,6 +3,7 @@ import type { JsonValue } from '../contracts/json.js';
 
 export const CANDIDATE_ENVELOPE_SCHEMA_VERSION = 'candidate-envelope-v1' as const;
 export const CANDIDATE_VALIDATOR_CONTRACT_VERSION = 'candidate-validator-v1' as const;
+export const CANDIDATE_BODY_SCHEMA_VERSION = 'candidate-body-schema-v1' as const;
 
 export const CANDIDATE_KINDS = [
   'rule',
@@ -123,18 +124,17 @@ export interface CandidateRejection {
   readonly message: string;
 }
 
-export interface CandidateBodyIssue {
-  readonly code: string;
-  readonly path: string;
-  readonly message: string;
-}
-
-/** Exact deterministic body-schema validator supplied by validation authority. */
-export interface CandidateBodyValidator {
+/**
+ * Immutable, declarative schema artifact for one executable Candidate body.
+ * The validator verifies identity.contentDigest over schemaVersion,
+ * candidateKind and schema before compiling the schema. No caller-provided
+ * executable validation callback is accepted as body-schema authority.
+ */
+export interface CandidateBodySchemaArtifact {
+  readonly schemaVersion: typeof CANDIDATE_BODY_SCHEMA_VERSION;
   readonly candidateKind: CandidateKind;
-  readonly bodyContract: CandidateExactReference;
-  /** Must be synchronous, deterministic, side-effect free and I/O free. */
-  validate(body: JsonValue): readonly CandidateBodyIssue[];
+  readonly identity: CandidateExactReference;
+  readonly schema: JsonValue;
 }
 
 export interface CandidateSpecializedIssue {
@@ -160,9 +160,40 @@ export interface ReviewedCandidateValidationCompatibility {
   readonly reviewDigest: string;
 }
 
+/**
+ * Read-only projection resolved from the exact retained Governance Baseline
+ * authority body. It is not accepted directly by the reuse helper; callers
+ * must resolve it through CandidateContractAuthorityPort.
+ */
+export interface CandidateGovernanceValidationAuthoritySnapshot {
+  readonly governanceBaseline: CandidateValidationGovernanceBaseline;
+  readonly governanceContractContentDigest: string;
+  readonly reviewedValidationCompatibilities: readonly ReviewedCandidateValidationCompatibility[];
+}
+
+/**
+ * Exact authority resolution seam.
+ *
+ * Production implementations MUST resolve body schemas from their immutable
+ * content-addressed schema authority and Governance validation authority from
+ * the exact retained T-003 Governance Baseline body/registry. They MUST NOT
+ * synthesize either source from request/call-site supplied compatibility data.
+ * T-004 consumes this seam but does not own those registries.
+ */
+export interface CandidateContractAuthorityPort {
+  resolveExactBodySchema(
+    reference: CandidateExactReference,
+  ): Promise<CandidateBodySchemaArtifact | undefined>;
+
+  resolveExactGovernanceValidationAuthority(
+    target: CandidateValidationGovernanceBaseline,
+  ): Promise<CandidateGovernanceValidationAuthoritySnapshot | undefined>;
+}
+
 export interface CandidateValidationAuthority {
   readonly governanceBaseline: CandidateValidationGovernanceBaseline;
-  readonly bodyValidators: Partial<Record<CandidateKind, CandidateBodyValidator>>;
+  /** Exact schema identities allowed for each executable Candidate kind. */
+  readonly bodyContracts: Partial<Record<CandidateKind, CandidateExactReference>>;
   readonly allowedInputs: readonly CandidateExactReference[];
   readonly allowedOutputs: readonly CandidateExactReference[];
   readonly allowedCapabilities: readonly string[];
@@ -176,12 +207,6 @@ export interface CandidateValidationAuthority {
   readonly maxControlEdges: number;
   readonly maxControlSteps: number;
   readonly specializedValidators?: Partial<Record<CandidateKind, CandidateSpecializedValidator>>;
-  /**
-   * Reviewed compatibility rules owned by this exact Governance Baseline
-   * authority. Call sites cannot inject an ad-hoc compatibility object into
-   * validation-evidence reuse.
-   */
-  readonly reviewedValidationCompatibilities?: readonly ReviewedCandidateValidationCompatibility[];
 }
 
 export type CandidateValidationResult =
