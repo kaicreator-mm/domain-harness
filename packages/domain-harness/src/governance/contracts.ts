@@ -72,16 +72,24 @@ export interface GovernanceBaselineStore {
   getBody(identity: GovernanceBaselineIdentity): Promise<GovernanceBaselineBody | undefined>;
   /** Insert immutable-by-digest body; same-key mutation must fail atomically. */
   putBody(body: GovernanceBaselineBody): Promise<void>;
-  /** Atomically delete only when no retention reference targets this exact body. */
+  /** Atomically delete only when no live retention reference targets this exact body. */
   collectBodyIfUnreferenced(identity: GovernanceBaselineIdentity): Promise<boolean>;
 
   getReference(referenceId: string): Promise<GovernanceBaselineRetentionReference | undefined>;
   /**
-   * Atomically require the exact body to exist, then insert-once/idempotently by
-   * referenceId. Rebinding or retaining a collected body must fail.
+   * Atomically require the exact body to exist, then bind referenceId once.
+   * Rebinding a live or previously released ID, or retaining a collected body,
+   * must fail closed. Repeating the same currently-live reference is idempotent.
    */
   putReference(reference: GovernanceBaselineRetentionReference): Promise<void>;
-  deleteReference(referenceId: string): Promise<void>;
+  /**
+   * Atomically release only when the currently-live reference exactly equals
+   * `expected`. The immutable referenceId binding/tombstone must be preserved so
+   * a released ID cannot later be rebound or reactivated.
+   */
+  releaseReference(
+    expected: GovernanceBaselineRetentionReference,
+  ): Promise<'released' | 'absent'>;
   listReferences(
     identity: GovernanceBaselineIdentity,
   ): Promise<readonly GovernanceBaselineRetentionReference[]>;
