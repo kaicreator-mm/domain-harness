@@ -39,6 +39,14 @@ test('T-001: equivalent objects with different insertion order produce identical
   assert.equal(canonicalJsonStringify(left), canonicalJsonStringify(right));
 });
 
+test('T-001: canonical JSON preserves __proto__ as ordinary data', () => {
+  const value = JSON.parse('{"__proto__":{"safe":true},"a":1}') as unknown;
+  assert.equal(
+    canonicalJsonStringify(value),
+    '{"__proto__":{"safe":true},"a":1}',
+  );
+});
+
 test('T-001: canonical SHA-256 seam consumes the frozen cross-host vector material', async () => {
   for (const vector of CANONICAL_SHA256_VECTORS) {
     const sha256: Sha256Port = {
@@ -63,6 +71,21 @@ test('T-001: invalid or lossy semantic material fails closed', () => {
   const arrayWithExtraProperty = [1] as unknown[] & { extra?: string };
   arrayWithExtraProperty.extra = 'not-json-array-data';
 
+  const nonEnumerable: Record<string, unknown> = { visible: true };
+  Object.defineProperty(nonEnumerable, 'hidden', { value: 'not-json', enumerable: false });
+
+  const accessor: Record<string, unknown> = {};
+  Object.defineProperty(accessor, 'dynamic', {
+    enumerable: true,
+    get() {
+      return 'not-data';
+    },
+  });
+
+  class CustomSemanticObject {
+    readonly value = 1;
+  }
+
   const invalidValues: unknown[] = [
     { missing: undefined },
     { fn: () => undefined },
@@ -73,6 +96,9 @@ test('T-001: invalid or lossy semantic material fails closed', () => {
     symbolKeyed,
     sparse,
     arrayWithExtraProperty,
+    nonEnumerable,
+    accessor,
+    new CustomSemanticObject(),
   ];
 
   for (const value of invalidValues) {
