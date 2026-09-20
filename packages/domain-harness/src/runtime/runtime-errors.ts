@@ -1,11 +1,28 @@
 /**
- * Stable public Runtime operation error envelope (seed of issue #172).
+ * Stable public Runtime operation error envelope (issue #172).
  *
- * Foreground Runtime operations reject with either this envelope (carrying a
- * stable machine-readable `code`) or an existing subsystem-specific typed
- * error (PackageActivationError, ProjectionError, MessageAcceptanceError,
- * recovery-v2 errors), which remain stable and are preserved intentionally.
- * Consumers must never need to parse message text.
+ * FOREGROUND (public DomainRuntime operations) reject with either:
+ * - this envelope, carrying a stable machine-readable `code` — consumers
+ *   branch on `error instanceof DomainRuntimeError && error.code`, never on
+ *   message text; or
+ * - an existing subsystem-specific typed error that is already stable and
+ *   intentionally preserved: PackageActivationError (+PackageErrorCode) for
+ *   activation/preflight, MessageAcceptanceError for send-time contract and
+ *   acceptance failures, ProjectionError for query/projection failures, and
+ *   the recovery-v2 error classes (RecoveryStateError, RecoveryTargetNotFoundError,
+ *   RecoveryRetryNotAuthorizedError, AmbiguousNonIdempotentResolutionRequiredError,
+ *   RecoveryStoreInvariantError) surfacing through recover().
+ *
+ * BACKGROUND (onBackgroundError) receives the underlying failure as-is:
+ * runtime-owned classes where they exist (ProcessingConflict-style drain
+ * failures surface as the thrown Error; durable poison-message facts are NOT
+ * re-reported because they are already persisted and observable through
+ * Query/recovery). The background channel is diagnostic; hosts that need
+ * stable codes there should classify by instanceof on the documented classes.
+ * Store/host driver errors pass through unchanged and remain host-owned.
+ *
+ * `cause` is preserved where safe; no code payload embeds host resources,
+ * credentials or runtime handles.
  */
 export type RuntimeErrorCode =
   /** The Runtime has been disposed; no operation can proceed. */

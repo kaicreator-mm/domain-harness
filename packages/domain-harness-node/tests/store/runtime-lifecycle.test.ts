@@ -259,3 +259,30 @@ test('G-lifecycle host can close the store race-free after dispose resolves', as
   store.close();
   await runtime.awaitIdle();
 });
+
+test('G-errors representative public operations expose stable codes without message parsing (#172)', async (t) => {
+  const { runtime } = await makeRuntime(t);
+
+  await assert.rejects(
+    runtime.openInstance({
+      address: { workflowId: 'missing-flow', instanceKey: 'e-1' },
+      correlationId: 'corr-e-1',
+      packageId: PACKAGE_ID,
+      input: {},
+    }),
+    (error: unknown) =>
+      error instanceof DomainRuntimeError && error.code === 'workflow_not_in_package',
+  );
+
+  await assert.rejects(
+    runtime.recover({
+      target: { workflowId: 'happy', instanceKey: 'nope' },
+      action: 'retry',
+      reason: 'authorized',
+    }),
+    (error: unknown) =>
+      error instanceof DomainRuntimeError && error.code === 'instance_not_found',
+  );
+
+  await runtime.dispose();
+});
