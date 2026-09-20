@@ -1,5 +1,5 @@
-import type { ExactContentIdentity } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
+import type { GovernanceBaselineIdentity } from '../governance/contracts.js';
 
 export const CANDIDATE_ENVELOPE_SCHEMA_VERSION = 'candidate-envelope-v1' as const;
 export const CANDIDATE_VALIDATOR_CONTRACT_VERSION = 'candidate-validator-v1' as const;
@@ -70,16 +70,8 @@ export interface CandidateEnvelope {
   readonly control?: CandidateControlContract;
 }
 
-/**
- * Narrow structural baseline reference for T-004. T-003 owns the canonical
- * GovernanceBaselineIdentity; its output is structurally compatible with this
- * validation-only reference and will be wired centrally by later tasks.
- */
-export interface CandidateValidationGovernanceBaseline extends ExactContentIdentity {
-  readonly domainId: string;
-  readonly governanceId: string;
-  readonly version?: string;
-}
+/** T-003 owns the canonical Governance Baseline identity. */
+export type CandidateValidationGovernanceBaseline = GovernanceBaselineIdentity;
 
 export interface ValidatedCandidateIdentity {
   readonly candidateKind: CandidateKind;
@@ -196,45 +188,29 @@ export interface CandidateSpecializedValidator {
   validate(candidate: CandidateEnvelope): readonly CandidateSpecializedIssue[];
 }
 
+/**
+ * Reviewed compatibility record stored inside the exact retained Governance
+ * Baseline semantic body. Ownership comes from containment in that body; the
+ * record therefore does not self-assert the target body's content digest.
+ */
 export interface ReviewedCandidateValidationCompatibility {
   readonly kind: 'reviewed-exact-governance-compatibility';
   readonly validatorContractVersion: typeof CANDIDATE_VALIDATOR_CONTRACT_VERSION;
   readonly candidateKind: CandidateKind;
   readonly from: CandidateValidationGovernanceBaseline;
   readonly to: CandidateValidationGovernanceBaseline;
-  /** Must match the exact target Governance Baseline contract digest. */
-  readonly governanceContractContentDigest: string;
   readonly reviewDigest: string;
 }
 
 /**
- * Read-only projection resolved from the exact retained Governance Baseline
- * authority body. It is not accepted directly by the reuse helper; callers
- * must resolve it through CandidateContractAuthorityPort.
- */
-export interface CandidateGovernanceValidationAuthoritySnapshot {
-  readonly governanceBaseline: CandidateValidationGovernanceBaseline;
-  readonly governanceContractContentDigest: string;
-  readonly reviewedValidationCompatibilities: readonly ReviewedCandidateValidationCompatibility[];
-}
-
-/**
- * Exact authority resolution seam.
- *
- * Production implementations MUST resolve body schemas from their immutable
- * content-addressed schema authority and Governance validation authority from
- * the exact retained T-003 Governance Baseline body/registry. They MUST NOT
- * synthesize either source from request/call-site supplied compatibility data.
- * T-004 consumes this seam but does not own those registries.
+ * Exact immutable body-schema resolution seam. Production implementations MUST
+ * resolve from their content-addressed contract authority. A resolved schema is
+ * never trusted by shape alone: T-004 recomputes and matches its semantic digest.
  */
 export interface CandidateContractAuthorityPort {
   resolveExactBodySchema(
     reference: CandidateExactReference,
   ): Promise<CandidateBodySchemaArtifact | undefined>;
-
-  resolveExactGovernanceValidationAuthority(
-    target: CandidateValidationGovernanceBaseline,
-  ): Promise<CandidateGovernanceValidationAuthoritySnapshot | undefined>;
 }
 
 export interface CandidateValidationAuthority {
