@@ -3,14 +3,16 @@
 **Version:** v0.3  
 **Wave:** A / portable contracts and capabilities  
 **Execution Issue:** #225  
-**Branch:** `v0.3_t007`  
+**Original Branch:** `v0.3_t007`  
+**Repair Branch:** `v0.3_t007_repair`  
 **PR Base:** `v0.3`  
-**Exact Base:** `be65e41e652d70c17ca10af66bc5f25abed2658a`  
+**Original Exact Base:** `be65e41e652d70c17ca10af66bc5f25abed2658a`  
+**Repair Exact Base:** `74514b07048ee62ce04d742a9685ae4804619d89`  
 **Depends On:** T-001  
 **Parallel:** YES  
 **Risk:** H  
 **L3:** REQUIRED  
-**Status:** DOING
+**Status:** DOING — independent-review repair / exact-SHA validation pending
 
 ## 1. Frozen Inputs
 
@@ -42,6 +44,8 @@ It SHALL NOT become a peer runtime or acquire parent Workflow, mutation, provide
 
 This task does not modify central Runtime assembly, package activation, Governance registry, Candidate promotion/activation, persistent journals, semantic cache, durable effect execution, provider routing or public v0.3 assembly barrels.
 
+The independent-review repair is intentionally narrower: it changes the harness contract type surface, focused tests, and this task evidence only.
+
 ## 4. Deliverables
 
 1. provider-neutral `ModelPort` request/response seam with no provider/model-selection fields;
@@ -66,6 +70,7 @@ Required scenarios:
 
 - query observation → bounded second model turn → exact structured decision/event success;
 - selected Facts/CDI dependencies plus successful query dependency returned as `ObservedDependencySet`;
+- selected invocation dependencies cannot pre-claim `kind: query` provenance at the public TypeScript contract;
 - mutation capability hidden from model-visible schemas;
 - direct mutation request rejected before executor invocation;
 - unknown capability rejected before executor invocation;
@@ -100,12 +105,14 @@ One invocation receives only selected execution inputs:
 Domain Facts
 + Compiled Domain Intelligence
 + current Workflow context
-+ exact selected dependency identities
++ exact selected Fact/CDI dependency identities
 + allowed decision outcomes / Domain Event types
 + capability registry
 + provider-neutral ModelPort
 + maxSteps
 ```
+
+`selectedDependencies` is restricted to preselected `domain-fact` / `compiled-intelligence` provenance. `kind: query` provenance is an output-only observation for this input surface and may appear in `ObservedDependencySet` only after a successful allowed query binding reports it.
 
 The model request exposes read/query schemas only. Mutation bindings may be present in the host registry solely so a malicious/invalid model request can be rejected explicitly; their schemas are never exposed to the model and their executors are never invoked by `HarnessMachine`.
 
@@ -217,3 +224,28 @@ This task SHALL NOT implement:
 - host durability claims;
 - autonomous Meta Harness or self-modifying production intelligence;
 - a second/peer Harness Runtime.
+
+## 11. Independent Review Repair Record
+
+Independent review of original exact HEAD `7520ca029a065471313044ce923c42b003fb2850` issued `VALIDATION_REQUEST` with `P0=0 / P1=0 / P2=2 / P3=0`.
+
+Repair actions on `v0.3_t007_repair`:
+
+1. split preselected Fact/CDI provenance from query provenance in the public contract so `BusinessHarnessInput.selectedDependencies` cannot claim `kind: query`;
+2. add a compile-time negative contract test using `@ts-expect-error` so typecheck fails if query provenance becomes pre-claimable again;
+3. fix the private-reasoning negative test's repeated `finalResponse()` union narrowing, which could fail TypeScript typecheck before runtime validation executed;
+4. reconcile this Task Pack with the reopened Issue #225 and repair branch.
+
+The repair starts from current integration baseline `v0.3@74514b07048ee62ce04d742a9685ae4804619d89`, because the original PR had already merged before independent review. The original implementation HEAD remains historical evidence only; all repair validation/review must bind to the new repair PR exact HEAD.
+
+Closure rule:
+
+```text
+repair exact HEAD
+→ required typecheck/focused/package tests PASS
+→ configured CI PASS, or post-failure exact-gate waiver with evidence
+→ independent exact-HEAD re-review
+→ Status: DONE
+```
+
+Until those gates are satisfied, this Task Pack remains `DOING` and Issue #225 remains open.
