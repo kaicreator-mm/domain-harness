@@ -4,9 +4,6 @@ import {
   type Sha256Port,
 } from '../contracts/identity.js';
 import type { JsonObject, JsonValue } from '../contracts/json.js';
-import type { GovernanceBaselineBody } from '../governance/contracts.js';
-import { sameGovernanceBaselineIdentity } from '../governance/identity.js';
-import { GovernanceBaselineRegistry } from '../governance/registry.js';
 import {
   CANDIDATE_BODY_SCHEMA_VERSION,
   CANDIDATE_ENVELOPE_SCHEMA_VERSION,
@@ -25,7 +22,6 @@ import {
   type CandidateValidationAuthority,
   type CandidateValidationGovernanceBaseline,
   type CandidateValidationResult,
-  type ReviewedCandidateValidationCompatibility,
   type ValidatedCandidateIdentity,
 } from './contracts.js';
 
@@ -58,7 +54,6 @@ const MAX_SCHEMA_DEPTH = 16;
 const MAX_SCHEMA_PROPERTIES = 128;
 const MAX_SCHEMA_ENUM_VALUES = 256;
 const MAX_SCHEMA_ARRAY_ITEMS = 1024;
-const GOVERNANCE_COMPATIBILITY_KEY = 'candidateValidationCompatibilities';
 
 const reject = (
   code: CandidateRejectionCode,
@@ -507,6 +502,16 @@ function baselineValid(value: CandidateValidationGovernanceBaseline): boolean {
     && (value.version === undefined || nonEmpty(value.version));
 }
 
+function sameBaseline(
+  left: CandidateValidationGovernanceBaseline,
+  right: CandidateValidationGovernanceBaseline,
+): boolean {
+  return left.domainId === right.domainId
+    && left.governanceId === right.governanceId
+    && left.schemaVersion === right.schemaVersion
+    && left.contentDigest === right.contentDigest;
+}
+
 function exactRefValid(value: CandidateExactReference): boolean {
   return nonEmpty(value.kind) && nonEmpty(value.artifactId) && nonEmpty(value.contentDigest);
 }
@@ -663,11 +668,15 @@ function parseBodySchemaNode(value: unknown, path: string, depth = 0): SchemaPar
     if (value.additionalProperties !== false || !plain(value.properties)) {
       return { ok: false, failures: [schemaAuthorityFailure(path, 'object schema must deny additional properties and declare properties')] };
     }
-    const required = Array.isArray(value.required)
-      ? value.required.filter((item): item is string => typeof item === 'string' && item.length > 0)
-      : undefined;
-    if (required === undefined || required.length !== value.required.length) {
-      return { ok: false, failures: [schemaAuthorityFailure(`${path}.required`, 'required properties must be non-empty strings')] };
+    if (!Array.isArray(value.required)) {
+      return { ok: false, failures: [schemaAuthorityFailure(`${path}.required`, 'required properties must be an array')] };
+    }
+    const required: string[] = [];
+    for (const item of value.required) {
+      if (!nonEmpty(item)) {
+        return { ok: false, failures: [schemaAuthorityFailure(`${path}.required`, 'required properties must be non-empty strings')] };
+      }
+      required.push(item);
     }
     if (new Set(required).size !== required.length) {
       return { ok: false, failures: [schemaAuthorityFailure(`${path}.required`, 'required properties must be unique')] };
@@ -951,100 +960,15 @@ export async function validateCandidate(
   return { ok: true, identity, grantsExecutionPermission: false };
 }
 
-function parseGovernanceBaseline(
-  value: JsonValue | undefined,
-): CandidateValidationGovernanceBaseline | undefined {
-  const object = jsonObject(value);
-  if (object === undefined || !keysOnly(object, ['domainId', 'governanceId', 'schemaVersion', 'version', 'contentDigest'])) {
-    return undefined;
-  }
-  const domainId = object.domainId;
-  const governanceId = object.governanceId;
-  const schemaVersion = object.schemaVersion;
-  const contentDigest = object.contentDigest;
-  const version = object.version;
-  if (
-    !nonEmpty(domainId)
-    || !nonEmpty(governanceId)
-    || !nonEmpty(schemaVersion)
-    || !nonEmpty(contentDigest)
-    || (version !== undefined && !nonEmpty(version))
-  ) {
-    return undefined;
-  }
-  return version === undefined
-    ? { domainId, governanceId, schemaVersion, contentDigest }
-    : { domainId, governanceId, schemaVersion, version, contentDigest };
-}
-
-function parseCompatibility(
-  value: JsonValue,
-): ReviewedCandidateValidationCompatibility | undefined {
-  const object = jsonObject(value);
-  if (
-    object === undefined
-    || !keysAre(object, ['kind', 'validatorContractVersion', 'candidateKind', 'from', 'reviewDigest'])
-    || object.kind !== 'reviewed-exact-governance-compatibility'
-    || object.validatorContractVersion !== CANDIDATE_VALIDATOR_CONTRACT_VERSION
-  ) {
-    return undefined;
-  }
-  const candidateKind = parseKind(object.candidateKind);
-  const from = parseGovernanceBaseline(object.from);
-  const reviewDigest = object.reviewDigest;
-  if (candidateKind === undefined || from === undefined || !nonEmpty(reviewDigest)) {
-    return undefined;
-  }
-  return {
-    kind: 'reviewed-exact-governance-compatibility',
-    validatorContractVersion: CANDIDATE_VALIDATOR_CONTRACT_VERSION,
-    candidateKind,
-    from,
-    reviewDigest,
-  };
-}
-
-function parseCompatibilityRecords(
-  semantics: JsonObject,
-): readonly ReviewedCandidateValidationCompatibility[] | undefined {
-  const raw = semantics[GOVERNANCE_COMPATIBILITY_KEY];
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) return undefined;
-  const result: ReviewedCandidateValidationCompatibility[] = [];
-  for (const item of raw) {
-    const parsed = parseCompatibility(item);
-    if (parsed === undefined) return undefined;
-    result.push(parsed);
-  }
-  return result;
-}
-
 /**
- * Reuse of validation evidence only; never promotion/activation/execution authority.
- * Cross-baseline reuse is accepted only when the reviewed compatibility record
- * is physically contained in the exact retained T-003 Governance Baseline body
- * resolved and digest-verified by GovernanceBaselineRegistry.
+ * T-004 only decides whether evidence is already bound to the same exact
+ * Governance Baseline. Any changed exact baseline fails closed to revalidation.
+ * The reviewed cross-baseline compatibility exception is owned by T-015, which
+ * depends on T-003 and can resolve the retained Governance contract itself.
  */
-export async function canReuseValidationForGovernanceBaseline(
+export function canReuseValidationForGovernanceBaseline(
   identity: ValidatedCandidateIdentity,
   target: CandidateValidationGovernanceBaseline,
-  governanceRegistry: GovernanceBaselineRegistry,
-): Promise<boolean> {
-  if (!baselineValid(target)) return false;
-  if (sameGovernanceBaselineIdentity(identity.governanceBaseline, target)) return true;
-
-  let body: GovernanceBaselineBody;
-  try {
-    body = await governanceRegistry.resolveExact(target);
-  } catch {
-    return false;
-  }
-  if (!sameGovernanceBaselineIdentity(body.identity, target)) return false;
-
-  const compatibilities = parseCompatibilityRecords(body.semantics);
-  if (compatibilities === undefined) return false;
-  return compatibilities.some((compatibility) =>
-    compatibility.validatorContractVersion === identity.validatorContractVersion
-    && compatibility.candidateKind === identity.candidateKind
-    && sameGovernanceBaselineIdentity(compatibility.from, identity.governanceBaseline));
+): boolean {
+  return baselineValid(target) && sameBaseline(identity.governanceBaseline, target);
 }
