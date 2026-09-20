@@ -5,7 +5,7 @@ when:
 
 clone:
   - name: git
-    image: /usr/bin/bash
+    image: /usr/local/bin/plugin-git
     settings:
       partial: false
       depth: 1
