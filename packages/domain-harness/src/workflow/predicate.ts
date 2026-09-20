@@ -419,7 +419,7 @@ function cloneDataOnlyForPreparation(
       throw new PredicateContractViolation(`${path} must use a plain object prototype`);
     }
 
-    const result: JsonObject = {};
+    const result = Object.create(null) as JsonObject;
     for (const key of Object.keys(value)) {
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (descriptor === undefined || !('value' in descriptor)) {
