@@ -15,9 +15,18 @@ import {
 
 const GOLDEN_URL = new URL('../fixtures/app-contracts/order-app.generated.ts', import.meta.url);
 
-test('generation matches the checked-in golden and excludes engine/runtime internals', () => {
+function readCheckoutNormalizedGolden(): string {
+  const checkedOut = readFileSync(GOLDEN_URL, 'utf8');
+  const normalized = checkedOut.replaceAll('\r\n', '\n');
+  assert.doesNotMatch(normalized, /\r/, 'golden checkout may contain only LF or CRLF line endings');
+  return normalized;
+}
+
+test('generation byte contract is LF-only with one terminal blank line and matches the checked-in golden', () => {
   const generated = generateTypedAppContracts(orderManifest, orderAppContracts);
-  assert.equal(generated, readFileSync(GOLDEN_URL, 'utf8'));
+  assert.doesNotMatch(generated, /\r/);
+  assert.equal(generated.match(/\n+$/)?.[0], '\n\n');
+  assert.equal(generated, readCheckoutNormalizedGolden());
   assert.doesNotMatch(generated, /xstate/i);
   assert.doesNotMatch(generated, /actor/i);
   assert.doesNotMatch(generated, /snapshot/i);
