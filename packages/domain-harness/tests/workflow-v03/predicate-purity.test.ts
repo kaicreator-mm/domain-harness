@@ -151,3 +151,26 @@ test('malformed prepared predicate throws at primitive layer while Guard wrapper
   const malformedGuard = prepareDomainWorkflowGuard({ guardId: 'malformed', predicate: malformed });
   assert.equal(evaluateDomainWorkflowGuard(malformedGuard, input), false);
 });
+
+test('preparation treats __proto__ as own JSON data and cannot inherit predicate authority', () => {
+  const inheritedOperator = JSON.parse(
+    '{"__proto__":{"op":"constant","value":true}}',
+  ) as unknown as DomainPredicate;
+  const protoContext = JSON.parse(
+    '{"__proto__":{"allowed":true}}',
+  ) as unknown as DomainPredicateEvaluationInput['context'];
+  const input = prepareDomainPredicateEvaluationInput({ context: protoContext, event: { type: 'CHECK' } });
+
+  const preparedMalformed = prepareDomainPredicate(inheritedOperator);
+  assert.throws(() => evaluateDomainPredicate(preparedMalformed, input), /unknown predicate operator/);
+
+  const malformedGuard = prepareDomainWorkflowGuard({ guardId: 'proto-smuggle', predicate: inheritedOperator });
+  assert.equal(evaluateDomainWorkflowGuard(malformedGuard, input), false);
+
+  const explicitDataPredicate = prepareDomainPredicate({
+    op: 'eq',
+    left: { source: 'context', path: ['__proto__', 'allowed'] },
+    right: { source: 'literal', value: true },
+  });
+  assert.equal(evaluateDomainPredicate(explicitDataPredicate, input), true);
+});
