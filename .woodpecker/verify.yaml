@@ -16,4 +16,6 @@ steps:
   - name: verify
     image: /usr/bin/bash
     commands:
-      - node --version
+      - NODE_BIN="$(find /usr /usr/local /opt /root /home -type f -name node -perm -111 2>/dev/null | head -n 1)"
+      - test -n "$NODE_BIN"
+      - "$NODE_BIN" --version
