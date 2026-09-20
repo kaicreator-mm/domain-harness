@@ -11,12 +11,17 @@ export interface ToolCall {
 
 export type ModelTurn =
   | { kind: 'final'; output: unknown; message?: string }
-  | { kind: 'tool_calls'; calls: readonly ToolCall[]; message?: string }
-  | { kind: 'handoff'; target: string; payload?: unknown; message?: string };
+  | { kind: 'tool_calls'; calls: readonly ToolCall[]; message?: string };
+
+export interface ToolAvailabilityContext {
+  messages: readonly PromptMessage[];
+}
 
 export interface MiniTool {
   name: string;
   description?: string;
+  isEnabled?: (context: ToolAvailabilityContext) => boolean;
+  requiresApproval?: boolean | ((input: unknown) => boolean);
   execute(input: unknown, context: { signal?: AbortSignal }): Promise<unknown>;
 }
 
@@ -27,6 +32,7 @@ export interface GenerateRequest {
 }
 
 export type Generate = (request: GenerateRequest) => Promise<ModelTurn>;
+export type FinalValidator = (output: unknown) => boolean;
 
 export type JournalEvent =
   | { kind: 'model'; step: number; response: ModelTurn }
@@ -45,6 +51,12 @@ export interface MiniRunnerContinuation {
   journal: JournalEvent[];
 }
 
+export interface ApprovalRequest {
+  callId: string;
+  name: string;
+  input: unknown;
+}
+
 export type MiniRunnerResult =
   | {
       status: 'completed';
@@ -52,8 +64,8 @@ export type MiniRunnerResult =
       continuation: MiniRunnerContinuation;
     }
   | {
-      status: 'handoff';
-      handoff: { target: string; payload?: unknown };
+      status: 'approval_required';
+      approval: ApprovalRequest;
       continuation: MiniRunnerContinuation;
     }
   | {
@@ -68,9 +80,17 @@ export interface RunMiniAgentOptions {
   continuation?: MiniRunnerContinuation;
   tools?: readonly MiniTool[];
   generate?: Generate;
+  validateFinal?: FinalValidator;
   signal?: AbortSignal;
   maxSteps?: number;
   replay?: readonly JournalEvent[];
+}
+
+export class InvalidFinalOutputError extends Error {
+  constructor() {
+    super('Final output did not satisfy the configured validator');
+    this.name = 'InvalidFinalOutputError';
+  }
 }
 
 function abortIfNeeded(signal?: AbortSignal): void {
@@ -117,6 +137,23 @@ function continuation(
   };
 }
 
+function enabledToolsFor(
+  tools: ReadonlyMap<string, MiniTool>,
+  messages: readonly PromptMessage[],
+): Map<string, MiniTool> {
+  const context: ToolAvailabilityContext = { messages: structuredClone(messages) };
+  return new Map(
+    [...tools.entries()].filter(([, tool]) => tool.isEnabled?.(context) ?? true),
+  );
+}
+
+function requiresApproval(tool: MiniTool, input: unknown): boolean {
+  if (typeof tool.requiresApproval === 'function') {
+    return tool.requiresApproval(structuredClone(input));
+  }
+  return tool.requiresApproval === true;
+}
+
 export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRunnerResult> {
   const maxSteps = options.maxSteps ?? 8;
   if (!Number.isInteger(maxSteps) || maxSteps < 1) {
@@ -124,10 +161,6 @@ export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRu
   }
 
   const tools = new Map((options.tools ?? []).map((tool) => [tool.name, tool]));
-  const toolDescriptors = [...tools.values()].map(({ name, description }) => ({
-    name,
-    ...(description === undefined ? {} : { description }),
-  }));
   const messages = initialMessages(options);
   const journal = options.continuation
     ? structuredClone(options.continuation.journal)
@@ -135,7 +168,10 @@ export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRu
   const firstStep = options.continuation?.nextStep ?? 0;
   let replayCursor = 0;
 
-  const takeReplay = <T extends JournalEvent['kind']>(kind: T, step: number): Extract<JournalEvent, { kind: T }> => {
+  const takeReplay = <T extends JournalEvent['kind']>(
+    kind: T,
+    step: number,
+  ): Extract<JournalEvent, { kind: T }> => {
     const event = options.replay?.[replayCursor++];
     if (!event || event.kind !== kind || event.step !== step) {
       throw new Error(`Replay mismatch at step ${step}: expected ${kind}`);
@@ -146,6 +182,12 @@ export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRu
   for (let offset = 0; offset < maxSteps; offset += 1) {
     const step = firstStep + offset;
     abortIfNeeded(options.signal);
+
+    const enabledTools = enabledToolsFor(tools, messages);
+    const toolDescriptors = [...enabledTools.values()].map(({ name, description }) => ({
+      name,
+      ...(description === undefined ? {} : { description }),
+    }));
 
     let turn: ModelTurn;
     if (options.replay) {
@@ -161,6 +203,9 @@ export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRu
     }
 
     if (turn.kind === 'final') {
+      if (options.validateFinal && !options.validateFinal(structuredClone(turn.output))) {
+        throw new InvalidFinalOutputError();
+      }
       if (turn.message !== undefined) messages.push({ role: 'assistant', content: turn.message });
       if (options.replay && replayCursor !== options.replay.length) {
         throw new Error('Replay contains unused events after final output');
@@ -168,27 +213,46 @@ export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRu
       return {
         status: 'completed',
         output: structuredClone(turn.output),
-        continuation: continuation(messages, step + 1, options.replay ? [...options.replay] : journal),
+        continuation: continuation(
+          messages,
+          step + 1,
+          options.replay ? [...options.replay] : journal,
+        ),
       };
     }
 
-    if (turn.kind === 'handoff') {
-      if (turn.message !== undefined) messages.push({ role: 'assistant', content: turn.message });
-      if (options.replay && replayCursor !== options.replay.length) {
-        throw new Error('Replay contains unused events after handoff');
+    messages.push({
+      role: 'assistant',
+      ...(turn.message === undefined ? {} : { content: turn.message }),
+      toolCalls: structuredClone(turn.calls),
+    });
+
+    for (const call of turn.calls) {
+      const tool = enabledTools.get(call.name);
+      if (!tool) {
+        throw new Error(`Tool is disabled or unknown: ${call.name}`);
       }
-      return {
-        status: 'handoff',
-        handoff: { target: turn.target, ...(turn.payload === undefined ? {} : { payload: structuredClone(turn.payload) }) },
-        continuation: continuation(messages, step + 1, options.replay ? [...options.replay] : journal),
-      };
+      if (requiresApproval(tool, call.input)) {
+        return {
+          status: 'approval_required',
+          approval: {
+            callId: call.id,
+            name: call.name,
+            input: structuredClone(call.input),
+          },
+          continuation: continuation(
+            messages,
+            step + 1,
+            options.replay ? [...options.replay] : journal,
+          ),
+        };
+      }
     }
 
-    messages.push({ role: 'assistant', ...(turn.message === undefined ? {} : { content: turn.message }), toolCalls: structuredClone(turn.calls) });
     for (const call of turn.calls) {
       abortIfNeeded(options.signal);
-      const tool = tools.get(call.name);
-      if (!tool) throw new Error(`Unknown tool: ${call.name}`);
+      const tool = enabledTools.get(call.name);
+      if (!tool) throw new Error(`Tool is disabled or unknown: ${call.name}`);
 
       let output: unknown;
       if (options.replay) {
@@ -215,7 +279,12 @@ export async function runMiniAgent(options: RunMiniAgentOptions): Promise<MiniRu
           output: structuredClone(output),
         });
       }
-      messages.push({ toolCallId: call.id, role: 'tool', name: call.name, output: structuredClone(output) });
+      messages.push({
+        toolCallId: call.id,
+        role: 'tool',
+        name: call.name,
+        output: structuredClone(output),
+      });
     }
   }
 

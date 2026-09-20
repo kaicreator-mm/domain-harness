@@ -2,52 +2,70 @@
 
 **Issue:** #186  
 **Status:** RESEARCH EVIDENCE / SPIKE — not a PRD or L2 freeze.  
-**DomainHarness baseline:** `main` @ `fa3e7f13e67a65a9fbd714d1518db920cb717144`.  
+**DomainHarness remediation baseline:** `main` @ `8d296d359c988f2759d8a1a811714fc3c948f548`.  
 **Upstream:** `openai/openai-agents-js` @ `b11eaba663b22fff2541457e1be508a0bf3eb344`.  
-**Provenance:** independent reimplementation of observed control-flow ideas; no upstream source is vendored or copied. Upstream package is MIT licensed.
+**Provenance:** independent clean-room reimplementation of observed control-flow ideas; no upstream source is vendored or copied. Upstream package is MIT licensed.
 
 ## Decision
 
-**Recommendation: ADAPT.** The useful design essence is a bounded `generation -> tool execution -> generation` loop with explicit continuation and failure/cancellation propagation. That essence fits in a node-local runner without importing the upstream SDK's orchestration, provider, tracing, session, sandbox, or policy surface.
+**Recommendation: ADAPT.** Preserve only the bounded single-Node `generation -> tool -> observation -> generation` kernel plus explicit tool availability, approval pause, final validation, cancellation/failure propagation, and ephemeral continuation facts.
 
-The spike is deliberately **not** a replacement for workflow orchestration. XState remains workflow owner; DomainHarness remains durable shell/context owner; AI Runtime remains provider routing/adapter owner. A handoff emitted by the runner is data returned to the caller, not an in-runner workflow transition.
+Do **not** adopt the OpenAI Agents SDK as a runtime dependency and do **not** reproduce its provider registry, sessions, tracing, sandbox, MCP, hosted tools, multi-agent handoffs, or workflow responsibility.
 
-## Upstream source inventory / footprint
+Boundary remains:
 
-Pinned-source measurements were taken from the exact commit above, not from upstream HEAD.
+- XState owns Domain Workflow state/transitions and any human/business approval transition;
+- DomainHarness owns context selection, durable messages/effects/recovery/cache and validates the Node result before emitting workflow events;
+- AI Runtime owns provider/model selection, credentials and retry policy;
+- this mini runner owns only bounded iterative model/tool execution inside one Workflow Node invocation.
 
-| Upstream surface | Measured footprint / dependency observation | Why it matters |
+## Pinned upstream evidence / footprint
+
+The study read the pinned `agents-core` Runner, RunState, run-loop/tool-execution surfaces and relevant tests, including approval/tool-enablement scenarios (`packages/agents-core/test/agentScenarios.test.ts`, `runState.cases.ts`, runner tests).
+
+| Upstream surface | Measured footprint / dependency observation | Research implication |
 | --- | ---: | --- |
-| `packages/agents-core/src/run.ts` | **3,809 source lines** | Primary Runner surface already combines model invocation, sessions, tracing, guardrails, retries, streaming, sandbox, handoff and persistence concerns. |
-| `packages/agents-core/src/runState.ts` | **>5,000 source lines** (line 5,000 is populated at the pinned commit) | General resumability/state machinery is far larger than the node-local state required here. |
-| `packages/agents-core/src/runner/runLoop.ts` | separate helper module | Confirms turn-resolution/interruption logic has already been split from the main Runner, but remains coupled to RunState and SDK semantics. |
-| `@openai/agents-core` required runtime deps | **3**: `@standard-schema/spec`, `debug`, `openai` | Direct adoption would pull provider/schema/logging policy into the node runner. |
-| optional runtime integration | `@modelcontextprotocol/client` | MCP is not a node-runner primitive for DomainHarness. |
-| optional peer | `zod` | DomainHarness already owns schema/contract boundaries; the spike does not need a schema library. |
+| `packages/agents-core/src/run.ts` | **3,809 source lines** | Runner combines model invocation, sessions, tracing, guardrails, retries, streaming, sandbox, handoff and persistence concerns. |
+| `packages/agents-core/src/runState.ts` | **>5,000 source lines** | General resumability/state is far larger than one Node needs. |
+| `packages/agents-core/src/runner/runLoop.ts` | separate helper module | Confirms useful turn-control logic exists but is coupled to the wider SDK state model. |
+| `@openai/agents-core` required runtime deps | **3**: `@standard-schema/spec`, `debug`, `openai` | Direct adoption would import provider/schema/logging policy into DomainHarness. |
+| optional integration | `@modelcontextprotocol/client` | MCP is outside this kernel. |
+| optional peer | `zod` | The kernel does not need a schema package; DomainHarness owns contract validation. |
 
-The two main upstream state/orchestration files alone are therefore **>8,809 lines**, before the supporting `runner/*`, model, tool, result, handoff, tracing, memory and sandbox modules are counted. This is evidence against direct adoption, not a criticism of the upstream SDK: it solves a substantially broader problem.
+The two main upstream Runner/RunState files alone are therefore **>8,809 lines**, before supporting runner/model/tool/result/tracing/session/sandbox modules.
+
+## Responsibility map
+
+| Concern | Upstream role | Mini-kernel treatment |
+| --- | --- | --- |
+| Agent configuration | instructions, tools, output contract, broader agent composition | Plain input data: ordered prompts, injected tools, optional final validator. No Agent object graph. |
+| Runner | drives turns, model calls, tool processing, termination | Retained only as a hard-bounded single-Node loop. |
+| RunState | tracks generated items, interruptions, resumable SDK state, lifecycle metadata | Reduced to ephemeral messages + `nextStep` + append-only research journal. It is not durable authority. |
+| Tool execution | tool visibility, approval checks, invocation, outputs | `isEnabled` filters model-visible tools; `requiresApproval` returns a pause before any side effect; `execute` is injected capability code. |
+| Provider/model integration | model provider selection and SDK model request implementation | Replaced by one injected `generate(request)` port owned operationally by AI Runtime. |
+| Output guardrail / validation | broad guardrail framework and output validation | Reduced to optional fail-closed `validateFinal` at the Node boundary. |
 
 ## KEEP / ADAPT / DROP
 
-| Classification | Upstream idea | Spike treatment / DomainHarness boundary |
+| Classification | Upstream principle | DomainHarness treatment |
 | --- | --- | --- |
-| KEEP | bounded turn loop | Explicit `maxSteps` hard bound; reaching it returns continuation rather than silently escaping the bound. |
-| KEEP | model -> tool call(s) -> model progression | Preserved as the core loop, including multiple tool turns. |
-| KEEP | cancellation signal propagation | `AbortSignal` checked before each model/tool side effect and passed to both ports. |
-| KEEP | failures remain observable | Provider/auth errors are not swallowed or translated into success. |
-| KEEP | resumable structured run state | Result carries ordered messages, next step and journal as continuation state. |
-| ADAPT | Agent/Runner prompt state | Reduced to ordered system + reusable developer + user messages; no Agent object graph. |
-| ADAPT | tool definitions / tool outputs | Reduced to named async tools plus structured input/output. No hosted/computer/shell/MCP specialization. |
-| ADAPT | handoff | Becomes terminal node-local data `{ target, payload }`; XState/caller decides any workflow transition. |
-| ADAPT | RunState replay/resume | Reduced to an append-only model/tool journal. Replay consumes recorded events without provider/tool side effects and validates tool identity/input. Durable storage remains outside the runner. |
-| ADAPT | provider model call | A single injected `generate(request)` port. Provider selection, model policy, credentials and retries belong to AI Runtime. |
-| DROP | multi-agent orchestration / agent switching | Workflow orchestration is explicitly out of scope and remains with XState. |
-| DROP | SDK session/memory persistence | DomainHarness durable shell/context owns persistence. |
-| DROP | tracing/span lifecycle and usage accounting | Orthogonal telemetry concern; not required for correct node execution. |
-| DROP | provider registry/default-provider logic/retry policy | AI Runtime owns provider routing and adapter behavior. |
-| DROP | streaming API | Not needed to prove the bounded node kernel. Can be evaluated separately if product evidence later requires it. |
-| DROP | generic input/output/tool guardrail framework | DomainHarness contract validation and workflow policy stay outside this mini runner. |
-| DROP | sandbox, MCP, computer/shell/apply-patch specializations | Tool implementations are injected capabilities; the kernel does not acquire new authority. |
+| KEEP | bounded turn loop | Explicit `maxSteps`; bound exhaustion returns continuation. |
+| KEEP | model -> tool -> observation -> model progression | Core iterative loop, including multiple tool steps. |
+| KEEP | conditional tool availability | Tool predicate is evaluated per turn; disabled tools are not exposed and cannot execute. |
+| KEEP | approval before protected tool side effect | Approval-required calls return `approval_required` before **any** tool execution; outer XState/business flow owns the decision. |
+| KEEP | cancellation propagation | `AbortSignal` checked before model/tool side effects and passed to injected ports. |
+| KEEP | failures remain observable | Model/provider and tool failures propagate unchanged. |
+| KEEP | final-output validation | Invalid structured final results fail closed with `InvalidFinalOutputError`. |
+| ADAPT | resumable RunState | Only Node-local transcript/step/journal continuation is retained; durable recovery remains DomainHarness-owned. |
+| ADAPT | tool schema/definitions | Reduced to name/description plus injected capability functions. |
+| ADAPT | model call | One provider-neutral injected generation port. |
+| DROP | handoffs / agent switching | Removed from the mini kernel; multi-agent/workflow routing belongs outside it. |
+| DROP | SDK session/memory persistence | DomainHarness durable runtime owns persistence. |
+| DROP | tracing/span lifecycle and usage accounting | Orthogonal telemetry concern. |
+| DROP | default provider registry, credentials and retry policy | AI Runtime owns them. |
+| DROP | streaming API | Not required to establish the minimal kernel. |
+| DROP | generic input/tool/output guardrail framework | Only minimal tool enablement, approval pause and final validation are retained. |
+| DROP | sandbox, hosted tools, MCP, computer/shell/apply-patch specializations | Capabilities are injected; kernel gains no external authority. |
 
 ## Runnable spike
 
@@ -56,55 +74,50 @@ Files:
 - `packages/domain-harness/tests/architecture-v03/agents-js-mini-runner/mini-agent-runner.ts`
 - `packages/domain-harness/tests/architecture-v03/agents-js-mini-runner/mini-agent-runner.test.ts`
 
-Measured spike runtime footprint:
+Measured runtime footprint after full #186 acceptance coverage:
 
-- **230 LOC runtime code** (`wc -l mini-agent-runner.ts`)
+- **300 LOC runtime code**
 - **0 third-party runtime dependencies**
 - target thresholds: `<= 400 LOC` and `<= 8 direct runtime dependencies` -> **PASS**
 
-The runtime exposes only:
+No production source, PRD, L2, public contract, provider, RuntimeStore, compiler or XState workflow semantics are changed.
 
-1. ordered prompt/messages;
-2. injected generation port;
-3. injected named tools;
-4. bounded loop;
-5. structured result / continuation;
-6. cancellation/failure propagation;
-7. deterministic replay journal;
-8. data-only handoff.
+## Executed evidence
 
-No production source, PRD, L2, public contract, live-event, provider or RuntimeStore semantics are changed by this spike.
+Local executable environment: Node **22.16.0**.
 
-## Executed tests
+- strict TypeScript compile of the runner using the repository-equivalent `NodeNext`, `strict`, `noUnused*`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax` options: **PASS**;
+- focused runtime scenarios using Node 22 TypeScript type stripping: **12/12 PASS**.
 
-Standalone strict TypeScript compile of the runtime: **PASS**.
-
-Executable spike tests: **9/9 PASS**:
+Scenarios:
 
 1. prompt accumulation;
-2. one tool call;
+2. model -> tool -> model -> final;
 3. multi-step tool loop;
-4. structured result + continuation propagation;
-5. cancellation before provider execution;
-6. provider/auth failure propagated unchanged;
-7. deterministic replay with zero repeated provider/tool side effects;
-8. handoff returned as node-local data only;
-9. hard max-step bound returns continuation.
+4. conditionally disabled tool hidden + fail-closed if requested;
+5. approval-required tool pauses before execution;
+6. structured result + continuation propagation;
+7. invalid structured final fail-closed;
+8. cancellation before provider execution;
+9. provider/model failure propagation;
+10. tool failure propagation;
+11. deterministic journal replay with zero repeated provider/tool side effects;
+12. hard max-step termination with continuation.
 
-Replay proof is intentionally narrow: given the same initial messages and recorded model/tool journal, replay returns the same structured result and does not invoke provider or tool code. This is a deterministic execution characteristic, **not** a claim that model generation itself is deterministic and **not** a replacement for DomainHarness durable effect authority.
+Replay proof is intentionally narrow: given the same initial messages and recorded model/tool journal, replay returns the same structured result without provider/tool side effects. It is not a claim that model generation is deterministic and is not a replacement for DomainHarness durable effect authority.
 
 ## Complexity-leak check
 
-Reject the extraction if the mini runner must own any of the following to be useful:
+Reject this extraction if it must own any of the following:
 
 - XState workflow transitions or workflow persistence;
-- DomainHarness durable context/effect authority;
-- provider/model selection, credentials, retry policy or auth recovery;
+- durable effect/message authority or recovery policy;
+- provider/model selection, credentials or retry policy;
 - cross-node or multi-agent orchestration;
 - SDK session/tracing/sandbox/MCP infrastructure.
 
-The current spike owns none of them. Its only state is the current node-local transcript/continuation and replay journal supplied to or returned by its caller. Therefore the bounded extraction passes the issue's complexity-leak criterion.
+The final spike owns none of them. Approval is deliberately a returned pause/decision boundary rather than hidden execution, and handoff support is deliberately absent.
 
 ## Architecture implication for later synthesis
 
-This evidence supports a v0.3 architecture option where one XState AI node invokes a small Agent Runner, the runner delegates every generation to AI Runtime, and DomainHarness wraps the invocation with its durable/replay authority. It does **not** freeze that option. Parent #183 / synthesis work should compare this evidence with the Vercel AI and Goose reductions before any PRD-L2 architecture decision.
+This evidence supports a v0.3 option where an XState AI Node invokes a small bounded Agent Runner, the runner delegates generation to AI Runtime, and DomainHarness wraps the invocation with durable context/effect/recovery authority. It does **not** freeze that option. Parent #183 should compare this evidence with the other mini-kernel research artifacts before any PRD/L2 decision.
