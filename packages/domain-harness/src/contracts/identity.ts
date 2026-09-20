@@ -45,6 +45,14 @@ function assertNoSymbolKeys(value: object, path: string): void {
   }
 }
 
+function requireDataProperty(value: object, key: string, path: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+    failCanonical(path, 'JSON properties must be enumerable data properties');
+  }
+  return descriptor.value;
+}
+
 function canonicalize(value: unknown, path: string, ancestors: Set<object>): JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
 
@@ -60,13 +68,17 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): Jso
 
     const result: JsonValue[] = [];
     for (let index = 0; index < value.length; index += 1) {
-      if (!Object.prototype.hasOwnProperty.call(value, index)) {
+      const key = String(index);
+      if (!Object.prototype.hasOwnProperty.call(value, key)) {
         failCanonical(`${path}[${index}]`, 'sparse array entries are not canonical JSON');
       }
-      result.push(canonicalize(value[index], `${path}[${index}]`, ancestors));
+      result.push(
+        canonicalize(requireDataProperty(value, key, `${path}[${index}]`), `${path}[${index}]`, ancestors),
+      );
     }
 
-    const unexpectedKeys = Object.keys(value).filter((key) => {
+    const unexpectedKeys = Object.getOwnPropertyNames(value).filter((key) => {
+      if (key === 'length') return false;
       if (!/^(0|[1-9]\d*)$/.test(key)) return true;
       const index = Number(key);
       return !Number.isSafeInteger(index) || index < 0 || index >= value.length;
@@ -82,12 +94,26 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): Jso
   if (typeof value === 'object' && value !== null) {
     if (ancestors.has(value)) failCanonical(path, 'circular reference');
     assertNoSymbolKeys(value, path);
-    ancestors.add(value);
 
-    const result: Record<string, JsonValue> = {};
-    for (const key of Object.keys(value).sort()) {
+    const prototype = Object.getPrototypeOf(value) as object | null;
+    if (prototype !== Object.prototype && prototype !== null) {
+      failCanonical(path, 'semantic objects must be plain JSON objects');
+    }
+
+    const ownNames = Object.getOwnPropertyNames(value);
+    const nonEnumerable = ownNames.filter(
+      (key) => !Object.prototype.propertyIsEnumerable.call(value, key),
+    );
+    if (nonEnumerable.length > 0) {
+      failCanonical(path, 'non-enumerable properties are not canonical JSON');
+    }
+
+    ancestors.add(value);
+    // Null-prototype avoids special setters such as Object.prototype.__proto__.
+    const result = Object.create(null) as Record<string, JsonValue>;
+    for (const key of ownNames.sort()) {
       result[key] = canonicalize(
-        (value as Record<string, unknown>)[key],
+        requireDataProperty(value, key, `${path}.${key}`),
         `${path}.${key}`,
         ancestors,
       );
