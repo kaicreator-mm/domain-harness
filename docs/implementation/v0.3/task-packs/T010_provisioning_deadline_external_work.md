@@ -159,6 +159,7 @@ Those host/integration concerns remain in later v0.3 tasks, with real Node/Expo 
 
 - Implementation PR: #255
 - Implementation HEAD before closeout evidence update: `e42cd1ae42d99928fe276dd7d0df6a35ee171e4a`
+- Closeout evidence commit: `c882b3b79a776ce6ae09b62b307d60f6f9b9f158`
 - CI status at waiver decision: `ci/woodpecker/pr/verify` pending
 - CI disposition: explicitly waived by task owner; no PASS claim
 - Real host/device validation: deferred to T-022/T-023
