@@ -168,7 +168,7 @@ export class GovernanceBaselineRegistry {
         `retention reference ${referenceId} does not belong to the expected baseline`,
       );
     }
-    await this.#store.deleteReference(referenceId);
+    await this.#store.releaseReference(existing);
   }
 
   async referenceCount(identity: GovernanceBaselineIdentity): Promise<number> {
@@ -193,7 +193,10 @@ export class GovernanceBaselineRegistry {
  */
 export class MemoryGovernanceBaselineStore implements GovernanceBaselineStore {
   readonly #bodies = new Map<string, GovernanceBaselineBody>();
+  /** Currently-live retention references only. */
   readonly #references = new Map<string, GovernanceBaselineRetentionReference>();
+  /** Immutable first binding retained even after release; acts as a tombstone. */
+  readonly #referenceBindings = new Map<string, GovernanceBaselineRetentionReference>();
 
   async getBody(identity: GovernanceBaselineIdentity): Promise<GovernanceBaselineBody | undefined> {
     const body = this.#bodies.get(governanceBaselineKey(identity));
@@ -228,24 +231,57 @@ export class MemoryGovernanceBaselineStore implements GovernanceBaselineStore {
   }
 
   async putReference(reference: GovernanceBaselineRetentionReference): Promise<void> {
+    const immutableBinding = this.#referenceBindings.get(reference.referenceId);
+    if (immutableBinding !== undefined) {
+      if (!referencesEquivalent(immutableBinding, reference)) {
+        throw new GovernanceContractError(
+          'RETENTION_REFERENCE_CONFLICT',
+          `logical store rejected retention reference rebinding for ${reference.referenceId}`,
+        );
+      }
+      if (!this.#references.has(reference.referenceId)) {
+        throw new GovernanceContractError(
+          'RETENTION_REFERENCE_CONFLICT',
+          `released retention reference ${reference.referenceId} cannot be reactivated`,
+        );
+      }
+      return;
+    }
+
     if (!this.#bodies.has(governanceBaselineKey(reference.baseline))) {
       throw new GovernanceContractError(
         'MISSING_RETAINED_GOVERNANCE_BASELINE',
         'logical store cannot retain a reference after the exact baseline body was collected',
       );
     }
-    const existing = this.#references.get(reference.referenceId);
-    if (existing !== undefined && !referencesEquivalent(existing, reference)) {
-      throw new GovernanceContractError(
-        'RETENTION_REFERENCE_CONFLICT',
-        `logical store rejected retention reference rebinding for ${reference.referenceId}`,
-      );
-    }
-    this.#references.set(reference.referenceId, cloneCanonical(reference));
+
+    const cloned = cloneCanonical(reference);
+    this.#referenceBindings.set(reference.referenceId, cloned);
+    this.#references.set(reference.referenceId, cloneCanonical(cloned));
   }
 
-  async deleteReference(referenceId: string): Promise<void> {
-    this.#references.delete(referenceId);
+  async releaseReference(
+    expected: GovernanceBaselineRetentionReference,
+  ): Promise<'released' | 'absent'> {
+    const immutableBinding = this.#referenceBindings.get(expected.referenceId);
+    if (immutableBinding !== undefined && !referencesEquivalent(immutableBinding, expected)) {
+      throw new GovernanceContractError(
+        'RETENTION_REFERENCE_CONFLICT',
+        `retention reference ${expected.referenceId} is bound to different authority`,
+      );
+    }
+
+    const current = this.#references.get(expected.referenceId);
+    if (current === undefined) return 'absent';
+    if (!referencesEquivalent(current, expected)) {
+      throw new GovernanceContractError(
+        'RETENTION_REFERENCE_CONFLICT',
+        `conditional release rejected stale authority for ${expected.referenceId}`,
+      );
+    }
+
+    this.#references.delete(expected.referenceId);
+    return 'released';
   }
 
   async listReferences(
