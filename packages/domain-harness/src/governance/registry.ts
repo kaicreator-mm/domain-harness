@@ -179,14 +179,13 @@ export class GovernanceBaselineRegistry {
 
   async collect(identity: GovernanceBaselineIdentity): Promise<void> {
     await this.resolveExact(identity);
-    const references = await this.#store.listReferences(identity);
-    if (references.length > 0) {
+    const collected = await this.#store.collectBodyIfUnreferenced(identity);
+    if (!collected) {
       throw new GovernanceContractError(
         'GOVERNANCE_BASELINE_RETAINED',
-        `Governance Baseline remains required by ${references.length} retained reference(s)`,
+        'Governance Baseline remains required by retained reference(s)',
       );
     }
-    await this.#store.deleteBody(identity);
   }
 }
 
@@ -214,8 +213,12 @@ export class MemoryGovernanceBaselineStore implements GovernanceBaselineStore {
     this.#bodies.set(key, cloneCanonical(body));
   }
 
-  async deleteBody(identity: GovernanceBaselineIdentity): Promise<void> {
+  async collectBodyIfUnreferenced(identity: GovernanceBaselineIdentity): Promise<boolean> {
+    for (const reference of this.#references.values()) {
+      if (sameGovernanceBaselineIdentity(reference.baseline, identity)) return false;
+    }
     this.#bodies.delete(governanceBaselineKey(identity));
+    return true;
   }
 
   async getReference(
