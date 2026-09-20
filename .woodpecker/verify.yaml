@@ -3,9 +3,8 @@ when:
   - event: push
     branch: [main, v0.2, v0.3]
 
-# The repository uses Woodpecker's local backend. Avoid depending on
-# agent-specific absolute executable paths: skip the default plugin-git clone,
-# use host git for exact checkout, and resolve the build shell from PATH.
+# Issue #261: Woodpecker local backend must not depend on agent-specific
+# absolute executables. Use host git for exact checkout and resolve bash via PATH.
 skip_clone: true
 
 steps:
