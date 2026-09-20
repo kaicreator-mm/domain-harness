@@ -59,7 +59,7 @@ test('public Domain Workflow contract covers engine-neutral business semantics',
   } satisfies DomainWorkflowDefinition;
 
   assert.equal(workflow.workflowKey, 'claim-review');
-  assert.equal(workflow.states[0].transitions?.[0]?.effectIntents?.[0]?.effectType, 'claim.approved');
+  assert.equal(workflow.states[0]?.transitions?.[0]?.effectIntents?.[0]?.effectType, 'claim.approved');
 });
 
 test('public Workflow surface does not expose selected-engine product identity', async () => {
