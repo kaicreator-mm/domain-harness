@@ -11,18 +11,20 @@ This task implements the portable exact semantic cache core only. Real Node/Expo
 
 Deterministic fixtures are in:
 
-`packages/domain-harness/tests/semantic-cache/exact-semantic-cache.test.ts`
+- `packages/domain-harness/tests/semantic-cache/exact-semantic-cache.test.ts`
+- `packages/domain-harness/tests/semantic-cache/exact-semantic-cache.race.test.ts`
+- `packages/domain-harness/tests/semantic-cache/exact-semantic-cache.legacy-selector.test.ts`
 
-The suite proves:
+The focused semantic-cache set proves:
 
 1. semantic identity is canonical across dependency order and human artifact-version changes;
 2. selected input or behaviorally relevant dependency changes produce a distinct exact key;
-3. a missing required semantic projection fails closed;
+3. a missing or source-mismatched required semantic projection fails closed, including the legacy input-only selector seam;
 4. a live dependency without a pre-bindable semantic revision bypasses both cache read and write;
 5. an incompletely pre-bound dynamic dependency bypasses cache read/write;
 6. post-execution `ObservedDependencySet` must be an exact subset of pre-read semantic material;
 7. producer identity must be both pre-bound and actually observed before cache write;
-8. `putIfAbsent` is exact-key first-writer-wins and a near-match input is a miss (no fuzzy/vector reuse);
+8. `putIfAbsent` is exact-key first-writer-wins, including concurrent writers, and a near-match input is a miss (no fuzzy/vector reuse);
 9. corrupt or current-schema-invalid entries are denied authority, quarantined, and returned as recompute misses;
 10. producer/dependency/namespace indexes perform scoped invalidation only;
 11. retention/capacity eviction is deterministic operational policy and never substitutes for freshness identity;
@@ -70,7 +72,10 @@ Fail-closed contract failure:
 
 - missing selected semantic input;
 - missing declared required semantic projection;
+- source-mismatched required semantic projection;
 - malformed T-002 dependency identity/digest material.
+
+`requiredProjections` is the exact selector and matches `source + projectionId`. The temporary `requiredProjectionIds` compatibility seam is restricted to `source = input`; it cannot satisfy a required projection from another semantic source.
 
 Normal cache bypass:
 
@@ -162,7 +167,7 @@ Expiry/capacity does not make an unversioned live dependency safe. Capacity evic
 
 | Condition | Behavior |
 |---|---|
-| missing required selected/projection input | contract error; fail closed |
+| missing/source-mismatched required selected/projection input | contract error; fail closed |
 | required live revision missing | cache bypass; no read/write |
 | dynamic dependency not fully pre-bound | cache bypass; no read/write |
 | observed dependency absent/mismatched vs pre-read | skip cache write |
