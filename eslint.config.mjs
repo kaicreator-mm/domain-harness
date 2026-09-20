@@ -5,6 +5,9 @@ import tseslint from 'typescript-eslint';
 // - type-aware rules (floating promises, promise misuse) run on the four
 //   packages' production src, where each package tsconfig provides the
 //   program; the portable core's v0.2 production graph is fully covered.
+//   NOTE: type-aware linting resolves cross-workspace imports through built
+//   dist/*.d.ts - run `npm run build` before `npm run lint` on a fresh
+//   checkout (Woodpecker verify does).
 // - the frozen v0.1 legacy directories inside the core package get reduced
 //   rules (regression evidence, deliberately not modernized).
 // - tests/scripts get the non-type-aware recommended sets.
