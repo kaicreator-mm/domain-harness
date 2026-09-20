@@ -1,7 +1,6 @@
 import type {
   ContentDigest,
   ExactContentIdentity,
-  Sha256Port,
 } from '../contracts/identity.js';
 import type { JsonObject } from '../contracts/json.js';
 
@@ -106,8 +105,4 @@ export class GovernanceContractError extends Error {
     this.name = 'GovernanceContractError';
     this.code = code;
   }
-}
-
-export interface GovernanceIdentityServices {
-  readonly sha256: Sha256Port;
 }
