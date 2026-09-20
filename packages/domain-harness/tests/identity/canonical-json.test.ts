@@ -52,12 +52,27 @@ test('T-001: canonical SHA-256 seam consumes the frozen cross-host vector materi
   }
 });
 
-test('T-001: invalid semantic material fails closed', () => {
+test('T-001: invalid or lossy semantic material fails closed', () => {
+  const symbolKeyed: Record<string | symbol, unknown> = { ok: true };
+  symbolKeyed[Symbol('hidden')] = 'not-json';
+
+  const sparse: unknown[] = [];
+  sparse.length = 2;
+  sparse[1] = 'present';
+
+  const arrayWithExtraProperty = [1] as unknown[] & { extra?: string };
+  arrayWithExtraProperty.extra = 'not-json-array-data';
+
   const invalidValues: unknown[] = [
     { missing: undefined },
     { fn: () => undefined },
+    { symbol: Symbol('value') },
+    { bigint: 1n },
     { bad: Number.NaN },
     { bad: Number.POSITIVE_INFINITY },
+    symbolKeyed,
+    sparse,
+    arrayWithExtraProperty,
   ];
 
   for (const value of invalidValues) {
