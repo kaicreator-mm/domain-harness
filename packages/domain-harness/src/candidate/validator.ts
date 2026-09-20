@@ -4,6 +4,7 @@ import {
   type Sha256Port,
 } from '../contracts/identity.js';
 import type { JsonObject, JsonValue } from '../contracts/json.js';
+import type { GovernanceBaselineBody } from '../governance/contracts.js';
 import { sameGovernanceBaselineIdentity } from '../governance/identity.js';
 import { GovernanceBaselineRegistry } from '../governance/registry.js';
 import {
@@ -44,6 +45,7 @@ const TOP_LEVEL = [
   'schemaVersion',
   'tools',
 ] as const;
+const TOP_LEVEL_SET: ReadonlySet<string> = new Set(TOP_LEVEL);
 
 const FORBIDDEN: ReadonlyArray<readonly [CandidateRejectionCode, ReadonlySet<string>]> = [
   ['ARBITRARY_CODE_FORBIDDEN', new Set(['code', 'eval', 'functionBody', 'moduleSource', 'script', 'sourceCode'])],
@@ -233,9 +235,7 @@ function parseCandidate(value: JsonValue): CandidateEnvelope | CandidateRejectio
   if (object === undefined) {
     return reject('INVALID_ENVELOPE', '$', 'Candidate envelope must be a JSON object');
   }
-  const unknown = Object.keys(object)
-    .filter((key) => !(TOP_LEVEL as readonly string[]).includes(key))
-    .sort();
+  const unknown = Object.keys(object).filter((key) => !TOP_LEVEL_SET.has(key)).sort();
   if (unknown.length > 0) {
     return reject('INVALID_ENVELOPE', '$', `unknown top-level Candidate fields: ${unknown.join(', ')}`);
   }
@@ -472,8 +472,8 @@ function candidateDigestMaterial(candidate: CandidateEnvelope): unknown {
         maxSteps: candidate.control.maxSteps,
       };
   const mutation = candidate.mutation.kind === 'none'
-    ? { kind: 'none' as const }
-    : { kind: 'durable-effect' as const, effects: sortedRefs(candidate.mutation.effects) };
+    ? { kind: 'none' }
+    : { kind: 'durable-effect', effects: sortedRefs(candidate.mutation.effects) };
   return {
     schemaVersion: candidate.schemaVersion,
     candidateKind: candidate.candidateKind,
@@ -983,7 +983,7 @@ function parseCompatibility(
   const object = jsonObject(value);
   if (
     object === undefined
-    || !keysAre(object, ['kind', 'validatorContractVersion', 'candidateKind', 'from', 'to', 'reviewDigest'])
+    || !keysAre(object, ['kind', 'validatorContractVersion', 'candidateKind', 'from', 'reviewDigest'])
     || object.kind !== 'reviewed-exact-governance-compatibility'
     || object.validatorContractVersion !== CANDIDATE_VALIDATOR_CONTRACT_VERSION
   ) {
@@ -991,9 +991,8 @@ function parseCompatibility(
   }
   const candidateKind = parseKind(object.candidateKind);
   const from = parseGovernanceBaseline(object.from);
-  const to = parseGovernanceBaseline(object.to);
   const reviewDigest = object.reviewDigest;
-  if (candidateKind === undefined || from === undefined || to === undefined || !nonEmpty(reviewDigest)) {
+  if (candidateKind === undefined || from === undefined || !nonEmpty(reviewDigest)) {
     return undefined;
   }
   return {
@@ -1001,7 +1000,6 @@ function parseCompatibility(
     validatorContractVersion: CANDIDATE_VALIDATOR_CONTRACT_VERSION,
     candidateKind,
     from,
-    to,
     reviewDigest,
   };
 }
@@ -1035,7 +1033,7 @@ export async function canReuseValidationForGovernanceBaseline(
   if (!baselineValid(target)) return false;
   if (sameGovernanceBaselineIdentity(identity.governanceBaseline, target)) return true;
 
-  let body;
+  let body: GovernanceBaselineBody;
   try {
     body = await governanceRegistry.resolveExact(target);
   } catch {
@@ -1048,6 +1046,5 @@ export async function canReuseValidationForGovernanceBaseline(
   return compatibilities.some((compatibility) =>
     compatibility.validatorContractVersion === identity.validatorContractVersion
     && compatibility.candidateKind === identity.candidateKind
-    && sameGovernanceBaselineIdentity(compatibility.from, identity.governanceBaseline)
-    && sameGovernanceBaselineIdentity(compatibility.to, target));
+    && sameGovernanceBaselineIdentity(compatibility.from, identity.governanceBaseline));
 }
