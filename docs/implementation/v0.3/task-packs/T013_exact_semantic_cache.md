@@ -2,8 +2,8 @@
 
 **Issue:** #231  
 **Branch:** `v0.3_t013`  
-**Base authority:** `v0.3@3ad53ffb335778fc745352e8c60e01af9d47711b`  
-**L3 status:** IMPLEMENTED — pending PR exact-HEAD CI/review evidence
+**Base authority:** `v0.3@09b9ce20c817cd3ad1721b7af6d39d3bd9b7eb73`  
+**L3 status:** IMPLEMENTED — refreshed onto current integration baseline; final exact-HEAD CI/review evidence is recorded on PR #268
 
 This task implements the portable exact semantic cache core only. Real Node/Expo persistence truth remains assigned to T-022/T-023. T-016/T-018 own execution-journal integration and DecisionResolver wiring respectively.
 
@@ -28,12 +28,12 @@ The suite proves:
 11. retention/capacity eviction is deterministic operational policy and never substitutes for freshness identity;
 12. store unavailability becomes an optimization failure (`store-error`) and grants no cached authority.
 
-Authoring validation used the exact production source plus contract-compatible T-002 stubs because the execution environment could not resolve `github.com` for a repository checkout:
+Historical authoring validation used the exact production source plus contract-compatible T-002 stubs because that authoring environment could not resolve `github.com` for a repository checkout:
 
 - TypeScript `5.8.3`, repository-equivalent strict flags (`strict`, `noUnused*`, `noImplicitReturns`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, NodeNext): **PASS**.
 - Node `v22.16.0`, deterministic isolated execution: **10/10 PASS**.
 
-These authoring results are not a substitute for repository PR CI. Exact-HEAD repository CI must be recorded on the PR.
+Those authoring results are retained only as implementation history and are not inherited as final-closeout evidence. The refreshed exact HEAD must independently pass repository PR CI before review/merge.
 
 ## 2. Contract / Interface
 
@@ -186,7 +186,7 @@ Authority consumed:
 - frozen v0.3 PRD/Architecture inputs named by the Task DAG;
 - frozen L2 exact semantic cache decisions;
 - T-002 production `domain-data.ts` semantic identity/projection/revision contracts;
-- `v0.3@3ad53ffb335778fc745352e8c60e01af9d47711b`.
+- refreshed integration baseline `v0.3@09b9ce20c817cd3ad1721b7af6d39d3bd9b7eb73`.
 
 Deliberately deferred:
 
