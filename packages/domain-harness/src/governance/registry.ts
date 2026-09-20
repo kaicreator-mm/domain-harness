@@ -228,6 +228,12 @@ export class MemoryGovernanceBaselineStore implements GovernanceBaselineStore {
   }
 
   async putReference(reference: GovernanceBaselineRetentionReference): Promise<void> {
+    if (!this.#bodies.has(governanceBaselineKey(reference.baseline))) {
+      throw new GovernanceContractError(
+        'MISSING_RETAINED_GOVERNANCE_BASELINE',
+        'logical store cannot retain a reference after the exact baseline body was collected',
+      );
+    }
     const existing = this.#references.get(reference.referenceId);
     if (existing !== undefined && !referencesEquivalent(existing, reference)) {
       throw new GovernanceContractError(
