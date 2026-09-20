@@ -193,4 +193,4 @@ The correction keeps the T-003 boundary unchanged and adds only store-contract s
 - deterministic regression tests cover release → attempted rebind and stale/different expected-reference release;
 - Task Pack status is closed from `DOING` to implementation-complete pending exact-HEAD independent re-review/merge.
 
-Configured CI and independent review must bind to the repaired final exact HEAD recorded in PR/Issue evidence; no result from `6f1e28bd761f752ab48225d09485103f4ced963f` is reused as validation authority for the repaired source shape.
+Configured CI and independent review must bind to the final repaired exact HEAD recorded in PR/Issue evidence. No validation or review result from `6f1e28bd761f752ab48225d09485103f4ced963f` may be reused as authority for the repaired source shape.
