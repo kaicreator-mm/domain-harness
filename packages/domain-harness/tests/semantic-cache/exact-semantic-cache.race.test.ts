@@ -4,6 +4,8 @@ import test from 'node:test';
 import type {
   BehaviorallyRelevantSemanticDependencies,
   CompiledArtifactIdentity,
+  ResolvedSemanticContextProjection,
+  SemanticRevisionIdentity,
 } from '../../src/contracts/domain-data.js';
 import type { Sha256Port } from '../../src/contracts/identity.js';
 import {
@@ -24,18 +26,21 @@ const producer: CompiledArtifactIdentity = {
   artifactId: 'parts.quote',
   contentDigest: 'a'.repeat(64),
 };
-
+const projections: readonly ResolvedSemanticContextProjection[] = [
+  {
+    source: 'workflow-context',
+    projectionId: 'buyer',
+    descriptorDigest: 'b'.repeat(64),
+    valueDigest: 'c'.repeat(64),
+  },
+];
+const revisions: readonly SemanticRevisionIdentity[] = [
+  { sourceId: 'catalog', revision: 'catalog@1' },
+];
 const dependencies: BehaviorallyRelevantSemanticDependencies = {
   artifacts: [producer],
-  projections: [
-    {
-      source: 'workflow-context',
-      projectionId: 'buyer',
-      descriptorDigest: 'b'.repeat(64),
-      valueDigest: 'c'.repeat(64),
-    },
-  ],
-  revisions: [{ sourceId: 'catalog', revision: 'catalog@1' }],
+  projections,
+  revisions,
 };
 
 async function prepared() {
@@ -78,12 +83,10 @@ test('T-013 regression: concurrent putIfAbsent remains first-writer-wins', async
   if (invocation.cacheEligibility.mode !== 'eligible') {
     throw new Error('fixture must be exact-cache eligible');
   }
+  const exact = invocation.semanticIdentity;
+  if (exact === undefined) throw new Error('eligible fixture must have exact identity');
 
-  const observed = {
-    artifacts: [producer],
-    projections: dependencies.projections,
-    revisions: dependencies.revisions,
-  };
+  const observed = { artifacts: [producer], projections, revisions };
   const first = await prepareSemanticCacheWrite(
     invocation,
     { answer: 'first' },
@@ -114,7 +117,7 @@ test('T-013 regression: concurrent putIfAbsent remains first-writer-wins', async
     writes.map((value) => value.status),
     ['inserted', 'existing'],
   );
-  const read = await store.read(invocation.semanticIdentity.key, 102);
+  const read = await store.read(exact.key, 102);
   assert.equal(read.status, 'hit');
   if (read.status === 'hit') assert.deepEqual(read.entry.result, { answer: 'first' });
 });
