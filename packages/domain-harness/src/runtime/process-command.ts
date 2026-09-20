@@ -2,7 +2,7 @@ import {
   IdentityContractError,
   canonicalJsonStringify,
 } from '../contracts/identity.js';
-import type { JsonObject, JsonValue } from '../contracts/json.js';
+import type { JsonValue } from '../contracts/json.js';
 import {
   ProcessCommandContractError,
   type AppliedCommandOutcome,
@@ -47,7 +47,7 @@ export function normalizeDurableProcessData(value: unknown): DurableProcessData 
   if (normalized === null || Array.isArray(normalized) || typeof normalized !== 'object') {
     fail('INVALID_PROCESS_DATA', 'process data must be a JSON object');
   }
-  return normalized as JsonObject;
+  return normalized;
 }
 
 function normalizeRejection(rejection: DomainCommandRejection): DomainCommandRejection {

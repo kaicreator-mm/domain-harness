@@ -179,10 +179,11 @@ test('model cannot smuggle transition, mutation, promotion, activation, or gover
 });
 
 test('private/free-form model reasoning fields are not an executable response surface', async () => {
+  const executable = finalResponse();
   const model = new ScriptedModel([
     {
       kind: 'final',
-      result: finalResponse().kind === 'final' ? finalResponse().result : {},
+      result: executable.kind === 'final' ? executable.result : {},
       privateReasoning: 'hidden plan that must never become authority',
     } as unknown as BusinessHarnessModelResponse,
   ]);
