@@ -58,28 +58,36 @@ export type DurableExternalWorkControlSource =
   | DeadlineControlSource
   | ExternalCallbackControlSource;
 
-export interface WaitingExternalWorkCorrelationRecord {
+interface ExternalWorkCorrelationRecordBase {
   readonly externalCorrelationId: string;
   readonly target: WorkflowAddress;
   readonly deadlineTimerId: string;
   readonly dueAt: string;
-  readonly status: 'waiting';
   readonly revision: number;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
-export interface CompletedExternalWorkCorrelationRecord {
-  readonly externalCorrelationId: string;
-  readonly target: WorkflowAddress;
-  readonly deadlineTimerId: string;
-  readonly dueAt: string;
-  readonly status: 'callback_received' | 'timed_out';
-  readonly revision: number;
-  readonly terminalSource: DurableExternalWorkControlSource;
-  readonly createdAt: string;
-  readonly updatedAt: string;
+export interface WaitingExternalWorkCorrelationRecord
+  extends ExternalWorkCorrelationRecordBase {
+  readonly status: 'waiting';
 }
+
+export interface CallbackCompletedExternalWorkCorrelationRecord
+  extends ExternalWorkCorrelationRecordBase {
+  readonly status: 'callback_received';
+  readonly terminalSource: ExternalCallbackControlSource;
+}
+
+export interface TimedOutExternalWorkCorrelationRecord
+  extends ExternalWorkCorrelationRecordBase {
+  readonly status: 'timed_out';
+  readonly terminalSource: DeadlineControlSource;
+}
+
+export type CompletedExternalWorkCorrelationRecord =
+  | CallbackCompletedExternalWorkCorrelationRecord
+  | TimedOutExternalWorkCorrelationRecord;
 
 export type ExternalWorkCorrelationRecord =
   | WaitingExternalWorkCorrelationRecord
