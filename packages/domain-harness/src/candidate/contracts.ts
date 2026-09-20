@@ -56,6 +56,7 @@ export interface CandidateEnvelope {
   readonly schemaVersion: typeof CANDIDATE_ENVELOPE_SCHEMA_VERSION;
   readonly candidateKind: CandidateKind;
   readonly candidateId: string;
+  readonly bodyContract: CandidateExactReference;
   readonly body: JsonValue;
   readonly io: CandidateIoContract;
   readonly capabilities: readonly string[];
@@ -94,6 +95,9 @@ export const CANDIDATE_REJECTION_CODES = [
   'PROVIDER_SECRET_OR_STATE_FORBIDDEN',
   'RUNTIME_OBJECT_FORBIDDEN',
   'PRIVATE_REASONING_FORBIDDEN',
+  'BODY_CONTRACT_NOT_ALLOWED',
+  'BODY_VALIDATOR_REQUIRED',
+  'BODY_SCHEMA_INVALID',
   'INPUT_CONTRACT_NOT_ALLOWED',
   'OUTPUT_CONTRACT_NOT_ALLOWED',
   'CAPABILITY_NOT_ALLOWED',
@@ -119,6 +123,20 @@ export interface CandidateRejection {
   readonly message: string;
 }
 
+export interface CandidateBodyIssue {
+  readonly code: string;
+  readonly path: string;
+  readonly message: string;
+}
+
+/** Exact deterministic body-schema validator supplied by validation authority. */
+export interface CandidateBodyValidator {
+  readonly candidateKind: CandidateKind;
+  readonly bodyContract: CandidateExactReference;
+  /** Must be synchronous, deterministic, side-effect free and I/O free. */
+  validate(body: JsonValue): readonly CandidateBodyIssue[];
+}
+
 export interface CandidateSpecializedIssue {
   readonly code: string;
   readonly path: string;
@@ -131,8 +149,20 @@ export interface CandidateSpecializedValidator {
   validate(candidate: CandidateEnvelope): readonly CandidateSpecializedIssue[];
 }
 
+export interface ReviewedCandidateValidationCompatibility {
+  readonly kind: 'reviewed-exact-governance-compatibility';
+  readonly validatorContractVersion: typeof CANDIDATE_VALIDATOR_CONTRACT_VERSION;
+  readonly candidateKind: CandidateKind;
+  readonly from: CandidateValidationGovernanceBaseline;
+  readonly to: CandidateValidationGovernanceBaseline;
+  /** Must match the exact target Governance Baseline contract digest. */
+  readonly governanceContractContentDigest: string;
+  readonly reviewDigest: string;
+}
+
 export interface CandidateValidationAuthority {
   readonly governanceBaseline: CandidateValidationGovernanceBaseline;
+  readonly bodyValidators: Partial<Record<CandidateKind, CandidateBodyValidator>>;
   readonly allowedInputs: readonly CandidateExactReference[];
   readonly allowedOutputs: readonly CandidateExactReference[];
   readonly allowedCapabilities: readonly string[];
@@ -146,6 +176,12 @@ export interface CandidateValidationAuthority {
   readonly maxControlEdges: number;
   readonly maxControlSteps: number;
   readonly specializedValidators?: Partial<Record<CandidateKind, CandidateSpecializedValidator>>;
+  /**
+   * Reviewed compatibility rules owned by this exact Governance Baseline
+   * authority. Call sites cannot inject an ad-hoc compatibility object into
+   * validation-evidence reuse.
+   */
+  readonly reviewedValidationCompatibilities?: readonly ReviewedCandidateValidationCompatibility[];
 }
 
 export type CandidateValidationResult =
@@ -160,12 +196,3 @@ export type CandidateValidationResult =
       readonly rejections: readonly CandidateRejection[];
       readonly grantsExecutionPermission: false;
     };
-
-export interface ReviewedCandidateValidationCompatibility {
-  readonly kind: 'reviewed-exact-governance-compatibility';
-  readonly validatorContractVersion: typeof CANDIDATE_VALIDATOR_CONTRACT_VERSION;
-  readonly candidateKind: CandidateKind;
-  readonly from: CandidateValidationGovernanceBaseline;
-  readonly to: CandidateValidationGovernanceBaseline;
-  readonly reviewDigest: string;
-}
