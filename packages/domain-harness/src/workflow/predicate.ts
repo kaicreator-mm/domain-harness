@@ -53,41 +53,207 @@ export class PredicateContractViolation extends Error {
 const MISSING = Symbol('domain-harness.predicate.missing');
 const MAX_PREDICATE_DEPTH = 64;
 
+/**
+ * Admission-time evaluation never attempts to discover whether an arbitrary
+ * live JavaScript object is safe. Values are copied/frozen at an explicit
+ * preparation boundary and their prepared identity is then checked with
+ * WeakSet.has(), which does not invoke Proxy traps.
+ */
+const preparedPredicates = new WeakSet<object>();
+const preparedWorkflowGuards = new WeakSet<object>();
+const preparedHardInvariants = new WeakSet<object>();
+const preparedContexts = new WeakSet<object>();
+const preparedEvents = new WeakSet<object>();
+const preparedInputs = new WeakSet<object>();
+
 type ResolvedOperand = JsonValue | typeof MISSING;
+
+/**
+ * Configuration/pre-admission boundary for compiled predicate data.
+ * This function may inspect the supplied value while preparing it; callers
+ * must not invoke it from an authoritative Guard/Hard-Invariant predicate.
+ */
+export function prepareDomainPredicate(predicate: DomainPredicate): DomainPredicate {
+  const safePredicate = cloneDataOnlyForPreparation(predicate, '$predicate') as unknown as DomainPredicate;
+  if (!isObjectReference(safePredicate)) {
+    throw new PredicateContractViolation('$predicate must be an object');
+  }
+  deepFreezePreparedData(safePredicate as unknown as JsonValue);
+  preparedPredicates.add(safePredicate as object);
+  return safePredicate;
+}
+
+/**
+ * Configuration/pre-admission boundary for Workflow Guard definitions.
+ */
+export function prepareDomainWorkflowGuard(guard: DomainWorkflowGuard): DomainWorkflowGuard {
+  const safeGuard = cloneDataOnlyForPreparation(guard, '$guard') as unknown as DomainWorkflowGuard;
+  if (
+    !isObjectReference(safeGuard) ||
+    typeof safeGuard.guardId !== 'string' ||
+    safeGuard.guardId.length === 0 ||
+    !isObjectReference(safeGuard.predicate)
+  ) {
+    throw new PredicateContractViolation('Workflow Guard must contain a non-empty guardId and predicate object');
+  }
+  deepFreezePreparedData(safeGuard as unknown as JsonValue);
+  preparedWorkflowGuards.add(safeGuard as object);
+  preparedPredicates.add(safeGuard.predicate as object);
+  return safeGuard;
+}
+
+/**
+ * Configuration/pre-admission boundary for Governance Hard Invariants.
+ */
+export function prepareDomainHardInvariantPredicate(
+  invariant: DomainHardInvariantPredicate,
+): DomainHardInvariantPredicate {
+  const safeInvariant = cloneDataOnlyForPreparation(
+    invariant,
+    '$hardInvariant',
+  ) as unknown as DomainHardInvariantPredicate;
+  if (
+    !isObjectReference(safeInvariant) ||
+    typeof safeInvariant.invariantId !== 'string' ||
+    safeInvariant.invariantId.length === 0 ||
+    !isObjectReference(safeInvariant.predicate)
+  ) {
+    throw new PredicateContractViolation(
+      'Hard Invariant must contain a non-empty invariantId and predicate object',
+    );
+  }
+  deepFreezePreparedData(safeInvariant as unknown as JsonValue);
+  preparedHardInvariants.add(safeInvariant as object);
+  preparedPredicates.add(safeInvariant.predicate as object);
+  return safeInvariant;
+}
+
+/**
+ * Pre-admission boundary for Workflow context. The returned object is detached
+ * from the caller, recursively frozen, and registered as trusted predicate
+ * data. Runtime Guard evaluation only accepts this prepared identity.
+ */
+export function prepareDomainPredicateContext(context: JsonObject): JsonObject {
+  const safeContext = cloneDataOnlyForPreparation(context, '$context');
+  if (!isJsonObject(safeContext)) {
+    throw new PredicateContractViolation('$context must be a JSON object');
+  }
+  deepFreezePreparedData(safeContext);
+  preparedContexts.add(safeContext as object);
+  return safeContext;
+}
+
+/**
+ * Pre-admission boundary for structured Domain Events.
+ */
+export function prepareDomainPredicateEvent(event: DomainPredicateEvent): DomainPredicateEvent {
+  const safeEvent = cloneDataOnlyForPreparation(event, '$event');
+  if (!isJsonObject(safeEvent)) {
+    throw new PredicateContractViolation('$event must be a JSON object');
+  }
+  const type = safeEvent['type'];
+  if (typeof type !== 'string' || type.length === 0) {
+    throw new PredicateContractViolation('$event.type must be a non-empty string');
+  }
+  const payload = safeEvent['payload'];
+  if (payload !== undefined && !isJsonObject(payload)) {
+    throw new PredicateContractViolation('$event.payload must be a JSON object when present');
+  }
+  deepFreezePreparedData(safeEvent);
+  preparedEvents.add(safeEvent as object);
+  return safeEvent as unknown as DomainPredicateEvent;
+}
+
+/**
+ * Creates an admission input only from already prepared context/event values.
+ * WeakSet membership checks are trap-free and therefore safe to run on an
+ * untrusted candidate reference before any property access occurs.
+ */
+export function createPreparedDomainPredicateEvaluationInput(
+  context: JsonObject,
+  event: DomainPredicateEvent,
+): DomainPredicateEvaluationInput {
+  if (
+    !isObjectReference(context) ||
+    !preparedContexts.has(context as object) ||
+    !isObjectReference(event) ||
+    !preparedEvents.has(event as object)
+  ) {
+    throw new PredicateContractViolation('predicate input must use prepared context and event data');
+  }
+  const input: DomainPredicateEvaluationInput = Object.freeze({ context, event });
+  preparedInputs.add(input as object);
+  return input;
+}
+
+/**
+ * Convenience preparation boundary for callers that already hold trusted
+ * compiled/runtime-owned data. It is intentionally separate from evaluation.
+ */
+export function prepareDomainPredicateEvaluationInput(
+  input: DomainPredicateEvaluationInput,
+): DomainPredicateEvaluationInput {
+  const context = prepareDomainPredicateContext(input.context);
+  const event = prepareDomainPredicateEvent(input.event);
+  return createPreparedDomainPredicateEvaluationInput(context, event);
+}
 
 export function evaluateDomainPredicate(
   predicate: DomainPredicate,
   input: DomainPredicateEvaluationInput,
 ): boolean {
-  const safePredicate = cloneDataOnly(predicate, '$predicate') as unknown as DomainPredicate;
-  const safeContext = cloneDataOnly(input.context, '$context') as JsonObject;
-  const safeEvent = cloneDataOnly(input.event, '$event') as unknown as DomainPredicateEvent;
-
-  return evaluateSafePredicate(safePredicate, { context: safeContext, event: safeEvent }, 0);
+  assertPreparedPredicate(predicate);
+  assertPreparedInput(input);
+  return evaluateSafePredicate(predicate, input, 0);
 }
 
 export function evaluateDomainWorkflowGuard(
   guard: DomainWorkflowGuard,
   input: DomainPredicateEvaluationInput,
 ): boolean {
-  return evaluateFailClosed(guard.predicate, input);
+  if (
+    !isObjectReference(guard) ||
+    !preparedWorkflowGuards.has(guard as object) ||
+    !isObjectReference(input) ||
+    !preparedInputs.has(input as object)
+  ) {
+    return false;
+  }
+  try {
+    return evaluateSafePredicate(guard.predicate, input, 0);
+  } catch {
+    return false;
+  }
 }
 
 export function evaluateDomainHardInvariantPredicate(
   invariant: DomainHardInvariantPredicate,
   input: DomainPredicateEvaluationInput,
 ): boolean {
-  return evaluateFailClosed(invariant.predicate, input);
-}
-
-function evaluateFailClosed(
-  predicate: DomainPredicate,
-  input: DomainPredicateEvaluationInput,
-): boolean {
+  if (
+    !isObjectReference(invariant) ||
+    !preparedHardInvariants.has(invariant as object) ||
+    !isObjectReference(input) ||
+    !preparedInputs.has(input as object)
+  ) {
+    return false;
+  }
   try {
-    return evaluateDomainPredicate(predicate, input);
+    return evaluateSafePredicate(invariant.predicate, input, 0);
   } catch {
     return false;
+  }
+}
+
+function assertPreparedPredicate(predicate: DomainPredicate): void {
+  if (!isObjectReference(predicate) || !preparedPredicates.has(predicate as object)) {
+    throw new PredicateContractViolation('predicate must be prepared before authoritative evaluation');
+  }
+}
+
+function assertPreparedInput(input: DomainPredicateEvaluationInput): void {
+  if (!isObjectReference(input) || !preparedInputs.has(input as object)) {
+    throw new PredicateContractViolation('predicate input must be prepared before authoritative evaluation');
   }
 }
 
@@ -153,14 +319,10 @@ function readPath(root: JsonObject, path: readonly string[]): ResolvedOperand {
     if (current === null || typeof current !== 'object') {
       return MISSING;
     }
-    const descriptor = Object.getOwnPropertyDescriptor(current, segment);
-    if (descriptor === undefined) {
+    if (!Object.prototype.hasOwnProperty.call(current, segment)) {
       return MISSING;
     }
-    if (!('value' in descriptor)) {
-      throw new PredicateContractViolation('accessor properties are forbidden in predicate inputs');
-    }
-    current = descriptor.value;
+    current = (current as Record<string, unknown>)[segment];
   }
   return current as JsonValue;
 }
@@ -217,7 +379,11 @@ function dataEquals(left: JsonValue, right: JsonValue): boolean {
   });
 }
 
-function cloneDataOnly(value: unknown, path: string, seen = new WeakSet<object>()): JsonValue {
+function cloneDataOnlyForPreparation(
+  value: unknown,
+  path: string,
+  seen = new WeakSet<object>(),
+): JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
     return value;
   }
@@ -243,7 +409,7 @@ function cloneDataOnly(value: unknown, path: string, seen = new WeakSet<object>(
         if (descriptor === undefined || !('value' in descriptor)) {
           throw new PredicateContractViolation(`${path}[${index}] must be a data property`);
         }
-        result.push(cloneDataOnly(descriptor.value, `${path}[${index}]`, seen));
+        result.push(cloneDataOnlyForPreparation(descriptor.value, `${path}[${index}]`, seen));
       }
       return result;
     }
@@ -259,10 +425,37 @@ function cloneDataOnly(value: unknown, path: string, seen = new WeakSet<object>(
       if (descriptor === undefined || !('value' in descriptor)) {
         throw new PredicateContractViolation(`${path}.${key} accessor properties are forbidden`);
       }
-      result[key] = cloneDataOnly(descriptor.value, `${path}.${key}`, seen);
+      result[key] = cloneDataOnlyForPreparation(descriptor.value, `${path}.${key}`, seen);
     }
     return result;
   } finally {
     seen.delete(value);
   }
+}
+
+function deepFreezePreparedData(value: JsonValue): void {
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      deepFreezePreparedData(item);
+    }
+  } else {
+    for (const key of Object.keys(value)) {
+      const item = value[key];
+      if (item !== undefined) {
+        deepFreezePreparedData(item);
+      }
+    }
+  }
+  Object.freeze(value);
+}
+
+function isJsonObject(value: JsonValue): value is JsonObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isObjectReference(value: unknown): value is object {
+  return value !== null && (typeof value === 'object' || typeof value === 'function');
 }
