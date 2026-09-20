@@ -4,6 +4,7 @@ Issue: #224
 Task: T-006 — Domain Workflow public contract / XState boundary + predicate purity  
 Original fixed baseline: `v0.3@be65e41e652d70c17ca10af66bc5f25abed2658a`  
 Independent-review remediation baseline: `v0.3@74514b07048ee62ce04d742a9685ae4804619d89`  
+Repair-closeout refresh baseline: `v0.3@09b9ce20c817cd3ad1721b7af6d39d3bd9b7eb73`  
 Authority: Frozen v0.3 PRD + A1 amendment, Frozen L2 + A1 architecture amendment, v0.3 Task DAG
 
 ## Tests
@@ -33,7 +34,8 @@ Proves:
 - authoritative evaluation accepts only prepared identities registered by private `WeakSet`s;
 - unprepared accessor/capability-shaped values fail closed without invoking the accessor/function;
 - Proxy-backed Guard/input references are rejected through trap-free `WeakSet.has()` checks and execute zero Proxy traps;
-- malformed prepared primitive evaluation reports a contract violation while Guard/Hard-Invariant wrappers return false.
+- malformed prepared primitive evaluation reports a contract violation while Guard/Hard-Invariant wrappers return false;
+- preparation copies object data into null-prototype records so an own JSON `__proto__` key stays data and cannot become inherited predicate authority.
 
 ### XState boundary
 
@@ -59,9 +61,11 @@ npm run build
 npm run lint
 npm run typecheck
 npm test
-node --import tsx --test "packages/domain-harness/tests/workflow-v03/*.test.ts"
+node --import tsx --test "packages/domain-harness/tests/workflow-v03/predicate-purity.test.ts" "packages/domain-harness/tests/workflow-v03/xstate-boundary.test.ts"
 npm pack -w @kaicreator/domain-harness
 ```
+
+The monorepo lint/type-aware checks require generated package build artifacts on a clean checkout, so repository CI intentionally performs the build bootstrap before lint. A clean pre-build lint failure caused only by unresolved generated sibling package types is diagnostic evidence, not a T-006 finding; the post-build lint result is the qualifying lint gate.
 
 Repository CI is required unless a newly authorized unavailable-service waiver is recorded; an unavailable or failed CI result is never represented as PASS.
 
@@ -107,7 +111,7 @@ The authoritative predicate boundary is now explicitly two-phase:
 
 ```text
 configuration / pre-admission preparation
-→ copy JSON-only data
+→ copy JSON-only data into detached null-prototype records
 → recursively freeze
 → register trusted object identity
 
@@ -116,7 +120,7 @@ admission predicate evaluation
 → synchronous closed-AST evaluation only
 ```
 
-The preparation phase is deliberately outside the authoritative Guard/Hard-Invariant decision. Evaluation never attempts to prove safety by reflecting over an arbitrary live object.
+The preparation phase is deliberately outside the authoritative Guard/Hard-Invariant decision. Evaluation never attempts to prove safety by reflecting over an arbitrary live object. Null-prototype copy destinations also preserve special JSON object keys such as `__proto__` as ordinary own data rather than invoking `Object.prototype` setters or creating inherited authority.
 
 ### Internal event provenance contract
 
@@ -148,7 +152,7 @@ Preparation rejects:
 - non-finite numbers;
 - cycles.
 
-Prepared values are detached copies, recursively frozen, and registered in private `WeakSet`s. At authoritative evaluation time, `WeakSet.has()` is performed before any property read on a candidate Guard/input reference. A Proxy or other unprepared object therefore fails closed without executing Proxy traps.
+Prepared values are detached copies, recursively frozen, and registered in private `WeakSet`s. Object copies use null-prototype records, preventing own JSON `__proto__` data from mutating the clone prototype. At authoritative evaluation time, `WeakSet.has()` is performed before any property read on a candidate Guard/input reference. A Proxy or other unprepared object therefore fails closed without executing Proxy traps.
 
 The evaluator itself remains a bounded closed-AST interpreter with no LLM, Tool, network, filesystem, database, timer, or other external-I/O capability.
 
@@ -189,6 +193,7 @@ Fail-closed behavior for this task:
 | unprepared Guard / Hard Invariant / evaluation input | authoritative wrapper returns `false` before property access |
 | Proxy-backed Guard/input wrapper | private `WeakSet.has()` rejects it; no Proxy trap executes |
 | malformed/unknown prepared predicate operator | primitive evaluator raises `PredicateContractViolation`; Guard/Hard-Invariant wrapper returns `false` |
+| own JSON `__proto__` key carries predicate-like fields | copied as ordinary own data on a null-prototype record; cannot become inherited `op`/`value` authority |
 | capability/function/promise/non-JSON preparation data | preparation rejects; no function is called |
 | accessor-backed preparation data | preparation rejects from descriptors without invoking accessor |
 | predicate nesting beyond deterministic limit | rejected; wrapper returns `false` |
@@ -214,7 +219,13 @@ This remediation closes both findings at their authority boundaries rather than 
 - event type is no longer provenance authority;
 - authoritative predicate evaluation no longer reflects over arbitrary live objects.
 
-Because remediation changes the exact HEAD, all validation/review evidence from `b428604b...` is historical only and cannot qualify the corrected candidate.
+Repair-closeout evidence handling is exact-HEAD scoped:
+
+- `23683fe1c0f894081699f43cec35c3a2f932970c` is the pre-refresh repair HEAD. Its focused 11/11, build/typecheck/pack PASS evidence is historical diagnosis only; stale-base/sibling lint or test failures are not attributed to T-006, and none of that evidence qualifies a refreshed candidate.
+- the repair branch was refreshed onto `v0.3@09b9ce20c817cd3ad1721b7af6d39d3bd9b7eb73` while preserving only the six-file T-006 write set and retaining the newer base type-narrowing in `predicate.ts`.
+- `97b744c9b4589921cecec4f35928c5acb2d789ad` is an interim refreshed candidate. Its exact-head validation is historical only because pre-review hardening subsequently added the `__proto__` regression/fix.
+- `7b80172b92eb0fd75c95baa3561536ea5c9508c6` is the pre-L3-closeout code candidate. Its validation is historical once this L3 closeout commit changes the PR HEAD.
+- the qualifying closeout SHA is always the current PR #263 exact HEAD recorded by GitHub after this L3 update; CI and Fresh Independent Review must bind to that SHA, and any later HEAD drift invalidates them.
 
 ## Reference / Ownership Boundary
 
