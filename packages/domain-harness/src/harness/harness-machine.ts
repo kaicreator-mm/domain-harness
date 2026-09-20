@@ -120,7 +120,7 @@ function normalizeDependency(value: unknown): ObservedDependency | null {
   return {
     kind: record.kind,
     identity: record.identity,
-    ...(record.revision === undefined ? {} : { revision: record.revision as string }),
+    ...(record.revision === undefined ? {} : { revision: record.revision }),
   };
 }
 
