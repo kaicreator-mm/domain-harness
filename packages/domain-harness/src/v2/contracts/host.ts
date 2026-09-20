@@ -1,11 +1,12 @@
+import type { Sha256Port } from '../../contracts/identity.js';
 import type { JsonValue } from '../../contracts/json.js';
 import type { CapabilityId } from './capability.js';
 import type { EffectExecutionContext } from './effect.js';
 import type { CompiledBindingDescriptor } from './package.js';
 
-export interface Sha256Port {
-  digestUtf8(value: string): Promise<string>;
-}
+// Compatibility re-export: v0.2 consumers may continue importing Sha256Port
+// from the v2 host contracts while v0.3 uses the shared identity contract.
+export type { Sha256Port } from '../../contracts/identity.js';
 
 export interface SecureRandomPort {
   randomId(): string;
