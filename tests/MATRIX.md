@@ -8,7 +8,7 @@ and no deterministic suite can silently orphan (issue #162).
 
 | Suite | Command | Expected files/tests (update when suites change) |
 | --- | --- | --- |
-| Core portable unit + nested suites | `npm test -w @kaicreator/domain-harness` (recursive `tests/**/*.test.ts` + `tsconfig.test.json` typecheck) | 45 files / 237 tests, incl. `tests/discovery/nested/sentinel.test.ts` proving recursion |
+| Core portable unit + nested suites | `npm test -w @kaicreator/domain-harness` (recursive `tests/**/*.test.ts` + `tsconfig.test.json` typecheck) | 46 files / 243 tests, incl. `tests/discovery/nested/sentinel.test.ts` proving recursion and `tests/architecture-v03/deepseek-harness-mini-core.test.ts` covering the #185 research mini core |
 | Node RuntimeStore adapter + shared conformance + T-016 pack consumer | `npm test -w @kaicreator/domain-harness-node` | 34 tests, incl. `shared-conformance.test.ts` (the Expo-authored RuntimeStore conformance suite run against the Node adapter) and `runtime-lifecycle.test.ts` (awaitIdle/dispose semantics) |
 | Compiler public consumer | `npm test -w @kaicreator/domain-harness-compiler` | 1 test |
 | Expo package typecheck (store src + conformance suite + structural sentinel) | `npm test -w @kaicreator/domain-harness-expo` | `tsc -p tsconfig.json` + `tsc -p tests/store/tsconfig.json` |
