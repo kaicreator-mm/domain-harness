@@ -12,7 +12,7 @@
 **Parallel:** YES  
 **Risk:** H  
 **L3:** REQUIRED  
-**Status:** DOING — independent-review repair / exact-SHA validation pending
+**Status:** DONE — repair closed at refreshed exact HEAD `12e2d72` (gates/CI/re-review evidence in §11)
 
 ## 1. Frozen Inputs
 
@@ -257,3 +257,15 @@ repair exact HEAD
 ```
 
 Until those gates are satisfied, this Task Pack remains `DOING` and Issue #225 remains open.
+
+### Closeout evidence (refreshed exact HEAD)
+
+All closeout gates bind to refreshed repair exact HEAD `12e2d72d91325fb92022432ace45dd69d2a271d9` (refresh merge `a7a5ba8` + evidence record `12e2d72`; tree differs from `v0.3@09b9ce2` only by the three T-007 repair files):
+
+1. Repository full gates at `12e2d72`: `npm run lint` PASS (stale-base lint failures cleared by the refreshed baseline), `npm run typecheck` PASS, `npm test` 426/426 PASS (baseline grew from 425 via refreshed T-002/T-003/T-004 test merges).
+2. Focused BusinessHarness tests at `12e2d72`: 21/21 PASS.
+3. `npm pack -w @kaicreator/domain-harness` PASS (`kaicreator-domain-harness-0.2.0.tgz`, 422 files).
+4. Exact-head CI: Woodpecker pipeline #426 `ci/woodpecker/pr/verify` = success on commit `12e2d72` (PR #262).
+5. Independent exact-HEAD re-review at `12e2d72`: verdict APPROVE, `P0=0 / P1=0 / P2=1 / P3=0`. V1 Fact/CDI vs query provenance split verified at the type surface with the `@ts-expect-error` negative pin (`contract.ts` `BusinessHarnessSelectedDependency`/`HarnessQueryDependency`); V2 no fabricated query evidence verified by tracing both `context.dependencies` write sites (`initialContext` host Fact/CDI input; query `onDone` post-`requireQueryBinding` executor report) — model output has no reachable dependency field and failed/rejected queries append none; V3 structured decision/event-only surface with exact-key validation and `INVALID_STRUCTURED_RESULT`/`INVALID_MODEL_RESPONSE` rejection of smuggled authority and private reasoning; V4 no transition/mutation/promotion/activation authority — mutation capabilities never advertised to the model and rejected in `authorizeQuery` before any executor invocation. The single P2 (non-blocking, recorded for future hardening): runtime `normalizeDependency` on the input path accepts `kind: 'query'`, so a non-typechecked host caller could seed query provenance at runtime; the task pack scope fixes this guarantee at the public TypeScript contract, and a hostile host could fabricate evidence regardless of input validation. Recommended follow-up for the T-016 journal integration: add an input-side runtime validator restricted to Fact/CDI kinds for fail-closed symmetry.
+
+**Status: DONE** (this section records the satisfied closure rule; Issue #225 closes with this merge).
