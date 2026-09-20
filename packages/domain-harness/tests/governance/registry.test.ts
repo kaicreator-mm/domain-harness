@@ -161,3 +161,18 @@ test('T-003: digest mismatch and same-digest body mutation fail closed', async (
       && error.code === 'GOVERNANCE_BODY_CONFLICT',
   );
 });
+
+test('T-003: logical store refuses references to a collected exact body', async () => {
+  const { baseline, store, registry } = await fixture();
+  await registry.collect(baseline.identity);
+
+  await assert.rejects(
+    store.putReference({
+      referenceId: 'late-audit:1',
+      reason: 'audit',
+      baseline: baseline.identity,
+    }),
+    (error: unknown) => error instanceof GovernanceContractError
+      && error.code === 'MISSING_RETAINED_GOVERNANCE_BASELINE',
+  );
+});
