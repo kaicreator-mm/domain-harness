@@ -10,8 +10,9 @@ import type { CompiledDomainDataPort } from '../projection/compiled-domain-data.
 import { ProjectionService } from '../projection/projection-service.js';
 import { DomainQueryDispatcher } from '../query/domain-query-dispatcher.js';
 import { PoisonMessageRecoveryCoordinator } from '../recovery-v2/poison-message-recovery.js';
-import { SubscriptionRegistry, type ProjectionSubscription } from '../subscription/subscription-registry.js';
-import { MessageRevisionTracker } from './message-revision-tracker.js';
+import { MailboxDrainScheduler } from './mailbox-drain-scheduler.js';
+import { RuntimeSubscriptionCoordinator } from './subscription-coordinator.js';
+import { DomainRuntimeError } from './runtime-errors.js';
 import type { BusinessSnapshotPort } from '../v2/contracts/projection.js';
 import type { DomainQuery } from '../v2/contracts/query.js';
 import type {
@@ -122,109 +123,59 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     sha256: options.bindings.sha256,
   });
   const query = new DomainQueryDispatcher({ store: options.store, projection });
-  const projectionSubscriptions = new Map<string, { request: ProjectionSubscription; count: number }>();
-  const messageRevisions = new MessageRevisionTracker();
 
-  const subscriptions = new SubscriptionRegistry({
-    observationSource: {
-      async readRevision(subscription) {
-        if (subscription.kind === 'instance') {
-          const instance = await options.store.getInstance(subscription.target);
-          return instance === null
-            ? null
-            : JSON.stringify([instance.packageId, instance.stateRevision, instance.lifecycle, instance.updatedAt]);
-        }
-        if (subscription.kind === 'message') {
-          if (subscription.messageId === undefined) {
-            return messageRevisions.read(addressKey(subscription.target));
-          }
-          const disposition = await options.store.getMessageDisposition(
-            subscription.target,
-            subscription.messageId,
-          );
-          return disposition === null
-            ? null
-            : JSON.stringify([
-                disposition.targetSequence,
-                disposition.disposition,
-                disposition.processingAt ?? null,
-                disposition.resolvedAt ?? null,
-              ]);
-        }
-        const snapshot = await projection.read({
-          projectionId: subscription.projectionId,
-          key: subscription.key,
-        });
-        return snapshot.revision;
-      },
-      isProjectionAffectedByBusinessInvalidation(subscription, invalidation) {
-        const compiledPackage = options.packageRegistry.get(options.packageRegistry.defaultPackageId);
-        const descriptor = compiledPackage?.manifest.projections[subscription.projectionId];
-        return descriptor?.dependencies.some(
-          (dependency) => dependency.kind === 'business' && dependency.source === invalidation.source,
-        ) ?? false;
-      },
-    },
+  // Observation state (subscription registry, projection refcounts, bounded
+  // message revisions) is owned by RuntimeSubscriptionCoordinator (#170/#171);
+  // drain scheduling state (active drains, wake-ups, disposal gating) is owned
+  // by MailboxDrainScheduler (#169/#171). This composition root keeps only the
+  // lifecycle flags and wiring.
+  const subscriptionCoordinator = new RuntimeSubscriptionCoordinator({
+    store: options.store,
+    projection,
+    packageRegistry: options.packageRegistry,
     ...(options.onBackgroundError === undefined
       ? {}
       : {
           onObservationError(error, subscription) {
             if (subscription.kind === 'projection') return;
-            options.onBackgroundError?.(
-              error,
-              subscription.target,
-            );
+            options.onBackgroundError?.(error, subscription.target);
           },
         }),
   });
 
-  const drains = new Map<string, Promise<void>>();
-  const drainRequested = new Set<string>();
-  let runtimeWorkflow: CompiledWorkflowRuntime;
+  let disposed = false;
+  let disposePromise: Promise<void> | undefined;
+
+  const drainScheduler = new MailboxDrainScheduler({
+    drain: (target) => drainMailbox(target),
+    // RecoveryRecordedError is the durable poison-message path: the failure
+    // fact is already persisted and observable, so it is not reported again.
+    // Every other drain failure — including ProcessingConflictError —
+    // surfaces so a stuck mailbox is never silent.
+    isDrainSuppressed: (error) => error instanceof RecoveryRecordedError,
+    reportError(error, target) {
+      options.onBackgroundError?.(error, target);
+    },
+  });
 
   const scheduleDrain = (target: WorkflowAddress): void => {
-    const key = addressKey(target);
-    if (drains.has(key)) {
-      // Preserve the wake-up. The active drain may already have observed an empty
-      // mailbox; dropping this signal would strand an accepted message.
-      drainRequested.add(key);
-      return;
-    }
-    const drain = Promise.resolve()
-      .then(() => drainMailbox(target))
-      .catch((error: unknown) => {
-        // RecoveryRecordedError is the durable poison-message path: the failure fact
-        // is already persisted and observable, so it is not reported again. Every
-        // other drain failure — including ProcessingConflictError — surfaces here so
-        // a stuck mailbox is never silent.
-        if (!(error instanceof RecoveryRecordedError)) {
-          try {
-            options.onBackgroundError?.(error, target);
-          } catch {
-            // A throwing host error handler must not turn drain-error routing into
-            // an unhandled rejection on the floating drain promise chain.
-          }
-        }
-      })
-      .finally(() => {
-        if (drains.get(key) !== drain) return;
-        drains.delete(key);
-        if (drainRequested.delete(key)) scheduleDrain(target);
-      });
-    drains.set(key, drain);
+    drainScheduler.schedule(target);
   };
 
   const notifyTargetChanged = (target: WorkflowAddress, messageId?: string): void => {
-    const key = addressKey(target);
-    messageRevisions.bump(key);
-    subscriptions.notifyInstanceChanged(target);
-    subscriptions.notifyMessageChanged(target, messageId);
-    for (const { request } of projectionSubscriptions.values()) {
-      subscriptions.notifyProjectionChanged(request.projectionId, request.key);
+    subscriptionCoordinator.notifyTargetChanged(target, messageId);
+  };
+
+  const assertActive = (): void => {
+    if (disposed) {
+      throw new DomainRuntimeError(
+        'runtime_disposed',
+        'DomainRuntime has been disposed; create a new Runtime to resume operations',
+      );
     }
   };
 
-  runtimeWorkflow = new CompiledWorkflowRuntime({
+  const runtimeWorkflow = new CompiledWorkflowRuntime({
     expression: options.bindings.expression,
     toolRunner,
     toolExecutor: createRuntimeToolExecutor(options.bindings),
@@ -252,6 +203,9 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
 
   async function drainMailbox(target: WorkflowAddress): Promise<void> {
     while (true) {
+      // Disposal boundary: the in-flight turn (if any) has already completed;
+      // no new turn is started after dispose() (#169).
+      if (drainScheduler.disposed) return;
       const stored = await recovery.nextProcessableMessage(target);
       if (stored === null) return;
 
@@ -320,11 +274,13 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   }
 
   async function openInstance(request: OpenWorkflowInstanceRequest): Promise<WorkflowInstanceSnapshot> {
+    assertActive();
     const packageId = request.packageId ?? options.packageRegistry.defaultPackageId;
     const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
     const workflow = compiledPackage.manifest.workflows[request.address.workflowId];
     if (workflow === undefined) {
-      throw new Error(
+      throw new DomainRuntimeError(
+        'workflow_not_in_package',
         `Package ${packageId} does not contain workflow ${request.address.workflowId}`,
       );
     }
@@ -340,6 +296,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   }
 
   async function send(message: DomainMessage): Promise<MessageAcceptedAck> {
+    assertActive();
     const ack = await acceptance.accept(message);
     notifyTargetChanged(message.target, message.messageId);
     scheduleDrain(message.target);
@@ -347,19 +304,29 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   }
 
   async function recover(request: RecoveryRequest): Promise<RecoveryResult> {
+    assertActive();
     let shouldDrain = false;
     const instance = await lane.run(request.target, async () => {
       const current = await options.store.getInstance(request.target);
       if (current === null) {
-        throw new Error(`Workflow ${request.target.workflowId}/${request.target.instanceKey} does not exist`);
+        throw new DomainRuntimeError(
+          'instance_not_found',
+          `Workflow ${request.target.workflowId}/${request.target.instanceKey} does not exist`,
+        );
       }
       const messageId = current.failure?.sourceMessageId;
       if (messageId === undefined || messageId.length === 0) {
-        throw new Error('Recovery requires a durable poison-message identity on the instance failure');
+        throw new DomainRuntimeError(
+          'recovery_identity_missing',
+          'Recovery requires a durable poison-message identity on the instance failure',
+        );
       }
       const reason = request.reason?.trim();
       if (reason === undefined || reason.length === 0) {
-        throw new Error(`Recovery action ${request.action} requires a non-empty domain authorization reason`);
+        throw new DomainRuntimeError(
+          'recovery_reason_required',
+          `Recovery action ${request.action} requires a non-empty domain authorization reason`,
+        );
       }
 
       if (request.action === 'retry') {
@@ -367,7 +334,10 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
           ? (() => {
               const effectId = current.failure?.effectId;
               if (effectId === undefined || effectId.length === 0) {
-                throw new Error('Ambiguous non-idempotent recovery is missing durable effectId');
+                throw new DomainRuntimeError(
+                  'recovery_effect_identity_missing',
+                  'Ambiguous non-idempotent recovery is missing durable effectId',
+                );
               }
               return {
                 kind: 'ambiguous-non-idempotent-resolved' as const,
@@ -403,53 +373,52 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   }
 
   function subscribe(request: DomainSubscription, listener: DomainChangeListener): Unsubscribe {
-    let projectionKey: string | undefined;
-    if (request.kind === 'projection') {
-      projectionKey = JSON.stringify([request.projectionId, request.key]);
-      const existing = projectionSubscriptions.get(projectionKey);
-      projectionSubscriptions.set(projectionKey, {
-        request: { ...request },
-        count: (existing?.count ?? 0) + 1,
-      });
-    }
-    // Target-wide message subscriptions are the only consumer of synthesized
-    // revisions; scoping retention to them keeps the tracker bounded by active
-    // subscriptions instead of address history (#170).
-    let revisionKey: string | undefined;
-    if (request.kind === 'message' && request.messageId === undefined) {
-      revisionKey = addressKey(request.target);
-      messageRevisions.retain(revisionKey);
-    }
-    const unsubscribe = subscriptions.subscribe(request, listener);
-    let active = true;
-    return () => {
-      if (!active) return;
-      active = false;
-      unsubscribe();
-      if (projectionKey !== undefined) {
-        const existing = projectionSubscriptions.get(projectionKey);
-        if (existing !== undefined) {
-          if (existing.count <= 1) projectionSubscriptions.delete(projectionKey);
-          else projectionSubscriptions.set(projectionKey, { ...existing, count: existing.count - 1 });
-        }
-      }
-      if (revisionKey !== undefined) messageRevisions.release(revisionKey);
-    };
+    assertActive();
+    return subscriptionCoordinator.subscribe(request, listener);
   }
 
   function invalidateBusinessSnapshot(request: BusinessInvalidation): void {
-    subscriptions.invalidateBusinessSnapshot(request);
+    assertActive();
+    subscriptionCoordinator.invalidateBusinessSnapshot(request);
+  }
+
+  async function awaitIdle(): Promise<void> {
+    for (;;) {
+      await drainScheduler.awaitIdle();
+      await subscriptionCoordinator.idle();
+      if (drainScheduler.activeDrainCount === 0) {
+        return;
+      }
+    }
+  }
+
+  function dispose(): Promise<void> {
+    disposePromise ??= performDispose();
+    return disposePromise;
+  }
+
+  async function performDispose(): Promise<void> {
+    disposed = true;
+    // No new drains/redrains; in-flight loops stop at their next safe
+    // boundary (the current mailbox turn completes to its durable commit).
+    drainScheduler.dispose();
+    // Delivery, observation retries and idle waiters settle immediately.
+    subscriptionCoordinator.dispose();
+    await drainScheduler.awaitIdle();
   }
 
   return {
     openInstance,
     send,
     query(request: DomainQuery) {
+      assertActive();
       return query.query(request);
     },
     subscribe,
     recover,
     invalidateBusinessSnapshot,
+    awaitIdle,
+    dispose,
   };
 }
 
@@ -461,10 +430,6 @@ function normalizeFailure(error: unknown, messageId: string): RuntimeFailure {
     message: error instanceof Error ? error.message : String(error),
     sourceMessageId: messageId,
   };
-}
-
-function addressKey(target: WorkflowAddress): string {
-  return JSON.stringify([target.workflowId, target.instanceKey]);
 }
 
 function isTerminal(instance: WorkflowInstanceSnapshot): boolean {

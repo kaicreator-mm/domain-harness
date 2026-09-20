@@ -8,8 +8,8 @@ and no deterministic suite can silently orphan (issue #162).
 
 | Suite | Command | Expected files/tests (update when suites change) |
 | --- | --- | --- |
-| Core portable unit + nested suites | `npm test -w @kaicreator/domain-harness` (recursive `tests/**/*.test.ts` + `tsconfig.test.json` typecheck) | 41 files / 212 tests, incl. `tests/discovery/nested/sentinel.test.ts` proving recursion |
-| Node RuntimeStore adapter + shared conformance + T-016 pack consumer | `npm test -w @kaicreator/domain-harness-node` | 29 tests, incl. `shared-conformance.test.ts` (the Expo-authored RuntimeStore conformance suite run against the Node adapter) |
+| Core portable unit + nested suites | `npm test -w @kaicreator/domain-harness` (recursive `tests/**/*.test.ts` + `tsconfig.test.json` typecheck) | 42 files / 218 tests, incl. `tests/discovery/nested/sentinel.test.ts` proving recursion |
+| Node RuntimeStore adapter + shared conformance + T-016 pack consumer | `npm test -w @kaicreator/domain-harness-node` | 34 tests, incl. `shared-conformance.test.ts` (the Expo-authored RuntimeStore conformance suite run against the Node adapter) and `runtime-lifecycle.test.ts` (awaitIdle/dispose semantics) |
 | Compiler public consumer | `npm test -w @kaicreator/domain-harness-compiler` | 1 test |
 | Expo package typecheck (store src + conformance suite + structural sentinel) | `npm test -w @kaicreator/domain-harness-expo` | `tsc -p tsconfig.json` + `tsc -p tests/store/tsconfig.json` |
 | Root deterministic suites | `npm run test:root` | G30 conformance self-tests (3), compiler round-trip, T-018 Node host G30 (1), v01-expr migration equivalence, remote tool HTTP/JSON (ts: 34 total); v01-script migration equivalence + script tool (mjs: 9 total) |

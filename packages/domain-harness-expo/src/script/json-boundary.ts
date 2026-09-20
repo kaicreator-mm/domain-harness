@@ -15,7 +15,7 @@ function isPortableJson(value: unknown, active = new WeakSet<object>()): value i
   active.add(value);
   try {
     if (Array.isArray(value)) return value.every((item) => isPortableJson(item, active));
-    const prototype = Object.getPrototypeOf(value);
+    const prototype = Object.getPrototypeOf(value) as object | null;
     if (prototype !== Object.prototype && prototype !== null) return false;
     return Object.values(value as Record<string, unknown>).every((item) => isPortableJson(item, active));
   } finally {

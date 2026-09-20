@@ -35,7 +35,7 @@ async function run(input: WorkerInput): Promise<WorkerResponse> {
   }
 
   const scriptInput = JSON.parse(input.inputJson) as unknown;
-  const result = await (execute as (value: unknown) => unknown | Promise<unknown>)(scriptInput);
+  const result = await (execute as (value: unknown) => unknown)(scriptInput);
   const outputJson = serializeJsonOnly(result);
   if (Buffer.byteLength(outputJson, 'utf8') > input.maxOutputBytes) {
     throw new Error('Script result exceeds maxOutputBytes');
@@ -58,7 +58,7 @@ function isPortableJson(value: unknown, active = new WeakSet<object>()): boolean
   active.add(value);
   try {
     if (Array.isArray(value)) return value.every((item) => isPortableJson(item, active));
-    const prototype = Object.getPrototypeOf(value);
+    const prototype = Object.getPrototypeOf(value) as object | null;
     if (prototype !== Object.prototype && prototype !== null) return false;
     return Object.values(value as Record<string, unknown>).every((item) => isPortableJson(item, active));
   } finally {

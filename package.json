@@ -13,13 +13,16 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && npm run test:root",
     "test:root": "node --import tsx --test \"tests/conformance/*.test.ts\" \"tests/compiler/*.test.ts\" \"tests/hosts/node/*.test.ts\" \"tests/migration/v01-expr/*.test.ts\" \"tests/tools/remote/*.test.ts\" && node --test \"tests/migration/v01-script/*.test.mjs\" \"tests/tools/script/*.test.mjs\"",
-    "lint": "node scripts/lint.mjs"
+    "lint": "node scripts/lint.mjs && eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
     "better-sqlite3": "^12.0.0",
+    "eslint": "^10.11.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.70.0"
   }
 }

@@ -62,6 +62,7 @@ function assertJsonataSyntax(expression: string, context: string): void {
   } catch (error) {
     throw new Error(
       `${context} is not valid JSONata: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 }
@@ -261,7 +262,10 @@ function compileProjections(projections: readonly RawProjectionDefinition[]): Re
     try {
       jsonata(projection.expression);
     } catch (error) {
-      throw new Error(`projection '${projection.projectionId}' JSONata compile failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `projection '${projection.projectionId}' JSONata compile failed: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
     }
     result[projection.projectionId] = {
       projectionId: projection.projectionId,

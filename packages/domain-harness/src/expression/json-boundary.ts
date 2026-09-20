@@ -17,7 +17,7 @@ function isPortableJsonValueInternal(value: unknown, ancestors: WeakSet<object>)
   if (Array.isArray(value)) {
     valid = value.every((item) => isPortableJsonValueInternal(item, ancestors));
   } else {
-    const prototype = Object.getPrototypeOf(value);
+    const prototype = Object.getPrototypeOf(value) as object | null;
     valid =
       (prototype === Object.prototype || prototype === null) &&
       Object.values(value as Record<string, unknown>).every((item) =>

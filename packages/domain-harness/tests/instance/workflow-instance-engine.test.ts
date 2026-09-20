@@ -199,7 +199,7 @@ test('T-010 instance/engine implementation does not import or persist XState int
   ];
   for (const relative of files) {
     const source = readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8');
-    assert.doesNotMatch(source, /from\s+['\"]xstate['\"]/);
+    assert.doesNotMatch(source, /from\s+['"]xstate['"]/);
     assert.doesNotMatch(source, /xstate/i);
   }
 });

@@ -20,7 +20,7 @@ export function assertExpressionPolicy(source: string): void {
     );
   }
 
-  inspectNode(expression.ast() as unknown);
+  inspectNode(expression.ast());
 }
 
 function inspectNode(value: unknown): void {

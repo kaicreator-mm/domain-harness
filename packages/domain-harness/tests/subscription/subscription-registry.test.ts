@@ -466,3 +466,88 @@ test('G23 signals arriving during a pending observation retry coalesce to the la
   assert.deepEqual(seen, ['i-2'], 'retry must observe the latest revision exactly once');
   assert.equal(reads, 2);
 });
+
+test('G23 idle() spans scheduled flushes and resolves after a pending retry succeeds', async () => {
+  const scheduler = new ManualScheduler();
+  const retries: RecordedRetry[] = [];
+  let failReads = 1;
+  const registry = new SubscriptionRegistry({
+    scheduler,
+    retryScheduler: (task, delayMs) => {
+      retries.push({ task, delayMs });
+    },
+    observationSource: {
+      readRevision: async () => {
+        if (failReads > 0) {
+          failReads -= 1;
+          throw new Error('transient observation failure');
+        }
+        return 'i-1';
+      },
+    },
+  });
+  const target = { workflowId: 'design', instanceKey: '90' };
+  registry.subscribe({ kind: 'instance', target }, () => {});
+
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(retries.length, 1);
+
+  // idle() is a point-in-time query: with a failure retry pending it must not
+  // resolve until a successful observation consumes the generation.
+  let idleResolved = false;
+  const idle = registry.idle().then(() => {
+    idleResolved = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(idleResolved, false, 'pending failure retry keeps the registry non-idle');
+
+  retries.shift()?.task();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await idle;
+  assert.equal(idleResolved, true, 'idle resolves after the retry succeeds');
+});
+
+test('G23 dispose stops delivery, resolves idle and neutralizes pending retries', async () => {
+  const scheduler = new ManualScheduler();
+  const retries: RecordedRetry[] = [];
+  const seen: string[] = [];
+  const registry = new SubscriptionRegistry({
+    scheduler,
+    retryScheduler: (task, delayMs) => {
+      retries.push({ task, delayMs });
+    },
+    observationSource: {
+      readRevision: async () => {
+        throw new Error('persistent observation failure');
+      },
+    },
+  });
+  const target = { workflowId: 'design', instanceKey: '91' };
+  registry.subscribe({ kind: 'instance', target }, (change) => seen.push(change.revision));
+
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(retries.length, 1);
+
+  const idle = registry.idle();
+  registry.dispose();
+  await idle;
+
+  retries.shift()?.task();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(seen, [], 'pending retry must not deliver after dispose');
+
+  registry.notifyInstanceChanged(target);
+  scheduler.flushAll();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(seen, [], 'notify after dispose is a no-op');
+
+  assert.throws(
+    () => registry.subscribe({ kind: 'instance', target }, () => {}),
+    /disposed/u,
+  );
+  registry.dispose(); // idempotent
+});
