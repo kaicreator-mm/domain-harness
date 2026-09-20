@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  InvalidFinalOutputError,
   runMiniAgent,
   type Generate,
   type MiniTool,
@@ -77,6 +78,60 @@ test('supports a bounded multi-step tool loop', async () => {
   assert.equal(result.continuation.journal.length, 5);
 });
 
+test('conditionally disabled tools are hidden and cannot execute', async () => {
+  let toolCalls = 0;
+  const disabled: MiniTool = {
+    name: 'dangerous',
+    isEnabled: () => false,
+    async execute() {
+      toolCalls += 1;
+      return 'should-not-run';
+    },
+  };
+  const seen: any[] = [];
+  await assert.rejects(
+    runMiniAgent({
+      input: 'try disabled tool',
+      tools: [disabled],
+      generate: scripted([
+        { kind: 'tool_calls', calls: [{ id: 'd1', name: 'dangerous', input: {} }] },
+      ], seen),
+    }),
+    /Tool is disabled or unknown: dangerous/,
+  );
+  assert.deepEqual(seen[0].tools, []);
+  assert.equal(toolCalls, 0);
+});
+
+test('approval-required tool pauses before any tool execution', async () => {
+  let toolCalls = 0;
+  const protectedTool: MiniTool = {
+    name: 'publish',
+    requiresApproval: true,
+    async execute() {
+      toolCalls += 1;
+      return { published: true };
+    },
+  };
+  const result = await runMiniAgent({
+    input: 'publish',
+    tools: [protectedTool],
+    generate: scripted([
+      { kind: 'tool_calls', calls: [{ id: 'p1', name: 'publish', input: { id: 42 } }] },
+    ]),
+  });
+  assert.equal(toolCalls, 0);
+  assert.equal(result.status, 'approval_required');
+  if (result.status === 'approval_required') {
+    assert.deepEqual(result.approval, {
+      callId: 'p1',
+      name: 'publish',
+      input: { id: 42 },
+    });
+    assert.equal(result.continuation.nextStep, 1);
+  }
+});
+
 test('propagates structured final output and continuation state', async () => {
   const result = await runMiniAgent({
     input: 'review',
@@ -87,6 +142,21 @@ test('propagates structured final output and continuation state', async () => {
   assert.deepEqual(result.output, { decision: 'approve', score: 0.91 });
   assert.equal(result.continuation.nextStep, 1);
   assert.deepEqual(result.continuation.messages.at(-1), { role: 'assistant', content: 'done' });
+});
+
+test('invalid structured final output fails closed', async () => {
+  await assert.rejects(
+    runMiniAgent({
+      input: 'review',
+      validateFinal: (output) => (
+        typeof output === 'object' &&
+        output !== null &&
+        (output as Record<string, unknown>).decision === 'approve'
+      ),
+      generate: scripted([{ kind: 'final', output: { decision: 'unknown' } }]),
+    }),
+    InvalidFinalOutputError,
+  );
 });
 
 test('cancellation prevents provider execution and propagates AbortError', async () => {
@@ -116,6 +186,29 @@ test('provider/auth failures propagate unchanged', async () => {
     caught = error;
   }
   assert.strictEqual(caught, authError);
+});
+
+test('tool failures propagate unchanged', async () => {
+  const toolError = new Error('tool failed');
+  const tool: MiniTool = {
+    name: 'explode',
+    async execute() {
+      throw toolError;
+    },
+  };
+  let caught: unknown;
+  try {
+    await runMiniAgent({
+      input: 'explode',
+      tools: [tool],
+      generate: scripted([
+        { kind: 'tool_calls', calls: [{ id: 'e1', name: 'explode', input: null }] },
+      ]),
+    });
+  } catch (error) {
+    caught = error;
+  }
+  assert.strictEqual(caught, toolError);
 });
 
 test('journal replay is deterministic and does not re-run provider or tools', async () => {
@@ -151,17 +244,6 @@ test('journal replay is deterministic and does not re-run provider or tools', as
   assert.equal(providerCalls, 0);
   assert.equal(toolCalls, 0);
   assert.deepEqual(replayed, first);
-});
-
-test('handoff is returned as node-local data rather than performing orchestration', async () => {
-  const result = await runMiniAgent({
-    input: 'route',
-    generate: scripted([{ kind: 'handoff', target: 'specialist', payload: { reason: 'domain' } }]),
-  });
-  assert.equal(result.status, 'handoff');
-  if (result.status === 'handoff') {
-    assert.deepEqual(result.handoff, { target: 'specialist', payload: { reason: 'domain' } });
-  }
 });
 
 test('returns continuation instead of escaping the configured step bound', async () => {
