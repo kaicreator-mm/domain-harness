@@ -248,13 +248,13 @@ test('fails closed when exact body-schema authority is missing, mismatched or ta
   assert.equal(hasCode(missingResolvedSchema, 'BODY_VALIDATOR_REQUIRED'), true);
 
   const trusted = bodySchemas.workflow;
-  const tampered: CandidateBodySchemaArtifact = {
+  const tampered = {
     ...trusted,
     schema: {
       type: 'object',
       additionalProperties: true,
     },
-  };
+  } as unknown as CandidateBodySchemaArtifact;
   const tamperedSchema = await validate(
     workflowCandidate(),
     authority(),
