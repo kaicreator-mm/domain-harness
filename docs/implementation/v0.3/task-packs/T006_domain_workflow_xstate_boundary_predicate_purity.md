@@ -2,7 +2,9 @@
 
 Issue: #224  
 Task: T-006 — Domain Workflow public contract / XState boundary + predicate purity  
-Fixed baseline: `v0.3@be65e41e652d70c17ca10af66bc5f25abed2658a`  
+Original fixed baseline: `v0.3@be65e41e652d70c17ca10af66bc5f25abed2658a`  
+Independent-review remediation baseline: `v0.3@74514b07048ee62ce04d742a9685ae4804619d89`  
+Repair-closeout refresh baseline: `v0.3@0087720854dd235e02a35d612bddb4a023d80171`  
 Authority: Frozen v0.3 PRD + A1 amendment, Frozen L2 + A1 architecture amendment, v0.3 Task DAG
 
 ## Tests
@@ -28,10 +30,12 @@ Proves:
 
 - Guard and Hard Invariant predicates use one synchronous deterministic evaluator;
 - predicates are a closed declarative data AST, not user callbacks;
-- the predicate implementation has no AI/Tool/Promise/external-I/O execution seam;
-- accessor-backed input is rejected without invoking the accessor;
-- capability-shaped/function-bearing predicate data fails closed without calling the function;
-- malformed primitive evaluation reports a contract violation while Guard/Hard-Invariant wrappers return false.
+- predicate/context/event values are prepared and frozen before authoritative predicate evaluation;
+- authoritative evaluation accepts only prepared identities registered by private `WeakSet`s;
+- unprepared accessor/capability-shaped values fail closed without invoking the accessor/function;
+- Proxy-backed Guard/input references are rejected through trap-free `WeakSet.has()` checks and execute zero Proxy traps;
+- malformed prepared primitive evaluation reports a contract violation while Guard/Hard-Invariant wrappers return false;
+- preparation copies object data into null-prototype records so an own JSON `__proto__` key stays data and cannot become inherited predicate authority.
 
 ### XState boundary
 
@@ -40,26 +44,36 @@ Proves:
 Proves:
 
 - engine-neutral states/transitions map to the internal XState-compatible configuration seam;
-- Guard evaluation remains on the pure predicate path;
-- accessor-backed engine events fail closed before hidden work can execute;
+- Guard evaluation remains on the prepared pure-predicate path;
+- ordinary Domain Events and internal lifecycle events have distinct unforgeable runtime provenance;
+- raw events cannot spoof `invocation_done`, `invocation_failed`, `wait`, `timer`, `deadline`, `callback`, or `recovery` transitions even when the event-type string is identical;
+- the `@@domain-harness/` namespace is reserved from ordinary Domain Events;
+- unsafe record keys (`__proto__`, `prototype`, `constructor`) are rejected before insertion into internal state/event records;
+- accessor-backed untrusted engine events fail closed before hidden work can execute;
 - invalid state/guard references fail before machine execution;
 - Effect Intent remains data/metadata at this layer and is not translated into an executable action.
 
-Expected repository commands:
+Required remediation validation commands on the corrected exact HEAD:
 
 ```bash
-npm run typecheck --workspace @kaicreator/domain-harness
-node --import tsx --test "packages/domain-harness/tests/workflow-v03/*.test.ts"
-npm run build --workspace @kaicreator/domain-harness
+npm ci
+npm run build
+npm run lint
+npm run typecheck
+npm test
+node --import tsx --test "packages/domain-harness/tests/workflow-v03/predicate-purity.test.ts" "packages/domain-harness/tests/workflow-v03/xstate-boundary.test.ts"
+npm pack -w @kaicreator/domain-harness
 ```
 
-Full repository CI remains authoritative when available.
+The monorepo lint/type-aware checks require generated package build artifacts on a clean checkout, so repository CI intentionally performs the build bootstrap before lint. A clean pre-build lint failure caused only by unresolved generated sibling package types is diagnostic evidence, not a T-006 finding; the post-build lint result is the qualifying lint gate.
+
+Repository CI is required unless a newly authorized unavailable-service waiver is recorded; an unavailable or failed CI result is never represented as PASS.
 
 ## Contract / Interface
 
 ### Public Domain Workflow identity
 
-New package subpath: `@kaicreator/domain-harness/workflow`.
+Package subpath: `@kaicreator/domain-harness/workflow`.
 
 The product-level definition is `DomainWorkflowDefinition` and contains only engine-neutral domain semantics:
 
@@ -93,24 +107,54 @@ There is deliberately no callback/function/Promise/effect field. Both `DomainWor
 
 `DomainHardInvariantPredicate` defines only the predicate shape. Retrieval and exact binding of pinned Governance Baseline invariants remain T-014/T-019 scope.
 
+The authoritative predicate boundary is now explicitly two-phase:
+
+```text
+configuration / pre-admission preparation
+→ copy JSON-only data into detached null-prototype records
+→ recursively freeze
+→ register trusted object identity
+
+admission predicate evaluation
+→ trap-free trusted-identity check
+→ synchronous closed-AST evaluation only
+```
+
+The preparation phase is deliberately outside the authoritative Guard/Hard-Invariant decision. Evaluation never attempts to prove safety by reflecting over an arbitrary live object. Null-prototype copy destinations also preserve special JSON object keys such as `__proto__` as ordinary own data rather than invoking `Object.prototype` setters or creating inherited authority.
+
+### Internal event provenance contract
+
+String event type alone is not sufficient authority for internal lifecycle transitions.
+
+The internal adapter distinguishes:
+
+```text
+ordinary Domain Event provenance
+!=
+internal lifecycle/control provenance
+```
+
+Both event classes are prepared data, but they are registered in separate private `WeakSet`s. Every mapped transition receives an admission guard that first requires provenance matching the trigger kind. A caller that sends a raw object with an internal event-type string therefore cannot activate an internal lifecycle transition.
+
+`@@domain-harness/` is reserved for internal event identities and is rejected from ordinary Domain Event definitions/factories.
+
 ## Core Implementation
 
-### Pure evaluator
+### Prepared pure evaluator
 
-`packages/domain-harness/src/workflow/predicate.ts` implements synchronous evaluation only.
+`packages/domain-harness/src/workflow/predicate.ts` implements synchronous authoritative evaluation over prepared data only.
 
-Before evaluation it defensively copies predicate/context/event as data-only values using property descriptors. It rejects:
+Preparation rejects:
 
 - functions, promises, symbols, bigint, undefined, or other non-JSON capability values;
 - accessor properties without invoking their getter/setter;
 - non-plain object prototypes;
 - non-finite numbers;
-- cycles;
-- excessive predicate nesting.
+- cycles.
 
-Evaluation therefore has no capability through which an LLM, Tool, network request, filesystem request, database call, timer, or other external I/O can be invoked.
+Prepared values are detached copies, recursively frozen, and registered in private `WeakSet`s. Object copies use null-prototype records, preventing own JSON `__proto__` data from mutating the clone prototype. At authoritative evaluation time, `WeakSet.has()` is performed before any property read on a candidate Guard/input reference. A Proxy or other unprepared object therefore fails closed without executing Proxy traps.
 
-Guard and Hard Invariant wrappers catch malformed/contract-violating inputs and return `false` (fail closed).
+The evaluator itself remains a bounded closed-AST interpreter with no LLM, Tool, network, filesystem, database, timer, or other external-I/O capability.
 
 ### Internal XState mapping
 
@@ -119,12 +163,16 @@ Guard and Hard Invariant wrappers catch malformed/contract-violating inputs and 
 The adapter is intentionally internal and performs only control-flow translation:
 
 - state identity → internal machine state;
-- domain/synthetic completion trigger → internal event key;
+- domain/internal completion trigger → event key plus provenance class;
 - target state → transition target;
-- `guardId` → synchronous pure-predicate guard closure;
+- `guardId` → prepared synchronous pure-predicate guard closure;
 - declared workflow semantics, including Effect Intents, remain metadata for later central wiring.
 
-It does **not**:
+All internal control events are created through an internal factory and registered with internal provenance. Ordinary Domain Events are created through a separate factory that rejects the internal namespace. Control keys are encoded before being embedded in internal event identities.
+
+All state, guard, transition and ordinary Domain Event keys are validated before insertion into internal records; unsafe object keys are rejected before machine execution.
+
+The adapter does **not**:
 
 - execute an Invocation;
 - execute an Effect Intent;
@@ -142,16 +190,43 @@ Fail-closed behavior for this task:
 
 | Failure | Result |
 |---|---|
-| malformed/unknown predicate operator | primitive evaluator raises `PredicateContractViolation`; Guard/Hard-Invariant wrapper returns `false` |
-| capability/function/promise/non-JSON predicate data | rejected; wrapper returns `false` |
-| accessor-backed context/event/predicate input | rejected from descriptors without invoking accessor; wrapper returns `false` |
+| unprepared Guard / Hard Invariant / evaluation input | authoritative wrapper returns `false` before property access |
+| Proxy-backed Guard/input wrapper | private `WeakSet.has()` rejects it; no Proxy trap executes |
+| malformed/unknown prepared predicate operator | primitive evaluator raises `PredicateContractViolation`; Guard/Hard-Invariant wrapper returns `false` |
+| own JSON `__proto__` key carries predicate-like fields | copied as ordinary own data on a null-prototype record; cannot become inherited `op`/`value` authority |
+| capability/function/promise/non-JSON preparation data | preparation rejects; no function is called |
+| accessor-backed preparation data | preparation rejects from descriptors without invoking accessor |
 | predicate nesting beyond deterministic limit | rejected; wrapper returns `false` |
+| ordinary Domain Event uses `@@domain-harness/` internal namespace | `XStateBoundaryContractError` / fail closed before machine execution |
+| raw event string impersonates internal invocation/wait/timer/deadline/callback/recovery type | provenance check returns `false`; transition cannot fire |
+| unsafe record key (`__proto__`, `prototype`, `constructor`) | `XStateBoundaryContractError` before machine execution |
 | missing initial/target state | `XStateBoundaryContractError` before machine execution |
 | missing guard reference | `XStateBoundaryContractError` before machine execution |
 | duplicate state/guard/transition key | `XStateBoundaryContractError` before machine execution |
-| accessor-backed internal engine event | mapped guard catches the boundary violation and returns `false` |
+| accessor-backed untrusted engine event | provenance check returns `false` before accessor/property inspection |
 
 No failure path falls back to AI, Tool, or external observation.
+
+## Independent Review Remediation
+
+The first independent review of exact HEAD `b428604b18952243e8a15fbbc71c0b7add0990a3` returned `CHANGES_REQUIRED` with `P0=0 / P1=2`:
+
+1. internal lifecycle event strings could be spoofed by ordinary Domain Events;
+2. runtime-supplied Proxy objects could execute traps while the old evaluator attempted to inspect/copy arbitrary live predicate inputs.
+
+This remediation closes both findings at their authority boundaries rather than adding test-only filtering:
+
+- event type is no longer provenance authority;
+- authoritative predicate evaluation no longer reflects over arbitrary live objects.
+
+Repair-closeout evidence handling is exact-HEAD scoped:
+
+- `23683fe1c0f894081699f43cec35c3a2f932970c` is the pre-refresh repair HEAD. Its focused 11/11, build/typecheck/pack PASS evidence is historical diagnosis only; stale-base/sibling lint or test failures are not attributed to T-006, and none of that evidence qualifies a refreshed candidate.
+- `97b744c9b4589921cecec4f35928c5acb2d789ad` is an interim refreshed candidate. Its exact-head validation is historical only because pre-review hardening subsequently added the `__proto__` regression/fix.
+- `7b80172b92eb0fd75c95baa3561536ea5c9508c6` is the pre-L3-closeout code candidate. Its validation is historical once the L3 closeout commit changed the PR HEAD.
+- `1a1a5b0e15fbc120f95dfe37b3c66b4d2391175d` passed exact-head repository validation, including focused 12/12 and pack, but is historical only because `v0.3` advanced via merged T-013 while Woodpecker #428 was still pending.
+- final repair refresh baseline is `v0.3@0087720854dd235e02a35d612bddb4a023d80171`. The advance from prior refresh baseline `cce34b3f3e7fdf4b5bb521eaa6f52e247ee098b6` to current base is T-007 repair-only and changes only T-007 files, disjoint from the six-file T-006 write set. The earlier T-013 overlap in `packages/domain-harness/src/workflow/index.ts` remains resolved by preserving current-base content and restoring only T-006 predicate-preparation exports; no T-013/T-007 implementation file is newly absorbed into T-006 scope.
+- the qualifying closeout SHA is always the current PR #263 exact HEAD recorded by GitHub after this refresh; CI and Fresh Independent Review must bind to that SHA, and any later HEAD or base drift invalidates them.
 
 ## Reference / Ownership Boundary
 
