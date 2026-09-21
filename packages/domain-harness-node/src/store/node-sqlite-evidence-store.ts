@@ -3,6 +3,7 @@ import type {
   RuntimeEvidencePort,
   RuntimeEvidenceRecord,
 } from '@kaicreator/domain-harness';
+import type { JsonValue } from '@kaicreator/domain-harness/v2';
 import { canonicalText, decodeJson, type AuthoritySqliteDatabase } from './authority-shared.js';
 
 interface EvidenceRow {
@@ -23,7 +24,7 @@ export class NodeSqliteRuntimeEvidenceStore implements RuntimeEvidencePort {
   }
 
   async append(record: RuntimeEvidenceRecord): Promise<void> {
-    const encoded = canonicalText(record, 'runtime evidence record');
+    const encoded = canonicalText(record as unknown as JsonValue, 'runtime evidence record');
     const transaction = this.#db.transaction(() => {
       const existing = this.#db.prepare(`
         SELECT record_json FROM dh_v3_runtime_evidence WHERE evidence_id = ?
