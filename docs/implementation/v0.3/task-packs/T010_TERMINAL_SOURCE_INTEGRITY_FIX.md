@@ -5,7 +5,7 @@
 **Independent review finding:** P1 — persisted terminal sources were replayed without fail-closed integrity validation  
 **Fix PR:** #266  
 **Fix branch:** `v0.3_t010_terminal_source_integrity`  
-**Refreshed exact base:** `v0.3@0087720854dd235e02a35d612bddb4a023d80171`
+**Refreshed exact base:** `v0.3@d00f494ce4e127b8b93bb8ea0932de8e18a05057`
 
 ## Scope
 
@@ -25,11 +25,11 @@ Malformed persisted material fails closed as `STORE_CONTRACT_VIOLATION`.
 
 ## Repair closeout refresh
 
-The original repair HEAD `f3da55622c618b4b7acf04e574da32ec8f392a01` and intermediate refresh HEADs `a5791b25473418af177070af07209672ece95724`, `f877903927043108b311fe73bdd13b1670081172`, and `f2bd02e006ba5082fa4a693e78f85674370da071` are historical only. The final closeout refresh advances the branch onto current `v0.3@0087720854dd235e02a35d612bddb4a023d80171` after the T-007 repair merge.
+The original repair HEAD `f3da55622c618b4b7acf04e574da32ec8f392a01` and intermediate refresh HEADs `a5791b25473418af177070af07209672ece95724`, `f877903927043108b311fe73bdd13b1670081172`, `f2bd02e006ba5082fa4a693e78f85674370da071`, and `5350880a61c03536c23b0c0cb114f3e69f0b19ff` are historical only. The final-closeout branch was refreshed again after T-006 repair PR #263 advanced `v0.3` to `d00f494ce4e127b8b93bb8ea0932de8e18a05057`.
 
-The base advance from `c3389d07ae318e6d9f8aa2facd9dfa4211006920` to `0087720854dd235e02a35d612bddb4a023d80171` touches only T-007 files (`docs/implementation/v0.3/task-packs/T007_business_harness_contract.md`, `packages/domain-harness/src/harness/contract.ts`, and `packages/domain-harness/tests/harness/business-harness-machine.test.ts`). It does not overlap the T-010 repair write set or absorb T-007 semantics into this repair.
+The latest base advance from `0087720854dd235e02a35d612bddb4a023d80171` to `d00f494ce4e127b8b93bb8ea0932de8e18a05057` touches only T-006 workflow files (`T006_domain_workflow_xstate_boundary_predicate_purity.md`, workflow index/internal adapter/predicate, and focused workflow tests). It does not overlap the T-010 repair write set or absorb T-006 semantics into this repair.
 
-The earlier Build Host lint finding in `durable-control-coordinator.ts` was resolved by removing the unnecessary `JsonValue` assertion passed to `canonicalJsonStringify`; runtime behavior is unchanged because the canonicalizer accepts `unknown`.
+Earlier base advances likewise did not overlap the T-010 repair write set. The Build Host lint finding in `durable-control-coordinator.ts` was resolved by removing the unnecessary `JsonValue` assertion passed to `canonicalJsonStringify`; runtime behavior is unchanged because the canonicalizer accepts `unknown`.
 
 ## Focused tests
 
