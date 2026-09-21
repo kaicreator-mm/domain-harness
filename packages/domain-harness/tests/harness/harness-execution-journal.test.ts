@@ -128,7 +128,7 @@ const harnessArtifact = artifact('harness-config', 'quote-harness', 'harness-dig
 const catalogTool = artifact('tool', 'lookup_catalog', 'tool-digest-v1');
 
 function selectedSemantic(): BehaviorallyRelevantSemanticDependencies {
-  return { artifacts: [harnessArtifact] };
+  return {};
 }
 
 function preReadWithCatalogRevision(revision: string): BehaviorallyRelevantSemanticDependencies {
@@ -152,6 +152,7 @@ async function integrationOptions(
       sha256,
       journal,
     },
+    harnessProducerIdentity: harnessArtifact,
     selectedSemanticDependencies: selectedSemantic(),
     capabilitySemanticIdentities: { lookup_catalog: catalogTool },
     ...overrides,
@@ -206,7 +207,10 @@ test('committed query result replays without executing the query again', async (
   assert.equal(replay.harnessResult.status, 'ok');
   assert.equal(replayModel.requests.length, 0);
   assert.equal(queryExecutions, 1);
-  assert.equal(replay.journalEvidence.filter((entry) => entry.identity.slot.operationKind === 'query')[0]?.disposition, 'replayed');
+  assert.equal(
+    replay.journalEvidence.filter((entry) => entry.identity.slot.operationKind === 'query')[0]?.disposition,
+    'replayed',
+  );
 });
 
 test('same execution slot and semantic identity deterministically replays the same operation identity', async () => {
@@ -256,6 +260,45 @@ test('same deterministic slot with conflicting semantic identity fails closed', 
   assert.equal(conflictingCalls, 0);
 });
 
+test('concurrent callers for one deterministic slot execute external work at most once', async () => {
+  const journal = new VolatileHarnessExecutionJournalStore();
+  const context = {
+    target: { workflowId: 'quote-flow', instanceKey: 'rfq-concurrent' },
+    durableControlTurnId: 'turn-concurrent',
+    semanticContractDigest: await sha256.digestUtf8('base-contract'),
+    sha256,
+  };
+  const identity = await createHarnessExecutionOperationIdentity(
+    context,
+    'query',
+    1,
+    { capabilityId: 'lookup_catalog', input: { sku: 'P-1' } },
+  );
+  const signal = new AbortController().signal;
+  let calls = 0;
+  let enteredResolve: (() => void) | undefined;
+  let releaseResolve: (() => void) | undefined;
+  const entered = new Promise<void>((resolve) => { enteredResolve = resolve; });
+  const release = new Promise<void>((resolve) => { releaseResolve = resolve; });
+  const execute = async (): Promise<HarnessJournalOutcome> => {
+    calls += 1;
+    enteredResolve?.();
+    await release;
+    return { status: 'succeeded', value: { value: { available: true } } };
+  };
+
+  const firstPromise = executeJournaledHarnessOperation(journal, identity, signal, execute);
+  await entered;
+  const second = await executeJournaledHarnessOperation(journal, identity, signal, execute);
+  assert.equal(second.status, 'journal-failure');
+  if (second.status === 'journal-failure') assert.equal(second.code, 'AMBIGUOUS_COMPLETION');
+  assert.equal(calls, 1);
+  releaseResolve?.();
+  const first = await firstPromise;
+  assert.equal(first.status, 'completed');
+  assert.equal(calls, 1);
+});
+
 test('fresh Harness execution returns precise Fact/CDI/query/tool/semantic dependency evidence', async () => {
   const journal = new VolatileHarnessExecutionJournalStore();
   const model = new ScriptedModel([
@@ -282,6 +325,23 @@ test('fresh Harness execution returns precise Fact/CDI/query/tool/semantic depen
     { sourceId: 'catalog:P-1', revision: 'r7' },
   ]);
   assert.deepEqual(result.observedDependencies.toolArtifacts, [catalogTool]);
+  assert.deepEqual(result.cacheWriteHandoff.producerIdentity, harnessArtifact);
+  assert.deepEqual(
+    result.cacheWriteHandoff.observedDependencies,
+    result.observedDependencies.semantic,
+  );
+});
+
+test('Harness producer identity is exact, mandatory, and harness-config only', async () => {
+  const journal = new VolatileHarnessExecutionJournalStore();
+  const invalidOptions = await integrationOptions(baseInput(new ScriptedModel([finalResponse()])), journal, {
+    harnessProducerIdentity: artifact('tool', 'not-a-harness', 'wrong-kind'),
+  });
+  assert.throws(
+    () => createJournaledHarnessExecutionIntegration(invalidOptions),
+    (error: unknown) => error instanceof HarnessExecutionIntegrationError
+      && error.code === 'INVALID_HARNESS_PRODUCER_IDENTITY',
+  );
 });
 
 test('query provenance cannot be caller-predeclared and appears only after execution or committed replay', async () => {
@@ -314,6 +374,7 @@ test('dynamically observed versioned query dependency can remain cache-write eli
     cachePreReadDependencies: preReadWithCatalogRevision('r7'),
   }));
   assert.deepEqual(result.cacheWriteEligibility, { eligible: true });
+  assert.deepEqual(result.cacheWriteHandoff.dependencyEligibility, { eligible: true });
 });
 
 test('dynamically observed unversioned/live query dependency makes exact-cache write ineligible', async () => {
@@ -338,6 +399,27 @@ test('dynamically observed unversioned/live query dependency makes exact-cache w
       'observed-live-dependency-without-semantic-revision',
     );
   }
+});
+
+test('used query capability without exact tool identity makes exact-cache write ineligible', async () => {
+  const journal = new VolatileHarnessExecutionJournalStore();
+  const model = new ScriptedModel([
+    { kind: 'query', call: { capabilityId: 'lookup_catalog', input: { sku: 'P-1' } } },
+    finalResponse(),
+  ]);
+  const query = queryBinding('lookup_catalog', async () => ({
+    value: { available: true },
+    dependency: { kind: 'query', identity: 'catalog:P-1', revision: 'r7' },
+  }));
+  const result = await runIntegrated(await integrationOptions(baseInput(model, [query]), journal, {
+    capabilitySemanticIdentities: {},
+    cachePreReadDependencies: {
+      artifacts: [harnessArtifact],
+      revisions: [{ sourceId: 'catalog:P-1', revision: 'r7' }],
+    },
+  }));
+  assert.equal(result.cacheWriteEligibility.eligible, false);
+  assert.deepEqual(result.observedDependencies.semantic.unversionedLiveSourceIds, ['tool:lookup_catalog']);
 });
 
 class CrashAfterFirstCommitStore extends VolatileHarnessExecutionJournalStore {
@@ -439,7 +521,10 @@ test('HarnessMachine still has no transition/mutation authority and mutation bin
     assert.equal(result.harnessResult.code, 'MUTATION_CAPABILITY_FORBIDDEN');
   }
   assert.equal(mutationExecutions, 0);
-  assert.equal(result.journalEvidence.filter((entry) => entry.identity.slot.operationKind === 'query').length, 0);
+  assert.equal(
+    result.journalEvidence.filter((entry) => entry.identity.slot.operationKind === 'query').length,
+    0,
+  );
   assert.equal(JSON.stringify(result.harnessResult).includes('transition'), false);
   assert.equal(JSON.stringify(result.harnessResult).includes('mutation'), false);
 });
