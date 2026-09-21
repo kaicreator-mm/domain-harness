@@ -404,6 +404,7 @@ export class PromotedArtifactRegistry {
         throw new PromotedArtifactContractError(
           'PROMOTED_ARTIFACT_REVOKED',
           `artifact ${identity.artifactId}@${identity.contentDigest} is revoked for fresh selection (${revocation.revocationPolicy})`,
+          identity,
         );
       }
     }
@@ -566,6 +567,7 @@ export class PromotedArtifactRegistry {
       throw new PromotedArtifactContractError(
         'PROMOTED_ARTIFACT_REVOKED',
         'alias cannot target a revoked artifact',
+        input.artifact,
       );
     }
     const bound = await this.store.putAlias(input);

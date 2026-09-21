@@ -139,7 +139,11 @@ load exact pin (fail closed if missing)
 
 ## 5. Failure Handling
 
-Fail-closed cases: missing artifact; revoked artifact (fresh); incompatible artifact; applicability mismatch; alias drift (stale revision); floating selector; package mismatch; governance mismatch; corrupt digest; missing retained body; conflicting `DynamicChildExecutionPin`; missing pin before journaled work; cycles; duplicate control edges; non-terminal dead-end control; unbounded/over-bound control; non-allowlisted tool/event/effect; reasoned step; query failure; journal semantic-identity conflict.
+The module raises typed conditions; the frozen fresh/recovery taxonomy (L2 §18, S6) decides which of them continue resolution and which fail closed. T-018 consumes this mapping.
+
+Fallthrough-eligible on FRESH selection only (`FALLTHROUGH_ELIGIBLE_CODES`): incompatible artifact (`DYNAMIC_CHILD_INCOMPATIBLE`); applicability mismatch (`DYNAMIC_CHILD_NOT_APPLICABLE`). Registry `PROMOTED_ARTIFACT_NOT_FOUND` on fresh selection is likewise a continue outcome, and `PROMOTED_ARTIFACT_REVOKED` on fresh selection is resolved by the revocation record's `revocationPolicy` (`fallthrough` → continue with telemetry; `deny` → fail closed).
+
+Fail closed in every context: applicability mismatch or incompatibility observed during RECOVERY of an already-started child; alias drift (stale revision); floating selector; package mismatch; governance mismatch; corrupt digest; missing retained body; conflicting `DynamicChildExecutionPin`; missing pin before journaled work; cycles; duplicate control edges; non-terminal dead-end control; unbounded/over-bound control; non-allowlisted tool/event/effect; reasoned step; query failure; journal semantic-identity conflict.
 
 No failure path falls back to another artifact version, another package/CDI tuple, another Governance Baseline, an alias re-resolution, or silent journal re-execution.
 
