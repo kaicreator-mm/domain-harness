@@ -482,6 +482,19 @@ export class PromotedArtifactRegistry {
     return (await this.load(identity, expectedAuthority, { allowRevoked: false })).body;
   }
 
+  /**
+   * Frozen L2 §14.4 exact-recovery seam for T-017. Fresh selection
+   * (resolveExact/selectVersion/selectAlias) stays revocation-blocked, but an
+   * exact pinned recovery must remain resolvable even for a revoked artifact;
+   * an explicit operator abort/recovery action is the only way to stop it.
+   */
+  async recoverExact(
+    identity: PromotedArtifactIdentity,
+    expectedAuthority: GovernanceBaselineAuthorityBinding,
+  ): Promise<LoadedPromotedArtifact> {
+    return this.load(identity, expectedAuthority, { allowRevoked: true });
+  }
+
   async selectVersion(input: SelectPromotedArtifactVersionInput): Promise<SelectedPromotedArtifact> {
     const binding = await this.store.getVersion(input.artifactId, input.version);
     if (binding === undefined) {
