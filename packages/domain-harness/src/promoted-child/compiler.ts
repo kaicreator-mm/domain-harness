@@ -223,6 +223,7 @@ function topologicalOrder(control: CandidateControlContract): readonly string[] 
     indegree.set(node, 0);
     outgoing.set(node, []);
   }
+  const seenEdges = new Set<string>();
   for (const edge of control.edges) {
     if (!nodeSet.has(edge.from) || !nodeSet.has(edge.to)) {
       failCompile(`control edge ${edge.from} -> ${edge.to} references an undeclared node`);
@@ -233,6 +234,11 @@ function topologicalOrder(control: CandidateControlContract): readonly string[] 
         `control edge ${edge.from} -> ${edge.to} is a self cycle`,
       );
     }
+    const edgeKey = `${edge.from}->${edge.to}`;
+    if (seenEdges.has(edgeKey)) {
+      failCompile(`duplicate control edge ${edgeKey}`);
+    }
+    seenEdges.add(edgeKey);
     indegree.set(edge.to, (indegree.get(edge.to) ?? 0) + 1);
     (outgoing.get(edge.from) as string[]).push(edge.to);
   }
@@ -440,6 +446,13 @@ export function compilePromotedChild(body: PromotedArtifactBody): CompiledPromot
 
   if (terminalCount !== 1) {
     failCompile(`promoted-subworkflow requires exactly one terminal-output node, got ${terminalCount}`);
+  }
+  const terminalNode = order.find((node) => stepByNode.get(node)?.kind === 'terminal-output') as string;
+  for (const node of order) {
+    if (node === terminalNode) continue;
+    if (!control.edges.some((edge) => edge.from === node)) {
+      failCompile(`non-terminal node ${node} has no outgoing control edge; the compiled child would dead-end before its terminal output`);
+    }
   }
 
   const definition = buildDefinition(

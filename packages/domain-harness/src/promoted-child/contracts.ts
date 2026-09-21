@@ -82,7 +82,8 @@ export interface PromotedChildArtifactPort {
     expectedAuthority: PromotedChildExpectedAuthority,
   ): Promise<SelectedPromotedArtifact>;
   putRetention(reference: PromotedArtifactRetentionReference): Promise<void>;
-  releaseRetention(expected: PromotedArtifactRetentionReference): Promise<'released' | 'absent'>;
+  /** Exact-reference release. Idempotent for an already-absent reference; stale mismatches fail closed. */
+  releaseRetention(expected: PromotedArtifactRetentionReference): Promise<void>;
 }
 
 export interface PromotedChildExpectedAuthority {
@@ -213,11 +214,16 @@ export interface PromotedChildEffectIntentData {
   readonly idempotencyKey?: string;
 }
 
+export interface PromotedChildEmittedEvent {
+  readonly eventType: string;
+  readonly payload?: JsonValue;
+}
+
 export interface PromotedChildTerminalResult {
   readonly artifact: PromotedArtifactIdentity;
   readonly pin: DynamicChildExecutionPin;
   readonly output: JsonValue;
-  readonly emittedEvents: readonly string[];
+  readonly emittedEvents: readonly PromotedChildEmittedEvent[];
   /** Data only. Mutation admission/execution remains the parent durable effect authority. */
   readonly effectIntents: readonly PromotedChildEffectIntentData[];
 }

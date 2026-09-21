@@ -495,6 +495,18 @@ export class PromotedArtifactRegistry {
     return this.load(identity, expectedAuthority, { allowRevoked: true });
   }
 
+  /**
+   * Fresh exact-digest selection with full promotion provenance in ONE load
+   * (revocation-blocked). T-017 consumes this seam so fresh selection does not
+   * need a second revocation-tolerant load just to read the promotion record.
+   */
+  async resolveExactDetailed(
+    identity: PromotedArtifactIdentity,
+    expectedAuthority: GovernanceBaselineAuthorityBinding,
+  ): Promise<LoadedPromotedArtifact> {
+    return this.load(identity, expectedAuthority, { allowRevoked: false });
+  }
+
   async selectVersion(input: SelectPromotedArtifactVersionInput): Promise<SelectedPromotedArtifact> {
     const binding = await this.store.getVersion(input.artifactId, input.version);
     if (binding === undefined) {

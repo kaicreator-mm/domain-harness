@@ -17,6 +17,7 @@ import {
   type DynamicChildPinStore,
   type PromotedChildArtifactPort,
   type PromotedChildEffectIntentData,
+  type PromotedChildEmittedEvent,
   type PromotedChildInvokingContext,
   type PromotedChildSelector,
   type PromotedChildTerminalResult,
@@ -145,7 +146,7 @@ export class PromotedChildExecutionSession {
     const context = this.operationIdentityContext(options);
     const signal = options.signal ?? new AbortController().signal;
     const stepOutputs = new Map<string, JsonValue>();
-    const emittedEvents: string[] = [];
+    const emittedEvents: PromotedChildEmittedEvent[] = [];
     const effectIntents: PromotedChildEffectIntentData[] = [];
     let output: JsonValue | undefined;
     let executed = 0;
@@ -222,11 +223,13 @@ export class PromotedChildExecutionSession {
               `step ${compiled.node} emits undeclared Domain Event ${step.eventType}`,
             );
           }
-          if (step.payload !== undefined) {
-            // Payload resolution is validated eagerly; the emitted event identity is the declared type.
-            this.resolveSource(step.payload, options.input, stepOutputs, label);
-          }
-          emittedEvents.push(step.eventType);
+          const payload = step.payload === undefined
+            ? undefined
+            : this.resolveSource(step.payload, options.input, stepOutputs, label);
+          emittedEvents.push({
+            eventType: step.eventType,
+            ...(payload === undefined ? {} : { payload }),
+          });
           break;
         }
         case 'effect-intent': {
@@ -345,9 +348,14 @@ export class PromotedChildRuntime {
     }
     const pinnedAuthority = pin.invokingAuthority;
     const current = input.invoking;
+    if (pinnedAuthority.domainIntelligenceContentDigest !== current.domainIntelligenceContentDigest) {
+      throw new DynamicChildExecutionError(
+        'DYNAMIC_CHILD_PACKAGE_MISMATCH',
+        'recovery CDI digest does not match the pinned invocation package authority',
+      );
+    }
     if (
-      pinnedAuthority.domainIntelligenceContentDigest !== current.domainIntelligenceContentDigest
-      || pinnedAuthority.governanceBaseline.domainId !== current.governanceBaseline.domainId
+      pinnedAuthority.governanceBaseline.domainId !== current.governanceBaseline.domainId
       || pinnedAuthority.governanceBaseline.governanceId !== current.governanceBaseline.governanceId
       || pinnedAuthority.governanceBaseline.schemaVersion !== current.governanceBaseline.schemaVersion
       || pinnedAuthority.governanceBaseline.contentDigest !== current.governanceBaseline.contentDigest
@@ -391,10 +399,11 @@ export class PromotedChildRuntime {
     }
     // Recovery of an already-started child is fail-closed: never a fresh fallthrough.
     assertPromotedChildCompatible(compiled.envelope, recovered.promotion.authorityBinding, input.invoking);
+    assertPromotedChildApplicable(compiled.envelope, input.invoking);
     return new PromotedChildExecutionSession(pin, compiled, this.sha256);
   }
 
-  async releaseRetention(slot: DynamicChildInvocationSlot): Promise<'released' | 'absent'> {
+  async releaseRetention(slot: DynamicChildInvocationSlot): Promise<void> {
     return this.pins.releaseRetention(slot);
   }
 }

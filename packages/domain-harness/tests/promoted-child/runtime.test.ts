@@ -64,7 +64,7 @@ test('runtime: fresh selection pins BEFORE any journaled work, then runs to a te
   });
   assert.equal(calls.count, 1);
   assert.deepEqual(result.output, { amount: 42, currency: 'USD' });
-  assert.deepEqual(result.emittedEvents, ['QUOTE_PREPARED']);
+  assert.deepEqual(result.emittedEvents, [{ eventType: 'QUOTE_PREPARED', payload: 42 }]);
   assert.deepEqual(result.effectIntents, []);
   assert.equal(result.pin.artifact.contentDigest, fixture.body.identity.contentDigest);
 });
@@ -207,6 +207,15 @@ test('runtime: recovery against a moved package/governance authority fails close
       }),
     }),
     (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_GOVERNANCE_MISMATCH',
+  );
+});
+
+test('runtime: recovery against moved applicability facts fails closed (no fallthrough on recovery)', async () => {
+  const fixture = await promotedFixture();
+  await beginFresh(fixture);
+  await assert.rejects(
+    () => fixture.runtime.recoverExecution({ slot: makeSlot(), invoking: invokingContext({ applicabilityFacts: [] }) }),
+    (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_NOT_APPLICABLE',
   );
 });
 

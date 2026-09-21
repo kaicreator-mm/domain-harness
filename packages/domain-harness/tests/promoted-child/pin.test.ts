@@ -138,9 +138,9 @@ test('pin: requirePin fails closed when the slot was never pinned', async () => 
 
 test('pin: retention release uses the exact retained reference', async () => {
   const { coordinator, fixture, pin, slot } = await committed();
-  const released = await coordinator.releaseRetention(slot);
-  assert.equal(released, 'released');
+  await coordinator.releaseRetention(slot);
   assert.equal((await fixture.store.listRetentions(pin.artifact)).length, 0);
-  const again = await coordinator.releaseRetention(slot);
-  assert.equal(again, 'absent');
+  // Releasing an already-absent reference is idempotent and never errors.
+  await coordinator.releaseRetention(slot);
+  assert.equal((await fixture.store.listRetentions(pin.artifact)).length, 0);
 });

@@ -185,7 +185,7 @@ export class DynamicChildPinCoordinator {
     return pin;
   }
 
-  async releaseRetention(slot: DynamicChildInvocationSlot): Promise<'released' | 'absent'> {
+  async releaseRetention(slot: DynamicChildInvocationSlot): Promise<void> {
     const pin = await this.requirePin(slot);
     const referenceId = await computeRetentionReferenceId(slot, pin.invokingPackageId, pin.artifact, this.sha256);
     const retention = createRetentionReference(
@@ -198,6 +198,6 @@ export class DynamicChildPinCoordinator {
         governanceBaseline: pin.invokingAuthority.governanceBaseline,
       },
     );
-    return this.artifactPort.releaseRetention(retention);
+    await this.artifactPort.releaseRetention(retention);
   }
 }

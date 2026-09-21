@@ -35,12 +35,12 @@ The matrix proves:
 3. all control-flow cycles fail closed (including self loops), per frozen L2 §11.2;
 4. reasoned steps fail closed under the §11.6 allowance (T-017 ships deterministic/query steps only);
 5. query tools outside the envelope allowlist, mutation binding while `mutation.kind === 'none'`, effects outside `mutation.effects`, and undeclared Domain Events all fail closed at compile;
-6. unreachable nodes, `maxSteps` below the declared node count, and backward `step-output` references fail closed;
+6. unreachable nodes, duplicate control edges, non-terminal nodes that would dead-end before the terminal output, `maxSteps` below the declared node count, and backward `step-output` references fail closed;
 7. the pin commits durably BEFORE any journaled work and registers `recoverable-execution` retention in the T-012 registry;
-8. identical pin replay is idempotent; a different digest for the same logical invocation slot is `DYNAMIC_CHILD_DEFINITION_CONFLICT` and never overwrites;
+8. identical pin replay is idempotent — the idempotency comparison covers the full durable pin record including `pinnedAt`, so a replay must re-present the decision invocation's original pin metadata; any divergence (including a different `pinnedAt`) is treated as `DYNAMIC_CHILD_DEFINITION_CONFLICT` and never overwrites;
 9. `GovernanceExecutionPin` package/governance mismatch fails closed;
 10. `requirePin` on a never-pinned slot fails closed; retention release uses the exact retained reference;
-11. fresh selection pins before work, executes query steps journaled with the exact `promotedChildContentDigest`, and returns terminal output + finite declared events;
+11. fresh selection pins before work, executes query steps journaled with the exact `promotedChildContentDigest`, and returns terminal output + finite declared events with their evaluated payloads;
 12. a replayed control turn replays committed work without re-executing the query tool;
 13. committed work from digest D1 cannot be consumed by a D2 child on the same deterministic slot — conflicting semantic identity fails closed (frozen L2 §14.5);
 14. `requireDynamicChildOperationGate` enforces: no journaled work for a child whose pin was never made durable;
@@ -83,7 +83,7 @@ exact durable pin       = slot + invoking packageId + invoking authority context
 ```
 
 - The slot is insert-once (`DynamicChildPinStore.insertOnce`); conflict never overwrites and never silently reallocates.
-- `DynamicChildPinCoordinator.commitPin` validates the invoking context against the instance's durable `GovernanceExecutionPin` when supplied (T-014 integration), then registers a deterministic `dynamic-child-pin:<digest>` retention reference (`recoverable-execution`) in the T-012 registry, so the exact body is retained while any recoverable pin references it (§14.3). Release uses the exact retained reference (stale release fails closed in T-012).
+- `DynamicChildPinCoordinator.commitPin` validates the invoking context against the instance's durable `GovernanceExecutionPin` when supplied (T-014 integration), then registers a deterministic `dynamic-child-pin:<digest>` retention reference (`recoverable-execution`) in the T-012 registry, so the exact body is retained while any recoverable pin references it (§14.3). Retention flows through the registry's own validated `retain`/`release` surface — never the raw store — so release uses the exact retained reference and a stale release fails closed inside T-012.
 - The pin is a first-class durable record; host persistence (SQLite) is T-022/T-023 scope behind the same store contract.
 
 ### 3.5 Pin-before-journaled-work gate
@@ -92,19 +92,24 @@ exact durable pin       = slot + invoking packageId + invoking authority context
 
 ### 3.6 Compiler
 
-`compilePromotedChild(body)` is pure and deterministic: same exact body → same `DomainWorkflowDefinition` + topological step plan. The definition is the public engine-neutral contract (T-006) and adapts to the selected engine through the existing `adaptDomainWorkflowToXState`; T-017 introduces no peer workflow runtime and no generated arbitrary code. All cycles are rejected (§11.2). Reasoned steps fail closed (§11.6 allowance).
+`compilePromotedChild(body)` is pure and deterministic: same exact body → same `DomainWorkflowDefinition` + topological step plan. The definition is the public engine-neutral contract (T-006) and adapts to the selected engine through the existing `adaptDomainWorkflowToXState`; T-017 introduces no peer workflow runtime and no generated arbitrary code. All cycles are rejected (§11.2). Duplicate control edges and non-terminal sink nodes (which would dead-end the engine before the terminal output) are rejected at compile, not inside the adapter. Reasoned steps fail closed (§11.6 allowance).
 
 ### 3.7 Execution and terminal result
 
-`session.run(...)` executes the step plan under the declared `maxSteps` bound. Query steps run at most once per deterministic slot through the T-016 journal (`executeJournaledHarnessOperation`) with operation identities that include the exact child digest. `effect-intent` steps collect data only; mutation admission/execution remains the parent durable effect authority (§15). The terminal result (output, finite declared events, effect intents) is data returned for parent central admission (T-019 owns schema/guard/transition).
+`session.run(...)` executes the step plan under the declared `maxSteps` bound. Query steps run at most once per deterministic slot through the T-016 journal (`executeJournaledHarnessOperation`) with operation identities that include the exact child digest. `effect-intent` steps collect data only; mutation admission/execution remains the parent durable effect authority (§15). The terminal result (output, finite declared events as `{ eventType, payload? }` records with evaluated payloads, effect intents) is data returned for parent central admission (T-019 owns schema/guard/transition).
 
 ### 3.8 Exact pinned recovery
 
-`recoverExecution({ slot, invoking, governancePin? })` deliberately has NO selector input: load pin → verify invoking authority equality (never switch to the active package) → load exact body by content digest through the revocation-tolerant recovery seam → recompile deterministically → fail closed on missing body (`DYNAMIC_CHILD_BODY_MISSING`), corrupt digest (`DYNAMIC_CHILD_DIGEST_MISMATCH`) or authority drift. Revocation policy does not redefine exact recovery (§14.4).
+`recoverExecution({ slot, invoking, governancePin? })` deliberately has NO selector input: load pin → verify invoking authority equality (never switch to the active package) → load exact body by content digest through the revocation-tolerant recovery seam → recompile deterministically → re-check compatibility AND applicability against the invoking context (fail-closed on recovery, never fallthrough) → fail closed on missing body (`DYNAMIC_CHILD_BODY_MISSING`), corrupt digest (`DYNAMIC_CHILD_DIGEST_MISMATCH`) or authority drift. Revocation policy does not redefine exact recovery (§14.4).
 
-### 3.9 T-012 narrow seam addition
+### 3.9 T-012 narrow seam additions
 
-`PromotedArtifactRegistry.recoverExact(identity, expectedAuthority)` — additive, delegates to the existing private `load(..., { allowRevoked: true })`. Fresh selection methods remain revocation-blocked. No other T-012 behavior is changed or re-implemented.
+Two additive seams on `PromotedArtifactRegistry`, both delegating to the existing private `load(...)`:
+
+- `recoverExact(identity, expectedAuthority)` — `load(..., { allowRevoked: true })` for the revocation-tolerant recovery path;
+- `resolveExactDetailed(identity, expectedAuthority)` — `load(..., { allowRevoked: false })` returning the loaded artifact, so the fresh exact path stays revocation-blocked and loads exactly once.
+
+Fresh selection methods remain revocation-blocked. No other T-012 behavior is changed or re-implemented.
 
 ## 4. Implementation
 
@@ -128,13 +133,13 @@ load exact pin (fail closed if missing)
 → assert invoking authority == pinned authority
 → load exact promoted body by content digest (revocation-tolerant)
 → verify digest (registry) → recompile (deterministic)
-→ compatibility re-check (fail closed, never fallthrough)
+→ compatibility + applicability re-check (fail closed, never fallthrough)
 → session → replay/continue journaled work
 ```
 
 ## 5. Failure Handling
 
-Fail-closed cases: missing artifact; revoked artifact (fresh); incompatible artifact; applicability mismatch; alias drift (stale revision); floating selector; package mismatch; governance mismatch; corrupt digest; missing retained body; conflicting `DynamicChildExecutionPin`; missing pin before journaled work; cycles; unbounded/over-bound control; non-allowlisted tool/event/effect; reasoned step; query failure; journal semantic-identity conflict.
+Fail-closed cases: missing artifact; revoked artifact (fresh); incompatible artifact; applicability mismatch; alias drift (stale revision); floating selector; package mismatch; governance mismatch; corrupt digest; missing retained body; conflicting `DynamicChildExecutionPin`; missing pin before journaled work; cycles; duplicate control edges; non-terminal dead-end control; unbounded/over-bound control; non-allowlisted tool/event/effect; reasoned step; query failure; journal semantic-identity conflict.
 
 No failure path falls back to another artifact version, another package/CDI tuple, another Governance Baseline, an alias re-resolution, or silent journal re-execution.
 

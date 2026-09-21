@@ -144,7 +144,7 @@ export async function promotedFixture(
       recordedAt: '2026-09-21T03:00:00.000Z',
     },
   });
-  const port = createRegistryPromotedChildArtifactPort(registry, store);
+  const port = createRegistryPromotedChildArtifactPort(registry);
   const pinStore = new MemoryDynamicChildPinStore();
   const runtime = new PromotedChildRuntime(port, pinStore, sha256);
   return { store, registry, port, pinStore, runtime, body: result.body, semanticMaterial };

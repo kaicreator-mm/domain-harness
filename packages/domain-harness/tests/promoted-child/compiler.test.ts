@@ -182,6 +182,48 @@ test('compiler: unreachable node and insufficient maxSteps fail closed', async (
   );
 });
 
+test('compiler: a non-terminal sink node fails closed (definition must not dead-end)', async () => {
+  const body = await bodyFor({
+    bodyNodes: [
+      { node: 'a', step: { kind: 'emit-event', eventType: 'QUOTE_PREPARED' } },
+      { node: 'sink', step: { kind: 'emit-event', eventType: 'QUOTE_PREPARED' } },
+      { node: 'z', step: { kind: 'terminal-output', output: { kind: 'literal', value: 'ok' } } },
+    ],
+    control: {
+      startNode: 'a',
+      nodes: ['a', 'sink', 'z'],
+      edges: [
+        { from: 'a', to: 'sink' },
+        { from: 'a', to: 'z' },
+      ],
+      maxSteps: 5,
+    },
+  });
+  await assert.rejects(
+    async () => compilePromotedChild(body),
+    (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_COMPILE_INVALID',
+  );
+});
+
+test('compiler: duplicate control edges fail closed at compile, not inside the engine adapter', async () => {
+  const body = await bodyFor({
+    control: {
+      startNode: 'fetch',
+      nodes: ['fetch', 'notify', 'finish'],
+      edges: [
+        { from: 'fetch', to: 'notify' },
+        { from: 'fetch', to: 'notify' },
+        { from: 'notify', to: 'finish' },
+      ],
+      maxSteps: 5,
+    },
+  });
+  await assert.rejects(
+    async () => compilePromotedChild(body),
+    (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_COMPILE_INVALID',
+  );
+});
+
 test('compiler: non-workflow candidate kind and bad body schema fail closed', async () => {
   const wrongKind = makeEnvelope({ candidateKind: 'rule' });
   assert.throws(
