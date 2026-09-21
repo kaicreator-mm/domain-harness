@@ -22,6 +22,7 @@ import {
   type PromotedChildSelector,
   type PromotedChildTerminalResult,
   type PromotedChildValueSource,
+  type ResolvedPromotedChild,
 } from './contracts.js';
 import { compilePromotedChild } from './compiler.js';
 import {
@@ -282,6 +283,15 @@ export interface BeginFreshPromotedChildInput {
   readonly pinnedAt: string;
 }
 
+export interface BeginFreshResolvedPromotedChildInput {
+  /** The single pre-resolved selection object (frozen L2 §17.3: resolved once, reused here). */
+  readonly resolved: ResolvedPromotedChild;
+  readonly slot: DynamicChildInvocationSlot;
+  readonly invoking: PromotedChildInvokingContext;
+  readonly governancePin?: GovernanceExecutionPin;
+  readonly pinnedAt: string;
+}
+
 export interface RecoverPromotedChildInput {
   readonly slot: DynamicChildInvocationSlot;
   readonly invoking: PromotedChildInvokingContext;
@@ -319,12 +329,27 @@ export class PromotedChildRuntime {
       governanceBaseline: input.invoking.governanceBaseline,
     };
     const resolved = await resolvePromotedChildOnce(input.selector, expectedAuthority, this.artifactPort);
-    const compiled = compilePromotedChild(resolved.body);
-    assertPromotedChildCompatible(compiled.envelope, resolved.promotion.authorityBinding, input.invoking);
+    return this.beginFreshResolvedExecution({
+      resolved,
+      slot: input.slot,
+      invoking: input.invoking,
+      ...(input.governancePin !== undefined ? { governancePin: input.governancePin } : {}),
+      pinnedAt: input.pinnedAt,
+    });
+  }
+
+  /**
+   * Same fresh selection-to-execution boundary, but consuming an already
+   * resolved selection object (T-018 resolver pre-read reuse). The runtime
+   * never resolves a selector twice per decision invocation (frozen L2 §17.3).
+   */
+  async beginFreshResolvedExecution(input: BeginFreshResolvedPromotedChildInput): Promise<PromotedChildExecutionSession> {
+    const compiled = compilePromotedChild(input.resolved.body);
+    assertPromotedChildCompatible(compiled.envelope, input.resolved.promotion.authorityBinding, input.invoking);
     assertPromotedChildApplicable(compiled.envelope, input.invoking);
     const pin = await this.pins.commitPin({
       slot: input.slot,
-      resolved,
+      resolved: input.resolved,
       invoking: input.invoking,
       ...(input.governancePin !== undefined ? { governancePin: input.governancePin } : {}),
       pinnedAt: input.pinnedAt,

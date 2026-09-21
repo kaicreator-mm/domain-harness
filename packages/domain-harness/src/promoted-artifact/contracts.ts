@@ -241,10 +241,17 @@ export type PromotedArtifactContractErrorCode =
 
 export class PromotedArtifactContractError extends Error {
   readonly code: PromotedArtifactContractErrorCode;
+  /**
+   * Exact artifact the error refers to, when the registry had already resolved
+   * one (additive for T-018 revocation-policy lookup; never required to parse
+   * the message).
+   */
+  readonly artifact?: PromotedArtifactIdentity;
 
-  constructor(code: PromotedArtifactContractErrorCode, message: string) {
+  constructor(code: PromotedArtifactContractErrorCode, message: string, artifact?: PromotedArtifactIdentity) {
     super(message);
     this.name = 'PromotedArtifactContractError';
     this.code = code;
+    if (artifact !== undefined) this.artifact = artifact;
   }
 }
