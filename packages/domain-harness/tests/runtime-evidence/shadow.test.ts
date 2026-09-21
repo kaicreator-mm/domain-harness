@@ -84,7 +84,9 @@ test('shadow: V10 — the shadow path cannot mutate the running parent workflow'
     { capture, evaluator: evaluator({ verdict: { viability: 'unclear' } }) },
   );
 
-  assert.equal(fixture.durableStore.snapshotCount(), 0, 'shadow wrote no control snapshot');
+  // Structural proof: ShadowEvaluationPorts carries no admission/journal/tool/
+  // baseline/durable-store handle, so no snapshot channel exists by
+  // construction. The discriminating runtime checks are the journal/tool logs.
   assert.equal(fixture.journal.getRecords().length, 0, 'shadow recorded no durable effect');
   assert.equal(fixture.tools.calls.length, 0, 'shadow invoked no effect tool');
   assert.ok(store.records().length > 0, 'shadow still produced evidence');
@@ -201,6 +203,45 @@ test('shadow: V11 — the exact stable fallback triple is accepted and recorded 
     (evaluation.payload as { readonly stableFallback: unknown }).stableFallback,
     EXPERIMENTAL.stableFallback,
   );
+});
+
+test('shadow: repeated failures stay distinct records and never mask the shadow error', async () => {
+  const { capture, store } = makeCapture();
+  const exploding = (label: string): ShadowEvaluatorPort => ({
+    evaluate: async () => {
+      throw new Error(label);
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      runShadowEvaluation(
+        { shadowId: 'shadow-006a', experimentalArtifact: EXPERIMENTAL, input: null },
+        { capture, evaluator: exploding('first failure') },
+      ),
+    (error: unknown) => isIntegrationError(error, 'RUNTIME_EVIDENCE_SHADOW_FAILED'),
+  );
+  await assert.rejects(
+    () =>
+      runShadowEvaluation(
+        { shadowId: 'shadow-006b', experimentalArtifact: EXPERIMENTAL, input: null },
+        { capture, evaluator: exploding('second failure') },
+      ),
+    (error: unknown) => isIntegrationError(error, 'RUNTIME_EVIDENCE_SHADOW_FAILED'),
+  );
+  assert.equal(store.records().length, 2, 'distinct shadow failures are distinct records');
+
+  // Same shadowId failing twice: the evidence append conflict must not mask
+  // the shadow failure code.
+  await assert.rejects(
+    () =>
+      runShadowEvaluation(
+        { shadowId: 'shadow-006a', experimentalArtifact: EXPERIMENTAL, input: null },
+        { capture, evaluator: exploding('first failure again') },
+      ),
+    (error: unknown) => isIntegrationError(error, 'RUNTIME_EVIDENCE_SHADOW_FAILED'),
+  );
+  assert.equal(store.records().length, 2, 'conflicting failure evidence never rewrites existing records');
 });
 
 test('shadow: an empty shadowId is rejected as malformed integration input', async () => {

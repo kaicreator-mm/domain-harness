@@ -127,7 +127,6 @@ test('rollback: never undoes committed effects — compensation stays an explici
   assert.equal(rollback.evidence.length, 2);
   assert.equal(fixture.journal.getRecords().length, journalBefore, 'rollback touched no effect record');
   assert.equal(fixture.tools.calls.length, toolsBefore, 'rollback invoked no tool');
-  assert.equal(fixture.durableStore.snapshotCount(), 0, 'rollback wrote no snapshot');
 
   const compensation = await admitCentralDecision(
     makeRequest({

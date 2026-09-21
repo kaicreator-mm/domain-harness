@@ -74,13 +74,21 @@ export async function runShadowEvaluation(
     return { evidence };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await ports.capture.captureFailure({
-      code: 'RUNTIME_EVIDENCE_SHADOW_FAILED',
-      message,
-      ...(request.sourceExecution === undefined
-        ? {}
-        : { sourceExecution: request.sourceExecution }),
-    });
+    // Failure evidence is audit material: its append must never mask the
+    // shadow failure itself, so a store conflict cannot rewrite the surfaced
+    // error code. The discriminator keeps distinct shadow failures distinct.
+    try {
+      await ports.capture.captureFailure({
+        code: 'RUNTIME_EVIDENCE_SHADOW_FAILED',
+        message,
+        discriminator: `shadow:${request.shadowId}`,
+        ...(request.sourceExecution === undefined
+          ? {}
+          : { sourceExecution: request.sourceExecution }),
+      });
+    } catch {
+      // evidence append failure is secondary to the shadow failure
+    }
     throw new RuntimeEvidenceIntegrationError(
       'RUNTIME_EVIDENCE_SHADOW_FAILED',
       `shadow evaluation failed closed: ${message}`,

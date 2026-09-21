@@ -11,6 +11,7 @@ import {
 import type { CentralAdmissionOutcome } from '../admission/contracts.js';
 import type { PromotionActivationAuditRecord } from '../promotion-activation/contracts.js';
 import type { HumanOperatorActorIdentity } from '../promotion-activation/contracts.js';
+import { RuntimeEvidenceIntegrationError } from './contracts.js';
 import type {
   ExperimentalArtifactReference,
   RuntimeEvidenceCaptureContext,
@@ -31,6 +32,12 @@ export interface CaptureFailureInput {
   readonly code: string;
   readonly message: string;
   readonly sourceExecution?: RuntimeEvidenceSourceExecutionRef;
+  /**
+   * Optional evidence-id discriminator override. Integration points that can
+   * fail repeatedly under the same code/turn (e.g. shadow evaluation) supply
+   * their own discriminator so distinct failures stay distinct records.
+   */
+  readonly discriminator?: string;
   readonly sequence?: number;
 }
 
@@ -136,6 +143,7 @@ export class RuntimeEvidenceCapture {
 
   async captureFailure(input: CaptureFailureInput): Promise<RuntimeEvidenceRecord> {
     const discriminator =
+      input.discriminator ??
       input.sourceExecution?.durableControlTurnId ??
       input.sourceExecution?.workflowInstanceId ??
       input.code;
@@ -188,6 +196,12 @@ export class RuntimeEvidenceCapture {
   async captureOperatorOverride(
     input: CaptureOperatorOverrideInput,
   ): Promise<RuntimeEvidenceRecord> {
+    if (input.actionId.trim().length === 0) {
+      throw new RuntimeEvidenceIntegrationError(
+        'INVALID_RUNTIME_EVIDENCE_INTEGRATION',
+        'operator override actionId must be a non-empty string',
+      );
+    }
     return this.#emit('human-override', 'durable-audit', input.actionId, input.sequence, {
       actor: {
         kind: input.actor.kind,
