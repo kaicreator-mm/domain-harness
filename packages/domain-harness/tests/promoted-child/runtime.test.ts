@@ -195,6 +195,10 @@ test('runtime: recovery against a moved package/governance authority fails close
     (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_PACKAGE_MISMATCH',
   );
   await assert.rejects(
+    () => fixture.runtime.recoverExecution({ slot: makeSlot(), invoking: invokingContext({ domainIntelligenceContentDigest: 'cdi-orders-b2' }) }),
+    (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_PACKAGE_MISMATCH',
+  );
+  await assert.rejects(
     () => fixture.runtime.recoverExecution({
       slot: makeSlot(),
       invoking: invokingContext({
@@ -207,6 +211,15 @@ test('runtime: recovery against a moved package/governance authority fails close
       }),
     }),
     (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_GOVERNANCE_MISMATCH',
+  );
+});
+
+test('runtime: recovery against missing referenced artifacts fails closed (never fallthrough)', async () => {
+  const fixture = await promotedFixture();
+  await beginFresh(fixture);
+  await assert.rejects(
+    () => fixture.runtime.recoverExecution({ slot: makeSlot(), invoking: invokingContext({ availableArtifacts: [] }) }),
+    (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_INCOMPATIBLE',
   );
 });
 

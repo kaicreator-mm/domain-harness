@@ -62,6 +62,21 @@ test('pin: identical replay is idempotent, never a conflict', async () => {
   assert.ok(replayed.artifact.contentDigest.length > 0);
 });
 
+test('pin: a replay with divergent pinnedAt is a conflict, never an idempotent replay', async () => {
+  const { fixture, coordinator, resolved, invoking, slot, pin } = await committed();
+  await assert.rejects(
+    () => coordinator.commitPin({
+      slot,
+      resolved,
+      invoking,
+      pinnedAt: '2026-09-21T04:00:01.000Z',
+    }),
+    (error: unknown) => error instanceof DynamicChildExecutionError && error.code === 'DYNAMIC_CHILD_DEFINITION_CONFLICT',
+  );
+  const stored = await fixture.pinStore.get(dynamicChildSlotKey(slot));
+  assert.equal(stored?.pinnedAt, pin.pinnedAt, 'the original pin record must never be overwritten');
+});
+
 test('pin: a different digest for the same logical slot fails closed and never overwrites', async () => {
   const first = await committed(makeSlot(1));
   // A second artifact with different semantic content (different declared events => different digest).
