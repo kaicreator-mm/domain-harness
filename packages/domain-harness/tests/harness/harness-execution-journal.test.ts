@@ -526,7 +526,23 @@ test('HarnessMachine still has no transition/mutation authority and mutation bin
     0,
   );
   assert.equal(JSON.stringify(result.harnessResult).includes('transition'), false);
-  assert.equal(JSON.stringify(result.harnessResult).includes('mutation'), false);
+  // The rejected mutation binding must leave no executed observation: the trace
+  // records no query.call/query.observation and observedDependencies gains no
+  // query provenance. The machine's MUTATION_CAPABILITY_FORBIDDEN message is
+  // frozen v0.3 fail-closed semantics and may name the rejected kind, so the
+  // assertion is structural instead of matching the literal word "mutation".
+  assert.equal(
+    result.harnessResult.trace.entries.some((entry) => entry.type === 'query.call'),
+    false,
+  );
+  assert.equal(
+    result.harnessResult.trace.entries.some((entry) => entry.type === 'query.observation'),
+    false,
+  );
+  assert.equal(
+    result.harnessResult.observedDependencies.items.some((entry) => entry.kind === 'query'),
+    false,
+  );
 });
 
 test('execution journal storage is strictly separate from T-013 semantic cache storage/identity', async () => {
