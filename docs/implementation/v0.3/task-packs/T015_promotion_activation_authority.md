@@ -6,25 +6,26 @@
 **Execution-start dependency-complete baseline:** `v0.3@a857ce40e4d94202e7f2ad2b7ab42a480cab9834`  
 **Pinned development standard:** `ai-development-standard@0446f04583f6cf464c835f26e2f657c8b703cb4e`
 
-> No standalone T-015 Task Pack existed on the exact dependency-complete baseline. Issue #233 + the frozen v0.3 Task DAG are the execution authority; this file is the T-015 L3 implementation evidence/reference created by the task.
+> No standalone T-015 Task Pack existed on the exact dependency-complete baseline. Issue #233 plus the frozen v0.3 Task DAG are the task authority; this file is the required T-015 L3 implementation evidence/reference.
 
 ## 1. Frozen authority consumed
 
-- Issue #233 latest body; no execution-start comments were present.
-- `docs/product/DomainHarness_v0.3_PRD_FROZEN.md`.
-- frozen PRD Amendment A1 + freeze record.
-- `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_EVIDENCE_FROZEN.md`.
-- frozen L2 Amendment A1 + freeze record.
-- `docs/implementation/DomainHarness_v0.3_TASK_DAG.md`.
+- Issue #233 latest body and comments.
+- Frozen v0.3 PRD.
+- frozen PRD Amendment A1 and freeze record.
+- Frozen v0.3 L2 Architecture Evidence.
+- frozen L2 Amendment A1 and freeze record.
+- v0.3 Task DAG.
 - `.dev-standard/VERSION` and `.dev-standard/PROJECT_OVERRIDES.md`.
 - pinned `ai-development-standard@0446f04583f6cf464c835f26e2f657c8b703cb4e`.
 - T-003 final merged Governance Baseline authority.
 - T-004 final merged Candidate validation authority.
 - T-012 / PR #269 final merged Promoted Artifact Registry authority.
+- T-014 parallel contract was inspected only to keep ownership boundaries explicit; T-015 does not import or implement its binding/pin core.
 
-The dependency-complete baseline was re-read immediately before implementation and remained exactly `a857ce40e4d94202e7f2ad2b7ab42a480cab9834`; it already contains the final T-003, T-004, and T-012 authorities.
+At execution start and again after the first implementation pass, `v0.3` remained exactly `a857ce40e4d94202e7f2ad2b7ab42a480cab9834`. It already contains the required T-003, T-004 and T-012 dependencies.
 
-Frozen L2 ADR-08 is preserved without weakening: validation/evaluation do not imply promotion, promotion is an explicit human/operator action, activation is a second explicit human/operator action, and promotion does not mutate active selection. Amendment A1 is also preserved: a Governance Baseline transition is decided under the exact pre-change baseline, the new baseline cannot self-authorize, and revalidation is explicit.
+Frozen L2 ADR-08 is preserved without weakening: validation/evaluation do not imply promotion, promotion requires explicit human/operator authority, activation is a separate explicit human/operator action, and promotion does not mutate active selection. Amendment A1 is also preserved: a Governance Baseline transition is evaluated under exact pre-change authority and the target baseline cannot self-authorize.
 
 ## 2. Tests
 
@@ -32,7 +33,7 @@ Focused deterministic tests:
 
 `packages/domain-harness/tests/promotion-activation/authority.test.ts`
 
-The matrix covers all Issue #233 required cases:
+The required matrix proves:
 
 1. proposal cannot promote;
 2. validation cannot promote;
@@ -42,18 +43,23 @@ The matrix covers all Issue #233 required cases:
 6. activation of non-promoted artifact is rejected;
 7. stale validation is rejected;
 8. incompatible Governance Baseline is rejected;
-9. a B1 validated/promoted artifact cannot activate under B2 without B2 revalidation/promotion;
+9. a B1-promoted artifact cannot be activated under B2 without B2 revalidation/promotion;
 10. B2 cannot self-authorize its own governance transition;
 11. exact pre-change B1 authority governs B1 -> B2;
-12. activation changes only future fresh selection;
+12. activation changes future fresh selection only;
 13. an existing running/pinned instance remains unchanged;
 14. LLM/Harness automatic promotion is rejected;
 15. LLM/Harness automatic activation is rejected;
 16. stale/conflicting audit action identity is rejected;
 17. audit identity deterministically binds actor/action/artifact/package/governance identity;
-18. a human override cannot weaken frozen Hard-Invariant/governance requirements.
+18. human override cannot weaken frozen Hard-Invariant/governance requirements.
 
-The activation test double deliberately has two separate states: `freshSelection` and pre-existing `runningPins`. T-015 can update only `freshSelection`; the port exposes no operation that can mutate a running pin.
+Two additional regressions close the pre-change authority hole explicitly:
+
+19. B1 -> B2 cannot omit transition revalidation;
+20. a pre-change baseline that changes while promotion authority is being evaluated fails closed before T-012 promotion commit.
+
+The activation test double maintains `freshSelection` separately from pre-existing `runningPins`. The T-015 port exposes no operation that can rewrite a running pin.
 
 ## 3. Contract / Interface
 
@@ -61,130 +67,146 @@ Module:
 
 `packages/domain-harness/src/promotion-activation/`
 
-The lifecycle remains explicitly non-equivalent:
+Lifecycle identity remains:
 
 ```text
 Proposal != Validation != Evaluation != Promotion != Activation
 ```
 
-### 3.1 Explicit authority action
+### 3.1 Explicit human/operator authority
 
-`ExplicitAuthorityAction<'promote' | 'activate'>` binds:
+`ExplicitAuthorityAction<'promote' | 'activate'>` binds an exact action kind, action ID, actor ID, operator ID and timestamp. Runtime checks reject type-forged `proposal`, `validation`, `llm`, `harness` and `candidate` authority. Static TypeScript typing is not the authority boundary.
 
-- exact action kind;
-- unique action ID;
-- human actor ID;
-- operator ID;
-- recorded timestamp.
+### 3.2 Exact audit tuple
 
-Runtime checks fail closed if a caller forges proposal/validation/evaluation as promotion/activation or supplies `llm`, `harness`, or `candidate` as authority actor. Static typing is not relied on as the security boundary.
+Each `PromotionActivationAuditRecord` binds:
 
-### 3.2 Exact authority tuple
-
-Each audit record binds:
-
-- action ID + action type;
-- actor ID + operator ID;
+- action ID and action kind;
+- human actor ID and operator ID;
 - exact promoted artifact ID + content digest;
 - exact validated Candidate identity;
-- domain/package ID + exact CDI content digest;
-- exact Governance Baseline semantic identity (`domainId/governanceId/schemaVersion/contentDigest`);
-- exact evaluation ID + evaluation baseline;
-- exact lifecycle version used for registry selection;
-- exact transition/revalidation tuple when Governance Baseline changes.
+- domain/package ID + exact CDI digest;
+- exact pre-change Governance Baseline semantic identity;
+- exact target Governance Baseline semantic identity;
+- exact evaluation ID and evaluation baseline;
+- exact artifact lifecycle version;
+- exact B1 -> B2 transition/revalidation tuple when the governance baseline changes.
 
-Governance `version` remains lifecycle metadata and is never accepted as a substitute for the semantic content digest. Floating selector tokens such as `latest`, `current`, `active`, `head`, `default`, and `*` are forbidden where an exact artifact version/content authority is required.
+Governance `version` remains lifecycle metadata; semantic authority is `domainId/governanceId/schemaVersion/contentDigest`. Floating authority tokens (`latest`, `current`, `active`, `head`, `default`, `*`) are rejected at exact authority boundaries.
 
-`auditId` is the canonical SHA-256 digest of the complete normalized authority tuple (excluding `auditId` itself). The action ID is bind-once in `PromotionActivationAuditStore`; replay/rebind fails closed.
+`auditId` is the canonical SHA-256 digest of the normalized authority tuple excluding `auditId` itself. `actionId` is bind-once in the audit-store seam, so stale/conflicting action rebinding fails closed.
 
-### 3.3 T-012 seam
+### 3.3 T-012 promoted-registry seam
 
-`PromotedArtifactAuthorityPort` is deliberately structural and narrow:
+`PromotedArtifactAuthorityPort` consumes the final T-012 structural API only:
 
 ```text
 promote(PromoteArtifactInput)
 selectVersion(SelectPromotedArtifactVersionInput)
 ```
 
-The final T-012 `PromotedArtifactRegistry` satisfies this port directly. T-015 does not copy T-012 registry/body/version/CAS/revocation/retention logic.
+T-015 does not reproduce T-012 body/version/CAS/revocation/retention logic.
 
-For promotion, T-015 recomputes the exact promoted semantic identity before calling T-012, requires it to equal the validated Candidate digest, then delegates the immutable body + promotion provenance + version transaction to T-012. The T-012 `promotion.recordId` is the exact T-015 action ID and `authorityRef` is the exact actor/operator pair.
+Before promotion, T-015:
 
-### 3.4 T-014 activation seam
+1. recomputes the raw Candidate semantic digest and requires it to equal the T-004 validated Candidate digest;
+2. independently computes the exact T-012 promoted artifact identity, whose digest intentionally also binds promoted artifact kind/id;
+3. computes the complete T-015 audit tuple;
+4. rechecks that the exact pre-change Governance Baseline did not move;
+5. calls T-012 promotion.
 
-`FreshSelectionActivationPort.publishFreshSelection()` carries only:
+The T-012 atomic promotion record uses the exact T-015 `actionId` as `recordId` and canonical serialized `PromotionActivationAuditRecord` as `authorityRef`. Therefore the immutable promoted body/version/provenance transaction retains the exact T-015 promotion audit identity even if a secondary audit mirror adapter subsequently fails.
+
+### 3.4 Narrow T-014 activation seam
+
+T-015 defines only a narrow authority port:
+
+```text
+readCurrentGovernanceBaseline(domainId)
+publishFreshSelection(grant)
+```
+
+`publishFreshSelection(grant)` receives:
 
 - exact promoted artifact identity;
-- exact package/CDI/Governance authority binding;
+- exact package/CDI/Governance target binding;
+- exact `expectedPreChangeGovernanceBaseline` observed by T-015;
 - exact T-015 activation audit.
 
-This is an authority grant for a future fresh selection/binding. It has no `DomainActivationBinding` storage implementation, no `GovernanceExecutionPin`, no running pin recovery, and no method capable of mutating a running instance. Atomic non-torn binding and execution pin ownership remain exclusively T-014.
+This is a future-fresh-selection authority grant. The port contains no `DomainActivationBinding` implementation, no `GovernanceExecutionPin`, no durable store, no running-pin recovery and no running-instance mutation operation. T-014 remains the sole owner of atomic non-torn activation binding and execution-pin behavior. A T-014 adapter must fail closed if its current binding no longer matches `expectedPreChangeGovernanceBaseline` when the grant is published.
 
 ## 4. Implementation
 
-`PromotionActivationAuthority.promote()` executes the following deterministic gates:
+### Promotion
 
 ```text
 explicit promote action
 -> human/operator identity
--> exact package/CDI/Governance authority
--> successful Candidate validation bound to target Governance Baseline
--> evaluation bound to target baseline
--> Hard Invariants satisfied
--> if B1 != B2: explicit transition proof from B1 to B2 evaluated under B1
--> recompute Candidate/promoted semantic digest
--> deterministic exact audit tuple
+-> exact package/CDI/Governance target authority
+-> read exact current pre-change Governance Baseline from activation seam
+-> successful Candidate validation bound to target baseline
+-> target-baseline evaluation + Hard Invariants
+-> if pre-change != target: require explicit transition evidence
+   whose from/to are exact and whose evaluatedUnder == exact pre-change baseline
+-> target baseline cannot self-authorize
+-> recompute exact Candidate semantic digest
+-> independently compute exact promoted artifact identity
+-> deterministic audit tuple/auditId
 -> actionId unused
--> T-012 explicit promotion
--> persist full T-015 authority audit
+-> re-read pre-change baseline and reject stale movement
+-> T-012 atomic promotion with canonical T-015 audit provenance
+-> secondary audit mirror
 ```
 
-Promotion never calls the activation port.
+Promotion never calls `publishFreshSelection()` and therefore never activates.
 
-`PromotionActivationAuthority.activate()` executes:
+### Activation
 
 ```text
 explicit activate action
 -> human/operator identity
--> exact package/CDI/Governance authority
+-> exact package/CDI/Governance target authority
+-> read exact current pre-change Governance Baseline
 -> target-baseline evaluation + Hard Invariants
--> if B1 != B2: explicit transition proof evaluated under exact B1
+-> if pre-change != target: require exact transition evidence evaluated under pre-change
 -> actionId unused
--> T-012 exact-version selection under target authority
--> selected exact digest == explicitly expected artifact digest
--> promotion source Candidate was validated against target Governance Baseline
+-> T-012 exact-version selection under exact target authority
+-> selected promoted digest == explicitly expected artifact digest
+-> source Candidate was validated against target Governance Baseline
 -> deterministic activation audit
--> persist activation authority audit
--> T-014 narrow fresh-selection grant
+-> persist audit before any activation publication
+-> publish narrow future-fresh-selection grant with exact expected pre-change baseline
 ```
 
-A B1 promotion therefore cannot be reused as B2 activation authority. The artifact must have explicit T-004 revalidation and T-012 promotion provenance under B2 before T-015 will publish a B2 fresh-selection grant.
+A B1 promotion cannot be reused as B2 activation authority. The Candidate must be revalidated against B2 and the artifact must have T-012 promotion provenance under B2 before T-015 can grant B2 activation.
 
 ## 5. Failure Handling
 
-Fail-closed failures include:
+Fail-closed cases include:
 
 - wrong lifecycle action;
 - non-human authority actor;
-- empty/inexact/floating authority identity;
-- rejected Candidate validation;
-- stale Candidate validation;
-- baseline mismatch;
-- missing transition revalidation;
-- mismatched transition tuple;
+- empty/floating authority identity;
+- rejected or stale Candidate validation;
+- Candidate semantic digest drift;
+- missing/unreadable/stale pre-change Governance Baseline;
+- target Governance Baseline mismatch;
+- missing or mismatched transition revalidation;
 - new-baseline self-authorization;
-- pre-change-baseline transition rejection;
-- failed Hard Invariants regardless of any extra/forged override field;
-- missing/non-promoted artifact for activation;
+- transition rejection under pre-change authority;
+- failed Hard Invariants despite any forged override field;
+- missing/non-promoted artifact on activation;
 - selected exact artifact mismatch;
 - stale promoted Candidate baseline;
 - duplicate/conflicting action/audit identity;
-- authority audit persistence failure;
-- T-014 fresh-selection seam failure.
+- audit persistence failure;
+- stale/rejected T-014 fresh-selection publication.
 
-Promotion registry provenance remains observable through T-012 even if the richer T-015 audit adapter fails after the T-012 atomic promotion transaction. Activation persists its exact authority grant before calling the T-014 seam; if T-014 rejects/fails, no activation success is claimed and the attempted grant remains auditable.
+No failure path falls back to `latest`, another artifact version, another package/CDI tuple, another Governance Baseline or LLM-selected authority.
 
-No error path falls back to `latest`, another version, another package/CDI, another Governance Baseline, another artifact, or LLM-selected authority.
+Promotion audit durability is anchored in the T-012 atomic promotion provenance (`recordId=actionId`, `authorityRef=canonical T-015 audit`). The separate audit store is a mirror/lookup seam, not the only surviving promotion authority record.
+
+For activation, audit persistence occurs before publication. A publication failure can leave an auditable attempted grant, but cannot claim activation success. Successful publication is required before `activate()` returns success.
 
 ## 6. Reference
 
@@ -192,10 +214,10 @@ Ordinary lifecycle:
 
 ```text
 Proposal
-  -> T-004 Validation (no promotion/execution permission)
+  -> T-004 Validation (no promotion permission)
   -> Evaluation (no promotion/activation permission)
   -> explicit T-015 human/operator Promotion
-  -> T-012 promoted body + exact version/provenance
+  -> T-012 immutable promoted body/version + exact audit provenance
   -> [still not active]
   -> explicit T-015 human/operator Activation
   -> T-012 exact promoted selection under exact authority
@@ -206,14 +228,15 @@ Proposal
 Governance change:
 
 ```text
-B1 active authority
-  -> proposed B2
-  -> B1 evaluates B1 -> B2 transition
-  -> B2 cannot evaluate/approve itself
-  -> Candidate explicitly revalidated against B2
-  -> explicit promotion under B2
-  -> explicit activation under B2
-  -> only future fresh binding changes
+read exact active B1 from activation authority
+  -> proposed target B2
+  -> B1 evaluates/authorizes B1 -> B2 transition
+  -> B2 cannot self-approve
+  -> Candidate revalidated against B2
+  -> explicit human/operator promotion under B2
+  -> explicit human/operator activation under B2
+  -> T-014 conditionally publishes future binding against expected B1
+  -> only future fresh selection changes
   -> existing GovernanceExecutionPin/running pins remain untouched
 ```
 
@@ -222,7 +245,7 @@ B1 active authority
 Not implemented in T-015:
 
 - T-014 `DomainActivationBinding` core;
-- T-014 atomic non-torn binding storage;
+- T-014 atomic non-torn activation storage;
 - T-014 `GovernanceExecutionPin`;
 - T-014 running-pin recovery;
 - T-017 promoted-child runtime;
@@ -233,18 +256,20 @@ Not implemented in T-015:
 - provider/model routing;
 - real Node/Expo durability.
 
-## 8. Validation requirements
+## 8. Exact-head closeout
 
-Final exact-head closeout requires:
+A validation/review result is valid only for the exact PR HEAD it names. Any code or L3 change invalidates earlier evidence.
 
+Required before merge to `v0.3`:
+
+- repository build;
 - repository lint;
 - repository typecheck;
-- repository build;
-- repository test;
-- focused T-015 authority tests;
+- repository tests;
+- focused T-015 matrix;
 - exact-head Woodpecker terminal success;
-- packaging/repository validation handoff only if the standard/PR facts require it;
+- packaging/repository validation handoff if required by the pinned standard/current repository gates;
 - Fresh Independent Review bound to the final exact HEAD;
-- P0/P1 = 0 before merge to `v0.3`.
+- P0/P1 = 0.
 
-Any validation or review evidence from an earlier T-015 head becomes stale after a HEAD change.
+This task never merges `main`.
