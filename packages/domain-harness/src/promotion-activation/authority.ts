@@ -136,22 +136,11 @@ function assertEvaluation(
 }
 
 function normalizeTransition(
-  preChange: GovernanceBaselineIdentity | undefined,
+  preChange: ExactGovernanceBaselineAuditIdentity,
   target: ExactGovernanceBaselineAuditIdentity,
   evidence: GovernanceTransitionRevalidation | undefined,
 ): GovernanceTransitionRevalidation | undefined {
-  if (preChange === undefined) {
-    if (evidence !== undefined) {
-      throw new PromotionActivationAuthorityError(
-        'GOVERNANCE_TRANSITION_MISMATCH',
-        'transition evidence requires an exact pre-change Governance Baseline',
-      );
-    }
-    return undefined;
-  }
-
-  const from = exactBaseline(preChange);
-  if (sameBaseline(from, target)) {
+  if (sameBaseline(preChange, target)) {
     if (evidence !== undefined) {
       throw new PromotionActivationAuthorityError(
         'GOVERNANCE_TRANSITION_MISMATCH',
@@ -168,7 +157,7 @@ function normalizeTransition(
     );
   }
   requireNonEmpty(evidence.revalidationId, 'governanceTransition.revalidationId');
-  if (!sameBaseline(evidence.fromBaseline, from) || !sameBaseline(evidence.toBaseline, target)) {
+  if (!sameBaseline(evidence.fromBaseline, preChange) || !sameBaseline(evidence.toBaseline, target)) {
     throw new PromotionActivationAuthorityError(
       'GOVERNANCE_TRANSITION_MISMATCH',
       'Governance transition evidence does not bind the exact pre-change and target baselines',
@@ -180,7 +169,7 @@ function normalizeTransition(
       'a new Governance Baseline cannot authorize its own transition',
     );
   }
-  if (!sameBaseline(evidence.evaluatedUnder, from)) {
+  if (!sameBaseline(evidence.evaluatedUnder, preChange)) {
     throw new PromotionActivationAuthorityError(
       'GOVERNANCE_TRANSITION_MISMATCH',
       'Governance transition must be evaluated under exact pre-change baseline authority',
@@ -222,6 +211,7 @@ function authorityTuple(
   artifact: PromotedArtifactIdentity,
   candidate: Extract<PromotionAuthorityRequest['validation'], { readonly ok: true }>['identity'],
   binding: GovernanceBaselineAuthorityBinding,
+  preChange: ExactGovernanceBaselineAuditIdentity,
   evaluation: GovernanceEvaluationEvidence,
   version: string,
   transition: GovernanceTransitionRevalidation | undefined,
@@ -239,6 +229,7 @@ function authorityTuple(
       domainIntelligenceContentDigest: binding.domainIntelligenceContentDigest,
     },
     governance: {
+      preChangeBaseline: cloneJson(preChange),
       targetBaseline: exactBaseline(binding.governanceBaseline),
       evaluatedUnder: cloneJson(evaluation.evaluatedUnder),
       ...(transition === undefined ? {} : { transition: cloneJson(transition) }),
@@ -294,18 +285,49 @@ export class PromotionActivationAuthority {
     }
   }
 
+  private async readPreChangeBaseline(domainId: string): Promise<ExactGovernanceBaselineAuditIdentity> {
+    let baseline: GovernanceBaselineIdentity;
+    try {
+      baseline = await this.activationPort.readCurrentGovernanceBaseline(domainId);
+    } catch (error) {
+      throw new PromotionActivationAuthorityError(
+        'STALE_GOVERNANCE_BASELINE',
+        'exact pre-change Governance Baseline could not be read from the activation authority seam',
+        error,
+      );
+    }
+    if (baseline.domainId !== domainId) {
+      throw new PromotionActivationAuthorityError(
+        'STALE_GOVERNANCE_BASELINE',
+        'activation authority seam returned a Governance Baseline for a different domain',
+      );
+    }
+    rejectFloating(baseline.contentDigest, 'preChangeGovernanceBaseline.contentDigest');
+    return exactBaseline(baseline);
+  }
+
+  private async assertPreChangeStillCurrent(
+    domainId: string,
+    expected: ExactGovernanceBaselineAuditIdentity,
+  ): Promise<void> {
+    const current = await this.readPreChangeBaseline(domainId);
+    if (!sameBaseline(current, expected)) {
+      throw new PromotionActivationAuthorityError(
+        'STALE_GOVERNANCE_BASELINE',
+        'pre-change Governance Baseline changed while authority action was being evaluated',
+      );
+    }
+  }
+
   async promote(request: PromotionAuthorityRequest): Promise<PromotionAuthorityResult> {
     assertAction(request.action, 'promote');
     assertExactVersion(request.version);
     assertAuthorityBinding(request.authorityBinding);
     const target = exactBaseline(request.authorityBinding.governanceBaseline);
+    const preChange = await this.readPreChangeBaseline(request.authorityBinding.domainId);
     assertValidationBaseline(request, target);
     assertEvaluation(request.evaluation, target);
-    const governanceTransition = normalizeTransition(
-      request.preChangeGovernanceBaseline,
-      target,
-      request.governanceTransition,
-    );
+    const governanceTransition = normalizeTransition(preChange, target, request.governanceTransition);
 
     const expectedBody = await createPromotedArtifactBody({
       artifactId: request.artifactId,
@@ -323,12 +345,14 @@ export class PromotionActivationAuthority {
       expectedBody.identity,
       request.validation.identity,
       request.authorityBinding,
+      preChange,
       request.evaluation,
       request.version,
       governanceTransition,
     );
     const audit = await makeAudit(tuple, this.sha256);
     await this.assertUnusedAction(request.action.actionId);
+    await this.assertPreChangeStillCurrent(request.authorityBinding.domainId, preChange);
 
     const promoted = await this.registry.promote({
       artifactId: request.artifactId,
@@ -369,12 +393,9 @@ export class PromotionActivationAuthority {
     assertAuthorityBinding(request.authorityBinding);
     rejectFloating(request.expectedArtifact.contentDigest, 'expectedArtifact.contentDigest');
     const target = exactBaseline(request.authorityBinding.governanceBaseline);
+    const preChange = await this.readPreChangeBaseline(request.authorityBinding.domainId);
     assertEvaluation(request.evaluation, target);
-    const governanceTransition = normalizeTransition(
-      request.preChangeGovernanceBaseline,
-      target,
-      request.governanceTransition,
-    );
+    const governanceTransition = normalizeTransition(preChange, target, request.governanceTransition);
     await this.assertUnusedAction(request.action.actionId);
 
     let selected: SelectedPromotedArtifact;
@@ -409,14 +430,16 @@ export class PromotionActivationAuthority {
       selected.body.identity,
       selected.promotion.sourceCandidate,
       request.authorityBinding,
+      preChange,
       request.evaluation,
       request.version,
       governanceTransition,
     );
     const audit = await makeAudit(tuple, this.sha256);
 
-    // Persist the exact activation authority grant before exposing it to T-014.
-    // If T-014 rejects/fails, no binding change is claimed; the audit remains an attempted explicit grant.
+    // Persist the exact activation grant before exposing it to T-014. The grant
+    // carries exact expected pre-change authority so T-014 can atomically fail
+    // closed if the active binding changed after this evaluation snapshot.
     try {
       await this.auditStore.put(audit);
     } catch (error) {
@@ -432,6 +455,7 @@ export class PromotionActivationAuthority {
       await this.activationPort.publishFreshSelection({
         artifact: selected.body.identity,
         authorityBinding: cloneJson(request.authorityBinding),
+        expectedPreChangeGovernanceBaseline: cloneJson(preChange),
         audit,
       });
     } catch (error) {
