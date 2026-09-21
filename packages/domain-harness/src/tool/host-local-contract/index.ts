@@ -12,6 +12,7 @@ export type HostLocalDomainToolBindingErrorCode =
   | 'HOST_LOCAL_BINDING_NOT_ALLOWED'
   | 'HOST_LOCAL_BINDING_DIGEST_MISSING'
   | 'HOST_LOCAL_BINDING_DIGEST_MISMATCH'
+  | 'HOST_LOCAL_BINDING_SEMANTICS_MISMATCH'
   | 'HOST_LOCAL_EFFECT_AUTHORITY_REQUIRED';
 
 export class HostLocalDomainToolBindingError extends Error {

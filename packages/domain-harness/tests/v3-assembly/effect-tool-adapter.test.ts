@@ -107,6 +107,25 @@ test('adapter: execute on an unbound effect type fails closed', async () => {
   );
 });
 
+test('adapter: execute rejects a binding whose semantics do not match the compiled descriptor', async () => {
+  const port = admissionEffectToolPort({
+    executor: { execute: async () => null },
+    descriptors: { 'effect:reserve': RESERVE_DESCRIPTOR },
+  });
+  await assert.rejects(
+    () =>
+      port.execute(
+        effectRequest({
+          binding: { effectType: 'effect:reserve', effectSemantics: 'idempotent' },
+        }),
+      ),
+    (error: unknown) =>
+      error instanceof HostLocalDomainToolBindingError &&
+      error.code === 'HOST_LOCAL_BINDING_SEMANTICS_MISMATCH',
+    'descriptor truth is structural, not conventional',
+  );
+});
+
 test('adapter: drives a real T-008 host/local executor end to end', async () => {
   const calls: JsonValue[] = [];
   const executor = createHostLocalDomainToolExecutor({
