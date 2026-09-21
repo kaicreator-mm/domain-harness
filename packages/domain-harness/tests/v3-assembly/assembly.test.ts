@@ -280,6 +280,42 @@ test('assembly: evidence-append failure never rewrites the admission outcome', a
   assert.equal(evidenceErrors.length, 1, 'the secondary channel observed the evidence failure');
 });
 
+test('assembly: a throwing onEvidenceError observer cannot rewrite an admission outcome', async () => {
+  const brokenEvidence = new VolatileRuntimeEvidenceStore();
+  brokenEvidence.append = async () => {
+    throw new Error('evidence sink unavailable');
+  };
+  const observed: unknown[] = [];
+  const fixture = await assemblyFixture({
+    evidence: brokenEvidence,
+    onEvidenceError: (error) => {
+      observed.push(error);
+      throw new Error('observer blew up');
+    },
+  });
+  await pinInstance(fixture);
+
+  const outcome = await fixture.assembly.admitTurn(makeRequest());
+  assert.equal(outcome.status, 'admitted', 'observer failure is swallowed with the append failure (V8)');
+  assert.equal(fixture.tools.calls.length, 1);
+  assert.equal(observed.length, 1);
+
+  await assert.rejects(
+    () =>
+      fixture.assembly.admitTurn(
+        makeRequest({
+          definition: makeDefinition({
+            approveEffects: [{ effectType: 'effect:unbound', input: {} }],
+          }),
+        }),
+      ),
+    (error: unknown) =>
+      error instanceof CentralAdmissionError && error.code === 'ADMISSION_EFFECT_TOOL_UNBOUND',
+    'the original admission error propagates, never the observer error',
+  );
+  assert.equal(observed.length, 2);
+});
+
 test('assembly: admitTurn on an unpinned instance fails closed without fabricating provenance', async () => {
   const fixture = await assemblyFixture();
   await assert.rejects(

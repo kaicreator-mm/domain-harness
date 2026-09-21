@@ -57,7 +57,11 @@ export interface CreateDomainRuntimeV3AuthorityOptions {
   /** T-005/T-020 append-only evidence sink. */
   readonly evidence: RuntimeEvidencePort;
   readonly tenantScope?: string;
-  /** Secondary-channel observer for evidence-append failures (never admission truth). */
+  /**
+   * Secondary-channel observer for evidence-append failures (never admission
+   * truth). A throwing observer is swallowed with the append failure itself —
+   * host observer code can never rewrite an admission outcome (V8).
+   */
   readonly onEvidenceError?: (error: unknown) => void;
 }
 
@@ -132,13 +136,24 @@ export async function createDomainRuntimeV3(
 
   const onEvidenceError = v3.onEvidenceError;
   const swallowEvidenceError = (error: unknown): void => {
-    if (onEvidenceError !== undefined) onEvidenceError(error);
+    if (onEvidenceError === undefined) return;
+    // The observer is host code on a secondary channel: its own failure is
+    // swallowed with the append failure so it can never rewrite an admission
+    // outcome (V8).
+    try {
+      onEvidenceError(error);
+    } catch {
+      // intentionally ignored
+    }
   };
 
   async function admitTurn(request: CentralAdmissionRequest): Promise<CentralAdmissionOutcome> {
     // Load the exact pin first for evidence provenance. Without a pin there is
     // no honest provenance, so the pin-missing error propagates without evidence
     // (admission would fail closed on the same pin gate immediately afterwards).
+    // admitCentralDecision re-reads the pin below; pins are bind-once immutable
+    // (conflicts throw, never overwrite), so the two reads cannot observe
+    // different authority.
     const pin = await governance.requirePinnedExecution(request.workflowInstanceId);
     const capture = evidenceCapture({
       domainId: pin.domainId,

@@ -19,7 +19,27 @@ import type {
   WorkflowInstanceSnapshot,
   WorkflowLifecycle,
 } from '@kaicreator/domain-harness/v2';
-import { NODE_SQLITE_RUNTIME_STORE_MIGRATIONS } from './migrations.js';
+import { applyNodeSqliteMigrations } from './migrations.js';
+import { canonicalJsonStringify } from '@kaicreator/domain-harness';
+import type {
+  BindGovernanceExecutionPinResult,
+  CommandOutcomeSnapshot,
+  CompareAndSetExternalWorkCorrelationRequest,
+  DurableControlStore,
+  DurableExecutionStore,
+  DurableProcessData,
+  DurableProcessDataSnapshot,
+  EnsureExternalWorkCorrelationResult,
+  EnsureProvisionedWorkflowInstanceResult,
+  ExternalWorkCorrelationRecord,
+  GovernanceBoundSnapshot,
+  GovernanceExecutionPin,
+  ProcessedCommandTurnCommit,
+  ProvisionedWorkflowInstance,
+  ProvisionWorkflowInstanceRequest,
+  RegisterExternalWorkRequest,
+  RuntimeStoreProcessCommandExtension,
+} from '@kaicreator/domain-harness';
 
 const DEFAULT_BUSY_TIMEOUT_MS = 5_000;
 const TERMINAL_LIFECYCLES = new Set<WorkflowLifecycle>([
@@ -109,6 +129,11 @@ function decodeJson<T>(encoded: string, label: string): T {
   } catch (error) {
     throw new Error(`Corrupt JSON in ${label}`, { cause: error });
   }
+}
+
+/** Canonical JSON text of a plain-JSON value (stable key order for byte equality). */
+function canonicalText(value: JsonValue, label: string): string {
+  return canonicalJsonStringify(decodeJson<JsonValue>(encodeJson(value, label), label));
 }
 
 function mapInstance(row: InstanceRow): WorkflowInstanceSnapshot {
@@ -293,7 +318,13 @@ function assertEffectIdentity(existing: EffectJournalRecord, request: BeginEffec
   }
 }
 
-export class NodeSqliteRuntimeStore implements RuntimeStore {
+export class NodeSqliteRuntimeStore
+  implements
+    RuntimeStore,
+    RuntimeStoreProcessCommandExtension,
+    DurableExecutionStore,
+    DurableControlStore
+{
   readonly #db: InstanceType<typeof Database>;
 
   constructor(options: NodeSqliteRuntimeStoreOptions) {
@@ -676,6 +707,307 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
     transaction.immediate();
   }
 
+  // ---------------------------------------------------------------------
+  // T-009 RuntimeStoreProcessCommandExtension
+  // ---------------------------------------------------------------------
+
+  async getProcessData(target: WorkflowAddress): Promise<DurableProcessDataSnapshot | null> {
+    const instance = this.#getInstanceRow(target);
+    if (instance === null) return null;
+    const row = this.#db.prepare(`
+      SELECT instance_state_revision, data_json
+      FROM dh_v3_process_data
+      WHERE target_internal_id = ?
+    `).get(instance.internal_id) as
+      | { instance_state_revision: number; data_json: string }
+      | undefined;
+    if (row === undefined) return null;
+    return {
+      target,
+      instanceStateRevision: row.instance_state_revision,
+      data: decodeJson<DurableProcessData>(row.data_json, 'process data'),
+    };
+  }
+
+  async getCommandOutcome(
+    target: WorkflowAddress,
+    messageId: string,
+  ): Promise<CommandOutcomeSnapshot | null> {
+    const instance = this.#getInstanceRow(target);
+    if (instance === null) return null;
+    const row = this.#db.prepare(`
+      SELECT outcome_json
+      FROM dh_v3_command_outcomes
+      WHERE target_internal_id = ? AND message_id = ?
+    `).get(instance.internal_id, messageId) as { outcome_json: string } | undefined;
+    if (row === undefined) return null;
+    return decodeJson<CommandOutcomeSnapshot>(row.outcome_json, 'command outcome');
+  }
+
+  async commitProcessedCommandTurn(commit: ProcessedCommandTurnCommit): Promise<void> {
+    const transaction = this.#db.transaction(() => {
+      const instance = this.#requireInstanceRow(commit.target);
+      const message = this.#requireMessageRow(instance.internal_id, commit.messageId);
+
+      if (
+        message.target_sequence !== commit.expectedTargetSequence ||
+        message.disposition !== 'processing'
+      ) {
+        throw new Error(
+          `Message ${commit.messageId} is not the expected processing message at sequence ${commit.expectedTargetSequence}`,
+        );
+      }
+
+      const messageUpdate = this.#db.prepare(`
+        UPDATE dh_v2_messages
+        SET disposition = 'processed', resolved_at = ?, error_json = NULL
+        WHERE target_internal_id = ?
+          AND message_id = ?
+          AND target_sequence = ?
+          AND disposition = 'processing'
+      `).run(
+        commit.updatedAt,
+        instance.internal_id,
+        commit.messageId,
+        commit.expectedTargetSequence,
+      );
+      if (messageUpdate.changes !== 1) {
+        throw new Error(`Message ${commit.messageId} changed during processed-command commit`);
+      }
+
+      const instanceUpdate = this.#db.prepare(`
+        UPDATE dh_v2_instances
+        SET workflow_state_json = @stateJson,
+            lifecycle = @lifecycle,
+            state_revision = @nextRevision,
+            output_json = CASE WHEN @hasOutput = 1 THEN @outputJson ELSE output_json END,
+            failure_json = CASE WHEN @clearFailure = 1 THEN NULL ELSE failure_json END,
+            updated_at = @updatedAt
+        WHERE internal_id = @internalId
+          AND state_revision = @expectedRevision
+      `).run({
+        stateJson: encodeJson(commit.nextState, 'commit.nextState'),
+        lifecycle: commit.nextLifecycle,
+        nextRevision: commit.nextStateRevision,
+        hasOutput: commit.output === undefined ? 0 : 1,
+        outputJson:
+          commit.output === undefined ? null : encodeJson(commit.output, 'commit.output'),
+        clearFailure: commit.nextLifecycle === 'recovery_required' ? 0 : 1,
+        updatedAt: commit.updatedAt,
+        internalId: instance.internal_id,
+        expectedRevision: commit.expectedStateRevision,
+      });
+      if (instanceUpdate.changes !== 1) {
+        throw new Error('Workflow instance changed during processed-command commit');
+      }
+
+      this.#db.prepare(`
+        INSERT INTO dh_v3_process_data (target_internal_id, instance_state_revision, data_json)
+        VALUES (@internalId, @revision, @dataJson)
+        ON CONFLICT(target_internal_id) DO UPDATE SET
+          instance_state_revision = @revision,
+          data_json = @dataJson
+      `).run({
+        internalId: instance.internal_id,
+        revision: commit.nextStateRevision,
+        dataJson: encodeJson(commit.nextProcessData, 'commit.nextProcessData'),
+      });
+
+      this.#db.prepare(`
+        INSERT INTO dh_v3_command_outcomes (target_internal_id, message_id, outcome_json)
+        VALUES (?, ?, ?)
+      `).run(
+        instance.internal_id,
+        commit.messageId,
+        encodeJson(commit.outcome as unknown as JsonValue, 'commit.outcome'),
+      );
+
+      if (TERMINAL_LIFECYCLES.has(commit.nextLifecycle)) {
+        this.#abandonUnresolvedMessages(instance.internal_id, commit.updatedAt);
+      }
+    });
+
+    transaction.immediate();
+  }
+
+  // ---------------------------------------------------------------------
+  // T-014 DurableExecutionStore (governance execution pin + bound snapshot)
+  // ---------------------------------------------------------------------
+
+  async getGovernanceExecutionPin(workflowInstanceId: string): Promise<unknown> {
+    const row = this.#db.prepare(`
+      SELECT pin_json FROM dh_v3_governance_execution_pins WHERE workflow_instance_id = ?
+    `).get(workflowInstanceId) as { pin_json: string } | undefined;
+    if (row === undefined) return undefined;
+    return decodeJson<JsonValue>(row.pin_json, 'governance execution pin');
+  }
+
+  async bindGovernanceExecutionPin(
+    pin: GovernanceExecutionPin,
+  ): Promise<BindGovernanceExecutionPinResult> {
+    const encoded = canonicalText(pin as unknown as JsonValue, 'governance execution pin');
+    const transaction = this.#db.transaction((): BindGovernanceExecutionPinResult => {
+      const existing = this.#db.prepare(`
+        SELECT pin_json FROM dh_v3_governance_execution_pins WHERE workflow_instance_id = ?
+      `).get(pin.workflowInstanceId) as { pin_json: string } | undefined;
+      if (existing !== undefined) {
+        // Pins are bind-once: the same exact pin is idempotent, a different
+        // pin under the same instance id is a conflict and never overwrites.
+        return existing.pin_json === encoded ? 'existing' : 'conflict';
+      }
+      this.#db.prepare(`
+        INSERT INTO dh_v3_governance_execution_pins (workflow_instance_id, binding_digest, pin_json)
+        VALUES (?, ?, ?)
+      `).run(pin.workflowInstanceId, pin.bindingDigest, encoded);
+      return 'inserted';
+    });
+    return transaction.immediate();
+  }
+
+  async getGovernanceBoundSnapshot(workflowInstanceId: string): Promise<unknown> {
+    const row = this.#db.prepare(`
+      SELECT snapshot_json FROM dh_v3_governance_bound_snapshots WHERE workflow_instance_id = ?
+    `).get(workflowInstanceId) as { snapshot_json: string } | undefined;
+    if (row === undefined) return undefined;
+    return decodeJson<JsonValue>(row.snapshot_json, 'governance bound snapshot');
+  }
+
+  async putGovernanceBoundSnapshot(snapshot: GovernanceBoundSnapshot): Promise<void> {
+    this.#db.prepare(`
+      INSERT INTO dh_v3_governance_bound_snapshots (
+        workflow_instance_id, governance_binding_digest, snapshot_json
+      ) VALUES (@workflowInstanceId, @digest, @snapshotJson)
+      ON CONFLICT(workflow_instance_id) DO UPDATE SET
+        governance_binding_digest = @digest,
+        snapshot_json = @snapshotJson
+    `).run({
+      workflowInstanceId: snapshot.workflowInstanceId,
+      digest: snapshot.governanceBindingDigest,
+      snapshotJson: encodeJson(snapshot as unknown as JsonValue, 'governance bound snapshot'),
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // T-010 DurableControlStore (provisioning + external-work correlations)
+  // ---------------------------------------------------------------------
+
+  async ensureProvisionedWorkflowInstance(
+    request: ProvisionWorkflowInstanceRequest,
+  ): Promise<EnsureProvisionedWorkflowInstanceResult> {
+    const transaction = this.#db.transaction((): EnsureProvisionedWorkflowInstanceResult => {
+      const existing = this.#db.prepare(`
+        SELECT record_json FROM dh_v3_provisioning_keys WHERE provisioning_key = ?
+      `).get(request.provisioningKey) as { record_json: string } | undefined;
+      if (existing !== undefined) {
+        return {
+          disposition: 'existing',
+          record: decodeJson<ProvisionedWorkflowInstance>(existing.record_json, 'provisioning record'),
+        };
+      }
+      const record: ProvisionedWorkflowInstance = {
+        provisioningKey: request.provisioningKey,
+        target: request.target,
+        correlationId: request.correlationId,
+        packageId: request.packageId,
+        input: request.input,
+        createdAt: request.requestedAt,
+      };
+      this.#db.prepare(`
+        INSERT INTO dh_v3_provisioning_keys (provisioning_key, record_json) VALUES (?, ?)
+      `).run(request.provisioningKey, encodeJson(record as unknown as JsonValue, 'provisioning record'));
+      return { disposition: 'created', record };
+    });
+    // Atomic ensure/open: the bind of provisioning key to exact WorkflowAddress
+    // happens in this single durable transaction, never query-then-insert.
+    return transaction.immediate();
+  }
+
+  async ensureExternalWorkCorrelation(
+    request: RegisterExternalWorkRequest,
+  ): Promise<EnsureExternalWorkCorrelationResult> {
+    const transaction = this.#db.transaction((): EnsureExternalWorkCorrelationResult => {
+      const existing = this.#db.prepare(`
+        SELECT record_json FROM dh_v3_external_work_correlations WHERE external_correlation_id = ?
+      `).get(request.externalCorrelationId) as { record_json: string } | undefined;
+      if (existing !== undefined) {
+        return {
+          disposition: 'existing',
+          record: decodeJson<ExternalWorkCorrelationRecord>(existing.record_json, 'external-work correlation'),
+        };
+      }
+      const record: ExternalWorkCorrelationRecord = {
+        externalCorrelationId: request.externalCorrelationId,
+        target: request.target,
+        deadlineTimerId: request.deadlineTimerId,
+        dueAt: request.dueAt,
+        status: 'waiting',
+        revision: 0,
+        createdAt: request.registeredAt,
+        updatedAt: request.registeredAt,
+      };
+      this.#db.prepare(`
+        INSERT INTO dh_v3_external_work_correlations (
+          external_correlation_id, status, revision, due_at, record_json
+        ) VALUES (?, 'waiting', 0, ?, ?)
+      `).run(
+        request.externalCorrelationId,
+        request.dueAt,
+        encodeJson(record as unknown as JsonValue, 'external-work correlation'),
+      );
+      return { disposition: 'created', record };
+    });
+    return transaction.immediate();
+  }
+
+  async getExternalWorkCorrelation(
+    externalCorrelationId: string,
+  ): Promise<ExternalWorkCorrelationRecord | null> {
+    const row = this.#db.prepare(`
+      SELECT record_json FROM dh_v3_external_work_correlations WHERE external_correlation_id = ?
+    `).get(externalCorrelationId) as { record_json: string } | undefined;
+    if (row === undefined) return null;
+    return decodeJson<ExternalWorkCorrelationRecord>(row.record_json, 'external-work correlation');
+  }
+
+  async listDueExternalWorkCorrelations(
+    dueAtOrBefore: string,
+  ): Promise<readonly ExternalWorkCorrelationRecord[]> {
+    const rows = this.#db.prepare(`
+      SELECT record_json FROM dh_v3_external_work_correlations
+      WHERE status = 'waiting' AND due_at <= ?
+      ORDER BY external_correlation_id
+    `).all(dueAtOrBefore) as Array<{ record_json: string }>;
+    return rows.map((row) =>
+      decodeJson<ExternalWorkCorrelationRecord>(row.record_json, 'external-work correlation'),
+    );
+  }
+
+  async compareAndSetExternalWorkCorrelation(
+    request: CompareAndSetExternalWorkCorrelationRequest,
+  ): Promise<boolean> {
+    const transaction = this.#db.transaction((): boolean => {
+      const update = this.#db.prepare(`
+        UPDATE dh_v3_external_work_correlations
+        SET status = @status,
+            revision = @revision,
+            record_json = @recordJson
+        WHERE external_correlation_id = @externalCorrelationId
+          AND status = 'waiting'
+          AND revision = @expectedRevision
+      `).run({
+        status: request.next.status,
+        revision: request.next.revision,
+        recordJson: encodeJson(request.next as unknown as JsonValue, 'external-work correlation'),
+        externalCorrelationId: request.externalCorrelationId,
+        expectedRevision: request.expectedRevision,
+      });
+      // One atomic terminal settlement: a stale expectedRevision or a record
+      // that is no longer waiting can never partially update the correlation.
+      return update.changes === 1;
+    });
+    return transaction.immediate();
+  }
+
   async terminalizeInstance(request: TerminalizeInstanceRequest): Promise<void> {
     const transaction = this.#db.transaction(() => {
       const instance = this.#requireInstanceRow(request.target);
@@ -942,41 +1274,7 @@ export class NodeSqliteRuntimeStore implements RuntimeStore {
   }
 
   #applyMigrations(): void {
-    this.#db.exec(`
-      CREATE TABLE IF NOT EXISTS dh_v2_schema_migrations (
-        version INTEGER PRIMARY KEY,
-        applied_at TEXT NOT NULL
-      )
-    `);
-
-    const appliedRows = this.#db.prepare(
-      'SELECT version FROM dh_v2_schema_migrations ORDER BY version',
-    ).all() as Array<{ version: number }>;
-    const applied = new Set(appliedRows.map((row) => row.version));
-    const known = new Set(NODE_SQLITE_RUNTIME_STORE_MIGRATIONS.map((migration) => migration.version));
-
-    for (const version of applied) {
-      if (!known.has(version)) {
-        throw new Error(`SQLite dh_v2 schema migration ${version} is newer than this adapter`);
-      }
-    }
-
-    for (const migration of NODE_SQLITE_RUNTIME_STORE_MIGRATIONS) {
-      if (applied.has(migration.version)) continue;
-      const apply = this.#db.transaction(() => {
-        const alreadyApplied = this.#db.prepare(
-          'SELECT 1 FROM dh_v2_schema_migrations WHERE version = ?',
-        ).get(migration.version);
-        if (alreadyApplied !== undefined) return;
-
-        this.#db.exec(migration.sql);
-        this.#db.prepare(`
-          INSERT INTO dh_v2_schema_migrations(version, applied_at)
-          VALUES (?, ?)
-        `).run(migration.version, new Date().toISOString());
-      });
-      apply.immediate();
-    }
+    applyNodeSqliteMigrations(this.#db);
   }
 
   #getInstanceRow(target: WorkflowAddress): InstanceRow | null {
