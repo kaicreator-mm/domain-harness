@@ -73,6 +73,27 @@ if (typeof sdk.StaticPackageRegistry !== 'function') {
 if ('createDomainHarness' in sdk) {
   throw new Error('v0.1 Node-bound createDomainHarness leaked into v0.2 portable root');
 }
+if (typeof sdk.createDomainRuntimeV3 !== 'function') {
+  throw new Error('root does not expose the v0.3 runtime assembly');
+}
+if (typeof sdk.admitCentralDecision !== 'function') {
+  throw new Error('root does not expose the v0.3 central admission path');
+}
+if (typeof sdk.RuntimeEvidenceCapture !== 'function') {
+  throw new Error('root does not expose the v0.3 evidence capture seam');
+}
+for (const leaked of ['HarnessMachine', 'BusinessHarnessMachine', 'createActor', 'SqliteStore']) {
+  if (leaked in sdk) {
+    throw new Error('engine/host internals leaked into the portable root: ' + leaked);
+  }
+}
+const v3 = await import('@kaicreator/domain-harness/v3');
+if (typeof v3.createDomainRuntimeV3 !== 'function') {
+  throw new Error('./v3 subpath does not expose the v0.3 runtime assembly');
+}
+if (typeof v3.requestExperimentalRollback !== 'function') {
+  throw new Error('./v3 subpath does not expose the v0.3 fallback seam');
+}
 `);
 
     run(process.execPath, ['index.mjs'], consumer);
