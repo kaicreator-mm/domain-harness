@@ -5,10 +5,12 @@ import { VolatileHarnessExecutionJournalStore } from '../../src/harness/executio
 import { dynamicChildSlotKey } from '../../src/promoted-child/index.js';
 import { resolveDecision, type ResolvedDecision } from '../../src/decision-resolver/index.js';
 import {
+  allAvailableArtifacts,
   promotedFixture,
   exactSelector,
   invokingContext,
   makeSlot,
+  ref,
   sha256,
   type PromotedFixture,
 } from '../promoted-child/helpers.js';
@@ -183,6 +185,46 @@ test('resolver: promoted subworkflow reuses the pre-read resolution exactly once
   assert.equal(pin.artifact.contentDigest, promoted.fixture.body.identity.contentDigest);
   assert.deepEqual(decision.provenance.promoted?.emittedEvents, [{ eventType: 'QUOTE_PREPARED', payload: 42 }]);
   assert.equal(decision.cacheDisposition.write, 'inserted', 'promoted-produced results are cacheable under the exact producer rule');
+});
+
+test('resolver: promoted effect intents reach the resolver boundary as data for the parent admission authority', async () => {
+  const fixture = makeFixture();
+  const promoted = await promotedSetup({
+    mutation: { kind: 'durable-effect', effects: [ref('tool', 'effect:reserve')] },
+    bodyNodes: [
+      { node: 'fetch', step: { kind: 'query', tool: { kind: 'tool', artifactId: 'tool:price', contentDigest: 'digest-tool:price' }, input: { kind: 'input', path: 'sku' } } },
+      { node: 'reserve', step: { kind: 'effect-intent', effect: { kind: 'tool', artifactId: 'effect:reserve', contentDigest: 'digest-effect:reserve' }, input: { kind: 'step-output', node: 'fetch', path: 'quote' }, idempotencyKey: 'reserve:quote:1' } },
+      { node: 'finish', step: { kind: 'terminal-output', output: { kind: 'step-output', node: 'fetch', path: 'quote' } } },
+    ],
+    control: {
+      startNode: 'fetch',
+      nodes: ['fetch', 'reserve', 'finish'],
+      edges: [
+        { from: 'fetch', to: 'reserve' },
+        { from: 'reserve', to: 'finish' },
+      ],
+      maxSteps: 5,
+    },
+  });
+  const model = new ScriptedModel([]);
+  const decision = await resolveDecision(
+    await makeInvocation({
+      promoted: promoted.promoted,
+      harness: harnessConfig(model, fixture.journal),
+      invoking: invokingContext({
+        availableArtifacts: [...allAvailableArtifacts(), ref('tool', 'effect:reserve')],
+      }),
+    }),
+    makePorts(fixture, { rule: noMatchRule(), promoted: promoted.ports }),
+    sha256,
+  );
+  assert.equal(decision.source, 'promoted-subworkflow');
+  const intents = decision.provenance.promoted?.effectIntents;
+  assert.equal(intents?.length, 1, 'the promoted stage hands effect intents to the parent as data');
+  assert.equal(intents?.[0]?.effect.artifactId, 'effect:reserve');
+  assert.equal(intents?.[0]?.idempotencyKey, 'reserve:quote:1');
+  assertJsonEqual(intents?.[0]?.input ?? null, quoteResult('approve', { amount: 42 }));
+  assert.equal(promoted.executorCalls.count, 1, 'only the query step executed; the resolver never executes mutation');
 });
 
 test('resolver: a promoted-produced entry serves the next invocation before any second pin or child work', async () => {

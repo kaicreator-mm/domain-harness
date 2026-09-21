@@ -386,6 +386,26 @@ test('resolver: a HarnessMachine terminal error fails closed', async () => {
   );
 });
 
+test('resolver: a Harness execution journal failure fails closed through the journalFailure leg', async () => {
+  class BrokenJournal extends VolatileHarnessExecutionJournalStore {
+    override async begin(): Promise<never> {
+      throw new Error('journal backend unavailable');
+    }
+  }
+  const fixture = makeFixture();
+  const journal = new BrokenJournal();
+  const model = new ScriptedModel([finalResponse('approve', { n: 1 })]);
+  await assert.rejects(
+    () => makeInvocation({
+      harness: harnessConfig(model, journal),
+    }).then((invocation) => resolveDecision(invocation, makePorts(fixture, { rule: noMatchRule() }), sha256)),
+    (error: unknown) => error instanceof DecisionResolverError
+      && error.code === 'DECISION_RESOLVER_HARNESS_FAILED'
+      && error.message.includes('JOURNAL_STORE_ERROR'),
+  );
+  assert.equal(model.calls, 0, 'journal begin gates the external call; no ambiguous fresh model work executed');
+});
+
 test('resolver: Harness producer identity must be exact or the integration fails closed', async () => {
   const fixture = makeFixture();
   const model = new ScriptedModel([finalResponse('approve', { n: 1 })]);
