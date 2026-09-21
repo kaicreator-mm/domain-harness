@@ -37,14 +37,28 @@ export interface BusinessHarnessStructuredResult {
 }
 
 /**
- * Behaviorally relevant dependency observed/consumed by this invocation.
- * T-016 owns durable journal integration; this contract is invocation-local only.
+ * Fact/CDI dependencies selected before the Harness invocation. Query provenance
+ * is intentionally excluded: query dependencies may only be observed after an
+ * allowed query binding executes successfully.
  */
-export interface ObservedDependency {
-  readonly kind: 'domain-fact' | 'compiled-intelligence' | 'query';
+export interface BusinessHarnessSelectedDependency {
+  readonly kind: 'domain-fact' | 'compiled-intelligence';
   readonly identity: string;
   readonly revision?: string;
 }
+
+/** Query provenance created by a successful allowed query observation. */
+export interface HarnessQueryDependency {
+  readonly kind: 'query';
+  readonly identity: string;
+  readonly revision?: string;
+}
+
+/**
+ * Behaviorally relevant dependency observed/consumed by this invocation.
+ * T-016 owns durable journal integration; this contract is invocation-local only.
+ */
+export type ObservedDependency = BusinessHarnessSelectedDependency | HarnessQueryDependency;
 
 export interface ObservedDependencySet {
   readonly items: readonly ObservedDependency[];
@@ -143,7 +157,7 @@ export interface BusinessHarnessInput {
   readonly domainFacts: JsonObject;
   readonly compiledIntelligence: JsonObject;
   readonly workflowContext: JsonObject;
-  readonly selectedDependencies?: readonly ObservedDependency[];
+  readonly selectedDependencies?: readonly BusinessHarnessSelectedDependency[];
   readonly allowedDecisionOutcomes: readonly string[];
   readonly allowedEventTypes: readonly string[];
   readonly capabilities: readonly HarnessCapabilityBinding[];
