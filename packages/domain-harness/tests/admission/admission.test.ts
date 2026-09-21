@@ -5,6 +5,7 @@ import {
   deriveDurableControlTurnId,
 } from '../../src/admission/index.js';
 import type { DecisionResolverSource } from '../../src/decision-resolver/index.js';
+import { createGovernanceBaselineBody } from '../../src/governance/index.js';
 import { PredicateContractViolation } from '../../src/workflow/index.js';
 import {
   CAP_INVARIANT,
@@ -17,6 +18,7 @@ import {
   quoteDecision,
   quoteEvent,
   resolvedFrom,
+  sha256,
   target,
 } from './helpers.js';
 
@@ -167,7 +169,8 @@ test('admission V5: guards carrying non-JSON (function) content are rejected at 
   });
   await assert.rejects(
     () => admitCentralDecision(makeRequest({ definition }), fixture.ports),
-    (error: unknown) => error instanceof PredicateContractViolation,
+    (error: unknown) => isAdmissionError(error, 'ADMISSION_INVALID_PREDICATE_SHAPE')
+      || error instanceof PredicateContractViolation,
   );
   assert.equal(fixture.tools.calls.length, 0);
 });
@@ -231,6 +234,79 @@ test('admission: promoted effect intents in resolver provenance are never auto-e
   assert.equal(outcome.status, 'admitted');
   if (outcome.status !== 'admitted') return;
   assert.equal(outcome.admitted.effects.length, 0, 'only the admitted transition declares executable effects');
+  assert.equal(fixture.tools.calls.length, 0);
+});
+
+test('admission: a guard-rejected candidate falls through to the next declared candidate (review P2-1)', async () => {
+  // Deny only when ALL candidates reject: amount 5000 fails the approve
+  // guard, so the unguarded reject fallback is admitted in declared order.
+  const fixture = await admissionFixture({ b1Invariants: [] });
+  const outcome = await admitCentralDecision(
+    makeRequest({
+      event: quoteEvent(5000),
+      resolved: resolvedFrom('harness-machine', quoteDecision(5000)),
+    }),
+    fixture.ports,
+  );
+  assert.equal(outcome.status, 'admitted');
+  if (outcome.status !== 'admitted') return;
+  assert.equal(outcome.admitted.transitionKey, 'reject');
+  assert.equal(outcome.admitted.targetState, 'rejected');
+});
+
+test('admission: a digest-consistent but shape-malformed Hard Invariant predicate fails closed (review P2-2)', async () => {
+  const malformed = await createGovernanceBaselineBody({
+    domainId: 'orders',
+    governanceId: 'orders-governance',
+    schemaVersion: '1',
+    version: 'B1',
+    semantics: {
+      hardInvariants: [{ invariantId: 'inv:truthy', predicate: { op: 'constant', value: 'yes' } }],
+      operatorAuthority: 'B1',
+    },
+  }, sha256);
+  const fixture = await admissionFixture({ b1Override: malformed });
+  await assert.rejects(
+    () => admitCentralDecision(makeRequest(), fixture.ports),
+    (error: unknown) => isAdmissionError(error, 'ADMISSION_INVALID_HARD_INVARIANTS'),
+  );
+  assert.equal(fixture.tools.calls.length, 0);
+});
+
+test('admission: a shape-malformed guard predicate fails closed as definition integrity (review P2-2)', async () => {
+  const fixture = await admissionFixture();
+  const definition = makeDefinition({
+    guards: [
+      {
+        guardId: 'guard:truthy',
+        predicate: { op: 'constant', value: 'yes' as unknown as boolean },
+      },
+    ],
+    approveGuardId: 'guard:truthy',
+    omitReject: true,
+  });
+  await assert.rejects(
+    () => admitCentralDecision(makeRequest({ definition }), fixture.ports),
+    (error: unknown) => isAdmissionError(error, 'ADMISSION_INVALID_PREDICATE_SHAPE'),
+  );
+  assert.equal(fixture.tools.calls.length, 0);
+});
+
+test('admission: a throwing decision schema fails closed inside the typed taxonomy (review P3-1)', async () => {
+  const fixture = await admissionFixture();
+  await assert.rejects(
+    () => admitCentralDecision(
+      makeRequest({
+        decisionSchema: {
+          isValid: () => {
+            throw new Error('schema backend exploded');
+          },
+        },
+      }),
+      fixture.ports,
+    ),
+    (error: unknown) => isAdmissionError(error, 'ADMISSION_EVALUATION_INPUT_INVALID'),
+  );
   assert.equal(fixture.tools.calls.length, 0);
 });
 

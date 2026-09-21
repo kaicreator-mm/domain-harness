@@ -214,3 +214,16 @@ Denials are terminal data: no transition, no effects, no retry channel. Integrit
 ## 7. Scope boundary
 
 Out of scope for T-019: public SDK surface/export wiring (T-021); Runtime Evidence module (T-020, consumes the admission evidence seam); real kill/reopen and host adapter durability (T-022/T-023); timer/callback/recovery *execution* loops (turn identity for all five sources is contracted and fixtured; only message + child-terminal paths are exercised end-to-end); governance change evaluation (T-004/T-015); XState microstep settling inside a turn (engine behavior; operation identities derive from the containing turn id by contract).
+
+---
+
+## Addendum — T-019 independent-review carryovers (closed on branch `v0.3_t020`)
+
+The T-019 fresh independent review @ `e89c211` passed with P0=0/P1=0 and two P2 + four P3 findings, all closed by the first commit on the T-020 branch:
+
+- **P2-1** — added the "first passing candidate admitted" test leg (guard-rejected first candidate falls through to the next declared candidate; denial requires ALL candidates to reject).
+- **P2-2** — recursive `DomainPredicate` shape validation now runs before any authoritative evaluation: a digest-consistent but type-malformed Hard Invariant predicate (e.g. `{op:'constant', value:'yes'}`) fails closed as `ADMISSION_INVALID_HARD_INVARIANTS`; a malformed guard predicate fails closed as `ADMISSION_INVALID_PREDICATE_SHAPE` (new definition-integrity code). The T-006 evaluator's `constant`-returns-raw behavior can therefore never become a fail-open admission input.
+- **P3-1** — a throwing `decisionSchema.isValid` fails closed inside the typed taxonomy (`ADMISSION_EVALUATION_INPUT_INVALID`, new code) instead of escaping as a naked error.
+- **P3-2** — a journal-store failure while committing a `failed` effect record is no longer swallowed; it surfaces as `ADMISSION_EFFECT_JOURNAL_CONFLICT` (chaining the original failure message).
+- **P3-3** — the started + `none`-semantics re-execute leg now has a committed test alongside the `idempotent` leg.
+- **P3-4** — `VolatileAdmissionEffectJournal.completeEffect` now enforces the canonical-JSON gate store-side, and the `AdmissionDurableEffectJournal` port contract requires every implementation to reject non-canonical outcomes.

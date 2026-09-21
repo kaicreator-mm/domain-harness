@@ -104,10 +104,102 @@ export function admissionResolverEvidence(
   };
 }
 
+const PREDICATE_OPS = new Set([
+  'constant', 'exists', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'not', 'all', 'any',
+]);
+const OPERAND_SOURCES = new Set(['context', 'event', 'literal']);
+const MAX_SHAPE_DEPTH = 64;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  return prototype === Object.prototype || prototype === null;
+}
+
+function assertOperandShape(operand: unknown, path: string, fail: (message: string) => never): void {
+  if (!isPlainObject(operand)) fail(`${path} must be an operand object`);
+  const source = operand['source'];
+  if (typeof source !== 'string' || !OPERAND_SOURCES.has(source)) {
+    fail(`${path}.source must be context, event or literal`);
+  }
+  if (source === 'literal') {
+    if (!Object.prototype.hasOwnProperty.call(operand, 'value')) fail(`${path}.value is required for a literal operand`);
+    try {
+      canonicalizeJson(operand['value']);
+    } catch (error) {
+      fail(`${path}.value must be canonical JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return;
+  }
+  const pathValue = operand['path'];
+  if (
+    !Array.isArray(pathValue)
+    || pathValue.some((segment) => typeof segment !== 'string' || segment.length === 0)
+  ) {
+    fail(`${path}.path must be an array of non-empty strings`);
+  }
+}
+
+/**
+ * Recursive DomainPredicate shape validation. Evaluation trusts the shape
+ * (e.g. `constant` returns its value raw), so admission validates the full
+ * predicate tree before any authoritative evaluation — a digest-consistent
+ * but type-malformed predicate can never become a truthy Hard Invariant or a
+ * fail-open guard (T-019 review P2-2).
+ */
+function assertDomainPredicateShape(
+  predicate: unknown,
+  path: string,
+  fail: (message: string) => never,
+  depth = 0,
+): void {
+  if (depth > MAX_SHAPE_DEPTH) fail(`${path} exceeds the supported predicate depth`);
+  if (!isPlainObject(predicate)) fail(`${path} must be a predicate object`);
+  const op = predicate['op'];
+  if (typeof op !== 'string' || !PREDICATE_OPS.has(op)) {
+    fail(`${path}.op is not a known predicate operator`);
+  }
+  switch (op) {
+    case 'constant':
+      if (typeof predicate['value'] !== 'boolean') fail(`${path}.value must be a boolean`);
+      return;
+    case 'exists':
+      assertOperandShape(predicate['operand'], `${path}.operand`, fail);
+      return;
+    case 'eq':
+    case 'neq':
+    case 'gt':
+    case 'gte':
+    case 'lt':
+    case 'lte':
+      assertOperandShape(predicate['left'], `${path}.left`, fail);
+      assertOperandShape(predicate['right'], `${path}.right`, fail);
+      return;
+    case 'not':
+      assertDomainPredicateShape(predicate['predicate'], `${path}.predicate`, fail, depth + 1);
+      return;
+    case 'all':
+    case 'any': {
+      const predicates = predicate['predicates'];
+      if (!Array.isArray(predicates)) fail(`${path}.predicates must be an array`);
+      predicates.forEach((candidate, index) => {
+        assertDomainPredicateShape(candidate, `${path}.predicates[${index}]`, fail, depth + 1);
+      });
+      return;
+    }
+    default:
+      fail(`${path}.op is not a known predicate operator`);
+  }
+}
+
+function invalidHardInvariant(message: string): never {
+  throw new CentralAdmissionError('ADMISSION_INVALID_HARD_INVARIANTS', message);
+}
+
 /**
  * The pinned baseline body is the only Hard Invariant source. Structurally
- * malformed content fails closed loudly; evaluation-time predicate errors are
- * denied by the T-006 evaluator (false), which is already the safe direction.
+ * malformed content fails closed loudly; evaluation-time errors are denied by
+ * the T-006 evaluator (false), which is already the safe direction.
  */
 function readPinnedHardInvariants(
   body: GovernanceBaselineBody,
@@ -121,28 +213,26 @@ function readPinnedHardInvariants(
     );
   }
   return raw.map((entry, index) => {
-    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+    if (!isPlainObject(entry)) {
       throw new CentralAdmissionError(
         'ADMISSION_INVALID_HARD_INVARIANTS',
         `hardInvariants[${index}] must be an object`,
       );
     }
-    const record = entry as Record<string, unknown>;
-    if (typeof record['invariantId'] !== 'string' || record['invariantId'].length === 0) {
+    if (typeof entry['invariantId'] !== 'string' || entry['invariantId'].length === 0) {
       throw new CentralAdmissionError(
         'ADMISSION_INVALID_HARD_INVARIANTS',
         `hardInvariants[${index}].invariantId must be a non-empty string`,
       );
     }
-    if (typeof record['predicate'] !== 'object' || record['predicate'] === null || Array.isArray(record['predicate'])) {
-      throw new CentralAdmissionError(
-        'ADMISSION_INVALID_HARD_INVARIANTS',
-        `hardInvariants[${index}].predicate must be a predicate object`,
-      );
-    }
+    assertDomainPredicateShape(
+      entry['predicate'],
+      `hardInvariants[${index}].predicate`,
+      invalidHardInvariant,
+    );
     return {
-      invariantId: record['invariantId'],
-      predicate: record['predicate'] as DomainPredicate,
+      invariantId: entry['invariantId'],
+      predicate: entry['predicate'] as DomainPredicate,
     };
   });
 }
@@ -249,6 +339,15 @@ function selectAdmittedTransition(
         );
       }
       guardId = guard.guardId;
+      // Definition integrity: a malformed guard predicate must never become a
+      // fail-open constant or a silent denial (T-019 review P2-2).
+      assertDomainPredicateShape(
+        guard.predicate,
+        `guard ${guard.guardId}.predicate`,
+        (message) => {
+          throw new CentralAdmissionError('ADMISSION_INVALID_PREDICATE_SHAPE', message);
+        },
+      );
       guardPasses = evaluateDomainWorkflowGuard(prepareDomainWorkflowGuard(guard), input);
     }
     if (guardPasses) return { admitted: candidate };
@@ -345,9 +444,19 @@ async function executeEffectIntents(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const failure: JsonObject = { message };
-      await ports.effectJournal
-        .completeEffect(effectId, { status: 'failed', error: failure, completedAt: request.now })
-        .catch(() => undefined);
+      try {
+        await ports.effectJournal.completeEffect(
+          effectId,
+          { status: 'failed', error: failure, completedAt: request.now },
+        );
+      } catch (commitError) {
+        // Never lose the journal-unreadable signal: the host must see that the
+        // failure record itself is not durable (P3-2).
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+          `effect ${effectId} failed (${message}) and the failure record could not be committed: ${commitError instanceof Error ? commitError.message : String(commitError)}`,
+        );
+      }
       throw new CentralAdmissionError(
         'ADMISSION_EFFECT_FAILED',
         `effect ${effectId} (${intent.effectType}) failed: ${message}`,
@@ -404,7 +513,18 @@ export async function admitCentralDecision(
     prepareDomainPredicateEvent(request.event),
   );
 
-  if (!request.decisionSchema.isValid(request.resolved.structuredDecision)) {
+  let schemaValid: boolean;
+  try {
+    schemaValid = request.decisionSchema.isValid(request.resolved.structuredDecision);
+  } catch (error) {
+    // The schema is caller authority; its failure fails the admission closed
+    // inside the typed taxonomy rather than escaping as a naked error (P3-1).
+    throw new CentralAdmissionError(
+      'ADMISSION_EVALUATION_INPUT_INVALID',
+      `decision schema evaluation failed closed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (!schemaValid) {
     return deny('schema', turnId, pinned.bindingDigest, resolver);
   }
 

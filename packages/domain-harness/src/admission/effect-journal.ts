@@ -116,6 +116,18 @@ export class VolatileAdmissionEffectJournal implements AdmissionDurableEffectJou
       | { readonly status: 'failed'; readonly error: JsonValue; readonly completedAt: string },
   ): Promise<AdmissionEffectJournalRecord> {
     requireNonEmpty(effectId, 'effectId');
+    // Store-side canonical-JSON gate (P3-4): a journaled outcome must always be
+    // canonical-JSON-safe, independent of the caller's own checks.
+    try {
+      canonicalJsonStringify(
+        outcome.status === 'completed' ? { output: outcome.output } : { error: outcome.error },
+      );
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+        `effect ${effectId} outcome must be canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     const existing = this.records.get(effectId);
     if (existing === undefined) {
       throw new CentralAdmissionError(
