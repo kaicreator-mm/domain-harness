@@ -4,7 +4,7 @@ Issue: #224
 Task: T-006 — Domain Workflow public contract / XState boundary + predicate purity  
 Original fixed baseline: `v0.3@be65e41e652d70c17ca10af66bc5f25abed2658a`  
 Independent-review remediation baseline: `v0.3@74514b07048ee62ce04d742a9685ae4804619d89`  
-Repair-closeout refresh baseline: `v0.3@cce34b3f3e7fdf4b5bb521eaa6f52e247ee098b6`  
+Repair-closeout refresh baseline: `v0.3@0087720854dd235e02a35d612bddb4a023d80171`  
 Authority: Frozen v0.3 PRD + A1 amendment, Frozen L2 + A1 architecture amendment, v0.3 Task DAG
 
 ## Tests
@@ -225,7 +225,7 @@ Repair-closeout evidence handling is exact-HEAD scoped:
 - `97b744c9b4589921cecec4f35928c5acb2d789ad` is an interim refreshed candidate. Its exact-head validation is historical only because pre-review hardening subsequently added the `__proto__` regression/fix.
 - `7b80172b92eb0fd75c95baa3561536ea5c9508c6` is the pre-L3-closeout code candidate. Its validation is historical once the L3 closeout commit changed the PR HEAD.
 - `1a1a5b0e15fbc120f95dfe37b3c66b4d2391175d` passed exact-head repository validation, including focused 12/12 and pack, but is historical only because `v0.3` advanced via merged T-013 while Woodpecker #428 was still pending.
-- the repair branch is refreshed onto `v0.3@cce34b3f3e7fdf4b5bb521eaa6f52e247ee098b6`. T-013's only overlap with the T-006 write set is `packages/domain-harness/src/workflow/index.ts`; the current base content is preserved and only T-006 predicate-preparation exports are restored. No T-013 implementation file is imported into T-006 scope.
+- final repair refresh baseline is `v0.3@0087720854dd235e02a35d612bddb4a023d80171`. The advance from prior refresh baseline `cce34b3f3e7fdf4b5bb521eaa6f52e247ee098b6` to current base is T-007 repair-only and changes only T-007 files, disjoint from the six-file T-006 write set. The earlier T-013 overlap in `packages/domain-harness/src/workflow/index.ts` remains resolved by preserving current-base content and restoring only T-006 predicate-preparation exports; no T-013/T-007 implementation file is newly absorbed into T-006 scope.
 - the qualifying closeout SHA is always the current PR #263 exact HEAD recorded by GitHub after this refresh; CI and Fresh Independent Review must bind to that SHA, and any later HEAD or base drift invalidates them.
 
 ## Reference / Ownership Boundary
