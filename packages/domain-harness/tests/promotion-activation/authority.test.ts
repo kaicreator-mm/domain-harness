@@ -16,6 +16,7 @@ import {
   PromotionActivationAuthority,
   PromotionActivationAuthorityError,
   type ActivationAuthorityRequest,
+  type ExactGovernanceBaselineAuditIdentity,
   type FreshSelectionActivationGrant,
   type FreshSelectionActivationPort,
   type GovernanceTransitionRevalidation,
@@ -37,11 +38,30 @@ const b2: GovernanceBaselineIdentity = {
   version: 'B2', contentDigest: 'governance-content-b2',
 };
 
+function exactBaseline(value: GovernanceBaselineIdentity): ExactGovernanceBaselineAuditIdentity {
+  return {
+    domainId: value.domainId,
+    governanceId: value.governanceId,
+    schemaVersion: value.schemaVersion,
+    contentDigest: value.contentDigest,
+  };
+}
+
+function sameBaseline(
+  left: ExactGovernanceBaselineAuditIdentity,
+  right: ExactGovernanceBaselineAuditIdentity,
+): boolean {
+  return left.domainId === right.domainId
+    && left.governanceId === right.governanceId
+    && left.schemaVersion === right.schemaVersion
+    && left.contentDigest === right.contentDigest;
+}
+
 function authority(baseline: GovernanceBaselineIdentity = b1): GovernanceBaselineAuthorityBinding {
   return {
     domainId: 'orders',
-    packageId: baseline === b1 ? 'pkg-orders-b1' : 'pkg-orders-b2',
-    domainIntelligenceContentDigest: baseline === b1 ? 'cdi-orders-b1' : 'cdi-orders-b2',
+    packageId: baseline.contentDigest === b1.contentDigest ? 'pkg-orders-b1' : 'pkg-orders-b2',
+    domainIntelligenceContentDigest: baseline.contentDigest === b1.contentDigest ? 'cdi-orders-b1' : 'cdi-orders-b2',
     governanceBaseline: { ...baseline },
   };
 }
@@ -77,12 +97,7 @@ function operatorAction(action: 'promote' | 'activate', actionId = `${action}:or
 function evaluation(target: GovernanceBaselineIdentity = b1, hardInvariantsSatisfied = true) {
   return {
     evaluationId: `evaluation:${target.version ?? target.contentDigest}`,
-    evaluatedUnder: {
-      domainId: target.domainId,
-      governanceId: target.governanceId,
-      schemaVersion: target.schemaVersion,
-      contentDigest: target.contentDigest,
-    },
+    evaluatedUnder: exactBaseline(target),
     verdict: 'allow' as const,
     hardInvariantsSatisfied,
   };
@@ -95,26 +110,35 @@ function transition(
 ): GovernanceTransitionRevalidation {
   return {
     revalidationId: `governance-revalidation:${from.contentDigest}->${to.contentDigest}`,
-    fromBaseline: { domainId: from.domainId, governanceId: from.governanceId, schemaVersion: from.schemaVersion, contentDigest: from.contentDigest },
-    toBaseline: { domainId: to.domainId, governanceId: to.governanceId, schemaVersion: to.schemaVersion, contentDigest: to.contentDigest },
-    evaluatedUnder: { domainId: evaluatedUnder.domainId, governanceId: evaluatedUnder.governanceId, schemaVersion: evaluatedUnder.schemaVersion, contentDigest: evaluatedUnder.contentDigest },
+    fromBaseline: exactBaseline(from),
+    toBaseline: exactBaseline(to),
+    evaluatedUnder: exactBaseline(evaluatedUnder),
     verdict: 'allow',
   };
 }
 
 class RecordingActivationPort implements FreshSelectionActivationPort {
   readonly runningPins = new Map<string, PromotedArtifactIdentity>();
+  currentGovernanceBaseline: GovernanceBaselineIdentity = { ...b1 };
   freshSelection?: FreshSelectionActivationGrant;
 
+  async readCurrentGovernanceBaseline(domainId: string): Promise<GovernanceBaselineIdentity> {
+    assert.equal(domainId, this.currentGovernanceBaseline.domainId);
+    return structuredClone(this.currentGovernanceBaseline);
+  }
+
   async publishFreshSelection(grant: FreshSelectionActivationGrant): Promise<void> {
+    if (!sameBaseline(grant.expectedPreChangeGovernanceBaseline, exactBaseline(this.currentGovernanceBaseline))) {
+      throw new Error('stale pre-change Governance Baseline');
+    }
     this.freshSelection = structuredClone(grant);
+    this.currentGovernanceBaseline = structuredClone(grant.authorityBinding.governanceBaseline);
   }
 }
 
-function makeSystem() {
+function makeSystem(activationPort: FreshSelectionActivationPort = new RecordingActivationPort()) {
   const registry = new PromotedArtifactRegistry(new MemoryPromotedArtifactStore(), sha256);
   const auditStore = new MemoryAuthorityAuditStore();
-  const activationPort = new RecordingActivationPort();
   const service = new PromotionActivationAuthority(registry, auditStore, activationPort, sha256);
   return { registry, auditStore, activationPort, service };
 }
@@ -187,7 +211,7 @@ test('T-015 matrix 03: promotion requires explicit human/operator authority', as
 test('T-015 matrix 04: promotion does not activate', async () => {
   const system = makeSystem();
   await system.service.promote(await promotionRequest());
-  assert.equal(system.activationPort.freshSelection, undefined);
+  assert.equal((system.activationPort as RecordingActivationPort).freshSelection, undefined);
 });
 
 test('T-015 matrix 05: activation requires a separate explicit authority action', async () => {
@@ -208,7 +232,7 @@ test('T-015 matrix 06: activation of non-promoted artifact is rejected', async (
 
 test('T-015 matrix 07: stale validation is rejected', async () => {
   const { service } = makeSystem();
-  const request = await promotionRequest(authority(b2));
+  const request = await promotionRequest(authority(b2), { governanceTransition: transition() });
   const stale = await validationFor(authority(b1));
   await expectAuthorityError(service.promote({ ...request, validation: stale }), 'STALE_VALIDATION');
 });
@@ -227,7 +251,6 @@ test('T-015 matrix 09: B1 promoted artifact under B2 requires B2 revalidation/pr
   const b2Authority = authority(b2);
   await expectAuthorityError(
     system.service.activate(await activationRequest(system.promoted.promoted.body.identity, b2Authority, {
-      preChangeGovernanceBaseline: b1,
       governanceTransition: transition(),
     })),
     'PROMOTED_AUTHORITY_REQUIRED',
@@ -238,7 +261,6 @@ test('T-015 matrix 10: B2 cannot self-authorize its own governance transition', 
   const { service } = makeSystem();
   await expectAuthorityError(
     service.promote(await promotionRequest(authority(b2), {
-      preChangeGovernanceBaseline: b1,
       governanceTransition: transition(b1, b2, b2),
     })),
     'GOVERNANCE_SELF_AUTHORIZATION_FORBIDDEN',
@@ -248,25 +270,27 @@ test('T-015 matrix 10: B2 cannot self-authorize its own governance transition', 
 test('T-015 matrix 11: exact pre-change B1 authority governs B1 -> B2 decision', async () => {
   const system = makeSystem();
   const promoted = await system.service.promote(await promotionRequest(authority(b2), {
-    preChangeGovernanceBaseline: b1,
     governanceTransition: transition(b1, b2, b1),
   }));
+  assert.equal(promoted.audit.governance.preChangeBaseline.contentDigest, b1.contentDigest);
   assert.equal(promoted.audit.governance.transition?.evaluatedUnder.contentDigest, b1.contentDigest);
 });
 
 test('T-015 matrix 12: activation changes future fresh selection only', async () => {
   const system = await promoteB1();
   const result = await system.service.activate(await activationRequest(system.promoted.promoted.body.identity));
-  assert.equal(system.activationPort.freshSelection?.artifact.contentDigest, system.promoted.promoted.body.identity.contentDigest);
+  const port = system.activationPort as RecordingActivationPort;
+  assert.equal(port.freshSelection?.artifact.contentDigest, system.promoted.promoted.body.identity.contentDigest);
   assert.equal(result.audit.action, 'activate');
 });
 
 test('T-015 matrix 13: an existing running/pinned instance remains unchanged', async () => {
   const system = await promoteB1();
+  const port = system.activationPort as RecordingActivationPort;
   const oldPin = await createPromotedArtifactBody({ artifactId: 'orders-review', semanticMaterial: { nodes: ['old-running'] } }, sha256);
-  system.activationPort.runningPins.set('run:1', oldPin.identity);
+  port.runningPins.set('run:1', oldPin.identity);
   await system.service.activate(await activationRequest(system.promoted.promoted.body.identity));
-  assert.deepEqual(system.activationPort.runningPins.get('run:1'), oldPin.identity);
+  assert.deepEqual(port.runningPins.get('run:1'), oldPin.identity);
 });
 
 test('T-015 matrix 14: LLM/Harness automatic promotion is rejected', async () => {
@@ -304,6 +328,7 @@ test('T-015 matrix 17: audit identity deterministically binds actor/action/artif
   assert.equal(first.audit.actor.operatorId, 'operator:release-manager');
   assert.equal(first.audit.artifact.contentDigest, first.promoted.body.identity.contentDigest);
   assert.equal(first.audit.package.packageId, authority(b1).packageId);
+  assert.equal(first.audit.governance.preChangeBaseline.contentDigest, b1.contentDigest);
   assert.equal(first.audit.governance.targetBaseline.contentDigest, b1.contentDigest);
 });
 
@@ -312,4 +337,30 @@ test('T-015 matrix 18: human override cannot weaken hard-invariant/governance re
   const request = await promotionRequest(authority(b1), { evaluation: evaluation(b1, false) });
   const forged = { ...request, overrideHardInvariants: true } as PromotionAuthorityRequest & { overrideHardInvariants: true };
   await expectAuthorityError(service.promote(forged), 'HARD_INVARIANT_REJECTED');
+});
+
+test('T-015: B1 -> B2 cannot omit explicit transition revalidation', async () => {
+  const { service } = makeSystem();
+  await expectAuthorityError(
+    service.promote(await promotionRequest(authority(b2))),
+    'GOVERNANCE_REVALIDATION_REQUIRED',
+  );
+});
+
+test('T-015: stale pre-change baseline observed before promotion fails closed', async () => {
+  let reads = 0;
+  const stalePort: FreshSelectionActivationPort = {
+    async readCurrentGovernanceBaseline(): Promise<GovernanceBaselineIdentity> {
+      reads += 1;
+      return reads === 1 ? { ...b1 } : { ...b2 };
+    },
+    async publishFreshSelection(): Promise<void> {
+      throw new Error('not reached');
+    },
+  };
+  const { service } = makeSystem(stalePort);
+  await expectAuthorityError(
+    service.promote(await promotionRequest(authority(b1))),
+    'STALE_GOVERNANCE_BASELINE',
+  );
 });
