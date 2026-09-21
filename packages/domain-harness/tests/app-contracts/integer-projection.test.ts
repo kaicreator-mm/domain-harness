@@ -106,7 +106,7 @@ test('integer object properties fail closed', () => {
   assert.equal(error.path, `schemas.${PROJECTION_SCHEMA_ID}.properties.count.type`);
 });
 
-test('integer cannot be silently widened through oneOf or type-array composition', () => {
+test('integer cannot be silently widened through type arrays or composition members', () => {
   const oneOfError = captureUnsupported({
     oneOf: [
       {
@@ -133,6 +133,16 @@ test('integer cannot be silently widened through oneOf or type-array composition
     oneOfError.path,
     `schemas.${PROJECTION_SCHEMA_ID}.oneOf[0].properties.value.type`,
   );
+
+  const anyOfError = captureUnsupported({
+    anyOf: [{ type: 'string' }, { type: 'integer' }],
+  });
+  assert.equal(anyOfError.path, `schemas.${PROJECTION_SCHEMA_ID}.anyOf[1].type`);
+
+  const allOfError = captureUnsupported({
+    allOf: [{ type: 'integer' }, { const: 1 }],
+  });
+  assert.equal(allOfError.path, `schemas.${PROJECTION_SCHEMA_ID}.allOf[0].type`);
 
   const typeArrayError = captureUnsupported({ type: ['string', 'integer'] });
   assert.equal(typeArrayError.path, `schemas.${PROJECTION_SCHEMA_ID}.type`);
