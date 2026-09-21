@@ -109,6 +109,10 @@ class FakeDurableControlStore implements DurableControlStore {
     this.externalWork.set(request.externalCorrelationId, request.next);
     return true;
   }
+
+  replaceExternalWork(record: ExternalWorkCorrelationRecord): void {
+    this.externalWork.set(record.externalCorrelationId, record);
+  }
 }
 
 const target: WorkflowAddress = {
@@ -228,7 +232,10 @@ test('callback source has stable identity and duplicate callback replays the sam
 
   assert.equal(accepted.disposition, 'accepted');
   assert.equal(duplicate.disposition, 'duplicate');
-  assert.equal(duplicate.controlSource.durableControlTurnId, accepted.controlSource.durableControlTurnId);
+  assert.equal(
+    duplicate.controlSource.durableControlTurnId,
+    accepted.controlSource.durableControlTurnId,
+  );
   assert.equal(duplicate.controlSource.observedAt, accepted.controlSource.observedAt);
 
   await assertDurableControlError(
@@ -267,7 +274,10 @@ test('callback completion wins before dueAt and a later timer cannot create a se
 
   assert.equal(callback.disposition, 'accepted');
   assert.equal(deadline.disposition, 'callback_already_completed');
-  assert.equal(deadline.controlSource.durableControlTurnId, callback.controlSource.durableControlTurnId);
+  assert.equal(
+    deadline.controlSource.durableControlTurnId,
+    callback.controlSource.durableControlTurnId,
+  );
 });
 
 test('dueAt is a deterministic closed timeout boundary and late callback replays deadline source', async () => {
@@ -294,7 +304,10 @@ test('dueAt is a deterministic closed timeout boundary and late callback replays
   assert.equal(late.disposition, 'late_after_timeout');
   assert.equal(late.controlSource.kind, 'deadline');
   assert.equal(timer.disposition, 'duplicate');
-  assert.equal(timer.controlSource.durableControlTurnId, late.controlSource.durableControlTurnId);
+  assert.equal(
+    timer.controlSource.durableControlTurnId,
+    late.controlSource.durableControlTurnId,
+  );
 });
 
 test('restart recovers deadline without volatile timer state and keeps one logical wake-up', async () => {
@@ -396,5 +409,69 @@ test('unknown, wrong-target, wrong-timer and early deadline sources fail closed'
         firedAt: '2026-09-21T00:04:59.999Z',
       }),
     'DEADLINE_NOT_DUE',
+  );
+});
+
+test('malformed persisted callback terminal source fails closed before replay', async () => {
+  const clock = new FakeClock('2026-09-21T00:00:00.000Z');
+  const store = new FakeDurableControlStore();
+  const coordinator = new DurableControlCoordinator(store);
+  await coordinator.registerExternalWork(externalWorkRequest(clock));
+  await coordinator.acceptExternalCallback({
+    externalCorrelationId: 'job-42',
+    target,
+    callbackOrdinal: 2,
+    payload: { status: 'complete' },
+    receivedAt: '2026-09-21T00:01:00.000Z',
+  });
+
+  const committed = await store.getExternalWorkCorrelation('job-42');
+  if (committed === null || committed.status !== 'callback_received') {
+    throw new Error('expected committed callback terminal record');
+  }
+  store.replaceExternalWork({
+    ...committed,
+    terminalSource: {
+      ...committed.terminalSource,
+      durableControlTurnId: 'dct:v1:forged',
+    },
+  });
+
+  const restarted = new DurableControlCoordinator(store);
+  await assertDurableControlError(
+    () => restarted.recoverExternalWork('job-42', '2026-09-21T00:02:00.000Z'),
+    'STORE_CONTRACT_VIOLATION',
+  );
+});
+
+test('malformed persisted deadline terminal source fails closed during due recovery', async () => {
+  const clock = new FakeClock('2026-09-21T00:00:00.000Z');
+  const store = new FakeDurableControlStore();
+  const coordinator = new DurableControlCoordinator(store);
+  await coordinator.registerExternalWork(externalWorkRequest(clock));
+  await coordinator.fireDeadline({
+    externalCorrelationId: 'job-42',
+    target,
+    timerId: 'deadline-job-42',
+    fireOrdinal: 1,
+    firedAt: '2026-09-21T00:05:00.000Z',
+  });
+
+  const committed = await store.getExternalWorkCorrelation('job-42');
+  if (committed === null || committed.status !== 'timed_out') {
+    throw new Error('expected committed deadline terminal record');
+  }
+  store.replaceExternalWork({
+    ...committed,
+    terminalSource: {
+      ...committed.terminalSource,
+      timerId: 'forged-timer',
+    },
+  });
+
+  const restarted = new DurableControlCoordinator(store);
+  await assertDurableControlError(
+    () => restarted.recoverDueDeadlines('2026-09-21T00:06:00.000Z'),
+    'STORE_CONTRACT_VIOLATION',
   );
 });
