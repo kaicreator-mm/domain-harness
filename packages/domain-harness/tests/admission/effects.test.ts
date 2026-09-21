@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  VolatileAdmissionEffectJournal,
   admitCentralDecision,
   deriveDurableControlTurnId,
   type AdmissionEffectJournalRecord,
@@ -166,6 +167,46 @@ test('effects: an effect type without a declared mutation-capable binding fails 
   );
   assert.equal(fixture.journal.getRecords().length, 0, 'unbound tools never enter the journal');
   assert.equal(fixture.tools.calls.length, 0);
+});
+
+test('effects: a started none-semantics record may re-execute under the same identity (review P3-3)', async () => {
+  const fixture = await admissionFixture({ bindings: { 'effect:reserve': 'none' } });
+  await fixture.journal.beginEffect(effectRecord({ effectSemantics: 'none' }));
+  const admitted = await admittedEffects(fixture);
+  assert.equal(admitted.effects[0]?.disposition, 'executed');
+  assert.equal(fixture.tools.calls.length, 1);
+  assert.equal(fixture.journal.getRecords()[0]?.status, 'completed');
+});
+
+test('effects: a journal failure while committing the failed record surfaces as a journal conflict (review P3-2)', async () => {
+  class UnwritableJournal extends VolatileAdmissionEffectJournal {
+    override async completeEffect(): Promise<never> {
+      throw new Error('journal disk full');
+    }
+  }
+  const fixture = await admissionFixture({
+    journal: new UnwritableJournal(),
+    failTool: () => new Error('reserve backend down'),
+  });
+  await assert.rejects(
+    () => admitCentralDecision(makeRequest(), fixture.ports),
+    (error: unknown) => isAdmissionError(error, 'ADMISSION_EFFECT_JOURNAL_CONFLICT')
+      && (error as Error).message.includes('reserve backend down'),
+  );
+});
+
+test('effects: the journal itself rejects non-canonical outcomes (review P3-4)', async () => {
+  const fixture = await admissionFixture();
+  const record = effectRecord();
+  await fixture.journal.beginEffect(record);
+  await assert.rejects(
+    () => fixture.journal.completeEffect(record.effectId, {
+      status: 'completed',
+      output: { callback: (() => true) as unknown as string },
+      completedAt: NOW,
+    }),
+    (error: unknown) => isAdmissionError(error, 'ADMISSION_EFFECT_JOURNAL_CONFLICT'),
+  );
 });
 
 test('effects: idempotency identity excludes volatile execution detail', async () => {

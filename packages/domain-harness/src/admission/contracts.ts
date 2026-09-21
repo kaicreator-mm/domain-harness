@@ -123,7 +123,8 @@ export interface AdmissionDurableEffectJournal {
   /**
    * Commit the terminal state of one started effect. Completing an already
    * settled record with the same outcome is idempotent; a conflicting outcome
-   * fails closed.
+   * fails closed. Implementations MUST reject outcomes that are not
+   * canonical-JSON-safe (`ADMISSION_EFFECT_JOURNAL_CONFLICT`).
    */
   completeEffect(
     effectId: string,
@@ -146,6 +147,8 @@ export type CentralAdmissionErrorCode =
   | 'ADMISSION_INVALID_TURN_SOURCE'
   | 'ADMISSION_UNKNOWN_STATE'
   | 'ADMISSION_UNKNOWN_GUARD'
+  | 'ADMISSION_INVALID_PREDICATE_SHAPE'
+  | 'ADMISSION_EVALUATION_INPUT_INVALID'
   | 'ADMISSION_PINNED_BASELINE_UNAVAILABLE'
   | 'ADMISSION_INVALID_HARD_INVARIANTS'
   | 'ADMISSION_EFFECT_TOOL_UNBOUND'
