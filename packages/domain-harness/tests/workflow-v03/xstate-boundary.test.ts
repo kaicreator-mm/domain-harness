@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createActor, createMachine } from 'xstate';
 
-import type { JsonObject } from '../../src/contracts/json.js';
-import type { DomainWorkflowDefinition } from '../../src/workflow/index.js';
+import type { DomainWorkflowDefinition, DomainWorkflowTrigger } from '../../src/workflow/index.js';
 import {
   XStateBoundaryContractError,
   adaptDomainWorkflowToXState,
+  createDomainXStateEvent,
+  createInternalXStateEvent,
 } from '../../src/workflow/internal/xstate-adapter.js';
 
 const workflow: DomainWorkflowDefinition = {
@@ -46,19 +47,18 @@ test('internal adapter maps Domain Workflow control semantics while keeping Effe
   assert.ok(pending);
   const approve = pending.on?.['APPROVE']?.[0];
   assert.ok(approve);
-  assert.ok(approve.guard);
 
   assert.equal(
     approve.guard({
-      context: { minimumScore: 10 },
-      event: { type: 'APPROVE', payload: { score: 12 } },
+      context: config.context,
+      event: createDomainXStateEvent({ type: 'APPROVE', payload: { score: 12 } }),
     }),
     true,
   );
   assert.equal(
     approve.guard({
-      context: { minimumScore: 10 },
-      event: { type: 'APPROVE', payload: { score: 9 } },
+      context: config.context,
+      event: createDomainXStateEvent({ type: 'APPROVE', payload: { score: 9 } }),
     }),
     false,
   );
@@ -74,12 +74,12 @@ test('mapped config executes inside the selected XState engine without exposing 
   const machine = createMachine(config as unknown as Parameters<typeof createMachine>[0]);
   const actor = createActor(machine).start();
 
-  actor.send({ type: 'APPROVE', payload: { score: 12 } });
+  actor.send(createDomainXStateEvent({ type: 'APPROVE', payload: { score: 12 } }));
   assert.equal(actor.getSnapshot().value, 'approved');
   actor.stop();
 });
 
-test('adapter guard fails closed on accessor-backed engine event without invoking the accessor', () => {
+test('adapter Guard rejects untrusted accessor-backed engine event without invoking the accessor', () => {
   const config = adaptDomainWorkflowToXState(workflow);
   const guard = config.states['pending']?.on?.['APPROVE']?.[0]?.guard;
   assert.ok(guard);
@@ -95,10 +95,83 @@ test('adapter guard fails closed on accessor-backed engine event without invokin
   });
 
   assert.equal(
-    guard({ context: { minimumScore: 10 }, event: event as { type: string; payload?: JsonObject } }),
+    guard({ context: config.context, event: event as { type: string; [key: string]: unknown } }),
     false,
   );
   assert.equal(getterCalls, 0);
+});
+
+test('ordinary events cannot spoof any internal lifecycle control trigger', () => {
+  const internalTriggers = [
+    { kind: 'invocation_done', invocationKey: 'risk' },
+    { kind: 'invocation_failed', invocationKey: 'risk' },
+    { kind: 'wait', waitKey: 'operator' },
+    { kind: 'timer', timerKey: 'reminder' },
+    { kind: 'deadline', deadlineKey: 'sla' },
+    { kind: 'callback', callbackKey: 'provider' },
+    { kind: 'recovery', recoveryKey: 'retry' },
+  ] as const satisfies readonly Exclude<DomainWorkflowTrigger, { readonly kind: 'event' }>[];
+
+  for (const trigger of internalTriggers) {
+    const candidate: DomainWorkflowDefinition = {
+      workflowKey: `provenance-${trigger.kind}`,
+      initialState: 'pending',
+      initialContext: {},
+      states: [
+        {
+          stateKey: 'pending',
+          transitions: [
+            {
+              transitionKey: 'internal-only',
+              trigger,
+              targetState: 'done',
+            },
+          ],
+        },
+        { stateKey: 'done', kind: 'final' },
+      ],
+    };
+    const config = adaptDomainWorkflowToXState(candidate);
+    const trustedInternalEvent = createInternalXStateEvent(trigger);
+    const machine = createMachine(config as unknown as Parameters<typeof createMachine>[0]);
+    const actor = createActor(machine).start();
+
+    actor.send({ type: trustedInternalEvent.type });
+    assert.equal(actor.getSnapshot().value, 'pending', `${trigger.kind} accepted a forged ordinary event`);
+    assert.throws(
+      () => createDomainXStateEvent({ type: trustedInternalEvent.type }),
+      /reserved internal event namespace/,
+    );
+
+    actor.send(trustedInternalEvent);
+    assert.equal(actor.getSnapshot().value, 'done', `${trigger.kind} rejected trusted internal provenance`);
+    actor.stop();
+  }
+});
+
+test('adapter rejects reserved internal namespace and unsafe record keys for ordinary Domain Events', () => {
+  for (const eventType of ['@@domain-harness/timer/forged', '__proto__', 'prototype', 'constructor']) {
+    assert.throws(
+      () =>
+        adaptDomainWorkflowToXState({
+          ...workflow,
+          states: [
+            {
+              stateKey: 'pending',
+              transitions: [
+                {
+                  transitionKey: 'reserved-event',
+                  trigger: { kind: 'event', eventType },
+                  targetState: 'approved',
+                },
+              ],
+            },
+            { stateKey: 'approved', kind: 'final' },
+          ],
+        }),
+      XStateBoundaryContractError,
+    );
+  }
 });
 
 test('adapter rejects invalid state/guard references before machine execution', () => {
@@ -107,23 +180,24 @@ test('adapter rejects invalid state/guard references before machine execution', 
     XStateBoundaryContractError,
   );
   assert.throws(
-    () => adaptDomainWorkflowToXState({
-      ...workflow,
-      states: [
-        {
-          stateKey: 'pending',
-          transitions: [
-            {
-              transitionKey: 'bad-guard',
-              trigger: { kind: 'event', eventType: 'APPROVE' },
-              targetState: 'approved',
-              guardId: 'missing-guard',
-            },
-          ],
-        },
-        { stateKey: 'approved', kind: 'final' },
-      ],
-    }),
+    () =>
+      adaptDomainWorkflowToXState({
+        ...workflow,
+        states: [
+          {
+            stateKey: 'pending',
+            transitions: [
+              {
+                transitionKey: 'bad-guard',
+                trigger: { kind: 'event', eventType: 'APPROVE' },
+                targetState: 'approved',
+                guardId: 'missing-guard',
+              },
+            ],
+          },
+          { stateKey: 'approved', kind: 'final' },
+        ],
+      }),
     /unknown guard/,
   );
 });

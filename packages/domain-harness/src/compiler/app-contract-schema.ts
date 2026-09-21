@@ -259,8 +259,13 @@ function renderType(
     case 'string':
       return 'string';
     case 'number':
-    case 'integer':
       return 'number';
+    case 'integer':
+      throw new AppContractGenerationError(
+        'UNSUPPORTED_SCHEMA',
+        `${path}.type`,
+        'JSON Schema integer cannot be represented exactly by the generated unbranded TypeScript contract',
+      );
     case 'boolean':
       return 'boolean';
     case 'null':

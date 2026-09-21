@@ -68,7 +68,7 @@ export const orderManifest = {
           type: 'object',
           properties: {
             status: { const: 'accepted' },
-            sequence: { type: 'integer' },
+            sequence: { type: 'number' },
           },
           required: ['status', 'sequence'],
           additionalProperties: false,
