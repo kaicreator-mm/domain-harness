@@ -1,5 +1,4 @@
 import { canonicalJsonStringify, computeCanonicalJsonDigest, type Sha256Port } from '../contracts/identity.js';
-import type { JsonValue } from '../contracts/json.js';
 import type { GovernanceBaselineAuthorityBinding, GovernanceBaselineIdentity } from '../governance/contracts.js';
 import { createPromotedArtifactBody } from '../promoted-artifact/identity.js';
 import type { PromotedArtifactIdentity, SelectedPromotedArtifact } from '../promoted-artifact/contracts.js';
@@ -243,7 +242,7 @@ async function makeAudit(
   tuple: Omit<PromotionActivationAuditRecord, 'auditId'>,
   sha256: Sha256Port,
 ): Promise<PromotionActivationAuditRecord> {
-  const auditId = await computeCanonicalJsonDigest(tuple as unknown as JsonValue, sha256);
+  const auditId = await computeCanonicalJsonDigest(tuple, sha256);
   return { auditId, ...tuple };
 }
 
@@ -329,17 +328,21 @@ export class PromotionActivationAuthority {
     assertEvaluation(request.evaluation, target);
     const governanceTransition = normalizeTransition(preChange, target, request.governanceTransition);
 
+    const recomputedCandidateDigest = await computeCanonicalJsonDigest(
+      request.semanticMaterial,
+      this.sha256,
+    );
+    if (recomputedCandidateDigest !== request.validation.identity.candidateContentDigest) {
+      throw new PromotionActivationAuthorityError(
+        'STALE_VALIDATION',
+        'promotion semantic material no longer matches the exact validated Candidate digest',
+      );
+    }
+
     const expectedBody = await createPromotedArtifactBody({
       artifactId: request.artifactId,
       semanticMaterial: request.semanticMaterial,
     }, this.sha256);
-    if (expectedBody.identity.contentDigest !== request.validation.identity.candidateContentDigest) {
-      throw new PromotionActivationAuthorityError(
-        'STALE_VALIDATION',
-        'validated Candidate semantic digest no longer matches promotion material',
-      );
-    }
-
     const tuple = authorityTuple(
       request.action,
       expectedBody.identity,
@@ -362,7 +365,7 @@ export class PromotionActivationAuthority {
       semanticMaterial: request.semanticMaterial,
       promotion: {
         recordId: request.action.actionId,
-        authorityRef: `${request.action.actor.actorId}/${request.action.actor.operatorId}`,
+        authorityRef: canonicalJsonStringify(audit),
         recordedAt: request.action.recordedAt,
       },
     });
@@ -380,7 +383,7 @@ export class PromotionActivationAuthority {
       if (error instanceof PromotionActivationAuthorityError) throw error;
       throw new PromotionActivationAuthorityError(
         'AUTHORITY_AUDIT_WRITE_FAILED',
-        'promotion committed registry provenance but full authority audit persistence failed',
+        'promotion committed exact T-015 audit provenance in T-012 but audit mirror persistence failed',
         error,
       );
     }
@@ -437,9 +440,6 @@ export class PromotionActivationAuthority {
     );
     const audit = await makeAudit(tuple, this.sha256);
 
-    // Persist the exact activation grant before exposing it to T-014. The grant
-    // carries exact expected pre-change authority so T-014 can atomically fail
-    // closed if the active binding changed after this evaluation snapshot.
     try {
       await this.auditStore.put(audit);
     } catch (error) {
@@ -470,7 +470,6 @@ export class PromotionActivationAuthority {
   }
 }
 
-/** Deterministic equality helper for review/tests; audit identity never relies on object insertion order. */
 export function samePromotionActivationAudit(
   left: PromotionActivationAuditRecord,
   right: PromotionActivationAuditRecord,
