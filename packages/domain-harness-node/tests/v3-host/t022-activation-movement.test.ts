@@ -86,6 +86,22 @@ test('T-022 V5: activation movement publishes non-torn bindings durably', async 
     'no torn v2-CDI/v1-baseline mix',
   );
 
+  // Interleaved movement: after every publication a reader observes exactly
+  // one complete tuple — never a field-level mix of the two.
+  for (let index = 0; index < 8; index += 1) {
+    const expected = index % 2 === 0 ? v1 : v2;
+    await fixture.assembly.activation.publish(expected);
+    const observed = await fixture.assembly.activation.resolveForNewInstance('orders');
+    assert.deepEqual(observed, expected, `iteration ${index}: complete tuple only`);
+    const other = index % 2 === 0 ? v2 : v1;
+    const tornCdi = observed.domainIntelligenceContentDigest === other.domainIntelligenceContentDigest
+      && observed.governanceBaseline.contentDigest === expected.governanceBaseline.contentDigest;
+    const tornBaseline = observed.domainIntelligenceContentDigest === expected.domainIntelligenceContentDigest
+      && observed.governanceBaseline.contentDigest === other.governanceBaseline.contentDigest;
+    assert.equal(tornCdi || tornBaseline, false, `iteration ${index}: no torn mix`);
+  }
+  await fixture.assembly.activation.publish(v2);
+
   fixture.close();
   const reopened = await openHostFixture(path);
   assert.deepEqual(
