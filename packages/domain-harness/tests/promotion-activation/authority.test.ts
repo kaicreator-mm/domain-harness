@@ -85,7 +85,7 @@ async function validationFor(
   };
 }
 
-function operatorAction(action: 'promote' | 'activate', actionId = `${action}:orders-review:1`) {
+function operatorAction<Action extends 'promote' | 'activate'>(action: Action, actionId = `${action}:orders-review:1`) {
   return {
     action,
     actionId,
