@@ -63,8 +63,7 @@ export interface PromotionAuthorityRequest {
   readonly authorityBinding: GovernanceBaselineAuthorityBinding;
   readonly semanticMaterial: JsonValue;
   readonly evaluation: GovernanceEvaluationEvidence;
-  /** Set when target Governance Baseline differs from the exact pre-change authority. */
-  readonly preChangeGovernanceBaseline?: GovernanceBaselineIdentity;
+  /** Required exactly when current pre-change baseline differs from target. */
   readonly governanceTransition?: GovernanceTransitionRevalidation;
 }
 
@@ -76,7 +75,7 @@ export interface ActivationAuthorityRequest {
   readonly expectedArtifact: PromotedArtifactIdentity;
   readonly authorityBinding: GovernanceBaselineAuthorityBinding;
   readonly evaluation: GovernanceEvaluationEvidence;
-  readonly preChangeGovernanceBaseline?: GovernanceBaselineIdentity;
+  /** Required exactly when current pre-change baseline differs from target. */
   readonly governanceTransition?: GovernanceTransitionRevalidation;
 }
 
@@ -87,6 +86,7 @@ export interface AuthorityAuditPackageIdentity {
 }
 
 export interface AuthorityAuditGovernanceIdentity {
+  readonly preChangeBaseline: ExactGovernanceBaselineAuditIdentity;
   readonly targetBaseline: ExactGovernanceBaselineAuditIdentity;
   readonly evaluatedUnder: ExactGovernanceBaselineAuditIdentity;
   readonly transition?: GovernanceTransitionRevalidation;
@@ -128,16 +128,20 @@ export interface PromotedArtifactAuthorityPort {
 }
 
 /**
- * Narrow seam into T-014. It can publish an authority grant for future fresh
- * selection/binding only. No running instance/pin mutation exists on this port.
+ * Narrow read/publish seam into T-014. T-015 reads the exact currently active
+ * Governance Baseline, then publishes a future-fresh-selection grant with that
+ * exact baseline as its expected pre-change authority. T-014 remains owner of
+ * atomic non-torn DomainActivationBinding/GovernanceExecutionPin behavior.
  */
 export interface FreshSelectionActivationGrant {
   readonly artifact: PromotedArtifactIdentity;
   readonly authorityBinding: GovernanceBaselineAuthorityBinding;
+  readonly expectedPreChangeGovernanceBaseline: ExactGovernanceBaselineAuditIdentity;
   readonly audit: PromotionActivationAuditRecord;
 }
 
 export interface FreshSelectionActivationPort {
+  readCurrentGovernanceBaseline(domainId: string): Promise<GovernanceBaselineIdentity>;
   publishFreshSelection(grant: FreshSelectionActivationGrant): Promise<void>;
 }
 
@@ -155,6 +159,7 @@ export type PromotionActivationAuthorityErrorCode =
   | 'FLOATING_AUTHORITY_FORBIDDEN'
   | 'PROMOTION_REQUIRES_VALIDATED_CANDIDATE'
   | 'STALE_VALIDATION'
+  | 'STALE_GOVERNANCE_BASELINE'
   | 'GOVERNANCE_BASELINE_MISMATCH'
   | 'GOVERNANCE_REVALIDATION_REQUIRED'
   | 'GOVERNANCE_TRANSITION_MISMATCH'
