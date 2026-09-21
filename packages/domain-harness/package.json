@@ -20,6 +20,11 @@
       "types": "./dist/workflow/index.d.ts",
       "import": "./dist/workflow/index.js",
       "require": "./dist/workflow/index.js"
+    },
+    "./v3": {
+      "types": "./dist/public-v3/index.d.ts",
+      "import": "./dist/public-v3/index.js",
+      "require": "./dist/public-v3/index.js"
     }
   },
   "files": [
@@ -33,11 +38,11 @@
     "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
-    "ajv": "^8.17.1"
+    "ajv": "^8.17.1",
+    "xstate": "^5.26.0"
   },
   "devDependencies": {
     "jsonata": "^2.2.2",
-    "xstate": "^5.26.0",
     "yaml": "^2.0.0",
     "zod": "^4.0.0"
   }

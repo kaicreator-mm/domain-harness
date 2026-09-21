@@ -253,6 +253,20 @@ test('capture: mismatched context domain/baseline provenance fails closed before
   assert.equal(store.records().length, 0, 'invalid evidence never reaches the port');
 });
 
+test('capture: operator override rejects an empty actionId fail-closed', async () => {
+  const { capture, store } = makeCapture();
+  await assert.rejects(
+    () =>
+      capture.captureOperatorOverride({
+        actionId: '  ',
+        actor: { kind: 'human-operator', actorId: 'actor-1', operatorId: 'op-1' },
+        detail: { kind: 'manual-state-review' },
+      }),
+    (error: unknown) => isIntegrationError(error, 'INVALID_RUNTIME_EVIDENCE_INTEGRATION'),
+  );
+  assert.equal(store.records().length, 0);
+});
+
 test('capture: the runtime-facing port stays write-only', () => {
   const { capture, store } = makeCapture();
   const port: RuntimeEvidencePort = store;

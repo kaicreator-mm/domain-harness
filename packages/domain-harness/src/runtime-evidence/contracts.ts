@@ -101,7 +101,13 @@ export function assertExactExperimentalArtifact(reference: ExperimentalArtifactR
   assertExactStableFallbackIdentity(reference.stableFallback);
 }
 
-/** Capture-time binding of the exact authority context every record inherits. */
+/**
+ * Capture-time binding of the exact authority context every record inherits.
+ * This is pinned-package/Governance provenance, not fallback authority:
+ * Amendment A1 §15.2 floating-alias rejection applies to the Experimental
+ * artifact slots (assertExactExperimentalArtifact), which is the only place
+ * the Amendment forbids floating fallback authority.
+ */
 export interface RuntimeEvidenceCaptureContext {
   readonly domainId: string;
   readonly tenantScope?: string;

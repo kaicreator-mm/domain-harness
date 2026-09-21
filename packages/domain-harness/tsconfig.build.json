@@ -6,6 +6,10 @@
   // in the repository as regression/migration evidence - they remain
   // typechecked by tsconfig.json and runnable from source via tsx, but are no
   // longer compiled into or shipped inside the published artifact.
+  // T-021: src/index.ts now re-exports the additive v0.3 surface
+  // (src/public-v3/index.ts), so the v0.3 module closure ships through the
+  // same root closure; public-v3 is listed explicitly to anchor the ./v3
+  // subpath declaration entry.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
@@ -15,6 +19,7 @@
   },
   "include": [
     "src/index.ts",
+    "src/public-v3/index.ts",
     "src/workflow/index.ts",
     "src/workflow/internal/xstate-adapter.ts"
   ]
