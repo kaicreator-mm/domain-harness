@@ -32,6 +32,7 @@ import {
 
 export type HarnessExecutionIntegrationErrorCode =
   | 'INVALID_CAPABILITY_SEMANTIC_IDENTITY'
+  | 'INVALID_HARNESS_PRODUCER_IDENTITY'
   | 'INVALID_SELECTED_DEPENDENCY_PROVENANCE';
 
 export class HarnessExecutionIntegrationError extends Error {
@@ -51,6 +52,8 @@ export interface HarnessJournalIntegrationContext extends HarnessExecutionIdenti
 export interface HarnessExecutionIntegrationOptions {
   readonly input: BusinessHarnessInput;
   readonly execution: HarnessJournalIntegrationContext;
+  /** Exact producer identity required by the T-013 Harness cache-write contract. */
+  readonly harnessProducerIdentity: CompiledArtifactIdentity;
   /** Selected Fact/CDI semantic identities actually supplied to this Harness invocation. */
   readonly selectedSemanticDependencies?: BehaviorallyRelevantSemanticDependencies;
   /** T-013 pre-read semantic material. It is eligibility input only, never observed provenance. */
@@ -76,6 +79,13 @@ export interface HarnessIntegratedObservedDependencySet {
   readonly toolArtifacts: readonly CompiledArtifactIdentity[];
 }
 
+export interface HarnessSemanticCacheWriteHandoff {
+  /** Exact `harness-config` producer; T-013 still performs final producer/pre-read checks. */
+  readonly producerIdentity: CompiledArtifactIdentity;
+  readonly observedDependencies: SemanticObservedDependencySet;
+  readonly dependencyEligibility: HarnessObservedCacheWriteEligibility;
+}
+
 export interface HarnessJournalFailureEvidence {
   readonly code: HarnessJournalFailureCode;
   readonly message: string;
@@ -88,6 +98,8 @@ export interface JournaledHarnessExecutionResult {
   readonly observedDependencies: HarnessIntegratedObservedDependencySet;
   /** Dependency-only T-013 handoff. T-013 producer checks still run before any actual cache write. */
   readonly cacheWriteEligibility: HarnessObservedCacheWriteEligibility;
+  /** Exact producer + observed dependency material for T-013 final cache-write preparation. */
+  readonly cacheWriteHandoff: HarnessSemanticCacheWriteHandoff;
   readonly journalEvidence: readonly HarnessOperationEvidence[];
   readonly journalFailure?: HarnessJournalFailureEvidence;
 }
@@ -227,6 +239,19 @@ function validateSelectedProvenance(input: BusinessHarnessInput): void {
         'selectedDependencies may contain only runtime-validated domain-fact/compiled-intelligence provenance',
       );
     }
+  }
+}
+
+function validateHarnessProducerIdentity(identity: CompiledArtifactIdentity): void {
+  if (
+    identity.kind !== 'harness-config'
+    || identity.artifactId.trim().length === 0
+    || !isContentDigest(identity.contentDigest)
+  ) {
+    throw new HarnessExecutionIntegrationError(
+      'INVALID_HARNESS_PRODUCER_IDENTITY',
+      'Harness execution must bind an exact harness-config producer identity',
+    );
   }
 }
 
@@ -429,8 +454,11 @@ export function createJournaledHarnessExecutionIntegration(
   options: HarnessExecutionIntegrationOptions,
 ): JournaledHarnessExecutionIntegration {
   validateSelectedProvenance(options.input);
+  validateHarnessProducerIdentity(options.harnessProducerIdentity);
   const evidence: HarnessOperationEvidence[] = [];
+  const producerIdentity = exactArtifact(options.harnessProducerIdentity);
   const semantic = normalizeSemanticDependencies(options.selectedSemanticDependencies);
+  semantic.artifacts = dedupeBy([...semantic.artifacts, producerIdentity], artifactKey);
   const tools: CompiledArtifactIdentity[] = [];
   let journalFailure: HarnessJournalFailureEvidence | undefined;
   let completed = false;
@@ -482,6 +510,11 @@ export function createJournaledHarnessExecutionIntegration(
         harnessResult: result,
         observedDependencies,
         cacheWriteEligibility,
+        cacheWriteHandoff: {
+          producerIdentity,
+          observedDependencies: semanticObserved,
+          dependencyEligibility: cacheWriteEligibility,
+        },
         journalEvidence: [...evidence],
         ...(journalFailure === undefined ? {} : { journalFailure }),
       };
