@@ -419,6 +419,7 @@ export class ExpoSqliteRuntimeStore
     DurableControlStore
 {
   private readonly writes: ExclusiveTransactionQueue;
+  private readonly ownsQueue: boolean;
   private closed = false;
 
   public constructor(
@@ -431,7 +432,9 @@ export class ExpoSqliteRuntimeStore
     // database — the same transaction manager/durability domain as the
     // RuntimeStore methods they extend (T-009/T-010/T-014 frozen requirement).
     // openExpoSqliteAuthorityStores injects the shared queue so every adapter
-    // on one logical database serializes through one writer gate.
+    // on one logical database serializes through one writer gate. An injected
+    // queue is owned (and drained) by its creator, not by this store.
+    this.ownsQueue = writes === undefined;
     this.writes = writes ?? new ExclusiveTransactionQueue(database);
   }
 
@@ -447,7 +450,9 @@ export class ExpoSqliteRuntimeStore
     if (this.closed) {
       return;
     }
-    await this.writes.idle();
+    if (this.ownsQueue) {
+      await this.writes.idle();
+    }
     this.closed = true;
     if (this.ownsDatabase) {
       await this.database.closeAsync?.();
