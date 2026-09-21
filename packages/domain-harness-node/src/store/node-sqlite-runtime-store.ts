@@ -853,6 +853,11 @@ export class NodeSqliteRuntimeStore
       if (existing !== undefined) {
         // Pins are bind-once: the same exact pin is idempotent, a different
         // pin under the same instance id is a conflict and never overwrites.
+        // T-022 review P2-2: equality is canonical-JSON byte equality, where
+        // core sameExecutionPin is field-wise. The two agree for every pin
+        // produced by createGovernanceExecutionPin; only a pin carrying extra
+        // ad-hoc fields could diverge, and the divergence direction is
+        // fail-closed ('conflict', never an overwrite).
         return existing.pin_json === encoded ? 'existing' : 'conflict';
       }
       this.#db.prepare(`
@@ -919,6 +924,10 @@ export class NodeSqliteRuntimeStore
     });
     // Atomic ensure/open: the bind of provisioning key to exact WorkflowAddress
     // happens in this single durable transaction, never query-then-insert.
+    // Note (T-022 review P2-1): this adapter — like the T-010 reference fake —
+    // binds the provisioning key to the exact-address RECORD only; it does not
+    // create a dh_v2_instances row. Instance creation is owned by the runtime
+    // message path that consumes the bound address, never by this call.
     return transaction.immediate();
   }
 

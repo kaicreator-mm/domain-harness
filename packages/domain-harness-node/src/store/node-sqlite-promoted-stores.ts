@@ -377,7 +377,6 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
   async releaseRetention(
     expected: PromotedArtifactRetentionReference,
   ): Promise<'released' | 'absent'> {
-    const encoded = canonicalText(expected as unknown as JsonValue, 'promoted retention reference');
     const transaction = this.#db.transaction((): 'released' | 'absent' => {
       const current = this.#db.prepare(`
         SELECT reference_json FROM dh_v3_promoted_artifact_retentions
@@ -412,12 +411,15 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
           `retention reference ${expected.referenceId} changed before release`,
         );
       }
-      // Keep the row: a released reference is a permanent tombstone, never deleted.
+      // Keep the row: a released reference is a permanent tombstone, never
+      // deleted. T-022 review P3-2: the tombstone retains the originally
+      // stored bytes (sameRetention already proved caller equivalence), not
+      // the caller's reserialized text.
       this.#db.prepare(`
         UPDATE dh_v3_promoted_artifact_retentions
-        SET live = 0, reference_json = ?
+        SET live = 0
         WHERE reference_id = ?
-      `).run(encoded, expected.referenceId);
+      `).run(expected.referenceId);
       return 'released';
     });
     return transaction.immediate();
