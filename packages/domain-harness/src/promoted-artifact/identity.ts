@@ -126,7 +126,7 @@ export async function verifyPromotedArtifactBody(
   if (body.identity.kind !== PROMOTED_ARTIFACT_KIND) {
     throw new PromotedArtifactContractError(
       'INVALID_PROMOTED_ARTIFACT',
-      `unexpected artifact kind ${body.identity.kind}`,
+      `unexpected artifact kind ${String(body.identity.kind)}`,
     );
   }
   const recomputed = await createPromotedArtifactBody({
