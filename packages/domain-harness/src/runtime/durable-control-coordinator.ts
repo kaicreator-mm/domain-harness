@@ -250,6 +250,183 @@ function requireValidRevision(record: ExternalWorkCorrelationRecord): void {
   }
 }
 
+function storeContractViolation(message: string): never {
+  throw new DurableControlError('STORE_CONTRACT_VIOLATION', message);
+}
+
+function asStoredObject(value: unknown, name: string): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return storeContractViolation(`${name} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function storedNonEmptyString(value: unknown, name: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    return storeContractViolation(`${name} must be a non-empty string`);
+  }
+  return value;
+}
+
+function storedInstant(value: unknown, name: string): string {
+  const text = storedNonEmptyString(value, name);
+  if (!Number.isFinite(Date.parse(text))) {
+    return storeContractViolation(`${name} must be a valid timestamp`);
+  }
+  return text;
+}
+
+function storedPositiveOrdinal(value: unknown, name: string): number {
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+    return storeContractViolation(`${name} must be a positive safe integer`);
+  }
+  return value as number;
+}
+
+function storedTarget(value: unknown, name: string): WorkflowAddress {
+  const target = asStoredObject(value, name);
+  return {
+    workflowId: storedNonEmptyString(target.workflowId, `${name}.workflowId`),
+    instanceKey: storedNonEmptyString(target.instanceKey, `${name}.instanceKey`),
+  };
+}
+
+function assertStoredJson(value: unknown, name: string): JsonValue {
+  if (value === undefined) {
+    return storeContractViolation(`${name} must be valid JSON material`);
+  }
+  try {
+    canonicalJsonStringify(value);
+  } catch {
+    return storeContractViolation(`${name} must be valid canonical JSON material`);
+  }
+  return value as JsonValue;
+}
+
+function assertStoredTerminalSource(
+  record: ExternalWorkCorrelationRecord,
+  rawRecord: Record<string, unknown>,
+): void {
+  const source = asStoredObject(rawRecord.terminalSource, 'terminalSource');
+  const sourceTarget = storedTarget(source.target, 'terminalSource.target');
+  if (!sameTarget(sourceTarget, record.target)) {
+    storeContractViolation('terminalSource target does not match external-work record target');
+  }
+
+  if (
+    storedNonEmptyString(
+      source.externalCorrelationId,
+      'terminalSource.externalCorrelationId',
+    ) !== record.externalCorrelationId
+  ) {
+    storeContractViolation('terminalSource external correlation does not match external-work record');
+  }
+
+  storedInstant(source.observedAt, 'terminalSource.observedAt');
+  const storedTurnId = storedNonEmptyString(
+    source.durableControlTurnId,
+    'terminalSource.durableControlTurnId',
+  );
+
+  if (record.status === 'timed_out') {
+    if (source.kind !== 'deadline') {
+      storeContractViolation('timed_out record must contain a deadline terminalSource');
+    }
+    const timerId = storedNonEmptyString(source.timerId, 'terminalSource.timerId');
+    if (timerId !== record.deadlineTimerId) {
+      storeContractViolation('deadline terminalSource timerId does not match external-work record');
+    }
+    const fireOrdinal = storedPositiveOrdinal(
+      source.fireOrdinal,
+      'terminalSource.fireOrdinal',
+    );
+    if (fireOrdinal !== 1) {
+      storeContractViolation('T-010 external-work deadline terminalSource must use fireOrdinal=1');
+    }
+    const expectedTurnId = durableControlTurnId([
+      'deadline',
+      ...targetMaterial(record.target),
+      timerId,
+      fireOrdinal,
+    ]);
+    if (storedTurnId !== expectedTurnId) {
+      storeContractViolation(
+        'deadline terminalSource durableControlTurnId does not match its identity material',
+      );
+    }
+    return;
+  }
+
+  if (record.status === 'callback_received') {
+    if (source.kind !== 'external_callback') {
+      storeContractViolation(
+        'callback_received record must contain an external_callback terminalSource',
+      );
+    }
+    const callbackOrdinal = storedPositiveOrdinal(
+      source.callbackOrdinal,
+      'terminalSource.callbackOrdinal',
+    );
+    assertStoredJson(source.payload, 'terminalSource.payload');
+    const expectedTurnId = durableControlTurnId([
+      'external_callback',
+      ...targetMaterial(record.target),
+      record.externalCorrelationId,
+      callbackOrdinal,
+    ]);
+    if (storedTurnId !== expectedTurnId) {
+      storeContractViolation(
+        'callback terminalSource durableControlTurnId does not match its identity material',
+      );
+    }
+  }
+}
+
+function assertStoredExternalWorkRecord(
+  value: unknown,
+  expectedExternalCorrelationId?: string,
+): asserts value is ExternalWorkCorrelationRecord {
+  const rawRecord = asStoredObject(value, 'external-work record');
+  const externalCorrelationId = storedNonEmptyString(
+    rawRecord.externalCorrelationId,
+    'external-work record.externalCorrelationId',
+  );
+  if (
+    expectedExternalCorrelationId !== undefined &&
+    externalCorrelationId !== expectedExternalCorrelationId
+  ) {
+    storeContractViolation('external-work record key does not match requested correlation');
+  }
+
+  const target = storedTarget(rawRecord.target, 'external-work record.target');
+  storedNonEmptyString(rawRecord.deadlineTimerId, 'external-work record.deadlineTimerId');
+  storedInstant(rawRecord.dueAt, 'external-work record.dueAt');
+  storedInstant(rawRecord.createdAt, 'external-work record.createdAt');
+  storedInstant(rawRecord.updatedAt, 'external-work record.updatedAt');
+  if (!Number.isSafeInteger(rawRecord.revision) || (rawRecord.revision as number) < 0) {
+    storeContractViolation('external-work record.revision must be a non-negative safe integer');
+  }
+
+  const status = rawRecord.status;
+  if (status !== 'waiting' && status !== 'callback_received' && status !== 'timed_out') {
+    storeContractViolation('external-work record has an unknown status');
+  }
+
+  const typedRecord = value as ExternalWorkCorrelationRecord;
+  if (!sameTarget(target, typedRecord.target)) {
+    storeContractViolation('external-work record target is malformed');
+  }
+
+  if (status === 'waiting') {
+    if (rawRecord.terminalSource !== undefined) {
+      storeContractViolation('waiting external-work record must not contain terminalSource');
+    }
+    return;
+  }
+
+  assertStoredTerminalSource(typedRecord, rawRecord);
+}
+
 /**
  * Portable T-010 coordinator.
  *
@@ -298,6 +475,7 @@ export class DurableControlCoordinator {
         'external-work store returned an unknown disposition',
       );
     }
+    assertStoredExternalWorkRecord(result.record, request.externalCorrelationId);
     assertExternalWorkIdentity(request, result.record);
     requireValidRevision(result.record);
     return result.record;
@@ -475,11 +653,18 @@ export class DurableControlCoordinator {
    */
   async recoverDueDeadlines(now: string): Promise<readonly DeadlineControlSource[]> {
     instantMillis(now, 'now');
-    const candidates = [
-      ...(await this.store.listDueExternalWorkCorrelations(now)),
-    ].sort((left, right) =>
-      left.externalCorrelationId.localeCompare(right.externalCorrelationId),
-    );
+    const rawCandidates: unknown = await this.store.listDueExternalWorkCorrelations(now);
+    if (!Array.isArray(rawCandidates)) {
+      storeContractViolation('due-deadline store query must return an array');
+    }
+    const candidates = rawCandidates
+      .map((candidate) => {
+        assertStoredExternalWorkRecord(candidate);
+        return candidate;
+      })
+      .sort((left, right) =>
+        left.externalCorrelationId.localeCompare(right.externalCorrelationId),
+      );
     const sources: DeadlineControlSource[] = [];
 
     for (const candidate of candidates) {
@@ -493,13 +678,14 @@ export class DurableControlCoordinator {
   private async requireExternalWork(
     externalCorrelationId: string,
   ): Promise<ExternalWorkCorrelationRecord> {
-    const record = await this.store.getExternalWorkCorrelation(externalCorrelationId);
+    const record: unknown = await this.store.getExternalWorkCorrelation(externalCorrelationId);
     if (record === null) {
       throw new DurableControlError(
         'UNKNOWN_EXTERNAL_CORRELATION',
         `external correlation ${externalCorrelationId} is not durably registered`,
       );
     }
+    assertStoredExternalWorkRecord(record, externalCorrelationId);
     return record;
   }
 }
