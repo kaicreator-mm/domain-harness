@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../src/persistence/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,UAAU,EAAE,KAAK,SAAS,EAAE,MAAM,iBAAiB,CAAC;AAC7D,OAAO,EAAE,WAAW,EAAE,KAAK,kBAAkB,EAAE,MAAM,mBAAmB,CAAC;AACzE,YAAY,EACV,eAAe,EACf,iBAAiB,EACjB,SAAS,EACT,mBAAmB,EACnB,WAAW,EACX,YAAY,EACZ,gBAAgB,EAChB,SAAS,EACT,UAAU,EACV,kBAAkB,GACnB,MAAM,YAAY,CAAC"}

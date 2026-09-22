@@ -1,0 +1,292 @@
+import { canonicalJsonStringify, computeCanonicalJsonDigest } from '../contracts/identity.js';
+import { createPromotedArtifactBody } from '../promoted-artifact/identity.js';
+import { PromotionActivationAuthorityError, } from './contracts.js';
+const FLOATING_TOKENS = new Set(['latest', 'current', 'active', 'head', 'default', '*']);
+function cloneJson(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+function requireNonEmpty(value, label) {
+    if (typeof value !== 'string' || value.length === 0) {
+        throw new PromotionActivationAuthorityError('INVALID_EXACT_AUTHORITY', `${label} must be non-empty`);
+    }
+}
+function rejectFloating(value, label) {
+    requireNonEmpty(value, label);
+    if (FLOATING_TOKENS.has(value.trim().toLowerCase())) {
+        throw new PromotionActivationAuthorityError('FLOATING_AUTHORITY_FORBIDDEN', `${label} must be an exact immutable identity, not ${value}`);
+    }
+}
+function exactBaseline(identity) {
+    return {
+        domainId: identity.domainId,
+        governanceId: identity.governanceId,
+        schemaVersion: identity.schemaVersion,
+        contentDigest: identity.contentDigest,
+    };
+}
+function sameBaseline(left, right) {
+    return left.domainId === right.domainId
+        && left.governanceId === right.governanceId
+        && left.schemaVersion === right.schemaVersion
+        && left.contentDigest === right.contentDigest;
+}
+function sameArtifact(left, right) {
+    return left.kind === right.kind
+        && left.artifactId === right.artifactId
+        && left.contentDigest === right.contentDigest;
+}
+function assertActor(actor) {
+    if (actor?.kind !== 'human-operator') {
+        throw new PromotionActivationAuthorityError('HUMAN_OPERATOR_AUTHORITY_REQUIRED', 'promotion and activation require explicit human/operator authority');
+    }
+    requireNonEmpty(actor.actorId, 'action.actor.actorId');
+    requireNonEmpty(actor.operatorId, 'action.actor.operatorId');
+}
+function assertAction(action, expected) {
+    if (action?.action !== expected) {
+        throw new PromotionActivationAuthorityError('INVALID_AUTHORITY_ACTION', `${expected} requires a distinct explicit ${expected} authority action`);
+    }
+    requireNonEmpty(action.actionId, 'action.actionId');
+    requireNonEmpty(action.recordedAt, 'action.recordedAt');
+    assertActor(action.actor);
+}
+function assertAuthorityBinding(binding) {
+    requireNonEmpty(binding.domainId, 'authorityBinding.domainId');
+    requireNonEmpty(binding.packageId, 'authorityBinding.packageId');
+    rejectFloating(binding.domainIntelligenceContentDigest, 'authorityBinding.domainIntelligenceContentDigest');
+    const baseline = binding.governanceBaseline;
+    requireNonEmpty(baseline.domainId, 'governanceBaseline.domainId');
+    requireNonEmpty(baseline.governanceId, 'governanceBaseline.governanceId');
+    requireNonEmpty(baseline.schemaVersion, 'governanceBaseline.schemaVersion');
+    rejectFloating(baseline.contentDigest, 'governanceBaseline.contentDigest');
+    if (binding.domainId !== baseline.domainId) {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_BASELINE_MISMATCH', 'package/CDI domain and Governance Baseline domain must match exactly');
+    }
+}
+function assertEvaluation(evidence, target) {
+    requireNonEmpty(evidence.evaluationId, 'evaluation.evaluationId');
+    if (!sameBaseline(evidence.evaluatedUnder, target)) {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_BASELINE_MISMATCH', 'evaluation is not bound to the exact target Governance Baseline');
+    }
+    if (evidence.verdict !== 'allow') {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_TRANSITION_REJECTED', 'governance evaluation did not authorize the requested lifecycle action');
+    }
+    if (evidence.hardInvariantsSatisfied !== true) {
+        throw new PromotionActivationAuthorityError('HARD_INVARIANT_REJECTED', 'human/operator authority cannot override failed Hard Invariants');
+    }
+}
+function normalizeTransition(preChange, target, evidence) {
+    if (sameBaseline(preChange, target)) {
+        if (evidence !== undefined) {
+            throw new PromotionActivationAuthorityError('GOVERNANCE_TRANSITION_MISMATCH', 'transition evidence was supplied although Governance Baseline did not change');
+        }
+        return undefined;
+    }
+    if (evidence === undefined) {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_REVALIDATION_REQUIRED', 'Governance Baseline change requires explicit baseline-bound revalidation');
+    }
+    requireNonEmpty(evidence.revalidationId, 'governanceTransition.revalidationId');
+    if (!sameBaseline(evidence.fromBaseline, preChange) || !sameBaseline(evidence.toBaseline, target)) {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_TRANSITION_MISMATCH', 'Governance transition evidence does not bind the exact pre-change and target baselines');
+    }
+    if (sameBaseline(evidence.evaluatedUnder, target)) {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_SELF_AUTHORIZATION_FORBIDDEN', 'a new Governance Baseline cannot authorize its own transition');
+    }
+    if (!sameBaseline(evidence.evaluatedUnder, preChange)) {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_TRANSITION_MISMATCH', 'Governance transition must be evaluated under exact pre-change baseline authority');
+    }
+    if (evidence.verdict !== 'allow') {
+        throw new PromotionActivationAuthorityError('GOVERNANCE_TRANSITION_REJECTED', 'pre-change Governance Baseline rejected the transition');
+    }
+    return cloneJson(evidence);
+}
+function assertExactVersion(version) {
+    rejectFloating(version, 'artifactVersion');
+}
+function assertValidationBaseline(request, target) {
+    if (!request.validation.ok) {
+        throw new PromotionActivationAuthorityError('PROMOTION_REQUIRES_VALIDATED_CANDIDATE', 'proposal/evaluation/rejected validation cannot grant promotion authority');
+    }
+    if (!sameBaseline(exactBaseline(request.validation.identity.governanceBaseline), target)) {
+        throw new PromotionActivationAuthorityError('STALE_VALIDATION', 'Candidate validation is stale for the exact target Governance Baseline');
+    }
+}
+function authorityTuple(action, artifact, candidate, binding, preChange, evaluation, version, transition) {
+    return {
+        actionId: action.actionId,
+        action: action.action,
+        actor: cloneJson(action.actor),
+        recordedAt: action.recordedAt,
+        artifact: cloneJson(artifact),
+        candidate: cloneJson(candidate),
+        package: {
+            domainId: binding.domainId,
+            packageId: binding.packageId,
+            domainIntelligenceContentDigest: binding.domainIntelligenceContentDigest,
+        },
+        governance: {
+            preChangeBaseline: cloneJson(preChange),
+            targetBaseline: exactBaseline(binding.governanceBaseline),
+            evaluatedUnder: cloneJson(evaluation.evaluatedUnder),
+            ...(transition === undefined ? {} : { transition: cloneJson(transition) }),
+        },
+        evaluationId: evaluation.evaluationId,
+        artifactVersion: version,
+    };
+}
+async function makeAudit(tuple, sha256) {
+    const auditId = await computeCanonicalJsonDigest(tuple, sha256);
+    return { auditId, ...tuple };
+}
+export class MemoryAuthorityAuditStore {
+    records = new Map();
+    async getByActionId(actionId) {
+        const record = this.records.get(actionId);
+        return record === undefined ? undefined : cloneJson(record);
+    }
+    async put(record) {
+        const existing = this.records.get(record.actionId);
+        if (existing !== undefined) {
+            throw new PromotionActivationAuthorityError('AUDIT_IDENTITY_CONFLICT', `authority action ${record.actionId} is already bound to audit ${existing.auditId}`);
+        }
+        this.records.set(record.actionId, cloneJson(record));
+    }
+}
+export class PromotionActivationAuthority {
+    registry;
+    auditStore;
+    activationPort;
+    sha256;
+    constructor(registry, auditStore, activationPort, sha256) {
+        this.registry = registry;
+        this.auditStore = auditStore;
+        this.activationPort = activationPort;
+        this.sha256 = sha256;
+    }
+    async assertUnusedAction(actionId) {
+        const existing = await this.auditStore.getByActionId(actionId);
+        if (existing !== undefined) {
+            throw new PromotionActivationAuthorityError('AUDIT_IDENTITY_CONFLICT', `authority action ${actionId} is already bound to audit ${existing.auditId}`);
+        }
+    }
+    async readPreChangeBaseline(domainId) {
+        let baseline;
+        try {
+            baseline = await this.activationPort.readCurrentGovernanceBaseline(domainId);
+        }
+        catch (error) {
+            throw new PromotionActivationAuthorityError('STALE_GOVERNANCE_BASELINE', 'exact pre-change Governance Baseline could not be read from the activation authority seam', error);
+        }
+        if (baseline.domainId !== domainId) {
+            throw new PromotionActivationAuthorityError('STALE_GOVERNANCE_BASELINE', 'activation authority seam returned a Governance Baseline for a different domain');
+        }
+        rejectFloating(baseline.contentDigest, 'preChangeGovernanceBaseline.contentDigest');
+        return exactBaseline(baseline);
+    }
+    async assertPreChangeStillCurrent(domainId, expected) {
+        const current = await this.readPreChangeBaseline(domainId);
+        if (!sameBaseline(current, expected)) {
+            throw new PromotionActivationAuthorityError('STALE_GOVERNANCE_BASELINE', 'pre-change Governance Baseline changed while authority action was being evaluated');
+        }
+    }
+    async promote(request) {
+        assertAction(request.action, 'promote');
+        assertExactVersion(request.version);
+        assertAuthorityBinding(request.authorityBinding);
+        const target = exactBaseline(request.authorityBinding.governanceBaseline);
+        const preChange = await this.readPreChangeBaseline(request.authorityBinding.domainId);
+        assertValidationBaseline(request, target);
+        assertEvaluation(request.evaluation, target);
+        const governanceTransition = normalizeTransition(preChange, target, request.governanceTransition);
+        const recomputedCandidateDigest = await computeCanonicalJsonDigest(request.semanticMaterial, this.sha256);
+        if (recomputedCandidateDigest !== request.validation.identity.candidateContentDigest) {
+            throw new PromotionActivationAuthorityError('STALE_VALIDATION', 'promotion semantic material no longer matches the exact validated Candidate digest');
+        }
+        const expectedBody = await createPromotedArtifactBody({
+            artifactId: request.artifactId,
+            semanticMaterial: request.semanticMaterial,
+        }, this.sha256);
+        const tuple = authorityTuple(request.action, expectedBody.identity, request.validation.identity, request.authorityBinding, preChange, request.evaluation, request.version, governanceTransition);
+        const audit = await makeAudit(tuple, this.sha256);
+        await this.assertUnusedAction(request.action.actionId);
+        await this.assertPreChangeStillCurrent(request.authorityBinding.domainId, preChange);
+        const promoted = await this.registry.promote({
+            artifactId: request.artifactId,
+            version: request.version,
+            validation: request.validation,
+            authorityBinding: request.authorityBinding,
+            semanticMaterial: request.semanticMaterial,
+            promotion: {
+                recordId: request.action.actionId,
+                authorityRef: canonicalJsonStringify(audit),
+                recordedAt: request.action.recordedAt,
+            },
+        });
+        if (!sameArtifact(promoted.body.identity, expectedBody.identity)) {
+            throw new PromotionActivationAuthorityError('PROMOTED_ARTIFACT_MISMATCH', 'promoted registry returned an artifact different from the authorized exact identity');
+        }
+        try {
+            await this.auditStore.put(audit);
+        }
+        catch (error) {
+            if (error instanceof PromotionActivationAuthorityError)
+                throw error;
+            throw new PromotionActivationAuthorityError('AUTHORITY_AUDIT_WRITE_FAILED', 'promotion committed exact T-015 audit provenance in T-012 but audit mirror persistence failed', error);
+        }
+        return { promoted, audit };
+    }
+    async activate(request) {
+        assertAction(request.action, 'activate');
+        assertExactVersion(request.version);
+        assertAuthorityBinding(request.authorityBinding);
+        rejectFloating(request.expectedArtifact.contentDigest, 'expectedArtifact.contentDigest');
+        const target = exactBaseline(request.authorityBinding.governanceBaseline);
+        const preChange = await this.readPreChangeBaseline(request.authorityBinding.domainId);
+        assertEvaluation(request.evaluation, target);
+        const governanceTransition = normalizeTransition(preChange, target, request.governanceTransition);
+        await this.assertUnusedAction(request.action.actionId);
+        let selected;
+        try {
+            selected = await this.registry.selectVersion({
+                artifactId: request.artifactId,
+                version: request.version,
+                expectedAuthority: request.authorityBinding,
+            });
+        }
+        catch (error) {
+            throw new PromotionActivationAuthorityError('PROMOTED_AUTHORITY_REQUIRED', 'activation requires an exact promoted artifact under the target package/CDI/Governance authority', error);
+        }
+        if (!sameArtifact(selected.body.identity, request.expectedArtifact)) {
+            throw new PromotionActivationAuthorityError('PROMOTED_ARTIFACT_MISMATCH', 'selected promoted artifact does not equal the exact artifact authorized for activation');
+        }
+        if (!sameBaseline(exactBaseline(selected.promotion.sourceCandidate.governanceBaseline), target)) {
+            throw new PromotionActivationAuthorityError('STALE_VALIDATION', 'promoted artifact source Candidate was not revalidated against the target Governance Baseline');
+        }
+        const tuple = authorityTuple(request.action, selected.body.identity, selected.promotion.sourceCandidate, request.authorityBinding, preChange, request.evaluation, request.version, governanceTransition);
+        const audit = await makeAudit(tuple, this.sha256);
+        try {
+            await this.auditStore.put(audit);
+        }
+        catch (error) {
+            if (error instanceof PromotionActivationAuthorityError)
+                throw error;
+            throw new PromotionActivationAuthorityError('AUTHORITY_AUDIT_WRITE_FAILED', 'activation authority audit persistence failed before fresh binding publication', error);
+        }
+        try {
+            await this.activationPort.publishFreshSelection({
+                artifact: selected.body.identity,
+                authorityBinding: cloneJson(request.authorityBinding),
+                expectedPreChangeGovernanceBaseline: cloneJson(preChange),
+                audit,
+            });
+        }
+        catch (error) {
+            throw new PromotionActivationAuthorityError('ACTIVATION_BINDING_FAILED', 'T-014 fresh-selection activation seam rejected or failed the authority grant', error);
+        }
+        return { selected, audit };
+    }
+}
+export function samePromotionActivationAudit(left, right) {
+    return canonicalJsonStringify(left) === canonicalJsonStringify(right);
+}
+//# sourceMappingURL=authority.js.map

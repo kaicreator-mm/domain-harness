@@ -1,0 +1,1 @@
+{"version":3,"file":"process-command.js","sourceRoot":"","sources":["../../src/contracts/process-command.ts"],"names":[],"mappings":"AAoKA,MAAM,OAAO,2BAA4B,SAAQ,KAAK;IAC3C,IAAI,CAAkC;IAE/C,YAAY,IAAqC,EAAE,OAAe;QAChE,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,6BAA6B,CAAC;QAC1C,IAAI,CAAC,IAAI,GAAG,IAAI,CAAC;IACnB,CAAC;CACF"}

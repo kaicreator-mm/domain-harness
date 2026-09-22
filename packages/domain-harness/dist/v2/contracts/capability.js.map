@@ -1,0 +1,1 @@
+{"version":3,"file":"capability.js","sourceRoot":"","sources":["../../../src/v2/contracts/capability.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,qBAAqB,GAAG;IACnC,kBAAkB,EAAE,wBAAwB;IAC5C,iBAAiB,EAAE,sBAAsB;IACzC,eAAe,EAAE,oBAAoB;IACrC,aAAa,EAAE,kBAAkB;IACjC,YAAY,EAAE,iBAAiB;IAC/B,gBAAgB,EAAE,sBAAsB;IACxC,qBAAqB,EAAE,2BAA2B;CACO,CAAC"}

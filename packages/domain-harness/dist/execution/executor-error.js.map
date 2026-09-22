@@ -1,0 +1,1 @@
+{"version":3,"file":"executor-error.js","sourceRoot":"","sources":["../../src/execution/executor-error.ts"],"names":[],"mappings":"AAOA,MAAM,OAAO,aAAc,SAAQ,KAAK;IAC7B,IAAI,CAAoB;IAEjC,YAAY,IAAuB,EAAE,OAAe,EAAE,OAAsB;QAC1E,KAAK,CAAC,OAAO,EAAE,OAAO,CAAC,CAAC;QACxB,IAAI,CAAC,IAAI,GAAG,eAAe,CAAC;QAC5B,IAAI,CAAC,IAAI,GAAG,IAAI,CAAC;IACnB,CAAC;CACF"}

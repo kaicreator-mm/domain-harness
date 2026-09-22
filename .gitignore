@@ -1,5 +1,11 @@
 node_modules/
 dist/
+# Issue #299: the two externally consumed packages ship their built dist/
+# trees from git so an exact-SHA git install delivers a usable package
+# without lifecycle scripts. scripts/check-committed-dist.mjs enforces that
+# the committed output always matches a fresh build of the committed sources.
+!packages/domain-harness/dist/
+!packages/domain-harness-compiler/dist/
 coverage/
 *.log
 *.sqlite

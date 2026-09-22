@@ -1,0 +1,174 @@
+import type { ExactContentIdentity } from '../contracts/identity.js';
+import type { JsonValue } from '../contracts/json.js';
+export declare const CANDIDATE_ENVELOPE_SCHEMA_VERSION: "candidate-envelope-v1";
+export declare const CANDIDATE_VALIDATOR_CONTRACT_VERSION: "candidate-validator-v1";
+export declare const CANDIDATE_BODY_SCHEMA_VERSION: "candidate-body-schema-v1";
+export declare const CANDIDATE_KINDS: readonly ["rule", "decision-procedure", "skill", "workflow"];
+export type CandidateKind = (typeof CANDIDATE_KINDS)[number];
+export interface CandidateExactReference {
+    readonly kind: string;
+    readonly artifactId: string;
+    readonly contentDigest: string;
+}
+export interface CandidateToolReference extends CandidateExactReference {
+    readonly kind: 'tool';
+    readonly capability: 'query';
+}
+export interface CandidateIoContract {
+    readonly inputs: readonly CandidateExactReference[];
+    readonly outputs: readonly CandidateExactReference[];
+}
+export type CandidateMutationContract = {
+    readonly kind: 'none';
+} | {
+    readonly kind: 'durable-effect';
+    readonly effects: readonly CandidateExactReference[];
+};
+export interface CandidateControlEdge {
+    readonly from: string;
+    readonly to: string;
+}
+export interface CandidateControlContract {
+    readonly startNode: string;
+    readonly nodes: readonly string[];
+    readonly edges: readonly CandidateControlEdge[];
+    readonly maxSteps: number;
+}
+/**
+ * Common, engine-neutral envelope for executable CDI proposals.
+ * Proposal provenance/evaluation/promotion metadata deliberately lives outside
+ * the semantic body so it cannot become execution authority by accident.
+ */
+export interface CandidateEnvelope {
+    readonly schemaVersion: typeof CANDIDATE_ENVELOPE_SCHEMA_VERSION;
+    readonly candidateKind: CandidateKind;
+    readonly candidateId: string;
+    readonly bodyContract: CandidateExactReference;
+    readonly body: JsonValue;
+    readonly io: CandidateIoContract;
+    readonly capabilities: readonly string[];
+    readonly tools: readonly CandidateToolReference[];
+    readonly events: readonly string[];
+    readonly mutation: CandidateMutationContract;
+    readonly references: readonly CandidateExactReference[];
+    readonly applicability: readonly CandidateExactReference[];
+    readonly hardInvariants: readonly CandidateExactReference[];
+    readonly control?: CandidateControlContract;
+}
+/**
+ * Narrow structural baseline reference for T-004. T-003 owns the canonical
+ * GovernanceBaselineIdentity; later integration replaces this seam with that
+ * canonical authority without giving T-004 registry/lifecycle ownership.
+ */
+export interface CandidateValidationGovernanceBaseline extends ExactContentIdentity {
+    readonly domainId: string;
+    readonly governanceId: string;
+    readonly version?: string;
+}
+export interface ValidatedCandidateIdentity {
+    readonly candidateKind: CandidateKind;
+    readonly candidateId: string;
+    readonly candidateContentDigest: string;
+    readonly validatorContractVersion: typeof CANDIDATE_VALIDATOR_CONTRACT_VERSION;
+    readonly governanceBaseline: CandidateValidationGovernanceBaseline;
+}
+export declare const CANDIDATE_REJECTION_CODES: readonly ["INVALID_ENVELOPE", "NON_CANONICAL_CONTENT", "ARBITRARY_CODE_FORBIDDEN", "PROVIDER_SECRET_OR_STATE_FORBIDDEN", "RUNTIME_OBJECT_FORBIDDEN", "PRIVATE_REASONING_FORBIDDEN", "BODY_CONTRACT_NOT_ALLOWED", "BODY_VALIDATOR_REQUIRED", "BODY_SCHEMA_INVALID", "INPUT_CONTRACT_NOT_ALLOWED", "OUTPUT_CONTRACT_NOT_ALLOWED", "CAPABILITY_NOT_ALLOWED", "TOOL_NOT_ALLOWED", "EVENT_NOT_ALLOWED", "MUTATION_PATH_INVALID", "EXACT_REFERENCE_UNRESOLVED", "APPLICABILITY_NOT_ALLOWED", "HARD_INVARIANT_INCOMPATIBLE", "CONTROL_INVALID", "CONTROL_LIMIT_EXCEEDED", "CONTROL_CYCLE_FORBIDDEN", "SPECIALIZED_VALIDATOR_REQUIRED", "SPECIALIZED_REJECTED", "VALIDATION_AUTHORITY_INVALID", "CONTENT_DIGEST_INVALID"];
+export type CandidateRejectionCode = (typeof CANDIDATE_REJECTION_CODES)[number];
+export interface CandidateRejection {
+    readonly code: CandidateRejectionCode;
+    readonly path: string;
+    readonly message: string;
+}
+/**
+ * Bounded declarative schema language for executable Candidate bodies.
+ * It intentionally has no callbacks, source code, regular expressions,
+ * external references, custom keywords or provider/runtime objects.
+ */
+export type CandidateBodySchemaNode = CandidateBodyStringSchema | CandidateBodyNumberSchema | CandidateBodyBooleanSchema | CandidateBodyNullSchema | CandidateBodyArraySchema | CandidateBodyObjectSchema;
+export interface CandidateBodyStringSchema {
+    readonly type: 'string';
+    readonly minLength?: number;
+    readonly enum?: readonly string[];
+}
+export interface CandidateBodyNumberSchema {
+    readonly type: 'number';
+    readonly integer?: boolean;
+    readonly minimum?: number;
+    readonly maximum?: number;
+}
+export interface CandidateBodyBooleanSchema {
+    readonly type: 'boolean';
+}
+export interface CandidateBodyNullSchema {
+    readonly type: 'null';
+}
+export interface CandidateBodyArraySchema {
+    readonly type: 'array';
+    readonly items: CandidateBodySchemaNode;
+    readonly maxItems: number;
+}
+export interface CandidateBodyObjectSchema {
+    readonly type: 'object';
+    readonly properties: Readonly<Record<string, CandidateBodySchemaNode>>;
+    readonly required: readonly string[];
+    readonly additionalProperties: false;
+}
+/**
+ * Immutable declarative schema artifact for one executable Candidate body.
+ * The validator verifies identity.contentDigest over schemaVersion,
+ * candidateKind and schema before interpreting the schema. No caller-provided
+ * executable validation callback is accepted as body-schema authority.
+ */
+export interface CandidateBodySchemaArtifact {
+    readonly schemaVersion: typeof CANDIDATE_BODY_SCHEMA_VERSION;
+    readonly candidateKind: CandidateKind;
+    readonly identity: CandidateExactReference;
+    readonly schema: CandidateBodySchemaNode;
+}
+export interface CandidateSpecializedIssue {
+    readonly code: string;
+    readonly path: string;
+    readonly message: string;
+}
+export interface CandidateSpecializedValidator {
+    readonly candidateKind: CandidateKind;
+    /** Must be synchronous, deterministic, side-effect free and I/O free. */
+    validate(candidate: CandidateEnvelope): readonly CandidateSpecializedIssue[];
+}
+/**
+ * Exact immutable body-schema resolution seam. Production implementations MUST
+ * resolve from their content-addressed contract authority. A resolved schema is
+ * never trusted by shape alone: T-004 recomputes and matches its semantic digest.
+ */
+export interface CandidateContractAuthorityPort {
+    resolveExactBodySchema(reference: CandidateExactReference): Promise<CandidateBodySchemaArtifact | undefined>;
+}
+export interface CandidateValidationAuthority {
+    readonly governanceBaseline: CandidateValidationGovernanceBaseline;
+    /** Exact schema identities allowed for each executable Candidate kind. */
+    readonly bodyContracts: Partial<Record<CandidateKind, CandidateExactReference>>;
+    readonly allowedInputs: readonly CandidateExactReference[];
+    readonly allowedOutputs: readonly CandidateExactReference[];
+    readonly allowedCapabilities: readonly string[];
+    readonly allowedTools: readonly CandidateToolReference[];
+    readonly allowedEvents: readonly string[];
+    readonly allowedMutationEffects: readonly CandidateExactReference[];
+    readonly availableReferences: readonly CandidateExactReference[];
+    readonly allowedApplicability: readonly CandidateExactReference[];
+    readonly hardInvariants: readonly CandidateExactReference[];
+    readonly maxControlNodes: number;
+    readonly maxControlEdges: number;
+    readonly maxControlSteps: number;
+    readonly specializedValidators?: Partial<Record<CandidateKind, CandidateSpecializedValidator>>;
+}
+export type CandidateValidationResult = {
+    readonly ok: true;
+    readonly identity: ValidatedCandidateIdentity;
+    /** Deterministic validation never grants promotion, activation or execution. */
+    readonly grantsExecutionPermission: false;
+} | {
+    readonly ok: false;
+    readonly rejections: readonly CandidateRejection[];
+    readonly grantsExecutionPermission: false;
+};
+//# sourceMappingURL=contracts.d.ts.map
