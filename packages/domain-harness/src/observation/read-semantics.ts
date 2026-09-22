@@ -92,6 +92,36 @@ export interface ObservationReadStreamState {
   readonly earliestAvailable: number | null;
 }
 
+/**
+ * Page for a requested stream that has no durable binding at all. Nothing was
+ * ever committed under this exact identity — EXCEPT that a presented cursor
+ * proves the caller previously read SOME stream, so a foreign cursor is an
+ * explicit CURSOR_INVALID and an own-stream cursor (binding lost wholesale to
+ * host deletion) is an explicit RETENTION_TRUNCATED. Never a silent empty
+ * success when a cursor is involved (review P2 repair).
+ */
+export function absentRuntimeObservationStreamPage(
+  request: RuntimeObservationReadRequest,
+): RuntimeObservationPage {
+  if (request.afterCursor === undefined) {
+    return { records: [], highWatermark: 0 };
+  }
+  const streamKey = runtimeObservationStreamKey(request.stream);
+  const decoded = decodeRuntimeObservationCursor(request.afterCursor);
+  if (decoded.k !== streamKey) {
+    return {
+      records: [],
+      highWatermark: 0,
+      gap: { kind: 'CURSOR_INVALID', requestedAfter: decoded.a, highWatermark: 0 },
+    };
+  }
+  return {
+    records: [],
+    highWatermark: 0,
+    gap: { kind: 'RETENTION_TRUNCATED', requestedAfter: decoded.a, highWatermark: 0 },
+  };
+}
+
 export interface ObservationReadRow {
   readonly sequence: number;
   readonly record: RuntimeObservationRecord;

@@ -7,6 +7,7 @@ import type {
 } from './expo-sqlite-types.js';
 import { migrateExpoRuntimeStore } from './migrations.js';
 import {
+  absentRuntimeObservationStreamPage,
   assembleRuntimeObservationPage,
   decodeRuntimeObservationCursor,
   normalizeRuntimeObservationLimit,
@@ -1191,9 +1192,11 @@ export class ExpoSqliteRuntimeStore
 
     if (streamRow === null) {
       // No stream exists under this exact identity/epoch: nothing has been
-      // committed under it. Never a silent stand-in for "no activity" claims
-      // beyond this exact identity.
-      return { records: [], highWatermark: 0 };
+      // committed under it — but a presented cursor still fails closed
+      // explicitly (foreign cursor -> CURSOR_INVALID; own cursor with the
+      // binding wholly lost -> RETENTION_TRUNCATED), never a silent empty
+      // success.
+      return absentRuntimeObservationStreamPage(request);
     }
     if (streamRow.package_identity_json !== identityJson) {
       throw new RuntimeObservationError(

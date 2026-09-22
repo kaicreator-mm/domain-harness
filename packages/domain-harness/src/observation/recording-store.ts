@@ -101,13 +101,10 @@ export class ObservationRecordingRuntimeStore implements RuntimeStore {
   async acceptMessage(message: DomainMessage): Promise<MessageAcceptedAck> {
     // The pinned package for acceptance is the instance's own packageId; the
     // durable adapter resolves and validates the instance row in-transaction.
-    const instance = await this.#options.base.getInstance(message.target);
-    const packageId = instance === null ? undefined : instance.packageId;
-    if (packageId === undefined) {
-      // Unknown instance: let the authoritative acceptance path produce its
-      // own fail-closed error (identical to the non-observed Runtime).
-      return this.#options.base.acceptMessage(message);
-    }
+    // An unknown instance fails closed here — in enabled mode there is NO
+    // unobserved acceptance fallback (review P3 repair): instances are never
+    // deleted, so a missing row cannot become present mid-transaction.
+    const packageId = await this.#requirePackageId(message.target);
     const { ack, records } = await this.#options.base.acceptMessageWithObservation(
       message,
       this.#intent('MESSAGE_ACCEPTED', packageId),

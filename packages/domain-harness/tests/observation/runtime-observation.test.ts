@@ -16,6 +16,7 @@ import type {
 import type { DomainIntelligencePackageIdentity } from '../../src/contracts/domain-data.js';
 import {
   isRuntimeObservationStore,
+  ObservationRecordingRuntimeStore,
   RUNTIME_OBSERVATION_CONTRACT_VERSION,
   RUNTIME_OBSERVATION_EVENT_FAMILIES,
   runtimeObservationStreamKey,
@@ -714,6 +715,74 @@ test('t312: stream identity mismatch fails closed (no aliasing across identities
     }),
     (error: unknown) => error instanceof RuntimeObservationError && error.code === 'STREAM_IDENTITY_MISMATCH',
   );
+});
+
+test('t312: foreign cursor against a nonexistent stream fails closed explicitly (review P2)', async () => {
+  const store = new InMemoryObservationStore();
+  const { runtime, streamFor } = await setup(store, { observation: { mode: 'enabled' } });
+  const capability = runtime.observation;
+  assert.ok(capability !== undefined && capability.status === 'ENABLED');
+  const target = { workflowId: 'happy', instanceKey: 'u20' };
+  const stream = streamFor(target);
+
+  // Seed a cursor from a DIFFERENT existing stream.
+  await runtime.openInstance({ address: target, correlationId: 'c20', input: {} });
+  const page = await readAll(capability, stream);
+  assert.equal(page.records.length, 1);
+  assert.ok(page.nextCursor !== undefined);
+  const foreignCursor = page.nextCursor;
+  await runtime.dispose();
+
+  // Present it against a stream that has never existed: explicit
+  // CURSOR_INVALID, never a silent empty success.
+  const absent = await store.readObservations({
+    stream: streamFor({ workflowId: 'happy', instanceKey: 'never-opened' }),
+    afterCursor: foreignCursor,
+  });
+  assert.equal(absent.records.length, 0);
+  assert.ok(absent.gap !== undefined);
+  assert.equal(absent.gap.kind, 'CURSOR_INVALID');
+
+  // Own-stream cursor after the whole binding was host-deleted: explicit
+  // RETENTION_TRUNCATED, still never silence.
+  store.dropObservationStreamBinding(target, '1');
+  const lost = await store.readObservations({ stream, afterCursor: foreignCursor });
+  assert.equal(lost.records.length, 0);
+  assert.ok(lost.gap !== undefined);
+  assert.equal(lost.gap.kind, 'RETENTION_TRUNCATED');
+
+  // Without any cursor, an absent stream stays a plain honest empty page.
+  const plain = await store.readObservations({
+    stream: streamFor({ workflowId: 'happy', instanceKey: 'never-opened' }),
+  });
+  assert.equal(plain.records.length, 0);
+  assert.equal(plain.highWatermark, 0);
+  assert.equal(plain.gap, undefined);
+});
+
+test('t312: decorated store has no unobserved acceptance fallback (review P3)', async () => {
+  const store = new InMemoryObservationStore();
+  const { streamFor } = await setup(store, { observation: { mode: 'enabled' } });
+  const decorated = new ObservationRecordingRuntimeStore({
+    base: store,
+    resolvePackageIdentity: () => streamFor({ workflowId: 'happy', instanceKey: 'x' }).package,
+  });
+  // A direct host call with an unknown instance fails closed; it never takes
+  // an unobserved mutation path in enabled mode.
+  await assert.rejects(
+    decorated.acceptMessage({
+      messageId: 'ghost',
+      target: { workflowId: 'happy', instanceKey: 'ghost' },
+      type: 'STEP',
+      payload: {},
+    }),
+    (error: unknown) => error instanceof Error && error.message.includes('Unknown workflow'),
+  );
+  const disposition = await store.getMessageDisposition(
+    { workflowId: 'happy', instanceKey: 'ghost' },
+    'ghost',
+  );
+  assert.equal(disposition, null);
 });
 
 test('t312: read limit validation fails closed', async () => {
