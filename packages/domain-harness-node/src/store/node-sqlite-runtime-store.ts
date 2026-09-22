@@ -888,7 +888,9 @@ export class NodeSqliteRuntimeStore
     `).run({
       workflowInstanceId: snapshot.workflowInstanceId,
       digest: snapshot.governanceBindingDigest,
-      snapshotJson: encodeJson(snapshot as unknown as JsonValue, 'governance bound snapshot'),
+      // Canonical bytes: the v0.3 authority columns store canonical JSON (same
+      // convention as the execution pin) so durable state is host-independent.
+      snapshotJson: canonicalText(snapshot as unknown as JsonValue, 'governance bound snapshot'),
     });
   }
 
