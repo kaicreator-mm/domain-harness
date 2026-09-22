@@ -25,13 +25,13 @@ L2 amendment:
 docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A2_DAC_V002_REVIEW_CANDIDATE.md
 ```
 
-Exact-content identity (verified at adoption):
+Exact-content identity (verified at adoption; SHA-256 over the canonical committed LF bytes — a CRLF-normalizing checkout will hash differently while the git blob stays identical):
 
 ```text
 PRD A2  git blob: fd9c530ba8c4277ab7c1653f11e5e4661cd76024
-PRD A2  SHA-256:  67f9c5a3ba947f47ee69b2d53af1ec4a5edcef767e0d47b5446ca8e70f32ef99
+PRD A2  SHA-256:  dbe4eee9203effcbc0398977ae99a9970f4e1396aa89dd9a78a97f08c0f56eaa
 L2 A2   git blob: 2d119b3440b37576847cdf91c2bdee3358b7784f
-L2 A2   SHA-256:  498cc3d198365a1fa0f9e549ad5a80473ef60af7f8d545cadf1581c62fdf9003
+L2 A2   SHA-256:  a0c18fdf049bdcc9f41307e4ddef292d04a667c89f77664ffd0a141fa526ba54
 ```
 
 Both blobs are byte-identical to the blobs at the reviewed candidate HEAD and at the PR #297 merge commit recorded below. Git blob equality is the no-semantic-drift proof for this adoption: no reformatting, no rewording, no content adjustment of any kind.
