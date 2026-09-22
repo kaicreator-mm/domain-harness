@@ -1101,13 +1101,13 @@ export class ExpoSqliteRuntimeStore
           WHERE internal_id = ?
             AND state_revision = ?`,
         params([
-          encodeJson(commit.nextState as CanonicalJsonValue, 'commit.nextState'),
+          encodeJson(commit.nextState, 'commit.nextState'),
           commit.nextLifecycle,
           commit.nextStateRevision,
           commit.output === undefined ? 0 : 1,
           commit.output === undefined
             ? null
-            : encodeJson(commit.output as CanonicalJsonValue, 'commit.output'),
+            : encodeJson(commit.output, 'commit.output'),
           commit.nextLifecycle === 'recovery_required' ? 0 : 1,
           commit.updatedAt,
           instance.internal_id,
@@ -1130,7 +1130,7 @@ export class ExpoSqliteRuntimeStore
         params([
           instance.internal_id,
           commit.nextStateRevision,
-          encodeJson(commit.nextProcessData as CanonicalJsonValue, 'commit.nextProcessData'),
+          encodeJson(commit.nextProcessData, 'commit.nextProcessData'),
         ]),
       );
 

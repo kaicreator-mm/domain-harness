@@ -10,7 +10,6 @@
 //   3. Static E1/E7 gates: the generated Expo store bundle and the vendored
 //      core must not reference Node built-ins, better-sqlite3, or the Node
 //      host package. Failure here fails the whole build.
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
