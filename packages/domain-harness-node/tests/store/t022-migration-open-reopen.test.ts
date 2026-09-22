@@ -35,6 +35,8 @@ const V3_TABLES = [
   'dh_v3_runtime_evidence',
   'dh_v3_harness_execution_journal',
   'dh_v3_admission_effect_journal',
+  'dh_v3_observation_streams',
+  'dh_v3_observation_records',
 ] as const;
 
 function tableNames(path: string): string[] {
@@ -73,7 +75,7 @@ test('T-022 V1: fresh open applies the full v1+v2 chain with durable pragmas', a
   assert.equal(pragmas.foreignKeys, 1);
   store.close();
 
-  assert.deepEqual(migrationLedger(path), [1, 2]);
+  assert.deepEqual(migrationLedger(path), [1, 2, 3]);
   const tables = new Set(tableNames(path));
   for (const table of V3_TABLES) {
     assert.ok(tables.has(table), `missing v0.3 authority table ${table}`);
@@ -104,7 +106,7 @@ test('T-022 V1: reopen is idempotent and preserves migrated state', async (t) =>
   assert.equal(snapshot?.stateRevision, 0);
   second.close();
 
-  assert.deepEqual(migrationLedger(path), [1, 2], 'no duplicate migration application');
+  assert.deepEqual(migrationLedger(path), [1, 2, 3], 'no duplicate migration application');
 });
 
 test('T-022 V1: a v1-only database file is upgraded in place to v2', async (t) => {
@@ -137,7 +139,8 @@ test('T-022 V1: a v1-only database file is upgraded in place to v2', async (t) =
   assert.deepEqual(migrationLedger(path), [1]);
   const store = new NodeSqliteRuntimeStore({ path });
   store.close();
-  assert.deepEqual(migrationLedger(path), [1, 2], 'v2 applied on open');
+  // v2 added the T-022 authority tables; v3 adds the #312 observation tables.
+  assert.deepEqual(migrationLedger(path), [1, 2, 3], 'v2+v3 applied on open');
 
   const tables = new Set(tableNames(path));
   for (const table of V3_TABLES) {

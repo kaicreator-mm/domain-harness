@@ -6,6 +6,21 @@ import type {
   ExpoSqliteModuleLike,
 } from './expo-sqlite-types.js';
 import { migrateExpoRuntimeStore } from './migrations.js';
+import {
+  assembleRuntimeObservationPage,
+  decodeRuntimeObservationCursor,
+  normalizeRuntimeObservationLimit,
+  RUNTIME_OBSERVATION_INITIAL_EPOCH_ID,
+  runtimeObservationId,
+  runtimeObservationStreamKey,
+  RuntimeObservationError,
+  type ObservationReadRow,
+  type RuntimeObservationIntent,
+  type RuntimeObservationPage,
+  type RuntimeObservationReadRequest,
+  type RuntimeObservationRecord,
+  type RuntimeObservationStore,
+} from '@kaicreator/domain-harness';
 import type {
   BindGovernanceExecutionPinResult,
   CommandOutcomeSnapshot,
@@ -414,6 +429,7 @@ function jsonEquals(left: JsonValue, right: JsonValue): boolean {
 export class ExpoSqliteRuntimeStore
   implements
     RuntimeStoreLike,
+    RuntimeObservationStore,
     RuntimeStoreProcessCommandExtension,
     DurableExecutionStore,
     DurableControlStore
@@ -460,9 +476,16 @@ export class ExpoSqliteRuntimeStore
   }
 
   public async createInstance(snapshot: WorkflowInstanceSnapshot): Promise<void> {
+    await this.createInstanceWithObservation(snapshot, undefined);
+  }
+
+  public async createInstanceWithObservation(
+    snapshot: WorkflowInstanceSnapshot,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<readonly RuntimeObservationRecord[]> {
     this.assertOpen();
     try {
-      await this.writes.run(async (transaction) => {
+      return await this.writes.run(async (transaction) => {
         await transaction.runAsync(
           `INSERT INTO dh_v2_instances(
              workflow_id, instance_key, correlation_id, package_id, lifecycle,
@@ -483,6 +506,13 @@ export class ExpoSqliteRuntimeStore
             snapshot.updatedAt,
           ]),
         );
+        return recordObservations(transaction, snapshot.address, snapshot.packageId, intent, [
+          {
+            kind: 'INSTANCE_OPENED',
+            stateRevisionAfter: snapshot.stateRevision,
+            lifecycleAfter: snapshot.lifecycle,
+          },
+        ]);
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -518,18 +548,31 @@ export class ExpoSqliteRuntimeStore
   }
 
   public async acceptMessage(message: DomainMessage): Promise<MessageAcceptedAck> {
+    const { ack } = await this.acceptMessageWithObservation(message, undefined);
+    return ack;
+  }
+
+  public async acceptMessageWithObservation(
+    message: DomainMessage,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<{ readonly ack: MessageAcceptedAck; readonly records: readonly RuntimeObservationRecord[] }> {
     this.assertOpen();
     return this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, message.target);
       const duplicate = await getMessageRow(transaction, instance.internal_id, message.messageId);
       if (duplicate !== null) {
+        // Idempotent duplicate acceptance: the durable fact (and its
+        // observation, when enabled) already committed exactly once.
         return {
-          status: 'duplicate',
-          messageId: duplicate.message_id,
-          target: message.target,
-          targetSequence: duplicate.target_sequence,
-          packageId: duplicate.target_package_id,
-          acceptedAt: duplicate.accepted_at,
+          ack: {
+            status: 'duplicate',
+            messageId: duplicate.message_id,
+            target: message.target,
+            targetSequence: duplicate.target_sequence,
+            packageId: duplicate.target_package_id,
+            acceptedAt: duplicate.accepted_at,
+          },
+          records: [],
         };
       }
 
@@ -570,13 +613,29 @@ export class ExpoSqliteRuntimeStore
         ]),
       );
 
+      const records = await recordObservations(
+        transaction,
+        message.target,
+        instance.package_id,
+        intent,
+        [
+          {
+            kind: 'MESSAGE_ACCEPTED',
+            sourceMessageId: message.messageId,
+            targetSequence,
+          },
+        ],
+      );
       return {
-        status: 'accepted',
-        messageId: message.messageId,
-        target: message.target,
-        targetSequence,
-        packageId: instance.package_id,
-        acceptedAt,
+        ack: {
+          status: 'accepted',
+          messageId: message.messageId,
+          target: message.target,
+          targetSequence,
+          packageId: instance.package_id,
+          acceptedAt,
+        },
+        records,
       };
     });
   }
@@ -663,8 +722,15 @@ export class ExpoSqliteRuntimeStore
   }
 
   public async commitProcessedMessage(request: CommitProcessedMessageRequest): Promise<void> {
+    await this.commitProcessedMessageWithObservation(request, undefined);
+  }
+
+  public async commitProcessedMessageWithObservation(
+    request: CommitProcessedMessageRequest,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<readonly RuntimeObservationRecord[]> {
     this.assertOpen();
-    await this.writes.run(async (transaction) => {
+    return this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, request.target);
       const message = await getMessageRow(transaction, instance.internal_id, request.messageId);
       if (
@@ -720,12 +786,50 @@ export class ExpoSqliteRuntimeStore
       if (TERMINAL_LIFECYCLES.has(request.nextLifecycle)) {
         await abandonUnprocessedMessages(transaction, instance.internal_id, request.updatedAt);
       }
+
+      // Transaction-derived observation: the turn record plus, exactly once,
+      // the terminal-entry record when this commit carries the instance into
+      // a terminal lifecycle (CAS above forbids replays).
+      const nextRevision = instance.state_revision + 1;
+      const facts: ObservationFact[] = [
+        {
+          kind: 'TURN_COMMITTED',
+          stateRevisionBefore: instance.state_revision,
+          stateRevisionAfter: nextRevision,
+          sourceMessageId: request.messageId,
+          targetSequence: request.expectedTargetSequence,
+          lifecycleBefore: instance.lifecycle,
+          lifecycleAfter: request.nextLifecycle,
+        },
+      ];
+      if (
+        TERMINAL_LIFECYCLES.has(request.nextLifecycle) &&
+        !TERMINAL_LIFECYCLES.has(instance.lifecycle)
+      ) {
+        facts.push({
+          kind: 'INSTANCE_TERMINALIZED',
+          stateRevisionBefore: instance.state_revision,
+          stateRevisionAfter: nextRevision,
+          sourceMessageId: request.messageId,
+          targetSequence: request.expectedTargetSequence,
+          lifecycleBefore: instance.lifecycle,
+          lifecycleAfter: request.nextLifecycle,
+        });
+      }
+      return recordObservations(transaction, request.target, instance.package_id, intent, facts);
     });
   }
 
   public async failMessageProcessing(request: FailMessageProcessingRequest): Promise<void> {
+    await this.failMessageProcessingWithObservation(request, undefined);
+  }
+
+  public async failMessageProcessingWithObservation(
+    request: FailMessageProcessingRequest,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<readonly RuntimeObservationRecord[]> {
     this.assertOpen();
-    await this.writes.run(async (transaction) => {
+    return this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, request.target);
       const message = await getMessageRow(transaction, instance.internal_id, request.messageId);
       if (
@@ -767,12 +871,31 @@ export class ExpoSqliteRuntimeStore
       if (instanceUpdate.changes !== 1) {
         throw new ExpoRuntimeStoreError('MESSAGE_STATE_CONFLICT', 'Workflow state revision changed before failure commit');
       }
+
+      return recordObservations(transaction, request.target, instance.package_id, intent, [
+        {
+          kind: 'TURN_RECOVERY_REQUIRED',
+          stateRevisionBefore: instance.state_revision,
+          stateRevisionAfter: instance.state_revision + 1,
+          sourceMessageId: request.messageId,
+          targetSequence: request.expectedTargetSequence,
+          lifecycleBefore: instance.lifecycle,
+          lifecycleAfter: 'recovery_required',
+        },
+      ]);
     });
   }
 
   public async terminalizeInstance(request: TerminalizeInstanceRequest): Promise<void> {
+    await this.terminalizeInstanceWithObservation(request, undefined);
+  }
+
+  public async terminalizeInstanceWithObservation(
+    request: TerminalizeInstanceRequest,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<readonly RuntimeObservationRecord[]> {
     this.assertOpen();
-    await this.writes.run(async (transaction) => {
+    return this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, request.target);
       if (TERMINAL_LIFECYCLES.has(instance.lifecycle)) {
         if (instance.lifecycle === request.lifecycle) {
@@ -781,7 +904,9 @@ export class ExpoSqliteRuntimeStore
             instance.internal_id,
             request.updatedAt,
           );
-          return;
+          // Idempotent replay: the terminal fact was already committed and
+          // observed exactly once — no second record.
+          return [];
         }
         throw new ExpoRuntimeStoreError(
           'INSTANCE_NOT_ACCEPTING_MESSAGES',
@@ -821,6 +946,16 @@ export class ExpoSqliteRuntimeStore
         instance.internal_id,
         request.updatedAt,
       );
+
+      return recordObservations(transaction, request.target, instance.package_id, intent, [
+        {
+          kind: 'INSTANCE_TERMINALIZED',
+          stateRevisionBefore: instance.state_revision,
+          stateRevisionAfter: instance.state_revision + 1,
+          lifecycleBefore: instance.lifecycle,
+          lifecycleAfter: request.lifecycle,
+        },
+      ]);
     });
   }
 
@@ -962,6 +1097,15 @@ export class ExpoSqliteRuntimeStore
     target: WorkflowAddress,
     updatedAt: string,
   ): Promise<WorkflowInstanceSnapshot> {
+    const { instance } = await this.resetRecoveryWithObservation(target, updatedAt, undefined);
+    return instance;
+  }
+
+  public async resetRecoveryWithObservation(
+    target: WorkflowAddress,
+    updatedAt: string,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<{ readonly instance: WorkflowInstanceSnapshot; readonly records: readonly RuntimeObservationRecord[] }> {
     this.assertOpen();
     return this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, target);
@@ -1002,6 +1146,16 @@ export class ExpoSqliteRuntimeStore
         throw new ExpoRuntimeStoreError('RECOVERY_STATE_CONFLICT', 'Workflow recovery state changed before reset');
       }
 
+      const records = await recordObservations(transaction, target, instance.package_id, intent, [
+        {
+          kind: 'RECOVERY_COMMITTED',
+          stateRevisionBefore: instance.state_revision,
+          stateRevisionAfter: instance.state_revision + 1,
+          lifecycleBefore: instance.lifecycle,
+          lifecycleAfter: 'active',
+        },
+      ]);
+
       const reset = await transaction.getFirstAsync<InstanceRow>(
         INSTANCE_SELECT,
         params([target.workflowId, target.instanceKey]),
@@ -1009,7 +1163,74 @@ export class ExpoSqliteRuntimeStore
       if (reset === null) {
         throw new ExpoRuntimeStoreError('INSTANCE_NOT_FOUND', 'Workflow instance disappeared after recovery reset');
       }
-      return toInstanceSnapshot(reset);
+      return { instance: toInstanceSnapshot(reset), records };
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // #312 RuntimeObservationStore — durable ordered observation read
+  // ---------------------------------------------------------------------
+
+  public async readObservations(
+    request: RuntimeObservationReadRequest,
+  ): Promise<RuntimeObservationPage> {
+    this.assertOpen();
+    const limit = normalizeRuntimeObservationLimit(request.limit);
+    const { target, epochId } = request.stream;
+    const identityJson = canonicalText(request.stream.package as unknown as CanonicalJsonValue, 'observation stream package identity');
+
+    const streamRow = await this.database.getFirstAsync<{
+      package_identity_json: string;
+      last_sequence: number;
+    }>(
+      `SELECT package_identity_json, last_sequence
+         FROM dh_v3_observation_streams
+        WHERE workflow_id = ? AND instance_key = ? AND epoch_id = ?`,
+      params([target.workflowId, target.instanceKey, epochId]),
+    );
+
+    if (streamRow === null) {
+      // No stream exists under this exact identity/epoch: nothing has been
+      // committed under it. Never a silent stand-in for "no activity" claims
+      // beyond this exact identity.
+      return { records: [], highWatermark: 0 };
+    }
+    if (streamRow.package_identity_json !== identityJson) {
+      throw new RuntimeObservationError(
+        'STREAM_IDENTITY_MISMATCH',
+        `Requested stream identity does not match the durable stream binding for ${target.workflowId}/${target.instanceKey} epoch ${epochId}`,
+      );
+    }
+
+    let after = 0;
+    if (request.afterCursor !== undefined) {
+      after = decodeRuntimeObservationCursor(request.afterCursor).a;
+    }
+
+    const earliestRow = await this.database.getFirstAsync<{ earliest: number | null }>(
+      `SELECT MIN(sequence) AS earliest
+         FROM dh_v3_observation_records
+        WHERE workflow_id = ? AND instance_key = ? AND epoch_id = ?`,
+      params([target.workflowId, target.instanceKey, epochId]),
+    );
+
+    const rows = await this.database.getAllAsync<{ sequence: number; record_json: string }>(
+      `SELECT sequence, record_json
+         FROM dh_v3_observation_records
+        WHERE workflow_id = ? AND instance_key = ? AND epoch_id = ? AND sequence > ?
+        ORDER BY sequence ASC
+        LIMIT ?`,
+      params([target.workflowId, target.instanceKey, epochId, after, limit]),
+    );
+
+    const readRows: ObservationReadRow[] = rows.map((row) => ({
+      sequence: row.sequence,
+      record: decodeJson<RuntimeObservationRecord>(row.record_json, 'observation record'),
+    }));
+
+    return assembleRuntimeObservationPage(request, readRows, {
+      highWatermark: streamRow.last_sequence,
+      earliestAvailable: earliestRow?.earliest ?? null,
     });
   }
 
@@ -1386,6 +1607,149 @@ function isUniqueConstraintError(error: unknown): boolean {
   }
   const message = error.message.toLowerCase();
   return message.includes('unique constraint') || message.includes('constraint failed');
+}
+
+/**
+ * Family fields of one observation to append; everything else on the record
+ * is derived in-transaction (sequence from the stream row, identity from the
+ * stream binding, timestamp from the intent).
+ */
+interface ObservationFact {
+  readonly kind: RuntimeObservationRecord['kind'];
+  readonly stateRevisionBefore?: number;
+  readonly stateRevisionAfter?: number;
+  readonly sourceMessageId?: string;
+  readonly targetSequence?: number;
+  readonly lifecycleBefore?: WorkflowLifecycle;
+  readonly lifecycleAfter?: WorkflowLifecycle;
+}
+
+/**
+ * #312 atomic observation append. Runs INSIDE the caller's exclusive
+ * transaction, right after the authoritative mutation statements: sequence
+ * allocation, stream binding and record inserts commit together with the
+ * mutation or roll back together with it (ExclusiveTransactionQueue + expo
+ * transaction semantics), mirroring the Node reference adapter exactly.
+ */
+async function recordObservations(
+  transaction: ExpoSqliteExecutorLike,
+  target: WorkflowAddress,
+  boundPackageId: string,
+  intent: RuntimeObservationIntent | undefined,
+  facts: ReadonlyArray<ObservationFact>,
+): Promise<RuntimeObservationRecord[]> {
+  if (intent === undefined || facts.length === 0) return [];
+  if (intent.packageIdentity.packageId !== boundPackageId) {
+    throw new RuntimeObservationError(
+      'STREAM_IDENTITY_MISMATCH',
+      `Observation intent package ${intent.packageIdentity.packageId} does not match the instance binding ${boundPackageId}`,
+    );
+  }
+
+  const epochId = RUNTIME_OBSERVATION_INITIAL_EPOCH_ID;
+  const identityJson = canonicalText(intent.packageIdentity as unknown as CanonicalJsonValue, 'observation package identity');
+
+  const streamRow = await transaction.getFirstAsync<{
+    package_identity_json: string;
+    last_sequence: number;
+  }>(
+    `SELECT package_identity_json, last_sequence
+       FROM dh_v3_observation_streams
+      WHERE workflow_id = ? AND instance_key = ? AND epoch_id = ?`,
+    params([target.workflowId, target.instanceKey, epochId]),
+  );
+
+  let lastSequence: number;
+  if (streamRow === null) {
+    lastSequence = 0;
+    await transaction.runAsync(
+      `INSERT INTO dh_v3_observation_streams(
+         workflow_id, instance_key, epoch_id, package_identity_json, last_sequence, created_at
+       ) VALUES(?, ?, ?, ?, 0, ?)`,
+      params([target.workflowId, target.instanceKey, epochId, identityJson, intent.observedAt]),
+    );
+  } else if (streamRow.package_identity_json !== identityJson) {
+    // A package/binding change cannot silently continue the same stream:
+    // contract v1 has no rebind epoch semantics, so this fails closed and
+    // rolls the covered mutation back with it.
+    throw new RuntimeObservationError(
+      'STREAM_IDENTITY_MISMATCH',
+      `Durable observation stream for ${target.workflowId}/${target.instanceKey} is bound to a different package identity`,
+    );
+  } else {
+    lastSequence = streamRow.last_sequence;
+  }
+
+  const streamRef: RuntimeObservationRecord['stream'] = {
+    target: { workflowId: target.workflowId, instanceKey: target.instanceKey },
+    package: intent.packageIdentity,
+    epochId,
+    ...(intent.runtimeBindingRef === undefined
+      ? {}
+      : { runtimeBindingRef: intent.runtimeBindingRef }),
+    ...(intent.runtimeActivationRef === undefined
+      ? {}
+      : { runtimeActivationRef: intent.runtimeActivationRef }),
+  };
+  const streamKey = runtimeObservationStreamKey(streamRef);
+
+  const records: RuntimeObservationRecord[] = [];
+  for (const fact of facts) {
+    const sequence = lastSequence + 1;
+    const record: RuntimeObservationRecord = {
+      stream: streamRef,
+      sequence,
+      observationId: runtimeObservationId(streamKey, sequence),
+      kind: fact.kind,
+      observedAt: intent.observedAt,
+      ...(fact.stateRevisionBefore === undefined
+        ? {}
+        : { stateRevisionBefore: fact.stateRevisionBefore }),
+      ...(fact.stateRevisionAfter === undefined
+        ? {}
+        : { stateRevisionAfter: fact.stateRevisionAfter }),
+      ...(fact.sourceMessageId === undefined ? {} : { sourceMessageId: fact.sourceMessageId }),
+      ...(fact.targetSequence === undefined ? {} : { targetSequence: fact.targetSequence }),
+      ...(fact.lifecycleBefore === undefined ? {} : { lifecycleBefore: fact.lifecycleBefore }),
+      ...(fact.lifecycleAfter === undefined ? {} : { lifecycleAfter: fact.lifecycleAfter }),
+    };
+    await transaction.runAsync(
+      `INSERT INTO dh_v3_observation_records(
+         workflow_id, instance_key, epoch_id, sequence, record_json, observed_at
+       ) VALUES(?, ?, ?, ?, ?, ?)`,
+      params([
+        target.workflowId,
+        target.instanceKey,
+        epochId,
+        sequence,
+        canonicalText(record as unknown as CanonicalJsonValue, 'observation record'),
+        intent.observedAt,
+      ]),
+    );
+    records.push(record);
+    lastSequence = sequence;
+  }
+
+  const streamUpdate = await transaction.runAsync(
+    `UPDATE dh_v3_observation_streams
+        SET last_sequence = ?
+      WHERE workflow_id = ? AND instance_key = ? AND epoch_id = ? AND last_sequence = ?`,
+    params([
+      lastSequence,
+      target.workflowId,
+      target.instanceKey,
+      epochId,
+      lastSequence - records.length,
+    ]),
+  );
+  if (streamUpdate.changes !== 1) {
+    throw new RuntimeObservationError(
+      'OBSERVATION_APPEND_FAILED',
+      `Observation sequence allocation raced for ${target.workflowId}/${target.instanceKey}`,
+    );
+  }
+
+  return records;
 }
 
 export async function openExpoSqliteRuntimeStore(

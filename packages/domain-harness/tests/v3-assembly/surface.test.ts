@@ -30,6 +30,15 @@ const EXPECTED_V3_NAMES = [
   'APP_CONTRACT_SOURCE_FORMAT',
   'evaluateDomainWorkflowGuard',
   'PredicateContractViolation',
+  // #312 durable ordered Runtime Observation Stream surface.
+  'ObservationRecordingRuntimeStore',
+  'isRuntimeObservationStore',
+  'RuntimeObservationError',
+  'RUNTIME_OBSERVATION_CONTRACT_VERSION',
+  'RUNTIME_OBSERVATION_EVENT_FAMILIES',
+  'runtimePackageIdentityFromManifest',
+  'runtimeObservationStreamKey',
+  'encodeRuntimeObservationCursor',
 ] as const;
 
 const FORBIDDEN_NAMES = [

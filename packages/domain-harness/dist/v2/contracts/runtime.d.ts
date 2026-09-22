@@ -1,3 +1,4 @@
+import type { RuntimeObservationCapability } from '../../observation/contracts.js';
 import type { DomainMessage, MessageAcceptedAck } from './message.js';
 import type { DomainQuery, DomainQueryResult } from './query.js';
 import type { BusinessInvalidation, DomainChangeListener, DomainSubscription, Unsubscribe } from './subscription.js';
@@ -41,5 +42,15 @@ export interface DomainRuntime {
      * DomainRuntimeError code 'runtime_disposed'.
      */
     dispose(): Promise<void>;
+    /**
+     * Issue #312 durable ordered Runtime Observation Stream capability.
+     * Optional and additive: the factory always populates it explicitly —
+     * `{ status: 'UNSUPPORTED' }` when observation is not enabled (existing
+     * Runtime semantics unchanged; absence of records never means "no
+     * activity"), or the enabled durable pull/cursor read surface. Consumers
+     * treating older hand-built runtimes without this member MUST default it
+     * to UNSUPPORTED.
+     */
+    readonly observation?: RuntimeObservationCapability;
 }
 //# sourceMappingURL=runtime.d.ts.map

@@ -27,6 +27,10 @@ export * from '../runtime/durable-control-contracts.js';
 export * from '../runtime/durable-control-coordinator.js';
 export * from '../tool/host-local-contract/index.js';
 export * from '../compiler/app-contracts.js';
+// Issue #312: durable ordered public Runtime Observation Stream (optional
+// capability; read-only evidence, atomic enabled-mode durability, fail-closed
+// cursor/gap semantics — see src/observation/).
+export * from '../observation/index.js';
 // T-025: compiled-package identity derivation for consumers producing or
 // verifying a v0.3 compiled package outside the legacy v0.1/v0.2 compiler
 // toolchain (previously reachable only via internal src/ paths; additive,

@@ -1,4 +1,13 @@
 import type { AIOperationPort } from '../contracts/ai.js';
+import type { DomainIntelligencePackageIdentity } from '../contracts/domain-data.js';
+import {
+  isRuntimeObservationStore,
+  ObservationRecordingRuntimeStore,
+  RUNTIME_OBSERVATION_CONTRACT_VERSION,
+  RUNTIME_OBSERVATION_EVENT_FAMILIES,
+  runtimePackageIdentityFromManifest,
+  type RuntimeObservationCapability,
+} from '../observation/index.js';
 import { WorkflowInstanceEngine } from '../engine/workflow-instance-engine.js';
 import { PerInstanceSerializedLane } from '../engine/per-instance-serialized-lane.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
@@ -54,12 +63,81 @@ export interface CreateDomainRuntimeOptions {
   domainData?: CompiledDomainDataPort;
   now?: () => string;
   onBackgroundError?: (error: unknown, target: WorkflowAddress) => void;
+  /**
+   * Issue #312 durable ordered Runtime Observation Stream. Absent/unsupported
+   * keeps every existing Runtime semantic unchanged and exposes the explicit
+   * `{ status: 'UNSUPPORTED' }` capability; `enabled` requires an
+   * observation-capable RuntimeStore (`RuntimeObservationStore`) so every
+   * covered mutation commits atomically with its observation record.
+   */
+  observation?: RuntimeObservationEnableOptions;
+}
+
+/** Enablement options for the durable Runtime Observation Stream (#312). */
+export interface RuntimeObservationEnableOptions {
+  readonly mode: 'enabled';
+  /**
+   * Overrides the default exact package identity mapping. By default the
+   * compiled manifest maps to `DomainIntelligencePackageIdentity` via
+   * `runtimePackageIdentityFromManifest` (contentDigest = the content-derived
+   * compiled packageId, verified at activation).
+   */
+  readonly resolvePackageIdentity?: (packageId: string) => DomainIntelligencePackageIdentity;
+  /** Opaque DAC/A2-owned provenance refs, carried verbatim when the host holds them. */
+  readonly runtimeBindingRef?: string;
+  readonly runtimeActivationRef?: string;
 }
 
 class RecoveryRecordedError extends Error {
   constructor(readonly target: WorkflowAddress) {
     super(`Workflow ${target.workflowId}/${target.instanceKey} entered recovery_required`);
     this.name = 'RecoveryRecordedError';
+  }
+}
+
+/**
+ * Wake-up registry behind the optional `watch` on the ENABLED observation
+ * capability. Purely a coalescible hint: it fires when observation records
+ * commit and carries no data — consumers must re-read the durable sequence
+ * (push never substitutes the durable pull/cursor read).
+ */
+class ObservationWakeRegistry {
+  readonly #watchers = new Map<string, Set<() => void>>();
+
+  watch(target: WorkflowAddress, onWake: () => void): () => void {
+    const key = `${target.workflowId}\u0000${target.instanceKey}`;
+    let listeners = this.#watchers.get(key);
+    if (listeners === undefined) {
+      listeners = new Set();
+      this.#watchers.set(key, listeners);
+    }
+    listeners.add(onWake);
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      const current = this.#watchers.get(key);
+      if (current === undefined) return;
+      current.delete(onWake);
+      if (current.size === 0) this.#watchers.delete(key);
+    };
+  }
+
+  wake(target: WorkflowAddress): void {
+    const listeners = this.#watchers.get(`${target.workflowId}\u0000${target.instanceKey}`);
+    if (listeners === undefined) return;
+    for (const onWake of [...listeners]) {
+      try {
+        onWake();
+      } catch {
+        // A wake-up listener is host convenience code; its failure can never
+        // affect the durable record path that already committed.
+      }
+    }
+  }
+
+  clear(): void {
+    this.#watchers.clear();
   }
 }
 
@@ -75,9 +153,46 @@ class ProcessingConflictError extends Error {
  * No Raw Domain Package loader/compiler is imported or reachable from this path.
  */
 export async function createDomainRuntime(options: CreateDomainRuntimeOptions): Promise<DomainRuntime> {
+  // Issue #312 observation composition: when enabled, every covered mutation
+  // flows through the observation-capable store so the record commits in the
+  // SAME durable transaction as the mutation. When absent/unsupported the
+  // store below is exactly the caller's store and no observation code runs.
+  const observationStore = isRuntimeObservationStore(options.store) ? options.store : null;
+  const observationRequested = options.observation?.mode === 'enabled';
+  if (observationRequested && observationStore === null) {
+    throw new DomainRuntimeError(
+      'observation_store_required',
+      'observation.mode "enabled" requires a RuntimeStore implementing RuntimeObservationStore',
+    );
+  }
+
+  const observationWake = new ObservationWakeRegistry();
+  const now = options.now ?? (() => new Date().toISOString());
+
+  const effectiveStore: RuntimeStore =
+    observationRequested && observationStore !== null
+      ? new ObservationRecordingRuntimeStore({
+          base: observationStore,
+          resolvePackageIdentity:
+            options.observation?.resolvePackageIdentity ??
+            ((packageId: string): DomainIntelligencePackageIdentity => {
+              const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+              return runtimePackageIdentityFromManifest(compiledPackage.manifest);
+            }),
+          ...(options.now === undefined ? {} : { now: options.now }),
+          ...(options.observation?.runtimeBindingRef === undefined
+            ? {}
+            : { runtimeBindingRef: options.observation.runtimeBindingRef }),
+          ...(options.observation?.runtimeActivationRef === undefined
+            ? {}
+            : { runtimeActivationRef: options.observation.runtimeActivationRef }),
+          onRecordsCommitted: (target) => observationWake.wake(target),
+        })
+      : options.store;
+
   await preflightPackageActivation({
     registry: options.packageRegistry,
-    store: options.store,
+    store: effectiveStore,
     validationPolicy: {
       formatVersion: '0.2',
       runtimeContractMajor: 2,
@@ -87,29 +202,28 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     },
   });
 
-  const now = options.now ?? (() => new Date().toISOString());
   const lane = new PerInstanceSerializedLane();
-  const instanceEngine = new WorkflowInstanceEngine(options.store, { now, lane });
+  const instanceEngine = new WorkflowInstanceEngine(effectiveStore, { now, lane });
   const acceptance = new DomainMessageAcceptance({
-    store: options.store,
+    store: effectiveStore,
     packages: options.packageRegistry,
   });
-  const recovery = new PoisonMessageRecoveryCoordinator(options.store, { now });
+  const recovery = new PoisonMessageRecoveryCoordinator(effectiveStore, { now });
   const toolRunner = new DurableToolRunner({
-    store: options.store,
+    store: effectiveStore,
     sha256: options.bindings.sha256,
     now,
   });
   const skillRunner = options.ai === undefined
     ? undefined
     : new JournaledSkillRunner({
-        store: options.store,
+        store: effectiveStore,
         sha256: options.bindings.sha256,
         ai: options.ai,
         now,
       });
   const messageEffect = new JournaledDomainMessageEffect({
-    store: options.store,
+    store: effectiveStore,
     acceptance,
     sha256: options.bindings.sha256,
     now,
@@ -404,8 +518,20 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     drainScheduler.dispose();
     // Delivery, observation retries and idle waiters settle immediately.
     subscriptionCoordinator.dispose();
+    observationWake.clear();
     await drainScheduler.awaitIdle();
   }
+
+  const observationCapability: RuntimeObservationCapability =
+    observationRequested && observationStore !== null
+      ? {
+          status: 'ENABLED',
+          contractVersion: RUNTIME_OBSERVATION_CONTRACT_VERSION,
+          eventFamilies: RUNTIME_OBSERVATION_EVENT_FAMILIES,
+          readObservations: (request) => observationStore.readObservations(request),
+          watch: (stream, onWake) => observationWake.watch(stream.target, onWake),
+        }
+      : { status: 'UNSUPPORTED' };
 
   return {
     openInstance,
@@ -419,6 +545,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     invalidateBusinessSnapshot,
     awaitIdle,
     dispose,
+    observation: observationCapability,
   };
 }
 

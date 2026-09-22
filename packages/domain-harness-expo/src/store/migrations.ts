@@ -1,6 +1,6 @@
 import type { ExpoSqliteExecutorLike } from './expo-sqlite-types.js';
 
-export const EXPO_RUNTIME_STORE_SCHEMA_VERSION = 2 as const;
+export const EXPO_RUNTIME_STORE_SCHEMA_VERSION = 3 as const;
 
 const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS dh_v2_store_meta (
@@ -257,6 +257,34 @@ const CREATE_AUTHORITY_SCHEMA_SQL = `
       );
 `;
 
+// #312: durable ordered Runtime Observation Stream (same shape as the Node
+// reference adapter — one stream row binds WorkflowAddress + exact immutable
+// package identity + epoch; records carry the full public envelope).
+const CREATE_OBSERVATION_SCHEMA_SQL = `
+      CREATE TABLE IF NOT EXISTS dh_v3_observation_streams (
+        workflow_id TEXT NOT NULL,
+        instance_key TEXT NOT NULL,
+        epoch_id TEXT NOT NULL,
+        package_identity_json TEXT NOT NULL,
+        last_sequence INTEGER NOT NULL CHECK (last_sequence >= 0),
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (workflow_id, instance_key, epoch_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS dh_v3_observation_records (
+        workflow_id TEXT NOT NULL,
+        instance_key TEXT NOT NULL,
+        epoch_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        record_json TEXT NOT NULL,
+        observed_at TEXT NOT NULL,
+        PRIMARY KEY (workflow_id, instance_key, epoch_id, sequence),
+        FOREIGN KEY (workflow_id, instance_key, epoch_id)
+          REFERENCES dh_v3_observation_streams(workflow_id, instance_key, epoch_id)
+          ON DELETE RESTRICT
+      );
+`;
+
 interface SchemaVersionRow {
   schema_version: number;
 }
@@ -268,6 +296,7 @@ export async function migrateExpoRuntimeStore(transaction: ExpoSqliteExecutorLik
   // row then advances 1 -> 2 inside the same exclusive transaction.
   await transaction.execAsync(CREATE_SCHEMA_SQL);
   await transaction.execAsync(CREATE_AUTHORITY_SCHEMA_SQL);
+  await transaction.execAsync(CREATE_OBSERVATION_SCHEMA_SQL);
 
   const row = await transaction.getFirstAsync<SchemaVersionRow>(
     'SELECT schema_version FROM dh_v2_store_meta WHERE singleton_id = 1',
@@ -281,7 +310,10 @@ export async function migrateExpoRuntimeStore(transaction: ExpoSqliteExecutorLik
     return;
   }
 
-  if (row.schema_version === 1) {
+  // Append-only chain: any file version below the current one advances in
+  // this same exclusive transaction (1 -> 2 added the dh_v3_* authority
+  // tables; 2 -> 3 added the #312 observation tables).
+  if (row.schema_version >= 1 && row.schema_version < EXPO_RUNTIME_STORE_SCHEMA_VERSION) {
     await transaction.runAsync(
       'UPDATE dh_v2_store_meta SET schema_version = ? WHERE singleton_id = 1',
       [EXPO_RUNTIME_STORE_SCHEMA_VERSION],
