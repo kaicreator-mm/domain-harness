@@ -63,6 +63,12 @@ export * from '../runtime/durable-control-coordinator.js';
 export * from '../tool/host-local-contract/index.js';
 export * from '../compiler/app-contracts.js';
 
+// T-025: compiled-package identity derivation for consumers producing or
+// verifying a v0.3 compiled package outside the legacy v0.1/v0.2 compiler
+// toolchain (previously reachable only via internal src/ paths; additive,
+// semantics unchanged).
+export { computeCompiledPackageId } from '../package/validation.js';
+
 // T-021 assembly root + T-008→T-019 effect-tool adapter.
 export { createDomainRuntimeV3 } from '../runtime/create-domain-runtime-v3.js';
 export type {
