@@ -1,8 +1,17 @@
-# DomainHarness v0.1 SDK Documentation
+# DomainHarness SDK Documentation
 
 Use this directory as the consumer/Agent entry point for `@kaicreator/domain-harness`.
 
-## Read in this order
+## Current line: v0.3
+
+1. `DomainHarness_v0.3_SDK_USAGE.md` — v0.3 integration entry point: what v0.3 adds, runnable examples, ownership boundaries.
+2. `DomainHarness_v0.3_SDK_REFERENCE.md` — complete v0.3 public API reference (assembly, governance, admission, promotion/activation, Runtime Evidence, error codes).
+3. `../migration/DomainHarness_v0.2_TO_v0.3.md` — v0.2 → v0.3 migration, including the forbidden floating-authority substitutions.
+4. `../integration/DomainHarness_v0.3_HOST_INTEGRATION.md` — durable Node/Expo host setup and the validation evidence behind durability claims.
+
+Executable v0.3 examples (run in CI, import the published package by name) live in `packages/domain-harness/tests/examples/`.
+
+## v0.1 line (legacy)
 
 1. `DomainHarness_v0.1_SDK_USAGE.md` — short integration entry point and ownership boundaries.
 2. `DomainHarness_v0.1_SDK_REFERENCE.md` — complete public API, Harness DSL, lifecycle, recovery and error reference.
