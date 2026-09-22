@@ -1,0 +1,1 @@
+{"version":3,"file":"registry-adapter.d.ts","sourceRoot":"","sources":["../../src/promoted-child/registry-adapter.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,wBAAwB,EAAE,MAAM,kCAAkC,CAAC;AACjF,OAAO,KAAK,EAAE,yBAAyB,EAAE,MAAM,gBAAgB,CAAC;AAEhE;;;;;GAKG;AACH,wBAAgB,uCAAuC,CACrD,QAAQ,EAAE,wBAAwB,GACjC,yBAAyB,CAyB3B"}

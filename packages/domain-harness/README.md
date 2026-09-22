@@ -4,6 +4,18 @@ Portable DomainHarness v0.2 Runtime Core and Contract SDK.
 
 The package root is the portable v0.2 public surface. It does not require Node built-ins, `better-sqlite3`, filesystem discovery, Worker Threads, or Raw Domain Package compilation at application startup.
 
+## Installation (exact git pin)
+
+The package is consumed by pinning an exact repository revision — there is no npm release. The built `dist/` tree is committed to the repository, so a git install delivers a usable package without lifecycle scripts:
+
+```sh
+pnpm add "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-harness"
+```
+
+- Pin `<exact-sha>` to the full commit SHA you validated against; record it as your dependency fact.
+- The subdirectory (`&path:`) form is required because this package lives in a monorepo; pnpm supports it (npm does not resolve git subdirectory dependencies).
+- Use the same exact SHA for `@kaicreator/domain-harness-compiler` (its runtime peer dependency is satisfied by this package) and for the host packages if you consume them.
+
 ```ts
 import {
   createDomainRuntime,

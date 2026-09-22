@@ -21,6 +21,20 @@ Executable v0.3 examples (run in CI, import the published package by name) live 
 
 Until v0.1 is formally release-qualified/tagged, downstream projects should integrate an **exact DomainHarness commit SHA** and record that SHA in their own integration evidence. Do not depend on a moving branch as though it were a released package.
 
+### Supported install spec (issue #299)
+
+There is no npm release; the packages are consumed as exact-SHA git dependencies. The built `dist/` trees of `@kaicreator/domain-harness` and `@kaicreator/domain-harness-compiler` are committed to the repository, so a git install delivers a usable package without lifecycle scripts:
+
+```sh
+pnpm add "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-harness" \
+          "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-harness-compiler"
+```
+
+- Pin `<exact-sha>` to the full commit SHA you validated against (the same SHA for every DomainHarness package you consume).
+- The `&path:` subdirectory form is required (monorepo packages); pnpm resolves it — npm does not support git subdirectory dependencies.
+- `@kaicreator/domain-harness-compiler` declares the runtime as a **peer dependency** (`0.2.0`), satisfied by the `@kaicreator/domain-harness` install above; installing the compiler alone would try to fetch an unpublished npm version and fail by design.
+- `npm run build` in the DomainHarness repository verifies via `scripts/check-committed-dist.mjs` that the committed `dist/` trees always match a fresh build of the committed sources.
+
 A downstream project should import only from:
 
 ```ts

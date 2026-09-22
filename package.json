@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present && node scripts/check-committed-dist.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && npm run test:root",
     "test:root": "node --import tsx --test \"tests/conformance/*.test.ts\" \"tests/compiler/*.test.ts\" \"tests/hosts/node/*.test.ts\" \"tests/migration/v01-expr/*.test.ts\" \"tests/tools/remote/*.test.ts\" && node --test \"tests/migration/v01-script/*.test.mjs\" \"tests/tools/script/*.test.mjs\"",
