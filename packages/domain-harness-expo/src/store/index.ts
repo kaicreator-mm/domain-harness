@@ -1,4 +1,10 @@
 export * from './expo-sqlite-runtime-store.js';
+export * from './expo-sqlite-authority-stores.js';
+export * from './expo-sqlite-evidence-store.js';
+export * from './expo-sqlite-governance-stores.js';
+export * from './expo-sqlite-promoted-stores.js';
+export * from './expo-sqlite-execution-stores.js';
+export { ExclusiveTransactionQueue } from './exclusive-transaction.js';
 export type {
   ExpoSqliteBindParams,
   ExpoSqliteBindValue,

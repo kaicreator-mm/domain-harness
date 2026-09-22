@@ -1,0 +1,24 @@
+{
+  "name": "domain-harness-t023-expo-v3-host-validation",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "build:validation": "tsc -p ../../../packages/domain-harness-expo/tests/store/tsconfig.host-t023.json && node build-device-fixture.mjs",
+    "start": "npm run build:validation && expo start",
+    "android": "npm run build:validation && expo start --android",
+    "typecheck": "npm run build:validation && tsc --noEmit"
+  },
+  "dependencies": {
+    "@kaicreator/domain-harness": "file:vendor/domain-harness",
+    "expo": "~55.0.31",
+    "expo-sqlite": "~55.0.20",
+    "react": "19.2.0",
+    "react-native": "0.83.10"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "^5.8.3"
+  }
+}

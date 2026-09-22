@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": [
+    "App.tsx",
+    "index.ts",
+    "run-expo-v3-host-validation.ts",
+    "fixture-constants.ts",
+    "generated/**/*.d.ts"
+  ]
+}

@@ -17,8 +17,10 @@ import type {
   PromotedArtifactStore,
   PromotedArtifactVersionBinding,
 } from '@kaicreator/domain-harness';
-import type { JsonValue } from '@kaicreator/domain-harness/v2';
-import { canonicalText, decodeJson, type AuthoritySqliteDatabase } from './authority-shared.js';
+import type { JsonValue as CanonicalJsonValue } from '@kaicreator/domain-harness/v2';
+import type { ExclusiveTransactionQueue } from './exclusive-transaction.js';
+import type { ExpoSqliteExecutorLike } from './expo-sqlite-types.js';
+import { canonicalText, decodeJson } from './authority-shared.js';
 
 interface BodyRow {
   body_json: string;
@@ -82,25 +84,28 @@ function samePin(left: DynamicChildExecutionPin, right: DynamicChildExecutionPin
 }
 
 /**
- * T-022 Node SQLite adapter for the T-012 promoted artifact registry store.
- * Semantics mirror the volatile reference store exactly (same error classes,
- * codes and messages); every multi-step mutation is one IMMEDIATE transaction
- * and every equality is canonical byte/text comparison, so the durable home
- * fails closed exactly like the in-memory reference.
+ * T-023 Expo SQLite adapter for the T-012 promoted artifact registry store.
+ * Semantics mirror the volatile reference store and the T-022 Node adapter
+ * exactly (same error classes, codes and messages); every multi-step mutation
+ * is one exclusive transaction behind the serialized writer queue and every
+ * equality is canonical byte/text comparison, so the durable home fails closed
+ * exactly like the in-memory reference.
  */
-export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
-  readonly #db: AuthoritySqliteDatabase;
+export class ExpoSqlitePromotedArtifactStore implements PromotedArtifactStore {
+  readonly #database: ExpoSqliteExecutorLike;
+  readonly #writes: ExclusiveTransactionQueue;
 
-  constructor(db: AuthoritySqliteDatabase) {
-    this.#db = db;
+  public constructor(database: ExpoSqliteExecutorLike, writes: ExclusiveTransactionQueue) {
+    this.#database = database;
+    this.#writes = writes;
   }
 
   async getBody(identity: PromotedArtifactIdentity): Promise<PromotedArtifactBody | undefined> {
-    const row = this.#db.prepare(`
+    const row = await this.#database.getFirstAsync<BodyRow>(`
       SELECT body_json FROM dh_v3_promoted_artifact_bodies
       WHERE artifact_id = ? AND content_digest = ?
-    `).get(identity.artifactId, identity.contentDigest) as BodyRow | undefined;
-    return row === undefined
+    `, [identity.artifactId, identity.contentDigest]);
+    return row === null
       ? undefined
       : decodeJson<PromotedArtifactBody>(row.body_json, 'promoted artifact body');
   }
@@ -108,10 +113,10 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
   async getPromotionRecords(
     identity: PromotedArtifactIdentity,
   ): Promise<readonly PromotedArtifactPromotionRecord[]> {
-    const rows = this.#db.prepare(`
+    const rows = await this.#database.getAllAsync<PromotionRow>(`
       SELECT promotion_json FROM dh_v3_promoted_artifact_promotions
       WHERE artifact_id = ? AND content_digest = ?
-    `).all(identity.artifactId, identity.contentDigest) as PromotionRow[];
+    `, [identity.artifactId, identity.contentDigest]);
     return rows
       .map((row) => decodeJson<PromotedArtifactPromotionRecord>(row.promotion_json, 'promotion record'))
       .sort((left, right) => left.recordId.localeCompare(right.recordId));
@@ -122,10 +127,10 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
     promotion: PromotedArtifactPromotionRecord,
     versionBinding: PromotedArtifactVersionBinding,
   ): Promise<void> {
-    const encodedBody = canonicalText(body as unknown as JsonValue, 'promoted artifact body');
-    const encodedPromotion = canonicalText(promotion as unknown as JsonValue, 'promotion record');
-    const encodedVersion = canonicalText(versionBinding as unknown as JsonValue, 'promoted version binding');
-    const transaction = this.#db.transaction(() => {
+    const encodedBody = canonicalText(body as unknown as CanonicalJsonValue, 'promoted artifact body');
+    const encodedPromotion = canonicalText(promotion as unknown as CanonicalJsonValue, 'promotion record');
+    const encodedVersion = canonicalText(versionBinding as unknown as CanonicalJsonValue, 'promoted version binding');
+    await this.#writes.run(async (transaction) => {
       if (
         !samePromotedArtifactIdentity(body.identity, promotion.artifact)
         || !samePromotedArtifactIdentity(body.identity, versionBinding.artifact)
@@ -138,22 +143,22 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
         );
       }
 
-      const existingBody = this.#db.prepare(`
+      const existingBody = await transaction.getFirstAsync<BodyRow>(`
         SELECT body_json FROM dh_v3_promoted_artifact_bodies
         WHERE artifact_id = ? AND content_digest = ?
-      `).get(body.identity.artifactId, body.identity.contentDigest) as BodyRow | undefined;
-      if (existingBody !== undefined && existingBody.body_json !== encodedBody) {
+      `, [body.identity.artifactId, body.identity.contentDigest]);
+      if (existingBody !== null && existingBody.body_json !== encodedBody) {
         throw new PromotedArtifactContractError(
           'PROMOTED_ARTIFACT_BODY_CONFLICT',
           `immutable promoted body conflict for ${body.identity.artifactId}@${body.identity.contentDigest}`,
         );
       }
 
-      const existingVersion = this.#db.prepare(`
+      const existingVersion = await transaction.getFirstAsync<BindingRow>(`
         SELECT binding_json FROM dh_v3_promoted_artifact_versions
         WHERE artifact_id = ? AND version = ?
-      `).get(versionBinding.artifactId, versionBinding.version) as BindingRow | undefined;
-      if (existingVersion !== undefined) {
+      `, [versionBinding.artifactId, versionBinding.version]);
+      if (existingVersion !== null) {
         const existingBinding = decodeJson<PromotedArtifactVersionBinding>(
           existingVersion.binding_json,
           'promoted version binding',
@@ -166,10 +171,10 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
         }
       }
 
-      const recordOwner = this.#db.prepare(`
+      const recordOwner = await transaction.getFirstAsync<PromotionRow>(`
         SELECT promotion_json FROM dh_v3_promoted_artifact_promotions WHERE record_id = ?
-      `).get(promotion.recordId) as PromotionRow | undefined;
-      if (recordOwner !== undefined && recordOwner.promotion_json !== encodedPromotion) {
+      `, [promotion.recordId]);
+      if (recordOwner !== null && recordOwner.promotion_json !== encodedPromotion) {
         throw new PromotedArtifactContractError(
           'PROMOTED_ARTIFACT_BODY_CONFLICT',
           `promotion record ${promotion.recordId} cannot be rebound`,
@@ -177,38 +182,37 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
       }
 
       // No mutation above this point: commit all three authorities together.
-      if (existingBody === undefined) {
-        this.#db.prepare(`
+      if (existingBody === null) {
+        await transaction.runAsync(`
           INSERT INTO dh_v3_promoted_artifact_bodies (artifact_id, content_digest, body_json)
           VALUES (?, ?, ?)
-        `).run(body.identity.artifactId, body.identity.contentDigest, encodedBody);
+        `, [body.identity.artifactId, body.identity.contentDigest, encodedBody]);
       }
-      if (existingVersion === undefined) {
-        this.#db.prepare(`
+      if (existingVersion === null) {
+        await transaction.runAsync(`
           INSERT INTO dh_v3_promoted_artifact_versions (artifact_id, version, binding_json)
           VALUES (?, ?, ?)
-        `).run(versionBinding.artifactId, versionBinding.version, encodedVersion);
+        `, [versionBinding.artifactId, versionBinding.version, encodedVersion]);
       }
-      if (recordOwner === undefined) {
-        this.#db.prepare(`
+      if (recordOwner === null) {
+        await transaction.runAsync(`
           INSERT INTO dh_v3_promoted_artifact_promotions
             (record_id, artifact_id, content_digest, promotion_json)
           VALUES (?, ?, ?, ?)
-        `).run(promotion.recordId, body.identity.artifactId, body.identity.contentDigest, encodedPromotion);
+        `, [promotion.recordId, body.identity.artifactId, body.identity.contentDigest, encodedPromotion]);
       }
     });
-    transaction.immediate();
   }
 
   async getVersion(
     artifactId: string,
     version: string,
   ): Promise<PromotedArtifactVersionBinding | undefined> {
-    const row = this.#db.prepare(`
+    const row = await this.#database.getFirstAsync<BindingRow>(`
       SELECT binding_json FROM dh_v3_promoted_artifact_versions
       WHERE artifact_id = ? AND version = ?
-    `).get(artifactId, version) as BindingRow | undefined;
-    return row === undefined
+    `, [artifactId, version]);
+    return row === null
       ? undefined
       : decodeJson<PromotedArtifactVersionBinding>(row.binding_json, 'promoted version binding');
   }
@@ -217,11 +221,11 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
     artifactId: string,
     alias: string,
   ): Promise<PromotedArtifactAliasBinding | undefined> {
-    const row = this.#db.prepare(`
+    const row = await this.#database.getFirstAsync<BindingRow>(`
       SELECT binding_json FROM dh_v3_promoted_artifact_aliases
       WHERE artifact_id = ? AND alias = ?
-    `).get(artifactId, alias) as BindingRow | undefined;
-    return row === undefined
+    `, [artifactId, alias]);
+    return row === null
       ? undefined
       : decodeJson<PromotedArtifactAliasBinding>(row.binding_json, 'promoted alias binding');
   }
@@ -233,11 +237,11 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
         'alias expectedRevision must be a non-negative integer',
       );
     }
-    const transaction = this.#db.transaction((): PromotedArtifactAliasBinding => {
-      const existing = this.#db.prepare(`
+    return this.#writes.run(async (transaction) => {
+      const existing = await transaction.getFirstAsync<AliasRow>(`
         SELECT revision, binding_json FROM dh_v3_promoted_artifact_aliases
         WHERE artifact_id = ? AND alias = ?
-      `).get(input.artifactId, input.alias) as AliasRow | undefined;
+      `, [input.artifactId, input.alias]);
       const currentRevision = existing?.revision ?? 0;
       if (input.expectedRevision !== currentRevision) {
         throw new PromotedArtifactContractError(
@@ -251,37 +255,36 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
         artifact: input.artifact,
         revision: currentRevision + 1,
       };
-      const encoded = canonicalText(next as unknown as JsonValue, 'promoted alias binding');
-      this.#db.prepare(`
+      const encoded = canonicalText(next as unknown as CanonicalJsonValue, 'promoted alias binding');
+      await transaction.runAsync(`
         INSERT INTO dh_v3_promoted_artifact_aliases (artifact_id, alias, revision, binding_json)
         VALUES (?, ?, ?, ?)
         ON CONFLICT (artifact_id, alias) DO UPDATE SET revision = excluded.revision, binding_json = excluded.binding_json
-      `).run(input.artifactId, input.alias, next.revision, encoded);
+      `, [input.artifactId, input.alias, next.revision, encoded]);
       return decodeJson<PromotedArtifactAliasBinding>(encoded, 'promoted alias binding');
     });
-    return transaction.immediate();
   }
 
   async getRevocation(
     identity: PromotedArtifactIdentity,
   ): Promise<PromotedArtifactRevocationRecord | undefined> {
-    const row = this.#db.prepare(`
+    const row = await this.#database.getFirstAsync<RevocationRow>(`
       SELECT revocation_json FROM dh_v3_promoted_artifact_revocations
       WHERE artifact_id = ? AND content_digest = ?
-    `).get(identity.artifactId, identity.contentDigest) as RevocationRow | undefined;
-    return row === undefined
+    `, [identity.artifactId, identity.contentDigest]);
+    return row === null
       ? undefined
       : decodeJson<PromotedArtifactRevocationRecord>(row.revocation_json, 'promoted revocation record');
   }
 
   async putRevocation(record: PromotedArtifactRevocationRecord): Promise<void> {
-    const encoded = canonicalText(record as unknown as JsonValue, 'promoted revocation record');
-    const transaction = this.#db.transaction(() => {
-      const existing = this.#db.prepare(`
+    const encoded = canonicalText(record as unknown as CanonicalJsonValue, 'promoted revocation record');
+    await this.#writes.run(async (transaction) => {
+      const existing = await transaction.getFirstAsync<RevocationRow>(`
         SELECT revocation_json FROM dh_v3_promoted_artifact_revocations
         WHERE artifact_id = ? AND content_digest = ?
-      `).get(record.artifact.artifactId, record.artifact.contentDigest) as RevocationRow | undefined;
-      if (existing !== undefined) {
+      `, [record.artifact.artifactId, record.artifact.contentDigest]);
+      if (existing !== null) {
         if (existing.revocation_json !== encoded) {
           throw new PromotedArtifactContractError(
             'PROMOTED_ARTIFACT_REVOCATION_CONFLICT',
@@ -290,22 +293,21 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
         }
         return;
       }
-      this.#db.prepare(`
+      await transaction.runAsync(`
         INSERT INTO dh_v3_promoted_artifact_revocations (artifact_id, content_digest, revocation_json)
         VALUES (?, ?, ?)
-      `).run(record.artifact.artifactId, record.artifact.contentDigest, encoded);
+      `, [record.artifact.artifactId, record.artifact.contentDigest, encoded]);
     });
-    transaction.immediate();
   }
 
   async getRetention(
     referenceId: string,
   ): Promise<PromotedArtifactRetentionReference | undefined> {
-    const row = this.#db.prepare(`
+    const row = await this.#database.getFirstAsync<RetentionRow>(`
       SELECT reference_json FROM dh_v3_promoted_artifact_retentions
       WHERE reference_id = ? AND live = 1
-    `).get(referenceId) as RetentionRow | undefined;
-    return row === undefined
+    `, [referenceId]);
+    return row === null
       ? undefined
       : decodeJson<PromotedArtifactRetentionReference>(row.reference_json, 'promoted retention reference');
   }
@@ -313,33 +315,33 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
   async listRetentions(
     identity: PromotedArtifactIdentity,
   ): Promise<readonly PromotedArtifactRetentionReference[]> {
-    const rows = this.#db.prepare(`
+    const rows = await this.#database.getAllAsync<RetentionRow>(`
       SELECT reference_json FROM dh_v3_promoted_artifact_retentions
       WHERE artifact_id = ? AND content_digest = ? AND live = 1
-    `).all(identity.artifactId, identity.contentDigest) as RetentionRow[];
+    `, [identity.artifactId, identity.contentDigest]);
     return rows
       .map((row) => decodeJson<PromotedArtifactRetentionReference>(row.reference_json, 'promoted retention reference'))
       .sort((left, right) => left.referenceId.localeCompare(right.referenceId));
   }
 
   async putRetention(reference: PromotedArtifactRetentionReference): Promise<void> {
-    const encoded = canonicalText(reference as unknown as JsonValue, 'promoted retention reference');
-    const transaction = this.#db.transaction(() => {
-      const tombstone = this.#db.prepare(`
+    const encoded = canonicalText(reference as unknown as CanonicalJsonValue, 'promoted retention reference');
+    await this.#writes.run(async (transaction) => {
+      const tombstone = await transaction.getFirstAsync<RetentionRow>(`
         SELECT reference_json FROM dh_v3_promoted_artifact_retentions
         WHERE reference_id = ? AND live = 0
-      `).get(reference.referenceId) as RetentionRow | undefined;
-      if (tombstone !== undefined) {
+      `, [reference.referenceId]);
+      if (tombstone !== null) {
         throw new PromotedArtifactContractError(
           'PROMOTED_ARTIFACT_RETENTION_REBIND',
           `released retention reference ${reference.referenceId} is tombstoned`,
         );
       }
-      const current = this.#db.prepare(`
+      const current = await transaction.getFirstAsync<RetentionRow>(`
         SELECT reference_json FROM dh_v3_promoted_artifact_retentions
         WHERE reference_id = ? AND live = 1
-      `).get(reference.referenceId) as RetentionRow | undefined;
-      if (current !== undefined) {
+      `, [reference.referenceId]);
+      if (current !== null) {
         const currentReference = decodeJson<PromotedArtifactRetentionReference>(
           current.reference_json,
           'promoted retention reference',
@@ -350,44 +352,43 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
           `retention reference ${reference.referenceId} cannot be rebound`,
         );
       }
-      const referencedBody = this.#db.prepare(`
+      const referencedBody = await transaction.getFirstAsync<ExistenceRow>(`
         SELECT 1 AS present FROM dh_v3_promoted_artifact_bodies
         WHERE artifact_id = ? AND content_digest = ?
-      `).get(reference.artifact.artifactId, reference.artifact.contentDigest) as ExistenceRow | undefined;
-      if (referencedBody === undefined) {
+      `, [reference.artifact.artifactId, reference.artifact.contentDigest]);
+      if (referencedBody === null) {
         throw new PromotedArtifactContractError(
           'PROMOTED_ARTIFACT_NOT_FOUND',
           `cannot retain missing artifact ${reference.artifact.artifactId}@${reference.artifact.contentDigest}`,
         );
       }
-      this.#db.prepare(`
+      await transaction.runAsync(`
         INSERT INTO dh_v3_promoted_artifact_retentions
           (reference_id, artifact_id, content_digest, live, reference_json)
         VALUES (?, ?, ?, 1, ?)
-      `).run(
+      `, [
         reference.referenceId,
         reference.artifact.artifactId,
         reference.artifact.contentDigest,
         encoded,
-      );
+      ]);
     });
-    transaction.immediate();
   }
 
   async releaseRetention(
     expected: PromotedArtifactRetentionReference,
   ): Promise<'released' | 'absent'> {
-    const transaction = this.#db.transaction((): 'released' | 'absent' => {
-      const current = this.#db.prepare(`
+    return this.#writes.run(async (transaction) => {
+      const current = await transaction.getFirstAsync<RetentionRow>(`
         SELECT reference_json FROM dh_v3_promoted_artifact_retentions
         WHERE reference_id = ? AND live = 1
-      `).get(expected.referenceId) as RetentionRow | undefined;
-      if (current === undefined) {
-        const tombstone = this.#db.prepare(`
+      `, [expected.referenceId]);
+      if (current === null) {
+        const tombstone = await transaction.getFirstAsync<RetentionRow>(`
           SELECT reference_json FROM dh_v3_promoted_artifact_retentions
           WHERE reference_id = ? AND live = 0
-        `).get(expected.referenceId) as RetentionRow | undefined;
-        if (tombstone !== undefined) {
+        `, [expected.referenceId]);
+        if (tombstone !== null) {
           const tombstoneReference = decodeJson<PromotedArtifactRetentionReference>(
             tombstone.reference_json,
             'promoted retention reference',
@@ -415,56 +416,56 @@ export class NodeSqlitePromotedArtifactStore implements PromotedArtifactStore {
       // deleted. T-022 review P3-2: the tombstone retains the originally
       // stored bytes (sameRetention already proved caller equivalence), not
       // the caller's reserialized text.
-      this.#db.prepare(`
+      await transaction.runAsync(`
         UPDATE dh_v3_promoted_artifact_retentions
         SET live = 0
         WHERE reference_id = ?
-      `).run(expected.referenceId);
+      `, [expected.referenceId]);
       return 'released';
     });
-    return transaction.immediate();
   }
 }
 
 /**
- * T-022 Node SQLite adapter for the T-017 dynamic child pin store. The pin is
+ * T-023 Expo SQLite adapter for the T-017 dynamic child pin store. The pin is
  * insert-once per logical invocation slot: identical replay is idempotent and a
  * different exact child definition is a conflict that never overwrites.
  */
-export class NodeSqliteDynamicChildPinStore implements DynamicChildPinStore {
-  readonly #db: AuthoritySqliteDatabase;
+export class ExpoSqliteDynamicChildPinStore implements DynamicChildPinStore {
+  readonly #database: ExpoSqliteExecutorLike;
+  readonly #writes: ExclusiveTransactionQueue;
 
-  constructor(db: AuthoritySqliteDatabase) {
-    this.#db = db;
+  public constructor(database: ExpoSqliteExecutorLike, writes: ExclusiveTransactionQueue) {
+    this.#database = database;
+    this.#writes = writes;
   }
 
   async get(slotKey: string): Promise<DynamicChildExecutionPin | undefined> {
-    const row = this.#db.prepare(`
+    const row = await this.#database.getFirstAsync<PinRow>(`
       SELECT pin_json FROM dh_v3_dynamic_child_pins WHERE slot_key = ?
-    `).get(slotKey) as PinRow | undefined;
-    return row === undefined
+    `, [slotKey]);
+    return row === null
       ? undefined
       : decodeJson<DynamicChildExecutionPin>(row.pin_json, 'dynamic child execution pin');
   }
 
   async insertOnce(slotKey: string, pin: DynamicChildExecutionPin): Promise<InsertDynamicChildPinResult> {
-    const encoded = canonicalText(pin as unknown as JsonValue, 'dynamic child execution pin');
-    const transaction = this.#db.transaction((): InsertDynamicChildPinResult => {
-      const existing = this.#db.prepare(`
+    const encoded = canonicalText(pin as unknown as CanonicalJsonValue, 'dynamic child execution pin');
+    return this.#writes.run(async (transaction) => {
+      const existing = await transaction.getFirstAsync<PinRow>(`
         SELECT pin_json FROM dh_v3_dynamic_child_pins WHERE slot_key = ?
-      `).get(slotKey) as PinRow | undefined;
-      if (existing !== undefined) {
+      `, [slotKey]);
+      if (existing !== null) {
         const existingPin = decodeJson<DynamicChildExecutionPin>(
           existing.pin_json,
           'dynamic child execution pin',
         );
         return samePin(existingPin, pin) ? 'existing' : 'conflict';
       }
-      this.#db.prepare(`
+      await transaction.runAsync(`
         INSERT INTO dh_v3_dynamic_child_pins (slot_key, pin_json) VALUES (?, ?)
-      `).run(slotKey, encoded);
+      `, [slotKey, encoded]);
       return 'inserted';
     });
-    return transaction.immediate();
   }
 }

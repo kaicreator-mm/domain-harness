@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "DomainHarness T023 V3 Host Validation",
+    "slug": "domain-harness-t023-expo-v3-host-validation",
+    "version": "0.0.0",
+    "jsEngine": "hermes",
+    "android": {
+      "package": "com.kaicreator.domainharness.t023v3host"
+    }
+  }
+}

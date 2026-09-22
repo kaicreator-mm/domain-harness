@@ -7,6 +7,27 @@ import type {
 } from './expo-sqlite-types.js';
 import { migrateExpoRuntimeStore } from './migrations.js';
 import type {
+  BindGovernanceExecutionPinResult,
+  CommandOutcomeSnapshot,
+  CompareAndSetExternalWorkCorrelationRequest,
+  DurableControlStore,
+  DurableExecutionStore,
+  DurableProcessData,
+  DurableProcessDataSnapshot,
+  EnsureExternalWorkCorrelationResult,
+  EnsureProvisionedWorkflowInstanceResult,
+  ExternalWorkCorrelationRecord,
+  GovernanceBoundSnapshot,
+  GovernanceExecutionPin,
+  ProcessedCommandTurnCommit,
+  ProvisionedWorkflowInstance,
+  ProvisionWorkflowInstanceRequest,
+  RegisterExternalWorkRequest,
+  RuntimeStoreProcessCommandExtension,
+} from '@kaicreator/domain-harness';
+import type { JsonValue as CanonicalJsonValue } from '@kaicreator/domain-harness/v2';
+import { canonicalText, decodeJson, encodeJson } from './authority-shared.js';
+import type {
   BeginEffectRequest,
   CommitProcessedMessageRequest,
   CompleteEffectRequest,
@@ -32,6 +53,7 @@ export type ExpoRuntimeStoreErrorCode =
   | 'INSTANCE_ALREADY_EXISTS'
   | 'INSTANCE_NOT_ACCEPTING_MESSAGES'
   | 'MESSAGE_STATE_CONFLICT'
+  | 'INSTANCE_STATE_CONFLICT'
   | 'EFFECT_NOT_FOUND'
   | 'EFFECT_IDENTITY_CONFLICT'
   | 'EFFECT_STATE_CONFLICT'
@@ -52,6 +74,12 @@ export interface OpenExpoSqliteRuntimeStoreOptions {
   sqlite?: ExpoSqliteModuleLike;
   databaseName?: string;
   now?: () => string;
+  /**
+   * T-023: inject the shared ExclusiveTransactionQueue from
+   * openExpoSqliteAuthorityStores so the RuntimeStore half and the standalone
+   * authority stores serialize through one writer gate on this database.
+   */
+  writes?: ExclusiveTransactionQueue;
 }
 
 interface InstanceRow {
@@ -383,16 +411,31 @@ function jsonEquals(left: JsonValue, right: JsonValue): boolean {
   return false;
 }
 
-export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
+export class ExpoSqliteRuntimeStore
+  implements
+    RuntimeStoreLike,
+    RuntimeStoreProcessCommandExtension,
+    DurableExecutionStore,
+    DurableControlStore
+{
   private readonly writes: ExclusiveTransactionQueue;
+  private readonly ownsQueue: boolean;
   private closed = false;
 
   public constructor(
     private readonly database: ExpoSqliteDatabaseLike,
     private readonly ownsDatabase: boolean,
     private readonly now: () => string = () => new Date().toISOString(),
+    writes?: ExclusiveTransactionQueue,
   ) {
-    this.writes = new ExclusiveTransactionQueue(database);
+    // T-023: the v0.3 durability seams below run on THIS queue and THIS
+    // database — the same transaction manager/durability domain as the
+    // RuntimeStore methods they extend (T-009/T-010/T-014 frozen requirement).
+    // openExpoSqliteAuthorityStores injects the shared queue so every adapter
+    // on one logical database serializes through one writer gate. An injected
+    // queue is owned (and drained) by its creator, not by this store.
+    this.ownsQueue = writes === undefined;
+    this.writes = writes ?? new ExclusiveTransactionQueue(database);
   }
 
   public async initialize(): Promise<void> {
@@ -407,7 +450,9 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
     if (this.closed) {
       return;
     }
-    await this.writes.idle();
+    if (this.ownsQueue) {
+      await this.writes.idle();
+    }
     this.closed = true;
     if (this.ownsDatabase) {
       await this.database.closeAsync?.();
@@ -968,6 +1013,349 @@ export class ExpoSqliteRuntimeStore implements RuntimeStoreLike {
     });
   }
 
+  // ---------------------------------------------------------------------
+  // T-009 RuntimeStoreProcessCommandExtension (same durability domain)
+  // ---------------------------------------------------------------------
+
+  public async getProcessData(target: WorkflowAddress): Promise<DurableProcessDataSnapshot | null> {
+    this.assertOpen();
+    const instance = await this.database.getFirstAsync<InstanceRow>(
+      INSTANCE_SELECT,
+      params([target.workflowId, target.instanceKey]),
+    );
+    if (instance === null) return null;
+    const row = await this.database.getFirstAsync<{ instance_state_revision: number; data_json: string }>(
+      `SELECT instance_state_revision, data_json
+         FROM dh_v3_process_data
+        WHERE target_internal_id = ?`,
+      params([instance.internal_id]),
+    );
+    if (row === null) return null;
+    return {
+      target,
+      instanceStateRevision: row.instance_state_revision,
+      data: decodeJson<DurableProcessData>(row.data_json, 'process data'),
+    };
+  }
+
+  public async getCommandOutcome(
+    target: WorkflowAddress,
+    messageId: string,
+  ): Promise<CommandOutcomeSnapshot | null> {
+    this.assertOpen();
+    const instance = await this.database.getFirstAsync<InstanceRow>(
+      INSTANCE_SELECT,
+      params([target.workflowId, target.instanceKey]),
+    );
+    if (instance === null) return null;
+    const row = await this.database.getFirstAsync<{ outcome_json: string }>(
+      `SELECT outcome_json
+         FROM dh_v3_command_outcomes
+        WHERE target_internal_id = ? AND message_id = ?`,
+      params([instance.internal_id, messageId]),
+    );
+    if (row === null) return null;
+    return decodeJson<CommandOutcomeSnapshot>(row.outcome_json, 'command outcome');
+  }
+
+  public async commitProcessedCommandTurn(commit: ProcessedCommandTurnCommit): Promise<void> {
+    this.assertOpen();
+    await this.writes.run(async (transaction) => {
+      const instance = await requireInstance(transaction, commit.target);
+      const message = await getMessageRow(transaction, instance.internal_id, commit.messageId);
+      if (
+        message === null ||
+        message.target_sequence !== commit.expectedTargetSequence ||
+        message.disposition !== 'processing'
+      ) {
+        throw new ExpoRuntimeStoreError(
+          'MESSAGE_STATE_CONFLICT',
+          `Message ${commit.messageId} is not the expected processing message at sequence ${commit.expectedTargetSequence}`,
+        );
+      }
+
+      const messageUpdate = await transaction.runAsync(
+        `UPDATE dh_v2_messages
+            SET disposition = 'processed', resolved_at = ?, error_json = NULL
+          WHERE target_internal_id = ?
+            AND message_id = ?
+            AND target_sequence = ?
+            AND disposition = 'processing'`,
+        params([commit.updatedAt, instance.internal_id, commit.messageId, commit.expectedTargetSequence]),
+      );
+      if (messageUpdate.changes !== 1) {
+        throw new ExpoRuntimeStoreError(
+          'MESSAGE_STATE_CONFLICT',
+          `Message ${commit.messageId} changed during processed-command commit`,
+        );
+      }
+
+      const instanceUpdate = await transaction.runAsync(
+        `UPDATE dh_v2_instances
+            SET workflow_state_json = ?,
+                lifecycle = ?,
+                state_revision = ?,
+                output_json = CASE WHEN ? = 1 THEN ? ELSE output_json END,
+                failure_json = CASE WHEN ? = 1 THEN NULL ELSE failure_json END,
+                updated_at = ?
+          WHERE internal_id = ?
+            AND state_revision = ?`,
+        params([
+          encodeJson(commit.nextState, 'commit.nextState'),
+          commit.nextLifecycle,
+          commit.nextStateRevision,
+          commit.output === undefined ? 0 : 1,
+          commit.output === undefined
+            ? null
+            : encodeJson(commit.output, 'commit.output'),
+          commit.nextLifecycle === 'recovery_required' ? 0 : 1,
+          commit.updatedAt,
+          instance.internal_id,
+          commit.expectedStateRevision,
+        ]),
+      );
+      if (instanceUpdate.changes !== 1) {
+        throw new ExpoRuntimeStoreError(
+          'INSTANCE_STATE_CONFLICT',
+          'Workflow instance changed during processed-command commit',
+        );
+      }
+
+      await transaction.runAsync(
+        `INSERT INTO dh_v3_process_data (target_internal_id, instance_state_revision, data_json)
+         VALUES (?, ?, ?)
+         ON CONFLICT(target_internal_id) DO UPDATE SET
+           instance_state_revision = excluded.instance_state_revision,
+           data_json = excluded.data_json`,
+        params([
+          instance.internal_id,
+          commit.nextStateRevision,
+          encodeJson(commit.nextProcessData, 'commit.nextProcessData'),
+        ]),
+      );
+
+      await transaction.runAsync(
+        `INSERT INTO dh_v3_command_outcomes (target_internal_id, message_id, outcome_json)
+         VALUES (?, ?, ?)`,
+        params([
+          instance.internal_id,
+          commit.messageId,
+          encodeJson(commit.outcome as unknown as CanonicalJsonValue, 'commit.outcome'),
+        ]),
+      );
+
+      if (TERMINAL_LIFECYCLES.has(commit.nextLifecycle)) {
+        await abandonUnprocessedMessages(transaction, instance.internal_id, commit.updatedAt);
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // T-014 DurableExecutionStore (governance execution pin + bound snapshot)
+  // ---------------------------------------------------------------------
+
+  public async getGovernanceExecutionPin(workflowInstanceId: string): Promise<unknown> {
+    this.assertOpen();
+    const row = await this.database.getFirstAsync<{ pin_json: string }>(
+      `SELECT pin_json FROM dh_v3_governance_execution_pins WHERE workflow_instance_id = ?`,
+      params([workflowInstanceId]),
+    );
+    if (row === null) return undefined;
+    return decodeJson<CanonicalJsonValue>(row.pin_json, 'governance execution pin');
+  }
+
+  public async bindGovernanceExecutionPin(
+    pin: GovernanceExecutionPin,
+  ): Promise<BindGovernanceExecutionPinResult> {
+    this.assertOpen();
+    const encoded = canonicalText(pin as unknown as CanonicalJsonValue, 'governance execution pin');
+    return this.writes.run(async (transaction): Promise<BindGovernanceExecutionPinResult> => {
+      const existing = await transaction.getFirstAsync<{ pin_json: string }>(
+        `SELECT pin_json FROM dh_v3_governance_execution_pins WHERE workflow_instance_id = ?`,
+        params([pin.workflowInstanceId]),
+      );
+      if (existing !== null) {
+        // Pins are bind-once: the same exact pin is idempotent, a different
+        // pin under the same instance id is a conflict and never overwrites.
+        // Equality is canonical-JSON byte equality (T-022 review P2-2): it
+        // agrees with field-wise sameExecutionPin for every
+        // coordinator-produced pin and diverges only fail-closed.
+        return existing.pin_json === encoded ? 'existing' : 'conflict';
+      }
+      await transaction.runAsync(
+        `INSERT INTO dh_v3_governance_execution_pins (workflow_instance_id, binding_digest, pin_json)
+         VALUES (?, ?, ?)`,
+        params([pin.workflowInstanceId, pin.bindingDigest, encoded]),
+      );
+      return 'inserted';
+    });
+  }
+
+  public async getGovernanceBoundSnapshot(workflowInstanceId: string): Promise<unknown> {
+    this.assertOpen();
+    const row = await this.database.getFirstAsync<{ snapshot_json: string }>(
+      `SELECT snapshot_json FROM dh_v3_governance_bound_snapshots WHERE workflow_instance_id = ?`,
+      params([workflowInstanceId]),
+    );
+    if (row === null) return undefined;
+    return decodeJson<CanonicalJsonValue>(row.snapshot_json, 'governance bound snapshot');
+  }
+
+  public async putGovernanceBoundSnapshot(snapshot: GovernanceBoundSnapshot): Promise<void> {
+    this.assertOpen();
+    await this.writes.run(async (transaction) => {
+      await transaction.runAsync(
+        `INSERT INTO dh_v3_governance_bound_snapshots (
+           workflow_instance_id, governance_binding_digest, snapshot_json
+         ) VALUES (?, ?, ?)
+         ON CONFLICT(workflow_instance_id) DO UPDATE SET
+           governance_binding_digest = excluded.governance_binding_digest,
+           snapshot_json = excluded.snapshot_json`,
+        params([
+          snapshot.workflowInstanceId,
+          snapshot.governanceBindingDigest,
+          canonicalText(snapshot as unknown as CanonicalJsonValue, 'governance bound snapshot'),
+        ]),
+      );
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // T-010 DurableControlStore (provisioning + external-work correlations)
+  // ---------------------------------------------------------------------
+
+  public async ensureProvisionedWorkflowInstance(
+    request: ProvisionWorkflowInstanceRequest,
+  ): Promise<EnsureProvisionedWorkflowInstanceResult> {
+    this.assertOpen();
+    return this.writes.run(async (transaction): Promise<EnsureProvisionedWorkflowInstanceResult> => {
+      const existing = await transaction.getFirstAsync<{ record_json: string }>(
+        `SELECT record_json FROM dh_v3_provisioning_keys WHERE provisioning_key = ?`,
+        params([request.provisioningKey]),
+      );
+      if (existing !== null) {
+        return {
+          disposition: 'existing',
+          record: decodeJson<ProvisionedWorkflowInstance>(existing.record_json, 'provisioning record'),
+        };
+      }
+      const record: ProvisionedWorkflowInstance = {
+        provisioningKey: request.provisioningKey,
+        target: request.target,
+        correlationId: request.correlationId,
+        packageId: request.packageId,
+        input: request.input,
+        createdAt: request.requestedAt,
+      };
+      await transaction.runAsync(
+        `INSERT INTO dh_v3_provisioning_keys (provisioning_key, record_json) VALUES (?, ?)`,
+        params([
+          request.provisioningKey,
+          encodeJson(record as unknown as CanonicalJsonValue, 'provisioning record'),
+        ]),
+      );
+      // Atomic ensure/open: the bind of provisioning key to exact
+      // WorkflowAddress happens in this single durable transaction, never
+      // query-then-insert. Like the T-010 reference fake and the T-022 Node
+      // adapter, this binds the key to the exact-address RECORD only;
+      // instance creation is owned by the runtime message path.
+      return { disposition: 'created', record };
+    });
+  }
+
+  public async ensureExternalWorkCorrelation(
+    request: RegisterExternalWorkRequest,
+  ): Promise<EnsureExternalWorkCorrelationResult> {
+    this.assertOpen();
+    return this.writes.run(async (transaction): Promise<EnsureExternalWorkCorrelationResult> => {
+      const existing = await transaction.getFirstAsync<{ record_json: string }>(
+        `SELECT record_json FROM dh_v3_external_work_correlations WHERE external_correlation_id = ?`,
+        params([request.externalCorrelationId]),
+      );
+      if (existing !== null) {
+        return {
+          disposition: 'existing',
+          record: decodeJson<ExternalWorkCorrelationRecord>(existing.record_json, 'external-work correlation'),
+        };
+      }
+      const record: ExternalWorkCorrelationRecord = {
+        externalCorrelationId: request.externalCorrelationId,
+        target: request.target,
+        deadlineTimerId: request.deadlineTimerId,
+        dueAt: request.dueAt,
+        status: 'waiting',
+        revision: 0,
+        createdAt: request.registeredAt,
+        updatedAt: request.registeredAt,
+      };
+      await transaction.runAsync(
+        `INSERT INTO dh_v3_external_work_correlations (
+           external_correlation_id, status, revision, due_at, record_json
+         ) VALUES (?, 'waiting', 0, ?, ?)`,
+        params([
+          request.externalCorrelationId,
+          request.dueAt,
+          encodeJson(record as unknown as CanonicalJsonValue, 'external-work correlation'),
+        ]),
+      );
+      return { disposition: 'created', record };
+    });
+  }
+
+  public async getExternalWorkCorrelation(
+    externalCorrelationId: string,
+  ): Promise<ExternalWorkCorrelationRecord | null> {
+    this.assertOpen();
+    const row = await this.database.getFirstAsync<{ record_json: string }>(
+      `SELECT record_json FROM dh_v3_external_work_correlations WHERE external_correlation_id = ?`,
+      params([externalCorrelationId]),
+    );
+    if (row === null) return null;
+    return decodeJson<ExternalWorkCorrelationRecord>(row.record_json, 'external-work correlation');
+  }
+
+  public async listDueExternalWorkCorrelations(
+    dueAtOrBefore: string,
+  ): Promise<readonly ExternalWorkCorrelationRecord[]> {
+    this.assertOpen();
+    const rows = await this.database.getAllAsync<{ record_json: string }>(
+      `SELECT record_json FROM dh_v3_external_work_correlations
+        WHERE status = 'waiting' AND due_at <= ?
+        ORDER BY external_correlation_id`,
+      params([dueAtOrBefore]),
+    );
+    return rows.map((row) =>
+      decodeJson<ExternalWorkCorrelationRecord>(row.record_json, 'external-work correlation'),
+    );
+  }
+
+  public async compareAndSetExternalWorkCorrelation(
+    request: CompareAndSetExternalWorkCorrelationRequest,
+  ): Promise<boolean> {
+    this.assertOpen();
+    return this.writes.run(async (transaction): Promise<boolean> => {
+      const update = await transaction.runAsync(
+        `UPDATE dh_v3_external_work_correlations
+            SET status = ?,
+                revision = ?,
+                record_json = ?
+          WHERE external_correlation_id = ?
+            AND status = 'waiting'
+            AND revision = ?`,
+        params([
+          request.next.status,
+          request.next.revision,
+          encodeJson(request.next as unknown as CanonicalJsonValue, 'external-work correlation'),
+          request.externalCorrelationId,
+          request.expectedRevision,
+        ]),
+      );
+      // One atomic terminal settlement: a stale expectedRevision or a record
+      // that is no longer waiting can never partially update the correlation.
+      return update.changes === 1;
+    });
+  }
+
   private assertOpen(): void {
     if (this.closed) {
       throw new ExpoRuntimeStoreError('STORE_CLOSED', 'Expo RuntimeStore is closed');
@@ -1014,7 +1402,7 @@ export async function openExpoSqliteRuntimeStore(
     ownsDatabase = true;
   }
 
-  const store = new ExpoSqliteRuntimeStore(database, ownsDatabase, options.now);
+  const store = new ExpoSqliteRuntimeStore(database, ownsDatabase, options.now, options.writes);
   try {
     await store.initialize();
     return store;
