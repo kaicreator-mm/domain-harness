@@ -298,12 +298,13 @@ for (const kind of STACKS) {
           const versions = raw
             .prepare('SELECT version FROM dh_v2_schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>;
-          assert.deepEqual(versions.map((row) => row.version), [1, 2]);
+          // v2 added authority tables; v3 added the #312 observation tables.
+          assert.deepEqual(versions.map((row) => row.version), [1, 2, 3]);
         } else {
           const meta = raw
             .prepare('SELECT schema_version FROM dh_v2_store_meta WHERE singleton_id = 1')
             .get() as { schema_version: number };
-          assert.equal(meta.schema_version, 2);
+          assert.equal(meta.schema_version, 3);
         }
       } finally {
         raw.close();

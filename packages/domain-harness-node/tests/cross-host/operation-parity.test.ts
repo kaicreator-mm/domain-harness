@@ -129,7 +129,7 @@ test('T-024 C1: identical operation script produces byte-identical durable state
     const versions = nodeDb
       .prepare('SELECT version FROM dh_v2_schema_migrations ORDER BY version')
       .all() as Array<{ version: number }>;
-    assert.deepEqual(versions.map((row) => row.version), [1, 2]);
+    assert.deepEqual(versions.map((row) => row.version), [1, 2, 3]);
   } finally {
     nodeDb.close();
   }
@@ -138,7 +138,7 @@ test('T-024 C1: identical operation script produces byte-identical durable state
     const meta = expoDb
       .prepare('SELECT schema_version FROM dh_v2_store_meta WHERE singleton_id = 1')
       .get() as { schema_version: number };
-    assert.equal(meta.schema_version, 2);
+    assert.equal(meta.schema_version, 3);
   } finally {
     expoDb.close();
   }

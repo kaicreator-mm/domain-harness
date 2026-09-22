@@ -4,7 +4,7 @@
 // CI instead of relying on human review.
 //
 // Frozen reality this gate encodes:
-//  1. The 24 dh_v3_* authority tables + their indexes are host-neutral by
+//  1. The 26 dh_v3_* authority tables + their indexes are host-neutral by
 //     design (T-022 wrote them, T-023 mirrored them): BYTE-IDENTICAL DDL after
 //     whitespace normalization. Drift here is a P1 parity defect.
 //  2. The dh_v2_* RuntimeStore tables are frozen v0.2 heritage and differ in
@@ -164,8 +164,8 @@ test('T-024 C1: Node and Expo migration chains produce identical logical schemas
   const expoV3Tables = expoSchema.filter(
     (row) => row.type === 'table' && row.name.startsWith('dh_v3_'),
   );
-  assert.equal(nodeV3Tables.length, 24, 'Node migration v2 creates 24 dh_v3_* tables');
-  assert.equal(expoV3Tables.length, 24, 'Expo migration v2 creates 24 dh_v3_* tables');
+  assert.equal(nodeV3Tables.length, 26, 'Node migrations v2+v3 create 26 dh_v3_* tables');
+  assert.equal(expoV3Tables.length, 26, 'Expo migrations v2+v3 create 26 dh_v3_* tables');
   assert.deepEqual(
     expoV3,
     nodeV3,
@@ -215,8 +215,8 @@ test('T-024 C1: Node and Expo migration chains produce identical logical schemas
       .all() as Array<{ version: number }>;
     assert.deepEqual(
       versions.map((row) => row.version),
-      [1, 2],
-      'Node ledger records migrations 1 and 2',
+      [1, 2, 3],
+      'Node ledger records migrations 1, 2 and 3',
     );
     assert.equal(nodeDb.pragma('journal_mode', { simple: true }), 'wal');
   } finally {
@@ -227,7 +227,7 @@ test('T-024 C1: Node and Expo migration chains produce identical logical schemas
     const meta = expoDb
       .prepare('SELECT schema_version FROM dh_v2_store_meta WHERE singleton_id = 1')
       .get() as { schema_version: number };
-    assert.equal(meta.schema_version, 2, 'Expo meta records schema version 2');
+    assert.equal(meta.schema_version, 3, 'Expo meta records schema version 3');
     assert.equal(expoDb.pragma('journal_mode', { simple: true }), 'wal');
   } finally {
     expoDb.close();

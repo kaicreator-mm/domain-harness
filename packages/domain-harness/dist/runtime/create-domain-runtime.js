@@ -1,3 +1,4 @@
+import { isRuntimeObservationStore, ObservationRecordingRuntimeStore, RUNTIME_OBSERVATION_CONTRACT_VERSION, RUNTIME_OBSERVATION_EVENT_FAMILIES, runtimePackageIdentityFromManifest, } from '../observation/index.js';
 import { WorkflowInstanceEngine } from '../engine/workflow-instance-engine.js';
 import { PerInstanceSerializedLane } from '../engine/per-instance-serialized-lane.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
@@ -22,6 +23,53 @@ class RecoveryRecordedError extends Error {
         this.name = 'RecoveryRecordedError';
     }
 }
+/**
+ * Wake-up registry behind the optional `watch` on the ENABLED observation
+ * capability. Purely a coalescible hint: it fires when observation records
+ * commit and carries no data — consumers must re-read the durable sequence
+ * (push never substitutes the durable pull/cursor read).
+ */
+class ObservationWakeRegistry {
+    #watchers = new Map();
+    watch(target, onWake) {
+        const key = `${target.workflowId}\u0000${target.instanceKey}`;
+        let listeners = this.#watchers.get(key);
+        if (listeners === undefined) {
+            listeners = new Set();
+            this.#watchers.set(key, listeners);
+        }
+        listeners.add(onWake);
+        let active = true;
+        return () => {
+            if (!active)
+                return;
+            active = false;
+            const current = this.#watchers.get(key);
+            if (current === undefined)
+                return;
+            current.delete(onWake);
+            if (current.size === 0)
+                this.#watchers.delete(key);
+        };
+    }
+    wake(target) {
+        const listeners = this.#watchers.get(`${target.workflowId}\u0000${target.instanceKey}`);
+        if (listeners === undefined)
+            return;
+        for (const onWake of [...listeners]) {
+            try {
+                onWake();
+            }
+            catch {
+                // A wake-up listener is host convenience code; its failure can never
+                // affect the durable record path that already committed.
+            }
+        }
+    }
+    clear() {
+        this.#watchers.clear();
+    }
+}
 class ProcessingConflictError extends Error {
     target;
     constructor(target) {
@@ -35,9 +83,38 @@ class ProcessingConflictError extends Error {
  * No Raw Domain Package loader/compiler is imported or reachable from this path.
  */
 export async function createDomainRuntime(options) {
+    // Issue #312 observation composition: when enabled, every covered mutation
+    // flows through the observation-capable store so the record commits in the
+    // SAME durable transaction as the mutation. When absent/unsupported the
+    // store below is exactly the caller's store and no observation code runs.
+    const observationStore = isRuntimeObservationStore(options.store) ? options.store : null;
+    const observationRequested = options.observation?.mode === 'enabled';
+    if (observationRequested && observationStore === null) {
+        throw new DomainRuntimeError('observation_store_required', 'observation.mode "enabled" requires a RuntimeStore implementing RuntimeObservationStore');
+    }
+    const observationWake = new ObservationWakeRegistry();
+    const now = options.now ?? (() => new Date().toISOString());
+    const effectiveStore = observationRequested && observationStore !== null
+        ? new ObservationRecordingRuntimeStore({
+            base: observationStore,
+            resolvePackageIdentity: options.observation?.resolvePackageIdentity ??
+                ((packageId) => {
+                    const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+                    return runtimePackageIdentityFromManifest(compiledPackage.manifest);
+                }),
+            ...(options.now === undefined ? {} : { now: options.now }),
+            ...(options.observation?.runtimeBindingRef === undefined
+                ? {}
+                : { runtimeBindingRef: options.observation.runtimeBindingRef }),
+            ...(options.observation?.runtimeActivationRef === undefined
+                ? {}
+                : { runtimeActivationRef: options.observation.runtimeActivationRef }),
+            onRecordsCommitted: (target) => observationWake.wake(target),
+        })
+        : options.store;
     await preflightPackageActivation({
         registry: options.packageRegistry,
-        store: options.store,
+        store: effectiveStore,
         validationPolicy: {
             formatVersion: '0.2',
             runtimeContractMajor: 2,
@@ -46,29 +123,28 @@ export async function createDomainRuntime(options) {
             sha256: options.bindings.sha256,
         },
     });
-    const now = options.now ?? (() => new Date().toISOString());
     const lane = new PerInstanceSerializedLane();
-    const instanceEngine = new WorkflowInstanceEngine(options.store, { now, lane });
+    const instanceEngine = new WorkflowInstanceEngine(effectiveStore, { now, lane });
     const acceptance = new DomainMessageAcceptance({
-        store: options.store,
+        store: effectiveStore,
         packages: options.packageRegistry,
     });
-    const recovery = new PoisonMessageRecoveryCoordinator(options.store, { now });
+    const recovery = new PoisonMessageRecoveryCoordinator(effectiveStore, { now });
     const toolRunner = new DurableToolRunner({
-        store: options.store,
+        store: effectiveStore,
         sha256: options.bindings.sha256,
         now,
     });
     const skillRunner = options.ai === undefined
         ? undefined
         : new JournaledSkillRunner({
-            store: options.store,
+            store: effectiveStore,
             sha256: options.bindings.sha256,
             ai: options.ai,
             now,
         });
     const messageEffect = new JournaledDomainMessageEffect({
-        store: options.store,
+        store: effectiveStore,
         acceptance,
         sha256: options.bindings.sha256,
         now,
@@ -318,8 +394,18 @@ export async function createDomainRuntime(options) {
         drainScheduler.dispose();
         // Delivery, observation retries and idle waiters settle immediately.
         subscriptionCoordinator.dispose();
+        observationWake.clear();
         await drainScheduler.awaitIdle();
     }
+    const observationCapability = observationRequested && observationStore !== null
+        ? {
+            status: 'ENABLED',
+            contractVersion: RUNTIME_OBSERVATION_CONTRACT_VERSION,
+            eventFamilies: RUNTIME_OBSERVATION_EVENT_FAMILIES,
+            readObservations: (request) => observationStore.readObservations(request),
+            watch: (stream, onWake) => observationWake.watch(stream.target, onWake),
+        }
+        : { status: 'UNSUPPORTED' };
     return {
         openInstance,
         send,
@@ -332,6 +418,7 @@ export async function createDomainRuntime(options) {
         invalidateBusinessSnapshot,
         awaitIdle,
         dispose,
+        observation: observationCapability,
     };
 }
 function normalizeFailure(error, messageId) {

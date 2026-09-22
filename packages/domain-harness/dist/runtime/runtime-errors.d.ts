@@ -36,7 +36,9 @@ export type RuntimeErrorCode =
 /** Recovery actions require a non-empty domain authorization reason. */
  | 'recovery_reason_required'
 /** Ambiguous non-idempotent recovery requires the durable effectId. */
- | 'recovery_effect_identity_missing';
+ | 'recovery_effect_identity_missing'
+/** Observation enabled, but the store does not implement the observation seam (#312). */
+ | 'observation_store_required';
 export declare class DomainRuntimeError extends Error {
     readonly code: RuntimeErrorCode;
     constructor(code: RuntimeErrorCode, message: string, options?: {

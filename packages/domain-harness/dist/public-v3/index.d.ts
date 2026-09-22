@@ -18,6 +18,7 @@ export * from '../runtime/durable-control-contracts.js';
 export * from '../runtime/durable-control-coordinator.js';
 export * from '../tool/host-local-contract/index.js';
 export * from '../compiler/app-contracts.js';
+export * from '../observation/index.js';
 export { computeCompiledPackageId } from '../package/validation.js';
 export { createDomainRuntimeV3 } from '../runtime/create-domain-runtime-v3.js';
 export type { CreateDomainRuntimeV3AuthorityOptions, CreateDomainRuntimeV3Options, DomainRuntimeV3, } from '../runtime/create-domain-runtime-v3.js';

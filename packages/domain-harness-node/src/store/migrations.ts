@@ -285,6 +285,39 @@ export const NODE_SQLITE_RUNTIME_STORE_MIGRATIONS: readonly NodeSqliteMigration[
       );
     `,
   },
+  {
+    // #312: durable ordered Runtime Observation Stream. One stream row binds
+    // one WorkflowAddress + one exact immutable package identity + one epoch
+    // (contract v1 always allocates epoch '1'); records carry the full public
+    // envelope as canonical JSON so reads are self-describing after restart.
+    // Sequence contiguity is maintained transactionally with the covered
+    // Runtime mutation (never appended best-effort after the fact).
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS dh_v3_observation_streams (
+        workflow_id TEXT NOT NULL,
+        instance_key TEXT NOT NULL,
+        epoch_id TEXT NOT NULL,
+        package_identity_json TEXT NOT NULL,
+        last_sequence INTEGER NOT NULL CHECK (last_sequence >= 0),
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (workflow_id, instance_key, epoch_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS dh_v3_observation_records (
+        workflow_id TEXT NOT NULL,
+        instance_key TEXT NOT NULL,
+        epoch_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        record_json TEXT NOT NULL,
+        observed_at TEXT NOT NULL,
+        PRIMARY KEY (workflow_id, instance_key, epoch_id, sequence),
+        FOREIGN KEY (workflow_id, instance_key, epoch_id)
+          REFERENCES dh_v3_observation_streams(workflow_id, instance_key, epoch_id)
+          ON DELETE RESTRICT
+      );
+    `,
+  },
 ] as const;
 
 /**

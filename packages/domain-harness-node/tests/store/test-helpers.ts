@@ -18,7 +18,13 @@ export function makeTestStore(t: TestContext, busyTimeoutMs?: number): TestStore
   });
 
   t.after(() => {
-    store.close();
+    // Tolerant close: #312 restart tests close the handle explicitly before
+    // the hook runs; a double close is harmless, a locked temp dir is not.
+    try {
+      store.close();
+    } catch {
+      // already closed by the test
+    }
     rmSync(directory, { recursive: true, force: true });
   });
 
