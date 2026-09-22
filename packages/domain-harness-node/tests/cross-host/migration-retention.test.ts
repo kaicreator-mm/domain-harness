@@ -29,7 +29,10 @@ import {
 import { makeBaseline, sha256 } from '../../../domain-harness/tests/admission/helpers.js';
 import { bootablePackage } from '../v3-host/host-fixture.js';
 import { openAuthorityTestDatabase } from '../store/authority-test-helpers.js';
-import { NODE_SQLITE_RUNTIME_STORE_MIGRATIONS } from '../../src/store/migrations.js';
+import {
+  applyNodeSqliteMigrations,
+  NODE_SQLITE_RUNTIME_STORE_MIGRATIONS,
+} from '../../src/store/migrations.js';
 import { NodeSqliteExactSemanticCacheStore } from '../../src/store/node-sqlite-execution-stores.js';
 import { openExpoSqliteAuthorityStores } from '../../../domain-harness-expo/src/store/expo-sqlite-authority-stores.js';
 import { ExpoSqliteExactSemanticCacheStore } from '../../../domain-harness-expo/src/store/expo-sqlite-execution-stores.js';
@@ -46,6 +49,7 @@ const m6Outcomes: Array<{
   readonly count: number;
   readonly missReason: string;
   readonly quarantineRecords: number;
+  readonly quarantineRecordsTrimmed: number;
 }> = [];
 
 function tempDir(t: TestContext, label: string): string {
@@ -682,6 +686,91 @@ for (const kind of STACKS) {
   });
 }
 
+/* --- M7: newer-than-adapter rejection (pack §3.1 open-guard) ----------------- */
+
+for (const kind of STACKS) {
+  test(`T-024 M7 (${kind}): a store file newer than the adapter is rejected fail-closed`, async (t) => {
+    const directory = tempDir(t, `m7-${kind}`);
+    const path = join(directory, DB_FILE);
+    // Fabricate a file whose ledger claims a future schema version.
+    const db = new Database(path);
+    try {
+      db.pragma('journal_mode = WAL');
+      if (kind === 'node') {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS dh_v2_schema_migrations (
+            version INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL
+          )
+        `);
+        db.prepare('INSERT INTO dh_v2_schema_migrations(version, applied_at) VALUES(99, ?)').run(PARITY_NOW);
+      } else {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS dh_v2_store_meta (
+            singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+            schema_version INTEGER NOT NULL
+          )
+        `);
+        db.prepare('INSERT INTO dh_v2_store_meta(singleton_id, schema_version) VALUES(1, 99)').run();
+      }
+    } finally {
+      db.close();
+    }
+
+    if (kind === 'node') {
+      // The newer-than-adapter guard lives in applyNodeSqliteMigrations, the
+      // single migration runner shared by BOTH Node entry points
+      // (NodeSqliteRuntimeStore and openNodeSqliteAuthorityStores — see the
+      // migrations.ts doc comment). Exercise it directly so the probe handle
+      // closes cleanly; the store constructors do call it, but their
+      // rejection path leaks the just-opened handle (in-process file lock on
+      // Windows) — recorded as a P3 observation for the task record.
+      const probe = new Database(path);
+      try {
+        assert.throws(
+          () => applyNodeSqliteMigrations(probe),
+          /newer than this adapter/,
+          'Node migration runner must reject a newer ledger',
+        );
+      } finally {
+        probe.close();
+      }
+      // The rejected file was not downgraded or mutated by the failed open.
+      const ledger = new Database(path, { readonly: true });
+      try {
+        const rows = ledger
+          .prepare('SELECT version FROM dh_v2_schema_migrations ORDER BY version')
+          .all() as Array<{ version: number }>;
+        assert.deepEqual(rows.map((row) => row.version), [99], 'failed open must not mutate the ledger');
+      } finally {
+        ledger.close();
+      }
+      return;
+    }
+    const sqlite = createParitySqliteModule(directory);
+    const database = await sqlite.openDatabaseAsync(DB_FILE);
+    try {
+      await assert.rejects(
+        () => openExpoSqliteAuthorityStores({ database }),
+        /Unsupported DomainHarness Expo RuntimeStore schema version/,
+        'Expo migration must reject a newer store_meta version',
+      );
+    } finally {
+      await database.closeAsync();
+    }
+    // The rejected file was not downgraded or mutated by the failed open.
+    const meta = new Database(path, { readonly: true });
+    try {
+      const row = meta
+        .prepare('SELECT schema_version FROM dh_v2_store_meta WHERE singleton_id = 1')
+        .get() as { schema_version: number };
+      assert.equal(row.schema_version, 99, 'failed open must not mutate the ledger');
+    } finally {
+      meta.close();
+    }
+  });
+}
+
 /* --- M6: cache retention bound ---------------------------------------------- */
 
 interface CacheHandles {
@@ -790,7 +879,19 @@ for (const kind of STACKS) {
       assert.equal(quarantinedAfterReopen.status, 'miss', 'quarantined entry stays unserved after reopen');
       const quarantineRecords = quarantineRecordCount(join(directory, DB_FILE));
       assert.equal(quarantineRecords, 1, 'quarantine record must survive reopen');
-      m6Outcomes.push({ count: invalidatedCount, missReason: miss.reason, quarantineRecords });
+
+      // maxQuarantineRecords bound: five more quarantines (total 6) trim to 5.
+      const extraKeys: SemanticCacheKey[] = [];
+      for (const n of [5, 6, 7, 8, 9]) {
+        extraKeys.push((await makeCacheEntry(n, T0 + 400 + n)).key);
+      }
+      for (const [index, key] of extraKeys.entries()) {
+        await second.quarantine(key, `m6-quarantine-extra-${index}`, T0 + 500 + index);
+      }
+      const quarantineRecordsTrimmed = quarantineRecordCount(join(directory, DB_FILE));
+      assert.equal(quarantineRecordsTrimmed, 5, 'quarantine records must trim to the policy bound');
+
+      m6Outcomes.push({ count: invalidatedCount, missReason: miss.reason, quarantineRecords, quarantineRecordsTrimmed });
     } finally {
       await second.close();
     }

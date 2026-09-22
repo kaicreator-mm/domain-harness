@@ -217,7 +217,10 @@ export async function runOperationScript(
     await assembly.governance.persistSnapshot({
       workflowInstanceId: WORKFLOW_INSTANCE_ID,
       governanceBindingDigest: pin.bindingDigest,
-      snapshot: { marker: 't024-bound-snapshot', packageId },
+      // Deliberately unsorted keys: insertion order differs from canonical
+      // order, so the byte-parity dump fails if either host stores this
+      // column non-canonically (loads the e0cdacc canonicalization fix).
+      snapshot: { zebra: 't024-bound-snapshot', packageId, alpha: 42 },
     });
 
     // Pin conflict probe (fail closed, never overwrites).
