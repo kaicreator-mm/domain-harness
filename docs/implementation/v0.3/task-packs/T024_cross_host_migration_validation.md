@@ -57,22 +57,22 @@ Run on both adapter stacks (same driver pattern):
 
 ### 3.4 Amendment V1–V12 host-level reconciliation matrix
 
-For each vector, the matrix names either the new T-024 test that executes it on both adapter stacks, or the existing exact-SHA evidence that already owns it, with the suite/file. Initial mapping (confirmed during implementation; the matrix lands in the PR record):
+For each vector, the matrix names either the new T-024 test that executes it on both adapter stacks, or the existing exact-SHA evidence that already owns it, with the suite/file. Final mapping, confirmed during implementation:
 
 | Vector | Host-level evidence |
 |---|---|
-| V1 pin survives baseline movement | M5 + T-022 V10 (Node, efc9917) + T-023 E4 (device, 2cfb65b) |
-| V2 missing pinned baseline fails closed | M2 (both stacks) |
-| V3 governance self-approval rejected | core T-015 authority suite (existing); host: audit append evidence via parity script |
+| V1 pin survives baseline movement | M5 (both stacks) + T-022 V10 (Node, efc9917) + T-023 E4 (device, 2cfb65b) |
+| V2 missing pinned baseline fails closed | M2 (both stacks): recovery throws `GOVERNANCE_BASELINE_RECOVERY_MISMATCH`, store layer throws `MISSING_RETAINED_GOVERNANCE_BASELINE` |
+| V3 governance self-approval rejected | core T-015 authority suite (existing); host: audit append-once identity probe (`AUDIT_IDENTITY_CONFLICT`) in the parity script |
 | V4 pre-change evaluation | core T-015 suite (existing); not a persistence concern — cite, no new test |
 | V5 guard purity | compile-time/contract gate (core tests + expo structural check); cite |
 | V6 reasoning explicit | core decision-resolver suite (T-018); cite |
 | V7 candidate invalid after governance change | core promotion-authority suite (T-015/T-004); cite |
-| V8 evidence cannot replay work | parity script: evidence record present but journal lacks committed fact → retry not suppressed (both stacks) |
-| V9 tenant evidence isolation | evidence-store scoping probe on both stacks + core T-005 suite citation |
+| V8 evidence cannot replay work | parity script V8 probe (both stacks): evidence referencing an unexecuted slot does not suppress `harnessJournal.begin` (`created`, not `existing`) + write-only port contract |
+| V9 tenant evidence isolation | parity script V9 probe (both stacks): scoped evidence bytes persist exactly (byte-parity dump), cross-scope rewrite under an existing id conflicts (`RUNTIME_EVIDENCE_APPEND_CONFLICT`); enforcement cited to core T-005 use-gate suite |
 | V10 shadow L4 cannot mutate | core T-020 suite (existing); cite |
-| V11 exact stable fallback | behavioral: alias/current never used for recovery — parity script moves alias, recovery resolves pinned digest only (both stacks) |
-| V12 existing durability unchanged | T-022 V8/V9 crash windows (Node) + T-023 E5 (device force-stop); parity script journal-hit replay (both stacks) |
+| V11 exact stable fallback | M5: activation movement never rebinds the pin (both stacks) + parity script: alias moves 0→1→2 while `recoverExact` resolves the pinned identity only (both stacks) |
+| V12 existing durability unchanged | T-022 V8/V9 crash windows (Node) + T-023 E5 (device force-stop); parity script V12 replay probe (both stacks): re-begin returns `existing`, idempotent re-commit returns the committed fact byte-exactly |
 
 ## 4. Validation matrix (issue #242 bullets → evidence)
 
