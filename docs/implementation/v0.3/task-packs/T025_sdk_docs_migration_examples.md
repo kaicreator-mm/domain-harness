@@ -48,6 +48,7 @@ Examples are real tests: typechecked by `tsconfig.test.json` (the core package's
 - `docs/sdk/README.md` — add the v0.3 pair to the read order (v0.1 docs retained for the legacy surface).
 - `docs/migration/DomainHarness_v0.2_TO_v0.3.md` — migration guide: v0.2 persisted rows are historical (no semantic import); migration to v0.3 authority schema is explicit and exact-authority-only; **explicitly forbids** silent `current`/`latest`/`active` substitution in any migration or recovery path; pre-A1 fail-closed behavior (pin missing → no recovery, no snapshot) with the T-024 M1/M2 evidence pointers.
 - `docs/integration/DomainHarness_v0.3_HOST_INTEGRATION.md` — Node and Expo host wiring (adapter factories, injected expo-sqlite module, exclusive write queue), and the honesty section: durability claims are established only by dedicated validation evidence (T-022 Node, T-023 device, T-024 logical parity) at the named SHAs; the T-024 parity driver is labeled logical-parity infrastructure.
+- `docs/integration/DomainHarness_v0.3_DEVELOPMENT_INTEGRATION_BASELINE.md` — the capstone that freezes this task's output as the **v0.3 Development Integration Baseline** for sibling projects: the exact authority set (Frozen PRD + PRD A1 + Frozen L2 + L2 A1 + the named integration HEAD), the doc/example map with a sibling-adoption checklist, and the explicit non-claims — this baseline is **not** a release qualification (that remains T-026 / issue #244), it claims no Release Ready state, it depends on no floating `current`/`latest`/`active` authority, and it references no unfrozen Domain Application Contract version (the public surface is documented exactly as shipped at the integration HEAD).
 
 ## 4. Acceptance mapping (issue #243 → evidence)
 
@@ -58,6 +59,7 @@ Examples are real tests: typechecked by `tsconfig.test.json` (the core package's
 | migration docs forbid silent `current`/`latest`/`active` substitution | migration doc §"Forbidden substitution patterns" + docs-guard test |
 | docs explain durability claims come only from dedicated validation evidence | host-integration doc §"Durability claims and evidence" + docs-guard test |
 | examples compile/typecheck where applicable | `tsc -p tsconfig.test.json --noEmit` in core `npm test` + CI |
+| baseline is adoptable by sibling projects without release-qualification overclaim | baseline doc §"What this baseline is NOT" + docs-guard test (no Release Ready claim, no floating-authority dependency, T-026 left to #244) |
 
 ## 5. Failure handling / blocker protocol
 
@@ -66,7 +68,7 @@ Examples are real tests: typechecked by `tsconfig.test.json` (the core package's
 
 ## 6. Reference / ownership boundary
 
-- Owns: this pack; `docs/sdk/DomainHarness_v0.3_*`, `docs/sdk/README.md` (additive), `docs/migration/DomainHarness_v0.2_TO_v0.3.md`, `docs/integration/DomainHarness_v0.3_HOST_INTEGRATION.md`, `packages/domain-harness/tests/examples/**`, and the one-line barrel export (3.1).
+- Owns: this pack; `docs/sdk/DomainHarness_v0.3_*`, `docs/sdk/README.md` (additive), `docs/migration/DomainHarness_v0.2_TO_v0.3.md`, `docs/integration/DomainHarness_v0.3_HOST_INTEGRATION.md`, `docs/integration/DomainHarness_v0.3_DEVELOPMENT_INTEGRATION_BASELINE.md`, `packages/domain-harness/tests/examples/**`, and the one-line barrel export (3.1).
 - Does not own: architecture/PRD semantics, host adapters, validation evidence re-runs, release qualification (T-026).
 
 ## 7. Scope guard
