@@ -182,6 +182,90 @@ test('v3-003 §8: cross-logical-operation / cross-authority inputs fail closed',
   );
 });
 
+test('v3-003 §8 (review P1-1): opaque provider tokens never order truth — v9 vs v10 conflicts', () => {
+  const logical = logicalOperation();
+  const result = adjudicateDacV003ObservationCurrentness({
+    observations: [
+      observation({
+        observationIdentity: 'obs-v9',
+        logicalOperation: logical,
+        observedClass: 'KNOWN_FAILED_BEFORE_COMMIT',
+        providerCurrentness: { version: 'v9' },
+      }),
+      observation({
+        observationIdentity: 'obs-v10',
+        logicalOperation: logical,
+        observedClass: 'AUTHORITATIVE_COMMITTED',
+        providerCurrentness: { version: 'v10' },
+      }),
+    ],
+  });
+  // Lexicographic intuition would call v10 the winner: the surface MUST NOT
+  // invent that ordering — opaque tokens are unorderable, so the materially
+  // contradictory pair is CONFLICTING (§8, conformance C69).
+  assert.equal(currentnessOf(result, 'obs-v9'), 'CONFLICTING');
+  assert.equal(currentnessOf(result, 'obs-v10'), 'CONFLICTING');
+  assert.equal(result.requiresReconciliation, true);
+});
+
+test('v3-003 §8 (review P1-1): sequence and version metadata never order against each other', () => {
+  const logical = logicalOperation();
+  const result = adjudicateDacV003ObservationCurrentness({
+    observations: [
+      observation({
+        observationIdentity: 'obs-seq2',
+        logicalOperation: logical,
+        observedClass: 'AUTHORITATIVE_COMMITTED',
+        providerCurrentness: { sequence: '2' },
+      }),
+      observation({
+        observationIdentity: 'obs-ver3',
+        logicalOperation: logical,
+        observedClass: 'KNOWN_FAILED_BEFORE_COMMIT',
+        providerCurrentness: { version: '3' },
+      }),
+    ],
+  });
+  // No evidenced relation exists between a sequence and a version: the
+  // contradictory pair stays CONFLICTING instead of a cross-kind winner.
+  assert.equal(currentnessOf(result, 'obs-seq2'), 'CONFLICTING');
+  assert.equal(currentnessOf(result, 'obs-ver3'), 'CONFLICTING');
+  assert.equal(result.requiresReconciliation, true);
+});
+
+test('v3-003 §8 (review P1-1): same-kind integer ordering still applies within one kind', () => {
+  const logical = logicalOperation();
+  const result = adjudicateDacV003ObservationCurrentness({
+    observations: [
+      observation({
+        observationIdentity: 'obs-seq1',
+        logicalOperation: logical,
+        observedClass: 'REJECTED',
+        providerCurrentness: { sequence: '1' },
+      }),
+      observation({
+        observationIdentity: 'obs-seq2',
+        logicalOperation: logical,
+        observedClass: 'AUTHORITATIVE_COMMITTED',
+        providerCurrentness: { sequence: '2' },
+      }),
+      observation({
+        observationIdentity: 'obs-ver1',
+        logicalOperation: logical,
+        observedClass: 'PENDING_IN_PROGRESS',
+        providerCurrentness: { version: '1' },
+      }),
+    ],
+  });
+  // The sequence-1 observation is stale against sequence-2 (same kind,
+  // evidenced integer ordering); the version-1 observation is the newest of
+  // its own kind and stays a current candidate.
+  assert.equal(currentnessOf(result, 'obs-seq1'), 'STALE');
+  assert.equal(currentnessOf(result, 'obs-seq2'), 'CURRENT');
+  assert.equal(currentnessOf(result, 'obs-ver1'), 'CURRENT');
+  assert.equal(result.requiresReconciliation, false);
+});
+
 test('v3-003 §8: equal provider sequence with contradictory classes conflicts', () => {
   const logical = logicalOperation();
   const result = adjudicateDacV003ObservationCurrentness({

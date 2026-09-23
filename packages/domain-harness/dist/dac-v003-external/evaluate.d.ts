@@ -6,9 +6,11 @@ import type { DacV003ObservationCurrentnessInput, DacV003ObservationCurrentnessR
  *  - an observation whose own class is STALE, or whose provider-operation
  *    channel is superseded (e.g. by a proven continuation), is STALE for
  *    current truth while remaining valid historical evidence;
- *  - within orderable evidence, the provider's sequence/version metadata
- *    orders the observations: strictly older ones are STALE, the newest is
- *    a current candidate;
+ *  - ordering is applied only where the provider metadata establishes it:
+ *    within ONE metadata kind (sequence or version), plain integer tokens
+ *    order the groups — strictly older ones are STALE, the newest is a
+ *    current candidate. Opaque provider tokens and cross-kind comparisons
+ *    establish no ordering: those observations stay current candidates;
  *  - materially contradictory current candidates that provider metadata
  *    cannot order apart are CONFLICTING and require reconciliation —
  *    arbitrary last-write-wins is non-conforming and adapter receipt time

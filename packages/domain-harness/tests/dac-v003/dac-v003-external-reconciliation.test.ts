@@ -354,3 +354,33 @@ test('v3-003 #309 consumption: genuine upstream evidence drives the conclusion',
   });
   assert.equal(providerScope.conclusion.outcomeClass, 'STILL_UNKNOWN');
 });
+
+test('v3-003 #309 consumption: genuine evidence correlated to a DIFFERENT effect/authority fails closed (review P0-1)', () => {
+  const logical = logicalOperation();
+  // Genuine #309 records — but correlated to another runtime effect.
+  assertErrorCode(
+    () =>
+      request({
+        logicalOperation: logical,
+        externalAuthority: logical.externalAuthority,
+        upstreamV002Evidence: [
+          v002ObservationEvidence('commit-observed', { effectId: 'other-effect' }),
+        ],
+      }),
+    'CORRELATION_CONFLICT',
+    'a genuine #309 commit record for a different effect can never drive this episode',
+  );
+  // Genuine records under a different external authority equally fail.
+  assertErrorCode(
+    () =>
+      request({
+        logicalOperation: logical,
+        externalAuthority: logical.externalAuthority,
+        upstreamV002Evidence: [
+          v002ObservationEvidence('commit-observed', { authorityId: 'other-sor' }),
+        ],
+      }),
+    'CORRELATION_CONFLICT',
+    'a genuine #309 commit record for a different authority can never drive this episode',
+  );
+});

@@ -96,28 +96,53 @@ function materiallyContradictory(
 }
 
 /**
- * Provider-exposed ordering key: the provider's own version/sequence
+ * Provider-exposed ordering material: the provider's own sequence/version
  * metadata, preserved verbatim. `adapterReceivedAt` is deliberately NOT
  * consulted — adapter receipt time may aid provenance but MUST NOT override
  * provider/source ordering semantics as authority (§8).
+ *
+ * An ordering relation between two observations exists ONLY when both carry
+ * the SAME metadata kind AND both tokens are plain integer sequences — the
+ * one provider ordering this surface is justified to interpret. Opaque
+ * tokens (version tags like `v9`/`v10`, dates, provider-defined formats)
+ * and cross-kind comparisons are UNORDERABLE: such observations stay current
+ * candidates, so a materially contradictory pair becomes CONFLICTING
+ * instead of being resolved by an invented lexical/numeric winner
+ * (§8, conformance C69).
  */
-function providerOrderKey(
+interface ProviderOrderMaterial {
+  readonly kind: 'sequence' | 'version';
+  readonly token: string;
+  readonly groupKey: string;
+}
+
+function providerOrderMaterial(
   observation: DacV003ExternalObservationRef,
-): string | undefined {
+): ProviderOrderMaterial | undefined {
   const currentness = observation.providerCurrentness;
   if (currentness === undefined) return undefined;
-  if (currentness.sequence !== undefined) return `seq:${currentness.sequence}`;
-  if (currentness.version !== undefined) return `ver:${currentness.version}`;
+  if (currentness.sequence !== undefined) {
+    return {
+      kind: 'sequence',
+      token: currentness.sequence,
+      groupKey: `sequence:${currentness.sequence}`,
+    };
+  }
+  if (currentness.version !== undefined) {
+    return {
+      kind: 'version',
+      token: currentness.version,
+      groupKey: `version:${currentness.version}`,
+    };
+  }
   return undefined;
 }
 
-const INTEGER_KEY = /^(?:seq|ver):(\d+)$/u;
+const INTEGER_TOKEN = /^\d+$/u;
 
-function compareOrderKeys(a: string, b: string): number {
-  const ma = INTEGER_KEY.exec(a);
-  const mb = INTEGER_KEY.exec(b);
-  if (ma !== null && mb !== null) return Number(ma[1]) - Number(mb[1]);
-  return a < b ? -1 : a > b ? 1 : 0;
+function integerTokenValue(material: ProviderOrderMaterial): number | undefined {
+  if (!INTEGER_TOKEN.test(material.token)) return undefined;
+  return Number.parseInt(material.token, 10);
 }
 
 /**
@@ -127,9 +152,11 @@ function compareOrderKeys(a: string, b: string): number {
  *  - an observation whose own class is STALE, or whose provider-operation
  *    channel is superseded (e.g. by a proven continuation), is STALE for
  *    current truth while remaining valid historical evidence;
- *  - within orderable evidence, the provider's sequence/version metadata
- *    orders the observations: strictly older ones are STALE, the newest is
- *    a current candidate;
+ *  - ordering is applied only where the provider metadata establishes it:
+ *    within ONE metadata kind (sequence or version), plain integer tokens
+ *    order the groups — strictly older ones are STALE, the newest is a
+ *    current candidate. Opaque provider tokens and cross-kind comparisons
+ *    establish no ordering: those observations stay current candidates;
  *  - materially contradictory current candidates that provider metadata
  *    cannot order apart are CONFLICTING and require reconciliation —
  *    arbitrary last-write-wins is non-conforming and adapter receipt time
@@ -170,8 +197,16 @@ export function adjudicateDacV003ObservationCurrentness(
 
   const stale: DacV003ExternalObservationRef[] = [];
   const candidates: DacV003ExternalObservationRef[] = [];
-  // Group key -> observations carrying that provider order key.
-  const orderGroups = new Map<string, DacV003ExternalObservationRef[]>();
+  // Orderable material per (kind, token) group — integer tokens of ONE
+  // metadata kind only; opaque/cross-kind material is unorderable.
+  const orderGroups = new Map<
+    string,
+    {
+      kind: 'sequence' | 'version';
+      value: number;
+      observations: DacV003ExternalObservationRef[];
+    }
+  >();
 
   for (const observation of observations) {
     expectDacV003ExternalObservationRef(observation);
@@ -195,28 +230,47 @@ export function adjudicateDacV003ObservationCurrentness(
       stale.push(observation);
       continue;
     }
-    const key = providerOrderKey(observation);
-    if (key === undefined) {
+    const material = providerOrderMaterial(observation);
+    const value = material === undefined ? undefined : integerTokenValue(material);
+    if (material === undefined || value === undefined) {
+      // No provider-exposed metadata, or an opaque provider-defined token
+      // whose ordering this surface is not justified to interpret: the
+      // observation stays a current candidate and any material
+      // contradiction is adjudicated CONFLICTING, never resolved by an
+      // invented ordering (§8, conformance C69).
       candidates.push(observation);
     } else {
-      const group = orderGroups.get(key);
-      if (group === undefined) orderGroups.set(key, [observation]);
-      else group.push(observation);
+      const group = orderGroups.get(material.groupKey);
+      if (group === undefined) {
+        orderGroups.set(material.groupKey, {
+          kind: material.kind,
+          value,
+          observations: [observation],
+        });
+      } else {
+        group.observations.push(observation);
+      }
     }
   }
 
-  // Provider-ordered groups: everything older than the newest key is STALE
-  // for current truth; the newest group joins the current candidates.
-  const orderedKeys = [...orderGroups.keys()].sort(compareOrderKeys);
-  const newestKey = orderedKeys[orderedKeys.length - 1];
-  if (newestKey !== undefined) {
-    for (const key of orderedKeys) {
-      const group = orderGroups.get(key);
-      if (group === undefined) continue;
-      for (const observation of group) {
-        if (key === newestKey) candidates.push(observation);
-        else stale.push(observation);
-      }
+  // Ordering applies only WITHIN one metadata kind: per kind, the highest
+  // integer-token group joins the current candidates and strictly lower
+  // groups are STALE for current truth. Kinds never order against each
+  // other (a sequence and a version of the same operation have no evidenced
+  // relation), so their newest groups are separate candidates and a
+  // material contradiction between them is CONFLICTING via the pair scan.
+  const newestPerKind = new Map<'sequence' | 'version', number>();
+  for (const group of orderGroups.values()) {
+    const newest = newestPerKind.get(group.kind);
+    if (newest === undefined || group.value > newest) {
+      newestPerKind.set(group.kind, group.value);
+    }
+  }
+  for (const group of orderGroups.values()) {
+    const isKindNewest = newestPerKind.get(group.kind) === group.value;
+    for (const observation of group.observations) {
+      if (isKindNewest) candidates.push(observation);
+      else stale.push(observation);
     }
   }
 
@@ -473,6 +527,29 @@ export function reconcileDacV003ExternalOperation(
   });
   const upstreamV002Evidence = (request.upstreamV002Evidence ?? []).map((e) => {
     expectDacV003UpstreamV002Evidence(e);
+    // Exact-operation / exact-authority binding (§9): a GENUINE #309 record
+    // still fails closed unless its correlation binds exactly THIS episode's
+    // logical operation and external authority — a genuine record about a
+    // different effect can never be this episode's evidence basis.
+    if (
+      e.correlation.runtimeOperation.effectId !==
+      logicalOperation.reference.primaryIdentity
+    ) {
+      throw new DacV003ExternalError(
+        'CORRELATION_CONFLICT',
+        `upstream #309 evidence correlates runtime effect "${e.correlation.runtimeOperation.effectId}", not this episode's logical operation "${logicalOperation.reference.primaryIdentity}"`,
+      );
+    }
+    const evidenceAuthority = e.correlation.externalAuthority;
+    if (
+      evidenceAuthority.authorityId !== externalAuthority.reference.primaryIdentity ||
+      evidenceAuthority.authorityScope !== externalAuthority.reference.authorityScope
+    ) {
+      throw new DacV003ExternalError(
+        'CORRELATION_CONFLICT',
+        'upstream #309 evidence correlates a different external authority than this reconciliation episode',
+      );
+    }
     return e;
   });
 
