@@ -54,6 +54,35 @@ const EXPECTED_V3_NAMES = [
   'adoptRuntimeActivationRef',
   'verifyDacReferenceIdentity',
   'refuteExternalBusinessSoRIdentity',
+  // #309 / A2 I-006 external authority / operation / observation /
+  // reconciliation refs (evidence/correlation adapter around existing
+  // durable effect semantics).
+  'EXTERNAL_AUTHORITY_ADAPTER_VERSION',
+  'EXTERNAL_AUTHORITY_BASELINE',
+  'EXTERNAL_AUTHORITY_REFERENCE_ROLES',
+  'EXTERNAL_EVIDENCE_CLASSES',
+  'EXTERNAL_OBSERVATION_CLASSIFICATIONS',
+  'EXTERNAL_OBSERVATION_CLAIMS',
+  'EXTERNAL_RECONCILIATION_RESULTS',
+  'ExternalAuthorityError',
+  'adoptExternalAuthorityRef',
+  'adoptRuntimeLogicalOperationRef',
+  'adoptRuntimeLogicalOperationRefFromJournal',
+  'adoptRuntimeLogicalOperationRefFromExecutionContext',
+  'adoptProviderOperationRef',
+  'adoptExternalObservationRef',
+  'adoptExternalReconciliationRef',
+  'correlateExternalEffect',
+  'verifyExternalEffectCorrelation',
+  'adoptExternalDispatchAttemptEvidence',
+  'adoptExternalObservationEvidence',
+  'adoptExternalReconciliationOutcome',
+  'maxClaimableForExternalObservation',
+  'observationSupportsCommitClaim',
+  'observationSupportsNonCommitClaim',
+  'refuteNonExternalAuthorityIdentity',
+  'isExternalAuthorityFamilyReference',
+  'getExternalAuthorityFamilyRole',
 ] as const;
 
 const FORBIDDEN_NAMES = [
