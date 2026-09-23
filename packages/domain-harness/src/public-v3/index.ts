@@ -100,3 +100,12 @@ export type { AdmissionEffectToolAdapterOptions } from '../runtime/admission-eff
 // activation). Nominal, version-bound to the exact DAC v0.0.2 baseline,
 // fail-closed; no PROVISIONAL wire freeze; no role-conversion surface.
 export * from '../dac/index.js';
+
+// Issue #308 / A2 I-005: renderer-independent DAC UX<->Runtime correlation
+// bridge — adapters over the existing DomainMessage/query/workflow-snapshot/
+// projection/subscription mechanisms for DomainIntent / SemanticTarget /
+// Command / Outcome / View / Snapshot / Watch correlation, plus fail-safe
+// observed-basis (stale-observation) classification. Correlation only: no
+// transition authority moves, Domain UX semantics/rendering stay outside the
+// Harness, Runtime transition authority stays inside.
+export * from '../dac-bridge/index.js';
