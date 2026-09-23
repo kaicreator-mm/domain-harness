@@ -31,6 +31,10 @@ export * from '../compiler/app-contracts.js';
 // capability; read-only evidence, atomic enabled-mode durability, fail-closed
 // cursor/gap semantics — see src/observation/).
 export * from '../observation/index.js';
+// Issue #313: generic public Runtime cancel/interrupt control (optional
+// fail-closed capability; durable request/outcome evidence, deterministic
+// control-vs-commit winner, restart reconciliation — see src/control/).
+export * from '../control/index.js';
 // T-025: compiled-package identity derivation for consumers producing or
 // verifying a v0.3 compiled package outside the legacy v0.1/v0.2 compiler
 // toolchain (previously reachable only via internal src/ paths; additive,
