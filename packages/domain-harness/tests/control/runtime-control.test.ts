@@ -253,6 +253,11 @@ function request(overrides: Partial<RuntimeControlRequest> = {}): RuntimeControl
   };
 }
 
+function controlOf(runtime: DomainRuntime): RuntimeControlCapability {
+  assert.ok(runtime.control !== undefined, 'runtime control capability must exist');
+  return runtime.control;
+}
+
 async function openIdle(runtime: DomainRuntime): Promise<void> {
   await runtime.openInstance({ address: ADDRESS, correlationId: 'c1', input: {} });
 }
@@ -279,7 +284,7 @@ test('t313 P2a: no authorizer -> UNSUPPORTED capability, request causes no mutat
   assert.equal(runtime.control.status, 'UNSUPPORTED');
   await openIdle(runtime);
   const before = await store.getInstance(ADDRESS);
-  const receipt = await runtime.control.requestControl(request());
+  const receipt = await controlOf(runtime).requestControl(request());
   assert.equal(receipt.disposition, 'UNSUPPORTED');
   assert.equal(receipt.outcome, 'UNSUPPORTED');
   assert.deepEqual(await store.getInstance(ADDRESS), before);
@@ -295,7 +300,7 @@ test('t313 P2b: DENIED and UNKNOWN authorization -> REJECTED, no mutation, durab
   ]) {
     const { runtime, store, controlStore } = await setup({ authorizer: new FakeAuthorizer(decision) });
     await openIdle(runtime);
-    const receipt = await runtime.control.requestControl(request());
+    const receipt = await controlOf(runtime).requestControl(request());
     assert.equal(receipt.disposition, 'REJECTED');
     assert.equal(receipt.outcome, 'REJECTED');
     const record = await controlStore.getRequest('ctl-1');
@@ -313,7 +318,7 @@ test('t313 P1: authorized idle CANCEL -> durable cancelled + queued work can nev
   await openIdle(runtime);
   await store.acceptMessage({ messageId: 'queued-1', target: ADDRESS, type: 'FINISH', payload: {} });
 
-  const receipt = await runtime.control.requestControl(request());
+  const receipt = await controlOf(runtime).requestControl(request());
   assert.equal(receipt.disposition, 'ACCEPTED');
   assert.equal(receipt.outcome, 'CANCELLED_AT_SAFE_BOUNDARY');
 
@@ -343,18 +348,18 @@ test('t313 P1: authorized idle CANCEL -> durable cancelled + queued work can nev
 test('t313 P3: exact duplicate is idempotent; conflicting reuse fails closed', async () => {
   const { runtime, controlStore, authorizer } = await setup();
   await openIdle(runtime);
-  const first = await runtime.control.requestControl(request());
+  const first = await controlOf(runtime).requestControl(request());
   assert.equal(first.outcome, 'CANCELLED_AT_SAFE_BOUNDARY');
   const authorizedCalls = authorizer.calls;
 
-  const duplicate = await runtime.control.requestControl(request());
+  const duplicate = await controlOf(runtime).requestControl(request());
   assert.equal(duplicate.disposition, 'DUPLICATE');
   assert.equal(duplicate.outcome, 'CANCELLED_AT_SAFE_BOUNDARY');
   // The replay resolves against the ORIGINAL authorization evidence.
   assert.equal(authorizer.calls, authorizedCalls);
   assert.equal((await controlStore.getRequest('ctl-1'))?.outcome, 'CANCELLED_AT_SAFE_BOUNDARY');
 
-  const conflicting = await runtime.control.requestControl(
+  const conflicting = await controlOf(runtime).requestControl(
     request({ reason: 'different intent entirely' }),
   );
   assert.equal(conflicting.disposition, 'REJECTED');
@@ -371,7 +376,7 @@ test('t313 P4: honored INTERRUPT before commit -> no turn commit + INTERRUPTED_T
   const before = await store.getInstance(WORKING_ADDRESS);
   await startWorkingTurn(runtime, script);
 
-  const receipt = await runtime.control.requestControl(
+  const receipt = await controlOf(runtime).requestControl(
     request({ action: 'INTERRUPT', target: { target: WORKING_ADDRESS } }),
   );
   assert.equal(receipt.disposition, 'ACCEPTED');
@@ -399,7 +404,7 @@ test('t313 P6a/P7: ignored AbortSignal -> turn commits -> truthful TOO_LATE_TURN
   await openWorking(runtime);
   await startWorkingTurn(runtime, script);
 
-  const controlPromise = runtime.control.requestControl(
+  const controlPromise = controlOf(runtime).requestControl(
     request({ action: 'INTERRUPT', target: { target: WORKING_ADDRESS } }),
   );
   await script.signalObserved; // signal reached the callee; it ignores it
@@ -426,7 +431,7 @@ test('t313 P8: unresolved non-idempotent effect -> REQUIRES_RECONCILIATION, neve
   await openWorking(runtime);
   await startWorkingTurn(runtime, script);
 
-  const receipt = await runtime.control.requestControl(
+  const receipt = await controlOf(runtime).requestControl(
     request({ action: 'INTERRUPT', target: { target: WORKING_ADDRESS } }),
   );
   assert.equal(receipt.outcome, 'REQUIRES_RECONCILIATION');
@@ -464,7 +469,7 @@ test('t313 P9: committed effects remain visible after a later CANCEL (cancel != 
   const committedEffectId = store.listEffectIds()[0];
   assert.ok(committedEffectId !== undefined);
 
-  const receipt = await runtime.control.requestControl(
+  const receipt = await controlOf(runtime).requestControl(
     request({ action: 'CANCEL', target: { target: PING_ADDRESS } }),
   );
   assert.equal(receipt.outcome, 'CANCELLED_AT_SAFE_BOUNDARY');
@@ -482,7 +487,7 @@ test('t313 P5: stale revision and stale turn selector -> no effect', async () =>
   const { runtime, store, script } = await setup({ toolEffect: 'idempotent', honorSignal: true });
   await openIdle(runtime);
   const instance = await store.getInstance(ADDRESS);
-  const staleRevision = await runtime.control.requestControl(
+  const staleRevision = await controlOf(runtime).requestControl(
     request({ target: { target: ADDRESS, expectedStateRevision: (instance?.stateRevision ?? 0) + 40 } }),
   );
   assert.equal(staleRevision.disposition, 'STALE_TARGET');
@@ -493,7 +498,7 @@ test('t313 P5: stale revision and stale turn selector -> no effect', async () =>
   // Stale exact-turn selector: a different turn is active; no retargeting.
   await openWorking(runtime);
   await startWorkingTurn(runtime, script, 'go-9');
-  const staleTurnReceipt = await runtime.control.requestControl(
+  const staleTurnReceipt = await controlOf(runtime).requestControl(
     request({
       controlRequestId: 'ctl-stale-turn',
       action: 'INTERRUPT',
@@ -563,7 +568,7 @@ test('t313 P10a: restart reconciles an accepted CANCEL from authoritative facts,
   const all = await controlStore.listUnresolvedRequests();
   assert.equal(all.length, 0);
   // Duplicate poll after restart reads the reconciled durable result.
-  const poll = await second.runtime.control.requestControl({
+  const poll = await controlOf(second.runtime).requestControl({
     controlRequestId: 'ctl-crash',
     action: 'CANCEL',
     target: { target: ADDRESS },
@@ -619,7 +624,7 @@ test('t313 P11: PAUSE/RESUME are explicit UNSUPPORTED with no mutation', async (
   await openIdle(runtime);
   const before = await store.getInstance(ADDRESS);
   for (const action of ['PAUSE', 'RESUME'] as const) {
-    const receipt = await runtime.control.requestControl(
+    const receipt = await controlOf(runtime).requestControl(
       request({ action, controlRequestId: `ctl-${action.toLowerCase()}` }),
     );
     assert.equal(receipt.disposition, 'UNSUPPORTED_ACTION');
@@ -635,7 +640,7 @@ test('t313: INTERRUPT with no active turn -> NO_ACTIVE_TURN, no fabricated state
   const { runtime, store } = await setup();
   await openIdle(runtime);
   const before = await store.getInstance(ADDRESS);
-  const receipt = await runtime.control.requestControl(
+  const receipt = await controlOf(runtime).requestControl(
     request({ action: 'INTERRUPT', target: { target: ADDRESS } }),
   );
   assert.equal(receipt.disposition, 'NO_ACTIVE_TURN');
@@ -651,7 +656,7 @@ test('t313: CANCEL during an active turn -> in-flight turn commits, then safe-bo
   await runtime.send({ messageId: 'ping-1', target: PING_ADDRESS, type: 'PING', payload: {} });
   await script.started;
 
-  const cancelPromise = runtime.control.requestControl(
+  const cancelPromise = controlOf(runtime).requestControl(
     request({ action: 'CANCEL', target: { target: PING_ADDRESS } }),
   );
   script.release();
@@ -667,7 +672,7 @@ test('t313: CANCEL during an active turn -> in-flight turn commits, then safe-bo
 
 test('t313: control of a non-existent instance -> REJECTED, no mutation', async () => {
   const { runtime } = await setup();
-  const receipt = await runtime.control.requestControl(
+  const receipt = await controlOf(runtime).requestControl(
     request({ target: { target: { workflowId: 'idle', instanceKey: 'ghost' } } }),
   );
   assert.equal(receipt.disposition, 'REJECTED');
@@ -678,7 +683,7 @@ test('t313: control of a non-existent instance -> REJECTED, no mutation', async 
 test('t313: getControlOutcome reads durable evidence by id (public surface)', async () => {
   const { runtime, control } = await setup();
   await openIdle(runtime);
-  await runtime.control.requestControl(request());
+  await controlOf(runtime).requestControl(request());
   assert.equal(control.status, 'ENABLED');
   const record = await control.getControlOutcome('ctl-1');
   assert.ok(record !== null);
