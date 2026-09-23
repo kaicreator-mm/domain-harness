@@ -28,4 +28,5 @@ export { admissionEffectToolPort } from '../runtime/admission-effect-tool-adapte
 export type { AdmissionEffectToolAdapterOptions } from '../runtime/admission-effect-tool-adapter.js';
 export * from '../dac/index.js';
 export * from '../external-authority/index.js';
+export * from '../composition-intake/index.js';
 //# sourceMappingURL=index.d.ts.map
