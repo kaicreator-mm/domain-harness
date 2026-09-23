@@ -51,6 +51,13 @@ export { admissionEffectToolPort } from '../runtime/admission-effect-tool-adapte
 // activation). Nominal, version-bound to the exact DAC v0.0.2 baseline,
 // fail-closed; no PROVISIONAL wire freeze; no role-conversion surface.
 export * from '../dac/index.js';
+// Issue #309 / A2 I-006: external authority / operation / observation /
+// reconciliation refs — public evidence/correlation adapter around the
+// EXISTING durable effect semantics (DAC v0.0.2 EXTERNAL_AUTHORITY). Nominal,
+// fail-closed, claim-strength ceilings frozen; dispatch evidence is never
+// commit evidence; local timeout/abandonment is never remote non-commit; no
+// evidence object acquires Runtime transition authority.
+export * from '../external-authority/index.js';
 // Issue #306 / A2 I-003: DAC-aware composition intake — validates an
 // already-decided exact composition/selection against the concrete compiled
 // package and a declared runtime compatibility target. Validation only: never
