@@ -133,3 +133,16 @@ export * from '../dac-bridge/index.js';
 // default/latest/another revision; ApplicationSelectionRef !=
 // RuntimeBindingRef != RuntimeActivationRef stays structural.
 export * from '../runtime-binding/index.js';
+
+// Issue #310 / A2 I-007: PROVISIONAL Application Manifest composition
+// adapter — consumes an externally-presented DAC Application Manifest as
+// narrow already-selected composition metadata ONLY. Reuses the #305 DAC
+// roles (no parallel identity hierarchy), validates exact selected
+// identity/package mapping through the #306 intake (the compatibility
+// authority), anchors UX interaction-contract requirements on #308 bridge
+// references and external-authority declarations on #309 references. The
+// manifest never promotes/selects/substitutes/binds/activates, never
+// absorbs live instance state, and #306/#307 evidence stays outside the
+// manifest definition as separate evidence referencing the exact manifest
+// identity/digest.
+export * from '../application-manifest/index.js';
