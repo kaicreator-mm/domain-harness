@@ -347,8 +347,10 @@ function sameAuthority(
  * Derive the justified reconciliation conclusion (§9/§12). Commit requires
  * an AUTHORITATIVE_COMMITTED current observation or an effect record with
  * linking evidence to this exact logical operation (or the matching genuine
- * #309 upstream basis); non-commit requires KNOWN_FAILED_BEFORE_COMMIT
- * current evidence (a bare REJECTED does not establish it); materially
+ * #309 upstream basis — including genuine #309 known-failed observation
+ * evidence, symmetrically with the commit side); non-commit requires
+ * KNOWN_FAILED_BEFORE_COMMIT current evidence or the matching #309 basis
+ * (a bare REJECTED does not establish it); materially
  * contradictory authoritative evidence — commit-polarity bases against
  * non-commit-polarity bases across current observations, linked effect
  * records and upstream #309 evidence — is resolved by NO precedence at all:
@@ -387,6 +389,18 @@ function deriveConclusion(
   const upstreamCommitObservations = upstreamV002Evidence.filter(
     (e) => isExternalObservationEvidence(e) && e.classification === 'commit-observed',
   );
+  // Genuine #309 non-commit observation evidence. `known-failed-before-commit`
+  // establishes non-commit for the addressed subject (it is the same claim
+  // strength as the v0.0.3 KNOWN_FAILED_BEFORE_COMMIT class, mapped 1:1); a
+  // bare `rejected` claims only provider rejection and does NOT establish
+  // non-commit (§12) — it still carries non-commit POLARITY for contradiction
+  // detection, exactly as it does in the currentness adjudicator.
+  const upstreamNonCommitObservations = upstreamV002Evidence.filter(
+    (e) => isExternalObservationEvidence(e) && e.classification === 'known-failed-before-commit',
+  );
+  const upstreamRejectedObservations = upstreamV002Evidence.filter(
+    (e) => isExternalObservationEvidence(e) && e.classification === 'rejected',
+  );
 
   const commitBasisPresent =
     committedObservations.length > 0 ||
@@ -394,7 +408,11 @@ function deriveConclusion(
     upstreamCommitted.length > 0 ||
     upstreamCommitObservations.length > 0;
   const nonCommitBasisPresent =
-    nonCommitObservations.length > 0 || upstreamNotCommitted.length > 0;
+    nonCommitObservations.length > 0 ||
+    upstreamNotCommitted.length > 0 ||
+    upstreamNonCommitObservations.length > 0;
+  const nonCommitPolarityPresent =
+    nonCommitBasisPresent || upstreamRejectedObservations.length > 0;
 
   if (conflictPresent) {
     notes.push(
@@ -407,9 +425,9 @@ function deriveConclusion(
   // against a non-commit basis — that would be an arbitrary winner in the
   // C69 class. Truth stays unresolved; reconciliation with ordering
   // evidence or human authority is required.
-  if (commitBasisPresent && nonCommitBasisPresent) {
+  if (commitBasisPresent && nonCommitPolarityPresent) {
     notes.push(
-      'materially contradictory authoritative evidence: commit-polarity bases (AUTHORITATIVE_COMMITTED observation, linked effect record, or genuine #309 committed basis) stand against non-commit-polarity bases (KNOWN_FAILED_BEFORE_COMMIT observation or genuine #309 non-committed basis); no precedence resolves them and the truth stays unresolved',
+      'materially contradictory authoritative evidence: commit-polarity bases (AUTHORITATIVE_COMMITTED observation, linked effect record, or genuine #309 committed basis) stand against non-commit-polarity bases (KNOWN_FAILED_BEFORE_COMMIT observation, or genuine #309 non-committed/known-failed/rejected basis); no precedence resolves them and the truth stays unresolved',
     );
     return Object.freeze({
       outcomeClass: 'STILL_UNKNOWN' as const,
@@ -444,7 +462,7 @@ function deriveConclusion(
     });
   }
 
-  if (nonCommitObservations.length > 0 || upstreamNotCommitted.length > 0) {
+  if (nonCommitBasisPresent) {
     for (const o of nonCommitObservations) basis.push(o.reference);
     if (nonCommitObservations.length === 0) {
       notes.push('non-commit conclusion derived from a genuine #309 upstream evidence basis');
@@ -722,15 +740,17 @@ export function evaluateDacV003SafeRetry(
     operationSemanticIdentity: request.intendedCommandSemanticIdentity,
     semanticTargetRefs: logicalOperation.semanticTargetRefs,
   });
-  if (request.intendedSemanticTargetIdentities !== undefined) {
+  if (request.intendedSemanticTargets !== undefined) {
     const currentTargets = logicalOperation.semanticTargetRefs
-      .map((r) => r.primaryIdentity)
+      .map((r) => `${r.role}:${r.primaryIdentity}`)
       .sort();
-    const intendedTargets = [...request.intendedSemanticTargetIdentities].sort();
+    const intendedTargets = request.intendedSemanticTargets
+      .map((t) => `${t.role}:${t.primaryIdentity}`)
+      .sort();
     if (JSON.stringify(currentTargets) !== JSON.stringify(intendedTargets)) {
       throw new DacV003ExternalError(
         'IDENTITY_MISMATCH',
-        `the intended semantic targets [${intendedTargets.join(', ')}] differ from logical operation "${logicalOperation.reference.primaryIdentity}" targets [${currentTargets.join(', ')}]; a changed semantic target creates a NEW LogicalOperationRef (§4 rule 2)`,
+        `the intended semantic targets [${intendedTargets.join(', ')}] differ from logical operation "${logicalOperation.reference.primaryIdentity}" targets [${currentTargets.join(', ')}]; a changed semantic target (identity or role) creates a NEW LogicalOperationRef (§4 rule 2)`,
       );
     }
   }

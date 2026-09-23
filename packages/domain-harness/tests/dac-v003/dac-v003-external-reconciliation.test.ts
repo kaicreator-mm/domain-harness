@@ -399,6 +399,55 @@ test('v3-003 #309 consumption: genuine reconciliation-outcome records drive and 
   );
 });
 
+test('v3-003 (review P1-1 r3): upstream known-failed observation evidence is a symmetric non-commit basis', () => {
+  const logical = logicalOperation();
+  // Alone, a genuine #309 known-failed-before-commit observation establishes
+  // the non-commit conclusion, symmetrically with commit-observed.
+  const alone = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    upstreamV002Evidence: [v002ObservationEvidence('known-failed-before-commit')],
+  });
+  assert.equal(alone.conclusion.outcomeClass, 'RECONCILED_NOT_COMMITTED');
+  assert.equal(alone.conclusion.remoteTruth, 'not-committed');
+  // Against a CURRENT authoritative-committed observation it is a materially
+  // contradictory pair: no commit-wins precedence may resolve it.
+  const againstCommit = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-commit-r3',
+        logicalOperation: logical,
+        observedClass: 'AUTHORITATIVE_COMMITTED',
+      }),
+    ],
+    upstreamV002Evidence: [v002ObservationEvidence('known-failed-before-commit')],
+  });
+  assert.equal(againstCommit.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(againstCommit.conclusion.remoteTruth, 'unresolved');
+  assert.equal(againstCommit.conclusion.unresolvedConflictPresent, true);
+  // A genuine #309 rejected observation claims only provider rejection: it
+  // never concludes non-commit, but its non-commit POLARITY still conflicts
+  // with a commit basis.
+  const rejectedOnly = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    upstreamV002Evidence: [v002ObservationEvidence('rejected')],
+  });
+  assert.equal(rejectedOnly.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  const rejectedVsCommit = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    upstreamV002Evidence: [
+      v002ObservationEvidence('commit-observed'),
+      v002ObservationEvidence('rejected'),
+    ],
+  });
+  assert.equal(rejectedVsCommit.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(rejectedVsCommit.conclusion.unresolvedConflictPresent, true);
+});
+
 test('v3-003 (review P1-1 r2): contradictory authoritative bases resolve by NO precedence — truth stays unresolved', () => {
   const logical = logicalOperation();
   // Commit-polarity and non-commit-polarity #309 outcomes for the same

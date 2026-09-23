@@ -724,8 +724,17 @@ export interface DacV003SafeRetryRequest {
   readonly idempotencyIdentity?: DacV003IdempotencyIdentityRef;
   /** Semantic identity of the command intended to be (re)sent now. */
   readonly intendedCommandSemanticIdentity: string;
-  /** Semantic target identities intended now (continuity check, §4 rule 2). */
-  readonly intendedSemanticTargetIdentities?: readonly string[];
+  /**
+   * Role-qualified exact semantic targets intended now (continuity check,
+   * §4 rule 2). Compared against the logical operation's
+   * `semanticTargetRefs` as `role:primaryIdentity` sets: a same identity
+   * under a different role is a different target and requires a NEW
+   * logical operation.
+   */
+  readonly intendedSemanticTargets?: readonly {
+    readonly role: string;
+    readonly primaryIdentity: string;
+  }[];
   /** Domain intentionally permits an additional independent duplicate effect. */
   readonly explicitIntentionalDuplicate?: boolean;
   /** Notes prior local abandonment — never a non-commit proof (§11 row 6). */

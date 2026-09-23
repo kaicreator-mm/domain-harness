@@ -231,10 +231,40 @@ test('v3-003 §4 rule 2 (evaluator side): changed intent requires a new logical 
         logicalOperation: logical,
         priorAttempts: [attempt({ evidenceClass: 'not-dispatched' })],
         intendedCommandSemanticIdentity: SEMANTIC,
-        intendedSemanticTargetIdentities: ['order-999'],
+        intendedSemanticTargets: [{ role: 'semantic-target', primaryIdentity: 'order-999' }],
       }),
     'IDENTITY_MISMATCH',
     'a changed semantic target creates a new logical operation',
+  );
+  // A same identity under a different role is a different target (review
+  // P2 r3): the comparison is role-qualified, never bare primaryIdentity.
+  const withTarget = logicalOperation({
+    semanticTargetRefs: [
+      adoptDacV003RegistryReference('semantic-target', {
+        baseline: BASELINE,
+        authorityScope: 'app/checkout/orders',
+        primaryIdentity: 'order-1',
+      }),
+    ],
+  });
+  assert.doesNotThrow(() =>
+    evaluateDacV003SafeRetry({
+      logicalOperation: withTarget,
+      priorAttempts: [attempt({ evidenceClass: 'not-dispatched', logicalOperation: withTarget })],
+      intendedCommandSemanticIdentity: SEMANTIC,
+      intendedSemanticTargets: [{ role: 'semantic-target', primaryIdentity: 'order-1' }],
+    }),
+  );
+  assertErrorCode(
+    () =>
+      evaluateDacV003SafeRetry({
+        logicalOperation: withTarget,
+        priorAttempts: [attempt({ evidenceClass: 'not-dispatched', logicalOperation: withTarget })],
+        intendedCommandSemanticIdentity: SEMANTIC,
+        intendedSemanticTargets: [{ role: 'ux-view', primaryIdentity: 'order-1' }],
+      }),
+    'IDENTITY_MISMATCH',
+    'a same identity under a different role is a changed target',
   );
   // Prior attempts of a DIFFERENT logical operation fail closed.
   assertErrorCode(
