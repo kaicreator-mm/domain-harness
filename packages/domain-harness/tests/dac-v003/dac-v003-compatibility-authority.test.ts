@@ -190,6 +190,75 @@ test('v3-002 §11: declared requirement constraints are carried into the closure
   ]);
 });
 
+test('v3-002-F1/#339: delimiter-bearing constraint values cannot collide in the validation identity', async () => {
+  // Direct reproduction of the #325 re-review residual P2-1: qualifications
+  // ['a','b'] mint tokens ['qualification:a','qualification:b'] whose old
+  // join('|') stream equaled the single-token stream of the qualification
+  // ['a|qualification:b'] — one validation identity for two different
+  // declarations. The canonical JSON array encoding keeps them distinct.
+  const adoptWithQualifications = (qualifications: readonly string[]) =>
+    adoptDacV003CapabilityRequirement({
+      baseline: { ...DAC_V003_BASELINE },
+      authorityScope: 'dac://app-composition/acme',
+      primaryIdentity: 'cap-req/persistence-1',
+      semanticIdentity: 'capability/durable-storage',
+      strength: 'required',
+      qualifications,
+    });
+  const twoQualifications = await validateDacV003Compatibility(
+    await buildCompatibleRequest({
+      capabilityRequirements: [adoptWithQualifications(['a', 'b'])],
+    }),
+  );
+  const smuggledDelimiter = await validateDacV003Compatibility(
+    await buildCompatibleRequest({
+      capabilityRequirements: [adoptWithQualifications(['a|qualification:b'])],
+    }),
+  );
+  // The disposition does not depend on constraints (both stay COMPATIBLE
+  // here), so the identity is what keeps these declarations from collapsing
+  // into one authority — it must differ.
+  assert.equal(twoQualifications.disposition.value, 'COMPATIBLE');
+  assert.equal(smuggledDelimiter.disposition.value, 'COMPATIBLE');
+  assert.notEqual(
+    twoQualifications.subject.validationIdentity,
+    smuggledDelimiter.subject.validationIdentity,
+    'distinct declared constraint arrays must not mint one validation identity',
+  );
+  assert.throws(
+    () =>
+      assertSameDacV003CompatibilityAuthority(
+        twoQualifications.validationRef,
+        smuggledDelimiter,
+      ),
+    (error: unknown) =>
+      error instanceof DacV003CompatibilityError && error.code === 'AUTHORITY_DIVERGENCE',
+  );
+  const twoEntry = twoQualifications.requirementClosure.find(
+    (e) => e.requirementIdentity === 'cap-req/persistence-1',
+  );
+  const oneEntry = smuggledDelimiter.requirementClosure.find(
+    (e) => e.requirementIdentity === 'cap-req/persistence-1',
+  );
+  assert.ok(twoEntry);
+  assert.ok(oneEntry);
+  assert.deepEqual(twoEntry.declaredConstraints, ['qualification:a', 'qualification:b']);
+  assert.deepEqual(oneEntry.declaredConstraints, ['qualification:a|qualification:b']);
+
+  // Canonical determinism is preserved: a semantically identical declaration
+  // (same qualification set, permuted declaration order) stays one identity.
+  const permuted = await validateDacV003Compatibility(
+    await buildCompatibleRequest({
+      capabilityRequirements: [adoptWithQualifications(['b', 'a'])],
+    }),
+  );
+  assert.equal(
+    permuted.subject.validationIdentity,
+    twoQualifications.subject.validationIdentity,
+    'sorted token construction keeps identical declarations canonical',
+  );
+});
+
 test('v3-002 validation act, validation record, result ref and result record all resolve to the one authority', async () => {
   const validation = await validateDacV003Compatibility(await buildCompatibleRequest());
   const result = deriveDacV003CompatibilityResult(validation);

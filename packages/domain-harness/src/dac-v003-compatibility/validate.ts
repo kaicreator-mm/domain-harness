@@ -379,7 +379,7 @@ function canonicalValidationIdentityMaterial(input: {
         r.kind,
         r.identity,
         r.effectiveStrength,
-        r.declaredConstraints.join('|'),
+        canonicalDeclaredConstraints(r.declaredConstraints),
       ]),
     ),
     evidence: sorted(
@@ -392,6 +392,20 @@ function canonicalValidationIdentityMaterial(input: {
       requiredRoles: sorted(input.ux.requiredRoles),
     },
   });
+}
+
+/**
+ * Canonical encoding of one requirement's declared constraint tokens for the
+ * identity material (#339 / V3-002-F1): the JSON text of the exact token
+ * array. Delimiter-safe and collision-free — JSON string escaping keeps
+ * element boundaries structural, so distinct declared constraint arrays
+ * (including values containing `|` or a smuggled `qualification:`-style
+ * prefix) can never collapse into one token stream, while semantically
+ * identical declarations (identical token array by deterministic
+ * construction) still encode identically.
+ */
+function canonicalDeclaredConstraints(constraints: readonly string[]): string {
+  return JSON.stringify(constraints);
 }
 
 // ---------------------------------------------------------------------------
