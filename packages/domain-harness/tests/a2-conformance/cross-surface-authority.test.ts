@@ -25,7 +25,6 @@ import { getDacReferenceRole, isDacReference } from '../../src/dac/index.js';
 import { adoptRuntimeBindingRef } from '../../src/dac/index.js';
 import type { DomainIntelligencePackageIdentity } from '../../src/contracts/domain-data.js';
 import type {
-  DomainRuntime,
   RuntimeHostBindings,
   TargetCompiledDomainPackage,
 } from '../../src/v2/index.js';
@@ -146,7 +145,7 @@ function explodingExpressionHost(): RuntimeHostBindings {
   return {
     ...base,
     expression: {
-      async evaluate(request: { expression: string; input: unknown }) {
+      async evaluate(request) {
         if (request.expression === 'explode') {
           throw new Error('injected expression failure');
         }

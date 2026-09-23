@@ -176,7 +176,7 @@ test('a2 N04: defaultPackageId / registry-shaped extra adoption fields never rea
       latest: true,
       resolution: { strategy: 'auto-latest' },
     }) as never,
-  ) as Record<string, unknown>;
+  ) as unknown as Record<string, unknown>;
   for (const foreign of ['defaultPackageId', 'packageId', 'latest', 'resolution']) {
     assert.equal(adopted[foreign], undefined, `foreign field "${foreign}" must not be adopted`);
   }
