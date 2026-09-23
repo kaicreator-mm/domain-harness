@@ -39,6 +39,21 @@ const EXPECTED_V3_NAMES = [
   'runtimePackageIdentityFromManifest',
   'runtimeObservationStreamKey',
   'encodeRuntimeObservationCursor',
+  // #305 / A2 I-002 DAC cross-layer reference adapter core.
+  'DAC_REFERENCE_ADAPTER_VERSION',
+  'DAC_REFERENCE_BASELINE',
+  'DAC_REFERENCE_ROLES',
+  'DacReferenceError',
+  'adoptPromotionDecisionRef',
+  'adoptApplicationSelectionRef',
+  'adoptSelectedDomainDataRef',
+  'adoptRuntimeContractRef',
+  'adoptRuntimeImplementationRef',
+  'adoptCompatibilityTargetRef',
+  'adoptRuntimeBindingRef',
+  'adoptRuntimeActivationRef',
+  'verifyDacReferenceIdentity',
+  'refuteExternalBusinessSoRIdentity',
 ] as const;
 
 const FORBIDDEN_NAMES = [
