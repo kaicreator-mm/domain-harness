@@ -72,4 +72,12 @@ export * from '../composition-intake/index.js';
 // transition authority moves, Domain UX semantics/rendering stay outside the
 // Harness, Runtime transition authority stays inside.
 export * from '../dac-bridge/index.js';
+// Issue #307 / A2 I-004: Runtime binding and technical activation evidence —
+// stages 4+5 of the composition-to-runtime boundary. Binding consumes ONLY a
+// genuine #306 stage-3 verdict; activation consumes ONLY a genuine binding of
+// this module plus an exact activation instance identity. Never manufactures
+// selection from compatibility or activation; never substitutes
+// default/latest/another revision; ApplicationSelectionRef !=
+// RuntimeBindingRef != RuntimeActivationRef stays structural.
+export * from '../runtime-binding/index.js';
 //# sourceMappingURL=index.js.map

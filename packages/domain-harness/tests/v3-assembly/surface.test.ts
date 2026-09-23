@@ -88,6 +88,7 @@ const EXPECTED_V3_NAMES = [
   'CompositionIntakeError',
   'validateSelectedComposition',
   'computeCompatibilityTargetDigest',
+  'isSelectedCompositionValidation',
   // #308 / A2 I-005 DAC UX<->Runtime correlation bridge surface.
   'DAC_BRIDGE_ADAPTER_VERSION',
   'DAC_BRIDGE_BASELINE',
@@ -111,6 +112,13 @@ const EXPECTED_V3_NAMES = [
   'isOutcomeRef',
   'isDomainCommandCorrelation',
   'isDomainOutcomeCorrelation',
+  // #307 / A2 I-004 Runtime binding + technical activation evidence.
+  'RUNTIME_BINDING_ADAPTER_VERSION',
+  'RUNTIME_ACTIVATION_ADAPTER_VERSION',
+  'RuntimeBindingError',
+  'bindValidatedComposition',
+  'activateRuntimeBinding',
+  'isRuntimeBindingEvidence',
 ] as const;
 
 const FORBIDDEN_NAMES = [
