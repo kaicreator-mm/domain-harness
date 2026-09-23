@@ -12,7 +12,7 @@ export class CompiledWorkflowRuntime {
         requireState(definition, definition.initial);
         return portableState(definition.initial, input, null, null);
     }
-    async processMessage(compiledPackage, workflow, current, stored) {
+    async processMessage(compiledPackage, workflow, current, stored, execution = {}) {
         const definition = parseDefinition(workflow);
         let state = parsePortableState(current.state);
         const sourceState = requireState(definition, state.stateId);
@@ -27,9 +27,9 @@ export class CompiledWorkflowRuntime {
             throw new Error(`Workflow ${workflow.workflowId} message ${stored.message.type} has no matching route from ${state.stateId}`);
         }
         state = portableState(route.target, state.data, stored.message.payload, null);
-        return this.settle(compiledPackage, workflow, definition, current, stored, state, logicalTime);
+        return this.settle(compiledPackage, workflow, definition, current, stored, state, logicalTime, execution);
     }
-    async settle(compiledPackage, workflow, definition, current, stored, initialState, logicalTime) {
+    async settle(compiledPackage, workflow, definition, current, stored, initialState, logicalTime, execution = {}) {
         let state = initialState;
         const maxSteps = Math.max(1, definition.limits?.maxSteps ?? 256);
         for (let step = 0; step < maxSteps; step += 1) {
@@ -56,7 +56,7 @@ export class CompiledWorkflowRuntime {
                 };
             }
             try {
-                const result = await this.invoke(compiledPackage, stateDefinition.invoke, current, stored, state, logicalTime, step);
+                const result = await this.invoke(compiledPackage, stateDefinition.invoke, current, stored, state, logicalTime, step, execution);
                 if (result.recoveryFailure !== undefined) {
                     return {
                         nextState: state,
@@ -84,7 +84,7 @@ export class CompiledWorkflowRuntime {
         }
         throw new Error(`Workflow ${workflow.workflowId} exceeded maxSteps while processing ${stored.message.messageId}`);
     }
-    async invoke(compiledPackage, invoke, current, stored, state, logicalTime, step) {
+    async invoke(compiledPackage, invoke, current, stored, state, logicalTime, step, execution = {}) {
         const scope = workflowScope(current, state);
         if (invoke.kind === 'expr') {
             if (invoke.expression === undefined || invoke.expression.length === 0) {
@@ -145,6 +145,7 @@ export class CompiledWorkflowRuntime {
                 input,
                 logicalTime,
                 executor: this.options.toolExecutor,
+                ...(execution.signal === undefined ? {} : { signal: execution.signal }),
             });
             if (result.status === 'recovery_required') {
                 return {

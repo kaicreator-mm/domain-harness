@@ -1,6 +1,8 @@
 import { isRuntimeObservationStore, ObservationRecordingRuntimeStore, RUNTIME_OBSERVATION_CONTRACT_VERSION, RUNTIME_OBSERVATION_EVENT_FAMILIES, runtimePackageIdentityFromManifest, } from '../observation/index.js';
 import { WorkflowInstanceEngine } from '../engine/workflow-instance-engine.js';
 import { PerInstanceSerializedLane } from '../engine/per-instance-serialized-lane.js';
+import { workflowAddressKey } from '../instance/workflow-address.js';
+import { RUNTIME_CONTROL_CONTRACT_VERSION, RuntimeControlCoordinator, RuntimeControlInterruptSignal, } from '../control/index.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
 import { DomainMessageAcceptance } from '../messaging/acceptance/domain-message-acceptance.js';
 import { JournaledDomainMessageEffect } from '../messaging/send-effect/journaled-domain-message-effect.js';
@@ -179,6 +181,31 @@ export async function createDomainRuntime(options) {
     });
     let disposed = false;
     let disposePromise;
+    // Issue #313 in-flight turn registry: per-target handle for the ONE turn
+    // currently between markMessageProcessing and its durable commit/failure.
+    // Private implementation detail — the public control truth is the durable
+    // control record, never this AbortController.
+    const activeTurns = new Map();
+    const turnKey = (target) => workflowAddressKey(target);
+    const controlRequested = options.control?.mode === 'enabled';
+    const controlCoordinator = controlRequested && options.control !== undefined
+        ? new RuntimeControlCoordinator({
+            authorizer: options.control.authorizer,
+            store: options.control.store,
+            ports: {
+                store: options.store,
+                recovery,
+                lane,
+                now,
+                activeTurn: (target) => activeTurns.get(turnKey(target)),
+                onNewTurnsUnblocked: (target) => {
+                    if (!disposed && controlCoordinator?.blocksNewTurns(target) !== true) {
+                        scheduleDrain(target);
+                    }
+                },
+            },
+        })
+        : null;
     const drainScheduler = new MailboxDrainScheduler({
         drain: (target) => drainMailbox(target),
         // RecoveryRecordedError is the durable poison-message path: the failure
@@ -225,61 +252,98 @@ export async function createDomainRuntime(options) {
         await options.store.reclaimInterruptedProcessing(target);
         scheduleDrain(target);
     }
+    // Issue #313 startup control reconciliation: accepted/resolving control
+    // requests from a previous process are classified from authoritative
+    // instance/message/effect facts — never blindly reissued as new intents,
+    // never re-authorized, never left indefinitely pending.
+    if (controlCoordinator !== null) {
+        await controlCoordinator.reconcileUnresolved();
+    }
     async function drainMailbox(target) {
         while (true) {
             // Disposal boundary: the in-flight turn (if any) has already completed;
             // no new turn is started after dispose() (#169).
             if (drainScheduler.disposed)
                 return;
+            // Control gate (#313): while an admitted CANCEL intent is pending for
+            // this target, no new turn may begin. The in-flight turn (if any) has
+            // already completed to its safe boundary before the gate can be observed.
+            if (controlCoordinator !== null && controlCoordinator.blocksNewTurns(target))
+                return;
             const stored = await recovery.nextProcessableMessage(target);
             if (stored === null)
                 return;
-            const committed = await instanceEngine.processAcceptedTransition({
-                target,
+            // Turn-scoped internal AbortController (#313): a winning INTERRUPT
+            // aborts it AFTER its durable control claim commits. Honoring the
+            // signal is best-effort — an ignoring callee can never fabricate a
+            // stop; the durable commit/failure facts decide the outcome.
+            const turnController = new AbortController();
+            let settleTurn = () => { };
+            const settled = new Promise((resolve) => {
+                settleTurn = resolve;
+            });
+            const key = turnKey(target);
+            activeTurns.set(key, {
                 messageId: stored.message.messageId,
-                expectedTargetSequence: stored.ack.targetSequence,
-                async transition(current) {
-                    const marked = await options.store.markMessageProcessing(target, stored.message.messageId, now());
-                    if (!marked)
-                        throw new ProcessingConflictError(target);
-                    try {
-                        const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
-                        const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
-                        if (workflow === undefined) {
-                            throw new Error(`Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`);
+                targetSequence: stored.ack.targetSequence,
+                controller: turnController,
+                settled,
+            });
+            let committed;
+            try {
+                committed = await instanceEngine.processAcceptedTransition({
+                    target,
+                    messageId: stored.message.messageId,
+                    expectedTargetSequence: stored.ack.targetSequence,
+                    async transition(current) {
+                        const marked = await options.store.markMessageProcessing(target, stored.message.messageId, now());
+                        if (!marked)
+                            throw new ProcessingConflictError(target);
+                        try {
+                            const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+                            const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
+                            if (workflow === undefined) {
+                                throw new Error(`Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`);
+                            }
+                            const transition = await runtimeWorkflow.processMessage(compiledPackage, workflow, current, stored, { signal: turnController.signal });
+                            if (transition.recoveryFailure !== undefined) {
+                                await recovery.recordProcessingFailure({
+                                    target,
+                                    messageId: stored.message.messageId,
+                                    expectedTargetSequence: stored.ack.targetSequence,
+                                    failure: withControlProvenance(transition.recoveryFailure, turnController.signal),
+                                });
+                                notifyTargetChanged(target, stored.message.messageId);
+                                throw new RecoveryRecordedError(target);
+                            }
+                            return {
+                                nextState: transition.nextState,
+                                nextLifecycle: transition.nextLifecycle,
+                                ...(transition.output === undefined ? {} : { output: transition.output }),
+                            };
                         }
-                        const transition = await runtimeWorkflow.processMessage(compiledPackage, workflow, current, stored);
-                        if (transition.recoveryFailure !== undefined) {
+                        catch (error) {
+                            if (error instanceof RecoveryRecordedError || error instanceof ProcessingConflictError)
+                                throw error;
+                            const failure = withControlProvenance(turnController.signal.aborted
+                                ? controlInterruptFailure(turnController.signal, stored.message.messageId)
+                                : normalizeFailure(error, stored.message.messageId), turnController.signal);
                             await recovery.recordProcessingFailure({
                                 target,
                                 messageId: stored.message.messageId,
                                 expectedTargetSequence: stored.ack.targetSequence,
-                                failure: transition.recoveryFailure,
+                                failure,
                             });
                             notifyTargetChanged(target, stored.message.messageId);
                             throw new RecoveryRecordedError(target);
                         }
-                        return {
-                            nextState: transition.nextState,
-                            nextLifecycle: transition.nextLifecycle,
-                            ...(transition.output === undefined ? {} : { output: transition.output }),
-                        };
-                    }
-                    catch (error) {
-                        if (error instanceof RecoveryRecordedError || error instanceof ProcessingConflictError)
-                            throw error;
-                        const failure = normalizeFailure(error, stored.message.messageId);
-                        await recovery.recordProcessingFailure({
-                            target,
-                            messageId: stored.message.messageId,
-                            expectedTargetSequence: stored.ack.targetSequence,
-                            failure,
-                        });
-                        notifyTargetChanged(target, stored.message.messageId);
-                        throw new RecoveryRecordedError(target);
-                    }
-                },
-            });
+                    },
+                });
+            }
+            finally {
+                activeTurns.delete(key);
+                settleTurn();
+            }
             if (isTerminal(committed)) {
                 notifyTargetChanged(target);
                 return;
@@ -406,6 +470,55 @@ export async function createDomainRuntime(options) {
             watch: (stream, onWake) => observationWake.watch(stream.target, onWake),
         }
         : { status: 'UNSUPPORTED' };
+    // Issue #313 control capability. Default (no authorizer): explicit
+    // default-deny UNSUPPORTED — a request through this surface receives an
+    // UNSUPPORTED receipt and causes no mutation; normal Runtime operation is
+    // unaffected. Enabled: fail-closed authorization + durable evidence.
+    const controlCapability = controlCoordinator !== null
+        ? {
+            status: 'ENABLED',
+            contractVersion: RUNTIME_CONTROL_CONTRACT_VERSION,
+            requestControl: (request) => {
+                assertActive();
+                return controlCoordinator.requestControl(request);
+            },
+            getControlOutcome: (controlRequestId) => {
+                assertActive();
+                return controlCoordinator.getControlOutcome(controlRequestId);
+            },
+        }
+        : {
+            status: 'UNSUPPORTED',
+            requestControl: async (request) => ({
+                controlRequestId: request.controlRequestId,
+                status: 'resolved',
+                disposition: 'UNSUPPORTED',
+                outcome: 'UNSUPPORTED',
+                record: {
+                    controlRequestId: request.controlRequestId,
+                    action: request.action,
+                    target: request.target.target,
+                    ...(request.target.expectedStateRevision === undefined
+                        ? {}
+                        : { expectedStateRevision: request.target.expectedStateRevision }),
+                    ...(request.target.expectedTurn === undefined
+                        ? {}
+                        : { expectedTurn: request.target.expectedTurn }),
+                    callerRef: request.callerRef,
+                    ...(request.reason === undefined ? {} : { reason: request.reason }),
+                    authorization: {
+                        decision: 'DENIED',
+                        callerRef: request.callerRef,
+                        code: 'control_not_configured',
+                    },
+                    status: 'resolved',
+                    receiptDisposition: 'UNSUPPORTED',
+                    outcome: 'UNSUPPORTED',
+                    requestedAt: now(),
+                    resolvedAt: now(),
+                },
+            }),
+        };
     return {
         openInstance,
         send,
@@ -419,6 +532,49 @@ export async function createDomainRuntime(options) {
         awaitIdle,
         dispose,
         observation: observationCapability,
+        control: controlCapability,
+    };
+}
+/** Failure recorded when a winning INTERRUPT's signal stopped the in-flight turn. */
+function controlInterruptFailure(signal, messageId) {
+    const reason = signal.reason;
+    const controlRequestId = reason instanceof RuntimeControlInterruptSignal ? reason.controlRequestId : undefined;
+    return {
+        code: 'runtime_control_interrupted',
+        message: controlRequestId === undefined
+            ? `Turn for message ${messageId} was interrupted by runtime control`
+            : `Turn for message ${messageId} was interrupted by runtime control ${controlRequestId}`,
+        sourceMessageId: messageId,
+        ...(controlRequestId === undefined
+            ? {}
+            : {
+                details: {
+                    kind: 'runtime-control',
+                    controlRequestId,
+                    action: 'INTERRUPT',
+                    authorizationRef: '',
+                    policyRevision: '',
+                },
+            }),
+    };
+}
+/** Binds exact control provenance into a failure recorded for a signalled turn. */
+function withControlProvenance(failure, signal) {
+    if (!signal.aborted)
+        return failure;
+    const reason = signal.reason;
+    if (!(reason instanceof RuntimeControlInterruptSignal))
+        return failure;
+    return {
+        ...failure,
+        details: {
+            ...(failure.details ?? {}),
+            kind: 'runtime-control',
+            controlRequestId: reason.controlRequestId,
+            action: 'INTERRUPT',
+            authorizationRef: '',
+            policyRevision: '',
+        },
     };
 }
 function normalizeFailure(error, messageId) {

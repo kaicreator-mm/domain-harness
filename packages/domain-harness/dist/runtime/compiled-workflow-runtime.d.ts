@@ -27,11 +27,20 @@ export interface CompiledWorkflowTransition {
     output?: JsonValue;
     recoveryFailure?: RuntimeFailure;
 }
+/**
+ * Turn-scoped execution options (#313): the internal AbortSignal of the ONE
+ * in-flight mailbox turn, issued only after a durable winning control claim.
+ * Public semantics remain defined exclusively by the durable control outcome;
+ * a callee ignoring this signal can never fabricate a stop.
+ */
+export interface CompiledWorkflowExecutionOptions {
+    signal?: AbortSignal;
+}
 export declare class CompiledWorkflowRuntime {
     private readonly options;
     constructor(options: CompiledWorkflowRuntimeOptions);
     initialState(workflow: CompiledWorkflowDescriptor, input: JsonValue): JsonValue;
-    processMessage(compiledPackage: TargetCompiledDomainPackage, workflow: CompiledWorkflowDescriptor, current: WorkflowInstanceSnapshot, stored: StoredAcceptedMessage): Promise<CompiledWorkflowTransition>;
+    processMessage(compiledPackage: TargetCompiledDomainPackage, workflow: CompiledWorkflowDescriptor, current: WorkflowInstanceSnapshot, stored: StoredAcceptedMessage, execution?: CompiledWorkflowExecutionOptions): Promise<CompiledWorkflowTransition>;
     private settle;
     private invoke;
     private runMessageEffects;

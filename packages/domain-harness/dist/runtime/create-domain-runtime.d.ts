@@ -1,5 +1,6 @@
 import type { AIOperationPort } from '../contracts/ai.js';
 import type { DomainIntelligencePackageIdentity } from '../contracts/domain-data.js';
+import { type RuntimeControlAuthorizer, type RuntimeControlStore } from '../control/index.js';
 import type { CompiledDomainDataPort } from '../projection/compiled-domain-data.js';
 import type { BusinessSnapshotPort } from '../v2/contracts/projection.js';
 import type { DomainRuntime } from '../v2/contracts/runtime.js';
@@ -26,6 +27,21 @@ export interface CreateDomainRuntimeOptions {
      * covered mutation commits atomically with its observation record.
      */
     observation?: RuntimeObservationEnableOptions;
+    /**
+     * Issue #313 generic public Runtime cancel/interrupt control. Absent (the
+     * default) keeps every existing Runtime semantic unchanged and exposes the
+     * explicit default-deny `{ status: 'UNSUPPORTED' }` control capability: no
+     * authorizer means no external control authority. `enabled` requires a
+     * fail-closed `RuntimeControlAuthorizer` plus a durable `RuntimeControlStore`
+     * for request/outcome evidence and restart reconciliation.
+     */
+    control?: RuntimeControlEnableOptions;
+}
+/** Enablement options for the generic public Runtime control surface (#313). */
+export interface RuntimeControlEnableOptions {
+    readonly mode: 'enabled';
+    readonly authorizer: RuntimeControlAuthorizer;
+    readonly store: RuntimeControlStore;
 }
 /** Enablement options for the durable Runtime Observation Stream (#312). */
 export interface RuntimeObservationEnableOptions {
