@@ -22,6 +22,7 @@ import {
   observation,
   providerOperation,
   v002ObservationEvidence,
+  v002ReconciliationOutcome,
   BASELINE,
 } from './external-fixture.js';
 
@@ -353,6 +354,87 @@ test('v3-003 #309 consumption: genuine upstream evidence drives the conclusion',
     upstreamV002Evidence: [v002ObservationEvidence('effect-succeeded-provider-scope')],
   });
   assert.equal(providerScope.conclusion.outcomeClass, 'STILL_UNKNOWN');
+});
+
+test('v3-003 #309 consumption: genuine reconciliation-outcome records drive and gate the conclusion (review P2-1)', () => {
+  const logical = logicalOperation();
+  const committed = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    upstreamV002Evidence: [v002ReconciliationOutcome('RECONCILED_COMMITTED')],
+  });
+  assert.equal(committed.conclusion.outcomeClass, 'RECONCILED_COMMITTED');
+  assert.equal(committed.conclusion.remoteTruth, 'committed');
+  const notCommitted = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    upstreamV002Evidence: [v002ReconciliationOutcome('RECONCILED_NOT_COMMITTED')],
+  });
+  assert.equal(notCommitted.conclusion.outcomeClass, 'RECONCILED_NOT_COMMITTED');
+  assert.equal(notCommitted.conclusion.remoteTruth, 'not-committed');
+  // Drifted correlation fails closed for this class too.
+  assertErrorCode(
+    () =>
+      request({
+        logicalOperation: logical,
+        externalAuthority: logical.externalAuthority,
+        upstreamV002Evidence: [
+          v002ReconciliationOutcome('RECONCILED_COMMITTED', { effectId: 'other-effect' }),
+        ],
+      }),
+    'CORRELATION_CONFLICT',
+    'a genuine #309 outcome for a different effect can never drive this episode',
+  );
+  assertErrorCode(
+    () =>
+      request({
+        logicalOperation: logical,
+        externalAuthority: logical.externalAuthority,
+        upstreamV002Evidence: [
+          v002ReconciliationOutcome('RECONCILED_COMMITTED', { authorityId: 'other-sor' }),
+        ],
+      }),
+    'CORRELATION_CONFLICT',
+    'a genuine #309 outcome for a different authority can never drive this episode',
+  );
+});
+
+test('v3-003 (review P1-1 r2): contradictory authoritative bases resolve by NO precedence — truth stays unresolved', () => {
+  const logical = logicalOperation();
+  // Commit-polarity and non-commit-polarity #309 outcomes for the same
+  // effect: no commit-wins rule may resolve this.
+  const oppositeUpstream = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    upstreamV002Evidence: [
+      v002ReconciliationOutcome('RECONCILED_COMMITTED'),
+      v002ReconciliationOutcome('RECONCILED_NOT_COMMITTED'),
+    ],
+  });
+  assert.equal(oppositeUpstream.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(oppositeUpstream.conclusion.remoteTruth, 'unresolved');
+  assert.equal(oppositeUpstream.conclusion.unresolvedConflictPresent, true);
+  assert.ok(
+    oppositeUpstream.conclusion.notes.some((n) => n.includes('no precedence resolves')),
+    'the contradiction is recorded, not resolved',
+  );
+  // Upstream committed conclusion against a CURRENT v0.0.3 known-failed
+  // observation equally stays unresolved.
+  const crossSource = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-known-failed',
+        logicalOperation: logical,
+        observedClass: 'KNOWN_FAILED_BEFORE_COMMIT',
+      }),
+    ],
+    upstreamV002Evidence: [v002ObservationEvidence('commit-observed')],
+  });
+  assert.equal(crossSource.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(crossSource.conclusion.remoteTruth, 'unresolved');
+  assert.equal(crossSource.conclusion.unresolvedConflictPresent, true);
 });
 
 test('v3-003 #309 consumption: genuine evidence correlated to a DIFFERENT effect/authority fails closed (review P0-1)', () => {

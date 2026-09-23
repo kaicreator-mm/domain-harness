@@ -32,12 +32,15 @@ import { EXTERNAL_AUTHORITY_BASELINE } from '../../src/external-authority/index.
 import {
   adoptExternalAuthorityRef as adoptV002ExternalAuthorityRef,
   adoptExternalObservationEvidence as adoptV002ObservationEvidence,
+  adoptExternalReconciliationOutcome as adoptV002ReconciliationOutcome,
+  adoptExternalReconciliationRef as adoptV002ReconciliationRef,
   adoptRuntimeLogicalOperationRef as adoptV002RuntimeLogicalOperationRef,
   correlateExternalEffect,
 } from '../../src/external-authority/index.js';
 import type {
   ExternalObservationClassification,
   ExternalObservationEvidence,
+  ExternalReconciliationOutcome,
 } from '../../src/external-authority/index.js';
 
 export const BASELINE = { ...DAC_V003_BASELINE } as const;
@@ -193,21 +196,14 @@ export function externalCapability(
   } as never);
 }
 
-/**
- * A GENUINE #309 (v0.0.2) observation evidence record for the given
- * classification, correlated to effectId `logical-op-0001` under authority
- * `payment-sor` / scope `payments/truth` — the exact identities the default
- * v0.0.3 builders above use.
- */
-export function v002ObservationEvidence(
-  classification: ExternalObservationClassification,
-  options: {
-    readonly effectId?: string;
-    readonly authorityId?: string;
-    readonly authorityScope?: string;
-  } = {},
-): ExternalObservationEvidence {
-  const correlation = correlateExternalEffect({
+interface V002CorrelationOptions {
+  readonly effectId?: string;
+  readonly authorityId?: string;
+  readonly authorityScope?: string;
+}
+
+function v002Correlation(options: V002CorrelationOptions = {}) {
+  return correlateExternalEffect({
     correlationId: 'corr-0001',
     runtimeOperation: adoptV002RuntimeLogicalOperationRef({
       baseline: V002_BASELINE,
@@ -219,10 +215,48 @@ export function v002ObservationEvidence(
       authorityScope: options.authorityScope ?? 'payments/truth',
     }),
   });
+}
+
+/**
+ * A GENUINE #309 (v0.0.2) observation evidence record for the given
+ * classification, correlated to effectId `logical-op-0001` under authority
+ * `payment-sor` / scope `payments/truth` — the exact identities the default
+ * v0.0.3 builders above use.
+ */
+export function v002ObservationEvidence(
+  classification: ExternalObservationClassification,
+  options: V002CorrelationOptions = {},
+): ExternalObservationEvidence {
   return adoptV002ObservationEvidence({
-    correlation,
+    correlation: v002Correlation(options),
     classification,
     rawStatement: `provider statement (${classification})`,
+  });
+}
+
+/**
+ * A GENUINE #309 (v0.0.2) reconciliation OUTCOME record for a decisive
+ * result, carrying the decisive observation basis the #309 surface itself
+ * requires (commit => commit-observed; non-commit =>
+ * known-failed-before-commit).
+ */
+export function v002ReconciliationOutcome(
+  result: 'RECONCILED_COMMITTED' | 'RECONCILED_NOT_COMMITTED',
+  options: V002CorrelationOptions = {},
+): ExternalReconciliationOutcome {
+  const correlation = v002Correlation(options);
+  const decisive = v002ObservationEvidence(
+    result === 'RECONCILED_COMMITTED' ? 'commit-observed' : 'known-failed-before-commit',
+    options,
+  );
+  return adoptV002ReconciliationOutcome({
+    correlation,
+    reconciliation: adoptV002ReconciliationRef({
+      baseline: V002_BASELINE,
+      reconciliationId: 'recon-309-0001',
+    }),
+    result,
+    basis: [decisive],
   });
 }
 

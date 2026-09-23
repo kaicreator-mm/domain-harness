@@ -198,6 +198,19 @@ test('v3-003 C66: idempotency reuse for a semantically different effect fails cl
     'IDEMPOTENCY_REUSE_FORBIDDEN',
     'an issuer divergence is a contract violation',
   );
+  // Same key + same issuer but a divergent promised deduplication scope is
+  // equally a contract violation (review P2-2): the scope is part of the
+  // replay-safety identity.
+  assertErrorCode(
+    () =>
+      assertDacV003IdempotencyReuseForLogicalEffect(
+        provenIdempotency({ promisedDeduplicationScope: 'payments/truth:other-scope' }),
+        bound,
+        SEMANTIC,
+      ),
+    'IDEMPOTENCY_REUSE_FORBIDDEN',
+    'a promised deduplication scope divergence is a contract violation',
+  );
 });
 
 test('v3-003 §4 rule 2 (evaluator side): changed intent requires a new logical operation', () => {

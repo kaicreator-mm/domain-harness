@@ -545,7 +545,6 @@ export interface DacV003SafeRetryDecision {
  *   material presented as remote truth evidence;
  * - `AMBIGUITY_STRENGTHENING_FORBIDDEN` — strengthening ambiguous/weak
  *   evidence into a stronger claim;
- * - `EVIDENCE_CONFLICT` — contradictory evidence presented as resolvable;
  * - `CAPABILITY_DECLARATION_NOT_PROVEN` — a declaration used where proven
  *   satisfaction is required;
  * - `EFFECTFUL_ACTION_REQUIRES_EXPLICIT_MODELING` — effectful resume
@@ -561,7 +560,7 @@ export interface DacV003SafeRetryDecision {
  * No code carries or suggests a substitute/default/latest resolution or a
  * local-cause-to-remote-outcome inference.
  */
-export type DacV003ExternalErrorCode = 'INVALID_EXTERNAL_BINDING' | 'ROLE_MISMATCH' | 'IDENTITY_MISMATCH' | 'CORRELATION_CONFLICT' | 'IDEMPOTENCY_REUSE_FORBIDDEN' | 'LOCAL_CAUSE_FORBIDDEN' | 'AMBIGUITY_STRENGTHENING_FORBIDDEN' | 'EVIDENCE_CONFLICT' | 'CAPABILITY_DECLARATION_NOT_PROVEN' | 'EFFECTFUL_ACTION_REQUIRES_EXPLICIT_MODELING' | 'INVALID_ACTION_SEMANTICS' | 'COMPOSITION_LIVE_OPERATION_STATE_FORBIDDEN' | 'EXTERNAL_IDENTITY_FORBIDDEN' | 'INVALID_UPSTREAM_EVIDENCE';
+export type DacV003ExternalErrorCode = 'INVALID_EXTERNAL_BINDING' | 'ROLE_MISMATCH' | 'IDENTITY_MISMATCH' | 'CORRELATION_CONFLICT' | 'IDEMPOTENCY_REUSE_FORBIDDEN' | 'LOCAL_CAUSE_FORBIDDEN' | 'AMBIGUITY_STRENGTHENING_FORBIDDEN' | 'CAPABILITY_DECLARATION_NOT_PROVEN' | 'EFFECTFUL_ACTION_REQUIRES_EXPLICIT_MODELING' | 'INVALID_ACTION_SEMANTICS' | 'COMPOSITION_LIVE_OPERATION_STATE_FORBIDDEN' | 'EXTERNAL_IDENTITY_FORBIDDEN' | 'INVALID_UPSTREAM_EVIDENCE';
 /** Fail-closed error surface for the DAC v0.0.3 external-operation binding. */
 export declare class DacV003ExternalError extends Error {
     readonly code: DacV003ExternalErrorCode;

@@ -348,9 +348,13 @@ function sameAuthority(
  * an AUTHORITATIVE_COMMITTED current observation or an effect record with
  * linking evidence to this exact logical operation (or the matching genuine
  * #309 upstream basis); non-commit requires KNOWN_FAILED_BEFORE_COMMIT
- * current evidence (a bare REJECTED does not establish it); conflicting
- * current observations keep the truth unresolved; TERMINAL_ABANDONMENT is
- * a local stop only and never resolves remote truth.
+ * current evidence (a bare REJECTED does not establish it); materially
+ * contradictory authoritative evidence — commit-polarity bases against
+ * non-commit-polarity bases across current observations, linked effect
+ * records and upstream #309 evidence — is resolved by NO precedence at all:
+ * the truth stays unresolved (§8/C69 anti-arbitrary-winner; there is no
+ * fixed commit-wins rule); TERMINAL_ABANDONMENT is a local stop only and
+ * never resolves remote truth.
  */
 function deriveConclusion(
   logicalOperation: DacV003LogicalOperationRef,
@@ -384,18 +388,48 @@ function deriveConclusion(
     (e) => isExternalObservationEvidence(e) && e.classification === 'commit-observed',
   );
 
+  const commitBasisPresent =
+    committedObservations.length > 0 ||
+    linkedEffectRecord !== undefined ||
+    upstreamCommitted.length > 0 ||
+    upstreamCommitObservations.length > 0;
+  const nonCommitBasisPresent =
+    nonCommitObservations.length > 0 || upstreamNotCommitted.length > 0;
+
   if (conflictPresent) {
     notes.push(
       'unresolvable CONFLICTING current observations present: commit/non-commit cannot be concluded and the historical observations stay immutable',
     );
   }
 
-  if (
-    committedObservations.length > 0 ||
-    linkedEffectRecord !== undefined ||
-    upstreamCommitted.length > 0 ||
-    upstreamCommitObservations.length > 0
-  ) {
+  // Fail closed on materially contradictory authoritative evidence: no
+  // fixed precedence (commit-first or otherwise) may resolve a commit basis
+  // against a non-commit basis — that would be an arbitrary winner in the
+  // C69 class. Truth stays unresolved; reconciliation with ordering
+  // evidence or human authority is required.
+  if (commitBasisPresent && nonCommitBasisPresent) {
+    notes.push(
+      'materially contradictory authoritative evidence: commit-polarity bases (AUTHORITATIVE_COMMITTED observation, linked effect record, or genuine #309 committed basis) stand against non-commit-polarity bases (KNOWN_FAILED_BEFORE_COMMIT observation or genuine #309 non-committed basis); no precedence resolves them and the truth stays unresolved',
+    );
+    return Object.freeze({
+      outcomeClass: 'STILL_UNKNOWN' as const,
+      remoteTruth: 'unresolved' as const,
+      basis: Object.freeze([]),
+      unresolvedConflictPresent: true,
+      notes: Object.freeze(notes),
+    });
+  }
+  if (conflictPresent) {
+    return Object.freeze({
+      outcomeClass: 'STILL_UNKNOWN' as const,
+      remoteTruth: 'unresolved' as const,
+      basis: Object.freeze([]),
+      unresolvedConflictPresent: true,
+      notes: Object.freeze(notes),
+    });
+  }
+
+  if (commitBasisPresent) {
     for (const o of committedObservations) basis.push(o.reference);
     if (linkedEffectRecord !== undefined) basis.push(linkedEffectRecord.reference);
     if (committedObservations.length === 0 && linkedEffectRecord === undefined) {

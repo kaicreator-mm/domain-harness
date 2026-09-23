@@ -766,7 +766,6 @@ export interface DacV003SafeRetryDecision {
  *   material presented as remote truth evidence;
  * - `AMBIGUITY_STRENGTHENING_FORBIDDEN` — strengthening ambiguous/weak
  *   evidence into a stronger claim;
- * - `EVIDENCE_CONFLICT` — contradictory evidence presented as resolvable;
  * - `CAPABILITY_DECLARATION_NOT_PROVEN` — a declaration used where proven
  *   satisfaction is required;
  * - `EFFECTFUL_ACTION_REQUIRES_EXPLICIT_MODELING` — effectful resume
@@ -790,7 +789,6 @@ export type DacV003ExternalErrorCode =
   | 'IDEMPOTENCY_REUSE_FORBIDDEN'
   | 'LOCAL_CAUSE_FORBIDDEN'
   | 'AMBIGUITY_STRENGTHENING_FORBIDDEN'
-  | 'EVIDENCE_CONFLICT'
   | 'CAPABILITY_DECLARATION_NOT_PROVEN'
   | 'EFFECTFUL_ACTION_REQUIRES_EXPLICIT_MODELING'
   | 'INVALID_ACTION_SEMANTICS'

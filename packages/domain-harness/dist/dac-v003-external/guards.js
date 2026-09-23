@@ -465,8 +465,9 @@ export function assertDacV003IdempotencyReuseForLogicalEffect(idempotencyIdentit
     if (bound !== undefined &&
         bound !== idempotencyIdentity &&
         (bound.reference.primaryIdentity !== idempotencyIdentity.reference.primaryIdentity ||
-            bound.issuer !== idempotencyIdentity.issuer)) {
-        throw new DacV003ExternalError('IDEMPOTENCY_REUSE_FORBIDDEN', `logical operation "${logicalOperation.reference.primaryIdentity}" already carries a different idempotency identity; one logical operation is bound to one idempotency identity within its scope`);
+            bound.issuer !== idempotencyIdentity.issuer ||
+            bound.promisedDeduplicationScope !== idempotencyIdentity.promisedDeduplicationScope)) {
+        throw new DacV003ExternalError('IDEMPOTENCY_REUSE_FORBIDDEN', `logical operation "${logicalOperation.reference.primaryIdentity}" already carries a different idempotency identity (key, issuer or promised deduplication scope diverge); one logical operation is bound to one idempotency identity within its scope`);
     }
 }
 /**
