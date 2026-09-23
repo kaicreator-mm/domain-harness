@@ -142,24 +142,28 @@ export interface SelectedCompositionValidation {
   readonly compatibility: SelectedCompositionCompatibilityEvidence;
 }
 
+/**
+ * Fail-closed error taxonomy:
+ *
+ * - `INVALID_COMPOSITION_INTAKE` — malformed request or concrete environment declaration (N09);
+ * - `SELECTED_IDENTITY_MISMATCH` — selected ref identity does not map exactly onto the compiled package;
+ * - `PROVENANCE_CHAIN_MISMATCH` — promotion/selection provenance contradicts the selected identity;
+ * - `RUNTIME_CONTRACT_MISMATCH` — declared runtime contract does not match the concrete contract revision;
+ * - `RUNTIME_IMPLEMENTATION_MISMATCH` — declared runtime implementation identity/version/build mismatch;
+ * - `COMPATIBILITY_TARGET_MISMATCH` — declared compatibility target does not match the concrete target;
+ * - `ROLE_IDENTITY_COLLAPSE` — contract and implementation refs share one identity tuple (N08);
+ * - `INVALID_COMPOSITION_PACKAGE` — the compiled package itself failed integrity/shape validation;
+ * - `INCOMPATIBLE_SELECTED_COMPOSITION` — the selected package is incompatible with the declared target.
+ */
 export type CompositionIntakeErrorCode =
-  /** Malformed request or concrete environment declaration (N09). */
   | 'INVALID_COMPOSITION_INTAKE'
-  /** Selected ref identity does not map exactly onto the compiled package. */
   | 'SELECTED_IDENTITY_MISMATCH'
-  /** Promotion/selection provenance contradicts the selected identity. */
   | 'PROVENANCE_CHAIN_MISMATCH'
-  /** Declared runtime contract does not match the concrete contract revision. */
   | 'RUNTIME_CONTRACT_MISMATCH'
-  /** Declared runtime implementation identity/version/build mismatch. */
   | 'RUNTIME_IMPLEMENTATION_MISMATCH'
-  /** Declared compatibility target does not match the concrete target. */
   | 'COMPATIBILITY_TARGET_MISMATCH'
-  /** Contract and implementation refs share one identity tuple (N08). */
   | 'ROLE_IDENTITY_COLLAPSE'
-  /** The compiled package itself failed integrity/shape validation. */
   | 'INVALID_COMPOSITION_PACKAGE'
-  /** The selected package is incompatible with the declared target. */
   | 'INCOMPATIBLE_SELECTED_COMPOSITION';
 
 /**
