@@ -92,4 +92,17 @@ export * from '../runtime-binding/index.js';
 // manifest definition as separate evidence referencing the exact manifest
 // identity/digest.
 export * from '../application-manifest/index.js';
+// Issue #323 / DAC v0.0.3 V3-001: NEW explicit v0.0.3 versioned adapter
+// surface — base-reference/profile foundation bound to the exact DAC v0.0.3
+// semantic freeze (commit 3322b21… / tree 163d2a4…): Base Reference
+// Obligations envelope, composable exactness profiles P0–P7, canonical role
+// registry vocabulary, the three owned refs (RuntimeHostBindingRequirementRef /
+// RuntimeHostBindingRef / RuntimeInteractionContractRef), shared
+// exact-reference primitives, and the repaired required-target disposition
+// vocabulary (missing => FAIL_CLOSED; explicit unsupported => INCOMPATIBLE).
+// No compatibility decision, Manifest cardinality, external-operation
+// semantics, promotion/selection or Runtime binding/activation authority;
+// the historical v0.0.2 adapter above stays byte-separate and separately
+// testable.
+export * from '../dac-v003/index.js';
 //# sourceMappingURL=index.js.map
