@@ -27,5 +27,6 @@ export { DomainRuntimeV3Error, type DomainRuntimeV3ErrorCode, } from '../runtime
 export { admissionEffectToolPort } from '../runtime/admission-effect-tool-adapter.js';
 export type { AdmissionEffectToolAdapterOptions } from '../runtime/admission-effect-tool-adapter.js';
 export * from '../dac/index.js';
+export * from '../composition-intake/index.js';
 export * from '../dac-bridge/index.js';
 //# sourceMappingURL=index.d.ts.map
