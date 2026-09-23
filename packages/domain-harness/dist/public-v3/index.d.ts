@@ -33,4 +33,5 @@ export * from '../dac-bridge/index.js';
 export * from '../runtime-binding/index.js';
 export * from '../application-manifest/index.js';
 export * from '../dac-v003/index.js';
+export * from '../dac-v003-compatibility/index.js';
 //# sourceMappingURL=index.d.ts.map
