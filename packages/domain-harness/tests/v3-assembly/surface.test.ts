@@ -119,6 +119,23 @@ const EXPECTED_V3_NAMES = [
   'bindValidatedComposition',
   'activateRuntimeBinding',
   'isRuntimeBindingEvidence',
+  // #310 / A2 I-007 PROVISIONAL Application Manifest composition adapter.
+  'APPLICATION_MANIFEST_ADAPTER_VERSION',
+  'APPLICATION_MANIFEST_CONTRACT_VERSION',
+  'ApplicationManifestError',
+  'MANIFEST_COMPOSITION_ADAPTER_VERSION',
+  'MANIFEST_BINDING_CORRELATION_VERSION',
+  'MANIFEST_ACTIVATION_CORRELATION_VERSION',
+  'adoptApplicationManifest',
+  'computeApplicationManifestDigest',
+  'composeSelectedApplicationManifest',
+  'correlateManifestRuntimeBinding',
+  'correlateManifestRuntimeActivation',
+  'isApplicationManifest',
+  'isManifestCompositionEvidence',
+  'isManifestRuntimeBindingCorrelation',
+  'isManifestRuntimeActivationCorrelation',
+  'manifestIdentityOf',
 ] as const;
 
 const FORBIDDEN_NAMES = [
