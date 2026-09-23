@@ -54,6 +54,11 @@ const EXPECTED_V3_NAMES = [
   'adoptRuntimeActivationRef',
   'verifyDacReferenceIdentity',
   'refuteExternalBusinessSoRIdentity',
+  // #306 / A2 I-003 DAC-aware composition intake.
+  'COMPOSITION_INTAKE_ADAPTER_VERSION',
+  'CompositionIntakeError',
+  'validateSelectedComposition',
+  'computeCompatibilityTargetDigest',
 ] as const;
 
 const FORBIDDEN_NAMES = [

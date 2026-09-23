@@ -100,3 +100,10 @@ export type { AdmissionEffectToolAdapterOptions } from '../runtime/admission-eff
 // activation). Nominal, version-bound to the exact DAC v0.0.2 baseline,
 // fail-closed; no PROVISIONAL wire freeze; no role-conversion surface.
 export * from '../dac/index.js';
+
+// Issue #306 / A2 I-003: DAC-aware composition intake — validates an
+// already-decided exact composition/selection against the concrete compiled
+// package and a declared runtime compatibility target. Validation only: never
+// selects, never substitutes, never binds/activates; emits explicit
+// compatibility-target evidence for downstream binding.
+export * from '../composition-intake/index.js';
