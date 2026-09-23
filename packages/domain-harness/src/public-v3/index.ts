@@ -199,3 +199,24 @@ export * from '../dac-v003-compatibility/index.js';
 // binding/activation/transition authority; provider-private proof
 // protocols stay OPEN_NOT_OWNED.
 export * from '../dac-v003-external/index.js';
+
+// Issue #328 / DAC v0.0.3 V3-004: immutable Application Manifest
+// composition consumption over the #323 V3-001 foundation, the #325/#339
+// V3-002 compatibility closure and (only on the APPLICABLE path) the #327
+// V3-003 external-authority identity declarations, following the merged A2
+// #310 Manifest foundation pattern. Owns the Manifest-side bounded closure
+// only: selected Domain Data 1..n with effective upstream promotion
+// evidence and total upstream ApplicationSelection coverage, exactly one
+// primary Runtime contract plus one explicit compatibility target, exactly
+// one DomainUXDefinitionRef and one RuntimeInteractionContractRef, exact
+// Capability/Port/Host-Binding requirement declarations with references to
+// their V3-002 satisfaction evidence, and the explicitly recorded
+// external-authority applicability decision. The exact subject/target-bound
+// compatibility validation result is only ever an ASSOCIATED EXTERNAL
+// record (never a required field inside the content its digest covers — R1
+// P2 self-reference rule). Never creates promotion/selection/compatibility
+// authority, never absorbs Runtime binding/activation evidence, live
+// instance/process/execution/UX state or live external
+// operation/reconciliation state; the historical v0.0.2 manifest adapter
+// stays byte-separate and separately testable.
+export * from '../dac-v003-manifest/index.js';
