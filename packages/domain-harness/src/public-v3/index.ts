@@ -160,3 +160,20 @@ export * from '../application-manifest/index.js';
 // the historical v0.0.2 adapter above stays byte-separate and separately
 // testable.
 export * from '../dac-v003/index.js';
+
+// Issue #325 / DAC v0.0.3 V3-002: the single subject/target-bound
+// compatibility-validation authority over the V3-001 foundation and the
+// merged A2 surfaces (#306 exact-selection intake verdict as mandatory
+// upstream evidence, #307 binding separation preserved — validation is never
+// binding, #308 renderer-independent UX semantic-role anchors). Closes
+// Capability/Port/Host-Binding requirement-vs-satisfaction evidence
+// (missing required evidence can never produce COMPATIBLE), the repaired
+// target rule (missing => FAIL_CLOSED; explicit unsupported =>
+// INCOMPATIBLE), and the single validation authority whose
+// CompatibilityValidationRef and CompatibilityResultRef resolve together
+// even though encoded separately. Incompatibility is terminal: no
+// auto-latest/default/substitute, no ApplicationSelection manufacturing.
+// No Manifest cardinality/storage (V3-004), no external-operation semantics
+// (V3-003), no promotion/selection or Runtime binding/activation/transition
+// authority.
+export * from '../dac-v003-compatibility/index.js';
