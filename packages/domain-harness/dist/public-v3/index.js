@@ -121,4 +121,25 @@ export * from '../dac-v003/index.js';
 // (V3-003), no promotion/selection or Runtime binding/activation/transition
 // authority.
 export * from '../dac-v003-compatibility/index.js';
+// Issue #327 / DAC v0.0.3 V3-003: external-operation / idempotency /
+// reconciliation exact role binding over the #323 V3-001 foundation and the
+// merged A2 #309 durable external-effect evidence surface (consumed
+// read-only; the v0.0.2 classifications map onto the v0.0.3 outcome classes
+// without ever strengthening a claim). Binds the ten reviewed #319 R1 roles
+// (ExternalAuthorityRef / LogicalOperationRef / AttemptRef /
+// ProviderOperationRef / ExternalObservationRef / ReconciliationRef /
+// AuthoritativeEffectRecordRef / IdempotencyIdentityRef /
+// RecoveryCapabilityRef / ExternalCapabilityRef) with fail-closed §8
+// currentness adjudication (stale/conflicting never last-write-wins), §9
+// observational reconciliation episodes (query/watch/reconcile is not a new
+// effect attempt; effectful resume must be explicitly modeled), the §10
+// declaration-vs-satisfaction capability separation (cancel is a request
+// semantic only), and the §11 safe-retry matrix (retry keeps the
+// LogicalOperationRef and mints a new AttemptRef only under evidence-backed
+// conditions; safe replay requires a proven idempotency
+// issuer/scope/effect equivalence). No durable-effect execution redesign,
+// no Manifest cardinality, no promotion/selection, no Runtime
+// binding/activation/transition authority; provider-private proof
+// protocols stay OPEN_NOT_OWNED.
+export * from '../dac-v003-external/index.js';
 //# sourceMappingURL=index.js.map
