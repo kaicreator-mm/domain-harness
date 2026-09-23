@@ -11,7 +11,7 @@
 // reconciliation only establish evidence-backed CURRENT conclusions.
 import { adoptDacV003RegistryReference } from '../dac-v003/guards.js';
 import { isExternalObservationEvidence, isExternalReconciliationOutcome, } from '../external-authority/guards.js';
-import { DAC_V003_EXTERNAL_OPERATION_ADAPTER_VERSION, DacV003ExternalError, } from './contracts.js';
+import { DAC_V003_EXTERNAL_OPERATION_ADAPTER_VERSION, DAC_V003_OUTCOME_CLASS_FROM_V002_CLASSIFICATION, DacV003ExternalError, } from './contracts.js';
 import { assertDacV003AttemptIdentitiesDistinct, assertDacV003IdempotencyReuseForLogicalEffect, assertDacV003LogicalOperationContinuity, assertDacV003ReconciliationActionSemantics, expectDacV003AttemptRef, expectDacV003AuthoritativeEffectRecordRef, expectDacV003ExternalAuthorityRef, expectDacV003ExternalObservationRef, expectDacV003IdempotencyIdentityRef, expectDacV003LogicalOperationRef, expectDacV003ProviderOperationRef, expectDacV003UpstreamV002Evidence, isDacV003IdempotencyGuaranteeProven, } from './guards.js';
 // ---------------------------------------------------------------------------
 // §8 currentness adjudication
@@ -264,7 +264,6 @@ function deriveConclusion(logicalOperation, currentObservations, conflictPresent
     // non-commit (§12) — it still carries non-commit POLARITY for contradiction
     // detection, exactly as it does in the currentness adjudicator.
     const upstreamNonCommitObservations = upstreamV002Evidence.filter((e) => isExternalObservationEvidence(e) && e.classification === 'known-failed-before-commit');
-    const upstreamRejectedObservations = upstreamV002Evidence.filter((e) => isExternalObservationEvidence(e) && e.classification === 'rejected');
     const commitBasisPresent = committedObservations.length > 0 ||
         linkedEffectRecord !== undefined ||
         upstreamCommitted.length > 0 ||
@@ -272,17 +271,48 @@ function deriveConclusion(logicalOperation, currentObservations, conflictPresent
     const nonCommitBasisPresent = nonCommitObservations.length > 0 ||
         upstreamNotCommitted.length > 0 ||
         upstreamNonCommitObservations.length > 0;
-    const nonCommitPolarityPresent = nonCommitBasisPresent || upstreamRejectedObservations.length > 0;
+    // Contradiction polarity over EVERY source, derived from the ONE
+    // `truthPolarity` model the currentness adjudicator already uses —
+    // v0.0.3 CURRENT observations, the linked effect record (commit polarity),
+    // upstream #309 outcomes, and upstream #309 observations mapped through
+    // the total ceiling-preserving classification map. Two distinct non-neutral
+    // polarities coexisting is a material contradiction no precedence may
+    // resolve: a CURRENT REJECTED or EFFECT_SUCCEEDED observation contradicts
+    // a linked effect record or an upstream conclusion exactly as it
+    // contradicts another observation (§8, conformance C69).
+    const evidencePolarities = new Set();
+    for (const o of currentObservations) {
+        const polarity = truthPolarity(o.observedClass);
+        if (polarity !== 'neutral')
+            evidencePolarities.add(polarity);
+    }
+    if (linkedEffectRecord !== undefined)
+        evidencePolarities.add('commit');
+    for (const e of upstreamV002Evidence) {
+        if (isExternalReconciliationOutcome(e)) {
+            if (e.result === 'RECONCILED_COMMITTED')
+                evidencePolarities.add('commit');
+            else if (e.result === 'RECONCILED_NOT_COMMITTED') {
+                evidencePolarities.add('non-commit');
+            }
+            // STILL_UNKNOWN / TERMINAL_ABANDONMENT stay neutral.
+        }
+        else if (isExternalObservationEvidence(e)) {
+            const polarity = truthPolarity(DAC_V003_OUTCOME_CLASS_FROM_V002_CLASSIFICATION[e.classification]);
+            if (polarity !== 'neutral')
+                evidencePolarities.add(polarity);
+        }
+    }
     if (conflictPresent) {
         notes.push('unresolvable CONFLICTING current observations present: commit/non-commit cannot be concluded and the historical observations stay immutable');
     }
     // Fail closed on materially contradictory authoritative evidence: no
-    // fixed precedence (commit-first or otherwise) may resolve a commit basis
-    // against a non-commit basis — that would be an arbitrary winner in the
+    // fixed precedence (commit-first or otherwise) may resolve one non-neutral
+    // polarity against another — that would be an arbitrary winner in the
     // C69 class. Truth stays unresolved; reconciliation with ordering
     // evidence or human authority is required.
-    if (commitBasisPresent && nonCommitPolarityPresent) {
-        notes.push('materially contradictory authoritative evidence: commit-polarity bases (AUTHORITATIVE_COMMITTED observation, linked effect record, or genuine #309 committed basis) stand against non-commit-polarity bases (KNOWN_FAILED_BEFORE_COMMIT observation, or genuine #309 non-committed/known-failed/rejected basis); no precedence resolves them and the truth stays unresolved');
+    if (evidencePolarities.size >= 2) {
+        notes.push(`materially contradictory authoritative evidence: distinct non-neutral polarities [${[...evidencePolarities].join(', ')}] coexist across current observations, effect-record links and/or genuine #309 upstream evidence; no precedence resolves them and the truth stays unresolved`);
         return Object.freeze({
             outcomeClass: 'STILL_UNKNOWN',
             remoteTruth: 'unresolved',

@@ -448,6 +448,94 @@ test('v3-003 (review P1-1 r3): upstream known-failed observation evidence is a s
   assert.equal(rejectedVsCommit.conclusion.unresolvedConflictPresent, true);
 });
 
+test('v3-003 (review P1-1 r4): one truthPolarity model gates every source combination', () => {
+  const logical = logicalOperation();
+  const link = adoptDacV003RegistryReference('evidence', {
+    baseline: BASELINE,
+    authorityScope: 'payment-sor/link-evidence',
+    primaryIdentity: 'link-r4',
+    logicalOperationIdentity: 'logical-op-0001',
+  });
+  // CURRENT REJECTED (non-commit polarity) vs linked effect record (commit
+  // polarity): previously concluded RECONCILED_COMMITTED — now unresolved.
+  const rejectedVsRecord = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-rejected-r4',
+        logicalOperation: logical,
+        observedClass: 'REJECTED',
+      }),
+    ],
+    inputEffectRecords: [effectRecord({ effectRecordIdentity: 'rec-r4', linkingEvidence: [link] })],
+  });
+  assert.equal(rejectedVsRecord.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(rejectedVsRecord.conclusion.unresolvedConflictPresent, true);
+  // CURRENT EFFECT_SUCCEEDED (provider-effect-success polarity) vs an
+  // upstream #309 RECONCILED_NOT_COMMITTED outcome: previously concluded
+  // RECONCILED_NOT_COMMITTED — now unresolved.
+  const successVsUpstreamNonCommit = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-success-r4',
+        logicalOperation: logical,
+        observedClass: 'EFFECT_SUCCEEDED',
+      }),
+    ],
+    upstreamV002Evidence: [v002ReconciliationOutcome('RECONCILED_NOT_COMMITTED')],
+  });
+  assert.equal(successVsUpstreamNonCommit.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(successVsUpstreamNonCommit.conclusion.unresolvedConflictPresent, true);
+  // CURRENT EFFECT_SUCCEEDED vs a linked effect record (commit polarity):
+  // distinct non-neutral polarities conflict in both directions.
+  const successVsRecord = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-success-r4b',
+        logicalOperation: logical,
+        observedClass: 'EFFECT_SUCCEEDED',
+      }),
+    ],
+    inputEffectRecords: [effectRecord({ effectRecordIdentity: 'rec-r4b', linkingEvidence: [link] })],
+  });
+  assert.equal(successVsRecord.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  // Upstream provider-scope-success observation vs a CURRENT commit basis.
+  const upstreamSuccessVsCommit = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-commit-r4',
+        logicalOperation: logical,
+        observedClass: 'AUTHORITATIVE_COMMITTED',
+      }),
+    ],
+    upstreamV002Evidence: [v002ObservationEvidence('effect-succeeded-provider-scope')],
+  });
+  assert.equal(upstreamSuccessVsCommit.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.equal(upstreamSuccessVsCommit.conclusion.unresolvedConflictPresent, true);
+  // Control: a NEUTRAL current observation (PENDING) does not gate a
+  // legitimate commit basis.
+  const neutralControl = request({
+    logicalOperation: logical,
+    externalAuthority: logical.externalAuthority,
+    inputObservations: [
+      observation({
+        observationIdentity: 'obs-pending-r4',
+        logicalOperation: logical,
+        observedClass: 'PENDING_IN_PROGRESS',
+      }),
+    ],
+    inputEffectRecords: [effectRecord({ effectRecordIdentity: 'rec-r4c', linkingEvidence: [link] })],
+  });
+  assert.equal(neutralControl.conclusion.outcomeClass, 'RECONCILED_COMMITTED');
+});
+
 test('v3-003 (review P1-1 r2): contradictory authoritative bases resolve by NO precedence — truth stays unresolved', () => {
   const logical = logicalOperation();
   // Commit-polarity and non-commit-polarity #309 outcomes for the same
