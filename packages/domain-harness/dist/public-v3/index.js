@@ -44,4 +44,11 @@ export { computeCompiledPackageId } from '../package/validation.js';
 export { createDomainRuntimeV3 } from '../runtime/create-domain-runtime-v3.js';
 export { DomainRuntimeV3Error, } from '../runtime/create-domain-runtime-v3.js';
 export { admissionEffectToolPort } from '../runtime/admission-effect-tool-adapter.js';
+// Issue #305 / A2 I-002: DAC cross-layer reference adapter core — the
+// dependency-light public boundary for DAC-owned semantic lifecycle roles
+// (promotion decision / application selection / selected Domain Data /
+// runtime contract / implementation / compatibility target / binding /
+// activation). Nominal, version-bound to the exact DAC v0.0.2 baseline,
+// fail-closed; no PROVISIONAL wire freeze; no role-conversion surface.
+export * from '../dac/index.js';
 //# sourceMappingURL=index.js.map

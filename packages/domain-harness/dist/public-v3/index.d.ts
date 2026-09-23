@@ -26,4 +26,5 @@ export type { CreateDomainRuntimeV3AuthorityOptions, CreateDomainRuntimeV3Option
 export { DomainRuntimeV3Error, type DomainRuntimeV3ErrorCode, } from '../runtime/create-domain-runtime-v3.js';
 export { admissionEffectToolPort } from '../runtime/admission-effect-tool-adapter.js';
 export type { AdmissionEffectToolAdapterOptions } from '../runtime/admission-effect-tool-adapter.js';
+export * from '../dac/index.js';
 //# sourceMappingURL=index.d.ts.map
