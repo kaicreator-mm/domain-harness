@@ -634,6 +634,14 @@ export function snapshotRefFromBusinessSnapshot(snapshot: BusinessSnapshot): Sna
   requireNonEmptyString(snapshot.source, 'snapshot.source');
   requireNonEmptyString(snapshot.key, 'snapshot.key');
   requireNonEmptyString(snapshot.revision, 'snapshot.revision');
+  // Uniform fail-closed contract with the projection path: a mutable alias
+  // can never become an exact snapshot basis (review finding F1, #308).
+  if (isMutableAliasToken(snapshot.revision)) {
+    throw new DacBridgeError(
+      'MUTABLE_ALIAS_REJECTED',
+      `business-source revision "${snapshot.revision}" is a mutable alias and can never be an exact snapshot basis`,
+    );
+  }
   return mintReference({
     adapter: DAC_BRIDGE_ADAPTER_VERSION,
     baseline: DAC_BRIDGE_BASELINE,

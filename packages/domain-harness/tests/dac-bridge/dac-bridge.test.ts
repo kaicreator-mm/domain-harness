@@ -452,6 +452,13 @@ test('dac bridge: ViewRef/SnapshotRef/WatchRef adapters preserve renderer-indepe
     'MUTABLE_ALIAS_REJECTED',
     'mutable alias projection revision',
   );
+  // Uniform fail-closed contract: business-source revisions too (review F1).
+  assertBridgeErrorCode(
+    () =>
+      snapshotRefFromBusinessSnapshot({ source: 'ledger', key: 'inv-42', revision: 'latest', value: {} }),
+    'MUTABLE_ALIAS_REJECTED',
+    'mutable alias business revision',
+  );
 
   // WatchRef over subscription + observed change.
   const watchSub: DomainSubscription = { kind: 'projection', projectionId: 'invoice-summary', key: 'inv-42' };
