@@ -38,6 +38,34 @@ function isUxSemanticRole(value) {
 function invalid(detail) {
     throw new DacV003CompatibilityError('INVALID_COMPATIBILITY_REQUEST', detail);
 }
+/**
+ * Deterministic constraint tokens for one declared requirement
+ * (APPLICATION_MANIFEST §8/§11): the declared qualification constraints,
+ * binding authority and required contract/profile target are carried into
+ * the auditable closure and the validation identity — never silently
+ * dropped, even where enforcement waits for a provider-capability evidence
+ * vocabulary.
+ */
+function capabilityConstraints(requirement) {
+    return [
+        ...(requirement.reference.contractProfileIdentity === undefined
+            ? []
+            : [`profile:${requirement.reference.contractProfileIdentity}`]),
+        ...[...requirement.qualifications].sort().map((q) => `qualification:${q}`),
+    ];
+}
+function portConstraints(requirement) {
+    return [
+        ...(requirement.reference.contractProfileIdentity === undefined
+            ? []
+            : [`profile:${requirement.reference.contractProfileIdentity}`]),
+        ...[...requirement.qualifications].sort().map((q) => `qualification:${q}`),
+        `bindingAuthority:${requirement.bindingAuthority}`,
+    ];
+}
+function hostBindingConstraints(requirement) {
+    return [`requiredHostBindingRole:${requirement.requiredHostBindingRole}`];
+}
 function requireArray(value, guard, field) {
     if (!Array.isArray(value))
         invalid(`${field} must be an array`);
@@ -74,12 +102,14 @@ function validateRequest(request) {
     if (!Array.isArray(request.supportedTargetProfiles)) {
         invalid('supportedTargetProfiles must be an array of exact target profile keys');
     }
-    const supportedTargetProfiles = request.supportedTargetProfiles.map((key) => {
-        if (typeof key !== 'string' || key.trim().length === 0) {
-            invalid('supportedTargetProfiles entries must be non-empty exact target profile keys');
-        }
-        return key;
-    });
+    const supportedTargetProfiles = [
+        ...new Set(request.supportedTargetProfiles.map((key) => {
+            if (typeof key !== 'string' || key.trim().length === 0) {
+                invalid('supportedTargetProfiles entries must be non-empty exact target profile keys');
+            }
+            return key;
+        })),
+    ].sort();
     if (!isDomainUXDefinitionRefValue(request.domainUxDefinition)) {
         invalid('domainUxDefinition must be the adopted exactly-1 Domain UX semantic definition (P1)');
     }
@@ -163,9 +193,12 @@ function validateRequest(request) {
 /**
  * Canonical JSON of the full evaluated closure. The digest over this material
  * is the validation identity: identical subject/target/requirement/evidence
- * closures always produce the identical validation identity and disposition
- * (pure evaluation), so no second authority or contradictory disposition can
- * be synthesized for the same exact subject/target.
+ * closures — INCLUDING the validator-environment support declaration the
+ * disposition depends on and the declared requirement constraints — always
+ * produce the identical validation identity and disposition (pure
+ * evaluation), so no second authority or contradictory disposition can be
+ * synthesized for the same exact subject/target (CROSS_LAYER_REFERENCES
+ * §6.3).
  */
 function canonicalValidationIdentityMaterial(input) {
     const sorted = (values) => [...values].sort();
@@ -180,7 +213,15 @@ function canonicalValidationIdentityMaterial(input) {
             implementationBuild: input.upstream.implementation.build,
         },
         targetProfile: input.targetProfile,
-        requirements: sorted(input.requirements.map((r) => [r.kind, r.identity, r.effectiveStrength])),
+        validatorEnvironment: {
+            supportedTargetProfiles: sorted(input.supportedTargetProfiles),
+        },
+        requirements: sorted(input.requirements.map((r) => [
+            r.kind,
+            r.identity,
+            r.effectiveStrength,
+            r.declaredConstraints.join('|'),
+        ])),
         evidence: sorted(input.evidence.map((e) => [e.identity, e.satisfies, e.provider, e.validForTargetProfile])),
         ux: {
             definition: input.ux.definition,
@@ -262,7 +303,7 @@ export async function validateDacV003Compatibility(request) {
         }
     }
     const requirementClosure = [];
-    const evaluateRequirement = (kind, reference, strength, condition) => {
+    const evaluateRequirement = (kind, reference, strength, condition, declaredConstraints) => {
         let effectiveStrength;
         if (strength === 'conditional') {
             effectiveStrength = condition !== undefined && parsed.applicableConditions.has(condition)
@@ -278,6 +319,7 @@ export async function validateDacV003Compatibility(request) {
             requirementIdentity: reference.primaryIdentity,
             effectiveStrength,
             satisfiedBy: freeze(matching.map((evidence) => evidence.reference.primaryIdentity)),
+            declaredConstraints: freeze([...declaredConstraints]),
         }));
         if (effectiveStrength === 'required' && matching.length === 0) {
             incompatible = true;
@@ -288,15 +330,15 @@ export async function validateDacV003Compatibility(request) {
         }
     };
     for (const requirement of parsed.capabilityRequirements) {
-        evaluateRequirement('capability', requirement.reference, requirement.strength, requirement.condition);
+        evaluateRequirement('capability', requirement.reference, requirement.strength, requirement.condition, capabilityConstraints(requirement));
     }
     for (const requirement of parsed.portRequirements) {
-        evaluateRequirement('port', requirement.reference, requirement.strength, requirement.condition);
+        evaluateRequirement('port', requirement.reference, requirement.strength, requirement.condition, portConstraints(requirement));
     }
     // A declared Host Binding requirement is a requirement: the declaration
     // exists precisely because the composition needs that host-binding role.
     for (const requirement of parsed.hostBindingRequirements) {
-        evaluateRequirement('host-binding', requirement, 'required', undefined);
+        evaluateRequirement('host-binding', requirement, 'required', undefined, hostBindingConstraints(requirement));
     }
     // --- UX semantic-role coverage (C58).
     const covered = request.interactionCoverage;
@@ -325,10 +367,12 @@ export async function validateDacV003Compatibility(request) {
             implementation: verdict.compatibility.runtimeImplementation,
         },
         targetProfile: targetProfileKey ?? null,
+        supportedTargetProfiles: parsed.supportedTargetProfiles,
         requirements: requirementClosure.map((entry) => ({
             kind: entry.kind,
             identity: entry.requirementIdentity,
             effectiveStrength: entry.effectiveStrength,
+            declaredConstraints: entry.declaredConstraints,
         })),
         evidence: parsed.evidence.map((evidence) => ({
             identity: evidence.reference.primaryIdentity,
@@ -393,6 +437,7 @@ export async function validateDacV003Compatibility(request) {
             authorityScope: DAC_V003_COMPATIBILITY_AUTHORITY_SCOPE,
             validationIdentity,
             targetProfile: targetProfileKey,
+            supportedTargetProfiles: freeze([...parsed.supportedTargetProfiles]),
             upstreamSelectionValidation: verdict,
         }),
         requirementClosure: freeze(requirementClosure),

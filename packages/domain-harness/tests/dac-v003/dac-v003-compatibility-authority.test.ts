@@ -12,6 +12,7 @@ import {
   DAC_V003_COMPATIBILITY_AUTHORITY_SCOPE,
   DAC_V003_COMPATIBILITY_AUTHORITY_VERSION,
   DacV003CompatibilityError,
+  adoptDacV003CapabilityRequirement,
   deriveDacV003CompatibilityResult,
   isDacV003CompatibilityResultRefValue,
   isDacV003CompatibilityResultValue,
@@ -94,6 +95,99 @@ test('v3-002 deterministic identity: identical closure => identical validation i
   assert.notEqual(third.subject.validationIdentity, first.subject.validationIdentity);
   assert.equal(third.subject.authorityScope, first.subject.authorityScope);
   assert.equal(third.disposition.value, 'INCOMPATIBLE');
+});
+
+test('v3-002 §6.3: the validator-environment support set is part of the subject and identity — no contradictory disposition under one identity', async () => {
+  // Identical subject/target/requirement/evidence closure; ONLY the declared
+  // support set differs. The dispositions contradict, so the validation
+  // identities MUST differ and the two records must never resolve to one
+  // authority (this is the reproduced P1-1 of the first independent review).
+  const supported = await validateDacV003Compatibility(
+    await buildCompatibleRequest({ supportedTargetProfiles: ['domain-harness@v0.0.3-profile/node-1'] }),
+  );
+  const unsupported = await validateDacV003Compatibility(
+    await buildCompatibleRequest({ supportedTargetProfiles: ['domain-harness@v0.0.3-profile/other'] }),
+  );
+  assert.equal(supported.disposition.value, 'COMPATIBLE');
+  assert.equal(unsupported.disposition.value, 'INCOMPATIBLE');
+  assert.notEqual(
+    supported.subject.validationIdentity,
+    unsupported.subject.validationIdentity,
+    'disposition-relevant environment declaration is identity material',
+  );
+  assert.deepEqual(supported.subject.supportedTargetProfiles, [
+    'domain-harness@v0.0.3-profile/node-1',
+  ]);
+  assert.deepEqual(unsupported.subject.supportedTargetProfiles, [
+    'domain-harness@v0.0.3-profile/other',
+  ]);
+  assert.throws(
+    () => assertSameDacV003CompatibilityAuthority(supported.validationRef, unsupported),
+    (error: unknown) =>
+      error instanceof DacV003CompatibilityError && error.code === 'AUTHORITY_DIVERGENCE',
+  );
+  assert.throws(
+    () => assertSameDacV003CompatibilityAuthority(unsupported.validationRef, supported),
+    (error: unknown) =>
+      error instanceof DacV003CompatibilityError && error.code === 'AUTHORITY_DIVERGENCE',
+  );
+  // Support-set order/duplication is not identity-relevant (same declaration).
+  const reordered = await validateDacV003Compatibility(
+    await buildCompatibleRequest({
+      supportedTargetProfiles: [
+        'domain-harness@v0.0.3-profile/node-1',
+        'domain-harness@v0.0.3-profile/node-1',
+      ],
+    }),
+  );
+  assert.equal(
+    reordered.subject.validationIdentity,
+    supported.subject.validationIdentity,
+    'sorted-unique support declaration is canonical',
+  );
+});
+
+test('v3-002 §11: declared requirement constraints are carried into the closure and the identity, never silently dropped', async () => {
+  const baseline = { ...DAC_V003_BASELINE };
+  const withConstraints = adoptDacV003CapabilityRequirement({
+    baseline,
+    authorityScope: 'dac://app-composition/acme',
+    primaryIdentity: 'cap-req/persistence-1',
+    semanticIdentity: 'capability/durable-storage',
+    strength: 'required',
+    qualifications: ['region:eu', 'at-rest-encryption'],
+    contractProfileIdentity: 'domain-harness@v0.0.3-profile/node-1',
+  });
+  const constrained = await validateDacV003Compatibility(
+    await buildCompatibleRequest({
+      capabilityRequirements: [withConstraints],
+    }),
+  );
+  const unconstrained = await validateDacV003Compatibility(await buildCompatibleRequest());
+  assert.notEqual(
+    constrained.subject.validationIdentity,
+    unconstrained.subject.validationIdentity,
+    'declared constraints are identity material',
+  );
+  const entry = constrained.requirementClosure.find(
+    (e) => e.requirementIdentity === 'cap-req/persistence-1',
+  );
+  assert.ok(entry);
+  assert.deepEqual(entry.declaredConstraints, [
+    'profile:domain-harness@v0.0.3-profile/node-1',
+    'qualification:at-rest-encryption',
+    'qualification:region:eu',
+  ]);
+  const portEntry = constrained.requirementClosure.find((e) => e.kind === 'port');
+  assert.ok(portEntry);
+  assert.deepEqual(portEntry.declaredConstraints, [
+    'bindingAuthority:runtime-binding-authority',
+  ]);
+  const hostBindingEntry = constrained.requirementClosure.find((e) => e.kind === 'host-binding');
+  assert.ok(hostBindingEntry);
+  assert.deepEqual(hostBindingEntry.declaredConstraints, [
+    'requiredHostBindingRole:runtime-port/sqlite-storage',
+  ]);
 });
 
 test('v3-002 validation act, validation record, result ref and result record all resolve to the one authority', async () => {

@@ -222,6 +222,15 @@ export interface DacV003RequirementClosureEntry {
     /** Effective strength after conditional applicability was applied. */
     readonly effectiveStrength: 'required' | 'optional' | 'not-applicable';
     readonly satisfiedBy: readonly string[];
+    /**
+     * The declared constraint semantics carried into the evaluation
+     * (qualifications, binding authority, required host-binding role, required
+     * contract/profile target). APPLICATION_MANIFEST §11: a validator MUST NOT
+     * silently drop declared required constraints — even where enforcement
+     * waits for a provider-capability evidence vocabulary, the declared values
+     * remain part of the auditable closure and the validation identity.
+     */
+    readonly declaredConstraints: readonly string[];
 }
 /** The UX interaction-closure outcome the validation evaluated. */
 export interface DacV003UxClosure {
@@ -254,6 +263,15 @@ export interface DacV003CompatibilityValidation {
         readonly authorityScope: typeof DAC_V003_COMPATIBILITY_AUTHORITY_SCOPE;
         readonly validationIdentity: string;
         readonly targetProfile: string | undefined;
+        /**
+         * The exact validator-environment support declaration this validation
+         * evaluated against (sorted unique). Part of the subject closure and of
+         * the deterministic identity: the disposition depends on it, so two
+         * validations differing only in the support set are different
+         * validations — a contradictory disposition can never appear under one
+         * validation identity (CROSS_LAYER_REFERENCES §6.3).
+         */
+        readonly supportedTargetProfiles: readonly string[];
         readonly upstreamSelectionValidation: SelectedCompositionValidation;
     };
     readonly requirementClosure: readonly DacV003RequirementClosureEntry[];
