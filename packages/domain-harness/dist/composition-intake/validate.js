@@ -1,6 +1,6 @@
 import { PackageActivationError } from '../package/errors.js';
 import { validateCompiledPackage } from '../package/validation.js';
-import { adoptCompatibilityTargetRef, expectApplicationSelectionRef, expectCompatibilityTargetRef, expectPromotionDecisionRef, expectRuntimeContractRef, expectRuntimeImplementationRef, expectSelectedDomainDataRef, } from '../dac/guards.js';
+import { adoptCompatibilityTargetRef, expectApplicationSelectionRef, expectCompatibilityTargetRef, expectPromotionDecisionRef, expectRuntimeContractRef, expectRuntimeImplementationRef, expectSelectedDomainDataRef, isApplicationSelectionRef, isPromotionDecisionRef, isRuntimeContractRef, isRuntimeImplementationRef, isSelectedDomainDataRef, } from '../dac/guards.js';
 import { DAC_REFERENCE_BASELINE } from '../dac/contracts.js';
 import { COMPOSITION_INTAKE_ADAPTER_VERSION, CompositionIntakeError, } from './contracts.js';
 const CAPABILITY_ID_PATTERN = /^.+@\d+$/u;
@@ -230,6 +230,35 @@ function freeze(value) {
     return Object.freeze(value);
 }
 /**
+ * Private minting registry. Only verdicts actually produced by
+ * `validateSelectedComposition` pass `isSelectedCompositionValidation` — a
+ * structurally identical forged object is rejected, so downstream stages
+ * (#307 runtime binding) can prove stage-3 compatibility PASS actually
+ * happened instead of being claimed.
+ */
+const MINTED_VALIDATIONS = new WeakSet();
+/** True only for verdicts actually minted by `validateSelectedComposition`. */
+export function isSelectedCompositionValidation(value) {
+    if (value === null || typeof value !== 'object' || !MINTED_VALIDATIONS.has(value)) {
+        return false;
+    }
+    const candidate = value;
+    return (candidate.intake === COMPOSITION_INTAKE_ADAPTER_VERSION &&
+        typeof candidate.validatedPackageId === 'string' &&
+        candidate.validatedPackageId.length > 0 &&
+        isSelectedDomainDataRef(candidate.selectedDomainData) &&
+        candidate.provenance !== null &&
+        typeof candidate.provenance === 'object' &&
+        isPromotionDecisionRef(candidate.provenance.promotionDecision) &&
+        isApplicationSelectionRef(candidate.provenance.applicationSelection) &&
+        candidate.declared !== null &&
+        typeof candidate.declared === 'object' &&
+        isRuntimeContractRef(candidate.declared.runtimeContract) &&
+        isRuntimeImplementationRef(candidate.declared.runtimeImplementation) &&
+        typeof candidate.compatibility === 'object' &&
+        candidate.compatibility !== null);
+}
+/**
  * Validates an already-decided DAC-aware composition against the concrete
  * compiled package and runtime compatibility target (fail closed on every
  * mismatch). Returns stage-3 compatibility evidence only — never a selection,
@@ -268,7 +297,7 @@ export async function validateSelectedComposition(request) {
             hostCapabilities: [...new Set(request.environment.hostCapabilities)].sort(),
         },
     });
-    return freeze({
+    const verdict = freeze({
         intake: COMPOSITION_INTAKE_ADAPTER_VERSION,
         validatedPackageId: validatedPackage.manifest.packageId,
         validatedPackage,
@@ -292,5 +321,7 @@ export async function validateSelectedComposition(request) {
             runtimeImplementation: freeze({ ...request.environment.implementation }),
         }),
     });
+    MINTED_VALIDATIONS.add(verdict);
+    return verdict;
 }
 //# sourceMappingURL=validate.js.map

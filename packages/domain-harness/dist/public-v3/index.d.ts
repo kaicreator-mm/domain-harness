@@ -30,4 +30,5 @@ export * from '../dac/index.js';
 export * from '../external-authority/index.js';
 export * from '../composition-intake/index.js';
 export * from '../dac-bridge/index.js';
+export * from '../runtime-binding/index.js';
 //# sourceMappingURL=index.d.ts.map
