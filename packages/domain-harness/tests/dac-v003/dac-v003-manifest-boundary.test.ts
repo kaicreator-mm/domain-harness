@@ -313,6 +313,99 @@ test('V3-004/#328 review repair P1-1 regression: cyclic opaque content fails clo
   );
 });
 
+test('V3-004/#328 review repair R2 P2 regression: true cycles fail closed in every shape (mutual, shared-with-back-edge, through arrays)', async () => {
+  const fixture = await buildManifestInput();
+  // Two-node mutual cycle (no direct self-reference anywhere).
+  const first: Record<string, unknown> = {};
+  const second: Record<string, unknown> = {};
+  first.peer = second;
+  second.peer = first;
+  await expectManifestError({ ...fixture.input, opaque: { first } }, 'INVALID_MANIFEST_INPUT');
+  // A subtree referenced from two SIBLING positions that also re-enters
+  // itself: the sibling aliasing is legitimate, the self-edge is the cycle.
+  const shared: Record<string, unknown> = { note: 'shared-with-back-edge' };
+  shared.self = shared;
+  await expectManifestError(
+    { ...fixture.input, compositionProvenance: { a: shared, b: shared } },
+    'INVALID_MANIFEST_INPUT',
+  );
+  // Cycle through an object → array → object path.
+  const holder: Record<string, unknown> = { items: [] as unknown[] };
+  (holder.items as unknown[]).push(holder);
+  await expectManifestError({ ...fixture.input, opaque: { holder } }, 'INVALID_MANIFEST_INPUT');
+});
+
+test('V3-004/#328 review repair R2 P2 regression: acyclic shared-object aliasing is adoptable deterministic JSON content', async () => {
+  const fixture = await buildManifestInput();
+  const shared: Record<string, unknown> = { note: 'shared-subtree', tags: ['x', 'y'] };
+  const sharedArray = ['first', 'second'];
+  const input = {
+    ...fixture.input,
+    manifestIdentity: 'manifest://acme/tally-ledger/7-r2p2-shared',
+    opaque: { left: shared, right: shared, list: sharedArray, copy: sharedArray },
+  };
+  const manifest = await adoptDacV003ApplicationManifest(await withDeclaredDigest(input), {
+    sha256: createSha256Fake(),
+  });
+  const opaque = manifest.opaque as Record<string, unknown>;
+  // Both positions carry the shared subtree's verbatim content, exactly as
+  // the canonical JSON material serializes aliased (non-cyclic) content.
+  assert.deepEqual(opaque.left, shared);
+  assert.deepEqual(opaque.right, shared);
+  assert.deepEqual(opaque.list, sharedArray);
+  assert.deepEqual(opaque.copy, sharedArray);
+  assert.notEqual(opaque.left, opaque.right);
+  // Aliasing does not perturb determinism: the same aliased input digests
+  // identically every time, through both the digest entry point and adoption.
+  const digestOnce = await computeDacV003ApplicationManifestDigest(input, {
+    sha256: createSha256Fake(),
+  });
+  const digestTwice = await computeDacV003ApplicationManifestDigest(input, {
+    sha256: createSha256Fake(),
+  });
+  assert.equal(digestOnce, digestTwice);
+  assert.equal(manifest.manifestContentDigest, digestOnce);
+  // And the adopted copy stays detached from the caller's shared subtrees.
+  const materializedBefore = JSON.stringify(manifest);
+  shared.note = 'mutated-by-caller';
+  (shared.tags as string[])[0] = 'tampered';
+  sharedArray[0] = 'tampered';
+  assert.equal(JSON.stringify(manifest), materializedBefore);
+  assert.deepEqual(opaque.left, { note: 'shared-subtree', tags: ['x', 'y'] });
+});
+
+test('V3-004/#328 review repair R2 P1 regression: non-JSON-shaped opaque values fail closed instead of entering digest material', async () => {
+  const fixture = await buildManifestInput();
+  // A mutable-behind-freeze Date and its toJSON form are never deterministic
+  // digest material; exotic objects fail closed at any position.
+  await expectManifestError(
+    { ...fixture.input, opaque: { when: new Date(0) } },
+    'INVALID_MANIFEST_INPUT',
+  );
+  await expectManifestError(
+    { ...fixture.input, compositionProvenance: { index: new Map() } },
+    'INVALID_MANIFEST_INPUT',
+  );
+  await expectManifestError(
+    { ...fixture.input, opaque: new Date(0) },
+    'INVALID_MANIFEST_INPUT',
+  );
+  // bigint would throw natively inside JSON canonicalization; functions and
+  // symbols are silently dropped by it — both fail closed here instead.
+  await expectManifestError(
+    { ...fixture.input, opaque: { size: 10n } },
+    'INVALID_MANIFEST_INPUT',
+  );
+  await expectManifestError(
+    { ...fixture.input, opaque: { helper: () => 'x' } },
+    'INVALID_MANIFEST_INPUT',
+  );
+  await expectManifestError(
+    { ...fixture.input, compositionProvenance: { tag: Symbol('x') } },
+    'INVALID_MANIFEST_INPUT',
+  );
+});
+
 test('V3-004/#328 review repair P1-1 regression: the digest entry point rejects nested forbidden content and benign nested content stays digest-covered', async () => {
   const fixture = await buildManifestInput();
   const validation = await buildValidationFor();

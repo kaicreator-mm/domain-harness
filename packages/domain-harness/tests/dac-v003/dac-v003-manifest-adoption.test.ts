@@ -6,7 +6,8 @@
 // identity projection.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DAC_V003_BASELINE } from '../../src/dac-v003/index.js';
+import { DAC_V003_BASELINE, adoptDacV003RegistryReference } from '../../src/dac-v003/index.js';
+import { adoptDacV003LogicalOperationRef } from '../../src/dac-v003-external/index.js';
 import {
   DAC_V003_MANIFEST_ADAPTER_VERSION,
   DAC_V003_MANIFEST_CONTRACT_VERSION,
@@ -20,6 +21,7 @@ import {
   buildAdoptedManifest,
   buildExternalAuthority,
   buildManifestInput,
+  buildValidationFor,
   withDeclaredDigest,
 } from './manifest-fixture.js';
 import { createSha256Fake } from '../package/fixture.js';
@@ -213,5 +215,149 @@ test('V3-004/#328: adoption rejects a foreign/forged manifest object and identit
   assert.throws(
     () => dacV003ManifestIdentityOf({ ...manifest } as never),
     (error: unknown) => error instanceof DacV003ManifestError && error.code === 'NOT_AN_ADOPTED_V003_MANIFEST',
+  );
+});
+
+test('V3-004/#328 review repair R2 P1 regression: post-adoption mutation of the caller input cannot change adopted content or its verified digest', async () => {
+  const fixture = await buildManifestInput();
+  // Caller-owned nested content in every digest-covered opaque-preserved area.
+  const nestedOpaque: Record<string, unknown> = {
+    nested: { note: 'original', deep: { tool: 'composer' } },
+  };
+  const nestedProvenance: Record<string, unknown> = {
+    layer: { tool: 'composer', options: ['a', 'b'] },
+  };
+  const nestedCapability: Record<string, unknown> = {
+    retry: { policy: 'none', backoff: { baseMs: 10 } },
+  };
+  const nestedDeclarationOpaque: Record<string, unknown> = { notes: { source: 'sor-docs' } };
+  const input = {
+    ...fixture.input,
+    manifestIdentity: 'manifest://acme/tally-ledger/7-r2p1-detach',
+    opaque: nestedOpaque,
+    compositionProvenance: nestedProvenance,
+    externalAuthority: {
+      applicability: 'APPLICABLE' as const,
+      declarations: [
+        {
+          authority: buildExternalAuthority('sor://billing/acme-r2p1'),
+          capabilityRequirements: nestedCapability,
+          opaque: nestedDeclarationOpaque,
+        },
+      ],
+    },
+  };
+  const manifest = await adoptDacV003ApplicationManifest(await withDeclaredDigest(input), {
+    sha256: createSha256Fake(),
+  });
+  const digestBefore = manifest.manifestContentDigest;
+  const materializedBefore = JSON.stringify(manifest);
+  const opaqueBefore = structuredClone(manifest.opaque);
+  const provenanceBefore = structuredClone(manifest.compositionProvenance);
+  const externalAuthorityBefore = structuredClone(manifest.externalAuthority);
+
+  // The caller mutates every adopted area at depth AFTER the one-time screen.
+  (nestedOpaque.nested as Record<string, unknown>).note = 'changed-by-caller';
+  ((nestedOpaque.nested as Record<string, unknown>).deep as Record<string, unknown>).tool =
+    'attacker';
+  ((nestedProvenance.layer as Record<string, unknown>).options as string[])[0] = 'tampered';
+  ((nestedCapability.retry as Record<string, unknown>).backoff as Record<string, unknown>).baseMs =
+    999;
+  (nestedDeclarationOpaque.notes as Record<string, unknown>).source = 'attacker';
+
+  // Returned adopted content and its verified digest are unchanged.
+  assert.equal(manifest.manifestContentDigest, digestBefore);
+  assert.equal(JSON.stringify(manifest), materializedBefore);
+  assert.deepEqual(manifest.opaque, opaqueBefore);
+  assert.deepEqual(manifest.compositionProvenance, provenanceBefore);
+  assert.deepEqual(manifest.externalAuthority, externalAuthorityBefore);
+
+  // The adopted areas are detached deep copies of the caller input...
+  assert.notEqual(manifest.opaque, nestedOpaque);
+  assert.notEqual(manifest.opaque, input.opaque);
+  assert.notEqual((manifest.opaque as Record<string, unknown>).nested, nestedOpaque.nested);
+  if (manifest.externalAuthority.applicability === 'APPLICABLE') {
+    const [declaration] = manifest.externalAuthority.declarations;
+    assert.ok(declaration);
+    assert.notEqual(declaration.capabilityRequirements, nestedCapability);
+  }
+  // ...recursively frozen: direct mutation of the adopted nested content fails.
+  assert.ok(Object.isFrozen(manifest.opaque));
+  assert.ok(Object.isFrozen((manifest.opaque as Record<string, unknown>).nested));
+  assert.ok(Object.isFrozen(manifest.compositionProvenance));
+  assert.ok(
+    Object.isFrozen((manifest.compositionProvenance as Record<string, unknown>).layer),
+  );
+  assert.ok(
+    Object.isFrozen(
+      ((manifest.compositionProvenance as Record<string, unknown>).layer as Record<string, unknown>)
+        .options,
+    ),
+  );
+  assert.throws(() => {
+    ((manifest.opaque as Record<string, unknown>).nested as Record<string, unknown>).note = 'x';
+  });
+  assert.throws(() => {
+    (
+      (manifest.compositionProvenance as Record<string, unknown>).layer as Record<string, unknown>
+    ).tool = 'x';
+  });
+});
+
+test('V3-004/#328 review repair R2 P1 regression: forbidden records inserted into the caller input after adoption are not absorbed', async () => {
+  const fixture = await buildManifestInput();
+  const nested: Record<string, unknown> = { note: 'v0.0.3 opaque content' };
+  const input = {
+    ...fixture.input,
+    manifestIdentity: 'manifest://acme/tally-ledger/7-r2p1-inject',
+    opaque: { nested },
+  };
+  const manifest = await adoptDacV003ApplicationManifest(await withDeclaredDigest(input), {
+    sha256: createSha256Fake(),
+  });
+  const digestBefore = manifest.manifestContentDigest;
+  const materializedBefore = JSON.stringify(manifest);
+
+  // Late insertion of every forbidden family into the ORIGINAL caller object.
+  const validation = await buildValidationFor();
+  const bindingRef = adoptDacV003RegistryReference('runtime-binding', {
+    baseline: { ...DAC_V003_BASELINE },
+    authorityScope: 'domain-harness://runtime-binding',
+    primaryIdentity: 'binding/instance-r2p1',
+  });
+  const logicalOperation = adoptDacV003LogicalOperationRef({
+    baseline: { ...DAC_V003_BASELINE },
+    runtimeAuthorityScope: 'domain-harness://runtime',
+    logicalOperationIdentity: 'op://tally/commit-r2p1',
+    externalAuthority: buildExternalAuthority('sor://billing/acme-r2p1-inject'),
+    operationSemanticIdentity: 'tally/commit',
+  });
+  nested.validation = validation;
+  nested.binding = bindingRef;
+  nested.pendingOperation = logicalOperation;
+  nested.currentWorkflowStep = 'step-9';
+
+  // The adopted manifest is byte-identical: none of the late inserts reached
+  // the returned content, and its verified digest did not move.
+  assert.equal(JSON.stringify(manifest), materializedBefore);
+  assert.equal(manifest.manifestContentDigest, digestBefore);
+  assert.deepEqual(manifest.opaque, { nested: { note: 'v0.0.3 opaque content' } });
+
+  // Re-presenting the mutated input cannot smuggle any of the forbidden
+  // inserts past the one-time screen either: screening is part of
+  // canonicalization, so the late-inserted records fail closed (whichever
+  // screening class fires first by key order) before any digest logic.
+  await assert.rejects(
+    adoptDacV003ApplicationManifest(
+      { ...input, manifestContentDigest: digestBefore },
+      { sha256: createSha256Fake() },
+    ),
+    (error: unknown) =>
+      error instanceof DacV003ManifestError &&
+      [
+        'MANIFEST_EVIDENCE_ABSORPTION',
+        'INSTANCE_STATE_LEAKAGE',
+        'LIVE_EXTERNAL_STATE_ABSORPTION',
+      ].includes(error.code),
   );
 });

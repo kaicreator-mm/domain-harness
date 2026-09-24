@@ -137,35 +137,106 @@ function rejectInstanceStateLeakage(area, where) {
  * buried under extra nesting must never reach the digest either). Cyclic
  * structures are unserializable digest material and fail closed through the
  * declared taxonomy instead of a native TypeError/stack overflow.
+ *
+ * The screen additionally enforces the declared "JSON-shaped" domain
+ * (review repair R2 P1): every value must be a JSON scalar
+ * (null/undefined/boolean/number/string), a plain object or an array. An
+ * exotic object (Date/Map/class instance) or a function/symbol/bigint value
+ * is either mutable behind `Object.freeze` or not canonically serializable,
+ * so accepting it would leave caller-mutable references or a degraded
+ * canonicalization inside digest-covered content.
  */
 function rejectCyclicOpaque(where) {
     throw new DacV003ManifestError('INVALID_MANIFEST_INPUT', `${where}: opaque-preserved manifest content must be an acyclic JSON-shaped structure (an object/array graph that visits itself can never be canonical digest material)`);
 }
-function screenOpaqueValue(value, where, seen) {
+function rejectNonJsonOpaque(where) {
+    throw new DacV003ManifestError('INVALID_MANIFEST_INPUT', `${where}: opaque-preserved manifest content must be JSON-shaped (only null/boolean/number/string scalars, plain objects and arrays can be deterministic digest material; exotic objects, functions, symbols and bigints fail closed)`);
+}
+function isPlainRecord(value) {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+/**
+ * Tracks only the ACTIVE recursion path (review repair R2 P2): an entry is
+ * removed again when its subtree finishes screening, so a structure seen
+ * twice in SIBLING positions — an acyclic JSON-serializable shared object —
+ * is legitimately screened at each position, and only a structure that
+ * re-enters itself on its own current path (a true cycle) fails closed.
+ */
+function screenOpaqueValue(value, where, active) {
     rejectEvidenceAbsorption(value, where);
     rejectLiveExternalState(value, where);
+    if (value === null)
+        return;
+    if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'bigint') {
+        rejectNonJsonOpaque(where);
+    }
+    if (typeof value !== 'object')
+        return;
     if (Array.isArray(value)) {
-        if (seen.has(value))
+        if (active.has(value))
             rejectCyclicOpaque(where);
-        seen.add(value);
+        active.add(value);
         for (let index = 0; index < value.length; index += 1) {
-            screenOpaqueValue(value[index], `${where}[${index}]`, seen);
+            screenOpaqueValue(value[index], `${where}[${index}]`, active);
         }
+        active.delete(value);
         return;
     }
-    if (isRecord(value)) {
-        if (seen.has(value))
-            rejectCyclicOpaque(where);
-        seen.add(value);
-        rejectInstanceStateLeakage(value, where);
-        for (const key of Object.keys(value)) {
-            screenOpaqueValue(value[key], `${where}.${key}`, seen);
-        }
+    if (!isPlainRecord(value)) {
+        rejectNonJsonOpaque(where);
     }
+    if (active.has(value))
+        rejectCyclicOpaque(where);
+    active.add(value);
+    rejectInstanceStateLeakage(value, where);
+    for (const key of Object.keys(value)) {
+        screenOpaqueValue(value[key], `${where}.${key}`, active);
+    }
+    active.delete(value);
 }
 /** Screens one opaque-preserved area (root included) at every depth. */
 function screenOpaqueArea(area, where) {
     screenOpaqueValue(area, where, new WeakSet());
+}
+// ---------------------------------------------------------------------------
+// Adoption-time detachment of caller-owned opaque content (review repair
+// R2 P1). Authority-minted records (V3-001 references, V3-002 declarations,
+// #327 wrappers) are immutable by their minting authority and are carried by
+// exact reference; the opaque-preserved areas below are caller-owned, so
+// every one of them is deterministically deep-copied and recursively frozen
+// BEFORE it becomes adopted/digest-bound state.
+// ---------------------------------------------------------------------------
+function frozenJsonValue(value) {
+    if (Array.isArray(value)) {
+        return Object.freeze(value.map((element) => frozenJsonValue(element)));
+    }
+    if (typeof value === 'object' && value !== null && isPlainRecord(value)) {
+        const copy = {};
+        for (const key of Object.keys(value)) {
+            copy[key] = frozenJsonValue(value[key]);
+        }
+        return Object.freeze(copy);
+    }
+    return value;
+}
+/**
+ * Deterministic deep copy of one screened opaque-preserved area, recursively
+ * frozen. Key order, array order and the canonical JSON view of shared
+ * subtrees are preserved (an acyclic aliased subtree appears at each of its
+ * positions, exactly as the canonical material serializes it), so the copy
+ * is digest-identical to the input while being fully detached from it: after
+ * adoption, mutating the caller's original input can change neither the
+ * returned manifest content nor the content behind its verified digest, and
+ * a forbidden record inserted into the original after the one-time screen is
+ * never absorbed.
+ */
+function frozenJsonCopyOf(area) {
+    const copy = {};
+    for (const key of Object.keys(area)) {
+        copy[key] = frozenJsonValue(area[key]);
+    }
+    return Object.freeze(copy);
 }
 // ---------------------------------------------------------------------------
 // Selected Domain Data closure (cardinality 1..n, effective promotion
@@ -401,8 +472,8 @@ function validateExternalAuthorityPath(value) {
         screenOpaqueArea(opaque, `${where}.opaque`);
         const adopted = {
             authority,
-            capabilityRequirements: Object.freeze({ ...capabilityRequirements }),
-            opaque: Object.freeze({ ...opaque }),
+            capabilityRequirements: frozenJsonCopyOf(capabilityRequirements),
+            opaque: frozenJsonCopyOf(opaque),
         };
         return Object.freeze(adopted);
     });
@@ -499,8 +570,8 @@ async function materializeManifest(input) {
         requirements,
         satisfactionEvidenceRefs,
         externalAuthority,
-        compositionProvenance: Object.freeze({ ...compositionProvenance }),
-        opaque: Object.freeze({ ...opaque }),
+        compositionProvenance: frozenJsonCopyOf(compositionProvenance),
+        opaque: frozenJsonCopyOf(opaque),
     };
     return { material: canonicalManifestMaterial(record), record };
 }
