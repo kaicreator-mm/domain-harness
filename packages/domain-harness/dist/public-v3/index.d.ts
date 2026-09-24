@@ -35,4 +35,5 @@ export * from '../application-manifest/index.js';
 export * from '../dac-v003/index.js';
 export * from '../dac-v003-compatibility/index.js';
 export * from '../dac-v003-external/index.js';
+export * from '../dac-v003-manifest/index.js';
 //# sourceMappingURL=index.d.ts.map
