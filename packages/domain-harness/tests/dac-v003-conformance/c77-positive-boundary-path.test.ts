@@ -16,8 +16,14 @@
 //     -> logical external operation / ExternalAuthority evidence
 //     -> authoritative external observation + reconciliation evidence
 //        (external truth NOT_OWNED)
-//     -> executed Runtime consequence/outcome (commit-claim predicates +
-//        runtime-logical outcome correlation, actually read and asserted)
+//     -> executed Runtime consequence/outcome: the journey's activated
+//        package pin is registered and DRIVEN through the existing public
+//        v0.2 Runtime assembly (createDomainRuntime.openInstance/send), the
+//        mailbox drain executes the pinned workflow, and the resulting
+//        Runtime-owned processed disposition + committed instance state are
+//        READ from the Runtime store and asserted (commit-claim predicates +
+//        runtime-logical outcome correlation over that READ result — never a
+//        hand-written Runtime disposition/state)
 //     -> UX consequence/correlation evidence correlated to that Runtime
 //        outcome (Domain UX semantics NOT_OWNED)
 //
@@ -76,6 +82,8 @@ import {
   activateRuntimeBinding,
   RuntimeBindingError,
 } from '../../src/runtime-binding/index.js';
+import { createDomainRuntime } from '../../src/runtime/index.js';
+import { StaticPackageRegistry } from '../../src/package/registry.js';
 import {
   DAC_BRIDGE_BASELINE,
   adoptDomainIntentRef,
@@ -96,11 +104,7 @@ import {
   observationSupportsCommitClaim,
   verifyExternalEffectCorrelation,
 } from '../../src/external-authority/index.js';
-import type {
-  DomainMessage,
-  MessageDispositionSnapshot,
-} from '../../src/v2/contracts/message.js';
-import type { WorkflowInstanceSnapshot } from '../../src/v2/contracts/workflow.js';
+import type { DomainMessage } from '../../src/v2/contracts/message.js';
 import {
   buildIntakeVerdictFor,
   buildManifestInput,
@@ -111,6 +115,14 @@ import {
 } from '../dac-v003/manifest-fixture.js';
 import { buildV003Refs, V003_TARGET_PROFILE } from '../dac-v003/compatibility-fixture.js';
 import { createSha256Fake } from '../package/fixture.js';
+import { createRuntimeHostFake } from '../helpers/runtime-host-fake.js';
+import { InMemoryControlRuntimeStore } from '../control/in-memory-control-runtime-store.js';
+import {
+  JOURNEY_ADDRESS,
+  JOURNEY_COMMAND_TYPE,
+  JOURNEY_TERMINAL_STATE,
+  buildJourneyVerdict,
+} from './journey-runtime-fixture.js';
 
 const baseline = { ...DAC_V003_BASELINE };
 const sha256 = createSha256Fake();
@@ -198,8 +210,11 @@ test('C77: the complete positive boundary path is one connected exact identity/p
   });
   // The journey's compiled subject: a genuine #306 stage-3 verdict over the
   // compiled package of revision rev-000042. Built FIRST so the evolved
-  // fixture is constructed from the verdict's exact identity tuples.
-  const verdict = await buildIntakeVerdictFor('rev-000042');
+  // fixture is constructed from the verdict's exact identity tuples. The
+  // journey package carries ONE executable workflow, so the SAME package the
+  // verdict pins is what the public Runtime assembly later executes (segment
+  // 7) — the journey never swaps in a different artifact for execution.
+  const verdict = await buildJourneyVerdict('rev-000042', sha256);
   const { domainId, revision, digest } = entryTuplesFor(verdict);
   const evolvedCandidate = adoptDacV003RegistryReference('evolved-candidate', {
     baseline,
@@ -577,12 +592,17 @@ test('C77: the complete positive boundary path is one connected exact identity/p
 
   // ---------------------------------------------------------------------
   // Harness-owned segment 7 — Runtime consequence/outcome, actually
-  // executed and read: (a) the #309 Runtime-consequence predicates decide
-  // what the Runtime may claim from the journey's own commit evidence;
-  // (b) the runtime-logical outcome of the exact command that drove the
-  // external operation is correlated and read through the public bridge
-  // surface, under the exact activated package pin and the exact
-  // runtime<->external correlation id.
+  // EXECUTED by the existing public v0.2 Runtime assembly and read back
+  // from the Runtime store: (a) the #309 Runtime-consequence predicates
+  // decide what the Runtime may claim from the journey's own commit
+  // evidence; (b) the journey's activated package pin is registered and the
+  // exact command (message id / correlation id / package pin) is DRIVEN
+  // through `createDomainRuntime.openInstance/send` — the mailbox drain
+  // executes the pinned workflow and commits the disposition + instance
+  // state transition itself; (c) the resulting Runtime-owned
+  // `MessageDispositionSnapshot` and committed `WorkflowInstanceSnapshot`
+  // are READ from the Runtime store and only THEN feed the runtime-logical
+  // outcome -> UX correlation. No Runtime result is hand-written here.
   // ---------------------------------------------------------------------
   assert.equal(
     observationSupportsCommitClaim(commitEvidence),
@@ -593,51 +613,92 @@ test('C77: the complete positive boundary path is one connected exact identity/p
     maxClaimableForExternalObservation('commit-observed'),
     'commit-observed-within-authority-scope',
   );
-  const WORKFLOW_ADDRESS = { workflowId: 'wf-invoice', instanceKey: 'inv-001' } as const;
-  const workflowSnapshot: WorkflowInstanceSnapshot = {
-    address: { ...WORKFLOW_ADDRESS },
+  const registry = new StaticPackageRegistry(
+    [verdict.validatedPackage],
+    activation.activatedPackageId,
+  );
+  const runtimeStore = new InMemoryControlRuntimeStore();
+  const runtime = await createDomainRuntime({
+    packageRegistry: registry,
+    store: runtimeStore,
+    bindings: createRuntimeHostFake({ sha256 }),
+  });
+  const openedInstance = await runtime.openInstance({
+    address: { ...JOURNEY_ADDRESS },
     correlationId: v002Correlation.correlationId,
     packageId: activation.activatedPackageId,
-    lifecycle: 'active',
-    stateRevision: 8,
-    state: null,
-    createdAt: '2026-09-24T00:00:00.000Z',
-    updatedAt: '2026-09-24T00:00:05.000Z',
+    input: { invoice: 'inv-77' },
+  });
+  assert.equal(
+    openedInstance.packageId,
+    activation.activatedPackageId,
+    'the executed instance pins the exact activated package of the journey',
+  );
+  const message: DomainMessage = {
+    messageId: 'msg-c77',
+    target: { ...JOURNEY_ADDRESS },
+    type: JOURNEY_COMMAND_TYPE,
+    payload: null,
+    correlationId: v002Correlation.correlationId,
   };
+  const acceptedAck = await runtime.send(message);
+  assert.equal(acceptedAck.status, 'accepted');
+  await runtime.awaitIdle();
+  const runtimeDisposition = await runtimeStore.getMessageDisposition(
+    JOURNEY_ADDRESS,
+    'msg-c77',
+  );
+  assert.ok(
+    runtimeDisposition !== null,
+    'the executed Runtime owns the disposition consequence evidence',
+  );
+  const committedInstance = await runtimeStore.getInstance(JOURNEY_ADDRESS);
+  assert.ok(
+    committedInstance !== null,
+    'the executed Runtime owns the instance state consequence evidence',
+  );
+  await runtime.dispose();
+  // The READ Runtime consequence is asserted exactly: the Runtime's own
+  // processing turn produced the `processed` disposition under the exact
+  // activated package pin and the exact runtime<->external correlation id,
+  // and the state consequence is the workflow's real committed transition
+  // (open -> charged, terminal, revision advanced by exactly one turn).
+  assert.equal(runtimeDisposition.disposition, 'processed');
+  assert.equal(runtimeDisposition.packageId, activation.activatedPackageId);
+  assert.equal(runtimeDisposition.correlationId, v002Correlation.correlationId);
+  assert.equal(runtimeDisposition.targetSequence, acceptedAck.targetSequence);
+  assert.ok(
+    runtimeDisposition.resolvedAt !== undefined && runtimeDisposition.resolvedAt.length > 0,
+    'the executed turn resolved the command terminally',
+  );
+  assert.equal(committedInstance.lifecycle, 'completed');
+  assert.equal(committedInstance.packageId, activation.activatedPackageId);
+  assert.equal(committedInstance.correlationId, v002Correlation.correlationId);
+  assert.equal(
+    committedInstance.stateRevision,
+    openedInstance.stateRevision + 1,
+    'exactly one committed Runtime turn advanced the instance state',
+  );
+  const committedState = committedInstance.state as { stateId?: unknown };
+  assert.equal(committedState.stateId, JOURNEY_TERMINAL_STATE);
+  assert.deepEqual(committedInstance.output, { invoice: 'inv-77' });
   const intent = adoptDomainIntentRef({
     baseline: { ...DAC_BRIDGE_BASELINE },
     semanticIdentity: 'ux:post-invoice',
     authorityScope: 'ux://acme/invoice-ops',
     observedBasis: {
       kind: 'snapshot-ref',
-      snapshotRef: snapshotRefFromWorkflowInstanceSnapshot(workflowSnapshot),
+      snapshotRef: snapshotRefFromWorkflowInstanceSnapshot(committedInstance),
     },
   });
-  const message: DomainMessage = {
-    messageId: 'msg-c77',
-    target: { ...WORKFLOW_ADDRESS },
-    type: 'charge-order',
-    payload: null,
-    correlationId: v002Correlation.correlationId,
-  };
   const commandCorrelation = correlateDomainCommand(message, { intent });
   assert.equal(
     commandCorrelation.command.correlationId,
     v002Correlation.correlationId,
     'the runtime command carries the exact runtime<->external correlation id',
   );
-  const disposition: MessageDispositionSnapshot = {
-    messageId: 'msg-c77',
-    target: { ...WORKFLOW_ADDRESS },
-    targetSequence: 9,
-    packageId: activation.activatedPackageId,
-    disposition: 'processed',
-    correlationId: v002Correlation.correlationId,
-    acceptedAt: '2026-09-24T00:00:02.000Z',
-    resolvedAt: '2026-09-24T00:00:04.000Z',
-  };
   const runtimeOutcome = correlateDomainOutcome({
-    disposition,
+    disposition: runtimeDisposition,
     correlation: commandCorrelation,
   });
   // The resulting Runtime outcome is READ and asserted: the runtime-logical
@@ -666,16 +727,17 @@ test('C77: the complete positive boundary path is one connected exact identity/p
 
   // ---------------------------------------------------------------------
   // Lane 5 — UX consequence/correlation evidence [Domain UX semantics
-  // NOT_OWNED], correlated to the RESULTING Runtime outcome above: the
-  // processed command correlates to the UX intent on a CURRENT basis, and
-  // the outcome correlation carries that intent as evidence only — the UX
-  // lane never becomes Runtime transition authority and the external
-  // authority claim is exactly what the evidence supports.
+  // NOT_OWNED], correlated to the RESULTING Runtime outcome above: the UX
+  // intent's observed basis is the committed Runtime instance the executed
+  // turn produced, the processed command correlates to that intent on a
+  // CURRENT basis, and the outcome correlation carries that intent as
+  // evidence only — the UX lane never becomes Runtime transition authority
+  // and the external authority claim is exactly what the evidence supports.
   // ---------------------------------------------------------------------
   assert.equal(
     classifyObservedBasis(
       commandCorrelation,
-      { kind: 'workflow-instance', snapshot: workflowSnapshot },
+      { kind: 'workflow-instance', snapshot: committedInstance },
       { requireBasis: true },
     ).status,
     'CURRENT',
@@ -840,7 +902,9 @@ test("C77 unrelated-validation negative: an unrelated/incompatible compatibility
   const foreignBinding = await bindValidatedComposition(foreignVerdict, {
     sha256: sha256Local,
   });
-  const journeyVerdict = await buildIntakeVerdictFor('rev-000042');
+  // The journey's OWN verdict (the same workflow-bearing package the
+  // positive path executes) is the only genuine pin the journey accepts.
+  const journeyVerdict = await buildJourneyVerdict('rev-000042', sha256Local);
   const journeyBinding = await bindValidatedComposition(journeyVerdict, {
     sha256: sha256Local,
   });
@@ -942,34 +1006,49 @@ test("C77 acceptance-only negative: ambiguous/acceptance external evidence witho
   });
   assert.equal(episode.conclusion.outcomeClass, 'STILL_UNKNOWN');
   assert.notEqual(episode.conclusion.outcomeClass, 'RECONCILED_COMMITTED');
-  // Step 3 — the runtime-logical outcome under that unresolved truth still
-  // claims nothing external, so the correlated UX consequence can never
-  // present the journey's committed-success path on acceptance alone:
-  const WORKFLOW_ADDRESS = { workflowId: 'wf-invoice', instanceKey: 'inv-001' } as const;
+  // Step 3 — the REAL executed Runtime outcome under that unresolved truth
+  // still claims nothing external, so the correlated UX consequence can
+  // never present the journey's committed-success path on acceptance alone:
+  // the public Runtime assembly executes the journey's exact package, the
+  // processed disposition is READ from the Runtime store (not hand-written),
+  // and even that genuinely-executed outcome claims no external authority.
+  const journeyVerdict = await buildJourneyVerdict('rev-000042', sha256Local);
   const activation = await activateRuntimeBinding(
-    await bindValidatedComposition(await buildIntakeVerdictFor('rev-000042'), {
-      sha256: sha256Local,
-    }),
+    await bindValidatedComposition(journeyVerdict, { sha256: sha256Local }),
     { sha256: sha256Local, activationInstanceId: 'activation-instance-c77-n3' },
   );
+  const runtimeStore = new InMemoryControlRuntimeStore();
+  const runtime = await createDomainRuntime({
+    packageRegistry: new StaticPackageRegistry(
+      [journeyVerdict.validatedPackage],
+      activation.activatedPackageId,
+    ),
+    store: runtimeStore,
+    bindings: createRuntimeHostFake({ sha256: sha256Local }),
+  });
+  await runtime.openInstance({
+    address: { ...JOURNEY_ADDRESS },
+    correlationId: correlation.correlationId,
+    packageId: activation.activatedPackageId,
+    input: { invoice: 'inv-77' },
+  });
   const message: DomainMessage = {
     messageId: 'msg-c77-n3',
-    target: { ...WORKFLOW_ADDRESS },
-    type: 'charge-order',
+    target: { ...JOURNEY_ADDRESS },
+    type: JOURNEY_COMMAND_TYPE,
     payload: null,
     correlationId: correlation.correlationId,
   };
+  await runtime.send(message);
+  await runtime.awaitIdle();
+  const disposition = await runtimeStore.getMessageDisposition(
+    JOURNEY_ADDRESS,
+    'msg-c77-n3',
+  );
+  assert.ok(disposition !== null);
+  await runtime.dispose();
+  assert.equal(disposition.disposition, 'processed');
   const commandCorrelation = correlateDomainCommand(message);
-  const disposition: MessageDispositionSnapshot = {
-    messageId: 'msg-c77-n3',
-    target: { ...WORKFLOW_ADDRESS },
-    targetSequence: 4,
-    packageId: activation.activatedPackageId,
-    disposition: 'processed',
-    correlationId: correlation.correlationId,
-    acceptedAt: '2026-09-24T00:00:02.000Z',
-    resolvedAt: '2026-09-24T00:00:04.000Z',
-  };
   const outcome = correlateDomainOutcome({ disposition, correlation: commandCorrelation });
   assert.equal(outcome.outcome.externalAuthorityOutcome, 'not-claimed');
   assert.equal(episode.conclusion.remoteTruth, 'unresolved');

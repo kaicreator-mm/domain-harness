@@ -78,6 +78,34 @@ module. Matrix closure now verifies per-ref decisive semantic assertions,
 not title inventory, and documents the 25-axes/24-declarations mapping
 (5+6) exactly.
 
+R2 repair (review 5815516596 P1-1, dispatch 5816370978): the C77 journey's
+Runtime consequence leg is now REALLY EXECUTED by the existing public v0.2
+Runtime assembly — no hand-written Runtime disposition/state remains. The
+journey's #306 verdict is minted over a workflow-bearing compiled package
+(`journey-runtime-fixture.ts`, the same compiled-manifest contract shape
+the #313 runtime-control suite executes), so the exact package the verdict
+pins is the exact package the Runtime runs: the activated package pin is
+registered in a `StaticPackageRegistry`, `createDomainRuntime` is composed
+over an in-memory `RuntimeStore`, `openInstance`/`send` drive the exact
+command (message id, correlation id, package pin), the mailbox drain
+executes the pinned workflow, and the resulting Runtime-owned
+`processed` disposition plus committed instance state transition are READ
+back from the Runtime store and only then feed the #309 commit-claim
+predicates, the runtime-logical outcome correlation and the UX
+consequence/correlation. The acceptance-only negative drives the same real
+Runtime and proves even a genuinely-executed `processed` outcome claims
+nothing external while external truth is unresolved.
+
+R2 repair (review 5815516596 P2-1): matrix closure now binds every decisive
+`asserts` needle to the BODY of the referenced named test declaration —
+`matrix-closure.test.ts` deterministically extracts that one declaration's
+callback body (skipping strings/comments, tracking bracket depth, refusing
+non-standard declaration shapes) and requires each needle to occur inside
+it. A needle occurring in another test, a helper, an assertion message or
+a comment anywhere else in the file can no longer satisfy an evidence row.
+The 25-axes/24-declarations accounting and the 31 PASS / 0 NOT_APPLICABLE /
+8 NOT_OWNED counts are unchanged.
+
 | Case | Group | Classification | Evidence (suite → test) |
 | --- | --- | --- | --- |
 | C39 | Shared Reference | PASS | `c39-c44…` alias rejection at every identity slot; `adversarial 1` manifest identity fields |

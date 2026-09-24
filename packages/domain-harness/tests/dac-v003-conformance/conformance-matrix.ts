@@ -25,10 +25,13 @@ export interface DacV003ConformanceEvidenceRef {
   readonly test: string;
   /**
    * Decisive semantic assertions (error codes / dispositions / frozen
-   * outcomes) that MUST literally occur in the referenced test's source —
-   * verified by matrix-closure.test.ts so an evidence reference can never
-   * degrade into a title-only inventory: the referenced test must actually
-   * assert this row's expected semantic result.
+   * outcomes) that MUST literally occur inside the BODY of the referenced
+   * named test declaration — matrix-closure.test.ts extracts that exact
+   * test's body deterministically and binds every needle to it, so an
+   * evidence reference can never degrade into a title-only inventory and
+   * can never be satisfied by a needle occurring in another test, a
+   * helper, a message string or a comment: the referenced test must
+   * actually assert this row's expected semantic result itself.
    */
   readonly asserts?: readonly string[];
 }
@@ -1034,7 +1037,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c77-positive-boundary-path.test.ts',
         test: 'C77: the complete positive boundary path is one connected exact identity/provenance story from authored/evolved lineage to UX consequence',
-        asserts: ['RECONCILED_COMMITTED', 'commit-observed-within-authority-scope', 'PERMITTED_IDEMPOTENT_REPLAY', 'upstreamSelectionValidation,'],
+        asserts: [
+          'RECONCILED_COMMITTED',
+          'commit-observed-within-authority-scope',
+          'PERMITTED_IDEMPOTENT_REPLAY',
+          'upstreamSelectionValidation,',
+          'createDomainRuntime(',
+          "runtimeDisposition.disposition, 'processed'",
+        ],
       },
       {
         file: 'c77-positive-boundary-path.test.ts',
@@ -1076,7 +1086,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
     ],
     classification: 'PASS',
     reason:
-      'The complete path is ONE CONNECTED executable story: the authored/evolved lineage is asserted into the compiled subject by exact identity continuity (semantic+revision; digest is the declared compiled artifact — no false evolved-digest==package-digest requirement), the v0.0.3 compatibility validation + external association consume the SAME verdict instance the Runtime binding/activation gates on (object-identity asserted), the external operation binds the manifest\'s exact declared authority, the Runtime consequence/outcome step is actually executed (commit-claim predicates + runtime-logical outcome correlation under the activated package pin) and the UX consequence is correlated to that resulting outcome with NOT_OWNED marking (producer, promotion, selection, external truth, UX semantics); foreign-lineage, unrelated/incompatible-validation and acceptance-only negatives each fail closed, and every shortcut variant fails closed in the adversarial suite.',
+      'The complete path is ONE CONNECTED executable story: the authored/evolved lineage is asserted into the compiled subject by exact identity continuity (semantic+revision; digest is the declared compiled artifact — no false evolved-digest==package-digest requirement), the v0.0.3 compatibility validation + external association consume the SAME verdict instance the Runtime binding/activation gates on (object-identity asserted), the external operation binds the manifest\'s exact declared authority, the Runtime consequence/outcome step is REALLY EXECUTED by the existing public v0.2 Runtime assembly (the activated package pin is registered and driven through createDomainRuntime.openInstance/send; the Runtime\'s own processing turn commits the processed disposition and the instance state transition, both READ from the Runtime store before the commit-claim predicates + runtime-logical outcome correlation consume them) and the UX consequence is correlated to that resulting outcome with NOT_OWNED marking (producer, promotion, selection, external truth, UX semantics); foreign-lineage, unrelated/incompatible-validation and acceptance-only negatives each fail closed (the acceptance-only negative also drives the real Runtime and proves even a genuinely-executed processed outcome claims nothing external while the external truth is unresolved), and every shortcut variant fails closed in the adversarial suite.',
     identityLinkage: 'evolved-subject revision continuity -> compiled package pin + manifest content digest + validation verdict instance correlated end to end',
   },
 ];

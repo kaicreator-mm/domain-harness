@@ -2,9 +2,10 @@
 // matrix is SELF-VERIFYING. This suite proves there is no blank case, no
 // implicit coverage, and no dangling evidence reference: every row's
 // evidence file exists in this directory and the quoted test name is really
-// declared in that file's source; every classification is one of the three
-// frozen values; PASS rows always carry executable evidence; NOT_OWNED rows
-// always carry a reason stating the owning lane.
+// declared in that file's source with each decisive `asserts` needle bound
+// deterministically to THAT test's own body; every classification is one of
+// the three frozen values; PASS rows always carry executable evidence;
+// NOT_OWNED rows always carry a reason stating the owning lane.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -27,6 +28,108 @@ function sourceOf(file: string): string {
   const source = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8');
   fileCache.set(file, source);
   return source;
+}
+
+/**
+ * Deterministic named-test-body extraction (R2 P2-1 repair): scans the
+ * referenced source from its `test('<name>'` / `test("<name>"` declaration,
+ * skipping string/template literals and comments while tracking bracket
+ * depth, and returns exactly that one declaration's callback body. A needle
+ * checked against the returned span can only be satisfied by the referenced
+ * test's own code — never by another test, a helper, an assertion message
+ * elsewhere in the file, or a comment. The extraction is fail-closed: any
+ * declaration shape it cannot parse deterministically (e.g. a test-options
+ * object before the callback) returns null and the closure suite fails
+ * loudly instead of guessing.
+ */
+function extractNamedTestBody(source: string, testName: string): string | null {
+  for (const quote of ["'", '"'] as const) {
+    const declaration = `test(${quote}${testName}${quote}`;
+    const declarationAt = source.indexOf(declaration);
+    if (declarationAt === -1) continue;
+    let index = declarationAt + declaration.length;
+    let argumentDepth = 1; // inside the `test(` call's parentheses
+    let bodyStart = -1;
+    let signature = '';
+    while (index < source.length) {
+      const ch = source[index];
+      if (ch === "'" || ch === '"' || ch === '`') {
+        index = skipStringLiteral(source, index, ch);
+        continue;
+      }
+      if (ch === '/' && source[index + 1] === '/') {
+        index = skipLineComment(source, index);
+        continue;
+      }
+      if (ch === '/' && source[index + 1] === '*') {
+        index = skipBlockComment(source, index);
+        continue;
+      }
+      if (ch === '(') {
+        argumentDepth += 1;
+      } else if (ch === ')') {
+        argumentDepth -= 1;
+        if (argumentDepth === 0) return null; // call ended without a callback body
+      } else if (ch === '{' && argumentDepth === 1) {
+        bodyStart = index + 1;
+        break;
+      }
+      signature += ch;
+      index += 1;
+    }
+    if (bodyStart === -1) return null;
+    // Only the standard callback form binds: `test('<name>', async () => {`.
+    // Anything else (options object, dynamic name, ...) refuses to match.
+    if (!/^,\s*(?:async\s*)?\(\s*\)\s*=>\s*$/.test(signature)) return null;
+    let depth = 1;
+    let scan = bodyStart;
+    while (scan < source.length) {
+      const ch = source[scan];
+      if (ch === "'" || ch === '"' || ch === '`') {
+        scan = skipStringLiteral(source, scan, ch);
+        continue;
+      }
+      if (ch === '/' && source[scan + 1] === '/') {
+        scan = skipLineComment(source, scan);
+        continue;
+      }
+      if (ch === '/' && source[scan + 1] === '*') {
+        scan = skipBlockComment(source, scan);
+        continue;
+      }
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) return source.slice(bodyStart, scan);
+      }
+      scan += 1;
+    }
+    return null;
+  }
+  return null;
+}
+
+function skipStringLiteral(source: string, start: number, quote: string): number {
+  let index = start + 1;
+  while (index < source.length) {
+    if (source[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (source[index] === quote) return index + 1;
+    index += 1;
+  }
+  return index;
+}
+
+function skipLineComment(source: string, start: number): number {
+  const end = source.indexOf('\n', start);
+  return end === -1 ? source.length : end + 1;
+}
+
+function skipBlockComment(source: string, start: number): number {
+  const end = source.indexOf('*/', start + 2);
+  return end === -1 ? source.length : end + 2;
 }
 
 test('matrix closure: exactly C39..C77, no gaps, no duplicates, no foreign rows', () => {
@@ -77,32 +180,34 @@ test('matrix closure: every row is complete — no blank case, no implicit cover
   }
 });
 
-test('matrix closure: every referenced evidence file exists, the quoted test is really declared in it, and its decisive semantic assertions are present', () => {
+test("matrix closure: every referenced evidence file exists, the quoted test is really declared in it, and its decisive semantic assertions occur inside that test's own body", () => {
   for (const row of DAC_V003_C39_C77_MATRIX) {
     const refs = [...row.evidence, ...row.adversarial];
     assert.ok(refs.length > 0, `${row.id}: at least one evidence/adversarial ref`);
     for (const ref of refs) {
       assert.match(ref.file, /^[a-z0-9-]+\.test\.ts$/, `${row.id}: evidence file name`);
       const source = sourceOf(ref.file);
-      const declared = source.includes(`test('${ref.test}'`)
-        || source.includes(`test("${ref.test}"`);
-      assert.ok(
-        declared,
-        `${row.id}: test "${ref.test}" must be declared in ${ref.file}`,
-      );
-      // SEMANTIC verification, not title inventory: every reference carries
-      // the decisive assertion(s) of its expected result (error code /
+      const body = extractNamedTestBody(source, ref.test);
+      if (body === null) {
+        assert.fail(
+          `${row.id}: test "${ref.test}" must be declared as a named single-callback test declaration in ${ref.file}`,
+        );
+      }
+      // SEMANTIC verification, deterministically bound to the referenced
+      // test's OWN BODY (R2 P2-1 repair): every reference carries the
+      // decisive assertion(s) of its expected result (error code /
       // disposition / frozen outcome) and those assertions must literally
-      // occur in the referenced file's source — an evidence row can never
-      // claim a result its test does not actually assert.
+      // occur inside the body extracted from that exact named declaration —
+      // an evidence row can never claim a result asserted by another test,
+      // a helper, a message string or a comment anywhere in the file.
       assert.ok(
         ref.asserts !== undefined && ref.asserts.length > 0,
         `${row.id}: evidence ref "${ref.test}" must carry decisive semantic assertions`,
       );
       for (const needle of ref.asserts ?? []) {
         assert.ok(
-          source.includes(needle),
-          `${row.id}: semantic assertion "${needle}" of "${ref.test}" must literally occur in ${ref.file}`,
+          body.includes(needle),
+          `${row.id}: semantic assertion "${needle}" of "${ref.test}" must literally occur inside that test's body in ${ref.file}`,
         );
       }
     }
@@ -212,9 +317,40 @@ test('matrix closure: the C77 positive boundary path spans every mandated lane w
   assert.ok(source.includes("applicationSelectionAuthority: 'NOT_OWNED'"));
   assert.ok(source.includes("externalBusinessSoRTruth: 'NOT_OWNED'"));
   assert.ok(source.includes("domainUxSemantics: 'NOT_OWNED'"));
-  // The Runtime outcome step is actually executed: the commit-claim
-  // predicates and the runtime-logical outcome correlation are both read.
-  assert.ok(source.includes('observationSupportsCommitClaim(commitEvidence)'));
-  assert.ok(source.includes("maxClaimableForExternalObservation('commit-observed')"));
-  assert.ok(source.includes('correlateDomainOutcome({'));
+  // The Runtime consequence/outcome step is REALLY EXECUTED, and every one
+  // of these decisive assertions is bound to the positive journey test's
+  // own body (R2 P2-1 binding): the public Runtime assembly is driven, the
+  // commit-claim predicates and the runtime-logical outcome correlation
+  // both consume the Runtime-produced evidence.
+  const journeyBody = extractNamedTestBody(
+    source,
+    'C77: the complete positive boundary path is one connected exact identity/provenance story from authored/evolved lineage to UX consequence',
+  );
+  if (journeyBody === null) {
+    assert.fail('C77 positive journey test declaration not found in c77-positive-boundary-path.test.ts');
+  }
+  assert.ok(
+    journeyBody.includes('observationSupportsCommitClaim(commitEvidence)'),
+    'the journey body executes the commit-claim predicate',
+  );
+  assert.ok(
+    journeyBody.includes("maxClaimableForExternalObservation('commit-observed')"),
+    'the journey body executes the max-claimable predicate',
+  );
+  assert.ok(
+    journeyBody.includes('correlateDomainOutcome({'),
+    'the journey body correlates the runtime-logical outcome',
+  );
+  assert.ok(
+    journeyBody.includes('createDomainRuntime('),
+    'the journey body drives the existing public Harness Runtime assembly',
+  );
+  assert.ok(
+    journeyBody.includes("runtimeDisposition.disposition, 'processed'"),
+    "the journey body asserts the Runtime-produced 'processed' disposition",
+  );
+  assert.ok(
+    journeyBody.includes('runtimeStore.getMessageDisposition('),
+    'the journey body READS the disposition consequence from the Runtime store',
+  );
 });
