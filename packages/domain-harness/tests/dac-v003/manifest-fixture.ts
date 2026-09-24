@@ -242,6 +242,25 @@ export async function buildAdoptedManifest(): Promise<DacV003ApplicationManifest
   });
 }
 
+/**
+ * Adopts the standard fixture restricted to the single verdict-covered
+ * entry. The standard validation is minted over the rev-000042 #306 verdict,
+ * so under the exact multi-entry association semantics (every selected entry
+ * must be covered) only this single-entry form associates; the two-entry
+ * `buildAdoptedManifest` form is the multi-entry partial-coverage negative.
+ */
+export async function buildAdoptedSingleEntryManifest(): Promise<DacV003ApplicationManifest> {
+  const fixture = await buildManifestInput();
+  const input: DacV003ApplicationManifestAdoptionInput = {
+    ...fixture.input,
+    manifestIdentity: 'manifest://acme/tally-ledger/7-single-entry',
+    selectedDomainData: [fixture.entry as DacV003ManifestSelectedDomainDataEntryInput],
+  };
+  return adoptDacV003ApplicationManifest(await withDeclaredDigest(input), {
+    sha256: createSha256Fake(),
+  });
+}
+
 /** A genuine V3-002 COMPATIBLE validation over the standard fixture refs. */
 export async function buildValidationFor(
   overrides: Parameters<typeof buildCompatibleRequest>[0] = {},

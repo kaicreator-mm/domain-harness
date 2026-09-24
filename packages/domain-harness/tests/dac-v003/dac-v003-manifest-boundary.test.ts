@@ -194,6 +194,165 @@ test('V3-004/#328: recognized live instance-state fields fail closed', async () 
   );
 });
 
+test('V3-004/#328 review repair P1-1 regression: forbidden records nested at any depth of digest-covered opaque content fail closed', async () => {
+  const fixture = await buildManifestInput();
+  const validation = await buildValidationFor();
+  const result = deriveDacV003CompatibilityResult(validation);
+  // Extra object nesting buries the minted validation act two levels deep —
+  // the digest would still cover it, so the screen must reject at that depth.
+  await expectManifestError(
+    { ...fixture.input, opaque: { nested: { compatibilityValidation: validation } } },
+    'MANIFEST_EVIDENCE_ABSORPTION',
+  );
+  // Deep nesting through objects AND arrays (a #306 verdict at depth 4).
+  await expectManifestError(
+    {
+      ...fixture.input,
+      compositionProvenance: { chain: { steps: [{ verdict: fixture.verdict }] } },
+    },
+    'MANIFEST_EVIDENCE_ABSORPTION',
+  );
+  // The separately-encoded result view, nested inside an array element.
+  await expectManifestError(
+    { ...fixture.input, opaque: { history: [{ compatibilityResult: result }] } },
+    'MANIFEST_EVIDENCE_ABSORPTION',
+  );
+  // Binding/activation identity nested at depth.
+  const bindingRef = adoptDacV003RegistryReference('runtime-binding', {
+    baseline: { ...DAC_V003_BASELINE },
+    authorityScope: 'domain-harness://runtime-binding',
+    primaryIdentity: 'binding/instance-9',
+  });
+  await expectManifestError(
+    { ...fixture.input, opaque: { lifecycle: { binding: bindingRef } } },
+    'MANIFEST_EVIDENCE_ABSORPTION',
+  );
+  // The minted validation act presented AS the opaque area root itself.
+  await expectManifestError({ ...fixture.input, opaque: validation }, 'MANIFEST_EVIDENCE_ABSORPTION');
+});
+
+test('V3-004/#328 review repair P1-1 regression: nested live external state and instance-state fields fail closed at every depth', async () => {
+  const fixture = await buildManifestInput();
+  const authority = buildExternalAuthority();
+  const logicalOperation = adoptDacV003LogicalOperationRef({
+    baseline: { ...DAC_V003_BASELINE },
+    runtimeAuthorityScope: 'domain-harness://runtime',
+    logicalOperationIdentity: 'op://tally/commit-2',
+    externalAuthority: authority,
+    operationSemanticIdentity: 'tally/commit',
+  });
+  await expectManifestError(
+    { ...fixture.input, opaque: { inbox: [{ pendingOperation: logicalOperation }] } },
+    'LIVE_EXTERNAL_STATE_ABSORPTION',
+  );
+  const bareReconciliation = adoptDacV003RegistryReference('reconciliation', {
+    baseline: { ...DAC_V003_BASELINE },
+    authorityScope: 'ext://billing/acme',
+    primaryIdentity: 'reconciliation/2',
+  });
+  await expectManifestError(
+    { ...fixture.input, compositionProvenance: { open: { world: { reconciliation: bareReconciliation } } } },
+    'LIVE_EXTERNAL_STATE_ABSORPTION',
+  );
+  // Recognized instance-state vocabulary at nested object depth.
+  await expectManifestError(
+    { ...fixture.input, opaque: { ui: { session: { uxState: 'rendering' } } } },
+    'INSTANCE_STATE_LEAKAGE',
+  );
+  await expectManifestError(
+    { ...fixture.input, compositionProvenance: { steps: [{ currentWorkflowStep: 'step-3' }] } },
+    'INSTANCE_STATE_LEAKAGE',
+  );
+  // The same classes inside an external-authority declaration's opaque record.
+  const validation = await buildValidationFor();
+  await expectManifestError(
+    {
+      ...fixture.input,
+      externalAuthority: {
+        applicability: 'APPLICABLE',
+        declarations: [
+          {
+            authority: buildExternalAuthority(),
+            opaque: { nested: { compatibilityValidation: validation } },
+          },
+        ],
+      },
+    },
+    'MANIFEST_EVIDENCE_ABSORPTION',
+  );
+  await expectManifestError(
+    {
+      ...fixture.input,
+      externalAuthority: {
+        applicability: 'APPLICABLE',
+        declarations: [
+          {
+            authority: buildExternalAuthority(),
+            capabilityRequirements: { live: { mailboxState: 'pending' } },
+          },
+        ],
+      },
+    },
+    'INSTANCE_STATE_LEAKAGE',
+  );
+});
+
+test('V3-004/#328 review repair P1-1 regression: cyclic opaque content fails closed through the declared taxonomy', async () => {
+  const fixture = await buildManifestInput();
+  const cyclicObject: Record<string, unknown> = { note: 'self-referencing' };
+  cyclicObject.self = cyclicObject;
+  await expectManifestError(
+    { ...fixture.input, opaque: cyclicObject },
+    'INVALID_MANIFEST_INPUT',
+  );
+  const cyclicArray: unknown[] = ['element'];
+  cyclicArray.push(cyclicArray);
+  await expectManifestError(
+    { ...fixture.input, compositionProvenance: { chain: cyclicArray } },
+    'INVALID_MANIFEST_INPUT',
+  );
+});
+
+test('V3-004/#328 review repair P1-1 regression: the digest entry point rejects nested forbidden content and benign nested content stays digest-covered', async () => {
+  const fixture = await buildManifestInput();
+  const validation = await buildValidationFor();
+  // The digest computation path screens the same full depth as adoption, so
+  // a forbidden record can never become canonical digest material at all.
+  await assert.rejects(
+    computeDacV003ApplicationManifestDigest(
+      { ...fixture.input, opaque: { nested: { validation } } },
+      { sha256: createSha256Fake() },
+    ),
+    (error: unknown) =>
+      error instanceof DacV003ManifestError && error.code === 'MANIFEST_EVIDENCE_ABSORPTION',
+  );
+  // Benign nested unknown content is legitimate opaque material: preserved
+  // verbatim AND covered by the digest (a nested change moves the digest).
+  const baseInput = {
+    ...fixture.input,
+    manifestIdentity: 'manifest://acme/tally-ledger/7-nested-opaque',
+  };
+  const baseDigest = await computeDacV003ApplicationManifestDigest(baseInput, {
+    sha256: createSha256Fake(),
+  });
+  const nestedInput = {
+    ...baseInput,
+    opaque: { sourceMeta: { provenanceLayer: { tool: { name: 'composer', options: ['a', 'b'] } } } },
+  };
+  const nestedDigest = await computeDacV003ApplicationManifestDigest(nestedInput, {
+    sha256: createSha256Fake(),
+  });
+  assert.notEqual(nestedDigest, baseDigest);
+  const manifest = await adoptDacV003ApplicationManifest(
+    { ...nestedInput, manifestContentDigest: nestedDigest },
+    { sha256: createSha256Fake() },
+  );
+  assert.deepEqual(
+    (manifest.opaque as Record<string, unknown>).sourceMeta,
+    nestedInput.opaque.sourceMeta,
+  );
+});
+
 test('V3-004/#328: declared digest mismatch and identity/digest conflict fail closed', async () => {
   const fixture = await buildManifestInput();
   const input = await withDeclaredDigest(fixture.input);

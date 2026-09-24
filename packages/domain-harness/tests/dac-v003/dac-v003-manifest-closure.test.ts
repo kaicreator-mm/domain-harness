@@ -14,7 +14,7 @@ import {
   adoptDacV003ApplicationManifest,
 } from '../../src/dac-v003-manifest/index.js';
 import type { DacV003ApplicationManifestAdoptionInput } from '../../src/dac-v003-manifest/index.js';
-import { buildV003Entry, buildManifestInput } from './manifest-fixture.js';
+import { buildV003Entry, buildManifestInput, withDeclaredDigest } from './manifest-fixture.js';
 import { createSha256Fake } from '../package/fixture.js';
 
 function adopt(input: unknown): Promise<unknown> {
@@ -247,6 +247,46 @@ test('V3-004/#328: satisfaction evidence linking an undeclared requirement fails
     },
     'REQUIREMENT_EVIDENCE_FOREIGN',
   );
+});
+
+test('V3-004/#328 review repair P2-1 regression: malformed requirement/evidence inputs fail closed as INVALID_MANIFEST_INPUT, never native errors or string splitting', async () => {
+  const fixture = await buildManifestInput();
+  // A string is not an array of descriptors: rejected by shape BEFORE any
+  // spread/iteration could split it into characters.
+  await expectManifestError(
+    { ...fixture.input, capabilityRequirements: 'cap-req-1' as never },
+    'INVALID_MANIFEST_INPUT',
+  );
+  // A non-iterable primitive: rejected by shape instead of a native
+  // TypeError from the spread.
+  await expectManifestError(
+    { ...fixture.input, portRequirements: 7 as never },
+    'INVALID_MANIFEST_INPUT',
+  );
+  // A record where an array is required.
+  await expectManifestError(
+    { ...fixture.input, satisfactionEvidence: { evidence: 'cap-1' } as never },
+    'INVALID_MANIFEST_INPUT',
+  );
+  await expectManifestError(
+    { ...fixture.input, hostBindingRequirements: 'hb-req-1' as never },
+    'INVALID_MANIFEST_INPUT',
+  );
+  // Absent (undefined) and explicit null both stay "no declarations" — the
+  // pre-repair `?? []` semantics for genuinely absent input are unchanged.
+  // (This case adopts successfully, so it needs a real declared digest; the
+  // cast exists only because exactOptionalPropertyTypes rejects an explicit
+  // `undefined` in the literal while the runtime must handle it.)
+  const absentInput = {
+    ...fixture.input,
+    manifestIdentity: 'manifest://acme/tally-ledger/7-no-requirements',
+    capabilityRequirements: undefined,
+    portRequirements: null,
+    hostBindingRequirements: undefined,
+    satisfactionEvidence: null,
+  } as unknown as Parameters<typeof withDeclaredDigest>[0];
+  const manifest = await adopt(await withDeclaredDigest(absentInput));
+  assert.ok(manifest);
 });
 
 test('V3-004/#328: undecided external-authority applicability fails closed', async () => {

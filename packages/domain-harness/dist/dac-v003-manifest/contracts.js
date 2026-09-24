@@ -101,11 +101,14 @@ export const DAC_V003_MANIFEST_VALIDATION_ASSOCIATION_VERSION = 'dac-v003-manife
  * Adapter-recognized live instance-state field vocabulary (DAC
  * APPLICATION_MANIFEST §12, same closed recognized subset as the #310
  * adapter, duplicated so this leaf never edits the reviewed #310 surface).
- * An exact top-level match inside opaque-preserved areas is rejected
- * (`INSTANCE_STATE_LEAKAGE`): the manifest definition must not absorb live
- * Business/Process/Execution/UX instance facts. Novel state-shaped fields
- * can only ever land in opaque storage where they are preserved verbatim
- * and never read, so they can never acquire manifest authority.
+ * An exact match at ANY object depth inside opaque-preserved areas
+ * (including inside arrays and nested objects) is rejected
+ * (`INSTANCE_STATE_LEAKAGE`): the canonical digest preserves opaque content
+ * verbatim at full depth, so the manifest definition must not absorb live
+ * Business/Process/Execution/UX instance facts anywhere in that content.
+ * Novel state-shaped fields can only ever land in opaque storage where they
+ * are preserved verbatim and never read, so they can never acquire manifest
+ * authority.
  */
 export const DAC_V003_MANIFEST_INSTANCE_STATE_FIELD_VOCABULARY = [
     'currentWorkflowStep',

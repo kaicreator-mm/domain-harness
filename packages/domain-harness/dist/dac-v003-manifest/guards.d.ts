@@ -35,8 +35,10 @@ export declare function dacV003ManifestIdentityOf(manifest: DacV003ApplicationMa
  *    requirement identities;
  *  - every evidence identity it recorded as satisfying is one of this
  *    manifest's carried satisfaction-evidence references;
- *  - its upstream #306 verdict's selected Domain Data and provenance tuples
- *    are covered by one of this manifest's selected entries.
+ *  - its upstream #306 verdict covers EVERY selected entry of this
+ *    manifest by complete role/scope/semantic/revision/digest identity —
+ *    authoritative validation coverage binds the entire selected Domain
+ *    Data set, never only one entry;
  *
  * The returned record is NOT manifest content, is NOT covered by the
  * manifest content digest, and the disposition is the authority's

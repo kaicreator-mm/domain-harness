@@ -27,6 +27,7 @@ import type {
   DacV003RequirementSatisfactionEvidence,
 } from '../dac-v003-compatibility/contracts.js';
 import { isSelectedCompositionValidation } from '../composition-intake/validate.js';
+import type { SelectedCompositionValidation } from '../composition-intake/contracts.js';
 import { RUNTIME_ACTIVATION_ADAPTER_VERSION } from '../runtime-binding/contracts.js';
 import { isRuntimeBindingEvidence } from '../runtime-binding/evidence.js';
 import {
@@ -198,28 +199,62 @@ function rejectLiveExternalState(value: unknown, where: string): void {
 
 /**
  * Rejects adapter-recognized live instance-state field names (N17 / DAC
- * §12) at the top level of each opaque-preserved area. Exact-match only, no
- * heuristics: unrecognized fields can only ever remain inert opaque content
- * that no API reads back as state.
+ * §12) at every object depth of each opaque-preserved area. Exact-match
+ * only, no heuristics: unrecognized fields can only ever remain inert
+ * opaque content that no API reads back as state.
  */
 function rejectInstanceStateLeakage(area: Readonly<Record<string, unknown>>, where: string): void {
   for (const key of Object.keys(area)) {
     if (INSTANCE_STATE_FIELDS.has(key)) {
       throw new DacV003ManifestError(
         'INSTANCE_STATE_LEAKAGE',
-        `${where}: field "${key}" is live instance state; the Manifest definition must not absorb live Business/Process/Execution/UX instance facts`,
+        `${where}: field "${key}" is live instance state; the Manifest definition must not absorb live Business/Process/Execution/UX instance facts at any depth`,
       );
     }
   }
 }
 
-/** Screens one opaque-preserved area for all absorption classes. */
-function screenOpaqueArea(area: Readonly<Record<string, unknown>>, where: string): void {
-  rejectInstanceStateLeakage(area, where);
-  for (const value of Object.values(area)) {
-    rejectEvidenceAbsorption(value, `${where} (field value)`);
-    rejectLiveExternalState(value, `${where} (field value)`);
+/**
+ * Screens one opaque-preserved value and everything nested under it for all
+ * absorption classes. The canonical digest material preserves opaque content
+ * verbatim at full depth, so the screen must walk the same full depth: the
+ * root object/array itself, every nested object, every array element and
+ * every nested value are checked (R1 P2 review repair — a forbidden record
+ * buried under extra nesting must never reach the digest either). Cyclic
+ * structures are unserializable digest material and fail closed through the
+ * declared taxonomy instead of a native TypeError/stack overflow.
+ */
+function rejectCyclicOpaque(where: string): void {
+  throw new DacV003ManifestError(
+    'INVALID_MANIFEST_INPUT',
+    `${where}: opaque-preserved manifest content must be an acyclic JSON-shaped structure (an object/array graph that visits itself can never be canonical digest material)`,
+  );
+}
+
+function screenOpaqueValue(value: unknown, where: string, seen: WeakSet<object>): void {
+  rejectEvidenceAbsorption(value, where);
+  rejectLiveExternalState(value, where);
+  if (Array.isArray(value)) {
+    if (seen.has(value)) rejectCyclicOpaque(where);
+    seen.add(value);
+    for (let index = 0; index < value.length; index += 1) {
+      screenOpaqueValue(value[index], `${where}[${index}]`, seen);
+    }
+    return;
   }
+  if (isRecord(value)) {
+    if (seen.has(value)) rejectCyclicOpaque(where);
+    seen.add(value);
+    rejectInstanceStateLeakage(value, where);
+    for (const key of Object.keys(value)) {
+      screenOpaqueValue(value[key], `${where}.${key}`, seen);
+    }
+  }
+}
+
+/** Screens one opaque-preserved area (root included) at every depth. */
+function screenOpaqueArea(area: Readonly<Record<string, unknown>>, where: string): void {
+  screenOpaqueValue(area, where, new WeakSet());
 }
 
 // ---------------------------------------------------------------------------
@@ -422,27 +457,36 @@ function validateUxClosure(value: unknown): DacV003ApplicationManifest['ux'] {
   return Object.freeze({ domainUxDefinition: definition, runtimeInteractionContract: interaction });
 }
 
+/**
+ * Optional array input check (review repair P2-1): the shape is verified
+ * BEFORE any spread/iteration, so a malformed input (a string that would be
+ * split into characters, a non-iterable that would throw a native TypeError)
+ * fails closed through the declared taxonomy instead of a native error path.
+ */
+function requireOptionalArray<T>(
+  value: readonly T[] | undefined | null,
+  name: string,
+): readonly T[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    throw new DacV003ManifestError(
+      'INVALID_MANIFEST_INPUT',
+      `manifest field "${name}" must be an array`,
+    );
+  }
+  return value as readonly T[];
+}
+
 function validateRequirements(input: DacV003ApplicationManifestAdoptionInput): {
   requirements: DacV003ApplicationManifest['requirements'];
   satisfactionEvidenceRefs: readonly DacV003RequirementSatisfactionEvidence[];
 } {
-  const capability = [...(input.capabilityRequirements ?? [])];
-  const port = [...(input.portRequirements ?? [])];
-  const hostBinding = [...(input.hostBindingRequirements ?? [])];
-  const evidence = [...(input.satisfactionEvidence ?? [])];
-  for (const [list, name] of [
-    [capability, 'capabilityRequirements'],
-    [port, 'portRequirements'],
-    [hostBinding, 'hostBindingRequirements'],
-    [evidence, 'satisfactionEvidence'],
-  ] as const) {
-    if (!Array.isArray(list)) {
-      throw new DacV003ManifestError(
-        'INVALID_MANIFEST_INPUT',
-        `manifest field "${name}" must be an array`,
-      );
-    }
-  }
+  const capability = [...requireOptionalArray(input.capabilityRequirements, 'capabilityRequirements')];
+  const port = [...requireOptionalArray(input.portRequirements, 'portRequirements')];
+  const hostBinding = [
+    ...requireOptionalArray(input.hostBindingRequirements, 'hostBindingRequirements'),
+  ];
+  const evidence = [...requireOptionalArray(input.satisfactionEvidence, 'satisfactionEvidence')];
   for (const requirement of capability) {
     if (!isDacV003CapabilityRequirementValue(requirement)) {
       throw new DacV003ManifestError(
@@ -845,6 +889,42 @@ function sameTuple(
 }
 
 /**
+ * Complete-identity comparison between one #306 verdict closure (selected
+ * ref + promotion/selection provenance) and one manifest selected entry.
+ * The legacy #306 refs carry role/authorityScope/semanticIdentity/
+ * revisionIdentity/contentDigest (no primaryIdentity slot), so that five-slot
+ * identity IS the complete comparable identity across the two shapes: an
+ * authority sharing only semantic/revision — a different scope, or a
+ * different/absent content digest — is a foreign authority and never covers
+ * the entry (review repair P1-2).
+ */
+function verdictCoversSelectedEntry(
+  verdict: SelectedCompositionValidation,
+  entry: DacV003ManifestSelectedDomainDataEntry,
+): boolean {
+  const legacyRefCoversEntry = (
+    authority: {
+      readonly role: string;
+      readonly authorityScope: string;
+      readonly semanticIdentity: string;
+      readonly revisionIdentity?: string;
+      readonly contentDigest?: string;
+    },
+    selected: DacV003Reference,
+  ): boolean =>
+    selected.role === authority.role &&
+    selected.authorityScope === authority.authorityScope &&
+    selected.semanticIdentity === authority.semanticIdentity &&
+    selected.revisionIdentity === authority.revisionIdentity &&
+    selected.contentDigest === authority.contentDigest;
+  return (
+    legacyRefCoversEntry(verdict.selectedDomainData, entry.selected) &&
+    legacyRefCoversEntry(verdict.provenance.promotionDecision, entry.promotionEvidence) &&
+    legacyRefCoversEntry(verdict.provenance.applicationSelection, entry.applicationSelection)
+  );
+}
+
+/**
  * Associates the exact subject/target-bound compatibility validation result
  * of one adopted manifest as a SEPARATE external record (R1 P2). The
  * validation must be a genuine V3-002 mint evaluated over exactly this
@@ -858,8 +938,10 @@ function sameTuple(
  *    requirement identities;
  *  - every evidence identity it recorded as satisfying is one of this
  *    manifest's carried satisfaction-evidence references;
- *  - its upstream #306 verdict's selected Domain Data and provenance tuples
- *    are covered by one of this manifest's selected entries.
+ *  - its upstream #306 verdict covers EVERY selected entry of this
+ *    manifest by complete role/scope/semantic/revision/digest identity —
+ *    authoritative validation coverage binds the entire selected Domain
+ *    Data set, never only one entry;
  *
  * The returned record is NOT manifest content, is NOT covered by the
  * manifest content digest, and the disposition is the authority's
@@ -941,32 +1023,21 @@ export function associateDacV003ManifestCompatibilityValidation(
     }
   }
 
-  // Exact upstream selected-entry binding: the #306 verdict the validation
-  // consumed must be one of this manifest's selected entries (identity
-  // tuples, including its promotion/selection provenance).
+  // Exact upstream selected-set binding (review repair P1-2): the #306
+  // verdict the validation consumed must cover EVERY selected entry of this
+  // manifest by complete role/scope/semantic/revision/digest identity —
+  // authoritative validation coverage binds the entire selected Domain Data
+  // set, never `some` one entry. With the V3-002 single-verdict subject this
+  // means every entry must carry the verdict's exact closure; a manifest
+  // entry the verdict never evaluated stays unvalidated and the association
+  // fails closed.
   const verdict = validation.subject.upstreamSelectionValidation;
-  const upstreamSelected = verdict.selectedDomainData;
-  const covered = manifest.selectedDomainData.some(
-    (entry) =>
-      upstreamSelected.semanticIdentity === entry.selected.semanticIdentity &&
-      upstreamSelected.revisionIdentity === entry.selected.revisionIdentity &&
-      (upstreamSelected.contentDigest === entry.selected.contentDigest ||
-        (upstreamSelected.contentDigest !== undefined &&
-          entry.selected.contentDigest !== undefined &&
-          upstreamSelected.contentDigest === entry.selected.contentDigest)) &&
-      verdict.provenance.promotionDecision.semanticIdentity ===
-        entry.promotionEvidence.semanticIdentity &&
-      verdict.provenance.promotionDecision.revisionIdentity ===
-        entry.promotionEvidence.revisionIdentity &&
-      verdict.provenance.applicationSelection.semanticIdentity ===
-        entry.applicationSelection.semanticIdentity &&
-      verdict.provenance.applicationSelection.revisionIdentity ===
-        entry.applicationSelection.revisionIdentity,
-  );
-  if (!covered) {
-    throw mismatch(
-      'validation upstream selected Domain Data / provenance tuples are not covered by any manifest entry',
-    );
+  for (const [index, entry] of manifest.selectedDomainData.entries()) {
+    if (!verdictCoversSelectedEntry(verdict, entry)) {
+      throw mismatch(
+        `selected entry [${index}] (${entry.selected.primaryIdentity}) is not covered by the validation's upstream selection verdict by complete role/scope/semantic/revision/digest identity; authoritative validation coverage must bind the entire selected Domain Data set, not some one entry`,
+      );
+    }
   }
 
   return mintValidationAssociation(

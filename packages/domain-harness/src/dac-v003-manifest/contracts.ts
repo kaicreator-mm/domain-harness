@@ -128,11 +128,14 @@ export const DAC_V003_MANIFEST_VALIDATION_ASSOCIATION_VERSION =
  * Adapter-recognized live instance-state field vocabulary (DAC
  * APPLICATION_MANIFEST §12, same closed recognized subset as the #310
  * adapter, duplicated so this leaf never edits the reviewed #310 surface).
- * An exact top-level match inside opaque-preserved areas is rejected
- * (`INSTANCE_STATE_LEAKAGE`): the manifest definition must not absorb live
- * Business/Process/Execution/UX instance facts. Novel state-shaped fields
- * can only ever land in opaque storage where they are preserved verbatim
- * and never read, so they can never acquire manifest authority.
+ * An exact match at ANY object depth inside opaque-preserved areas
+ * (including inside arrays and nested objects) is rejected
+ * (`INSTANCE_STATE_LEAKAGE`): the canonical digest preserves opaque content
+ * verbatim at full depth, so the manifest definition must not absorb live
+ * Business/Process/Execution/UX instance facts anywhere in that content.
+ * Novel state-shaped fields can only ever land in opaque storage where they
+ * are preserved verbatim and never read, so they can never acquire manifest
+ * authority.
  */
 export const DAC_V003_MANIFEST_INSTANCE_STATE_FIELD_VOCABULARY = [
   'currentWorkflowStep',
@@ -413,20 +416,25 @@ export interface DacV003ManifestCompatibilityAssociation {
  * - `MANIFEST_IDENTITY_DIGEST_CONFLICT` — the same immutable manifest
  *   identity resolves to a different authoritative digest;
  * - `INSTANCE_STATE_LEAKAGE` — a recognized live instance-state field is
- *   presented as manifest definition content;
+ *   presented as manifest definition content (at any nesting depth inside a
+ *   digest-covered opaque-preserved area);
  * - `MANIFEST_EVIDENCE_ABSORPTION` — a V3-002 validation/result, a #306
  *   verdict, or Runtime binding/activation identity/evidence is presented
- *   as manifest definition content;
+ *   as manifest definition content (at any nesting depth inside a
+ *   digest-covered opaque-preserved area);
  * - `LIVE_EXTERNAL_STATE_ABSORPTION` — a live #327 external
  *   operation/observation/reconciliation record is presented as manifest
- *   definition content;
+ *   definition content (at any nesting depth inside a digest-covered
+ *   opaque-preserved area);
  * - `NOT_AN_ADOPTED_V003_MANIFEST` — an API input was not adopted by this
  *   adapter;
  * - `INVALID_ASSOCIATION_INPUT` — the association input is not a genuine
  *   minted V3-002 validation;
  * - `ASSOCIATION_SUBJECT_MISMATCH` — the validation was evaluated over a
- *   different target/UX/requirement/evidence/upstream-selected closure than
- *   the one this manifest carries.
+ *   different target/UX/requirement/evidence closure than the one this
+ *   manifest carries, or its upstream #306 verdict does not cover EVERY
+ *   selected Domain Data entry by complete role/scope/semantic/revision/
+ *   digest identity.
  *
  * Role-integrity failures of carried references surface as
  * `DacV003ReferenceError` from the V3-001 core and propagate un-wrapped so
