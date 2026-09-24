@@ -23,6 +23,14 @@
 export interface DacV003ConformanceEvidenceRef {
   readonly file: string;
   readonly test: string;
+  /**
+   * Decisive semantic assertions (error codes / dispositions / frozen
+   * outcomes) that MUST literally occur in the referenced test's source —
+   * verified by matrix-closure.test.ts so an evidence reference can never
+   * degrade into a title-only inventory: the referenced test must actually
+   * assert this row's expected semantic result.
+   */
+  readonly asserts?: readonly string[];
 }
 
 export interface DacV003ConformanceCase {
@@ -64,12 +72,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c39-c44-shared-reference.test.ts',
         test: 'C39: authoritative reference pinned to a latest/current/head alias fails closed at every identity slot',
+        asserts: ['MUTABLE_ALIAS_REJECTED'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 1 (floating identity substitution): mutable aliases are rejected at the exact-identity manifest fields',
+        asserts: ['MUTABLE_ALIAS_REJECTED'],
       },
     ],
     classification: 'PASS',
@@ -90,12 +100,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c39-c44-shared-reference.test.ts',
         test: 'C40: same immutable revision identity with a different authoritative digest fails closed with no identity-preserving reconciliation',
+        asserts: ['REVISION_DIGEST_CONTRADICTION'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 2 (same semantic identity, foreign revision/digest): a selected entry covered for its semantic name but a foreign revision is not adopted',
+        asserts: ['REVISION_DIGEST_CONTRADICTION', 'INVALID_MANIFEST_INPUT'],
       },
     ],
     classification: 'PASS',
@@ -116,12 +128,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c39-c44-shared-reference.test.ts',
         test: 'C41: the same digest under a different authority/scope never merges authority — explicit adoption is required per scope',
+        asserts: ['IDENTITY_MISMATCH', 'assertDacV003RevisionDigestConsistency'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 4 (scope substitution): a UX closure adopted under a foreign authority scope cannot associate with the exact manifest',
+        asserts: ['ASSOCIATION_SUBJECT_MISMATCH'],
       },
     ],
     classification: 'PASS',
@@ -141,12 +155,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c39-c44-shared-reference.test.ts',
         test: 'C42: evidence recorded for exact revision A is rejected for authoritative reuse against revision B',
+        asserts: ['IDENTITY_MISMATCH'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 2 (same semantic identity, foreign revision/digest): a selected entry covered for its semantic name but a foreign revision is not adopted',
+        asserts: ['REVISION_DIGEST_CONTRADICTION', 'INVALID_MANIFEST_INPUT'],
       },
     ],
     classification: 'PASS',
@@ -166,6 +182,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c39-c44-shared-reference.test.ts',
         test: 'C43: missing required CompatibilityTargetRef fails closed and never infers an ambient runtime',
+        asserts: ['FAIL_CLOSED'],
       },
     ],
     adversarial: [],
@@ -185,12 +202,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c39-c44-shared-reference.test.ts',
         test: 'C44: an explicit but unsupported compatibility target is INCOMPATIBLE, never classified as missing/unknown',
+        asserts: ['INCOMPATIBLE'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 7 (wrong subject/target binding): a validation over a different explicit target cannot associate with the exact manifest',
+        asserts: ['ASSOCIATION_SUBJECT_MISMATCH', 'INCOMPATIBLE'],
       },
     ],
     classification: 'PASS',
@@ -212,12 +231,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C45: an authored candidate never enters a Harness authority position — production selection requires evolved/promoted/selected stages',
+        asserts: ['INVALID_MANIFEST_INPUT', 'PROFILE_REQUIREMENT_UNMET'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 3 (role substitution): wrong-role references fail in every manifest authority slot',
+        asserts: ['PRIMARY_RUNTIME_CARDINALITY'],
       },
     ],
     classification: 'NOT_OWNED',
@@ -238,6 +259,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C46: a Simulator/validation PASS never becomes promotion evidence at the Harness boundary',
+        asserts: ['INVALID_MANIFEST_INPUT'],
       },
     ],
     adversarial: [],
@@ -259,6 +281,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C47: producer identity never substitutes EvolutionOperationRef authority at the Harness boundary',
+        asserts: ['derivation authority is the exact evolution-operation ref'],
       },
     ],
     adversarial: [],
@@ -280,6 +303,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C48: an ambiguous capability result is never fabricated into a produced candidate by any Harness surface',
+        asserts: ['ambiguous-preserve-unresolved', 'STILL_UNKNOWN'],
       },
     ],
     adversarial: [],
@@ -300,6 +324,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C49: accepted-for-evaluation is never a produced result — the exchange outcome classes stay ceiling-distinct',
+        asserts: ['ACCEPTED_FOR_PROCESSING', 'STILL_UNKNOWN'],
       },
     ],
     adversarial: [],
@@ -313,20 +338,23 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
     obligation:
       'evolved result lacks exact parent/root or owning evolution op => FAIL_CLOSED for authoritative reuse',
     source: SRC,
-    surface: 'src/dac-v003 (P4 lineage-closure primitive)',
-    ownerBoundary: 'Harness-owned P4 exactness primitive (evolution decision itself NOT_OWNED)',
-    expected: 'FAIL_CLOSED for authoritative reuse',
+    surface:
+      'NOT_OWNED evolution-lane owning-operation judgment; Harness boundary at src/dac-v003 (generic P4 lineage-closure primitive)',
+    ownerBoundary:
+      'owning-evolution-operation validation NOT_OWNED (upstream evolution/producer lane); Harness owns only the generic P4 parent/provenance exactness primitive',
+    expected: 'FAIL_CLOSED for authoritative reuse (upstream lane); generic P4 boundary fail-closed at the Harness',
     evidence: [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
-        test: 'C50: an evolved result without exact parent/root lineage or owning evolution op fails closed for authoritative reuse (P4)',
+        test: 'C50: generic P4 lineage closure (parent/provenance) fails closed at the Harness; the owning-evolution-operation half is not Harness-owned',
+        asserts: ['PROFILE_REQUIREMENT_UNMET', 'no merged Harness-owned surface rejects a missing owning evolution operation'],
       },
     ],
     adversarial: [],
-    classification: 'PASS',
+    classification: 'NOT_OWNED',
     reason:
-      'The Harness-owned applicable obligation is the P4 lineage-closure primitive: a derived result without parentRefs+provenanceRefs fails the P4 assertion (and P3 for production reuse); the promotion/evolution decision that would consume the lineage stays NOT_OWNED upstream.',
-    identityLinkage: 'parentRefs/provenanceRefs/derivationOperationRef of the evolved reference',
+      'Frozen C50 fails closed when the exact parent/root OR the owning evolution operation is missing. The Harness-owned half (parentRefs+provenanceRefs at the generic P4 primitive) fails closed and is kept as bounded boundary evidence. The owning-evolution-operation half is enforced by no merged Harness-owned authoritative consumer — P4 requires only parentRefs+provenanceRefs (derivationOperationRef is optional and only structurally validated when present), proven executably by the operation-missing probe with valid parent/provenance; that judgment belongs to the upstream evolution/producer lane, so C50 is NOT_OWNED overall.',
+    identityLinkage: 'parentRefs/provenanceRefs of the evolved reference; derivationOperationRef where declared',
   },
   {
     id: 'C51',
@@ -342,6 +370,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C51: improvement/non-regression claims need exact RegressionComparisonRef evidence — no Harness surface accepts a qualitative claim',
+        asserts: ['PROFILE_REQUIREMENT_UNMET'],
       },
     ],
     adversarial: [],
@@ -363,6 +392,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c45-c52-authoring-evolution-boundary.test.ts',
         test: 'C52: an exact authored patch from a replaceable producer stays producer provenance only and never gains evolution authority',
+        asserts: ['producer substitution does not transfer evolution authority'],
       },
     ],
     adversarial: [],
@@ -382,12 +412,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C53: promotion never implicitly becomes application selection — both authority steps are separately required',
+        asserts: ['SELECTED_LIFECYCLE_AUTHORITY_UNBOUND', 'INVALID_MANIFEST_INPUT'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 5 (promotion without selection) and 6 (selection without effective promotion) both fail',
+        asserts: ['SELECTED_PROMOTION_EVIDENCE_NOT_EFFECTIVE', 'INVALID_MANIFEST_INPUT'],
       },
     ],
     classification: 'PASS',
@@ -407,12 +439,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C54: a compatibility PASS never creates binding or activation — validation stops before the later lifecycle stages',
+        asserts: ['LIFECYCLE_BINDING_INPUT_REJECTED'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 11 (binding/activation evidence insertion): #307 evidence never enters manifest content',
+        asserts: ['MANIFEST_EVIDENCE_ABSORPTION'],
       },
     ],
     classification: 'PASS',
@@ -432,12 +466,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C55: runtime contract, compatibility target and runtime implementation identities stay separately referrable',
+        asserts: ['PRIMARY_RUNTIME_CARDINALITY', 'INVALID_MANIFEST_INPUT'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 3 (role substitution): wrong-role references fail in every manifest authority slot',
+        asserts: ['PRIMARY_RUNTIME_CARDINALITY'],
       },
     ],
     classification: 'PASS',
@@ -458,6 +494,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C56: RuntimeHostBindingRequirementRef is never a concrete Host Binding and never a lifecycle binding',
+        asserts: ['LIFECYCLE_BINDING_INPUT_REJECTED'],
       },
     ],
     adversarial: [],
@@ -478,6 +515,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C57: a required capability/port/host-binding without exact satisfaction yields INCOMPATIBLE, never COMPATIBLE',
+        asserts: ["noEvidence.disposition.value, 'INCOMPATIBLE'"],
       },
     ],
     adversarial: [],
@@ -498,6 +536,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C58: selected UX lacking a required runtime interaction semantic contract role is INCOMPATIBLE and blocks later bind/activate',
+        asserts: ["missingIntent.disposition.value, 'INCOMPATIBLE'", "full.disposition.value, 'COMPATIBLE'"],
       },
     ],
     adversarial: [],
@@ -519,12 +558,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C59: renderer/DOM/component identity never substitutes the Domain UX semantic identity',
+        asserts: ['PROFILE_REQUIREMENT_UNMET', 'locatorHints'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
-        test: 'adversarial 21 (renderer as UX semantic definition): renderer identity has no UX semantic authority slot',
+        test: 'adversarial 21 (renderer as UX semantic definition): renderer identity actually attempted in the UX semantic-definition role fails closed',
+        asserts: ['component/SubmitButton@dom-v3', 'renderer identity in the Domain UX definition slot'],
       },
     ],
     classification: 'PASS',
@@ -545,12 +586,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C60: runtime implementation identity never substitutes external Business SoR identity',
+        asserts: ['EXTERNAL_IDENTITY_SUBSTITUTION', 'EXTERNAL_IDENTITY_FORBIDDEN'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 20 (runtime identity as external authority): Harness-side identity is refuted in the external lane',
+        asserts: ['EXTERNAL_IDENTITY_FORBIDDEN'],
       },
     ],
     classification: 'PASS',
@@ -570,12 +613,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c53-c61-composition.test.ts',
         test: 'C61: live external operation/attempt/provider-job/reconciliation state embedded in the immutable Manifest fails closed',
+        asserts: ['LIVE_EXTERNAL_STATE_ABSORPTION'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 10 (live-state insertion): recognized instance-state vocabulary inside manifest content fails closed',
+        asserts: ['INSTANCE_STATE_LEAKAGE'],
       },
     ],
     classification: 'PASS',
@@ -594,6 +639,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C62: request dispatch is never authoritative commit — dispatch-only evidence keeps remote truth unresolved',
+        asserts: ['STILL_UNKNOWN'],
       },
     ],
     adversarial: [],
@@ -614,12 +660,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C63: provider acceptance and provider-scope success are never Business SoR commit',
+        asserts: ['AUTHORITATIVE_COMMITTED', 'STILL_UNKNOWN'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 12 (accepted mistaken for committed): acceptance evidence cannot drive a commit conclusion anywhere',
+        asserts: ['STILL_UNKNOWN'],
       },
     ],
     classification: 'PASS',
@@ -639,12 +687,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C64: timeout/crash after possible dispatch stays UNKNOWN_AMBIGUOUS and never becomes known non-commit',
+        asserts: ['LOCAL_CAUSE_FORBIDDEN'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 13 (timeout as non-commit): local timeout material cannot claim remote non-commit',
+        asserts: ['LOCAL_CAUSE_FORBIDDEN'],
       },
     ],
     classification: 'PASS',
@@ -664,12 +714,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C65: a duplicating retry after an unresolved attempt is not authorized without proven non-commit/idempotency',
+        asserts: ['NOT_AUTHORIZED_AMBIGUITY_PRESERVED'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 19 (query/watch/reconcile creating an effect attempt): effectful semantics fail closed',
+        asserts: ['INVALID_ACTION_SEMANTICS', 'NOT_AUTHORIZED_AMBIGUITY_PRESERVED'],
       },
     ],
     classification: 'PASS',
@@ -689,12 +741,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C66: an idempotency identity reused for a semantically different effect fails closed',
+        asserts: ['IDEMPOTENCY_REUSE_FORBIDDEN'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 16 (idempotency issuer/scope/effect mismatch): every mismatch axis fails',
+        asserts: ['IDEMPOTENCY_REUSE_FORBIDDEN', 'issuer mismatch of an otherwise bound idempotency identity', 'promised-deduplication-scope mismatch of an otherwise bound idempotency identity'],
       },
     ],
     classification: 'PASS',
@@ -714,16 +768,19 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C67: attempt identity stays distinct from the logical operation identity and from sibling attempts',
+        asserts: ['IDENTITY_MISMATCH', 'ROLE_MISMATCH'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 15 (same attempt reused when a new attempt is required): replayed attempt identity fails',
+        asserts: ['IDENTITY_MISMATCH'],
       },
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 25 (attempt identity collapse at adoption): an attempt cannot be minted with its operation identity',
+        asserts: ['IDENTITY_MISMATCH'],
       },
     ],
     classification: 'PASS',
@@ -743,12 +800,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C68: a provider job identity never substitutes the authoritative effect/business record',
+        asserts: ['ROLE_MISMATCH'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 23 (provider job as authoritative record): the substitution is refuted everywhere',
+        asserts: ['ROLE_MISMATCH'],
       },
     ],
     classification: 'PASS',
@@ -768,16 +827,19 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C69: stale/conflicting observations never mutate current truth by last-write-wins',
+        asserts: ['unresolvedConflictPresent'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 17 (stale observation): superseded provider operations are STALE for current truth while staying historical evidence',
+        asserts: ["'STALE'", "'CURRENT'"],
       },
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 18 (conflicting observations without reconciliation evidence): truth stays unknown',
+        asserts: ['unresolvedConflictPresent'],
       },
     ],
     classification: 'PASS',
@@ -797,6 +859,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c62-c70-external-operation.test.ts',
         test: 'C70: preserved exact operation/attempt/provider/observation identities reconcile to authoritative committed truth',
+        asserts: ['RECONCILED_COMMITTED'],
       },
     ],
     adversarial: [],
@@ -817,6 +880,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C71: an authored candidate never enters production selection/manifest directly',
+        asserts: ['INVALID_MANIFEST_INPUT'],
       },
     ],
     adversarial: [],
@@ -837,6 +901,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C72: a Simulator PASS never becomes promotion and then implicit selection',
+        asserts: ['INVALID_MANIFEST_INPUT'],
       },
     ],
     adversarial: [],
@@ -856,6 +921,7 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C73: promotion without a separately issued selection fails closed — selection is never inferred',
+        asserts: ['SELECTED_LIFECYCLE_AUTHORITY_UNBOUND'],
       },
     ],
     adversarial: [],
@@ -876,12 +942,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C74: a compatibility PASS never becomes implicit Runtime binding/activation',
+        asserts: ['MANIFEST_EVIDENCE_ABSORPTION'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 11 (binding/activation evidence insertion): #307 evidence never enters manifest content',
+        asserts: ['MANIFEST_EVIDENCE_ABSORPTION'],
       },
     ],
     classification: 'PASS',
@@ -903,12 +971,14 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C75: provider acceptance never becomes Runtime authoritative success or UX success without SoR commit evidence',
+        asserts: ['STILL_UNKNOWN', "externalAuthorityOutcome, 'not-claimed'"],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 12 (accepted mistaken for committed): acceptance evidence cannot drive a commit conclusion anywhere',
+        asserts: ['STILL_UNKNOWN'],
       },
     ],
     classification: 'PASS',
@@ -930,16 +1000,19 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C76: an exact composition never substitutes renderer identity for UX semantics or runtime identity for external SoR identity',
+        asserts: ['EXTERNAL_IDENTITY_FORBIDDEN'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
-        test: 'adversarial 21 (renderer as UX semantic definition): renderer identity has no UX semantic authority slot',
+        test: 'adversarial 21 (renderer as UX semantic definition): renderer identity actually attempted in the UX semantic-definition role fails closed',
+        asserts: ['component/SubmitButton@dom-v3', 'renderer identity in the Domain UX definition slot'],
       },
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 20 (runtime identity as external authority): Harness-side identity is refuted in the external lane',
+        asserts: ['EXTERNAL_IDENTITY_FORBIDDEN'],
       },
     ],
     classification: 'PASS',
@@ -960,31 +1033,51 @@ export const DAC_V003_C39_C77_MATRIX: readonly DacV003ConformanceCase[] = [
     evidence: [
       {
         file: 'c77-positive-boundary-path.test.ts',
-        test: 'C77: the complete positive boundary path preserves every authority and exactness boundary end to end',
+        test: 'C77: the complete positive boundary path is one connected exact identity/provenance story from authored/evolved lineage to UX consequence',
+        asserts: ['RECONCILED_COMMITTED', 'commit-observed-within-authority-scope', 'PERMITTED_IDEMPOTENT_REPLAY', 'upstreamSelectionValidation,'],
+      },
+      {
+        file: 'c77-positive-boundary-path.test.ts',
+        test: "C77 foreign-lineage negative: a candidate unlinked to the journey's promotion/selection coverage cannot traverse into the Manifest",
+        asserts: ['SELECTED_PROMOTION_EVIDENCE_NOT_EFFECTIVE', 'INVALID_MANIFEST_INPUT'],
+      },
+      {
+        file: 'c77-positive-boundary-path.test.ts',
+        test: "C77 unrelated-validation negative: an unrelated/incompatible compatibility result cannot gate the journey's binding/activation path",
+        asserts: ['NOT_A_VALIDATED_COMPOSITION', 'NOT_A_RUNTIME_BINDING', 'ASSOCIATION_SUBJECT_MISMATCH'],
+      },
+      {
+        file: 'c77-positive-boundary-path.test.ts',
+        test: "C77 acceptance-only negative: ambiguous/acceptance external evidence without authoritative reconciliation cannot reach the journey's Runtime-outcome/UX success path",
+        asserts: ['STILL_UNKNOWN', 'not-claimed'],
       },
       {
         file: 'c77-positive-boundary-path.test.ts',
         test: 'C77 ownership boundary: no NOT_OWNED lane can be smuggled into a Harness authority position on the path',
+        asserts: ['STILL_UNKNOWN'],
       },
       {
         file: 'c71-c77-cross-lane.test.ts',
         test: 'C77 negatives: any single shortcut across the full boundary path fails closed (pointer to the positive suite)',
+        asserts: ['STILL_UNKNOWN'],
       },
     ],
     adversarial: [
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 8 (manifest partial selected-set coverage): the multi-entry manifest cannot ride on a single-entry verdict validation',
+        asserts: ['ASSOCIATION_SUBJECT_MISMATCH'],
       },
       {
         file: 'adversarial-shortcuts.test.ts',
         test: 'adversarial 9 (self-referential compatibility result): a validation/result inside manifest content fails closed',
+        asserts: ['MANIFEST_EVIDENCE_ABSORPTION'],
       },
     ],
     classification: 'PASS',
     reason:
-      'The complete path is executed with mandatory NOT_OWNED ownership marking (producer, promotion, selection, external truth, UX semantics); every Harness-owned segment is actually asserted; cross-boundary identity correlation (package pin, manifest digest) is preserved; every shortcut variant fails closed in the adversarial suite.',
-    identityLinkage: 'compiled package pin + manifest content digest + validation identity correlated end to end',
+      'The complete path is ONE CONNECTED executable story: the authored/evolved lineage is asserted into the compiled subject by exact identity continuity (semantic+revision; digest is the declared compiled artifact — no false evolved-digest==package-digest requirement), the v0.0.3 compatibility validation + external association consume the SAME verdict instance the Runtime binding/activation gates on (object-identity asserted), the external operation binds the manifest\'s exact declared authority, the Runtime consequence/outcome step is actually executed (commit-claim predicates + runtime-logical outcome correlation under the activated package pin) and the UX consequence is correlated to that resulting outcome with NOT_OWNED marking (producer, promotion, selection, external truth, UX semantics); foreign-lineage, unrelated/incompatible-validation and acceptance-only negatives each fail closed, and every shortcut variant fails closed in the adversarial suite.',
+    identityLinkage: 'evolved-subject revision continuity -> compiled package pin + manifest content digest + validation verdict instance correlated end to end',
   },
 ];
 

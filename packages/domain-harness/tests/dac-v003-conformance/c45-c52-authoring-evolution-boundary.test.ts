@@ -7,9 +7,12 @@
 // producer-shaped inputs fail closed at every Harness authority position.
 //
 // Dispositions recorded in the conformance matrix:
-//   C45, C46, C47, C48, C49, C51, C52 — NOT_OWNED (producer/evolution
-//     authority) with the executable boundary evidence below;
-//   C50 — PASS (the Harness-owned P4 lineage-closure primitive).
+//   C45, C46, C47, C48, C49, C50, C51, C52 — NOT_OWNED (producer/evolution
+//     authority) with the executable boundary evidence below. C50's
+//     owning-evolution-operation half is NOT_OWNED because no merged
+//     Harness-owned authoritative consumer enforces it (proven below); the
+//     generic Harness-owned P4 parent/provenance primitive is preserved as
+//     bounded boundary evidence.
 //
 // Additive conformance evidence only: no product surface is edited here.
 import assert from 'node:assert/strict';
@@ -307,11 +310,16 @@ test('C49: accepted-for-evaluation is never a produced result — the exchange o
   assert.equal(episode.conclusion.outcomeClass, 'STILL_UNKNOWN');
 });
 
-test('C50: an evolved result without exact parent/root lineage or owning evolution op fails closed for authoritative reuse (P4)', () => {
-  const { evolvedCandidateWithLineage, evolvedCandidateWithoutLineage } =
-    producerLaneFixtures();
-  // The Harness-owned P4 lineage-closure primitive: a derived result without
-  // parentRefs + provenanceRefs is not P4 and fails closed.
+test('C50: generic P4 lineage closure (parent/provenance) fails closed at the Harness; the owning-evolution-operation half is not Harness-owned', () => {
+  const {
+    authoredCandidate,
+    evolutionOperation,
+    evolvedCandidateWithLineage,
+    evolvedCandidateWithoutLineage,
+  } = producerLaneFixtures();
+  // Bounded Harness-owned evidence — the generic P4 exactness primitive: a
+  // derived result without parentRefs + provenanceRefs is not P4 and fails
+  // closed, and is also not P3 for production reuse (lifecycle authorities).
   expectReferenceError(
     () => assertDacV003ExactnessProfile(evolvedCandidateWithoutLineage, 'P4'),
     'PROFILE_REQUIREMENT_UNMET',
@@ -321,12 +329,46 @@ test('C50: an evolved result without exact parent/root lineage or owning evoluti
   assert.doesNotThrow(() =>
     assertDacV003ExactnessProfile(evolvedCandidateWithLineage, 'P4'),
   );
-  // An evolved result without lineage is also not adoptable as the selected
-  // Domain Data of a production manifest (P3 requires lifecycle authorities).
   expectReferenceError(
     () => assertDacV003ExactnessProfile(evolvedCandidateWithoutLineage, 'P3'),
     'PROFILE_REQUIREMENT_UNMET',
     'evolved result without lifecycle authorities is not P3',
+  );
+  // C50's "or owning evolution op" half: frozen C50 also fails closed when
+  // the OWNING EVOLUTION OPERATION is missing while parent/root lineage is
+  // valid. That evolution-specific authoritative obligation is enforced by no
+  // merged Harness-owned authoritative consumer — the executable probe below
+  // proves it: with parentRefs + provenanceRefs valid and
+  // derivationOperationRef absent, every Harness P4 surface still accepts the
+  // reference (P4 requires only parentRefs + provenanceRefs per the frozen
+  // profile table; derivationOperationRef is structurally validated only when
+  // present). Deciding whether an evolved result genuinely carries its owning
+  // evolution operation belongs to the upstream evolution/producer lane, so
+  // C50 is classified NOT_OWNED for that half — this generic-P4 test is
+  // retained as bounded Harness-side boundary evidence only.
+  const evolvedWithoutOwningOperation = adoptDacV003RegistryReference('evolved-candidate', {
+    baseline,
+    authorityScope: 'sim://acme/evolution',
+    primaryIdentity: 'evolved/candidate-no-owning-op',
+    semanticIdentity: 'fixture-domain',
+    revisionIdentity: 'evolved-rev-3',
+    contentDigest: 'sha256:evolved-3',
+    parentRefs: [authoredCandidate],
+    provenanceRefs: [authoredCandidate],
+  });
+  assert.equal(evolvedWithoutOwningOperation.derivationOperationRef, undefined);
+  assert.ok(evolvedWithoutOwningOperation.parentRefs.length > 0);
+  assert.ok(evolvedWithoutOwningOperation.provenanceRefs.length > 0);
+  assert.doesNotThrow(() =>
+    assertDacV003ExactnessProfile(evolvedWithoutOwningOperation, 'P4'),
+    'no merged Harness-owned surface rejects a missing owning evolution operation',
+  );
+  // For contrast, the complete fixture (owning operation present) carries the
+  // exact derivation authority — the upstream lane's obligation, preserved
+  // verbatim by the Harness when it IS declared.
+  assert.equal(
+    evolvedCandidateWithLineage.derivationOperationRef,
+    evolutionOperation,
   );
 });
 

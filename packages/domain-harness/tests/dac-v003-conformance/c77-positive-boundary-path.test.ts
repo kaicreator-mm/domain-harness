@@ -1,25 +1,40 @@
 // Issue #329 / DAC v0.0.3 V3-005 — the reviewed C77 COMPLETE positive
-// boundary path, executed end to end over the merged #323/#325/#327/#328
-// surfaces plus the A2 #306/#307/#308/#309 lanes they consume:
+// boundary path, repaired per review 5813257460 P1-1 into ONE CONNECTED
+// executable journey over the merged #323/#325/#327/#328 surfaces plus the
+// A2 #306/#307/#308/#309 lanes they consume:
 //
 //   authored/evolved lineage evidence (NOT_OWNED producer)
+//     -> [asserted exact transformation relation] the promoted/selected
+//        subject actually consumed by the Manifest
 //     -> effective promotion evidence (NOT_OWNED authority)
 //     -> exact ApplicationSelection evidence (NOT_OWNED authority)
 //     -> immutable Manifest consumption
-//     -> exact compatibility validation
+//     -> exact DAC v0.0.3 compatibility validation + external association
+//        correlated (same verdict instance) to
 //     -> Runtime binding
 //     -> Runtime activation
 //     -> logical external operation / ExternalAuthority evidence
 //     -> authoritative external observation + reconciliation evidence
 //        (external truth NOT_OWNED)
-//     -> Runtime outcome
-//     -> UX consequence/correlation evidence (Domain UX semantics NOT_OWNED)
+//     -> executed Runtime consequence/outcome (commit-claim predicates +
+//        runtime-logical outcome correlation, actually read and asserted)
+//     -> UX consequence/correlation evidence correlated to that Runtime
+//        outcome (Domain UX semantics NOT_OWNED)
 //
-// Ownership marking is mandatory and asserted below: the four NOT_OWNED
-// lanes are boundary fixtures (upstream evidence the Harness consumes, never
-// mints); every Harness-owned segment is actually executed and asserted.
-// The test proves CORRELATION across the boundaries without making the
-// Harness authoritative for any non-owned lane.
+// Every transition between segments is ASSERTED by exact identity
+// (object-instance identity and identity tuples) — never inferred from
+// reused primary-identity strings in opaque data. The three journey
+// negatives prove: foreign/unlinked lineage cannot traverse into the
+// Manifest; unrelated/incompatible compatibility evidence cannot gate the
+// binding/activation path; acceptance-only/ambiguous external evidence
+// without authoritative reconciliation cannot reach the same
+// Runtime-outcome/UX success path.
+//
+// Ownership marking is mandatory and asserted below: the NOT_OWNED lanes are
+// boundary fixtures (upstream evidence the Harness consumes, never mints);
+// every Harness-owned segment is actually executed and asserted. The test
+// proves CORRELATION across the boundaries without making the Harness
+// authoritative for any non-owned lane.
 //
 // Additive conformance evidence only: no product surface is edited here.
 import assert from 'node:assert/strict';
@@ -28,16 +43,22 @@ import {
   DAC_V003_BASELINE,
   adoptDacV003RegistryReference,
   assertDacV003ExactnessProfile,
+  verifyDacV003ReferenceIdentity,
 } from '../../src/dac-v003/index.js';
 import {
+  adoptDacV003CompatibilityTargetRef,
   validateDacV003Compatibility,
 } from '../../src/dac-v003-compatibility/index.js';
 import type { DacV003CompatibilityValidationRequest } from '../../src/dac-v003-compatibility/index.js';
 import {
+  DacV003ManifestError,
   adoptDacV003ApplicationManifest,
   associateDacV003ManifestCompatibilityValidation,
   computeDacV003ApplicationManifestDigest,
   isDacV003ManifestCompatibilityAssociation,
+} from '../../src/dac-v003-manifest/index.js';
+import type {
+  DacV003ApplicationManifestAdoptionInput,
 } from '../../src/dac-v003-manifest/index.js';
 import {
   adjudicateDacV003ObservationCurrentness,
@@ -53,6 +74,7 @@ import {
 import {
   bindValidatedComposition,
   activateRuntimeBinding,
+  RuntimeBindingError,
 } from '../../src/runtime-binding/index.js';
 import {
   DAC_BRIDGE_BASELINE,
@@ -70,6 +92,9 @@ import {
   adoptProviderOperationRef as adoptV002ProviderOperationRef,
   adoptRuntimeLogicalOperationRef,
   correlateExternalEffect,
+  maxClaimableForExternalObservation,
+  observationSupportsCommitClaim,
+  verifyExternalEffectCorrelation,
 } from '../../src/external-authority/index.js';
 import type {
   DomainMessage,
@@ -78,13 +103,13 @@ import type {
 import type { WorkflowInstanceSnapshot } from '../../src/v2/contracts/workflow.js';
 import {
   buildIntakeVerdictFor,
+  buildManifestInput,
+  buildValidationFor,
   buildV003Entry,
   entryTuplesFor,
+  withDeclaredDigest,
 } from '../dac-v003/manifest-fixture.js';
 import { buildV003Refs, V003_TARGET_PROFILE } from '../dac-v003/compatibility-fixture.js';
-import type {
-  DacV003ApplicationManifestAdoptionInput,
-} from '../../src/dac-v003-manifest/index.js';
 import { createSha256Fake } from '../package/fixture.js';
 
 const baseline = { ...DAC_V003_BASELINE };
@@ -98,7 +123,57 @@ const OWNERSHIP = {
   domainUxSemantics: 'NOT_OWNED',
 } as const;
 
-test('C77: the complete positive boundary path preserves every authority and exactness boundary end to end', async () => {
+/** The journey's exact external Business SoR identity declaration. */
+function journeyExternalAuthority() {
+  return adoptDacV003ExternalAuthorityRef({
+    baseline: { ...DAC_V003_BASELINE },
+    authorityId: 'sor://billing/acme-c77',
+    authorityScope: 'ext://billing/acme',
+    contractProfileIdentity: 'billing-authority/v1',
+  });
+}
+
+async function expectManifestErrorAsync(
+  fn: () => Promise<unknown>,
+  code: string,
+  label: string,
+): Promise<void> {
+  let caught: unknown;
+  try {
+    await fn();
+  } catch (error) {
+    caught = error;
+  }
+  assert.ok(
+    caught instanceof DacV003ManifestError,
+    `${label}: expected DacV003ManifestError, got ${
+      caught instanceof Error ? caught.message : String(caught)
+    }`,
+  );
+  assert.equal((caught as DacV003ManifestError).code, code, `${label}: code`);
+}
+
+async function expectBindingErrorAsync(
+  fn: () => Promise<unknown>,
+  code: string,
+  label: string,
+): Promise<void> {
+  let caught: unknown;
+  try {
+    await fn();
+  } catch (error) {
+    caught = error;
+  }
+  assert.ok(
+    caught instanceof RuntimeBindingError,
+    `${label}: expected RuntimeBindingError, got ${
+      caught instanceof Error ? caught.message : String(caught)
+    }`,
+  );
+  assert.equal((caught as RuntimeBindingError).code, code, `${label}: code`);
+}
+
+test('C77: the complete positive boundary path is one connected exact identity/provenance story from authored/evolved lineage to UX consequence', async () => {
   // ---------------------------------------------------------------------
   // Lane 1 — authored/evolved lineage evidence [NOT_OWNED producer].
   // Boundary fixtures adopted as identity-only upstream evidence: the
@@ -121,12 +196,17 @@ test('C77: the complete positive boundary path preserves every authority and exa
     semanticIdentity: 'simulator-evolve',
     logicalOperationIdentity: 'sim-evolution-run-c77',
   });
+  // The journey's compiled subject: a genuine #306 stage-3 verdict over the
+  // compiled package of revision rev-000042. Built FIRST so the evolved
+  // fixture is constructed from the verdict's exact identity tuples.
+  const verdict = await buildIntakeVerdictFor('rev-000042');
+  const { domainId, revision, digest } = entryTuplesFor(verdict);
   const evolvedCandidate = adoptDacV003RegistryReference('evolved-candidate', {
     baseline,
     authorityScope: 'sim://acme/evolution',
     primaryIdentity: 'evolved/candidate-c77',
-    semanticIdentity: 'fixture-domain',
-    revisionIdentity: 'rev-000042',
+    semanticIdentity: domainId,
+    revisionIdentity: revision,
     contentDigest: 'sha256:evolved-c77',
     parentRefs: [authoredCandidate],
     provenanceRefs: [evolutionOperation, authoredCandidate],
@@ -136,20 +216,49 @@ test('C77: the complete positive boundary path preserves every authority and exa
   assert.equal(OWNERSHIP.authoredEvolvedProducer, 'NOT_OWNED');
 
   // ---------------------------------------------------------------------
-  // Lanes 2+3 — effective promotion evidence [NOT_OWNED authority] and
-  // exact ApplicationSelection evidence [NOT_OWNED authority], as upstream
-  // boundary fixtures whose exact identity covers the compiled package the
-  // journey pins. The #306 stage-3 verdict is minted from them (genuine
-  // upstream evidence consumption — never re-minted by the Harness).
+  // The DECLARED EXACT TRANSFORMATION/PROVENANCE RELATION — asserted, never
+  // inferred from reused primary-identity strings in opaque data. The
+  // evolved candidate is the exact upstream Domain Data subject whose
+  // COMPILED artifact the journey pins: subject semantic identity and
+  // revision continue exactly from the evolved candidate through promotion,
+  // selection and the Manifest entry; the content-digest axis is the digest
+  // of the compiled artifact of that exact revision (compilation is the
+  // declared transformation — the frozen model does NOT require the
+  // evolved-candidate digest to equal the compiled-package digest).
   // ---------------------------------------------------------------------
-  const verdict = await buildIntakeVerdictFor('rev-000042');
-  const { domainId, revision, digest } = entryTuplesFor(verdict);
+  verifyDacV003ReferenceIdentity(evolvedCandidate, {
+    semanticIdentity: domainId,
+    revisionIdentity: revision,
+  });
+  assert.notEqual(evolvedCandidate.contentDigest, digest);
   const upstreamEntry = buildV003Entry(revision, digest, domainId);
-  // The journey's promotion/selection fixtures cover exactly this compiled
-  // revision — the effective-promotion/total-selection alignment the
-  // manifest checks below consume.
+  assert.equal(upstreamEntry.selected.semanticIdentity, evolvedCandidate.semanticIdentity);
+  assert.equal(upstreamEntry.selected.revisionIdentity, evolvedCandidate.revisionIdentity);
+  assert.equal(upstreamEntry.selected.contentDigest, digest);
+  assert.equal(verdict.selectedDomainData.revisionIdentity, revision);
+  assert.equal(verdict.selectedDomainData.contentDigest, digest);
+  // The lineage closure of that exact subject is P4-complete and the
+  // derivation authority is the Simulator operation (executed verification,
+  // not string reuse).
+  assert.ok(evolvedCandidate.parentRefs.includes(authoredCandidate));
+  assert.equal(evolvedCandidate.derivationOperationRef, evolutionOperation);
+
+  // ---------------------------------------------------------------------
+  // Lanes 2+3 — effective promotion evidence [NOT_OWNED authority] and
+  // exact ApplicationSelection evidence [NOT_OWNED authority]: upstream
+  // boundary fixtures covering EXACTLY the compiled subject asserted above
+  // (promotion/selection revision === the evolved candidate's revision).
+  // ---------------------------------------------------------------------
   assert.equal(upstreamEntry.promotionEvidence.revisionIdentity, revision);
   assert.equal(upstreamEntry.applicationSelection.revisionIdentity, revision);
+  assert.equal(
+    upstreamEntry.promotionEvidence.revisionIdentity,
+    evolvedCandidate.revisionIdentity,
+  );
+  assert.equal(
+    upstreamEntry.applicationSelection.revisionIdentity,
+    evolvedCandidate.revisionIdentity,
+  );
   assert.equal(OWNERSHIP.promotionAuthority, 'NOT_OWNED');
   assert.equal(OWNERSHIP.applicationSelectionAuthority, 'NOT_OWNED');
 
@@ -193,12 +302,7 @@ test('C77: the complete positive boundary path preserves every authority and exa
       applicability: 'APPLICABLE',
       declarations: [
         {
-          authority: adoptDacV003ExternalAuthorityRef({
-            baseline,
-            authorityId: 'sor://billing/acme-c77',
-            authorityScope: 'ext://billing/acme',
-            contractProfileIdentity: 'billing-authority/v1',
-          }),
+          authority: journeyExternalAuthority(),
           capabilityRequirements: { reconciliation: true },
         },
       ],
@@ -209,6 +313,7 @@ test('C77: the complete positive boundary path preserves every authority and exa
         authoredCandidate: authoredCandidate.primaryIdentity,
         evolvedCandidate: evolvedCandidate.primaryIdentity,
         evolutionOperation: evolutionOperation.primaryIdentity,
+        evolvedRevision: evolvedCandidate.revisionIdentity,
       },
     },
     opaque: { note: 'C77 positive boundary path' },
@@ -223,22 +328,28 @@ test('C77: the complete positive boundary path preserves every authority and exa
   );
   assert.equal(manifest.manifestContentDigest, manifestContentDigest);
   assert.ok(Object.isFrozen(manifest));
-  // The manifest carries the lineage fixtures ONLY as opaque composition
-  // provenance — they never became selection/promotion authority.
+  // The manifest carries the lineage fixtures ONLY as declared composition
+  // provenance — they never became selection/promotion authority (that
+  // linkage is the asserted identity continuity above, not this record).
   const provenance = manifest.compositionProvenance as {
-    lineage?: { evolvedCandidate?: string };
+    lineage?: { evolvedCandidate?: string; evolvedRevision?: string };
   };
   assert.ok(provenance.lineage !== undefined);
   assert.equal(provenance.lineage.evolvedCandidate, 'evolved/candidate-c77');
-  assert.equal(manifest.selectedDomainData.length, 1);
+  assert.equal(provenance.lineage.evolvedRevision, revision);
   const journeyEntry = manifest.selectedDomainData[0];
   assert.ok(journeyEntry !== undefined);
   assert.equal(journeyEntry.selected.role, 'selected-domain-data');
+  assert.equal(journeyEntry.selected.semanticIdentity, domainId);
+  assert.equal(journeyEntry.selected.revisionIdentity, revision);
+  assert.equal(journeyEntry.selected.contentDigest, digest);
 
   // ---------------------------------------------------------------------
   // Harness-owned segment 2 — exact compatibility validation of the exact
   // declared closure, plus its EXTERNAL association with the manifest
-  // (never content, never digest-covered).
+  // (never content, never digest-covered). The validation consumes the SAME
+  // verdict instance the journey later binds — the correlation is asserted
+  // by object identity below.
   // ---------------------------------------------------------------------
   const compatibilityRequest: DacV003CompatibilityValidationRequest = {
     selectionValidation: verdict,
@@ -265,6 +376,16 @@ test('C77: the complete positive boundary path preserves every authority and exa
   };
   const validation = await validateDacV003Compatibility(compatibilityRequest);
   assert.equal(validation.disposition.value, 'COMPATIBLE');
+  // EXACT correlation to the journey's subject: the validated subject IS the
+  // #306 verdict instance this journey selected, and the validated target IS
+  // the manifest's declared compatibility target profile.
+  assert.equal(
+    validation.subject.upstreamSelectionValidation,
+    verdict,
+    'the v0.0.3 validation consumed the exact journey verdict instance',
+  );
+  assert.equal(validation.subject.targetProfile, V003_TARGET_PROFILE);
+  assert.equal(manifest.primaryRuntime.compatibilityTarget, refs.target);
   const association = associateDacV003ManifestCompatibilityValidation(
     manifest,
     validation,
@@ -280,14 +401,27 @@ test('C77: the complete positive boundary path preserves every authority and exa
 
   // ---------------------------------------------------------------------
   // Harness-owned segments 3+4 — Runtime binding and technical activation
-  // from the #306 verdict through the #307 lifecycle (stages 4 and 5 stay
-  // separately observable; the exact package pin is preserved).
+  // gated on the exact verdict the compatible validation correlated: the
+  // binding consumes the SAME verdict instance (asserted), the activation
+  // consumes that exact binding instance, and the activated package pin is
+  // the verdict's validated package id end to end.
   // ---------------------------------------------------------------------
   const binding = await bindValidatedComposition(verdict, { sha256 });
+  assert.equal(
+    binding.validation,
+    verdict,
+    'the binding bound the exact verdict instance the compatible validation covers',
+  );
+  assert.equal(
+    binding.validation,
+    validation.subject.upstreamSelectionValidation,
+    'binding subject === validation subject (one exact subject, not a same-shaped copy)',
+  );
   const activation = await activateRuntimeBinding(binding, {
     sha256,
     activationInstanceId: 'activation-instance-c77',
   });
+  assert.equal(activation.binding, binding);
   assert.equal(activation.activatedPackageId, verdict.validatedPackageId);
   assert.equal(
     binding.validation.validatedPackageId,
@@ -296,17 +430,27 @@ test('C77: the complete positive boundary path preserves every authority and exa
   );
 
   // ---------------------------------------------------------------------
-  // Harness-owned segment 5 — logical external operation bound to the exact
-  // ExternalAuthority declaration the manifest carries [external Business
-  // SoR truth stays NOT_OWNED]: proven idempotency, an ambiguous first
-  // attempt, and the safe-retry rule refusing blind duplication.
+  // Harness-owned segment 5 — logical external operation bound to the EXACT
+  // ExternalAuthority declaration the adopted manifest carries [external
+  // Business SoR truth stays NOT_OWNED]: proven idempotency, an ambiguous
+  // first attempt, and the safe-retry rule authorizing replay only under the
+  // proven guarantee.
   // ---------------------------------------------------------------------
-  const externalAuthority = adoptDacV003ExternalAuthorityRef({
-    baseline,
-    authorityId: 'sor://billing/acme-c77',
-    authorityScope: 'ext://billing/acme',
-    contractProfileIdentity: 'billing-authority/v1',
-  });
+  const externalAuthorityPath = manifest.externalAuthority;
+  if (externalAuthorityPath.applicability !== 'APPLICABLE') {
+    assert.fail('the journey manifest must declare an applicable external-authority path');
+  }
+  const declaredAuthority = externalAuthorityPath.declarations[0]?.authority;
+  assert.ok(
+    declaredAuthority !== undefined,
+    'the journey manifest declares its external authority',
+  );
+  assert.equal(
+    declaredAuthority.reference.primaryIdentity,
+    'sor://billing/acme-c77',
+    'the journey external operation must bind the manifest\'s exact declared authority',
+  );
+  const externalAuthority = declaredAuthority;
   const idempotency = adoptDacV003IdempotencyIdentityRef({
     baseline,
     idempotencyKey: 'idem-c77-1',
@@ -362,7 +506,8 @@ test('C77: the complete positive boundary path preserves every authority and exa
   // reconciliation [external truth NOT_OWNED]: a GENUINE #309 commit-
   // observed evidence record adopted through the v0.0.3 bridge, adjudicated
   // CURRENT, and reconciled to RECONCILED_COMMITTED with the exact evidence
-  // basis preserved.
+  // basis preserved. The runtime<->external correlation is verified by the
+  // #309 exact-correlation surface (executed), not by string reuse.
   // ---------------------------------------------------------------------
   const v002Baseline = { ...EXTERNAL_AUTHORITY_BASELINE };
   const v002Correlation = correlateExternalEffect({
@@ -380,6 +525,12 @@ test('C77: the complete positive boundary path preserves every authority and exa
       baseline: v002Baseline,
       providerOperationId: 'provider-job-c77',
     }),
+  });
+  verifyExternalEffectCorrelation(v002Correlation, {
+    correlationId: 'corr-c77',
+    effectId: 'logical-op-c77-0001',
+    authorityId: 'sor://billing/acme-c77',
+    providerOperationId: 'provider-job-c77',
   });
   const commitEvidence = adoptV002ObservationEvidence({
     correlation: v002Correlation,
@@ -425,30 +576,27 @@ test('C77: the complete positive boundary path preserves every authority and exa
   assert.equal(reconciliation.runtimeExecutionAuthority, 'none');
 
   // ---------------------------------------------------------------------
-  // Harness-owned segment 7 — Runtime outcome: the reconciled committed
-  // truth is the external outcome the Runtime records; the ambiguous first
-  // attempt stays immutable historical evidence (never rewritten).
+  // Harness-owned segment 7 — Runtime consequence/outcome, actually
+  // executed and read: (a) the #309 Runtime-consequence predicates decide
+  // what the Runtime may claim from the journey's own commit evidence;
+  // (b) the runtime-logical outcome of the exact command that drove the
+  // external operation is correlated and read through the public bridge
+  // surface, under the exact activated package pin and the exact
+  // runtime<->external correlation id.
   // ---------------------------------------------------------------------
-  assert.ok(
-    reconciliation.inputAttempts.some(
-      (a) =>
-        a.reference.primaryIdentity === 'attempt-c77-0001' &&
-        a.evidenceClass === 'dispatch-outcome-ambiguous',
-    ),
+  assert.equal(
+    observationSupportsCommitClaim(commitEvidence),
+    true,
+    'a Business-SoR commit observation is the only commit-claim basis',
   );
-  assert.equal(commitObservation.observedClass, 'AUTHORITATIVE_COMMITTED');
-
-  // ---------------------------------------------------------------------
-  // Lane 5 — UX consequence/correlation evidence [Domain UX semantics
-  // NOT_OWNED]: the processed command correlates to the UX intent on a
-  // CURRENT basis, and the outcome correlation is evidence only — the UX
-  // lane never becomes Runtime transition authority and the external
-  // authority claim is exactly what the evidence supports.
-  // ---------------------------------------------------------------------
+  assert.equal(
+    maxClaimableForExternalObservation('commit-observed'),
+    'commit-observed-within-authority-scope',
+  );
   const WORKFLOW_ADDRESS = { workflowId: 'wf-invoice', instanceKey: 'inv-001' } as const;
   const workflowSnapshot: WorkflowInstanceSnapshot = {
     address: { ...WORKFLOW_ADDRESS },
-    correlationId: 'corr-c77',
+    correlationId: v002Correlation.correlationId,
     packageId: activation.activatedPackageId,
     lifecycle: 'active',
     stateRevision: 8,
@@ -468,11 +616,62 @@ test('C77: the complete positive boundary path preserves every authority and exa
   const message: DomainMessage = {
     messageId: 'msg-c77',
     target: { ...WORKFLOW_ADDRESS },
-    type: 'post-invoice',
+    type: 'charge-order',
     payload: null,
-    correlationId: 'corr-c77',
+    correlationId: v002Correlation.correlationId,
   };
   const commandCorrelation = correlateDomainCommand(message, { intent });
+  assert.equal(
+    commandCorrelation.command.correlationId,
+    v002Correlation.correlationId,
+    'the runtime command carries the exact runtime<->external correlation id',
+  );
+  const disposition: MessageDispositionSnapshot = {
+    messageId: 'msg-c77',
+    target: { ...WORKFLOW_ADDRESS },
+    targetSequence: 9,
+    packageId: activation.activatedPackageId,
+    disposition: 'processed',
+    correlationId: v002Correlation.correlationId,
+    acceptedAt: '2026-09-24T00:00:02.000Z',
+    resolvedAt: '2026-09-24T00:00:04.000Z',
+  };
+  const runtimeOutcome = correlateDomainOutcome({
+    disposition,
+    correlation: commandCorrelation,
+  });
+  // The resulting Runtime outcome is READ and asserted: the runtime-logical
+  // outcome resolves the exact command under the exact activated package,
+  // and claims no external authority itself — the committed truth stays in
+  // the authoritative evidence predicates + reconciliation above.
+  assert.equal(runtimeOutcome.outcome.messageId, 'msg-c77');
+  assert.equal(runtimeOutcome.outcome.disposition, 'processed');
+  assert.equal(runtimeOutcome.outcome.packageId, activation.activatedPackageId);
+  assert.equal(runtimeOutcome.outcome.correlationId, 'corr-c77');
+  assert.equal(runtimeOutcome.outcome.externalAuthorityOutcome, 'not-claimed');
+  assert.equal(
+    reconciliation.conclusion.outcomeClass,
+    'RECONCILED_COMMITTED',
+    'the Runtime outcome external-truth basis is the executed reconciliation',
+  );
+  // The ambiguous first attempt stays immutable historical evidence (never
+  // rewritten by the later commit conclusion).
+  assert.ok(
+    reconciliation.inputAttempts.some(
+      (a) =>
+        a.reference.primaryIdentity === 'attempt-c77-0001' &&
+        a.evidenceClass === 'dispatch-outcome-ambiguous',
+    ),
+  );
+
+  // ---------------------------------------------------------------------
+  // Lane 5 — UX consequence/correlation evidence [Domain UX semantics
+  // NOT_OWNED], correlated to the RESULTING Runtime outcome above: the
+  // processed command correlates to the UX intent on a CURRENT basis, and
+  // the outcome correlation carries that intent as evidence only — the UX
+  // lane never becomes Runtime transition authority and the external
+  // authority claim is exactly what the evidence supports.
+  // ---------------------------------------------------------------------
   assert.equal(
     classifyObservedBasis(
       commandCorrelation,
@@ -481,30 +680,21 @@ test('C77: the complete positive boundary path preserves every authority and exa
     ).status,
     'CURRENT',
   );
-  const disposition: MessageDispositionSnapshot = {
-    messageId: 'msg-c77',
-    target: { ...WORKFLOW_ADDRESS },
-    targetSequence: 9,
-    packageId: activation.activatedPackageId,
-    disposition: 'processed',
-    correlationId: 'corr-c77',
-    acceptedAt: '2026-09-24T00:00:02.000Z',
-    resolvedAt: '2026-09-24T00:00:04.000Z',
-  };
-  const outcomeCorrelation = correlateDomainOutcome({
-    disposition,
-    correlation: commandCorrelation,
-  });
-  assert.equal(outcomeCorrelation.outcome.externalAuthorityOutcome, 'not-claimed');
-  assert.equal(outcomeCorrelation.intent, intent);
+  assert.equal(runtimeOutcome.intent, intent);
+  assert.equal(runtimeOutcome.command, commandCorrelation.command);
+  assert.equal(runtimeOutcome.outcome.externalAuthorityOutcome, 'not-claimed');
   assert.equal(OWNERSHIP.domainUxSemantics, 'NOT_OWNED');
 
   // ---------------------------------------------------------------------
-  // Cross-boundary identity correlation: one exact identity story —
-  // compiled package pin preserved from selection validation through
-  // activation; the manifest digest unchanged by every downstream step.
+  // Cross-boundary identity correlation summary: one exact identity story —
+  // the evolved subject's revision continuity into the compiled package pin
+  // preserved from selection validation through binding to activation; the
+  // manifest digest unchanged by every downstream step; the validation
+  // target identical to the manifest's declared target.
   // ---------------------------------------------------------------------
   assert.equal(activation.activatedPackageId, verdict.validatedPackageId);
+  assert.equal(binding.validation, verdict);
+  assert.equal(validation.subject.upstreamSelectionValidation, verdict);
   assert.equal(
     manifest.manifestContentDigest,
     association.manifestIdentity.manifestContentDigest,
@@ -512,14 +702,287 @@ test('C77: the complete positive boundary path preserves every authority and exa
   assert.equal(validation.subject.targetProfile, V003_TARGET_PROFILE);
 });
 
-test('C77 ownership boundary: no NOT_OWNED lane can be smuggled into a Harness authority position on the path', async () => {
-  const { buildManifestInput, withDeclaredDigest } = await import(
-    '../dac-v003/manifest-fixture.js'
+test("C77 foreign-lineage negative: a candidate unlinked to the journey's promotion/selection coverage cannot traverse into the Manifest", async () => {
+  const { input, entry } = await buildManifestInput();
+  // A P4-complete evolved candidate of a FOREIGN revision (its own valid
+  // lineage) — not the subject the journey's promotion/selection covers.
+  const foreignAuthored = adoptDacV003RegistryReference('authored-candidate', {
+    baseline,
+    authorityScope: 'forge://acme/authoring',
+    primaryIdentity: 'authored/candidate-foreign',
+    semanticIdentity: 'fixture-domain',
+    revisionIdentity: 'authored-draft-foreign',
+    contentDigest: 'sha256:authored-foreign',
+  });
+  const foreignEvolution = adoptDacV003RegistryReference('evolution-operation', {
+    baseline,
+    authorityScope: 'sim://acme/evolution',
+    primaryIdentity: 'evolution/op-foreign',
+    semanticIdentity: 'simulator-evolve',
+    logicalOperationIdentity: 'sim-evolution-run-foreign',
+  });
+  const foreignEvolved = adoptDacV003RegistryReference('evolved-candidate', {
+    baseline,
+    authorityScope: 'sim://acme/evolution',
+    primaryIdentity: 'evolved/candidate-foreign',
+    semanticIdentity: 'fixture-domain',
+    revisionIdentity: 'rev-000099',
+    contentDigest: 'sha256:evolved-foreign',
+    parentRefs: [foreignAuthored],
+    provenanceRefs: [foreignEvolution, foreignAuthored],
+    derivationOperationRef: foreignEvolution,
+  });
+  assert.doesNotThrow(() => assertDacV003ExactnessProfile(foreignEvolved, 'P4'));
+  // (a) The evolved-candidate role itself has no selected-slot authority:
+  await expectManifestErrorAsync(
+    async () =>
+      adoptDacV003ApplicationManifest(
+        await withDeclaredDigest({
+          ...input,
+          manifestIdentity: 'manifest://acme/tally-ledger/7-c77-n1a',
+          selectedDomainData: [
+            {
+              selected: foreignEvolved as never,
+              promotionEvidence: entry.promotionEvidence,
+              applicationSelection: entry.applicationSelection,
+            },
+          ],
+        } as never),
+        { sha256: createSha256Fake() },
+      ),
+    'INVALID_MANIFEST_INPUT',
+    'foreign evolved candidate directly in the selected slot',
   );
+  // (b) The foreign candidate's exact subject tuple behind a genuine
+  // selected-domain-data reference while promotion+selection cover only the
+  // journey's revision: the lifecycle coverage fails closed — the foreign
+  // lineage cannot traverse even when dressed as the right role.
+  const foreignSelected = adoptDacV003RegistryReference('selected-domain-data', {
+    baseline,
+    authorityScope: 'dac://app-composition/acme',
+    primaryIdentity: 'selected/fixture-domain@rev-000099',
+    semanticIdentity: 'fixture-domain',
+    revisionIdentity: 'rev-000099',
+    contentDigest: 'pkg-rev-000099',
+    lifecycleAuthorityRefs: [entry.promotionEvidence, entry.applicationSelection],
+  });
+  await expectManifestErrorAsync(
+    async () =>
+      adoptDacV003ApplicationManifest(
+        await withDeclaredDigest({
+          ...input,
+          manifestIdentity: 'manifest://acme/tally-ledger/7-c77-n1b',
+          selectedDomainData: [
+            {
+              selected: foreignSelected,
+              promotionEvidence: entry.promotionEvidence,
+              applicationSelection: entry.applicationSelection,
+            },
+          ],
+        } as never),
+        { sha256: createSha256Fake() },
+      ),
+    'SELECTED_PROMOTION_EVIDENCE_NOT_EFFECTIVE',
+    'foreign-revision selected entry covered only by the journey promotion/selection',
+  );
+});
+
+test("C77 unrelated-validation negative: an unrelated/incompatible compatibility result cannot gate the journey's binding/activation path", async () => {
+  const sha256Local = createSha256Fake();
+  const fixture = await buildManifestInput();
+  const manifest = await adoptDacV003ApplicationManifest(
+    await withDeclaredDigest({
+      ...fixture.input,
+      manifestIdentity: 'manifest://acme/tally-ledger/7-c77-journey-n2',
+      selectedDomainData: [fixture.entry as never],
+    } as never),
+    { sha256: sha256Local },
+  );
+  // (a) An INCOMPATIBLE validation of a foreign explicit target cannot even
+  // associate with the journey manifest — there is no compatible gate to ride.
+  const foreignTarget = adoptDacV003CompatibilityTargetRef({
+    baseline: { ...DAC_V003_BASELINE },
+    authorityScope: 'domain-harness://runtime/compatibility',
+    primaryIdentity: 'compat-target/other-9',
+    contractProfileIdentity: 'some-other-runtime',
+    revisionIdentity: 'profile/other-9',
+  });
+  const incompatible = await buildValidationFor({
+    compatibilityTarget: foreignTarget,
+  });
+  assert.equal(incompatible.disposition.value, 'INCOMPATIBLE');
+  await expectManifestErrorAsync(
+    async () =>
+      associateDacV003ManifestCompatibilityValidation(manifest, incompatible),
+    'ASSOCIATION_SUBJECT_MISMATCH',
+    'INCOMPATIBLE foreign-target validation associated to the journey manifest',
+  );
+  // (b) Compatibility evidence of ANY disposition is not a binding input: a
+  // COMPATIBLE v0.0.3 validation object (and the adopted manifest itself)
+  // both fail the binding gate — only a genuine #306 verdict binds.
+  const compatible = await buildValidationFor();
+  assert.equal(compatible.disposition.value, 'COMPATIBLE');
+  await expectBindingErrorAsync(
+    () => bindValidatedComposition(compatible as never, { sha256: sha256Local }),
+    'NOT_A_VALIDATED_COMPOSITION',
+    'COMPATIBLE validation object as binding input',
+  );
+  await expectBindingErrorAsync(
+    () => bindValidatedComposition(manifest as never, { sha256: sha256Local }),
+    'NOT_A_VALIDATED_COMPOSITION',
+    'adopted manifest as binding input',
+  );
+  // (c) A genuine verdict over a FOREIGN package does bind — but only that
+  // foreign package: it cannot silently pass the journey's correlation gate
+  // (the journey's success path requires the exact same verdict instance /
+  // package pin, asserted unequal here).
+  const foreignVerdict = await buildIntakeVerdictFor('rev-000043');
+  const foreignBinding = await bindValidatedComposition(foreignVerdict, {
+    sha256: sha256Local,
+  });
+  const journeyVerdict = await buildIntakeVerdictFor('rev-000042');
+  const journeyBinding = await bindValidatedComposition(journeyVerdict, {
+    sha256: sha256Local,
+  });
+  assert.notEqual(foreignBinding.validation, journeyBinding.validation);
+  assert.notEqual(
+    foreignBinding.validation.validatedPackageId,
+    journeyBinding.validation.validatedPackageId,
+  );
+  assert.notEqual(
+    foreignBinding.validation.validatedPackageId,
+    manifest.selectedDomainData[0]?.selected.contentDigest,
+    'a foreign package pin never correlates to the journey manifest entry',
+  );
+  // (d) Activation refuses every non-genuine binding basis: a forged
+  // lookalike of the journey binding fails the mint-registry gate.
+  await expectBindingErrorAsync(
+    () =>
+      activateRuntimeBinding(
+        { ...journeyBinding } as never,
+        { sha256: sha256Local, activationInstanceId: 'activation-forged' },
+      ),
+    'NOT_A_RUNTIME_BINDING',
+    'forged binding lookalike as activation basis',
+  );
+  // The genuine activation still follows only from the genuine binding:
+  const genuineActivation = await activateRuntimeBinding(journeyBinding, {
+    sha256: sha256Local,
+    activationInstanceId: 'activation-instance-c77-n2',
+  });
+  assert.equal(
+    genuineActivation.activatedPackageId,
+    journeyVerdict.validatedPackageId,
+  );
+});
+
+test("C77 acceptance-only negative: ambiguous/acceptance external evidence without authoritative reconciliation cannot reach the journey's Runtime-outcome/UX success path", async () => {
+  const sha256Local = createSha256Fake();
+  const externalAuthority = journeyExternalAuthority();
+  const logicalOperation = adoptDacV003LogicalOperationRef({
+    baseline,
+    runtimeAuthorityScope: 'app/checkout',
+    logicalOperationIdentity: 'logical-op-c77-0002',
+    externalAuthority,
+    operationSemanticIdentity: 'charge-order',
+  });
+  const v002Baseline = { ...EXTERNAL_AUTHORITY_BASELINE };
+  const correlation = correlateExternalEffect({
+    correlationId: 'corr-c77-acceptance',
+    runtimeOperation: adoptRuntimeLogicalOperationRef({
+      baseline: v002Baseline,
+      effectId: 'logical-op-c77-0002',
+    }),
+    externalAuthority: adoptV002ExternalAuthorityRef({
+      baseline: v002Baseline,
+      authorityId: 'sor://billing/acme-c77',
+      authorityScope: 'ext://billing/acme',
+    }),
+  });
+  // Acceptance-only external evidence: the provider accepted the request but
+  // the Business SoR never observed a commit.
+  const acceptanceEvidence = adoptV002ObservationEvidence({
+    correlation,
+    observation: adoptV002ObservationRef({
+      baseline: v002Baseline,
+      observationId: 'obs-c77-acceptance',
+    }),
+    classification: 'accepted-pending',
+    rawStatement: 'billing provider queued: inv-77',
+    observedAt: '2026-09-24T00:00:03.000Z',
+  });
+  // Step 1 — the Runtime-consequence predicates refuse a commit claim:
+  assert.equal(observationSupportsCommitClaim(acceptanceEvidence), false);
+  assert.notEqual(
+    maxClaimableForExternalObservation('accepted-pending'),
+    'commit-observed-within-authority-scope',
+  );
+  // Step 2 — the v0.0.3 reconciliation stays unresolved:
+  const acceptanceObservation = adoptDacV003ObservationFromV002Evidence(
+    acceptanceEvidence,
+    {
+      baseline,
+      observationIdentity: 'obs-c77-acceptance',
+      externalAuthority,
+      logicalOperation,
+      producer: 'billing-adapter/callback',
+      providerCurrentness: { sequence: '2' },
+    },
+  );
+  assert.equal(acceptanceObservation.observedClass, 'ACCEPTED_FOR_PROCESSING');
+  const episode = reconcileDacV003ExternalOperation({
+    baseline,
+    reconciliationIdentity: 'recon-c77-acceptance',
+    localReconciliationAuthorityScope: 'app/checkout/reconciliation',
+    externalAuthority,
+    logicalOperation,
+    actionSemantics: 'reconcile-local-vs-external-truth',
+    methodClass: 'query+compare',
+    inputObservations: [acceptanceObservation],
+  });
+  assert.equal(episode.conclusion.outcomeClass, 'STILL_UNKNOWN');
+  assert.notEqual(episode.conclusion.outcomeClass, 'RECONCILED_COMMITTED');
+  // Step 3 — the runtime-logical outcome under that unresolved truth still
+  // claims nothing external, so the correlated UX consequence can never
+  // present the journey's committed-success path on acceptance alone:
+  const WORKFLOW_ADDRESS = { workflowId: 'wf-invoice', instanceKey: 'inv-001' } as const;
+  const activation = await activateRuntimeBinding(
+    await bindValidatedComposition(await buildIntakeVerdictFor('rev-000042'), {
+      sha256: sha256Local,
+    }),
+    { sha256: sha256Local, activationInstanceId: 'activation-instance-c77-n3' },
+  );
+  const message: DomainMessage = {
+    messageId: 'msg-c77-n3',
+    target: { ...WORKFLOW_ADDRESS },
+    type: 'charge-order',
+    payload: null,
+    correlationId: correlation.correlationId,
+  };
+  const commandCorrelation = correlateDomainCommand(message);
+  const disposition: MessageDispositionSnapshot = {
+    messageId: 'msg-c77-n3',
+    target: { ...WORKFLOW_ADDRESS },
+    targetSequence: 4,
+    packageId: activation.activatedPackageId,
+    disposition: 'processed',
+    correlationId: correlation.correlationId,
+    acceptedAt: '2026-09-24T00:00:02.000Z',
+    resolvedAt: '2026-09-24T00:00:04.000Z',
+  };
+  const outcome = correlateDomainOutcome({ disposition, correlation: commandCorrelation });
+  assert.equal(outcome.outcome.externalAuthorityOutcome, 'not-claimed');
+  assert.equal(episode.conclusion.remoteTruth, 'unresolved');
+  assert.equal(OWNERSHIP.externalBusinessSoRTruth, 'NOT_OWNED');
+  assert.equal(OWNERSHIP.domainUxSemantics, 'NOT_OWNED');
+});
+
+test('C77 ownership boundary: no NOT_OWNED lane can be smuggled into a Harness authority position on the path', async () => {
   const { input } = await buildManifestInput();
-  // The lineage fixture rides ONLY as opaque content: with a genuine
-  // declared digest the manifest still adopts, and the authored candidate
-  // stays a verbatim opaque value — it never becomes entry authority.
+  // The lineage fixture rides ONLY as declared composition provenance: with
+  // a genuine declared digest the manifest still adopts, and the authored
+  // candidate stays a verbatim opaque value — it never becomes entry
+  // authority.
   const authoredCandidate = adoptDacV003RegistryReference('authored-candidate', {
     baseline,
     authorityScope: 'forge://acme/authoring',
@@ -549,15 +1012,11 @@ test('C77 ownership boundary: no NOT_OWNED lane can be smuggled into a Harness a
   // External truth stays external: a commit conclusion still requires the
   // AUTHORITATIVE_COMMITTED evidence class — the path's reconciliation above
   // could not have been driven by local wishes.
-  const externalAuthority = adoptDacV003ExternalAuthorityRef({
-    baseline,
-    authorityId: 'sor://billing/acme-c77',
-    authorityScope: 'ext://billing/acme',
-  });
+  const externalAuthority = journeyExternalAuthority();
   const logicalOperation = adoptDacV003LogicalOperationRef({
     baseline,
     runtimeAuthorityScope: 'app/checkout',
-    logicalOperationIdentity: 'logical-op-c77-0002',
+    logicalOperationIdentity: 'logical-op-c77-0003',
     externalAuthority,
     operationSemanticIdentity: 'charge-order',
   });

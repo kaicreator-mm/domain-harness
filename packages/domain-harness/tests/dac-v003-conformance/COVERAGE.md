@@ -29,7 +29,54 @@ source, dist, or frozen doc was changed.
   boundary evidence (fail-closed at every Harness authority position) and
   never claims the non-owned authority.
 
-## Final classification: 32 PASS / 0 NOT_APPLICABLE / 7 NOT_OWNED (39 cases)
+## Final classification: 31 PASS / 0 NOT_APPLICABLE / 8 NOT_OWNED (39 cases)
+
+R1 correction (review 5813257460 P1-2): C50 is reclassified PASS -> NOT_OWNED.
+Frozen C50 fails closed when the exact parent/root OR the owning evolution
+operation is missing. The generic Harness-owned P4 primitive enforces the
+parent/provenance half (kept as bounded boundary evidence), but the
+owning-evolution-operation half is enforced by no merged Harness-owned
+authoritative consumer — P4 requires only `parentRefs`+`provenanceRefs`,
+`derivationOperationRef` is optional and only structurally validated when
+present, and an operation-missing probe with valid parent/provenance passes
+every Harness surface (proven in the C50 test). That judgment belongs to the
+upstream evolution/producer lane. The old `32 PASS / 7 NOT_OWNED` number is
+not preserved by broadening generic P4.
+
+R1 repair (review 5813257460 P1-1): `c77-positive-boundary-path.test.ts` is
+now ONE CONNECTED executable journey. The authored/evolved lineage is linked
+to the promoted/selected subject by an ASSERTED exact transformation
+relation (subject semantic+revision continuity; the digest axis is the
+declared compiled artifact — no false evolved-digest==package-digest
+requirement); the DAC v0.0.3 compatibility validation and its external
+manifest association consume the SAME #306 verdict instance the Runtime
+binding/activation gates on (object-identity asserted, historical v0.0.2
+binding API unchanged); the Harness-owned Runtime consequence/outcome step
+is actually executed (commit-claim predicates + runtime-logical outcome
+correlation under the activated package pin) and read; the UX consequence
+evidence is correlated to that resulting Runtime outcome with Domain UX
+semantics NOT_OWNED. Three journey negatives prove foreign/unlinked
+lineage, unrelated/incompatible compatibility evidence, and
+acceptance-only/ambiguous external evidence each cannot reach the success
+path.
+
+R1 repair (review 5813257460 P2-1): the adversarial suite now attacks the
+real executable axes — the retry attack changes the logical-operation
+IDENTITY while holding effect semantics valid (the safe-retry surface
+refuses foreign prior-attempt correlation with CORRELATION_CONFLICT, with a
+same-operation positive control; the materially-changed-effect-semantics
+check is separately and correctly labeled); idempotency independently
+exercises effect-equivalence, issuer, promised-deduplication-scope and
+foreign-authority mismatches with a genuine-reuse positive control;
+adversarial 21 actually attempts renderer identity in the UX
+semantic-definition role (mint layer + manifest slot + role vocabulary);
+adversarial 22 exercises the strongest executable boundary (UX intent can
+never mint/substitute/resolve Runtime command authority — command
+correlation is minted only from a genuine Runtime message) and explicitly
+maps the non-owned workflow-transition surface as outside this conformance
+module. Matrix closure now verifies per-ref decisive semantic assertions,
+not title inventory, and documents the 25-axes/24-declarations mapping
+(5+6) exactly.
 
 | Case | Group | Classification | Evidence (suite → test) |
 | --- | --- | --- | --- |
@@ -44,7 +91,7 @@ source, dist, or frozen doc was changed.
 | C47 | Authoring/Evolution | NOT_OWNED | `c45-c52…` producer identity never substitutes evolution-operation authority (Simulator lane) |
 | C48 | Authoring/Evolution | NOT_OWNED | `c45-c52…` ambiguity never fabricated into a produced candidate (capability exchange upstream) |
 | C49 | Authoring/Evolution | NOT_OWNED | `c45-c52…` accepted-for-evaluation ≠ produced (exchange outcome ceilings) |
-| C50 | Authoring/Evolution | PASS | `c45-c52…` P4 lineage closure fails closed without parent/provenance/derivation (Harness-owned primitive) |
+| C50 | Authoring/Evolution | NOT_OWNED | `c45-c52…` generic P4 parent/provenance closure fails closed (bounded evidence); owning-evolution-operation half proven not Harness-enforced (operation-missing probe passes) — upstream evolution lane |
 | C51 | Authoring/Evolution | NOT_OWNED | `c45-c52…` qualitative improvement claim is not P6 evidence (evolution lane owns the judgment) |
 | C52 | Authoring/Evolution | NOT_OWNED | `c45-c52…` authored patch stays substitutable producer provenance, never evolution authority |
 | C53 | Composition | PASS | `c53-c61…` both promotion and selection authorities separately required; `adversarial 5+6` |
@@ -71,31 +118,49 @@ source, dist, or frozen doc was changed.
 | C74 | Cross-lane E2E | PASS | `c71-c77…` compatibility PASS never binds/activates; `adversarial 11` |
 | C75 | Cross-lane E2E | PASS | `c71-c77…` acceptance never becomes Runtime success or UX claim (UX semantics NOT_OWNED) |
 | C76 | Cross-lane E2E | PASS | `c71-c77…` no renderer slot on UX closure + external identity refutation; `adversarial 20+21` |
-| C77 | Cross-lane E2E | PASS | `c77-positive-boundary-path…` complete journey with NOT_OWNED marking + shortcut negatives; `adversarial 8+9` |
+| C77 | Cross-lane E2E | PASS | `c77-positive-boundary-path…` ONE CONNECTED journey (asserted lineage→subject identity continuity, same-verdict-instance correlation into binding/activation, executed Runtime consequence/outcome, UX correlation) + foreign-lineage / unrelated-validation / acceptance-only negatives; `adversarial 8+9` |
 
 ## Files
 
 - `conformance-matrix.ts` — the machine-readable C39–C77 matrix (one row per
   case: obligation, frozen source, applicable surface, owner/boundary,
-  expected result, executable evidence refs, adversarial refs,
-  classification, reason, identity linkage where identity-sensitive).
+  expected result, executable evidence refs with decisive semantic
+  assertions, adversarial refs, classification, reason, identity linkage
+  where identity-sensitive).
 - `matrix-closure.test.ts` — self-verification: exact C39..C77 ids; no
-  blank rows; every evidence file exists and every quoted test name is
-  really declared in it; classification vocabulary; counts 32/0/7; the
-  consumed freeze equals the dispatched freeze; the dispatch's adversarial
-  list and C77 lane list are fully materialized.
+  blank rows; every evidence file exists, every quoted test name is really
+  declared in it AND its decisive semantic assertions (error codes /
+  dispositions / frozen outcomes, carried per evidence ref as `asserts`)
+  literally occur in the source — semantic verification, never a
+  title/source-string inventory; classification vocabulary; counts 31/0/8;
+  the consumed freeze equals the dispatched freeze; the dispatch's
+  adversarial list (25 attack axes in 24 declarations — axes 5 and 6 share
+  one declaration that executably carries both attacks, documented exactly
+  in the closure test) and the C77 lane list + three journey negatives are
+  fully materialized.
 - `c39-c44-shared-reference.test.ts` — Shared Reference group + foundation
   role-inequality freeze.
 - `c45-c52-authoring-evolution-boundary.test.ts` — producer/evolution lane
-  boundary (NOT_OWNED lanes + the Harness-owned P4 primitive C50).
+  boundary (all eight cases NOT_OWNED; C50 keeps the generic P4
+  parent/provenance closure as bounded Harness-side evidence).
 - `c53-c61-composition.test.ts` — Composition group.
 - `c62-c70-external-operation.test.ts` — External Operation group.
 - `c71-c77-cross-lane.test.ts` — Cross-lane E2E negatives.
 - `c77-positive-boundary-path.test.ts` — the reviewed complete positive
-  boundary path with mandatory ownership marking.
-- `adversarial-shortcuts.test.ts` — the dispatch-mandated adversarial list
-  (25 executable attacks, each failing closed or producing the frozen
-  non-success disposition).
+  boundary path as ONE CONNECTED exact identity/provenance story (asserted
+  lineage→subject continuity, same-verdict-instance correlation through
+  compatibility validation into binding/activation, executed Runtime
+  consequence/outcome step, UX correlation to that outcome) with mandatory
+  ownership marking plus the three journey negatives (foreign lineage,
+  unrelated/incompatible validation, acceptance-only evidence).
+- `adversarial-shortcuts.test.ts` — the dispatch-mandated adversarial list:
+  25 executable attack axes in 24 test declarations (axes 5+6 share one
+  declaration carrying both attacks), each failing closed or producing the
+  frozen non-success disposition, with positive controls on the axes the
+  R1 repair made independently meaningful (foreign-operation retry,
+  idempotency issuer/scope/effect), renderer identity actually attempted in
+  the UX semantic-definition role, and the UX-intent claim narrowed to the
+  executable command-authority boundary.
 
 ## Recorded observations (not defects, no product change made)
 

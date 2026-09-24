@@ -16,10 +16,11 @@ import {
 } from '../../src/dac-v003/index.js';
 import {
   DacV003CompatibilityError,
+  DAC_V003_UX_SEMANTIC_ROLES,
   adoptDacV003CompatibilityTargetRef,
   adoptDacV003RequirementSatisfactionEvidence,
-  validateDacV003Compatibility,
   adoptDomainUXDefinitionRef,
+  validateDacV003Compatibility,
 } from '../../src/dac-v003-compatibility/index.js';
 import {
   DacV003ManifestError,
@@ -42,7 +43,10 @@ import {
   refuteDacV003ProviderOperationAsAuthoritativeEffectRecord,
 } from '../../src/dac-v003-external/index.js';
 import {
+  DacBridgeError,
   adoptDomainIntentRef,
+  correlateDomainCommand,
+  correlateDomainOutcome,
   DAC_BRIDGE_BASELINE,
 } from '../../src/dac-bridge/index.js';
 import {
@@ -440,17 +444,74 @@ test('adversarial 13 (timeout as non-commit): local timeout material cannot clai
   );
 });
 
-test('adversarial 14 (retry under a different logical operation when the same is required): continuity fails closed', () => {
-  const prior = logicalOperation();
+test('adversarial 14 (retry under a different logical operation when the same is required): a foreign-operation prior attempt is refused even with identical effect semantics', () => {
+  const logical = logicalOperation();
+  // The different-LOGICAL-OPERATION identity attack: an attacker retries
+  // logical-op A while citing an ambiguous prior attempt that belongs to
+  // logical-op B, holding every effect-semantics/correlation dimension
+  // otherwise valid (same external authority, same charge-order effect
+  // semantics, same runtime scope). The actual retry/evaluation surface that
+  // checks foreign prior-attempt correlation fails closed on the identity
+  // axis alone.
+  const foreignOperation = adoptDacV003LogicalOperationRef({
+    baseline: BASELINE,
+    runtimeAuthorityScope: 'app/checkout',
+    logicalOperationIdentity: 'logical-op-adv14-foreign',
+    externalAuthority: logical.externalAuthority,
+    operationSemanticIdentity: logical.operationSemanticIdentity,
+  });
+  assert.notEqual(
+    foreignOperation.reference.primaryIdentity,
+    logical.reference.primaryIdentity,
+  );
+  assert.equal(
+    foreignOperation.operationSemanticIdentity,
+    logical.operationSemanticIdentity,
+    'the foreign attack holds the effect semantics valid',
+  );
+  const foreignAttempt = attempt({
+    attemptIdentity: 'attempt-adv14-foreign',
+    logicalOperation: foreignOperation,
+    evidenceClass: 'dispatch-outcome-ambiguous',
+  });
   assert.throws(
     () =>
-      assertDacV003LogicalOperationContinuity(prior, {
-        externalAuthority: prior.externalAuthority,
+      evaluateDacV003SafeRetry({
+        logicalOperation: logical,
+        priorAttempts: [foreignAttempt],
+        idempotencyIdentity: provenIdempotency(),
+        intendedCommandSemanticIdentity: logical.operationSemanticIdentity,
+      }),
+    (error: unknown) =>
+      error instanceof DacV003ExternalError && error.code === 'CORRELATION_CONFLICT',
+    'a prior attempt of a different logical operation cannot authorize this operation\'s retry',
+  );
+  // Positive control — the same attack shape with a SAME-operation attempt
+  // is evaluated (not correlation-refused): the failure above came from the
+  // foreign operation identity alone.
+  const decision = evaluateDacV003SafeRetry({
+    logicalOperation: logical,
+    priorAttempts: [
+      attempt({ attemptIdentity: 'attempt-adv14-genuine', evidenceClass: 'dispatch-outcome-ambiguous' }),
+    ],
+    idempotencyIdentity: provenIdempotency(),
+    intendedCommandSemanticIdentity: logical.operationSemanticIdentity,
+  });
+  assert.equal(decision.decision, 'PERMITTED_IDEMPOTENT_REPLAY');
+  // A DISTINCT, correctly labeled axis — materially changed command
+  // semantics (an effect-semantics change requires a NEW logical operation;
+  // §4 rule 2). This is NOT a different-logical-operation identity attack
+  // and is not presented as one.
+  assert.throws(
+    () =>
+      assertDacV003LogicalOperationContinuity(logical, {
+        externalAuthority: logical.externalAuthority,
         operationSemanticIdentity: 'different-effect',
-        semanticTargetRefs: prior.semanticTargetRefs,
+        semanticTargetRefs: logical.semanticTargetRefs,
       }),
     (error: unknown) =>
       error instanceof DacV003ExternalError && error.code === 'IDENTITY_MISMATCH',
+    'a materially changed command semantics is refused as a retry of the same operation',
   );
 });
 
@@ -465,15 +526,51 @@ test('adversarial 15 (same attempt reused when a new attempt is required): repla
 });
 
 test('adversarial 16 (idempotency issuer/scope/effect mismatch): every mismatch axis fails', () => {
+  // The genuine binding under attack: an otherwise-bound idempotency
+  // identity (same key, issuer, promised deduplication scope, authority and
+  // bound effect) already bound to the logical operation.
   const idem = provenIdempotency();
-  const logical = logicalOperation();
-  // Effect mismatch.
+  const logicalBound = logicalOperation({ idempotencyIdentity: idem });
+  // Positive control — the genuine reuse of the exact bound identity passes:
+  assert.doesNotThrow(() =>
+    assertDacV003IdempotencyReuseForLogicalEffect(idem, logicalBound, 'charge-order'),
+  );
+  // Axis 1 — effect-equivalence mismatch: the same identity replayed for a
+  // semantically different command.
   assert.throws(
-    () => assertDacV003IdempotencyReuseForLogicalEffect(idem, logical, 'void-order'),
+    () => assertDacV003IdempotencyReuseForLogicalEffect(idem, logicalBound, 'void-order'),
     (error: unknown) =>
       error instanceof DacV003ExternalError && error.code === 'IDEMPOTENCY_REUSE_FORBIDDEN',
+    'effect-equivalence mismatch',
   );
-  // Scope mismatch: same key shape under a different authority.
+  // Axis 2 — issuer mismatch: same key/scope/authority/effect, a different
+  // issuer presenting the identity.
+  const foreignIssuer = provenIdempotency({ issuer: 'other-integration' });
+  assert.equal(foreignIssuer.reference.primaryIdentity, idem.reference.primaryIdentity);
+  assert.notEqual(foreignIssuer.issuer, idem.issuer);
+  assert.throws(
+    () =>
+      assertDacV003IdempotencyReuseForLogicalEffect(foreignIssuer, logicalBound, 'charge-order'),
+    (error: unknown) =>
+      error instanceof DacV003ExternalError && error.code === 'IDEMPOTENCY_REUSE_FORBIDDEN',
+    'issuer mismatch of an otherwise bound idempotency identity',
+  );
+  // Axis 3 — promised-deduplication-scope mismatch: same key/issuer/
+  // authority/effect, a different promised deduplication scope.
+  const foreignScope = provenIdempotency({
+    promisedDeduplicationScope: 'payments/truth:refund-order',
+  });
+  assert.notEqual(foreignScope.promisedDeduplicationScope, idem.promisedDeduplicationScope);
+  assert.throws(
+    () =>
+      assertDacV003IdempotencyReuseForLogicalEffect(foreignScope, logicalBound, 'charge-order'),
+    (error: unknown) =>
+      error instanceof DacV003ExternalError && error.code === 'IDEMPOTENCY_REUSE_FORBIDDEN',
+    'promised-deduplication-scope mismatch of an otherwise bound idempotency identity',
+  );
+  // Axis 4 — authority/scope substitution: same key shape under a different
+  // external authority (the logical operation itself is foreign-scoped).
+  const logical = logicalOperation();
   const otherAuthority = adoptDacV003ExternalAuthorityRef({
     baseline,
     authorityId: 'other-sor',
@@ -486,12 +583,17 @@ test('adversarial 16 (idempotency issuer/scope/effect mismatch): every mismatch 
     externalAuthority: otherAuthority,
     operationSemanticIdentity: 'charge-order',
   });
+  assert.notEqual(logical.externalAuthority, otherAuthority);
   assert.throws(
     () =>
       assertDacV003IdempotencyReuseForLogicalEffect(idem, otherScopedLogical, 'charge-order'),
     (error: unknown) =>
       error instanceof DacV003ExternalError && error.code === 'IDEMPOTENCY_REUSE_FORBIDDEN',
+    'idempotency identity replayed under a foreign authority/scope',
   );
+  // The unbound default operation is kept distinct from the bound one (the
+  // axes above exercised the bound path; this one the authority axis).
+  assert.equal(logical.idempotencyIdentity, undefined);
 });
 
 test('adversarial 17 (stale observation): superseded provider operations are STALE for current truth while staying historical evidence', () => {
@@ -593,14 +695,35 @@ test('adversarial 20 (runtime identity as external authority): Harness-side iden
   }
 });
 
-test('adversarial 21 (renderer as UX semantic definition): renderer identity has no UX semantic authority slot', async () => {
+test('adversarial 21 (renderer as UX semantic definition): renderer identity actually attempted in the UX semantic-definition role fails closed', async () => {
   const { input } = await buildManifestInput();
-  // A #308 domain-intent ref (UX-lane semantic object) cannot fill the UX
-  // definition slot, and renderer-shaped identities stay non-authoritative.
-  const intentRef = adoptDomainIntentRef({
-    baseline: { ...DAC_BRIDGE_BASELINE },
-    semanticIdentity: 'ux:post-invoice',
-    authorityScope: 'ux://acme/invoice-ops',
+  // Attack at the mint layer: attempt to adopt the Domain UX semantic
+  // DEFINITION as a renderer/presentation identity — a renderer authority
+  // scope + renderer component identity, no semantic identity and no
+  // revision (a renderer identity alone is not a UX semantic definition).
+  assert.throws(
+    () =>
+      adoptDomainUXDefinitionRef({
+        baseline,
+        authorityScope: 'renderer://react/acme',
+        primaryIdentity: 'component/SubmitButton@dom-v3',
+      } as never),
+    (error: unknown) =>
+      (error instanceof DacV003ReferenceError ||
+        error instanceof DacV003CompatibilityError) &&
+      /PROFILE_REQUIREMENT_UNMET|INVALID_REFERENCE/.test(
+        (error as Error & { code?: string }).code ?? '',
+      ),
+    'renderer identity alone cannot be minted as the Domain UX semantic definition',
+  );
+  // Attack at the manifest layer: a renderer-shaped registry reference (the
+  // same renderer component identity) actually attempted in the
+  // ux.domainUxDefinition slot fails the role gate — the UX closure has no
+  // renderer authority position at all.
+  const rendererRef = adoptDacV003RegistryReference('scenario', {
+    baseline,
+    authorityScope: 'renderer://react/acme',
+    primaryIdentity: 'component/SubmitButton@dom-v3',
   });
   await expectManifestError(
     async () =>
@@ -609,24 +732,87 @@ test('adversarial 21 (renderer as UX semantic definition): renderer identity has
           ...input,
           manifestIdentity: 'manifest://acme/tally-ledger/7-adv21',
           ux: {
-            domainUxDefinition: intentRef as never,
+            domainUxDefinition: rendererRef as never,
             runtimeInteractionContract: input.ux.runtimeInteractionContract,
           },
         } as never),
         { sha256: createSha256Fake() },
       ),
     ['INVALID_MANIFEST_INPUT', 'UX_CLOSURE_CARDINALITY'],
-    'UX intent ref in the Domain UX definition slot',
+    'renderer identity in the Domain UX definition slot',
   );
+  // Vocabulary axis: renderer/presentation tokens are not UX semantic roles —
+  // the frozen role vocabulary has no renderer role.
+  assert.ok(
+    !(DAC_V003_UX_SEMANTIC_ROLES as readonly string[]).includes('renderer'),
+    'the UX semantic role vocabulary has no renderer role',
+  );
+  // On the GENUINE definition, renderer/DOM/component identities can only
+  // ever ride as non-authoritative locator hints.
+  const genuine = adoptDomainUXDefinitionRef({
+    baseline,
+    authorityScope: 'dac://domain-ux/acme',
+    primaryIdentity: 'ux-def/tally-ledger-1',
+    semanticIdentity: 'tally-ledger-ux',
+    revisionIdentity: 'ux-rev-3',
+    locatorHints: ['dom:#submit-button', 'component:SubmitButton'],
+  });
+  assert.notEqual(genuine.semanticIdentity, 'component:SubmitButton');
+  assert.deepEqual([...genuine.locatorHints], [
+    'dom:#submit-button',
+    'component:SubmitButton',
+  ]);
 });
 
-test('adversarial 22 (UX intent as Runtime transition authority): intent identity cannot fill the interaction-contract slot', async () => {
-  const { input } = await buildManifestInput();
+test('adversarial 22 (UX intent cannot act as Runtime command/transition authority): the command correlation is minted only from a genuine Runtime message', async () => {
   const intentRef = adoptDomainIntentRef({
     baseline: { ...DAC_BRIDGE_BASELINE },
     semanticIdentity: 'ux:post-invoice',
     authorityScope: 'ux://acme/invoice-ops',
   });
+  // The strongest executable boundary this conformance module owns: Runtime
+  // command authority is minted from a genuine DomainMessage — a UX intent
+  // cannot mint, fill or substitute the command itself.
+  assert.throws(
+    () => correlateDomainCommand(intentRef as never),
+    (error: unknown) =>
+      error instanceof DacBridgeError && error.code === 'INVALID_REFERENCE',
+    'a UX intent cannot stand in for the Runtime message that mints command authority',
+  );
+  // The genuine path: the message (Runtime input) mints the command; the
+  // intent rides only as optional UX-origin correlation evidence.
+  const message = {
+    messageId: 'msg-adv22',
+    target: { workflowId: 'wf-invoice', instanceKey: 'inv-001' },
+    type: 'post-invoice',
+    payload: null,
+  };
+  const correlation = correlateDomainCommand(message, { intent: intentRef });
+  assert.equal(correlation.intent, intentRef);
+  assert.equal(correlation.command.messageId, 'msg-adv22');
+  // And the Runtime outcome resolves only the exact minted command — a
+  // causal chain is never assembled across different commands, so a UX
+  // intent can never smuggle a different command's outcome.
+  assert.throws(
+    () =>
+      correlateDomainOutcome({
+        disposition: {
+          messageId: 'msg-other',
+          target: { workflowId: 'wf-invoice', instanceKey: 'inv-001' },
+          targetSequence: 3,
+          packageId: 'fixture-sha256:pkg',
+          disposition: 'processed',
+          correlationId: 'corr-adv22',
+          acceptedAt: '2026-09-24T00:00:01.000Z',
+        },
+        correlation,
+      }),
+    (error: unknown) =>
+      error instanceof DacBridgeError && error.code === 'CORRELATION_CONFLICT',
+  );
+  // Supporting slot-role fact (not the transition-authority claim): a UX
+  // intent ref also cannot fill the Runtime interaction-contract slot.
+  const { input } = await buildManifestInput();
   await expectManifestError(
     async () =>
       adoptDacV003ApplicationManifest(
@@ -643,8 +829,11 @@ test('adversarial 22 (UX intent as Runtime transition authority): intent identit
     ['INVALID_MANIFEST_INPUT', 'UX_CLOSURE_CARDINALITY'],
     'UX intent ref in the Runtime interaction-contract slot',
   );
-  // The genuine interaction contract is a distinct immutable semantic
-  // contract with its own revision — not a UX-lane object.
+  // Boundary narrowing (mapped, not overclaimed): the exact workflow-machine
+  // transition surface (which command triggers which transition) is outside
+  // this conformance module's executable surfaces; what IS proven here is
+  // that at the merged bridge boundary, UX intent identity never mints,
+  // substitutes or resolves Runtime command authority.
   const genuine = adoptRuntimeInteractionContractRef({
     baseline,
     authorityScope: 'domain-harness://runtime/interaction',
