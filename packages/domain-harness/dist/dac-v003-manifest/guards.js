@@ -207,6 +207,23 @@ function screenOpaqueArea(area, where) {
 // every one of them is deterministically deep-copied and recursively frozen
 // BEFORE it becomes adopted/digest-bound state.
 // ---------------------------------------------------------------------------
+/**
+ * Defines one copied key with CreateDataProperty semantics (review repair
+ * R3 P1): an own enumerable `"__proto__"` data key — exactly what
+ * `JSON.parse('{"__proto__": …}')` produces — must survive adoption as an
+ * own enumerable data property. Ordinary assignment would route that key
+ * through the legacy `Object.prototype` `"__proto__"` accessor, mutating the
+ * copy's prototype and silently dropping the key from the adopted content
+ * and its canonical digest material.
+ */
+function defineOwnJsonDataProperty(target, key, value) {
+    Object.defineProperty(target, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+    });
+}
 function frozenJsonValue(value) {
     if (Array.isArray(value)) {
         return Object.freeze(value.map((element) => frozenJsonValue(element)));
@@ -214,7 +231,7 @@ function frozenJsonValue(value) {
     if (typeof value === 'object' && value !== null && isPlainRecord(value)) {
         const copy = {};
         for (const key of Object.keys(value)) {
-            copy[key] = frozenJsonValue(value[key]);
+            defineOwnJsonDataProperty(copy, key, frozenJsonValue(value[key]));
         }
         return Object.freeze(copy);
     }
@@ -222,19 +239,21 @@ function frozenJsonValue(value) {
 }
 /**
  * Deterministic deep copy of one screened opaque-preserved area, recursively
- * frozen. Key order, array order and the canonical JSON view of shared
- * subtrees are preserved (an acyclic aliased subtree appears at each of its
- * positions, exactly as the canonical material serializes it), so the copy
- * is digest-identical to the input while being fully detached from it: after
- * adoption, mutating the caller's original input can change neither the
- * returned manifest content nor the content behind its verified digest, and
- * a forbidden record inserted into the original after the one-time screen is
- * never absorbed.
+ * frozen. Every own enumerable string key is preserved exactly — including an
+ * own `"__proto__"` data key from `JSON.parse`, which stays an own enumerable
+ * data key on an unmodified plain-object prototype. Key order, array order and
+ * the canonical JSON view of shared subtrees are preserved (an acyclic aliased
+ * subtree appears at each of its positions, exactly as the canonical material
+ * serializes it), so the copy is digest-identical to the input while being
+ * fully detached from it: after adoption, mutating the caller's original
+ * input can change neither the returned manifest content nor the content
+ * behind its verified digest, and a forbidden record inserted into the
+ * original after the one-time screen is never absorbed.
  */
 function frozenJsonCopyOf(area) {
     const copy = {};
     for (const key of Object.keys(area)) {
-        copy[key] = frozenJsonValue(area[key]);
+        defineOwnJsonDataProperty(copy, key, frozenJsonValue(area[key]));
     }
     return Object.freeze(copy);
 }
