@@ -16,7 +16,7 @@
  *   phase 2 (after am force-stop + relaunch): reopen assertions — pins
  *     byte-identical, committed effect replayed without re-execution (E5),
  *     deadlines/process data intact (E6), registry/cache/pins intact (E3),
- *     migration meta still 2 (E10), conflicts still fail-closed (E9).
+ *     migration meta still 3 (E10), conflicts still fail-closed (E9).
  */
 import * as SQLite from 'expo-sqlite';
 import {
@@ -451,7 +451,7 @@ async function runMigrationUpgradeCheck(
   checks: string[],
 ): Promise<void> {
   // Fabricate a v1-era physical store: meta row at version 1 plus one live
-  // dh_v2 instance row. Opening the T-023 store must upgrade in place to 2
+  // dh_v2 instance row. Opening the T-023 store must upgrade in place to 3
   // and preserve the v1-era row (E10).
   const database = await sqlite.openDatabaseAsync(MIGRATION_DB);
   await database.execAsync(`
@@ -490,7 +490,7 @@ INSERT INTO dh_v2_instances(
   const store = await openExpoSqliteRuntimeStore({ database });
   try {
     const version = await readSchemaVersion(sqlite, MIGRATION_DB);
-    check(version === EXPO_RUNTIME_STORE_SCHEMA_VERSION, 'E10 migration-v1-to-v2-meta', checks);
+    check(version === EXPO_RUNTIME_STORE_SCHEMA_VERSION, 'E10 migration-v1-to-v3-meta', checks);
     const preserved = await store.getInstance({ workflowId: 'order-quote', instanceKey: 'v1-era' });
     check(
       preserved !== null && preserved.packageId === 'pkg-v1-era' && preserved.correlationId === 'corr-v1-era',
@@ -501,7 +501,16 @@ INSERT INTO dh_v2_instances(
       `SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name LIKE 'dh_v3_%'`,
       [],
     );
-    check(tables !== null && tables.count === 24, 'E10 migration-v2-24-authority-tables', checks);
+    check(tables !== null && tables.count === 26, 'E10 migration-v3-26-authority-tables', checks);
+    const observationTables = await database.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name IN ('dh_v3_observation_streams', 'dh_v3_observation_records')`,
+      [],
+    );
+    check(
+      observationTables !== null && observationTables.count === 2,
+      'E10 migration-v3-observation-tables-present',
+      checks,
+    );
   } finally {
     await store.close();
     await database.closeAsync?.();
@@ -521,7 +530,7 @@ async function runPhase1(sqlite: ExpoSqliteModuleLike): Promise<T023ValidationRe
   await runSha256KnownAnswers(checks);
   check(typeof HermesInternal === 'object', 'E1 hermes-engine-live', checks);
 
-  // E10: fresh migrate lands at meta version 2; v1→v2 in-place upgrade works.
+  // E10: fresh migrate lands at meta version 3; v1→v3 in-place upgrade works.
   await runMigrationUpgradeCheck(sqlite, checks);
 
   // E2: the full v0.2 RuntimeStore conformance checklist on Hermes, on the
@@ -545,7 +554,7 @@ async function runPhase1(sqlite: ExpoSqliteModuleLike): Promise<T023ValidationRe
   const fixture = await openMainFixture(sqlite);
   try {
     const version = await readSchemaVersion(sqlite, MAIN_DB);
-    check(version === EXPO_RUNTIME_STORE_SCHEMA_VERSION, 'E10 main-db-schema-v2', checks);
+    check(version === EXPO_RUNTIME_STORE_SCHEMA_VERSION, 'E10 main-db-schema-v3', checks);
 
     // E4 (write half): governance execution pin + bound snapshot.
     await pinMainInstance(fixture);
@@ -922,7 +931,7 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike): Promise<T023ValidationRe
   const fixture = await openMainFixture(sqlite);
   try {
     const version = await readSchemaVersion(sqlite, MAIN_DB);
-    check(version === EXPO_RUNTIME_STORE_SCHEMA_VERSION, 'E10 meta-still-v2-after-restart', checks);
+    check(version === EXPO_RUNTIME_STORE_SCHEMA_VERSION, 'E10 meta-still-v3-after-restart', checks);
 
     // E4: package + governance + snapshot survive the process kill.
     const pinned = await fixture.assembly.governance.requirePinnedExecution(WORKFLOW_INSTANCE_ID);
