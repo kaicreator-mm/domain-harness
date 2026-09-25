@@ -17,11 +17,15 @@ Product authority is the complete frozen composition:
 1. `docs/product/DomainHarness_v0.3_PRD_FROZEN.md`;
 2. `docs/product/amendments/DomainHarness_v0.3_PRD_AMENDMENT_A1_ROUND2_REVIEW_CANDIDATE.md`, frozen by `docs/product/amendments/DomainHarness_v0.3_PRD_AMENDMENT_A1_FREEZE_RECORD.md`;
 3. `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_EVIDENCE_FROZEN.md`;
-4. `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1.md`, frozen by `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1_FREEZE_RECORD.md`.
+4. `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1.md`, frozen by `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A1_FREEZE_RECORD.md`;
+5. `docs/product/amendments/DomainHarness_v0.3_PRD_AMENDMENT_A2_DAC_V002_REVIEW_CANDIDATE.md` (PRD Amendment A2 — DAC v0.0.2 cross-layer reference adoption), frozen by `docs/architecture/DomainHarness_v0.3_AMENDMENT_A2_DAC_V002_FREEZE_RECORD.md`;
+6. `docs/architecture/DomainHarness_v0.3_L2_ARCHITECTURE_AMENDMENT_A2_DAC_V002_REVIEW_CANDIDATE.md` (L2 Amendment A2 — DAC v0.0.2 cross-layer reference adoption), frozen by the same record.
 
-The L2 Amendment supersedes only explicitly mapped clauses. Every unaffected Frozen L2 contract remains authoritative.
+Each Amendment supersedes only its explicitly mapped clauses. Every unaffected Frozen PRD / PRD A1 / L2 / L2 A1 contract remains authoritative.
 
-Task authority after planning freeze is `docs/implementation/DomainHarness_v0.3_TASK_DAG.md` plus v0.3 task packs / GitHub Execution Issues generated from that DAG.
+Amendment A2 provenance is pinned by its freeze record: reviewed candidate HEAD `677056c4978a6379daf28e502842b0b0bb9080c1`, merged via PR #297 as `main@2fe688401bd89dbc8ba1a9bd2cd3bffaea8c84d4`, against DAC v0.0.2 exact baseline `kaicreator-mm/domain-application-contract@9c3ef91b8b40d893e4fe2b0370200e765816ec2b`, and adopted onto `v0.3` byte-identically without semantic edits.
+
+Task authority after planning freeze is `docs/implementation/DomainHarness_v0.3_TASK_DAG.md` plus v0.3 task packs / GitHub Execution Issues generated from that DAG. Implementation task authority for the A2 DAC-adoption line is the reviewed #300 A2 Task DAG materialized as GitHub Execution Issues #304–#311, branched JIT from dependency-complete exact `v0.3` SHAs.
 
 v0.1 and v0.2 remain historical frozen baselines. v0.3 does not retroactively redefine their persisted behavior.
 
@@ -135,7 +139,7 @@ CI PASS is not Release Qualification PASS.
 - Tasks marked parallel MAY run in separate conversations from the same dependency-complete `v0.3` checkpoint.
 - Parallel leaf tasks should avoid central barrels/root runtime assembly/shared exports. Central wiring is deferred to explicit integration tasks to reduce merge conflicts.
 - One concern → one task branch → one PR.
-- Every execution starts by recording exact base SHA and reading Frozen PRD + Amendment A1 + Frozen L2 + L2 Amendment A1 + its Task Pack/Issue.
+- Every execution starts by recording exact base SHA and reading the complete Frozen authority composition above (Frozen PRD + PRD Amendments A1/A2 + Frozen L2 + L2 Amendments A1/A2) + its Task Pack/Issue.
 - If implementation evidence reveals a real architecture contradiction, stop that concern and record the contradiction rather than silently expanding scope.
 
 ## L3 / evidence order
@@ -158,8 +162,8 @@ Individual task completion, PR CI or a dedicated host-validation wave does not e
 
 The final closure task must reconcile the exact v0.3 candidate against:
 
-- Frozen PRD + PRD Amendment A1 acceptance;
-- Frozen L2 + L2 Amendment A1 review vectors V1–V12 and existing architecture gates;
+- Frozen PRD + PRD Amendment A1 acceptance + PRD Amendment A2 (DAC v0.0.2) acceptance;
+- Frozen L2 + L2 Amendment A1 review vectors V1–V12 + L2 Amendment A2 (DAC v0.0.2) acceptance and existing architecture gates;
 - Node/Expo host evidence;
 - migration/compatibility evidence;
 - full repository regression/packaging;

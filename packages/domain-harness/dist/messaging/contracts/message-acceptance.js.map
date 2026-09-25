@@ -1,0 +1,1 @@
+{"version":3,"file":"message-acceptance.js","sourceRoot":"","sources":["../../../src/messaging/contracts/message-acceptance.ts"],"names":[],"mappings":"AA+BA,MAAM,OAAO,sBAAuB,SAAQ,KAAK;IACtC,IAAI,CAA6B;IAE1C,YAAY,IAAgC,EAAE,OAAe,EAAE,OAAsB;QACnF,KAAK,CAAC,OAAO,EAAE,OAAO,CAAC,CAAC;QACxB,IAAI,CAAC,IAAI,GAAG,wBAAwB,CAAC;QACrC,IAAI,CAAC,IAAI,GAAG,IAAI,CAAC;IACnB,CAAC;CACF"}

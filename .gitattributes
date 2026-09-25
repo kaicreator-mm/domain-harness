@@ -1,0 +1,5 @@
+# Issue #299: committed build outputs must round-trip byte-identically on
+# every platform so scripts/check-committed-dist.mjs (fresh build must equal
+# committed bytes) cannot false-fail on CRLF-normalizing checkouts.
+packages/domain-harness/dist/** -text
+packages/domain-harness-compiler/dist/** -text

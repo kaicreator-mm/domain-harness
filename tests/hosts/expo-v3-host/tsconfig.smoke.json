@@ -1,0 +1,18 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "expo-sqlite": ["./node-smoke-sqlite-stub.ts"]
+    }
+  },
+  "include": [
+    "App.tsx",
+    "index.ts",
+    "run-expo-v3-host-validation.ts",
+    "node-smoke.ts",
+    "node-smoke-sqlite-stub.ts",
+    "fixture-constants.ts",
+    "generated/**/*.d.ts"
+  ]
+}

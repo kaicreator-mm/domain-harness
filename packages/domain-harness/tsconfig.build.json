@@ -1,10 +1,15 @@
 {
   // Production build graph (issue #166): emit only the transitive import
-  // closure of the public v0.2 entry point. Legacy v0.1 modules
+  // closure of the public v0.2 entry point plus the explicit v0.3 Workflow
+  // public seam and its internal selected-engine adapter. Legacy v0.1 modules
   // (loader/compiler/engine-runner/persistence/recovery/public/legacy-v1) stay
   // in the repository as regression/migration evidence - they remain
   // typechecked by tsconfig.json and runnable from source via tsx, but are no
   // longer compiled into or shipped inside the published artifact.
+  // T-021: src/index.ts now re-exports the additive v0.3 surface
+  // (src/public-v3/index.ts), so the v0.3 module closure ships through the
+  // same root closure; public-v3 is listed explicitly to anchor the ./v3
+  // subpath declaration entry.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
@@ -12,5 +17,10 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/index.ts"]
+  "include": [
+    "src/index.ts",
+    "src/public-v3/index.ts",
+    "src/workflow/index.ts",
+    "src/workflow/internal/xstate-adapter.ts"
+  ]
 }

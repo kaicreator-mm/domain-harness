@@ -1,21 +1,21 @@
 when:
   - event: pull_request
   - event: push
-    branch: [main, v0.2]
+    branch: [main, v0.2, v0.3]
 
-clone:
-  - name: git
-    image: /usr/local/bin/plugin-git
-    settings:
-      partial: false
-      depth: 1
-      recursive: false
-      lfs: false
+# Issue #261: Woodpecker local backend must not depend on agent-specific
+# absolute executables. Use host git for exact checkout and resolve bash via PATH.
+skip_clone: true
 
 steps:
   - name: verify
-    image: /usr/bin/bash
+    image: bash
     commands:
+      - git --version
+      - git init .
+      - git fetch --no-tags --depth=1 "$CI_REPO_CLONE_URL" "$CI_COMMIT_SHA"
+      - git checkout --detach FETCH_HEAD
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node --version
       - npm --version
       - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'

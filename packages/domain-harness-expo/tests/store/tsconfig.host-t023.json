@@ -1,0 +1,12 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../../../tests/hosts/expo-v3-host/generated",
+    "declaration": true
+  },
+  "include": [
+    "../../src/store/**/*.ts",
+    "./runtime-store-conformance.ts"
+  ]
+}

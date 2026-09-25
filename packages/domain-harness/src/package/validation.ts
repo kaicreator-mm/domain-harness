@@ -1,5 +1,9 @@
+import {
+  IdentityContractError,
+  canonicalizeJson,
+  type Sha256Port,
+} from '../contracts/identity.js';
 import type { CapabilityId } from '../v2/contracts/capability.js';
-import type { Sha256Port } from '../v2/contracts/host.js';
 import type {
   CompiledPackageManifest,
   TargetCompiledDomainPackage,
@@ -255,11 +259,19 @@ function validateBindings(
   }
 }
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((entry) => canonicalize(entry));
+/**
+ * v0.2 package identity canonicalization used ordinary object assignment.
+ * Keep that exact byte behavior for packageId compatibility, including its
+ * historical treatment of an own "__proto__" JSON key, after the shared
+ * canonicalizer has validated and normalized the semantic input.
+ */
+function canonicalizeLegacyPackageIdentity(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((entry) => canonicalizeLegacyPackageIdentity(entry));
   if (isRecord(value)) {
     const result: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) result[key] = canonicalize(value[key]);
+    for (const key of Object.keys(value).sort()) {
+      result[key] = canonicalizeLegacyPackageIdentity(value[key]);
+    }
     return result;
   }
   return value;
@@ -268,7 +280,18 @@ function canonicalize(value: unknown): unknown {
 export function canonicalPackageIdentityMaterial(manifest: CompiledPackageManifest): string {
   const { packageId: _packageId, ...identityMaterial } = manifest;
   assertJsonSerializable(identityMaterial, 'compiled package identity material');
-  const encoded = JSON.stringify(canonicalize(identityMaterial));
+
+  let sharedCanonical: unknown;
+  try {
+    sharedCanonical = canonicalizeJson(identityMaterial);
+  } catch (error) {
+    if (error instanceof IdentityContractError) {
+      failInvalid(`compiled package identity material failed canonical identity validation: ${error.message}`);
+    }
+    throw error;
+  }
+
+  const encoded = JSON.stringify(canonicalizeLegacyPackageIdentity(sharedCanonical));
   if (encoded === undefined) failInvalid('compiled package identity material is not serializable');
   return encoded;
 }

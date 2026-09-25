@@ -1,0 +1,199 @@
+import { Ajv2020 } from 'ajv/dist/2020.js';
+import { MessageAcceptanceError, } from '../contracts/message-acceptance.js';
+export class DomainMessageAcceptance {
+    store;
+    packages;
+    payloadValidator = new MessagePayloadValidator();
+    constructor(dependencies) {
+        this.store = dependencies.store;
+        this.packages = dependencies.packages;
+    }
+    async accept(message) {
+        validateEnvelope(message);
+        // A durable (target, messageId) identity wins before target lifecycle or pinned-contract
+        // validation. This preserves idempotent retry after the target becomes terminal or enters
+        // recovery_required. RuntimeStore.acceptMessage retains the atomic duplicate re-check for
+        // races between this read and the final acceptance transaction.
+        const existing = await this.store.getMessageDisposition(message.target, message.messageId);
+        if (existing) {
+            const ack = duplicateAck(existing);
+            assertAcceptedAck(ack, message, existing.packageId);
+            return ack;
+        }
+        const target = await this.store.getInstance(message.target);
+        if (!target) {
+            throw new MessageAcceptanceError('target_not_found', `Workflow target ${formatAddress(message.target)} does not exist`);
+        }
+        assertTargetSnapshot(target, message.target);
+        assertTargetAccepting(target);
+        const pinnedPackage = this.packages.get(target.packageId);
+        if (!pinnedPackage) {
+            throw new MessageAcceptanceError('pinned_package_missing', `Pinned package ${target.packageId} for ${formatAddress(message.target)} is unavailable`);
+        }
+        const contract = resolvePinnedMessageContract(pinnedPackage, message);
+        assertContractVersion(contract, message);
+        this.payloadValidator.validate(contract.payloadSchema, message.payload, message.type);
+        const correlationId = message.correlationId ?? target.correlationId;
+        if (!isNonEmptyString(correlationId)) {
+            throw new MessageAcceptanceError('store_invariant_violation', `Workflow target ${formatAddress(message.target)} has no usable correlation identity`);
+        }
+        const persistedMessage = {
+            ...message,
+            correlationId,
+        };
+        // RuntimeStore.acceptMessage is the frozen atomic boundary that re-checks target lifecycle,
+        // deduplicates, durably persists and allocates the per-target sequence before it resolves.
+        // If an adapter rejects during the race window after our first lookup, reconcile once against
+        // the durable identity before surfacing the error. This preserves the public duplicate
+        // contract even for an adapter that observes lifecycle before its own duplicate read.
+        let ack;
+        try {
+            ack = await this.store.acceptMessage(persistedMessage);
+        }
+        catch (error) {
+            const racedDuplicate = await this.store.getMessageDisposition(persistedMessage.target, persistedMessage.messageId);
+            if (!racedDuplicate)
+                throw error;
+            const duplicate = duplicateAck(racedDuplicate);
+            assertAcceptedAck(duplicate, persistedMessage, racedDuplicate.packageId);
+            return duplicate;
+        }
+        // Store contract violations must fail closed; they are not delivery races and therefore must
+        // never be converted into a duplicate result by the reconciliation path above.
+        assertAcceptedAck(ack, persistedMessage, target.packageId);
+        return ack;
+    }
+}
+class MessagePayloadValidator {
+    ajv = new Ajv2020({ strict: true, allErrors: true });
+    cache = new WeakMap();
+    validate(schema, payload, messageType) {
+        if (!isPortableJson(payload)) {
+            throw new MessageAcceptanceError('payload_contract_violation', `Message ${messageType} payload is not a portable JSON value`);
+        }
+        let validate = this.cache.get(schema);
+        if (!validate) {
+            try {
+                validate = this.ajv.compile(schema);
+            }
+            catch (error) {
+                throw new MessageAcceptanceError('invalid_pinned_contract', `Pinned message contract ${messageType} contains an invalid JSON Schema`, { cause: error });
+            }
+            this.cache.set(schema, validate);
+        }
+        if (!validate(payload)) {
+            throw new MessageAcceptanceError('payload_contract_violation', `Message ${messageType} payload does not satisfy the pinned contract: ${formatAjvErrors(validate.errors)}`);
+        }
+    }
+}
+function validateEnvelope(message) {
+    if (!isNonEmptyString(message.messageId)) {
+        throw new MessageAcceptanceError('invalid_message', 'messageId must be a non-empty string');
+    }
+    if (!message.target || typeof message.target !== 'object') {
+        throw new MessageAcceptanceError('invalid_message', 'target must be a WorkflowAddress');
+    }
+    if (!isNonEmptyString(message.target.workflowId) || !isNonEmptyString(message.target.instanceKey)) {
+        throw new MessageAcceptanceError('invalid_message', 'target.workflowId and target.instanceKey must be non-empty strings');
+    }
+    if (!isNonEmptyString(message.type)) {
+        throw new MessageAcceptanceError('invalid_message', 'type must be a non-empty string');
+    }
+    if (message.correlationId !== undefined && !isNonEmptyString(message.correlationId)) {
+        throw new MessageAcceptanceError('invalid_message', 'correlationId must be a non-empty string when provided');
+    }
+    if (message.causationId !== undefined && !isNonEmptyString(message.causationId)) {
+        throw new MessageAcceptanceError('invalid_message', 'causationId must be a non-empty string when provided');
+    }
+    if (message.contractVersion !== undefined && !isNonEmptyString(message.contractVersion)) {
+        throw new MessageAcceptanceError('invalid_message', 'contractVersion must be a non-empty string when provided');
+    }
+}
+function duplicateAck(existing) {
+    return {
+        status: 'duplicate',
+        messageId: existing.messageId,
+        target: { ...existing.target },
+        targetSequence: existing.targetSequence,
+        packageId: existing.packageId,
+        acceptedAt: existing.acceptedAt,
+    };
+}
+function assertTargetSnapshot(target, requested) {
+    if (!sameAddress(target.address, requested)) {
+        throw new MessageAcceptanceError('store_invariant_violation', `RuntimeStore returned ${formatAddress(target.address)} for requested target ${formatAddress(requested)}`);
+    }
+    if (!isNonEmptyString(target.packageId)) {
+        throw new MessageAcceptanceError('store_invariant_violation', `Workflow target ${formatAddress(requested)} has no pinned package identity`);
+    }
+}
+function assertTargetAccepting(target) {
+    if (target.lifecycle === 'active' || target.lifecycle === 'waiting')
+        return;
+    throw new MessageAcceptanceError('target_not_accepting', `Workflow target ${formatAddress(target.address)} cannot accept state-changing messages while ${target.lifecycle}`);
+}
+function resolvePinnedMessageContract(pinnedPackage, message) {
+    const workflow = pinnedPackage.manifest.workflows[message.target.workflowId];
+    if (!workflow) {
+        throw new MessageAcceptanceError('workflow_not_found', `Pinned package ${pinnedPackage.manifest.packageId} has no workflow ${message.target.workflowId}`);
+    }
+    const matches = Object.values(workflow.messageContracts).filter((contract) => contract.type === message.type);
+    if (matches.length === 0) {
+        throw new MessageAcceptanceError('message_contract_not_found', `Workflow ${message.target.workflowId} in pinned package ${pinnedPackage.manifest.packageId} does not accept message type ${message.type}`);
+    }
+    if (matches.length > 1) {
+        throw new MessageAcceptanceError('invalid_pinned_contract', `Workflow ${message.target.workflowId} contains multiple contracts for message type ${message.type}`);
+    }
+    return matches[0];
+}
+function assertContractVersion(contract, message) {
+    if (contract.version === message.contractVersion)
+        return;
+    throw new MessageAcceptanceError('contract_version_mismatch', `Message ${message.type} contract version ${message.contractVersion ?? '<unversioned>'} is incompatible with pinned version ${contract.version ?? '<unversioned>'}`);
+}
+function assertAcceptedAck(ack, message, expectedPackageId) {
+    const validStatus = ack.status === 'accepted' || ack.status === 'duplicate';
+    const validSequence = Number.isSafeInteger(ack.targetSequence) && ack.targetSequence >= 0;
+    if (!validStatus ||
+        ack.messageId !== message.messageId ||
+        !sameAddress(ack.target, message.target) ||
+        !isNonEmptyString(ack.packageId) ||
+        ack.packageId !== expectedPackageId ||
+        !validSequence ||
+        !isNonEmptyString(ack.acceptedAt)) {
+        throw new MessageAcceptanceError('store_invariant_violation', `RuntimeStore returned an invalid acceptance ACK for message ${message.messageId}`);
+    }
+}
+function isNonEmptyString(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+function sameAddress(left, right) {
+    return left.workflowId === right.workflowId && left.instanceKey === right.instanceKey;
+}
+function formatAddress(address) {
+    return `${address.workflowId}/${address.instanceKey}`;
+}
+function isPortableJson(value) {
+    if (value === null)
+        return true;
+    if (typeof value === 'string' || typeof value === 'boolean')
+        return true;
+    if (typeof value === 'number')
+        return Number.isFinite(value);
+    if (Array.isArray(value))
+        return value.every(isPortableJson);
+    if (typeof value !== 'object')
+        return false;
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null)
+        return false;
+    return Object.values(value).every(isPortableJson);
+}
+function formatAjvErrors(errors) {
+    if (!errors?.length)
+        return 'validation failed';
+    return errors
+        .map((error) => `${error.instancePath || '/'} ${error.message ?? error.keyword}`)
+        .join('; ');
+}
+//# sourceMappingURL=domain-message-acceptance.js.map

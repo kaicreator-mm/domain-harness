@@ -1,0 +1,1 @@
+{"version":3,"file":"migrations.js","sourceRoot":"","sources":["../../src/persistence/migrations.ts"],"names":[],"mappings":"AAKA,MAAM,CAAC,MAAM,UAAU,GAAyB;IAC9C;QACE,OAAO,EAAE,CAAC;QACV,GAAG,EAAE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CAuCR;KACE;IACD;QACE,OAAO,EAAE,CAAC;QACV,GAAG,EAAE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CA6BR;KACE;CACO,CAAC"}

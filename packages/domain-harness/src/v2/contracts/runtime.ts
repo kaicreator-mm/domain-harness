@@ -1,3 +1,5 @@
+import type { RuntimeObservationCapability } from '../../observation/contracts.js';
+import type { RuntimeControlCapability } from '../../control/contracts.js';
 import type { DomainMessage, MessageAcceptedAck } from './message.js';
 import type { DomainQuery, DomainQueryResult } from './query.js';
 import type {
@@ -51,4 +53,28 @@ export interface DomainRuntime {
    * DomainRuntimeError code 'runtime_disposed'.
    */
   dispose(): Promise<void>;
+
+  /**
+   * Issue #312 durable ordered Runtime Observation Stream capability.
+   * Optional and additive: the factory always populates it explicitly —
+   * `{ status: 'UNSUPPORTED' }` when observation is not enabled (existing
+   * Runtime semantics unchanged; absence of records never means "no
+   * activity"), or the enabled durable pull/cursor read surface. Consumers
+   * treating older hand-built runtimes without this member MUST default it
+   * to UNSUPPORTED.
+   */
+  readonly observation?: RuntimeObservationCapability;
+
+  /**
+   * Issue #313 generic public Runtime cancel/interrupt control capability.
+   * Optional and additive: the factory always populates it explicitly —
+   * `{ status: 'UNSUPPORTED' }` (default deny; a request receives an
+   * UNSUPPORTED receipt and causes no mutation) when no fail-closed
+   * `RuntimeControlAuthorizer` is configured, or the authorized durable
+   * requestControl/getControlOutcome surface when enabled. Consumers
+   * treating older hand-built runtimes without this member MUST default it
+   * to UNSUPPORTED. Raw AbortSignal/XState authority stays private: the
+   * durable control record is the only public truth.
+   */
+  readonly control?: RuntimeControlCapability;
 }

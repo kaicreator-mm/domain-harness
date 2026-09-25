@@ -1,8 +1,17 @@
-# DomainHarness v0.1 SDK Documentation
+# DomainHarness SDK Documentation
 
 Use this directory as the consumer/Agent entry point for `@kaicreator/domain-harness`.
 
-## Read in this order
+## Current line: v0.3
+
+1. `DomainHarness_v0.3_SDK_USAGE.md` — v0.3 integration entry point: what v0.3 adds, runnable examples, ownership boundaries.
+2. `DomainHarness_v0.3_SDK_REFERENCE.md` — complete v0.3 public API reference (assembly, governance, admission, promotion/activation, Runtime Evidence, error codes).
+3. `../migration/DomainHarness_v0.2_TO_v0.3.md` — v0.2 → v0.3 migration, including the forbidden floating-authority substitutions.
+4. `../integration/DomainHarness_v0.3_HOST_INTEGRATION.md` — durable Node/Expo host setup and the validation evidence behind durability claims.
+
+Executable v0.3 examples (run in CI, import the published package by name) live in `packages/domain-harness/tests/examples/`.
+
+## v0.1 line (legacy)
 
 1. `DomainHarness_v0.1_SDK_USAGE.md` — short integration entry point and ownership boundaries.
 2. `DomainHarness_v0.1_SDK_REFERENCE.md` — complete public API, Harness DSL, lifecycle, recovery and error reference.
@@ -11,6 +20,20 @@ Use this directory as the consumer/Agent entry point for `@kaicreator/domain-har
 ## Consumer rule
 
 Until v0.1 is formally release-qualified/tagged, downstream projects should integrate an **exact DomainHarness commit SHA** and record that SHA in their own integration evidence. Do not depend on a moving branch as though it were a released package.
+
+### Supported install spec (issue #299)
+
+There is no npm release; the packages are consumed as exact-SHA git dependencies. The built `dist/` trees of `@kaicreator/domain-harness` and `@kaicreator/domain-harness-compiler` are committed to the repository, so a git install delivers a usable package without lifecycle scripts:
+
+```sh
+pnpm add "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-harness" \
+          "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-harness-compiler"
+```
+
+- Pin `<exact-sha>` to the full commit SHA you validated against (the same SHA for every DomainHarness package you consume).
+- The `&path:` subdirectory form is required (monorepo packages); pnpm resolves it — npm does not support git subdirectory dependencies.
+- `@kaicreator/domain-harness-compiler` declares the runtime as a **peer dependency** (`0.2.0`), satisfied by the `@kaicreator/domain-harness` install above; installing the compiler alone would try to fetch an unpublished npm version and fail by design.
+- `npm run build` in the DomainHarness repository verifies via `scripts/check-committed-dist.mjs` that the committed `dist/` trees always match a fresh build of the committed sources.
 
 A downstream project should import only from:
 

@@ -55,6 +55,16 @@ export interface CompiledWorkflowTransition {
   recoveryFailure?: RuntimeFailure;
 }
 
+/**
+ * Turn-scoped execution options (#313): the internal AbortSignal of the ONE
+ * in-flight mailbox turn, issued only after a durable winning control claim.
+ * Public semantics remain defined exclusively by the durable control outcome;
+ * a callee ignoring this signal can never fabricate a stop.
+ */
+export interface CompiledWorkflowExecutionOptions {
+  signal?: AbortSignal;
+}
+
 export class CompiledWorkflowRuntime {
   constructor(private readonly options: CompiledWorkflowRuntimeOptions) {}
 
@@ -69,6 +79,7 @@ export class CompiledWorkflowRuntime {
     workflow: CompiledWorkflowDescriptor,
     current: WorkflowInstanceSnapshot,
     stored: StoredAcceptedMessage,
+    execution: CompiledWorkflowExecutionOptions = {},
   ): Promise<CompiledWorkflowTransition> {
     const definition = parseDefinition(workflow);
     let state = parsePortableState(current.state);
@@ -98,6 +109,7 @@ export class CompiledWorkflowRuntime {
       stored,
       state,
       logicalTime,
+      execution,
     );
   }
 
@@ -109,6 +121,7 @@ export class CompiledWorkflowRuntime {
     stored: StoredAcceptedMessage,
     initialState: PortableWorkflowState,
     logicalTime: string,
+    execution: CompiledWorkflowExecutionOptions = {},
   ): Promise<CompiledWorkflowTransition> {
     let state = initialState;
     const maxSteps = Math.max(1, definition.limits?.maxSteps ?? 256);
@@ -155,6 +168,7 @@ export class CompiledWorkflowRuntime {
           state,
           logicalTime,
           step,
+          execution,
         );
         if (result.recoveryFailure !== undefined) {
           return {
@@ -196,6 +210,7 @@ export class CompiledWorkflowRuntime {
     state: PortableWorkflowState,
     logicalTime: string,
     step: number,
+    execution: CompiledWorkflowExecutionOptions = {},
   ): Promise<{ value: JsonValue; recoveryFailure?: RuntimeFailure }> {
     const scope = workflowScope(current, state);
 
@@ -262,6 +277,7 @@ export class CompiledWorkflowRuntime {
         input,
         logicalTime,
         executor: this.options.toolExecutor,
+        ...(execution.signal === undefined ? {} : { signal: execution.signal }),
       });
       if (result.status === 'recovery_required') {
         return {
