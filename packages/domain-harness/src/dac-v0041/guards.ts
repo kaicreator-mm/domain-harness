@@ -19,6 +19,7 @@ import {
   DAC_V0041_CURRENTNESS_USE_STATES,
   DAC_V0041_FOUNDATION_REQUEST_ROLES,
   DAC_V0041_PREDECESSOR_BASELINES,
+  DAC_V0041_PREDECESSOR_EVIDENCE_PURPOSE,
   DAC_V0041_REFERENCE_ADAPTER_VERSION,
   DAC_V0041_REQUEST_RESULT_ALIAS_CHAINS,
   DAC_V0041_ROLE_REGISTRY,
@@ -69,16 +70,33 @@ function baselineEqualsSuccessor(input: DacV0041BaselineInput): boolean {
   );
 }
 
-function isPredecessorBaselineInput(input: unknown): input is DacV0041PredecessorBaseline {
-  if (input === null || typeof input !== 'object') return false;
+function matchPredecessorBaselineInput(
+  input: unknown,
+): DacV0041PredecessorBaseline | null {
+  if (input === null || typeof input !== 'object') return null;
   const candidate = input as Partial<DacV0041PredecessorBaseline>;
-  return DAC_V0041_PREDECESSOR_BASELINES.some(
-    (baseline) =>
-      candidate.contract === baseline.contract &&
-      candidate.version === baseline.version &&
-      candidate.semanticFreezeCommit === baseline.semanticFreezeCommit &&
-      candidate.semanticFreezeTree === baseline.semanticFreezeTree,
+  // The evidence record is validated completely: a `purpose` retained by the
+  // carrier must be the exact evidence-only purpose — a predecessor identity
+  // relabeled toward any other purpose fails closed.
+  if (
+    candidate.purpose !== undefined &&
+    candidate.purpose !== DAC_V0041_PREDECESSOR_EVIDENCE_PURPOSE
+  ) {
+    return null;
+  }
+  return (
+    DAC_V0041_PREDECESSOR_BASELINES.find(
+      (baseline) =>
+        candidate.contract === baseline.contract &&
+        candidate.version === baseline.version &&
+        candidate.semanticFreezeCommit === baseline.semanticFreezeCommit &&
+        candidate.semanticFreezeTree === baseline.semanticFreezeTree,
+    ) ?? null
   );
+}
+
+function isPredecessorBaselineInput(input: unknown): input is DacV0041PredecessorBaseline {
+  return matchPredecessorBaselineInput(input) !== null;
 }
 
 function requireNonEmptyString(value: unknown, field: string): void {
@@ -120,27 +138,56 @@ function requirePredecessorOrigin(origin: DacV0041PredecessorBaseline | undefine
   if (!isPredecessorBaselineInput(origin)) {
     throw new DacV0041ReferenceError(
       'INVALID_PREDECESSOR_ORIGIN',
-      'predecessorOrigin must name exactly one frozen predecessor baseline (v0.0.3 or v0.0.4 semantic freeze) and is retained for transition/adoption evidence only',
+      'predecessorOrigin must name exactly one frozen predecessor baseline (v0.0.3 or v0.0.4 semantic freeze) carrying the exact evidence-only purpose, and is retained for transition/adoption evidence only',
     );
   }
+}
+
+/**
+ * Frozen predecessor-evidence slot closed into a minted reference: a fresh
+ * frozen snapshot of the matched frozen table entry (canonical evidence-only
+ * purpose included, extra carrier fields dropped) — never the caller-owned
+ * carrier object. Mutating the caller's origin object after mint can never
+ * change the exact historic-origin evidence the reference carries.
+ */
+function predecessorOriginSlot(
+  origin: DacV0041PredecessorBaseline | undefined,
+): { predecessorOrigin: DacV0041PredecessorBaseline } | Record<string, never> {
+  if (origin === undefined) return {};
+  const matched = matchPredecessorBaselineInput(origin);
+  if (matched === null) {
+    throw new DacV0041ReferenceError(
+      'INVALID_PREDECESSOR_ORIGIN',
+      'predecessorOrigin must name exactly one frozen predecessor baseline (v0.0.3 or v0.0.4 semantic freeze) carrying the exact evidence-only purpose, and is retained for transition/adoption evidence only',
+    );
+  }
+  return { predecessorOrigin: Object.freeze({ ...matched }) };
 }
 
 function freezeAdopted<T extends object>(value: T): T {
   return Object.freeze(value);
 }
 
+/**
+ * Defensive FROZEN copy of an optional string collection. The copied
+ * container participates in the exact request/evidence closure, so it is
+ * frozen like the historical v0.0.3 adoption core freezes its copied
+ * collections — minted material can never be mutated after mint.
+ */
 function copyStrings(value: readonly string[] | undefined): readonly string[] {
-  return value === undefined ? [] : value.slice();
+  return freezeAdopted(value === undefined ? [] : value.slice());
 }
 
+/** Defensive FROZEN copy of an optional reference collection (same closure rule). */
 function copyRefs(value: readonly DacV0041Reference[] | undefined): readonly DacV0041Reference[] {
-  return value === undefined ? [] : value.slice();
+  return freezeAdopted(value === undefined ? [] : value.slice());
 }
 
+/** Defensive FROZEN shallow copy of the opaque record (same closure rule). */
 function copyOpaque(
   value: Readonly<Record<string, unknown>> | undefined,
 ): Readonly<Record<string, unknown>> {
-  return value === undefined ? {} : { ...value };
+  return freezeAdopted(value === undefined ? {} : { ...value });
 }
 
 /**
@@ -228,8 +275,11 @@ export function adoptDacV0041RegistryReference(
   }
   sharedEnvelopeSlots(input);
   // Defensive copies with conditional spreads: every minted reference is
-  // frozen and never aliases a caller-mutable array/object, and optional
-  // slots are omitted (not assigned undefined) under exactOptionalPropertyTypes.
+  // frozen, never aliases a caller-mutable array/object, and every nested
+  // container closed into the reference (string/ref collections, opaque
+  // record, predecessor-origin evidence snapshot) is frozen with it;
+  // optional slots are omitted (not assigned undefined) under
+  // exactOptionalPropertyTypes.
   const reference = freezeAdopted({
     adapter: DAC_V0041_REFERENCE_ADAPTER_VERSION,
     baseline: DAC_V0041_BASELINE,
@@ -243,9 +293,7 @@ export function adoptDacV0041RegistryReference(
       ? {}
       : { contractProfileIdentity: input.contractProfileIdentity }),
     locatorHints: copyStrings(input.locatorHints),
-    ...(input.predecessorOrigin === undefined
-      ? {}
-      : { predecessorOrigin: input.predecessorOrigin }),
+    ...predecessorOriginSlot(input.predecessorOrigin),
     opaque: copyOpaque(input.opaque),
   }) as DacV0041RegistryReference;
   MINTED_V0041_REFERENCES.add(reference);
@@ -306,9 +354,7 @@ function mintRequestReference<R extends CompatibilityValidationRequestRef | Runt
       ? {}
       : { contractProfileIdentity: input.contractProfileIdentity }),
     locatorHints: copyStrings(input.locatorHints),
-    ...(input.predecessorOrigin === undefined
-      ? {}
-      : { predecessorOrigin: input.predecessorOrigin }),
+    ...predecessorOriginSlot(input.predecessorOrigin),
     requesterIdentity: input.requesterIdentity,
     providerIdentity: input.providerIdentity,
     requestedCapabilityKind: input.requestedCapabilityKind,
@@ -424,12 +470,25 @@ export function verifyDacV0041RequestResultSeparation(
   }
 }
 
+/**
+ * A capability kind (requested or offered) is an exact non-empty string.
+ * Empty, whitespace-only and non-string kinds are MALFORMED facts — they fail
+ * closed as `INVALID_FACTS` and never take part in the Step-1 kind match
+ * (neither as an empty match nor as a normal blocked classification).
+ */
+function isCapabilityKindString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function isCapabilityExchangeFacts(value: DacV0041CapabilityExchangeFacts): value is DacV0041CapabilityExchangeFacts {
   if (value === null || typeof value !== 'object') return false;
   const candidate = value as Partial<DacV0041CapabilityExchangeFacts>;
   if (typeof candidate.currentDescriptorEstablished !== 'boolean') return false;
   if (!Array.isArray(candidate.currentDescriptorOfferedCapabilityKinds)) return false;
-  if (typeof candidate.requestedCapabilityKind !== 'string') return false;
+  for (const offeredKind of candidate.currentDescriptorOfferedCapabilityKinds) {
+    if (!isCapabilityKindString(offeredKind)) return false;
+  }
+  if (!isCapabilityKindString(candidate.requestedCapabilityKind)) return false;
   if (typeof candidate.requiredInputsStructurallyValid !== 'boolean') return false;
   if (typeof candidate.materialStaleness !== 'boolean') return false;
   const target = candidate.bindingTargetState;
@@ -454,7 +513,8 @@ function isCapabilityExchangeFacts(value: DacV0041CapabilityExchangeFacts): valu
  *   Step 4  otherwise                                     => evaluation phase
  *
  * The classifier reads only the externally supplied facts, never invents or
- * defaults one (`INVALID_FACTS` on a malformed facts object), never consults
+ * defaults one (`INVALID_FACTS` on a malformed facts object — including
+ * empty/whitespace-only/non-string capability kinds), never consults
  * advisory hints, and never produces COMPATIBLE or any evaluation outcome.
  */
 export function classifyDacV0041CapabilityExchange(

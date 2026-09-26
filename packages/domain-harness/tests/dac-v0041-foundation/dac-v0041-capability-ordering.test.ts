@@ -234,6 +234,73 @@ test('a41-001 ordering: malformed facts fail closed instead of being guessed', (
   );
 });
 
+test('a41-001 R1 ordering P2-1: empty/non-string capability-kind facts are INVALID_FACTS — never a blocked or evaluation classification', () => {
+  // Hostile pair from review: an empty requested kind previously matched an
+  // offered [''] at Step 1 and reached the evaluation phase.
+  expectFactsError(
+    () =>
+      classifyDacV0041CapabilityExchange(
+        facts({ requestedCapabilityKind: '', currentDescriptorOfferedCapabilityKinds: [''] }),
+      ),
+    'empty requested kind against empty offered kind',
+  );
+  expectFactsError(
+    () => classifyDacV0041CapabilityExchange(facts({ requestedCapabilityKind: '' })),
+    'empty requested kind alone',
+  );
+  expectFactsError(
+    () => classifyDacV0041CapabilityExchange(facts({ requestedCapabilityKind: '   ' })),
+    'whitespace-only requested kind',
+  );
+  expectFactsError(
+    () => classifyDacV0041CapabilityExchange(facts({ requestedCapabilityKind: 42 as never })),
+    'non-string requested kind',
+  );
+  // Non-string/empty offered members are malformed facts, never a normal
+  // blocked/missing-capability classification.
+  expectFactsError(
+    () =>
+      classifyDacV0041CapabilityExchange(
+        facts({ currentDescriptorOfferedCapabilityKinds: [42] as never }),
+      ),
+    'non-string offered member must not classify as blocked',
+  );
+  expectFactsError(
+    () =>
+      classifyDacV0041CapabilityExchange(
+        facts({ currentDescriptorOfferedCapabilityKinds: [''] }),
+      ),
+    'empty offered member',
+  );
+  expectFactsError(
+    () =>
+      classifyDacV0041CapabilityExchange(
+        facts({
+          currentDescriptorOfferedCapabilityKinds: [
+            'domain-harness.compatibility-validation/1',
+            null,
+          ] as never,
+        }),
+      ),
+    'null offered member',
+  );
+  // Malformed kinds stay INVALID_FACTS even when other facts would fail an
+  // earlier step — the facts guard dominates every classification phase.
+  expectFactsError(
+    () =>
+      classifyDacV0041CapabilityExchange(
+        facts({ currentDescriptorEstablished: false, requestedCapabilityKind: '' }),
+      ),
+    'malformed kind dominates a failing descriptor step',
+  );
+  // A legally EMPTY offered list stays a normal Step-1 blocked classification
+  // (the empty list is valid; only malformed ENTRIES are invalid facts).
+  assert.deepEqual(
+    classifyDacV0041CapabilityExchange(facts({ currentDescriptorOfferedCapabilityKinds: [] })),
+    { phase: 'capability-kind', outcome: 'blocked/missing-capability', targetNotJudged: true },
+  );
+});
+
 test('a41-001 ordering C157: currentness-use classification is deterministic and fail-closed', () => {
   assert.deepEqual(classifyDacV0041CurrentnessUse('current'), { state: 'current', usable: true });
   assert.deepEqual(classifyDacV0041CurrentnessUse('stale'), { state: 'stale', disposition: 'STALE' });

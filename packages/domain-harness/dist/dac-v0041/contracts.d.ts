@@ -135,8 +135,12 @@ export interface DacV0041ReferenceEnvelope {
     readonly locatorHints: readonly string[];
     /**
      * Transition/adoption evidence input only (F-06): the exact predecessor
-     * DAC baseline the referenced historic artifact originates from. Presence
-     * grants no authority and never substitutes the successor baseline.
+     * DAC baseline the referenced historic artifact originates from. The
+     * adoption core validates the evidence record completely (identity plus
+     * its evidence-only purpose) and closes a FROZEN snapshot of it into the
+     * reference — the caller's carrier object is never aliased, so the exact
+     * historic-origin evidence cannot be mutated after mint. Presence grants
+     * no authority and never substitutes the successor baseline.
      */
     readonly predecessorOrigin?: DacV0041PredecessorBaseline;
     readonly opaque: Readonly<Record<string, unknown>>;
@@ -285,11 +289,17 @@ export interface DacV0041CapabilityExchangeFacts {
      */
     readonly currentDescriptorEstablished: boolean;
     /**
-     * Step 1: capability kinds the CURRENT exact descriptor offers (empty
-     * array allowed). Never read from a stale/reused descriptor.
+     * Step 1: capability kinds the CURRENT exact descriptor offers. The list
+     * itself may be empty, but every offered kind is a non-empty string —
+     * empty/whitespace-only/non-string entries are malformed facts and fail
+     * closed as `INVALID_FACTS`. Never read from a stale/reused descriptor.
      */
     readonly currentDescriptorOfferedCapabilityKinds: readonly string[];
-    /** The exact capability kind the request asks for. */
+    /**
+     * The exact capability kind the request asks for: a non-empty string.
+     * Empty/whitespace-only/non-string values are malformed facts and fail
+     * closed as `INVALID_FACTS`, never a normal classification.
+     */
     readonly requestedCapabilityKind: string;
     /**
      * Step 2a (§13.2): false when any role-required exact material input is

@@ -66,7 +66,8 @@ export declare function verifyDacV0041RequestResultSeparation(request: DacV0041R
  *   Step 4  otherwise                                     => evaluation phase
  *
  * The classifier reads only the externally supplied facts, never invents or
- * defaults one (`INVALID_FACTS` on a malformed facts object), never consults
+ * defaults one (`INVALID_FACTS` on a malformed facts object — including
+ * empty/whitespace-only/non-string capability kinds), never consults
  * advisory hints, and never produces COMPATIBLE or any evaluation outcome.
  */
 export declare function classifyDacV0041CapabilityExchange(facts: DacV0041CapabilityExchangeFacts): DacV0041CapabilityExchangeClassification;
