@@ -10,4 +10,10 @@ export * from './public-v2/index.js';
 // runtime assembly root. Host-neutral like the v0.2 surface; also reachable
 // through the explicit `./v3` export.
 export * from './public-v3/index.js';
+// Additive portable v0.4 surface (Issue #355 / A41-001): the DAC v0.0.4.1
+// successor reference/request-role foundation. Successor-only consumption
+// and validation primitives; no historical v0.0.2/v0.0.3 semantics are
+// edited, relabeled or re-exported through it. Also reachable through the
+// explicit `./v4` export.
+export * from './public-v4/index.js';
 //# sourceMappingURL=index.js.map
