@@ -376,12 +376,20 @@ export interface DacV0041AuthorityAdoptionFacts {
   /**
    * Exact historic artifact reference, adopted through the A41-001
    * foundation and therefore identity-closed, immutable and — for a
-   * genuinely older-baseline artifact — carrying the exact frozen
-   * `predecessorOrigin` evidence. This binding is what a consumer wrapper
-   * or a predecessor-as-successor relabel cannot forge (C145/C147).
+   * genuinely older-baseline artifact — carrying both the exact frozen
+   * `predecessorOrigin` evidence and its exact closed
+   * `contractProfileIdentity` origin profile. This binding is what a
+   * consumer wrapper or a predecessor-as-successor relabel cannot forge
+   * (C145/C147).
    */
   readonly adoptedArtifactRef: DacV0041Reference;
-  /** Exact origin DAC/reference profile identity of the historic artifact. */
+  /**
+   * Exact origin DAC/reference profile identity of the historic artifact.
+   * MUST exactly equal the `contractProfileIdentity` closed over by
+   * `adoptedArtifactRef`: a claimed origin profile that is not recoverable
+   * from the exact historic artifact fails closed (no predecessor profile
+   * relabeling at the adoption boundary).
+   */
   readonly originDacProfileIdentity: string;
   /**
    * Exact authority role required to issue the adopted artifact class. The
@@ -438,7 +446,9 @@ export interface DacV0041AuthorityAdoptionFacts {
  *   3. class precondition unsatisfied => FAIL_CLOSED CLASS_PRECONDITION_
  *      UNSATISFIED
  *   4. forged/unbound or successor-native source (no exact predecessor
- *      origin binding) => FAIL_CLOSED MALFORMED_SOURCE
+ *      origin binding, no closed origin contract-profile identity, or a
+ *      claimed origin profile not exactly equal to the artifact's closed
+ *      profile) => FAIL_CLOSED MALFORMED_SOURCE
  *   5. incomplete re-evaluation => FAIL_CLOSED REEVALUATION_INCOMPLETE
  *   6. issuer chain invalid (structural, per the chain precedence) =>
  *      FAIL_CLOSED ADOPTION_ISSUER_CHAIN_INVALID (carries the chain code)

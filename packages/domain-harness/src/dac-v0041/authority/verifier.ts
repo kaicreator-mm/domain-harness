@@ -1184,8 +1184,11 @@ export function verifyDacV0041AuthorityAdoption(
 
   // Ladder step 4: exact historic-source binding (C145/C147). The adopted
   // artifact must be a foundation-minted reference carrying the exact frozen
-  // predecessor-origin evidence — a consumer wrapper, a forged carrier, or a
-  // successor-native artifact presented for adoption all fail closed.
+  // predecessor-origin evidence AND its exact closed origin contract-profile
+  // identity equal to the claimed origin profile — a consumer wrapper, a
+  // forged carrier, a successor-native artifact presented for adoption, or a
+  // claimed origin profile not recoverable from the exact historic artifact
+  // (predecessor profile relabeling) all fail closed.
   if (!isDacV0041Reference(candidate.adoptedArtifactRef)) {
     return adoptionFail(
       'MALFORMED_SOURCE',
@@ -1202,6 +1205,19 @@ export function verifyDacV0041AuthorityAdoption(
     return adoptionFail(
       'MALFORMED_SOURCE',
       'adopted artifact carries no predecessor-origin evidence; a successor-native artifact needs no adoption and an older-baseline artifact must be bound through its exact frozen predecessor origin',
+    );
+  }
+  const closedOriginProfile = candidate.adoptedArtifactRef.contractProfileIdentity;
+  if (closedOriginProfile === undefined) {
+    return adoptionFail(
+      'MALFORMED_SOURCE',
+      'adopted artifact closes over no exact origin contract-profile identity, so the claimed origin DAC/reference profile cannot be bound to this exact historic artifact (an unbound origin profile is a relabeled source, not an adoption)',
+    );
+  }
+  if (closedOriginProfile !== candidate.originDacProfileIdentity) {
+    return adoptionFail(
+      'MALFORMED_SOURCE',
+      `claimed origin DAC/reference profile "${candidate.originDacProfileIdentity}" is not the exact origin contract-profile identity closed over by the adopted historic artifact ("${closedOriginProfile}"); predecessor profile relabeling fails closed`,
     );
   }
 

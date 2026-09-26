@@ -238,8 +238,34 @@ export function buildEndAct(
   };
 }
 
-/** Exact historic v0.0.3-origin artifact reference of the given registry role. */
+/**
+ * Exact historic v0.0.3-origin artifact reference of the given registry
+ * role. The reference closes over its exact origin contract-profile
+ * identity (PROFILE.v003) so the adoption verifier can bind the claimed
+ * origin profile to this exact historic artifact.
+ */
 export function buildHistoricArtifactRef(
+  role: DacV0041RegistryRole,
+  authorityScope: string = SCOPE.domainA,
+): DacV0041Reference {
+  const v003Predecessor = DAC_V0041_PREDECESSOR_BASELINES[0] as DacV0041PredecessorBaseline;
+  return adoptDacV0041RegistryReference({
+    role,
+    baseline: DAC_V0041_BASELINE,
+    authorityScope,
+    primaryIdentity: `artifact/historic-${role}-v003-1`,
+    contractProfileIdentity: PROFILE.v003,
+    predecessorOrigin: v003Predecessor,
+    opaque: {},
+  });
+}
+
+/**
+ * Adversarial shape of {@link buildHistoricArtifactRef}: the same
+ * predecessor-origin historic artifact minted WITHOUT any closed origin
+ * contract-profile identity, for the missing-origin-profile negative.
+ */
+export function buildProfilelessHistoricArtifactRef(
   role: DacV0041RegistryRole,
   authorityScope: string = SCOPE.domainA,
 ): DacV0041Reference {

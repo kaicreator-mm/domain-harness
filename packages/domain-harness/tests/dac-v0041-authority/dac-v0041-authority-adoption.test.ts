@@ -16,6 +16,7 @@ import {
   SOD_PERMISSION,
   buildHistoricArtifactRef,
   buildHistoricPromotionArtifactRef,
+  buildProfilelessHistoricArtifactRef,
   buildPromotionChainInput,
   buildPromotionLeafLink,
   buildRootIssuanceLink,
@@ -107,6 +108,69 @@ test('a41-002 adoption C145: adopting a successor-native artifact without predec
   );
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'MALFORMED_SOURCE');
+});
+
+test('a41-002 adoption C145/C147: a claimed origin profile that is not the artifact\'s closed origin profile fails closed (no predecessor profile relabeling)', () => {
+  const result = verifyDacV0041AuthorityAdoption(
+    buildValidAdoptionFacts({
+      originDacProfileIdentity: 'dac-profile/wrong-origin',
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'MALFORMED_SOURCE');
+
+  // Even an otherwise-real profile token from the local vocabulary cannot
+  // relabel the historic artifact's exact closed origin profile.
+  const relabeled = verifyDacV0041AuthorityAdoption(
+    buildValidAdoptionFacts({ originDacProfileIdentity: PROFILE.other }),
+  );
+  assert.equal(relabeled.outcome, 'FAIL_CLOSED');
+  assert.equal(relabeled.code, 'MALFORMED_SOURCE');
+});
+
+test('a41-002 adoption C145/C147: a historic artifact closing over no origin contract-profile identity fails closed', () => {
+  const profileless = buildProfilelessHistoricArtifactRef('promotion-decision');
+  const result = verifyDacV0041AuthorityAdoption(
+    buildValidAdoptionFacts({ adoptedArtifactRef: profileless }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'MALFORMED_SOURCE');
+});
+
+test('a41-002 adoption precedence: the exact origin-profile binding dominates incomplete re-evaluation and a broken issuer chain', () => {
+  const result = verifyDacV0041AuthorityAdoption(
+    buildValidAdoptionFacts({
+      originDacProfileIdentity: 'dac-profile/wrong-origin',
+      reEvaluation: {
+        sourceAuthenticityEstablished: false,
+        sourceProvenanceRecoverable: false,
+        subjectExactnessEstablished: false,
+        sourceCurrentnessEstablished: false,
+        evidenceClosureRecoverable: false,
+        classSpecificObligationsSatisfied: false,
+      },
+      issuerDesignationChain: buildPromotionChainInput(60, {
+        links: [
+          buildPromotionLeafLink({ authorityRole: 'runtime-activation' }),
+          buildRootIssuanceLink(),
+        ],
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'MALFORMED_SOURCE');
+});
+
+test('a41-002 adoption: a missing or blank claimed origin profile is malformed facts', () => {
+  for (const claimed of [undefined, '', '   '] as (string | undefined)[]) {
+    const result = verifyDacV0041AuthorityAdoption(
+      buildValidAdoptionFacts({
+        originDacProfileIdentity: claimed as never,
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'INVALID_FACTS');
+  }
 });
 
 test('a41-002 adoption C163: an ordinary role holder cannot adopt AuthorityDesignationRef or attestation forms', () => {
