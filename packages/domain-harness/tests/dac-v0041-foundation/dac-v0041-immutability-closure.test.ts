@@ -64,7 +64,7 @@ test('a41-001 R1 immutability: every nested closure container of an adopted refe
     primaryIdentity: 'r1-target-2',
     locatorHints: ['registry://targets/two'],
     opaque: { sourceField: 'value-2' },
-    predecessorOrigin: DAC_V0041_PREDECESSOR_BASELINES[1],
+    predecessorOrigin: DAC_V0041_PREDECESSOR_BASELINES[1]!,
   });
   assert.equal(Object.isFrozen(ref), true, 'outer reference frozen');
   assert.equal(Object.isFrozen(ref.locatorHints), true, 'locatorHints frozen');
@@ -85,7 +85,7 @@ test('a41-001 R1 immutability: every nested closure container of an adopted refe
   assert.equal(ref.opaque.sourceField, 'value-2');
   assert.equal(
     ref.predecessorOrigin?.semanticFreezeCommit,
-    DAC_V0041_PREDECESSOR_BASELINES[1].semanticFreezeCommit,
+    DAC_V0041_PREDECESSOR_BASELINES[1]!.semanticFreezeCommit,
   );
 });
 
@@ -247,7 +247,7 @@ test('a41-001 R1 immutability: a minted request reference closes frozen nested r
   const advisoryTargetHints = ['env:prod'];
   const locatorHints = ['registry://binding-requests'];
   const opaque: Record<string, unknown> = { transport: 'wire-1' };
-  const originCarrier = { ...DAC_V0041_PREDECESSOR_BASELINES[0] };
+  const originCarrier = { ...DAC_V0041_PREDECESSOR_BASELINES[0]! };
 
   const request = mintRuntimeBindingRequestRef({
     baseline: { ...DAC_V0041_BASELINE },
@@ -288,7 +288,7 @@ test('a41-001 R1 immutability: a minted request reference closes frozen nested r
   assert.deepEqual({ ...request.opaque }, { transport: 'wire-1' });
   assert.equal(
     request.predecessorOrigin?.semanticFreezeTree,
-    DAC_V0041_PREDECESSOR_BASELINES[0].semanticFreezeTree,
+    DAC_V0041_PREDECESSOR_BASELINES[0]!.semanticFreezeTree,
   );
 
   // Direct mutation attempts throw; the request stays minted and valid.

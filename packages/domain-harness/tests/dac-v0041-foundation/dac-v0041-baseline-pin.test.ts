@@ -183,7 +183,7 @@ test('a41-001 pin: predecessorOrigin is optional evidence and rejects non-frozen
   };
   const withOrigin = adoptDacV0041RegistryReference({
     ...good,
-    predecessorOrigin: DAC_V0041_PREDECESSOR_BASELINES[0],
+    predecessorOrigin: DAC_V0041_PREDECESSOR_BASELINES[0]!,
   });
   assert.equal(withOrigin.predecessorOrigin?.version, 'v0.0.3', 'origin retained verbatim');
 
