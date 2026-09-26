@@ -209,7 +209,7 @@ test('a41-001 separation: minting a request records identity only — never a de
     contractProfileIdentity: 'domain-harness@v0.0.4.1-profile/node-1',
     locatorHints: ['registry://binding-requests'],
     descriptorRef: descriptor,
-    predecessorOrigin: DAC_V0041_PREDECESSOR_BASELINES[0],
+    predecessorOrigin: DAC_V0041_PREDECESSOR_BASELINES[0]!,
     bindingTargetRef: exactTarget,
     advisoryTargetHints: ['preferred-provider-x'],
   });
