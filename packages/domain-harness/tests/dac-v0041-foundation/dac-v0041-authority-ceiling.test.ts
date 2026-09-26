@@ -170,7 +170,7 @@ test('a41-001 ceiling: the successor role registry contains the v0.0.4.1 additiv
     'domain-application-assembly-plan',
     'authority-refusal',
     'authority-adoption',
-  ]) {
+  ] as const) {
     assert.ok(registry.includes(successorRole), `registry must contain ${successorRole}`);
   }
   // Closed vocabulary: unknown roles fail closed.
