@@ -25,6 +25,7 @@ import {
   isCompatibilityValidationRequestRef,
   classifyDacV0041CapabilityExchange,
 } from '../guards.js';
+import type { CompatibilityValidationRequestRef } from '../contracts.js';
 import {
   DAC_V0041_AUTHORITY_REFUSAL_SEAM_KINDS,
   type DacV0041AuthorityRefusalEvidenceClassification,
@@ -34,7 +35,6 @@ import {
   type DacV0041CompatibilitySubjectFacts,
   type DacV0041CompatibilityViewAssociation,
   type DacV0041CompatibilityViewAssociationInput,
-  type DacV0041CompetingValidationFacts,
   type DacV0041RefusalEvidenceFailureCode,
   type DacV0041AuthorityRefusalSeamKind,
   type DacV0041CompatibilityAssociationFailureCode,
@@ -160,6 +160,138 @@ function subjectMutableAlias(subject: DacV0041CompatibilitySubjectFacts): string
 }
 
 /**
+ * The exact §8 request-subject closure recovered from a foundation-minted
+ * `CompatibilityValidationRequestRef` (APPLICATION_MANIFEST §8; CROSS_LAYER_
+ * REFERENCES §3.1 "exact Manifest identity+digest+material refs+explicit
+ * binding target/profile when required"):
+ *
+ *   - ManifestIdentity            <- the (exactly one) `manifest` material input
+ *   - ManifestContentDigest       <- that manifest envelope's `contentDigest`
+ *   - exact targets               <- the binding explicit target identity plus
+ *                                    every `compatibility-target` material
+ *                                    input, in request order
+ *   - requirements/check profile  <- the binding explicit target's
+ *                                    `contractProfileIdentity` (ACE §4.1
+ *                                    binds the target/profile as one slot)
+ *   - DAC/reference profile       <- the request envelope's own
+ *                                    `contractProfileIdentity`
+ *   - RuntimeImplementationRef    <- the `runtime-implementation` material
+ *                                    input (0..1)
+ *   - RuntimeHostBindingRef       <- the `runtime-host-binding` material
+ *                                    input (0..1; a legitimate §8 input when
+ *                                    a concrete Host Binding is material)
+ *
+ * `null` marks a closure element the request fails to bind; `duplicateRole`
+ * marks a role the request binds more than once where §8 requires exactly 1.
+ * Every element is compared for EXACT equality against the externally
+ * asserted validation/result subject before VALID_TWO_VIEW.
+ */
+interface RecoveredRequestSubjectClosure {
+  readonly manifestIdentity: string | null;
+  readonly manifestContentDigest: string | null;
+  readonly targetIdentities: readonly string[];
+  readonly requirementsProfileIdentity: string | null;
+  readonly dacProfileIdentity: string | null;
+  readonly runtimeImplementationIdentity: string | null;
+  readonly runtimeHostBindingIdentity: string | null;
+  readonly duplicateRole: string | null;
+}
+
+function recoverRequestSubjectClosure(
+  request: CompatibilityValidationRequestRef,
+): RecoveredRequestSubjectClosure {
+  const manifestInputs = request.materialInputRefs.filter(
+    (material) => material.role === 'manifest',
+  );
+  const implementationInputs = request.materialInputRefs.filter(
+    (material) => material.role === 'runtime-implementation',
+  );
+  const hostBindingInputs = request.materialInputRefs.filter(
+    (material) => material.role === 'runtime-host-binding',
+  );
+  const duplicateRole =
+    manifestInputs.length > 1
+      ? 'manifest'
+      : implementationInputs.length > 1
+        ? 'runtime-implementation'
+        : hostBindingInputs.length > 1
+          ? 'runtime-host-binding'
+          : null;
+  return {
+    manifestIdentity: manifestInputs[0]?.primaryIdentity ?? null,
+    manifestContentDigest: manifestInputs[0]?.contentDigest ?? null,
+    targetIdentities: [
+      ...(request.bindingTargetRef === undefined
+        ? []
+        : [request.bindingTargetRef.primaryIdentity]),
+      ...request.materialInputRefs
+        .filter((material) => material.role === 'compatibility-target')
+        .map((material) => material.primaryIdentity),
+    ],
+    requirementsProfileIdentity:
+      request.bindingTargetRef?.contractProfileIdentity ?? null,
+    dacProfileIdentity: request.contractProfileIdentity ?? null,
+    runtimeImplementationIdentity: implementationInputs[0]?.primaryIdentity ?? null,
+    runtimeHostBindingIdentity: hostBindingInputs[0]?.primaryIdentity ?? null,
+    duplicateRole,
+  };
+}
+
+/**
+ * Exact §8 request-subject closure equality: every recovered request element
+ * must equal the asserted subject, element for element, with no fuzzy
+ * containment. Returns a fail-closed detail string, or null when the request
+ * closure exactly equals the subject.
+ */
+function requestSubjectClosureMismatch(
+  closure: RecoveredRequestSubjectClosure,
+  subject: DacV0041CompatibilitySubjectFacts,
+): string | null {
+  if (closure.duplicateRole !== null) {
+    return `the request binds more than one "${closure.duplicateRole}" material input; the §8 subject closure requires exactly 1`;
+  }
+  if (closure.manifestIdentity === null) {
+    return 'the request does not bind the exact ManifestIdentity (no "manifest" material input); §8 requires the request to bind the exact compatibility subject';
+  }
+  if (closure.manifestIdentity !== subject.manifestIdentity) {
+    return `the request binds ManifestIdentity "${closure.manifestIdentity}" but the validation/result subject is "${subject.manifestIdentity}"; a request for one subject can never validate another`;
+  }
+  if (closure.manifestContentDigest === null) {
+    return 'the request does not bind the ManifestContentDigest (the manifest material input carries no contentDigest); §8 requires exact digest binding';
+  }
+  if (closure.manifestContentDigest !== subject.manifestContentDigest) {
+    return `the request binds ManifestContentDigest "${closure.manifestContentDigest}" but the validation/result subject is "${subject.manifestContentDigest}"`;
+  }
+  if (
+    closure.targetIdentities.length !== subject.targetIdentities.length ||
+    !closure.targetIdentities.every(
+      (identity, index) => identity === subject.targetIdentities[index],
+    )
+  ) {
+    return `the request binds exact target identities [${closure.targetIdentities.join(', ')}] but the validation/result subject is [${subject.targetIdentities.join(', ')}]; the request MUST bind exactly the targets it validates`;
+  }
+  if (closure.requirementsProfileIdentity === null) {
+    return 'the request does not bind an exact requirements/check profile (the binding explicit target carries no contractProfileIdentity); §8 requires the exact check profile';
+  }
+  if (closure.requirementsProfileIdentity !== subject.requirementsProfileIdentity) {
+    return `the request binds requirements/check profile "${closure.requirementsProfileIdentity}" but the validation/result subject is "${subject.requirementsProfileIdentity}"`;
+  }
+  if (closure.dacProfileIdentity === null) {
+    return 'the request does not bind an exact DAC/reference profile (no contractProfileIdentity on the request); §8 requires the exact DAC/reference profile';
+  }
+  if (closure.dacProfileIdentity !== subject.dacProfileIdentity) {
+    return `the request binds DAC/reference profile "${closure.dacProfileIdentity}" but the validation/result subject is "${subject.dacProfileIdentity}"`;
+  }
+  if (closure.runtimeImplementationIdentity !== (subject.runtimeImplementationIdentity ?? null)) {
+    return `the request binds RuntimeImplementationRef "${String(closure.runtimeImplementationIdentity)}" but the validation/result subject is "${String(subject.runtimeImplementationIdentity)}"; an implementation-specific claim requires exact implementation identity on both sides`;
+  }
+  if (closure.runtimeHostBindingIdentity !== (subject.runtimeHostBindingIdentity ?? null)) {
+    return `the request binds RuntimeHostBindingRef "${String(closure.runtimeHostBindingIdentity)}" but the validation/result subject is "${String(subject.runtimeHostBindingIdentity)}"; a concrete Host Binding material input must match the subject exactly`;
+  }
+  return null;
+}
+
+/**
  * C144 / C89 / F-05 two-view association verifier: one validation record
  * exposes separately recoverable `CompatibilityValidationRef` and
  * `CompatibilityResultRef` views with exactly ONE validation authority and a
@@ -173,16 +305,40 @@ function subjectMutableAlias(subject: DacV0041CompatibilitySubjectFacts): string
  *                                         VIEW_IDENTITY_ALIAS F-05)
  *   4. forbidden binding inputs          (FORBIDDEN_BINDING_INPUT §8:
  *                                         RuntimeBindingRef MUST NOT be a
- *                                         compatibility-validation input)
+ *                                         compatibility-validation input;
+ *                                         a RuntimeActivationRef is equally
+ *                                         downstream of compatibility. A
+ *                                         RuntimeHostBindingRef IS a
+ *                                         legitimate §8 material input when
+ *                                         a concrete Host Binding is
+ *                                         material — it is exactness-matched
+ *                                         by pass 9, never blanket-forbidden)
  *   5. exact association request->view   (REQUEST_ASSOCIATION_MISMATCH)
  *   6. exact association view->result    (VALIDATION_ASSOCIATION_MISMATCH:
  *                                         any swap/reuse fails closed)
  *   7. request target binding            (TARGET_ASSOCIATION_MISMATCH §8)
  *   8. subject equality across views     (SUBJECT_MISMATCH)
- *   9. single authority                  (SECOND_AUTHORITY F-05 co-storage)
- *  10. no second independent validation
- *       for the same exact subject       (SECOND_VALIDATION_FOR_SAME_SUBJECT
- *                                         C144; C98 evidence bar)
+ *   9. exact §8 request-subject closure  (REQUEST_SUBJECT_CLOSURE_MISMATCH:
+ *                                         the subject recovered from the
+ *                                         minted request — Manifest
+ *                                         identity+digest, exact target
+ *                                         list, binding target/profile,
+ *                                         request DAC/reference profile,
+ *                                         implementation/host-binding
+ *                                         inputs when material — MUST equal
+ *                                         the validation/result subject
+ *                                         exactly; a request for subject A
+ *                                         can never validate subject B)
+ *  10. single authority                  (SECOND_AUTHORITY F-05 co-storage;
+ *                                         local to the two views of THIS
+ *                                         record — a second independently
+ *                                         issued validation for the same
+ *                                         exact subject is NOT an
+ *                                         association defect; consistent
+ *                                         multiple validations are
+ *                                         permitted and contradictions/
+ *                                         currentness belong to the
+ *                                         C98/C157 precedence rungs)
  *  11. no contradictory dispositions     (CONTRADICTORY_DISPOSITIONS F-05)
  *  12. validator designation             (NON_DESIGNATED_VALIDATOR C113)
  *  13. otherwise => VALID_TWO_VIEW (PASS subject to all other checks; never
@@ -251,27 +407,6 @@ export function verifyDacV0041CompatibilityViewAssociation(
   if (resultSubjectFailure !== null) {
     return associationFail('INVALID_FACTS', `resultView subject: ${resultSubjectFailure}`);
   }
-  const competingValidations: readonly DacV0041CompetingValidationFacts[] =
-    candidate.competingValidations ?? [];
-  if (!Array.isArray(competingValidations)) {
-    return associationFail('INVALID_FACTS', 'competingValidations must be an array when present');
-  }
-  for (const competing of competingValidations) {
-    if (competing === null || typeof competing !== 'object') {
-      return associationFail('INVALID_FACTS', 'each competing validation must be an object');
-    }
-    const competingCandidate = competing as Partial<DacV0041CompetingValidationFacts>;
-    if (
-      !isNonEmptyString(competingCandidate.validationViewIdentity) ||
-      !isNonEmptyString(competingCandidate.validatorIdentity)
-    ) {
-      return associationFail('INVALID_FACTS', 'competing validation identities must be non-empty strings');
-    }
-    const competingSubjectFailure = subjectShapeFailure(competingCandidate.subject);
-    if (competingSubjectFailure !== null) {
-      return associationFail('INVALID_FACTS', `competing validation subject: ${competingSubjectFailure}`);
-    }
-  }
 
   const validationView: DacV0041CompatibilityValidationViewFacts = validation;
   const resultView: DacV0041CompatibilityResultViewFacts = result;
@@ -318,13 +453,14 @@ export function verifyDacV0041CompatibilityViewAssociation(
     );
   }
 
-  // Pass 4: forbidden binding inputs (APPLICATION_MANIFEST §8).
+  // Pass 4: forbidden binding inputs (APPLICATION_MANIFEST §8). A
+  // RuntimeBindingRef MUST NOT be a compatibility-validation input for
+  // proving the compatibility that must precede binding, and a
+  // RuntimeActivationRef is equally downstream. A RuntimeHostBindingRef is
+  // NOT forbidden: §8 requires the request to bind it when a concrete Host
+  // Binding is a material validation input (exactness-matched by pass 9).
   for (const material of request.materialInputRefs) {
-    if (
-      material.role === 'runtime-binding' ||
-      material.role === 'runtime-host-binding' ||
-      material.role === 'runtime-activation'
-    ) {
+    if (material.role === 'runtime-binding' || material.role === 'runtime-activation') {
       return associationFail(
         'FORBIDDEN_BINDING_INPUT',
         `material input of role "${material.role}" MUST NOT be a compatibility-validation input for proving the compatibility that must precede binding (§8)`,
@@ -370,30 +506,28 @@ export function verifyDacV0041CompatibilityViewAssociation(
     );
   }
 
-  // Pass 9: one authority (F-05 co-storage bar on synthesizing a second).
+  // Pass 9: exact §8 request-subject closure. The subject recovered from the
+  // minted request MUST equal the validation/result subject exactly — a
+  // request minted for subject A can never validate subject B.
+  const closure = recoverRequestSubjectClosure(request);
+  const closureFailure = requestSubjectClosureMismatch(closure, validationView.subject);
+  if (closureFailure !== null) {
+    return associationFail(
+      'REQUEST_SUBJECT_CLOSURE_MISMATCH',
+      `the request does not close over the exact compatibility subject it validates: ${closureFailure} (APPLICATION_MANIFEST §8)`,
+    );
+  }
+
+  // Pass 10: one authority (F-05 co-storage bar on synthesizing a second
+  // inside THIS record). A second independently-issued validation for the
+  // same exact subject is not an association defect: consistent multiple
+  // validations are permitted (§11) and contradictions/currentness across
+  // them belong to the C98/C157 precedence rungs.
   if (validationView.validatorIdentity !== resultView.validatorIdentity) {
     return associationFail(
       'SECOND_AUTHORITY',
       `validation view authority "${validationView.validatorIdentity}" differs from result view authority "${resultView.validatorIdentity}"; the two views share ONE validation authority and are not peer authorities (C144)`,
     );
-  }
-
-  // Pass 10: no second independently-issued validation for the same exact
-  // subject may both count (C144; C98 evidence).
-  for (const competing of competingValidations) {
-    const competingRecord = competing as Partial<DacV0041CompetingValidationFacts>;
-    if (
-      competingRecord.validationViewIdentity !== validationView.validationViewIdentity &&
-      sameSubject(
-        competingRecord.subject as DacV0041CompatibilitySubjectFacts,
-        validationView.subject,
-      )
-    ) {
-      return associationFail(
-        'SECOND_VALIDATION_FOR_SAME_SUBJECT',
-        `a second independently-issued validation "${String(competingRecord.validationViewIdentity)}" covers the same exact subject; two peer validations cannot both count (C144/C98)`,
-      );
-    }
   }
 
   // Pass 11: no contradictory dispositions inside one co-stored record.
@@ -414,7 +548,6 @@ export function verifyDacV0041CompatibilityViewAssociation(
       `validator "${validationView.validatorIdentity}" lacks a valid in-scope compatibility-validation designation; a non-designated issuer's compatibility artifact fails closed for authoritative use (C113)`,
     );
   }
-
   return {
     outcome: 'VALID_TWO_VIEW',
     requestIdentity,
@@ -436,14 +569,18 @@ function refusalFail(
 
 /**
  * AuthorityRefusal evidence verifier (LIFECYCLE_REFERENCE_REPAIRS §4.2;
- * C142/C143). A valid refusal is substantive PRODUCED negative evidence for
- * one of the refusal seams, issued by a designated refusing issuer, bound to
- * its exact request. It can verify and report incompatibility but the
- * classification result structurally carries `canManufactureAuthority:
- * false` / `canProduceCompatibilityPass: false` — negative evidence can
- * never manufacture a target, selection, binding or activation authority,
- * and binding refusal never conflates with activation refusal (distinct seam
- * kinds are distinct evidence).
+ * C142/C143). A valid refusal binds the COMPLETE frozen §4.2 closure —
+ * exact request/initiation, exact subject/scope/profile, refusing issuer
+ * AND its designation, refusal seam kind, negative decision, issuance
+ * provenance and issuance point — and is substantive PRODUCED negative
+ * evidence for one of the refusal seams. It can verify and report
+ * incompatibility at its own seam but the classification result
+ * structurally carries `canManufactureAuthority: false` /
+ * `canProduceCompatibilityPass: false` — negative evidence can never
+ * manufacture a target, selection, binding or activation authority, and
+ * binding refusal never conflates with activation refusal (distinct seam
+ * kinds are distinct evidence). An entry missing any closure element fails
+ * closed and is never treated as substantive refusal evidence.
  */
 export function verifyDacV0041AuthorityRefusalEvidence(
   facts: DacV0041AuthorityRefusalEvidenceFacts,
@@ -455,10 +592,18 @@ export function verifyDacV0041AuthorityRefusalEvidence(
   for (const field of [
     'refusalIdentity',
     'refusingIssuerIdentity',
+    'issuerDesignationIdentity',
     'boundRequestIdentity',
+    'refusedSubjectIdentity',
+    'dacProfileIdentity',
+    'issuanceProvenanceIdentity',
+    'issuancePointIdentity',
   ] as const) {
     if (!isNonEmptyString(candidate[field])) {
-      return refusalFail('INVALID_FACTS', `refusal evidence field ${field} must be a non-empty string`);
+      return refusalFail(
+        'INVALID_FACTS',
+        `refusal evidence field ${field} must be a non-empty string (§4.2 closure: exact request/initiation, exact subject/scope/profile, issuer and designation, seam kind, negative decision, issuance provenance and issuance point are all mandatory)`,
+      );
     }
   }
   if (typeof candidate.refusingIssuerDesignated !== 'boolean') {
@@ -480,7 +625,16 @@ export function verifyDacV0041AuthorityRefusalEvidence(
   if (typeof candidate.producedResult !== 'boolean') {
     return refusalFail('INVALID_FACTS', 'producedResult must be a boolean');
   }
-  for (const identity of [candidate.refusalIdentity, candidate.refusingIssuerIdentity]) {
+  for (const identity of [
+    candidate.refusalIdentity,
+    candidate.refusingIssuerIdentity,
+    candidate.issuerDesignationIdentity,
+    candidate.boundRequestIdentity,
+    candidate.refusedSubjectIdentity,
+    candidate.dacProfileIdentity,
+    candidate.issuanceProvenanceIdentity,
+    candidate.issuancePointIdentity,
+  ] as const) {
     if (isMutableAliasToken(identity as string)) {
       return refusalFail(
         'MUTABLE_ALIAS_IDENTITY',
@@ -520,15 +674,19 @@ export function verifyDacV0041AuthorityRefusalEvidence(
 
 /**
  * Frozen compatibility precedence classifier (see the result type in
- * contracts.ts for the full 13-rung ladder). Composes the A41-001
+ * contracts.ts for the full 16-rung ladder). Composes the A41-001
  * foundation Steps 0–3 unchanged (descriptor -> capability kind ->
  * structural invalidity -> staleness -> unsupported target), then continues
  * with the compatibility-specific rungs: C99 binding-check
- * misclassification, C98 contradiction, C157 result currentness, C113
- * validator designation, and the negative-evidence ceiling (a COMPATIBLE
- * claim without exactly one consistent, current, designated favorable
- * produced result fails closed; refusal/negative evidence alone can never
- * manufacture a compatibility PASS). Pure, total, deterministic; never
+ * misclassification, §4.2 refusal-evidence closure validation, C98
+ * contradiction, polarity-neutral C157 result currentness, polarity-neutral
+ * C113 validator designation, the C143 material-refusal block, and the
+ * negative-evidence ceiling (a COMPATIBLE claim without exactly one
+ * consistent, current, designated favorable produced result fails closed;
+ * refusal/negative evidence alone can never manufacture a compatibility
+ * PASS, and compatibility INCOMPATIBLE comes only from compatibility-owned
+ * evidence — never from an AuthorityRefusalRef, which is distinct from
+ * compatibility INCOMPATIBLE per C142). Pure, total, deterministic; never
  * throws, never repairs, never selects only the favorable result.
  */
 export function classifyDacV0041CompatibilityPrecedence(
@@ -655,7 +813,22 @@ export function classifyDacV0041CompatibilityPrecedence(
     );
   }
 
-  // Rung 8 (C98): contradictory authoritative results for the same exact
+  // Rung 8 (§4.2): every supplied refusal-evidence entry MUST verify as a
+  // complete substantive §4.2 closure before it counts. A malformed or
+  // non-substantive entry is never silently dropped — omitting negative
+  // evidence could strengthen a claim (C143-family), so the classification
+  // fails closed instead.
+  for (const entry of factsIn.refusalEvidence) {
+    const verified = verifyDacV0041AuthorityRefusalEvidence(entry);
+    if (verified.outcome !== 'REFUSAL_EVIDENCE') {
+      return precedenceFail(
+        'INVALID_REFUSAL_EVIDENCE',
+        `refusal evidence entry "${String(entry.refusalIdentity)}" does not verify as a complete substantive §4.2 closure (${verified.outcome}${verified.outcome === 'FAIL_CLOSED' ? `/${verified.code}` : ''}); non-substantive negative evidence is never silently dropped from claim closure`,
+      );
+    }
+  }
+
+  // Rung 9 (C98): contradictory authoritative results for the same exact
   // subject — the consumer must never select only the favorable one.
   const favorable = factsIn.authoritativeResults.filter(
     (result) => result.disposition === 'COMPATIBLE',
@@ -670,8 +843,11 @@ export function classifyDacV0041CompatibilityPrecedence(
     );
   }
 
-  // Rung 9 (C157): currentness of the relied-upon result set. Revoked/voided
-  // dominates; stale/superseded yields STALE.
+  // Rung 10 (C157, polarity-neutral): currentness of every relied-upon
+  // authoritative result. Revoked/voided dominates; stale/superseded yields
+  // STALE — regardless of whether the non-current result is favorable or
+  // unfavorable, a stale negative result can no more support a current
+  // INCOMPATIBLE than a stale favorable result can support COMPATIBLE.
   const invalidated = factsIn.authoritativeResults.filter(
     (result) => result.currentness === 'revoked' || result.currentness === 'voided',
   );
@@ -684,35 +860,47 @@ export function classifyDacV0041CompatibilityPrecedence(
   const nonCurrent = factsIn.authoritativeResults.filter(
     (result) => result.currentness === 'stale' || result.currentness === 'superseded',
   );
-  if (nonCurrent.length > 0 && factsIn.assertedDisposition === 'COMPATIBLE') {
+  if (nonCurrent.length > 0) {
     return {
       outcome: 'STALE',
-      detail: `relied-upon compatibility result "${nonCurrent[0]?.resultViewIdentity}" is stale/superseded and cannot support a current COMPATIBLE claim without refresh/re-evaluation (C85/C157)`,
+      detail: `relied-upon compatibility result "${nonCurrent[0]?.resultViewIdentity}" is stale/superseded and cannot support a current compatibility claim of either polarity without refresh/re-evaluation (C85/C157)`,
     };
   }
 
-  // Rung 10 (C113/C154): the sole favorable validator must be designated.
-  if (favorable.length >= 1) {
-    const undesignated = favorable.find((result) => !result.validatorDesignated);
-    if (undesignated !== undefined) {
-      return precedenceFail(
-        'NON_DESIGNATED_VALIDATOR',
-        `favorable result "${undesignated.resultViewIdentity}" was issued by validator "${undesignated.validatorIdentity}" lacking a valid in-scope compatibility-validation designation (C113/C154)`,
-      );
-    }
+  // Rung 11 (C113/C154, polarity-neutral): EVERY authoritative result must
+  // come from a designated validator. An issuer lacking valid in-scope
+  // designation cannot be used as authority — neither for a favorable nor
+  // for an unfavorable disposition.
+  const undesignated = factsIn.authoritativeResults.find(
+    (result) => !result.validatorDesignated,
+  );
+  if (undesignated !== undefined) {
+    return precedenceFail(
+      'NON_DESIGNATED_VALIDATOR',
+      `authoritative result "${undesignated.resultViewIdentity}" (${undesignated.disposition}) was issued by validator "${undesignated.validatorIdentity}" lacking a valid in-scope compatibility-validation designation; an undesignated validator can drive neither COMPATIBLE nor INCOMPATIBLE (C113/C154)`,
+    );
   }
 
-  // Rung 11: the negative-evidence ceiling. A COMPATIBLE claim needs exactly
-  // one consistent, current, designated favorable produced result; refusal
-  // and other negative evidence can never back it. An INCOMPATIBLE claim is
-  // reportable from genuinely produced negative evidence (unfavorable
-  // results or substantive refusal evidence) but is never guessed from an
-  // empty evidence set.
+  // Rungs 12–15: the negative-evidence ceiling. A COMPATIBLE claim needs
+  // exactly one consistent, current, designated favorable produced result;
+  // refusal and other negative evidence can never back it, and while such a
+  // favorable result is relied upon a standing material refusal blocks the
+  // close (C143). An INCOMPATIBLE claim is reportable ONLY from
+  // compatibility-owned negative evidence — produced unfavorable
+  // authoritative compatibility results — and never from an
+  // AuthorityRefusalRef (C142: reclassifying a refusal as compatibility
+  // INCOMPATIBLE is REJECT).
   if (factsIn.assertedDisposition === 'COMPATIBLE') {
     if (favorable.length !== 1) {
       return precedenceFail(
         'FAVORABLE_CLAIM_UNBACKED',
         `asserted COMPATIBLE with ${favorable.length} favorable authoritative produced results (need exactly 1); refusal/negative evidence alone can never manufacture a compatibility PASS (§4.2; C156-family)`,
+      );
+    }
+    if (factsIn.refusalEvidence.length > 0) {
+      return precedenceFail(
+        'MATERIAL_REFUSAL_PRESENT',
+        `asserted COMPATIBLE relies on a favorable result while ${factsIn.refusalEvidence.length} substantive refusal evidence ${factsIn.refusalEvidence.length === 1 ? 'entry stands' : 'entries stand'} in the closure; the claim cannot close until the material refusal is reconciled at its own seam (C143)`,
       );
     }
     return {
@@ -725,18 +913,16 @@ export function classifyDacV0041CompatibilityPrecedence(
         'a distinct, bounded compatibility verdict; implies nothing about ApplicationSelection, RuntimeBinding or RuntimeActivation, which require their own independently issued authorities (§10; C107)',
     };
   }
-  const hasNegativeEvidence =
-    unfavorable.length >= 1 || factsIn.refusalEvidence.length >= 1;
-  if (!hasNegativeEvidence) {
+  if (unfavorable.length < 1) {
     return precedenceFail(
       'FAVORABLE_CLAIM_UNBACKED',
-      'asserted INCOMPATIBLE without any produced unfavorable result or substantive refusal evidence; a verdict is never guessed from an empty evidence set',
+      'asserted INCOMPATIBLE without a produced unfavorable authoritative compatibility result; an AuthorityRefusalRef is distinct from compatibility INCOMPATIBLE and can never back this disposition (C142), and a verdict is never guessed from an empty evidence set',
     );
   }
   return {
     outcome: 'INCOMPATIBLE',
     detail:
-      'produced negative compatibility evidence verifies and reports incompatibility; the result remains distinct from AuthorityRefusal and from invocation transport outcomes (§4.2; C142)',
+      'produced unfavorable authoritative compatibility results verify and report incompatibility; the disposition is compatibility-owned evidence only and remains distinct from AuthorityRefusal and from invocation transport outcomes (§4.2; C142)',
   };
 }
 

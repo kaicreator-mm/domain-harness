@@ -118,21 +118,23 @@ test('a41-003 exact association: reusing another record\'s result view against t
   assert.equal(result.code, 'VALIDATION_ASSOCIATION_MISMATCH');
 });
 
-test('a41-003 exact association §8: a RuntimeBindingRef material input fails closed', () => {
-  const runtimeBinding = adoptDacV0041RegistryReference({
-    role: 'runtime-binding',
-    baseline: DAC_V0041_BASELINE,
-    authorityScope: 'scope/domain-a',
-    primaryIdentity: 'binding/runtime-binding-1',
-    opaque: {},
-  });
-  const result = verifyDacV0041CompatibilityViewAssociation(
-    buildAssociationInput({
-      requestRef: buildRequestRef({ materialInputRefs: [runtimeBinding] }),
-    }),
-  );
-  assert.equal(result.outcome, 'FAIL_CLOSED');
-  assert.equal(result.code, 'FORBIDDEN_BINDING_INPUT');
+test('a41-003 exact association §8: a RuntimeBindingRef (or RuntimeActivationRef) material input fails closed', () => {
+  for (const forbiddenRole of ['runtime-binding', 'runtime-activation'] as const) {
+    const downstream = adoptDacV0041RegistryReference({
+      role: forbiddenRole,
+      baseline: DAC_V0041_BASELINE,
+      authorityScope: 'scope/domain-a',
+      primaryIdentity: `binding/${forbiddenRole}-1`,
+      opaque: {},
+    });
+    const result = verifyDacV0041CompatibilityViewAssociation(
+      buildAssociationInput({
+        requestRef: buildRequestRef({ materialInputRefs: [downstream] }),
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'FORBIDDEN_BINDING_INPUT');
+  }
 });
 
 test('a41-003 exact association §8: the request\'s binding explicit target must be among the subject targets', () => {
@@ -196,7 +198,6 @@ test('a41-003 role separation: malformed facts objects fail closed as INVALID_FA
       validationView: buildValidationView(),
       resultView: { resultViewIdentity: VIEW.result, disposition: 'MAYBE' },
     },
-    buildAssociationInput({ competingValidations: 'nope' as never }),
   ]) {
     const result = verifyDacV0041CompatibilityViewAssociation(input as never);
     assert.equal(result.outcome, 'FAIL_CLOSED');

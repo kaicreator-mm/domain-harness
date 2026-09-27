@@ -23,9 +23,14 @@
 // frozen: CompatibilityValidationRef and CompatibilityResultRef are
 // separately recoverable semantic views of ONE validation authority; one
 // concrete immutable record MAY carry both views, but co-storage must never
-// alias the request identity, synthesize a second authority, create
-// contradictory dispositions, or let two independently-issued validations
-// for the same exact subject both count (LIFECYCLE_REFERENCE_REPAIRS §5).
+// alias the request identity, synthesize a second authority, or create
+// contradictory dispositions inside that one record (LIFECYCLE_REFERENCE_
+// REPAIRS §5). The one-authority invariant is LOCAL to the two views of the
+// SAME validation record: a second independently-issued validation for the
+// same exact subject is not an association defect — mutually consistent
+// multiple validations are permitted (APPLICATION_MANIFEST §11), and
+// contradiction/currentness across them belongs to the C98/C157 precedence
+// rungs of the classifier below, never to this association verifier.
 //
 // Like the foundation and the authority module, this module freezes NO wire
 // schema, serialization, cryptography, clock, storage or transport. Portable:
@@ -91,8 +96,13 @@ export type DacV0041CompatibilityDisposition =
  * validation request MUST bind the exact compatibility subject. The subject
  * facts here are the externally recovered, independently asserted form of
  * that closure; the association verifier requires the validation view and
- * the result view to carry the IDENTICAL subject record and the request's
- * binding explicit target (when present) to be among the exact targets.
+ * the result view to carry the IDENTICAL subject record, the request's
+ * binding explicit target (when present) to be among the exact targets, and
+ * — per the §8 request-subject closure pass — the exact subject recovered
+ * from the minted request itself (Manifest identity+digest, exact target
+ * list, binding target/profile, request DAC/reference profile, and
+ * implementation/host-binding inputs when material) to equal the
+ * validation/result subject exactly.
  */
 export interface DacV0041CompatibilitySubjectFacts {
   /** Exact ManifestIdentity of the validated composition (exactly 1). */
@@ -152,19 +162,6 @@ export interface DacV0041CompatibilityResultViewFacts {
   readonly currentness: DacV0041CurrentnessUseState;
 }
 
-/**
- * A separately recovered, independently issued competing validation record
- * covering the SAME exact subject (C144 second-authority bar; C98
- * contradiction evidence). Supplied by the caller as evidence; the verifier
- * decides deterministically whether it bars the association.
- */
-export interface DacV0041CompetingValidationFacts {
-  readonly validationViewIdentity: string;
-  readonly validatorIdentity: string;
-  /** Exact subject the competing record claims (must be compared for sameness). */
-  readonly subject: DacV0041CompatibilitySubjectFacts;
-}
-
 /** Deterministic FAIL_CLOSED reason codes for view association verification. */
 export type DacV0041CompatibilityAssociationFailureCode =
   | 'INVALID_FACTS'
@@ -177,8 +174,8 @@ export type DacV0041CompatibilityAssociationFailureCode =
   | 'FORBIDDEN_BINDING_INPUT'
   | 'TARGET_ASSOCIATION_MISMATCH'
   | 'SUBJECT_MISMATCH'
+  | 'REQUEST_SUBJECT_CLOSURE_MISMATCH'
   | 'SECOND_AUTHORITY'
-  | 'SECOND_VALIDATION_FOR_SAME_SUBJECT'
   | 'CONTRADICTORY_DISPOSITIONS'
   | 'NON_DESIGNATED_VALIDATOR';
 
@@ -188,8 +185,6 @@ export interface DacV0041CompatibilityViewAssociationInput {
   readonly requestRef: unknown;
   readonly validationView: DacV0041CompatibilityValidationViewFacts;
   readonly resultView: DacV0041CompatibilityResultViewFacts;
-  /** Independently issued validations covering the same exact subject (0..n). */
-  readonly competingValidations?: readonly DacV0041CompetingValidationFacts[];
 }
 
 /**
@@ -241,18 +236,37 @@ export interface DacV0041AuthoritativeCompatibilityResultFacts {
  * material invocation evidence that MUST NOT be omitted merely because a
  * later favorable result exists (C143), and can NEVER manufacture a target,
  * selection, binding or activation authority.
+ *
+ * The facts carry the COMPLETE frozen §4.2 closure: exact request/initiation,
+ * exact subject/scope/profile, refusing issuer AND its designation, refusal
+ * seam kind, negative decision, issuance provenance and issuance point. An
+ * entry missing any closure element is not substantive refusal evidence and
+ * fails closed.
  */
 export interface DacV0041AuthorityRefusalEvidenceFacts {
   readonly refusalIdentity: string;
   readonly refusingIssuerIdentity: string;
   readonly refusingIssuerDesignated: boolean;
+  /**
+   * Exact `AuthorityDesignationRef` identity of the refusing issuer for the
+   * refused seam role (exactly 1; §4.2 "refusing issuer and designation").
+   */
+  readonly issuerDesignationIdentity: string;
   readonly seamKind: DacV0041AuthorityRefusalSeamKind;
   /** The exact request/initiation identity the refusal binds (exactly 1). */
   readonly boundRequestIdentity: string;
+  /** Exact subject/scope the refusal covers (exactly 1; never a mutable alias). */
+  readonly refusedSubjectIdentity: string;
+  /** Exact DAC/reference profile governing the refusal (exactly 1). */
+  readonly dacProfileIdentity: string;
   /** A refusal is by definition a negative decision; a "favorable refusal" is malformed facts. */
   readonly negativeDecision: boolean;
   /** Whether the refusal is a produced-result (required for substantive evidence). */
   readonly producedResult: boolean;
+  /** Recoverable issuance provenance closure identity (exactly 1). */
+  readonly issuanceProvenanceIdentity: string;
+  /** Recoverable issuance-point evidence identity (exactly 1). */
+  readonly issuancePointIdentity: string;
 }
 
 /** Deterministic FAIL_CLOSED reason codes for refusal evidence verification. */
@@ -306,7 +320,16 @@ export interface DacV0041CompatibilityPrecedenceFacts {
   readonly bindingTimeCheckReliedAsCompatibilityResult: boolean;
   /** The evidence set of authoritative produced results for the same exact subject (C98). */
   readonly authoritativeResults: readonly DacV0041AuthoritativeCompatibilityResultFacts[];
-  /** Refusal / negative evidence materially present (0..n; C143 anti-omission input). */
+  /**
+   * Seam-typed refusal / negative evidence materially present (0..n; C143
+   * anti-omission input). Every entry MUST satisfy the complete frozen §4.2
+   * closure (it is validated before it counts). Refusal evidence is NEVER a
+   * compatibility disposition: it can block a favorable close (a claim must
+   * not close while a material refusal stands) but can NEVER back
+   * compatibility INCOMPATIBLE — that disposition comes only from
+   * compatibility-owned evidence (unfavorable authoritative results or the
+   * capability-exchange unsupported-target rung) per C142.
+   */
   readonly refusalEvidence: readonly DacV0041AuthorityRefusalEvidenceFacts[];
   /**
    * The compatibility disposition asserted by the claim being classified.
@@ -323,9 +346,11 @@ export type DacV0041CompatibilityPrecedenceFailureCode =
   | 'DESCRIPTOR_UNESTABLISHED'
   | 'STRUCTURALLY_INVALID_INPUT'
   | 'BINDING_CHECK_MISCLASSIFIED'
+  | 'INVALID_REFUSAL_EVIDENCE'
   | 'CONTRADICTORY_AUTHORITATIVE_RESULTS'
   | 'INVALIDATED_RESULT'
   | 'NON_DESIGNATED_VALIDATOR'
+  | 'MATERIAL_REFUSAL_PRESENT'
   | 'FAVORABLE_CLAIM_UNBACKED';
 
 /**
@@ -349,27 +374,44 @@ export type DacV0041CompatibilityPrecedenceFailureCode =
  *   7. C99: binding-time check relied as
  *      compatibility result                         => FAIL_CLOSED
  *      BINDING_CHECK_MISCLASSIFIED (remains binding-authority evidence)
- *   8. C98: contradictory authoritative results for
+ *   8. §4.2: a supplied refusal-evidence entry does
+ *      not verify as a complete substantive closure => FAIL_CLOSED
+ *      INVALID_REFUSAL_EVIDENCE (malformed/non-substantive negative
+ *      evidence is never silently dropped — omission could strengthen a
+ *      claim)
+ *   9. C98: contradictory authoritative results for
  *      the same exact subject                       => FAIL_CLOSED
  *      CONTRADICTORY_AUTHORITATIVE_RESULTS (no favorable-only selection)
- *   9. C157: a relied-upon result is revoked/voided => FAIL_CLOSED
- *      INVALIDATED_RESULT; stale/superseded        => STALE
- *  10. C113/C154: sole favorable validator not
- *      designated                                  => FAIL_CLOSED
- *      NON_DESIGNATED_VALIDATOR
- *  11. asserted COMPATIBLE without exactly one consistent, current,
- *      designated favorable produced result (including refusal/negative
- *      evidence alone)                             => FAIL_CLOSED
+ *  10. C157 (polarity-neutral): a relied-upon result
+ *      is revoked/voided                            => FAIL_CLOSED
+ *      INVALIDATED_RESULT; stale/superseded        => STALE — regardless of
+ *      whether the non-current result is favorable or unfavorable
+ *  11. C113/C154 (polarity-neutral): any authoritative
+ *      result whose validator lacks designation     => FAIL_CLOSED
+ *      NON_DESIGNATED_VALIDATOR — an undesignated validator can drive
+ *      neither COMPATIBLE nor INCOMPATIBLE
+ *  12. asserted COMPATIBLE without exactly one consistent, current,
+ *      designated favorable produced result        => FAIL_CLOSED
  *      FAVORABLE_CLAIM_UNBACKED (negative evidence can never manufacture
  *      a compatibility PASS — §4.2; C156-family)
- *  12. asserted INCOMPATIBLE with produced negative evidence
- *      (unfavorable results / substantive refusal evidence) => INCOMPATIBLE
- *      (verifiable and reportable from negative evidence; never guessed
- *      from an empty evidence set)
- *  13. otherwise (asserted COMPATIBLE, exactly one consistent, current,
- *      designated favorable produced result) => COMPATIBLE_VERDICT:
- *      a distinct, BOUNDED verdict that implies nothing about
- *      ApplicationSelection, RuntimeBinding or RuntimeActivation
+ *  13. C143: asserted COMPATIBLE backed by exactly one
+ *      favorable result while substantive refusal
+ *      evidence stands                               => FAIL_CLOSED
+ *      MATERIAL_REFUSAL_PRESENT (material refusal must not be omitted from
+ *      claim closure while a favorable result is relied upon)
+ *  14. asserted INCOMPATIBLE backed by produced unfavorable
+ *      authoritative compatibility results         => INCOMPATIBLE
+ *      (compatibility-owned evidence only; an AuthorityRefusalRef is
+ *      distinct from compatibility INCOMPATIBLE and can NEVER back this
+ *      disposition — C142)
+ *  15. asserted INCOMPATIBLE without produced unfavorable
+ *      authoritative compatibility results         => FAIL_CLOSED
+ *      FAVORABLE_CLAIM_UNBACKED (never guessed from an empty or
+ *      refusal-only evidence set)
+ *  16. otherwise (asserted COMPATIBLE, exactly one consistent, current,
+ *      designated favorable produced result, no standing refusal) =>
+ *      COMPATIBLE_VERDICT: a distinct, BOUNDED verdict that implies nothing
+ *      about ApplicationSelection, RuntimeBinding or RuntimeActivation
  *      (APPLICATION_MANIFEST §10; C107) — the result object deliberately
  *      carries no selection/binding/activation field.
  */

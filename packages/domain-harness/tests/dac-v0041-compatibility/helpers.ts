@@ -1,7 +1,8 @@
-// Issue #357 / A41-003 — shared deterministic fixtures for the focused
-// compatibility verifier suites. Pure data builders over the A41-001
-// foundation; every adversarial variation is expressed as an explicit
-// override so each test's facts stay fully recoverable.
+// Issue #357 / A41-003 (R1 repair per #378 comment 5852943693 / #376 P1s) —
+// shared deterministic fixtures for the focused compatibility verifier
+// suites. Pure data builders over the A41-001 foundation; every adversarial
+// variation is expressed as an explicit override so each test's facts stay
+// fully recoverable.
 import {
   DAC_V0041_BASELINE,
   adoptDacV0041RegistryReference,
@@ -45,12 +46,51 @@ export const VIEW = {
   resultB: 'compat-result/res-2',
 } as const;
 
-/** Exact binding explicit target reference (foundation-minted, role-gated). */
+/**
+ * Exact binding explicit target/profile reference (foundation-minted,
+ * role-gated; ACE §4.1 binds the target and its check profile as one slot).
+ * Omit `contractProfileIdentity` to model a request that fails to bind the
+ * exact requirements/check profile (§8 adversarial).
+ */
 export function buildTargetRef(
   primaryIdentity: string = SUBJECT.target,
+  contractProfileIdentity?: string,
 ): DacV0041Reference {
   return adoptDacV0041RegistryReference({
     role: 'compatibility-target',
+    baseline: DAC_V0041_BASELINE,
+    authorityScope: 'scope/domain-a',
+    primaryIdentity,
+    ...(contractProfileIdentity === undefined ? {} : { contractProfileIdentity }),
+    opaque: {},
+  });
+}
+
+/**
+ * Exact Manifest material input (identity + contentDigest per §8). Omit
+ * `contentDigest` to model a request that fails to bind the exact digest
+ * (§8 adversarial).
+ */
+export function buildManifestRef(
+  primaryIdentity: string = SUBJECT.manifest,
+  contentDigest?: string,
+): DacV0041Reference {
+  return adoptDacV0041RegistryReference({
+    role: 'manifest',
+    baseline: DAC_V0041_BASELINE,
+    authorityScope: 'scope/domain-a',
+    primaryIdentity,
+    ...(contentDigest === undefined ? {} : { contentDigest }),
+    opaque: {},
+  });
+}
+
+/** Exact RuntimeImplementationRef material input (implementation-specific claims). */
+export function buildImplementationRef(
+  primaryIdentity: string = SUBJECT.implementation,
+): DacV0041Reference {
+  return adoptDacV0041RegistryReference({
+    role: 'runtime-implementation',
     baseline: DAC_V0041_BASELINE,
     authorityScope: 'scope/domain-a',
     primaryIdentity,
@@ -58,7 +98,26 @@ export function buildTargetRef(
   });
 }
 
-/** The C89 request reference (minted; binding explicit target included). */
+/** Exact RuntimeHostBindingRef material input (concrete Host Binding claims). */
+export function buildHostBindingRef(
+  primaryIdentity: string = SUBJECT.hostBinding,
+): DacV0041Reference {
+  return adoptDacV0041RegistryReference({
+    role: 'runtime-host-binding',
+    baseline: DAC_V0041_BASELINE,
+    authorityScope: 'scope/domain-a',
+    primaryIdentity,
+    opaque: {},
+  });
+}
+
+/**
+ * The C89 request reference (minted), closing over the exact §8 subject:
+ * Manifest identity+digest material input, binding explicit target/profile,
+ * and the request's own DAC/reference profile. A request minted WITHOUT the
+ * DAC/reference profile is modelled by `buildRequestRefWithoutDacProfile`
+ * (a destructuring default cannot distinguish "absent" from "unset").
+ */
 export function buildRequestRef(
   overrides: Partial<Parameters<typeof mintCompatibilityValidationRequestRef>[0]> = {},
 ): ReturnType<typeof mintCompatibilityValidationRequestRef> {
@@ -69,10 +128,11 @@ export function buildRequestRef(
     requesterIdentity = IDENTITY.requester,
     providerIdentity = IDENTITY.provider,
     requestedCapabilityKind = 'compatibility-validation',
-    materialInputRefs = [],
+    contractProfileIdentity = SUBJECT.dacProfile,
+    materialInputRefs = [buildManifestRef(SUBJECT.manifest, SUBJECT.digest)],
     advisoryTargetHints = [],
     opaque = {},
-    bindingTargetRef = buildTargetRef(),
+    bindingTargetRef = buildTargetRef(SUBJECT.target, SUBJECT.requirements),
     ...rest
   } = overrides;
   return mintCompatibilityValidationRequestRef({
@@ -83,10 +143,30 @@ export function buildRequestRef(
     requesterIdentity,
     providerIdentity,
     requestedCapabilityKind,
+    contractProfileIdentity,
     bindingTargetRef,
     materialInputRefs,
     advisoryTargetHints,
     opaque,
+  });
+}
+
+/**
+ * A request minted WITHOUT a DAC/reference profile — the §8 adversarial
+ * carrier for "the request does not bind the exact DAC/reference profile".
+ */
+export function buildRequestRefWithoutDacProfile(): ReturnType<
+  typeof mintCompatibilityValidationRequestRef
+> {
+  return mintCompatibilityValidationRequestRef({
+    baseline: DAC_V0041_BASELINE,
+    authorityScope: 'scope/domain-a',
+    primaryIdentity: VIEW.request,
+    requesterIdentity: IDENTITY.requester,
+    providerIdentity: IDENTITY.provider,
+    requestedCapabilityKind: 'compatibility-validation',
+    bindingTargetRef: buildTargetRef(SUBJECT.target, SUBJECT.requirements),
+    materialInputRefs: [buildManifestRef(SUBJECT.manifest, SUBJECT.digest)],
   });
 }
 
@@ -185,7 +265,12 @@ export function buildPrecedenceFacts(
   };
 }
 
-/** Well-formed substantive refusal evidence (LIFECYCLE_REFERENCE_REPAIRS §4.2). */
+/**
+ * Well-formed substantive refusal evidence carrying the COMPLETE frozen
+ * §4.2 closure (exact request/initiation, exact subject/scope/profile,
+ * refusing issuer and its designation, seam kind, negative decision,
+ * issuance provenance and issuance point).
+ */
 export function buildRefusalEvidence(
   overrides: Partial<DacV0041AuthorityRefusalEvidenceFacts> = {},
 ): DacV0041AuthorityRefusalEvidenceFacts {
@@ -193,10 +278,15 @@ export function buildRefusalEvidence(
     refusalIdentity: 'refusal/runtime-binding-1',
     refusingIssuerIdentity: IDENTITY.bindingAuthority,
     refusingIssuerDesignated: true,
+    issuerDesignationIdentity: 'designation/binding-authority-role-1',
     seamKind: 'runtime-binding',
     boundRequestIdentity: 'binding-request/req-1',
+    refusedSubjectIdentity: SUBJECT.manifest,
+    dacProfileIdentity: SUBJECT.dacProfile,
     negativeDecision: true,
     producedResult: true,
+    issuanceProvenanceIdentity: 'provenance/refusal-runtime-binding-1',
+    issuancePointIdentity: 'issuance-point/refusal-runtime-binding-1',
     ...overrides,
   };
 }

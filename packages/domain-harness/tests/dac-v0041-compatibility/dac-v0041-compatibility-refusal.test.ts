@@ -1,8 +1,14 @@
-// Issue #357 / A41-003 — focused refusal / negative-evidence suite
+// Issue #357 / A41-003 (R1 repair per #378 comment 5852943693 / #376 P1-3)
+// — focused refusal / negative-evidence suite
 // (LIFECYCLE_REFERENCE_REPAIRS §4.2; C142/C143; C156-family): an
-// AuthorityRefusalRef can verify and report incompatibility but can NEVER
-// manufacture a target, selection, binding or activation authority, and no
-// success-style outcome is derivable from negative evidence alone.
+// AuthorityRefusalRef binds the COMPLETE §4.2 closure (exact
+// request/initiation, exact subject/scope/profile, refusing issuer and its
+// designation, seam kind, negative decision, issuance provenance and
+// issuance point), can verify and report incompatibility at its own seam
+// but can NEVER manufacture a target, selection, binding or activation
+// authority, and — per C142 — can never be reclassified as (or back)
+// compatibility INCOMPATIBLE: no success-style or compatibility-disposition
+// outcome is derivable from refusal evidence alone.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -17,6 +23,39 @@ test('a41-003 refusal §4.2: a valid substantive refusal classifies as negative 
   assert.ok(result.outcome === 'REFUSAL_EVIDENCE');
   assert.equal(result.canManufactureAuthority, false);
   assert.equal(result.canProduceCompatibilityPass, false);
+});
+
+test('a41-003 refusal §4.2 (R1): the complete closure is mandatory — every missing element fails closed', () => {
+  for (const overrides of [
+    { issuerDesignationIdentity: '' },
+    { refusedSubjectIdentity: '' },
+    { dacProfileIdentity: '' },
+    { issuanceProvenanceIdentity: '' },
+    { issuancePointIdentity: '' },
+    { boundRequestIdentity: '' },
+  ]) {
+    const result = verifyDacV0041AuthorityRefusalEvidence(buildRefusalEvidence(overrides));
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.ok(result.outcome === 'FAIL_CLOSED');
+    assert.equal(result.code, 'INVALID_FACTS');
+    assert.match(result.detail, /§4.2 closure/u);
+  }
+});
+
+test('a41-003 refusal §4.2 (R1): mutable aliases are rejected on every closure identity, including the bound request', () => {
+  for (const overrides of [
+    { boundRequestIdentity: 'latest' },
+    { issuerDesignationIdentity: 'current' },
+    { refusedSubjectIdentity: 'head' },
+    { dacProfileIdentity: 'main' },
+    { issuanceProvenanceIdentity: 'default' },
+    { issuancePointIdentity: 'tip' },
+  ]) {
+    const result = verifyDacV0041AuthorityRefusalEvidence(buildRefusalEvidence(overrides));
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.ok(result.outcome === 'FAIL_CLOSED');
+    assert.equal(result.code, 'MUTABLE_ALIAS_IDENTITY');
+  }
 });
 
 test('a41-003 refusal C142: binding refusal and activation refusal are distinct seam kinds and never conflate', () => {
@@ -111,29 +150,50 @@ test('a41-003 refusal ceiling: refusal evidence alone can never satisfy a COMPAT
   }
 });
 
-test('a41-003 refusal ceiling: negative evidence verifies and reports INCOMPATIBLE, and an empty evidence set never guesses', () => {
-  const reported = classifyDacV0041CompatibilityPrecedence(
+test('a41-003 refusal ceiling (R1/C142): refusal evidence never becomes a compatibility INCOMPATIBLE disposition', () => {
+  // A41-003R1 P1-3: the failed HEAD let any non-empty refusalEvidence array
+  // satisfy an asserted INCOMPATIBLE claim, reclassifying a seam-typed
+  // refusal as compatibility INCOMPATIBLE — frozen §4.2/C142 forbids this.
+  const refusalOnly = classifyDacV0041CompatibilityPrecedence(
     buildPrecedenceFacts({
       authoritativeResults: [],
       refusalEvidence: [buildRefusalEvidence()],
       assertedDisposition: 'INCOMPATIBLE',
     }),
   );
-  assert.equal(reported.outcome, 'INCOMPATIBLE');
+  assert.equal(refusalOnly.outcome, 'FAIL_CLOSED');
+  assert.ok(refusalOnly.outcome === 'FAIL_CLOSED');
+  assert.equal(refusalOnly.code, 'FAVORABLE_CLAIM_UNBACKED');
 
-  const guessed = classifyDacV0041CompatibilityPrecedence(
+  const empty = classifyDacV0041CompatibilityPrecedence(
     buildPrecedenceFacts({
       authoritativeResults: [],
       refusalEvidence: [],
       assertedDisposition: 'INCOMPATIBLE',
     }),
   );
-  assert.equal(guessed.outcome, 'FAIL_CLOSED');
-  assert.ok(guessed.outcome === 'FAIL_CLOSED');
-  assert.equal(guessed.code, 'FAVORABLE_CLAIM_UNBACKED');
+  assert.equal(empty.outcome, 'FAIL_CLOSED');
+  assert.ok(empty.outcome === 'FAIL_CLOSED');
+  assert.equal(empty.code, 'FAVORABLE_CLAIM_UNBACKED');
 });
 
-test('a41-003 refusal C143-family: material refusal evidence coexisting with a favorable result surfaces the contradiction (C98), never a favorable-only selection', () => {
+test('a41-003 refusal C143: material refusal evidence coexisting with a favorable result blocks the favorable close', () => {
+  // The refusal is never omitted from claim closure merely because a later
+  // favorable result exists; the claim must be re-established after
+  // reconciliation at the refusing seam.
+  const result = classifyDacV0041CompatibilityPrecedence(
+    buildPrecedenceFacts({
+      authoritativeResults: [buildFavorableResult()],
+      refusalEvidence: [buildRefusalEvidence()],
+      assertedDisposition: 'COMPATIBLE',
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.ok(result.outcome === 'FAIL_CLOSED');
+  assert.equal(result.code, 'MATERIAL_REFUSAL_PRESENT');
+});
+
+test('a41-003 refusal C143-family: material refusal evidence coexisting with contradictory results surfaces the contradiction (C98), never a favorable-only selection', () => {
   const result = classifyDacV0041CompatibilityPrecedence(
     buildPrecedenceFacts({
       authoritativeResults: [
