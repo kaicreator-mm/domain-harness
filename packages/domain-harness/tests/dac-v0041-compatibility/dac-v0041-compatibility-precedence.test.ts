@@ -209,14 +209,14 @@ test('a41-003 precedence: malformed facts fail closed as INVALID_FACTS, never th
       },
     }),
     buildPrecedenceFacts({
-      authoritativeResults: 'nope' as unknown,
+      authoritativeResults: 'nope' as never,
     }),
     buildPrecedenceFacts({ assertedDisposition: 'MAYBE' as 'COMPATIBLE' }),
     buildPrecedenceFacts({
       authoritativeResults: [{ resultViewIdentity: 'x', disposition: 'COMPATIBLE' } as never],
     }),
   ]) {
-    const result = classifyDacV0041CompatibilityPrecedence(facts);
+    const result = classifyDacV0041CompatibilityPrecedence(facts as never);
     assert.equal(result.outcome, 'FAIL_CLOSED');
     assert.ok(result.outcome === 'FAIL_CLOSED');
     assert.equal(result.code, 'INVALID_FACTS');

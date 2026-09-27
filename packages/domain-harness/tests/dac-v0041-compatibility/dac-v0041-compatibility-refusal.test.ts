@@ -79,7 +79,7 @@ test('a41-003 refusal: malformed facts and mutable aliases fail closed, never th
     buildRefusalEvidence({ refusalIdentity: 'latest' }),
     buildRefusalEvidence({ seamKind: 'nonsense' as 'runtime-binding' }),
   ]) {
-    const result = verifyDacV0041AuthorityRefusalEvidence(facts);
+    const result = verifyDacV0041AuthorityRefusalEvidence(facts as never);
     assert.equal(result.outcome, 'FAIL_CLOSED');
     assert.ok(result.outcome === 'FAIL_CLOSED');
     assert.ok(

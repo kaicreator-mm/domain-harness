@@ -60,20 +60,33 @@ export function buildTargetRef(
 
 /** The C89 request reference (minted; binding explicit target included). */
 export function buildRequestRef(
-  overrides: Parameters<typeof mintCompatibilityValidationRequestRef>[0] = {},
+  overrides: Partial<Parameters<typeof mintCompatibilityValidationRequestRef>[0]> = {},
 ): ReturnType<typeof mintCompatibilityValidationRequestRef> {
+  const {
+    baseline = DAC_V0041_BASELINE,
+    authorityScope = 'scope/domain-a',
+    primaryIdentity = VIEW.request,
+    requesterIdentity = IDENTITY.requester,
+    providerIdentity = IDENTITY.provider,
+    requestedCapabilityKind = 'compatibility-validation',
+    materialInputRefs = [],
+    advisoryTargetHints = [],
+    opaque = {},
+    bindingTargetRef = buildTargetRef(),
+    ...rest
+  } = overrides;
   return mintCompatibilityValidationRequestRef({
-    baseline: DAC_V0041_BASELINE,
-    authorityScope: 'scope/domain-a',
-    primaryIdentity: VIEW.request,
-    requesterIdentity: IDENTITY.requester,
-    providerIdentity: IDENTITY.provider,
-    requestedCapabilityKind: 'compatibility-validation',
-    bindingTargetRef: buildTargetRef(),
-    materialInputRefs: [],
-    advisoryTargetHints: [],
-    opaque: {},
-    ...overrides,
+    ...rest,
+    baseline,
+    authorityScope,
+    primaryIdentity,
+    requesterIdentity,
+    providerIdentity,
+    requestedCapabilityKind,
+    bindingTargetRef,
+    materialInputRefs,
+    advisoryTargetHints,
+    opaque,
   });
 }
 

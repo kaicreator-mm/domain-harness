@@ -196,9 +196,9 @@ test('a41-003 role separation: malformed facts objects fail closed as INVALID_FA
       validationView: buildValidationView(),
       resultView: { resultViewIdentity: VIEW.result, disposition: 'MAYBE' },
     },
-    buildAssociationInput({ competingValidations: 'nope' as unknown }),
+    buildAssociationInput({ competingValidations: 'nope' as never }),
   ]) {
-    const result = verifyDacV0041CompatibilityViewAssociation(input);
+    const result = verifyDacV0041CompatibilityViewAssociation(input as never);
     assert.equal(result.outcome, 'FAIL_CLOSED');
     assert.equal(result.code, 'INVALID_FACTS');
   }
