@@ -144,6 +144,9 @@ export function buildRef(
   primaryIdentity: string,
   overrides: {
     authorityScope?: string;
+    semanticIdentity?: string;
+    revisionIdentity?: string;
+    contentDigest?: string;
     predecessorOrigin?: DacV0041PredecessorBaseline;
   } = {},
 ): DacV0041Reference {
@@ -152,6 +155,15 @@ export function buildRef(
     baseline: DAC_V0041_BASELINE,
     authorityScope: overrides.authorityScope ?? SCOPE.app,
     primaryIdentity,
+    ...(overrides.semanticIdentity === undefined
+      ? {}
+      : { semanticIdentity: overrides.semanticIdentity }),
+    ...(overrides.revisionIdentity === undefined
+      ? {}
+      : { revisionIdentity: overrides.revisionIdentity }),
+    ...(overrides.contentDigest === undefined
+      ? {}
+      : { contentDigest: overrides.contentDigest }),
     ...(overrides.predecessorOrigin === undefined
       ? {}
       : { predecessorOrigin: overrides.predecessorOrigin }),

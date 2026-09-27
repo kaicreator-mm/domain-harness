@@ -8,6 +8,7 @@ import { verifyDacV0041CompositionIntake } from '../../src/dac-v0041/composition
 import {
   ROLE,
   buildCoverage,
+  buildManifestFacts,
   buildRef,
   buildReuseCurrentness,
   buildSelectionFacts,
@@ -139,6 +140,45 @@ test('a41-004 selection: coverage citing a different ApplicationSelectionRef fai
   assert.equal(result.code, 'SUBJECT_MISMATCH');
 });
 
+test('a41-004 selection: R2/#381 P1-2 — coverage row naming the same primary identity under a different exact tuple fails closed', () => {
+  // selection and Manifest agree on alpha@revision-r1, but the coverage row
+  // names the same primary identity under a different revision: the exact
+  // selected tuple — not the primary identity alone — must correspond, so
+  // primary-identity coincidence is never accepted coverage
+  // (DOMAIN_DATA_IR §2).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', {
+            revisionIdentity: 'revision/alpha-r1',
+          }),
+          buildRef('selected-domain-data', 'subject/selected-beta'),
+        ],
+      }),
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', {
+            revisionIdentity: 'revision/alpha-r1',
+          }),
+          buildRef('selected-domain-data', 'subject/selected-beta'),
+        ],
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha', {
+          subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', {
+            revisionIdentity: 'revision/alpha-forged-r9',
+          }),
+        }),
+        buildCoverage('subject/selected-beta'),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+
 test('a41-004 selection: a promotion decision presented in the selection slot fails closed (selection != promotion)', () => {
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
@@ -226,6 +266,37 @@ test('a41-004 selection: R1/#377 P1-3 — currentness determination predating th
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'INVALID_FACTS');
 });
+
+test('a41-004 selection: R2/#381 P1-3 — evaluation point predating the selection issuance fails closed (impossible temporal claim)', () => {
+  // Reviewer counterexample: selection@40 / Manifest@50 / determination@60
+  // with evaluationPoint=35 — both currentness checks would classify
+  // `current` even though neither the selection nor the Manifest existed
+  // at the claimed evaluation point. The artifact must exist at the
+  // intended-use point (ASSEMBLY_PROFILES §8.2).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      evaluationPoint: 35,
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 selection: R2/#381 P1-3 — deterministic precedence: an evaluation point predating issuance is malformed facts even when the selection is also revoked', () => {
+  // The impossible-temporal-claim check (structural malformed facts)
+  // dominates the revoked currentness state (C152/C171 family).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      evaluationPoint: 35,
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ state: 'revoked' }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
 
 test('a41-004 selection: R1/#377 P1-3 — deterministic precedence: revoked selection fails closed even when promotion coverage is also stale', () => {
   // Structural/authority violation (explicit invalidation, FAIL_CLOSED)

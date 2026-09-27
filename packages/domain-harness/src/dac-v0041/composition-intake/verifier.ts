@@ -27,12 +27,19 @@
 //                                      selection -> Manifest)
 //   9. exact scope/profile/subject   (SCOPE_/PROFILE_/SUBJECT_MISMATCH;
 //                                      incl. exact selection/Manifest
-//                                      selected-subject correspondence)
+//                                      selected-subject correspondence as
+//                                      FULL exact selected tuples — scope +
+//                                      semantic/revision identity + content
+//                                      digest — never primary identity
+//                                      alone)
 // 10. coverage totals + currentness  (COVERAGE_*; selection/Manifest §8.2
-//                                      reuse currentness — SELECTION_/
-//                                      MANIFEST_INVALIDATED fail closed,
-//                                      *_NOT_CURRENT stale — then promotion
-//                                      currentness; total per C80/C81)
+//                                      reuse currentness — an intended-use
+//                                      point predating the artifact's own
+//                                      issuance is INVALID_FACTS,
+//                                      SELECTION_/MANIFEST_INVALIDATED fail
+//                                      closed, *_NOT_CURRENT stale — then
+//                                      promotion currentness; total per
+//                                      C80/C81)
 //  11. material refusal evidence     (F-04 §4.2 codes)
 //  12. otherwise                     => INTAKE_VERIFIED
 //
@@ -405,6 +412,25 @@ function distinctIdentities(
   return null;
 }
 
+/**
+ * The frozen exact selected-Domain-Data tuple key (DOMAIN_DATA_IR §2;
+ * A41-004R2 / #381 P1-2): authoritative selected-subject correspondence
+ * binds the FULL exact tuple — authority scope, primary/semantic/revision
+ * identity and content digest — never primary identity alone. JSON array
+ * encoding is injective over arbitrary identity strings (control
+ * characters are escaped), so two distinct exact tuples can never collide
+ * on one key.
+ */
+function selectedSubjectTuple(ref: DacV0041Reference): string {
+  return JSON.stringify([
+    ref.authorityScope,
+    ref.primaryIdentity,
+    ref.semanticIdentity ?? null,
+    ref.revisionIdentity ?? null,
+    ref.contentDigest ?? null,
+  ]);
+}
+
 interface ChainChecks {
   readonly issuerIdentity: string;
   readonly requiredIssuingRole: string;
@@ -417,15 +443,18 @@ interface ChainChecks {
 
 /**
  * ASSEMBLY_PROFILES §§8.2–8.3 current authoritative reuse classification for
- * one externally owned artifact (A41-004R1 / #377 P1-3). Deterministic
- * precedence: undecidable state or a determination predating the artifact's
- * own issuance are malformed facts (FAIL_CLOSED INVALID_FACTS); explicit
- * revocation/void FAIL CLOSED for the new authoritative use even though the
- * historical record stays immutable; ordinary stale/superseded/reselected
- * states and determinations that do not cover the evaluation point are
- * STALE; `current` passes only when established at/after the evaluation
- * point. Structural and authority violations dominate these temporal
- * states (C152/C171).
+ * one externally owned artifact (A41-004R1 / #377 P1-3; A41-004R2 / #381
+ * P1-3). Deterministic precedence: an undecidable state, a determination
+ * predating the artifact's own issuance, or an intended-use/evaluation
+ * point predating the artifact's own issuance are malformed facts
+ * (FAIL_CLOSED INVALID_FACTS — the artifact did not exist at the claimed
+ * use point, so no currentness determination can make it current there);
+ * explicit revocation/void FAIL CLOSED for the new authoritative use even
+ * though the historical record stays immutable; ordinary
+ * stale/superseded/reselected states and determinations that do not cover
+ * the evaluation point are STALE; `current` passes only when established
+ * at/after the evaluation point. Structural and authority violations
+ * dominate these temporal states (C152/C171).
  */
 function classifyReuseCurrentness(
   currentness: DacV0041ApplicationSelectionFacts['reuseCurrentness'],
@@ -448,6 +477,13 @@ function classifyReuseCurrentness(
       outcome: 'FAIL_CLOSED',
       code: 'INVALID_FACTS',
       detail: `${label} reuse-currentness determination predates the artifact's own issuance point; a determination for a not-yet-issued artifact is malformed provenance`,
+    };
+  }
+  if (evaluationPoint < artifactIssuancePoint) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'INVALID_FACTS',
+      detail: `${label} intended use/evaluation point ${evaluationPoint} predates the artifact's own issuance point ${artifactIssuancePoint}; the artifact did not exist at the claimed use point, so it can never be current there (ASSEMBLY_PROFILES §8.2 / APPLICATION_MANIFEST §7)`,
     };
   }
   if (currentness.state === 'revoked' || currentness.state === 'voided') {
@@ -893,22 +929,24 @@ export function verifyDacV0041CompositionIntake(
 
   // Pass 10: total selected Domain Data coverage (C80/C81; Manifest §3).
   // 10a. EXACT selected-subject correspondence between the presented
-  // ApplicationSelectionRef and the Manifest (A41-004R1 / #377 P1-2): a
-  // Manifest-only subject fails closed even when a syntactically complete
-  // forged coverage row naming the presented selection identity exists,
-  // because a Manifest must not retroactively manufacture selection
-  // authority (APPLICATION_MANIFEST §2 — Manifest issuance records the
-  // exact selected composition, it never widens it).
-  const selectionSubjectIdentities = selection.selectedDomainDataRefs.map(
-    (subject) => subject.primaryIdentity,
-  );
-  const manifestSubjectIdentities = manifest.selectedDomainDataRefs.map(
-    (subject) => subject.primaryIdentity,
-  );
-  for (const [label, identities] of [
-    ['applicationSelection.selectedDomainDataRefs', selectionSubjectIdentities],
-    ['manifest.selectedDomainDataRefs', manifestSubjectIdentities],
+  // ApplicationSelectionRef and the Manifest over the FULL frozen exact
+  // selected tuple — authority scope + primary/semantic/revision identity
+  // + content digest (DOMAIN_DATA_IR §2; A41-004R2 / #381 P1-2).
+  // Primary-identity correspondence alone cannot close selection closure:
+  // a Manifest revision/digest the presented selection never selected (or
+  // a different authority scope under the same primary identity) would
+  // otherwise be admitted, silently changing material composition
+  // identity (APPLICATION_MANIFEST §6). Duplicate subject identities fail
+  // closed; a Manifest-only exact tuple fails closed even when a
+  // syntactically complete forged coverage row naming the presented
+  // selection identity exists, because a Manifest must not retroactively
+  // manufacture selection authority (APPLICATION_MANIFEST §2 — Manifest
+  // issuance records the exact selected composition, it never widens it).
+  for (const [label, refs] of [
+    ['applicationSelection.selectedDomainDataRefs', selection.selectedDomainDataRefs],
+    ['manifest.selectedDomainDataRefs', manifest.selectedDomainDataRefs],
   ] as const) {
+    const identities = refs.map((subject) => subject.primaryIdentity);
     if (new Set(identities).size !== identities.length) {
       return {
         outcome: 'FAIL_CLOSED',
@@ -917,49 +955,60 @@ export function verifyDacV0041CompositionIntake(
       };
     }
   }
-  const selectionSubjectSet = new Set(selectionSubjectIdentities);
-  const manifestSubjectSet = new Set(manifestSubjectIdentities);
-  for (const subject of manifestSubjectIdentities) {
-    if (!selectionSubjectSet.has(subject)) {
+  const selectionTupleSet = new Set(
+    selection.selectedDomainDataRefs.map((subject) => selectedSubjectTuple(subject)),
+  );
+  const manifestTupleSet = new Set(
+    manifest.selectedDomainDataRefs.map((subject) => selectedSubjectTuple(subject)),
+  );
+  for (const subject of manifest.selectedDomainDataRefs) {
+    if (!selectionTupleSet.has(selectedSubjectTuple(subject))) {
       return {
         outcome: 'FAIL_CLOSED',
         code: 'SUBJECT_MISMATCH',
-        detail: `Manifest claims selected Domain Data subject "${subject}" that the presented ApplicationSelectionRef did not select; a Manifest cannot retroactively manufacture selection authority (APPLICATION_MANIFEST §2)`,
+        detail: `Manifest claims selected Domain Data subject "${subject.primaryIdentity}" as an exact tuple (scope/semantic/revision/digest) that the presented ApplicationSelectionRef did not select; the exact selected tuple — not the primary identity alone — must correspond (DOMAIN_DATA_IR §2), and a Manifest cannot retroactively manufacture selection authority (APPLICATION_MANIFEST §2)`,
       };
     }
   }
-  for (const subject of selectionSubjectIdentities) {
-    if (!manifestSubjectSet.has(subject)) {
+  for (const subject of selection.selectedDomainDataRefs) {
+    if (!manifestTupleSet.has(selectedSubjectTuple(subject))) {
       return {
         outcome: 'FAIL_CLOSED',
         code: 'SUBJECT_MISMATCH',
-        detail: `selected Domain Data subject "${subject}" is absent from the Manifest composition; the Manifest must record the exact selected subject set`,
+        detail: `selected Domain Data subject "${subject.primaryIdentity}" (exact scope/semantic/revision/digest tuple) is absent from the Manifest composition; the Manifest must record the exact selected subject set as full exact tuples (DOMAIN_DATA_IR §2)`,
       };
     }
   }
-  // 10b. Coverage-row reconciliation over the exactly corresponding set.
-  const requiredSubjects = selectionSubjectSet;
+  // 10b. Coverage-row reconciliation over the exactly corresponding set,
+  // keyed by the same full exact selected tuple: a coverage row naming the
+  // primary identity of a selected subject under a DIFFERENT exact tuple
+  // is a subject mismatch, never accepted coverage (A41-004R2 / #381 P1-2).
+  const requiredSubjects = new Map<string, string>();
+  for (const subject of selection.selectedDomainDataRefs) {
+    requiredSubjects.set(selectedSubjectTuple(subject), subject.primaryIdentity);
+  }
   const coveredSubjects = new Map<string, DacV0041SelectedDomainDataFacts>();
   for (const coverage of input.selectedDomainData) {
-    if (requiredSubjects.has(coverage.subjectRef.primaryIdentity)) {
-      if (coveredSubjects.has(coverage.subjectRef.primaryIdentity)) {
+    const tuple = selectedSubjectTuple(coverage.subjectRef);
+    if (requiredSubjects.has(tuple)) {
+      if (coveredSubjects.has(tuple)) {
         return {
           outcome: 'FAIL_CLOSED',
           code: 'COVERAGE_INCOMPLETE',
           detail: `duplicate coverage records for selected subject "${coverage.subjectRef.primaryIdentity}"`,
         };
       }
-      coveredSubjects.set(coverage.subjectRef.primaryIdentity, coverage);
+      coveredSubjects.set(tuple, coverage);
     } else {
       return {
         outcome: 'FAIL_CLOSED',
         code: 'SUBJECT_MISMATCH',
-        detail: `coverage record for "${coverage.subjectRef.primaryIdentity}" does not correspond to any selected Domain Data subject of the selection/Manifest evidence`,
+        detail: `coverage record for "${coverage.subjectRef.primaryIdentity}" does not correspond to the exact selected Domain Data tuple (scope/semantic/revision/digest) of the selection/Manifest evidence; primary-identity coincidence is not selection coverage (DOMAIN_DATA_IR §2)`,
       };
     }
   }
-  for (const subject of requiredSubjects) {
-    const coverage = coveredSubjects.get(subject);
+  for (const [tuple, subject] of requiredSubjects) {
+    const coverage = coveredSubjects.get(tuple);
     if (coverage === undefined) {
       return {
         outcome: 'FAIL_CLOSED',
@@ -1004,9 +1053,10 @@ export function verifyDacV0041CompositionIntake(
   if (manifestCurrentnessFailure !== null) {
     return manifestCurrentnessFailure;
   }
-  // 10d. Promotion coverage currentness per selected subject (C81/C157).
-  for (const subject of requiredSubjects) {
-    const coverage = coveredSubjects.get(subject);
+  // 10d. Promotion coverage currentness per selected subject (C81/C157),
+  // reconciled over the same full exact selected tuples.
+  for (const [tuple, subject] of requiredSubjects) {
+    const coverage = coveredSubjects.get(tuple);
     if (coverage === undefined) {
       continue;
     }
@@ -1066,7 +1116,7 @@ export function verifyDacV0041CompositionIntake(
     establishmentIdentity: establishment.establishmentRef.primaryIdentity,
     selectionIdentity: selection.selectionRef.primaryIdentity,
     manifestIdentity: manifest.manifestRef.primaryIdentity,
-    coveredSubjectIdentities: Object.freeze([...requiredSubjects].sort()),
+    coveredSubjectIdentities: Object.freeze([...requiredSubjects.values()].sort()),
     detail: 'externally owned identity/selection/Manifest/refusal evidence verified at intake; no Composer, selection, promotion or Manifest authority created and no live Runtime state absorbed',
   };
 }

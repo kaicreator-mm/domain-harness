@@ -8,10 +8,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyDacV0041CompositionIntake } from '../../src/dac-v0041/composition-intake/index.js';
 import {
+  SCOPE,
   buildCoverage,
   buildManifestFacts,
   buildRef,
   buildReuseCurrentness,
+  buildSelectionFacts,
   buildValidIntakeInput,
   v003Predecessor,
 } from './helpers.js';
@@ -164,6 +166,119 @@ test('a41-004 manifest: R1/#377 P1-2 — a repeated selected subject identity fa
   assert.equal(result.code, 'INVALID_FACTS');
 });
 
+test('a41-004 manifest: R2/#381 P1-2 — same primary identity under a different revision/digest fails closed (full exact selected tuple)', () => {
+  // The reviewer counterexample: selection-side and Manifest-side refs share
+  // primaryIdentity "subject/selected-alpha" but the Manifest ref carries a
+  // different revisionIdentity/contentDigest, with otherwise valid minted
+  // carriers and complete coverage rows naming the same
+  // ApplicationSelectionRef. Primary-identity correspondence admits a
+  // Manifest revision/digest the selection never selected; the full exact
+  // tuple (DOMAIN_DATA_IR §2) must correspond instead.
+  for (const forged of [
+    { revisionIdentity: 'revision/alpha-forged-r9' },
+    { contentDigest: 'digest/alpha-forged-d9' },
+  ] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        manifest: buildManifestFacts({
+          selectedDomainDataRefs: [
+            buildRef('selected-domain-data', 'subject/selected-alpha', forged),
+            buildRef('selected-domain-data', 'subject/selected-beta'),
+          ],
+        }),
+        selectedDomainData: [
+          buildCoverage('subject/selected-alpha'),
+          buildCoverage('subject/selected-beta'),
+        ],
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'SUBJECT_MISMATCH');
+  }
+});
+
+test('a41-004 manifest: R2/#381 P1-2 — same primary identity under a different authority scope fails closed (full exact selected tuple)', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', {
+            authorityScope: SCOPE.other,
+          }),
+          buildRef('selected-domain-data', 'subject/selected-beta'),
+        ],
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha'),
+        buildCoverage('subject/selected-beta'),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+test('a41-004 manifest: R2/#381 P1-2 — a selection subject whose exact tuple is absent from the Manifest composition fails closed', () => {
+  // selection alpha carries revision r1; the Manifest keeps the primary
+  // identity but drops the exact revision, so the selected exact tuple is
+  // absent from the composition (material identity change without a new
+  // Manifest revision — APPLICATION_MANIFEST §6).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', {
+            revisionIdentity: 'revision/alpha-r1',
+          }),
+          buildRef('selected-domain-data', 'subject/selected-beta'),
+        ],
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha', {
+          subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', {
+            revisionIdentity: 'revision/alpha-r1',
+          }),
+        }),
+        buildCoverage('subject/selected-beta'),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+test('a41-004 manifest: R2/#381 P1-2 — identical full exact tuples on selection, Manifest and coverage verify (exact-tuple positive control)', () => {
+  const exactAlpha = {
+    semanticIdentity: 'semantic/alpha-s1',
+    revisionIdentity: 'revision/alpha-r1',
+    contentDigest: 'digest/alpha-d1',
+  } as const;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', exactAlpha),
+          buildRef('selected-domain-data', 'subject/selected-beta'),
+        ],
+      }),
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', exactAlpha),
+          buildRef('selected-domain-data', 'subject/selected-beta'),
+        ],
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha', {
+          subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', exactAlpha),
+        }),
+        buildCoverage('subject/selected-beta'),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'INTAKE_VERIFIED');
+});
+
+
 test('a41-004 manifest: R1/#377 P1-3 — stale or superseded Manifest revision is STALE, never silently reused', () => {
   for (const state of ['stale', 'superseded'] as const) {
     const result = verifyDacV0041CompositionIntake(
@@ -228,6 +343,37 @@ test('a41-004 manifest: R1/#377 P1-3 — currentness determination predating the
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'INVALID_FACTS');
 });
+
+test('a41-004 manifest: R2/#381 P1-3 — evaluation point after selection issuance but before Manifest issuance fails closed', () => {
+  // Normal fixture ordering: selection@40 / Manifest@50 / determination@60.
+  // An intended use at 45 postdates the selection but predates the Manifest
+  // issuance point — the Manifest did not exist at the claimed use point,
+  // so no currentness determination can make it current there
+  // (ASSEMBLY_PROFILES §8.2 / APPLICATION_MANIFEST §7).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      evaluationPoint: 45,
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 manifest: R2/#381 P1-3 — evaluation point exactly at the Manifest issuance point is a valid intended-use point', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      evaluationPoint: 50,
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ establishedAt: 50 }),
+      }),
+      manifest: buildManifestFacts({
+        reuseCurrentness: buildReuseCurrentness({ establishedAt: 50 }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'INTAKE_VERIFIED');
+});
+
 
 test('a41-004 manifest: unauthorized Manifest issuer fails closed', () => {
   const result = verifyDacV0041CompositionIntake(

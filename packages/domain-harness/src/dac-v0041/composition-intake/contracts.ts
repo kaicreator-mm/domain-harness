@@ -183,7 +183,10 @@ export interface DacV0041RequestlessInitiationEvidence {
  * point. `establishedAt` MUST be no earlier than the artifact's own
  * issuance point (a determination predating the artifact is malformed) and
  * no earlier than the evaluation point (a determination that does not cover
- * the intended use point is not current for that use).
+ * the intended use point is not current for that use). The evaluation
+ * point itself MUST be no earlier than the artifact's own issuance point —
+ * an intended use that predates the selection/Manifest issuance is an
+ * impossible temporal claim and fails closed (A41-004R2 / #381 P1-3).
  */
 export interface DacV0041ReuseCurrentnessFacts {
   /**
@@ -385,7 +388,13 @@ export interface DacV0041AuthorityRefusalFacts {
  * with the promotion decision's externally established currentness.
  */
 export interface DacV0041SelectedDomainDataFacts {
-  /** Minted `selected-domain-data` subject reference (exactly 1). */
+  /**
+   * Minted `selected-domain-data` subject reference (exactly 1). Its FULL
+   * exact selected tuple — authority scope + primary/semantic/revision
+   * identity + content digest (DOMAIN_DATA_IR §2) — must correspond to the
+   * selection/Manifest subject it covers; primary-identity coincidence
+   * alone is not coverage (A41-004R2 / #381 P1-2).
+   */
   readonly subjectRef: DacV0041Reference;
   /** Minted `promotion-decision` reference covering this subject (exactly 1). */
   readonly promotionCoverageRef: DacV0041Reference;
@@ -508,9 +517,14 @@ export type DacV0041AuthorityRefusalEvidenceVerification =
  *   9. scope/profile/subject mismatch      => FAIL_CLOSED (SCOPE_MISMATCH /
  *      PROFILE_MISMATCH / SUBJECT_MISMATCH — exact-token only, never fuzzy;
  *      the selection and Manifest selected-subject sets must correspond
- *      EXACTLY — a Manifest-only subject with a syntactically complete
- *      forged coverage row still fails closed, because a Manifest must not
- *      retroactively manufacture selection authority)
+ *      EXACTLY as full exact selected tuples — authority scope + primary/
+ *      semantic/revision identity + content digest (DOMAIN_DATA_IR §2) —
+ *      never primary identity alone; a Manifest-only tuple, or the same
+ *      primary identity under a different revision/digest/scope, fails
+ *      closed even with a syntactically complete forged coverage row,
+ *      because a Manifest must not retroactively manufacture selection
+ *      authority nor silently change material composition identity
+ *      (APPLICATION_MANIFEST §§2, 6))
  *  10. revoked/voided promotion coverage    => FAIL_CLOSED
  *      COVERAGE_INVALIDATED (C81/C157); revoked/voided selection/Manifest
  *      => FAIL_CLOSED SELECTION_INVALIDATED / MANIFEST_INVALIDATED
@@ -530,7 +544,10 @@ export type DacV0041AuthorityRefusalEvidenceVerification =
  *      evaluation point                    => STALE (ISSUER_CHAIN_STALE /
  *      COVERAGE_NOT_CURRENT / SELECTION_NOT_CURRENT / MANIFEST_NOT_CURRENT;
  *      C85/C157; ASSEMBLY_PROFILES §8.2 — current authoritative reuse
- *      re-checks later invalidation/supersession at the intended use point)
+ *      re-checks later invalidation/supersession at the intended use
+ *      point); an intended-use/evaluation point predating the selection
+ *      or Manifest issuance point is an impossible temporal claim and
+ *      fails closed as INVALID_FACTS first (A41-004R2 / #381 P1-3)
  *  13. otherwise                            => INTAKE_VERIFIED — the
  *      externally owned evidence is verified-and-accepted as intake input
  *      ONLY: no Composer/selection/promotion/Manifest authority is created,
