@@ -32,7 +32,7 @@ import {
   verifyDacV0041CompatibilityViewAssociation,
 } from '../compatibility/index.js';
 import { verifyDacV0041CompositionIntake } from '../composition-intake/index.js';
-import type { DacV0041Reference, DacV0041ReferenceEnvelope } from '../contracts.js';
+import type { DacV0041Reference } from '../contracts.js';
 import type {
   DacV0041DesignationChainFailureCode,
   DacV0041DesignationChainInput,
@@ -269,10 +269,27 @@ type DacV0041EnvelopeMaterialField =
   | 'contentDigest'
   | 'contractProfileIdentity';
 
+/**
+ * Structural material-exactness view shared by minted foundation reference
+ * envelopes and A41-003 `materialManifestRefs` fact entries: exactly the
+ * slots full-envelope equality compares. Lets the binding verifier bridge
+ * the concrete Runtime evidence envelopes to the compatibility-verified
+ * material closure without widening either type.
+ */
+interface DacV0041MaterialExactnessEnvelope {
+  readonly role: string;
+  readonly authorityScope: string;
+  readonly primaryIdentity: string;
+  readonly semanticIdentity?: string;
+  readonly revisionIdentity?: string;
+  readonly contentDigest?: string;
+  readonly contractProfileIdentity?: string;
+}
+
 /** First material-exactness field in which two reference envelopes diverge. */
 function envelopeDivergenceField(
-  a: DacV0041ReferenceEnvelope,
-  b: DacV0041ReferenceEnvelope,
+  a: DacV0041MaterialExactnessEnvelope,
+  b: DacV0041MaterialExactnessEnvelope,
 ): DacV0041EnvelopeMaterialField | null {
   for (const field of [
     'role',
@@ -782,9 +799,12 @@ export function verifyDacV0041RuntimeBinding(
   }
   // §10/§11 implementation-exactness closure: an implementation-specific
   // binding claim must be backed by implementation-specific compatibility
-  // evidence binding the SAME exact implementation/Host Binding identity;
+  // evidence binding the SAME exact implementation/Host Binding material —
+  // primary identity AND the full material envelope the compatibility
+  // authority validated in the subject's §8 materialManifestRefs closure;
   // a later concrete choice never retroactively strengthens an earlier
-  // abstract compatibility result.
+  // abstract compatibility result, and a same-primary envelope drift never
+  // transposes compatibility authority onto unvalidated material.
   const compatibilityImplementation = compatibilitySubject.runtimeImplementationIdentity;
   if (compatibilityImplementation !== undefined) {
     if (implementationRef === undefined) {
@@ -799,6 +819,39 @@ export function verifyDacV0041RuntimeBinding(
         outcome: 'FAIL_CLOSED',
         code: 'SUBJECT_MISMATCH',
         detail: `binding Runtime implementation evidence "${implementationRef.primaryIdentity}" does not equal the compatibility-validated implementation "${compatibilityImplementation}"`,
+      };
+    }
+    // R2 P1 closure (APPLICATION_MANIFEST §8; ASSEMBLY_CAPABILITY_EXCHANGE
+    // §10): the implementation exactness the compatibility authority
+    // validated is the subject's VERIFIED §8 materialManifestRefs closure
+    // entry, and the concrete evidence the binding binds must equal that
+    // entry on EVERY material-exactness slot — never primary identity
+    // alone. Without this bridge a coherent same-primary envelope A→B
+    // substitution (compatibility validates envelope A while the binding
+    // request and presented evidence both carry envelope B) would transpose
+    // upstream compatibility authority onto material that was never
+    // compatibility-validated.
+    const subjectImplementationEntries =
+      compatibilitySubject.materialManifestRefs.filter(
+        (entry) => entry.role === 'runtime-implementation',
+      );
+    if (subjectImplementationEntries.length !== 1) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the compatibility subject claims implementation "${compatibilityImplementation}" but its verified §8 material closure carries ${subjectImplementationEntries.length} "runtime-implementation" material ref(s); the exact compatibility-validated implementation envelope cannot be established`,
+      };
+    }
+    const subjectImplementationEntry = subjectImplementationEntries[0]!;
+    const implementationDivergence = envelopeDivergenceField(
+      subjectImplementationEntry,
+      implementationRef,
+    );
+    if (implementationDivergence !== null) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the binding's Runtime implementation evidence ("${implementationRef.primaryIdentity}") diverges from the compatibility-validated material closure on ${implementationDivergence} (binding evidence "${String(implementationRef[implementationDivergence])}" vs compatibility material "${String(subjectImplementationEntry[implementationDivergence])}"); a binding may bind only the EXACT material the compatibility authority validated — a same-primary envelope drift can never transpose upstream compatibility authority onto unvalidated material (APPLICATION_MANIFEST §8; ASSEMBLY_CAPABILITY_EXCHANGE §10)`,
       };
     }
   } else if (implementationRef !== undefined) {
@@ -825,6 +878,31 @@ export function verifyDacV0041RuntimeBinding(
         outcome: 'FAIL_CLOSED',
         code: 'SUBJECT_MISMATCH',
         detail: `the binding carries ${mintedHostRefs.length} Host Binding artifacts while the compatibility subject binds exactly one ("${compatibilityHostBinding}"); material the compatibility subject did not cover cannot join the bound composition`,
+      };
+    }
+    // R2 P1 closure (same bridge as the implementation slot): the Host
+    // Binding material exactness the compatibility authority validated is
+    // the subject's VERIFIED §8 materialManifestRefs closure entry; the
+    // presented concrete Host Binding evidence must equal that entry on
+    // every material-exactness slot, so a coherent same-primary envelope
+    // A→B drift fails closed here too.
+    const subjectHostEntries = compatibilitySubject.materialManifestRefs.filter(
+      (entry) => entry.role === 'runtime-host-binding',
+    );
+    if (subjectHostEntries.length !== 1) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the compatibility subject binds Host Binding "${compatibilityHostBinding}" but its verified §8 material closure carries ${subjectHostEntries.length} "runtime-host-binding" material ref(s); the exact compatibility-validated Host Binding envelope cannot be established`,
+      };
+    }
+    const subjectHostEntry = subjectHostEntries[0]!;
+    const hostDivergence = envelopeDivergenceField(subjectHostEntry, matchingHost);
+    if (hostDivergence !== null) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the binding's Host Binding evidence ("${matchingHost.primaryIdentity}") diverges from the compatibility-validated material closure on ${hostDivergence} (binding evidence "${String(matchingHost[hostDivergence])}" vs compatibility material "${String(subjectHostEntry[hostDivergence])}"); a binding may bind only the EXACT material the compatibility authority validated — a same-primary envelope drift can never transpose upstream compatibility authority onto unvalidated material (APPLICATION_MANIFEST §8; ASSEMBLY_CAPABILITY_EXCHANGE §10)`,
       };
     }
   } else if (mintedHostRefs.length > 0) {
