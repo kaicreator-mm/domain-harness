@@ -9,7 +9,7 @@ skip_clone: true
 
 steps:
   - name: verify
-    image: bash
+    image: kaicreator/builder:1.0
     commands:
       - git --version
       - git init .
