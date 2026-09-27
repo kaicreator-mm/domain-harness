@@ -15,7 +15,7 @@ labels:
 steps:
   - name: verify
     image: kaicreator/builder:1.0
-    pull: never
+    pull: false
     commands:
       - git --version
       - git init .
