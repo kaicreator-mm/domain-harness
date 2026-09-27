@@ -178,6 +178,57 @@ export function v003Predecessor(): DacV0041PredecessorBaseline {
 
 export const SUBJECTS = ['subject/selected-alpha', 'subject/selected-beta'] as const;
 
+/**
+ * Canonical COMPLETE exact selected-tuple material for the canonical
+ * subjects (A41-004R3 / #385 P1-1): every valid fixture selected subject
+ * carries non-empty semanticIdentity + revisionIdentity + contentDigest in
+ * addition to authorityScope + primaryIdentity, because the verifier
+ * requires the complete exact tuple as selected-subject material before
+ * any correspondence/coverage.
+ */
+export const SUBJECT_EXACT_MATERIAL = {
+  'subject/selected-alpha': {
+    semanticIdentity: 'semantic/alpha-s1',
+    revisionIdentity: 'revision/alpha-r1',
+    contentDigest: 'digest/alpha-d1',
+  },
+  'subject/selected-beta': {
+    semanticIdentity: 'semantic/beta-s1',
+    revisionIdentity: 'revision/beta-r1',
+    contentDigest: 'digest/beta-d1',
+  },
+} as const;
+
+/**
+ * Mint a `selected-domain-data` reference carrying the COMPLETE exact
+ * selected tuple (R3 canonical shape). Non-canonical subjects (test-only
+ * extras such as gamma) derive deterministic complete material from the
+ * trailing identity segment; `overrides` narrow exactly one dimension for
+ * forged-tuple negatives while keeping the other components present.
+ */
+export function buildSelectedSubjectRef(
+  subjectIdentity: string,
+  overrides: {
+    authorityScope?: string;
+    semanticIdentity?: string;
+    revisionIdentity?: string;
+    contentDigest?: string;
+  } = {},
+): DacV0041Reference {
+  const canonical =
+    SUBJECT_EXACT_MATERIAL[subjectIdentity as keyof typeof SUBJECT_EXACT_MATERIAL];
+  const short = subjectIdentity.replace(/^.*\//u, '');
+  const material = canonical ?? {
+    semanticIdentity: `semantic/${short}-s1`,
+    revisionIdentity: `revision/${short}-r1`,
+    contentDigest: `digest/${short}-d1`,
+  };
+  return buildRef('selected-domain-data', subjectIdentity, {
+    ...material,
+    ...overrides,
+  });
+}
+
 /** Default §8.2 current-authoritative-reuse determination (covers point 60). */
 export function buildReuseCurrentness(
   overrides: Partial<DacV0041ReuseCurrentnessFacts> = {},
@@ -241,9 +292,7 @@ export function buildSelectionFacts(
   return {
     selectionRef: buildRef(ROLE.selection, 'selection/record-1'),
     applicationSemanticIdentityRef: buildRef('application-semantic', 'app/semantic-alpha'),
-    selectedDomainDataRefs: SUBJECTS.map((subject) =>
-      buildRef('selected-domain-data', subject),
-    ),
+    selectedDomainDataRefs: SUBJECTS.map((subject) => buildSelectedSubjectRef(subject)),
     issuerIdentity: IDENTITY.selectionIssuer,
     issuerDesignationChain: buildChainInput(
       'link/selection-leaf',
@@ -269,9 +318,7 @@ export function buildManifestFacts(
     manifestContentDigestRef: buildRef('manifest-content-digest', 'digest/manifest-1'),
     applicationRevisionRef: buildRef('application-revision', 'app-revision/rev-1'),
     applicationSemanticIdentityRef: buildRef('application-semantic', 'app/semantic-alpha'),
-    selectedDomainDataRefs: SUBJECTS.map((subject) =>
-      buildRef('selected-domain-data', subject),
-    ),
+    selectedDomainDataRefs: SUBJECTS.map((subject) => buildSelectedSubjectRef(subject)),
     issuerIdentity: IDENTITY.manifestIssuer,
     issuerDesignationChain: buildChainInput(
       'link/manifest-leaf',
@@ -294,7 +341,7 @@ export function buildCoverage(
   overrides: Partial<DacV0041SelectedDomainDataFacts> = {},
 ): DacV0041SelectedDomainDataFacts {
   return {
-    subjectRef: buildRef('selected-domain-data', subjectIdentity),
+    subjectRef: buildSelectedSubjectRef(subjectIdentity),
     promotionCoverageRef: buildRef('promotion-decision', `promotion/${subjectIdentity}`),
     promotionCurrentness: 'current',
     selectionCoverageRef: buildRef(ROLE.selection, 'selection/record-1'),

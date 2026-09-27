@@ -114,6 +114,7 @@ export type DacV0041CompositionIntakeFailureCode =
   | 'SCOPE_MISMATCH'
   | 'PROFILE_MISMATCH'
   | 'SUBJECT_MISMATCH'
+  | 'INCOMPLETE_SELECTED_TUPLE'
   | 'COVERAGE_INCOMPLETE'
   | 'COVERAGE_INVALIDATED'
   | 'SELECTION_INVALIDATED'
@@ -283,7 +284,15 @@ export interface DacV0041ApplicationSelectionFacts {
   readonly selectionRef: DacV0041Reference;
   /** The already-established application semantic identity it binds. */
   readonly applicationSemanticIdentityRef: DacV0041Reference;
-  /** Exact selected Domain Data subject refs (1..n, `selected-domain-data`). */
+  /**
+   * Exact selected Domain Data subject refs (1..n, `selected-domain-data`).
+   * Every ref MUST carry the COMPLETE exact selected tuple — non-empty
+   * `authorityScope` + `primaryIdentity` + `semanticIdentity` +
+   * `revisionIdentity` + `contentDigest` (DOMAIN_DATA_IR §2; A41-004R3 /
+   * #385 P1-1). An exactness component that is absent or blank is required
+   * material missing, fails closed as INCOMPLETE_SELECTED_TUPLE BEFORE any
+   * correspondence/coverage is evaluated, and is never normalized to null.
+   */
   readonly selectedDomainDataRefs: readonly DacV0041Reference[];
   /** Selection issuer identity (exactly 1). */
   readonly issuerIdentity: string;
@@ -323,7 +332,14 @@ export interface DacV0041ManifestEvidenceFacts {
   readonly applicationRevisionRef: DacV0041Reference;
   /** The established application semantic identity the composition claims. */
   readonly applicationSemanticIdentityRef: DacV0041Reference;
-  /** Exact selected Domain Data subjects the composition claims (1..n). */
+  /**
+   * Exact selected Domain Data subjects the composition claims (1..n). Every
+   * ref MUST carry the COMPLETE exact selected tuple — non-empty
+   * `authorityScope` + `primaryIdentity` + `semanticIdentity` +
+   * `revisionIdentity` + `contentDigest` (DOMAIN_DATA_IR §2; A41-004R3 /
+   * #385 P1-1); an absent/blank exactness component fails closed as
+   * INCOMPLETE_SELECTED_TUPLE before correspondence/coverage.
+   */
   readonly selectedDomainDataRefs: readonly DacV0041Reference[];
   /** Composition/Manifest-issuance issuer identity (exactly 1). */
   readonly issuerIdentity: string;
@@ -391,9 +407,12 @@ export interface DacV0041SelectedDomainDataFacts {
   /**
    * Minted `selected-domain-data` subject reference (exactly 1). Its FULL
    * exact selected tuple — authority scope + primary/semantic/revision
-   * identity + content digest (DOMAIN_DATA_IR §2) — must correspond to the
-   * selection/Manifest subject it covers; primary-identity coincidence
-   * alone is not coverage (A41-004R2 / #381 P1-2).
+   * identity + content digest (DOMAIN_DATA_IR §2) — must be COMPLETE (every
+   * component present and non-empty; an absent/blank exactness component
+   * fails closed as INCOMPLETE_SELECTED_TUPLE before
+   * correspondence/coverage — A41-004R3 / #385 P1-1) and must correspond
+   * to the selection/Manifest subject it covers; primary-identity
+   * coincidence alone is not coverage (A41-004R2 / #381 P1-2).
    */
   readonly subjectRef: DacV0041Reference;
   /** Minted `promotion-decision` reference covering this subject (exactly 1). */
@@ -525,19 +544,30 @@ export type DacV0041AuthorityRefusalEvidenceVerification =
  *      because a Manifest must not retroactively manufacture selection
  *      authority nor silently change material composition identity
  *      (APPLICATION_MANIFEST §§2, 6))
- *  10. revoked/voided promotion coverage    => FAIL_CLOSED
+ *  10. incomplete selected-domain-data
+ *      exact tuple on selection, Manifest
+ *      or coverage evidence (any of
+ *      semanticIdentity/revisionIdentity/
+ *      contentDigest absent or blank)  => FAIL_CLOSED
+ *      INCOMPLETE_SELECTED_TUPLE
+ *      (DOMAIN_DATA_IR §2; A41-004R3 / #385 P1-1: the complete exact tuple
+ *      is REQUIRED selected-subject material — an exactness component that
+ *      is not present cannot correspond, so completeness fails closed
+ *      BEFORE any correspondence/coverage/currentness is evaluated and is
+ *      never normalized to null)
+ *  11. revoked/voided promotion coverage    => FAIL_CLOSED
  *      COVERAGE_INVALIDATED (C81/C157); revoked/voided selection/Manifest
  *      => FAIL_CLOSED SELECTION_INVALIDATED / MANIFEST_INVALIDATED
  *      (ASSEMBLY_PROFILES §8.3 explicit invalidation fails closed for new
  *      authoritative use; structural/authority violations dominate
  *      temporal states per C152/C171)
- *  11. incomplete selected Domain Data
+ *  12. incomplete selected Domain Data
  *      coverage / material refusal omitted
  *      or reclassified                      => FAIL_CLOSED
  *      (COVERAGE_INCOMPLETE / MATERIAL_REFUSAL_OMITTED / refusal codes —
  *      C80/C81/C142/C143: total coverage wherever Runtime consequence
  *      depends on it; refusals are material evidence)
- *  12. stale issuer chain / stale coverage
+ *  13. stale issuer chain / stale coverage
  *      / stale-or-superseded selection or
  *      Manifest reuse / currentness
  *      determination not covering the
@@ -548,7 +578,7 @@ export type DacV0041AuthorityRefusalEvidenceVerification =
  *      point); an intended-use/evaluation point predating the selection
  *      or Manifest issuance point is an impossible temporal claim and
  *      fails closed as INVALID_FACTS first (A41-004R2 / #381 P1-3)
- *  13. otherwise                            => INTAKE_VERIFIED — the
+ *  14. otherwise                            => INTAKE_VERIFIED — the
  *      externally owned evidence is verified-and-accepted as intake input
  *      ONLY: no Composer/selection/promotion/Manifest authority is created,
  *      no Manifest is issued and no live Runtime state is absorbed.

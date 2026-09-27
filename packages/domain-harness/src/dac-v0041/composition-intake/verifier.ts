@@ -32,9 +32,22 @@
 //                                      semantic/revision identity + content
 //                                      digest — never primary identity
 //                                      alone)
-// 10. coverage totals + currentness  (COVERAGE_*; selection/Manifest §8.2
-//                                      reuse currentness — an intended-use
-//                                      point predating the artifact's own
+// 10. selected-tuple completeness
+//                                      then coverage totals + currentness
+//                                      (INCOMPLETE_SELECTED_TUPLE /
+//                                      COVERAGE_*; DOMAIN_DATA_IR §2;
+//                                      A41-004R3 / #385 P1-1: every
+//                                      selected-domain-data ref consumed
+//                                      from ApplicationSelection, Manifest
+//                                      and coverage must carry non-empty
+//                                      semantic/revision identity and
+//                                      content digest BEFORE
+//                                      correspondence/coverage — an
+//                                      absent/blank exactness component
+//                                      never normalizes to null;
+//                                      then selection/Manifest §8.2 reuse
+//                                      currentness — an intended-use point
+//                                      predating the artifact's own
 //                                      issuance is INVALID_FACTS,
 //                                      SELECTION_/MANIFEST_INVALIDATED fail
 //                                      closed, *_NOT_CURRENT stale — then
@@ -419,7 +432,11 @@ function distinctIdentities(
  * identity and content digest — never primary identity alone. JSON array
  * encoding is injective over arbitrary identity strings (control
  * characters are escaped), so two distinct exact tuples can never collide
- * on one key.
+ * on one key. The tuple is only ever computed AFTER the completeness gate
+ * (A41-004R3 / #385 P1-1) — every consumed selected-domain-data ref has
+ * already been required to carry all five components non-empty, so the
+ * `?? null` normalization below is unreachable defensive material, never
+ * a path that admits an incomplete tuple.
  */
 function selectedSubjectTuple(ref: DacV0041Reference): string {
   return JSON.stringify([
@@ -927,8 +944,39 @@ export function verifyDacV0041CompositionIntake(
     };
   }
 
-  // Pass 10: total selected Domain Data coverage (C80/C81; Manifest §3).
-  // 10a. EXACT selected-subject correspondence between the presented
+  // Pass 10: selected-tuple completeness, then total selected Domain Data
+  // coverage (C80/C81; Manifest §3; DOMAIN_DATA_IR §2).
+  // 10a. COMPLETE exact selected-tuple material (A41-004R3 / #385 P1-1):
+  // every `selected-domain-data` ref consumed from ApplicationSelection,
+  // the Manifest and the coverage rows MUST carry the complete exact tuple
+  // — non-empty authorityScope + primaryIdentity + semanticIdentity +
+  // revisionIdentity + contentDigest — BEFORE any correspondence/coverage/
+  // currentness is evaluated. An exactness component that is absent or
+  // blank is required material missing: it can never correspond, and it is
+  // never normalized to null so that an incomplete tuple could collide
+  // with another incomplete tuple and pass as "corresponding" evidence.
+  for (const [label, refs] of [
+    ['applicationSelection.selectedDomainDataRefs', selection.selectedDomainDataRefs],
+    ['manifest.selectedDomainDataRefs', manifest.selectedDomainDataRefs],
+    ['selectedDomainData[].subjectRef', input.selectedDomainData.map((coverage) => coverage.subjectRef)],
+  ] as const) {
+    for (const [index, subject] of refs.entries()) {
+      const missing: string[] = [];
+      if (!isNonEmptyString(subject.authorityScope)) missing.push('authorityScope');
+      if (!isNonEmptyString(subject.primaryIdentity)) missing.push('primaryIdentity');
+      if (!isNonEmptyString(subject.semanticIdentity)) missing.push('semanticIdentity');
+      if (!isNonEmptyString(subject.revisionIdentity)) missing.push('revisionIdentity');
+      if (!isNonEmptyString(subject.contentDigest)) missing.push('contentDigest');
+      if (missing.length > 0) {
+        return {
+          outcome: 'FAIL_CLOSED',
+          code: 'INCOMPLETE_SELECTED_TUPLE',
+          detail: `${label}[${index}] ("${String(subject.primaryIdentity)}") omits required exact selected-tuple material: ${missing.join(', ')}; every selected-domain-data ref must carry the complete exact tuple — authorityScope + primaryIdentity + semanticIdentity + revisionIdentity + contentDigest — before correspondence/coverage (DOMAIN_DATA_IR §2; an absent/blank exactness component can never correspond)`,
+        };
+      }
+    }
+  }
+  // 10b. EXACT selected-subject correspondence between the presented
   // ApplicationSelectionRef and the Manifest over the FULL frozen exact
   // selected tuple — authority scope + primary/semantic/revision identity
   // + content digest (DOMAIN_DATA_IR §2; A41-004R2 / #381 P1-2).
@@ -979,7 +1027,7 @@ export function verifyDacV0041CompositionIntake(
       };
     }
   }
-  // 10b. Coverage-row reconciliation over the exactly corresponding set,
+  // 10c. Coverage-row reconciliation over the exactly corresponding set,
   // keyed by the same full exact selected tuple: a coverage row naming the
   // primary identity of a selected subject under a DIFFERENT exact tuple
   // is a subject mismatch, never accepted coverage (A41-004R2 / #381 P1-2).
@@ -1024,7 +1072,7 @@ export function verifyDacV0041CompositionIntake(
       };
     }
   }
-  // 10c. Current authoritative reuse of the selection and the Manifest
+  // 10d. Current authoritative reuse of the selection and the Manifest
   // (ASSEMBLY_PROFILES §§8.2–8.3; A41-004R1 / #377 P1-3), evaluated at the
   // intended use/evaluation point. Explicit invalidation fails closed
   // BEFORE per-subject promotion currentness is even consulted — structural
@@ -1053,7 +1101,7 @@ export function verifyDacV0041CompositionIntake(
   if (manifestCurrentnessFailure !== null) {
     return manifestCurrentnessFailure;
   }
-  // 10d. Promotion coverage currentness per selected subject (C81/C157),
+  // 10e. Promotion coverage currentness per selected subject (C81/C157),
   // reconciled over the same full exact selected tuples.
   for (const [tuple, subject] of requiredSubjects) {
     const coverage = coveredSubjects.get(tuple);

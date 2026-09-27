@@ -11,9 +11,11 @@ import {
   buildManifestFacts,
   buildRef,
   buildReuseCurrentness,
+  buildSelectedSubjectRef,
   buildSelectionFacts,
   buildValidIntakeInput,
 } from './helpers.js';
+import type { DacV0041Reference } from '../../src/dac-v0041/index.js';
 
 test('a41-004 selection: valid selection evidence verifies as evidence only — no selection authority is created', () => {
   const result = verifyDacV0041CompositionIntake(buildValidIntakeInput());
@@ -141,32 +143,28 @@ test('a41-004 selection: coverage citing a different ApplicationSelectionRef fai
 });
 
 test('a41-004 selection: R2/#381 P1-2 — coverage row naming the same primary identity under a different exact tuple fails closed', () => {
-  // selection and Manifest agree on alpha@revision-r1, but the coverage row
-  // names the same primary identity under a different revision: the exact
-  // selected tuple — not the primary identity alone — must correspond, so
-  // primary-identity coincidence is never accepted coverage
-  // (DOMAIN_DATA_IR §2).
+  // selection and Manifest agree on the COMPLETE alpha tuple (s1/r1/d1),
+  // but the coverage row names the same primary identity under a different
+  // complete revision: the exact selected tuple — not the primary identity
+  // alone — must correspond, so primary-identity coincidence is never
+  // accepted coverage (DOMAIN_DATA_IR §2).
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
       applicationSelection: buildSelectionFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha', {
-            revisionIdentity: 'revision/alpha-r1',
-          }),
-          buildRef('selected-domain-data', 'subject/selected-beta'),
+          buildSelectedSubjectRef('subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-beta'),
         ],
       }),
       manifest: buildManifestFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha', {
-            revisionIdentity: 'revision/alpha-r1',
-          }),
-          buildRef('selected-domain-data', 'subject/selected-beta'),
+          buildSelectedSubjectRef('subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-beta'),
         ],
       }),
       selectedDomainData: [
         buildCoverage('subject/selected-alpha', {
-          subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', {
+          subjectRef: buildSelectedSubjectRef('subject/selected-alpha', {
             revisionIdentity: 'revision/alpha-forged-r9',
           }),
         }),
@@ -176,6 +174,163 @@ test('a41-004 selection: R2/#381 P1-2 — coverage row naming the same primary i
   );
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+test('a41-004 selection: R3/#385 P1-1 — an omitted semanticIdentity/revisionIdentity/contentDigest on a selection selected ref fails closed INCOMPLETE_SELECTED_TUPLE', () => {
+  // The canonical valid intake itself was the R2 counterexample: the
+  // default fixtures selected only authorityScope + primaryIdentity, and
+  // the null-normalizing tuple key let selection/Manifest/coverage
+  // "correspond" on [scope, primary, null, null, null] all the way to
+  // INTAKE_VERIFIED. Under R3 every consumed selected-domain-data ref must
+  // carry the complete exact tuple BEFORE correspondence/coverage. Each
+  // variant omits exactly one component; the counterexample that closed
+  // the P1 is the omission making beta's exactness unknown.
+  for (const [missing, present] of [
+    ['semanticIdentity', { revisionIdentity: 'revision/beta-r1', contentDigest: 'digest/beta-d1' }],
+    ['revisionIdentity', { semanticIdentity: 'semantic/beta-s1', contentDigest: 'digest/beta-d1' }],
+    ['contentDigest', { semanticIdentity: 'semantic/beta-s1', revisionIdentity: 'revision/beta-r1' }],
+  ] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        applicationSelection: buildSelectionFacts({
+          selectedDomainDataRefs: [
+            buildSelectedSubjectRef('subject/selected-alpha'),
+            buildRef('selected-domain-data', 'subject/selected-beta', present),
+          ],
+        }),
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'INCOMPLETE_SELECTED_TUPLE');
+    assert.match(result.detail, new RegExp(missing, 'u'));
+  }
+});
+
+test('a41-004 selection: R3/#385 P1-1 — an omitted exactness component on a coverage subject ref fails closed INCOMPLETE_SELECTED_TUPLE', () => {
+  // Coverage rows are consumed through the same complete-tuple material
+  // rule: a coverage subjectRef whose exactness is partially unknown can
+  // never be reconciled against the selection/Manifest tuples.
+  for (const [missing, present] of [
+    ['semanticIdentity', { revisionIdentity: 'revision/beta-r1', contentDigest: 'digest/beta-d1' }],
+    ['revisionIdentity', { semanticIdentity: 'semantic/beta-s1', contentDigest: 'digest/beta-d1' }],
+    ['contentDigest', { semanticIdentity: 'semantic/beta-s1', revisionIdentity: 'revision/beta-r1' }],
+  ] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        selectedDomainData: [
+          buildCoverage('subject/selected-alpha'),
+          buildCoverage('subject/selected-beta', {
+            subjectRef: buildRef('selected-domain-data', 'subject/selected-beta', present),
+          }),
+        ],
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'INCOMPLETE_SELECTED_TUPLE');
+    assert.match(result.detail, new RegExp(missing, 'u'));
+  }
+});
+
+test('a41-004 selection: R3/#385 P1-1 — an incomplete tuple fails closed even when selection/Manifest/coverage all agree on the SAME incomplete shape', () => {
+  // The exact reviewer counterexample: every position presents the same
+  // selected subjects omitting semantic/revision/digest. Tuple keys become
+  // identical [scope, primary, null, null, null] values, so R2
+  // correspondence + coverage + currentness all closed and the verifier
+  // could return INTAKE_VERIFIED with revision/content exactness unknown.
+  // R3 fails closed before correspondence regardless of the agreement.
+  for (const present of [
+    { revisionIdentity: 'revision/alpha-r1', contentDigest: 'digest/alpha-d1' },
+    { semanticIdentity: 'semantic/alpha-s1', contentDigest: 'digest/alpha-d1' },
+    { semanticIdentity: 'semantic/alpha-s1', revisionIdentity: 'revision/alpha-r1' },
+  ] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        applicationSelection: buildSelectionFacts({
+          selectedDomainDataRefs: [
+            buildRef('selected-domain-data', 'subject/selected-alpha', present),
+            buildRef('selected-domain-data', 'subject/selected-beta'),
+          ],
+        }),
+        manifest: buildManifestFacts({
+          selectedDomainDataRefs: [
+            buildRef('selected-domain-data', 'subject/selected-alpha', present),
+            buildRef('selected-domain-data', 'subject/selected-beta'),
+          ],
+        }),
+        selectedDomainData: [
+          buildCoverage('subject/selected-alpha', {
+            subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', present),
+          }),
+          buildCoverage('subject/selected-beta'),
+        ],
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'INCOMPLETE_SELECTED_TUPLE');
+  }
+});
+
+test('a41-004 selection: R3/#385 P1-1 — deterministic precedence: an incomplete selected tuple fails closed before reuse-currentness classification', () => {
+  // The completeness gate is required material BEFORE
+  // correspondence/coverage/currentness; a revoked selection (which would
+  // fail SELECTION_INVALIDATED at 10d) never masks an incomplete tuple.
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', {
+            semanticIdentity: 'semantic/alpha-s1',
+            revisionIdentity: 'revision/alpha-r1',
+          }),
+          buildSelectedSubjectRef('subject/selected-beta'),
+        ],
+        reuseCurrentness: buildReuseCurrentness({ state: 'revoked' }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INCOMPLETE_SELECTED_TUPLE');
+});
+
+test('a41-004 selection: R3/#385 P1-1 — the mint API never issues a blank exactness component (INVALID_REFERENCE at mint)', () => {
+  // Blank material cannot even become a minted selected-domain-data
+  // reference: the foundation adopt path requires every present identity
+  // component to be a non-empty exact identity string. The verifier's
+  // completeness gate treats a hypothetical blank exactly like an omitted
+  // component (fail closed), so blank fails closed at every layer.
+  for (const blank of ['', '   ']) {
+    assert.throws(
+      () =>
+        buildSelectedSubjectRef('subject/selected-alpha', {
+          semanticIdentity: 'semantic/alpha-s1',
+          revisionIdentity: 'revision/alpha-r1',
+          contentDigest: blank,
+        }),
+      /INVALID_REFERENCE|non-empty/u,
+    );
+  }
+});
+
+test('a41-004 selection: R3/#385 P1-1 — a hand-forged carrier carrying a blank exactness component fails closed as FOREIGN_EVIDENCE (carrier dominates)', () => {
+  // A blank component can only ride a FORGED carrier (mint rejects it), and
+  // the minted-carrier pass dominates the completeness pass: structural
+  // carrier validation fires FOREIGN_EVIDENCE first. Fail-closed either
+  // way — blank is never admitted anywhere.
+  const complete = buildSelectedSubjectRef('subject/selected-alpha');
+  const forged = {
+    ...complete,
+    revisionIdentity: '',
+  } as DacV0041Reference;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha', { subjectRef: forged }),
+        buildCoverage('subject/selected-beta'),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'FOREIGN_EVIDENCE');
 });
 
 

@@ -13,6 +13,7 @@ import {
   buildManifestFacts,
   buildRef,
   buildReuseCurrentness,
+  buildSelectedSubjectRef,
   buildSelectionFacts,
   buildValidIntakeInput,
   v003Predecessor,
@@ -103,8 +104,8 @@ test('a41-004 manifest: R1/#377 P1-2 — Manifest claiming a subject the selecti
     buildValidIntakeInput({
       manifest: buildManifestFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha'),
-          buildRef('selected-domain-data', 'subject/selected-gamma'),
+          buildSelectedSubjectRef('subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-gamma'),
         ],
       }),
     }),
@@ -124,8 +125,8 @@ test('a41-004 manifest: R1/#377 P1-2 — Manifest-only subject with a syntactica
     buildValidIntakeInput({
       manifest: buildManifestFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha'),
-          buildRef('selected-domain-data', 'subject/selected-gamma'),
+          buildSelectedSubjectRef('subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-gamma'),
         ],
       }),
       selectedDomainData: [
@@ -143,7 +144,7 @@ test('a41-004 manifest: R1/#377 P1-2 — a selection subject absent from the Man
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
       manifest: buildManifestFacts({
-        selectedDomainDataRefs: [buildRef('selected-domain-data', 'subject/selected-alpha')],
+        selectedDomainDataRefs: [buildSelectedSubjectRef('subject/selected-alpha')],
       }),
     }),
   );
@@ -156,8 +157,8 @@ test('a41-004 manifest: R1/#377 P1-2 — a repeated selected subject identity fa
     buildValidIntakeInput({
       manifest: buildManifestFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha'),
-          buildRef('selected-domain-data', 'subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-alpha'),
         ],
       }),
     }),
@@ -173,7 +174,9 @@ test('a41-004 manifest: R2/#381 P1-2 — same primary identity under a different
   // carriers and complete coverage rows naming the same
   // ApplicationSelectionRef. Primary-identity correspondence admits a
   // Manifest revision/digest the selection never selected; the full exact
-  // tuple (DOMAIN_DATA_IR §2) must correspond instead.
+  // tuple (DOMAIN_DATA_IR §2) must correspond instead. Only the forged
+  // dimension differs — the Manifest ref still carries the complete tuple
+  // (the omitted-component shape is the separate R3/#385 discriminator).
   for (const forged of [
     { revisionIdentity: 'revision/alpha-forged-r9' },
     { contentDigest: 'digest/alpha-forged-d9' },
@@ -182,8 +185,8 @@ test('a41-004 manifest: R2/#381 P1-2 — same primary identity under a different
       buildValidIntakeInput({
         manifest: buildManifestFacts({
           selectedDomainDataRefs: [
-            buildRef('selected-domain-data', 'subject/selected-alpha', forged),
-            buildRef('selected-domain-data', 'subject/selected-beta'),
+            buildSelectedSubjectRef('subject/selected-alpha', forged),
+            buildSelectedSubjectRef('subject/selected-beta'),
           ],
         }),
         selectedDomainData: [
@@ -202,10 +205,8 @@ test('a41-004 manifest: R2/#381 P1-2 — same primary identity under a different
     buildValidIntakeInput({
       manifest: buildManifestFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha', {
-            authorityScope: SCOPE.other,
-          }),
-          buildRef('selected-domain-data', 'subject/selected-beta'),
+          buildSelectedSubjectRef('subject/selected-alpha', { authorityScope: SCOPE.other }),
+          buildSelectedSubjectRef('subject/selected-beta'),
         ],
       }),
       selectedDomainData: [
@@ -219,26 +220,30 @@ test('a41-004 manifest: R2/#381 P1-2 — same primary identity under a different
 });
 
 test('a41-004 manifest: R2/#381 P1-2 — a selection subject whose exact tuple is absent from the Manifest composition fails closed', () => {
-  // selection alpha carries revision r1; the Manifest keeps the primary
-  // identity but drops the exact revision, so the selected exact tuple is
-  // absent from the composition (material identity change without a new
-  // Manifest revision — APPLICATION_MANIFEST §6).
+  // selection alpha carries the complete exact tuple (s1/r1/d1); the
+  // Manifest keeps the primary identity but claims a DIFFERENT complete
+  // revision (s1/r2/d1), so the selected exact tuple is absent from the
+  // composition (material identity change without a new Manifest revision
+  // — APPLICATION_MANIFEST §6). Both tuples are complete; this is a
+  // tuple-EQUALITY divergence, not the R3 completeness discriminator.
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
       applicationSelection: buildSelectionFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha', {
-            revisionIdentity: 'revision/alpha-r1',
+          buildSelectedSubjectRef('subject/selected-alpha'),
+          buildSelectedSubjectRef('subject/selected-beta'),
+        ],
+      }),
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildSelectedSubjectRef('subject/selected-alpha', {
+            revisionIdentity: 'revision/alpha-r2',
           }),
-          buildRef('selected-domain-data', 'subject/selected-beta'),
+          buildSelectedSubjectRef('subject/selected-beta'),
         ],
       }),
       selectedDomainData: [
-        buildCoverage('subject/selected-alpha', {
-          subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', {
-            revisionIdentity: 'revision/alpha-r1',
-          }),
-        }),
+        buildCoverage('subject/selected-alpha'),
         buildCoverage('subject/selected-beta'),
       ],
     }),
@@ -247,37 +252,99 @@ test('a41-004 manifest: R2/#381 P1-2 — a selection subject whose exact tuple i
   assert.equal(result.code, 'SUBJECT_MISMATCH');
 });
 
-test('a41-004 manifest: R2/#381 P1-2 — identical full exact tuples on selection, Manifest and coverage verify (exact-tuple positive control)', () => {
-  const exactAlpha = {
+test('a41-004 manifest: R2/#381 + R3/#385 — identical complete exact tuples on selection, Manifest and coverage verify (complete-tuple positive boundary)', () => {
+  // Positive boundary: EVERY selected subject (alpha AND beta) carries the
+  // identical COMPLETE exact tuple — authorityScope + primaryIdentity +
+  // semanticIdentity + revisionIdentity + contentDigest — in all three
+  // consumed positions (selection, Manifest, coverage).
+  const alpha = {
     semanticIdentity: 'semantic/alpha-s1',
     revisionIdentity: 'revision/alpha-r1',
     contentDigest: 'digest/alpha-d1',
+  } as const;
+  const beta = {
+    semanticIdentity: 'semantic/beta-s1',
+    revisionIdentity: 'revision/beta-r1',
+    contentDigest: 'digest/beta-d1',
   } as const;
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
       applicationSelection: buildSelectionFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha', exactAlpha),
-          buildRef('selected-domain-data', 'subject/selected-beta'),
+          buildSelectedSubjectRef('subject/selected-alpha', alpha),
+          buildSelectedSubjectRef('subject/selected-beta', beta),
         ],
       }),
       manifest: buildManifestFacts({
         selectedDomainDataRefs: [
-          buildRef('selected-domain-data', 'subject/selected-alpha', exactAlpha),
-          buildRef('selected-domain-data', 'subject/selected-beta'),
+          buildSelectedSubjectRef('subject/selected-alpha', alpha),
+          buildSelectedSubjectRef('subject/selected-beta', beta),
         ],
       }),
       selectedDomainData: [
         buildCoverage('subject/selected-alpha', {
-          subjectRef: buildRef('selected-domain-data', 'subject/selected-alpha', exactAlpha),
+          subjectRef: buildSelectedSubjectRef('subject/selected-alpha', alpha),
         }),
-        buildCoverage('subject/selected-beta'),
+        buildCoverage('subject/selected-beta', {
+          subjectRef: buildSelectedSubjectRef('subject/selected-beta', beta),
+        }),
       ],
     }),
   );
   assert.equal(result.outcome, 'INTAKE_VERIFIED');
 });
 
+
+test('a41-004 manifest: R3/#385 P1-1 — an omitted semanticIdentity/revisionIdentity/contentDigest on a Manifest selected ref fails closed INCOMPLETE_SELECTED_TUPLE', () => {
+  // The R2 gap: the tuple key normalized absent exactness components to
+  // null, so refs that omit semantic/revision/digest would "correspond" on
+  // [scope, primary, null, null, null] and could close INTAKE_VERIFIED
+  // with revision/content exactness unknown. Under R3 the complete exact
+  // tuple is required selected-subject material: any absent component
+  // fails closed BEFORE correspondence/coverage. Each variant omits
+  // exactly one component while the other two stay present.
+  for (const [missing, present] of [
+    ['semanticIdentity', { revisionIdentity: 'revision/alpha-r1', contentDigest: 'digest/alpha-d1' }],
+    ['revisionIdentity', { semanticIdentity: 'semantic/alpha-s1', contentDigest: 'digest/alpha-d1' }],
+    ['contentDigest', { semanticIdentity: 'semantic/alpha-s1', revisionIdentity: 'revision/alpha-r1' }],
+  ] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        manifest: buildManifestFacts({
+          selectedDomainDataRefs: [
+            buildRef('selected-domain-data', 'subject/selected-alpha', present),
+            buildSelectedSubjectRef('subject/selected-beta'),
+          ],
+        }),
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'INCOMPLETE_SELECTED_TUPLE');
+    assert.match(result.detail, new RegExp(missing, 'u'));
+  }
+});
+
+test('a41-004 manifest: R3/#385 P1-1 — an incomplete Manifest tuple fails closed BEFORE selection/Manifest correspondence', () => {
+  // Deterministic precedence: the same input also carries a Manifest-only
+  // subject (gamma) that would fail SUBJECT_MISMATCH at correspondence —
+  // the completeness gate fires first because an exactness component that
+  // is not present cannot correspond at all.
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha', {
+            semanticIdentity: 'semantic/alpha-s1',
+            revisionIdentity: 'revision/alpha-r1',
+          }),
+          buildSelectedSubjectRef('subject/selected-gamma'),
+        ],
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INCOMPLETE_SELECTED_TUPLE');
+});
 
 test('a41-004 manifest: R1/#377 P1-3 — stale or superseded Manifest revision is STALE, never silently reused', () => {
   for (const state of ['stale', 'superseded'] as const) {
