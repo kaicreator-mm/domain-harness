@@ -33,7 +33,6 @@
 // adapter. Imports only the A41-001 foundation contracts/guards.
 
 import type {
-  CompatibilityValidationRequestRef,
   DacV0041CapabilityExchangeFacts,
   DacV0041CurrentnessUseState,
 } from '../contracts.js';

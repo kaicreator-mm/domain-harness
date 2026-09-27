@@ -37,7 +37,11 @@ import {
   type DacV0041CompatibilityViewAssociationInput,
   type DacV0041CompetingValidationFacts,
   type DacV0041RefusalEvidenceFailureCode,
+  type DacV0041AuthorityRefusalSeamKind,
   type DacV0041CompatibilityAssociationFailureCode,
+  type DacV0041CompatibilityPrecedenceFailureCode,
+  type DacV0041CompatibilityResultViewFacts,
+  type DacV0041CompatibilityValidationViewFacts,
 } from './contracts.js';
 
 /** Mutable alias tokens (CROSS_LAYER_REFERENCES §8), mirrored from the frozen foundation set. */
@@ -270,8 +274,8 @@ export function verifyDacV0041CompatibilityViewAssociation(
     }
   }
 
-  const validationView = candidate.validationView;
-  const resultView = candidate.resultView;
+  const validationView = validation as DacV0041CompatibilityValidationViewFacts;
+  const resultView = result as DacV0041CompatibilityResultViewFacts;
   const requestIdentity = request.primaryIdentity;
 
   // Pass 2: mutable aliases.
@@ -499,10 +503,11 @@ export function verifyDacV0041AuthorityRefusalEvidence(
       `refusing issuer "${String(candidate.refusingIssuerIdentity)}" lacks a valid in-scope designation; a non-designated refusal fails closed for authoritative use (C113)`,
     );
   }
+  const seamKind = candidate.seamKind as DacV0041AuthorityRefusalSeamKind;
   return {
     outcome: 'REFUSAL_EVIDENCE',
     refusalIdentity: candidate.refusalIdentity as string,
-    seamKind: candidate.seamKind,
+    seamKind,
     canManufactureAuthority: false,
     canProduceCompatibilityPass: false,
     detail:
