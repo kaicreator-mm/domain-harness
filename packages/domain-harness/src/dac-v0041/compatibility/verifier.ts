@@ -25,6 +25,7 @@ import {
   isCompatibilityValidationRequestRef,
   classifyDacV0041CapabilityExchange,
 } from '../guards.js';
+import { DAC_V0041_ROLE_REGISTRY } from '../contracts.js';
 import type { CompatibilityValidationRequestRef } from '../contracts.js';
 import {
   DAC_V0041_AUTHORITY_REFUSAL_SEAM_KINDS,
@@ -41,6 +42,7 @@ import {
   type DacV0041CompatibilityPrecedenceFailureCode,
   type DacV0041CompatibilityResultViewFacts,
   type DacV0041CompatibilityValidationViewFacts,
+  type DacV0041MaterialManifestRefFacts,
 } from './contracts.js';
 
 /** Mutable alias tokens (CROSS_LAYER_REFERENCES §8), mirrored from the frozen foundation set. */
@@ -88,6 +90,33 @@ function associationFail(
   return { outcome: 'FAIL_CLOSED', code, detail };
 }
 
+/**
+ * Exact material-ref sameness: role and every material-exactness slot
+ * identical, absent slots equal only absent slots (no fuzzy containment).
+ */
+function sameMaterialRefFacts(
+  a: DacV0041MaterialManifestRefFacts,
+  b: DacV0041MaterialManifestRefFacts,
+): boolean {
+  return (
+    a.role === b.role &&
+    a.authorityScope === b.authorityScope &&
+    a.primaryIdentity === b.primaryIdentity &&
+    a.semanticIdentity === b.semanticIdentity &&
+    a.revisionIdentity === b.revisionIdentity &&
+    a.contentDigest === b.contentDigest &&
+    a.contractProfileIdentity === b.contractProfileIdentity
+  );
+}
+
+function sameMaterialRefList(
+  a: readonly DacV0041MaterialManifestRefFacts[],
+  b: readonly DacV0041MaterialManifestRefFacts[],
+): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((entry, index) => sameMaterialRefFacts(entry, b[index]!));
+}
+
 /** Deterministic exact-subject sameness: every closed field identical. */
 function sameSubject(
   a: DacV0041CompatibilitySubjectFacts,
@@ -103,10 +132,41 @@ function sameSubject(
   }
   if (a.runtimeImplementationIdentity !== b.runtimeImplementationIdentity) return false;
   if (a.runtimeHostBindingIdentity !== b.runtimeHostBindingIdentity) return false;
+  if (!sameMaterialRefList(a.materialManifestRefs, b.materialManifestRefs)) return false;
   if (a.targetIdentities.length !== b.targetIdentities.length) return false;
   return a.targetIdentities.every(
     (identity, index) => identity === b.targetIdentities[index],
   );
+}
+
+function materialRefShapeFailure(entry: unknown): string | null {
+  if (entry === null || typeof entry !== 'object') {
+    return 'each materialManifestRefs entry must be an object';
+  }
+  const candidate = entry as Partial<DacV0041MaterialManifestRefFacts>;
+  if (
+    typeof candidate.role !== 'string' ||
+    (DAC_V0041_ROLE_REGISTRY as readonly string[]).indexOf(candidate.role) === -1
+  ) {
+    return `materialManifestRefs entry role "${String(candidate.role)}" is not in the DAC v0.0.4.1 successor role registry`;
+  }
+  if (!isNonEmptyString(candidate.authorityScope)) {
+    return 'materialManifestRefs entry authorityScope must be a non-empty string';
+  }
+  if (!isNonEmptyString(candidate.primaryIdentity)) {
+    return 'materialManifestRefs entry primaryIdentity must be a non-empty string';
+  }
+  for (const field of [
+    'semanticIdentity',
+    'revisionIdentity',
+    'contentDigest',
+    'contractProfileIdentity',
+  ] as const) {
+    if (candidate[field] !== undefined && !isNonEmptyString(candidate[field])) {
+      return `materialManifestRefs entry field ${field} must be a non-empty string when present`;
+    }
+  }
+  return null;
 }
 
 function subjectShapeFailure(subject: unknown): string | null {
@@ -139,6 +199,15 @@ function subjectShapeFailure(subject: unknown): string | null {
   ) {
     return 'runtimeHostBindingIdentity must be a non-empty string when present';
   }
+  if (!Array.isArray(candidate.materialManifestRefs)) {
+    return 'compatibility subject materialManifestRefs must be a list (the complete §8 material-Manifest-ref closure is mandatory; a subject model that cannot carry a material request ref fails closed rather than ignoring it)';
+  }
+  for (const entry of candidate.materialManifestRefs) {
+    const entryFailure = materialRefShapeFailure(entry);
+    if (entryFailure !== null) {
+      return entryFailure;
+    }
+  }
   return null;
 }
 
@@ -156,6 +225,16 @@ function subjectMutableAlias(subject: DacV0041CompatibilitySubjectFacts): string
       : [subject.runtimeHostBindingIdentity]),
     subject.dacProfileIdentity,
   ];
+  for (const entry of subject.materialManifestRefs) {
+    identities.push(
+      entry.primaryIdentity,
+      ...(entry.semanticIdentity === undefined ? [] : [entry.semanticIdentity]),
+      ...(entry.revisionIdentity === undefined ? [] : [entry.revisionIdentity]),
+      ...(entry.contractProfileIdentity === undefined
+        ? []
+        : [entry.contractProfileIdentity]),
+    );
+  }
   return identities.find((identity) => isMutableAliasToken(identity)) ?? null;
 }
 
@@ -180,6 +259,16 @@ function subjectMutableAlias(subject: DacV0041CompatibilitySubjectFacts): string
  *   - RuntimeHostBindingRef       <- the `runtime-host-binding` material
  *                                    input (0..1; a legitimate §8 input when
  *                                    a concrete Host Binding is material)
+ *   - materialManifestRefs        <- EVERY `materialInputRefs` entry of the
+ *                                    request (all roles, not only the named
+ *                                    families above), each with role plus all
+ *                                    material exactness the envelope carries
+ *                                    (authority scope / semantic identity /
+ *                                    revision / digest / profile where
+ *                                    represented) — the complete §8
+ *                                    material-Manifest-ref closure. No
+ *                                    role-valid material input is ever
+ *                                    ignored by request-subject equality.
  *
  * `null` marks a closure element the request fails to bind; `duplicateRole`
  * marks a role the request binds more than once where §8 requires exactly 1.
@@ -194,6 +283,7 @@ interface RecoveredRequestSubjectClosure {
   readonly dacProfileIdentity: string | null;
   readonly runtimeImplementationIdentity: string | null;
   readonly runtimeHostBindingIdentity: string | null;
+  readonly materialManifestRefs: readonly DacV0041MaterialManifestRefFacts[];
   readonly duplicateRole: string | null;
 }
 
@@ -233,15 +323,51 @@ function recoverRequestSubjectClosure(
     dacProfileIdentity: request.contractProfileIdentity ?? null,
     runtimeImplementationIdentity: implementationInputs[0]?.primaryIdentity ?? null,
     runtimeHostBindingIdentity: hostBindingInputs[0]?.primaryIdentity ?? null,
+    materialManifestRefs: request.materialInputRefs.map((material) => ({
+      role: material.role,
+      authorityScope: material.authorityScope,
+      primaryIdentity: material.primaryIdentity,
+      ...(material.semanticIdentity === undefined ? {} : { semanticIdentity: material.semanticIdentity }),
+      ...(material.revisionIdentity === undefined ? {} : { revisionIdentity: material.revisionIdentity }),
+      ...(material.contentDigest === undefined ? {} : { contentDigest: material.contentDigest }),
+      ...(material.contractProfileIdentity === undefined
+        ? {}
+        : { contractProfileIdentity: material.contractProfileIdentity }),
+    })),
     duplicateRole,
   };
+}
+
+/** First material-exactness field in which two material refs diverge (for the fail-closed detail). */
+function materialRefDivergenceField(
+  a: DacV0041MaterialManifestRefFacts,
+  b: DacV0041MaterialManifestRefFacts,
+): keyof DacV0041MaterialManifestRefFacts | null {
+  for (const field of [
+    'role',
+    'authorityScope',
+    'primaryIdentity',
+    'semanticIdentity',
+    'revisionIdentity',
+    'contentDigest',
+    'contractProfileIdentity',
+  ] as const) {
+    if (a[field] !== b[field]) {
+      return field;
+    }
+  }
+  return null;
 }
 
 /**
  * Exact §8 request-subject closure equality: every recovered request element
  * must equal the asserted subject, element for element, with no fuzzy
- * containment. Returns a fail-closed detail string, or null when the request
- * closure exactly equals the subject.
+ * containment — including the COMPLETE material-Manifest-ref list, so a
+ * role-valid material request ref outside the named subject families (e.g.
+ * `runtime-contract`, `domain-ux-definition`,
+ * `runtime-interaction-contract`) is compared, never ignored. Returns a
+ * fail-closed detail string, or null when the request closure exactly
+ * equals the subject.
  */
 function requestSubjectClosureMismatch(
   closure: RecoveredRequestSubjectClosure,
@@ -288,6 +414,22 @@ function requestSubjectClosureMismatch(
   if (closure.runtimeHostBindingIdentity !== (subject.runtimeHostBindingIdentity ?? null)) {
     return `the request binds RuntimeHostBindingRef "${String(closure.runtimeHostBindingIdentity)}" but the validation/result subject is "${String(subject.runtimeHostBindingIdentity)}"; a concrete Host Binding material input must match the subject exactly`;
   }
+  const subjectMaterialRefs = subject.materialManifestRefs;
+  if (closure.materialManifestRefs.length !== subjectMaterialRefs.length) {
+    return `the request carries ${closure.materialManifestRefs.length} material Manifest refs [${closure.materialManifestRefs
+      .map((entry) => `${entry.role}=${entry.primaryIdentity}`)
+      .join(', ')}] but the validation/result subject closes over ${subjectMaterialRefs.length} [${subjectMaterialRefs
+      .map((entry) => `${entry.role}=${entry.primaryIdentity}`)
+      .join(', ')}]; §8 requires ALL material Manifest refs to be part of the exact subject closure — none may be ignored`;
+  }
+  for (let index = 0; index < closure.materialManifestRefs.length; index += 1) {
+    const requestEntry = closure.materialManifestRefs[index]!;
+    const subjectEntry = subjectMaterialRefs[index]!;
+    const divergence = materialRefDivergenceField(requestEntry, subjectEntry);
+    if (divergence !== null) {
+      return `material Manifest ref #${index + 1} (role "${requestEntry.role}") diverges on ${divergence}: the request binds ${String(requestEntry[divergence])} but the validation/result subject carries ${String(subjectEntry[divergence])}; §8 requires role and all material exactness to be identical on both sides`;
+    }
+  }
   return null;
 }
 
@@ -325,10 +467,15 @@ function requestSubjectClosureMismatch(
  *                                         list, binding target/profile,
  *                                         request DAC/reference profile,
  *                                         implementation/host-binding
- *                                         inputs when material — MUST equal
- *                                         the validation/result subject
+ *                                         inputs when material, AND the
+ *                                         COMPLETE material-Manifest-ref
+ *                                         list with role + all material
+ *                                         exactness — MUST equal the
+ *                                         validation/result subject
  *                                         exactly; a request for subject A
- *                                         can never validate subject B)
+ *                                         can never validate subject B,
+ *                                         and no role-valid material
+ *                                         request ref is ever ignored)
  *  10. single authority                  (SECOND_AUTHORITY F-05 co-storage;
  *                                         local to the two views of THIS
  *                                         record — a second independently

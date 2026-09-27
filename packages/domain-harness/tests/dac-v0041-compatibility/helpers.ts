@@ -1,4 +1,6 @@
-// Issue #357 / A41-003 (R1 repair per #378 comment 5852943693 / #376 P1s) —
+// Issue #357 / A41-003 (R1 repair per #378 comment 5852943693 / #376 P1s;
+// R2 repair per #382 comment 5853969754 / #380 comment 5853882625 residual
+// P1 — complete material-Manifest-ref subject closure) —
 // shared deterministic fixtures for the focused compatibility verifier
 // suites. Pure data builders over the A41-001 foundation; every adversarial
 // variation is expressed as an explicit override so each test's facts stay
@@ -16,6 +18,7 @@ import type {
   DacV0041CompatibilitySubjectFacts,
   DacV0041CompatibilityValidationViewFacts,
   DacV0041CompatibilityViewAssociationInput,
+  DacV0041MaterialManifestRefFacts,
 } from '../../src/dac-v0041/compatibility/index.js';
 
 export const IDENTITY = {
@@ -37,6 +40,12 @@ export const SUBJECT = {
   implementation: 'impl/runtime-implementation-7',
   hostBinding: 'host-binding/concrete-hb-9',
   dacProfile: 'dac-profile/v0041-a',
+  runtimeContract: 'runtime-contract/host-contract-11',
+  runtimeContractRevision: 'revision/host-contract-11-r2',
+  runtimeContractDigest: 'sha256:digest-host-contract-11',
+  runtimeContractProfile: 'profile/host-contract-semantics-v3',
+  domainUxDefinition: 'domain-ux/ux-definition-5',
+  domainUxDefinitionRevision: 'revision/ux-definition-5-r1',
 } as const;
 
 export const VIEW = {
@@ -112,6 +121,63 @@ export function buildHostBindingRef(
 }
 
 /**
+ * Exact `runtime-contract` material Manifest ref (R2 §8 closure): carried by
+ * the request and asserted by the subject with role + all material
+ * exactness (semantic identity / revision / digest / profile).
+ */
+export function buildRuntimeContractRef(
+  primaryIdentity: string = SUBJECT.runtimeContract,
+): DacV0041Reference {
+  return adoptDacV0041RegistryReference({
+    role: 'runtime-contract',
+    baseline: DAC_V0041_BASELINE,
+    authorityScope: 'scope/domain-a',
+    primaryIdentity,
+    semanticIdentity: `semantic/${primaryIdentity}`,
+    revisionIdentity: SUBJECT.runtimeContractRevision,
+    contentDigest: SUBJECT.runtimeContractDigest,
+    contractProfileIdentity: SUBJECT.runtimeContractProfile,
+    opaque: {},
+  });
+}
+
+/**
+ * Exact `domain-ux-definition` material Manifest ref (R2 §8 closure, second
+ * material family outside the named subject fields).
+ */
+export function buildDomainUxDefinitionRef(
+  primaryIdentity: string = SUBJECT.domainUxDefinition,
+): DacV0041Reference {
+  return adoptDacV0041RegistryReference({
+    role: 'domain-ux-definition',
+    baseline: DAC_V0041_BASELINE,
+    authorityScope: 'scope/domain-a',
+    primaryIdentity,
+    revisionIdentity: SUBJECT.domainUxDefinitionRevision,
+    opaque: {},
+  });
+}
+
+/**
+ * Test-side derivation of the subject's material-Manifest-ref closure facts
+ * from a foundation-minted reference (the verifier derives the same tuple
+ * from the request independently; fixtures stay recoverable by hand).
+ */
+export function materialRefFacts(ref: DacV0041Reference): DacV0041MaterialManifestRefFacts {
+  return {
+    role: ref.role,
+    authorityScope: ref.authorityScope,
+    primaryIdentity: ref.primaryIdentity,
+    ...(ref.semanticIdentity === undefined ? {} : { semanticIdentity: ref.semanticIdentity }),
+    ...(ref.revisionIdentity === undefined ? {} : { revisionIdentity: ref.revisionIdentity }),
+    ...(ref.contentDigest === undefined ? {} : { contentDigest: ref.contentDigest }),
+    ...(ref.contractProfileIdentity === undefined
+      ? {}
+      : { contractProfileIdentity: ref.contractProfileIdentity }),
+  };
+}
+
+/**
  * The C89 request reference (minted), closing over the exact §8 subject:
  * Manifest identity+digest material input, binding explicit target/profile,
  * and the request's own DAC/reference profile. A request minted WITHOUT the
@@ -170,7 +236,12 @@ export function buildRequestRefWithoutDacProfile(): ReturnType<
   });
 }
 
-/** Exact compatibility subject closure (APPLICATION_MANIFEST §8). */
+/**
+ * Exact compatibility subject closure (APPLICATION_MANIFEST §8), including
+ * the COMPLETE material-Manifest-ref list matching the default request's
+ * `materialInputRefs` (R2: the closure covers every material ref, not only
+ * the named subject families).
+ */
 export function buildSubject(
   overrides: Partial<DacV0041CompatibilitySubjectFacts> = {},
 ): DacV0041CompatibilitySubjectFacts {
@@ -180,6 +251,14 @@ export function buildSubject(
     targetIdentities: [SUBJECT.target],
     requirementsProfileIdentity: SUBJECT.requirements,
     dacProfileIdentity: SUBJECT.dacProfile,
+    materialManifestRefs: [
+      {
+        role: 'manifest',
+        authorityScope: 'scope/domain-a',
+        primaryIdentity: SUBJECT.manifest,
+        contentDigest: SUBJECT.digest,
+      },
+    ],
     ...overrides,
   };
 }

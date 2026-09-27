@@ -40,6 +40,7 @@
 import type {
   DacV0041CapabilityExchangeFacts,
   DacV0041CurrentnessUseState,
+  DacV0041RegistryRole,
 } from '../contracts.js';
 
 /**
@@ -92,6 +93,37 @@ export type DacV0041CompatibilityDisposition =
   (typeof DAC_V0041_COMPATIBILITY_DISPOSITIONS)[number];
 
 /**
+ * One material Manifest ref of the exact §8 subject closure, in externally
+ * recovered fact form (APPLICATION_MANIFEST §8 "all material Manifest refs
+ * required by the validation claim"; CROSS_LAYER_REFERENCES §3.1). Exact
+ * equality covers the role plus every material-exactness slot the foundation
+ * envelope can carry — authority scope, semantic identity, revision,
+ * content digest and contract/profile — each compared only where the ref
+ * represents it (an absent slot equals only an absent slot). Foundation
+ * envelope slots that are NOT subject exactness are deliberately NOT carried
+ * here: `adapter`/`baseline` are uniform mint metadata (guard-enforced on
+ * every minted reference), `locatorHints` is discovery-only, `opaque` is
+ * never interpreted, and `predecessorOrigin` is A41-002 transition/adoption
+ * evidence, not part of the compatibility subject composition.
+ */
+export interface DacV0041MaterialManifestRefFacts {
+  /** Registry role of the material ref (closed DAC v0.0.4.1 vocabulary). */
+  readonly role: DacV0041RegistryRole;
+  /** Exact authority scope the referenced artifact was adopted under. */
+  readonly authorityScope: string;
+  /** Exact primary reference identity of the material artifact. */
+  readonly primaryIdentity: string;
+  /** Exact semantic identity when the ref carries one (0..1). */
+  readonly semanticIdentity?: string;
+  /** Exact revision identity when the ref carries one (0..1). */
+  readonly revisionIdentity?: string;
+  /** Exact content digest when the ref carries one (0..1). */
+  readonly contentDigest?: string;
+  /** Exact contract/profile identity when the ref carries one (0..1). */
+  readonly contractProfileIdentity?: string;
+}
+
+/**
  * Exact compatibility subject closure (APPLICATION_MANIFEST §8): the
  * validation request MUST bind the exact compatibility subject. The subject
  * facts here are the externally recovered, independently asserted form of
@@ -100,9 +132,10 @@ export type DacV0041CompatibilityDisposition =
  * binding explicit target (when present) to be among the exact targets, and
  * — per the §8 request-subject closure pass — the exact subject recovered
  * from the minted request itself (Manifest identity+digest, exact target
- * list, binding target/profile, request DAC/reference profile, and
- * implementation/host-binding inputs when material) to equal the
- * validation/result subject exactly.
+ * list, binding target/profile, request DAC/reference profile,
+ * implementation/host-binding inputs when material, AND the COMPLETE
+ * material-Manifest-ref closure) to equal the validation/result subject
+ * exactly.
  */
 export interface DacV0041CompatibilitySubjectFacts {
   /** Exact ManifestIdentity of the validated composition (exactly 1). */
@@ -119,6 +152,17 @@ export interface DacV0041CompatibilitySubjectFacts {
   readonly runtimeHostBindingIdentity?: string;
   /** Exact DAC/reference profile governing interpretation (exactly 1). */
   readonly dacProfileIdentity: string;
+  /**
+   * The COMPLETE material-Manifest-ref closure required by the validation
+   * claim (APPLICATION_MANIFEST §8), in request order: EVERY material input
+   * the request carries (not only the named families above) with role and
+   * all material exactness per {@link DacV0041MaterialManifestRefFacts}.
+   * This is required, not optional: a subject model that cannot represent a
+   * role-valid material request ref fails closed on the closure comparison
+   * rather than ignoring the ref — two requests differing in a material
+   * composition ref can never verify against one asserted subject.
+   */
+  readonly materialManifestRefs: readonly DacV0041MaterialManifestRefFacts[];
 }
 
 /**

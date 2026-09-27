@@ -1,4 +1,5 @@
-// Issue #357 / A41-003 (R1 repair per #378 comment 5852943693 / #376 P1-1+P1-2)
+// Issue #357 / A41-003 (R1 repair per #378 comment 5852943693 / #376 P1-1+P1-2;
+// R2 repair per #382 comment 5853969754 / #380 comment 5853882625 residual P1)
 // — focused C144 two-view/same-validation-authority suite (LIFECYCLE_
 // REFERENCE_REPAIRS §5): one compatibility validation record exposes
 // separately recoverable CompatibilityValidationRef and CompatibilityResultRef
@@ -13,7 +14,10 @@
 // (APPLICATION_MANIFEST §8): the subject recovered from the minted request
 // (Manifest identity+digest, exact targets, binding target/profile, DAC
 // profile, implementation/host-binding when material) must equal the
-// validation/result subject exactly before VALID_TWO_VIEW.
+// validation/result subject exactly before VALID_TWO_VIEW — and the R2
+// complete material-Manifest-ref closure requires EVERY material input role
+// (e.g. runtime-contract, domain-ux-definition) to be part of that equality,
+// never ignored.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyDacV0041CompatibilityViewAssociation } from '../../src/dac-v0041/compatibility/index.js';
@@ -21,15 +25,18 @@ import {
   IDENTITY,
   SUBJECT,
   buildAssociationInput,
+  buildDomainUxDefinitionRef,
   buildHostBindingRef,
   buildImplementationRef,
   buildManifestRef,
   buildRequestRef,
   buildRequestRefWithoutDacProfile,
   buildResultView,
+  buildRuntimeContractRef,
   buildSubject,
   buildTargetRef,
   buildValidationView,
+  materialRefFacts,
 } from './helpers.js';
 
 test('a41-003 C144: one record may carry both views with one authority (co-storage positive path)', () => {
@@ -216,39 +223,42 @@ test('a41-003 §8 closure: an extra compatibility-target material input outside 
 });
 
 test('a41-003 §8 closure: a multi-target request validating the identical multi-target subject passes', () => {
+  const manifestRef = buildManifestRef(SUBJECT.manifest, SUBJECT.digest);
+  const targetBRef = buildTargetRef(SUBJECT.targetB, SUBJECT.requirements);
+  const multiTargetSubject = buildSubject({
+    targetIdentities: [SUBJECT.target, SUBJECT.targetB],
+    materialManifestRefs: [materialRefFacts(manifestRef), materialRefFacts(targetBRef)],
+  });
   const result = verifyDacV0041CompatibilityViewAssociation(
     buildAssociationInput({
       requestRef: buildRequestRef({
-        materialInputRefs: [
-          buildManifestRef(SUBJECT.manifest, SUBJECT.digest),
-          buildTargetRef(SUBJECT.targetB, SUBJECT.requirements),
-        ],
+        materialInputRefs: [manifestRef, targetBRef],
       }),
-      validationView: buildValidationView({
-        subject: buildSubject({ targetIdentities: [SUBJECT.target, SUBJECT.targetB] }),
-      }),
-      resultView: buildResultView({
-        subject: buildSubject({ targetIdentities: [SUBJECT.target, SUBJECT.targetB] }),
-      }),
+      validationView: buildValidationView({ subject: multiTargetSubject }),
+      resultView: buildResultView({ subject: multiTargetSubject }),
     }),
   );
   assert.equal(result.outcome, 'VALID_TWO_VIEW');
 });
 
 test('a41-003 §8 closure: implementation/host-binding material inputs must match the subject exactly (both directions)', () => {
+  const manifestRef = buildManifestRef(SUBJECT.manifest, SUBJECT.digest);
+  const implementationRef = buildImplementationRef();
+  const hostBindingRef = buildHostBindingRef();
   const implementationSubject = buildSubject({
     runtimeImplementationIdentity: SUBJECT.implementation,
     runtimeHostBindingIdentity: SUBJECT.hostBinding,
+    materialManifestRefs: [
+      materialRefFacts(manifestRef),
+      materialRefFacts(implementationRef),
+      materialRefFacts(hostBindingRef),
+    ],
   });
   // Positive: the request binds both material inputs and both views assert them.
   const positive = verifyDacV0041CompatibilityViewAssociation(
     buildAssociationInput({
       requestRef: buildRequestRef({
-        materialInputRefs: [
-          buildManifestRef(SUBJECT.manifest, SUBJECT.digest),
-          buildImplementationRef(),
-          buildHostBindingRef(),
-        ],
+        materialInputRefs: [manifestRef, implementationRef, hostBindingRef],
       }),
       validationView: buildValidationView({ subject: implementationSubject }),
       resultView: buildResultView({ subject: implementationSubject }),
@@ -271,9 +281,9 @@ test('a41-003 §8 closure: implementation/host-binding material inputs must matc
     buildAssociationInput({
       requestRef: buildRequestRef({
         materialInputRefs: [
-          buildManifestRef(SUBJECT.manifest, SUBJECT.digest),
+          manifestRef,
           buildImplementationRef('impl/runtime-implementation-9'),
-          buildHostBindingRef(),
+          hostBindingRef,
         ],
       }),
       validationView: buildValidationView({ subject: implementationSubject }),
@@ -290,8 +300,8 @@ test('a41-003 §8 closure: implementation/host-binding material inputs must matc
     buildAssociationInput({
       requestRef: buildRequestRef({
         materialInputRefs: [
-          buildManifestRef(SUBJECT.manifest, SUBJECT.digest),
-          buildImplementationRef(),
+          manifestRef,
+          implementationRef,
           buildHostBindingRef('host-binding/concrete-hb-8'),
         ],
       }),
@@ -313,6 +323,108 @@ test('a41-003 §8 closure: duplicate single-cardinality material inputs fail clo
   );
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'REQUEST_SUBJECT_CLOSURE_MISMATCH');
+});
+
+test('a41-003 §8 closure (R2): a role-valid runtime-contract material ref the subject does not close over fails closed', () => {
+  // The R2 discriminator (#380 comment 5853882625 residual P1): every named
+  // subject field is identical — the ONLY difference is a role-valid
+  // material Manifest ref (`runtime-contract`) carried by the request and
+  // ignored by the old subject model. It MUST NOT reach VALID_TWO_VIEW.
+  const requestWithRuntimeContract = buildRequestRef({
+    materialInputRefs: [
+      buildManifestRef(SUBJECT.manifest, SUBJECT.digest),
+      buildRuntimeContractRef(),
+    ],
+  });
+  const result = verifyDacV0041CompatibilityViewAssociation(
+    buildAssociationInput({ requestRef: requestWithRuntimeContract }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'REQUEST_SUBJECT_CLOSURE_MISMATCH');
+  assert.match(result.detail, /material Manifest ref/u);
+});
+
+test('a41-003 §8 closure (R2): a runtime-contract material ref diverging only in material exactness fails closed', () => {
+  // Role and primary identity identical; only the revision/digest/profile
+  // exactness differs — the closure compares ALL material exactness carried
+  // by the ref, not just role + identity.
+  const runtimeContractRef = buildRuntimeContractRef();
+  const subjectWithRuntimeContract = buildSubject({
+    materialManifestRefs: [
+      materialRefFacts(buildManifestRef(SUBJECT.manifest, SUBJECT.digest)),
+      {
+        role: 'runtime-contract',
+        authorityScope: 'scope/domain-a',
+        primaryIdentity: SUBJECT.runtimeContract,
+        semanticIdentity: `semantic/${SUBJECT.runtimeContract}`,
+        revisionIdentity: 'revision/host-contract-11-r1',
+        contentDigest: SUBJECT.runtimeContractDigest,
+        contractProfileIdentity: SUBJECT.runtimeContractProfile,
+      },
+    ],
+  });
+  const result = verifyDacV0041CompatibilityViewAssociation(
+    buildAssociationInput({
+      requestRef: buildRequestRef({
+        materialInputRefs: [
+          buildManifestRef(SUBJECT.manifest, SUBJECT.digest),
+          runtimeContractRef,
+        ],
+      }),
+      validationView: buildValidationView({ subject: subjectWithRuntimeContract }),
+      resultView: buildResultView({ subject: subjectWithRuntimeContract }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'REQUEST_SUBJECT_CLOSURE_MISMATCH');
+  assert.match(result.detail, /revisionIdentity/u);
+});
+
+test('a41-003 §8 closure (R2): a subject asserting a material ref the request never bound fails closed', () => {
+  // Reverse direction with a second material family (domain-ux-definition):
+  // the subject's material-Manifest-ref closure must be backed by the
+  // request element-for-element — an asserted-but-unbound material ref is
+  // not part of the validated subject.
+  const subjectWithUxDefinition = buildSubject({
+    materialManifestRefs: [
+      materialRefFacts(buildManifestRef(SUBJECT.manifest, SUBJECT.digest)),
+      materialRefFacts(buildDomainUxDefinitionRef()),
+    ],
+  });
+  const result = verifyDacV0041CompatibilityViewAssociation(
+    buildAssociationInput({
+      validationView: buildValidationView({ subject: subjectWithUxDefinition }),
+      resultView: buildResultView({ subject: subjectWithUxDefinition }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'REQUEST_SUBJECT_CLOSURE_MISMATCH');
+});
+
+test('a41-003 §8 closure (R2): a request closing over runtime-contract and domain-ux-definition verifies against the identical generalized subject', () => {
+  // Exact positive for the generalized closure: the subject model now
+  // represents arbitrary role-valid material Manifest refs, and a subject
+  // carrying the identical complete material-ref list reaches VALID_TWO_VIEW.
+  const manifestRef = buildManifestRef(SUBJECT.manifest, SUBJECT.digest);
+  const runtimeContractRef = buildRuntimeContractRef();
+  const domainUxDefinitionRef = buildDomainUxDefinitionRef();
+  const generalizedSubject = buildSubject({
+    materialManifestRefs: [
+      materialRefFacts(manifestRef),
+      materialRefFacts(runtimeContractRef),
+      materialRefFacts(domainUxDefinitionRef),
+    ],
+  });
+  const result = verifyDacV0041CompatibilityViewAssociation(
+    buildAssociationInput({
+      requestRef: buildRequestRef({
+        materialInputRefs: [manifestRef, runtimeContractRef, domainUxDefinitionRef],
+      }),
+      validationView: buildValidationView({ subject: generalizedSubject }),
+      resultView: buildResultView({ subject: generalizedSubject }),
+    }),
+  );
+  assert.equal(result.outcome, 'VALID_TWO_VIEW');
 });
 
 test('a41-003 C113: a non-designated validator fails closed for authoritative use', () => {
