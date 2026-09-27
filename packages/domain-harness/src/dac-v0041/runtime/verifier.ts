@@ -32,7 +32,7 @@ import {
   verifyDacV0041CompatibilityViewAssociation,
 } from '../compatibility/index.js';
 import { verifyDacV0041CompositionIntake } from '../composition-intake/index.js';
-import type { DacV0041Reference } from '../contracts.js';
+import type { DacV0041Reference, DacV0041ReferenceEnvelope } from '../contracts.js';
 import type {
   DacV0041DesignationChainFailureCode,
   DacV0041DesignationChainInput,
@@ -42,10 +42,13 @@ import type {
 import type { DacV0041ReuseCurrentnessFacts } from '../composition-intake/contracts.js';
 import {
   DAC_V0041_EXTERNAL_SOR_EVIDENCE_CLASSES,
+  DAC_V0041_RUNTIME_ACTIVATION_ISSUER_SEAM_ROLE,
+  DAC_V0041_RUNTIME_BINDING_ISSUER_SEAM_ROLE,
   DAC_V0041_RUNTIME_NON_SOR_STATE_CLASSES,
 } from './contracts.js';
 import type {
   DacV0041ExternalSorEvidenceClass,
+  DacV0041RuntimeActivationRequestSubjectFacts,
   DacV0041RuntimeNonSorStateClass,
   DacV0041BusinessSorBoundaryClassification,
   DacV0041BusinessSorTruthSourceFacts,
@@ -68,6 +71,15 @@ function isTimePoint(value: unknown): value is DacV0041TimePoint {
 
 function isStringArray(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every(isNonEmptyString);
+}
+
+/** Exact element-for-element string-array equality (no order tolerance). */
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
 }
 
 function isRefLike(value: unknown): value is DacV0041Reference {
@@ -181,6 +193,22 @@ function isRuntimeBindingInput(
   return isTimePoint(candidate.evaluationPoint);
 }
 
+/** Structural shape of the exact §3.1 activation-request subject facts. */
+function isActivationRequestSubjectFacts(
+  value: unknown,
+): value is DacV0041RuntimeActivationRequestSubjectFacts {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as Partial<DacV0041RuntimeActivationRequestSubjectFacts>;
+  for (const field of [
+    'targetBindingIdentity',
+    'targetManifestIdentity',
+    'targetManifestContentDigest',
+  ] as const) {
+    if (!isNonEmptyString(candidate[field])) return false;
+  }
+  return isReuseCurrentness(candidate.reliedBindingCurrentness);
+}
+
 /** Structural shape of the complete Runtime activation verification input. */
 function isRuntimeActivationInput(
   value: unknown,
@@ -197,6 +225,7 @@ function isRuntimeActivationInput(
   ] as const) {
     if (!isNonEmptyString(candidate[field])) return false;
   }
+  if (!isActivationRequestSubjectFacts(candidate.activationRequestSubject)) return false;
   if (!isRuntimeBindingInput(candidate.binding)) return false;
   if (!isIssuerFacts(candidate.activationIssuer)) return false;
   if (!isIssuanceEvidence(candidate.activationIssuanceEvidence)) return false;
@@ -225,6 +254,37 @@ function distinctIdentities(
           detail: `identity "${left.identity}" is shared by ${left.label} and ${right.label}; every Runtime-seam identity must remain separately recoverable`,
         };
       }
+    }
+  }
+  return null;
+}
+
+/** Material-exactness envelope fields compared for full exact reference equality. */
+type DacV0041EnvelopeMaterialField =
+  | 'role'
+  | 'authorityScope'
+  | 'primaryIdentity'
+  | 'semanticIdentity'
+  | 'revisionIdentity'
+  | 'contentDigest'
+  | 'contractProfileIdentity';
+
+/** First material-exactness field in which two reference envelopes diverge. */
+function envelopeDivergenceField(
+  a: DacV0041ReferenceEnvelope,
+  b: DacV0041ReferenceEnvelope,
+): DacV0041EnvelopeMaterialField | null {
+  for (const field of [
+    'role',
+    'authorityScope',
+    'primaryIdentity',
+    'semanticIdentity',
+    'revisionIdentity',
+    'contentDigest',
+    'contractProfileIdentity',
+  ] as const) {
+    if (a[field] !== b[field]) {
+      return field;
     }
   }
   return null;
@@ -775,6 +835,142 @@ export function verifyDacV0041RuntimeBinding(
     };
   }
 
+  // Rung 10 (closed, §3.1): the presented RuntimeBindingRequestRef itself
+  // must close exactly over the bound facts — envelope scope/profile, the
+  // §4.1 binding explicit target/profile, and the complete material input
+  // set (exact Manifest identity+digest plus the FULL exact Runtime
+  // implementation/Host Binding envelopes when material). Primary identity
+  // association alone (checked at rung 6) never suffices; a minted request
+  // with the expected identity but a foreign scope, target, profile or
+  // material set fails closed.
+  if (request.authorityScope !== intakeScope) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SCOPE_MISMATCH',
+      detail: `the binding request's authority scope "${request.authorityScope}" does not equal the intake-verified application scope "${intakeScope}"; the request must close exactly over the authority scope of the composition it binds (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (request.contractProfileIdentity !== input.subject.dacProfileIdentity) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'PROFILE_MISMATCH',
+      detail: `the binding request's DAC/reference profile "${String(request.contractProfileIdentity)}" does not equal the bound DAC/reference profile "${input.subject.dacProfileIdentity}"; the request must close exactly over the profile of the composition it binds (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  const subjectTarget = compatibilitySubject.targetIdentities[0];
+  if (
+    request.bindingTargetRef === undefined ||
+    request.bindingTargetRef.role !== 'compatibility-target' ||
+    request.bindingTargetRef.primaryIdentity !== subjectTarget
+  ) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the binding request's §4.1 binding explicit target (${request.bindingTargetRef === undefined ? 'absent' : `"${request.bindingTargetRef.primaryIdentity}"`}) does not equal the exact compatibility target "${String(subjectTarget)}" the subject validated; the request must bind the exact target it binds the composition to, never an advisory hint (ASSEMBLY_CAPABILITY_EXCHANGE §4.1; CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (
+    request.bindingTargetRef.contractProfileIdentity !==
+    compatibilitySubject.requirementsProfileIdentity
+  ) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'PROFILE_MISMATCH',
+      detail: `the binding request's target requirements/check profile "${String(request.bindingTargetRef.contractProfileIdentity)}" does not equal the compatibility-validated requirements profile "${compatibilitySubject.requirementsProfileIdentity}"; the request must close exactly over the exact target/profile the compatibility evidence established (ASSEMBLY_CAPABILITY_EXCHANGE §4.1)`,
+    };
+  }
+  const materialByRole = (role: string) =>
+    request.materialInputRefs.filter((material) => material.role === role);
+  const requestManifestInputs = materialByRole('manifest');
+  const requestImplementationInputs = materialByRole('runtime-implementation');
+  const requestHostInputs = materialByRole('runtime-host-binding');
+  if (requestManifestInputs.length !== 1) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the binding request carries ${requestManifestInputs.length} "manifest" material input(s); §3.1 requires exactly the one exact Manifest (identity + content digest) the binding binds`,
+    };
+  }
+  const requestManifest = requestManifestInputs[0]!;
+  if (requestManifest.primaryIdentity !== input.subject.manifestIdentity) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the binding request's manifest material input "${requestManifest.primaryIdentity}" does not equal the bound Manifest identity "${input.subject.manifestIdentity}"`,
+    };
+  }
+  if (requestManifest.contentDigest !== input.subject.manifestContentDigest) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the binding request's manifest material input carries content digest "${String(requestManifest.contentDigest)}" instead of the bound Manifest content digest "${input.subject.manifestContentDigest}"; the request must bind the exact digest, not the identity alone`,
+    };
+  }
+  const expectedImplementationCount = implementationRef === undefined ? 0 : 1;
+  if (requestImplementationInputs.length !== expectedImplementationCount) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the binding request carries ${requestImplementationInputs.length} "runtime-implementation" material input(s) while the binding ${implementationRef === undefined ? 'presents no' : 'presents exactly one'} Runtime implementation artifact; the request material set must close exactly over the bound material (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (implementationRef !== undefined) {
+    const divergence = envelopeDivergenceField(requestImplementationInputs[0]!, implementationRef);
+    if (divergence !== null) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the binding request's runtime-implementation material input diverges from the presented Runtime implementation evidence on ${divergence} (request "${String(requestImplementationInputs[0]![divergence])}" vs evidence "${String(implementationRef[divergence])}"); the exact reference material must be identical on both sides, never primary identity alone (ASSEMBLY_CAPABILITY_EXCHANGE §10)`,
+      };
+    }
+  }
+  if (requestHostInputs.length !== mintedHostRefs.length) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the binding request carries ${requestHostInputs.length} "runtime-host-binding" material input(s) while the binding presents ${mintedHostRefs.length} Host Binding artifact(s); the request material set must close exactly over the bound material (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  for (const hostRef of mintedHostRefs) {
+    const requestHostInput = requestHostInputs.find(
+      (material) => material.primaryIdentity === hostRef.primaryIdentity,
+    );
+    if (requestHostInput === undefined) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the binding request carries no runtime-host-binding material input for the presented Host Binding evidence "${hostRef.primaryIdentity}"; wrong/missing material reference fails closed (CROSS_LAYER_REFERENCES §3.1)`,
+      };
+    }
+    const divergence = envelopeDivergenceField(requestHostInput, hostRef);
+    if (divergence !== null) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `the binding request's runtime-host-binding material input for "${hostRef.primaryIdentity}" diverges from the presented Host Binding evidence on ${divergence} (request "${String(requestHostInput[divergence])}" vs evidence "${String(hostRef[divergence])}"); the exact reference material must be identical on both sides, never primary identity alone (ASSEMBLY_CAPABILITY_EXCHANGE §10)`,
+      };
+    }
+  }
+  const expectedMaterialCount =
+    1 + expectedImplementationCount + mintedHostRefs.length;
+  if (request.materialInputRefs.length !== expectedMaterialCount) {
+    const extra = request.materialInputRefs.find((material) => {
+      const role = material.role;
+      return (
+        role !== 'manifest' &&
+        role !== 'runtime-implementation' &&
+        role !== 'runtime-host-binding'
+      );
+    });
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: extra === undefined
+        ? `the binding request carries ${request.materialInputRefs.length} material input(s) instead of the exact ${expectedMaterialCount} bound material input(s); the material set must close exactly (CROSS_LAYER_REFERENCES §3.1)`
+        : `the binding request carries a material input of role "${extra.role}" ("${extra.primaryIdentity}") that is not part of the exact bound material set; material the binding does not cover cannot join the bound composition (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+
   // Rung 11: the binding act's own issuance evidence (C128 family: never
   // asserted solely by the binding issuer) and temporal sanity of the
   // evaluation point.
@@ -799,7 +995,21 @@ export function verifyDacV0041RuntimeBinding(
   }
 
   // Rung 12: binding issuer designation chain at the evidenced issuance
-  // point, then the exact leaf issuer/role/scope/profile binding.
+  // point, then the exact leaf issuer/role/scope/profile binding. The
+  // issuing role is SEAM-FIXED: the binding seam requires exactly
+  // "runtime-binding" independently of (and before) the chain comparison,
+  // so a caller-supplied role token — even one coherently matched by the
+  // chain-current leaf designation — can never substitute the seam's
+  // issuing authority (§§12/§16; C154). The same identity MAY still hold
+  // other separately designated roles (C169): only the role occupying the
+  // binding-issuer position is fixed.
+  if (input.bindingIssuer.requiredIssuingRole !== DAC_V0041_RUNTIME_BINDING_ISSUER_SEAM_ROLE) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'UNAUTHORIZED_BINDING_ISSUER',
+      detail: `the Runtime binding seam requires the seam-fixed issuing role "${DAC_V0041_RUNTIME_BINDING_ISSUER_SEAM_ROLE}" (got caller-supplied "${input.bindingIssuer.requiredIssuingRole}"); a caller-controlled role token — even one coherently matched by the chain-current leaf — can never define the binding seam's issuing authority (ASSEMBLY_LIFECYCLE §§12,16; C154)`,
+    };
+  }
   const chainFailure = checkRuntimeIssuerChain({
     issuer: input.bindingIssuer,
     issuancePoint: input.bindingIssuanceEvidence.point,
@@ -1058,10 +1268,83 @@ export function verifyDacV0041RuntimeActivation(
     };
   }
 
+  // Rung 6 (closed, §3.1): the activation REQUEST itself must carry the
+  // frozen §3.1 minimum — exact RuntimeBindingRef + exact composition/
+  // Manifest/currentness evidence. The generic registry reference has no
+  // structural material slots, so the request's exact subject arrives as
+  // the recovered `activationRequestSubject` facts and is closed exactly
+  // against the bound bundle (and the request envelope's scope/profile);
+  // the request's relied currentness determination must cohere exactly
+  // with the one this verifier evaluates. Generic role + primary request
+  // association alone never suffices.
+  const requestSubject = input.activationRequestSubject;
+  if (requestSubject.targetBindingIdentity !== input.boundBindingIdentity) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'REQUEST_ASSOCIATION_MISMATCH',
+      detail: `the activation request targets RuntimeBindingRef "${requestSubject.targetBindingIdentity}" but the activation binds "${input.boundBindingIdentity}"; the request must carry the exact binding subject it asks to activate (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (requestSubject.targetManifestIdentity !== input.boundManifestIdentity) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the activation request targets Manifest identity "${requestSubject.targetManifestIdentity}" but the activation binds "${input.boundManifestIdentity}"; the request must carry the exact composition/Manifest subject (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (requestSubject.targetManifestContentDigest !== input.boundManifestContentDigest) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SUBJECT_MISMATCH',
+      detail: `the activation request targets Manifest content digest "${requestSubject.targetManifestContentDigest}" but the activation binds "${input.boundManifestContentDigest}"; the request must carry the exact composition/Manifest subject (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (
+    requestSubject.reliedBindingCurrentness.state !== input.bindingReuseCurrentness.state ||
+    requestSubject.reliedBindingCurrentness.establishedAt !==
+      input.bindingReuseCurrentness.establishedAt ||
+    !arraysEqual(
+      requestSubject.reliedBindingCurrentness.assertedBy,
+      input.bindingReuseCurrentness.assertedBy,
+    )
+  ) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'REQUEST_ASSOCIATION_MISMATCH',
+      detail: `the activation request relies on a §8.2 binding-currentness determination (${requestSubject.reliedBindingCurrentness.state} at ${requestSubject.reliedBindingCurrentness.establishedAt}) that differs from the determination the activation evaluates (${input.bindingReuseCurrentness.state} at ${input.bindingReuseCurrentness.establishedAt}); the request must carry the exact currentness evidence relied on (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  const activationIntakeScope =
+    input.binding.compositionIntake.applicationIdentityEstablishment.applicationScope;
+  if (activationRequest.authorityScope !== activationIntakeScope) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'REQUEST_ASSOCIATION_MISMATCH',
+      detail: `the activation request's authority scope "${activationRequest.authorityScope}" does not equal the bound binding's intake-verified application scope "${activationIntakeScope}"; the request must close exactly over the authority scope of the binding it asks to activate (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+  if (activationRequest.contractProfileIdentity !== input.binding.subject.dacProfileIdentity) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'REQUEST_ASSOCIATION_MISMATCH',
+      detail: `the activation request's DAC/reference profile "${String(activationRequest.contractProfileIdentity)}" does not equal the bound binding's DAC/reference profile "${input.binding.subject.dacProfileIdentity}"; the request must close exactly over the profile of the binding it asks to activate (CROSS_LAYER_REFERENCES §3.1)`,
+    };
+  }
+
   // Rung 7: the bound binding bundle must itself verify at the activation
   // point — activation never manufactures the missing upstream
-  // promotion/selection/Manifest/compatibility authority (§13).
-  const binding = verifyDacV0041RuntimeBinding(input.binding);
+  // promotion/selection/Manifest/compatibility authority (§13). The
+  // COMPLETE bundle is re-verified WITH the activation evaluation point:
+  // every currentness-dependent component — including the material Runtime
+  // implementation/Host Binding §8.2 reuse determinations — is
+  // re-established at the ACTIVATION point, never merely trusted from
+  // binding time (§14). The derived verification context re-evaluates the
+  // recovered evidence in memory; no upstream evidence is mutated or
+  // reissued.
+  const binding = verifyDacV0041RuntimeBinding({
+    ...input.binding,
+    evaluationPoint: input.evaluationPoint,
+  });
   if (binding.outcome === 'FAIL_CLOSED') {
     return {
       outcome: 'FAIL_CLOSED',
@@ -1109,7 +1392,24 @@ export function verifyDacV0041RuntimeActivation(
   }
 
   // Rung 9: activation issuer designation chain at the evidenced issuance
-  // point, then the exact leaf issuer/role/scope/profile binding.
+  // point, then the exact leaf issuer/role/scope/profile binding. The
+  // issuing role is SEAM-FIXED: the activation seam requires exactly
+  // "runtime-activation" independently of (and before) the chain
+  // comparison, so a caller-supplied role token — even one coherently
+  // matched by the chain-current leaf designation — can never substitute
+  // the seam's issuing authority (§13/§16; C142). The same identity MAY
+  // still hold the separately designated binding role (C169): only the
+  // role occupying the activation-issuer position is fixed.
+  if (
+    input.activationIssuer.requiredIssuingRole !==
+    DAC_V0041_RUNTIME_ACTIVATION_ISSUER_SEAM_ROLE
+  ) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'UNAUTHORIZED_ACTIVATION_ISSUER',
+      detail: `the Runtime activation seam requires the seam-fixed issuing role "${DAC_V0041_RUNTIME_ACTIVATION_ISSUER_SEAM_ROLE}" (got caller-supplied "${input.activationIssuer.requiredIssuingRole}"); a caller-controlled role token — even one coherently matched by the chain-current leaf — can never define the activation seam's issuing authority (ASSEMBLY_LIFECYCLE §§13,16; C142)`,
+    };
+  }
   const chainFailure = checkRuntimeIssuerChain({
     issuer: input.activationIssuer,
     issuancePoint: input.activationIssuanceEvidence.point,

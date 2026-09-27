@@ -99,6 +99,19 @@ export const DAC_V0041_RUNTIME_SEAM_ROLES = [
 export type DacV0041RuntimeSeamRole = (typeof DAC_V0041_RUNTIME_SEAM_ROLES)[number];
 
 /**
+ * Seam-FIXED issuing-authority roles (ASSEMBLY_LIFECYCLE §§12–13, §16; C142/
+ * C154). Each Runtime authority-bearing seam owns exactly one issuing role;
+ * the verifier — never the caller — fixes it. A caller-supplied
+ * `requiredIssuingRole` token can never define or substitute the seam's
+ * issuing authority: a coherent substitution that changes both the asserted
+ * token and the chain-current leaf to another valid role still fails closed.
+ * The same identity MAY validly hold both separately designated roles (C169).
+ */
+export const DAC_V0041_RUNTIME_BINDING_ISSUER_SEAM_ROLE = 'runtime-binding';
+
+export const DAC_V0041_RUNTIME_ACTIVATION_ISSUER_SEAM_ROLE = 'runtime-activation';
+
+/**
  * Closed §8.2 current-authoritative-reuse vocabulary for Runtime
  * implementation / Host Binding / binding reuse at the Runtime seams
  * (ASSEMBLY_PROFILES §§8.2–8.3). Same deterministic semantics as the
@@ -196,12 +209,15 @@ export interface DacV0041RuntimeCompatibilityEvidenceFacts {
 
 /**
  * Issuer/designation facts for one Runtime authority-bearing act. The
- * issuing-role token is the caller's exact assertion (like the A41-002
- * adoption and A41-004 intake boundaries): this verifier enforces it
- * exactly against the chain-current leaf designation and never guesses a
- * role mapping. Per ASSEMBLY_LIFECYCLE §16 the Runtime binding issuer role
- * and the Runtime activation issuer role are DISTINCT seams even when the
- * same identity holds both designations.
+ * issuing-role token is the caller's exact assertion, but the seam's
+ * authority role is FIXED by this verifier (`runtime-binding` for the
+ * binding seam, `runtime-activation` for the activation seam): the token
+ * must equal the seam-fixed role AND the chain-current leaf designation
+ * must carry that same exact role with the issuer/scope/profile — so a
+ * coherent wrong-role substitution (token and leaf changed together to
+ * another valid role) fails closed, never passes. Per ASSEMBLY_LIFECYCLE
+ * §16 the two Runtime issuer roles are DISTINCT seams even when the same
+ * identity holds both designations.
  */
 export interface DacV0041RuntimeIssuerFacts {
   readonly issuerIdentity: string;
@@ -216,7 +232,21 @@ export interface DacV0041RuntimeIssuerFacts {
  * performs no live-state reads or writes anywhere and issues nothing.
  */
 export interface DacV0041RuntimeBindingVerificationInput {
-  /** Minted foundation `RuntimeBindingRequestRef` (C108) being answered. */
+  /**
+   * Minted foundation `RuntimeBindingRequestRef` (C108) being answered. The
+   * request is closed EXACTLY over the facts being bound (CROSS_LAYER_
+   * REFERENCES §3.1: "exact selected/compatible composition + Runtime
+   * implementation/Host Binding evidence when material"): its
+   * `authorityScope` must equal the intake-verified application scope, its
+   * `contractProfileIdentity` must equal the bound DAC/reference profile,
+   * its §4.1 `bindingTargetRef` must be the exact `compatibility-target`
+   * (identity + requirements profile) the compatibility subject validated,
+   * and its `materialInputRefs` must close exactly (full material
+   * exactness, not primary identity alone) over the exact Manifest
+   * (identity + content digest) plus the exact Runtime implementation /
+   * Host Binding material artifacts when the claim is implementation-
+   * specific — no foreign, missing or extra material.
+   */
   readonly bindingRequestRef: unknown;
   /** Minted `runtime-binding` registry reference presented as the result. */
   readonly bindingResultRef: unknown;
@@ -312,14 +342,26 @@ export type DacV0041RuntimeBindingStaleCode =
  *      implementation-specific compatibility evidence binding the SAME
  *      exact implementation/Host Binding identities — a later concrete
  *      choice never retroactively strengthens an earlier abstract
- *      compatibility result)
+ *      compatibility result — and the presented RuntimeBindingRequestRef
+ *      must close exactly over the bound facts (§3.1): request authority
+ *      scope == intake scope, request DAC profile == subject profile, the
+ *      request's §4.1 binding explicit target == the exact compatibility
+ *      target/requirements profile the subject validated, and the
+ *      request's material inputs == the exact Manifest (identity + content
+ *      digest) plus the FULL exact Runtime implementation/Host Binding
+ *      material envelopes when material — never a foreign scope, target or
+ *      material set, and never primary identity alone)
  *  11. binding issuance evidence          => FAIL_CLOSED
  *      EVIDENCE_UNESTABLISHED (C128 family: not asserted solely by the
  *      binding issuer)
  *  12. binding issuer designation chain   => FAIL_CLOSED
- *      UNAUTHORIZED_BINDING_ISSUER (carries the chain code; C100/C113/
- *      C154: Composer-role or non-designated issuers, and leaf
- *      issuer/role/scope/profile mismatch) / STALE ISSUER_CHAIN_STALE
+ *      UNAUTHORIZED_BINDING_ISSUER (the seam-fixed issuing role
+ *      "runtime-binding" is required INDEPENDENTLY of the chain
+ *      comparison — a caller-supplied role token, even one coherently
+ *      matched by the chain-current leaf, can never substitute the seam's
+ *      issuing authority; the A41-002 chain walk then carries the chain
+ *      code; C100/C113/C154: Composer-role or non-designated issuers, and
+ *      leaf issuer/role/scope/profile mismatch) / STALE ISSUER_CHAIN_STALE
  *  13. F-07 SoD                           => FAIL_CLOSED (SELF_APPROVAL /
  *      SOD_PERMISSION_MISSING / COLOCATION_UNDISCLOSED; C148/C149; the
  *      same-identity rule cannot be cured by permission, and a co-hosted
@@ -365,14 +407,48 @@ export type DacV0041RuntimeBindingVerification =
     };
 
 /**
+ * Exact §3.1 subject association a `RuntimeActivationRequestRef` must carry
+ * (CROSS_LAYER_REFERENCES §3.1: "exact `RuntimeBindingRef` + exact
+ * composition/Manifest/currentness evidence"). A generic registry reference
+ * has no structural material slots, so the request's exact subject arrives
+ * as these externally recovered facts; the verifier closes them exactly
+ * against the bound binding bundle and the activation request envelope —
+ * generic role + primary request association alone never suffices.
+ */
+export interface DacV0041RuntimeActivationRequestSubjectFacts {
+  /** Exact `RuntimeBindingRef` identity the activation request targets. */
+  readonly targetBindingIdentity: string;
+  /** Exact Manifest identity the activation request targets. */
+  readonly targetManifestIdentity: string;
+  readonly targetManifestContentDigest: string;
+  /**
+   * The exact §8.2 currentness determination the request itself relies on
+   * for the bound binding; it must cohere exactly (state, establishment
+   * point and attestors) with the binding-reuse determination the
+   * activation verifier evaluates.
+   */
+  readonly reliedBindingCurrentness: DacV0041ReuseCurrentnessFacts;
+}
+
+/**
  * Complete Runtime activation verification input (ASSEMBLY_LIFECYCLE §13).
  * The activation seam re-verifies the COMPLETE binding evidence bundle at
- * the activation point (binding must be current there) — activation never
- * manufactures the missing upstream promotion/selection/Manifest/
- * compatibility authority the binding bundle itself did not prove.
+ * the activation point — every currentness-dependent component of the
+ * relied bundle (compatibility result currentness plus material Runtime
+ * implementation/Host Binding §8.2 reuse) is re-evaluated at the
+ * ACTIVATION evaluation point, never merely trusted from binding time —
+ * and activation never manufactures the missing upstream promotion/
+ * selection/Manifest/compatibility authority the binding bundle itself did
+ * not prove.
  */
 export interface DacV0041RuntimeActivationVerificationInput {
-  /** Minted `runtime-activation-request` registry reference. */
+  /**
+   * Minted `runtime-activation-request` registry reference. Its envelope
+   * must close over the bound facts: `authorityScope` == the binding's
+   * intake-verified application scope and `contractProfileIdentity` == the
+   * bound DAC/reference profile; its exact subject association is carried
+   * by `activationRequestSubject` (§3.1 minimum).
+   */
   readonly activationRequestRef: unknown;
   /** Minted `runtime-activation` registry reference presented as the result. */
   readonly activationResultRef: unknown;
@@ -383,7 +459,13 @@ export interface DacV0041RuntimeActivationVerificationInput {
   /** Exact composition/Manifest identity the activation binds (§13). */
   readonly boundManifestIdentity: string;
   readonly boundManifestContentDigest: string;
-  /** The COMPLETE binding evidence bundle, re-verified at activation time. */
+  /** The exact §3.1 subject the activation request itself binds. */
+  readonly activationRequestSubject: DacV0041RuntimeActivationRequestSubjectFacts;
+  /**
+   * The COMPLETE binding evidence bundle, re-verified at the activation
+   * point with every currentness-dependent component re-evaluated at the
+   * activation evaluation point (binding must be current THERE).
+   */
   readonly binding: DacV0041RuntimeBindingVerificationInput;
   /** Activation issuer designation/provenance (§16: a DISTINCT seam role). */
   readonly activationIssuer: DacV0041RuntimeIssuerFacts;
@@ -442,16 +524,31 @@ export type DacV0041RuntimeActivationStaleCode =
  *   6. request/binding association       => FAIL_CLOSED
  *      REQUEST_ASSOCIATION_MISMATCH / SUBJECT_MISMATCH (the activation
  *      binds exactly its presented request identity, the exact bound
- *      binding identity and the exact composition/Manifest identity)
+ *      binding identity and the exact composition/Manifest identity; the
+ *      activation REQUEST itself must additionally carry the §3.1
+ *      minimum — its envelope scope/profile must equal the bound scope/
+ *      profile and its `activationRequestSubject` must close exactly over
+ *      the exact RuntimeBindingRef + Manifest identity/digest + the
+ *      currentness determination it relies on; generic role + primary
+ *      request association alone never suffices)
  *   7. the bound binding bundle itself   => FAIL_CLOSED
  *      BINDING_NOT_ESTABLISHED (carries the binding code; STALE binding
- *      evidence propagates as STALE BINDING_EVIDENCE_STALE) — activation
- *      manufactures no missing upstream authority (§13)
+ *      evidence propagates as STALE BINDING_EVIDENCE_STALE) — the
+ *      COMPLETE bundle is re-verified WITH every currentness-dependent
+ *      component (material Runtime implementation/Host Binding §8.2
+ *      reuse included) re-evaluated at the ACTIVATION evaluation point:
+ *      material evidence current only at binding time but not covering
+ *      the activation point is STALE, never admitted; activation
+ *      manufactures no missing upstream authority (§13/§14)
  *   8. activation issuance evidence      => FAIL_CLOSED
  *      EVIDENCE_UNESTABLISHED (C128 family)
  *   9. activation issuer chain           => FAIL_CLOSED
- *      UNAUTHORIZED_ACTIVATION_ISSUER (carries the chain code; C100/C113)
- *      / STALE ISSUER_CHAIN_STALE
+ *      UNAUTHORIZED_ACTIVATION_ISSUER (the seam-fixed issuing role
+ *      "runtime-activation" is required INDEPENDENTLY of the chain
+ *      comparison — a caller-supplied role token, even one coherently
+ *      matched by the chain-current leaf, can never substitute the seam's
+ *      issuing authority; the A41-002 chain walk then carries the chain
+ *      code; C100/C113) / STALE ISSUER_CHAIN_STALE
  *  10. F-07 SoD                          => FAIL_CLOSED (SELF_APPROVAL /
  *      SOD_PERMISSION_MISSING / COLOCATION_UNDISCLOSED)
  *  11. binding §8.2 reuse at activation  => FAIL_CLOSED

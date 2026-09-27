@@ -330,7 +330,10 @@ test('a41-005 binding: C100/§2.2 — designation derived from a Composer-role d
   assert.equal(result.chainCode, 'COMPOSER_DESIGNATOR');
 });
 
-test('a41-005 binding: a leaf designation that does not carry the asserted issuer/role fails closed', () => {
+test('a41-005 binding: a caller-supplied non-binding issuing role token fails closed before the chain comparison', () => {
+  // A41-005R1 P1-1: the seam-fixed role check fires INDEPENDENTLY of the
+  // designation-chain leaf comparison — changing only the asserted token
+  // (leaf untouched) is rejected at the seam before any chain walk.
   const input = buildValidBindingInput();
   const result = verifyDacV0041RuntimeBinding({
     ...input,
@@ -341,7 +344,7 @@ test('a41-005 binding: a leaf designation that does not carry the asserted issue
   });
   assert.ok(result.outcome === 'FAIL_CLOSED');
   assert.equal(result.code, 'UNAUTHORIZED_BINDING_ISSUER');
-  assert.match(result.detail, /leaf designation/u);
+  assert.match(result.detail, /seam-fixed issuing role/u);
 });
 
 test('a41-005 binding: an issuer chain lapsed at the binding issuance point is STALE', () => {

@@ -527,6 +527,11 @@ export function buildMaterialArtifact(
  * The default bundle is the abstract claim; passing implementation/host
  * artifacts switches every layer (compatibility subject, request material
  * inputs, binding evidence) to the implementation-specific §11 shape.
+ * The minted RuntimeBindingRequestRef carries the COMPLETE §3.1 closure:
+ * exact authority scope + DAC profile, the §4.1 binding explicit target
+ * (identity + requirements profile) and the exact material input set
+ * (Manifest identity+digest plus the full implementation/Host Binding
+ * envelopes when material).
  */
 export function buildValidBindingInput(
   overrides: {
@@ -567,7 +572,19 @@ export function buildValidBindingInput(
         buildRef('manifest', MANIFEST_MATERIAL.manifestIdentity, {
           contentDigest: MANIFEST_MATERIAL.manifestContentDigest,
         }),
+        ...(implementation === undefined
+          ? []
+          : [implementation.artifactRef as DacV0041Reference]),
+        ...(hostBindings === undefined
+          ? []
+          : hostBindings.map((host) => host.artifactRef as DacV0041Reference)),
       ],
+      bindingTargetRef: buildRef(
+        'compatibility-target',
+        MANIFEST_MATERIAL.targetIdentity,
+        { contractProfileIdentity: PROFILE.requirements },
+      ),
+      contractProfileIdentity: PROFILE.v0041,
     }),
     bindingResultRef: buildRef('runtime-binding', 'binding/record-1'),
     boundRequestIdentity: 'request/binding-1',
@@ -599,21 +616,37 @@ export function buildValidBindingInput(
 
 /**
  * Fully valid Runtime activation verification input (ACTIVATION_VERIFIED
- * at 85) over the canonical binding bundle.
+ * at 85) over the canonical binding bundle. The activation request
+ * envelope carries the exact bound scope/profile and the §3.1 subject
+ * facts (exact binding + Manifest identity/digest + the relied §8.2
+ * currentness determination), derived coherently from the resolved
+ * `bound*` / `bindingReuseCurrentness` values unless explicitly overridden.
  */
 export function buildValidActivationInput(
   overrides: Partial<DacV0041RuntimeActivationVerificationInput> & {
     binding?: DacV0041RuntimeBindingVerificationInput;
   } = {},
 ): DacV0041RuntimeActivationVerificationInput {
-  const { binding, ...inputOverrides } = overrides;
-  return {
-    activationRequestRef: buildRef('runtime-activation-request', 'request/activation-1'),
+  const { binding, activationRequestSubject, ...inputOverrides } = overrides;
+  const resolved: DacV0041RuntimeActivationVerificationInput = {
+    activationRequestRef: buildRef('runtime-activation-request', 'request/activation-1', {
+      contractProfileIdentity: PROFILE.v0041,
+    }),
     activationResultRef: buildRef('runtime-activation', 'activation/record-1'),
     boundRequestIdentity: 'request/activation-1',
     boundBindingIdentity: 'binding/record-1',
     boundManifestIdentity: 'manifest/record-1',
     boundManifestContentDigest: 'digest/manifest-1',
+    activationRequestSubject: {
+      targetBindingIdentity: 'binding/record-1',
+      targetManifestIdentity: 'manifest/record-1',
+      targetManifestContentDigest: 'digest/manifest-1',
+      reliedBindingCurrentness: {
+        state: 'current',
+        establishedAt: 85,
+        assertedBy: [IDENTITY.witness],
+      },
+    },
     binding: binding ?? buildValidBindingInput(),
     activationIssuer: {
       issuerIdentity: IDENTITY.activationIssuer,
@@ -634,5 +667,17 @@ export function buildValidActivationInput(
     sod: buildSodFacts(),
     evaluationPoint: 85,
     ...inputOverrides,
+  };
+  return {
+    ...resolved,
+    activationRequestSubject:
+      activationRequestSubject === undefined
+        ? {
+            targetBindingIdentity: resolved.boundBindingIdentity,
+            targetManifestIdentity: resolved.boundManifestIdentity,
+            targetManifestContentDigest: resolved.boundManifestContentDigest,
+            reliedBindingCurrentness: resolved.bindingReuseCurrentness,
+          }
+        : activationRequestSubject,
   };
 }
