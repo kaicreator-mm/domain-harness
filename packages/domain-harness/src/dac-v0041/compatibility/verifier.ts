@@ -204,7 +204,7 @@ export function verifyDacV0041CompatibilityViewAssociation(
       'requestRef must be a CompatibilityValidationRequestRef minted by the DAC v0.0.4.1 foundation core (foreign/forged carriers fail closed)',
     );
   }
-  const request = candidate.requestRef as CompatibilityValidationRequestRef;
+  const request = candidate.requestRef;
   const validation = candidate.validationView;
   if (validation === null || typeof validation !== 'object') {
     return associationFail('INVALID_FACTS', 'validationView must be an object');
@@ -252,8 +252,8 @@ export function verifyDacV0041CompatibilityViewAssociation(
   if (resultSubjectFailure !== null) {
     return associationFail('INVALID_FACTS', `resultView subject: ${resultSubjectFailure}`);
   }
-  const competingValidations =
-    candidate.competingValidations === undefined ? [] : candidate.competingValidations;
+  const competingValidations: readonly DacV0041CompetingValidationFacts[] =
+    candidate.competingValidations ?? [];
   if (!Array.isArray(competingValidations)) {
     return associationFail('INVALID_FACTS', 'competingValidations must be an array when present');
   }
@@ -274,8 +274,8 @@ export function verifyDacV0041CompatibilityViewAssociation(
     }
   }
 
-  const validationView = validation as DacV0041CompatibilityValidationViewFacts;
-  const resultView = result as DacV0041CompatibilityResultViewFacts;
+  const validationView: DacV0041CompatibilityValidationViewFacts = validation;
+  const resultView: DacV0041CompatibilityResultViewFacts = result;
   const requestIdentity = request.primaryIdentity;
 
   // Pass 2: mutable aliases.
@@ -382,13 +382,17 @@ export function verifyDacV0041CompatibilityViewAssociation(
   // Pass 10: no second independently-issued validation for the same exact
   // subject may both count (C144; C98 evidence).
   for (const competing of competingValidations) {
+    const competingRecord = competing as Partial<DacV0041CompetingValidationFacts>;
     if (
-      competing.validationViewIdentity !== validationView.validationViewIdentity &&
-      sameSubject(competing.subject, validationView.subject)
+      competingRecord.validationViewIdentity !== validationView.validationViewIdentity &&
+      sameSubject(
+        competingRecord.subject as DacV0041CompatibilitySubjectFacts,
+        validationView.subject,
+      )
     ) {
       return associationFail(
         'SECOND_VALIDATION_FOR_SAME_SUBJECT',
-        `a second independently-issued validation "${competing.validationViewIdentity}" covers the same exact subject; two peer validations cannot both count (C144/C98)`,
+        `a second independently-issued validation "${String(competingRecord.validationViewIdentity)}" covers the same exact subject; two peer validations cannot both count (C144/C98)`,
       );
     }
   }
