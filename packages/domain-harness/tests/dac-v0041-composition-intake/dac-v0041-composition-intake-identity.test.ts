@@ -13,6 +13,7 @@ import {
   SCOPE,
   buildLeafLink,
   buildRef,
+  buildRequestlessInitiation,
   buildRootIssuanceLink,
   buildEstablishmentFacts,
   buildValidIntakeInput,
@@ -63,33 +64,204 @@ test('a41-004 identity: C141 — establishment record aliasing its own request f
   assert.equal(result.code, 'IDENTITY_ALIAS');
 });
 
-test('a41-004 identity: absent initiation evidence (no request, no explicit initiation) fails closed', () => {
+test('a41-004 identity: absent initiation evidence (no request, no requestless initiation record) fails closed', () => {
   const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
   void _omitted;
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
-      applicationIdentityEstablishment: {
-        ...requestless,
-        initiationExplicitlyEvidenced: false,
-      },
+      applicationIdentityEstablishment: requestless,
     }),
   );
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'INVALID_FACTS');
 });
 
-test('a41-004 identity: requestless seam with explicitly evidenced initiation verifies', () => {
+test('a41-004 identity: R1/#377 P1-1 — claim-only boolean initiation cannot close identity intake', () => {
+  // The pre-R1 shape asserted initiation through a boolean caller claim
+  // (`initiationExplicitlyEvidenced: true`) with no externally recoverable
+  // initiation record; exactly that claim-only shape must fail closed.
+  const claimOnly = {
+    establishmentRequestRef: undefined,
+    initiationExplicitlyEvidenced: true,
+  } as unknown as Parameters<typeof buildEstablishmentFacts>[0];
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: buildEstablishmentFacts(claimOnly),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 identity: requestless seam with an externally recoverable initiation record verifies', () => {
   const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
   void _omitted;
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
       applicationIdentityEstablishment: {
         ...requestless,
-        initiationExplicitlyEvidenced: true,
+        requestlessInitiation: buildRequestlessInitiation(),
       },
     }),
   );
   assert.equal(result.outcome, 'INTAKE_VERIFIED');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — both request seam and requestless initiation is an ambiguous seam and fails closed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: buildEstablishmentFacts({
+        requestlessInitiation: buildRequestlessInitiation(),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — forged requestless initiation carrier fails closed as FOREIGN_EVIDENCE', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationRef: { role: 'evidence', primaryIdentity: 'x' } as never,
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'FOREIGN_EVIDENCE');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — wrong-role initiation reference fails closed', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationRef: buildRef(
+            'application-identity-establishment-request',
+            'initiation/establishment-1',
+          ),
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'ROLE_MISMATCH');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — predecessor-wrapped initiation reference fails closed', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationRef: buildRef('evidence', 'initiation/establishment-1', {
+            predecessorOrigin: v003Predecessor(),
+          }),
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'PREDECESSOR_WRAPPED');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — initiation reference aliasing the establishment record fails closed', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationRef: buildRef('evidence', 'establishment/record-1'),
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'IDENTITY_ALIAS');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — unattested requestless initiation provenance fails closed', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationProvenance: { point: 28, assertedBy: [] },
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'EVIDENCE_UNESTABLISHED');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — initiation issuer not covered by the provenance attestors fails closed', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationIssuerIdentity: 'id/outsider',
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'EVIDENCE_UNESTABLISHED');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — initiation reference bound to a different application scope fails closed', () => {
+  const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+  void _omitted;
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationIdentityEstablishment: {
+        ...requestless,
+        requestlessInitiation: buildRequestlessInitiation({
+          initiationRef: buildRef('evidence', 'initiation/establishment-1', {
+            authorityScope: SCOPE.other,
+          }),
+        }),
+      },
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SCOPE_MISMATCH');
+});
+
+test('a41-004 identity: R1/#377 P1-1 — initiation provenance at/after the establishment issuance point fails closed', () => {
+  for (const point of [30, 31] as const) {
+    const { establishmentRequestRef: _omitted, ...requestless } = buildEstablishmentFacts();
+    void _omitted;
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        applicationIdentityEstablishment: {
+          ...requestless,
+          requestlessInitiation: buildRequestlessInitiation({
+            initiationProvenance: { point, assertedBy: [IDENTITY.witness] },
+          }),
+        },
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'ESTABLISHMENT_ORDER_VIOLATED');
+  }
 });
 
 test('a41-004 identity: foreign/forged establishment carrier fails closed', () => {

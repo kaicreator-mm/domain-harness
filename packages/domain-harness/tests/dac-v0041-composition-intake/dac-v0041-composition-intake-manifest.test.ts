@@ -8,8 +8,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyDacV0041CompositionIntake } from '../../src/dac-v0041/composition-intake/index.js';
 import {
+  buildCoverage,
   buildManifestFacts,
   buildRef,
+  buildReuseCurrentness,
   buildValidIntakeInput,
   v003Predecessor,
 } from './helpers.js';
@@ -94,7 +96,7 @@ test('a41-004 manifest: C145 — predecessor-wrapped Manifest evidence fails clo
   assert.equal(result.code, 'PREDECESSOR_WRAPPED');
 });
 
-test('a41-004 manifest: Manifest claiming a subject the selection did not select fails closed (no composition absorption)', () => {
+test('a41-004 manifest: R1/#377 P1-2 — Manifest claiming a subject the selection did not select fails closed (exact selected-subject correspondence)', () => {
   const result = verifyDacV0041CompositionIntake(
     buildValidIntakeInput({
       manifest: buildManifestFacts({
@@ -106,7 +108,125 @@ test('a41-004 manifest: Manifest claiming a subject the selection did not select
     }),
   );
   assert.equal(result.outcome, 'FAIL_CLOSED');
-  assert.equal(result.code, 'COVERAGE_INCOMPLETE');
+  assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+test('a41-004 manifest: R1/#377 P1-2 — Manifest-only subject with a syntactically complete forged coverage row still fails closed', () => {
+  // selection = {alpha,beta}; Manifest = {alpha,gamma}; the attacker also
+  // forges a complete coverage row for gamma naming the PRESENTED
+  // ApplicationSelectionRef with current promotion. Exact selected-subject
+  // correspondence fails closed before any coverage row is consulted — a
+  // Manifest must not retroactively manufacture selection authority
+  // (APPLICATION_MANIFEST §2).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha'),
+          buildRef('selected-domain-data', 'subject/selected-gamma'),
+        ],
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha'),
+        buildCoverage('subject/selected-beta'),
+        buildCoverage('subject/selected-gamma'),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+test('a41-004 manifest: R1/#377 P1-2 — a selection subject absent from the Manifest composition fails closed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [buildRef('selected-domain-data', 'subject/selected-alpha')],
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SUBJECT_MISMATCH');
+});
+
+test('a41-004 manifest: R1/#377 P1-2 — a repeated selected subject identity fails closed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        selectedDomainDataRefs: [
+          buildRef('selected-domain-data', 'subject/selected-alpha'),
+          buildRef('selected-domain-data', 'subject/selected-alpha'),
+        ],
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 manifest: R1/#377 P1-3 — stale or superseded Manifest revision is STALE, never silently reused', () => {
+  for (const state of ['stale', 'superseded'] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        manifest: buildManifestFacts({
+          reuseCurrentness: buildReuseCurrentness({ state }),
+        }),
+      }),
+    );
+    assert.equal(result.outcome, 'STALE');
+    assert.equal(result.code, 'MANIFEST_NOT_CURRENT');
+  }
+});
+
+test('a41-004 manifest: R1/#377 P1-3 — revoked or voided Manifest fails closed', () => {
+  for (const state of ['revoked', 'voided'] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        manifest: buildManifestFacts({
+          reuseCurrentness: buildReuseCurrentness({ state }),
+        }),
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'MANIFEST_INVALIDATED');
+  }
+});
+
+test('a41-004 manifest: R1/#377 P1-3 — Manifest currentness determination not covering the evaluation point is STALE', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        reuseCurrentness: buildReuseCurrentness({ establishedAt: 59 }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'STALE');
+  assert.equal(result.code, 'MANIFEST_NOT_CURRENT');
+});
+
+test('a41-004 manifest: R1/#377 P1-3 — undecidable Manifest currentness state fails closed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        // `reselected` is a selection-only state, not a Manifest state.
+        reuseCurrentness: buildReuseCurrentness({ state: 'reselected' }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 manifest: R1/#377 P1-3 — currentness determination predating the Manifest issuance is malformed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      manifest: buildManifestFacts({
+        reuseCurrentness: buildReuseCurrentness({ establishedAt: 49 }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
 });
 
 test('a41-004 manifest: unauthorized Manifest issuer fails closed', () => {

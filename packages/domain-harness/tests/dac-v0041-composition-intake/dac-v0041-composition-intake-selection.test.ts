@@ -9,6 +9,7 @@ import {
   ROLE,
   buildCoverage,
   buildRef,
+  buildReuseCurrentness,
   buildSelectionFacts,
   buildValidIntakeInput,
 } from './helpers.js';
@@ -160,4 +161,102 @@ test('a41-004 selection: unauthorized selection issuer fails closed', () => {
   );
   assert.equal(result.outcome, 'FAIL_CLOSED');
   assert.equal(result.code, 'UNAUTHORIZED_ISSUER');
+});
+
+test('a41-004 selection: R1/#377 P1-3 — superseded or reselected selection is STALE for authoritative reuse', () => {
+  for (const state of ['stale', 'superseded', 'reselected'] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        applicationSelection: buildSelectionFacts({
+          reuseCurrentness: buildReuseCurrentness({ state }),
+        }),
+      }),
+    );
+    assert.equal(result.outcome, 'STALE');
+    assert.equal(result.code, 'SELECTION_NOT_CURRENT');
+  }
+});
+
+test('a41-004 selection: R1/#377 P1-3 — revoked or voided selection fails closed', () => {
+  for (const state of ['revoked', 'voided'] as const) {
+    const result = verifyDacV0041CompositionIntake(
+      buildValidIntakeInput({
+        applicationSelection: buildSelectionFacts({
+          reuseCurrentness: buildReuseCurrentness({ state }),
+        }),
+      }),
+    );
+    assert.equal(result.outcome, 'FAIL_CLOSED');
+    assert.equal(result.code, 'SELECTION_INVALIDATED');
+  }
+});
+
+test('a41-004 selection: R1/#377 P1-3 — selection currentness determination not covering the evaluation point is STALE', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ establishedAt: 59 }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'STALE');
+  assert.equal(result.code, 'SELECTION_NOT_CURRENT');
+});
+
+test('a41-004 selection: R1/#377 P1-3 — undecidable selection currentness state fails closed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ state: 'maybe' }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 selection: R1/#377 P1-3 — currentness determination predating the selection issuance is malformed', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ establishedAt: 39 }),
+      }),
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'INVALID_FACTS');
+});
+
+test('a41-004 selection: R1/#377 P1-3 — deterministic precedence: revoked selection fails closed even when promotion coverage is also stale', () => {
+  // Structural/authority violation (explicit invalidation, FAIL_CLOSED)
+  // dominates the temporal stale coverage state (C152/C171).
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ state: 'revoked' }),
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha'),
+        buildCoverage('subject/selected-beta', { promotionCurrentness: 'stale' }),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'SELECTION_INVALIDATED');
+});
+
+test('a41-004 selection: R1/#377 P1-3 — deterministic precedence: selection currentness is decided before per-subject promotion currentness', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      applicationSelection: buildSelectionFacts({
+        reuseCurrentness: buildReuseCurrentness({ state: 'superseded' }),
+      }),
+      selectedDomainData: [
+        buildCoverage('subject/selected-alpha'),
+        buildCoverage('subject/selected-beta', { promotionCurrentness: 'stale' }),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'STALE');
+  assert.equal(result.code, 'SELECTION_NOT_CURRENT');
 });

@@ -78,7 +78,10 @@ export const DAC_V0041_REFUSAL_SEAM_REQUEST_ROLES: Readonly<
  * presented reference carrying any other role fails closed with
  * ROLE_MISMATCH — a ManifestDraft, promotion decision or request reference
  * can never occupy a result/decision position (C88 / APPLICATION_MANIFEST
- * §4; CROSS_LAYER_REFERENCES §6).
+ * §4; CROSS_LAYER_REFERENCES §6). The generic `evidence` registry role is
+ * consumed only for F-04 §4.1 requestless initiation records (A41-004R1:
+ * requestless initiation must be externally recoverable evidence, never a
+ * caller boolean claim).
  */
 export const DAC_V0041_COMPOSITION_INTAKE_EVIDENCE_ROLES = [
   'application-identity-establishment',
@@ -92,6 +95,7 @@ export const DAC_V0041_COMPOSITION_INTAKE_EVIDENCE_ROLES = [
   'authority-refusal',
   'selected-domain-data',
   'promotion-decision',
+  'evidence',
 ] as const;
 
 export type DacV0041CompositionIntakeEvidenceRole =
@@ -112,6 +116,8 @@ export type DacV0041CompositionIntakeFailureCode =
   | 'SUBJECT_MISMATCH'
   | 'COVERAGE_INCOMPLETE'
   | 'COVERAGE_INVALIDATED'
+  | 'SELECTION_INVALIDATED'
+  | 'MANIFEST_INVALIDATED'
   | 'MATERIAL_REFUSAL_OMITTED'
   | 'REFUSAL_SEAM_UNKNOWN'
   | 'REFUSAL_SEAM_CONFLATED'
@@ -122,7 +128,105 @@ export type DacV0041CompositionIntakeFailureCode =
 /** Deterministic STALE reason codes (non-current reusable evidence). */
 export type DacV0041CompositionIntakeStaleCode =
   | 'ISSUER_CHAIN_STALE'
-  | 'COVERAGE_NOT_CURRENT';
+  | 'COVERAGE_NOT_CURRENT'
+  | 'SELECTION_NOT_CURRENT'
+  | 'MANIFEST_NOT_CURRENT';
+
+/**
+ * F-04 §4.1 requestless initiation evidence (A41-004R1 repair of #377
+ * P1-1): when no `ApplicationIdentityEstablishmentRequestRef` seam is used,
+ * the "explicitly evidenced initiation" the frozen minima demand MUST be an
+ * externally recoverable record — never a caller boolean claim. The record
+ * carries its minted `evidence`-role reference, the exact initiating
+ * subject, the issuer that evidenced the initiation, and independently
+ * recoverable initiation provenance. Intake verifies the exact
+ * reference/evidence/provenance/issuer/subject closure (carrier, role,
+ * predecessor wrap, identity anti-alias, scope binding, attestor-backed
+ * provenance, issuer recoverability, initiation-before-establishment
+ * ordering); a claim-only or self-asserted boolean cannot close identity
+ * intake.
+ */
+export interface DacV0041RequestlessInitiationEvidence {
+  /**
+   * Minted `evidence`-role reference of the initiation record (exactly 1).
+   * Its `authorityScope` must equal the establishment's application scope
+   * (subject/scope closure) and its identity must stay distinct from every
+   * other F-04 chain identity (C141).
+   */
+  readonly initiationRef: DacV0041Reference;
+  /** Exact initiating subject identity (exactly 1, non-empty). */
+  readonly initiatedBy: string;
+  /**
+   * Identity of the issuer that evidenced the initiation record (exactly 1).
+   * MUST be among the initiation provenance attestors, so the issuer claim
+   * is backed by the independently recoverable provenance closure.
+   */
+  readonly initiationIssuerIdentity: string;
+  /**
+   * Independently recoverable initiation provenance (exactly 1): the
+   * initiation record's own issuance point and attestors. Must be attested
+   * (>= 1 attestor) and must strictly precede the establishment issuance
+   * point — the establishment record responds to its initiation, never the
+   * other way around.
+   */
+  readonly initiationProvenance: DacV0041IssuancePointEvidence;
+}
+
+/**
+ * ASSEMBLY_PROFILES §8.2 current authoritative reuse closure (A41-004R1
+ * repair of #377 P1-3): before an externally issued ApplicationSelectionRef
+ * or authoritative Manifest is reused for a new authoritative action
+ * (composition intake here), the consumer MUST re-check explicit later
+ * invalidation/revocation/void and ordinary supersession/current status.
+ * This is the externally established currentness determination for one
+ * artifact, evaluated for the intended current use at the input evaluation
+ * point. `establishedAt` MUST be no earlier than the artifact's own
+ * issuance point (a determination predating the artifact is malformed) and
+ * no earlier than the evaluation point (a determination that does not cover
+ * the intended use point is not current for that use).
+ */
+export interface DacV0041ReuseCurrentnessFacts {
+  /**
+   * Externally established currentness state (closed per-artifact
+   * vocabulary; undecidable states fail closed).
+   */
+  readonly state: string;
+  /** Point at which the currentness state was externally established. */
+  readonly establishedAt: DacV0041TimePoint;
+  /** Independent attestors of the currentness determination (1..n). */
+  readonly assertedBy: readonly string[];
+}
+
+/**
+ * Closed currentness vocabulary for ApplicationSelectionRef reuse
+ * (ASSEMBLY_PROFILES §§8.2–8.3, §9): `revoked`/`voided` are explicit
+ * invalidations that FAIL CLOSED for new authoritative use;
+ * `stale`/`superseded`/`reselected` are ordinary non-current states that are
+ * STALE for authoritative intake; `current` passes only when the
+ * determination covers the evaluation point.
+ */
+export const DAC_V0041_SELECTION_REUSE_CURRENTNESS_STATES = [
+  'current',
+  'stale',
+  'superseded',
+  'reselected',
+  'revoked',
+  'voided',
+] as const;
+
+/**
+ * Closed currentness vocabulary for authoritative Manifest reuse
+ * (ASSEMBLY_PROFILES §8.2 "Manifest revision/currentness"): same
+ * deterministic FAIL_CLOSED/STALE precedence; `reselected` is a selection
+ * state and is NOT a Manifest state (undecidable for a Manifest).
+ */
+export const DAC_V0041_MANIFEST_REUSE_CURRENTNESS_STATES = [
+  'current',
+  'stale',
+  'superseded',
+  'revoked',
+  'voided',
+] as const;
 
 /**
  * Externally recovered facts of one `ApplicationIdentityEstablishmentRef`
@@ -133,12 +237,19 @@ export interface DacV0041IdentityEstablishmentFacts {
   readonly establishmentRef: DacV0041Reference;
   /**
    * Minted `application-identity-establishment-request` reference: exactly 1
-   * when a request seam is used; otherwise `initiationExplicitlyEvidenced`
-   * must carry the evidenced initiation (C141 anti-alias either way).
+   * when a request seam is used. Mutually exclusive with
+   * `requestlessInitiation` — both present is an ambiguous seam and neither
+   * present is absent initiation evidence; both fail closed (C141
+   * anti-alias either way).
    */
   readonly establishmentRequestRef?: DacV0041Reference;
-  /** Whether an explicitly evidenced initiation exists (requestless seam). */
-  readonly initiationExplicitlyEvidenced: boolean;
+  /**
+   * F-04 §4.1 "explicitly evidenced initiation" for the requestless seam:
+   * an externally recoverable initiation record with exact
+   * reference/evidence/provenance/issuer/subject closure. A boolean
+   * caller claim can never substitute for it (A41-004R1 / #377 P1-1).
+   */
+  readonly requestlessInitiation?: DacV0041RequestlessInitiationEvidence;
   /** The established `ApplicationSemanticIdentity` (minted, exactly 1). */
   readonly applicationSemanticIdentityRef: DacV0041Reference;
   /** Issuer identity of the establishment record (exactly 1). */
@@ -183,6 +294,15 @@ export interface DacV0041ApplicationSelectionFacts {
   readonly dacProfileIdentity: string;
   /** Independently recoverable issuance-point evidence (exactly 1). */
   readonly issuanceEvidence: DacV0041IssuancePointEvidence;
+  /**
+   * ASSEMBLY_PROFILES §8.2 current authoritative reuse closure: the
+   * externally established invalidation/supersession/reselection/current
+   * status of this selection, evaluated for the intended current use at the
+   * input evaluation point (A41-004R1 / #377 P1-3). A historically valid
+   * but later superseded/reselected/revoked selection can never close
+   * authoritative intake.
+   */
+  readonly reuseCurrentness: DacV0041ReuseCurrentnessFacts;
 }
 
 /**
@@ -214,6 +334,14 @@ export interface DacV0041ManifestEvidenceFacts {
   readonly dacProfileIdentity: string;
   /** Independently recoverable issuance-point evidence (exactly 1). */
   readonly issuanceEvidence: DacV0041IssuancePointEvidence;
+  /**
+   * ASSEMBLY_PROFILES §8.2 current authoritative reuse closure for the
+   * Manifest: the externally established invalidation/supersession/
+   * revision-currentness status, evaluated for the intended current use at
+   * the input evaluation point (A41-004R1 / #377 P1-3). A stale or
+   * superseded Manifest revision can never close authoritative intake.
+   */
+  readonly reuseCurrentness: DacV0041ReuseCurrentnessFacts;
 }
 
 /**
@@ -308,7 +436,9 @@ export type DacV0041AuthorityRefusalFailureCode =
 /**
  * Terminal refusal-evidence verification result with the frozen precedence
  * ladder (deterministic; structural dominates temporal, mirroring the
- * C152/C171 rule):
+ * C152/C171 rule). Structural SHAPE is separate from minted-CARRIER
+ * validation (A41-004R1 / #377 P2-1): a structurally shaped but forged
+ * carrier is typed FOREIGN_EVIDENCE, not INVALID_FACTS:
  *
  *   1. malformed facts                       => FAIL_CLOSED INVALID_FACTS
  *   2. foreign/forged carrier                => FAIL_CLOSED FOREIGN_EVIDENCE
@@ -370,20 +500,37 @@ export type DacV0041AuthorityRefusalEvidenceVerification =
  *      ISSUER (C140/C90 family; carries the chain code)
  *   8. establishment does not precede
  *      selection / selection precedes
- *      Manifest issuance                    => FAIL_CLOSED
- *      ESTABLISHMENT_ORDER_VIOLATED (C140; APPLICATION_MANIFEST §2)
+ *      Manifest issuance / requestless
+ *      initiation does not precede the
+ *      establishment issuance         => FAIL_CLOSED
+ *      ESTABLISHMENT_ORDER_VIOLATED (C140; APPLICATION_MANIFEST §2;
+ *      A41-004R1: initiation ordering closure for the requestless seam)
  *   9. scope/profile/subject mismatch      => FAIL_CLOSED (SCOPE_MISMATCH /
- *      PROFILE_MISMATCH / SUBJECT_MISMATCH — exact-token only, never fuzzy)
+ *      PROFILE_MISMATCH / SUBJECT_MISMATCH — exact-token only, never fuzzy;
+ *      the selection and Manifest selected-subject sets must correspond
+ *      EXACTLY — a Manifest-only subject with a syntactically complete
+ *      forged coverage row still fails closed, because a Manifest must not
+ *      retroactively manufacture selection authority)
  *  10. revoked/voided promotion coverage    => FAIL_CLOSED
- *      COVERAGE_INVALIDATED (C81/C157)
+ *      COVERAGE_INVALIDATED (C81/C157); revoked/voided selection/Manifest
+ *      => FAIL_CLOSED SELECTION_INVALIDATED / MANIFEST_INVALIDATED
+ *      (ASSEMBLY_PROFILES §8.3 explicit invalidation fails closed for new
+ *      authoritative use; structural/authority violations dominate
+ *      temporal states per C152/C171)
  *  11. incomplete selected Domain Data
  *      coverage / material refusal omitted
  *      or reclassified                      => FAIL_CLOSED
  *      (COVERAGE_INCOMPLETE / MATERIAL_REFUSAL_OMITTED / refusal codes —
  *      C80/C81/C142/C143: total coverage wherever Runtime consequence
  *      depends on it; refusals are material evidence)
- *  12. stale issuer chain / stale coverage  => STALE (ISSUER_CHAIN_STALE /
- *      COVERAGE_NOT_CURRENT; C85/C157)
+ *  12. stale issuer chain / stale coverage
+ *      / stale-or-superseded selection or
+ *      Manifest reuse / currentness
+ *      determination not covering the
+ *      evaluation point                    => STALE (ISSUER_CHAIN_STALE /
+ *      COVERAGE_NOT_CURRENT / SELECTION_NOT_CURRENT / MANIFEST_NOT_CURRENT;
+ *      C85/C157; ASSEMBLY_PROFILES §8.2 — current authoritative reuse
+ *      re-checks later invalidation/supersession at the intended use point)
  *  13. otherwise                            => INTAKE_VERIFIED — the
  *      externally owned evidence is verified-and-accepted as intake input
  *      ONLY: no Composer/selection/promotion/Manifest authority is created,

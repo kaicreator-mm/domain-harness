@@ -22,6 +22,8 @@ import type {
   DacV0041CompositionIntakeInput,
   DacV0041IdentityEstablishmentFacts,
   DacV0041ManifestEvidenceFacts,
+  DacV0041RequestlessInitiationEvidence,
+  DacV0041ReuseCurrentnessFacts,
   DacV0041SelectedDomainDataFacts,
 } from '../../src/dac-v0041/composition-intake/index.js';
 
@@ -164,7 +166,37 @@ export function v003Predecessor(): DacV0041PredecessorBaseline {
 
 export const SUBJECTS = ['subject/selected-alpha', 'subject/selected-beta'] as const;
 
-/** Valid establishment facts (issued at point 30). */
+/** Default §8.2 current-authoritative-reuse determination (covers point 60). */
+export function buildReuseCurrentness(
+  overrides: Partial<DacV0041ReuseCurrentnessFacts> = {},
+): DacV0041ReuseCurrentnessFacts {
+  return {
+    state: 'current',
+    establishedAt: 60,
+    assertedBy: [IDENTITY.witness],
+    ...overrides,
+  };
+}
+
+/**
+ * Valid F-04 §4.1 requestless initiation record (externally recoverable):
+ * minted `evidence`-role reference bound to the establishment application
+ * scope, initiating subject, evidenced issuer covered by the attested
+ * provenance, provenance strictly before the establishment issuance (30).
+ */
+export function buildRequestlessInitiation(
+  overrides: Partial<DacV0041RequestlessInitiationEvidence> = {},
+): DacV0041RequestlessInitiationEvidence {
+  return {
+    initiationRef: buildRef('evidence', 'initiation/establishment-1'),
+    initiatedBy: 'id/app-initiator',
+    initiationIssuerIdentity: IDENTITY.witness,
+    initiationProvenance: { point: 28, assertedBy: [IDENTITY.witness] },
+    ...overrides,
+  };
+}
+
+/** Valid establishment facts (issued at point 30, request seam). */
 export function buildEstablishmentFacts(
   overrides: Partial<DacV0041IdentityEstablishmentFacts> = {},
 ): DacV0041IdentityEstablishmentFacts {
@@ -174,7 +206,6 @@ export function buildEstablishmentFacts(
       'application-identity-establishment-request',
       'request/establishment-1',
     ),
-    initiationExplicitlyEvidenced: false,
     applicationSemanticIdentityRef: buildRef('application-semantic', 'app/semantic-alpha'),
     issuerIdentity: IDENTITY.establishmentIssuer,
     issuerDesignationChain: buildChainInput(
@@ -212,6 +243,7 @@ export function buildSelectionFacts(
     applicationScope: SCOPE.app,
     dacProfileIdentity: PROFILE.v0041,
     issuanceEvidence: { point: 40, assertedBy: [IDENTITY.witness] },
+    reuseCurrentness: buildReuseCurrentness(),
     ...overrides,
   };
 }
@@ -239,6 +271,7 @@ export function buildManifestFacts(
     applicationScope: SCOPE.app,
     dacProfileIdentity: PROFILE.v0041,
     issuanceEvidence: { point: 50, assertedBy: [IDENTITY.witness] },
+    reuseCurrentness: buildReuseCurrentness(),
     ...overrides,
   };
 }

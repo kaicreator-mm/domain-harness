@@ -12,16 +12,27 @@
 //
 // Frozen deterministic pass order (first failure wins; structural and
 // authority violations dominate temporal states per C152/C171):
-//   1. input/shape validation        (INVALID_FACTS)
+//   1. input/shape validation        (INVALID_FACTS; exactly one initiation
+//                                      seam — request OR requestless record)
 //   2. minted-carrier check          (FOREIGN_EVIDENCE)
 //   3. evidence-role check           (ROLE_MISMATCH)
 //   4. predecessor-wrap check        (PREDECESSOR_WRAPPED, C145)
 //   5. F-04 identity anti-alias      (IDENTITY_ALIAS, C141)
-//   6. issuance-evidence check       (EVIDENCE_UNESTABLISHED)
+//   6. issuance-evidence check       (EVIDENCE_UNESTABLISHED; incl. the
+//                                      requestless initiation provenance +
+//                                      issuer recoverability closure)
 //   7. issuer designation chains     (UNAUTHORIZED_ISSUER / STALE)
-//   8. identity-precedence ordering  (ESTABLISHMENT_ORDER_VIOLATED, C140)
-//   9. exact scope/profile/subject   (SCOPE_/PROFILE_/SUBJECT_MISMATCH)
-//  10. coverage totals + currentness (COVERAGE_*, total per C80/C81)
+//   8. identity-precedence ordering  (ESTABLISHMENT_ORDER_VIOLATED, C140;
+//                                      initiation -> establishment ->
+//                                      selection -> Manifest)
+//   9. exact scope/profile/subject   (SCOPE_/PROFILE_/SUBJECT_MISMATCH;
+//                                      incl. exact selection/Manifest
+//                                      selected-subject correspondence)
+// 10. coverage totals + currentness  (COVERAGE_*; selection/Manifest §8.2
+//                                      reuse currentness — SELECTION_/
+//                                      MANIFEST_INVALIDATED fail closed,
+//                                      *_NOT_CURRENT stale — then promotion
+//                                      currentness; total per C80/C81)
 //  11. material refusal evidence     (F-04 §4.2 codes)
 //  12. otherwise                     => INTAKE_VERIFIED
 //
@@ -37,7 +48,9 @@ import type {
 } from '../authority/contracts.js';
 import {
   DAC_V0041_AUTHORITY_REFUSAL_SEAM_KINDS,
+  DAC_V0041_MANIFEST_REUSE_CURRENTNESS_STATES,
   DAC_V0041_REFUSAL_SEAM_REQUEST_ROLES,
+  DAC_V0041_SELECTION_REUSE_CURRENTNESS_STATES,
   type DacV0041CompositionIntakeFailureCode,
   type DacV0041ApplicationSelectionFacts,
   type DacV0041AuthorityRefusalEvidenceVerification,
@@ -71,6 +84,37 @@ function isIssuanceEvidence(value: unknown): value is DacV0041IssuancePointEvide
   if (value === null || typeof value !== 'object') return false;
   const candidate = value as Partial<DacV0041IssuancePointEvidence>;
   return isTimePoint(candidate.point) && isStringArray(candidate.assertedBy);
+}
+
+/** Structural shape of F-04 §4.1 requestless initiation evidence. */
+function isRequestlessInitiation(value: unknown): value is DacV0041IdentityEstablishmentFacts['requestlessInitiation'] {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as {
+    initiationRef?: unknown;
+    initiatedBy?: unknown;
+    initiationIssuerIdentity?: unknown;
+    initiationProvenance?: unknown;
+  };
+  return (
+    isRefLike(candidate.initiationRef) &&
+    isNonEmptyString(candidate.initiatedBy) &&
+    isNonEmptyString(candidate.initiationIssuerIdentity) &&
+    isIssuanceEvidence(candidate.initiationProvenance)
+  );
+}
+
+/** Structural shape of a §8.2 current-authoritative-reuse determination. */
+function isReuseCurrentness(value: unknown): value is
+  DacV0041ApplicationSelectionFacts['reuseCurrentness'] {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as { state?: unknown; establishedAt?: unknown; assertedBy?: unknown };
+  return (
+    isNonEmptyString(candidate.state) &&
+    isTimePoint(candidate.establishedAt) &&
+    Array.isArray(candidate.assertedBy) &&
+    candidate.assertedBy.length > 0 &&
+    candidate.assertedBy.every((entry) => isNonEmptyString(entry))
+  );
 }
 
 /** Evidence is established only with at least one independent attestor. */
@@ -134,6 +178,14 @@ function collectRefs(input: DacV0041CompositionIntakeInput): readonly Ref[] {
       value: optionalRequest,
       label: 'applicationIdentityEstablishment.establishmentRequestRef',
       expectedRole: 'application-identity-establishment-request',
+    });
+  }
+  const optionalRequestless = input.applicationIdentityEstablishment.requestlessInitiation;
+  if (optionalRequestless !== undefined) {
+    refs.push({
+      value: optionalRequestless.initiationRef,
+      label: 'applicationIdentityEstablishment.requestlessInitiation.initiationRef',
+      expectedRole: 'evidence',
     });
   }
   for (const [index, subject] of input.applicationSelection.selectedDomainDataRefs.entries()) {
@@ -226,7 +278,8 @@ function isEstablishmentFacts(
     isRefLike(candidate.establishmentRef) &&
     (candidate.establishmentRequestRef === undefined ||
       isRefLike(candidate.establishmentRequestRef)) &&
-    typeof candidate.initiationExplicitlyEvidenced === 'boolean' &&
+    (candidate.requestlessInitiation === undefined ||
+      isRequestlessInitiation(candidate.requestlessInitiation)) &&
     isRefLike(candidate.applicationSemanticIdentityRef) &&
     isNonEmptyString(candidate.issuerIdentity) &&
     candidate.issuerDesignationChain !== null &&
@@ -253,7 +306,8 @@ function isSelectionFacts(value: unknown): value is DacV0041ApplicationSelection
     isNonEmptyString(candidate.requiredIssuingRole) &&
     isNonEmptyString(candidate.applicationScope) &&
     isNonEmptyString(candidate.dacProfileIdentity) &&
-    isIssuanceEvidence(candidate.issuanceEvidence)
+    isIssuanceEvidence(candidate.issuanceEvidence) &&
+    isReuseCurrentness(candidate.reuseCurrentness)
   );
 }
 
@@ -274,7 +328,8 @@ function isManifestFacts(value: unknown): value is DacV0041ManifestEvidenceFacts
     isNonEmptyString(candidate.requiredIssuingRole) &&
     isNonEmptyString(candidate.applicationScope) &&
     isNonEmptyString(candidate.dacProfileIdentity) &&
-    isIssuanceEvidence(candidate.issuanceEvidence)
+    isIssuanceEvidence(candidate.issuanceEvidence) &&
+    isReuseCurrentness(candidate.reuseCurrentness)
   );
 }
 
@@ -360,6 +415,69 @@ interface ChainChecks {
   readonly label: string;
 }
 
+/**
+ * ASSEMBLY_PROFILES §§8.2–8.3 current authoritative reuse classification for
+ * one externally owned artifact (A41-004R1 / #377 P1-3). Deterministic
+ * precedence: undecidable state or a determination predating the artifact's
+ * own issuance are malformed facts (FAIL_CLOSED INVALID_FACTS); explicit
+ * revocation/void FAIL CLOSED for the new authoritative use even though the
+ * historical record stays immutable; ordinary stale/superseded/reselected
+ * states and determinations that do not cover the evaluation point are
+ * STALE; `current` passes only when established at/after the evaluation
+ * point. Structural and authority violations dominate these temporal
+ * states (C152/C171).
+ */
+function classifyReuseCurrentness(
+  currentness: DacV0041ApplicationSelectionFacts['reuseCurrentness'],
+  vocabulary: readonly string[],
+  artifactIssuancePoint: DacV0041TimePoint,
+  evaluationPoint: DacV0041TimePoint,
+  label: string,
+  invalidatedCode: 'SELECTION_INVALIDATED' | 'MANIFEST_INVALIDATED',
+  notCurrentCode: 'SELECTION_NOT_CURRENT' | 'MANIFEST_NOT_CURRENT',
+): DacV0041CompositionIntakeVerification | null {
+  if (vocabulary.indexOf(currentness.state) === -1) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'INVALID_FACTS',
+      detail: `${label} reuse-currentness state "${currentness.state}" is not a decidable currentness state; undecidable currentness fails closed`,
+    };
+  }
+  if (currentness.establishedAt < artifactIssuancePoint) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'INVALID_FACTS',
+      detail: `${label} reuse-currentness determination predates the artifact's own issuance point; a determination for a not-yet-issued artifact is malformed provenance`,
+    };
+  }
+  if (currentness.state === 'revoked' || currentness.state === 'voided') {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: invalidatedCode,
+      detail: `${label} is ${currentness.state} for new authoritative use; an explicitly invalidated artifact fails closed even though its historical record stays immutable (ASSEMBLY_PROFILES §8.3)`,
+    };
+  }
+  if (
+    currentness.state === 'stale' ||
+    currentness.state === 'superseded' ||
+    currentness.state === 'reselected'
+  ) {
+    return {
+      outcome: 'STALE',
+      code: notCurrentCode,
+      detail: `${label} is ${currentness.state}; non-current artifacts are stale for authoritative intake (ASSEMBLY_PROFILES §8.2: current authoritative reuse re-checks later invalidation/supersession)`,
+    };
+  }
+  if (currentness.establishedAt < evaluationPoint) {
+    return {
+      outcome: 'STALE',
+      code: notCurrentCode,
+      detail: `${label} currentness determination (at ${currentness.establishedAt}) does not cover the intended use/evaluation point ${evaluationPoint}; the determination must be established at or after the evaluation point`,
+    };
+  }
+  return null;
+}
+
 /** Slot metadata for one issuer designation-chain check (pass 7). */
 
 /**
@@ -372,12 +490,16 @@ interface ChainChecks {
 export function verifyDacV0041AuthorityRefusalEvidence(
   facts: DacV0041AuthorityRefusalFacts,
 ): DacV0041AuthorityRefusalEvidenceVerification {
+  // Pass 1 is STRUCTURAL SHAPE ONLY (#377 P2-1): reference slots need only
+  // be ref-like objects, so a structurally shaped but forged carrier
+  // survives shape and is deterministically typed FOREIGN_EVIDENCE in pass
+  // 2 — never swallowed by INVALID_FACTS.
   if (
     facts === null ||
     typeof facts !== 'object' ||
-    !isDacV0041Reference(facts.refusalRef) ||
+    !isRefLike(facts.refusalRef) ||
     !isNonEmptyString(facts.seamKind) ||
-    !isDacV0041Reference(facts.exactRequestRef) ||
+    !isRefLike(facts.exactRequestRef) ||
     !isNonEmptyString(facts.refusingIssuerIdentity) ||
     !isNonEmptyString(facts.requiredIssuingRole) ||
     !isNonEmptyString(facts.subjectScope) ||
@@ -391,11 +513,19 @@ export function verifyDacV0041AuthorityRefusalEvidence(
       detail: 'authority-refusal facts are malformed; every required fact must be an externally recoverable non-empty value',
     };
   }
+  // Pass 2: minted-carrier validation, distinct from structural shape.
   if (!isDacV0041Reference(facts.refusalRef)) {
     return {
       outcome: 'FAIL_CLOSED',
       code: 'FOREIGN_EVIDENCE',
-      detail: 'refusalRef is not a reference minted by the DAC v0.0.4.1 adoption core',
+      detail: 'refusalRef is not a reference minted by the DAC v0.0.4.1 adoption core; foreign/forged carriers fail closed',
+    };
+  }
+  if (!isDacV0041Reference(facts.exactRequestRef)) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'FOREIGN_EVIDENCE',
+      detail: 'exactRequestRef is not a reference minted by the DAC v0.0.4.1 adoption core; foreign/forged carriers fail closed',
     };
   }
   if (facts.refusalRef.role !== 'authority-refusal') {
@@ -410,13 +540,6 @@ export function verifyDacV0041AuthorityRefusalEvidence(
       outcome: 'FAIL_CLOSED',
       code: 'PREDECESSOR_WRAPPED',
       detail: 'refusalRef carries a predecessor origin; older-baseline refusal evidence cannot be consumer-wrapped into v0.0.4.1 intake (C145)',
-    };
-  }
-  if (!isDacV0041Reference(facts.exactRequestRef)) {
-    return {
-      outcome: 'FAIL_CLOSED',
-      code: 'FOREIGN_EVIDENCE',
-      detail: 'exactRequestRef is not a reference minted by the DAC v0.0.4.1 adoption core',
     };
   }
   if (facts.refusalRef.primaryIdentity === facts.exactRequestRef.primaryIdentity) {
@@ -525,14 +648,25 @@ export function verifyDacV0041CompositionIntake(
   const establishment = input.applicationIdentityEstablishment;
   const selection = input.applicationSelection;
   const manifest = input.manifest;
+  const requestless = establishment.requestlessInitiation;
 
-  // F-04 §4.1 initiation minimum: a request seam OR an explicitly evidenced
-  // initiation — neither present fails closed (absent evidence).
-  if (establishment.establishmentRequestRef === undefined && !establishment.initiationExplicitlyEvidenced) {
+  // F-04 §4.1 initiation minimum, exactly one of the two frozen seams: a
+  // request seam OR an explicitly evidenced (externally recoverable)
+  // requestless initiation. Neither present is absent initiation evidence;
+  // both present is an ambiguous seam; a boolean claim alone is not
+  // evidence (A41-004R1 / #377 P1-1).
+  if (establishment.establishmentRequestRef !== undefined && requestless !== undefined) {
     return {
       outcome: 'FAIL_CLOSED',
       code: 'INVALID_FACTS',
-      detail: 'application-identity establishment must carry exactly 1 establishment request or an explicitly evidenced initiation; absent initiation evidence fails closed',
+      detail: 'application-identity establishment cannot carry both an establishment request and a requestless initiation; exactly one initiation seam must be evidenced',
+    };
+  }
+  if (establishment.establishmentRequestRef === undefined && requestless === undefined) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'INVALID_FACTS',
+      detail: 'application-identity establishment must carry exactly 1 establishment request or an explicitly evidenced requestless initiation record; absent initiation evidence fails closed',
     };
   }
 
@@ -552,6 +686,14 @@ export function verifyDacV0041CompositionIntake(
           {
             label: 'establishment:request',
             identity: establishment.establishmentRequestRef.primaryIdentity,
+          },
+        ]),
+    ...(requestless === undefined
+      ? []
+      : [
+          {
+            label: 'establishment:requestless-initiation',
+            identity: requestless.initiationRef.primaryIdentity,
           },
         ]),
     {
@@ -578,6 +720,22 @@ export function verifyDacV0041CompositionIntake(
         outcome: 'FAIL_CLOSED',
         code: 'EVIDENCE_UNESTABLISHED',
         detail: `${label} issuance point has no independent attestor; issuance evidence must be independently recoverable`,
+      };
+    }
+  }
+  if (requestless !== undefined) {
+    if (!evidenceEstablished(requestless.initiationProvenance)) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'EVIDENCE_UNESTABLISHED',
+        detail: 'requestless initiation provenance has no independent attestor; the initiation record must be independently recoverable (a caller boolean claim is not initiation evidence)',
+      };
+    }
+    if (!requestless.initiationProvenance.assertedBy.includes(requestless.initiationIssuerIdentity)) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'EVIDENCE_UNESTABLISHED',
+        detail: `requestless initiation issuer "${requestless.initiationIssuerIdentity}" is not covered by the independently recoverable initiation provenance; the issuer claim must be backed by the provenance attestors`,
       };
     }
   }
@@ -651,6 +809,16 @@ export function verifyDacV0041CompositionIntake(
   }
 
   // Pass 8: identity precedence (C140; APPLICATION_MANIFEST §2).
+  if (
+    requestless !== undefined &&
+    !(requestless.initiationProvenance.point < establishment.issuanceEvidence.point)
+  ) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'ESTABLISHMENT_ORDER_VIOLATED',
+      detail: 'requestless initiation provenance must strictly precede the establishment issuance point; an establishment record never responds to a later initiation',
+    };
+  }
   if (!(establishment.issuanceEvidence.point < selection.issuanceEvidence.point)) {
     return {
       outcome: 'FAIL_CLOSED',
@@ -712,12 +880,65 @@ export function verifyDacV0041CompositionIntake(
       };
     }
   }
+  if (
+    requestless !== undefined &&
+    requestless.initiationRef.authorityScope !== scopes[0]
+  ) {
+    return {
+      outcome: 'FAIL_CLOSED',
+      code: 'SCOPE_MISMATCH',
+      detail: 'requestless initiation reference does not carry the exact application scope of the establishment it initiates (subject/scope closure)',
+    };
+  }
 
   // Pass 10: total selected Domain Data coverage (C80/C81; Manifest §3).
-  const requiredSubjects = new Set<string>([
-    ...selection.selectedDomainDataRefs.map((subject) => subject.primaryIdentity),
-    ...manifest.selectedDomainDataRefs.map((subject) => subject.primaryIdentity),
-  ]);
+  // 10a. EXACT selected-subject correspondence between the presented
+  // ApplicationSelectionRef and the Manifest (A41-004R1 / #377 P1-2): a
+  // Manifest-only subject fails closed even when a syntactically complete
+  // forged coverage row naming the presented selection identity exists,
+  // because a Manifest must not retroactively manufacture selection
+  // authority (APPLICATION_MANIFEST §2 — Manifest issuance records the
+  // exact selected composition, it never widens it).
+  const selectionSubjectIdentities = selection.selectedDomainDataRefs.map(
+    (subject) => subject.primaryIdentity,
+  );
+  const manifestSubjectIdentities = manifest.selectedDomainDataRefs.map(
+    (subject) => subject.primaryIdentity,
+  );
+  for (const [label, identities] of [
+    ['applicationSelection.selectedDomainDataRefs', selectionSubjectIdentities],
+    ['manifest.selectedDomainDataRefs', manifestSubjectIdentities],
+  ] as const) {
+    if (new Set(identities).size !== identities.length) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'INVALID_FACTS',
+        detail: `${label} repeats a selected subject identity; the exact selected subject set must be duplicate-free`,
+      };
+    }
+  }
+  const selectionSubjectSet = new Set(selectionSubjectIdentities);
+  const manifestSubjectSet = new Set(manifestSubjectIdentities);
+  for (const subject of manifestSubjectIdentities) {
+    if (!selectionSubjectSet.has(subject)) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `Manifest claims selected Domain Data subject "${subject}" that the presented ApplicationSelectionRef did not select; a Manifest cannot retroactively manufacture selection authority (APPLICATION_MANIFEST §2)`,
+      };
+    }
+  }
+  for (const subject of selectionSubjectIdentities) {
+    if (!manifestSubjectSet.has(subject)) {
+      return {
+        outcome: 'FAIL_CLOSED',
+        code: 'SUBJECT_MISMATCH',
+        detail: `selected Domain Data subject "${subject}" is absent from the Manifest composition; the Manifest must record the exact selected subject set`,
+      };
+    }
+  }
+  // 10b. Coverage-row reconciliation over the exactly corresponding set.
+  const requiredSubjects = selectionSubjectSet;
   const coveredSubjects = new Map<string, DacV0041SelectedDomainDataFacts>();
   for (const coverage of input.selectedDomainData) {
     if (requiredSubjects.has(coverage.subjectRef.primaryIdentity)) {
@@ -752,6 +973,42 @@ export function verifyDacV0041CompositionIntake(
         code: 'SUBJECT_MISMATCH',
         detail: `selection coverage for "${subject}" must be the exact presented ApplicationSelectionRef (got "${coverage.selectionCoverageRef.primaryIdentity}")`,
       };
+    }
+  }
+  // 10c. Current authoritative reuse of the selection and the Manifest
+  // (ASSEMBLY_PROFILES §§8.2–8.3; A41-004R1 / #377 P1-3), evaluated at the
+  // intended use/evaluation point. Explicit invalidation fails closed
+  // BEFORE per-subject promotion currentness is even consulted — structural
+  // and authority violations dominate temporal states (C152/C171).
+  const selectionCurrentnessFailure = classifyReuseCurrentness(
+    selection.reuseCurrentness,
+    DAC_V0041_SELECTION_REUSE_CURRENTNESS_STATES,
+    selection.issuanceEvidence.point,
+    input.evaluationPoint,
+    'applicationSelection',
+    'SELECTION_INVALIDATED',
+    'SELECTION_NOT_CURRENT',
+  );
+  if (selectionCurrentnessFailure !== null) {
+    return selectionCurrentnessFailure;
+  }
+  const manifestCurrentnessFailure = classifyReuseCurrentness(
+    manifest.reuseCurrentness,
+    DAC_V0041_MANIFEST_REUSE_CURRENTNESS_STATES,
+    manifest.issuanceEvidence.point,
+    input.evaluationPoint,
+    'manifest',
+    'MANIFEST_INVALIDATED',
+    'MANIFEST_NOT_CURRENT',
+  );
+  if (manifestCurrentnessFailure !== null) {
+    return manifestCurrentnessFailure;
+  }
+  // 10d. Promotion coverage currentness per selected subject (C81/C157).
+  for (const subject of requiredSubjects) {
+    const coverage = coveredSubjects.get(subject);
+    if (coverage === undefined) {
+      continue;
     }
     if (coverage.promotionCurrentness === 'revoked' || coverage.promotionCurrentness === 'voided') {
       return {

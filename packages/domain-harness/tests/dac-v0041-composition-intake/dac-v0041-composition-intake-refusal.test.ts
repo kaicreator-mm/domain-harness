@@ -126,3 +126,57 @@ test('a41-004 refusal: refusal evidence stays external — consuming it creates 
   // The verified result names the external record; it mints nothing.
   assert.deepEqual(Object.keys(standalone).sort(), ['detail', 'outcome', 'refusalIdentity', 'seamKind']);
 });
+
+test('a41-004 refusal: R1/#377 P2-1 — a forged refusal carrier is typed FOREIGN_EVIDENCE, not INVALID_FACTS (standalone)', () => {
+  const result = verifyDacV0041AuthorityRefusalEvidence(
+    buildBindingRefusalFacts({
+      refusalRef: { role: 'authority-refusal', primaryIdentity: 'x' } as never,
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'FOREIGN_EVIDENCE');
+});
+
+test('a41-004 refusal: R1/#377 P2-1 — a forged bound-request carrier is typed FOREIGN_EVIDENCE (standalone)', () => {
+  const result = verifyDacV0041AuthorityRefusalEvidence(
+    buildBindingRefusalFacts({
+      exactRequestRef: { role: 'runtime-binding-request', primaryIdentity: 'y' } as never,
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'FOREIGN_EVIDENCE');
+});
+
+test('a41-004 refusal: R1/#377 P2-1 — structural shape stays distinct from carrier typing (discrimination)', () => {
+  // Malformed STRUCTURE (non-object ref slot) is INVALID_FACTS …
+  const malformed = verifyDacV0041AuthorityRefusalEvidence(
+    buildBindingRefusalFacts({
+      refusalRef: 'refusal/binding-1' as never,
+    }),
+  );
+  assert.equal(malformed.outcome, 'FAIL_CLOSED');
+  assert.equal(malformed.code, 'INVALID_FACTS');
+  // … while a well-shaped FORGED carrier is FOREIGN_EVIDENCE, and carrier
+  // precedence dominates the later role check.
+  const forgedWrongRole = verifyDacV0041AuthorityRefusalEvidence(
+    buildBindingRefusalFacts({
+      refusalRef: { role: 'manifest', primaryIdentity: 'x' } as never,
+    }),
+  );
+  assert.equal(forgedWrongRole.outcome, 'FAIL_CLOSED');
+  assert.equal(forgedWrongRole.code, 'FOREIGN_EVIDENCE');
+});
+
+test('a41-004 refusal: R1/#377 P2-1 — intake still rejects a forged refusal carrier through its own carrier pass', () => {
+  const result = verifyDacV0041CompositionIntake(
+    buildValidIntakeInput({
+      materialRefusals: [
+        buildBindingRefusalFacts({
+          refusalRef: { role: 'authority-refusal', primaryIdentity: 'x' } as never,
+        }),
+      ],
+    }),
+  );
+  assert.equal(result.outcome, 'FAIL_CLOSED');
+  assert.equal(result.code, 'FOREIGN_EVIDENCE');
+});

@@ -16,7 +16,9 @@ import { buildValidIntakeInput } from './helpers.js';
 const FROZEN_COMPOSITION_INTAKE_SURFACE = [
   'DAC_V0041_AUTHORITY_REFUSAL_SEAM_KINDS',
   'DAC_V0041_COMPOSITION_INTAKE_EVIDENCE_ROLES',
+  'DAC_V0041_MANIFEST_REUSE_CURRENTNESS_STATES',
   'DAC_V0041_REFUSAL_SEAM_REQUEST_ROLES',
+  'DAC_V0041_SELECTION_REUSE_CURRENTNESS_STATES',
   'verifyDacV0041AuthorityRefusalEvidence',
   'verifyDacV0041CompositionIntake',
 ] as const;
@@ -122,5 +124,31 @@ test('a41-004 ceiling: frozen vocabulary constants match the F-04 §4.2 seam voc
   assert.notEqual(
     compositionIntake.DAC_V0041_REFUSAL_SEAM_REQUEST_ROLES['runtime-binding'],
     compositionIntake.DAC_V0041_REFUSAL_SEAM_REQUEST_ROLES['runtime-activation'],
+  );
+});
+
+test('a41-004 ceiling: frozen §8.2 reuse-currentness vocabularies are closed and artifact-scoped (R1)', () => {
+  assert.deepEqual([...compositionIntake.DAC_V0041_SELECTION_REUSE_CURRENTNESS_STATES], [
+    'current',
+    'stale',
+    'superseded',
+    'reselected',
+    'revoked',
+    'voided',
+  ]);
+  assert.deepEqual([...compositionIntake.DAC_V0041_MANIFEST_REUSE_CURRENTNESS_STATES], [
+    'current',
+    'stale',
+    'superseded',
+    'revoked',
+    'voided',
+  ]);
+  // `reselected` is a selection-only state: a Manifest currentness
+  // determination can never claim it.
+  assert.equal(
+    (compositionIntake.DAC_V0041_MANIFEST_REUSE_CURRENTNESS_STATES as readonly string[]).includes(
+      'reselected',
+    ),
+    false,
   );
 });
