@@ -25,7 +25,6 @@ import {
   isCompatibilityValidationRequestRef,
   classifyDacV0041CapabilityExchange,
 } from '../guards.js';
-import type { CompatibilityValidationRequestRef } from '../contracts.js';
 import {
   DAC_V0041_AUTHORITY_REFUSAL_SEAM_KINDS,
   type DacV0041AuthorityRefusalEvidenceClassification,
