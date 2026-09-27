@@ -7,6 +7,11 @@ when:
 # absolute executables. Use host git for exact checkout and resolve bash via PATH.
 skip_clone: true
 
+# Route to ECF elastic agents (docker backend + kaicreator/builder image);
+# the server-local agent (local backend) treats `image` as a host executable.
+labels:
+  backend: docker
+
 steps:
   - name: verify
     image: kaicreator/builder:1.0
