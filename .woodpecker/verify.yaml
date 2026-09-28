@@ -1,7 +1,7 @@
 when:
   - event: pull_request
   - event: push
-    branch: [main, v0.2, v0.3]
+    branch: [main, v0.2, v0.3, v0.4]
 
 # Issue #261: Woodpecker local backend must not depend on agent-specific
 # absolute executables. Use host git for exact checkout and resolve bash via PATH.

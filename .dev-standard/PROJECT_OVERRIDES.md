@@ -12,7 +12,7 @@
 - Structure: Git monorepo. Primary portable SDK remains `packages/domain-harness`; compiler and host-specific adapters remain separate workspace packages.
 - v0.3 was an incremental productionization of the shipped v0.2 runtime, not a rewrite.
 - v0.1 and v0.2 remain historical frozen baselines; v0.3 does not retroactively redefine their persisted behavior.
-- Current state: the v0.3 version lane is COMPLETE — release qualification closed and `v0.3` merged to `main` via PR #347 (`main@f2b61cc720a85d3e0fb94c1eed9b68f8ed855e6c`, tree `1e5473e2feab3dea1d92fb2b1590e963e71d2709`). Successor version lanes are declared by their own frozen Task DAG; none is materialized yet.
+- Current state: the v0.3 version lane is COMPLETE — release qualification closed and `v0.3` merged to `main` via PR #347 (`main@f2b61cc720a85d3e0fb94c1eed9b68f8ed855e6c`, tree `1e5473e2feab3dea1d92fb2b1590e963e71d2709`). The successor `v0.4` version lane is materialized as integration branch `v0.4` under reviewed #353 (A41 Task DAG planning) / #354 (fresh independent review) and is currently in Version Closure — not yet release-qualified; no further successor lane is materialized.
 
 ## Integration / GitHub Execution Profile
 
@@ -172,7 +172,7 @@ Interpret provider-specific workflow syntax only after declaring the real execut
 - CI backend / execution model: local backend — step commands execute directly on the agent host; `image: bash` is resolved through host PATH and is not a container
 - CI runner role: single dedicated local-backend agent host acting as the project Build Host (no hosted or shared runners)
 - Workflow config: repository path `.woodpecker/verify.yaml`
-- Workflow config source: pr-head for `pull_request` events (exact `$CI_COMMIT_SHA` checkout) and the exact pushed SHA for `push` events on `main`/`v0.2`/`v0.3`
+- Workflow config source: pr-head for `pull_request` events (exact `$CI_COMMIT_SHA` checkout) and the exact pushed SHA for `push` events on `main`/`v0.2`/`v0.3`/`v0.4`
 - Execution shell / entrypoint model: host shell; bash step commands with git/bash/node/npm resolved from agent-host PATH (no container entrypoint)
 - Runtime source: host-managed (git, bash, Node.js, npm from the agent host; the pipeline itself gates Node major version 22 or higher)
 - Clone / checkout model: `skip_clone`; the pipeline runs explicit `git init` + `git fetch --no-tags --depth=1` from the repo clone URL at `$CI_COMMIT_SHA`, then `git checkout --detach FETCH_HEAD`, and asserts `git rev-parse HEAD` equals `$CI_COMMIT_SHA`
