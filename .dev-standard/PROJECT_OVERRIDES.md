@@ -146,7 +146,7 @@ CI PASS is not Release Qualification PASS.
 ### Real validation environments
 
 - Windows validation: Windows workstation / Local Agent Build Host (governance verification, local-first deterministic validation)
-- Linux validation: NOT_RUN — no independent Linux validation host is established for this repository; repository CI runs on the single local-backend Woodpecker agent host
+- Linux validation: NOT_RUN — no independent Linux validation host is established for this repository; repository CI runs on the ECF elastic local-backend Woodpecker worker VM(s)
 - macOS validation: NOT_APPLICABLE — no macOS target in the frozen v0.3 product contract
 - Other real environment/device: real Android device/emulator (Hermes + `expo-sqlite`) for the dedicated Expo host wave
 
@@ -162,21 +162,21 @@ One tuple PASS never implies another tuple PASS. Cross-build is not real platfor
 - CI profile: custom
 - CI checks (for `custom`): single Woodpecker pipeline `.woodpecker/verify.yaml` — exact-SHA checkout assertion, Node major-version 22+ gate, `npm ci`, `npm run build` (includes committed-dist byte-identity check), `npm run lint`, `npm run typecheck`, `npm test`. Profile semantics remain `minimal-per-task + concentrated-host-validation + version-closure-full`: parallel feature PRs prove their local deterministic concern; expensive host validation is concentrated into dedicated Node and Expo waves; version closure runs full regression.
 - Disabled reason (for `disabled`): NOT_APPLICABLE — CI is enabled
-- Exact-SHA clean-validation fallback: every CI run fetches and asserts the exact `$CI_COMMIT_SHA` (depth-1) and a new source SHA always requires a fresh run; when Woodpecker CI is unavailable, required validation falls back to exact-SHA clean local execution on the Windows Build Host (clean tracked checkout at the exact SHA plus the full required command set) recorded as local exact-SHA evidence — CI/service unavailability may be recorded through the authorized waiver path, but unavailable CI is never reported as PASS.
+- Exact-SHA clean-validation fallback: every CI run checks out the event's exact `$CI_COMMIT_SHA` via the provider-managed clone and the verify step explicitly asserts `git rev-parse HEAD` equals it, and a new source SHA always requires a fresh run; when Woodpecker CI is unavailable, required validation falls back to exact-SHA clean local execution on the Windows Build Host (clean tracked checkout at the exact SHA plus the full required command set) recorded as local exact-SHA evidence — CI/service unavailability may be recorded through the authorized waiver path, but unavailable CI is never reported as PASS.
 
 ## CI Execution Profile
 
 Interpret provider-specific workflow syntax only after declaring the real execution model. Follow `standards/CI_EXECUTION_STANDARD.md` from the pinned standard revision.
 
 - CI provider: woodpecker
-- CI backend / execution model: local backend — step commands execute directly on the agent host; `image: bash` is resolved through host PATH and is not a container
-- CI runner role: single dedicated local-backend agent host acting as the project Build Host (no hosted or shared runners)
+- CI backend / execution model: local backend — ECF elastic worker VM(s) run the agent with `labels.backend: local` (VM-is-the-sandbox); step commands execute directly on the worker VM host (Alpine with node24 + git preinstalled); `image: bash` is resolved through worker-VM host PATH and is not a container
+- CI runner role: ECF elastic local-backend worker VM(s) acting as the project CI Build Host (no hosted or shared public runners)
 - Workflow config: repository path `.woodpecker/verify.yaml`
 - Workflow config source: pr-head for `pull_request` events (exact `$CI_COMMIT_SHA` checkout) and the exact pushed SHA for `push` events on `main`/`v0.2`/`v0.3`/`v0.4`
-- Execution shell / entrypoint model: host shell; bash step commands with git/bash/node/npm resolved from agent-host PATH (no container entrypoint)
-- Runtime source: host-managed (git, bash, Node.js, npm from the agent host; the pipeline itself gates Node major version 22 or higher)
-- Clone / checkout model: `skip_clone`; the pipeline runs explicit `git init` + `git fetch --no-tags --depth=1` from the repo clone URL at `$CI_COMMIT_SHA`, then `git checkout --detach FETCH_HEAD`, and asserts `git rev-parse HEAD` equals `$CI_COMMIT_SHA`
-- Partial clone policy: disabled beyond the depth-1 shallow fetch; no blob/tree-filter partial clone is used
+- Execution shell / entrypoint model: worker-VM host shell; bash step commands with git/bash/node/npm resolved from worker-VM host PATH (no container entrypoint)
+- Runtime source: worker-VM host-managed (git, bash, Node.js, npm from the ECF elastic worker VM host; the pipeline itself gates Node major version 22 or higher)
+- Clone / checkout model: provider-managed checkout (default clone step; no `skip_clone` manual `git init`/`git fetch`); the verify step explicitly asserts `git rev-parse HEAD` equals `$CI_COMMIT_SHA`
+- Partial clone policy: disabled — no blob/tree-filter partial clone is used; clone depth is provider-managed by the default clone step
 - Submodule policy: disabled — the repository declares no `.gitmodules`; submodules are out of scope without a governance change
 - Git LFS policy: disabled — the repository uses no LFS objects or filters (`.gitattributes` only pins `-text` on committed dist outputs)
 - Fresh-run / rerun policy: new exact SHA requires fresh run; rerun only proves its own run subject
