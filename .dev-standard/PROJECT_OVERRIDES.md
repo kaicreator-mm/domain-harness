@@ -12,7 +12,22 @@
 - Structure: Git monorepo. Primary portable SDK remains `packages/domain-harness`; compiler and host-specific adapters remain separate workspace packages.
 - v0.3 was an incremental productionization of the shipped v0.2 runtime, not a rewrite.
 - v0.1 and v0.2 remain historical frozen baselines; v0.3 does not retroactively redefine their persisted behavior.
-- Current state: the v0.3 version lane is COMPLETE — release qualification closed and `v0.3` merged to `main` via PR #347 (`main@f2b61cc720a85d3e0fb94c1eed9b68f8ed855e6c`, tree `1e5473e2feab3dea1d92fb2b1590e963e71d2709`). Successor version lanes are declared by their own frozen Task DAG; none is materialized yet.
+- Current state: the v0.3 version lane is COMPLETE — release qualification closed and `v0.3` merged to `main` via PR #347 (`main@f2b61cc720a85d3e0fb94c1eed9b68f8ed855e6c`, tree `1e5473e2feab3dea1d92fb2b1590e963e71d2709`). The successor `v0.4` version lane is materialized and in flight on branch `v0.4` (DAC v0.0.4.1 cumulative adoption); its closure follows its own reviewed Task DAG (#353). Successor lanes are always declared by their own frozen Task DAG.
+
+## v4 standard adoption
+
+Standard authority is the exact pinned revision in `.dev-standard/VERSION` — AI Development Standard `4.0.0@88aa35a6ac6ceec859c7c1d9114828873842c0c5` (migrated from `3.4.0@418d244f23a6bf724acf5d4c4eff4ea292f1c4db` by Issue #397; v4 PROJECT_ADOPTION §2.3 compatibility applies).
+
+- v4.adoption_level: A0_COMPATIBILITY
+- v4.compatibility_mode: v3.4 durable facts / authority / exact identity / required Validation & Review semantics carried forward unchanged; all historical evidence (v0.3 lane, A41 nodes) keeps its original subject identity and status — no PASS migration
+- v4.assurance.default: manual risk-based review per the Independent Review Profile below; v4 Operation/Assurance concepts are recorded only as durable GitHub facts (no machine records)
+- v4.model_diversity.default_basis: NOT_ADOPTED (A0 — no model-diverse adversarial review automation)
+- v4.interchange: disabled — GitHub durable facts remain the only reference/correlation profile
+- v4.reducer: NOT_ADOPTED — no derived-state automation; live execution truth stays GitHub Issue Dependencies + coordinator discipline
+- v4.controllers: NOT_ADOPTED — merge/candidate/release control stays manual with exact-SHA evidence
+- v4.fast_path: canonical v4 disqualifiers preserved; no project-specific weakening
+
+A0 does not weaken any required gate: immutable pin, exact-SHA Validation, risk-based required Review, Candidate Freeze, `PR PASS != Release PASS` and truthful `NOT_RUN/BLOCKED/NOT_APPLICABLE` all remain mandatory (v4 non-weakening floor; PROJECT_ADOPTION §2.2).
 
 ## Integration / GitHub Execution Profile
 
