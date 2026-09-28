@@ -802,9 +802,6 @@ test('C111 [CONFORMANCE_ONLY] a complete greenfield flow preserves every authori
 test('C112 [CONFORMANCE_ONLY] the complete brownfield flow carries the exact adopted subject through successor promotion coverage and downstream intake', () => {
   const journey = runDacV0041BrownfieldConnectedJourney();
   assert.equal(journey.outcome, 'PASS');
-  if (journey.outcome !== 'PASS') {
-    assert.fail(`brownfield C112 failed at ${journey.stage}: ${journey.code}`);
-  }
   assert.equal(journey.historicUse.outcome, 'ADOPTION_REQUIRED');
   assert.equal(journey.adoption.outcome, 'ADOPTED_PROSPECTIVE');
   assert.equal(journey.adoption.effectiveFrom, 60);

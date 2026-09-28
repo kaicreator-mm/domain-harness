@@ -31,9 +31,6 @@ import { runDacV0041BrownfieldConnectedJourney } from './brownfield-connected-jo
 function requireConnectedPass() {
   const journey = runDacV0041BrownfieldConnectedJourney();
   assert.equal(journey.outcome, 'PASS');
-  if (journey.outcome !== 'PASS') {
-    assert.fail(`brownfield journey failed at ${journey.stage}: ${journey.code}`);
-  }
   return journey;
 }
 
