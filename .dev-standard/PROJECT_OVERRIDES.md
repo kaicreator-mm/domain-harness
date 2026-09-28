@@ -32,6 +32,37 @@ When Issue-based execution is enabled:
 
 Post-release governance note: after a version lane is merged to `main`, concerns that depend only on the released `main` state (such as this standard-pin migration) branch JIT from exact `main` with PR base `main`.
 
+## v4 Adoption / Compatibility Profile
+
+Adoption level controls how much v4 implementation machinery this project uses. It does **not** reduce the mandatory truth/authority floor.
+
+Canonical project fields:
+
+- `v4.adoption_level`: `A1_MANUAL_PROTOCOL`
+- `v4.compatibility_mode`: `v3.4-bridge` — migrated from pinned v3.4.0 (`418d244f23a6bf724acf5d4c4eff4ea292f1c4db`); durable authority, GitHub Issue Dependencies live execution DAG, exact-SHA Validation, `ai-dev:event:v2` attribution and all required gates continue unchanged under the v4 pin
+- `v4.assurance.default`: `manual-minimum` — default Assurance remains the Independent Review Profile above (risk-based `required` triggers, Builder-vs-Reviewer context independence); this default applies only where no stronger authority-derived requirement exists
+- `v4.model_diversity.default_basis`: `none` — no project-wide multi-model review requirement exists; per-task required reviews keep their authority-defined independence rules (fresh ChatGPT Web session, independent Local Agent review context, or human), and provider diversity occurring incidentally is not claimed as a diversity program
+- `v4.interchange`: `disabled` — no Interchange transport is enabled; if ever enabled, authority semantics MUST remain `CORRELATION_ONLY_NON_AUTHORITATIVE`
+- `v4.reducer`: `disabled` — every required gate retains a truthful manual path through GitHub durable facts
+- `v4.controllers`: `disabled` — no automated dispatch/routing controllers run; dispatch/handoff/review/closure stay manual per the pinned workflow standards
+- `v4.fast_path`: `canonical` — canonical v4 Fast Path disqualifiers apply unchanged; this project's required-Review triggers, release gates and owner-held Hidden Validation are independent of Fast Path eligibility and are not weakened by it
+
+Level rationale: this repository already executes GitHub durable facts, exact-SHA Validation, manual dispatch/handoff/review/closure and owner-held Hidden Validation, but does not yet truthfully operate v4 machine-contract reducers/controllers or full orchestration as project runtime automation. `A1_MANUAL_PROTOCOL` is therefore the truthful adoption level; `A2_MACHINE_CONTRACTS`+ are not claimed merely because the standard repository ships those schemas/controllers.
+
+Non-weakening rules:
+
+- These fields select implementation surface only; they MUST NOT weaken any higher-authority required Review, Validation tuple, Candidate Freeze, Release Qualification or Repository Integration requirement.
+- Candidate PREPARED != FROZEN; PR PASS != Release PASS; Release READY != Repository Integration complete at every adoption level.
+- Model/reviewer agreement never becomes executable Validation truth.
+- `NOT_RUN`, `BLOCKED` and `NOT_APPLICABLE` retain their standard meanings; an unavailable required gate is never rewritten as `NOT_APPLICABLE`.
+- Disabling reducer/controllers is valid at A1 because every required gate retains its truthful manual execution path recorded in this file.
+
+Migration truth:
+
+- This adoption (v3.4.0 → v4.0.0 at `A1_MANUAL_PROTOCOL`) changes the governance implementation surface only; Product/PRD/L2/DAC/runtime/package/test semantics are untouched.
+- Historical v3.4 A41/VC evidence keeps its original subject identity and status; it is NOT relabeled as newly produced v4 machine-contract evidence.
+- Final release evidence after this governance SHA move must be rebound/re-executed according to Version Closure impact rules before #408 Release Qualification.
+
 ## Execution Pack / Pull Worker Profile (v3.4, optional)
 
 All optional v3.4 execution-architecture capabilities below are DEFERRED for this repository. They are declared disabled so verifier syntax is satisfied; they are NOT project gates, and enabling any of them requires its own reviewed governance change.
