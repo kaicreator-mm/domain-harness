@@ -37,7 +37,6 @@ import {
 } from '../../src/dac-v0041/index.js';
 import {
   classifyDacV0041HistoricAuthorityArtifactUse,
-  verifyDacV0041AuthorityAdoption,
   verifyDacV0041DesignationChain,
 } from '../../src/dac-v0041/authority/index.js';
 import {
@@ -50,6 +49,7 @@ import * as authorityFixtures from '../dac-v0041-authority/helpers.js';
 import * as compatibilityFixtures from '../dac-v0041-compatibility/helpers.js';
 import * as compositionIntakeFixtures from '../dac-v0041-composition-intake/helpers.js';
 import * as runtimeFixtures from '../dac-v0041-runtime/helpers.js';
+import { runDacV0041BrownfieldConnectedJourney } from './brownfield-connected-journey.js';
 
 function assertAliasRejected(request: Parameters<typeof verifyDacV0041RequestResultSeparation>[0], counterpart: Parameters<typeof verifyDacV0041RequestResultSeparation>[1][number]): void {
   assert.throws(
@@ -514,7 +514,7 @@ test('C101 [NOT_OWNED] a DomainApplicationAssemblyPlanRef cited as selection aut
   assert.equal(result.code, 'ROLE_MISMATCH');
 });
 
-test('C102 [IMPLEMENTATION_DELTA] brownfield inferred authority without an owner-established scope anchor fails closed', () => {
+test('C102 [NOT_OWNED] Harness consumer boundary rejects inferred brownfield promotion authority without an owner-established scope anchor', () => {
   const result = verifyDacV0041DesignationChain(
     authorityFixtures.buildPromotionChainInput(60, { scopeOwnerAnchors: [] }),
   );
@@ -719,11 +719,12 @@ test('C115 [NOT_OWNED] a superseded AssemblyPlan is STALE for authoritative hand
 });
 
 // ---------------------------------------------------------------------------
-// C116–C117 — revoked promotion carry-forward; the alias-resolution
-// positive path.
+// C116–C117 — external promotion currentness consumption boundary; the
+// alias-resolution positive path. Promotion issuance/currentness remains
+// NOT_OWNED even though Harness intake fails closed when it is revoked.
 // ---------------------------------------------------------------------------
 
-test('C116 [IMPLEMENTATION_DELTA] a revoked PromotionDecisionRef carried into authoritative intake fails closed', () => {
+test('C116 [NOT_OWNED] Harness consumer boundary rejects a revoked external PromotionDecisionRef carried into authoritative intake', () => {
   const result = verifyDacV0041CompositionIntake(
     compositionIntakeFixtures.buildValidIntakeInput({
       selectedDomainData: [
@@ -773,8 +774,8 @@ test('C117 [NOT_OWNED] alias-resolution positive path: a mutable alias is refuse
 
 // ---------------------------------------------------------------------------
 // C111–C112 — the complete greenfield / brownfield flows (compact matrix
-// anchors; the full connected boundary journey with adoption and Runtime
-// consequence lives in the dedicated positive-journey suite).
+// anchors; C112 invokes the SAME test-local connected brownfield orchestrator
+// used by the dedicated positive journey and root closure anchor).
 // ---------------------------------------------------------------------------
 
 test('C111 [CONFORMANCE_ONLY] a complete greenfield flow preserves every authority/identity seam end to end', () => {
@@ -798,14 +799,21 @@ test('C111 [CONFORMANCE_ONLY] a complete greenfield flow preserves every authori
   assert.equal(binding.requestIdentity, bindingInput.bindingRequestRef.primaryIdentity);
 });
 
-test('C112 [CONFORMANCE_ONLY] a complete brownfield flow adopts the historic artifact prospectively and then proceeds through the fresh successor path', () => {
-  const adoption = verifyDacV0041AuthorityAdoption(
-    authorityFixtures.buildValidAdoptionFacts(),
+test('C112 [CONFORMANCE_ONLY] the complete brownfield flow carries the exact adopted subject through successor promotion coverage and downstream intake', () => {
+  const journey = runDacV0041BrownfieldConnectedJourney();
+  assert.equal(journey.outcome, 'PASS');
+  if (journey.outcome !== 'PASS') {
+    assert.fail(`brownfield C112 failed at ${journey.stage}: ${journey.code}`);
+  }
+  assert.equal(journey.historicUse.outcome, 'ADOPTION_REQUIRED');
+  assert.equal(journey.adoption.outcome, 'ADOPTED_PROSPECTIVE');
+  assert.equal(journey.adoption.effectiveFrom, 60);
+  const adoptedCoverage = journey.bindingInput.compositionIntake.selectedDomainData[0];
+  assert.ok(adoptedCoverage !== undefined);
+  assert.equal(adoptedCoverage.promotionCoverageRef, journey.successorPromotion);
+  assert.equal(
+    adoptedCoverage.promotionCoverageRef.primaryIdentity,
+    journey.historicArtifact.primaryIdentity,
   );
-  assert.equal(adoption.outcome, 'ADOPTED_PROSPECTIVE');
-  assert.equal(adoption.effectiveFrom, 60);
-  const intake = verifyDacV0041CompositionIntake(
-    compositionIntakeFixtures.buildValidIntakeInput(),
-  );
-  assert.equal(intake.outcome, 'INTAKE_VERIFIED');
+  assert.equal(journey.intake.outcome, 'INTAKE_VERIFIED');
 });
