@@ -52,9 +52,19 @@ export async function commitV3ProcessedCommandTurn(request: {
     ) {
       throw new Error(`T-009 process data target mismatch for ${stored.message.messageId}`);
     }
-    if (processData.instanceStateRevision !== current.stateRevision) {
+    // Process data is mutated only by commitProcessedCommandTurn(). Other
+    // authoritative Runtime operations (technical failure, recovery/control
+    // settlement, terminalization) may advance the instance revision while
+    // preserving process data. Therefore an older snapshot is the last
+    // committed process-data value and is carried forward into this command
+    // turn; a snapshot from the future is impossible/corrupt and fails closed.
+    if (
+      !Number.isSafeInteger(processData.instanceStateRevision)
+      || processData.instanceStateRevision < 0
+      || processData.instanceStateRevision > current.stateRevision
+    ) {
       throw new Error(
-        `T-009 process data revision ${processData.instanceStateRevision} does not match instance revision ${current.stateRevision}`,
+        `T-009 process data revision ${processData.instanceStateRevision} is invalid for current instance revision ${current.stateRevision}`,
       );
     }
   }
