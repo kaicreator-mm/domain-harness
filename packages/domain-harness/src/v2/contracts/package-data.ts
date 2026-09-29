@@ -39,3 +39,17 @@ export interface CompiledDomainDataIdentityMaterial {
   readonly descriptors: readonly CompiledDomainDataDescriptor[];
   readonly packageDataBounds: PackageDataBounds;
 }
+
+/** One authoritative projection from a validated/compiled Domain Data section into identity material. */
+export function compiledDomainDataIdentityMaterial(
+  section: CompiledDomainDataSection,
+): CompiledDomainDataIdentityMaterial {
+  return {
+    descriptors: section.descriptors.map((descriptor) => ({
+      key: descriptor.key,
+      contentDigest: descriptor.contentDigest,
+      ...(descriptor.valueSchema === undefined ? {} : { valueSchema: descriptor.valueSchema }),
+    })),
+    packageDataBounds: { ...section.packageDataBounds },
+  };
+}
