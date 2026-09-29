@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import {
   canonicalJsonStringify,
+  compareCompiledDomainDataKeys,
   type CompiledDomainDataDescriptor,
   type CompiledDomainDataSection,
   type JsonSchema,
@@ -149,7 +150,7 @@ export function buildCompiledDomainDataSection(
 
   if (issues.length > 0) throw new DomainDataCompileError(issues);
 
-  prepared.sort((left, right) => left.key.localeCompare(right.key));
+  prepared.sort((left, right) => compareCompiledDomainDataKeys(left.key, right.key));
   const descriptors: CompiledDomainDataDescriptor[] = prepared.map((entry) => ({
     key: entry.key,
     contentDigest: sha256Text(entry.canonicalValue),
