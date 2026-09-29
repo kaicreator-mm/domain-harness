@@ -25,6 +25,11 @@
       "types": "./dist/public-v3/index.d.ts",
       "import": "./dist/public-v3/index.js",
       "require": "./dist/public-v3/index.js"
+    },
+    "./v4": {
+      "types": "./dist/public-v4/index.d.ts",
+      "import": "./dist/public-v4/index.js",
+      "require": "./dist/public-v4/index.js"
     }
   },
   "files": [

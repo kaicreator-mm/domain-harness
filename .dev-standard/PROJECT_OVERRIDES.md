@@ -12,7 +12,7 @@
 - Structure: Git monorepo. Primary portable SDK remains `packages/domain-harness`; compiler and host-specific adapters remain separate workspace packages.
 - v0.3 was an incremental productionization of the shipped v0.2 runtime, not a rewrite.
 - v0.1 and v0.2 remain historical frozen baselines; v0.3 does not retroactively redefine their persisted behavior.
-- Current state: the v0.3 version lane is COMPLETE — release qualification closed and `v0.3` merged to `main` via PR #347 (`main@f2b61cc720a85d3e0fb94c1eed9b68f8ed855e6c`, tree `1e5473e2feab3dea1d92fb2b1590e963e71d2709`). Successor version lanes are declared by their own frozen Task DAG; none is materialized yet.
+- Current state: the v0.3 version lane is COMPLETE — release qualification closed and `v0.3` merged to `main` via PR #347 (`main@f2b61cc720a85d3e0fb94c1eed9b68f8ed855e6c`, tree `1e5473e2feab3dea1d92fb2b1590e963e71d2709`). The successor `v0.4` version lane is materialized as integration branch `v0.4` under reviewed #353 (A41 Task DAG planning) / #354 (fresh independent review) and is currently in Version Closure — not yet release-qualified; no further successor lane is materialized.
 
 ## Integration / GitHub Execution Profile
 
@@ -31,6 +31,37 @@ When Issue-based execution is enabled:
 - JIT branch rule: task branches are created after dependencies merge, from the current integration exact SHA (exceptions only for real stacked code dependency).
 
 Post-release governance note: after a version lane is merged to `main`, concerns that depend only on the released `main` state (such as this standard-pin migration) branch JIT from exact `main` with PR base `main`.
+
+## v4 Adoption / Compatibility Profile
+
+Adoption level controls how much v4 implementation machinery this project uses. It does **not** reduce the mandatory truth/authority floor.
+
+Canonical project fields:
+
+- `v4.adoption_level`: `A1_MANUAL_PROTOCOL`
+- `v4.compatibility_mode`: `v3.4-bridge` — migrated from pinned v3.4.0 (`418d244f23a6bf724acf5d4c4eff4ea292f1c4db`); durable authority, GitHub Issue Dependencies live execution DAG, exact-SHA Validation, `ai-dev:event:v2` attribution and all required gates continue unchanged under the v4 pin
+- `v4.assurance.default`: `manual-minimum` — default Assurance remains the Independent Review Profile above (risk-based `required` triggers, Builder-vs-Reviewer context independence); this default applies only where no stronger authority-derived requirement exists
+- `v4.model_diversity.default_basis`: `none` — no project-wide multi-model review requirement exists; per-task required reviews keep their authority-defined independence rules (fresh ChatGPT Web session, independent Local Agent review context, or human), and provider diversity occurring incidentally is not claimed as a diversity program
+- `v4.interchange`: `disabled` — no Interchange transport is enabled; if ever enabled, authority semantics MUST remain `CORRELATION_ONLY_NON_AUTHORITATIVE`
+- `v4.reducer`: `disabled` — every required gate retains a truthful manual path through GitHub durable facts
+- `v4.controllers`: `disabled` — no automated dispatch/routing controllers run; dispatch/handoff/review/closure stay manual per the pinned workflow standards
+- `v4.fast_path`: `canonical` — canonical v4 Fast Path disqualifiers apply unchanged; this project's required-Review triggers, release gates and owner-held Hidden Validation are independent of Fast Path eligibility and are not weakened by it
+
+Level rationale: this repository already executes GitHub durable facts, exact-SHA Validation, manual dispatch/handoff/review/closure and owner-held Hidden Validation, but does not yet truthfully operate v4 machine-contract reducers/controllers or full orchestration as project runtime automation. `A1_MANUAL_PROTOCOL` is therefore the truthful adoption level; `A2_MACHINE_CONTRACTS`+ are not claimed merely because the standard repository ships those schemas/controllers.
+
+Non-weakening rules:
+
+- These fields select implementation surface only; they MUST NOT weaken any higher-authority required Review, Validation tuple, Candidate Freeze, Release Qualification or Repository Integration requirement.
+- Candidate PREPARED != FROZEN; PR PASS != Release PASS; Release READY != Repository Integration complete at every adoption level.
+- Model/reviewer agreement never becomes executable Validation truth.
+- `NOT_RUN`, `BLOCKED` and `NOT_APPLICABLE` retain their standard meanings; an unavailable required gate is never rewritten as `NOT_APPLICABLE`.
+- Disabling reducer/controllers is valid at A1 because every required gate retains its truthful manual execution path recorded in this file.
+
+Migration truth:
+
+- This adoption (v3.4.0 → v4.0.0 at `A1_MANUAL_PROTOCOL`) changes the governance implementation surface only; Product/PRD/L2/DAC/runtime/package/test semantics are untouched.
+- Historical v3.4 A41/VC evidence keeps its original subject identity and status; it is NOT relabeled as newly produced v4 machine-contract evidence.
+- Final release evidence after this governance SHA move must be rebound/re-executed according to Version Closure impact rules before #408 Release Qualification.
 
 ## Execution Pack / Pull Worker Profile (v3.4, optional)
 
@@ -146,7 +177,7 @@ CI PASS is not Release Qualification PASS.
 ### Real validation environments
 
 - Windows validation: Windows workstation / Local Agent Build Host (governance verification, local-first deterministic validation)
-- Linux validation: NOT_RUN — no independent Linux validation host is established for this repository; repository CI runs on the single local-backend Woodpecker agent host
+- Linux validation: NOT_RUN — no independent Linux validation host is established for this repository; repository CI runs on the ECF elastic local-backend Woodpecker worker VM(s)
 - macOS validation: NOT_APPLICABLE — no macOS target in the frozen v0.3 product contract
 - Other real environment/device: real Android device/emulator (Hermes + `expo-sqlite`) for the dedicated Expo host wave
 
@@ -162,21 +193,21 @@ One tuple PASS never implies another tuple PASS. Cross-build is not real platfor
 - CI profile: custom
 - CI checks (for `custom`): single Woodpecker pipeline `.woodpecker/verify.yaml` — exact-SHA checkout assertion, Node major-version 22+ gate, `npm ci`, `npm run build` (includes committed-dist byte-identity check), `npm run lint`, `npm run typecheck`, `npm test`. Profile semantics remain `minimal-per-task + concentrated-host-validation + version-closure-full`: parallel feature PRs prove their local deterministic concern; expensive host validation is concentrated into dedicated Node and Expo waves; version closure runs full regression.
 - Disabled reason (for `disabled`): NOT_APPLICABLE — CI is enabled
-- Exact-SHA clean-validation fallback: every CI run fetches and asserts the exact `$CI_COMMIT_SHA` (depth-1) and a new source SHA always requires a fresh run; when Woodpecker CI is unavailable, required validation falls back to exact-SHA clean local execution on the Windows Build Host (clean tracked checkout at the exact SHA plus the full required command set) recorded as local exact-SHA evidence — CI/service unavailability may be recorded through the authorized waiver path, but unavailable CI is never reported as PASS.
+- Exact-SHA clean-validation fallback: every CI run checks out the event's exact `$CI_COMMIT_SHA` via the provider-managed clone and the verify step explicitly asserts `git rev-parse HEAD` equals it, and a new source SHA always requires a fresh run; when Woodpecker CI is unavailable, required validation falls back to exact-SHA clean local execution on the Windows Build Host (clean tracked checkout at the exact SHA plus the full required command set) recorded as local exact-SHA evidence — CI/service unavailability may be recorded through the authorized waiver path, but unavailable CI is never reported as PASS.
 
 ## CI Execution Profile
 
 Interpret provider-specific workflow syntax only after declaring the real execution model. Follow `standards/CI_EXECUTION_STANDARD.md` from the pinned standard revision.
 
 - CI provider: woodpecker
-- CI backend / execution model: local backend — step commands execute directly on the agent host; `image: bash` is resolved through host PATH and is not a container
-- CI runner role: single dedicated local-backend agent host acting as the project Build Host (no hosted or shared runners)
+- CI backend / execution model: local backend — ECF elastic worker VM(s) run the agent with `labels.backend: local` (VM-is-the-sandbox); step commands execute directly on the worker VM host (Alpine with node24 + git preinstalled); `image: bash` is resolved through worker-VM host PATH and is not a container
+- CI runner role: ECF elastic local-backend worker VM(s) acting as the project CI Build Host (no hosted or shared public runners)
 - Workflow config: repository path `.woodpecker/verify.yaml`
-- Workflow config source: pr-head for `pull_request` events (exact `$CI_COMMIT_SHA` checkout) and the exact pushed SHA for `push` events on `main`/`v0.2`/`v0.3`
-- Execution shell / entrypoint model: host shell; bash step commands with git/bash/node/npm resolved from agent-host PATH (no container entrypoint)
-- Runtime source: host-managed (git, bash, Node.js, npm from the agent host; the pipeline itself gates Node major version 22 or higher)
-- Clone / checkout model: `skip_clone`; the pipeline runs explicit `git init` + `git fetch --no-tags --depth=1` from the repo clone URL at `$CI_COMMIT_SHA`, then `git checkout --detach FETCH_HEAD`, and asserts `git rev-parse HEAD` equals `$CI_COMMIT_SHA`
-- Partial clone policy: disabled beyond the depth-1 shallow fetch; no blob/tree-filter partial clone is used
+- Workflow config source: pr-head for `pull_request` events (exact `$CI_COMMIT_SHA` checkout) and the exact pushed SHA for `push` events on `main`/`v0.2`/`v0.3`/`v0.4`
+- Execution shell / entrypoint model: worker-VM host shell; bash step commands with git/bash/node/npm resolved from worker-VM host PATH (no container entrypoint)
+- Runtime source: worker-VM host-managed (git, bash, Node.js, npm from the ECF elastic worker VM host; the pipeline itself gates Node major version 22 or higher)
+- Clone / checkout model: provider-managed checkout (default clone step; no `skip_clone` manual `git init`/`git fetch`); the verify step explicitly asserts `git rev-parse HEAD` equals `$CI_COMMIT_SHA`
+- Partial clone policy: disabled — no blob/tree-filter partial clone is used; clone depth is provider-managed by the default clone step
 - Submodule policy: disabled — the repository declares no `.gitmodules`; submodules are out of scope without a governance change
 - Git LFS policy: disabled — the repository uses no LFS objects or filters (`.gitattributes` only pins `-text` on committed dist outputs)
 - Fresh-run / rerun policy: new exact SHA requires fresh run; rerun only proves its own run subject
