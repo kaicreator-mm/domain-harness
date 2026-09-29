@@ -1,7 +1,6 @@
 import { Buffer } from 'node:buffer';
 import {
   canonicalJsonStringify,
-  compiledDomainDataIdentityMaterial,
   type CompiledDomainDataDescriptor,
   type CompiledDomainDataSection,
   type JsonSchema,
@@ -75,11 +74,14 @@ function projectionDomainDataIssues(
 /**
  * Internal successor compiler primitive. Public compileDomainPackage() remains
  * frozen on 0.2/2/2 until central I-03-ASSEMBLY.
+ *
+ * `projections` is intentionally mandatory: successor compilation may never
+ * silently skip the statically knowable Domain Data dependency-closure gate.
  */
 export function buildCompiledDomainDataSection(
   entries: readonly DomainDataCompileEntry[],
   bounds: PackageDataBounds,
-  projections: readonly RawProjectionDefinition[] = [],
+  projections: readonly RawProjectionDefinition[],
 ): CompiledDomainDataSection {
   assertBounds(bounds);
 
@@ -156,13 +158,9 @@ export function buildCompiledDomainDataSection(
   const values = Object.create(null) as Record<string, JsonValue>;
   for (const entry of prepared) values[entry.key] = entry.value;
 
-  const section: CompiledDomainDataSection = {
+  return {
     descriptors,
     values,
     packageDataBounds: { ...bounds },
   };
-  // Force the shared identity projection to remain type-compatible with this
-  // compiler output; central assembly consumes the same authoritative helper.
-  compiledDomainDataIdentityMaterial(section);
-  return section;
 }
