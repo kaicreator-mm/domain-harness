@@ -6,8 +6,12 @@ import {
   DomainHarnessJsonSchemaV1Error,
   DomainHarnessJsonSchemaV1Validator,
 } from '../schema/domainharness-json-schema-v1.js';
-import type { CompiledBusinessSourceContractPort } from './compiled-business-source.js';
+import type { CompiledBusinessSourceContract, CompiledBusinessSourceContractPort } from './compiled-business-source.js';
 import type { CompiledDomainDataPort, CompiledDomainDataValue } from './compiled-domain-data.js';
+import {
+  SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+  sameCompiledArtifactProfile,
+} from '../v2/contracts/compiled-artifact-profile.js';
 import type { ExpressionExecutorPort, Sha256Port } from '../v2/contracts/host.js';
 import type {
   CompiledProjectionDescriptor,
@@ -64,7 +68,11 @@ export interface ProjectionServiceOptions {
   packageRegistry: PackageRegistry;
   store: Pick<RuntimeStore, 'getInstance'>;
   businessSnapshots?: BusinessSnapshotPort;
-  /** Omission preserves retained 0.2 behavior; successor assembly must supply this port. */
+  /**
+   * Package-local successor contract lookup. Exact 0.3/2/3 packages require
+   * this seam; exact legacy 0.2/2/2 packages ignore it to preserve historical
+   * projection semantics even if a host happens to provide one.
+   */
   businessSourceContracts?: CompiledBusinessSourceContractPort;
   domainData?: CompiledDomainDataPort;
   expression: ExpressionExecutorPort;
@@ -90,10 +98,12 @@ export class ProjectionService {
       );
     }
 
+    const successorBusinessSourceContractsRequired = isSuccessorPackage(compiledPackage);
     const assembled = await this.assembleDeclaredSnapshots(
       descriptor,
       request.key,
       compiledPackage.manifest.packageId,
+      successorBusinessSourceContractsRequired,
     );
     const projectionInput: JsonObject = {
       key: request.key,
@@ -197,6 +207,7 @@ export class ProjectionService {
     descriptor: CompiledProjectionDescriptor,
     key: string,
     packageId: string,
+    successorBusinessSourceContractsRequired: boolean,
   ): Promise<{
     workflowSources: WorkflowProjectionInput[];
     businessSnapshots: BusinessSnapshot[];
@@ -212,6 +223,7 @@ export class ProjectionService {
         dependency,
         key,
         packageId,
+        successorBusinessSourceContractsRequired,
         workflowSources,
         businessSnapshots,
         domainData,
@@ -226,6 +238,7 @@ export class ProjectionService {
     dependency: ProjectionDependencyDescriptor,
     key: string,
     packageId: string,
+    successorBusinessSourceContractsRequired: boolean,
     workflowSources: WorkflowProjectionInput[],
     businessSnapshots: BusinessSnapshot[],
     domainData: CompiledDomainDataValue[],
@@ -257,21 +270,16 @@ export class ProjectionService {
       }
       assertNonEmpty(dependency.source, 'business source');
       const businessKey = resolveBusinessSelector(dependency.selector, key);
-      const snapshot = await this.options.businessSnapshots.read({
-        source: dependency.source,
-        key: businessKey,
-      });
-      if (snapshot.source !== dependency.source || snapshot.key !== businessKey) {
-        throw new ProjectionError(
-          'business_snapshot_mismatch',
-          `Business snapshot identity mismatch for ${dependency.source}/${businessKey}`,
-        );
-      }
-      assertNonEmpty(snapshot.revision, 'business snapshot revision');
 
-      let validatedSnapshot = snapshot;
-      if (this.options.businessSourceContracts) {
-        const contract = this.options.businessSourceContracts.get(packageId, dependency.source);
+      let contract: CompiledBusinessSourceContract | undefined;
+      if (successorBusinessSourceContractsRequired) {
+        if (!this.options.businessSourceContracts) {
+          throw new ProjectionError(
+            'business_source_contract_missing',
+            `Successor package ${packageId} requires a package-pinned Business Source contract lookup`,
+          );
+        }
+        contract = this.options.businessSourceContracts.get(packageId, dependency.source);
         if (!contract) {
           throw new ProjectionError(
             'business_source_contract_missing',
@@ -285,6 +293,22 @@ export class ProjectionService {
             `Business Source contract for ${dependency.source} is not exact package-pinned ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`,
           );
         }
+      }
+
+      const snapshot = await this.options.businessSnapshots.read({
+        source: dependency.source,
+        key: businessKey,
+      });
+      if (snapshot.source !== dependency.source || snapshot.key !== businessKey) {
+        throw new ProjectionError(
+          'business_snapshot_mismatch',
+          `Business snapshot identity mismatch for ${dependency.source}/${businessKey}`,
+        );
+      }
+      assertNonEmpty(snapshot.revision, 'business snapshot revision');
+
+      let validatedSnapshot = snapshot;
+      if (contract) {
         try {
           const validatedValue = this.successorSchemaValidator.validate(
             contract.descriptor.valueSchema,
@@ -347,6 +371,17 @@ export class ProjectionService {
       `Projection dependency ${String((dependency as { kind?: unknown }).kind)} is outside the frozen Workflow/Business/Domain Data dependency kinds`,
     );
   }
+}
+
+function isSuccessorPackage(compiledPackage: TargetCompiledDomainPackage): boolean {
+  return sameCompiledArtifactProfile(
+    {
+      formatVersion: compiledPackage.manifest.formatVersion,
+      runtimeContractMajor: compiledPackage.manifest.runtimeContractMajor,
+      executionEngineMajor: compiledPackage.manifest.executionEngineMajor,
+    },
+    SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+  );
 }
 
 function resolveWorkflowSelector(selector: JsonObject, queryKey: string): WorkflowAddress {
