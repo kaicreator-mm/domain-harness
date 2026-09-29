@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { PackageDataBounds } from '@kaicreator/domain-harness/v2';
+import type { RawProjectionDefinition } from '../src/raw/types.js';
 import {
   buildCompiledDomainDataSection,
   DomainDataCompileError,
@@ -15,6 +16,15 @@ const BOUNDS: PackageDataBounds = {
   maxSchemaCanonicalBytes: 512,
 };
 
+function projection(key: string): RawProjectionDefinition {
+  return {
+    projectionId: `schema-view-${key}`,
+    expression: '$',
+    dependencies: [{ kind: 'domain-data', key }],
+    outputSchema: {},
+  };
+}
+
 test('I-BIZ-SRC: Domain Data valueSchema validates exact compiled value at compile time', () => {
   const section = buildCompiledDomainDataSection([
     {
@@ -27,7 +37,7 @@ test('I-BIZ-SRC: Domain Data valueSchema validates exact compiled value at compi
         additionalProperties: false,
       },
     },
-  ], BOUNDS, []);
+  ], BOUNDS, [projection('catalog')]);
   assert.equal(section.descriptors.length, 1);
 
   assert.throws(
@@ -41,7 +51,7 @@ test('I-BIZ-SRC: Domain Data valueSchema validates exact compiled value at compi
           properties: { count: { type: 'integer', minimum: 0 } },
         },
       },
-    ], BOUNDS, []),
+    ], BOUNDS, [projection('catalog')]),
     (error: unknown) => error instanceof DomainDataCompileError
       && error.issues.some((issue) => issue.includes('INSTANCE_VALIDATION_FAILED')),
   );
@@ -51,14 +61,14 @@ test('I-BIZ-SRC: Domain Data schema contract and byte bounds fail compile', () =
   assert.throws(
     () => buildCompiledDomainDataSection([
       { key: 'a', value: 'x', valueSchema: { type: 'string', customKeyword: true } },
-    ], BOUNDS, []),
+    ], BOUNDS, [projection('a')]),
     DomainDataCompileError,
   );
 
   assert.throws(
     () => buildCompiledDomainDataSection([
       { key: 'a', value: 'x', valueSchema: { type: 'string' } },
-    ], { ...BOUNDS, maxSchemaCanonicalBytes: 2 }, []),
+    ], { ...BOUNDS, maxSchemaCanonicalBytes: 2 }, [projection('a')]),
     (error: unknown) => error instanceof DomainDataCompileError
       && error.issues.some((issue) => issue.includes('maxSchemaCanonicalBytes')),
   );
