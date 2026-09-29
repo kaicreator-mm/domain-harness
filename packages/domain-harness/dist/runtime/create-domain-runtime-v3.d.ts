@@ -1,4 +1,5 @@
 import type { AdmissionDurableEffectJournal, AdmissionEffectToolPort, CentralAdmissionOutcome, CentralAdmissionRequest } from '../admission/contracts.js';
+import type { RuntimeStoreProcessCommandExtension } from '../contracts/process-command.js';
 import type { RuntimeEvidencePort } from '../contracts/runtime-evidence.js';
 import { DomainActivationBindingCoordinator, GovernanceExecutionCoordinator, type DomainActivationAuthority, type DurableExecutionStore, type ExactPackageCdiAuthority, type GovernanceBaselineStore } from '../governance/index.js';
 import { RuntimeEvidenceCapture, type RuntimeEvidenceCaptureContext } from '../runtime-evidence/index.js';
@@ -33,10 +34,12 @@ export interface CreateDomainRuntimeV3AuthorityOptions {
     readonly onEvidenceError?: (error: unknown) => void;
 }
 export interface CreateDomainRuntimeV3Options extends CreateDomainRuntimeOptions {
+    /** v3 processing requires the already-frozen T-009 extension on the SAME store. */
+    readonly store: CreateDomainRuntimeOptions['store'] & RuntimeStoreProcessCommandExtension;
     readonly v3: CreateDomainRuntimeV3AuthorityOptions;
 }
 export interface DomainRuntimeV3 {
-    /** The ONE existing v0.2 runtime — retained Domain-App capabilities unchanged. */
+    /** The ONE existing portable Runtime with v3-only T-009 processing enabled. */
     readonly runtime: DomainRuntime;
     /** T-014 activation-binding authority (publish/read exact bindings). */
     readonly activation: DomainActivationBindingCoordinator;
@@ -54,10 +57,9 @@ export interface DomainRuntimeV3 {
     evidenceCapture(context: RuntimeEvidenceCaptureContext): RuntimeEvidenceCapture;
 }
 /**
- * Portable v0.3 runtime assembly. Boots the existing v0.2 runtime unchanged
- * (target compiled package + Runtime Resources only), then composes the
- * governance/decision/evidence authority stack from portable ports. No second
- * runtime, no provider routing, no Node built-ins.
+ * Portable v0.3 runtime assembly. Reuses the ONE existing portable Runtime but
+ * explicitly enables the already-frozen T-009 processed-command authority on
+ * its same RuntimeStore. Legacy createDomainRuntime() remains unchanged.
  */
 export declare function createDomainRuntimeV3(options: CreateDomainRuntimeV3Options): Promise<DomainRuntimeV3>;
 //# sourceMappingURL=create-domain-runtime-v3.d.ts.map

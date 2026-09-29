@@ -38,7 +38,9 @@ export type RuntimeErrorCode =
 /** Ambiguous non-idempotent recovery requires the durable effectId. */
  | 'recovery_effect_identity_missing'
 /** Observation enabled, but the store does not implement the observation seam (#312). */
- | 'observation_store_required';
+ | 'observation_store_required'
+/** v3 command processing requires the already-frozen T-009 store extension (#137). */
+ | 'process_command_store_required';
 export declare class DomainRuntimeError extends Error {
     readonly code: RuntimeErrorCode;
     constructor(code: RuntimeErrorCode, message: string, options?: {

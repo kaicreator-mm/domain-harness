@@ -53,13 +53,16 @@ export interface RuntimeObservationEnableOptions {
      * compiled packageId, verified at activation).
      */
     readonly resolvePackageIdentity?: (packageId: string) => DomainIntelligencePackageIdentity;
-    /** Opaque DAC/A2-owned provenance refs, carried verbatim when the host holds them. */
+    /** Opaque DAC/A2-owned provenance refs, carried verbatim on records when present. */
     readonly runtimeBindingRef?: string;
     readonly runtimeActivationRef?: string;
 }
 /**
- * Activates the portable v0.2 Runtime from already-target-compiled package modules.
- * No Raw Domain Package loader/compiler is imported or reachable from this path.
+ * Activates the portable retained Runtime from already-target-compiled package
+ * modules. The public v0.2 entrypoint always uses the historical processing
+ * path; createDomainRuntimeV3 alone opts into the frozen T-009 commit path.
  */
 export declare function createDomainRuntime(options: CreateDomainRuntimeOptions): Promise<DomainRuntime>;
+/** Internal v3 assembly entrypoint; intentionally not re-exported by runtime/index.ts. */
+export declare function createDomainRuntimeWithProcessCommandOutcomes(options: CreateDomainRuntimeOptions): Promise<DomainRuntime>;
 //# sourceMappingURL=create-domain-runtime.d.ts.map

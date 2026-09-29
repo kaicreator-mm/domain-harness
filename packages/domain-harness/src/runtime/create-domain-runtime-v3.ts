@@ -6,6 +6,7 @@ import type {
 } from '../admission/contracts.js';
 import { admitCentralDecision, CentralAdmissionError } from '../admission/index.js';
 import type { CompiledArtifactIdentity } from '../contracts/domain-data.js';
+import type { RuntimeStoreProcessCommandExtension } from '../contracts/process-command.js';
 import type {
   RuntimeEvidenceArtifactRef,
   RuntimeEvidencePort,
@@ -23,7 +24,10 @@ import {
   type RuntimeEvidenceCaptureContext,
 } from '../runtime-evidence/index.js';
 import type { DomainRuntime } from '../v2/contracts/runtime.js';
-import { createDomainRuntime, type CreateDomainRuntimeOptions } from './create-domain-runtime.js';
+import {
+  createDomainRuntimeWithProcessCommandOutcomes,
+  type CreateDomainRuntimeOptions,
+} from './create-domain-runtime.js';
 
 export type DomainRuntimeV3ErrorCode = 'RUNTIME_V3_AUTHORITY_REQUIRED';
 
@@ -66,11 +70,13 @@ export interface CreateDomainRuntimeV3AuthorityOptions {
 }
 
 export interface CreateDomainRuntimeV3Options extends CreateDomainRuntimeOptions {
+  /** v3 processing requires the already-frozen T-009 extension on the SAME store. */
+  readonly store: CreateDomainRuntimeOptions['store'] & RuntimeStoreProcessCommandExtension;
   readonly v3: CreateDomainRuntimeV3AuthorityOptions;
 }
 
 export interface DomainRuntimeV3 {
-  /** The ONE existing v0.2 runtime — retained Domain-App capabilities unchanged. */
+  /** The ONE existing portable Runtime with v3-only T-009 processing enabled. */
   readonly runtime: DomainRuntime;
   /** T-014 activation-binding authority (publish/read exact bindings). */
   readonly activation: DomainActivationBindingCoordinator;
@@ -104,10 +110,9 @@ function toArtifactRef(identity: CompiledArtifactIdentity): RuntimeEvidenceArtif
 }
 
 /**
- * Portable v0.3 runtime assembly. Boots the existing v0.2 runtime unchanged
- * (target compiled package + Runtime Resources only), then composes the
- * governance/decision/evidence authority stack from portable ports. No second
- * runtime, no provider routing, no Node built-ins.
+ * Portable v0.3 runtime assembly. Reuses the ONE existing portable Runtime but
+ * explicitly enables the already-frozen T-009 processed-command authority on
+ * its same RuntimeStore. Legacy createDomainRuntime() remains unchanged.
  */
 export async function createDomainRuntimeV3(
   options: CreateDomainRuntimeV3Options,
@@ -121,7 +126,7 @@ export async function createDomainRuntimeV3(
   const effectTools = requirePort(v3.effectTools, 'v3.effectTools');
   const evidence = requirePort(v3.evidence, 'v3.evidence');
 
-  const runtime = await createDomainRuntime(options);
+  const runtime = await createDomainRuntimeWithProcessCommandOutcomes(options);
   const sha256 = options.bindings.sha256;
   const activation = new DomainActivationBindingCoordinator(
     activationAuthority,
@@ -137,23 +142,14 @@ export async function createDomainRuntimeV3(
   const onEvidenceError = v3.onEvidenceError;
   const swallowEvidenceError = (error: unknown): void => {
     if (onEvidenceError === undefined) return;
-    // The observer is host code on a secondary channel: its own failure is
-    // swallowed with the append failure so it can never rewrite an admission
-    // outcome (V8).
     try {
       onEvidenceError(error);
     } catch {
-      // intentionally ignored
+      // Host observer failures never rewrite admission truth.
     }
   };
 
   async function admitTurn(request: CentralAdmissionRequest): Promise<CentralAdmissionOutcome> {
-    // Load the exact pin first for evidence provenance. Without a pin there is
-    // no honest provenance, so the pin-missing error propagates without evidence
-    // (admission would fail closed on the same pin gate immediately afterwards).
-    // admitCentralDecision re-reads the pin below; pins are bind-once immutable
-    // (conflicts throw, never overwrite), so the two reads cannot observe
-    // different authority.
     const pin = await governance.requirePinnedExecution(request.workflowInstanceId);
     const capture = evidenceCapture({
       domainId: pin.domainId,

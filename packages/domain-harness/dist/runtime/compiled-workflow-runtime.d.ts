@@ -1,3 +1,4 @@
+import type { DomainCommandRejection } from '../contracts/process-command.js';
 import type { JsonObject, JsonValue } from '../contracts/json.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
 import { JournaledDomainMessageEffect } from '../messaging/send-effect/journaled-domain-message-effect.js';
@@ -27,6 +28,13 @@ export interface CompiledWorkflowTransition {
     output?: JsonValue;
     recoveryFailure?: RuntimeFailure;
 }
+export type CompiledWorkflowCommandResult = {
+    readonly status: 'applied';
+    readonly transition: CompiledWorkflowTransition;
+} | {
+    readonly status: 'rejected';
+    readonly rejection: DomainCommandRejection;
+};
 /**
  * Turn-scoped execution options (#313): the internal AbortSignal of the ONE
  * in-flight mailbox turn, issued only after a durable winning control claim.
@@ -40,7 +48,19 @@ export declare class CompiledWorkflowRuntime {
     private readonly options;
     constructor(options: CompiledWorkflowRuntimeOptions);
     initialState(workflow: CompiledWorkflowDescriptor, input: JsonValue): JsonValue;
+    /**
+     * Historical engine-2 execution entrypoint. Normal domain non-applicability
+     * deliberately remains an ordinary Error here so retained 0.2/2/2 Runtime
+     * failure/recovery semantics remain byte-for-byte compatible at the public
+     * behavior boundary. v3 assembly consumes processCommand() instead.
+     */
     processMessage(compiledPackage: TargetCompiledDomainPackage, workflow: CompiledWorkflowDescriptor, current: WorkflowInstanceSnapshot, stored: StoredAcceptedMessage, execution?: CompiledWorkflowExecutionOptions): Promise<CompiledWorkflowTransition>;
+    /**
+     * T-009 integration seam used only by v3 assembly. Ordinary current-state
+     * non-applicability becomes an explicit normal command rejection; technical
+     * failures still throw and therefore retain recovery/failure ownership.
+     */
+    processCommand(compiledPackage: TargetCompiledDomainPackage, workflow: CompiledWorkflowDescriptor, current: WorkflowInstanceSnapshot, stored: StoredAcceptedMessage, execution?: CompiledWorkflowExecutionOptions): Promise<CompiledWorkflowCommandResult>;
     private settle;
     private invoke;
     private runMessageEffects;

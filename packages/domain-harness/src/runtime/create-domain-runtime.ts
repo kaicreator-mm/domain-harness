@@ -32,6 +32,11 @@ import { ProjectionService } from '../projection/projection-service.js';
 import { DomainQueryDispatcher } from '../query/domain-query-dispatcher.js';
 import { PoisonMessageRecoveryCoordinator } from '../recovery-v2/poison-message-recovery.js';
 import { MailboxDrainScheduler } from './mailbox-drain-scheduler.js';
+import {
+  commitV3ProcessedCommandTurn,
+  requireV3ProcessCommandStore,
+  type V3ProcessCommandStore,
+} from './process-command-integration.js';
 import { RuntimeSubscriptionCoordinator } from './subscription-coordinator.js';
 import { DomainRuntimeError } from './runtime-errors.js';
 import type { BusinessSnapshotPort } from '../v2/contracts/projection.js';
@@ -47,7 +52,7 @@ import type {
   DomainSubscription,
   Unsubscribe,
 } from '../v2/contracts/subscription.js';
-import type { RuntimeStore } from '../v2/contracts/store.js';
+import type { RuntimeStore, StoredAcceptedMessage } from '../v2/contracts/store.js';
 import type {
   RuntimeHostBindings,
   RuntimeResources,
@@ -111,7 +116,7 @@ export interface RuntimeObservationEnableOptions {
    * compiled packageId, verified at activation).
    */
   readonly resolvePackageIdentity?: (packageId: string) => DomainIntelligencePackageIdentity;
-  /** Opaque DAC/A2-owned provenance refs, carried verbatim when the host holds them. */
+  /** Opaque DAC/A2-owned provenance refs, carried verbatim on records when present. */
   readonly runtimeBindingRef?: string;
   readonly runtimeActivationRef?: string;
 }
@@ -176,15 +181,36 @@ class ProcessingConflictError extends Error {
   }
 }
 
+type RuntimeProcessingMode = 'legacy' | 'v3-process-command';
+
 /**
- * Activates the portable v0.2 Runtime from already-target-compiled package modules.
- * No Raw Domain Package loader/compiler is imported or reachable from this path.
+ * Activates the portable retained Runtime from already-target-compiled package
+ * modules. The public v0.2 entrypoint always uses the historical processing
+ * path; createDomainRuntimeV3 alone opts into the frozen T-009 commit path.
  */
-export async function createDomainRuntime(options: CreateDomainRuntimeOptions): Promise<DomainRuntime> {
-  // Issue #312 observation composition: when enabled, every covered mutation
-  // flows through the observation-capable store so the record commits in the
-  // SAME durable transaction as the mutation. When absent/unsupported the
-  // store below is exactly the caller's store and no observation code runs.
+export function createDomainRuntime(options: CreateDomainRuntimeOptions): Promise<DomainRuntime> {
+  return createDomainRuntimeInternal(options, 'legacy');
+}
+
+/** Internal v3 assembly entrypoint; intentionally not re-exported by runtime/index.ts. */
+export function createDomainRuntimeWithProcessCommandOutcomes(
+  options: CreateDomainRuntimeOptions,
+): Promise<DomainRuntime> {
+  return createDomainRuntimeInternal(options, 'v3-process-command');
+}
+
+async function createDomainRuntimeInternal(
+  options: CreateDomainRuntimeOptions,
+  processingMode: RuntimeProcessingMode,
+): Promise<DomainRuntime> {
+  const processCommandStore: V3ProcessCommandStore | null =
+    processingMode === 'v3-process-command' ? requireV3ProcessCommandStore(options.store) : null;
+
+  // Issue #312 observation composition: when enabled, every observation-v1
+  // covered mutation flows through the observation-capable store. The frozen
+  // observation-v1 contract explicitly excludes T-009 process-command commits,
+  // so v3 processed-command publication remains on the same underlying store
+  // without fabricating a TURN_COMMITTED observation for an uncovered mutation.
   const observationStore = isRuntimeObservationStore(options.store) ? options.store : null;
   const observationRequested = options.observation?.mode === 'enabled';
   if (observationRequested && observationStore === null) {
@@ -266,11 +292,6 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   });
   const query = new DomainQueryDispatcher({ store: options.store, projection });
 
-  // Observation state (subscription registry, projection refcounts, bounded
-  // message revisions) is owned by RuntimeSubscriptionCoordinator (#170/#171);
-  // drain scheduling state (active drains, wake-ups, disposal gating) is owned
-  // by MailboxDrainScheduler (#169/#171). This composition root keeps only the
-  // lifecycle flags and wiring.
   const subscriptionCoordinator = new RuntimeSubscriptionCoordinator({
     store: options.store,
     projection,
@@ -288,10 +309,6 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
 
-  // Issue #313 in-flight turn registry: per-target handle for the ONE turn
-  // currently between markMessageProcessing and its durable commit/failure.
-  // Private implementation detail — the public control truth is the durable
-  // control record, never this AbortController.
   const activeTurns = new Map<string, ActiveRuntimeTurn>();
   const turnKey = (target: WorkflowAddress): string => workflowAddressKey(target);
 
@@ -318,10 +335,6 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
 
   const drainScheduler = new MailboxDrainScheduler({
     drain: (target) => drainMailbox(target),
-    // RecoveryRecordedError is the durable poison-message path: the failure
-    // fact is already persisted and observable, so it is not reported again.
-    // Every other drain failure — including ProcessingConflictError —
-    // surfaces so a stuck mailbox is never silent.
     isDrainSuppressed: (error) => error instanceof RecoveryRecordedError,
     reportError(error, target) {
       options.onBackgroundError?.(error, target);
@@ -357,44 +370,23 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
     },
   });
 
-  // Startup recovery: a previous writer process may have died with mailbox work
-  // still unresolved (accepted but never drained, or interrupted mid-processing).
-  // Under the single-writer rule (one logical Domain Runtime per store; L2 §11.1)
-  // activation is the safe point to reclaim interrupted processing back to
-  // accepted — preserving target sequence — and to schedule a drain per affected
-  // instance. Re-execution is then decided by the durable effect-journal recovery
-  // matrix (completed → reuse; started none/idempotent → re-run; started
-  // non-idempotent → recovery_required), never by blind retry.
   const unresolvedTargets = await options.store.listUnresolvedMessageTargets();
   for (const target of unresolvedTargets) {
     await options.store.reclaimInterruptedProcessing(target);
     scheduleDrain(target);
   }
 
-  // Issue #313 startup control reconciliation: accepted/resolving control
-  // requests from a previous process are classified from authoritative
-  // instance/message/effect facts — never blindly reissued as new intents,
-  // never re-authorized, never left indefinitely pending.
   if (controlCoordinator !== null) {
     await controlCoordinator.reconcileUnresolved();
   }
 
   async function drainMailbox(target: WorkflowAddress): Promise<void> {
     while (true) {
-      // Disposal boundary: the in-flight turn (if any) has already completed;
-      // no new turn is started after dispose() (#169).
       if (drainScheduler.disposed) return;
-      // Control gate (#313): while an admitted CANCEL intent is pending for
-      // this target, no new turn may begin. The in-flight turn (if any) has
-      // already completed to its safe boundary before the gate can be observed.
       if (controlCoordinator !== null && controlCoordinator.blocksNewTurns(target)) return;
       const stored = await recovery.nextProcessableMessage(target);
       if (stored === null) return;
 
-      // Turn-scoped internal AbortController (#313): a winning INTERRUPT
-      // aborts it AFTER its durable control claim commits. Honoring the
-      // signal is best-effort — an ignoring callee can never fabricate a
-      // stop; the durable commit/failure facts decide the outcome.
       const turnController = new AbortController();
       let settleTurn: () => void = () => {};
       const settled = new Promise<void>((resolve) => {
@@ -410,67 +402,9 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
 
       let committed: WorkflowInstanceSnapshot;
       try {
-        committed = await instanceEngine.processAcceptedTransition({
-          target,
-          messageId: stored.message.messageId,
-          expectedTargetSequence: stored.ack.targetSequence,
-          async transition(current) {
-            const marked = await options.store.markMessageProcessing(
-              target,
-              stored.message.messageId,
-              now(),
-            );
-            if (!marked) throw new ProcessingConflictError(target);
-
-            try {
-              const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
-              const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
-              if (workflow === undefined) {
-                throw new Error(
-                  `Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`,
-                );
-              }
-              const transition = await runtimeWorkflow.processMessage(
-                compiledPackage,
-                workflow,
-                current,
-                stored,
-                { signal: turnController.signal },
-              );
-              if (transition.recoveryFailure !== undefined) {
-                await recovery.recordProcessingFailure({
-                  target,
-                  messageId: stored.message.messageId,
-                  expectedTargetSequence: stored.ack.targetSequence,
-                  failure: withControlProvenance(transition.recoveryFailure, turnController.signal),
-                });
-                notifyTargetChanged(target, stored.message.messageId);
-                throw new RecoveryRecordedError(target);
-              }
-              return {
-                nextState: transition.nextState,
-                nextLifecycle: transition.nextLifecycle,
-                ...(transition.output === undefined ? {} : { output: transition.output }),
-              };
-            } catch (error) {
-              if (error instanceof RecoveryRecordedError || error instanceof ProcessingConflictError) throw error;
-              const failure = withControlProvenance(
-                turnController.signal.aborted
-                  ? controlInterruptFailure(turnController.signal, stored.message.messageId)
-                  : normalizeFailure(error, stored.message.messageId),
-                turnController.signal,
-              );
-              await recovery.recordProcessingFailure({
-                target,
-                messageId: stored.message.messageId,
-                expectedTargetSequence: stored.ack.targetSequence,
-                failure,
-              });
-              notifyTargetChanged(target, stored.message.messageId);
-              throw new RecoveryRecordedError(target);
-            }
-          },
-        });
+        committed = processCommandStore === null
+          ? await processLegacyTurn(target, stored, turnController)
+          : await processV3CommandTurn(target, stored, turnController, processCommandStore);
       } finally {
         activeTurns.delete(key);
         settleTurn();
@@ -482,6 +416,175 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
       }
       notifyTargetChanged(target, stored.message.messageId);
     }
+  }
+
+  async function processLegacyTurn(
+    target: WorkflowAddress,
+    stored: StoredAcceptedMessage,
+    turnController: AbortController,
+  ): Promise<WorkflowInstanceSnapshot> {
+    return instanceEngine.processAcceptedTransition({
+      target,
+      messageId: stored.message.messageId,
+      expectedTargetSequence: stored.ack.targetSequence,
+      async transition(current) {
+        const marked = await options.store.markMessageProcessing(
+          target,
+          stored.message.messageId,
+          now(),
+        );
+        if (!marked) throw new ProcessingConflictError(target);
+
+        try {
+          const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+          const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
+          if (workflow === undefined) {
+            throw new Error(
+              `Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`,
+            );
+          }
+          const transition = await runtimeWorkflow.processMessage(
+            compiledPackage,
+            workflow,
+            current,
+            stored,
+            { signal: turnController.signal },
+          );
+          if (transition.recoveryFailure !== undefined) {
+            await recovery.recordProcessingFailure({
+              target,
+              messageId: stored.message.messageId,
+              expectedTargetSequence: stored.ack.targetSequence,
+              failure: withControlProvenance(transition.recoveryFailure, turnController.signal),
+            });
+            notifyTargetChanged(target, stored.message.messageId);
+            throw new RecoveryRecordedError(target);
+          }
+          return {
+            nextState: transition.nextState,
+            nextLifecycle: transition.nextLifecycle,
+            ...(transition.output === undefined ? {} : { output: transition.output }),
+          };
+        } catch (error) {
+          if (error instanceof RecoveryRecordedError || error instanceof ProcessingConflictError) throw error;
+          await recordTechnicalProcessingFailure(target, stored, turnController, error);
+          throw new RecoveryRecordedError(target);
+        }
+      },
+    });
+  }
+
+  async function processV3CommandTurn(
+    target: WorkflowAddress,
+    stored: StoredAcceptedMessage,
+    turnController: AbortController,
+    store: V3ProcessCommandStore,
+  ): Promise<WorkflowInstanceSnapshot> {
+    let current!: WorkflowInstanceSnapshot;
+
+    await lane.run(target, async () => {
+      const resolved = await options.store.getInstance(target);
+      if (resolved === null) {
+        throw new DomainRuntimeError(
+          'instance_not_found',
+          `Workflow ${target.workflowId}/${target.instanceKey} does not exist`,
+        );
+      }
+      current = resolved;
+
+      const marked = await options.store.markMessageProcessing(
+        target,
+        stored.message.messageId,
+        now(),
+      );
+      if (!marked) throw new ProcessingConflictError(target);
+
+      try {
+        const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+        const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
+        if (workflow === undefined) {
+          throw new Error(
+            `Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`,
+          );
+        }
+
+        const result = await runtimeWorkflow.processCommand(
+          compiledPackage,
+          workflow,
+          current,
+          stored,
+          { signal: turnController.signal },
+        );
+        if (result.status === 'applied' && result.transition.recoveryFailure !== undefined) {
+          await recovery.recordProcessingFailure({
+            target,
+            messageId: stored.message.messageId,
+            expectedTargetSequence: stored.ack.targetSequence,
+            failure: withControlProvenance(
+              result.transition.recoveryFailure,
+              turnController.signal,
+            ),
+          });
+          notifyTargetChanged(target, stored.message.messageId);
+          throw new RecoveryRecordedError(target);
+        }
+
+        await commitV3ProcessedCommandTurn({
+          store,
+          current,
+          stored,
+          result,
+          updatedAt: now(),
+        });
+      } catch (error) {
+        if (error instanceof RecoveryRecordedError || error instanceof ProcessingConflictError) throw error;
+        await recordTechnicalProcessingFailure(target, stored, turnController, error);
+        throw new RecoveryRecordedError(target);
+      }
+    });
+
+    // The processed-command commit itself is the stateRevision authority. This
+    // read is verification only and is deliberately outside the recovery catch:
+    // once the atomic commit returns, a later read/invariant failure must never
+    // fabricate a second failure fact over an already-processed message.
+    const committed = await options.store.getInstance(target);
+    if (committed === null) {
+      throw new Error(`T-009 processed command removed workflow ${target.workflowId}/${target.instanceKey}`);
+    }
+    if (
+      workflowAddressKey(committed.address) !== workflowAddressKey(current.address)
+      || committed.packageId !== current.packageId
+      || committed.correlationId !== current.correlationId
+    ) {
+      throw new Error('T-009 processed-command commit changed persistent Workflow Instance identity');
+    }
+    if (committed.stateRevision !== current.stateRevision + 1) {
+      throw new Error(
+        `T-009 processed-command commit produced stateRevision ${committed.stateRevision}; expected ${current.stateRevision + 1}`,
+      );
+    }
+    return committed;
+  }
+
+  async function recordTechnicalProcessingFailure(
+    target: WorkflowAddress,
+    stored: StoredAcceptedMessage,
+    turnController: AbortController,
+    error: unknown,
+  ): Promise<void> {
+    const failure = withControlProvenance(
+      turnController.signal.aborted
+        ? controlInterruptFailure(turnController.signal, stored.message.messageId)
+        : normalizeFailure(error, stored.message.messageId),
+      turnController.signal,
+    );
+    await recovery.recordProcessingFailure({
+      target,
+      messageId: stored.message.messageId,
+      expectedTargetSequence: stored.ack.targetSequence,
+      failure,
+    });
+    notifyTargetChanged(target, stored.message.messageId);
   }
 
   async function openInstance(request: OpenWorkflowInstanceRequest): Promise<WorkflowInstanceSnapshot> {
@@ -610,10 +713,7 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
 
   async function performDispose(): Promise<void> {
     disposed = true;
-    // No new drains/redrains; in-flight loops stop at their next safe
-    // boundary (the current mailbox turn completes to its durable commit).
     drainScheduler.dispose();
-    // Delivery, observation retries and idle waiters settle immediately.
     subscriptionCoordinator.dispose();
     observationWake.clear();
     await drainScheduler.awaitIdle();
@@ -630,10 +730,6 @@ export async function createDomainRuntime(options: CreateDomainRuntimeOptions): 
         }
       : { status: 'UNSUPPORTED' };
 
-  // Issue #313 control capability. Default (no authorizer): explicit
-  // default-deny UNSUPPORTED — a request through this surface receives an
-  // UNSUPPORTED receipt and causes no mutation; normal Runtime operation is
-  // unaffected. Enabled: fail-closed authorization + durable evidence.
   const controlCapability: RuntimeControlCapability =
     controlCoordinator !== null
       ? {
