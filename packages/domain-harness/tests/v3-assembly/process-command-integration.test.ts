@@ -195,7 +195,7 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
     const instance = this.#requireInstance(request.target);
     const record = this.#requireMessage(request.target, request.messageId);
     if (record.disposition.targetSequence !== request.expectedTargetSequence) throw new Error('sequence mismatch');
-    const failure = structuredClone(request.failure) as RuntimeFailure;
+    const failure = structuredClone(request.failure) as unknown as RuntimeFailure;
     record.disposition = {
       ...record.disposition,
       disposition: 'failed',
