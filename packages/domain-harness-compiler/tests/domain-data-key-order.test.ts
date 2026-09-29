@@ -25,3 +25,16 @@ test('I-PKG-DATA: exact key ordering is locale-independent UTF-16 lexical order'
   );
   assert.deepEqual(section.descriptors.map((descriptor) => descriptor.key), ['Z', 'a', 'z', 'á', 'ä']);
 });
+
+test('I-PKG-DATA: __proto__ remains an ordinary own Domain Data key', () => {
+  const section = buildCompiledDomainDataSection(
+    [{ key: '__proto__', value: { safe: true } }],
+    BOUNDS,
+    [],
+  );
+
+  assert.equal(Object.getPrototypeOf(section.values), null);
+  assert.equal(Object.prototype.hasOwnProperty.call(section.values, '__proto__'), true);
+  assert.deepEqual(section.values['__proto__'], { safe: true });
+  assert.equal(section.descriptors[0]?.key, '__proto__');
+});
