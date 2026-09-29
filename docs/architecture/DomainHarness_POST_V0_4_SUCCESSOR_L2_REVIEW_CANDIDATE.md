@@ -8,7 +8,7 @@
 **Released v0.4 baseline:** `5cf7a8fc623651b8ced8b2152426a5568f75cba3` / same tree  
 **Standard:** `4.0.0@1edaee9291e25b6dd99303493bed75132cb54881`  
 **Successor version name:** UNSET  
-**Review history:** PR #425 R1 `CHANGES_REQUESTED` / comment `5885474880`  
+**Review history:** PR #425 R1 `CHANGES_REQUESTED` / `5885474880`; R2 `CHANGES_REQUESTED` / `5885549492`  
 
 This document is a narrow post-v0.4 architecture candidate. It does not reopen the Frozen v0.2/v0.3 product model, does not create a successor version, and does not authorize implementation tasks until adversarial review passes.
 
@@ -106,6 +106,15 @@ A Runtime MAY retain support for v2 packages for retained instances and migratio
 
 New compiler output implementing this amendment SHALL emit v3.
 
+The implementation plan SHALL create one minimal shared `I-FMT-V3` foundation before either L2-A or L2-B feature work. That foundation owns only:
+
+- the `target-domain-package/v3` format discriminator;
+- v3 decoder/validator dispatch scaffolding;
+- v3 extension points for manifest and compiled workflow/effect contracts;
+- v2/v3 coexistence/fail-closed version dispatch.
+
+`I-FMT-V3` SHALL NOT implement Domain Data, Business Source, rejection, Tool, provisioning or workflow semantics. This prevents two feature PRs from independently owning the same package-format/decoder write set.
+
 ## 2.3 Normative package contract
 
 Conceptual contract:
@@ -120,6 +129,8 @@ interface CompiledDomainDataDescriptor {
 interface CompiledBusinessSourceDescriptor {
   source: string;
   valueSchema: JsonSchema;
+  /** Present only when the compiler emits executable portable validator material. */
+  validatorBindingDigest?: ContentDigest;
 }
 
 interface PackageDataBounds {
@@ -132,6 +143,7 @@ interface PackageDataBounds {
 
 interface CompiledPackageManifestV3 {
   formatVersion: 'target-domain-package/v3';
+  schemaContractVersion: 'domainharness-json-schema/1';
   // retained manifest identity fields ...
   packageDataBounds: PackageDataBounds;
   domainData: readonly CompiledDomainDataDescriptor[];
@@ -147,7 +159,7 @@ interface TargetCompiledDomainPackageV3 {
 
 Exact TypeScript naming may be normalized during implementation, but the logical fields and invariants are normative.
 
-The supported schema language is a versioned portable DomainHarness subset of JSON Schema 2020-12. A schema using a keyword whose semantics are not supported by that versioned subset fails compilation rather than being silently ignored.
+`schemaContractVersion` names the exact portable DomainHarness schema dialect/subset. Version `domainharness-json-schema/1` is based on the supported DomainHarness subset of JSON Schema 2020-12. A schema using a keyword whose semantics are not supported by that exact version fails compilation rather than being silently ignored.
 
 ## 2.4 Exact digest and canonicalization contract
 
@@ -177,16 +189,17 @@ Object key order is normalized by the existing recursive canonicalizer; array or
 For v3, `packageId` identity material SHALL include canonicalized:
 
 - the existing manifest semantic fields;
+- exact `schemaContractVersion`;
 - `packageDataBounds`;
 - Domain Data descriptors sorted by exact `key`;
 - every Domain Data `contentDigest`;
 - Business Source descriptors sorted by exact `source`, including canonical schemas;
-- the schema dialect/subset version;
+- every present `validatorBindingDigest`;
 - retained binding/content digests.
 
 Current Business Snapshot values/revisions SHALL NOT be included.
 
-Changing behaviorally relevant Domain Data bytes or a Business Source schema therefore changes the target-package identity. Authoring/file enumeration order does not.
+Changing behaviorally relevant Domain Data bytes, schema semantics, a Business Source schema, or compiler-emitted validator executable material therefore changes target-package identity. Authoring/file enumeration order does not.
 
 ## 2.5 Package-owned Domain Data
 
@@ -217,7 +230,8 @@ Required invariants:
 - the source declaration contains no current business value, credential, connection, database handle or session state;
 - current business values and revisions remain application/Business SoR authority;
 - changing a source schema changes target-package semantic identity;
-- changing a current business value/revision does not change package identity.
+- changing a current business value/revision does not change package identity;
+- when `validatorBindingDigest` is present, the exact compiler-emitted executable validator artifact MUST match that digest and the digest is package identity material.
 
 The provider contract remains logically:
 
@@ -255,7 +269,8 @@ The compiler SHALL reject a target package when:
 - a Domain Data descriptor/value pair is orphaned or duplicated in a way that makes identity ambiguous;
 - a required Business Source schema is missing, invalid, unsupported or over bounds;
 - Domain Data is over the target-profile bounds;
-- generated types would silently widen an unsupported schema where exactness is required.
+- generated types would silently widen an unsupported schema where exactness is required;
+- a compiler-emitted validator artifact cannot be deterministically digested/bound to its declared `validatorBindingDigest`.
 
 No `domain_data_not_found` or undeclared business-source error that is statically knowable from the Raw Package may be deferred to first runtime projection execution.
 
@@ -278,13 +293,22 @@ Before a Business Snapshot value reaches projection evaluation, Runtime SHALL va
 
 This semantic check is mandatory for v3 conformance. Hosts MAY cache validators keyed by exact package/source/schema identity; they SHALL NOT disable validation and still claim this L2 contract.
 
-The validation implementation SHALL remain portable:
+The validation implementation SHALL remain portable and use exactly one of these two identity-safe modes:
 
-- portable core SHALL NOT acquire a mandatory Node-only schema-validation dependency;
-- the compiler MAY emit a portable validator artifact/predicate for the supported schema subset, or Runtime MAY use another portable validator seam that is available equivalently on Node and Expo/Hermes;
-- Node and Expo implementations SHALL pass the same schema conformance fixtures;
-- target-specific optimization MAY differ, but accept/reject semantics may not;
-- unsupported schema semantics fail compilation rather than degrading validation at runtime.
+**Mode A — portable schema interpreter**
+
+- Runtime evaluates the pinned `valueSchema` under the exact `schemaContractVersion`;
+- the interpreter implementation may differ internally by host only if conformance proves identical semantics;
+- portable core SHALL NOT acquire a mandatory Node-only dependency.
+
+**Mode B — compiler-emitted portable validator artifact**
+
+- compiler emits a portable executable validator for the exact pinned schema contract;
+- its exact content digest is recorded as `validatorBindingDigest` and included in package identity/binding integrity;
+- activation verifies the executable artifact digest before it can validate snapshots;
+- Node and Expo/Hermes execute semantically equivalent validator material and pass the same fixtures.
+
+A host SHALL NOT silently switch to an unbound validator with different semantics. Unsupported schema semantics fail compilation rather than degrading validation at runtime.
 
 Schema failure is a structured fail-closed Runtime/provider-contract failure. It is not coerced into an empty value or stale prior snapshot.
 
@@ -317,6 +341,7 @@ Generation remains fail-closed for schemas that cannot be projected exactly unde
 - Activation may support v2 and v3 concurrently during migration.
 - Compatibility metadata may state that a v3 package is behaviorally compatible for **new selection**, but compatibility never rewrites a retained instance pin.
 - A v2 package cannot be synthesized into a v3 identity at runtime.
+- `I-FMT-V3` is the only implementation node allowed to introduce the shared v3 version/decoder skeleton; feature nodes extend that skeleton rather than redefining format dispatch.
 
 ---
 
@@ -539,7 +564,8 @@ If a Domain Product later requires workflow-triggered provisioning, that change 
 | package compile | undeclared Business Source | fail compile |
 | package compile | unsupported/invalid/duplicate descriptor/schema | fail compile |
 | package compile | package data/schema exceeds target bounds | fail compile |
-| package activation | Domain Data digest/size/bounds mismatch | fail activation |
+| package compile | emitted validator digest cannot be bound | fail compile |
+| package activation | Domain Data/validator digest/size/bounds mismatch | fail activation |
 | business snapshot | value violates pinned schema | provider-contract/runtime failure |
 | business snapshot | same observed revision returns conflicting value | provider-contract/runtime failure |
 | child send | target terminal | durable semantic rejection |
@@ -576,7 +602,7 @@ selected/adopted package identity
 + activation binding/currentness evidence
 ```
 
-must refer to one coherent exact package. Runtime must never combine a v3 manifest from P2 with Domain Data, Business Source schemas or bindings from P1.
+must refer to one coherent exact package. Runtime must never combine a v3 manifest from P2 with Domain Data, Business Source schemas, validator material or bindings from P1.
 
 `DAC_CONTRACT_CHANGE_REQUIRED = NO`.
 
@@ -587,33 +613,36 @@ must refer to one coherent exact package. Runtime must never combine a v3 manife
 The review SHALL attempt to falsify this candidate with at least these vectors:
 
 1. **Fact-authority theft** — can package declarations accidentally make current Business Facts package-owned?
-2. **Identity omission** — can Domain Data/schema behavior change without `packageId` changing?
+2. **Identity omission** — can Domain Data/schema/validator behavior change without `packageId` changing?
 3. **Order instability** — can file/enumeration order change package identity?
-4. **Retained-pin tear** — can a retained instance read a newer package's data/schema under an old pin?
+4. **Retained-pin tear** — can a retained instance read a newer package's data/schema/validator under an old pin?
 5. **v2 reinterpretation** — can an old v2 package silently acquire v3 guarantees?
-6. **Schema bypass** — can a Business Snapshot reach projection evaluation without validation?
-7. **Portable validator drift** — can Node and Expo accept different values for the same pinned schema?
-8. **Resource exhaustion** — can package data/schema bypass deterministic target bounds?
-9. **Static gap deferral** — can an undeclared key/source survive compilation and fail only at runtime?
-10. **Rejection timing race** — can a permanent rejection remain `started` and later replay as accepted?
-11. **Missing-target race** — can an absent target be incorrectly frozen as permanent before later explicit provisioning?
-12. **Transient misclassification** — can `recovery_required` be durably frozen as permanent rejection?
-13. **Technical-error laundering** — can store/package corruption be exposed as normal domain rejection?
-14. **Source poisoning** — does a target's valid permanent rejection force the healthy source instance into `recovery_required`?
-15. **Blind retry** — can a completed rejection trigger a second acceptance attempt?
-16. **Partial-effect misreporting** — can prior committed source effects be erased/mislabeled by a later child-send rejection?
-17. **Rejection-route hole** — can every conditional rejection route miss and reintroduce an implicit default?
-18. **Implicit provisioning** — can send rejection handling create a target instance without an explicit separately-authorized provisioning action?
-19. **DAC authority drift** — do new manifest fields confer selection/activation authority?
-20. **Terminal-address future drift** — would future address reuse invalidate permanence assumptions without a new Product/L2 decision?
+6. **Schema-version ambiguity** — can Runtime validate without an exact `schemaContractVersion`?
+7. **Schema bypass** — can a Business Snapshot reach projection evaluation without validation?
+8. **Validator substitution** — can compiler-emitted validator executable material change without exact identity change?
+9. **Portable validator drift** — can Node and Expo accept different values for the same pinned schema?
+10. **Resource exhaustion** — can package data/schema bypass deterministic target bounds?
+11. **Static gap deferral** — can an undeclared key/source survive compilation and fail only at runtime?
+12. **Format ownership race** — can #178 and #138 independently redefine v3 decoder/format semantics?
+13. **Rejection timing race** — can a permanent rejection remain `started` and later replay as accepted?
+14. **Missing-target race** — can an absent target be incorrectly frozen as permanent before later explicit provisioning?
+15. **Transient misclassification** — can `recovery_required` be durably frozen as permanent rejection?
+16. **Technical-error laundering** — can store/package corruption be exposed as normal domain rejection?
+17. **Source poisoning** — does a target's valid permanent rejection force the healthy source instance into `recovery_required`?
+18. **Blind retry** — can a completed rejection trigger a second acceptance attempt?
+19. **Partial-effect misreporting** — can prior committed source effects be erased/mislabeled by a later child-send rejection?
+20. **Rejection-route hole** — can every conditional rejection route miss and reintroduce an implicit default?
+21. **Implicit provisioning** — can send rejection handling create a target instance without an explicit separately-authorized provisioning action?
+22. **DAC authority drift** — do new manifest fields confer selection/activation authority?
+23. **Terminal-address future drift** — would future address reuse invalidate permanence assumptions without a new Product/L2 decision?
 
 P0/P1 findings block freeze.
 
 ---
 
-# 7. R1 Finding Reconciliation
+# 7. Review Finding Reconciliation
 
-PR #425 R1 comment `5885474880` is reconciled as follows:
+## 7.1 R1 — comment `5885474880`
 
 | Finding | Resolution |
 |---|---|
@@ -622,6 +651,14 @@ PR #425 R1 comment `5885474880` is reconciled as follows:
 | P2-1 digest under-specified | bound to existing `computeCanonicalJsonDigest` / canonical JSON + portable SHA-256 seam |
 | P2-2 portable validation boundary | made mandatory; Node-only validation dependency forbidden from portable core; Node/Expo parity required |
 | P2-3 data/schema bounds | added identity-bound Target Host Profile `PackageDataBounds` and compile/activation checks |
+
+## 7.2 R2 — comment `5885549492`
+
+| Finding | Resolution |
+|---|---|
+| P1-1 hidden shared v3 format dependency | added minimal `I-FMT-V3` foundation; both #178 and #138 feature nodes depend on it; feature semantics forbidden in foundation |
+| P2-1 implicit schema contract version | added explicit `schemaContractVersion` to v3 manifest and package identity material |
+| P2-2 emitted validator integrity | added optional `validatorBindingDigest`; compiler-emitted executable validator must be exact-digest/package-identity bound and activation-verified |
 
 ---
 
@@ -632,25 +669,30 @@ The following DAG is a proposal only:
 ```text
 NOT_AUTHORIZED_UNTIL_THIS L2 REVIEW PASSES
 
-A. Already-frozen Runtime integration debt
-   I-LOCAL   #177 retained Runtime host-local Tool wiring
-   I-REJECT  #137 CompiledWorkflowRuntime normal-rejection integration
-   I-OPEN    #180 DomainRuntime open/ensure integration
+0. Shared successor package-format foundation
+   I-FMT-V3
+   target-domain-package/v3 discriminator + decoder/version scaffolding only
+       │
+       ├─────────────────────────────┐
+       ▼                             ▼
 
-B. Package/Data Integrity
-   I-PKG-DATA   #178 v3 package Domain Data + compiler closure/bounds
-        ↓
-   I-BIZ-SRC    #182 Business Source declarations/schema/portable runtime validation
+A. Package/Data Integrity         B. Workflow-send rejection
+   I-PKG-DATA #178                  I-REJECT #137 (already-frozen integration debt)
+       │                             │
+       ▼                             ├──────────┐
+   I-BIZ-SRC #182                   │          ▼
+                                     └────> I-MSG-REJECT #138
+                                           (also depends I-FMT-V3)
 
-C. Workflow-send rejection
-   I-REJECT ─┐
-             ├─ I-MSG-REJECT  #138 durable send rejection + total route composition
-   L2-B ─────┘
+C. Other already-frozen Runtime integration debt
+   I-LOCAL #177 retained Runtime host-local Tool wiring
+   I-OPEN  #180 DomainRuntime open/ensure integration
 
 D. Integration/validation
-   all implementation nodes
+   I-FMT-V3 + I-PKG-DATA + I-BIZ-SRC
+   + I-LOCAL + I-REJECT + I-OPEN + I-MSG-REJECT
         ↓
-   central Runtime/public assembly repair
+   central Runtime/public assembly reconciliation
         ↓
    Node + Expo real-host validation
         ↓
@@ -658,6 +700,16 @@ D. Integration/validation
         ↓
    Version Closure
 ```
+
+Dependency form:
+
+```text
+I-FMT-V3 -> I-PKG-DATA -> I-BIZ-SRC
+I-FMT-V3 + I-REJECT -> I-MSG-REJECT
+I-LOCAL || I-REJECT || I-OPEN may execute in parallel after task materialization
+```
+
+`I-FMT-V3` owns only shared package-format currentness. `I-PKG-DATA`, `I-BIZ-SRC` and `I-MSG-REJECT` remain one-concern feature nodes.
 
 `I-LOCAL`, `I-REJECT` and `I-OPEN` do not require a new Product/L2 decision; their L3 must cite existing T-008/T-009/T-010 authority and prove the production entry point actually consumes it.
 
