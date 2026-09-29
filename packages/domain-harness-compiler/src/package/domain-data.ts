@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import {
+  DomainHarnessJsonSchemaV1Error,
   DomainHarnessJsonSchemaV1Validator,
   canonicalJsonStringify,
   canonicalSchemaUtf8ByteLength,
@@ -36,6 +37,14 @@ const BOUND_KEYS = [
   'maxBusinessSources',
   'maxSchemaCanonicalBytes',
 ] as const satisfies readonly (keyof PackageDataBounds)[];
+
+function normalizedSchema(value: unknown): JsonSchema {
+  const normalized = JSON.parse(canonicalJsonStringify(value)) as unknown;
+  if (typeof normalized !== 'object' || normalized === null || Array.isArray(normalized)) {
+    throw new Error('valueSchema must be a canonical JSON object');
+  }
+  return normalized as JsonSchema;
+}
 
 function assertBounds(bounds: PackageDataBounds): void {
   const issues: string[] = [];
@@ -104,7 +113,7 @@ export function buildCompiledDomainDataSection(
       const value = JSON.parse(canonicalValue) as JsonValue;
       let valueSchema: JsonSchema | undefined;
       if (entry.valueSchema !== undefined) {
-        valueSchema = schemaValidator.normalizeSchema(entry.valueSchema);
+        valueSchema = schemaValidator.normalizeSchema(normalizedSchema(entry.valueSchema));
         const schemaBytes = canonicalSchemaUtf8ByteLength(valueSchema);
         if (schemaBytes > bounds.maxSchemaCanonicalBytes) {
           issues.push(
@@ -122,7 +131,9 @@ export function buildCompiledDomainDataSection(
       });
     } catch (error) {
       issues.push(
-        `Domain Data '${entry.key}' failed successor schema/data validation: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof DomainHarnessJsonSchemaV1Error
+          ? `Domain Data '${entry.key}' failed successor schema/data validation: ${error.code} ${error.message}`
+          : `Domain Data '${entry.key}' is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

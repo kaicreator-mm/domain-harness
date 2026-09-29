@@ -1,16 +1,14 @@
-/**
- * Exact locale-independent key ordering used by successor package identity.
- * JavaScript string relational comparison is lexicographic by UTF-16 code
- * units, matching the deterministic ordering used by the shared canonical JSON
- * seam. Locale/ICU collation must never participate in package identity.
- */
-export function compareCompiledDomainDataKeys(left, right) {
+/** Exact locale-independent ordering used by successor package identity. */
+export function compareCompiledPackageDataKeys(left, right) {
     if (left < right)
         return -1;
     if (left > right)
         return 1;
     return 0;
 }
+/** Compatibility name retained for I-PKG-DATA callers. */
+export const compareCompiledDomainDataKeys = compareCompiledPackageDataKeys;
+export const compareCompiledBusinessSourceKeys = compareCompiledPackageDataKeys;
 /** One authoritative projection from a validated/compiled Domain Data section into identity material. */
 export function compiledDomainDataIdentityMaterial(section) {
     return {
@@ -20,6 +18,18 @@ export function compiledDomainDataIdentityMaterial(section) {
             ...(descriptor.valueSchema === undefined ? {} : { valueSchema: descriptor.valueSchema }),
         })),
         packageDataBounds: { ...section.packageDataBounds },
+    };
+}
+export function compiledBusinessSourceIdentityMaterial(section) {
+    return {
+        schemaContractVersion: section.schemaContractVersion,
+        descriptors: section.descriptors.map((descriptor) => ({
+            source: descriptor.source,
+            valueSchema: descriptor.valueSchema,
+            ...(descriptor.validatorBindingDigest === undefined
+                ? {}
+                : { validatorBindingDigest: descriptor.validatorBindingDigest }),
+        })),
     };
 }
 //# sourceMappingURL=package-data.js.map

@@ -172,19 +172,24 @@ export class DomainHarnessJsonSchemaV1Validator {
     if (cached) return cached;
 
     try {
-      const compiled = compileSchema(schema as never, {
+      const compiled = compileSchema(schema, {
         drafts: [draft2020],
         formatAssertion: false,
         throwOnInvalidSchema: true,
         throwOnInvalidRef: true,
-        withSchemaAnnotations: true,
       });
 
       for (const node of compiled.toSchemaNodes()) {
         inspectActualSchemaNode(node.schema, node.schemaLocation ?? '#');
       }
+      // The pinned interpreter emits unknown-keyword warnings for keywords its
+      // draft registry does not list even when it fully implements them (for
+      // example `format` with assertions off and local $dynamicRef). The frozen
+      // profile is the DRAFT_2020_12_KEYWORDS walk above, so only warnings for
+      // keywords outside that profile are contract violations.
       const unknownAnnotations = compiled.schemaAnnotations.filter(
-        (annotation) => annotation.code === 'unknown-keyword-warning',
+        (annotation) => annotation.code === 'unknown-keyword-warning'
+          && !DRAFT_2020_12_KEYWORDS.has(String(annotation.data.value)),
       );
       if (unknownAnnotations.length > 0) {
         invalidSchema('schema contains unknown/custom keywords', unknownAnnotations.map(

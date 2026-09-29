@@ -1,4 +1,7 @@
+import { canonicalJsonStringify } from '../contracts/identity.js';
 import { SchemaValidator } from '../execution/schema-validator.js';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1, DomainHarnessJsonSchemaV1Error, DomainHarnessJsonSchemaV1Validator, } from '../schema/domainharness-json-schema-v1.js';
+import { SUCCESSOR_COMPILED_ARTIFACT_PROFILE, sameCompiledArtifactProfile, } from '../v2/contracts/compiled-artifact-profile.js';
 const PROJECTION_LOGICAL_TIME = '1970-01-01T00:00:00.000Z';
 export class ProjectionError extends Error {
     code;
@@ -8,18 +11,10 @@ export class ProjectionError extends Error {
         this.name = 'ProjectionError';
     }
 }
-/**
- * Executes frozen v0.2 projections over declared snapshots only.
- *
- * BusinessSnapshotPort I/O occurs while assembling the snapshot. Compiled
- * Domain Data is immutable package content read through a synchronous
- * in-memory lookup. The expression executor receives only portable JSON and
- * therefore has no Tool, Skill, Runtime Resource, transport, or
- * authoritative-data handle to call through.
- */
 export class ProjectionService {
     options;
     validator = new SchemaValidator();
+    successorSchemaValidator = new DomainHarnessJsonSchemaV1Validator();
     constructor(options) {
         this.options = options;
     }
@@ -31,7 +26,8 @@ export class ProjectionService {
         if (!descriptor) {
             throw new ProjectionError('projection_not_found', `Projection ${request.projectionId} does not exist in package ${compiledPackage.manifest.packageId}`);
         }
-        const assembled = await this.assembleDeclaredSnapshots(descriptor, request.key, compiledPackage.manifest.packageId);
+        const successorBusinessSourceContractsRequired = isSuccessorPackage(compiledPackage);
+        const assembled = await this.assembleDeclaredSnapshots(descriptor, request.key, compiledPackage.manifest.packageId, successorBusinessSourceContractsRequired);
         const projectionInput = {
             key: request.key,
             input: request.input ?? null,
@@ -108,16 +104,17 @@ export class ProjectionService {
         }
         return compiledPackage;
     }
-    async assembleDeclaredSnapshots(descriptor, key, packageId) {
+    async assembleDeclaredSnapshots(descriptor, key, packageId, successorBusinessSourceContractsRequired) {
         const workflowSources = [];
         const businessSnapshots = [];
         const domainData = [];
+        const observedBusinessRevisions = new Map();
         for (const dependency of descriptor.dependencies) {
-            await this.assembleDependency(dependency, key, packageId, workflowSources, businessSnapshots, domainData);
+            await this.assembleDependency(dependency, key, packageId, successorBusinessSourceContractsRequired, workflowSources, businessSnapshots, domainData, observedBusinessRevisions);
         }
         return { workflowSources, businessSnapshots, domainData };
     }
-    async assembleDependency(dependency, key, packageId, workflowSources, businessSnapshots, domainData) {
+    async assembleDependency(dependency, key, packageId, successorBusinessSourceContractsRequired, workflowSources, businessSnapshots, domainData, observedBusinessRevisions) {
         if (dependency.kind === 'workflow') {
             const target = resolveWorkflowSelector(dependency.selector, key);
             const snapshot = await this.options.store.getInstance(target);
@@ -137,6 +134,20 @@ export class ProjectionService {
             }
             assertNonEmpty(dependency.source, 'business source');
             const businessKey = resolveBusinessSelector(dependency.selector, key);
+            let contract;
+            if (successorBusinessSourceContractsRequired) {
+                if (!this.options.businessSourceContracts) {
+                    throw new ProjectionError('business_source_contract_missing', `Successor package ${packageId} requires a package-pinned Business Source contract lookup`);
+                }
+                contract = this.options.businessSourceContracts.get(packageId, dependency.source);
+                if (!contract) {
+                    throw new ProjectionError('business_source_contract_missing', `Business Source ${dependency.source} is not declared by package ${packageId}`);
+                }
+                if (contract.schemaContractVersion !== DOMAIN_HARNESS_JSON_SCHEMA_V1
+                    || contract.descriptor.source !== dependency.source) {
+                    throw new ProjectionError('business_source_contract_invalid', `Business Source contract for ${dependency.source} is not exact package-pinned ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`);
+                }
+            }
             const snapshot = await this.options.businessSnapshots.read({
                 source: dependency.source,
                 key: businessKey,
@@ -145,7 +156,31 @@ export class ProjectionService {
                 throw new ProjectionError('business_snapshot_mismatch', `Business snapshot identity mismatch for ${dependency.source}/${businessKey}`);
             }
             assertNonEmpty(snapshot.revision, 'business snapshot revision');
-            businessSnapshots.push(snapshot);
+            let validatedSnapshot = snapshot;
+            if (contract) {
+                try {
+                    const validatedValue = this.successorSchemaValidator.validate(contract.descriptor.valueSchema, snapshot.value, `Business Snapshot ${dependency.source}/${businessKey}`);
+                    validatedSnapshot = { ...snapshot, value: validatedValue };
+                }
+                catch (error) {
+                    if (error instanceof DomainHarnessJsonSchemaV1Error) {
+                        throw new ProjectionError('business_snapshot_schema_violation', `Business snapshot ${dependency.source}/${businessKey} violates its package-pinned schema`, { cause: error });
+                    }
+                    throw error;
+                }
+                const observationKey = canonicalJsonStringify([
+                    validatedSnapshot.source,
+                    validatedSnapshot.key,
+                    validatedSnapshot.revision,
+                ]);
+                const canonicalValue = canonicalJsonStringify(validatedSnapshot.value);
+                const previousValue = observedBusinessRevisions.get(observationKey);
+                if (previousValue !== undefined && previousValue !== canonicalValue) {
+                    throw new ProjectionError('business_snapshot_revision_conflict', `Business Source ${validatedSnapshot.source}/${validatedSnapshot.key} returned conflicting values for revision ${validatedSnapshot.revision}`);
+                }
+                observedBusinessRevisions.set(observationKey, canonicalValue);
+            }
+            businessSnapshots.push(validatedSnapshot);
             return;
         }
         if (dependency.kind === 'domain-data') {
@@ -162,6 +197,13 @@ export class ProjectionService {
         }
         throw new ProjectionError('unsupported_dependency', `Projection dependency ${String(dependency.kind)} is outside the frozen Workflow/Business/Domain Data dependency kinds`);
     }
+}
+function isSuccessorPackage(compiledPackage) {
+    return sameCompiledArtifactProfile({
+        formatVersion: compiledPackage.manifest.formatVersion,
+        runtimeContractMajor: compiledPackage.manifest.runtimeContractMajor,
+        executionEngineMajor: compiledPackage.manifest.executionEngineMajor,
+    }, SUCCESSOR_COMPILED_ARTIFACT_PROFILE);
 }
 function resolveWorkflowSelector(selector, queryKey) {
     assertSelectorKeys(selector, ['workflowId', 'instanceKey']);

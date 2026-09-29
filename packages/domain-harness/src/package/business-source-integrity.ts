@@ -85,7 +85,7 @@ export function validateCompiledBusinessSourceSection(
   const sources = new Set<string>();
 
   for (let index = 0; index < snapshot.descriptors.length; index += 1) {
-    const raw = snapshot.descriptors[index];
+    const raw: unknown = snapshot.descriptors[index];
     if (!isRecord(raw)) invalid(`descriptors[${index}] must be an object`);
     for (const key of Object.keys(raw)) {
       if (!DESCRIPTOR_KEYS.has(key)) invalid(`descriptors[${index}] contains unsupported field '${key}'`);
