@@ -1,14 +1,15 @@
 import { Buffer } from 'node:buffer';
-import type {
-  CompiledDomainDataDescriptor,
-  CompiledDomainDataIdentityMaterial,
-  CompiledDomainDataSection,
-  JsonSchema,
-  JsonValue,
-  PackageDataBounds,
+import {
+  canonicalJsonStringify,
+  type CompiledDomainDataDescriptor,
+  type CompiledDomainDataIdentityMaterial,
+  type CompiledDomainDataSection,
+  type JsonSchema,
+  type JsonValue,
+  type PackageDataBounds,
 } from '@kaicreator/domain-harness/v2';
 import type { RawProjectionDefinition } from '../raw/types.js';
-import { canonicalJson, sha256Canonical } from './canonical.js';
+import { sha256Text } from './canonical.js';
 
 export interface DomainDataCompileEntry {
   readonly key: string;
@@ -35,7 +36,7 @@ const BOUND_KEYS = [
 ] as const satisfies readonly (keyof PackageDataBounds)[];
 
 function normalizedJson<T extends JsonValue | JsonSchema>(value: unknown): T {
-  return JSON.parse(canonicalJson(value)) as T;
+  return JSON.parse(canonicalJsonStringify(value)) as T;
 }
 
 function assertBounds(bounds: PackageDataBounds): void {
@@ -116,7 +117,7 @@ export function buildCompiledDomainDataSection(
     seen.add(entry.key);
 
     try {
-      const canonicalValue = canonicalJson(entry.value);
+      const canonicalValue = canonicalJsonStringify(entry.value);
       const value = JSON.parse(canonicalValue) as JsonValue;
       const valueSchema = entry.valueSchema === undefined
         ? undefined
@@ -162,7 +163,7 @@ export function buildCompiledDomainDataSection(
   prepared.sort((left, right) => left.key.localeCompare(right.key));
   const descriptors: CompiledDomainDataDescriptor[] = prepared.map((entry) => ({
     key: entry.key,
-    contentDigest: sha256Canonical(entry.value),
+    contentDigest: sha256Text(entry.canonicalValue),
     ...(entry.valueSchema === undefined ? {} : { valueSchema: entry.valueSchema }),
   }));
   const values = Object.create(null) as Record<string, JsonValue>;
