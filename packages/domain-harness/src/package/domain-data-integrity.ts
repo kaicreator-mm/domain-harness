@@ -77,9 +77,6 @@ function utf8ByteLength(value: string): number {
 
 function readBounds(value: unknown): PackageDataBounds {
   if (!isRecord(value)) invalid('packageDataBounds must be an object');
-  if (Object.getOwnPropertySymbols(value).length > 0) {
-    invalid('packageDataBounds may not contain symbol keys');
-  }
   const actualKeys = Object.keys(value).sort();
   const expectedKeys = [...BOUND_KEYS].sort();
   if (actualKeys.length !== expectedKeys.length
@@ -99,9 +96,6 @@ function readBounds(value: unknown): PackageDataBounds {
 
 function readDescriptor(value: unknown, index: number): CompiledDomainDataDescriptor {
   if (!isRecord(value)) invalid(`descriptors[${index}] must be an object`);
-  if (Object.getOwnPropertySymbols(value).length > 0) {
-    invalid(`descriptors[${index}] may not contain symbol keys`);
-  }
   for (const key of Object.keys(value)) {
     if (!DESCRIPTOR_KEYS.has(key)) {
       invalid(`descriptors[${index}] contains unsupported field '${key}'`);
@@ -127,9 +121,6 @@ function readDescriptor(value: unknown, index: number): CompiledDomainDataDescri
 
 function readValues(value: unknown): Readonly<Record<string, JsonValue>> {
   if (!isRecord(value)) invalid('values must be an object record');
-  if (Object.getOwnPropertySymbols(value).length > 0) {
-    invalid('values may not contain symbol keys');
-  }
   const result = Object.create(null) as Record<string, JsonValue>;
   for (const key of Object.keys(value)) {
     if (key.length === 0) invalid('values may not contain an empty key');
@@ -161,6 +152,17 @@ export async function validateCompiledDomainDataSection(
   value: unknown,
   sha256: Sha256Port,
 ): Promise<CompiledDomainDataSection> {
+  try {
+    // Validate the complete value through the authoritative canonical seam
+    // before reading fields. This rejects accessors, non-plain prototypes,
+    // symbols, sparse arrays and other non-JSON shapes without invoking getters.
+    canonicalJsonStringify(value);
+  } catch (error) {
+    invalid('compiled Domain Data section must be canonical JSON', [
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
+
   if (!isRecord(value)) invalid('compiled Domain Data section must be an object');
   const actualSectionKeys = Object.keys(value).sort();
   const expectedSectionKeys = ['descriptors', 'packageDataBounds', 'values'];
