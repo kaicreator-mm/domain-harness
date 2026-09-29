@@ -1,0 +1,71 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  DomainHarnessJsonSchemaV1Error,
+  DomainHarnessJsonSchemaV1Validator,
+  JSON_SCHEMA_DRAFT_2020_12_URI,
+} from '../../src/schema/domainharness-json-schema-v1.js';
+
+function invalidSchema(error: unknown): boolean {
+  return error instanceof DomainHarnessJsonSchemaV1Error
+    && error.code === 'INVALID_SCHEMA_CONTRACT';
+}
+
+test('I-BIZ-SRC schema v1 accepts Draft 2020-12 local $defs/$ref and validates instances', () => {
+  const validator = new DomainHarnessJsonSchemaV1Validator();
+  const schema = validator.normalizeSchema({
+    $schema: JSON_SCHEMA_DRAFT_2020_12_URI,
+    $defs: {
+      amount: { type: 'number', minimum: 0 },
+    },
+    type: 'object',
+    required: ['amount'],
+    properties: {
+      amount: { $ref: '#/$defs/amount' },
+    },
+    additionalProperties: false,
+  });
+
+  assert.deepEqual(validator.validate(schema, { amount: 3 }, 'fixture'), { amount: 3 });
+  assert.throws(
+    () => validator.validate(schema, { amount: -1 }, 'fixture'),
+    (error: unknown) => error instanceof DomainHarnessJsonSchemaV1Error
+      && error.code === 'INSTANCE_VALIDATION_FAILED',
+  );
+});
+
+test('I-BIZ-SRC schema v1 rejects wrong dialect, external refs and dynamic vocabulary declarations', () => {
+  const validator = new DomainHarnessJsonSchemaV1Validator();
+  for (const schema of [
+    { $schema: 'https://json-schema.org/draft/2019-09/schema', type: 'string' },
+    { $ref: 'https://example.com/schema.json' },
+    { $vocabulary: { 'https://example.com/vocab': true }, type: 'string' },
+  ]) {
+    assert.throws(() => validator.normalizeSchema(schema), invalidSchema);
+  }
+});
+
+test('I-BIZ-SRC schema v1 rejects unknown/custom keywords under strict compilation', () => {
+  const validator = new DomainHarnessJsonSchemaV1Validator();
+  assert.throws(
+    () => validator.normalizeSchema({ type: 'string', domainHarnessMagic: true }),
+    invalidSchema,
+  );
+});
+
+test('I-BIZ-SRC schema v1 treats format as annotation-only', () => {
+  const validator = new DomainHarnessJsonSchemaV1Validator();
+  const schema = validator.normalizeSchema({ type: 'string', format: 'email' });
+  assert.equal(validator.validate(schema, 'not-an-email', 'fixture'), 'not-an-email');
+});
+
+test('I-BIZ-SRC schema v1 rejects non-object schemas and detaches validated values', () => {
+  const validator = new DomainHarnessJsonSchemaV1Validator();
+  assert.throws(() => validator.normalizeSchema([]), invalidSchema);
+
+  const source = { nested: { value: 1 } };
+  const validated = validator.validate({ type: 'object' }, source, 'fixture');
+  source.nested.value = 99;
+  assert.deepEqual(validated, { nested: { value: 1 } });
+});
