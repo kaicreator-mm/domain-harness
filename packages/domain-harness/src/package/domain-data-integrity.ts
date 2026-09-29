@@ -110,6 +110,9 @@ function readDescriptor(value: unknown, index: number): CompiledDomainDataDescri
   }
   let valueSchema: JsonSchema | undefined;
   if (value.valueSchema !== undefined) {
+    if (!isRecord(value.valueSchema)) {
+      invalid(`descriptors[${index}].valueSchema must be a JSON object`);
+    }
     canonicalJsonStringify(value.valueSchema);
     valueSchema = value.valueSchema as JsonSchema;
   }
