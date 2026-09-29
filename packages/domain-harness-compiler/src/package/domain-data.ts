@@ -62,6 +62,7 @@ function projectionDomainDataIssues(
   declaredKeys: ReadonlySet<string>,
 ): string[] {
   const issues: string[] = [];
+  const referencedKeys = new Set<string>();
   for (const projection of projections) {
     for (const dependency of projection.dependencies) {
       if (dependency.kind !== 'domain-data') continue;
@@ -69,11 +70,17 @@ function projectionDomainDataIssues(
         issues.push(`projection '${projection.projectionId}' declares an empty Domain Data dependency key`);
         continue;
       }
+      referencedKeys.add(dependency.key);
       if (!declaredKeys.has(dependency.key)) {
         issues.push(
           `projection '${projection.projectionId}' references undeclared Domain Data key '${dependency.key}'`,
         );
       }
+    }
+  }
+  for (const key of declaredKeys) {
+    if (!referencedKeys.has(key)) {
+      issues.push(`orphan Domain Data key '${key}' is not referenced by any projection`);
     }
   }
   return issues;
