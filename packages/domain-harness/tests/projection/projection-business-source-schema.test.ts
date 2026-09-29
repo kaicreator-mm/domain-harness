@@ -24,12 +24,13 @@ function outputSchema(): JsonSchema {
 
 function compiledPackage(
   dependencies: readonly ProjectionDependencyDescriptor[],
+  profile: 'successor' | 'legacy' = 'successor',
 ): TargetCompiledDomainPackage {
   return {
     manifest: {
-      formatVersion: '0.2',
+      formatVersion: profile === 'successor' ? '0.3' : '0.2',
       runtimeContractMajor: 2,
-      executionEngineMajor: 2,
+      executionEngineMajor: profile === 'successor' ? 3 : 2,
       domainId: 'fixture-domain',
       domainVersion: '0.2.0',
       packageId: 'pkg-business',
@@ -94,7 +95,7 @@ function expression(onInput?: (input: JsonObject) => void): ExpressionExecutorPo
   };
 }
 
-test('I-BIZ-SRC: package-pinned schema validates and detaches Business Snapshot before evaluation', async () => {
+test('I-BIZ-SRC: successor package-pinned schema validates and detaches Business Snapshot before evaluation', async () => {
   const pkg = compiledPackage([businessDependency()]);
   const sourceValue = { approved: true };
   let observed: JsonValue | undefined;
@@ -125,7 +126,7 @@ test('I-BIZ-SRC: package-pinned schema validates and detaches Business Snapshot 
   assert.equal(sourceValue.approved, false);
 });
 
-test('I-BIZ-SRC: schema violation fails before expression evaluation', async () => {
+test('I-BIZ-SRC: successor schema violation fails before expression evaluation', async () => {
   const pkg = compiledPackage([businessDependency()]);
   let evaluated = false;
   const service = new ProjectionService({
@@ -153,13 +154,15 @@ test('I-BIZ-SRC: schema violation fails before expression evaluation', async () 
   assert.equal(evaluated, false);
 });
 
-test('I-BIZ-SRC: successor contract lookup fails closed when source is undeclared', async () => {
+test('I-BIZ-SRC: successor contract lookup fails closed before SoR read when source is undeclared', async () => {
   const pkg = compiledPackage([businessDependency('missing')]);
+  let reads = 0;
   const service = new ProjectionService({
     packageRegistry: registry(pkg),
     store: { async getInstance() { return null; } },
     businessSnapshots: {
       async read() {
+        reads += 1;
         return { source: 'missing', key: 'case-1', revision: 'r1', value: null };
       },
     },
@@ -173,9 +176,36 @@ test('I-BIZ-SRC: successor contract lookup fails closed when source is undeclare
     (error: unknown) => error instanceof ProjectionError
       && error.code === 'business_source_contract_missing',
   );
+  assert.equal(reads, 0);
 });
 
-test('I-BIZ-SRC: conflicting values for one exact source/key/revision fail closed', async () => {
+test('I-BIZ-SRC: successor package cannot bypass schema validation by omitting contract port', async () => {
+  const pkg = compiledPackage([businessDependency()]);
+  let reads = 0;
+  let evaluated = false;
+  const service = new ProjectionService({
+    packageRegistry: registry(pkg),
+    store: { async getInstance() { return null; } },
+    businessSnapshots: {
+      async read() {
+        reads += 1;
+        return { source: 'orders', key: 'case-1', revision: 'r1', value: { approved: true } };
+      },
+    },
+    expression: expression(() => { evaluated = true; }),
+    sha256: sha256(),
+  });
+
+  await assert.rejects(
+    service.read({ projectionId: 'dashboard', key: 'case-1' }),
+    (error: unknown) => error instanceof ProjectionError
+      && error.code === 'business_source_contract_missing',
+  );
+  assert.equal(reads, 0);
+  assert.equal(evaluated, false);
+});
+
+test('I-BIZ-SRC: conflicting values for one exact successor source/key/revision fail closed', async () => {
   const pkg = compiledPackage([businessDependency(), businessDependency()]);
   let call = 0;
   const snapshots: BusinessSnapshotPort = {
@@ -209,8 +239,8 @@ test('I-BIZ-SRC: conflicting values for one exact source/key/revision fail close
   );
 });
 
-test('I-BIZ-SRC: retained legacy projection behavior remains available without contract port', async () => {
-  const pkg = compiledPackage([businessDependency()]);
+test('I-BIZ-SRC: retained 0.2 ignores successor contract port and preserves legacy projection behavior', async () => {
+  const pkg = compiledPackage([businessDependency()], 'legacy');
   let evaluated = false;
   const service = new ProjectionService({
     packageRegistry: registry(pkg),
@@ -220,6 +250,7 @@ test('I-BIZ-SRC: retained legacy projection behavior remains available without c
         return { source: 'orders', key: 'case-1', revision: 'r1', value: 'legacy-untyped' };
       },
     },
+    businessSourceContracts: businessContract({ type: 'number' }),
     expression: expression(() => { evaluated = true; }),
     sha256: sha256(),
   });
