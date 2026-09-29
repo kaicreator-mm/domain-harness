@@ -5,10 +5,11 @@ import {
   type Sha256Port,
 } from '../contracts/identity.js';
 import type { JsonSchema, JsonValue } from '../contracts/json.js';
-import type {
-  CompiledDomainDataDescriptor,
-  CompiledDomainDataSection,
-  PackageDataBounds,
+import {
+  compareCompiledDomainDataKeys,
+  type CompiledDomainDataDescriptor,
+  type CompiledDomainDataSection,
+  type PackageDataBounds,
 } from '../v2/contracts/package-data.js';
 
 export type DomainDataIntegrityErrorCode =
@@ -144,8 +145,6 @@ export async function validateCompiledDomainDataSection(
 ): Promise<CompiledDomainDataSection> {
   let canonicalText: string;
   try {
-    // This rejects accessors, non-plain prototypes, symbols, sparse arrays and
-    // other non-JSON shapes without invoking getters.
     canonicalText = canonicalJsonStringify(value);
   } catch (error) {
     invalid('compiled Domain Data section must be canonical JSON', [
@@ -153,8 +152,6 @@ export async function validateCompiledDomainDataSection(
     ]);
   }
 
-  // Work only from this detached immutable-by-ownership snapshot after the
-  // canonical boundary. Never re-read caller-owned material after this point.
   const snapshot = JSON.parse(canonicalText) as unknown;
   if (!isRecord(snapshot)) invalid('compiled Domain Data section must be an object');
   const actualSectionKeys = Object.keys(snapshot).sort();
@@ -170,7 +167,7 @@ export async function validateCompiledDomainDataSection(
   const packageDataBounds = readBounds(snapshot.packageDataBounds);
 
   const descriptorKeys = descriptors.map((descriptor) => descriptor.key);
-  const sortedDescriptorKeys = [...descriptorKeys].sort((left, right) => left.localeCompare(right));
+  const sortedDescriptorKeys = [...descriptorKeys].sort(compareCompiledDomainDataKeys);
   if (descriptorKeys.some((key, index) => key !== sortedDescriptorKeys[index])) {
     invalid('Domain Data descriptors must be sorted by exact key');
   }
@@ -178,7 +175,7 @@ export async function validateCompiledDomainDataSection(
     invalid('Domain Data descriptor keys must be unique');
   }
 
-  const valueKeys = Object.keys(values).sort((left, right) => left.localeCompare(right));
+  const valueKeys = Object.keys(values).sort(compareCompiledDomainDataKeys);
   if (descriptorKeys.length !== valueKeys.length
     || descriptorKeys.some((key, index) => key !== valueKeys[index])) {
     invalid('Domain Data descriptors and bundled values must form an exact bijection', [
