@@ -130,19 +130,6 @@ function readValues(value: unknown): Readonly<Record<string, JsonValue>> {
   return result;
 }
 
-export function domainDataIdentityMaterial(
-  section: CompiledDomainDataSection,
-): Pick<CompiledDomainDataSection, 'descriptors' | 'packageDataBounds'> {
-  return {
-    descriptors: section.descriptors.map((descriptor) => ({
-      key: descriptor.key,
-      contentDigest: descriptor.contentDigest,
-      ...(descriptor.valueSchema === undefined ? {} : { valueSchema: descriptor.valueSchema }),
-    })),
-    packageDataBounds: { ...section.packageDataBounds },
-  };
-}
-
 /**
  * Portable successor Domain Data integrity validation. This helper does not
  * install successor package admission or JSON Schema semantics; it is consumed
