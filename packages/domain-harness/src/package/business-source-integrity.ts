@@ -1,4 +1,4 @@
-import { isContentDigest } from '../contracts/identity.js';
+import { canonicalJsonStringify, isContentDigest } from '../contracts/identity.js';
 import {
   DOMAIN_HARNESS_JSON_SCHEMA_V1,
   DomainHarnessJsonSchemaV1Error,
@@ -39,13 +39,7 @@ function invalid(message: string, details: readonly string[] = []): never {
   throw new BusinessSourceIntegrityError('INVALID_BUSINESS_SOURCE_SECTION', message, details);
 }
 
-/**
- * Activation-time validation for the I-BIZ-SRC-owned section. Central successor
- * package assembly invokes this before exposing contracts to ProjectionService.
- * Mode B validator bytes are not packaged by this node, so a descriptor that
- * advertises a validatorBindingDigest fails closed rather than executing any
- * unverified validator material.
- */
+/** Activation-time validation for the I-BIZ-SRC-owned package section. */
 export function validateCompiledBusinessSourceSection(
   value: unknown,
   packageDataBounds: PackageDataBounds,
@@ -57,22 +51,32 @@ export function validateCompiledBusinessSourceSection(
     invalid('packageDataBounds Business Source/schema limits must be non-negative safe integers');
   }
 
-  if (!isRecord(value)) invalid('compiled Business Source section must be an object');
-  const sectionKeys = Object.keys(value).sort();
+  let canonicalText: string;
+  try {
+    canonicalText = canonicalJsonStringify(value);
+  } catch (error) {
+    invalid('compiled Business Source section must be canonical JSON', [
+      error instanceof Error ? error.message : String(error),
+    ]);
+  }
+  const snapshot = JSON.parse(canonicalText) as unknown;
+  if (!isRecord(snapshot)) invalid('compiled Business Source section must be an object');
+
+  const sectionKeys = Object.keys(snapshot).sort();
   if (sectionKeys.length !== 2
     || sectionKeys[0] !== 'descriptors'
     || sectionKeys[1] !== 'schemaContractVersion') {
     invalid('compiled Business Source section must contain exactly schemaContractVersion and descriptors');
   }
-  if (value.schemaContractVersion !== DOMAIN_HARNESS_JSON_SCHEMA_V1) {
+  if (snapshot.schemaContractVersion !== DOMAIN_HARNESS_JSON_SCHEMA_V1) {
     invalid(`schemaContractVersion must be exactly ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`);
   }
-  if (!Array.isArray(value.descriptors)) invalid('Business Source descriptors must be an array');
-  if (value.descriptors.length > packageDataBounds.maxBusinessSources) {
+  if (!Array.isArray(snapshot.descriptors)) invalid('Business Source descriptors must be an array');
+  if (snapshot.descriptors.length > packageDataBounds.maxBusinessSources) {
     throw new BusinessSourceIntegrityError(
       'BUSINESS_SOURCE_BOUNDS_EXCEEDED',
       'Business Source count exceeds package-recorded bound',
-      [`actual=${value.descriptors.length}`, `max=${packageDataBounds.maxBusinessSources}`],
+      [`actual=${snapshot.descriptors.length}`, `max=${packageDataBounds.maxBusinessSources}`],
     );
   }
 
@@ -80,8 +84,8 @@ export function validateCompiledBusinessSourceSection(
   const descriptors: CompiledBusinessSourceDescriptor[] = [];
   const sources = new Set<string>();
 
-  for (let index = 0; index < value.descriptors.length; index += 1) {
-    const raw = value.descriptors[index];
+  for (let index = 0; index < snapshot.descriptors.length; index += 1) {
+    const raw = snapshot.descriptors[index];
     if (!isRecord(raw)) invalid(`descriptors[${index}] must be an object`);
     for (const key of Object.keys(raw)) {
       if (!DESCRIPTOR_KEYS.has(key)) invalid(`descriptors[${index}] contains unsupported field '${key}'`);
@@ -132,8 +136,5 @@ export function validateCompiledBusinessSourceSection(
     invalid('Business Source descriptors must be sorted by exact source key');
   }
 
-  return {
-    schemaContractVersion: DOMAIN_HARNESS_JSON_SCHEMA_V1,
-    descriptors,
-  };
+  return { schemaContractVersion: DOMAIN_HARNESS_JSON_SCHEMA_V1, descriptors };
 }
