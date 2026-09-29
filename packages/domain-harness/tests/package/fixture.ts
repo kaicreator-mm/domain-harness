@@ -4,12 +4,11 @@ import type {
   Sha256Port,
   TargetCompiledDomainPackage,
 } from '../../src/v2/index.js';
+import { LEGACY_COMPILED_ARTIFACT_PROFILE } from '../../src/v2/index.js';
 import { computeCompiledPackageId } from '../../src/package/index.js';
 
 export const TEST_POLICY_BASE = {
-  formatVersion: '1',
-  runtimeContractMajor: 2,
-  executionEngineMajor: 1,
+  ...LEGACY_COMPILED_ARTIFACT_PROFILE,
   targetProfileId: 'node-test',
 } as const;
 
