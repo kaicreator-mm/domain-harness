@@ -19,12 +19,14 @@ import {
   type AdmissionEffectToolRequest,
   type BeginEffectRequest,
   type BindGovernanceExecutionPinResult,
+  type CommandOutcomeSnapshot,
   type CommitProcessedMessageRequest,
   type CompleteEffectRequest,
   type DomainActivationAuthority,
   type DomainActivationBinding,
   type DomainMessage,
   type DurableExecutionStore,
+  type DurableProcessDataSnapshot,
   type EffectJournalRecord,
   type ExactPackageCdiAuthority,
   type FailMessageProcessingRequest,
@@ -33,8 +35,10 @@ import {
   type GovernancePackageCdiBinding,
   type JsonValue,
   type MessageAcceptedAck,
+  type ProcessedCommandTurnCommit,
   type RuntimeHostBindings,
   type RuntimeStore,
+  type RuntimeStoreProcessCommandExtension,
   type Sha256Port,
   type TargetCompiledDomainPackage,
   type TerminalizeInstanceRequest,
@@ -116,11 +120,13 @@ const addressKey = (address: WorkflowAddress): string =>
   JSON.stringify([address.workflowId, address.instanceKey]);
 
 /**
- * Volatile in-memory RuntimeStore (the v0.2 durable-store port). A real host
- * injects the Node or Expo SQLite adapter instead; this exists only so the
- * examples run anywhere without I/O.
+ * Volatile in-memory RuntimeStore plus the frozen T-009 process-command
+ * extension required by the v0.3 assembly. A real host injects the Node or
+ * Expo SQLite adapter instead; this exists only so the examples run anywhere
+ * without I/O. Mailbox processed-command turns are outside this example
+ * surface, so the extension methods are deliberately non-authoritative stubs.
  */
-export class VolatileRuntimeStore implements RuntimeStore {
+export class VolatileRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExtension {
   readonly instances = new Map<string, WorkflowInstanceSnapshot>();
   readonly #effects = new Map<string, EffectJournalRecord>();
 
@@ -196,6 +202,21 @@ export class VolatileRuntimeStore implements RuntimeStore {
     const snapshot = this.instances.get(addressKey(target));
     if (snapshot === undefined) throw new Error('unknown instance');
     return structuredClone(snapshot);
+  }
+
+  async getProcessData(_target: WorkflowAddress): Promise<DurableProcessDataSnapshot | null> {
+    return null;
+  }
+
+  async getCommandOutcome(
+    _target: WorkflowAddress,
+    _messageId: string,
+  ): Promise<CommandOutcomeSnapshot | null> {
+    return null;
+  }
+
+  async commitProcessedCommandTurn(_commit: ProcessedCommandTurnCommit): Promise<void> {
+    throw new Error('VolatileRuntimeStore.commitProcessedCommandTurn is outside the example surface');
   }
 }
 
