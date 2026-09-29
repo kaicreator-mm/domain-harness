@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer';
 import {
+  DomainHarnessJsonSchemaV1Validator,
   canonicalJsonStringify,
+  canonicalSchemaUtf8ByteLength,
   compareCompiledDomainDataKeys,
   type CompiledDomainDataDescriptor,
   type CompiledDomainDataSection,
@@ -35,14 +37,6 @@ const BOUND_KEYS = [
   'maxSchemaCanonicalBytes',
 ] as const satisfies readonly (keyof PackageDataBounds)[];
 
-function normalizedSchema(value: unknown): JsonSchema {
-  const normalized = JSON.parse(canonicalJsonStringify(value)) as unknown;
-  if (typeof normalized !== 'object' || normalized === null || Array.isArray(normalized)) {
-    throw new Error('valueSchema must be a canonical JSON object');
-  }
-  return normalized as JsonSchema;
-}
-
 function assertBounds(bounds: PackageDataBounds): void {
   const issues: string[] = [];
   for (const key of BOUND_KEYS) {
@@ -76,13 +70,7 @@ function projectionDomainDataIssues(
   return issues;
 }
 
-/**
- * Internal successor compiler primitive. Public compileDomainPackage() remains
- * frozen on 0.2/2/2 until central I-03-ASSEMBLY.
- *
- * `projections` is intentionally mandatory: successor compilation may never
- * silently skip the statically knowable Domain Data dependency-closure gate.
- */
+/** Internal successor compiler primitive. Public compiler remains 0.2/2/2 until I-03-ASSEMBLY. */
 export function buildCompiledDomainDataSection(
   entries: readonly DomainDataCompileEntry[],
   bounds: PackageDataBounds,
@@ -90,6 +78,7 @@ export function buildCompiledDomainDataSection(
 ): CompiledDomainDataSection {
   assertBounds(bounds);
 
+  const schemaValidator = new DomainHarnessJsonSchemaV1Validator();
   const issues: string[] = [];
   const seen = new Set<string>();
   const prepared: Array<{
@@ -113,9 +102,18 @@ export function buildCompiledDomainDataSection(
     try {
       const canonicalValue = canonicalJsonStringify(entry.value);
       const value = JSON.parse(canonicalValue) as JsonValue;
-      const valueSchema = entry.valueSchema === undefined
-        ? undefined
-        : normalizedSchema(entry.valueSchema);
+      let valueSchema: JsonSchema | undefined;
+      if (entry.valueSchema !== undefined) {
+        valueSchema = schemaValidator.normalizeSchema(entry.valueSchema);
+        const schemaBytes = canonicalSchemaUtf8ByteLength(valueSchema);
+        if (schemaBytes > bounds.maxSchemaCanonicalBytes) {
+          issues.push(
+            `Domain Data '${entry.key}' valueSchema canonical bytes ${schemaBytes} exceed maxSchemaCanonicalBytes ${bounds.maxSchemaCanonicalBytes}`,
+          );
+        } else {
+          schemaValidator.validate(valueSchema, value, `Domain Data '${entry.key}'`);
+        }
+      }
       prepared.push({
         key: entry.key,
         canonicalValue,
@@ -124,7 +122,7 @@ export function buildCompiledDomainDataSection(
       });
     } catch (error) {
       issues.push(
-        `Domain Data '${entry.key}' is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
+        `Domain Data '${entry.key}' failed successor schema/data validation: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
