@@ -134,34 +134,40 @@ function readValues(value: unknown): Readonly<Record<string, JsonValue>> {
  * Portable successor Domain Data integrity validation. This helper does not
  * install successor package admission or JSON Schema semantics; it is consumed
  * later by the DomainHarness-owned successor validator assembly.
+ *
+ * Validation operates on a detached canonical snapshot so caller mutation
+ * cannot create a time-of-check/time-of-use split while async digests run.
  */
 export async function validateCompiledDomainDataSection(
   value: unknown,
   sha256: Sha256Port,
 ): Promise<CompiledDomainDataSection> {
+  let canonicalText: string;
   try {
-    // Validate the complete value through the authoritative canonical seam
-    // before reading fields. This rejects accessors, non-plain prototypes,
-    // symbols, sparse arrays and other non-JSON shapes without invoking getters.
-    canonicalJsonStringify(value);
+    // This rejects accessors, non-plain prototypes, symbols, sparse arrays and
+    // other non-JSON shapes without invoking getters.
+    canonicalText = canonicalJsonStringify(value);
   } catch (error) {
     invalid('compiled Domain Data section must be canonical JSON', [
       error instanceof Error ? error.message : String(error),
     ]);
   }
 
-  if (!isRecord(value)) invalid('compiled Domain Data section must be an object');
-  const actualSectionKeys = Object.keys(value).sort();
+  // Work only from this detached immutable-by-ownership snapshot after the
+  // canonical boundary. Never re-read caller-owned material after this point.
+  const snapshot = JSON.parse(canonicalText) as unknown;
+  if (!isRecord(snapshot)) invalid('compiled Domain Data section must be an object');
+  const actualSectionKeys = Object.keys(snapshot).sort();
   const expectedSectionKeys = ['descriptors', 'packageDataBounds', 'values'];
   if (actualSectionKeys.length !== expectedSectionKeys.length
     || actualSectionKeys.some((key, index) => key !== expectedSectionKeys[index])) {
     invalid('compiled Domain Data section must contain exactly descriptors, values and packageDataBounds');
   }
-  if (!Array.isArray(value.descriptors)) invalid('descriptors must be an array');
+  if (!Array.isArray(snapshot.descriptors)) invalid('descriptors must be an array');
 
-  const descriptors = value.descriptors.map(readDescriptor);
-  const values = readValues(value.values);
-  const packageDataBounds = readBounds(value.packageDataBounds);
+  const descriptors = snapshot.descriptors.map(readDescriptor);
+  const values = readValues(snapshot.values);
+  const packageDataBounds = readBounds(snapshot.packageDataBounds);
 
   const descriptorKeys = descriptors.map((descriptor) => descriptor.key);
   const sortedDescriptorKeys = [...descriptorKeys].sort((left, right) => left.localeCompare(right));
