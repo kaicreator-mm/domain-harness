@@ -1,4 +1,10 @@
 import type {
+  CommandOutcomeSnapshot,
+  DurableProcessDataSnapshot,
+  ProcessedCommandTurnCommit,
+  RuntimeStoreProcessCommandExtension,
+} from '../../src/contracts/process-command.js';
+import type {
   BeginEffectRequest,
   CompleteEffectRequest,
   CommitProcessedMessageRequest,
@@ -15,12 +21,11 @@ import type {
 import { workflowAddressKey } from '../../src/instance/workflow-address.js';
 
 /**
- * Fully-implemented in-memory RuntimeStore for the T-021 assembly smoke. The
- * T-010 instance-only fake deliberately throws on mailbox/effect methods; the
- * assembly boot path (startup reclaim + unresolved-target scan) needs a store
- * that answers the full contract. Deterministic, no I/O, test-only.
+ * Fully-implemented-enough in-memory RuntimeStore for T-021/T-009 assembly
+ * smoke. Mailbox processing itself remains outside this helper; focused #137
+ * integration tests use a dedicated command-capable store.
  */
-export class MemoryRuntimeStore implements RuntimeStore {
+export class MemoryRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExtension {
   readonly #instances = new Map<string, WorkflowInstanceSnapshot>();
   readonly #effects = new Map<string, EffectJournalRecord>();
   readonly committed: CommitProcessedMessageRequest[] = [];
@@ -99,5 +104,20 @@ export class MemoryRuntimeStore implements RuntimeStore {
     const snapshot = this.#instances.get(workflowAddressKey(target));
     if (snapshot === undefined) throw new Error('unknown instance');
     return structuredClone(snapshot);
+  }
+
+  async getProcessData(_target: WorkflowAddress): Promise<DurableProcessDataSnapshot | null> {
+    return null;
+  }
+
+  async getCommandOutcome(
+    _target: WorkflowAddress,
+    _messageId: string,
+  ): Promise<CommandOutcomeSnapshot | null> {
+    return null;
+  }
+
+  async commitProcessedCommandTurn(_commit: ProcessedCommandTurnCommit): Promise<void> {
+    throw new Error('MemoryRuntimeStore.commitProcessedCommandTurn is outside the assembly smoke surface');
   }
 }
