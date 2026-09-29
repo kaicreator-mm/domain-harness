@@ -16,8 +16,12 @@ const BOUND_KEYS = [
     'maxBusinessSources',
     'maxSchemaCanonicalBytes',
 ];
-function normalizedJson(value) {
-    return JSON.parse(canonicalJsonStringify(value));
+function normalizedSchema(value) {
+    const normalized = JSON.parse(canonicalJsonStringify(value));
+    if (typeof normalized !== 'object' || normalized === null || Array.isArray(normalized)) {
+        throw new Error('valueSchema must be a canonical JSON object');
+    }
+    return normalized;
 }
 function assertBounds(bounds) {
     const issues = [];
@@ -74,7 +78,7 @@ export function buildCompiledDomainDataSection(entries, bounds, projections) {
             const value = JSON.parse(canonicalValue);
             const valueSchema = entry.valueSchema === undefined
                 ? undefined
-                : normalizedJson(entry.valueSchema);
+                : normalizedSchema(entry.valueSchema);
             prepared.push({
                 key: entry.key,
                 canonicalValue,
