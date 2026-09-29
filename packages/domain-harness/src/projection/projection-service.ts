@@ -1,5 +1,12 @@
+import { canonicalJsonStringify } from '../contracts/identity.js';
 import type { JsonObject, JsonValue } from '../contracts/json.js';
 import { SchemaValidator } from '../execution/schema-validator.js';
+import {
+  DOMAIN_HARNESS_JSON_SCHEMA_V1,
+  DomainHarnessJsonSchemaV1Error,
+  DomainHarnessJsonSchemaV1Validator,
+} from '../schema/domainharness-json-schema-v1.js';
+import type { CompiledBusinessSourceContractPort } from './compiled-business-source.js';
 import type { CompiledDomainDataPort, CompiledDomainDataValue } from './compiled-domain-data.js';
 import type { ExpressionExecutorPort, Sha256Port } from '../v2/contracts/host.js';
 import type {
@@ -26,6 +33,10 @@ export type ProjectionErrorCode =
   | 'workflow_source_missing'
   | 'business_snapshot_port_missing'
   | 'business_snapshot_mismatch'
+  | 'business_source_contract_missing'
+  | 'business_source_contract_invalid'
+  | 'business_snapshot_schema_violation'
+  | 'business_snapshot_revision_conflict'
   | 'domain_data_port_missing'
   | 'domain_data_not_found'
   | 'unsupported_dependency'
@@ -53,22 +64,20 @@ export interface ProjectionServiceOptions {
   packageRegistry: PackageRegistry;
   store: Pick<RuntimeStore, 'getInstance'>;
   businessSnapshots?: BusinessSnapshotPort;
+  /**
+   * Package-pinned successor declaration lookup. Omission preserves retained
+   * 0.2 behavior; successor assembly must supply this port.
+   */
+  businessSourceContracts?: CompiledBusinessSourceContractPort;
   domainData?: CompiledDomainDataPort;
   expression: ExpressionExecutorPort;
   sha256: Sha256Port;
 }
 
-/**
- * Executes frozen v0.2 projections over declared snapshots only.
- *
- * BusinessSnapshotPort I/O occurs while assembling the snapshot. Compiled
- * Domain Data is immutable package content read through a synchronous
- * in-memory lookup. The expression executor receives only portable JSON and
- * therefore has no Tool, Skill, Runtime Resource, transport, or
- * authoritative-data handle to call through.
- */
+/** Executes projections over declared snapshots only. */
 export class ProjectionService {
   private readonly validator = new SchemaValidator();
+  private readonly successorSchemaValidator = new DomainHarnessJsonSchemaV1Validator();
 
   constructor(private readonly options: ProjectionServiceOptions) {}
 
@@ -85,7 +94,11 @@ export class ProjectionService {
       );
     }
 
-    const assembled = await this.assembleDeclaredSnapshots(descriptor, request.key, compiledPackage.manifest.packageId);
+    const assembled = await this.assembleDeclaredSnapshots(
+      descriptor,
+      request.key,
+      compiledPackage.manifest.packageId,
+    );
     const projectionInput: JsonObject = {
       key: request.key,
       input: request.input ?? null,
@@ -196,6 +209,7 @@ export class ProjectionService {
     const workflowSources: WorkflowProjectionInput[] = [];
     const businessSnapshots: BusinessSnapshot[] = [];
     const domainData: CompiledDomainDataValue[] = [];
+    const observedBusinessRevisions = new Map<string, string>();
 
     for (const dependency of descriptor.dependencies) {
       await this.assembleDependency(
@@ -205,6 +219,7 @@ export class ProjectionService {
         workflowSources,
         businessSnapshots,
         domainData,
+        observedBusinessRevisions,
       );
     }
 
@@ -218,6 +233,7 @@ export class ProjectionService {
     workflowSources: WorkflowProjectionInput[],
     businessSnapshots: BusinessSnapshot[],
     domainData: CompiledDomainDataValue[],
+    observedBusinessRevisions: Map<string, string>,
   ): Promise<void> {
     if (dependency.kind === 'workflow') {
       const target = resolveWorkflowSelector(dependency.selector, key);
@@ -256,7 +272,57 @@ export class ProjectionService {
         );
       }
       assertNonEmpty(snapshot.revision, 'business snapshot revision');
-      businessSnapshots.push(snapshot);
+
+      let validatedSnapshot = snapshot;
+      if (this.options.businessSourceContracts) {
+        const contract = this.options.businessSourceContracts.get(packageId, dependency.source);
+        if (!contract) {
+          throw new ProjectionError(
+            'business_source_contract_missing',
+            `Business Source ${dependency.source} is not declared by package ${packageId}`,
+          );
+        }
+        if (contract.schemaContractVersion !== DOMAIN_HARNESS_JSON_SCHEMA_V1
+          || contract.descriptor.source !== dependency.source) {
+          throw new ProjectionError(
+            'business_source_contract_invalid',
+            `Business Source contract for ${dependency.source} is not exact package-pinned ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`,
+          );
+        }
+        try {
+          const validatedValue = this.successorSchemaValidator.validate(
+            contract.descriptor.valueSchema,
+            snapshot.value,
+            `Business Snapshot ${dependency.source}/${businessKey}`,
+          );
+          validatedSnapshot = { ...snapshot, value: validatedValue };
+        } catch (error) {
+          if (error instanceof DomainHarnessJsonSchemaV1Error) {
+            throw new ProjectionError(
+              'business_snapshot_schema_violation',
+              `Business snapshot ${dependency.source}/${businessKey} violates its package-pinned schema`,
+              { cause: error },
+            );
+          }
+          throw error;
+        }
+      }
+
+      const observationKey = canonicalJsonStringify([
+        validatedSnapshot.source,
+        validatedSnapshot.key,
+        validatedSnapshot.revision,
+      ]);
+      const canonicalValue = canonicalJsonStringify(validatedSnapshot.value);
+      const previousValue = observedBusinessRevisions.get(observationKey);
+      if (previousValue !== undefined && previousValue !== canonicalValue) {
+        throw new ProjectionError(
+          'business_snapshot_revision_conflict',
+          `Business Source ${validatedSnapshot.source}/${validatedSnapshot.key} returned conflicting values for revision ${validatedSnapshot.revision}`,
+        );
+      }
+      observedBusinessRevisions.set(observationKey, canonicalValue);
+      businessSnapshots.push(validatedSnapshot);
       return;
     }
 
