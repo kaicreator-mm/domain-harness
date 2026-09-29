@@ -3,12 +3,12 @@ import { Buffer } from 'node:buffer';
 import test from 'node:test';
 import {
   canonicalJsonStringify,
+  compiledDomainDataIdentityMaterial,
   type PackageDataBounds,
 } from '@kaicreator/domain-harness/v2';
 import type { RawProjectionDefinition } from '../src/raw/types.js';
 import {
   buildCompiledDomainDataSection,
-  compiledDomainDataIdentityMaterial,
   DomainDataCompileError,
 } from '../src/package/domain-data.js';
 
