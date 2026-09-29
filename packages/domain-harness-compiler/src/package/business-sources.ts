@@ -38,6 +38,7 @@ function projectionBusinessSourceIssues(
   declaredSources: ReadonlySet<string>,
 ): string[] {
   const issues: string[] = [];
+  const referencedSources = new Set<string>();
   for (const projection of projections) {
     for (const dependency of projection.dependencies) {
       if (dependency.kind !== 'business') continue;
@@ -45,11 +46,17 @@ function projectionBusinessSourceIssues(
         issues.push(`projection '${projection.projectionId}' declares an empty Business Source`);
         continue;
       }
+      referencedSources.add(dependency.source);
       if (!declaredSources.has(dependency.source)) {
         issues.push(
           `projection '${projection.projectionId}' references undeclared Business Source '${dependency.source}'`,
         );
       }
+    }
+  }
+  for (const source of declaredSources) {
+    if (!referencedSources.has(source)) {
+      issues.push(`orphan Business Source '${source}' is not referenced by any projection`);
     }
   }
   return issues;
