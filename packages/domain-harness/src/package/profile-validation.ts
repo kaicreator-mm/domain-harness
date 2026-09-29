@@ -16,22 +16,25 @@ import {
   type CompiledPackageValidationPolicy as LegacyCompiledPackageValidationPolicy,
 } from './validation.js';
 
-export type SuccessorCompiledPackageValidator = (
-  value: unknown,
-  policy: SupportedCompiledPackageValidationPolicy,
-) => Promise<TargetCompiledDomainPackage>;
-
 export interface SupportedCompiledPackageValidationPolicy {
   readonly supportedProfiles: readonly SupportedCompiledArtifactProfile[];
   readonly hostCapabilities: readonly CapabilityId[];
   readonly sha256: Sha256Port;
   readonly targetProfileId?: string;
+}
+
+/** DomainHarness-owned extension point; never part of Host validation policy. */
+export type SuccessorCompiledPackageValidator = (
+  value: unknown,
+  policy: SupportedCompiledPackageValidationPolicy,
+) => Promise<TargetCompiledDomainPackage>;
+
+export interface CompiledPackageValidatorExtensions {
   /**
-   * Downstream-owned validator for the complete 0.3/2/3 package contract.
-   * I-FMT-03 intentionally does not install one: recognizing the tuple must
-   * never be confused with accepting an incomplete successor package.
+   * Installed only by downstream DomainHarness assembly after successor package
+   * semantics exist. I-FMT-03 and current production activation install none.
    */
-  readonly successorValidator?: SuccessorCompiledPackageValidator;
+  readonly successor?: SuccessorCompiledPackageValidator;
 }
 
 /**
@@ -134,9 +137,23 @@ function commonPolicy(
   };
 }
 
+function asSupportedPolicy(
+  policy: PackageActivationValidationPolicy,
+  supportedProfiles: readonly SupportedCompiledArtifactProfile[],
+): SupportedCompiledPackageValidationPolicy {
+  const common = commonPolicy(policy);
+  return {
+    supportedProfiles,
+    hostCapabilities: common.hostCapabilities,
+    sha256: common.sha256,
+    ...(common.targetProfileId === undefined ? {} : { targetProfileId: common.targetProfileId }),
+  };
+}
+
 export async function validateCompiledPackageByProfile(
   value: unknown,
   policy: PackageActivationValidationPolicy,
+  extensions: CompiledPackageValidatorExtensions = {},
 ): Promise<TargetCompiledDomainPackage> {
   const profile = readManifestProfile(value);
   if (!isSupportedCompiledArtifactProfile(profile)) {
@@ -169,17 +186,16 @@ export async function validateCompiledPackageByProfile(
   }
 
   if (sameCompiledArtifactProfile(profile, SUCCESSOR_COMPILED_ARTIFACT_PROFILE)) {
-    if (!isSupportedPolicy(policy) || !policy.successorValidator) {
+    if (!extensions.successor) {
       throw new PackageActivationError(
         'INCOMPATIBLE_PACKAGE',
-        'successor 0.3/2/3 profile is recognized but its feature validator is not installed',
+        'successor 0.3/2/3 profile is recognized but its DomainHarness feature validator is not installed',
         ['profile=0.3/2/3', 'feature-semantics=NOT_OWNED_BY_I-FMT-03'],
       );
     }
-    return policy.successorValidator(value, policy);
+    return extensions.successor(value, asSupportedPolicy(policy, supported));
   }
 
-  // Exhaustive fail-closed guard if the supported-profile union evolves.
   throw new PackageActivationError(
     'INCOMPATIBLE_PACKAGE',
     'compiled package profile has no validation dispatch implementation',
