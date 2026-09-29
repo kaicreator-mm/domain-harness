@@ -1,5 +1,5 @@
 import { PackageActivationError } from './errors.js';
-import { validateCompiledPackage } from './validation.js';
+import { validateCompiledPackageByProfile } from './profile-validation.js';
 export async function listRetainedPackageIds(store) {
     const packageIds = await store.listPinnedPackageIds();
     const normalized = new Set();
@@ -24,7 +24,7 @@ async function validateRegistryPackages(registry, policy) {
         if (compiledPackage.manifest.packageId !== packageId) {
             throw new PackageActivationError('PACKAGE_ID_MISMATCH', `PackageRegistry key "${packageId}" does not match resolved manifest packageId "${compiledPackage.manifest.packageId}"`);
         }
-        validated.set(packageId, await validateCompiledPackage(compiledPackage, policy));
+        validated.set(packageId, await validateCompiledPackageByProfile(compiledPackage, policy));
     }
     return validated;
 }

@@ -1,4 +1,5 @@
 export * from './capability.js';
+export * from './compiled-artifact-profile.js';
 export * from './effect.js';
 export * from './host.js';
 export * from './message.js';

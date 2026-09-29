@@ -1,5 +1,6 @@
 import type {
   CapabilityId,
+  CompiledArtifactProfile,
   CompiledPackageManifest,
   Sha256Port,
   TargetCompiledDomainPackage,
@@ -27,12 +28,16 @@ export async function createCompiledPackage(
     readonly requiredCapabilities?: readonly CapabilityId[];
     readonly targetProfileId?: string;
     readonly runtimeContractMajor?: number;
+    readonly profile?: CompiledArtifactProfile;
   } = {},
 ): Promise<TargetCompiledDomainPackage> {
   const manifest: CompiledPackageManifest = {
-    formatVersion: TEST_POLICY_BASE.formatVersion,
-    runtimeContractMajor: options.runtimeContractMajor ?? TEST_POLICY_BASE.runtimeContractMajor,
-    executionEngineMajor: TEST_POLICY_BASE.executionEngineMajor,
+    formatVersion: options.profile?.formatVersion ?? TEST_POLICY_BASE.formatVersion,
+    runtimeContractMajor:
+      options.profile?.runtimeContractMajor
+      ?? options.runtimeContractMajor
+      ?? TEST_POLICY_BASE.runtimeContractMajor,
+    executionEngineMajor: options.profile?.executionEngineMajor ?? TEST_POLICY_BASE.executionEngineMajor,
     domainId: 'fixture-domain',
     domainVersion,
     packageId: 'pending',

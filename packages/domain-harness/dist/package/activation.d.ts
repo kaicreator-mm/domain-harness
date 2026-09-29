@@ -1,11 +1,11 @@
 import type { RuntimeStore } from '../v2/contracts/store.js';
 import type { PackageRegistry, TargetCompiledDomainPackage } from '../v2/contracts/package.js';
-import type { CompiledPackageValidationPolicy } from './validation.js';
+import type { PackageActivationValidationPolicy } from './profile-validation.js';
 export type PackagePinStore = Pick<RuntimeStore, 'listPinnedPackageIds'>;
 export interface PackageActivationPreflightRequest {
     readonly registry: PackageRegistry;
     readonly store: PackagePinStore;
-    readonly validationPolicy: CompiledPackageValidationPolicy;
+    readonly validationPolicy: PackageActivationValidationPolicy;
 }
 export interface PackageActivationPreflightResult {
     readonly defaultPackage: TargetCompiledDomainPackage;

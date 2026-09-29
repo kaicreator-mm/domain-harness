@@ -4,15 +4,15 @@ import type {
   TargetCompiledDomainPackage,
 } from '../v2/contracts/package.js';
 import { PackageActivationError } from './errors.js';
-import type { CompiledPackageValidationPolicy } from './validation.js';
-import { validateCompiledPackage } from './validation.js';
+import type { PackageActivationValidationPolicy } from './profile-validation.js';
+import { validateCompiledPackageByProfile } from './profile-validation.js';
 
 export type PackagePinStore = Pick<RuntimeStore, 'listPinnedPackageIds'>;
 
 export interface PackageActivationPreflightRequest {
   readonly registry: PackageRegistry;
   readonly store: PackagePinStore;
-  readonly validationPolicy: CompiledPackageValidationPolicy;
+  readonly validationPolicy: PackageActivationValidationPolicy;
 }
 
 export interface PackageActivationPreflightResult {
@@ -38,7 +38,7 @@ export async function listRetainedPackageIds(store: PackagePinStore): Promise<re
 
 async function validateRegistryPackages(
   registry: PackageRegistry,
-  policy: CompiledPackageValidationPolicy,
+  policy: PackageActivationValidationPolicy,
 ): Promise<ReadonlyMap<string, TargetCompiledDomainPackage>> {
   const validated = new Map<string, TargetCompiledDomainPackage>();
   for (const packageId of registry.listPackageIds()) {
@@ -61,7 +61,7 @@ async function validateRegistryPackages(
         `PackageRegistry key "${packageId}" does not match resolved manifest packageId "${compiledPackage.manifest.packageId}"`,
       );
     }
-    validated.set(packageId, await validateCompiledPackage(compiledPackage, policy));
+    validated.set(packageId, await validateCompiledPackageByProfile(compiledPackage, policy));
   }
   return validated;
 }
