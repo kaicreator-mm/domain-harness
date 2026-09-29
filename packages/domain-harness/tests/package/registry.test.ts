@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { CapabilityId, PackageRegistry } from '../../src/v2/index.js';
+import { LEGACY_COMPILED_ARTIFACT_PROFILE } from '../../src/v2/index.js';
 import {
   PackageActivationError,
   StaticPackageRegistry,
@@ -20,14 +21,19 @@ const hostCapabilities = ['crypto-hash-sha256@1'] as const satisfies readonly Ca
 function validationPolicy() {
   return {
     ...TEST_POLICY_BASE,
+    ...LEGACY_COMPILED_ARTIFACT_PROFILE,
     hostCapabilities,
     sha256: createSha256Fake(),
   };
 }
 
+function registryPackage(domainVersion: string) {
+  return createCompiledPackage(domainVersion, { profile: LEGACY_COMPILED_ARTIFACT_PROFILE });
+}
+
 test('G27/G28: cross-version registry keeps A pinned while B is default for new instances', async () => {
-  const packageA = await createCompiledPackage('1.0.0');
-  const packageB = await createCompiledPackage('2.0.0');
+  const packageA = await registryPackage('1.0.0');
+  const packageB = await registryPackage('2.0.0');
   const registry = new StaticPackageRegistry([packageB, packageA], packageB.manifest.packageId);
 
   const preflight = await preflightPackageActivation({
@@ -57,7 +63,7 @@ test('G28: retained package id inspection is unique and deterministic', async ()
 });
 
 test('G28/G29: missing retained pin aborts activation with no default/latest fallback', async () => {
-  const packageB = await createCompiledPackage('2.0.0');
+  const packageB = await registryPackage('2.0.0');
   const registry = new StaticPackageRegistry([packageB], packageB.manifest.packageId);
 
   await assert.rejects(
@@ -78,8 +84,8 @@ test('G28/G29: missing retained pin aborts activation with no default/latest fal
 });
 
 test('G27: PackageRegistry package id listing is deterministic across insertion order', async () => {
-  const packageA = await createCompiledPackage('1.0.0');
-  const packageB = await createCompiledPackage('2.0.0');
+  const packageA = await registryPackage('1.0.0');
+  const packageB = await registryPackage('2.0.0');
   const first = new StaticPackageRegistry([packageB, packageA], packageB.manifest.packageId);
   const second = new StaticPackageRegistry([packageA, packageB], packageB.manifest.packageId);
   assert.deepEqual(first.listPackageIds(), second.listPackageIds());
@@ -87,7 +93,7 @@ test('G27: PackageRegistry package id listing is deterministic across insertion 
 });
 
 test('G29: preflight validates supplied packages before retained-pin inspection', async () => {
-  const compiledPackage = await createCompiledPackage('2.0.0');
+  const compiledPackage = await registryPackage('2.0.0');
   compiledPackage.manifest.packageId = 'corrupt-id';
   const registry = new StaticPackageRegistry([compiledPackage], compiledPackage.manifest.packageId);
   let pinRead = false;
@@ -111,7 +117,7 @@ test('G29: preflight validates supplied packages before retained-pin inspection'
 });
 
 test('G29: inconsistent registry key cannot substitute a different package identity', async () => {
-  const packageA = await createCompiledPackage('1.0.0');
+  const packageA = await registryPackage('1.0.0');
   const alias = 'registry-alias-that-is-not-package-a';
   const registry: PackageRegistry = {
     defaultPackageId: alias,
@@ -139,8 +145,8 @@ test('G29: inconsistent registry key cannot substitute a different package ident
 });
 
 test('G29: default package must be part of the validated registry enumeration', async () => {
-  const packageA = await createCompiledPackage('1.0.0');
-  const packageB = await createCompiledPackage('2.0.0');
+  const packageA = await registryPackage('1.0.0');
+  const packageB = await registryPackage('2.0.0');
   const registry: PackageRegistry = {
     defaultPackageId: packageB.manifest.packageId,
     listPackageIds: () => [packageA.manifest.packageId],

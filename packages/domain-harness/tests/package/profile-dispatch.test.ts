@@ -35,7 +35,9 @@ function profilePolicy() {
 }
 
 test('I-FMT-03: exact legacy profile delegates to historical package validator', async () => {
-  const compiledPackage = await createCompiledPackage('1.0.0');
+  const compiledPackage = await createCompiledPackage('1.0.0', {
+    profile: LEGACY_COMPILED_ARTIFACT_PROFILE,
+  });
   const validated = await validateCompiledPackageByProfile(compiledPackage, profilePolicy());
   assert.equal(validated.manifest.packageId, compiledPackage.manifest.packageId);
   assert.equal(validated.manifest.formatVersion, '0.2');
@@ -79,7 +81,9 @@ for (const [name, profile] of [
 }
 
 test('I-FMT-03: legacy single-profile compatibility shape cannot select an arbitrary tuple', async () => {
-  const compiledPackage = await createCompiledPackage('1.0.0');
+  const compiledPackage = await createCompiledPackage('1.0.0', {
+    profile: LEGACY_COMPILED_ARTIFACT_PROFILE,
+  });
   await assert.rejects(
     validateCompiledPackageByProfile(compiledPackage, {
       formatVersion: '0.1',

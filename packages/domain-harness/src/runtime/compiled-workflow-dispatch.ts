@@ -7,7 +7,6 @@ import {
 import {
   CompiledWorkflowIrError,
   decodeCompiledWorkflowDefinition,
-  type CompiledWorkflowIRV2,
 } from './compiled-workflow-ir.js';
 
 export type SuccessorCompiledWorkflowDecoder = (
@@ -24,12 +23,18 @@ export interface CompiledWorkflowDecoderExtensions {
   readonly engine3?: SuccessorCompiledWorkflowDecoder;
 }
 
+/**
+ * Legacy-profile definitions resolve through the historical V2 decoder
+ * (CompiledWorkflowIRV2); successor-profile definitions resolve through the
+ * installed engine-3 extension, whose result type is downstream-owned and
+ * opaque to DomainHarness, so the declared result is `unknown`.
+ */
 export function decodeCompiledWorkflowDefinitionForProfile(
   profile: CompiledArtifactProfile,
   workflowId: string,
   definition: unknown,
   extensions: CompiledWorkflowDecoderExtensions = {},
-): CompiledWorkflowIRV2 | unknown {
+): unknown {
   if (sameCompiledArtifactProfile(profile, LEGACY_COMPILED_ARTIFACT_PROFILE)) {
     return decodeCompiledWorkflowDefinition(workflowId, definition);
   }
