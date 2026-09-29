@@ -25,6 +25,14 @@ export class BusinessSourceCompileError extends Error {
   }
 }
 
+const BOUND_KEYS = [
+  'maxDomainDataEntries',
+  'maxDomainDataEntryCanonicalBytes',
+  'maxTotalDomainDataCanonicalBytes',
+  'maxBusinessSources',
+  'maxSchemaCanonicalBytes',
+] as const satisfies readonly (keyof PackageDataBounds)[];
+
 function projectionBusinessSourceIssues(
   projections: readonly RawProjectionDefinition[],
   declaredSources: ReadonlySet<string>,
@@ -62,11 +70,11 @@ export function buildCompiledBusinessSourceSection(
   const seen = new Set<string>();
   const descriptors: CompiledBusinessSourceDescriptor[] = [];
 
-  if (!Number.isSafeInteger(bounds.maxBusinessSources) || bounds.maxBusinessSources < 0) {
-    issues.push('packageDataBounds.maxBusinessSources must be a non-negative safe integer');
-  }
-  if (!Number.isSafeInteger(bounds.maxSchemaCanonicalBytes) || bounds.maxSchemaCanonicalBytes < 0) {
-    issues.push('packageDataBounds.maxSchemaCanonicalBytes must be a non-negative safe integer');
+  for (const key of BOUND_KEYS) {
+    const bound = bounds[key];
+    if (!Number.isSafeInteger(bound) || bound < 0) {
+      issues.push(`packageDataBounds.${key} must be a non-negative safe integer`);
+    }
   }
 
   for (const entry of entries) {
