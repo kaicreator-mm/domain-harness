@@ -15,7 +15,11 @@ import {
 } from '../../src/runtime/create-domain-runtime.js';
 import { DomainRuntimeError } from '../../src/runtime/runtime-errors.js';
 import type { EffectJournalRecord } from '../../src/v2/contracts/effect.js';
-import type { DomainMessage, MessageAcceptedAck, MessageDispositionSnapshot } from '../../src/v2/contracts/message.js';
+import type {
+  DomainMessage,
+  MessageAcceptedAck,
+  MessageDispositionSnapshot,
+} from '../../src/v2/contracts/message.js';
 import type { TargetCompiledDomainPackage } from '../../src/v2/contracts/package.js';
 import type {
   BeginEffectRequest,
@@ -131,7 +135,9 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
 
   async getNextAcceptedMessage(target: WorkflowAddress): Promise<StoredAcceptedMessage | null> {
     const candidates = [...this.#messages.values()]
-      .filter((item) => sameAddress(item.disposition.target, target) && item.disposition.disposition === 'accepted')
+      .filter(
+        (item) => sameAddress(item.disposition.target, target) && item.disposition.disposition === 'accepted',
+      )
       .sort((a, b) => a.disposition.targetSequence - b.disposition.targetSequence);
     const record = candidates[0];
     if (record === undefined) return null;
@@ -174,15 +180,14 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
       disposition: 'processed',
       resolvedAt: request.updatedAt,
     };
-    this.#instances.set(workflowAddressKey(request.target), {
-      ...instance,
-      lifecycle: request.nextLifecycle,
-      stateRevision: instance.stateRevision + 1,
-      state: structuredClone(request.nextState),
-      ...(request.output === undefined ? {} : { output: structuredClone(request.output) }),
-      failure: undefined,
-      updatedAt: request.updatedAt,
-    });
+    const next = structuredClone(instance);
+    next.lifecycle = request.nextLifecycle;
+    next.stateRevision += 1;
+    next.state = structuredClone(request.nextState);
+    if (request.output !== undefined) next.output = structuredClone(request.output);
+    delete next.failure;
+    next.updatedAt = request.updatedAt;
+    this.#instances.set(workflowAddressKey(request.target), next);
     this.#terminalizeRemainingAccepted(request.target, request.nextLifecycle, request.updatedAt);
   }
 
@@ -197,22 +202,19 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
       failure,
       resolvedAt: request.updatedAt,
     };
-    this.#instances.set(workflowAddressKey(request.target), {
-      ...instance,
-      lifecycle: 'recovery_required',
-      failure,
-      updatedAt: request.updatedAt,
-    });
+    const next = structuredClone(instance);
+    next.lifecycle = 'recovery_required';
+    next.failure = failure;
+    next.updatedAt = request.updatedAt;
+    this.#instances.set(workflowAddressKey(request.target), next);
   }
 
   async terminalizeInstance(request: TerminalizeInstanceRequest): Promise<void> {
-    const instance = this.#requireInstance(request.target);
-    this.#instances.set(workflowAddressKey(request.target), {
-      ...instance,
-      lifecycle: request.lifecycle,
-      ...(request.output === undefined ? {} : { output: structuredClone(request.output) }),
-      updatedAt: request.updatedAt,
-    });
+    const next = structuredClone(this.#requireInstance(request.target));
+    next.lifecycle = request.lifecycle;
+    if (request.output !== undefined) next.output = structuredClone(request.output);
+    next.updatedAt = request.updatedAt;
+    this.#instances.set(workflowAddressKey(request.target), next);
     this.#terminalizeRemainingAccepted(request.target, request.lifecycle, request.updatedAt);
   }
 
@@ -230,9 +232,11 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
     const reclaimed: Array<{ sequence: number; messageId: string }> = [];
     for (const record of this.#messages.values()) {
       if (!sameAddress(record.disposition.target, target) || record.disposition.disposition !== 'processing') continue;
-      const { processingAt: _processingAt, ...rest } = record.disposition;
-      record.disposition = { ...rest, disposition: 'accepted' };
-      reclaimed.push({ sequence: record.disposition.targetSequence, messageId: record.disposition.messageId });
+      const next = structuredClone(record.disposition);
+      next.disposition = 'accepted';
+      delete next.processingAt;
+      record.disposition = next;
+      reclaimed.push({ sequence: next.targetSequence, messageId: next.messageId });
     }
     return reclaimed.sort((a, b) => a.sequence - b.sequence).map((item) => item.messageId);
   }
@@ -268,15 +272,17 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
     const sourceMessageId = instance.failure?.sourceMessageId;
     if (sourceMessageId !== undefined) {
       const record = this.#requireMessage(target, sourceMessageId);
-      const { failure: _failure, resolvedAt: _resolvedAt, ...rest } = record.disposition;
-      record.disposition = { ...rest, disposition: 'accepted' };
+      const nextDisposition = structuredClone(record.disposition);
+      nextDisposition.disposition = 'accepted';
+      delete nextDisposition.failure;
+      delete nextDisposition.resolvedAt;
+      delete nextDisposition.processingAt;
+      record.disposition = nextDisposition;
     }
-    const recovered: WorkflowInstanceSnapshot = {
-      ...instance,
-      lifecycle: 'waiting',
-      failure: undefined,
-      updatedAt,
-    };
+    const recovered = structuredClone(instance);
+    recovered.lifecycle = 'waiting';
+    delete recovered.failure;
+    recovered.updatedAt = updatedAt;
     this.#instances.set(workflowAddressKey(target), recovered);
     return structuredClone(recovered);
   }
@@ -307,15 +313,14 @@ class CommandRuntimeStore implements RuntimeStore, RuntimeStoreProcessCommandExt
       disposition: 'processed',
       resolvedAt: commit.updatedAt,
     };
-    this.#instances.set(workflowAddressKey(commit.target), {
-      ...instance,
-      lifecycle: commit.nextLifecycle,
-      stateRevision: commit.nextStateRevision,
-      state: structuredClone(commit.nextState),
-      ...(commit.output === undefined ? {} : { output: structuredClone(commit.output) }),
-      failure: undefined,
-      updatedAt: commit.updatedAt,
-    });
+    const next = structuredClone(instance);
+    next.lifecycle = commit.nextLifecycle;
+    next.stateRevision = commit.nextStateRevision;
+    next.state = structuredClone(commit.nextState);
+    if (commit.output !== undefined) next.output = structuredClone(commit.output);
+    delete next.failure;
+    next.updatedAt = commit.updatedAt;
+    this.#instances.set(workflowAddressKey(commit.target), next);
     this.#processData.set(workflowAddressKey(commit.target), {
       target: structuredClone(commit.target),
       instanceStateRevision: commit.nextStateRevision,
@@ -462,7 +467,7 @@ async function boot(mode: 'legacy' | 'v3') {
     correlationId: CORRELATION_ID,
     input: { caseId: 'case-1' },
   });
-  return { runtime, store, bindings, compiledPackage };
+  return { runtime, store };
 }
 
 test('#137 v3: no-handler and no-route are durable normal rejections and the lane continues', async () => {
