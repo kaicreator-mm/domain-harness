@@ -1,8 +1,8 @@
 import { Buffer } from 'node:buffer';
 import {
   canonicalJsonStringify,
+  compiledDomainDataIdentityMaterial,
   type CompiledDomainDataDescriptor,
-  type CompiledDomainDataIdentityMaterial,
   type CompiledDomainDataSection,
   type JsonSchema,
   type JsonValue,
@@ -70,19 +70,6 @@ function projectionDomainDataIssues(
     }
   }
   return issues;
-}
-
-export function compiledDomainDataIdentityMaterial(
-  section: CompiledDomainDataSection,
-): CompiledDomainDataIdentityMaterial {
-  return {
-    descriptors: section.descriptors.map((descriptor) => ({
-      key: descriptor.key,
-      contentDigest: descriptor.contentDigest,
-      ...(descriptor.valueSchema === undefined ? {} : { valueSchema: descriptor.valueSchema }),
-    })),
-    packageDataBounds: { ...section.packageDataBounds },
-  };
 }
 
 /**
@@ -169,9 +156,13 @@ export function buildCompiledDomainDataSection(
   const values = Object.create(null) as Record<string, JsonValue>;
   for (const entry of prepared) values[entry.key] = entry.value;
 
-  return {
+  const section: CompiledDomainDataSection = {
     descriptors,
     values,
     packageDataBounds: { ...bounds },
   };
+  // Force the shared identity projection to remain type-compatible with this
+  // compiler output; central assembly consumes the same authoritative helper.
+  compiledDomainDataIdentityMaterial(section);
+  return section;
 }
