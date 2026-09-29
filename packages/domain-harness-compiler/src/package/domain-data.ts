@@ -35,8 +35,12 @@ const BOUND_KEYS = [
   'maxSchemaCanonicalBytes',
 ] as const satisfies readonly (keyof PackageDataBounds)[];
 
-function normalizedJson<T extends JsonValue | JsonSchema>(value: unknown): T {
-  return JSON.parse(canonicalJsonStringify(value)) as T;
+function normalizedSchema(value: unknown): JsonSchema {
+  const normalized = JSON.parse(canonicalJsonStringify(value)) as unknown;
+  if (typeof normalized !== 'object' || normalized === null || Array.isArray(normalized)) {
+    throw new Error('valueSchema must be a canonical JSON object');
+  }
+  return normalized as JsonSchema;
 }
 
 function assertBounds(bounds: PackageDataBounds): void {
@@ -111,7 +115,7 @@ export function buildCompiledDomainDataSection(
       const value = JSON.parse(canonicalValue) as JsonValue;
       const valueSchema = entry.valueSchema === undefined
         ? undefined
-        : normalizedJson<JsonSchema>(entry.valueSchema);
+        : normalizedSchema(entry.valueSchema);
       prepared.push({
         key: entry.key,
         canonicalValue,
