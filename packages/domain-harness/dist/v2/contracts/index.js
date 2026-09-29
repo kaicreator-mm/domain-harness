@@ -4,6 +4,7 @@ export * from './effect.js';
 export * from './host.js';
 export * from './message.js';
 export * from './package.js';
+export * from './package-data.js';
 export * from './projection.js';
 export * from './query.js';
 export * from './runtime.js';
