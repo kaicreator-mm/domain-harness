@@ -1,7 +1,7 @@
 when:
   - event: pull_request
   - event: push
-    branch: [main, v0.2, v0.3]
+    branch: [main, v0.2, v0.3, v0.4]
 
 # ECF elastic workers run the agent with backend=local (VM-is-the-sandbox):
 # steps execute on the Alpine host (node24 + git preinstalled).
@@ -13,6 +13,7 @@ steps:
     image: bash
     commands:
       - git --version && node --version && npm --version
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
       - npm ci
       - npm run build
