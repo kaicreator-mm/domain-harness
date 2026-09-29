@@ -63,18 +63,29 @@ test('I-BIZ-SRC: duplicate/empty declarations and undeclared projection source f
   );
 });
 
+test('I-BIZ-SRC: orphan Business Source declarations fail compile', () => {
+  assert.throws(
+    () => buildCompiledBusinessSourceSection([
+      { source: 'orders', valueSchema: { type: 'object' } },
+      { source: 'unused', valueSchema: { type: 'object' } },
+    ], BOUNDS, [projection('orders')]),
+    (error: unknown) => error instanceof BusinessSourceCompileError
+      && error.issues.some((issue) => issue.includes("orphan Business Source 'unused'")),
+  );
+});
+
 test('I-BIZ-SRC: exact schema profile and schema byte bounds fail closed', () => {
   assert.throws(
     () => buildCompiledBusinessSourceSection([
       { source: 'orders', valueSchema: { type: 'object', customKeyword: true } },
-    ], BOUNDS, []),
+    ], BOUNDS, [projection('orders')]),
     BusinessSourceCompileError,
   );
 
   assert.throws(
     () => buildCompiledBusinessSourceSection([
       { source: 'orders', valueSchema: { type: 'object', properties: { long: { type: 'string' } } } },
-    ], { ...BOUNDS, maxSchemaCanonicalBytes: 4 }, []),
+    ], { ...BOUNDS, maxSchemaCanonicalBytes: 4 }, [projection('orders')]),
     (error: unknown) => error instanceof BusinessSourceCompileError
       && error.issues.some((issue) => issue.includes('maxSchemaCanonicalBytes')),
   );
@@ -88,7 +99,7 @@ test('I-BIZ-SRC: source-count bound is exact and zero capacity is meaningful', (
   assert.throws(
     () => buildCompiledBusinessSourceSection([
       { source: 'orders', valueSchema: { type: 'object' } },
-    ], { ...BOUNDS, maxBusinessSources: 0 }, []),
+    ], { ...BOUNDS, maxBusinessSources: 0 }, [projection('orders')]),
     BusinessSourceCompileError,
   );
 });
