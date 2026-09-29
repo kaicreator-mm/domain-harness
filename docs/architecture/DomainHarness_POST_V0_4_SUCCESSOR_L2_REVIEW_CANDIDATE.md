@@ -8,9 +8,9 @@
 **Released v0.4 baseline:** `5cf7a8fc623651b8ced8b2152426a5568f75cba3` / same tree  
 **Standard:** `4.0.0@1edaee9291e25b6dd99303493bed75132cb54881`  
 **Successor release/version name:** UNSET  
-**Review history:** PR #425 R1 `CHANGES_REQUESTED` / `5885474880`; R2 `CHANGES_REQUESTED` / `5885549492`; R3 PASS superseded by currentness comment `5885642452`  
+**Review history:** PR #425 R1 `CHANGES_REQUESTED` / `5885474880`; R2 `CHANGES_REQUESTED` / `5885549492`; R3 PASS superseded by currentness comment `5885642452`; R4 `CHANGES_REQUESTED` / `5885723525`  
 
-This document is a narrow post-v0.4 architecture candidate. It does not reopen the Frozen v0.2/v0.3 product model, does not create a successor release version, and does not authorize implementation tasks until adversarial review and repository gates pass.
+This document is a narrow post-v0.4 architecture candidate. It does not reopen the Frozen v0.2/v0.3 product model, does not create a successor release version, and does not authorize implementation tasks until a new exact-head adversarial review and repository gates pass.
 
 ---
 
@@ -21,13 +21,13 @@ Read this candidate together with:
 - Frozen v0.2 PRD + L2 retained by v0.3;
 - Frozen v0.3 PRD;
 - Frozen v0.3 L2 Architecture Evidence + A1;
-- the formal v0.3 Task DAG and completed T-008/T-009/T-010/T-021 evidence;
+- formal v0.3 Task DAG and completed T-008/T-009/T-010/T-021 evidence;
 - #422 R2 currentness correction `5885381720`;
 - #423 R2 adversarial review `5885388617`;
-- open gaps #178, #182 and #138;
+- open gaps #178, #182 and narrowed #138;
 - current compiled-package implementation contracts at the pinned baseline.
 
-The reviewed authority establishes:
+The reconciled authority is:
 
 ```text
 PRODUCT_AMENDMENT_REQUIRED = NO
@@ -40,19 +40,19 @@ Only two feature decision surfaces remain:
 1. package/data integrity — #178 + #182;
 2. durable workflow-send rejection — narrowed #138.
 
-## 1.1 Explicitly out of L2 decision scope
+## 1.1 Already-frozen integration debt
 
-The following semantics are already frozen and already have production contract/core implementations:
+The following semantics are already frozen and have production contract/core implementations:
 
-- host/local Domain Tool semantics — PRD §14.1 / L2 §16.1 / T-008;
-- normal domain rejection and first-class command outcome — PRD §14.3 / L2 §16.3 / T-009;
-- idempotent instance provisioning — PRD §14.4 / L2 §16.4 / T-010.
+- #177 host/local Domain Tool semantics — PRD §14.1 / L2 §16.1 / T-008;
+- #137 normal domain rejection + command outcome — PRD §14.3 / L2 §16.3 / T-009;
+- #180 idempotent provisioning — PRD §14.4 / L2 §16.4 / T-010.
 
-Current-main deficiencies in #177/#137/#180 are integration carryovers. This candidate SHALL NOT redesign their product semantics.
+Their current-main deficiencies are integration carryovers. This candidate SHALL NOT redesign those product semantics.
 
-Historical optional ideas bundled into those issues are not implicitly authorized here. In particular this document does not add automatic initial-state execution, terminal-address reuse, or workflow-triggered auto-provisioning.
+Historical optional ideas bundled into those issues are not implicitly authorized. In particular this candidate does not add automatic initial-state execution, terminal-address reuse, or workflow-triggered auto-provisioning.
 
-## 1.2 Exact current compiled-artifact authority
+## 1.2 Current compiled-artifact authority
 
 Current production source establishes the legacy tuple:
 
@@ -62,21 +62,21 @@ runtimeContractMajor  = 2
 executionEngineMajor  = 2
 ```
 
-The compiler emits exactly that tuple. `CompiledWorkflowIRV2` is explicitly the executable IR for engine major 2. Runtime package validation currently equality-checks a package against one expected `(formatVersion, runtimeContractMajor, executionEngineMajor)` tuple.
+The current compiler emits exactly that tuple. Current `CompiledWorkflowIRV2` is the executable IR for engine major 2, and current Domain Message effects do not carry rejection routes.
 
-The successor architecture SHALL preserve legacy package identities exactly and SHALL NOT invent a second naming convention such as `target-domain-package/v2`.
+The successor architecture SHALL preserve historical package identities exactly and SHALL NOT invent a parallel naming convention such as `target-domain-package/v2`.
 
 ## 1.3 DAC boundary
 
 DAC v0.0.4.1 remains unchanged.
 
-This candidate may add behaviorally relevant material to DomainHarness target-package identity. It SHALL preserve:
+This candidate may add behaviorally relevant material to DomainHarness target-package identity, but SHALL preserve:
 
 - exact package identity;
 - non-torn `DomainActivationBinding` publication/consumption;
 - exact currentness/pinning semantics;
 - no package substitution merely because a newer compatible package exists;
-- no transfer of selection, compatibility, activation, promotion or external-authority ownership into DomainHarness package-data helpers.
+- no transfer of selection, compatibility, activation, promotion or external-authority ownership into DomainHarness helpers.
 
 ---
 
@@ -98,25 +98,30 @@ SUCCESSOR
   executionEngineMajor = 3
 ```
 
-Every other tuple fails closed as unsupported/incompatible.
+Every other tuple fails closed.
 
-`runtimeContractMajor` remains 2 because this amendment does not reopen the external Runtime/host contract major. The compiled package schema changes from `0.2` to `0.3`, and executable workflow semantics change from engine major 2 to engine major 3.
+`runtimeContractMajor` remains 2 because this amendment does not reopen the public Runtime/host contract major. The compiled package schema changes from `0.2` to `0.3`, and executable workflow semantics change from engine major 2 to engine major 3.
 
-The successor release/version name remains independent and UNSET; `formatVersion='0.3'` is a compiled-artifact schema identity, not a release name.
+`formatVersion='0.3'` is a compiled-artifact schema identity, not a product release/version name.
 
-## 2.2 Why engine major 3 is mandatory
+## 2.2 Engine major 3
 
-Current engine-major-2 authority is `CompiledWorkflowIRV2`. Its `domain-message` effect contains target/type/payload/version fields only and has no rejection route. Current engine-2 decoding is therefore not authoritative for the new total rejection-routing semantics.
+Engine-major-2 authority has no Domain Message rejection route. Required total rejection routing is therefore an incompatible executable-IR semantic and SHALL use engine major 3.
 
-The successor executable IR SHALL be `CompiledWorkflowIRV3` (exact naming may normalize in code) and SHALL be selected only for `executionEngineMajor=3`.
+Conceptually:
 
-Engine major 3 initially retains the supported invoke kinds and all unrelated engine-major-2 semantics unless this amendment explicitly changes them. The only newly authorized engine semantic in this L2 is the durable Domain Message rejection/result/route contract in §4.
+```text
+('0.2',2,2) -> CompiledWorkflowIRV2
+('0.3',2,3) -> CompiledWorkflowIRV3
+```
+
+Engine major 3 retains unrelated engine-major-2 semantics unless this amendment explicitly changes them. This L2 authorizes only the new Domain Message rejection/result/route behavior described in §4.
 
 No engine-major-2 package is reinterpreted as engine major 3.
 
 ## 2.3 Version-dispatched validation and decoding
 
-Current `CompiledPackageValidationPolicy` accepts one expected tuple. The successor Runtime must activate retained legacy packages together with new packages, so validation becomes exact-profile dispatch rather than one global equality tuple.
+Current validation accepts one expected tuple. Successor Runtime must coexist with retained legacy packages, so validation becomes exact-profile dispatch.
 
 Conceptual contract:
 
@@ -138,55 +143,52 @@ interface CompiledPackageValidationPolicy {
 Normative dispatch:
 
 ```text
-('0.2', 2, 2)
-  -> legacy manifest shape validation
-  -> legacy packageId canonicalization/compatibility behavior
+('0.2',2,2)
+  -> legacy manifest validation
+  -> historical packageId/canonicalization behavior
   -> CompiledWorkflowIRV2 decoder
 
-('0.3', 2, 3)
-  -> successor manifest shape validation
-  -> successor packageId canonicalization/integrity rules
+('0.3',2,3)
+  -> successor manifest/integrity validation
+  -> successor packageId rules
   -> CompiledWorkflowIRV3 decoder
 
 anything else
-  -> INCOMPATIBLE_PACKAGE / fail closed
+  -> incompatible / fail closed
 ```
 
-The exact tuple is read from the package itself and matched against the supported profile set before feature-specific decoding. A package cannot claim format 0.2 while being decoded under successor semantics, or claim engine 2 while using engine-3 rejection routes.
+Tuple dispatch occurs before feature-specific decoding. A package cannot claim format 0.2 while consuming successor semantics, or claim engine 2 while using engine-3 rejection routes.
 
 ## 2.4 Legacy identity preservation
 
-Current v0.2 validation contains historical canonicalization behavior that is intentionally preserved for existing package ids. The successor path SHALL NOT recompute legacy package ids under the new canonicalization rules.
+- `('0.2',2,2)` retains historical package identity/canonicalization behavior exactly.
+- `('0.3',2,3)` uses the successor identity rules in §3.
+- Runtime never synthesizes a 0.3 identity from a 0.2 package.
+- retained instance pins continue to resolve exact historical package bodies.
 
-Therefore:
+## 2.5 Shared foundation
 
-- `('0.2',2,2)` retains the existing legacy package identity algorithm byte/semantics exactly;
-- `('0.3',2,3)` uses the shared canonical JSON / portable SHA-256 identity seam defined in §3;
-- no migration process synthesizes a 0.3 package id from a 0.2 package at runtime;
-- retained instance pins continue to resolve their exact historical package bodies.
+One minimal `I-FMT-03` node SHALL precede both feature lanes. It owns only:
 
-## 2.5 Shared implementation foundation
-
-One minimal `I-FMT-03` implementation node SHALL precede both feature lanes. It owns only:
-
-- the `formatVersion='0.3'` discriminator;
-- exact supported-profile tuple types and fail-closed version dispatch;
-- v2 legacy dispatch preservation;
-- v0.3 manifest/IR decoder extension points;
-- the engine-major-3 decoder entry point/scaffold;
+- `formatVersion='0.3'` discriminator;
+- exact supported-profile tuple types;
+- fail-closed profile dispatch;
+- legacy `0.2/2/2` dispatch preservation;
+- successor manifest/IR decoder extension points;
+- engine-major-3 decoder scaffold;
 - successor package identity dispatch scaffold.
 
 `I-FMT-03` SHALL NOT implement Domain Data, Business Source, message rejection, Tool, provisioning or workflow feature semantics.
 
-Partial feature PRs may add internal successor support behind this scaffold, but the public compiler SHALL NOT emit the `('0.3',2,3)` successor tuple until the required L2-A and L2-B semantics and central assembly are complete. This prevents publication of a falsely complete successor artifact.
+Partial PRs may add internal successor support behind this scaffold, but the public compiler SHALL NOT emit `('0.3',2,3)` until §3 and §4 semantics plus central assembly are complete.
 
 ---
 
 # 3. L2-A — Package/Data Integrity
 
-## 3.1 Frozen authority to preserve
+## 3.1 Preserved authority
 
-The retained product model already requires:
+The retained model remains:
 
 ```text
 Target Compiled Domain Package
@@ -197,21 +199,21 @@ Compiled Domain Data
 + Package Identity / Compatibility Metadata
 ```
 
-Frozen v0.3 L2 further separates:
+and:
 
 ```text
 Domain Data
 =
-Domain Facts                    // mutable/current authority stays outside DomainHarness
+Domain Facts                    // current mutable authority stays outside DomainHarness
 +
 Compiled Domain Intelligence    // immutable/versioned package or registry content
 ```
 
-Therefore this amendment does not create package-owned business facts. It closes a contract contradiction: current package contracts expose projection dependencies for package-owned `domain-data` and external `business` snapshots, while the manifest does not fully declare either dependency surface.
+This amendment closes the current contradiction where projections can name `domain-data` keys and external `business` sources without complete package declarations.
 
-## 3.2 Normative successor manifest additions
+## 3.2 Successor manifest additions
 
-Conceptual additions for `formatVersion='0.3'`:
+Conceptual shape for `formatVersion='0.3'`:
 
 ```ts
 interface CompiledDomainDataDescriptor {
@@ -223,7 +225,6 @@ interface CompiledDomainDataDescriptor {
 interface CompiledBusinessSourceDescriptor {
   source: string;
   valueSchema: JsonSchema;
-  /** Present only when compiler emits executable portable validator material. */
   validatorBindingDigest?: ContentDigest;
 }
 
@@ -240,10 +241,10 @@ interface CompiledPackageManifest03 {
   runtimeContractMajor: 2;
   executionEngineMajor: 3;
   schemaContractVersion: 'domainharness-json-schema/1';
-  // retained manifest identity fields ...
   packageDataBounds: PackageDataBounds;
   domainData: readonly CompiledDomainDataDescriptor[];
   businessSources: readonly CompiledBusinessSourceDescriptor[];
+  // retained manifest fields ...
 }
 
 interface TargetCompiledDomainPackage03 {
@@ -253,87 +254,74 @@ interface TargetCompiledDomainPackage03 {
 }
 ```
 
-Exact TypeScript naming may normalize during implementation, but the logical fields and invariants are normative.
+Exact TypeScript names may normalize; logical fields/invariants are normative.
 
-`schemaContractVersion` names the exact portable DomainHarness schema dialect/subset. Version `domainharness-json-schema/1` is based on the supported DomainHarness subset of JSON Schema 2020-12. A schema using a keyword whose semantics are not supported by that exact version fails compilation rather than being silently ignored.
+`schemaContractVersion` names the exact portable schema dialect/subset. Unsupported keywords or semantics fail compilation rather than being ignored.
 
-## 3.3 Exact digest and canonicalization contract
+## 3.3 Exact digest and package identity
 
-For successor package-owned semantic material this amendment reuses the existing portable v0.3 identity seam:
+Successor semantic material reuses the existing portable canonical identity seam:
 
 ```text
 canonicalJsonStringify(value)
-→ UTF-8 text
+→ UTF-8
 → Sha256Port.digestUtf8(...)
 → ContentDigest
 ```
 
-Equivalent implementation contract: `computeCanonicalJsonDigest(value, sha256)` from `src/contracts/identity.ts`.
+Equivalent repository contract: `computeCanonicalJsonDigest(value, sha256)`.
 
-For a Domain Data value `D`:
-
-```text
-contentDigest(D)
-=
-computeCanonicalJsonDigest(D, sha256)
-```
-
-For the successor package id:
+For Domain Data value `D`:
 
 ```text
-packageId03
-=
-computeCanonicalJsonDigest(successorManifestWithoutPackageId, sha256)
+contentDigest(D) = computeCanonicalJsonDigest(D, sha256)
 ```
 
-This successor rule does not alter the legacy 0.2 package-id algorithm.
+For successor package identity:
 
-For 0.3, package identity material includes canonicalized:
+```text
+packageId03 = computeCanonicalJsonDigest(successorManifestWithoutPackageId, sha256)
+```
 
-- the exact successor tuple `('0.3',2,3)`;
-- exact `schemaContractVersion`;
+This does not modify historical 0.2 package-id behavior.
+
+Successor identity material includes:
+
+- exact tuple `('0.3',2,3)`;
+- `schemaContractVersion`;
 - `packageDataBounds`;
-- Domain Data descriptors sorted by exact `key`;
-- every Domain Data `contentDigest`;
-- Business Source descriptors sorted by exact `source`, including canonical schemas;
+- sorted Domain Data descriptors and content digests;
+- any declared Domain Data schemas;
+- sorted Business Source descriptors and canonical schemas;
 - every present `validatorBindingDigest`;
 - retained workflow/tool/projection/schema/binding semantic material and binding/content digests.
 
-Current Business Snapshot values/revisions SHALL NOT be included.
-
-Changing behaviorally relevant Domain Data bytes, schema semantics, a Business Source schema, or compiler-emitted validator executable material therefore changes successor package identity. Authoring/file enumeration order does not.
+Current Business Snapshot values/revisions SHALL NOT enter package identity.
 
 ## 3.4 Package-owned Domain Data
 
-Each `domainData` entry identifies one immutable JSON value bundled in the generated target package.
-
 Required invariants:
 
-- `key` is non-empty and unique within the package;
-- every bundled key has exactly one descriptor;
-- every descriptor has exactly one bundled value;
-- descriptor `contentDigest` exactly matches `computeCanonicalJsonDigest(value, sha256)`;
-- descriptor order does not affect semantic identity;
-- duplicate exact/normalized keys fail compilation;
-- runtime activation recomputes/verifies descriptor/value integrity before the package is admitted;
-- runtime lookup is an in-memory read of the activated package, never external I/O;
-- an instance pinned to package P1 never reads P2 Domain Data for the same logical key.
+- key is non-empty and unique under exact compiler normalization;
+- every bundled value has exactly one descriptor and vice versa;
+- descriptor digest equals exact canonical digest of bundled JSON;
+- runtime activation verifies descriptor/value integrity;
+- runtime lookup is in-memory from the exact activated package;
+- P1-pinned instances never read P2 data under the same logical key.
 
-If `valueSchema` is declared, the compiler SHALL validate the bundled value against it. Generated contract tooling MAY project a TypeScript type only where the schema can be represented without widening its semantics.
+If `valueSchema` is present, compiler validates the bundled value against it.
 
 ## 3.5 Business Source declarations
 
-`businessSources` declares the external snapshot contract that a projection is allowed to request. It does not move business-data ownership into the package.
-
 Required invariants:
 
-- `source` is non-empty and unique within the package;
+- `source` is non-empty and unique;
 - `valueSchema` is mandatory and package identity material;
-- declaration contains no current business value, credential, connection, database handle or session state;
-- current business values and revisions remain application/Business SoR authority;
-- changing a source schema changes successor package identity;
-- changing a current business value/revision does not change package identity;
-- when `validatorBindingDigest` is present, exact compiler-emitted executable validator material MUST match it and it is package identity material.
+- declarations contain no current business values, credentials, connections, database handles or session state;
+- current values/revisions remain application / Business Store / external SoR authority;
+- changing schema changes successor package identity;
+- changing current business values/revisions does not;
+- if compiler emits executable validator material, exact `validatorBindingDigest` is package identity material and activation verifies it.
 
 Provider contract remains logically:
 
@@ -342,98 +330,89 @@ Provider contract remains logically:
 → { source, selector, revision, value }
 ```
 
-with existing identity-echo/revision rules plus the schema rule below.
-
 ## 3.6 Deterministic boundedness
 
-Package-owned data and schemas are bounded compiler inputs, not an unbounded runtime ingestion surface.
+Package-owned data/schemas are bounded compiler inputs.
 
-The Target Host Profile SHALL provide exact `PackageDataBounds` used for compilation. The compiler records those bounds in the successor manifest, making the selected bounds package identity material.
+Target Host Profile supplies exact `PackageDataBounds`; compiler records them in the successor manifest so selected bounds are package identity material.
 
-Required compile-time checks:
+Compile-time checks:
 
-- Domain Data entry count <= `maxDomainDataEntries`;
-- each canonical Domain Data value byte length <= `maxDomainDataEntryCanonicalBytes`;
-- aggregate canonical Domain Data byte length <= `maxTotalDomainDataCanonicalBytes`;
+- Domain Data count <= `maxDomainDataEntries`;
+- each canonical Domain Data value <= `maxDomainDataEntryCanonicalBytes`;
+- aggregate canonical Domain Data <= `maxTotalDomainDataCanonicalBytes`;
 - Business Source count <= `maxBusinessSources`;
-- each canonical schema byte length <= `maxSchemaCanonicalBytes`.
+- each canonical schema <= `maxSchemaCanonicalBytes`.
 
-Exact numerical values are Target Host Profile decisions, not global Product constants. A profile id/bounds pair is immutable for one compiled package identity; compiler cannot silently raise limits under the same identity.
-
-Runtime activation SHALL recompute enough canonical sizes/identity material to reject corrupt packages whose actual bundled material violates recorded bounds. A host whose supported activation limits are lower than package requirements fails compatibility/activation; it does not truncate material.
+Exact numeric values are Target Host Profile decisions. Runtime activation verifies actual material against recorded bounds. A host with lower supported limits fails compatibility/activation rather than truncating.
 
 ## 3.7 Compiler dependency closure
 
-Successor compilation SHALL reject when:
+Successor compilation rejects:
 
-- projection references `{kind:'domain-data', key}` and key is undeclared/unbundled;
-- projection references `{kind:'business', source}` and source is undeclared;
-- Domain Data descriptor/value is orphaned/duplicated/ambiguous;
-- Business Source schema is missing, invalid, unsupported or over bounds;
-- Domain Data exceeds target-profile bounds;
-- generated types would silently widen an unsupported schema;
-- compiler-emitted validator material cannot be deterministically digested/bound.
+- undeclared/unbundled projection `domain-data` key;
+- undeclared projection `business` source;
+- orphaned/duplicate/ambiguous descriptor/value;
+- missing/invalid/unsupported/over-bound Business Source schema;
+- over-bound Domain Data;
+- generated types that would silently widen unsupported schema semantics;
+- emitted validator material without deterministic digest binding.
 
-No statically knowable undeclared Domain Data/Business Source error may be deferred to first projection execution.
+Statically knowable missing-key/source failures SHALL NOT be deferred to first runtime projection execution.
 
 ## 3.8 Runtime projection boundary
 
-### 3.8.1 Package-owned Domain Data
+### Package-owned Domain Data
 
-`CompiledDomainDataPort` remains a logical seam, but successor production assembly SHALL derive/bind it from the exact activated successor package. An arbitrary host-supplied out-of-band map cannot claim package-integrity conformance.
-
-Lookup remains:
+`CompiledDomainDataPort` remains a logical read seam, but successor production assembly derives it from the exact activated package. Arbitrary out-of-band host maps cannot claim successor integrity conformance.
 
 ```text
 exact packageId + declared key
-→ immutable package-owned JSON value
+→ exact immutable package-owned JSON value
 ```
 
-### 3.8.2 External Business Snapshot
+### External Business Snapshot
 
-Before a Business Snapshot reaches projection evaluation, Runtime SHALL validate its value against the exact source schema pinned by the package.
+Before projection evaluation, Runtime validates returned business value against the exact schema pinned by the package.
 
-This check is mandatory for successor conformance. Hosts MAY cache validators keyed by exact package/source/schema identity; they SHALL NOT disable validation and claim conformance.
+Validation is mandatory. Hosts may cache validators by exact package/source/schema identity, but may not disable semantic validation.
 
-Validation SHALL use exactly one identity-safe portable mode:
+Conforming implementations use one identity-safe mode:
 
-**Mode A — portable schema interpreter**
+**Mode A — portable schema interpretation**
 
-- Runtime evaluates pinned schema under exact `schemaContractVersion`;
-- implementation may differ internally by host only if conformance proves identical semantics;
-- portable core SHALL NOT acquire a mandatory Node-only dependency.
+- schema is interpreted under exact `schemaContractVersion`;
+- host implementations may differ internally only if conformance proves identical semantics;
+- portable core does not acquire mandatory Node-only dependencies.
 
-**Mode B — compiler-emitted portable validator artifact**
+**Mode B — compiler-emitted portable validator**
 
-- compiler emits portable executable validator for the exact pinned schema contract;
-- exact content digest is `validatorBindingDigest` and package identity material;
-- activation verifies artifact digest before execution;
-- Node and Expo/Hermes execute semantically equivalent validator material and pass the same fixtures.
+- validator executable material is emitted for the exact pinned schema contract;
+- exact artifact digest is `validatorBindingDigest` and package identity material;
+- activation verifies the artifact digest before execution;
+- Node and Expo/Hermes must pass identical semantic fixtures.
 
-A host SHALL NOT switch to an unbound validator with different semantics. Unsupported schema semantics fail compilation.
+A host cannot substitute an unbound validator with different semantics.
 
-Schema failure is a structured fail-closed Runtime/provider-contract failure, never an empty/stale value substitution.
+Schema violation is a structured provider-contract/runtime failure, never empty/stale substitution.
 
-Runtime cannot prove a provider's global revision discipline from one read, but SHALL preserve:
+Retained revision rule remains:
 
 ```text
 same source + selector + revision
 => semantically same snapshot value
 
 changed snapshot value
-=> provider must expose a changed revision
+=> provider exposes changed revision
 ```
 
-If Runtime directly observes one exact source/selector/revision returning conflicting canonical values within its retained evidence/cache boundary, it MUST fail closed as provider-contract violation.
+If Runtime directly observes the same exact identity/revision returning conflicting canonical values within retained evidence/cache scope, it fails closed.
 
 ## 3.9 Generated typed contracts
 
-Generated App contracts SHALL include representable types for:
+Generated contracts SHALL include exact representable types for declared Domain Data and Business Source schemas used by public projection/provider surfaces.
 
-- declared package-owned Domain Data values used by public view/projection contracts;
-- declared Business Source values used by generated integration/provider contracts.
-
-Generation remains fail-closed for schemas that cannot be projected exactly. Runtime schema validation remains authoritative even when TypeScript types are generated.
+If exact projection to the supported type system is impossible, generation fails closed for that typed surface rather than silently widening. Runtime schema validation remains authoritative.
 
 ---
 
@@ -441,28 +420,21 @@ Generation remains fail-closed for schemas that cannot be projected exactly. Run
 
 ## 4.1 Current contradiction
 
-Current `JournaledDomainMessageEffect` follows:
+Current flow is:
 
 ```text
 begin effect(status=started)
-→ target acceptance.accept(message)
+→ DomainMessageAcceptanceBoundary.accept(message)
 → complete effect with accepted ACK
 ```
 
-`DomainMessageAcceptanceBoundary.accept()` reports target rejection by throwing `MessageAcceptanceError`. Rejection before terminal effect completion may leave a `started` effect whose retry outcome depends on later target state.
+Current target rejection throws. A rejection before effect completion can leave a `started` journal record whose retry observes changed target state.
 
-Retained semantics require:
+Retained semantics require durable effect facts, normal rejection distinct from technical failure, deterministic replay after semantic commit, and no poisoning of a healthy source merely because the exact target rejects.
 
-- workflow-to-workflow messages are durable Runtime effects;
-- normal domain rejection is distinct from technical failure;
-- committed semantic results replay deterministically;
-- healthy source instance is not poisoned merely because target validly rejects.
+## 4.2 Engine-major-3 Domain Message IR
 
-## 4.2 Engine-major-3 IR extension
-
-Successor `CompiledWorkflowIRV3` keeps engine-major-2 unrelated semantics and adds an authoritative total rejection route to each compiled Domain Message effect.
-
-Conceptual shape:
+Successor `CompiledWorkflowIRV3` extends Domain Message effects with total rejection routing:
 
 ```ts
 interface CompiledDomainMessageEffectV3 {
@@ -475,14 +447,14 @@ interface CompiledDomainMessageEffectV3 {
 }
 ```
 
-Compiler/decoder rules for engine major 3:
+Compiler/decoder rules:
 
-- `rejected` is mandatory for each Domain Message effect;
-- it is non-empty;
-- final route is unconditional, making handling total;
-- routes target declared workflow states;
-- invalid/empty/non-total rejection routing fails compilation/activation;
-- engine-major-2 definitions remain decoded only by `CompiledWorkflowIRV2` and do not gain this field semantically.
+- `rejected` is mandatory and non-empty;
+- zero or more conditional routes may precede fallback;
+- final route is unconditional, making rejection handling total;
+- every route targets a declared state;
+- invalid/non-total routing fails compile/activation;
+- engine-major-2 definitions remain v2 IR and do not gain this field semantically.
 
 ## 4.3 Acceptance result contract
 
@@ -506,38 +478,32 @@ type DomainMessageAcceptanceTransientCode =
   | 'target_recovery_required';
 ```
 
-Existing `target_not_accepting` MUST be refined enough to distinguish terminal from recovery-required/transient inability.
+Current generic `target_not_accepting` must be refined enough to distinguish terminal from recovery-required/transient inability.
 
-Technical/integrity failures remain distinct:
+Pinned-package corruption/missing, store invariant failure, malformed durable records, unknown Runtime/transport failure, and invalid source-effect construction remain technical/integrity failures.
 
-- pinned package missing/corrupt;
-- store invariant violation;
-- malformed persisted journal/acceptance data;
-- unknown Runtime/transport failure;
-- invalid source effect construction.
-
-## 4.4 Permanent vs transient classification
+## 4.4 Permanent vs transient
 
 Permanent for the exact attempted child identity under current frozen invariants:
 
-- target terminal;
+- existing target is terminal;
 - workflow absent from target's exact pinned package;
 - message contract absent from exact pinned workflow/package;
-- incompatible requested contract version;
+- requested contract version incompatible;
 - payload violates exact pinned message contract.
 
-`target_terminal` is permanent because current frozen instance semantics do not rebind/reuse the same exact `WorkflowAddress` after terminal completion/termination. Future address reuse requires a new Product/L2 decision and reclassification or stronger rejection receipt.
+`target_terminal` is permanent because current frozen semantics do not reuse/rebind the same exact WorkflowAddress after terminal completion/termination. Any future address-reuse feature must revisit this classification or add a stronger durable rejection receipt.
 
 Transient/recovery-owned:
 
-- `target_not_found` — explicit provisioning may later create address;
-- `target_recovery_required` — target may recover.
+- `target_not_found` — separately authorized provisioning may create the address later;
+- `target_recovery_required` — same target may recover later.
 
-Retry for transient conditions SHALL reuse the same child message identity. Technical failures are never fabricated into semantic rejection.
+Transient retries reuse the same child message identity. Technical failures are never fabricated into semantic rejection.
 
-## 4.5 Effect journal result
+## 4.5 Effect journal outcome
 
-Terminal Domain Message effect result:
+Terminal semantic outcome:
 
 ```ts
 type DomainMessageEffectOutcome =
@@ -545,98 +511,83 @@ type DomainMessageEffectOutcome =
   | { status: 'rejected'; rejection: DomainMessageAcceptanceRejection };
 ```
 
-Both variants are stored under terminal `EffectJournalRecord.status='completed'` with structured durable output. Transient target conditions are not completed semantic outcomes.
+Both variants are stored under terminal `EffectJournalRecord.status='completed'` with structured output. Transient target conditions are not terminal semantic outcomes.
 
-Journal identity remains bound to:
+Journal identity remains bound to effect/source/state identity, derived child message id, resolved target, message type/version and payload identity.
 
-- effect id;
-- source workflow address;
-- source message id;
-- state/effect execution identity;
-- exact child `messageId` derived from effect identity;
-- resolved target;
-- message type/contract version/payload identity.
-
-Replay of completed rejection returns same rejection without target acceptance call. Conflicting completed record fails closed.
+Completed rejection replay returns the same rejection without re-consulting target acceptance. Conflicting terminal material fails closed.
 
 ## 4.6 Explicit total rejection routing
 
-A permanent child-send rejection is normal domain-level effect result, not Runtime crash, and MUST NOT be implicitly converted into whole-source-command rejection after prior effects may have committed.
+A permanent child-send rejection is a normal domain-level **effect result**, not implicitly the whole source-command result.
 
 Execution semantics:
 
-1. accepted child send → durably complete accepted effect → child-accepted notification → continue old state's normal execution;
-2. permanent rejection → durably complete rejection → select declared total `rejected` route → transition;
+1. accepted send → durably complete accepted effect → child-accepted observation → continue old-state execution;
+2. permanent rejection → durably complete rejected effect → select declared total `rejected` route → transition;
 3. after rejection route selection, remaining old-state message effects and invoke path are not executed;
-4. prior committed effects remain committed and replay from journals;
-5. transient target condition → no rejection route; retry/recovery ownership;
-6. technical/integrity failure → no fabricated domain rejection; existing fail-closed recovery/failure semantics.
+4. prior committed sibling effects remain committed/replayable;
+5. transient target condition → no rejection route; existing retry/recovery ownership;
+6. technical/integrity failure → no fabricated domain rejection.
 
-There is no default `no rejected route => reject whole source command` behavior because engine-major-3 IR makes rejection routing total at compile time.
+There is no `no rejected route => reject whole source command` behavior because engine-major-3 compilation makes routing total.
 
-T-009 remains source-command outcome authority. Final source command outcome follows the state/command resolution reached after explicit rejection routing; child rejection does not erase already committed work.
+T-009 remains source-command outcome authority. Final source outcome follows state/command resolution reached after explicit rejection routing; child rejection does not erase already committed work.
 
-## 4.7 Replay / crash ordering
-
-Required ordering:
+## 4.7 Replay and crash ordering
 
 ```text
 begin effect
 → attempt target acceptance
 → accepted OR permanent-rejected semantic result
-→ durably complete effect result
+→ durably complete semantic effect result
 → only then allow rejection-route/source-state/command-outcome commit
 ```
 
-Crash after target acceptance before effect completion reuses idempotent child `messageId`; duplicate acceptance is safe.
-
-Crash after permanent rejection completion replays rejection without target re-consultation.
-
-Missing/recovery-required target is transient, so recovery may retry same child identity.
-
-Crash after a prior sibling effect committed preserves that fact; explicit rejection route prevents false claims that earlier work did not happen.
+- accepted target + crash before source effect completion → retry reuses derived child message id; duplicate ACK converges;
+- permanent rejection + crash before source effect completion → retry may re-evaluate because no semantic fact was committed;
+- permanent rejection after effect completion → replay exact rejection without target consultation;
+- missing/recovery-required target → no permanent fact; later same child identity may legitimately become accepted;
+- prior sibling effect already committed → remains committed across later child rejection/recovery.
 
 ## 4.8 No implicit provisioning
 
-This amendment creates no `open-or-send`, `ensure-and-send` or automatic target creation.
+No `open-or-send`, `ensure-and-send` or automatic target creation is introduced.
 
-T-010 provisioning remains separate explicit Runtime capability. Future workflow-triggered provisioning requires its own Product decision covering authority, idempotency key, package selection, initial input, failure handling and durable composition.
+T-010 provisioning remains separate. Workflow-triggered provisioning, if ever desired, requires a separate Product decision for authority, idempotency identity, package selection, initial input, failure handling and durable composition.
 
 ---
 
-# 5. Migration / Coexistence Rules
+# 5. Migration and Coexistence
 
 ## 5.1 Runtime activation matrix
 
-One Runtime may have simultaneously:
+One Runtime may simultaneously contain:
 
 - retained instances pinned to exact `('0.2',2,2)` packages;
 - new instances pinned to exact `('0.3',2,3)` packages.
 
-Activation preflight SHALL validate each package through the decoder/canonicalization path selected by its exact tuple. A single Runtime activation does not require all retained packages to share one format/engine tuple.
+Each package is validated/decoded through the exact profile selected by its tuple. Runtime activation does not require all retained packages to share one tuple.
 
 ## 5.2 Compiler publication rule
 
-Feature PRs may implement internal 0.3/engine-3 support incrementally, but the public compiler SHALL continue emitting legacy `('0.2',2,2)` until:
+Feature PRs may implement internal successor support incrementally, but public compiler continues emitting legacy `('0.2',2,2)` until:
 
-- `I-FMT-03` tuple/decoder/identity dispatch exists;
+- `I-FMT-03` exists;
 - `I-PKG-DATA` and `I-BIZ-SRC` are complete;
-- `I-MSG-REJECT` engine-3 rejection semantics are complete;
-- central `I-03-ASSEMBLY` verifies the exact successor manifest/IR as one coherent artifact.
+- `I-MSG-REJECT` engine-3 semantics are complete;
+- central `I-03-ASSEMBLY` proves one coherent successor artifact.
 
-Only `I-03-ASSEMBLY` may switch the public compiler emission path to successor `('0.3',2,3)`.
+Only `I-03-ASSEMBLY` may switch public compiler emission to `('0.3',2,3)`.
 
-This preserves main-branch safety and one-concern PR boundaries.
+## 5.3 Exact pin/currentness
 
-## 5.3 Package selection/currentness
-
-Compatibility metadata may describe behavioral compatibility for **new selection**, but:
-
-- compatibility never rewrites a retained instance pin;
-- 0.2 package is never synthesized/reinterpreted as 0.3;
-- 0.3 package is never decoded as engine 2;
-- package body/Domain Data/schemas/validator material/bindings must all belong to one exact package identity;
-- DAC activation/currentness continues to carry one coherent exact package identity.
+- compatibility may authorize a successor package for **new selection** through existing authority only;
+- compatibility never rewrites retained pins;
+- 0.2 is never synthesized/reinterpreted as 0.3;
+- 0.3 is never decoded as engine 2;
+- manifest, Domain Data, schemas, validator material and bindings must all belong to one exact package identity;
+- DAC currentness/activation evidence continues to carry one coherent exact package.
 
 ---
 
@@ -645,31 +596,31 @@ Compatibility metadata may describe behavioral compatibility for **new selection
 | Surface | Condition | Required disposition |
 |---|---|---|
 | package tuple | unsupported format/runtime/engine tuple | incompatible / fail closed |
-| legacy package | 0.2 package routed to successor canonicalizer/IR | fail closed; forbidden dispatch |
-| successor package | 0.3 package claims engine 2 | fail closed |
+| legacy package | 0.2 routed to successor canonicalizer/IR | forbidden / fail closed |
+| successor package | 0.3 claims engine 2 | fail closed |
 | package compile | undeclared Domain Data key | fail compile |
 | package compile | undeclared Business Source | fail compile |
-| package compile | unsupported/invalid/duplicate descriptor/schema | fail compile |
-| package compile | data/schema exceeds target bounds | fail compile |
+| package compile | invalid/duplicate/orphaned descriptor/schema | fail compile |
+| package compile | data/schema exceeds recorded bounds | fail compile |
 | package compile | emitted validator digest cannot be bound | fail compile |
-| package activation | Domain Data/validator digest/size/bounds mismatch | fail activation |
+| package activation | Domain Data/validator digest or bounds mismatch | fail activation |
 | business snapshot | value violates pinned schema | provider-contract/runtime failure |
-| business snapshot | same observed revision returns conflicting value | provider-contract/runtime failure |
+| business snapshot | same observed revision conflicts | provider-contract/runtime failure |
 | engine-3 compile | rejection route absent/non-total | fail compile |
 | child send | target terminal | durable semantic rejection |
-| child send | workflow/message-contract/version/payload rejection | durable semantic rejection |
-| child send | target missing | retry/recovery-owned transient condition |
-| child send | target recovery-required | retry/recovery-owned transient condition |
-| child send | pinned package/store invariant failure | technical/integrity failure |
+| child send | exact workflow/message-contract/version/payload rejection | durable semantic rejection |
+| child send | target missing | retry/provisioning-owned transient |
+| child send | target recovery-required | retry/recovery-owned transient |
+| child send | package/store invariant failure | technical/integrity failure |
 | journal replay | completed rejection identity mismatch | fail closed journal invariant |
 
-No failure class is silently downgraded to success and no technical failure is laundered into domain rejection.
+No technical failure is laundered into domain rejection and no transient condition is frozen into a permanent semantic fact.
 
 ---
 
 # 7. DAC v0.0.4.1 Boundary Proof
 
-This amendment changes DomainHarness compiled package identity inputs, validator dispatch and executable workflow behavior only.
+This amendment changes DomainHarness compiled-package identity inputs, profile dispatch and executable workflow behavior only.
 
 It does not change DAC ownership of:
 
@@ -679,7 +630,7 @@ It does not change DAC ownership of:
 - authority adoption/refusal;
 - Runtime binding/activation authority boundaries.
 
-For successor packages, the exact 0.3 package id becomes the package identity carried by existing activation/binding paths.
+For successor packages, exact 0.3 package id is carried by existing activation/binding paths.
 
 The non-torn rule remains:
 
@@ -688,155 +639,174 @@ selected/adopted exact package identity
 + exact tuple
 + exact package body/digests
 + exact Domain Data / schemas / validator material / bindings
-+ activation binding/currentness evidence
++ exact activation/currentness evidence
 ```
 
 must refer to one coherent exact package.
 
-Legacy retained package validation remains isolated on its historical identity path; successor semantics never rewrite historical package ids.
+Legacy retained package validation remains isolated on historical identity semantics. Successor semantics never rewrite historical package ids.
 
 `DAC_CONTRACT_CHANGE_REQUIRED = NO`.
 
 ---
 
-# 8. Adversarial Review Vectors
+# 8. Required Adversarial Review Vectors
 
-Review SHALL attempt to falsify at least:
+The exact-head review SHALL attempt to falsify at least:
 
-1. **Version reinterpretation** — can a 0.2 package be decoded under successor semantics?
-2. **Engine-major laundering** — can rejection routes appear under engine major 2 or be ignored by V2 decoder?
-3. **Mixed retained activation** — can 0.2 retained pins and 0.3 new packages coexist without one global tuple rejecting one side?
-4. **Legacy identity drift** — does successor canonicalization change historical package ids?
-5. **Fact-authority theft** — can declarations make current Business Facts package-owned?
-6. **Identity omission** — can Domain Data/schema/validator behavior change without successor package id changing?
-7. **Order instability** — can file/enumeration order change successor identity?
-8. **Retained-pin tear** — can retained instance read newer package data/schema/validator under old pin?
-9. **Schema-version ambiguity** — can validation run without exact schemaContractVersion?
-10. **Schema bypass** — can Business Snapshot reach projection without validation?
-11. **Validator substitution** — can executable validator material change without exact identity change?
-12. **Portable validator drift** — can Node/Expo accept different values for same pinned schema?
-13. **Resource exhaustion** — can package data/schema bypass target bounds?
-14. **Static gap deferral** — can undeclared key/source survive compilation?
-15. **Format ownership race** — can #178/#138 independently redefine successor tuple/decoder?
-16. **Premature compiler publication** — can partial 0.3 semantics be emitted before central assembly?
-17. **Rejection timing race** — can permanent rejection remain started and later replay accepted?
-18. **Missing-target race** — can absent target be frozen permanent before later provisioning?
-19. **Transient misclassification** — can recovery-required be frozen permanent?
-20. **Technical-error laundering** — can corruption become normal domain rejection?
-21. **Source poisoning** — does valid target rejection force healthy source into recovery_required?
-22. **Blind retry** — can completed rejection call acceptance twice?
-23. **Partial-effect misreporting** — can prior committed effects be erased/mislabeled?
-24. **Rejection-route hole** — can conditional routes all miss?
-25. **Implicit provisioning** — can send handling create target without explicit provisioning authority?
-26. **DAC authority drift** — do manifest fields/version dispatch confer selection/activation authority?
-27. **Terminal-address future drift** — would future address reuse invalidate permanence without new decision?
+1. **Version currentness** — do source compiler/validator/IR facts really match `0.2/2/2`, and does successor require `0.3/2/3` rather than in-place reinterpretation?
+2. **Legacy identity preservation** — can a 0.2 package be recomputed or decoded under 0.3 rules?
+3. **Profile tear** — can tuple validation select one profile while decoder/canonicalizer uses another?
+4. **Fact-authority theft** — can package declarations accidentally make current Business Facts package-owned?
+5. **Identity omission** — can Domain Data/schema/validator behavior change without successor package id changing?
+6. **Digest ambiguity** — can two supported hosts compute different digest material for the same semantic JSON?
+7. **Bounds bypass** — can actual package data/schema exceed identity-bound limits after compilation?
+8. **Retained-pin tear** — can a retained instance read newer package data/schema under an old pin?
+9. **Schema divergence** — can Node and Expo validate the same declared schema differently while claiming conformance?
+10. **Validator substitution** — can emitted executable validator bytes change without identity change?
+11. **Static-gap deferral** — can undeclared key/source survive compilation?
+12. **Absent-target race** — can `target_not_found` be frozen permanent and contradicted by later authorized provisioning?
+13. **Rejection crash race** — can a committed permanent rejection later replay as accepted?
+14. **Transient misclassification** — can recovery-required become permanent rejection?
+15. **Technical-error laundering** — can package/store corruption become normal rejection?
+16. **Partial-effect mislabel** — can a later rejected child effect erase/mislabel prior committed sibling effects?
+17. **Unhandled rejection** — can a conforming engine-3 package omit total rejection routing?
+18. **Implicit provisioning** — can send handling create a target without separately authorized provisioning?
+19. **DAC drift** — do new package fields or profile dispatch confer selection/adoption/activation authority?
+20. **DAG/write-set race** — can #178 and #138 independently redefine shared 0.3 format/decoder scaffolding?
 
 P0/P1 findings block freeze.
 
 ---
 
-# 9. Review Finding Reconciliation
-
-## 9.1 R1 — `5885474880`
-
-| Finding | Resolution |
-|---|---|
-| target_not_found timing race | transient/recovery-owned; no permanent receipt fabricated |
-| implicit whole-turn rejection | removed; engine 3 requires total explicit rejection routing |
-| digest under-specified | existing canonical JSON / portable SHA-256 seam |
-| portable validation boundary | mandatory portable semantics + Node/Expo parity |
-| data/schema bounds | Target Host Profile bounds + compile/activation checks |
-
-## 9.2 R2 — `5885549492`
-
-| Finding | Resolution |
-|---|---|
-| shared successor format dependency | one shared foundation, now corrected to `I-FMT-03` |
-| implicit schema contract version | explicit `schemaContractVersion` identity field |
-| emitted validator integrity | exact `validatorBindingDigest`, identity-bound and activation-verified |
-
-## 9.3 R3 currentness supersession — `5885642452`
-
-| Finding | Resolution |
-|---|---|
-| invented `target-domain-package/v3` convention | aligned successor format to repository convention `formatVersion='0.3'`; legacy remains exact `'0.2'` |
-| new rejection semantics hidden inside engine major 2 | successor tuple requires `executionEngineMajor=3`; engine-2 IR remains legacy-only |
-| single validation tuple cannot preserve retained migration | successor policy is exact supported-profile dispatch over legacy `('0.2',2,2)` and successor `('0.3',2,3)` |
-
----
-
-# 10. Post-freeze Implementation Carryover Map
-
-The following DAG is a proposal only:
+# 9. Post-freeze Implementation Carryover / Proposed Task DAG
 
 ```text
-NOT_AUTHORIZED_UNTIL_THIS L2 REVIEW PASSES
+NOT_AUTHORIZED_UNTIL_REVIEW_PASS_AND_EXACT_HEAD_REPOSITORY_GATE
 
-I-FMT-03
-  exact tuple/profile dispatch
-  legacy 0.2 identity preservation
-  successor 0.3 identity/decoder scaffolding
-  engine-3 decoder entry scaffold
-      │
-      ├──────────────────────────────┐
-      ▼                              ▼
-I-PKG-DATA #178                  I-REJECT #137
-      │                         existing T-009 integration debt
-      ▼                              │
-I-BIZ-SRC #182                    │
-      │                            ▼
-      │                       I-MSG-REJECT #138
-      │                       (also depends I-FMT-03)
-      └──────────────┬─────────────┘
-                     ▼
-               I-03-ASSEMBLY
-        enable public compiler emission
-        of exact ('0.3',2,3) only here
+                 I-FMT-03
+                 /      \
+                v        v
+        I-PKG-DATA     I-MSG-REJECT
+            |          ^
+            v          |
+        I-BIZ-SRC   I-REJECT (#137 integration debt)
 
-Parallel already-frozen integration debt after materialization:
-  I-LOCAL #177 retained Runtime host-local Tool wiring
-  I-OPEN  #180 DomainRuntime open/ensure integration
-
-All implementation nodes
-      ↓
-central Runtime/public reconciliation
-      ↓
-Node + Expo real-host validation
-      ↓
-package/migration/cross-host validation
-      ↓
-Version Closure
+I-LOCAL (#177 integration debt)     I-OPEN (#180 integration debt)
+          \                |                /
+           \               |               /
+            +---------- I-03-ASSEMBLY -----+
+                           |
+             +-------------+-------------+
+             v                           v
+      Node host validation        Expo/Hermes validation
+             \                           /
+              +----------+--------------+
+                         v
+              cross-host / migration
+                         v
+                  Version Closure
 ```
 
-Dependency form:
+Dependencies:
 
 ```text
 I-FMT-03 -> I-PKG-DATA -> I-BIZ-SRC
 I-FMT-03 + I-REJECT -> I-MSG-REJECT
-I-BIZ-SRC + I-MSG-REJECT -> I-03-ASSEMBLY
-I-LOCAL || I-REJECT || I-OPEN may execute in parallel after task materialization
+I-FMT-03 + I-PKG-DATA + I-BIZ-SRC + I-MSG-REJECT
+  + I-LOCAL + I-REJECT + I-OPEN
+  -> I-03-ASSEMBLY
 ```
 
-`I-FMT-03` owns only exact version/identity/decoder dispatch scaffolding. `I-03-ASSEMBLY` is the only node authorized to switch public compiler output from legacy tuple to successor tuple.
+## 9.1 Node ownership
 
-`I-LOCAL`, `I-REJECT`, `I-OPEN` do not require new Product/L2 authority; their L3 must cite T-008/T-009/T-010 and prove production entry points consume those existing contracts.
+### I-FMT-03
 
-Exact one-concern implementation Issues may be materialized only after adversarial review/freeze of this document and exact-head repository gate PASS.
+Own only tuple/profile/version dispatch, legacy preservation, successor decoder/identity scaffolding. No feature semantics.
+
+### I-PKG-DATA
+
+Own #178 successor Domain Data descriptors/bundled content/digest/bounds/compiler dependency closure.
+
+### I-BIZ-SRC
+
+Depends on I-PKG-DATA. Own #182 Business Source declarations, portable schema contract, validator identity and runtime projection validation.
+
+### I-REJECT
+
+Existing #137 integration debt. Consume already-frozen T-009 normal-rejection semantics in actual production runtime entry path. No new Product/L2 decision.
+
+### I-MSG-REJECT
+
+Depends on I-FMT-03 + I-REJECT. Own narrowed #138 engine-3 typed acceptance, durable rejection outcome, total rejection routing, replay/crash semantics. No provisioning.
+
+### I-LOCAL
+
+Existing #177 integration debt. Consume T-008 host-local Tool contract/core in retained/production Runtime path.
+
+### I-OPEN
+
+Existing #180 integration debt. Consume T-010 idempotent provisioning contract/core in public Runtime path. No automatic initial-state or address-reuse expansion.
+
+### I-03-ASSEMBLY
+
+The only node allowed to publish coherent successor compiler/runtime assembly and switch public compiler output to `('0.3',2,3)`. Must not absorb new feature semantics.
+
+## 9.2 One-concern / one-PR rule
+
+Each node is one concern / one PR. Shared decoder/version files belong to I-FMT-03 or I-03-ASSEMBLY; feature PRs SHALL NOT independently redefine the tuple contract.
+
+Implementation Issues are **not yet materialized or authorized** by this document alone.
+
+---
+
+# 10. Validation Ownership
+
+This L2 draft/review is static GitHub work; no local Build Host is required.
+
+Later implementation/release qualification must include:
+
+- deterministic compiler/package identity and migration fixtures;
+- focused profile-dispatch and corruption negatives;
+- Node and Expo/Hermes equivalent schema-validation fixtures;
+- real exact-package activation/currentness validation;
+- real durable-store restart/crash-window validation for workflow-send rejection;
+- cross-host `0.2/2/2` retained + `0.3/2/3` coexistence validation;
+- packaging/installability and full repository regression at closure.
+
+Mock/in-memory tests may prove deterministic contract logic but do not prove real restart durability.
 
 ---
 
 # 11. Review / Freeze Rule
 
-This document is not frozen merely because it is committed or has a PR.
+This document is not frozen merely because it is committed, reviewed on an older SHA, or has a PR.
 
-Freeze requires:
+Freeze requires all of:
 
-- exact-head adversarial review;
-- P0=0 and P1=0;
-- explicit reconciliation of every review finding;
-- exact document commit/blob identity;
-- exact-head repository gate PASS;
-- confirmation Product amendment remains unnecessary;
-- confirmation DAC contract change remains unnecessary.
+```text
+DOCUMENT_EXACT_HEAD = current PR HEAD
+DOCUMENT_BLOB       = exact reviewed document blob
+ADVERSARIAL_REVIEW  = PASS on that exact HEAD
+P0                  = 0
+P1                  = 0
+REPOSITORY_GATE     = terminal PASS on the same exact HEAD (or explicit governance-authorized disposition)
+PRODUCT_AMENDMENT_REQUIRED = NO confirmed
+DAC_CONTRACT_CHANGE_REQUIRED = NO confirmed
+```
 
-Only then may coordinator create implementation Issues or name/freeze a successor release lane.
+Any document change supersedes older review/CI evidence.
+
+Only after freeze record is written may the coordinator:
+
+- materialize implementation Issues from §9;
+- create a successor integration lane;
+- choose/name a successor release version.
+
+Until then:
+
+```text
+IMPLEMENTATION_ISSUES_AUTHORIZED = NO
+SUCCESSOR_INTEGRATION_BRANCH     = NO
+SUCCESSOR_RELEASE_VERSION        = UNSET
+```
