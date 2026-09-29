@@ -179,3 +179,25 @@ test('I-PKG-DATA: non-canonical accessor material fails without invoking getter'
   );
   assert.equal(getterInvoked, false);
 });
+
+test('I-PKG-DATA: async digest-time caller mutation cannot alter the validated snapshot', async () => {
+  const a: JsonValue = { n: 1 };
+  const b: JsonValue = { n: 2 };
+  const section = {
+    descriptors: [await descriptor('a', a), await descriptor('b', b)],
+    values: { a, b } as Record<string, JsonValue>,
+    packageDataBounds: DEFAULT_BOUNDS,
+  };
+  let calls = 0;
+  const mutatingSha = {
+    async digestUtf8(value: string): Promise<string> {
+      calls += 1;
+      if (calls === 1) section.values.b = { n: 999 };
+      return `fixture-sha256:${value}`;
+    },
+  };
+
+  const validated = await validateCompiledDomainDataSection(section, mutatingSha);
+  assert.deepEqual(section.values.b, { n: 999 });
+  assert.deepEqual(validated.values.b, { n: 2 });
+});
