@@ -1,5 +1,4 @@
-import type { ErrorObject, ValidateFunction } from 'ajv';
-import { Ajv2020 } from 'ajv/dist/2020.js';
+import { compileSchema, draft2020 } from 'json-schema-library';
 
 import { canonicalJsonStringify } from '../contracts/identity.js';
 import type { JsonSchema, JsonValue } from '../contracts/json.js';
@@ -24,6 +23,18 @@ export class DomainHarnessJsonSchemaV1Error extends Error {
   }
 }
 
+const DRAFT_2020_12_KEYWORDS = new Set([
+  '$schema', '$id', '$ref', '$anchor', '$dynamicRef', '$dynamicAnchor', '$defs', '$comment',
+  'prefixItems', 'items', 'contains', 'additionalProperties', 'properties', 'patternProperties',
+  'dependentSchemas', 'propertyNames', 'if', 'then', 'else', 'allOf', 'anyOf', 'oneOf', 'not',
+  'unevaluatedItems', 'unevaluatedProperties',
+  'type', 'const', 'enum', 'multipleOf', 'maximum', 'exclusiveMaximum', 'minimum', 'exclusiveMinimum',
+  'maxLength', 'minLength', 'pattern', 'maxItems', 'minItems', 'uniqueItems', 'maxContains',
+  'minContains', 'maxProperties', 'minProperties', 'required', 'dependentRequired',
+  'title', 'description', 'default', 'deprecated', 'readOnly', 'writeOnly', 'examples',
+  'format', 'contentEncoding', 'contentMediaType', 'contentSchema',
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -32,12 +43,17 @@ function invalidSchema(message: string, details: readonly string[] = []): never 
   throw new DomainHarnessJsonSchemaV1Error('INVALID_SCHEMA_CONTRACT', message, details);
 }
 
-function inspectSchemaContract(value: unknown, path: string): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => inspectSchemaContract(entry, `${path}[${index}]`));
-    return;
-  }
+function inspectActualSchemaNode(value: unknown, path: string): void {
   if (!isRecord(value)) return;
+
+  for (const key of Object.keys(value)) {
+    if (key === '$vocabulary') {
+      invalidSchema(`${path}.$vocabulary is forbidden by ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`);
+    }
+    if (!DRAFT_2020_12_KEYWORDS.has(key)) {
+      invalidSchema(`${path} contains unknown/custom keyword '${key}'`);
+    }
+  }
 
   if (Object.prototype.hasOwnProperty.call(value, '$schema')
     && value.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI) {
@@ -46,28 +62,18 @@ function inspectSchemaContract(value: unknown, path: string): void {
     );
   }
 
-  if (Object.prototype.hasOwnProperty.call(value, '$ref')
-    && (typeof value.$ref !== 'string' || !value.$ref.startsWith('#'))) {
-    invalidSchema(`${path}.$ref must be a package-local fragment reference`);
-  }
-
-  // v1 deliberately authorizes only ordinary local `$ref`/`$defs` reference
-  // semantics. Dynamic-reference/vocabulary negotiation would enlarge the
-  // accept/reject contract beyond the frozen portable profile.
-  for (const forbidden of ['$dynamicRef', '$dynamicAnchor', '$vocabulary'] as const) {
-    if (Object.prototype.hasOwnProperty.call(value, forbidden)) {
-      invalidSchema(`${path}.${forbidden} is forbidden by ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`);
+  for (const keyword of ['$ref', '$dynamicRef'] as const) {
+    if (!Object.prototype.hasOwnProperty.call(value, keyword)) continue;
+    const reference = value[keyword];
+    if (typeof reference !== 'string' || !reference.startsWith('#')) {
+      invalidSchema(`${path}.${keyword} must be a package-local fragment reference`);
     }
-  }
-
-  for (const [key, child] of Object.entries(value)) {
-    inspectSchemaContract(child, `${path}.${key}`);
   }
 }
 
-function formatErrors(errors: ErrorObject[] | null | undefined): string[] {
-  if (!errors?.length) return ['validation failed'];
-  return errors.map((error) => `${error.instancePath || '/'} ${error.message ?? error.keyword}`);
+function validationErrorDetails(errors: readonly { readonly message?: string; readonly data?: { readonly pointer?: string } }[]): string[] {
+  if (errors.length === 0) return ['validation failed'];
+  return errors.map((error) => `${error.data?.pointer ?? '#'} ${error.message ?? 'validation failed'}`);
 }
 
 /** Portable UTF-8 byte length without Node Buffer/TextEncoder dependencies. */
@@ -100,9 +106,18 @@ export function canonicalSchemaUtf8ByteLength(schema: JsonSchema): number {
   return portableUtf8ByteLength(canonicalJsonStringify(schema));
 }
 
-/** Authoritative Mode-A interpreter for `domainharness-json-schema/1`. */
+type CompiledPortableSchema = ReturnType<typeof compileSchema>;
+
+/**
+ * Authoritative Mode-A portable interpreter for `domainharness-json-schema/1`.
+ *
+ * The pinned interpreter executes the schema directly and does not use Ajv's
+ * runtime `Function` code generation path. DomainHarness owns the exact profile
+ * restrictions around the interpreter so package identity is not delegated to
+ * library defaults.
+ */
 export class DomainHarnessJsonSchemaV1Validator {
-  private readonly compiled = new Map<string, ValidateFunction>();
+  private readonly compiled = new Map<string, CompiledPortableSchema>();
 
   normalizeSchema(value: unknown): JsonSchema {
     let canonicalText: string;
@@ -116,7 +131,10 @@ export class DomainHarnessJsonSchemaV1Validator {
 
     const normalized = JSON.parse(canonicalText) as unknown;
     if (!isRecord(normalized)) invalidSchema('schema root must be a JSON object');
-    inspectSchemaContract(normalized, '$');
+    if (Object.prototype.hasOwnProperty.call(normalized, '$schema')
+      && normalized.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI) {
+      invalidSchema(`$.$schema must be omitted or exactly ${JSON_SCHEMA_DRAFT_2020_12_URI}`);
+    }
     this.compileCanonical(canonicalText, normalized as JsonSchema);
     return normalized as JsonSchema;
   }
@@ -135,28 +153,49 @@ export class DomainHarnessJsonSchemaV1Validator {
         [error instanceof Error ? error.message : String(error)],
       );
     }
+
     const snapshot = JSON.parse(valueText) as JsonValue;
-    const validate = this.compileCanonical(schemaText, normalizedSchema);
-    if (!validate(snapshot)) {
+    const compiled = this.compileCanonical(schemaText, normalizedSchema);
+    const result = compiled.validate(snapshot);
+    if (!result.valid) {
       throw new DomainHarnessJsonSchemaV1Error(
         'INSTANCE_VALIDATION_FAILED',
         `${label} does not satisfy ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`,
-        formatErrors(validate.errors),
+        validationErrorDetails(result.errors),
       );
     }
     return snapshot;
   }
 
-  private compileCanonical(canonicalText: string, schema: JsonSchema): ValidateFunction {
+  private compileCanonical(canonicalText: string, schema: JsonSchema): CompiledPortableSchema {
     const cached = this.compiled.get(canonicalText);
     if (cached) return cached;
 
     try {
-      const ajv = new Ajv2020({ strict: true, allErrors: true, validateFormats: false });
-      const validate = ajv.compile(schema);
-      this.compiled.set(canonicalText, validate);
-      return validate;
+      const compiled = compileSchema(schema as never, {
+        drafts: [draft2020],
+        formatAssertion: false,
+        throwOnInvalidSchema: true,
+        throwOnInvalidRef: true,
+        withSchemaAnnotations: true,
+      });
+
+      for (const node of compiled.toSchemaNodes()) {
+        inspectActualSchemaNode(node.schema, node.schemaLocation ?? '#');
+      }
+      const unknownAnnotations = compiled.schemaAnnotations.filter(
+        (annotation) => annotation.code === 'unknown-keyword-warning',
+      );
+      if (unknownAnnotations.length > 0) {
+        invalidSchema('schema contains unknown/custom keywords', unknownAnnotations.map(
+          (annotation) => annotation.message,
+        ));
+      }
+
+      this.compiled.set(canonicalText, compiled);
+      return compiled;
     } catch (error) {
+      if (error instanceof DomainHarnessJsonSchemaV1Error) throw error;
       invalidSchema(`schema is not valid under ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`, [
         error instanceof Error ? error.message : String(error),
       ]);
