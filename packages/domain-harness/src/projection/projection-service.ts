@@ -64,17 +64,13 @@ export interface ProjectionServiceOptions {
   packageRegistry: PackageRegistry;
   store: Pick<RuntimeStore, 'getInstance'>;
   businessSnapshots?: BusinessSnapshotPort;
-  /**
-   * Package-pinned successor declaration lookup. Omission preserves retained
-   * 0.2 behavior; successor assembly must supply this port.
-   */
+  /** Omission preserves retained 0.2 behavior; successor assembly must supply this port. */
   businessSourceContracts?: CompiledBusinessSourceContractPort;
   domainData?: CompiledDomainDataPort;
   expression: ExpressionExecutorPort;
   sha256: Sha256Port;
 }
 
-/** Executes projections over declared snapshots only. */
 export class ProjectionService {
   private readonly validator = new SchemaValidator();
   private readonly successorSchemaValidator = new DomainHarnessJsonSchemaV1Validator();
@@ -306,22 +302,23 @@ export class ProjectionService {
           }
           throw error;
         }
+
+        const observationKey = canonicalJsonStringify([
+          validatedSnapshot.source,
+          validatedSnapshot.key,
+          validatedSnapshot.revision,
+        ]);
+        const canonicalValue = canonicalJsonStringify(validatedSnapshot.value);
+        const previousValue = observedBusinessRevisions.get(observationKey);
+        if (previousValue !== undefined && previousValue !== canonicalValue) {
+          throw new ProjectionError(
+            'business_snapshot_revision_conflict',
+            `Business Source ${validatedSnapshot.source}/${validatedSnapshot.key} returned conflicting values for revision ${validatedSnapshot.revision}`,
+          );
+        }
+        observedBusinessRevisions.set(observationKey, canonicalValue);
       }
 
-      const observationKey = canonicalJsonStringify([
-        validatedSnapshot.source,
-        validatedSnapshot.key,
-        validatedSnapshot.revision,
-      ]);
-      const canonicalValue = canonicalJsonStringify(validatedSnapshot.value);
-      const previousValue = observedBusinessRevisions.get(observationKey);
-      if (previousValue !== undefined && previousValue !== canonicalValue) {
-        throw new ProjectionError(
-          'business_snapshot_revision_conflict',
-          `Business Source ${validatedSnapshot.source}/${validatedSnapshot.key} returned conflicting values for revision ${validatedSnapshot.revision}`,
-        );
-      }
-      observedBusinessRevisions.set(observationKey, canonicalValue);
       businessSnapshots.push(validatedSnapshot);
       return;
     }
