@@ -77,7 +77,7 @@ function storeWithProcessData(
     getMessageDisposition: async () => processingDisposition(),
     getProcessData: async () => processData,
     getCommandOutcome: async () => null,
-    commitProcessedCommandTurn: async (commit) => onCommit(commit),
+    commitProcessedCommandTurn: async (commit: ProcessedCommandTurnCommit) => onCommit(commit),
   } as unknown as V3ProcessCommandStore;
 }
 
