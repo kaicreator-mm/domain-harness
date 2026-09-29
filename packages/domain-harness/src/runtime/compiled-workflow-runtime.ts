@@ -1,3 +1,4 @@
+import type { DomainCommandRejection } from '../contracts/process-command.js';
 import type { JsonObject, JsonValue } from '../contracts/json.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
 import type { EffectIdentitySeed } from '../execution/journal/effect-identity.js';
@@ -55,6 +56,16 @@ export interface CompiledWorkflowTransition {
   recoveryFailure?: RuntimeFailure;
 }
 
+export type CompiledWorkflowCommandResult =
+  | {
+      readonly status: 'applied';
+      readonly transition: CompiledWorkflowTransition;
+    }
+  | {
+      readonly status: 'rejected';
+      readonly rejection: DomainCommandRejection;
+    };
+
 /**
  * Turn-scoped execution options (#313): the internal AbortSignal of the ONE
  * in-flight mailbox turn, issued only after a durable winning control claim.
@@ -74,6 +85,12 @@ export class CompiledWorkflowRuntime {
     return portableState(definition.initial, input, null, null);
   }
 
+  /**
+   * Historical engine-2 execution entrypoint. Normal domain non-applicability
+   * deliberately remains an ordinary Error here so retained 0.2/2/2 Runtime
+   * failure/recovery semantics remain byte-for-byte compatible at the public
+   * behavior boundary. v3 assembly consumes processCommand() instead.
+   */
   async processMessage(
     compiledPackage: TargetCompiledDomainPackage,
     workflow: CompiledWorkflowDescriptor,
@@ -81,36 +98,82 @@ export class CompiledWorkflowRuntime {
     stored: StoredAcceptedMessage,
     execution: CompiledWorkflowExecutionOptions = {},
   ): Promise<CompiledWorkflowTransition> {
+    const result = await this.processCommand(
+      compiledPackage,
+      workflow,
+      current,
+      stored,
+      execution,
+    );
+    if (result.status === 'rejected') {
+      throw new Error(result.rejection.message);
+    }
+    return result.transition;
+  }
+
+  /**
+   * T-009 integration seam used only by v3 assembly. Ordinary current-state
+   * non-applicability becomes an explicit normal command rejection; technical
+   * failures still throw and therefore retain recovery/failure ownership.
+   */
+  async processCommand(
+    compiledPackage: TargetCompiledDomainPackage,
+    workflow: CompiledWorkflowDescriptor,
+    current: WorkflowInstanceSnapshot,
+    stored: StoredAcceptedMessage,
+    execution: CompiledWorkflowExecutionOptions = {},
+  ): Promise<CompiledWorkflowCommandResult> {
     const definition = parseDefinition(workflow);
     let state = parsePortableState(current.state);
     const sourceState = requireState(definition, state.stateId);
     const event = sourceState.events[stored.message.type];
     if (event === undefined) {
-      throw new Error(
-        `Workflow ${workflow.workflowId} state ${state.stateId} does not accept message ${stored.message.type}`,
-      );
+      return {
+        status: 'rejected',
+        rejection: {
+          code: 'MESSAGE_NOT_ACCEPTED_IN_STATE',
+          message: `Workflow ${workflow.workflowId} state ${state.stateId} does not accept message ${stored.message.type}`,
+          details: {
+            workflowId: workflow.workflowId,
+            stateId: state.stateId,
+            messageType: stored.message.type,
+          },
+        },
+      };
     }
 
     const logicalTime = stored.ack.acceptedAt;
     const scope = messageScope(current, state, stored.message.payload);
     const route = await this.selectRoute(event.routes, scope, logicalTime);
     if (route === null) {
-      throw new Error(
-        `Workflow ${workflow.workflowId} message ${stored.message.type} has no matching route from ${state.stateId}`,
-      );
+      return {
+        status: 'rejected',
+        rejection: {
+          code: 'NO_MATCHING_ROUTE',
+          message: `Workflow ${workflow.workflowId} message ${stored.message.type} has no matching route from ${state.stateId}`,
+          details: {
+            workflowId: workflow.workflowId,
+            stateId: state.stateId,
+            messageType: stored.message.type,
+          },
+        },
+      };
     }
 
     state = portableState(route.target, state.data, stored.message.payload, null);
-    return this.settle(
-      compiledPackage,
-      workflow,
-      definition,
-      current,
-      stored,
-      state,
-      logicalTime,
-      execution,
-    );
+    return {
+      status: 'applied',
+      transition: await this.settle(
+        compiledPackage,
+        workflow,
+        definition,
+        current,
+        stored,
+        state,
+        logicalTime,
+        execution,
+      ),
+    };
   }
 
   private async settle(
