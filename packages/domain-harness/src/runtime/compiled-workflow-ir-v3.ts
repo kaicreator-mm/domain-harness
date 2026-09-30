@@ -97,7 +97,10 @@ export function decodeCompiledWorkflowDefinitionV3(
   for (const [stateId, baseState] of Object.entries(base.states)) {
     const rawState = rawStates[stateId] as JsonObject;
     if (baseState.effects === undefined) {
-      states[stateId] = baseState;
+      // exactOptionalPropertyTypes: re-emit the state without the absent
+      // `effects` key instead of forwarding the engine-2 `CompiledState`.
+      const { effects: _effects, ...state } = baseState;
+      states[stateId] = state;
       continue;
     }
 
