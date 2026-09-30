@@ -1,5 +1,9 @@
 import { SchemaValidator } from '../execution/schema-validator.js';
 import {
+  HOST_LOCAL_DOMAIN_TOOL_BINDING_KIND,
+  createHostLocalDomainToolExecutor,
+} from '../tool/host-local-contract/index.js';
+import {
   REMOTE_HTTP_JSON_BINDING_KIND,
   createRemoteHttpJsonToolExecutor,
 } from '../tool/remote-contract/index.js';
@@ -16,6 +20,10 @@ export class RuntimeToolBindingError extends Error {
 export function createRuntimeToolExecutor(host: RuntimeHostBindings): ToolExecutorPort {
   const validator = new SchemaValidator();
   const remote = createRemoteHttpJsonToolExecutor({ host });
+  const hostLocal = createHostLocalDomainToolExecutor({
+    capabilities: host.capabilities,
+    bindings: host.hostLocalDomainTools ?? {},
+  });
 
   return {
     async execute(request: ToolExecutionRequest) {
@@ -29,6 +37,11 @@ export function createRuntimeToolExecutor(host: RuntimeHostBindings): ToolExecut
       let output;
       if (request.descriptor.execution.kind === REMOTE_HTTP_JSON_BINDING_KIND) {
         output = await remote.execute({ ...request, input });
+      } else if (request.descriptor.execution.kind === HOST_LOCAL_DOMAIN_TOOL_BINDING_KIND) {
+        // T-008 owns host-local identity/capability/effect-authority checks. The
+        // central Runtime dispatcher only selects that already-frozen executor;
+        // it never falls back to another execution kind on binding failure.
+        output = await hostLocal.execute({ ...request, input });
       } else if (isScriptBinding(request.descriptor.execution.kind)) {
         if (host.script === undefined) {
           throw new RuntimeToolBindingError(
