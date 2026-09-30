@@ -68,19 +68,26 @@ export class RuntimeInstanceProvisioningCoordinator {
       );
     }
 
-    // Observation-enabled composition routes through the same single host
-    // transaction: the store appends any newly emitted INSTANCE_OPENED record
-    // inside its atomic ensure/open when it implements the observation-capable
-    // form. There is deliberately no best-effort second write path.
-    const result: EnsureProvisionedWorkflowInstanceOpenResult =
-      observationIntent !== undefined && isRuntimeObservationInstanceProvisioningStore(this.store)
-        ? (
-            await this.store.ensureProvisionedWorkflowInstanceOpenWithObservation(
-              request,
-              observationIntent,
-            )
-          ).result
-        : await this.store.ensureProvisionedWorkflowInstanceOpen(request);
+    // Observation-enabled composition routes through one atomic host transaction.
+    // An explicit observation intent is mandatory, never best-effort: reject
+    // plain-only adapters BEFORE they can perform any durable mutation.
+    let result: EnsureProvisionedWorkflowInstanceOpenResult;
+    if (observationIntent !== undefined) {
+      if (!isRuntimeObservationInstanceProvisioningStore(this.store)) {
+        throw new DurableControlError(
+          'STORE_CONTRACT_VIOLATION',
+          'observationIntent requires an atomic observation-capable provisioning store',
+        );
+      }
+      result = (
+        await this.store.ensureProvisionedWorkflowInstanceOpenWithObservation(
+          request,
+          observationIntent,
+        )
+      ).result;
+    } else {
+      result = await this.store.ensureProvisionedWorkflowInstanceOpen(request);
+    }
     requireKnownDisposition(result.provisioningDisposition, 'provisioningDisposition');
     requireKnownDisposition(result.instanceDisposition, 'instanceDisposition');
 

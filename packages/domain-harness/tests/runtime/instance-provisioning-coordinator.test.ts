@@ -194,3 +194,73 @@ test('rejects unknown store dispositions as contract violation', async () => {
     'STORE_CONTRACT_VIOLATION',
   );
 });
+
+function observationIntent() {
+  return {
+    kind: 'INSTANCE_OPENED' as const,
+    packageIdentity: {
+      domainId: 'claims',
+      version: '0.1.0',
+      packageId: 'pkg-42',
+      contentDigest: `sha256:${'a'.repeat(64)}`,
+      formatVersion: '1',
+      runtimeContractMajor: 3,
+      executionEngineMajor: 3,
+      requiredCapabilities: [],
+    },
+    observedAt: '2026-09-30T00:00:00.000Z',
+  };
+}
+
+class ObservationCapableFakeStore extends FakeStore {
+  observationCalls = 0;
+  observedIntent: unknown;
+
+  async ensureProvisionedWorkflowInstanceOpenWithObservation(
+    input: ProvisionAndOpenWorkflowInstanceRequest,
+    intent: unknown,
+  ) {
+    this.observationCalls += 1;
+    this.observedIntent = intent;
+    return { result: createdResult(input), records: [] };
+  }
+}
+
+test('observation intent with plain-only provisioning store fails before any write', async () => {
+  const input = request();
+  const plainStore = new FakeStore(createdResult(input));
+  const coordinator = new RuntimeInstanceProvisioningCoordinator(plainStore);
+
+  await expectDurableControlError(
+    () => coordinator.ensureProvisionedWorkflowInstanceOpen(input, observationIntent()),
+    'STORE_CONTRACT_VIOLATION',
+  );
+  assert.equal(plainStore.calls, 0);
+  assert.equal('ensureProvisionedWorkflowInstanceOpenWithObservation' in plainStore, false);
+});
+
+test('observation intent invokes the atomic observation-capable path exactly once', async () => {
+  const input = request();
+  const intent = observationIntent();
+  const store = new ObservationCapableFakeStore(createdResult(input));
+  const coordinator = new RuntimeInstanceProvisioningCoordinator(store);
+
+  const result = await coordinator.ensureProvisionedWorkflowInstanceOpen(input, intent);
+
+  assert.equal(result.instanceDisposition, 'created');
+  assert.equal(store.observationCalls, 1);
+  assert.equal(store.calls, 0);
+  assert.deepEqual(store.observedIntent, intent);
+});
+
+test('no observation intent retains the plain ensure/open path', async () => {
+  const input = request();
+  const store = new ObservationCapableFakeStore(createdResult(input));
+  const coordinator = new RuntimeInstanceProvisioningCoordinator(store);
+
+  const result = await coordinator.ensureProvisionedWorkflowInstanceOpen(input);
+
+  assert.equal(result.provisioningDisposition, 'created');
+  assert.equal(store.calls, 1);
+  assert.equal(store.observationCalls, 0);
+});
