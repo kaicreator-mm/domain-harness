@@ -12,11 +12,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "prebuild": "npm run build -w @kaicreator/domain-harness",
     "build": "tsc -p tsconfig.build.json",
-    "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --import tsx --test tests/store/*.test.ts tests/v3-host/*.test.ts tests/cross-host/*.test.ts"
+    "test": "node --import tsx --test --test-isolation=none tests/store/*.test.ts tests/v3-host/*.test.ts tests/cross-host/*.test.ts"
   },
   "dependencies": {
     "@kaicreator/domain-harness": "0.2.0",
