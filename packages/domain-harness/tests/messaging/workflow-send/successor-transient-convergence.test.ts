@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { JsonValue } from '../../../src/contracts/json.js';
 import type {
   WorkflowSendAcceptanceBoundary,
   WorkflowSendAcceptanceResult,
@@ -122,7 +121,3 @@ test('transient target absence retries the same child identity and may later con
   assert.equal(acceptance.messages.length, 2);
   assert.equal(acceptance.messages[1]?.messageId, firstMessageId);
 });
-
-function cloneJson(value: JsonValue): JsonValue {
-  return structuredClone(value);
-}
