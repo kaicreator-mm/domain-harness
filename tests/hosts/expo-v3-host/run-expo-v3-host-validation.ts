@@ -33,6 +33,10 @@ import {
   runRuntimeStoreConformance,
   type CloseableRuntimeStore,
 } from './generated/tests/store/runtime-store-conformance.js';
+import {
+  runRuntimeProvisioningConformance,
+  type ProvisioningConformanceStore,
+} from './generated/tests/store/runtime-provisioning-conformance.js';
 import type {
   DomainMessage,
   WorkflowAddress,
@@ -75,6 +79,7 @@ declare const HermesInternal: unknown;
 
 const MAIN_DB = 'domain-harness-t023-v3-host.db';
 const CONFORMANCE_DB = 'domain-harness-t023-conformance.db';
+const PROVISIONING_CONFORMANCE_DB = 'domain-harness-t023-provisioning.db';
 const MIGRATION_DB = 'domain-harness-t023-migration.db';
 const ARTIFACT_ID = 'subworkflow:quote-review';
 
@@ -549,6 +554,29 @@ async function runPhase1(sqlite: ExpoSqliteModuleLike): Promise<T023ValidationRe
   check(conformance.restartPersistence === true, 'E2 runtime-store-conformance', checks);
   details['conformanceChecks'] = conformance.checks.length;
   details['conformanceConcurrentAcceptance'] = conformance.concurrentAcceptanceCount;
+
+  // E2 (#180): the atomic provisioning ensure/open conformance corpus on the
+  // same adapter/writer authority — the identical checklist the Node binding
+  // runs, so Node and Expo cannot drift on the one-transaction contract.
+  const provisioning = await runRuntimeProvisioningConformance({
+    async open(): Promise<ProvisioningConformanceStore> {
+      return openExpoSqliteRuntimeStore({
+        sqlite,
+        databaseName: PROVISIONING_CONFORMANCE_DB,
+      }) as unknown as ProvisioningConformanceStore;
+    },
+    async reopen(store: ProvisioningConformanceStore): Promise<ProvisioningConformanceStore> {
+      await store.close();
+      return openExpoSqliteRuntimeStore({
+        sqlite,
+        databaseName: PROVISIONING_CONFORMANCE_DB,
+      }) as unknown as ProvisioningConformanceStore;
+    },
+  });
+  check(provisioning.restartPersistence === true, 'E2 provisioning-conformance', checks);
+  check(provisioning.concurrentCreatedCount === 1, 'E2 provisioning-single-instance', checks);
+  check(provisioning.observationExactlyOnce === true, 'E2 provisioning-observation-once', checks);
+  details['provisioningChecks'] = provisioning.checks.length;
 
   // Main assembled fixture: 13 adapters on one physical database, one queue.
   const fixture = await openMainFixture(sqlite);

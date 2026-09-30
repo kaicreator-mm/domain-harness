@@ -40,7 +40,9 @@ export type RuntimeErrorCode =
   /** Observation enabled, but the store does not implement the observation seam (#312). */
   | 'observation_store_required'
   /** v3 command processing requires the already-frozen T-009 store extension (#137). */
-  | 'process_command_store_required';
+  | 'process_command_store_required'
+  /** #180 ensure/open requires the atomic I-OPEN provisioning store extension. */
+  | 'provisioning_unsupported';
 
 export class DomainRuntimeError extends Error {
   public constructor(

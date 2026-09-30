@@ -51,11 +51,19 @@ import type {
   GovernanceBoundSnapshot,
   GovernanceExecutionPin,
   ProcessedCommandTurnCommit,
+  ProvisionAndOpenWorkflowInstanceRequest,
+  EnsureProvisionedWorkflowInstanceOpenResult,
   ProvisionedWorkflowInstance,
   ProvisionWorkflowInstanceRequest,
   RegisterExternalWorkRequest,
+  RuntimeInstanceProvisioningStore,
   RuntimeStoreProcessCommandExtension,
 } from '@kaicreator/domain-harness';
+import {
+  provisioningInstanceIdentityMatchesRequest,
+  provisioningRecordMatchesRequest,
+} from '@kaicreator/domain-harness';
+import type { RuntimeObservationInstanceProvisioningStore } from '@kaicreator/domain-harness';
 
 const DEFAULT_BUSY_TIMEOUT_MS = 5_000;
 const TERMINAL_LIFECYCLES = new Set<WorkflowLifecycle>([
@@ -355,7 +363,9 @@ export class NodeSqliteRuntimeStore
     RuntimeObservationStore,
     RuntimeStoreProcessCommandExtension,
     DurableExecutionStore,
-    DurableControlStore
+    DurableControlStore,
+    RuntimeInstanceProvisioningStore,
+    RuntimeObservationInstanceProvisioningStore
 {
   readonly #db: InstanceType<typeof Database>;
 
@@ -1063,6 +1073,156 @@ export class NodeSqliteRuntimeStore
     // binds the provisioning key to the exact-address RECORD only; it does not
     // create a dh_v2_instances row. Instance creation is owned by the runtime
     // message path that consumes the bound address, never by this call.
+    return transaction.immediate();
+  }
+
+  // ---------------------------------------------------------------------
+  // #180 I-OPEN RuntimeInstanceProvisioningStore (atomic ensure/open)
+  // ---------------------------------------------------------------------
+
+  async ensureProvisionedWorkflowInstanceOpen(
+    request: ProvisionAndOpenWorkflowInstanceRequest,
+  ): Promise<EnsureProvisionedWorkflowInstanceOpenResult> {
+    const { result } = await this.ensureProvisionedWorkflowInstanceOpenWithObservation(
+      request,
+      undefined,
+    );
+    return result;
+  }
+
+  async ensureProvisionedWorkflowInstanceOpenWithObservation(
+    request: ProvisionAndOpenWorkflowInstanceRequest,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<{
+    readonly result: EnsureProvisionedWorkflowInstanceOpenResult;
+    readonly records: readonly RuntimeObservationRecord[];
+  }> {
+    const transaction = this.#db.transaction((): {
+      result: EnsureProvisionedWorkflowInstanceOpenResult;
+      records: RuntimeObservationRecord[];
+    } => {
+      // ONE immediate transaction: the write lock is taken at BEGIN, so the
+      // check-then-act below is serialized against every other writer and a
+      // concurrent same-key/same-address attempt can never interleave between
+      // the reads and the inserts (no query-then-insert race window).
+      const existingKey = this.#db.prepare(`
+        SELECT record_json FROM dh_v3_provisioning_keys WHERE provisioning_key = ?
+      `).get(request.provisioningKey) as { record_json: string } | undefined;
+
+      let record: ProvisionedWorkflowInstance;
+      let provisioningDisposition: 'created' | 'existing';
+      if (existingKey !== undefined) {
+        record = decodeJson<ProvisionedWorkflowInstance>(
+          existingKey.record_json,
+          'provisioning record',
+        );
+        if (!provisioningRecordMatchesRequest(record, request)) {
+          throw new Error(
+            `Provisioning key ${request.provisioningKey} is already bound to different logical material`,
+          );
+        }
+        provisioningDisposition = 'existing';
+      } else {
+        record = {
+          provisioningKey: request.provisioningKey,
+          target: request.target,
+          correlationId: request.correlationId,
+          packageId: request.packageId,
+          input: request.input,
+          createdAt: request.requestedAt,
+        };
+        provisioningDisposition = 'created';
+      }
+
+      const existingInstance = this.#getInstanceRow(request.target);
+      let instance: WorkflowInstanceSnapshot;
+      let instanceDisposition: 'created' | 'existing';
+      if (existingInstance !== null) {
+        instance = mapInstance(existingInstance);
+        if (!provisioningInstanceIdentityMatchesRequest(instance, request)) {
+          // Identity-only compatibility: a progressed/terminal instance at the
+          // same address is returned unchanged below; an incompatible durable
+          // identity fails closed before any write of this transaction.
+          throw new Error(
+            `Workflow ${request.target.workflowId}/${request.target.instanceKey} is already bound to incompatible durable identity`,
+          );
+        }
+        instanceDisposition = 'existing';
+      } else {
+        instance = request.initialInstance;
+        instanceDisposition = 'created';
+      }
+
+      if (provisioningDisposition === 'created') {
+        this.#db.prepare(`
+          INSERT INTO dh_v3_provisioning_keys (provisioning_key, record_json) VALUES (?, ?)
+        `).run(request.provisioningKey, encodeJson(record as unknown as JsonValue, 'provisioning record'));
+      }
+
+      let records: RuntimeObservationRecord[] = [];
+      if (instanceDisposition === 'created') {
+        this.#db.prepare(`
+          INSERT INTO dh_v2_instances (
+            workflow_id,
+            instance_key,
+            correlation_id,
+            package_id,
+            lifecycle,
+            state_revision,
+            workflow_state_json,
+            output_json,
+            failure_json,
+            next_target_sequence,
+            created_at,
+            updated_at
+          ) VALUES (
+            @workflowId,
+            @instanceKey,
+            @correlationId,
+            @packageId,
+            @lifecycle,
+            @stateRevision,
+            @stateJson,
+            @outputJson,
+            @failureJson,
+            1,
+            @createdAt,
+            @updatedAt
+          )
+        `).run({
+          workflowId: instance.address.workflowId,
+          instanceKey: instance.address.instanceKey,
+          correlationId: instance.correlationId,
+          packageId: instance.packageId,
+          lifecycle: instance.lifecycle,
+          stateRevision: instance.stateRevision,
+          stateJson: encodeJson(instance.state, 'instance.state'),
+          outputJson:
+            instance.output === undefined ? null : encodeJson(instance.output, 'instance.output'),
+          failureJson:
+            instance.failure === undefined
+              ? null
+              : encodeJson(instance.failure as unknown as JsonValue, 'instance.failure'),
+          createdAt: instance.createdAt,
+          updatedAt: instance.updatedAt,
+        });
+        // The provisioning bind, instance materialization and any newly
+        // emitted INSTANCE_OPENED record commit in THIS transaction; an exact
+        // or progressed replay of an existing instance emits no second record.
+        records = this.#recordObservations(request.target, instance.packageId, intent, [
+          {
+            kind: 'INSTANCE_OPENED',
+            stateRevisionAfter: instance.stateRevision,
+            lifecycleAfter: instance.lifecycle,
+          },
+        ]);
+      }
+
+      return {
+        result: { provisioningDisposition, instanceDisposition, record, instance },
+        records,
+      };
+    });
     return transaction.immediate();
   }
 

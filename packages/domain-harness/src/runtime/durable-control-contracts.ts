@@ -1,5 +1,9 @@
+import { canonicalJsonStringify } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
-import type { WorkflowAddress } from '../v2/contracts/workflow.js';
+import type {
+  WorkflowAddress,
+  WorkflowInstanceSnapshot,
+} from '../v2/contracts/workflow.js';
 
 export interface ProvisionWorkflowInstanceRequest {
   readonly provisioningKey: string;
@@ -23,6 +27,171 @@ export interface EnsureProvisionedWorkflowInstanceResult {
   readonly disposition: 'created' | 'existing';
   readonly record: ProvisionedWorkflowInstance;
 }
+
+/**
+ * I-OPEN / #180 additive request for the RuntimeStore/instance atomic ensure/open seam.
+ *
+ * `initialInstance` is the exact revision-0 snapshot already computed by the Runtime
+ * from the selected package/workflow. The durable adapter never derives workflow
+ * semantics, a provisioning key or initial state on its own.
+ */
+export interface ProvisionAndOpenWorkflowInstanceRequest
+  extends ProvisionWorkflowInstanceRequest {
+  readonly initialInstance: WorkflowInstanceSnapshot;
+}
+
+/**
+ * Result of one atomic provisioning-key + Runtime-instance convergence.
+ *
+ * The two dispositions are deliberately independent: a newly bound provisioning
+ * key may converge to an already-existing identity-compatible Runtime instance,
+ * while an older provisioning ledger entry may need to materialize its missing
+ * instance exactly once after an upgrade/restart.
+ */
+export interface EnsureProvisionedWorkflowInstanceOpenResult {
+  readonly provisioningDisposition: 'created' | 'existing';
+  readonly instanceDisposition: 'created' | 'existing';
+  readonly record: ProvisionedWorkflowInstance;
+  readonly instance: WorkflowInstanceSnapshot;
+}
+
+/**
+ * Successor-only RuntimeStore/instance provisioning extension (I-OPEN / #180).
+ *
+ * Implementations MUST perform provisioning-key reconciliation and exact
+ * WorkflowInstance create-or-return in ONE host transaction/durability domain.
+ * A caller must never emulate this contract with query-then-insert. Exact replay
+ * must never reset a progressed instance to `initialInstance`.
+ */
+export interface RuntimeInstanceProvisioningStore {
+  ensureProvisionedWorkflowInstanceOpen(
+    request: ProvisionAndOpenWorkflowInstanceRequest,
+  ): Promise<EnsureProvisionedWorkflowInstanceOpenResult>;
+}
+
+function sameAddress(left: WorkflowAddress, right: WorkflowAddress): boolean {
+  return left.workflowId === right.workflowId && left.instanceKey === right.instanceKey;
+}
+
+function sameCanonicalJson(left: JsonValue, right: JsonValue): boolean {
+  try {
+    return canonicalJsonStringify(left) === canonicalJsonStringify(right);
+  } catch {
+    return false;
+  }
+}
+
+/** Shared exact T-010 identity predicate used by coordinator and host adapters. */
+export function provisioningRecordMatchesRequest(
+  record: ProvisionedWorkflowInstance,
+  request: ProvisionWorkflowInstanceRequest,
+): boolean {
+  return (
+    record.provisioningKey === request.provisioningKey &&
+    sameAddress(record.target, request.target) &&
+    record.correlationId === request.correlationId &&
+    record.packageId === request.packageId &&
+    sameCanonicalJson(record.input, request.input)
+  );
+}
+
+/**
+ * Identity-only compatibility for an already durable Runtime instance.
+ * State/lifecycle/revision are intentionally excluded because an idempotent
+ * ensure replay must return a progressed or terminal instance without resetting it.
+ */
+export function provisioningInstanceIdentityMatchesRequest(
+  instance: WorkflowInstanceSnapshot,
+  request: ProvisionWorkflowInstanceRequest,
+): boolean {
+  return (
+    sameAddress(instance.address, request.target) &&
+    instance.correlationId === request.correlationId &&
+    instance.packageId === request.packageId
+  );
+}
+
+/**
+ * Exact initial-snapshot predicate for a newly materialized instance.
+ * Runtime owns construction; the store only persists this exact snapshot.
+ */
+export function initialProvisioningInstanceMatchesRequest(
+  instance: WorkflowInstanceSnapshot,
+  request: ProvisionAndOpenWorkflowInstanceRequest,
+): boolean {
+  if (!provisioningInstanceIdentityMatchesRequest(instance, request)) return false;
+  if (instance.stateRevision !== 0) return false;
+  if (instance.lifecycle !== 'active' && instance.lifecycle !== 'waiting') return false;
+  if (instance.output !== undefined || instance.failure !== undefined) return false;
+  if (instance.createdAt !== request.requestedAt || instance.updatedAt !== request.requestedAt) {
+    return false;
+  }
+  return sameCanonicalJson(instance.state, request.initialInstance.state) &&
+    sameAddress(instance.address, request.initialInstance.address) &&
+    instance.correlationId === request.initialInstance.correlationId &&
+    instance.packageId === request.initialInstance.packageId &&
+    instance.lifecycle === request.initialInstance.lifecycle &&
+    instance.stateRevision === request.initialInstance.stateRevision &&
+    instance.createdAt === request.initialInstance.createdAt &&
+    instance.updatedAt === request.initialInstance.updatedAt &&
+    instance.output === request.initialInstance.output &&
+    instance.failure === request.initialInstance.failure;
+}
+
+/** Structural capability check used by v3 composition without widening RuntimeStore. */
+export function isRuntimeInstanceProvisioningStore(
+  store: unknown,
+): store is RuntimeInstanceProvisioningStore {
+  return (
+    store !== null &&
+    typeof store === 'object' &&
+    typeof (store as { ensureProvisionedWorkflowInstanceOpen?: unknown })
+      .ensureProvisionedWorkflowInstanceOpen === 'function'
+  );
+}
+
+/**
+ * #180 additive public Runtime ensure/open request. The provisioning key is
+ * ALWAYS caller-supplied and explicit: the Runtime never derives one from
+ * address/correlation/package/input, and never auto-provisions from workflow
+ * activity (#138).
+ */
+export interface EnsureProvisionedInstanceOpenRequest {
+  readonly provisioningKey: string;
+  readonly address: WorkflowAddress;
+  readonly correlationId: string;
+  readonly input: JsonValue;
+  /** Defaults to the registry's default package, identical to openInstance(). */
+  readonly packageId?: string;
+}
+
+/** #180 additive public ensure/open outcome; existing snapshots are returned unchanged. */
+export interface EnsureProvisionedInstanceOpenOutcome {
+  readonly instance: WorkflowInstanceSnapshot;
+  readonly provisioningDisposition: 'created' | 'existing';
+  readonly instanceDisposition: 'created' | 'existing';
+}
+
+/**
+ * #180 additive optional Runtime provisioning capability (the third optional
+ * capability member after #312 observation and #313 control). The factory
+ * always populates it explicitly: `UNSUPPORTED` when the RuntimeStore does not
+ * implement the atomic I-OPEN provisioning extension — or, with Runtime
+ * Observation enabled, its observation-capable form, because instance
+ * materialization is then a covered `INSTANCE_OPENED` mutation that must commit
+ * atomically with its observation record and is never silently downgraded to an
+ * unobserved write. Consumers treating older hand-built runtimes without this
+ * member MUST default it to UNSUPPORTED. The retained `openInstance()` behavior
+ * is unchanged; `ensureOpen` never auto-runs the initial state.
+ */
+export type RuntimeProvisioningCapability =
+  | {
+      readonly status: 'ENABLED';
+      ensureOpen(
+        request: EnsureProvisionedInstanceOpenRequest,
+      ): Promise<EnsureProvisionedInstanceOpenOutcome>;
+    }
+  | { readonly status: 'UNSUPPORTED' };
 
 export interface RegisterExternalWorkRequest {
   readonly externalCorrelationId: string;

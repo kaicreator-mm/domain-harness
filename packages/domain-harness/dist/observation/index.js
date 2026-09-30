@@ -3,5 +3,6 @@
 // create-domain-runtime.ts (option) and the public barrels (exports only).
 export * from './contracts.js';
 export * from './read-semantics.js';
+export * from './provisioning-contract.js';
 export { ObservationRecordingRuntimeStore } from './recording-store.js';
 //# sourceMappingURL=index.js.map
