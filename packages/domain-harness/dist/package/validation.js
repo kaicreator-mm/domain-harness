@@ -69,7 +69,7 @@ function assertJsonSerializable(value, path, ancestors = new Set()) {
     }
     failInvalid(`${path} contains a non-JSON value`);
 }
-function validateWorkflows(workflows) {
+function validateWorkflows(workflows, decodeWorkflow) {
     for (const [workflowKey, workflowValue] of Object.entries(workflows)) {
         if (!isRecord(workflowValue))
             failInvalid(`workflow "${workflowKey}" must be an object`);
@@ -81,7 +81,7 @@ function validateWorkflows(workflows) {
         // unsupported invoke kinds are rejected at activation instead of surfacing
         // mid-drain, satisfying the PRD R4 corrupt-package fail-closed criterion.
         try {
-            decodeCompiledWorkflowDefinition(workflowKey, definition);
+            decodeWorkflow(workflowKey, definition);
         }
         catch (error) {
             if (error instanceof CompiledWorkflowIrError) {
@@ -171,7 +171,7 @@ function validateProjections(projections) {
         assertJsonSerializable(outputSchema, `projection "${projectionKey}" outputSchema`);
     }
 }
-function validateManifestShape(value) {
+export function validateManifestShape(value, decodeWorkflow = decodeCompiledWorkflowDefinition) {
     if (!isRecord(value))
         failInvalid('compiled package manifest must be an object');
     requireStringField(value, 'formatVersion');
@@ -202,12 +202,12 @@ function validateManifestShape(value) {
             failInvalid('compiled package compatibility must be an object');
         assertJsonSerializable(value.compatibility, 'compiled package compatibility');
     }
-    validateWorkflows(workflows);
+    validateWorkflows(workflows, decodeWorkflow);
     validateTools(tools, bindingDigests);
     validateProjections(projections);
     assertJsonSerializable(value, 'compiled package manifest');
 }
-function validateBindings(manifest, bindings) {
+export function validateBindings(manifest, bindings) {
     if (!isRecord(bindings)) {
         throw new PackageActivationError('INVALID_COMPILED_PACKAGE', 'compiled package bindings must be an object');
     }
@@ -257,7 +257,7 @@ export function canonicalPackageIdentityMaterial(manifest) {
 export async function computeCompiledPackageId(manifest, sha256) {
     return sha256.digestUtf8(canonicalPackageIdentityMaterial(manifest));
 }
-function validateCompatibility(manifest, policy) {
+export function validateCompatibility(manifest, policy) {
     const mismatches = [];
     if (manifest.formatVersion !== policy.formatVersion) {
         mismatches.push(`formatVersion expected=${policy.formatVersion} actual=${manifest.formatVersion}`);

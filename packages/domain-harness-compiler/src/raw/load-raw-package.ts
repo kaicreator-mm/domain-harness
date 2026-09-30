@@ -115,17 +115,43 @@ function parseInvoke(value: unknown, label: string): RawInvoke {
 
 function parseMessageEffect(value: unknown, label: string): RawMessageEffect {
   const raw = asRecord(value, label);
-  assertOnlyKeys(raw, ['kind', 'targetExpression', 'messageType', 'payloadExpression', 'contractVersion'], label);
+  assertOnlyKeys(raw, ['kind', 'targetExpression', 'messageType', 'payloadExpression', 'contractVersion', 'rejected'], label);
   if (raw.kind !== 'domain-message') throw new Error(`${label}.kind must be 'domain-message'`);
   const payloadExpression = optionalString(raw, 'payloadExpression', label);
   const contractVersion = optionalString(raw, 'contractVersion', label);
+  const rejected = parseRejectedRoutes(raw.rejected, `${label}.rejected`);
   return {
     kind: 'domain-message',
     targetExpression: requiredString(raw, 'targetExpression', label),
     messageType: requiredString(raw, 'messageType', label),
     ...(payloadExpression ? { payloadExpression } : {}),
     ...(contractVersion ? { contractVersion } : {}),
+    ...(rejected === undefined ? {} : { rejected }),
   };
+}
+
+/**
+ * Static shape validation for engine-major-3 rejection routing (L2-B §4.2):
+ * non-empty array, conditional routes first, final route unconditional. State
+ * target resolution and JSONata totality are compile-time checks in
+ * compile-domain-package.ts, which knows the declared state set.
+ */
+function parseRejectedRoutes(value: unknown, label: string): RawRoute[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${label} must be a non-empty array of rejection routes`);
+  }
+  return value.map((route, index) => {
+    const parsed = parseRoute(route, `${label}[${index}]`);
+    const isFallback = index === value.length - 1;
+    if (isFallback && parsed.when !== undefined) {
+      throw new Error(`${label}[${index}] final rejection route must be unconditional`);
+    }
+    if (!isFallback && parsed.when === undefined) {
+      throw new Error(`${label}[${index}] non-final rejection route must declare 'when'`);
+    }
+    return parsed;
+  });
 }
 
 function compileExpression(expression: string, label: string, issues: string[]): void {
@@ -316,6 +342,11 @@ export async function loadRawDomainPackage(options: LoadRawDomainPackageOptions)
       for (const [index, effect] of (state.effects ?? []).entries()) {
         compileExpression(effect.targetExpression, `${workflow.id}.${state.id}.effects[${index}].targetExpression`, issues);
         if (effect.payloadExpression) compileExpression(effect.payloadExpression, `${workflow.id}.${state.id}.effects[${index}].payloadExpression`, issues);
+        for (const [routeIndex, route] of (effect.rejected ?? []).entries()) {
+          if (route.when) {
+            compileExpression(route.when, `${workflow.id}.${state.id}.effects[${index}].rejected[${routeIndex}].when`, issues);
+          }
+        }
       }
       const invoke = state.invoke;
       if (!invoke) continue;

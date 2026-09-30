@@ -57,7 +57,8 @@ function failInvalid(message: string): never {
   throw new PackageActivationError('INVALID_COMPILED_PACKAGE', message);
 }
 
-function normalizePackageDataBounds(value: unknown, label: string): PackageDataBounds {
+/** Exact five-field package-data bounds reader shared by validation paths. */
+export function normalizePackageDataBounds(value: unknown, label: string): PackageDataBounds {
   if (!isRecord(value)) {
     throw new PackageActivationError('INCOMPATIBLE_PACKAGE', `${label} must be an object`);
   }

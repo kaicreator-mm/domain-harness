@@ -14,7 +14,8 @@ function isRecord(value) {
 function failInvalid(message) {
     throw new PackageActivationError('INVALID_COMPILED_PACKAGE', message);
 }
-function normalizePackageDataBounds(value, label) {
+/** Exact five-field package-data bounds reader shared by validation paths. */
+export function normalizePackageDataBounds(value, label) {
     if (!isRecord(value)) {
         throw new PackageActivationError('INCOMPATIBLE_PACKAGE', `${label} must be an object`);
     }

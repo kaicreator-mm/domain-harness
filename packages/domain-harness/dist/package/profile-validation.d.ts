@@ -19,6 +19,8 @@ export interface CompiledPackageValidatorExtensions {
     readonly successor?: SuccessorCompiledPackageValidator;
 }
 export type PackageActivationValidationPolicy = LegacyCompiledPackageValidationPolicy | SupportedCompiledPackageValidationPolicy;
+/** Exact five-field package-data bounds reader shared by validation paths. */
+export declare function normalizePackageDataBounds(value: unknown, label: string): PackageDataBounds;
 /**
  * Successor validators call this before package admission. Package-recorded
  * maxima are never allowed to exceed host-supported maxima or be silently

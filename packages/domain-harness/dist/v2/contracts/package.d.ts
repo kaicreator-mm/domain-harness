@@ -1,5 +1,7 @@
 import type { JsonObject, JsonSchema, JsonValue } from '../../contracts/json.js';
 import type { CapabilityId } from './capability.js';
+import type { CompiledBusinessSourceDescriptor, CompiledDomainDataDescriptor, PackageDataBounds } from './package-data.js';
+import type { DomainHarnessJsonSchemaContractVersion } from '../../schema/domainharness-json-schema-v1.js';
 export type ToolEffectSemantics = 'none' | 'idempotent' | 'non-idempotent';
 export interface CompiledMessageContract {
     type: string;
@@ -58,6 +60,15 @@ export interface CompiledPackageManifest {
     schemas: Readonly<Record<string, JsonSchema>>;
     bindingDigests: Readonly<Record<string, string>>;
     compatibility?: JsonObject;
+    /**
+     * Successor ('0.3',2,3)-only material (L2-A §3.2). Absent on every retained
+     * ('0.2',2,2) manifest; a retained manifest carrying these fields fails the
+     * compiler-side structural assertion and never validates as successor.
+     */
+    readonly schemaContractVersion?: DomainHarnessJsonSchemaContractVersion;
+    readonly packageDataBounds?: PackageDataBounds;
+    readonly domainData?: readonly CompiledDomainDataDescriptor[];
+    readonly businessSources?: readonly CompiledBusinessSourceDescriptor[];
 }
 /**
  * Invoke kinds executable by the portable engine at `executionEngineMajor` 2.
@@ -77,6 +88,13 @@ export interface TargetExecutableBindings {
 export interface TargetCompiledDomainPackage {
     manifest: CompiledPackageManifest;
     bindings: TargetExecutableBindings;
+    /**
+     * Bundled immutable Domain Data values of a successor ('0.3',2,3) package
+     * (L2-A §3.2 `TargetCompiledDomainPackage03`). Descriptor integrity over
+     * these values is revalidated at activation; retained 0.2/2/2 packages never
+     * carry this field.
+     */
+    readonly domainData?: Readonly<Record<string, JsonValue>>;
 }
 export interface PackageRegistry {
     readonly defaultPackageId: string;

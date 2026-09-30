@@ -11,7 +11,7 @@ export async function listRetainedPackageIds(store) {
     }
     return [...normalized].sort();
 }
-async function validateRegistryPackages(registry, policy) {
+async function validateRegistryPackages(registry, policy, extensions) {
     const validated = new Map();
     for (const packageId of registry.listPackageIds()) {
         if (typeof packageId !== 'string' || packageId.length === 0 || validated.has(packageId)) {
@@ -24,12 +24,12 @@ async function validateRegistryPackages(registry, policy) {
         if (compiledPackage.manifest.packageId !== packageId) {
             throw new PackageActivationError('PACKAGE_ID_MISMATCH', `PackageRegistry key "${packageId}" does not match resolved manifest packageId "${compiledPackage.manifest.packageId}"`);
         }
-        validated.set(packageId, await validateCompiledPackageByProfile(compiledPackage, policy));
+        validated.set(packageId, await validateCompiledPackageByProfile(compiledPackage, policy, extensions));
     }
     return validated;
 }
 export async function preflightPackageActivation(request) {
-    const validatedPackages = await validateRegistryPackages(request.registry, request.validationPolicy);
+    const validatedPackages = await validateRegistryPackages(request.registry, request.validationPolicy, request.extensions ?? {});
     const defaultPackage = validatedPackages.get(request.registry.defaultPackageId);
     if (defaultPackage === undefined) {
         throw new PackageActivationError('DEFAULT_PACKAGE_MISSING', `PackageRegistry default package "${request.registry.defaultPackageId}" was not listed and validated`);

@@ -10,6 +10,12 @@ export interface RawMessageEffect {
     messageType: string;
     payloadExpression?: string;
     contractVersion?: string;
+    /**
+     * Engine-major-3 total permanent-rejection routing (L2-B §4.2). Required on
+     * every domain-message effect compiled for the successor profile: non-empty,
+     * conditional routes first, final route unconditional.
+     */
+    rejected?: readonly RawRoute[];
 }
 export interface RawExternalEvent {
     schemaPath?: string;

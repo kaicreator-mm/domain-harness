@@ -11,7 +11,10 @@ import type {
   RawToolDefinition,
   TargetHostProfile,
 } from '../raw/types.js';
-import { SUPPORTED_COMPILED_INVOKE_KINDS_V2 } from '@kaicreator/domain-harness/v2';
+import {
+  DOMAIN_HARNESS_JSON_SCHEMA_V1,
+  SUPPORTED_COMPILED_INVOKE_KINDS_V2,
+} from '@kaicreator/domain-harness/v2';
 import { canonicalJson } from '../package/canonical.js';
 import {
   assertCompiledPackageManifest,
@@ -25,6 +28,12 @@ import {
   type CompiledWorkflowDescriptor,
   toolConfigIssues,
 } from '../package/manifest.js';
+import { PUBLIC_COMPILER_OUTPUT_PROFILE } from '../package/profile.js';
+import { buildCompiledDomainDataSection, type DomainDataCompileEntry } from '../package/domain-data.js';
+import {
+  buildCompiledBusinessSourceSection,
+  type BusinessSourceCompileEntry,
+} from '../package/business-sources.js';
 import { assertTargetCapabilities, collectRequiredCapabilities } from './capabilities.js';
 
 export interface CompileDomainPackageInput {
@@ -40,11 +49,29 @@ export interface CompileDomainPackageInput {
   requiredCapabilities?: readonly CapabilityId[];
   tools?: readonly RawToolDefinition[];
   projections?: readonly RawProjectionDefinition[];
+  /**
+   * Successor Domain Data entries bundled into the compiled package. Every
+   * projection `domain-data` dependency must be declared here and every entry
+   * must be referenced (undeclared/orphan keys fail compile, L2-A §3.7).
+   */
+  domainData?: readonly DomainDataCompileEntry[];
+  /**
+   * Successor Business Source declarations. Every projection `business`
+   * dependency must be declared here and every declaration must be referenced
+   * (undeclared/orphan sources fail compile, L2-A §3.7).
+   */
+  businessSources?: readonly BusinessSourceCompileEntry[];
 }
 
 export interface CompileDomainPackageResult {
   manifest: CompiledPackageManifest;
   requiredBindingIds: readonly string[];
+  /**
+   * Bundled immutable Domain Data values of the emitted successor package
+   * (L2-A §3.2 `TargetCompiledDomainPackage03`); descriptor digests over these
+   * values are identity material inside `manifest.domainData`.
+   */
+  readonly domainData: Readonly<Record<string, JsonValue>>;
 }
 
 /**
@@ -83,6 +110,42 @@ function jsonRoute(
     assertJsonataSyntax(route.when, `workflow '${workflowId}' state '${stateId}' ${context} route condition`);
   }
   return { target: route.target, ...(route.when ? { when: route.when } : {}) };
+}
+
+/**
+ * Engine-major-3 total permanent-rejection routing (L2-B §4.2): every
+ * domain-message effect declares a non-empty `rejected` route array whose final
+ * route is unconditional (and therefore total) and whose preceding routes are
+ * conditional; every target must be a declared state. Absent or non-total
+ * routing fails compile instead of deferring an unhandled rejection to the
+ * Runtime.
+ */
+function rejectedRoutes(
+  workflowId: string,
+  stateId: string,
+  rejected: readonly RawRoute[] | undefined,
+  stateIds: ReadonlySet<string>,
+): JsonObject[] {
+  const context = 'domain-message rejected route';
+  if (rejected === undefined || rejected.length === 0) {
+    throw new Error(
+      `workflow '${workflowId}' state '${stateId}': engine-major-3 domain-message effect requires a non-empty total 'rejected' route array`,
+    );
+  }
+  return rejected.map((route, index) => {
+    const isFallback = index === rejected.length - 1;
+    if (isFallback && route.when) {
+      throw new Error(
+        `workflow '${workflowId}' state '${stateId}': final ${context} must be unconditional`,
+      );
+    }
+    if (!isFallback && !route.when) {
+      throw new Error(
+        `workflow '${workflowId}' state '${stateId}': non-final ${context} must declare a 'when' condition`,
+      );
+    }
+    return jsonRoute(workflowId, stateId, route, stateIds, `${context}[${index}]`);
+  });
 }
 
 function jsonInvoke(workflowId: string, stateId: string, invoke: RawInvoke): JsonObject {
@@ -199,6 +262,7 @@ function compileWorkflow(raw: LoadedRawDomainPackage, workflowId: string): Compi
             messageType: effect.messageType,
             ...(effect.payloadExpression ? { payloadExpression: effect.payloadExpression } : {}),
             ...(effect.contractVersion ? { contractVersion: effect.contractVersion } : {}),
+            rejected: rejectedRoutes(workflowId, stateId, effect.rejected, stateIds),
           };
         }),
       } : {}),
@@ -291,10 +355,31 @@ export function compileDomainPackage(input: CompileDomainPackageInput): CompileD
   const workflows = Object.fromEntries(
     [...input.raw.workflows.keys()].sort().map((workflowId) => [workflowId, compileWorkflow(input.raw, workflowId)]),
   );
+
+  // I-03-ASSEMBLY emission switch (L2 §5): the public compiler emits exactly
+  // the successor ('0.3',2,3) profile, and only when the complete successor
+  // material is present and valid. The Target Host Profile supplies the exact
+  // package-data bounds recorded verbatim in the manifest (L2-A §3.6).
+  if (input.target.packageDataBounds === undefined) {
+    throw new Error(
+      `public compiler output profile ${PUBLIC_COMPILER_OUTPUT_PROFILE.formatVersion}/${PUBLIC_COMPILER_OUTPUT_PROFILE.runtimeContractMajor}/${PUBLIC_COMPILER_OUTPUT_PROFILE.executionEngineMajor} requires target.packageDataBounds`,
+    );
+  }
+  const domainDataSection = buildCompiledDomainDataSection(
+    input.domainData ?? [],
+    input.target.packageDataBounds,
+    projections,
+  );
+  const businessSourceSection = buildCompiledBusinessSourceSection(
+    input.businessSources ?? [],
+    input.target.packageDataBounds,
+    projections,
+  );
+
   const manifest = buildCompiledPackageManifest({
-    formatVersion: '0.2',
-    runtimeContractMajor: 2,
-    executionEngineMajor: 2,
+    formatVersion: PUBLIC_COMPILER_OUTPUT_PROFILE.formatVersion,
+    runtimeContractMajor: PUBLIC_COMPILER_OUTPUT_PROFILE.runtimeContractMajor,
+    executionEngineMajor: PUBLIC_COMPILER_OUTPUT_PROFILE.executionEngineMajor,
     domainId: input.raw.domainId,
     domainVersion: input.domainVersion,
     targetProfileId: input.target.id,
@@ -304,6 +389,10 @@ export function compileDomainPackage(input: CompileDomainPackageInput): CompileD
     projections: compileProjections(projections),
     schemas: schemaRecord(input.raw),
     bindingDigests,
+    schemaContractVersion: DOMAIN_HARNESS_JSON_SCHEMA_V1,
+    packageDataBounds: domainDataSection.packageDataBounds,
+    domainData: domainDataSection.descriptors,
+    businessSources: businessSourceSection.descriptors,
     compatibility: {
       sourceSchemaVersion: input.raw.schemaVersion,
       legacyChildDependencies: Object.fromEntries(
@@ -317,5 +406,6 @@ export function compileDomainPackage(input: CompileDomainPackageInput): CompileD
   return {
     manifest,
     requiredBindingIds: [...new Set(requiredCapabilities.map((capability) => input.target.bindings[capability]).filter((value): value is string => Boolean(value)))].sort(),
+    domainData: domainDataSection.values,
   };
 }

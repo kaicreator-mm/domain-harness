@@ -93,7 +93,10 @@ function assertJsonSerializable(value: unknown, path: string, ancestors = new Se
   failInvalid(`${path} contains a non-JSON value`);
 }
 
-function validateWorkflows(workflows: Record<string, unknown>): void {
+function validateWorkflows(
+  workflows: Record<string, unknown>,
+  decodeWorkflow: WorkflowDefinitionDecoder,
+): void {
   for (const [workflowKey, workflowValue] of Object.entries(workflows)) {
     if (!isRecord(workflowValue)) failInvalid(`workflow "${workflowKey}" must be an object`);
     requireStringField(workflowValue, 'workflowId');
@@ -104,7 +107,7 @@ function validateWorkflows(workflows: Record<string, unknown>): void {
     // unsupported invoke kinds are rejected at activation instead of surfacing
     // mid-drain, satisfying the PRD R4 corrupt-package fail-closed criterion.
     try {
-      decodeCompiledWorkflowDefinition(workflowKey, definition);
+      decodeWorkflow(workflowKey, definition);
     } catch (error) {
       if (error instanceof CompiledWorkflowIrError) {
         failInvalid(`workflow "${workflowKey}" definition is not executable compiled IR: ${error.message}`);
@@ -202,7 +205,18 @@ function validateProjections(projections: Record<string, unknown>): void {
   }
 }
 
-function validateManifestShape(value: unknown): asserts value is CompiledPackageManifest {
+/**
+ * Authoritative compiled-workflow decoder used by manifest-shape validation.
+ * The default is the historical engine-2 decoder; the successor validator
+ * passes the profile-dispatched engine-3 decoder so one retained-field
+ * validation authority serves both profiles.
+ */
+export type WorkflowDefinitionDecoder = (workflowId: string, definition: unknown) => unknown;
+
+export function validateManifestShape(
+  value: unknown,
+  decodeWorkflow: WorkflowDefinitionDecoder = decodeCompiledWorkflowDefinition,
+): asserts value is CompiledPackageManifest {
   if (!isRecord(value)) failInvalid('compiled package manifest must be an object');
 
   requireStringField(value, 'formatVersion');
@@ -234,13 +248,13 @@ function validateManifestShape(value: unknown): asserts value is CompiledPackage
     assertJsonSerializable(value.compatibility, 'compiled package compatibility');
   }
 
-  validateWorkflows(workflows);
+  validateWorkflows(workflows, decodeWorkflow);
   validateTools(tools, bindingDigests);
   validateProjections(projections);
   assertJsonSerializable(value, 'compiled package manifest');
 }
 
-function validateBindings(
+export function validateBindings(
   manifest: CompiledPackageManifest,
   bindings: unknown,
 ): asserts bindings is TargetCompiledDomainPackage['bindings'] {
@@ -303,7 +317,7 @@ export async function computeCompiledPackageId(
   return sha256.digestUtf8(canonicalPackageIdentityMaterial(manifest));
 }
 
-function validateCompatibility(
+export function validateCompatibility(
   manifest: CompiledPackageManifest,
   policy: CompiledPackageValidationPolicy,
 ): void {

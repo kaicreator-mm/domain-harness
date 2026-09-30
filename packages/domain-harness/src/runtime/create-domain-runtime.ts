@@ -33,19 +33,36 @@ import {
 } from '../control/index.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
 import { DomainMessageAcceptance } from '../messaging/acceptance/domain-message-acceptance.js';
+import { WorkflowSendAcceptance } from '../messaging/acceptance/workflow-send-acceptance.js';
 import { JournaledDomainMessageEffect } from '../messaging/send-effect/journaled-domain-message-effect.js';
+import { SuccessorJournaledDomainMessageEffect } from '../messaging/send-effect/successor-journaled-domain-message-effect.js';
 import { preflightPackageActivation } from '../package/activation.js';
+import type {
+  CompiledPackageValidatorExtensions,
+  PackageActivationValidationPolicy,
+} from '../package/profile-validation.js';
 import { resolvePinnedPackage } from '../package/registry.js';
+import { validateSuccessorCompiledPackage } from '../package/successor-validation.js';
+import type { CompiledBusinessSourceContract, CompiledBusinessSourceContractPort } from '../projection/compiled-business-source.js';
 import type { CompiledDomainDataPort } from '../projection/compiled-domain-data.js';
 import { ProjectionService } from '../projection/projection-service.js';
 import { DomainQueryDispatcher } from '../query/domain-query-dispatcher.js';
 import { PoisonMessageRecoveryCoordinator } from '../recovery-v2/poison-message-recovery.js';
+import {
+  LEGACY_COMPILED_ARTIFACT_PROFILE,
+  SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+  sameCompiledArtifactProfile,
+} from '../v2/contracts/compiled-artifact-profile.js';
+import type { PackageDataBounds } from '../v2/contracts/package-data.js';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1 } from '../schema/domainharness-json-schema-v1.js';
 import { MailboxDrainScheduler } from './mailbox-drain-scheduler.js';
 import {
   commitV3ProcessedCommandTurn,
   requireV3ProcessCommandStore,
   type V3ProcessCommandStore,
 } from './process-command-integration.js';
+import { CompiledWorkflowMessageEffectsV3 } from './compiled-workflow-message-effects-v3.js';
+import { CompiledWorkflowRuntimeV3 } from './compiled-workflow-runtime-v3.js';
 import { RuntimeSubscriptionCoordinator } from './subscription-coordinator.js';
 import { DomainRuntimeError } from './runtime-errors.js';
 import type { BusinessSnapshotPort } from '../v2/contracts/projection.js';
@@ -66,7 +83,12 @@ import type {
   RuntimeHostBindings,
   RuntimeResources,
 } from '../v2/contracts/host.js';
-import type { PackageRegistry } from '../v2/contracts/package.js';
+import type {
+  CompiledWorkflowDescriptor,
+  PackageRegistry,
+  TargetCompiledDomainPackage,
+} from '../v2/contracts/package.js';
+import type { JsonValue } from '../contracts/json.js';
 import type {
   OpenWorkflowInstanceRequest,
   RuntimeFailure,
@@ -74,7 +96,11 @@ import type {
   WorkflowInstanceSnapshot,
 } from '../v2/contracts/workflow.js';
 import type { DomainMessage, MessageAcceptedAck } from '../v2/contracts/message.js';
-import { CompiledWorkflowRuntime } from './compiled-workflow-runtime.js';
+import {
+  CompiledWorkflowRuntime,
+  type CompiledWorkflowCommandResult,
+  type CompiledWorkflowTransition,
+} from './compiled-workflow-runtime.js';
 import { JournaledSkillRunner } from './journaled-skill-runner.js';
 import { createRuntimeToolExecutor } from './tool-executor.js';
 
@@ -87,6 +113,14 @@ export interface CreateDomainRuntimeOptions {
   ai?: AIOperationPort;
   businessSnapshots?: BusinessSnapshotPort;
   domainData?: CompiledDomainDataPort;
+  /**
+   * I-03-ASSEMBLY successor profile enablement: host-side maxima declaring
+   * this Runtime/host also accepts successor ('0.3',2,3) packages. Absent
+   * (the default) keeps the exact historical legacy-only 0.2/2/2 activation
+   * policy. These maxima are host authority; package-recorded bounds may
+   * never exceed them and are never truncated or raised.
+   */
+  supportedPackageDataBounds?: PackageDataBounds;
   now?: () => string;
   onBackgroundError?: (error: unknown, target: WorkflowAddress) => void;
   /**
@@ -290,16 +324,38 @@ async function createDomainRuntimeInternal(
         })
       : undefined;
 
+  // I-03-ASSEMBLY activation policy: absent host maxima keep the exact
+  // historical legacy-only single-profile validation (byte-for-byte retained
+  // behavior for existing hosts); supplied maxima additionally enable the
+  // successor 0.3/2/3 profile with the DomainHarness-owned successor
+  // validator installed, so retained and successor packages in one registry
+  // each validate through their exact profile.
+  const successorSupportEnabled = options.supportedPackageDataBounds !== undefined;
+  const validationPolicy: PackageActivationValidationPolicy =
+    options.supportedPackageDataBounds === undefined
+      ? {
+          formatVersion: '0.2',
+          runtimeContractMajor: 2,
+          executionEngineMajor: 2,
+          hostCapabilities: options.bindings.capabilities,
+          sha256: options.bindings.sha256,
+        }
+      : {
+          supportedProfiles: [
+            LEGACY_COMPILED_ARTIFACT_PROFILE,
+            SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+          ],
+          hostCapabilities: options.bindings.capabilities,
+          sha256: options.bindings.sha256,
+          supportedPackageDataBounds: options.supportedPackageDataBounds,
+        };
+  const validatorExtensions: CompiledPackageValidatorExtensions | undefined =
+    successorSupportEnabled ? { successor: validateSuccessorCompiledPackage } : undefined;
   await preflightPackageActivation({
     registry: options.packageRegistry,
     store: effectiveStore,
-    validationPolicy: {
-      formatVersion: '0.2',
-      runtimeContractMajor: 2,
-      executionEngineMajor: 2,
-      hostCapabilities: options.bindings.capabilities,
-      sha256: options.bindings.sha256,
-    },
+    validationPolicy,
+    ...(validatorExtensions === undefined ? {} : { extensions: validatorExtensions }),
   });
 
   const lane = new PerInstanceSerializedLane();
@@ -328,11 +384,45 @@ async function createDomainRuntimeInternal(
     sha256: options.bindings.sha256,
     now,
   });
+  // I-03-ASSEMBLY projection boundary (L2-A §3.8): successor packages derive
+  // their Domain Data reads and Business Source contract lookups from the
+  // exact activated package material — out-of-band host maps cannot claim
+  // successor integrity conformance. Retained 0.2/2/2 packages keep the
+  // historical host-supplied CompiledDomainDataPort unchanged.
+  const dispatchingDomainData: CompiledDomainDataPort | undefined =
+    options.domainData === undefined && !successorSupportEnabled
+      ? undefined
+      : {
+          get(packageId, key) {
+            const compiledPackage = options.packageRegistry.get(packageId);
+            if (compiledPackage !== undefined && isSuccessorCompiledPackage(compiledPackage)) {
+              return compiledPackage.domainData?.[key];
+            }
+            return options.domainData?.get(packageId, key);
+          },
+        };
+  const packageBusinessSourceContracts: CompiledBusinessSourceContractPort = {
+    get(packageId, source): CompiledBusinessSourceContract | undefined {
+      const compiledPackage = options.packageRegistry.get(packageId);
+      if (compiledPackage === undefined || !isSuccessorCompiledPackage(compiledPackage)) {
+        return undefined;
+      }
+      const descriptor = compiledPackage.manifest.businessSources?.find(
+        (candidate) => candidate.source === source,
+      );
+      if (descriptor === undefined) return undefined;
+      return {
+        schemaContractVersion: DOMAIN_HARNESS_JSON_SCHEMA_V1,
+        descriptor: { source: descriptor.source, valueSchema: descriptor.valueSchema },
+      };
+    },
+  };
   const projection = new ProjectionService({
     packageRegistry: options.packageRegistry,
     store: options.store,
     ...(options.businessSnapshots === undefined ? {} : { businessSnapshots: options.businessSnapshots }),
-    ...(options.domainData === undefined ? {} : { domainData: options.domainData }),
+    ...(dispatchingDomainData === undefined ? {} : { domainData: dispatchingDomainData }),
+    businessSourceContracts: packageBusinessSourceContracts,
     expression: options.bindings.expression,
     sha256: options.bindings.sha256,
   });
@@ -416,6 +506,95 @@ async function createDomainRuntimeInternal(
     },
   });
 
+  // I-03-ASSEMBLY engine-major-3 execution: the successor interpreter stack is
+  // assembled onto the SAME store, acceptance authority, tool runner and
+  // notification path — one Runtime, one DurableExecutionStore, one durable
+  // effect authority. The I-MSG-REJECT typed acceptance adapter classifies the
+  // closed permanent/transient taxonomy; permanent child-send rejections are
+  // durably committed by the successor journaled effect and routed by the
+  // engine-3 interpreter's total `rejected` routes, while engine-2 packages
+  // keep the retained JournaledDomainMessageEffect unchanged.
+  const workflowSendAcceptance = new WorkflowSendAcceptance({ acceptance, store: effectiveStore });
+  const successorMessageEffect = new SuccessorJournaledDomainMessageEffect({
+    store: effectiveStore,
+    acceptance: workflowSendAcceptance,
+    sha256: options.bindings.sha256,
+    ...(options.now === undefined ? {} : { now }),
+  });
+  const successorMessageEffects = new CompiledWorkflowMessageEffectsV3({
+    expression: options.bindings.expression,
+    messageEffect: successorMessageEffect,
+    onChildAccepted(target, messageId) {
+      notifyTargetChanged(target, messageId);
+      scheduleDrain(target);
+    },
+  });
+  const runtimeWorkflowV3 = new CompiledWorkflowRuntimeV3({
+    expression: options.bindings.expression,
+    toolRunner,
+    toolExecutor: createRuntimeToolExecutor(options.bindings),
+    ...(skillRunner === undefined ? {} : { skillRunner }),
+    messageEffects: successorMessageEffects,
+  });
+
+  function isSuccessorCompiledPackage(
+    compiledPackage: TargetCompiledDomainPackage,
+  ): boolean {
+    return sameCompiledArtifactProfile(
+      {
+        formatVersion: compiledPackage.manifest.formatVersion,
+        runtimeContractMajor: compiledPackage.manifest.runtimeContractMajor,
+        executionEngineMajor: compiledPackage.manifest.executionEngineMajor,
+      },
+      SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+    );
+  }
+
+  // Exact per-package profile dispatch for execution: retained 0.2/2/2
+  // packages execute on the historical engine-2 interpreter and successor
+  // 0.3/2/3 packages on the engine-3 interpreter, in the same Runtime.
+  function processWorkflowMessage(
+    compiledPackage: TargetCompiledDomainPackage,
+    workflow: CompiledWorkflowDescriptor,
+    current: WorkflowInstanceSnapshot,
+    stored: StoredAcceptedMessage,
+    execution: { signal?: AbortSignal },
+  ): Promise<CompiledWorkflowTransition> {
+    if (!isSuccessorCompiledPackage(compiledPackage)) {
+      return runtimeWorkflow.processMessage(compiledPackage, workflow, current, stored, execution);
+    }
+    return runtimeWorkflowV3
+      .processCommand(compiledPackage, workflow, current, stored, execution)
+      .then((result) => {
+        if (result.status === 'rejected') {
+          throw new Error(result.rejection.message);
+        }
+        return result.transition;
+      });
+  }
+
+  function processWorkflowCommand(
+    compiledPackage: TargetCompiledDomainPackage,
+    workflow: CompiledWorkflowDescriptor,
+    current: WorkflowInstanceSnapshot,
+    stored: StoredAcceptedMessage,
+    execution: { signal?: AbortSignal },
+  ): Promise<CompiledWorkflowCommandResult> {
+    return isSuccessorCompiledPackage(compiledPackage)
+      ? runtimeWorkflowV3.processCommand(compiledPackage, workflow, current, stored, execution)
+      : runtimeWorkflow.processCommand(compiledPackage, workflow, current, stored, execution);
+  }
+
+  function initialWorkflowState(
+    compiledPackage: TargetCompiledDomainPackage,
+    workflow: CompiledWorkflowDescriptor,
+    input: JsonValue,
+  ): JsonValue {
+    return isSuccessorCompiledPackage(compiledPackage)
+      ? runtimeWorkflowV3.initialState(workflow, input)
+      : runtimeWorkflow.initialState(workflow, input);
+  }
+
   const unresolvedTargets = await options.store.listUnresolvedMessageTargets();
   for (const target of unresolvedTargets) {
     await options.store.reclaimInterruptedProcessing(target);
@@ -489,7 +668,7 @@ async function createDomainRuntimeInternal(
               `Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`,
             );
           }
-          const transition = await runtimeWorkflow.processMessage(
+          const transition = await processWorkflowMessage(
             compiledPackage,
             workflow,
             current,
@@ -554,7 +733,7 @@ async function createDomainRuntimeInternal(
           );
         }
 
-        const result = await runtimeWorkflow.processCommand(
+        const result = await processWorkflowCommand(
           compiledPackage,
           workflow,
           current,
@@ -648,7 +827,7 @@ async function createDomainRuntimeInternal(
       address: request.address,
       correlationId: request.correlationId,
       packageId,
-      initialState: runtimeWorkflow.initialState(workflow, request.input),
+      initialState: initialWorkflowState(compiledPackage, workflow, request.input),
       lifecycle: 'waiting',
     });
     notifyTargetChanged(request.address);
@@ -690,7 +869,7 @@ async function createDomainRuntimeInternal(
       packageId,
       lifecycle: 'waiting',
       stateRevision: 0,
-      state: runtimeWorkflow.initialState(workflow, request.input),
+      state: initialWorkflowState(compiledPackage, workflow, request.input),
       createdAt: requestedAt,
       updatedAt: requestedAt,
     };
