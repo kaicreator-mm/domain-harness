@@ -1,6 +1,9 @@
 import { Buffer } from 'node:buffer';
 import {
+  DomainHarnessJsonSchemaV1Error,
+  DomainHarnessJsonSchemaV1Validator,
   canonicalJsonStringify,
+  canonicalSchemaUtf8ByteLength,
   compareCompiledDomainDataKeys,
   type CompiledDomainDataDescriptor,
   type CompiledDomainDataSection,
@@ -59,6 +62,7 @@ function projectionDomainDataIssues(
   declaredKeys: ReadonlySet<string>,
 ): string[] {
   const issues: string[] = [];
+  const referencedKeys = new Set<string>();
   for (const projection of projections) {
     for (const dependency of projection.dependencies) {
       if (dependency.kind !== 'domain-data') continue;
@@ -66,6 +70,7 @@ function projectionDomainDataIssues(
         issues.push(`projection '${projection.projectionId}' declares an empty Domain Data dependency key`);
         continue;
       }
+      referencedKeys.add(dependency.key);
       if (!declaredKeys.has(dependency.key)) {
         issues.push(
           `projection '${projection.projectionId}' references undeclared Domain Data key '${dependency.key}'`,
@@ -73,16 +78,15 @@ function projectionDomainDataIssues(
       }
     }
   }
+  for (const key of declaredKeys) {
+    if (!referencedKeys.has(key)) {
+      issues.push(`orphan Domain Data key '${key}' is not referenced by any projection`);
+    }
+  }
   return issues;
 }
 
-/**
- * Internal successor compiler primitive. Public compileDomainPackage() remains
- * frozen on 0.2/2/2 until central I-03-ASSEMBLY.
- *
- * `projections` is intentionally mandatory: successor compilation may never
- * silently skip the statically knowable Domain Data dependency-closure gate.
- */
+/** Internal successor compiler primitive. Public compiler remains 0.2/2/2 until I-03-ASSEMBLY. */
 export function buildCompiledDomainDataSection(
   entries: readonly DomainDataCompileEntry[],
   bounds: PackageDataBounds,
@@ -90,6 +94,7 @@ export function buildCompiledDomainDataSection(
 ): CompiledDomainDataSection {
   assertBounds(bounds);
 
+  const schemaValidator = new DomainHarnessJsonSchemaV1Validator();
   const issues: string[] = [];
   const seen = new Set<string>();
   const prepared: Array<{
@@ -113,9 +118,18 @@ export function buildCompiledDomainDataSection(
     try {
       const canonicalValue = canonicalJsonStringify(entry.value);
       const value = JSON.parse(canonicalValue) as JsonValue;
-      const valueSchema = entry.valueSchema === undefined
-        ? undefined
-        : normalizedSchema(entry.valueSchema);
+      let valueSchema: JsonSchema | undefined;
+      if (entry.valueSchema !== undefined) {
+        valueSchema = schemaValidator.normalizeSchema(normalizedSchema(entry.valueSchema));
+        const schemaBytes = canonicalSchemaUtf8ByteLength(valueSchema);
+        if (schemaBytes > bounds.maxSchemaCanonicalBytes) {
+          issues.push(
+            `Domain Data '${entry.key}' valueSchema canonical bytes ${schemaBytes} exceed maxSchemaCanonicalBytes ${bounds.maxSchemaCanonicalBytes}`,
+          );
+        } else {
+          schemaValidator.validate(valueSchema, value, `Domain Data '${entry.key}'`);
+        }
+      }
       prepared.push({
         key: entry.key,
         canonicalValue,
@@ -124,7 +138,9 @@ export function buildCompiledDomainDataSection(
       });
     } catch (error) {
       issues.push(
-        `Domain Data '${entry.key}' is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof DomainHarnessJsonSchemaV1Error
+          ? `Domain Data '${entry.key}' failed successor schema/data validation: ${error.code} ${error.message}`
+          : `Domain Data '${entry.key}' is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { canonicalJsonStringify, compareCompiledDomainDataKeys, } from '@kaicreator/domain-harness/v2';
+import { DomainHarnessJsonSchemaV1Error, DomainHarnessJsonSchemaV1Validator, canonicalJsonStringify, canonicalSchemaUtf8ByteLength, compareCompiledDomainDataKeys, } from '@kaicreator/domain-harness/v2';
 import { sha256Text } from './canonical.js';
 export class DomainDataCompileError extends Error {
     issues;
@@ -36,6 +36,7 @@ function assertBounds(bounds) {
 }
 function projectionDomainDataIssues(projections, declaredKeys) {
     const issues = [];
+    const referencedKeys = new Set();
     for (const projection of projections) {
         for (const dependency of projection.dependencies) {
             if (dependency.kind !== 'domain-data')
@@ -44,22 +45,23 @@ function projectionDomainDataIssues(projections, declaredKeys) {
                 issues.push(`projection '${projection.projectionId}' declares an empty Domain Data dependency key`);
                 continue;
             }
+            referencedKeys.add(dependency.key);
             if (!declaredKeys.has(dependency.key)) {
                 issues.push(`projection '${projection.projectionId}' references undeclared Domain Data key '${dependency.key}'`);
             }
         }
     }
+    for (const key of declaredKeys) {
+        if (!referencedKeys.has(key)) {
+            issues.push(`orphan Domain Data key '${key}' is not referenced by any projection`);
+        }
+    }
     return issues;
 }
-/**
- * Internal successor compiler primitive. Public compileDomainPackage() remains
- * frozen on 0.2/2/2 until central I-03-ASSEMBLY.
- *
- * `projections` is intentionally mandatory: successor compilation may never
- * silently skip the statically knowable Domain Data dependency-closure gate.
- */
+/** Internal successor compiler primitive. Public compiler remains 0.2/2/2 until I-03-ASSEMBLY. */
 export function buildCompiledDomainDataSection(entries, bounds, projections) {
     assertBounds(bounds);
+    const schemaValidator = new DomainHarnessJsonSchemaV1Validator();
     const issues = [];
     const seen = new Set();
     const prepared = [];
@@ -76,9 +78,17 @@ export function buildCompiledDomainDataSection(entries, bounds, projections) {
         try {
             const canonicalValue = canonicalJsonStringify(entry.value);
             const value = JSON.parse(canonicalValue);
-            const valueSchema = entry.valueSchema === undefined
-                ? undefined
-                : normalizedSchema(entry.valueSchema);
+            let valueSchema;
+            if (entry.valueSchema !== undefined) {
+                valueSchema = schemaValidator.normalizeSchema(normalizedSchema(entry.valueSchema));
+                const schemaBytes = canonicalSchemaUtf8ByteLength(valueSchema);
+                if (schemaBytes > bounds.maxSchemaCanonicalBytes) {
+                    issues.push(`Domain Data '${entry.key}' valueSchema canonical bytes ${schemaBytes} exceed maxSchemaCanonicalBytes ${bounds.maxSchemaCanonicalBytes}`);
+                }
+                else {
+                    schemaValidator.validate(valueSchema, value, `Domain Data '${entry.key}'`);
+                }
+            }
             prepared.push({
                 key: entry.key,
                 canonicalValue,
@@ -87,7 +97,9 @@ export function buildCompiledDomainDataSection(entries, bounds, projections) {
             });
         }
         catch (error) {
-            issues.push(`Domain Data '${entry.key}' is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`);
+            issues.push(error instanceof DomainHarnessJsonSchemaV1Error
+                ? `Domain Data '${entry.key}' failed successor schema/data validation: ${error.code} ${error.message}`
+                : `Domain Data '${entry.key}' is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
     issues.push(...projectionDomainDataIssues(projections, seen));

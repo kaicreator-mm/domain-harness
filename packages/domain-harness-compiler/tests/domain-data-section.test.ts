@@ -22,7 +22,7 @@ const DEFAULT_BOUNDS: PackageDataBounds = {
 
 function projection(key: string): RawProjectionDefinition {
   return {
-    projectionId: 'catalog-view',
+    projectionId: `catalog-view-${key}`,
     expression: '$',
     dependencies: [{ kind: 'domain-data', key }],
     outputSchema: {},
@@ -30,14 +30,15 @@ function projection(key: string): RawProjectionDefinition {
 }
 
 test('I-PKG-DATA: input insertion order normalizes to identical Domain Data identity material', () => {
+  const projections = [projection('a'), projection('b')];
   const left = buildCompiledDomainDataSection([
     { key: 'b', value: { n: 2 } },
     { key: 'a', value: { n: 1 } },
-  ], DEFAULT_BOUNDS, []);
+  ], DEFAULT_BOUNDS, projections);
   const right = buildCompiledDomainDataSection([
     { key: 'a', value: { n: 1 } },
     { key: 'b', value: { n: 2 } },
-  ], DEFAULT_BOUNDS, []);
+  ], DEFAULT_BOUNDS, projections);
 
   assert.deepEqual(left.descriptors.map((item) => item.key), ['a', 'b']);
   assert.equal(
@@ -52,7 +53,7 @@ test('I-PKG-DATA: duplicate and empty keys fail at compile time', () => {
       { key: 'a', value: 1 },
       { key: 'a', value: 2 },
       { key: '', value: 3 },
-    ], DEFAULT_BOUNDS, []),
+    ], DEFAULT_BOUNDS, [projection('a')]),
     (error: unknown) => error instanceof DomainDataCompileError
       && error.issues.some((issue) => issue.includes("duplicate Domain Data key 'a'"))
       && error.issues.some((issue) => issue.includes('non-empty string')),
@@ -71,6 +72,17 @@ test('I-PKG-DATA: projection references to undeclared Domain Data fail during co
   );
 });
 
+test('I-PKG-DATA: orphan Domain Data declarations fail during compilation', () => {
+  assert.throws(
+    () => buildCompiledDomainDataSection([
+      { key: 'used', value: { ok: true } },
+      { key: 'unused', value: { ok: true } },
+    ], DEFAULT_BOUNDS, [projection('used')]),
+    (error: unknown) => error instanceof DomainDataCompileError
+      && error.issues.some((issue) => issue.includes("orphan Domain Data key 'unused'")),
+  );
+});
+
 test('I-PKG-DATA: exact per-entry boundary passes and one-byte lower bound fails', () => {
   const value = 'é';
   const bytes = Buffer.byteLength(canonicalJsonStringify(value), 'utf8');
@@ -80,14 +92,18 @@ test('I-PKG-DATA: exact per-entry boundary passes and one-byte lower bound fails
     maxTotalDomainDataCanonicalBytes: bytes,
   };
 
-  const compiled = buildCompiledDomainDataSection([{ key: 'text', value }], exact, []);
+  const compiled = buildCompiledDomainDataSection(
+    [{ key: 'text', value }],
+    exact,
+    [projection('text')],
+  );
   assert.equal(compiled.descriptors.length, 1);
 
   assert.throws(
     () => buildCompiledDomainDataSection([{ key: 'text', value }], {
       ...exact,
       maxDomainDataEntryCanonicalBytes: bytes - 1,
-    }, []),
+    }, [projection('text')]),
     (error: unknown) => error instanceof DomainDataCompileError
       && error.issues.some((issue) => issue.includes('maxDomainDataEntryCanonicalBytes')),
   );
@@ -107,19 +123,20 @@ test('I-PKG-DATA: aggregate canonical byte overflow fails independently', () => 
     () => buildCompiledDomainDataSection(entries, {
       ...DEFAULT_BOUNDS,
       maxTotalDomainDataCanonicalBytes: total - 1,
-    }, []),
+    }, [projection('a'), projection('b')]),
     (error: unknown) => error instanceof DomainDataCompileError
       && error.issues.some((issue) => issue.includes('maxTotalDomainDataCanonicalBytes')),
   );
 });
 
 test('I-PKG-DATA: optional valueSchema is identity-bound but not semantically interpreted here', () => {
+  const projections = [projection('a')];
   const first = buildCompiledDomainDataSection([
     { key: 'a', value: 1, valueSchema: { type: 'number' } },
-  ], DEFAULT_BOUNDS, []);
+  ], DEFAULT_BOUNDS, projections);
   const second = buildCompiledDomainDataSection([
     { key: 'a', value: 1, valueSchema: { type: 'integer' } },
-  ], DEFAULT_BOUNDS, []);
+  ], DEFAULT_BOUNDS, projections);
 
   assert.equal(first.descriptors[0]?.contentDigest, second.descriptors[0]?.contentDigest);
   assert.notEqual(
@@ -140,7 +157,11 @@ test('I-PKG-DATA: compiler canonical seam rejects accessor values without invoki
   });
 
   assert.throws(
-    () => buildCompiledDomainDataSection([{ key: 'a', value }], DEFAULT_BOUNDS, []),
+    () => buildCompiledDomainDataSection(
+      [{ key: 'a', value }],
+      DEFAULT_BOUNDS,
+      [projection('a')],
+    ),
     (error: unknown) => error instanceof DomainDataCompileError
       && error.issues.some((issue) => issue.includes('not canonical JSON')),
   );
@@ -156,7 +177,11 @@ test('I-PKG-DATA: zero Domain Data capacity is a valid fail-closed bound', () =>
   };
   assert.deepEqual(buildCompiledDomainDataSection([], zeroBounds, []).descriptors, []);
   assert.throws(
-    () => buildCompiledDomainDataSection([{ key: 'a', value: null }], zeroBounds, []),
+    () => buildCompiledDomainDataSection(
+      [{ key: 'a', value: null }],
+      zeroBounds,
+      [projection('a')],
+    ),
     DomainDataCompileError,
   );
 });

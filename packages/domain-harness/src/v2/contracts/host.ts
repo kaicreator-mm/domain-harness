@@ -1,5 +1,6 @@
 import type { Sha256Port } from '../../contracts/identity.js';
 import type { JsonValue } from '../../contracts/json.js';
+import type { HostLocalDomainToolBindings } from '../../tool/host-local-contract/index.js';
 import type { CapabilityId } from './capability.js';
 import type { EffectExecutionContext } from './effect.js';
 import type { CompiledBindingDescriptor } from './package.js';
@@ -66,6 +67,13 @@ export interface RuntimeHostBindings {
   expression: ExpressionExecutorPort;
   script?: ScriptExecutorPort;
   remoteTransports?: Readonly<Record<string, RemoteTransportPort>>;
+  /**
+   * T-008 host/project-local Domain Tool implementations keyed by the exact
+   * target-compiled bindingId. Implementations may close over native/project
+   * resources, but those resources never enter portable package content or
+   * Runtime internals. Absent keeps the historical remote/script behavior.
+   */
+  hostLocalDomainTools?: HostLocalDomainToolBindings;
 }
 
 export interface RuntimeResources {
