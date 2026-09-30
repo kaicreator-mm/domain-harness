@@ -4,6 +4,7 @@ import {
   compareCompiledDomainDataKeys,
   type PackageDataBounds,
 } from '@kaicreator/domain-harness/v2';
+import type { RawProjectionDefinition } from '../src/raw/types.js';
 import { buildCompiledDomainDataSection } from '../src/package/domain-data.js';
 
 const BOUNDS: PackageDataBounds = {
@@ -14,6 +15,17 @@ const BOUNDS: PackageDataBounds = {
   maxSchemaCanonicalBytes: 64,
 };
 
+// Keys must be referenced by at least one projection since I-BIZ-SRC orphan
+// rejection; ordering assertions are unaffected by the referencing projection.
+function projection(key: string): RawProjectionDefinition {
+  return {
+    projectionId: `key-order-${key}`,
+    expression: '$',
+    dependencies: [{ kind: 'domain-data', key }],
+    outputSchema: {},
+  };
+}
+
 test('I-PKG-DATA: exact key ordering is locale-independent UTF-16 lexical order', () => {
   const keys = ['ä', 'z', 'Z', 'á', 'a'];
   assert.deepEqual([...keys].sort(compareCompiledDomainDataKeys), ['Z', 'a', 'z', 'á', 'ä']);
@@ -21,7 +33,7 @@ test('I-PKG-DATA: exact key ordering is locale-independent UTF-16 lexical order'
   const section = buildCompiledDomainDataSection(
     keys.map((key) => ({ key, value: key })),
     BOUNDS,
-    [],
+    keys.map((key) => projection(key)),
   );
   assert.deepEqual(section.descriptors.map((descriptor) => descriptor.key), ['Z', 'a', 'z', 'á', 'ä']);
 });
@@ -30,7 +42,7 @@ test('I-PKG-DATA: __proto__ remains an ordinary own Domain Data key', () => {
   const section = buildCompiledDomainDataSection(
     [{ key: '__proto__', value: { safe: true } }],
     BOUNDS,
-    [],
+    [projection('__proto__')],
   );
 
   assert.equal(Object.getPrototypeOf(section.values), null);

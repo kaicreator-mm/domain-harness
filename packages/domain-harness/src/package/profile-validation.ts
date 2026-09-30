@@ -9,6 +9,7 @@ import {
   type CompiledArtifactProfile,
   type SupportedCompiledArtifactProfile,
 } from '../v2/contracts/compiled-artifact-profile.js';
+import type { PackageDataBounds } from '../v2/contracts/package-data.js';
 import type { TargetCompiledDomainPackage } from '../v2/contracts/package.js';
 import { PackageActivationError } from './errors.js';
 import {
@@ -21,30 +22,32 @@ export interface SupportedCompiledPackageValidationPolicy {
   readonly hostCapabilities: readonly CapabilityId[];
   readonly sha256: Sha256Port;
   readonly targetProfileId?: string;
+  /** Mandatory host-side maxima whenever successor 0.3/2/3 is enabled. */
+  readonly supportedPackageDataBounds?: PackageDataBounds;
 }
 
-/** DomainHarness-owned extension point; never part of Host validation policy. */
+/** DomainHarness-owned extension point; never part of Host feature authority. */
 export type SuccessorCompiledPackageValidator = (
   value: unknown,
   policy: SupportedCompiledPackageValidationPolicy,
 ) => Promise<TargetCompiledDomainPackage>;
 
 export interface CompiledPackageValidatorExtensions {
-  /**
-   * Installed only by downstream DomainHarness assembly after successor package
-   * semantics exist. I-FMT-03 and current production activation install none.
-   */
+  /** Installed only after downstream successor package semantics exist. */
   readonly successor?: SuccessorCompiledPackageValidator;
 }
 
-/**
- * Legacy single-profile policies remain source-compatible only for the exact
- * frozen 0.2/2/2 profile. Activation no longer accepts arbitrary expected
- * triples through that compatibility shape.
- */
 export type PackageActivationValidationPolicy =
   | LegacyCompiledPackageValidationPolicy
   | SupportedCompiledPackageValidationPolicy;
+
+const PACKAGE_DATA_BOUND_KEYS = [
+  'maxDomainDataEntries',
+  'maxDomainDataEntryCanonicalBytes',
+  'maxTotalDomainDataCanonicalBytes',
+  'maxBusinessSources',
+  'maxSchemaCanonicalBytes',
+] as const satisfies readonly (keyof PackageDataBounds)[];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -52,6 +55,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function failInvalid(message: string): never {
   throw new PackageActivationError('INVALID_COMPILED_PACKAGE', message);
+}
+
+function normalizePackageDataBounds(value: unknown, label: string): PackageDataBounds {
+  if (!isRecord(value)) {
+    throw new PackageActivationError('INCOMPATIBLE_PACKAGE', `${label} must be an object`);
+  }
+  const actualKeys = Object.keys(value).sort();
+  const expectedKeys = [...PACKAGE_DATA_BOUND_KEYS].sort();
+  if (actualKeys.length !== expectedKeys.length
+    || actualKeys.some((key, index) => key !== expectedKeys[index])) {
+    throw new PackageActivationError(
+      'INCOMPATIBLE_PACKAGE',
+      `${label} must contain exactly the frozen package-data bound fields`,
+      actualKeys,
+    );
+  }
+  const result: Record<string, number> = {};
+  for (const key of PACKAGE_DATA_BOUND_KEYS) {
+    const bound = value[key];
+    if (typeof bound !== 'number' || !Number.isSafeInteger(bound) || bound < 0) {
+      throw new PackageActivationError(
+        'INCOMPATIBLE_PACKAGE',
+        `${label}.${key} must be a non-negative safe integer`,
+      );
+    }
+    result[key] = bound;
+  }
+  return result as unknown as PackageDataBounds;
 }
 
 function readManifestProfile(value: unknown): CompiledArtifactProfile {
@@ -124,6 +155,18 @@ function normalizeSupportedProfiles(
     }
     unique.add(key);
   }
+
+  if (policy.supportedProfiles.some((profile) =>
+    sameCompiledArtifactProfile(profile, SUCCESSOR_COMPILED_ARTIFACT_PROFILE))) {
+    if (policy.supportedPackageDataBounds === undefined) {
+      throw new PackageActivationError(
+        'INCOMPATIBLE_PACKAGE',
+        'successor 0.3/2/3 support requires supportedPackageDataBounds',
+      );
+    }
+    normalizePackageDataBounds(policy.supportedPackageDataBounds, 'supportedPackageDataBounds');
+  }
+
   return policy.supportedProfiles;
 }
 
@@ -147,7 +190,43 @@ function asSupportedPolicy(
     hostCapabilities: common.hostCapabilities,
     sha256: common.sha256,
     ...(common.targetProfileId === undefined ? {} : { targetProfileId: common.targetProfileId }),
+    ...(isSupportedPolicy(policy) && policy.supportedPackageDataBounds !== undefined
+      ? { supportedPackageDataBounds: normalizePackageDataBounds(
+          policy.supportedPackageDataBounds,
+          'supportedPackageDataBounds',
+        ) }
+      : {}),
   };
+}
+
+/**
+ * Successor validators call this before package admission. Package-recorded
+ * maxima are never allowed to exceed host-supported maxima or be silently
+ * truncated/raised.
+ */
+export function assertPackageDataBoundsSupported(
+  packageBounds: PackageDataBounds,
+  policy: SupportedCompiledPackageValidationPolicy,
+): void {
+  const actual = normalizePackageDataBounds(packageBounds, 'packageDataBounds');
+  if (policy.supportedPackageDataBounds === undefined) {
+    throw new PackageActivationError(
+      'INCOMPATIBLE_PACKAGE',
+      'successor package validation requires supportedPackageDataBounds',
+    );
+  }
+  const supported = normalizePackageDataBounds(
+    policy.supportedPackageDataBounds,
+    'supportedPackageDataBounds',
+  );
+  const exceeded = PACKAGE_DATA_BOUND_KEYS.filter((key) => actual[key] > supported[key]);
+  if (exceeded.length > 0) {
+    throw new PackageActivationError(
+      'INCOMPATIBLE_PACKAGE',
+      'package-recorded data bounds exceed host-supported maxima',
+      exceeded.map((key) => `${key}: package=${actual[key]} host=${supported[key]}`),
+    );
+  }
 }
 
 export async function validateCompiledPackageByProfile(
@@ -190,7 +269,7 @@ export async function validateCompiledPackageByProfile(
       throw new PackageActivationError(
         'INCOMPATIBLE_PACKAGE',
         'successor 0.3/2/3 profile is recognized but its DomainHarness feature validator is not installed',
-        ['profile=0.3/2/3', 'feature-semantics=NOT_OWNED_BY_I-FMT-03'],
+        ['profile=0.3/2/3', 'feature-semantics=NOT_YET_ASSEMBLED'],
       );
     }
     return extensions.successor(value, asSupportedPolicy(policy, supported));

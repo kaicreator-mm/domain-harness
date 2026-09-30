@@ -6,6 +6,12 @@ import {
 } from '../contracts/identity.js';
 import type { JsonSchema, JsonValue } from '../contracts/json.js';
 import {
+  DomainHarnessJsonSchemaV1Error,
+  DomainHarnessJsonSchemaV1Validator,
+  canonicalSchemaUtf8ByteLength,
+  portableUtf8ByteLength,
+} from '../schema/domainharness-json-schema-v1.js';
+import {
   compareCompiledDomainDataKeys,
   type CompiledDomainDataDescriptor,
   type CompiledDomainDataSection,
@@ -15,7 +21,8 @@ import {
 export type DomainDataIntegrityErrorCode =
   | 'INVALID_DOMAIN_DATA_SECTION'
   | 'DOMAIN_DATA_DIGEST_MISMATCH'
-  | 'DOMAIN_DATA_BOUNDS_EXCEEDED';
+  | 'DOMAIN_DATA_BOUNDS_EXCEEDED'
+  | 'DOMAIN_DATA_SCHEMA_VIOLATION';
 
 export class DomainDataIntegrityError extends Error {
   readonly code: DomainDataIntegrityErrorCode;
@@ -49,31 +56,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalid(message: string, details: readonly string[] = []): never {
   throw new DomainDataIntegrityError('INVALID_DOMAIN_DATA_SECTION', message, details);
-}
-
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const codeUnit = value.charCodeAt(index);
-    if (codeUnit < 0x80) {
-      bytes += 1;
-      continue;
-    }
-    if (codeUnit < 0x800) {
-      bytes += 2;
-      continue;
-    }
-    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4;
-        index += 1;
-        continue;
-      }
-    }
-    bytes += 3;
-  }
-  return bytes;
 }
 
 function readBounds(value: unknown): PackageDataBounds {
@@ -113,7 +95,6 @@ function readDescriptor(value: unknown, index: number): CompiledDomainDataDescri
     if (!isRecord(value.valueSchema)) {
       invalid(`descriptors[${index}].valueSchema must be a JSON object`);
     }
-    canonicalJsonStringify(value.valueSchema);
     valueSchema = value.valueSchema as JsonSchema;
   }
   return {
@@ -135,10 +116,7 @@ function readValues(value: unknown): Readonly<Record<string, JsonValue>> {
 }
 
 /**
- * Portable successor Domain Data integrity validation. This helper does not
- * install successor package admission or JSON Schema semantics; it is consumed
- * later by the DomainHarness-owned successor validator assembly.
- *
+ * Portable successor Domain Data integrity + schema admission validation.
  * Validation operates on a detached canonical snapshot so caller mutation
  * cannot create a time-of-check/time-of-use split while async digests run.
  */
@@ -168,6 +146,7 @@ export async function validateCompiledDomainDataSection(
   const descriptors = snapshot.descriptors.map(readDescriptor);
   const values = readValues(snapshot.values);
   const packageDataBounds = readBounds(snapshot.packageDataBounds);
+  const schemaValidator = new DomainHarnessJsonSchemaV1Validator();
 
   const descriptorKeys = descriptors.map((descriptor) => descriptor.key);
   const sortedDescriptorKeys = [...descriptorKeys].sort(compareCompiledDomainDataKeys);
@@ -196,10 +175,11 @@ export async function validateCompiledDomainDataSection(
   }
 
   let totalBytes = 0;
+  const normalizedDescriptors: CompiledDomainDataDescriptor[] = [];
   for (const descriptor of descriptors) {
     const bundled = values[descriptor.key] as JsonValue;
     const canonical = canonicalJsonStringify(bundled);
-    const bytes = utf8ByteLength(canonical);
+    const bytes = portableUtf8ByteLength(canonical);
     if (bytes > packageDataBounds.maxDomainDataEntryCanonicalBytes) {
       throw new DomainDataIntegrityError(
         'DOMAIN_DATA_BOUNDS_EXCEEDED',
@@ -208,6 +188,33 @@ export async function validateCompiledDomainDataSection(
       );
     }
     totalBytes += bytes;
+
+    let valueSchema = descriptor.valueSchema;
+    if (valueSchema !== undefined) {
+      try {
+        valueSchema = schemaValidator.normalizeSchema(valueSchema);
+        const schemaBytes = canonicalSchemaUtf8ByteLength(valueSchema);
+        if (schemaBytes > packageDataBounds.maxSchemaCanonicalBytes) {
+          throw new DomainDataIntegrityError(
+            'DOMAIN_DATA_BOUNDS_EXCEEDED',
+            `Domain Data '${descriptor.key}' valueSchema exceeds canonical schema byte bound`,
+            [`actual=${schemaBytes}`, `max=${packageDataBounds.maxSchemaCanonicalBytes}`],
+          );
+        }
+        schemaValidator.validate(valueSchema, bundled, `Domain Data '${descriptor.key}'`);
+      } catch (error) {
+        if (error instanceof DomainDataIntegrityError) throw error;
+        if (error instanceof DomainHarnessJsonSchemaV1Error) {
+          throw new DomainDataIntegrityError(
+            'DOMAIN_DATA_SCHEMA_VIOLATION',
+            `Domain Data '${descriptor.key}' failed ${error.code}`,
+            [error.message, ...error.details],
+          );
+        }
+        throw error;
+      }
+    }
+
     const digest = await computeCanonicalJsonDigest(bundled, sha256);
     if (digest !== descriptor.contentDigest) {
       throw new DomainDataIntegrityError(
@@ -216,6 +223,11 @@ export async function validateCompiledDomainDataSection(
         [`expected=${descriptor.contentDigest}`, `actual=${digest}`],
       );
     }
+    normalizedDescriptors.push({
+      key: descriptor.key,
+      contentDigest: descriptor.contentDigest,
+      ...(valueSchema === undefined ? {} : { valueSchema }),
+    });
   }
 
   if (totalBytes > packageDataBounds.maxTotalDomainDataCanonicalBytes) {
@@ -226,5 +238,5 @@ export async function validateCompiledDomainDataSection(
     );
   }
 
-  return { descriptors, values, packageDataBounds };
+  return { descriptors: normalizedDescriptors, values, packageDataBounds };
 }

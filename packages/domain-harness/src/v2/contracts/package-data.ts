@@ -1,10 +1,8 @@
 import type { ContentDigest } from '../../contracts/identity.js';
 import type { JsonSchema, JsonValue } from '../../contracts/json.js';
+import type { DomainHarnessJsonSchemaContractVersion } from '../../schema/domainharness-json-schema-v1.js';
 
-/**
- * Frozen successor package data bounds shared by Domain Data and Business Source lanes.
- * I-PKG-DATA enforces only the Domain-Data-related fields; I-BIZ-SRC completes the rest.
- */
+/** Frozen successor package data bounds shared by Domain Data and Business Source lanes. */
 export interface PackageDataBounds {
   readonly maxDomainDataEntries: number;
   readonly maxDomainDataEntryCanonicalBytes: number;
@@ -16,10 +14,7 @@ export interface PackageDataBounds {
 export interface CompiledDomainDataDescriptor {
   readonly key: string;
   readonly contentDigest: ContentDigest;
-  /**
-   * Identity-bound schema material. Exact schema semantics are installed later
-   * by I-BIZ-SRC under the frozen `domainharness-json-schema/1` contract.
-   */
+  /** Identity-bound schema material validated under the exact successor schema contract. */
   readonly valueSchema?: JsonSchema;
 }
 
@@ -40,17 +35,35 @@ export interface CompiledDomainDataIdentityMaterial {
   readonly packageDataBounds: PackageDataBounds;
 }
 
-/**
- * Exact locale-independent key ordering used by successor package identity.
- * JavaScript string relational comparison is lexicographic by UTF-16 code
- * units, matching the deterministic ordering used by the shared canonical JSON
- * seam. Locale/ICU collation must never participate in package identity.
- */
-export function compareCompiledDomainDataKeys(left: string, right: string): number {
+export interface CompiledBusinessSourceDescriptor {
+  readonly source: string;
+  readonly valueSchema: JsonSchema;
+  /** Present only when portable compiler-emitted validator bytes are packaged. */
+  readonly validatorBindingDigest?: ContentDigest;
+}
+
+/** Internal successor section consumed later by central 0.3 manifest assembly. */
+export interface CompiledBusinessSourceSection {
+  readonly schemaContractVersion: DomainHarnessJsonSchemaContractVersion;
+  readonly descriptors: readonly CompiledBusinessSourceDescriptor[];
+}
+
+export interface CompiledBusinessSourceIdentityMaterial {
+  readonly schemaContractVersion: DomainHarnessJsonSchemaContractVersion;
+  readonly descriptors: readonly CompiledBusinessSourceDescriptor[];
+}
+
+/** Exact locale-independent ordering used by successor package identity. */
+export function compareCompiledPackageDataKeys(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
   return 0;
 }
+
+/** Compatibility name retained for I-PKG-DATA callers. */
+export const compareCompiledDomainDataKeys = compareCompiledPackageDataKeys;
+
+export const compareCompiledBusinessSourceKeys = compareCompiledPackageDataKeys;
 
 /** One authoritative projection from a validated/compiled Domain Data section into identity material. */
 export function compiledDomainDataIdentityMaterial(
@@ -63,5 +76,20 @@ export function compiledDomainDataIdentityMaterial(
       ...(descriptor.valueSchema === undefined ? {} : { valueSchema: descriptor.valueSchema }),
     })),
     packageDataBounds: { ...section.packageDataBounds },
+  };
+}
+
+export function compiledBusinessSourceIdentityMaterial(
+  section: CompiledBusinessSourceSection,
+): CompiledBusinessSourceIdentityMaterial {
+  return {
+    schemaContractVersion: section.schemaContractVersion,
+    descriptors: section.descriptors.map((descriptor) => ({
+      source: descriptor.source,
+      valueSchema: descriptor.valueSchema,
+      ...(descriptor.validatorBindingDigest === undefined
+        ? {}
+        : { validatorBindingDigest: descriptor.validatorBindingDigest }),
+    })),
   };
 }
