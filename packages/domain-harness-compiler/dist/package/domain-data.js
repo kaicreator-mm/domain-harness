@@ -36,6 +36,7 @@ function assertBounds(bounds) {
 }
 function projectionDomainDataIssues(projections, declaredKeys) {
     const issues = [];
+    const referencedKeys = new Set();
     for (const projection of projections) {
         for (const dependency of projection.dependencies) {
             if (dependency.kind !== 'domain-data')
@@ -44,9 +45,15 @@ function projectionDomainDataIssues(projections, declaredKeys) {
                 issues.push(`projection '${projection.projectionId}' declares an empty Domain Data dependency key`);
                 continue;
             }
+            referencedKeys.add(dependency.key);
             if (!declaredKeys.has(dependency.key)) {
                 issues.push(`projection '${projection.projectionId}' references undeclared Domain Data key '${dependency.key}'`);
             }
+        }
+    }
+    for (const key of declaredKeys) {
+        if (!referencedKeys.has(key)) {
+            issues.push(`orphan Domain Data key '${key}' is not referenced by any projection`);
         }
     }
     return issues;
