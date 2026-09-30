@@ -11,6 +11,7 @@ import type {
   CompiledWorkflowDescriptor,
   ProjectionDependencyDescriptor,
 } from '@kaicreator/domain-harness/v2';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1 } from '@kaicreator/domain-harness/v2';
 import { canonicalJson, sha256Canonical, sha256Text } from './canonical.js';
 
 // The compiled artifact contracts have exactly one authoritative owner: the
@@ -180,9 +181,40 @@ export function assertCompiledPackageManifest(manifest: CompiledPackageManifest)
   if (!manifest.domainId) issues.push('domainId must be non-empty');
   if (!manifest.domainVersion) issues.push('domainVersion must be non-empty');
   if (!manifest.targetProfileId) issues.push('targetProfileId must be non-empty');
-  if (manifest.formatVersion !== '0.2') issues.push(`formatVersion must be '0.2'`);
-  if (manifest.runtimeContractMajor !== 2) issues.push('runtimeContractMajor must be 2');
-  if (manifest.executionEngineMajor !== 2) issues.push('executionEngineMajor must be 2');
+
+  // Exact profile dispatch (L2 §2.3): exactly one of the frozen tuples is
+  // acceptable, and successor-only material is valid only on the successor
+  // tuple. A retained 0.2/2/2 manifest carrying successor fields would blur
+  // the identity boundary between the two artifact generations.
+  const isLegacyTuple = manifest.formatVersion === '0.2'
+    && manifest.runtimeContractMajor === 2
+    && manifest.executionEngineMajor === 2;
+  const isSuccessorTuple = manifest.formatVersion === '0.3'
+    && manifest.runtimeContractMajor === 2
+    && manifest.executionEngineMajor === 3;
+  if (!isLegacyTuple && !isSuccessorTuple) {
+    if (manifest.formatVersion !== '0.2' && manifest.formatVersion !== '0.3') {
+      issues.push(`formatVersion must be '0.2' or '0.3'`);
+    } else {
+      issues.push(
+        `profile tuple ${manifest.formatVersion}/${manifest.runtimeContractMajor}/${manifest.executionEngineMajor} is not a supported compiled-artifact profile`,
+      );
+    }
+  }
+  if (isLegacyTuple) {
+    if (manifest.schemaContractVersion !== undefined) issues.push('schemaContractVersion is successor-only material and must be absent on a 0.2/2/2 manifest');
+    if (manifest.packageDataBounds !== undefined) issues.push('packageDataBounds is successor-only material and must be absent on a 0.2/2/2 manifest');
+    if (manifest.domainData !== undefined) issues.push('domainData is successor-only material and must be absent on a 0.2/2/2 manifest');
+    if (manifest.businessSources !== undefined) issues.push('businessSources is successor-only material and must be absent on a 0.2/2/2 manifest');
+  }
+  if (isSuccessorTuple) {
+    if (manifest.schemaContractVersion !== DOMAIN_HARNESS_JSON_SCHEMA_V1) {
+      issues.push(`schemaContractVersion must be exactly ${DOMAIN_HARNESS_JSON_SCHEMA_V1}`);
+    }
+    issues.push(...packageDataBoundsIssues(manifest.packageDataBounds));
+    if (manifest.domainData === undefined) issues.push('domainData descriptors are required on a 0.3/2/3 manifest');
+    if (manifest.businessSources === undefined) issues.push('businessSources descriptors are required on a 0.3/2/3 manifest');
+  }
   const requiredSet = new Set(manifest.requiredCapabilities);
   if (requiredSet.size !== manifest.requiredCapabilities.length) issues.push('requiredCapabilities contains duplicates');
   for (const [key, workflow] of Object.entries(manifest.workflows)) {
@@ -210,4 +242,33 @@ export function assertCompiledPackageManifest(manifest: CompiledPackageManifest)
   const expectedId = sha256Canonical(manifestIdentityMaterial(manifest));
   if (manifest.packageId !== expectedId) issues.push(`packageId mismatch: expected '${expectedId}'`);
   if (issues.length) throw new CompiledManifestValidationError(issues);
+}
+
+const PACKAGE_DATA_BOUND_KEYS = [
+  'maxDomainDataEntries',
+  'maxDomainDataEntryCanonicalBytes',
+  'maxTotalDomainDataCanonicalBytes',
+  'maxBusinessSources',
+  'maxSchemaCanonicalBytes',
+] as const;
+
+function packageDataBoundsIssues(value: unknown): string[] {
+  if (value === undefined || value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return ['packageDataBounds must be an object on a 0.3/2/3 manifest'];
+  }
+  const issues: string[] = [];
+  const actualKeys = Object.keys(value).sort();
+  const expectedKeys = [...PACKAGE_DATA_BOUND_KEYS].sort();
+  if (actualKeys.length !== expectedKeys.length
+    || actualKeys.some((key, index) => key !== expectedKeys[index])) {
+    return ['packageDataBounds must contain exactly the frozen package-data bound fields'];
+  }
+  const bounds = value as Record<string, unknown>;
+  for (const key of PACKAGE_DATA_BOUND_KEYS) {
+    const bound = bounds[key];
+    if (typeof bound !== 'number' || !Number.isSafeInteger(bound) || bound < 0) {
+      issues.push(`packageDataBounds.${key} must be a non-negative safe integer`);
+    }
+  }
+  return issues;
 }

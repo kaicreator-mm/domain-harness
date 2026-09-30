@@ -36,6 +36,13 @@ const target: TargetHostProfile = {
     [INVENTORY]: 'inventory-native-v1',
     [AUDIT]: 'audit-read-v1',
   },
+  packageDataBounds: {
+    maxDomainDataEntries: 16,
+    maxDomainDataEntryCanonicalBytes: 2048,
+    maxTotalDomainDataCanonicalBytes: 8192,
+    maxBusinessSources: 8,
+    maxSchemaCanonicalBytes: 4096,
+  },
 };
 
 const bindingContents = {

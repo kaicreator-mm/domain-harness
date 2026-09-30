@@ -1,16 +1,18 @@
 import {
-  LEGACY_COMPILED_ARTIFACT_PROFILE,
   SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
 } from '@kaicreator/domain-harness/v2';
 
 /**
- * Public compiler output remains frozen on the legacy profile until the later
- * I-03-ASSEMBLY node authorizes publication of a complete successor artifact.
+ * I-03-ASSEMBLY owns the single compiler-emission switch point: after the
+ * complete successor package material (Domain Data, Business Source, engine-3
+ * rejection routing) is assembled, the public compiler emits exactly the
+ * successor ('0.3',2,3) profile. Retained ('0.2',2,2) packages remain valid
+ * Runtime artifacts and keep their exact historical identity/pins.
  */
-export const PUBLIC_COMPILER_OUTPUT_PROFILE = LEGACY_COMPILED_ARTIFACT_PROFILE;
+export const PUBLIC_COMPILER_OUTPUT_PROFILE = SUCCESSOR_COMPILED_ARTIFACT_PROFILE;
 
 /**
- * Internal scaffold identity available to downstream successor feature work.
- * Its presence does not authorize compileDomainPackage() to emit it.
+ * Historical name retained for I-FMT-03 callers; it is now the same successor
+ * profile the public compiler emits.
  */
 export const SUCCESSOR_COMPILER_PROFILE_SCAFFOLD = SUCCESSOR_COMPILED_ARTIFACT_PROFILE;

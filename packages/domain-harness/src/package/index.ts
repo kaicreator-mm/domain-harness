@@ -4,4 +4,5 @@ export * from './domain-data-integrity.js';
 export * from './errors.js';
 export * from './profile-validation.js';
 export * from './registry.js';
+export * from './successor-validation.js';
 export * from './validation.js';

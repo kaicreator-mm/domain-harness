@@ -2,6 +2,7 @@ import type { AIOperationPort } from '../contracts/ai.js';
 import type { DomainIntelligencePackageIdentity } from '../contracts/domain-data.js';
 import { type RuntimeControlAuthorizer, type RuntimeControlStore } from '../control/index.js';
 import type { CompiledDomainDataPort } from '../projection/compiled-domain-data.js';
+import type { PackageDataBounds } from '../v2/contracts/package-data.js';
 import type { BusinessSnapshotPort } from '../v2/contracts/projection.js';
 import type { DomainRuntime } from '../v2/contracts/runtime.js';
 import type { RuntimeStore } from '../v2/contracts/store.js';
@@ -17,6 +18,14 @@ export interface CreateDomainRuntimeOptions {
     ai?: AIOperationPort;
     businessSnapshots?: BusinessSnapshotPort;
     domainData?: CompiledDomainDataPort;
+    /**
+     * I-03-ASSEMBLY successor profile enablement: host-side maxima declaring
+     * this Runtime/host also accepts successor ('0.3',2,3) packages. Absent
+     * (the default) keeps the exact historical legacy-only 0.2/2/2 activation
+     * policy. These maxima are host authority; package-recorded bounds may
+     * never exceed them and are never truncated or raised.
+     */
+    supportedPackageDataBounds?: PackageDataBounds;
     now?: () => string;
     onBackgroundError?: (error: unknown, target: WorkflowAddress) => void;
     /**

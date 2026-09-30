@@ -8,17 +8,24 @@ import { isRuntimeInstanceProvisioningStore, } from './durable-control-contracts
 import { RUNTIME_CONTROL_CONTRACT_VERSION, RuntimeControlCoordinator, RuntimeControlInterruptSignal, } from '../control/index.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
 import { DomainMessageAcceptance } from '../messaging/acceptance/domain-message-acceptance.js';
+import { WorkflowSendAcceptance } from '../messaging/acceptance/workflow-send-acceptance.js';
 import { JournaledDomainMessageEffect } from '../messaging/send-effect/journaled-domain-message-effect.js';
+import { SuccessorJournaledDomainMessageEffect } from '../messaging/send-effect/successor-journaled-domain-message-effect.js';
 import { preflightPackageActivation } from '../package/activation.js';
-import { resolvePinnedPackage } from '../package/registry.js';
+import { resolvePinnedPackage, ValidatedPackageRegistry } from '../package/registry.js';
+import { validateSuccessorCompiledPackage } from '../package/successor-validation.js';
 import { ProjectionService } from '../projection/projection-service.js';
 import { DomainQueryDispatcher } from '../query/domain-query-dispatcher.js';
 import { PoisonMessageRecoveryCoordinator } from '../recovery-v2/poison-message-recovery.js';
+import { LEGACY_COMPILED_ARTIFACT_PROFILE, SUCCESSOR_COMPILED_ARTIFACT_PROFILE, sameCompiledArtifactProfile, } from '../v2/contracts/compiled-artifact-profile.js';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1 } from '../schema/domainharness-json-schema-v1.js';
 import { MailboxDrainScheduler } from './mailbox-drain-scheduler.js';
 import { commitV3ProcessedCommandTurn, requireV3ProcessCommandStore, } from './process-command-integration.js';
+import { CompiledWorkflowMessageEffectsV3 } from './compiled-workflow-message-effects-v3.js';
+import { CompiledWorkflowRuntimeV3 } from './compiled-workflow-runtime-v3.js';
 import { RuntimeSubscriptionCoordinator } from './subscription-coordinator.js';
 import { DomainRuntimeError } from './runtime-errors.js';
-import { CompiledWorkflowRuntime } from './compiled-workflow-runtime.js';
+import { CompiledWorkflowRuntime, } from './compiled-workflow-runtime.js';
 import { JournaledSkillRunner } from './journaled-skill-runner.js';
 import { createRuntimeToolExecutor } from './tool-executor.js';
 class RecoveryRecordedError extends Error {
@@ -113,9 +120,14 @@ async function createDomainRuntimeInternal(options, processingMode) {
     // Shared #312 exact package identity mapping: used by the recording-store
     // decorator for covered RuntimeStore mutations AND by the #180 provisioning
     // ensure/open intent so INSTANCE_OPENED records carry the same identity.
+    // R1 P1: after admission validation completes below, `runtimeRegistry` is
+    // rebound to the validated package view; these closures only execute on
+    // store mutations, which happen strictly after activation, so they always
+    // observe the admission-validated material.
+    let runtimeRegistry = options.packageRegistry;
     const resolveObservationPackageIdentity = options.observation?.resolvePackageIdentity ??
         ((packageId) => {
-            const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+            const compiledPackage = resolvePinnedPackage(runtimeRegistry, packageId);
             return runtimePackageIdentityFromManifest(compiledPackage.manifest);
         });
     const effectiveStore = observationRequested && observationStore !== null
@@ -160,22 +172,47 @@ async function createDomainRuntimeInternal(options, processingMode) {
                 : { runtimeActivationRef: options.observation.runtimeActivationRef }),
         })
         : undefined;
-    await preflightPackageActivation({
-        registry: options.packageRegistry,
-        store: effectiveStore,
-        validationPolicy: {
+    // I-03-ASSEMBLY activation policy: absent host maxima keep the exact
+    // historical legacy-only single-profile validation (byte-for-byte retained
+    // behavior for existing hosts); supplied maxima additionally enable the
+    // successor 0.3/2/3 profile with the DomainHarness-owned successor
+    // validator installed, so retained and successor packages in one registry
+    // each validate through their exact profile.
+    const successorSupportEnabled = options.supportedPackageDataBounds !== undefined;
+    const validationPolicy = options.supportedPackageDataBounds === undefined
+        ? {
             formatVersion: '0.2',
             runtimeContractMajor: 2,
             executionEngineMajor: 2,
             hostCapabilities: options.bindings.capabilities,
             sha256: options.bindings.sha256,
-        },
+        }
+        : {
+            supportedProfiles: [
+                LEGACY_COMPILED_ARTIFACT_PROFILE,
+                SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+            ],
+            hostCapabilities: options.bindings.capabilities,
+            sha256: options.bindings.sha256,
+            supportedPackageDataBounds: options.supportedPackageDataBounds,
+        };
+    const validatorExtensions = successorSupportEnabled ? { successor: validateSuccessorCompiledPackage } : undefined;
+    const activation = await preflightPackageActivation({
+        registry: options.packageRegistry,
+        store: effectiveStore,
+        validationPolicy,
+        ...(validatorExtensions === undefined ? {} : { extensions: validatorExtensions }),
     });
+    // R1 P1: production execution resolves packages only through the exact
+    // admission-validated set. Successor 0.3/2/3 entries are the validator's
+    // owned deep-immutable canonical snapshots; retained 0.2/2/2 entries keep
+    // their historical caller references (legacy validator identity).
+    runtimeRegistry = new ValidatedPackageRegistry(activation.validatedPackages, options.packageRegistry.defaultPackageId);
     const lane = new PerInstanceSerializedLane();
     const instanceEngine = new WorkflowInstanceEngine(effectiveStore, { now, lane });
     const acceptance = new DomainMessageAcceptance({
         store: effectiveStore,
-        packages: options.packageRegistry,
+        packages: runtimeRegistry,
     });
     const recovery = new PoisonMessageRecoveryCoordinator(effectiveStore, { now });
     const toolRunner = new DurableToolRunner({
@@ -197,11 +234,51 @@ async function createDomainRuntimeInternal(options, processingMode) {
         sha256: options.bindings.sha256,
         now,
     });
+    // I-03-ASSEMBLY projection boundary (L2-A §3.8): successor packages derive
+    // their Domain Data reads and Business Source contract lookups from the
+    // exact activated package material — out-of-band host maps cannot claim
+    // successor integrity conformance. Retained 0.2/2/2 packages keep the
+    // historical host-supplied CompiledDomainDataPort unchanged.
+    const dispatchingDomainData = options.domainData === undefined && !successorSupportEnabled
+        ? undefined
+        : {
+            get(packageId, key) {
+                const compiledPackage = runtimeRegistry.get(packageId);
+                if (compiledPackage !== undefined && isSuccessorCompiledPackage(compiledPackage)) {
+                    // Own-key lookup only (R1 P2): an undeclared or inherited name
+                    // such as `constructor` must miss, never fall through to
+                    // prototype-chain material.
+                    const bundled = compiledPackage.domainData;
+                    if (bundled === undefined
+                        || !Object.prototype.hasOwnProperty.call(bundled, key)) {
+                        return undefined;
+                    }
+                    return bundled[key];
+                }
+                return options.domainData?.get(packageId, key);
+            },
+        };
+    const packageBusinessSourceContracts = {
+        get(packageId, source) {
+            const compiledPackage = runtimeRegistry.get(packageId);
+            if (compiledPackage === undefined || !isSuccessorCompiledPackage(compiledPackage)) {
+                return undefined;
+            }
+            const descriptor = compiledPackage.manifest.businessSources?.find((candidate) => candidate.source === source);
+            if (descriptor === undefined)
+                return undefined;
+            return {
+                schemaContractVersion: DOMAIN_HARNESS_JSON_SCHEMA_V1,
+                descriptor: { source: descriptor.source, valueSchema: descriptor.valueSchema },
+            };
+        },
+    };
     const projection = new ProjectionService({
-        packageRegistry: options.packageRegistry,
+        packageRegistry: runtimeRegistry,
         store: options.store,
         ...(options.businessSnapshots === undefined ? {} : { businessSnapshots: options.businessSnapshots }),
-        ...(options.domainData === undefined ? {} : { domainData: options.domainData }),
+        ...(dispatchingDomainData === undefined ? {} : { domainData: dispatchingDomainData }),
+        businessSourceContracts: packageBusinessSourceContracts,
         expression: options.bindings.expression,
         sha256: options.bindings.sha256,
     });
@@ -209,7 +286,7 @@ async function createDomainRuntimeInternal(options, processingMode) {
     const subscriptionCoordinator = new RuntimeSubscriptionCoordinator({
         store: options.store,
         projection,
-        packageRegistry: options.packageRegistry,
+        packageRegistry: runtimeRegistry,
         ...(options.onBackgroundError === undefined
             ? {}
             : {
@@ -272,6 +349,69 @@ async function createDomainRuntimeInternal(options, processingMode) {
             scheduleDrain(target);
         },
     });
+    // I-03-ASSEMBLY engine-major-3 execution: the successor interpreter stack is
+    // assembled onto the SAME store, acceptance authority, tool runner and
+    // notification path — one Runtime, one DurableExecutionStore, one durable
+    // effect authority. The I-MSG-REJECT typed acceptance adapter classifies the
+    // closed permanent/transient taxonomy; permanent child-send rejections are
+    // durably committed by the successor journaled effect and routed by the
+    // engine-3 interpreter's total `rejected` routes, while engine-2 packages
+    // keep the retained JournaledDomainMessageEffect unchanged.
+    const workflowSendAcceptance = new WorkflowSendAcceptance({ acceptance, store: effectiveStore });
+    const successorMessageEffect = new SuccessorJournaledDomainMessageEffect({
+        store: effectiveStore,
+        acceptance: workflowSendAcceptance,
+        sha256: options.bindings.sha256,
+        ...(options.now === undefined ? {} : { now }),
+    });
+    const successorMessageEffects = new CompiledWorkflowMessageEffectsV3({
+        expression: options.bindings.expression,
+        messageEffect: successorMessageEffect,
+        onChildAccepted(target, messageId) {
+            notifyTargetChanged(target, messageId);
+            scheduleDrain(target);
+        },
+    });
+    const runtimeWorkflowV3 = new CompiledWorkflowRuntimeV3({
+        expression: options.bindings.expression,
+        toolRunner,
+        toolExecutor: createRuntimeToolExecutor(options.bindings),
+        ...(skillRunner === undefined ? {} : { skillRunner }),
+        messageEffects: successorMessageEffects,
+    });
+    function isSuccessorCompiledPackage(compiledPackage) {
+        return sameCompiledArtifactProfile({
+            formatVersion: compiledPackage.manifest.formatVersion,
+            runtimeContractMajor: compiledPackage.manifest.runtimeContractMajor,
+            executionEngineMajor: compiledPackage.manifest.executionEngineMajor,
+        }, SUCCESSOR_COMPILED_ARTIFACT_PROFILE);
+    }
+    // Exact per-package profile dispatch for execution: retained 0.2/2/2
+    // packages execute on the historical engine-2 interpreter and successor
+    // 0.3/2/3 packages on the engine-3 interpreter, in the same Runtime.
+    function processWorkflowMessage(compiledPackage, workflow, current, stored, execution) {
+        if (!isSuccessorCompiledPackage(compiledPackage)) {
+            return runtimeWorkflow.processMessage(compiledPackage, workflow, current, stored, execution);
+        }
+        return runtimeWorkflowV3
+            .processCommand(compiledPackage, workflow, current, stored, execution)
+            .then((result) => {
+            if (result.status === 'rejected') {
+                throw new Error(result.rejection.message);
+            }
+            return result.transition;
+        });
+    }
+    function processWorkflowCommand(compiledPackage, workflow, current, stored, execution) {
+        return isSuccessorCompiledPackage(compiledPackage)
+            ? runtimeWorkflowV3.processCommand(compiledPackage, workflow, current, stored, execution)
+            : runtimeWorkflow.processCommand(compiledPackage, workflow, current, stored, execution);
+    }
+    function initialWorkflowState(compiledPackage, workflow, input) {
+        return isSuccessorCompiledPackage(compiledPackage)
+            ? runtimeWorkflowV3.initialState(workflow, input)
+            : runtimeWorkflow.initialState(workflow, input);
+    }
     const unresolvedTargets = await options.store.listUnresolvedMessageTargets();
     for (const target of unresolvedTargets) {
         await options.store.reclaimInterruptedProcessing(target);
@@ -328,12 +468,12 @@ async function createDomainRuntimeInternal(options, processingMode) {
                 if (!marked)
                     throw new ProcessingConflictError(target);
                 try {
-                    const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+                    const compiledPackage = resolvePinnedPackage(runtimeRegistry, current.packageId);
                     const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
                     if (workflow === undefined) {
                         throw new Error(`Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`);
                     }
-                    const transition = await runtimeWorkflow.processMessage(compiledPackage, workflow, current, stored, { signal: turnController.signal });
+                    const transition = await processWorkflowMessage(compiledPackage, workflow, current, stored, { signal: turnController.signal });
                     if (transition.recoveryFailure !== undefined) {
                         await recovery.recordProcessingFailure({
                             target,
@@ -371,12 +511,12 @@ async function createDomainRuntimeInternal(options, processingMode) {
             if (!marked)
                 throw new ProcessingConflictError(target);
             try {
-                const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+                const compiledPackage = resolvePinnedPackage(runtimeRegistry, current.packageId);
                 const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
                 if (workflow === undefined) {
                     throw new Error(`Pinned package ${current.packageId} has no workflow ${current.address.workflowId}`);
                 }
-                const result = await runtimeWorkflow.processCommand(compiledPackage, workflow, current, stored, { signal: turnController.signal });
+                const result = await processWorkflowCommand(compiledPackage, workflow, current, stored, { signal: turnController.signal });
                 if (result.status === 'applied' && result.transition.recoveryFailure !== undefined) {
                     await recovery.recordProcessingFailure({
                         target,
@@ -434,8 +574,8 @@ async function createDomainRuntimeInternal(options, processingMode) {
     }
     async function openInstance(request) {
         assertActive();
-        const packageId = request.packageId ?? options.packageRegistry.defaultPackageId;
-        const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+        const packageId = request.packageId ?? runtimeRegistry.defaultPackageId;
+        const compiledPackage = resolvePinnedPackage(runtimeRegistry, packageId);
         const workflow = compiledPackage.manifest.workflows[request.address.workflowId];
         if (workflow === undefined) {
             throw new DomainRuntimeError('workflow_not_in_package', `Package ${packageId} does not contain workflow ${request.address.workflowId}`);
@@ -444,7 +584,7 @@ async function createDomainRuntimeInternal(options, processingMode) {
             address: request.address,
             correlationId: request.correlationId,
             packageId,
-            initialState: runtimeWorkflow.initialState(workflow, request.input),
+            initialState: initialWorkflowState(compiledPackage, workflow, request.input),
             lifecycle: 'waiting',
         });
         notifyTargetChanged(request.address);
@@ -464,8 +604,8 @@ async function createDomainRuntimeInternal(options, processingMode) {
         if (provisioningCoordinator === null) {
             throw new DomainRuntimeError('provisioning_unsupported', 'Runtime provisioning ensure/open requires a RuntimeStore implementing the atomic I-OPEN provisioning extension');
         }
-        const packageId = request.packageId ?? options.packageRegistry.defaultPackageId;
-        const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+        const packageId = request.packageId ?? runtimeRegistry.defaultPackageId;
+        const compiledPackage = resolvePinnedPackage(runtimeRegistry, packageId);
         const workflow = compiledPackage.manifest.workflows[request.address.workflowId];
         if (workflow === undefined) {
             throw new DomainRuntimeError('workflow_not_in_package', `Package ${packageId} does not contain workflow ${request.address.workflowId}`);
@@ -477,7 +617,7 @@ async function createDomainRuntimeInternal(options, processingMode) {
             packageId,
             lifecycle: 'waiting',
             stateRevision: 0,
-            state: runtimeWorkflow.initialState(workflow, request.input),
+            state: initialWorkflowState(compiledPackage, workflow, request.input),
             createdAt: requestedAt,
             updatedAt: requestedAt,
         };

@@ -12,6 +12,19 @@ export {
   type CompileDomainPackageResult,
 } from './compile/compile-domain-package.js';
 
+// I-03-ASSEMBLY public successor compile material: the exact output profile the
+// public compiler emits, plus the Domain Data / Business Source entry shapes
+// and their fail-closed compile errors (L2-A §3.6/§3.7).
+export { PUBLIC_COMPILER_OUTPUT_PROFILE } from './package/profile.js';
+export {
+  DomainDataCompileError,
+  type DomainDataCompileEntry,
+} from './package/domain-data.js';
+export {
+  BusinessSourceCompileError,
+  type BusinessSourceCompileEntry,
+} from './package/business-sources.js';
+
 export {
   emitTargetCompiledPackageModule,
   type BindingModuleReference,

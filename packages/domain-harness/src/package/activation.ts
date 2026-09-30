@@ -4,7 +4,10 @@ import type {
   TargetCompiledDomainPackage,
 } from '../v2/contracts/package.js';
 import { PackageActivationError } from './errors.js';
-import type { PackageActivationValidationPolicy } from './profile-validation.js';
+import type {
+  CompiledPackageValidatorExtensions,
+  PackageActivationValidationPolicy,
+} from './profile-validation.js';
 import { validateCompiledPackageByProfile } from './profile-validation.js';
 
 export type PackagePinStore = Pick<RuntimeStore, 'listPinnedPackageIds'>;
@@ -13,12 +16,25 @@ export interface PackageActivationPreflightRequest {
   readonly registry: PackageRegistry;
   readonly store: PackagePinStore;
   readonly validationPolicy: PackageActivationValidationPolicy;
+  /**
+   * Profile-dispatched validator extensions. I-03-ASSEMBLY installs the
+   * DomainHarness-owned successor validator so a supported 0.3/2/3 package
+   * validates through its exact profile instead of failing NOT_YET_ASSEMBLED.
+   */
+  readonly extensions?: CompiledPackageValidatorExtensions;
 }
 
 export interface PackageActivationPreflightResult {
   readonly defaultPackage: TargetCompiledDomainPackage;
   readonly retainedPackageIds: readonly string[];
   readonly retainedPackages: readonly TargetCompiledDomainPackage[];
+  /**
+   * Every listed registry package after exact-profile admission validation.
+   * Production execution resolves packages through this validated set (R1 P1:
+   * the successor profile's entries are the validator-owned immutable
+   * snapshots), never back through the caller-supplied registry references.
+   */
+  readonly validatedPackages: ReadonlyMap<string, TargetCompiledDomainPackage>;
 }
 
 export async function listRetainedPackageIds(store: PackagePinStore): Promise<readonly string[]> {
@@ -39,6 +55,7 @@ export async function listRetainedPackageIds(store: PackagePinStore): Promise<re
 async function validateRegistryPackages(
   registry: PackageRegistry,
   policy: PackageActivationValidationPolicy,
+  extensions: CompiledPackageValidatorExtensions,
 ): Promise<ReadonlyMap<string, TargetCompiledDomainPackage>> {
   const validated = new Map<string, TargetCompiledDomainPackage>();
   for (const packageId of registry.listPackageIds()) {
@@ -61,7 +78,7 @@ async function validateRegistryPackages(
         `PackageRegistry key "${packageId}" does not match resolved manifest packageId "${compiledPackage.manifest.packageId}"`,
       );
     }
-    validated.set(packageId, await validateCompiledPackageByProfile(compiledPackage, policy));
+    validated.set(packageId, await validateCompiledPackageByProfile(compiledPackage, policy, extensions));
   }
   return validated;
 }
@@ -72,6 +89,7 @@ export async function preflightPackageActivation(
   const validatedPackages = await validateRegistryPackages(
     request.registry,
     request.validationPolicy,
+    request.extensions ?? {},
   );
 
   const defaultPackage = validatedPackages.get(request.registry.defaultPackageId);
@@ -108,5 +126,6 @@ export async function preflightPackageActivation(
     defaultPackage,
     retainedPackageIds,
     retainedPackages,
+    validatedPackages,
   };
 }

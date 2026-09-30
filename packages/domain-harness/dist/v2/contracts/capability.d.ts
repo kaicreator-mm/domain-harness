@@ -1,3 +1,4 @@
+import type { PackageDataBounds } from './package-data.js';
 export type CapabilityId = `${string}@${number}`;
 export declare const STANDARD_CAPABILITIES: {
     readonly sqliteRuntimeStore: "sqlite-runtime-store@1";
@@ -13,5 +14,11 @@ export interface TargetHostProfile {
     id: string;
     capabilities: readonly CapabilityId[];
     bindings: Readonly<Record<CapabilityId, string>>;
+    /**
+     * Exact package-data bounds supplied by the compile Target Host Profile
+     * (L2-A §3.6). Successor ('0.3',2,3) compilation requires it and records it
+     * verbatim in the manifest; retained 0.2/2/2 compilation ignores it.
+     */
+    readonly packageDataBounds?: PackageDataBounds;
 }
 //# sourceMappingURL=capability.d.ts.map

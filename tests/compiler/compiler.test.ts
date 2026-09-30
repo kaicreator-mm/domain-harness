@@ -17,10 +17,13 @@ import {
   assertCompiledPackageManifest,
   CompiledManifestValidationError,
   MissingBindingContentError,
+  type CompiledPackageManifest,
 } from '../../packages/domain-harness-compiler/src/package/manifest.js';
 import { emitTargetCompiledPackageModule } from '../../packages/domain-harness-compiler/src/package/module-emitter.js';
 import type { TargetCompiledDomainPackage } from '../../packages/domain-harness/src/v2/index.js';
-import { decodeCompiledWorkflowDefinition } from '../../packages/domain-harness/src/runtime/compiled-workflow-ir.js';
+import { SUCCESSOR_COMPILED_ARTIFACT_PROFILE } from '../../packages/domain-harness/src/v2/index.js';
+import { decodeCompiledWorkflowDefinitionForProfile } from '../../packages/domain-harness/src/runtime/compiled-workflow-dispatch.js';
+import { SUCCESSOR_WORKFLOW_DECODER_EXTENSIONS } from '../../packages/domain-harness/src/package/successor-validation.js';
 import { translateV01ScriptInvokes } from '../../packages/domain-harness-compiler/src/compat/v01-script/index.js';
 
 const CAPS = {
@@ -42,6 +45,13 @@ function target(capabilities: readonly CapabilityId[] = Object.values(CAPS)): Ta
       [CAPS.script]: '@host/script',
       [CAPS.http]: '@host/http',
     },
+    packageDataBounds: {
+      maxDomainDataEntries: 16,
+      maxDomainDataEntryCanonicalBytes: 2048,
+      maxTotalDomainDataCanonicalBytes: 8192,
+      maxBusinessSources: 8,
+      maxSchemaCanonicalBytes: 4096,
+    },
   };
 }
 
@@ -62,6 +72,18 @@ function bindingModulesFor(manifest: { bindingDigests: Readonly<Record<string, s
   );
 }
 
+/**
+ * I-03-ASSEMBLY: the public compiler emits the successor 0.3/2/3 profile, so
+ * target-module emission carries the package's bundled Domain Data values
+ * (empty for these fixtures, which declare no Domain Data entries).
+ */
+function emitFixtureModule(
+  manifest: CompiledPackageManifest,
+  modules: Readonly<Record<string, ReturnType<typeof bindingModulesFor>[string]>> = bindingModulesFor(manifest),
+): string {
+  return emitTargetCompiledPackageModule({ manifest, bindingModules: modules, domainData: {} });
+}
+
 function workflow(id: string, kind: 'expr' | 'script' | 'workflow'): RawWorkflow {
   return {
     id,
@@ -80,7 +102,14 @@ function workflow(id: string, kind: 'expr' | 'script' | 'workflow'): RawWorkflow
         done: [{ target: 'waiting' }],
         error: [{ target: 'failed' }],
         events: {},
-        effects: [{ kind: 'domain-message', targetExpression: '$.target', messageType: 'CHANGED', payloadExpression: '$.payload', contractVersion: '1' }],
+        effects: [{
+          kind: 'domain-message',
+          targetExpression: '$.target',
+          messageType: 'CHANGED',
+          payloadExpression: '$.payload',
+          contractVersion: '1',
+          rejected: [{ target: 'failed' }],
+        }],
       },
       waiting: {
         id: 'waiting',
@@ -233,21 +262,18 @@ test('binding digest is content-addressed: changed executable binding content ch
 test('binding content location is not identity: same bytes at different module paths keep digest and packageId stable', () => {
   const manifest = compileFixture().manifest;
 
-  const nearPath = emitTargetCompiledPackageModule({
-    manifest,
-    bindingModules: bindingModulesFor(manifest),
-  });
-  const farPath = emitTargetCompiledPackageModule({
-    manifest,
-    bindingModules: Object.fromEntries(
-      Object.entries(bindingModulesFor(manifest))
-        .map(([bindingId, reference]) => [bindingId, { ...reference, moduleSpecifier: `../../generated/elsewhere/${reference.moduleSpecifier.slice('./bindings/'.length)}` }]),
-    ),
-  });
+  const nearPath = emitFixtureModule(manifest);
+  const farPath = emitFixtureModule(manifest, Object.fromEntries(
+    Object.entries(bindingModulesFor(manifest))
+      .map(([bindingId, reference]) => [bindingId, { ...reference, moduleSpecifier: `../../generated/elsewhere/${reference.moduleSpecifier.slice('./bindings/'.length)}` }]),
+  ));
 
-  const extractManifestJson = /export const manifest = Object\.freeze\(([\s\S]*?)\);\nexport const bindings/u;
-  const nearManifest = JSON.parse(extractManifestJson.exec(nearPath)?.[1] ?? 'null') as { packageId: string; bindingDigests: Record<string, string> };
-  const farManifest = JSON.parse(extractManifestJson.exec(farPath)?.[1] ?? 'null') as { packageId: string; bindingDigests: Record<string, string> };
+  // Successor emission rehydrates the manifest through JSON.parse (R1 P2
+  // own-key-safe emission), so the emitted argument is a double-encoded JSON
+  // string literal: unescape once to the JSON text, parse once to the object.
+  const extractManifestJson = /export const manifest = Object\.freeze\(JSON\.parse\(([\s\S]*?)\)\);\nexport const bindings/u;
+  const nearManifest = JSON.parse(JSON.parse(extractManifestJson.exec(nearPath)?.[1] ?? 'null') as string) as { packageId: string; bindingDigests: Record<string, string> };
+  const farManifest = JSON.parse(JSON.parse(extractManifestJson.exec(farPath)?.[1] ?? 'null') as string) as { packageId: string; bindingDigests: Record<string, string> };
   assert.equal(nearManifest.packageId, manifest.packageId);
   assert.deepEqual(nearManifest.bindingDigests, manifest.bindingDigests);
   assert.equal(farManifest.packageId, manifest.packageId);
@@ -262,7 +288,7 @@ test('emitter fails closed when binding module content does not match manifest b
     '@host/expression': 'export default function expression() { return 2; } // tampered\n',
   });
   assert.throws(
-    () => emitTargetCompiledPackageModule({ manifest, bindingModules: tamperedModules }),
+    () => emitFixtureModule(manifest, tamperedModules),
     (error: unknown) => error instanceof Error
       && error.message.includes('@host/expression')
       && error.message.includes('does not match'),
@@ -270,11 +296,11 @@ test('emitter fails closed when binding module content does not match manifest b
 
   const emptyContentModules = bindingModulesFor(manifest, { ...BINDING_CONTENTS, '@host/http': '' });
   assert.throws(
-    () => emitTargetCompiledPackageModule({ manifest, bindingModules: emptyContentModules }),
+    () => emitFixtureModule(manifest, emptyContentModules),
     (error: unknown) => error instanceof Error && error.message.includes('@host/http'),
   );
 
-  assert.doesNotThrow(() => emitTargetCompiledPackageModule({ manifest, bindingModules: bindingModulesFor(manifest) }));
+  assert.doesNotThrow(() => emitFixtureModule(manifest));
 });
 
 test('compilation fails closed when a required binding has no immutable content identity', () => {
@@ -334,9 +360,11 @@ test('T-021 translation produces executable tool IR through the public compile p
   assert.doesNotMatch(serialized, /"kind":"script"/u);
   assert.match(serialized, /"kind":"tool"/u);
   assert.doesNotMatch(serialized, /raw-script-secret-marker/u);
-  const decoded = decodeCompiledWorkflowDefinition(
+  const decoded = decodeCompiledWorkflowDefinitionForProfile(
+    SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
     'script_flow',
     manifest.workflows.script_flow?.definition,
+    SUCCESSOR_WORKFLOW_DECODER_EXTENSIONS,
   );
   assert.equal(decoded.initial, 'execute');
 });
@@ -378,13 +406,24 @@ test('compiler rejects dangling routes, invalid JSONata and non-positive maxStep
   );
 });
 
-test('every compiled workflow decodes through the authoritative runtime IR decoder (#168)', () => {
+test('every compiled workflow decodes through the authoritative profile-dispatched runtime IR decoder (#168)', () => {
   const { manifest } = compileFixture();
+  assert.equal(manifest.executionEngineMajor, 3);
   for (const [workflowId, workflowDescriptor] of Object.entries(manifest.workflows)) {
-    const decoded = decodeCompiledWorkflowDefinition(workflowId, workflowDescriptor.definition);
+    const decoded = decodeCompiledWorkflowDefinitionForProfile(
+      SUCCESSOR_COMPILED_ARTIFACT_PROFILE,
+      workflowId,
+      workflowDescriptor.definition,
+      SUCCESSOR_WORKFLOW_DECODER_EXTENSIONS,
+    );
     assert.equal(decoded.initial, 'execute');
     assert.ok(Object.keys(decoded.states).length >= 4);
     assert.equal(decoded.limits?.maxSteps, 50);
+    for (const state of Object.values((decoded as { states: Record<string, { effects?: Array<{ rejected: unknown[] }> }> }).states)) {
+      for (const effect of state.effects ?? []) {
+        assert.ok(effect.rejected.length >= 1, 'engine-3 effects carry total rejection routing');
+      }
+    }
   }
 });
 
@@ -551,7 +590,7 @@ test('corrupt packageId and inconsistent descriptor keys fail manifest validatio
 
 test('generated target module contains only compiled manifest and static binding imports', () => {
   const manifest = compileFixture().manifest;
-  const source = emitTargetCompiledPackageModule({ manifest, bindingModules: bindingModulesFor(manifest) });
+  const source = emitFixtureModule(manifest);
   assert.match(source, /Generated by @kaicreator\/domain-harness-compiler/u);
   assert.doesNotMatch(source, /raw-script-secret-marker/u);
   assert.doesNotMatch(source, /\.ya?ml/u);
@@ -604,6 +643,6 @@ test('compiled manifest is assignable to the authoritative core package contract
   // the compiler's emitted manifest IS the core frozen artifact contract -
   // producer and Runtime consumer share one source of truth, no adapter cast.
   const compiledPackage: TargetCompiledDomainPackage = { manifest, bindings: {} };
-  assert.equal(compiledPackage.manifest.executionEngineMajor, 2);
+  assert.equal(compiledPackage.manifest.executionEngineMajor, 3);
   assert.equal(compiledPackage.manifest.packageId, manifest.packageId);
 });
