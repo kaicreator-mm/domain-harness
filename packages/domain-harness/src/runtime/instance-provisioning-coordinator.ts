@@ -1,4 +1,6 @@
 import { canonicalJsonStringify } from '../contracts/identity.js';
+import type { RuntimeObservationIntent } from '../observation/contracts.js';
+import { isRuntimeObservationInstanceProvisioningStore } from '../observation/provisioning-contract.js';
 import type {
   EnsureProvisionedWorkflowInstanceOpenResult,
   ProvisionAndOpenWorkflowInstanceRequest,
@@ -49,6 +51,7 @@ export class RuntimeInstanceProvisioningCoordinator {
 
   async ensureProvisionedWorkflowInstanceOpen(
     request: ProvisionAndOpenWorkflowInstanceRequest,
+    observationIntent?: RuntimeObservationIntent,
   ): Promise<EnsureProvisionedWorkflowInstanceOpenResult> {
     requireNonEmpty(request.provisioningKey, 'provisioningKey');
     requireNonEmpty(request.target.workflowId, 'target.workflowId');
@@ -65,7 +68,19 @@ export class RuntimeInstanceProvisioningCoordinator {
       );
     }
 
-    const result = await this.store.ensureProvisionedWorkflowInstanceOpen(request);
+    // Observation-enabled composition routes through the same single host
+    // transaction: the store appends any newly emitted INSTANCE_OPENED record
+    // inside its atomic ensure/open when it implements the observation-capable
+    // form. There is deliberately no best-effort second write path.
+    const result: EnsureProvisionedWorkflowInstanceOpenResult =
+      observationIntent !== undefined && isRuntimeObservationInstanceProvisioningStore(this.store)
+        ? (
+            await this.store.ensureProvisionedWorkflowInstanceOpenWithObservation(
+              request,
+              observationIntent,
+            )
+          ).result
+        : await this.store.ensureProvisionedWorkflowInstanceOpen(request);
     requireKnownDisposition(result.provisioningDisposition, 'provisioningDisposition');
     requireKnownDisposition(result.instanceDisposition, 'instanceDisposition');
 

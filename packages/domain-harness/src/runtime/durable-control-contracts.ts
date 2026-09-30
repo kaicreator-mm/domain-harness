@@ -150,6 +150,49 @@ export function isRuntimeInstanceProvisioningStore(
   );
 }
 
+/**
+ * #180 additive public Runtime ensure/open request. The provisioning key is
+ * ALWAYS caller-supplied and explicit: the Runtime never derives one from
+ * address/correlation/package/input, and never auto-provisions from workflow
+ * activity (#138).
+ */
+export interface EnsureProvisionedInstanceOpenRequest {
+  readonly provisioningKey: string;
+  readonly address: WorkflowAddress;
+  readonly correlationId: string;
+  readonly input: JsonValue;
+  /** Defaults to the registry's default package, identical to openInstance(). */
+  readonly packageId?: string;
+}
+
+/** #180 additive public ensure/open outcome; existing snapshots are returned unchanged. */
+export interface EnsureProvisionedInstanceOpenOutcome {
+  readonly instance: WorkflowInstanceSnapshot;
+  readonly provisioningDisposition: 'created' | 'existing';
+  readonly instanceDisposition: 'created' | 'existing';
+}
+
+/**
+ * #180 additive optional Runtime provisioning capability (the third optional
+ * capability member after #312 observation and #313 control). The factory
+ * always populates it explicitly: `UNSUPPORTED` when the RuntimeStore does not
+ * implement the atomic I-OPEN provisioning extension — or, with Runtime
+ * Observation enabled, its observation-capable form, because instance
+ * materialization is then a covered `INSTANCE_OPENED` mutation that must commit
+ * atomically with its observation record and is never silently downgraded to an
+ * unobserved write. Consumers treating older hand-built runtimes without this
+ * member MUST default it to UNSUPPORTED. The retained `openInstance()` behavior
+ * is unchanged; `ensureOpen` never auto-runs the initial state.
+ */
+export type RuntimeProvisioningCapability =
+  | {
+      readonly status: 'ENABLED';
+      ensureOpen(
+        request: EnsureProvisionedInstanceOpenRequest,
+      ): Promise<EnsureProvisionedInstanceOpenOutcome>;
+    }
+  | { readonly status: 'UNSUPPORTED' };
+
 export interface RegisterExternalWorkRequest {
   readonly externalCorrelationId: string;
   readonly target: WorkflowAddress;

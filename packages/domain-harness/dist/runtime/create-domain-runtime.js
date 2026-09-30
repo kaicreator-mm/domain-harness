@@ -2,6 +2,9 @@ import { isRuntimeObservationStore, ObservationRecordingRuntimeStore, RUNTIME_OB
 import { WorkflowInstanceEngine } from '../engine/workflow-instance-engine.js';
 import { PerInstanceSerializedLane } from '../engine/per-instance-serialized-lane.js';
 import { workflowAddressKey } from '../instance/workflow-address.js';
+import { isRuntimeObservationInstanceProvisioningStore } from '../observation/provisioning-contract.js';
+import { RuntimeInstanceProvisioningCoordinator } from './instance-provisioning-coordinator.js';
+import { isRuntimeInstanceProvisioningStore, } from './durable-control-contracts.js';
 import { RUNTIME_CONTROL_CONTRACT_VERSION, RuntimeControlCoordinator, RuntimeControlInterruptSignal, } from '../control/index.js';
 import { DurableToolRunner } from '../execution/tool-runner/durable-tool-runner.js';
 import { DomainMessageAcceptance } from '../messaging/acceptance/domain-message-acceptance.js';
@@ -107,14 +110,18 @@ async function createDomainRuntimeInternal(options, processingMode) {
     }
     const observationWake = new ObservationWakeRegistry();
     const now = options.now ?? (() => new Date().toISOString());
+    // Shared #312 exact package identity mapping: used by the recording-store
+    // decorator for covered RuntimeStore mutations AND by the #180 provisioning
+    // ensure/open intent so INSTANCE_OPENED records carry the same identity.
+    const resolveObservationPackageIdentity = options.observation?.resolvePackageIdentity ??
+        ((packageId) => {
+            const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+            return runtimePackageIdentityFromManifest(compiledPackage.manifest);
+        });
     const effectiveStore = observationRequested && observationStore !== null
         ? new ObservationRecordingRuntimeStore({
             base: observationStore,
-            resolvePackageIdentity: options.observation?.resolvePackageIdentity ??
-                ((packageId) => {
-                    const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
-                    return runtimePackageIdentityFromManifest(compiledPackage.manifest);
-                }),
+            resolvePackageIdentity: resolveObservationPackageIdentity,
             ...(options.now === undefined ? {} : { now: options.now }),
             ...(options.observation?.runtimeBindingRef === undefined
                 ? {}
@@ -125,6 +132,34 @@ async function createDomainRuntimeInternal(options, processingMode) {
             onRecordsCommitted: (target) => observationWake.wake(target),
         })
         : options.store;
+    // Issue #180 provisioning composition: the additive ensure/open capability
+    // requires the atomic RuntimeInstanceProvisioningStore extension. When
+    // observation is enabled, instance materialization is a covered
+    // INSTANCE_OPENED mutation, so the capability additionally requires the
+    // observation-capable form — provisioning is then reported UNSUPPORTED
+    // rather than silently downgrading to an unobserved instance write.
+    const provisioningStore = isRuntimeInstanceProvisioningStore(options.store)
+        ? options.store
+        : null;
+    const provisioningObservationCapable = provisioningStore !== null &&
+        isRuntimeObservationInstanceProvisioningStore(options.store);
+    const provisioningCoordinator = provisioningStore !== null &&
+        (!observationRequested || provisioningObservationCapable)
+        ? new RuntimeInstanceProvisioningCoordinator(provisioningStore)
+        : null;
+    const provisioningObservationIntent = observationRequested && provisioningObservationCapable
+        ? (packageId) => ({
+            kind: 'INSTANCE_OPENED',
+            packageIdentity: resolveObservationPackageIdentity(packageId),
+            observedAt: now(),
+            ...(options.observation?.runtimeBindingRef === undefined
+                ? {}
+                : { runtimeBindingRef: options.observation.runtimeBindingRef }),
+            ...(options.observation?.runtimeActivationRef === undefined
+                ? {}
+                : { runtimeActivationRef: options.observation.runtimeActivationRef }),
+        })
+        : undefined;
     await preflightPackageActivation({
         registry: options.packageRegistry,
         store: effectiveStore,
@@ -415,6 +450,59 @@ async function createDomainRuntimeInternal(options, processingMode) {
         notifyTargetChanged(request.address);
         return instance;
     }
+    /**
+     * #180 additive atomic provisioning ensure/open. The Runtime is the sole
+     * authority for package/workflow resolution and the exact revision-0 initial
+     * snapshot (same construction openInstance uses, including `waiting`
+     * lifecycle — the initial state is never auto-run); the durable store alone
+     * performs the atomic provisioning-key + instance convergence in one host
+     * transaction, fail-closed validated by RuntimeInstanceProvisioningCoordinator.
+     * An existing progressed/terminal instance is returned unchanged.
+     */
+    async function ensureProvisionedInstanceOpen(request) {
+        assertActive();
+        if (provisioningCoordinator === null) {
+            throw new DomainRuntimeError('provisioning_unsupported', 'Runtime provisioning ensure/open requires a RuntimeStore implementing the atomic I-OPEN provisioning extension');
+        }
+        const packageId = request.packageId ?? options.packageRegistry.defaultPackageId;
+        const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+        const workflow = compiledPackage.manifest.workflows[request.address.workflowId];
+        if (workflow === undefined) {
+            throw new DomainRuntimeError('workflow_not_in_package', `Package ${packageId} does not contain workflow ${request.address.workflowId}`);
+        }
+        const requestedAt = now();
+        const initialInstance = {
+            address: request.address,
+            correlationId: request.correlationId,
+            packageId,
+            lifecycle: 'waiting',
+            stateRevision: 0,
+            state: runtimeWorkflow.initialState(workflow, request.input),
+            createdAt: requestedAt,
+            updatedAt: requestedAt,
+        };
+        const result = await provisioningCoordinator.ensureProvisionedWorkflowInstanceOpen({
+            provisioningKey: request.provisioningKey,
+            target: request.address,
+            correlationId: request.correlationId,
+            packageId,
+            input: request.input,
+            requestedAt,
+            initialInstance,
+        }, provisioningObservationIntent?.(packageId));
+        if (result.instanceDisposition === 'created') {
+            // Only a newly materialized instance changed durable state (and, in
+            // observation mode, emitted its exactly-once INSTANCE_OPENED record);
+            // an idempotent replay changed nothing and notifies nobody.
+            notifyTargetChanged(request.address);
+            observationWake.wake(request.address);
+        }
+        return {
+            instance: result.instance,
+            provisioningDisposition: result.provisioningDisposition,
+            instanceDisposition: result.instanceDisposition,
+        };
+    }
     async function send(message) {
         assertActive();
         const ack = await acceptance.accept(message);
@@ -558,6 +646,9 @@ async function createDomainRuntimeInternal(options, processingMode) {
                 },
             }),
         };
+    const provisioningCapability = provisioningCoordinator !== null
+        ? { status: 'ENABLED', ensureOpen: ensureProvisionedInstanceOpen }
+        : { status: 'UNSUPPORTED' };
     return {
         openInstance,
         send,
@@ -572,6 +663,7 @@ async function createDomainRuntimeInternal(options, processingMode) {
         dispose,
         observation: observationCapability,
         control: controlCapability,
+        provisioning: provisioningCapability,
     };
 }
 /** Failure recorded when a winning INTERRUPT's signal stopped the in-flight turn. */

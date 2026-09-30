@@ -1,0 +1,1 @@
+{"version":3,"file":"provisioning-contract.js","sourceRoot":"","sources":["../../src/observation/provisioning-contract.ts"],"names":[],"mappings":"AAgCA,MAAM,UAAU,6CAA6C,CAC3D,KAAc;IAEd,OAAO,CACL,KAAK,KAAK,IAAI;QACd,OAAO,KAAK,KAAK,QAAQ;QACzB,OAAQ,KAA6D;aAClE,qCAAqC,KAAK,UAAU;QACvD,OAAQ,KAA4E;aACjF,oDAAoD,KAAK,UAAU,CACvE,CAAC;AACJ,CAAC"}

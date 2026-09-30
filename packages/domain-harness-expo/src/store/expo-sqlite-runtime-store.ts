@@ -32,14 +32,22 @@ import type {
   DurableProcessDataSnapshot,
   EnsureExternalWorkCorrelationResult,
   EnsureProvisionedWorkflowInstanceResult,
+  EnsureProvisionedWorkflowInstanceOpenResult,
   ExternalWorkCorrelationRecord,
   GovernanceBoundSnapshot,
   GovernanceExecutionPin,
   ProcessedCommandTurnCommit,
+  ProvisionAndOpenWorkflowInstanceRequest,
   ProvisionedWorkflowInstance,
   ProvisionWorkflowInstanceRequest,
   RegisterExternalWorkRequest,
+  RuntimeInstanceProvisioningStore,
+  RuntimeObservationInstanceProvisioningStore,
   RuntimeStoreProcessCommandExtension,
+} from '@kaicreator/domain-harness';
+import {
+  provisioningInstanceIdentityMatchesRequest,
+  provisioningRecordMatchesRequest,
 } from '@kaicreator/domain-harness';
 import type { JsonValue as CanonicalJsonValue } from '@kaicreator/domain-harness/v2';
 import { canonicalText, decodeJson, encodeJson } from './authority-shared.js';
@@ -73,7 +81,8 @@ export type ExpoRuntimeStoreErrorCode =
   | 'EFFECT_NOT_FOUND'
   | 'EFFECT_IDENTITY_CONFLICT'
   | 'EFFECT_STATE_CONFLICT'
-  | 'RECOVERY_STATE_CONFLICT';
+  | 'RECOVERY_STATE_CONFLICT'
+  | 'PROVISIONING_IDENTITY_CONFLICT';
 
 export class ExpoRuntimeStoreError extends Error {
   public constructor(
@@ -433,7 +442,9 @@ export class ExpoSqliteRuntimeStore
     RuntimeObservationStore,
     RuntimeStoreProcessCommandExtension,
     DurableExecutionStore,
-    DurableControlStore
+    DurableControlStore,
+    RuntimeInstanceProvisioningStore,
+    RuntimeObservationInstanceProvisioningStore
 {
   private readonly writes: ExclusiveTransactionQueue;
   private readonly ownsQueue: boolean;
@@ -1484,6 +1495,141 @@ export class ExpoSqliteRuntimeStore
       // adapter, this binds the key to the exact-address RECORD only;
       // instance creation is owned by the runtime message path.
       return { disposition: 'created', record };
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // #180 I-OPEN RuntimeInstanceProvisioningStore (atomic ensure/open)
+  // ---------------------------------------------------------------------
+
+  public async ensureProvisionedWorkflowInstanceOpen(
+    request: ProvisionAndOpenWorkflowInstanceRequest,
+  ): Promise<EnsureProvisionedWorkflowInstanceOpenResult> {
+    this.assertOpen();
+    const { result } = await this.ensureProvisionedWorkflowInstanceOpenWithObservation(
+      request,
+      undefined,
+    );
+    return result;
+  }
+
+  public async ensureProvisionedWorkflowInstanceOpenWithObservation(
+    request: ProvisionAndOpenWorkflowInstanceRequest,
+    intent: RuntimeObservationIntent | undefined,
+  ): Promise<{
+    readonly result: EnsureProvisionedWorkflowInstanceOpenResult;
+    readonly records: readonly RuntimeObservationRecord[];
+  }> {
+    this.assertOpen();
+    // ONE ExclusiveTransactionQueue transaction (the same writer authority and
+    // durability domain as every other RuntimeStore mutation): the check-then-
+    // act below is serialized against every other writer, so a concurrent
+    // same-key/same-address attempt can never interleave between the reads and
+    // the inserts (no query-then-insert race window). Mirrors the Node adapter
+    // decision-for-decision.
+    return this.writes.run(async (transaction) => {
+      const existingKey = await transaction.getFirstAsync<{ record_json: string }>(
+        `SELECT record_json FROM dh_v3_provisioning_keys WHERE provisioning_key = ?`,
+        params([request.provisioningKey]),
+      );
+
+      let record: ProvisionedWorkflowInstance;
+      let provisioningDisposition: 'created' | 'existing';
+      if (existingKey !== null) {
+        record = decodeJson<ProvisionedWorkflowInstance>(
+          existingKey.record_json,
+          'provisioning record',
+        );
+        if (!provisioningRecordMatchesRequest(record, request)) {
+          throw new ExpoRuntimeStoreError(
+            'PROVISIONING_IDENTITY_CONFLICT',
+            `Provisioning key ${request.provisioningKey} is already bound to different logical material`,
+          );
+        }
+        provisioningDisposition = 'existing';
+      } else {
+        record = {
+          provisioningKey: request.provisioningKey,
+          target: request.target,
+          correlationId: request.correlationId,
+          packageId: request.packageId,
+          input: request.input,
+          createdAt: request.requestedAt,
+        };
+        provisioningDisposition = 'created';
+      }
+
+      const existingInstance = await transaction.getFirstAsync<InstanceRow>(
+        INSTANCE_SELECT,
+        params([request.target.workflowId, request.target.instanceKey]),
+      );
+      let instance: WorkflowInstanceSnapshot;
+      let instanceDisposition: 'created' | 'existing';
+      if (existingInstance !== null) {
+        instance = toInstanceSnapshot(existingInstance);
+        if (!provisioningInstanceIdentityMatchesRequest(instance, request)) {
+          // Identity-only compatibility: a progressed/terminal instance at the
+          // same address is returned unchanged below; an incompatible durable
+          // identity fails closed before any write of this transaction.
+          throw new ExpoRuntimeStoreError(
+            'PROVISIONING_IDENTITY_CONFLICT',
+            `Workflow ${request.target.workflowId}/${request.target.instanceKey} is already bound to incompatible durable identity`,
+          );
+        }
+        instanceDisposition = 'existing';
+      } else {
+        instance = request.initialInstance;
+        instanceDisposition = 'created';
+      }
+
+      if (provisioningDisposition === 'created') {
+        await transaction.runAsync(
+          `INSERT INTO dh_v3_provisioning_keys (provisioning_key, record_json) VALUES (?, ?)`,
+          params([
+            request.provisioningKey,
+            encodeJson(record as unknown as CanonicalJsonValue, 'provisioning record'),
+          ]),
+        );
+      }
+
+      let records: readonly RuntimeObservationRecord[] = [];
+      if (instanceDisposition === 'created') {
+        await transaction.runAsync(
+          `INSERT INTO dh_v2_instances(
+             workflow_id, instance_key, correlation_id, package_id, lifecycle,
+             state_revision, workflow_state_json, output_json, failure_json,
+             next_target_sequence, created_at, updated_at
+           ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+          params([
+            instance.address.workflowId,
+            instance.address.instanceKey,
+            instance.correlationId,
+            instance.packageId,
+            instance.lifecycle,
+            instance.stateRevision,
+            stringifyJson(instance.state),
+            optionalJson(instance.output),
+            optionalJson(instance.failure as unknown as JsonValue | undefined),
+            instance.createdAt,
+            instance.updatedAt,
+          ]),
+        );
+        // The provisioning bind, instance materialization and any newly
+        // emitted INSTANCE_OPENED record commit in THIS transaction; an exact
+        // or progressed replay of an existing instance emits no second record.
+        records = await recordObservations(transaction, request.target, instance.packageId, intent, [
+          {
+            kind: 'INSTANCE_OPENED',
+            stateRevisionAfter: instance.stateRevision,
+            lifecycleAfter: instance.lifecycle,
+          },
+        ]);
+      }
+
+      return {
+        result: { provisioningDisposition, instanceDisposition, record, instance },
+        records,
+      };
     });
   }
 

@@ -1,5 +1,6 @@
 import type { RuntimeObservationCapability } from '../../observation/contracts.js';
 import type { RuntimeControlCapability } from '../../control/contracts.js';
+import type { RuntimeProvisioningCapability } from '../../runtime/durable-control-contracts.js';
 import type { DomainMessage, MessageAcceptedAck } from './message.js';
 import type { DomainQuery, DomainQueryResult } from './query.js';
 import type { BusinessInvalidation, DomainChangeListener, DomainSubscription, Unsubscribe } from './subscription.js';
@@ -65,5 +66,21 @@ export interface DomainRuntime {
      * durable control record is the only public truth.
      */
     readonly control?: RuntimeControlCapability;
+    /**
+     * Issue #180 additive atomic provisioning ensure/open capability (the third
+     * optional capability member after observation and control). Optional and
+     * additive: the factory always populates it explicitly - `{ status:
+     * 'UNSUPPORTED' }` when the RuntimeStore does not implement the atomic
+     * I-OPEN provisioning extension (`RuntimeInstanceProvisioningStore`, or its
+     * observation-capable form when Runtime Observation is enabled), or the
+     * enabled `ensureOpen` surface. `ensureOpen` converges one explicit
+     * caller-supplied provisioning key and at most one Runtime instance at the
+     * exact WorkflowAddress in ONE host transaction: concurrent/retried
+     * identical calls never create a duplicate logical instance and never reset
+     * a progressed/terminal instance; the retained `openInstance()` behavior is
+     * unchanged and no initial state is auto-run. Consumers treating older
+     * hand-built runtimes without this member MUST default it to UNSUPPORTED.
+     */
+    readonly provisioning?: RuntimeProvisioningCapability;
 }
 //# sourceMappingURL=runtime.d.ts.map
