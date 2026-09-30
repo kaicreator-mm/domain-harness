@@ -268,9 +268,12 @@ test('binding content location is not identity: same bytes at different module p
       .map(([bindingId, reference]) => [bindingId, { ...reference, moduleSpecifier: `../../generated/elsewhere/${reference.moduleSpecifier.slice('./bindings/'.length)}` }]),
   ));
 
-  const extractManifestJson = /export const manifest = Object\.freeze\(([\s\S]*?)\);\nexport const bindings/u;
-  const nearManifest = JSON.parse(extractManifestJson.exec(nearPath)?.[1] ?? 'null') as { packageId: string; bindingDigests: Record<string, string> };
-  const farManifest = JSON.parse(extractManifestJson.exec(farPath)?.[1] ?? 'null') as { packageId: string; bindingDigests: Record<string, string> };
+  // Successor emission rehydrates the manifest through JSON.parse (R1 P2
+  // own-key-safe emission), so the emitted argument is a double-encoded JSON
+  // string literal: unescape once to the JSON text, parse once to the object.
+  const extractManifestJson = /export const manifest = Object\.freeze\(JSON\.parse\(([\s\S]*?)\)\);\nexport const bindings/u;
+  const nearManifest = JSON.parse(JSON.parse(extractManifestJson.exec(nearPath)?.[1] ?? 'null') as string) as { packageId: string; bindingDigests: Record<string, string> };
+  const farManifest = JSON.parse(JSON.parse(extractManifestJson.exec(farPath)?.[1] ?? 'null') as string) as { packageId: string; bindingDigests: Record<string, string> };
   assert.equal(nearManifest.packageId, manifest.packageId);
   assert.deepEqual(nearManifest.bindingDigests, manifest.bindingDigests);
   assert.equal(farManifest.packageId, manifest.packageId);

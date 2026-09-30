@@ -17,6 +17,13 @@ export interface PackageActivationPreflightResult {
     readonly defaultPackage: TargetCompiledDomainPackage;
     readonly retainedPackageIds: readonly string[];
     readonly retainedPackages: readonly TargetCompiledDomainPackage[];
+    /**
+     * Every listed registry package after exact-profile admission validation.
+     * Production execution resolves packages through this validated set (R1 P1:
+     * the successor profile's entries are the validator-owned immutable
+     * snapshots), never back through the caller-supplied registry references.
+     */
+    readonly validatedPackages: ReadonlyMap<string, TargetCompiledDomainPackage>;
 }
 export declare function listRetainedPackageIds(store: PackagePinStore): Promise<readonly string[]>;
 export declare function preflightPackageActivation(request: PackageActivationPreflightRequest): Promise<PackageActivationPreflightResult>;

@@ -255,8 +255,14 @@ test('I-03-ASSEMBLY: target module emission carries bundled domainData for succe
     bindingModules: assemblyBindingModules(withData.manifest),
     domainData: withData.domainData,
   });
-  assert.match(source, /export const domainData = Object\.freeze\(\{[\s\S]*"tier"/u);
+  // R1 P2 safe emission: manifest/domainData are double-encoded JSON rehydrated
+  // through JSON.parse so every own key (including "__proto__") survives
+  // object-literal evaluation; bindings are assigned on a null-prototype record.
+  assert.match(source, /export const manifest = Object\.freeze\(JSON\.parse\(/u);
+  assert.match(source, /export const domainData = Object\.freeze\(JSON\.parse\(/u);
+  assert.match(source, /\\"tier\\"/u);
   assert.match(source, /Object\.freeze\(\{ manifest, bindings, domainData \}\)/u);
+  assert.doesNotMatch(source, /export const domainData = Object\.freeze\(\{/u);
 
   assert.throws(
     () => emitTargetCompiledPackageModule({
@@ -273,7 +279,7 @@ test('I-03-ASSEMBLY: target module emission carries bundled domainData for succe
     bindingModules: emptyModules,
     domainData: empty.domainData,
   });
-  assert.match(emptySource, /export const domainData = Object\.freeze\(\{\}\)/u);
+  assert.match(emptySource, /export const domainData = Object\.freeze\(JSON\.parse\("\{\}"\)\)/u);
 
   assert.throws(
     () => emitTargetCompiledPackageModule({

@@ -41,7 +41,7 @@ import type {
   CompiledPackageValidatorExtensions,
   PackageActivationValidationPolicy,
 } from '../package/profile-validation.js';
-import { resolvePinnedPackage } from '../package/registry.js';
+import { resolvePinnedPackage, ValidatedPackageRegistry } from '../package/registry.js';
 import { validateSuccessorCompiledPackage } from '../package/successor-validation.js';
 import type { CompiledBusinessSourceContract, CompiledBusinessSourceContractPort } from '../projection/compiled-business-source.js';
 import type { CompiledDomainDataPort } from '../projection/compiled-domain-data.js';
@@ -269,10 +269,15 @@ async function createDomainRuntimeInternal(
   // Shared #312 exact package identity mapping: used by the recording-store
   // decorator for covered RuntimeStore mutations AND by the #180 provisioning
   // ensure/open intent so INSTANCE_OPENED records carry the same identity.
+  // R1 P1: after admission validation completes below, `runtimeRegistry` is
+  // rebound to the validated package view; these closures only execute on
+  // store mutations, which happen strictly after activation, so they always
+  // observe the admission-validated material.
+  let runtimeRegistry: PackageRegistry = options.packageRegistry;
   const resolveObservationPackageIdentity =
     options.observation?.resolvePackageIdentity ??
     ((packageId: string): DomainIntelligencePackageIdentity => {
-      const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+      const compiledPackage = resolvePinnedPackage(runtimeRegistry, packageId);
       return runtimePackageIdentityFromManifest(compiledPackage.manifest);
     });
 
@@ -351,18 +356,26 @@ async function createDomainRuntimeInternal(
         };
   const validatorExtensions: CompiledPackageValidatorExtensions | undefined =
     successorSupportEnabled ? { successor: validateSuccessorCompiledPackage } : undefined;
-  await preflightPackageActivation({
+  const activation = await preflightPackageActivation({
     registry: options.packageRegistry,
     store: effectiveStore,
     validationPolicy,
     ...(validatorExtensions === undefined ? {} : { extensions: validatorExtensions }),
   });
+  // R1 P1: production execution resolves packages only through the exact
+  // admission-validated set. Successor 0.3/2/3 entries are the validator's
+  // owned deep-immutable canonical snapshots; retained 0.2/2/2 entries keep
+  // their historical caller references (legacy validator identity).
+  runtimeRegistry = new ValidatedPackageRegistry(
+    activation.validatedPackages,
+    options.packageRegistry.defaultPackageId,
+  );
 
   const lane = new PerInstanceSerializedLane();
   const instanceEngine = new WorkflowInstanceEngine(effectiveStore, { now, lane });
   const acceptance = new DomainMessageAcceptance({
     store: effectiveStore,
-    packages: options.packageRegistry,
+    packages: runtimeRegistry,
   });
   const recovery = new PoisonMessageRecoveryCoordinator(effectiveStore, { now });
   const toolRunner = new DurableToolRunner({
@@ -394,16 +407,24 @@ async function createDomainRuntimeInternal(
       ? undefined
       : {
           get(packageId, key) {
-            const compiledPackage = options.packageRegistry.get(packageId);
+            const compiledPackage = runtimeRegistry.get(packageId);
             if (compiledPackage !== undefined && isSuccessorCompiledPackage(compiledPackage)) {
-              return compiledPackage.domainData?.[key];
+              // Own-key lookup only (R1 P2): an undeclared or inherited name
+              // such as `constructor` must miss, never fall through to
+              // prototype-chain material.
+              const bundled = compiledPackage.domainData;
+              if (bundled === undefined
+                || !Object.prototype.hasOwnProperty.call(bundled, key)) {
+                return undefined;
+              }
+              return bundled[key];
             }
             return options.domainData?.get(packageId, key);
           },
         };
   const packageBusinessSourceContracts: CompiledBusinessSourceContractPort = {
     get(packageId, source): CompiledBusinessSourceContract | undefined {
-      const compiledPackage = options.packageRegistry.get(packageId);
+      const compiledPackage = runtimeRegistry.get(packageId);
       if (compiledPackage === undefined || !isSuccessorCompiledPackage(compiledPackage)) {
         return undefined;
       }
@@ -418,7 +439,7 @@ async function createDomainRuntimeInternal(
     },
   };
   const projection = new ProjectionService({
-    packageRegistry: options.packageRegistry,
+    packageRegistry: runtimeRegistry,
     store: options.store,
     ...(options.businessSnapshots === undefined ? {} : { businessSnapshots: options.businessSnapshots }),
     ...(dispatchingDomainData === undefined ? {} : { domainData: dispatchingDomainData }),
@@ -431,7 +452,7 @@ async function createDomainRuntimeInternal(
   const subscriptionCoordinator = new RuntimeSubscriptionCoordinator({
     store: options.store,
     projection,
-    packageRegistry: options.packageRegistry,
+    packageRegistry: runtimeRegistry,
     ...(options.onBackgroundError === undefined
       ? {}
       : {
@@ -661,7 +682,7 @@ async function createDomainRuntimeInternal(
         if (!marked) throw new ProcessingConflictError(target);
 
         try {
-          const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+          const compiledPackage = resolvePinnedPackage(runtimeRegistry, current.packageId);
           const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
           if (workflow === undefined) {
             throw new Error(
@@ -725,7 +746,7 @@ async function createDomainRuntimeInternal(
       if (!marked) throw new ProcessingConflictError(target);
 
       try {
-        const compiledPackage = resolvePinnedPackage(options.packageRegistry, current.packageId);
+        const compiledPackage = resolvePinnedPackage(runtimeRegistry, current.packageId);
         const workflow = compiledPackage.manifest.workflows[current.address.workflowId];
         if (workflow === undefined) {
           throw new Error(
@@ -814,8 +835,8 @@ async function createDomainRuntimeInternal(
 
   async function openInstance(request: OpenWorkflowInstanceRequest): Promise<WorkflowInstanceSnapshot> {
     assertActive();
-    const packageId = request.packageId ?? options.packageRegistry.defaultPackageId;
-    const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+    const packageId = request.packageId ?? runtimeRegistry.defaultPackageId;
+    const compiledPackage = resolvePinnedPackage(runtimeRegistry, packageId);
     const workflow = compiledPackage.manifest.workflows[request.address.workflowId];
     if (workflow === undefined) {
       throw new DomainRuntimeError(
@@ -853,8 +874,8 @@ async function createDomainRuntimeInternal(
         'Runtime provisioning ensure/open requires a RuntimeStore implementing the atomic I-OPEN provisioning extension',
       );
     }
-    const packageId = request.packageId ?? options.packageRegistry.defaultPackageId;
-    const compiledPackage = resolvePinnedPackage(options.packageRegistry, packageId);
+    const packageId = request.packageId ?? runtimeRegistry.defaultPackageId;
+    const compiledPackage = resolvePinnedPackage(runtimeRegistry, packageId);
     const workflow = compiledPackage.manifest.workflows[request.address.workflowId];
     if (workflow === undefined) {
       throw new DomainRuntimeError(

@@ -50,6 +50,7 @@ export async function preflightPackageActivation(request) {
         defaultPackage,
         retainedPackageIds,
         retainedPackages,
+        validatedPackages,
     };
 }
 //# sourceMappingURL=activation.js.map
