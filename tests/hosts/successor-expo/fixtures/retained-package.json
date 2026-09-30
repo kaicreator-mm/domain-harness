@@ -1,0 +1,55 @@
+{
+  "manifest": {
+    "bindingDigests": {},
+    "domainId": "successor-expo.retained-legacy",
+    "domainVersion": "1.0.0-retained",
+    "executionEngineMajor": 2,
+    "formatVersion": "0.2",
+    "packageId": "f1a66264b013a6c030dd1cba85271fcb03bf525b5c17ceb44aa378162caae092",
+    "projections": {},
+    "requiredCapabilities": [],
+    "runtimeContractMajor": 2,
+    "schemas": {},
+    "targetProfileId": "successor-expo-host@1",
+    "tools": {},
+    "workflows": {
+      "retained": {
+        "definition": {
+          "initial": "idle",
+          "limits": {
+            "maxSteps": 8
+          },
+          "states": {
+            "finished": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "idle": {
+              "done": [],
+              "error": [],
+              "events": {
+                "ADVANCE": {
+                  "routes": [
+                    {
+                      "target": "finished"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "ADVANCE": {
+            "payloadSchema": {},
+            "type": "ADVANCE"
+          }
+        },
+        "workflowId": "retained"
+      }
+    }
+  }
+}

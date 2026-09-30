@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "DomainHarness Successor Expo Host Validation",
+    "slug": "domain-harness-successor-expo-host-validation",
+    "version": "0.0.0",
+    "jsEngine": "hermes",
+    "android": {
+      "package": "com.kaicreator.domainharness.succexphost"
+    }
+  }
+}

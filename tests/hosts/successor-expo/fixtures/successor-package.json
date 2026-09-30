@@ -1,0 +1,626 @@
+{
+  "manifest": {
+    "bindingDigests": {
+      "sx-inventory-native-v1": "d4ee94f6852cc6cdb90885a3a1a6cf8de80c5c6f153d78d16d3b3c99196fdbb0",
+      "sx-module-v1": "0a98f792c4d7bda549825517fe96e3b3099941a0a2849769f50264eb29dc31ce",
+      "sx-sha256-v1": "852f5756a0bc78dad4a1d15be5c21ffa64475b6b7593743330e1eba9d7769284"
+    },
+    "businessSources": [
+      {
+        "source": "crm",
+        "valueSchema": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      }
+    ],
+    "compatibility": {
+      "legacyChildDependencies": {
+        "child": [],
+        "ghost-parent": [],
+        "missing-parent": [],
+        "parent": [],
+        "strict-child": [],
+        "strict-parent": [],
+        "tool-parent": [],
+        "version-parent": []
+      },
+      "sourceSchemaVersion": "0.1"
+    },
+    "domainData": [
+      {
+        "contentDigest": "16a5197c426cd95602315f8e3673a9738175687f7f09d44ede8144b2a9be21f3",
+        "key": "tier",
+        "valueSchema": {
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        }
+      }
+    ],
+    "domainId": "successor-expo.domain",
+    "domainVersion": "1.0.0-successor-expo",
+    "executionEngineMajor": 3,
+    "formatVersion": "0.3",
+    "packageDataBounds": {
+      "maxBusinessSources": 8,
+      "maxDomainDataEntries": 16,
+      "maxDomainDataEntryCanonicalBytes": 2048,
+      "maxSchemaCanonicalBytes": 4096,
+      "maxTotalDomainDataCanonicalBytes": 8192
+    },
+    "packageId": "3932baae124e42bfc1a7a08508775c813206e1e3ec7f7c06fba3ae3aca161a03",
+    "projections": {
+      "overview": {
+        "dependencies": [
+          {
+            "key": "tier",
+            "kind": "domain-data"
+          },
+          {
+            "kind": "business",
+            "selector": {
+              "accountId": "*"
+            },
+            "source": "crm"
+          }
+        ],
+        "expression": "$",
+        "outputSchema": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "projectionId": "overview"
+      }
+    },
+    "requiredCapabilities": [
+      "compiled-package-module@1",
+      "crypto-hash-sha256@1",
+      "inventory-native@1"
+    ],
+    "runtimeContractMajor": 2,
+    "schemaContractVersion": "domainharness-json-schema/1",
+    "schemas": {},
+    "targetProfileId": "successor-expo-host@1",
+    "tools": {
+      "inventory.reserve": {
+        "effect": "idempotent",
+        "execution": {
+          "bindingId": "sx-inventory-native-v1",
+          "digest": "d4ee94f6852cc6cdb90885a3a1a6cf8de80c5c6f153d78d16d3b3c99196fdbb0",
+          "kind": "host-local-domain-tool@1"
+        },
+        "inputSchema": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "outputSchema": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "requiredCapabilities": [
+          "inventory-native@1"
+        ],
+        "toolId": "inventory.reserve"
+      }
+    },
+    "workflows": {
+      "child": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "done"
+                    }
+                  ]
+                },
+                "NOTIFY": {
+                  "routes": [
+                    {
+                      "target": "done"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          },
+          "NOTIFY": {
+            "payloadSchema": {},
+            "type": "NOTIFY"
+          }
+        },
+        "workflowId": "child"
+      },
+      "ghost-parent": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "acting": {
+              "done": [
+                {
+                  "target": "done"
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "domain-message",
+                  "messageType": "NOTIFY",
+                  "payloadExpression": "$",
+                  "rejected": [
+                    {
+                      "target": "rejected"
+                    }
+                  ],
+                  "targetExpression": "$.ghostChild"
+                }
+              ],
+              "error": [],
+              "events": {},
+              "final": false
+            },
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "rejected": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "acting"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          }
+        },
+        "workflowId": "ghost-parent"
+      },
+      "missing-parent": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "acting": {
+              "done": [
+                {
+                  "target": "done"
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "domain-message",
+                  "messageType": "NOTIFY",
+                  "payloadExpression": "$",
+                  "rejected": [
+                    {
+                      "target": "rejected"
+                    }
+                  ],
+                  "targetExpression": "$.missingChild"
+                }
+              ],
+              "error": [],
+              "events": {},
+              "final": false
+            },
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "rejected": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "acting"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          }
+        },
+        "workflowId": "missing-parent"
+      },
+      "parent": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "acting": {
+              "done": [
+                {
+                  "target": "done"
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "domain-message",
+                  "messageType": "NOTIFY",
+                  "payloadExpression": "$",
+                  "rejected": [
+                    {
+                      "target": "rejected"
+                    }
+                  ],
+                  "targetExpression": "$.child"
+                }
+              ],
+              "error": [],
+              "events": {},
+              "final": false,
+              "invoke": {
+                "kind": "tool",
+                "ref": "inventory.reserve"
+              }
+            },
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "rejected": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "acting"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          }
+        },
+        "workflowId": "parent"
+      },
+      "strict-child": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "done"
+                    }
+                  ]
+                },
+                "NOTIFY": {
+                  "routes": [
+                    {
+                      "target": "done"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          },
+          "NOTIFY": {
+            "payloadSchema": {
+              "additionalProperties": false,
+              "required": [
+                "orderId"
+              ],
+              "type": "object"
+            },
+            "type": "NOTIFY"
+          }
+        },
+        "workflowId": "strict-child"
+      },
+      "strict-parent": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "acting": {
+              "done": [
+                {
+                  "target": "done"
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "domain-message",
+                  "messageType": "NOTIFY",
+                  "payloadExpression": "$",
+                  "rejected": [
+                    {
+                      "target": "rejected"
+                    }
+                  ],
+                  "targetExpression": "$.strictChild"
+                }
+              ],
+              "error": [],
+              "events": {},
+              "final": false
+            },
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "rejected": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "acting"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          }
+        },
+        "workflowId": "strict-parent"
+      },
+      "tool-parent": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "acting": {
+              "done": [
+                {
+                  "target": "done"
+                }
+              ],
+              "effects": [
+                {
+                  "kind": "domain-message",
+                  "messageType": "NOTIFY",
+                  "payloadExpression": "$",
+                  "rejected": [
+                    {
+                      "target": "rejected"
+                    }
+                  ],
+                  "targetExpression": "$.toolChild"
+                }
+              ],
+              "error": [],
+              "events": {},
+              "final": false,
+              "invoke": {
+                "kind": "tool",
+                "ref": "inventory.reserve"
+              }
+            },
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "rejected": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "acting"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          }
+        },
+        "workflowId": "tool-parent"
+      },
+      "version-parent": {
+        "definition": {
+          "initial": "start",
+          "limits": {
+            "maxSteps": 16
+          },
+          "states": {
+            "acting": {
+              "done": [
+                {
+                  "target": "done"
+                }
+              ],
+              "effects": [
+                {
+                  "contractVersion": "2",
+                  "kind": "domain-message",
+                  "messageType": "NOTIFY",
+                  "payloadExpression": "$",
+                  "rejected": [
+                    {
+                      "target": "rejected"
+                    }
+                  ],
+                  "targetExpression": "$.child"
+                }
+              ],
+              "error": [],
+              "events": {},
+              "final": false
+            },
+            "done": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "rejected": {
+              "done": [],
+              "error": [],
+              "events": {},
+              "final": true
+            },
+            "start": {
+              "done": [],
+              "error": [],
+              "events": {
+                "BEGIN": {
+                  "routes": [
+                    {
+                      "target": "acting"
+                    }
+                  ]
+                }
+              },
+              "final": false
+            }
+          }
+        },
+        "messageContracts": {
+          "BEGIN": {
+            "payloadSchema": {},
+            "type": "BEGIN"
+          }
+        },
+        "workflowId": "version-parent"
+      }
+    }
+  },
+  "domainData": {
+    "tier": {
+      "level": 1
+    }
+  }
+}
