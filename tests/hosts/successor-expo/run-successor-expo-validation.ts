@@ -518,7 +518,7 @@ async function runSha256KnownAnswers(checks: string[]): Promise<void> {
       : JSON.stringify({ b: 2, a: 1 });
     // JSON-typed vectors are digested over their canonical (key-sorted) form
     // via the core canonicalizer, mirroring the build-time fixture compiler.
-    let parsedVector: unknown = null;
+    let parsedVector: unknown;
     try {
       parsedVector = JSON.parse(vectorText);
     } catch {
@@ -1104,7 +1104,7 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
       // Enrich: capture the SECOND failure's durable cause, then record an
       // honest product subcase failure and CONTINUE — aborting here would
       // skip every later phase-1 journey.
-      let runtimeFailure: JsonValue = null;
+      let runtimeFailure: JsonValue;
       try {
         const failureQuery = await main.runtime.query({ kind: 'runtime-failure', target: { workflowId: 'missing-parent', instanceKey: 'missing-1' } } as never);
         runtimeFailure = (failureQuery as { value?: JsonValue }).value ?? null;
