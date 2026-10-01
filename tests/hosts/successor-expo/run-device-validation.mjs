@@ -136,6 +136,8 @@ async function main() {
   adbSync(['shell', 'pm', 'clear', appPackage]);
   adbSync(['logcat', '-c']);
 
+  // Up to 8 launches accommodate the full barrier queue; the minimal
+  // happy path settles in 6 (phase-1 journeys, barrier restarts, phase 2).
   for (let launch = 1; launch <= 8; launch += 1) {
     adbSync(['logcat', '-c']);
     const beforePid = adbSync(['shell', 'pidof', appPackage]).trim();
