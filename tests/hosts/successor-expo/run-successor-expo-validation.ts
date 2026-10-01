@@ -1346,8 +1346,24 @@ async function runBarrierOracle(sqlite: ExpoSqliteModuleLike, control: ExpoSqlit
     const opened = await openRuntime(sqlite, CRASH15_DB, 'legacy', true);
     try {
       const facts = await observationFacts(opened.database);
-      check(facts.minSeq === 1, `SX-E15-CP2 sequences-start-at-1 (min=${facts.minSeq})`, checks);
-      check(facts.records === facts.maxSeq, `SX-E15-CP2 contiguous-monotonic (records=${facts.records}, max=${facts.maxSeq})`, checks);
+      // Sequences are PER (workflow, instance, epoch) stream: each stream
+      // starts at 1 and must be gapless. A global records==max check is
+      // meaningless across multiple streams/epochs.
+      const perStream = await opened.database.getAllAsync<{ workflow_id: string; instance_key: string; epoch_id: string; cnt: number; maxSeq: number; minSeq: number }>(
+        `SELECT workflow_id, instance_key, epoch_id, COUNT(*) AS cnt, MAX(sequence) AS maxSeq, MIN(sequence) AS minSeq
+           FROM dh_v3_observation_records GROUP BY workflow_id, instance_key, epoch_id`,
+        [],
+      );
+      check(perStream.length >= 1, `SX-E15-CP2 streams-present (${perStream.length})`, checks);
+      for (const stream of perStream) {
+        check(
+          stream.minSeq === 1 && stream.cnt === stream.maxSeq,
+          `SX-E15-CP2 per-stream-contiguous ${stream.workflow_id}/${stream.instance_key}/${stream.epoch_id} (min=${stream.minSeq}, count=${stream.cnt}, max=${stream.maxSeq})`,
+          checks,
+        );
+      }
+      const totalRecords = perStream.reduce((sum, stream) => sum + stream.cnt, 0);
+      check(totalRecords === facts.records, `SX-E15-CP2 stream-totals-match (sum=${totalRecords}, records=${facts.records})`, checks);
       check(facts.opened === 2, `SX-E15-CP2 both-opens-observed (opened=${facts.opened})`, checks);
       const streamIdentity = await opened.database.getAllAsync<{ package_identity_json: string }>(
         'SELECT DISTINCT package_identity_json FROM dh_v3_observation_streams',
