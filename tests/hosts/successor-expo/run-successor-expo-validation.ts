@@ -200,6 +200,17 @@ function retainedPackage(): TargetCompiledDomainPackage {
   return { manifest: RETAINED_MANIFEST, bindings: {} };
 }
 
+/**
+ * Bindings for standalone activation probes of the successor package. The
+ * core activation validates binding PRESENCE for every declared tool binding
+ * (missing executable binding fails closed), so probes must carry the
+ * declared inventory binding or every rejection would be a spurious
+ * MISSING_BINDING instead of the intended per-oracle error class.
+ */
+function activationProbeBindings(): TargetCompiledDomainPackage['bindings'] {
+  return { [INVENTORY_BINDING_ID]: { opaque: 'sx458-activation-probe' } };
+}
+
 function supportedPolicy(bounds?: Bounds) {
   return {
     supportedProfiles: [LEGACY_COMPILED_ARTIFACT_PROFILE, SUCCESSOR_COMPILED_ARTIFACT_PROFILE],
@@ -564,7 +575,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
 
   // Clean activation of the publicly compiled package on device.
   const validated = await validateCompiledPackageByProfile(
-    { manifest: SUCCESSOR_MANIFEST, bindings: {}, domainData: SUCCESSOR_DOMAIN_DATA },
+    { manifest: SUCCESSOR_MANIFEST, bindings: activationProbeBindings(), domainData: SUCCESSOR_DOMAIN_DATA },
     policy,
     extensions,
   );
@@ -580,7 +591,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
   try {
     const tampered = JSON.parse(SUCCESSOR_DOMAIN_DATA_JSON) as Record<string, JsonValue>;
     (tampered.tier as { level: number }).level = 999;
-    await validateCompiledPackageByProfile({ manifest: SUCCESSOR_MANIFEST, bindings: {}, domainData: tampered }, policy, extensions);
+    await validateCompiledPackageByProfile({ manifest: SUCCESSOR_MANIFEST, bindings: activationProbeBindings(), domainData: tampered }, policy, extensions);
   } catch (error) {
     threw = errorCode(error);
   }
@@ -592,7 +603,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
   try {
     const manifest = JSON.parse(SUCCESSOR_MANIFEST_JSON) as TargetCompiledDomainPackage['manifest'];
     (manifest.domainData?.[0] as { contentDigest: string }).contentDigest = 'forged-digest';
-    await validateCompiledPackageByProfile({ manifest, bindings: {}, domainData: SUCCESSOR_DOMAIN_DATA }, policy, extensions);
+    await validateCompiledPackageByProfile({ manifest, bindings: activationProbeBindings(), domainData: SUCCESSOR_DOMAIN_DATA }, policy, extensions);
   } catch (error) {
     threw = errorCode(error);
   }
@@ -602,7 +613,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
   // Missing Domain Data entry -> reject.
   threw = 'none';
   try {
-    await validateCompiledPackageByProfile({ manifest: SUCCESSOR_MANIFEST, bindings: {}, domainData: {} }, policy, extensions);
+    await validateCompiledPackageByProfile({ manifest: SUCCESSOR_MANIFEST, bindings: activationProbeBindings(), domainData: {} }, policy, extensions);
   } catch (error) {
     threw = errorCode(error);
   }
@@ -613,7 +624,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
   try {
     const manifest = JSON.parse(SUCCESSOR_MANIFEST_JSON) as TargetCompiledDomainPackage['manifest'];
     (manifest as { schemaContractVersion?: string }).schemaContractVersion = 'domainharness-json-schema/0';
-    await validateCompiledPackageByProfile({ manifest, bindings: {}, domainData: SUCCESSOR_DOMAIN_DATA }, policy, extensions);
+    await validateCompiledPackageByProfile({ manifest, bindings: activationProbeBindings(), domainData: SUCCESSOR_DOMAIN_DATA }, policy, extensions);
   } catch (error) {
     threw = errorCode(error);
   }
@@ -626,7 +637,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
     const overview = manifest.projections['overview'] as unknown as { dependencies: Array<{ kind: string; key?: string }> };
     overview.dependencies = [...overview.dependencies, { kind: 'domain-data', key: 'undeclared-key' }];
     await validateSuccessorCompiledPackage(
-      { manifest, bindings: {}, domainData: SUCCESSOR_DOMAIN_DATA },
+      { manifest, bindings: activationProbeBindings(), domainData: SUCCESSOR_DOMAIN_DATA },
       policy,
     );
   } catch (error) {
@@ -638,7 +649,7 @@ async function runIdentityAndActivationIntegrity(checks: string[], details: Reco
 
 async function runBoundsMatrix(checks: string[], details: Record<string, JsonValue>): Promise<void> {
   const extensions = { successor: validateSuccessorCompiledPackage };
-  const value = { manifest: SUCCESSOR_MANIFEST, bindings: {}, domainData: SUCCESSOR_DOMAIN_DATA };
+  const value = { manifest: SUCCESSOR_MANIFEST, bindings: activationProbeBindings(), domainData: SUCCESSOR_DOMAIN_DATA };
 
   // Equal-limit acceptance: host maxima exactly equal to package bounds.
   await validateCompiledPackageByProfile(value, supportedPolicy({ ...BOUNDS.package }), extensions);
@@ -692,7 +703,7 @@ async function runBoundsMatrix(checks: string[], details: Record<string, JsonVal
   ] as const) {
     let threw = 'none';
     try {
-      await validateCompiledPackageByProfile({ manifest: manifest as TargetCompiledDomainPackage['manifest'], bindings: {} }, supportedPolicy(BOUNDS.host), extensions);
+      await validateCompiledPackageByProfile({ manifest: manifest as TargetCompiledDomainPackage['manifest'], bindings: activationProbeBindings() }, supportedPolicy(BOUNDS.host), extensions);
     } catch (error) {
       threw = errorCode(error);
     }
@@ -741,6 +752,11 @@ INSERT INTO dh_v2_instances(
 );
 `);
   const reference = await sqlite.openDatabaseAsync('sx458-fresh-reference.db');
+  // The reference must be a FRESHLY INITIALIZED store (current-source schema
+  // v3 created from scratch); a never-initialized database has zero dh_v3_
+  // tables and the migrated-v1 comparison would be meaningless.
+  const referenceStore = await openExpoSqliteRuntimeStore({ database: reference });
+  await referenceStore.close();
   const referenceTables = await reference.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name LIKE 'dh_v3_%'`,
     [],

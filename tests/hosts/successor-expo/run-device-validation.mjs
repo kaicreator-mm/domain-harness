@@ -32,8 +32,11 @@ function log(line) {
 
 function adbSync(args, timeoutMs = 30000) {
   const result = spawnSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: timeoutMs });
-  if (result.status !== 0 && !result.stdout && !result.stderr) {
-    throw new Error(`adb ${args.join(' ')} failed: ${result.error?.message ?? 'unknown'}`);
+  // Only a real spawn failure (timeout / binary missing) is fatal here. Remote
+  // commands legitimately exit non-zero with empty output, e.g. `pidof` when
+  // the app process is absent (before launch / after force-stop).
+  if (result.error) {
+    throw new Error(`adb ${args.join(' ')} failed: ${result.error.message}`);
   }
   return `${result.stdout ?? ''}${result.stderr ?? ''}`;
 }
