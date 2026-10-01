@@ -41,6 +41,37 @@ function adbSync(args, timeoutMs = 30000) {
   return `${result.stdout ?? ''}${result.stderr ?? ''}`;
 }
 
+/**
+ * Reassemble a chunked marker payload (`TAG <i>/<n> <chunk>` lines emitted by
+ * the Hermes app because logcat truncates long single lines) and parse it as
+ * JSON. Returns undefined until every chunk of the latest emission is present.
+ */
+function parseChunkedTag(text, tag) {
+  const lines = [...text.matchAll(new RegExp(`${tag} (\\d+)/(\\d+) ([\\s\\S]*?)(?=\\n|$)`, 'g'))];
+  if (lines.length === 0) return undefined;
+  const last = lines[lines.length - 1];
+  const total = Number(last[2]);
+  const parts = new Map();
+  // Walk backwards to collect the <total> chunks of the FINAL emission.
+  for (let index = lines.length - 1; index >= 0 && parts.size < total; index -= 1) {
+    const [, idx, n, chunk] = lines[index];
+    if (Number(n) !== total) break;
+    if (!parts.has(Number(idx))) parts.set(Number(idx), chunk);
+  }
+  if (parts.size !== total) return undefined;
+  let payload = '';
+  for (let index = 0; index < total; index += 1) {
+    const part = parts.get(index);
+    if (part === undefined) return undefined;
+    payload += part;
+  }
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return undefined;
+  }
+}
+
 async function waitForMarker(launch) {
   // Wait up to 10 minutes for exactly one terminal/armed marker on logcat.
   const deadline = Date.now() + 10 * 60 * 1000;
@@ -53,25 +84,15 @@ async function waitForMarker(launch) {
       const match = text.match(/FAULT_BARRIER_ARMED:(\S+)/);
       if (match) armed = { kind: 'armed', barrier: match[1] };
     }
-    const validationLines = [...text.matchAll(/SUCCESSOR_EXPO_VALIDATION\s+(\{.*)/g)];
-    for (const lineMatch of validationLines) {
-      let parsed;
-      try {
-        parsed = JSON.parse(lineMatch[1]);
-      } catch {
-        continue;
-      }
+    const parsed = parseChunkedTag(text, 'SUCCESSOR_EXPO_VALIDATION');
+    if (parsed !== undefined) {
       if (parsed.status === 'PASS') return { kind: 'pass', ...parsed };
       if (parsed.status === 'FAIL') return { kind: 'fail', ...parsed };
       if (parsed.status === 'RESTART_REQUIRED') return { kind: 'restart-required', ...parsed };
     }
-    const comparatorLines = [...text.matchAll(/SUCCESSOR_EXPO_COMPARATOR\s+(\{.*)/g)];
-    if (comparatorLines.length > 0) {
-      try {
-        writeFileSync(join(outDir, 'comparator.json'), JSON.stringify(JSON.parse(comparatorLines[comparatorLines.length - 1][1]), null, 2));
-      } catch {
-        // comparator line truncated in logcat; final-result.json still has the aggregate
-      }
+    const comparator = parseChunkedTag(text, 'SUCCESSOR_EXPO_COMPARATOR');
+    if (comparator !== undefined) {
+      writeFileSync(join(outDir, 'comparator.json'), JSON.stringify(comparator, null, 2));
     }
   }
   throw new Error(`launch ${launch}: no marker within 10 minutes (armed=${JSON.stringify(armed)})`);

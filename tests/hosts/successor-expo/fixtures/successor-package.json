@@ -53,7 +53,7 @@
       "maxSchemaCanonicalBytes": 4096,
       "maxTotalDomainDataCanonicalBytes": 8192
     },
-    "packageId": "250262cdb89ff34b0d8cba5fa5e468321eeb6c62baa8303debadb9c197612a7f",
+    "packageId": "9eebf8ee0e857eff186656758c7a7e6e164a557a2dfc6205fd4d9053c87bd60e",
     "projections": {
       "overview": {
         "dependencies": [
@@ -173,7 +173,7 @@
               "effects": [
                 {
                   "kind": "domain-message",
-                  "messageType": "NOTIFY",
+                  "messageType": "GHOST",
                   "payloadExpression": "$",
                   "rejected": [
                     {

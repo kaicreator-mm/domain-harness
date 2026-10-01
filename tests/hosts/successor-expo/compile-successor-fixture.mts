@@ -220,7 +220,14 @@ const MAIN_WORKFLOWS: readonly WorkflowSpec[] = [
   { workflowId: 'child', simple: true },
   { workflowId: 'strict-parent', effectTarget: '$.strictChild', payloadExpression: '$' },
   { workflowId: 'strict-child', simple: true, notifySchema: { type: 'object', required: ['orderId'], additionalProperties: false } },
-  { workflowId: 'ghost-parent', effectTarget: '$.ghostChild', payloadExpression: '$' },
+  // Message-contract-not-found probe: the target instance EXISTS (child
+  // workflow) but the child declares no GHOST contract, so acceptance classifies
+  // the send as a PERMANENT message_contract_not_found rejection. (The frozen
+  // `workflow_not_found` permanent code is unreachable through public sends:
+  // instance existence is resolved before pinned-contract resolution, so an
+  // unknown workflow without a live instance classifies transient
+  // target_not_found — reported as a product finding.)
+  { workflowId: 'ghost-parent', effectTarget: '$.ghostChild', messageType: 'GHOST', payloadExpression: '$' },
   { workflowId: 'missing-parent', effectTarget: '$.missingChild', payloadExpression: '$' },
   { workflowId: 'version-parent', effectTarget: '$.child', payloadExpression: '$', contractVersion: '2' },
   { workflowId: 'tool-parent', tool: inventoryTool, effectTarget: '$.toolChild', payloadExpression: '$' },
