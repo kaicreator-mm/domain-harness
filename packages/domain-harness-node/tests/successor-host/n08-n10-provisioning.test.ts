@@ -34,7 +34,7 @@ function runChild(args: readonly string[], options: { readonly killAt?: string; 
       stdio: ['ignore', 'pipe', 'pipe'],
       // Strip the test-runner worker identity: a child of a `node --test`
       // parent must run as a plain process, not inherit NODE_TEST_CONTEXT.
-      env: { ...process.env, NODE_TEST_CONTEXT: undefined },
+      env: { ...process.env, NODE_TEST_CONTEXT: undefined, SX_BUSY_TIMEOUT_MS: '30000' },
     });
     let stdout = '';
     let killed = false;
@@ -98,8 +98,14 @@ test('N08: 8 real OS processes racing one provisioning key converge to exactly o
   }
   let results: Array<{ code: number | null; stdout: string; killed: boolean }>;
   try {
+    // Staggered ramp-up (~1s window): the 8 ensure transactions still race
+    // concurrently, but the tsx/migration startup storm on slower hosts no
+    // longer trips busy timeouts before the race even begins.
     results = await Promise.all(Array.from({ length: WORKERS }, (_, index) =>
-      runChild(['ensure', path, join(tmpdir(), `dh457-n08-marker-${index}`), 'sx:n08:key-42', 'n08-shared'])));
+      new Promise<{ code: number | null; stdout: string; killed: boolean }>((resolveStagger) => {
+        setTimeout(resolveStagger, index * 150);
+      }).then(() =>
+        runChild(['ensure', path, join(tmpdir(), `dh457-n08-marker-${index}`), 'sx:n08:key-42', 'n08-shared']))));
   } catch (error) {
     console.error('N08_RACE_ERROR', error);
     throw error;

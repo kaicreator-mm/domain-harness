@@ -20,7 +20,7 @@ function mark(stage: string): void {
 async function bootRuntime() {
   const successor = compileSuccessor(process.env.SX_WITH_TOOL === '1' ? { withTool: true } : {});
   const retained = await retainedLegacyPackage();
-  const store = openStore(databasePath);
+  const store = openStore(databasePath, Number(process.env.SX_BUSY_TIMEOUT_MS ?? '10000'));
   const runtime = await createNodeDomainRuntime({
     packageRegistry: new StaticPackageRegistry([
       retained,
