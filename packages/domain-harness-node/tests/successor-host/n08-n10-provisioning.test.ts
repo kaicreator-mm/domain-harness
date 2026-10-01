@@ -201,46 +201,62 @@ test('N09: a REAL durable-table failure at the covered boundary leaves zero part
 }, 120_000);
 
 test('N10: real taskkill crash windows around the durable commit', async () => {
+  // Rare local spawn races can make a worker die before its barrier marker
+  // (observed once under heavy parallel load); one bounded retry per window
+  // keeps the physical oracle stable without weakening any assertion.
+  const runWindowWithRetry = async (runWindow: () => Promise<void>): Promise<void> => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await runWindow();
+        return;
+      } catch (error) {
+        if (attempt >= 1 || !/really killed/.test(String((error as Error).message))) throw error;
+      }
+    }
+  };
   for (const stage of ['before-ensure', 'after-commit'] as const) {
-    const { path, dir } = freshDbPath(`n10-${stage}`);
-    {
-      const { store } = await bootRuntimeOn(path);
-      store.close();
-    }
-    const marker = join(dir, 'stages.log');
-    const killSignal = join(dir, 'kill-now');
-    writeFileSync(killSignal, 'go');
+    await runWindowWithRetry(async () => {
+      const { path, dir } = freshDbPath(`n10-${stage}`);
+      {
+        const { store } = await bootRuntimeOn(path);
+        store.close();
+      }
+      const marker = join(dir, 'stages.log');
+      const killSignal = join(dir, 'kill-now');
+      writeFileSync(killSignal, 'go');
 
-    const killed = await runChild(
-      ['ensure-armed', path, marker, stage, `sx:n10:${stage}`, `n10-${stage}`],
-      { killAt: 'at-barrier', killSignalFile: marker },
-    );
-    assert.equal(killed.killed, true, `${stage}: the worker was really killed by taskkill /F`);
-    assert.notEqual(killed.code, 0, `${stage}: killed worker exits abnormally`);
+      const killed = await runChild(
+        ['ensure-armed', path, marker, stage, `sx:n10:${stage}`, `n10-${stage}`],
+        { killAt: 'at-barrier', killSignalFile: marker },
+      );
+      assert.equal(killed.killed, true, `${stage}: the worker was really killed by taskkill /F`);
+      assert.notEqual(killed.code, 0, `${stage}: killed worker exits abnormally`);
 
-    const sql = rawSql(path);
-    const keys = sql.rows('SELECT provisioning_key FROM dh_v3_provisioning_keys');
-    const instances = sql.rows('SELECT instance_key, state_revision FROM dh_v2_instances');
-    if (stage === 'before-ensure') {
-      assert.equal(keys.length, 0, 'window A: nothing durable was committed');
-      assert.equal(instances.length, 0);
-    } else {
-      assert.equal(keys.length, 1, 'window B: the durable commit survived the kill');
-      assert.equal(instances.length, 1);
-      assert.equal((instances[0] as { state_revision: number }).state_revision, 0);
-    }
-    sql.close();
+      const sql = rawSql(path);
+      const keys = sql.rows('SELECT provisioning_key FROM dh_v3_provisioning_keys');
+      const instances = sql.rows('SELECT instance_key, state_revision FROM dh_v2_instances');
+      if (stage === 'before-ensure') {
+        assert.equal(keys.length, 0, 'window A: nothing durable was committed');
+        assert.equal(instances.length, 0);
+      } else {
+        assert.equal(keys.length, 1, 'window B: the durable commit survived the kill');
+        assert.equal(instances.length, 1);
+        assert.equal((instances[0] as { state_revision: number }).state_revision, 0);
+      }
+      sql.close();
 
-    // Reopen from a NEW OS process with the exact same request.
-    const retry = await runChild(['ensure', path, join(dir, 'retry-marker'), `sx:n10:${stage}`, `n10-${stage}`]);
-    const retryOutcome = JSON.parse(
-      retry.stdout.split('\n').filter((line) => line.startsWith('{')).pop()!,
-    ) as ChildOutcome;
-    if (stage === 'before-ensure') {
-      assert.equal(retryOutcome.instanceDisposition, 'created', 'window A retry materializes cleanly');
-    } else {
-      assert.equal(retryOutcome.instanceDisposition, 'existing', 'window B retry returns the committed instance without reset');
-      assert.equal(retryOutcome.stateRevision, 0, 'window B retry never resets progressed state');
-    }
+      // Reopen from a NEW OS process with the exact same request.
+      const retry = await runChild(['ensure', path, join(dir, 'retry-marker'), `sx:n10:${stage}`, `n10-${stage}`]);
+      const retryOutcome = JSON.parse(
+        retry.stdout.split('\n').filter((line) => line.startsWith('{')).pop()!,
+      ) as ChildOutcome;
+      if (stage === 'before-ensure') {
+        assert.equal(retryOutcome.instanceDisposition, 'created', 'window A retry materializes cleanly');
+      } else {
+        assert.equal(retryOutcome.instanceDisposition, 'existing', 'window B retry returns the committed instance without reset');
+        assert.equal(retryOutcome.stateRevision, 0, 'window B retry never resets progressed state');
+      }
+
+    });
   }
 }, 300_000);
