@@ -7,7 +7,8 @@
 // pins (SQL-level assertions included).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createNodeDomainRuntime } from '../../src/index.js';import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { createNodeDomainRuntime } from '../../src/index.js';
+import { StaticPackageRegistry } from '@kaicreator/domain-harness';
 import {
   CRM_SNAPSHOT,
   HOST_MAXIMA,
@@ -170,8 +171,6 @@ test('N07: retained and successor instances coexist, progress and reopen on one 
   const { path } = freshDbPath('n07');
   {
     const mixed = await bootMixed(path);
-    runtimeHolder.runtime = mixed.runtime;
-    runtimeHolder.store = mixed.store;
 
     await mixed.runtime.openInstance({
       address: { workflowId: 'retained', instanceKey: 'mix-retained' },

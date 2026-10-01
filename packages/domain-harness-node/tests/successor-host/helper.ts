@@ -23,7 +23,7 @@ import type {
   RawToolDefinition,
   RawWorkflow,
   TargetHostProfile,
-} from '../../../../domain-harness-compiler/src/raw/types.js';
+} from '../../../../packages/domain-harness-compiler/src/raw/types.js';
 import { computeCompiledPackageId } from '../../../../packages/domain-harness/src/package/validation.js';
 import { NodeSqliteRuntimeStore } from '../../src/store/node-sqlite-runtime-store.js';
 import type { RuntimeStore } from '@kaicreator/domain-harness/v2';
