@@ -328,6 +328,35 @@ function message(messageId: string, target: { workflowId: string; instanceKey: s
   return { messageId, target, type, payload, correlationId: CORRELATION_ID };
 }
 
+/**
+ * Poll for an instance to reach an accepted stable state. Recovery-driven
+ * drains are scheduled asynchronously and are not necessarily covered by
+ * awaitIdle, so a single immediate read races the journey.
+ */
+async function waitForInstanceState(
+  store: ExpoSqliteRuntimeStore,
+  address: { workflowId: string; instanceKey: string },
+  accept: (snapshot: { lifecycle?: string; stateId?: string } | null) => boolean,
+  label: string,
+  checks: string[],
+): Promise<void> {
+  const deadline = Date.now() + 20000;
+  let last: { lifecycle?: string; stateId?: string } | null = null;
+  while (Date.now() < deadline) {
+    const snapshot = await store.getInstance(address);
+    last = snapshot === null ? null : {
+      lifecycle: snapshot.lifecycle,
+      stateId: (snapshot.state as { stateId?: string } | undefined)?.stateId,
+    };
+    if (last !== null && accept(last)) {
+      checks.push(label);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`SX458 device check failed: ${label} last=${JSON.stringify(last)}`);
+}
+
 async function readSchemaVersion(sqlite: ExpoSqliteModuleLike, databaseName: string): Promise<number> {
   const database = await sqlite.openDatabaseAsync(databaseName);
   try {
@@ -1063,16 +1092,19 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     await main.runtime.awaitIdle();
     // After the retry the SAME effect identity is re-sent, now accepted, and
     // the journey genuinely completes: parent -> done (completed) and the
-    // child NOTIFY target processed to done as well.
-    const recovered = await main.store.getInstance({ workflowId: 'missing-parent', instanceKey: 'missing-1' });
-    check(
-      recovered !== null && recovered.lifecycle === 'completed' && (recovered.state as { stateId?: string }).stateId === 'done',
+    // child NOTIFY target processed to done as well. The drain is scheduled
+    // asynchronously, so poll for the stable terminal state.
+    await waitForInstanceState(
+      main.store,
+      { workflowId: 'missing-parent', instanceKey: 'missing-1' },
+      (snapshot) => snapshot?.lifecycle === 'completed' && snapshot.stateId === 'done',
       'SX-E08 retry-accepts-same-identity',
       checks,
     );
-    const recoveredChild = await main.store.getInstance({ workflowId: 'child', instanceKey: 'missing-child' });
-    check(
-      recoveredChild !== null && recoveredChild.lifecycle === 'completed' && (recoveredChild.state as { stateId?: string }).stateId === 'done',
+    await waitForInstanceState(
+      main.store,
+      { workflowId: 'child', instanceKey: 'missing-child' },
+      (snapshot) => snapshot?.lifecycle === 'completed' && snapshot.stateId === 'done',
       'SX-E08 retried-child-target-completed',
       checks,
     );
@@ -1108,11 +1140,13 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     await main.runtime.send(message('p-proj-notify', { workflowId: 'parent', instanceKey: 'proj-1' }, 'NOTIFY'));
     await main.runtime.awaitIdle();
     const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
-    check(
-      rejectedOutcome !== null && rejectedOutcome.status === 'rejected',
-      'SX-E11 command-outcome-rejected-in-state',
-      checks,
-    );
+    if (rejectedOutcome === null || rejectedOutcome.status !== 'rejected') {
+      const projState = await main.store.getInstance({ workflowId: 'parent', instanceKey: 'proj-1' });
+      throw new Error(
+        `SX458 device check failed: SX-E11 command-outcome-rejected-in-state outcome=${JSON.stringify(rejectedOutcome)} instance=${JSON.stringify(projState?.state)} lifecycle=${projState?.lifecycle}`,
+      );
+    }
+    checks.push('SX-E11 command-outcome-rejected-in-state');
 
     // SX-E12: runtime provisioning on the MAIN DB (create + replay).
     check(main.runtime.provisioning?.status === 'ENABLED', 'SX-E12 main-provisioning-enabled', checks);
