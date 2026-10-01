@@ -50,7 +50,13 @@ function runChild(args: readonly string[], options: { readonly killAt?: string; 
         try {
           const stages = readFileSync(options.killSignalFile, 'utf8');
           if (!stages.includes(`${child.pid}:${options.killAt}`)) return;
-          execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' });
+          // Real OS kill per platform (prep N00: Windows taskkill /F /T,
+          // POSIX PID-targeted SIGKILL).
+          if (process.platform === 'win32') {
+            execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' });
+          } else {
+            process.kill(child.pid, 'SIGKILL');
+          }
           killed = true;
         } catch {
           /* raced exit */
