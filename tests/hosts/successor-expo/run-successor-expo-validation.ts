@@ -1100,7 +1100,24 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
       (snapshot) => snapshot?.lifecycle === 'completed' && snapshot.stateId === 'done',
       'SX-E08 retry-accepts-same-identity',
       checks,
-    );
+    ).catch(async (pollError) => {
+      // Enrich: capture the SECOND failure's durable cause before giving up.
+      let runtimeFailure: JsonValue = null;
+      try {
+        const failureQuery = await main.runtime.query({ kind: 'runtime-failure', target: { workflowId: 'missing-parent', instanceKey: 'missing-1' } } as never);
+        runtimeFailure = (failureQuery as { value?: JsonValue }).value ?? null;
+      } catch (failureError) {
+        runtimeFailure = `failure-query-threw: ${errorMessage(failureError)}`;
+      }
+      const e08Journal = await main.database.getAllAsync<{ effect_kind: string; status: string; attempt: number; output_json: string }>(
+        `SELECT effect_kind, status, attempt, output_json FROM dh_v2_effect_journal WHERE source_message_id = 'p-missing'`,
+        [],
+      );
+      const childAfter = await main.store.getInstance({ workflowId: 'child', instanceKey: 'missing-child' });
+      throw new Error(
+        `${String(pollError)} runtimeFailure=${JSON.stringify(runtimeFailure).slice(0, 600)} journal=${JSON.stringify(e08Journal).slice(0, 400)} child=${JSON.stringify(childAfter && { lifecycle: childAfter.lifecycle, state: childAfter.state })}`,
+      );
+    });
     await waitForInstanceState(
       main.store,
       { workflowId: 'child', instanceKey: 'missing-child' },
