@@ -175,26 +175,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * A single required subcase failed for PRODUCT reasons (not harness or
- * environment). Recording it as an honest case FAIL lets the remaining
- * matrix execute so the wave still gathers full evidence; repair of the
- * product goes through a separate Builder task, never this wave.
- */
-class ProductSubcaseError extends Error {
-  readonly caseId: string;
-  readonly label: string;
-  readonly evidence: string;
-
-  constructor(caseId: string, label: string, evidence: string) {
-    super(`SX458 product subcase failed: ${caseId} ${label} ${evidence}`);
-    this.name = 'ProductSubcaseError';
-    this.caseId = caseId;
-    this.label = label;
-    this.evidence = evidence;
-  }
-}
-
 /* ------------------------------------------------------------------------ */
 /* Fixture loading                                                           */
 /* ------------------------------------------------------------------------ */
@@ -821,7 +801,13 @@ INSERT INTO dh_v2_instances(
 /* Main-database phase-1 journeys                                            */
 /* ------------------------------------------------------------------------ */
 
-async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDatabaseLike, checks: string[], details: Record<string, JsonValue>): Promise<void> {
+interface ProductSubcaseFailure {
+  readonly caseId: string;
+  readonly label: string;
+  readonly evidence: string;
+}
+
+async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDatabaseLike, checks: string[], details: Record<string, JsonValue>, productFailures: ProductSubcaseFailure[]): Promise<void> {
   // Store conformance corpora on the real native adapter (SX-E12/E14 bases).
   await runExclusiveTransactionQueueUnitCheck();
   checks.push('SX-E12 exclusive-transaction-queue-unit');
@@ -1039,13 +1025,16 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
       } catch (failureError) {
         strictFailure = `failure-query-threw: ${errorMessage(failureError)}`;
       }
-      throw new ProductSubcaseError(
-        'SX-E07',
-        'payload-contract-violation-routes-rejected',
-        `instance=${JSON.stringify(strictParent?.state)} lifecycle=${strictParent?.lifecycle} runtimeFailure=${JSON.stringify(strictFailure).slice(0, 700)} journal=${JSON.stringify(strictJournal).slice(0, 500)}`,
-      );
+      // Recorded and COLLECTED, not thrown: aborting here would skip every
+      // later phase-1 journey and make the remaining case results fake.
+      productFailures.push({
+        caseId: 'SX-E07',
+        label: 'payload-contract-violation-routes-rejected',
+        evidence: `instance=${JSON.stringify(strictParent?.state)} lifecycle=${strictParent?.lifecycle} runtimeFailure=${JSON.stringify(strictFailure).slice(0, 700)} journal=${JSON.stringify(strictJournal).slice(0, 500)}`,
+      });
+    } else {
+      checks.push('SX-E07 payload-contract-violation-routes-rejected');
     }
-    checks.push('SX-E07 payload-contract-violation-routes-rejected');
 
     await main.runtime.openInstance({ address: { workflowId: 'version-parent', instanceKey: 'version-1' }, correlationId: CORRELATION_ID, input: {} });
     await main.runtime.send(message('p-version', { workflowId: 'version-parent', instanceKey: 'version-1' }, 'BEGIN'));
@@ -1072,10 +1061,19 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     await main.runtime.openInstance({ address: { workflowId: 'child', instanceKey: 'missing-child' }, correlationId: CORRELATION_ID, input: {} });
     await main.runtime.recover({ target: { workflowId: 'missing-parent', instanceKey: 'missing-1' }, action: 'retry', reason: 'sx-e08 child provisioned' } as never);
     await main.runtime.awaitIdle();
+    // After the retry the SAME effect identity is re-sent, now accepted, and
+    // the journey genuinely completes: parent -> done (completed) and the
+    // child NOTIFY target processed to done as well.
     const recovered = await main.store.getInstance({ workflowId: 'missing-parent', instanceKey: 'missing-1' });
     check(
-      recovered !== null && recovered.lifecycle === 'waiting' && (recovered.state as { stateId?: string }).stateId === 'acting',
+      recovered !== null && recovered.lifecycle === 'completed' && (recovered.state as { stateId?: string }).stateId === 'done',
       'SX-E08 retry-accepts-same-identity',
+      checks,
+    );
+    const recoveredChild = await main.store.getInstance({ workflowId: 'child', instanceKey: 'missing-child' });
+    check(
+      recoveredChild !== null && recoveredChild.lifecycle === 'completed' && (recoveredChild.state as { stateId?: string }).stateId === 'done',
+      'SX-E08 retried-child-target-completed',
       checks,
     );
 
@@ -1104,9 +1102,12 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     // SX-E11: T-009 source-command outcomes under engine-3.
     const applied = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing');
     check(applied !== null && applied.status === 'applied', 'SX-E11 command-outcome-applied', checks);
-    await main.runtime.send(message('p-missing-2', { workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'BEGIN'));
+    // A state-machine-level domain rejection: proj-1 (parent workflow) is
+    // waiting at 'start', whose only accepted event is BEGIN — NOTIFY is
+    // rejected in-state, producing the durable T-009 'rejected' outcome.
+    await main.runtime.send(message('p-proj-notify', { workflowId: 'parent', instanceKey: 'proj-1' }, 'NOTIFY'));
     await main.runtime.awaitIdle();
-    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing-2');
+    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
     check(
       rejectedOutcome !== null && rejectedOutcome.status === 'rejected',
       'SX-E11 command-outcome-rejected-in-state',
@@ -1433,7 +1434,7 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDataba
         ? [['payload-contract', { workflowId: 'strict-parent', instanceKey: 'strict-1' }, 'rejected'] as const]
         : []),
       ['contract-version', { workflowId: 'version-parent', instanceKey: 'version-1' }, 'rejected'],
-      ['recovered', { workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'acting'],
+      ['recovered', { workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'done'],
     ];
     for (const [label, address, expectedState] of survivalExpectations) {
       const instance = await main.store.getInstance(address);
@@ -1452,7 +1453,7 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDataba
       checks,
     );
     const applied = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing');
-    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing-2');
+    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
     check(
       applied?.status === 'applied' && rejectedOutcome?.status === 'rejected',
       'SX-E13/E11 command-outcomes-survive',
@@ -1522,48 +1523,54 @@ export async function runSuccessorExpoValidation(): Promise<SuccessorValidationR
     if (stage === 'phase1') {
       const checks: string[] = [];
       const details: Record<string, JsonValue> = {};
-      const productFailures = new Set<string>();
+      const collectedFailures: ProductSubcaseFailure[] = [];
+      const failedCases = new Set<string>();
       try {
         await runAttestation(sqlite, checks, details);
         await runSchemaCorpus(checks, details);
         await runIdentityAndActivationIntegrity(checks, details);
         await runBoundsMatrix(checks, details);
-        await runMainPhase1(sqlite, control, checks, details);
+        await runMainPhase1(sqlite, control, checks, details, collectedFailures);
       } catch (error) {
-        if (error instanceof ProductSubcaseError) {
-          productFailures.add(error.caseId);
-          await recordCase(control, error.caseId, {
-            status: 'FAIL',
-            checks: checks.filter((item) => item.startsWith(error.caseId)),
-            note: `${error.label}: ${error.evidence}`,
-          });
-        } else {
-          for (const caseId of ['SX-E01', 'SX-E02', 'SX-E03', 'SX-E04', 'SX-E05', 'SX-E06', 'SX-E07', 'SX-E08', 'SX-E10', 'SX-E11', 'SX-E12', 'SX-E14']) {
-            if (await casesMissing(control, caseId)) {
-              await recordCase(control, caseId, {
-                status: 'FAIL',
-                checks: checks.filter((item) => item.startsWith(caseId)),
-                note: errorMessage(error),
-              });
-            }
+        for (const caseId of ['SX-E01', 'SX-E02', 'SX-E03', 'SX-E04', 'SX-E05', 'SX-E06', 'SX-E07', 'SX-E08', 'SX-E10', 'SX-E11', 'SX-E12', 'SX-E14']) {
+          if (await casesMissing(control, caseId)) {
+            await recordCase(control, caseId, {
+              status: 'FAIL',
+              checks: checks.filter((item) => item.startsWith(caseId)),
+              note: errorMessage(error),
+            });
           }
-          throw error;
         }
+        throw error;
       }
-      await recordCase(control, 'SX-E01', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E01')) });
-      await recordCase(control, 'SX-E02', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E02')) });
-      await recordCase(control, 'SX-E03', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E03')) });
-      await recordCase(control, 'SX-E04', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E04')) });
-      await recordCase(control, 'SX-E05', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E05')) });
-      await recordCase(control, 'SX-E06', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E06')) });
-      if (!productFailures.has('SX-E07')) {
-        await recordCase(control, 'SX-E07', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E07')) });
+      // Collected product subcase failures become honest case FAILs; every
+      // other case is recorded PASS only when it has REAL accumulated checks
+      // (an empty list would mean the journey never ran — never a PASS).
+      for (const failure of collectedFailures) {
+        failedCases.add(failure.caseId);
+        await recordCase(control, failure.caseId, {
+          status: 'FAIL',
+          checks: checks.filter((item) => item.startsWith(failure.caseId)),
+          note: `${failure.label}: ${failure.evidence}`,
+        });
       }
-      await recordCase(control, 'SX-E08', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E08')) });
-      await recordCase(control, 'SX-E10', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E10')) });
-      await recordCase(control, 'SX-E11', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E11')) });
-      await recordCase(control, 'SX-E12', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E12')) });
-      await recordCase(control, 'SX-E14', { status: 'PASS', checks: checks.filter((item) => item.startsWith('SX-E14')) });
+      const recordPass = (caseId: string): Promise<void> => {
+        const caseChecks = checks.filter((item) => item.startsWith(caseId));
+        if (failedCases.has(caseId) || caseChecks.length === 0) return Promise.resolve();
+        return recordCase(control, caseId, { status: 'PASS', checks: caseChecks });
+      };
+      await recordPass('SX-E01');
+      await recordPass('SX-E02');
+      await recordPass('SX-E03');
+      await recordPass('SX-E04');
+      await recordPass('SX-E05');
+      await recordPass('SX-E06');
+      await recordPass('SX-E07');
+      await recordPass('SX-E08');
+      await recordPass('SX-E10');
+      await recordPass('SX-E11');
+      await recordPass('SX-E12');
+      await recordPass('SX-E14');
       await armBarrier(sqlite, control, BARRIER_QUEUE[0]);
       console.log(`FAULT_BARRIER_ARMED:${BARRIER_QUEUE[0]}`);
       return {
