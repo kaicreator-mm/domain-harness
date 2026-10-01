@@ -95,7 +95,13 @@ async function waitForMarker(launch) {
       if (parsed.status === 'PASS') return { kind: 'pass', ...parsed };
       if (parsed.status === 'FAIL') return { kind: 'fail', ...parsed };
       if (parsed.status === 'RESTART_REQUIRED') return { kind: 'restart-required', ...parsed };
+      if (parsed.status === 'ARMED') return { kind: 'armed', barrier: parsed.barrier ?? armed?.barrier };
     }
+    // The FAULT_BARRIER_ARMED log line is emitted only AFTER the next
+    // barrier's durable writes and the control-DB stage update are committed,
+    // so it is itself a valid launch-terminal signal even if the ARMED result
+    // payload is not (yet) parseable.
+    if (armed !== null) return armed;
     const comparator = parseChunkedTag(text, 'SUCCESSOR_EXPO_COMPARATOR');
     if (comparator !== undefined) {
       writeFileSync(join(outDir, 'comparator.json'), JSON.stringify(comparator, null, 2));
