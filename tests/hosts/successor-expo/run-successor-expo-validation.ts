@@ -1101,7 +1101,9 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
       'SX-E08 retry-accepts-same-identity',
       checks,
     ).catch(async (pollError) => {
-      // Enrich: capture the SECOND failure's durable cause before giving up.
+      // Enrich: capture the SECOND failure's durable cause, then record an
+      // honest product subcase failure and CONTINUE — aborting here would
+      // skip every later phase-1 journey.
       let runtimeFailure: JsonValue = null;
       try {
         const failureQuery = await main.runtime.query({ kind: 'runtime-failure', target: { workflowId: 'missing-parent', instanceKey: 'missing-1' } } as never);
@@ -1114,9 +1116,11 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
         [],
       );
       const childAfter = await main.store.getInstance({ workflowId: 'child', instanceKey: 'missing-child' });
-      throw new Error(
-        `${String(pollError)} runtimeFailure=${JSON.stringify(runtimeFailure).slice(0, 600)} journal=${JSON.stringify(e08Journal).slice(0, 400)} child=${JSON.stringify(childAfter && { lifecycle: childAfter.lifecycle, state: childAfter.state })}`,
-      );
+      productFailures.push({
+        caseId: 'SX-E08',
+        label: 'retry-accepts-same-identity',
+        evidence: `${String(pollError)} runtimeFailure=${JSON.stringify(runtimeFailure).slice(0, 600)} journal=${JSON.stringify(e08Journal).slice(0, 400)} child=${JSON.stringify(childAfter && { lifecycle: childAfter.lifecycle, state: childAfter.state })}`,
+      });
     });
     await waitForInstanceState(
       main.store,
@@ -1485,7 +1489,9 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDataba
         ? [['payload-contract', { workflowId: 'strict-parent', instanceKey: 'strict-1' }, 'rejected'] as const]
         : []),
       ['contract-version', { workflowId: 'version-parent', instanceKey: 'version-1' }, 'rejected'],
-      ['recovered', { workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'done'],
+      ...(cases['SX-E08']?.status === 'PASS'
+        ? [['recovered', { workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'done'] as const]
+        : []),
     ];
     for (const [label, address, expectedState] of survivalExpectations) {
       const instance = await main.store.getInstance(address);
