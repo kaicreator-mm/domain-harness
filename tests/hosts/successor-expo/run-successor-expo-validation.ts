@@ -1128,7 +1128,19 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
       (snapshot) => snapshot?.lifecycle === 'completed' && snapshot.stateId === 'done',
       'SX-E08 retried-child-target-completed',
       checks,
-    );
+    ).catch(async (pollError) => {
+      // Same honest-subcase contract as the first E08 oracle: record the
+      // product failure with durable evidence and CONTINUE the journey so
+      // later phase-1 cases still execute and the terminal marker reaches
+      // the host orchestrator through the normal chunked channel.
+      const childAfterRetry = await main.store.getInstance({ workflowId: 'child', instanceKey: 'missing-child' });
+      const parentAfterRetry = await main.store.getInstance({ workflowId: 'missing-parent', instanceKey: 'missing-1' });
+      productFailures.push({
+        caseId: 'SX-E08',
+        label: 'retried-child-target-completed',
+        evidence: `${String(pollError)} child=${JSON.stringify(childAfterRetry && { lifecycle: childAfterRetry.lifecycle, state: childAfterRetry.state })} parent=${JSON.stringify(parentAfterRetry && { lifecycle: parentAfterRetry.lifecycle, state: parentAfterRetry.state })}`,
+      });
+    });
 
     // SX-E10: host-local Tool through DurableToolRunner, durable receipt.
     // Baselines are taken BEFORE this journey: earlier parent journeys
@@ -1152,22 +1164,50 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     );
     check(toolEffects?.count === toolJournalBefore + 1, `SX-E10 tool-effect-journaled-once (delta=${(toolEffects?.count ?? 0) - toolJournalBefore})`, checks);
 
-    // SX-E11: T-009 source-command outcomes under engine-3.
+    // SX-E11: T-009 source-command outcomes under engine-3. The 'applied'
+    // oracle CASCADES from the SX-E08 retry journey: when E08's product
+    // subcase failed, the p-missing command cannot have completed, so this
+    // records the cascade honestly and continues instead of aborting every
+    // later phase-1 journey.
     const applied = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing');
-    check(applied !== null && applied.status === 'applied', 'SX-E11 command-outcome-applied', checks);
+    if (applied === null || applied.status !== 'applied') {
+      const e08Parent = await main.store.getInstance({ workflowId: 'missing-parent', instanceKey: 'missing-1' });
+      productFailures.push({
+        caseId: 'SX-E11',
+        label: 'command-outcome-applied',
+        evidence: `cascades from SX-E08 retry: applied=${JSON.stringify(applied && { status: applied.status })} parent=${JSON.stringify(e08Parent && { lifecycle: e08Parent.lifecycle, state: e08Parent.state })}`,
+      });
+    } else {
+      checks.push('SX-E11 command-outcome-applied');
+    }
     // A state-machine-level domain rejection: proj-1 (parent workflow) is
     // waiting at 'start', whose only accepted event is BEGIN — NOTIFY is
     // rejected in-state, producing the durable T-009 'rejected' outcome.
-    await main.runtime.send(message('p-proj-notify', { workflowId: 'parent', instanceKey: 'proj-1' }, 'NOTIFY'));
-    await main.runtime.awaitIdle();
+    try {
+      await main.runtime.send(message('p-proj-notify', { workflowId: 'parent', instanceKey: 'proj-1' }, 'NOTIFY'));
+      await main.runtime.awaitIdle();
+    } catch (acceptanceError) {
+      // The acceptance layer rejects an out-of-contract message type outright
+      // (this parent declares only BEGIN): a DIFFERENT (earlier) boundary
+      // than the T-009 in-state outcome the oracle anticipated. Record the
+      // boundary divergence honestly and continue.
+      productFailures.push({
+        caseId: 'SX-E11',
+        label: 'command-outcome-rejected-in-state',
+        evidence: `acceptance-boundary divergence: ${errorMessage(acceptanceError)}`,
+      });
+    }
     const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
     if (rejectedOutcome === null || rejectedOutcome.status !== 'rejected') {
       const projState = await main.store.getInstance({ workflowId: 'parent', instanceKey: 'proj-1' });
-      throw new Error(
-        `SX458 device check failed: SX-E11 command-outcome-rejected-in-state outcome=${JSON.stringify(rejectedOutcome)} instance=${JSON.stringify(projState?.state)} lifecycle=${projState?.lifecycle}`,
-      );
+      productFailures.push({
+        caseId: 'SX-E11',
+        label: 'command-outcome-rejected-in-state',
+        evidence: `outcome=${JSON.stringify(rejectedOutcome && { status: rejectedOutcome.status })} instance=${JSON.stringify(projState && { lifecycle: projState.lifecycle, state: projState.state })}`,
+      });
+    } else {
+      checks.push('SX-E11 command-outcome-rejected-in-state');
     }
-    checks.push('SX-E11 command-outcome-rejected-in-state');
 
     // SX-E12: runtime provisioning on the MAIN DB (create + replay).
     check(main.runtime.provisioning?.status === 'ENABLED', 'SX-E12 main-provisioning-enabled', checks);
@@ -1465,6 +1505,7 @@ async function buildComparator(): Promise<JsonValue> {
 }
 
 async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDatabaseLike, checks: string[], details: Record<string, JsonValue>): Promise<Record<string, CaseResult>> {
+  const phase2Failures: ProductSubcaseFailure[] = [];
   const cases = await loadCases(control);
   const main = await openRuntime(sqlite, MAIN_DB, 'v3', true);
   try {
@@ -1511,11 +1552,18 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDataba
     );
     const applied = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing');
     const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
-    check(
-      applied?.status === 'applied' && rejectedOutcome?.status === 'rejected',
-      'SX-E13/E11 command-outcomes-survive',
-      checks,
-    );
+    if (applied?.status === 'applied' && rejectedOutcome?.status === 'rejected') {
+      checks.push('SX-E13/E11 command-outcomes-survive');
+    } else {
+      // Cascades from the SX-E08 retry subcase failure and the SX-E11
+      // acceptance-boundary divergence recorded in phase 1: those outcomes
+      // cannot exist in their terminal form. Record honestly, continue.
+      phase2Failures.push({
+        caseId: 'SX-E13',
+        label: 'command-outcomes-survive',
+        evidence: `cascade: applied=${JSON.stringify(applied && { status: applied.status })} rejected=${JSON.stringify(rejectedOutcome && { status: rejectedOutcome.status })} (E08 retry / E11 boundary failed in phase 1)`,
+      });
+    }
     if (main.runtime.provisioning?.status !== 'ENABLED') throw new Error('phase2 provisioning not enabled');
     const provisionReplay = await main.runtime.provisioning.ensureOpen({
       provisioningKey: 'sx458-main-key-1',
@@ -1563,7 +1611,25 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDataba
     await main.database.closeAsync?.();
   }
 
-  cases['SX-E13'] = { status: 'PASS', checks };
+  // Honest case status: SX-E13 is PASS only when no phase-2 product subcase
+  // failed (cascaded E08/E11 outcomes etc.); otherwise the recorded failure
+  // becomes the case verdict.
+  const e13Failures = phase2Failures.filter((failure) => failure.caseId === 'SX-E13');
+  if (e13Failures.length === 0) {
+    cases['SX-E13'] = { status: 'PASS', checks };
+  } else {
+    cases['SX-E13'] = {
+      status: 'FAIL',
+      checks,
+      note: e13Failures.map((failure) => `${failure.label}: ${failure.evidence}`).join(' | ').slice(0, 900),
+    };
+  }
+  for (const failure of phase2Failures.filter((entry) => entry.caseId !== 'SX-E13')) {
+    cases[failure.caseId] = {
+      status: 'FAIL',
+      note: `${failure.label}: ${failure.evidence}`.slice(0, 900),
+    };
+  }
   return cases;
 }
 
@@ -1688,7 +1754,7 @@ export async function runSuccessorExpoValidation(): Promise<SuccessorValidationR
       const checks: string[] = [];
       const details: Record<string, JsonValue> = {};
       const cases = await runPhase2(sqlite, control, checks, details);
-      cases['SX-E13'] = { status: 'PASS', checks };
+      if (cases['SX-E13']?.status !== 'FAIL') cases['SX-E13'] = { status: 'PASS', checks };
       cases['SX-E16'] = { status: 'PASS', checks: ['SX-E16 comparator-emitted-from-real-device'], note: 'normalized comparator exported; cross-host compare happens in the coordinator handoff' };
       return {
         status: 'PASS',
