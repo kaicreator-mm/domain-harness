@@ -354,6 +354,10 @@ const schemaCorpus = [
 ];
 
 // --- canonical digest vectors (SX-E01/E04) ---------------------------------
+// The digests are computed over the CANONICAL form of the vector material
+// (recursively key-sorted JSON, arrays preserved) exactly like the device-side
+// core `canonicalJsonStringify`; non-JSON texts digest raw UTF-8 bytes. This
+// is what makes d04/d05 (same object, different key order) digest-equal.
 const canonicalVectors = [
   { id: 'sx-d01-empty', text: '' },
   { id: 'sx-d02-abc', text: 'abc' },
@@ -361,8 +365,29 @@ const canonicalVectors = [
   { id: 'sx-d04-key-order-a', text: JSON.stringify({ a: 1, b: 2 }) },
   { id: 'sx-d05-key-order-b', text: JSON.stringify({ b: 2, a: 1 }) },
 ];
+function canonicalVectorMaterial(text: string): string {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed !== null && typeof parsed === 'object') {
+      const sortKeys = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(sortKeys);
+        if (value !== null && typeof value === 'object') {
+          return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>((acc, key) => {
+            acc[key] = sortKeys((value as Record<string, unknown>)[key]);
+            return acc;
+          }, {});
+        }
+        return value;
+      };
+      return JSON.stringify(sortKeys(parsed));
+    }
+  } catch {
+    // not JSON: digest the raw text
+  }
+  return text;
+}
 const canonicalDigests = Object.fromEntries(
-  canonicalVectors.map((vector) => [vector.id, createHash('sha256').update(vector.text, 'utf8').digest('hex')]),
+  canonicalVectors.map((vector) => [vector.id, createHash('sha256').update(canonicalVectorMaterial(vector.text), 'utf8').digest('hex')]),
 );
 
 const legacyPackageId = await computeCompiledPackageId(legacyManifest, sha256);

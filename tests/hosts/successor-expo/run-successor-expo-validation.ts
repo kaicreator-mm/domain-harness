@@ -71,8 +71,9 @@ import {
   BUILD_FACTS_JSON,
   CANONICAL_DIGESTS_JSON,
   CORPUS_REVISION,
+  FIXTURE_ASSEMBLY_HEAD,
+  FIXTURE_ASSEMBLY_TREE,
   FIXTURE_REPO_HEAD,
-  FIXTURE_REPO_TREE,
   INVENTORY_BINDING_ID,
   RETAINED_FIXTURE_FILE_SHA256,
   RETAINED_MANIFEST_JSON,
@@ -470,8 +471,19 @@ async function runSha256KnownAnswers(checks: string[]): Promise<void> {
       : id === 'sx-d03-unicode' ? 'héllo→世界'
       : id === 'sx-d04-key-order-a' ? JSON.stringify({ a: 1, b: 2 })
       : JSON.stringify({ b: 2, a: 1 });
+    // JSON-typed vectors are digested over their canonical (key-sorted) form
+    // via the core canonicalizer, mirroring the build-time fixture compiler.
+    let parsedVector: unknown = null;
+    try {
+      parsedVector = JSON.parse(vectorText);
+    } catch {
+      parsedVector = null;
+    }
+    const vectorMaterial = (parsedVector !== null && typeof parsedVector === 'object')
+      ? canonicalJsonStringify(parsedVector)
+      : vectorText;
     check(
-      (await deviceSha256.digestUtf8(vectorText)) === expected,
+      (await deviceSha256.digestUtf8(vectorMaterial)) === expected,
       `SX-E01/E04 canonical-vector-${id}`,
       checks,
     );
@@ -1261,8 +1273,9 @@ async function runBarrierOracle(sqlite: ExpoSqliteModuleLike, control: ExpoSqlit
 async function buildComparator(): Promise<JsonValue> {
   return {
     corpusRevision: CORPUS_REVISION,
-    assemblyHead: FIXTURE_REPO_HEAD,
-    assemblyTree: FIXTURE_REPO_TREE,
+    assemblyHead: FIXTURE_ASSEMBLY_HEAD,
+    assemblyTree: FIXTURE_ASSEMBLY_TREE,
+    validationBranchHead: FIXTURE_REPO_HEAD,
     successorPackageId: SUCCESSOR_PACKAGE_ID,
     successorFixtureFileSha256: SUCCESSOR_FIXTURE_FILE_SHA256,
     retainedPackageId: RETAINED_PACKAGE_ID,
