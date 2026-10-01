@@ -161,4 +161,5 @@ if (legacyInstance.value?.packageId !== retainedManifest.packageId) {
   throw new Error(`retained pin mismatch: ${legacyInstance.value?.packageId}`);
 }
 store.close();
-console.log(`N18_CONSUMER_OK packageId=${compiled.manifest.packageId.slice(0, 12)} retained=${retainedManifest.packageId.slice(0, 8)} sqlite=${require_('better-sqlite3')(':memory:') ? 'native' : 'native'}`);
+require_('better-sqlite3'); // the packed tarball must carry its native binding
+console.log(`N18_CONSUMER_OK packageId=${compiled.manifest.packageId.slice(0, 12)} retained=${retainedManifest.packageId.slice(0, 8)} sqlite=native`);
