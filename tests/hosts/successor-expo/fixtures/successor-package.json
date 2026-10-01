@@ -53,7 +53,7 @@
       "maxSchemaCanonicalBytes": 4096,
       "maxTotalDomainDataCanonicalBytes": 8192
     },
-    "packageId": "3932baae124e42bfc1a7a08508775c813206e1e3ec7f7c06fba3ae3aca161a03",
+    "packageId": "250262cdb89ff34b0d8cba5fa5e468321eeb6c62baa8303debadb9c197612a7f",
     "projections": {
       "overview": {
         "dependencies": [
@@ -64,7 +64,7 @@
           {
             "kind": "business",
             "selector": {
-              "accountId": "*"
+              "key": "acc-1"
             },
             "source": "crm"
           }

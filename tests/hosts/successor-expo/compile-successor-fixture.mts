@@ -170,7 +170,10 @@ const projections = [
     expression: '$',
     dependencies: [
       { kind: 'domain-data', key: 'tier' },
-      { kind: 'business', source: 'crm', selector: { accountId: '*' } },
+      // Business dependency selector: the runtime resolves business
+      // dependencies through a single `{ key }` selector (query key fallback
+      // when omitted); any other key is rejected as invalid_selector.
+      { kind: 'business', source: 'crm', selector: { key: 'acc-1' } },
     ],
     outputSchema: { type: 'object', additionalProperties: true },
   },

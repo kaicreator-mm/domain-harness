@@ -305,7 +305,12 @@ async function openRuntime(
   const options = {
     packageRegistry: new StaticPackageRegistry(
       [retainedPackage(), successorPackage()],
-      RETAINED_PACKAGE_ID,
+      // The registry default resolves default-scoped surfaces such as
+      // projection queries (ProjectionService.resolvePackage). The successor
+      // package must be the default for SX-E06; the retained instance is
+      // still opened and executed under its EXPLICIT retained packageId pin
+      // (SX-E02), which default selection does not affect.
+      SUCCESSOR_PACKAGE_ID,
     ),
     store,
     bindings: await tool.bindings(),
@@ -836,11 +841,15 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
       const stressProvisioning = stress.runtime.provisioning;
       if (stressProvisioning?.status !== 'ENABLED') throw new Error('provisioning not enabled');
       const results = await Promise.all(
-        Array.from({ length: 32 }, (_item, index) =>
+        Array.from({ length: 32 }, () =>
           stressProvisioning.ensureOpen({
             provisioningKey: 'sx458-stress-key',
             address: { workflowId: 'parent', instanceKey: 'stress-1' },
-            correlationId: `stress-${index}`,
+            // Same-key ensureOpen replays IDENTICAL logical material (the
+            // store binds a provisioning key to its request material and
+            // fails closed on divergence); the stress varies concurrency,
+            // not material.
+            correlationId: 'sx458-stress-corr',
             input: {},
             packageId: SUCCESSOR_PACKAGE_ID,
           })),
@@ -870,7 +879,9 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
         checks,
       );
       const facts = await observationFacts(stress.database);
-      check(facts.opened === 4, `SX-E12 one-INSTANCE_OPENED-per-create (opened=${facts.opened})`, checks);
+      // Three created instances on this DB (stress-1 + two competitors),
+      // each with exactly one durable INSTANCE_OPENED observation.
+      check(facts.opened === 3, `SX-E12 one-INSTANCE_OPENED-per-create (opened=${facts.opened})`, checks);
       details['stressObservation'] = facts as unknown as JsonValue;
     } finally {
       await stress.store.close();
@@ -1002,16 +1013,26 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     );
 
     // SX-E10: host-local Tool through DurableToolRunner, durable receipt.
+    // Baselines are taken BEFORE this journey: earlier parent journeys
+    // (SX-E07/E08 probes) legitimately invoked the same tool in this DB, so
+    // exactly-once is asserted RELATIVELY (this journey adds exactly one
+    // executable call and exactly one committed journal record).
+    const toolCallsBefore = main.tool.calls.length;
+    const toolJournalBeforeRow = await main.database.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM dh_v2_effect_journal WHERE effect_kind = 'tool:inventory.reserve'`,
+      [],
+    );
+    const toolJournalBefore = toolJournalBeforeRow?.count ?? -1;
     await main.runtime.openInstance({ address: { workflowId: 'child', instanceKey: 'tool-child-1' }, correlationId: CORRELATION_ID, input: {} });
     await main.runtime.openInstance({ address: { workflowId: 'tool-parent', instanceKey: 'tool-1' }, correlationId: CORRELATION_ID, input: {} });
     await main.runtime.send(message('p-tool', { workflowId: 'tool-parent', instanceKey: 'tool-1' }, 'BEGIN'));
     await main.runtime.awaitIdle();
-    check(main.tool.calls.length === 1, 'SX-E10 tool-ran-once', checks);
+    check(main.tool.calls.length === toolCallsBefore + 1, `SX-E10 tool-ran-once (journey delta=${main.tool.calls.length - toolCallsBefore})`, checks);
     const toolEffects = await main.database.getFirstAsync<{ count: number }>(
       `SELECT COUNT(*) AS count FROM dh_v2_effect_journal WHERE effect_kind = 'tool:inventory.reserve'`,
       [],
     );
-    check(toolEffects?.count === 1, 'SX-E10 tool-effect-journaled-once', checks);
+    check(toolEffects?.count === toolJournalBefore + 1, `SX-E10 tool-effect-journaled-once (delta=${(toolEffects?.count ?? 0) - toolJournalBefore})`, checks);
 
     // SX-E11: T-009 source-command outcomes under engine-3.
     const applied = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing');
