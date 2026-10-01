@@ -31,7 +31,7 @@ function log(line) {
 }
 
 function adbSync(args, timeoutMs = 30000) {
-  const result = spawnSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: timeoutMs });
+  const result = spawnSync(adb, ['-s', serial, ...args], { encoding: 'utf8', timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 });
   // Only a real spawn failure (timeout / binary missing) is fatal here. Remote
   // commands legitimately exit non-zero with empty output, e.g. `pidof` when
   // the app process is absent (before launch / after force-stop).
@@ -63,7 +63,11 @@ function parseChunkedTag(text, tag) {
   for (let index = 0; index < total; index += 1) {
     const part = parts.get(index);
     if (part === undefined) return undefined;
-    payload += part;
+    // adb on Windows emits CRLF: a trailing CR would sit inside the
+    // reassembled JSON string material and strict JSON.parse rejects raw
+    // control characters. JSON.stringify output never contains raw CR, so
+    // stripping is safe.
+    payload += part.replace(/\r/g, '');
   }
   try {
     return JSON.parse(payload);
@@ -78,7 +82,9 @@ async function waitForMarker(launch) {
   let armed = null;
   while (Date.now() < deadline) {
     spawnSync('sleep', ['2']);
-    const text = adbSync(['logcat', '-d', '-s', 'ReactNativeJS:V'], 60000);
+    // -t bounds the dump to the recent ring-buffer tail: -d output grows
+    // every poll within one launch (logcat -c happens only between launches).
+    const text = adbSync(['logcat', '-d', '-t', '2000', '-s', 'ReactNativeJS:V'], 60000);
     appendFileSync(join(outDir, `launch-${launch}-logcat.txt`), text);
     if (armed === null) {
       const match = text.match(/FAULT_BARRIER_ARMED:(\S+)/);
