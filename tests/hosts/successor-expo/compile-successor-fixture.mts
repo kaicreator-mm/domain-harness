@@ -228,9 +228,20 @@ const MAIN_WORKFLOWS: readonly WorkflowSpec[] = [
   // unknown workflow without a live instance classifies transient
   // target_not_found — reported as a product finding.)
   { workflowId: 'ghost-parent', effectTarget: '$.ghostChild', messageType: 'GHOST', payloadExpression: '$' },
-  { workflowId: 'missing-parent', effectTarget: '$.missingChild', payloadExpression: '$' },
+  // #464 fixture-oracle repair: the E08 completion oracle requires the parent
+  // to reach 'done' after the retried send is accepted. Under frozen engine
+  // semantics (both engines), done routes are selected only after invoke
+  // resolves, so the acting state needs the executable tool invoke — the same
+  // shape the 'parent' workflow uses. Effects still precede invoke in the
+  // settle loop, so the first transient attempt is unchanged.
+  { workflowId: 'missing-parent', tool: inventoryTool, effectTarget: '$.missingChild', payloadExpression: '$' },
   { workflowId: 'version-parent', effectTarget: '$.child', payloadExpression: '$', contractVersion: '2' },
   { workflowId: 'tool-parent', tool: inventoryTool, effectTarget: '$.toolChild', payloadExpression: '$' },
+  // SX-E11 probe shape: a parking parent whose acting state has effects but
+  // NO invoke, so a BEGIN settles waiting/acting and a second in-contract
+  // BEGIN is accepted at the boundary, processed, and rejected IN-STATE
+  // (durable T-009 rejected outcome) — the reachable no-route construction.
+  { workflowId: 'e11-parent', effectTarget: '$.e11Child', payloadExpression: '$' },
 ];
 
 const main = compileMain(MAIN_WORKFLOWS);

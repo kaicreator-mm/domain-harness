@@ -258,6 +258,7 @@ class InventoryTool {
           if (request.expression === '$.strictChild') return { workflowId: 'strict-child', instanceKey: 'strict-1' };
           if (request.expression === '$.ghostChild') return { workflowId: 'child', instanceKey: 'ghost-child-1' };
           if (request.expression === '$.toolChild') return { workflowId: 'child', instanceKey: 'tool-child-1' };
+          if (request.expression === '$.e11Child') return { workflowId: 'child', instanceKey: 'e11-child' };
           return request.input;
         },
       },
@@ -1180,33 +1181,94 @@ async function runMainPhase1(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDa
     } else {
       checks.push('SX-E11 command-outcome-applied');
     }
-    // A state-machine-level domain rejection: proj-1 (parent workflow) is
-    // waiting at 'start', whose only accepted event is BEGIN — NOTIFY is
-    // rejected in-state, producing the durable T-009 'rejected' outcome.
+    // A state-machine-level domain rejection under the frozen T-009 boundary:
+    // e11-parent is contract-ACCEPTED at the acceptance layer (its package
+    // declares BEGIN), processed by the engine, and rejected IN-STATE because
+    // its parked 'acting' state declares no event handlers. The probe parks a
+    // dedicated e11-parent instance first (BEGIN applied; acting has effects
+    // but no invoke, so the state settles waiting per frozen engine semantics),
+    // then re-delivers BEGIN with a fresh identity: accepted at the boundary,
+    // processed, durable 'rejected' command outcome, mailbox continues.
+    await main.runtime.openInstance({ address: { workflowId: 'child', instanceKey: 'e11-child' }, correlationId: CORRELATION_ID, input: {} });
+    await main.runtime.openInstance({ address: { workflowId: 'e11-parent', instanceKey: 'e11-1' }, correlationId: CORRELATION_ID, input: {} });
+    let parked: { lifecycle?: string; state?: { stateId?: string } } | null = null;
     try {
-      await main.runtime.send(message('p-proj-notify', { workflowId: 'parent', instanceKey: 'proj-1' }, 'NOTIFY'));
+      await main.runtime.send(message('p-e11-begin', { workflowId: 'e11-parent', instanceKey: 'e11-1' }, 'BEGIN'));
       await main.runtime.awaitIdle();
-    } catch (acceptanceError) {
-      // The acceptance layer rejects an out-of-contract message type outright
-      // (this parent declares only BEGIN): a DIFFERENT (earlier) boundary
-      // than the T-009 in-state outcome the oracle anticipated. Record the
-      // boundary divergence honestly and continue.
+      parked = (await main.store.getInstance({ workflowId: 'e11-parent', instanceKey: 'e11-1' })) as never;
+      const appliedOutcome = await main.store.getCommandOutcome({ workflowId: 'e11-parent', instanceKey: 'e11-1' }, 'p-e11-begin');
+      if (appliedOutcome === null || appliedOutcome.status !== 'applied') {
+        productFailures.push({
+          caseId: 'SX-E11',
+          label: 'command-outcome-applied-park',
+          evidence: `applied=${JSON.stringify(appliedOutcome && { status: appliedOutcome.status })} instance=${JSON.stringify(parked && { lifecycle: parked.lifecycle, state: parked.state })}`,
+        });
+      } else if (parked === null || parked.lifecycle !== 'waiting' || parked.state?.stateId !== 'acting') {
+        productFailures.push({
+          caseId: 'SX-E11',
+          label: 'command-outcome-applied-park',
+          evidence: `expected parked waiting/acting, instance=${JSON.stringify(parked && { lifecycle: parked.lifecycle, state: parked.state })}`,
+        });
+      } else {
+        checks.push('SX-E11 command-outcome-applied-park');
+      }
+    } catch (parkError) {
       productFailures.push({
         caseId: 'SX-E11',
-        label: 'command-outcome-rejected-in-state',
-        evidence: `acceptance-boundary divergence: ${errorMessage(acceptanceError)}`,
+        label: 'command-outcome-applied-park',
+        evidence: `park journey threw: ${errorMessage(parkError)}`,
       });
     }
-    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
-    if (rejectedOutcome === null || rejectedOutcome.status !== 'rejected') {
-      const projState = await main.store.getInstance({ workflowId: 'parent', instanceKey: 'proj-1' });
-      productFailures.push({
-        caseId: 'SX-E11',
-        label: 'command-outcome-rejected-in-state',
-        evidence: `outcome=${JSON.stringify(rejectedOutcome && { status: rejectedOutcome.status })} instance=${JSON.stringify(projState && { lifecycle: projState.lifecycle, state: projState.state })}`,
-      });
-    } else {
-      checks.push('SX-E11 command-outcome-rejected-in-state');
+    if (parked !== null && parked.state?.stateId === 'acting') {
+      try {
+        await main.runtime.send(message('p-e11-begin-2', { workflowId: 'e11-parent', instanceKey: 'e11-1' }, 'BEGIN'));
+        await main.runtime.awaitIdle();
+      } catch (inStateError) {
+        // Any throw here is a product failure: the second BEGIN is in-contract
+        // and the target is accepting, so the boundary must accept it and the
+        // engine must record the durable in-state rejected outcome.
+        productFailures.push({
+          caseId: 'SX-E11',
+          label: 'command-outcome-rejected-in-state',
+          evidence: `in-state re-delivery threw: ${errorMessage(inStateError)}`,
+        });
+      }
+      const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'e11-parent', instanceKey: 'e11-1' }, 'p-e11-begin-2');
+      const afterRejected = await main.store.getInstance({ workflowId: 'e11-parent', instanceKey: 'e11-1' });
+      if (rejectedOutcome === null || rejectedOutcome.status !== 'rejected') {
+        productFailures.push({
+          caseId: 'SX-E11',
+          label: 'command-outcome-rejected-in-state',
+          evidence: `outcome=${JSON.stringify(rejectedOutcome && { status: rejectedOutcome.status })} instance=${JSON.stringify(afterRejected && { lifecycle: afterRejected?.lifecycle, state: afterRejected?.state })}`,
+        });
+      } else {
+        checks.push('SX-E11 command-outcome-rejected-in-state');
+      }
+      // Mailbox continues after the in-state rejection: the next legal message
+      // on a FRESH accepting child still processes to done (the parking
+      // effect already terminalized e11-child, so the continuation uses its
+      // own instance).
+      await main.runtime.openInstance({ address: { workflowId: 'child', instanceKey: 'e11-child-2' }, correlationId: CORRELATION_ID, input: {} });
+      try {
+        await main.runtime.send(message('p-e11-notify', { workflowId: 'child', instanceKey: 'e11-child-2' }, 'NOTIFY'));
+        await main.runtime.awaitIdle();
+      } catch (continueError) {
+        productFailures.push({
+          caseId: 'SX-E11',
+          label: 'mailbox-continues-after-rejection',
+          evidence: `continuation send threw: ${errorMessage(continueError)}`,
+        });
+      }
+      const e11Child = await main.store.getInstance({ workflowId: 'child', instanceKey: 'e11-child-2' });
+      if (e11Child === null || (e11Child.state as { stateId?: string }).stateId !== 'done') {
+        productFailures.push({
+          caseId: 'SX-E11',
+          label: 'mailbox-continues-after-rejection',
+          evidence: `child=${JSON.stringify(e11Child && { lifecycle: e11Child.lifecycle, state: e11Child.state })}`,
+        });
+      } else {
+        checks.push('SX-E11 mailbox-continues-after-rejection');
+      }
     }
 
     // SX-E12: runtime provisioning on the MAIN DB (create + replay).
@@ -1551,17 +1613,27 @@ async function runPhase2(sqlite: ExpoSqliteModuleLike, control: ExpoSqliteDataba
       checks,
     );
     const applied = await main.store.getCommandOutcome({ workflowId: 'missing-parent', instanceKey: 'missing-1' }, 'p-missing');
-    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'parent', instanceKey: 'proj-1' }, 'p-proj-notify');
+    const rejectedOutcome = await main.store.getCommandOutcome({ workflowId: 'e11-parent', instanceKey: 'e11-1' }, 'p-e11-begin-2');
     if (applied?.status === 'applied' && rejectedOutcome?.status === 'rejected') {
       checks.push('SX-E13/E11 command-outcomes-survive');
     } else {
       // Cascades from the SX-E08 retry subcase failure and the SX-E11
-      // acceptance-boundary divergence recorded in phase 1: those outcomes
-      // cannot exist in their terminal form. Record honestly, continue.
+      // in-state rejection subcase failures recorded in phase 1: those
+      // outcomes cannot exist in their terminal form. Record honestly, continue.
       phase2Failures.push({
         caseId: 'SX-E13',
         label: 'command-outcomes-survive',
         evidence: `cascade: applied=${JSON.stringify(applied && { status: applied.status })} rejected=${JSON.stringify(rejectedOutcome && { status: rejectedOutcome.status })} (E08 retry / E11 boundary failed in phase 1)`,
+      });
+    }
+    const e11Parked = await main.store.getInstance({ workflowId: 'e11-parent', instanceKey: 'e11-1' });
+    if (e11Parked !== null && e11Parked.lifecycle === 'waiting' && (e11Parked.state as { stateId?: string }).stateId === 'acting') {
+      checks.push('SX-E13/E11 in-state-rejected-instance-survives');
+    } else {
+      phase2Failures.push({
+        caseId: 'SX-E13',
+        label: 'in-state-rejected-instance-survives',
+        evidence: `e11-parent=${JSON.stringify(e11Parked && { lifecycle: e11Parked.lifecycle, state: e11Parked.state })}`,
       });
     }
     if (main.runtime.provisioning?.status !== 'ENABLED') throw new Error('phase2 provisioning not enabled');
