@@ -76,51 +76,64 @@ export class SuccessorJournaledDomainMessageEffect {
     const effectId = await deriveEffectId(this.#sha256, request.source);
     const messageId = await deriveChildMessageId(this.#sha256, effectId);
     const input = journalInput(request);
-    const expected: ExpectedEffectJournalIdentity = {
+    const identity: Omit<ExpectedEffectJournalIdentity, 'input'> = {
       effectId,
       target: request.source.target,
       sourceMessageId: request.source.sourceMessageId,
       effectKind: EFFECT_KIND,
       effectSemantics: EFFECT_SEMANTICS,
-      input,
     };
 
     let record = await this.#store.getEffect(effectId);
     let replayed = record !== null;
 
+    // A replayed logical send consumes the journalled input as its authority.
+    // The recomputed input embeds evaluated scope material (e.g. the volatile
+    // stateRevision) that legitimately changes between attempts; only the
+    // first attempt's journalled payload keeps the child message identity and
+    // content stable across retries and restarts. A started record without
+    // journalled input is corrupt: fail closed instead of replaying a guess.
+    let authoritativeInput = input;
     if (record !== null) {
-      assertCompatibleEffectRecord(record, expected);
+      if (record.input === undefined) {
+        throw new DomainMessageEffectJournalInvariantError(
+          `started successor Domain Message effect ${effectId} has no journalled input to replay`,
+        );
+      }
+      authoritativeInput = record.input;
+      assertCompatibleEffectRecord(record, { ...identity, input: authoritativeInput });
       if (record.status === 'completed') {
         return completedResult(record, messageId, request.resolvedTarget, true);
       }
       if (record.status === 'failed') {
         throw new JournaledDomainMessageEffectFailureError(record);
       }
-      record = await this.#store.beginEffect(startRequest(record.attempt, request, effectId, input, this.#now()));
+      record = await this.#store.beginEffect(startRequest(record.attempt, request, effectId, authoritativeInput, this.#now()));
     } else {
-      record = await this.#store.beginEffect(startRequest(1, request, effectId, input, this.#now()));
+      record = await this.#store.beginEffect(startRequest(1, request, effectId, authoritativeInput, this.#now()));
       replayed = false;
     }
 
-    assertCompatibleEffectRecord(record, expected);
+    assertCompatibleEffectRecord(record, { ...identity, input: authoritativeInput });
     if (record.status === 'completed') {
-      return completedResult(record, messageId, request.resolvedTarget, true);
+      return completedResult(record, messageId, materialFromInput(authoritativeInput, effectId).resolvedTarget, true);
     }
     if (record.status === 'failed') {
       throw new JournaledDomainMessageEffectFailureError(record);
     }
 
     const activeRecord = record;
+    const material = materialFromInput(authoritativeInput, effectId);
     const result = await this.#acceptance.accept({
       messageId,
-      target: { ...request.resolvedTarget },
-      type: request.effect.messageType,
-      payload: request.payload,
-      correlationId: request.correlationId,
+      target: { ...material.resolvedTarget },
+      type: material.messageType,
+      payload: material.payload,
+      correlationId: material.correlationId,
       causationId: request.source.sourceMessageId,
-      ...(request.effect.contractVersion === undefined
+      ...(material.contractVersion === undefined
         ? {}
-        : { contractVersion: request.effect.contractVersion }),
+        : { contractVersion: material.contractVersion }),
     });
 
     if (result.status === 'transient_unavailable') {
@@ -143,7 +156,7 @@ export class SuccessorJournaledDomainMessageEffect {
         output: outcomeToJson(outcome),
         completedAt: this.#now(),
       });
-      assertCompatibleEffectRecord(completed, expected);
+      assertCompatibleEffectRecord(completed, { ...identity, input: authoritativeInput });
       if (completed.status === 'failed') {
         throw new JournaledDomainMessageEffectFailureError(completed);
       }
@@ -152,7 +165,7 @@ export class SuccessorJournaledDomainMessageEffect {
           `completeEffect returned ${completed.status} for ${effectId}`,
         );
       }
-      return completedResult(completed, messageId, request.resolvedTarget, replayed);
+      return completedResult(completed, messageId, material.resolvedTarget, replayed);
     } catch (error) {
       if (
         error instanceof JournaledDomainMessageEffectFailureError ||
@@ -169,9 +182,9 @@ export class SuccessorJournaledDomainMessageEffect {
         // child messageId are deterministic and target acceptance deduplicates.
       }
       if (reconciled !== null) {
-        assertCompatibleEffectRecord(reconciled, expected);
+        assertCompatibleEffectRecord(reconciled, { ...identity, input: authoritativeInput });
         if (reconciled.status === 'completed') {
-          return completedResult(reconciled, messageId, request.resolvedTarget, true);
+          return completedResult(reconciled, messageId, material.resolvedTarget, true);
         }
         if (reconciled.status === 'failed') {
           throw new JournaledDomainMessageEffectFailureError(reconciled);
@@ -219,6 +232,48 @@ function journalInput(request: RunSuccessorDomainMessageEffectRequest): JsonValu
     payload: request.payload,
     correlationId: request.correlationId,
     causationId: request.source.sourceMessageId,
+  };
+}
+
+interface JournalledSendMaterial {
+  readonly resolvedTarget: WorkflowAddress;
+  readonly messageType: string;
+  readonly contractVersion?: string;
+  readonly payload: JsonValue;
+  readonly correlationId: string;
+}
+
+/**
+ * Decodes the durable logical send from a journalled effect input. The input
+ * is written by journalInput on the first attempt and is the replay
+ * authority, so a malformed record fails closed instead of falling back to
+ * recomputed (attempt-local) request material.
+ */
+function materialFromInput(value: JsonValue, effectId: string): JournalledSendMaterial {
+  const object = asObject(value);
+  const effect = asObject(object?.effect);
+  const resolvedTarget = asObject(object?.resolvedTarget);
+  if (
+    object === null ||
+    effect === null ||
+    resolvedTarget === null ||
+    !isNonEmptyString(effect.messageType) ||
+    !isNonEmptyString(resolvedTarget.workflowId) ||
+    !isNonEmptyString(resolvedTarget.instanceKey) ||
+    !('payload' in object) ||
+    !isNonEmptyString(object.correlationId) ||
+    (effect.contractVersion !== undefined && !isNonEmptyString(effect.contractVersion))
+  ) {
+    throw new DomainMessageEffectJournalInvariantError(
+      `journalled successor Domain Message effect ${effectId} input is not a decodable logical send`,
+    );
+  }
+  return {
+    resolvedTarget: { workflowId: resolvedTarget.workflowId, instanceKey: resolvedTarget.instanceKey },
+    messageType: effect.messageType,
+    ...(isNonEmptyString(effect.contractVersion) ? { contractVersion: effect.contractVersion } : {}),
+    payload: object.payload,
+    correlationId: object.correlationId,
   };
 }
 

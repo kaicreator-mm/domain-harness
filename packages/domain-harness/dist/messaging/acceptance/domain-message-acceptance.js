@@ -65,7 +65,12 @@ export class DomainMessageAcceptance {
     }
 }
 class MessagePayloadValidator {
-    ajv = new Ajv2020({ strict: true, allErrors: true });
+    // Strict mode is a schema-authoring linter, not JSON Schema semantics: it
+    // rejects valid 2020-12 pinned contracts (e.g. `required` naming a property
+    // not listed in `properties`) that the compiler accepts, mislabeling them
+    // invalid_pinned_contract at acceptance. Meta-schema validation still fails
+    // closed for genuinely invalid schemas.
+    ajv = new Ajv2020({ strict: false, allErrors: true });
     cache = new WeakMap();
     validate(schema, payload, messageType) {
         if (!isPortableJson(payload)) {

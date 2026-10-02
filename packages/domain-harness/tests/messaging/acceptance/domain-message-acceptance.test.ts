@@ -321,6 +321,78 @@ test('acceptance rejects malformed envelope and unknown message contract before 
   assert.equal(store.persisted.length, 0);
 });
 
+test('valid 2020-12 pinned contracts compile even when required properties are not declared in properties', async () => {
+  // The compiler accepts these schema shapes; acceptance must not be stricter
+  // than the frozen schema contract (SX-E07: ajv strictRequired used to
+  // mislabel them invalid_pinned_contract instead of validating the payload).
+  const store = new AcceptanceStoreFake(createSnapshot({ packageId: 'pkg-strict' }));
+  const boundary = new DomainMessageAcceptance({
+    store,
+    packages: createRegistry([
+      createPackage({
+        packageId: 'pkg-strict',
+        contractVersion: '1',
+        payloadSchema: { type: 'object', required: ['orderId'] },
+      }),
+    ]),
+  });
+
+  await assert.rejects(
+    boundary.accept(createMessage({ payload: { wrong: 'shape' } })),
+    isAcceptanceError('payload_contract_violation'),
+  );
+  assert.equal(store.acceptCalls, 0);
+
+  const accepted = await boundary.accept(createMessage({ payload: { orderId: 'order-1' } }));
+  assert.equal(accepted.packageId, 'pkg-strict');
+  assert.equal(store.persisted.length, 1);
+});
+
+test('an unsatisfiable but schema-valid pinned contract validates, never mislabels the contract', async () => {
+  // required + additionalProperties:false with no properties declaration is
+  // unsatisfiable by pure 2020-12 semantics (the required property is itself
+  // "additional"). It must compile and yield payload_contract_violation for
+  // every payload — the SX-E07 fixture shape.
+  const store = new AcceptanceStoreFake(createSnapshot({ packageId: 'pkg-unsat' }));
+  const boundary = new DomainMessageAcceptance({
+    store,
+    packages: createRegistry([
+      createPackage({
+        packageId: 'pkg-unsat',
+        contractVersion: '1',
+        payloadSchema: { type: 'object', additionalProperties: false, required: ['orderId'] },
+      }),
+    ]),
+  });
+
+  await assert.rejects(
+    boundary.accept(createMessage({ payload: { orderId: 'order-1' } })),
+    isAcceptanceError('payload_contract_violation'),
+  );
+  assert.equal(store.acceptCalls, 0);
+  assert.equal(store.persisted.length, 0);
+});
+
+test('genuinely invalid pinned schemas still fail closed before acceptance', async () => {
+  const store = new AcceptanceStoreFake(createSnapshot({ packageId: 'pkg-broken' }));
+  const boundary = new DomainMessageAcceptance({
+    store,
+    packages: createRegistry([
+      createPackage({
+        packageId: 'pkg-broken',
+        contractVersion: '1',
+        payloadSchema: { type: 'nosuchtype' } as never,
+      }),
+    ]),
+  });
+
+  await assert.rejects(
+    boundary.accept(createMessage({ payload: {} })),
+    isAcceptanceError('invalid_pinned_contract'),
+  );
+  assert.equal(store.acceptCalls, 0);
+});
+
 function isAcceptanceError(code: MessageAcceptanceError['code']): (error: unknown) => boolean {
   return (error: unknown) => error instanceof MessageAcceptanceError && error.code === code;
 }

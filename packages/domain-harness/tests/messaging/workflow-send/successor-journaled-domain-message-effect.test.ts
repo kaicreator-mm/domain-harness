@@ -240,6 +240,71 @@ test('malformed completed successor outcome fails closed before target acceptanc
   assert.equal(acceptance.calls.length, 1);
 });
 
+test('replay consumes the journalled logical send when recomputed request material drifted', async () => {
+  const store = new FakeStore();
+  const acceptance = new FakeAcceptance({
+    status: 'transient_unavailable',
+    condition: { code: 'target_not_found', message: 'not materialized yet' },
+  });
+  const runner = runtime(store, acceptance);
+
+  await assert.rejects(() => runner.run(request()), RetryableDomainMessageEffectError);
+  assert.equal(store.record?.status, 'started');
+  const journalledPayload = (store.record?.input as { payload: JsonValue }).payload;
+  assert.deepEqual(journalledPayload, { caseId: '1' });
+
+  // The retry re-evaluates the payload expression against a scope that
+  // legitimately changed between attempts (e.g. the source instance revision
+  // moved when recovery ownership was recorded). The logical send is still
+  // the journalled one: same child messageId, same journalled payload.
+  const drifted = { ...request(), payload: { caseId: '1', stateRevision: 7 } };
+  acceptance.setResult(accepted());
+  const result = await runner.run(drifted);
+
+  assert.equal(result.outcome.status, 'accepted');
+  assert.equal(acceptance.calls.length, 2);
+  assert.deepEqual(acceptance.calls[1]?.payload, { caseId: '1' });
+  assert.equal(acceptance.calls[1]?.messageId, acceptance.calls[0]?.messageId);
+  assert.equal(acceptance.calls[1]?.correlationId, 'corr-1');
+  assert.equal(store.record?.status, 'completed');
+});
+
+test('a corrupt started record without journalled input fails closed', async () => {
+  const store = new FakeStore();
+  const acceptance = new FakeAcceptance({
+    status: 'transient_unavailable',
+    condition: { code: 'target_not_found', message: 'not materialized yet' },
+  });
+  const runner = runtime(store, acceptance);
+
+  await assert.rejects(() => runner.run(request()), RetryableDomainMessageEffectError);
+  assert.ok(store.record);
+  // Simulates a store row persisted with NULL input decoding to undefined.
+  store.record = { ...store.record, input: undefined as unknown as JsonValue };
+
+  await assert.rejects(() => runner.run(request()), DomainMessageEffectJournalInvariantError);
+  assert.equal(acceptance.calls.length, 1);
+});
+
+test('a journalled record with malformed logical-send material fails closed', async () => {
+  const store = new FakeStore();
+  const acceptance = new FakeAcceptance({
+    status: 'transient_unavailable',
+    condition: { code: 'target_not_found', message: 'not materialized yet' },
+  });
+  const runner = runtime(store, acceptance);
+
+  await assert.rejects(() => runner.run(request()), RetryableDomainMessageEffectError);
+  assert.ok(store.record);
+  store.record = {
+    ...store.record,
+    input: { effect: { kind: 'domain-message', targetExpression: '$child', messageType: 'START' }, resolvedTarget: { workflowId: 'child', instanceKey: 'case-1' }, correlationId: 'corr-1', causationId: 'source-1' },
+  };
+
+  await assert.rejects(() => runner.run(request()), DomainMessageEffectJournalInvariantError);
+  assert.equal(acceptance.calls.length, 1);
+});
+
 function cloneRecord(record: EffectJournalRecord): EffectJournalRecord {
   return structuredClone(record);
 }
