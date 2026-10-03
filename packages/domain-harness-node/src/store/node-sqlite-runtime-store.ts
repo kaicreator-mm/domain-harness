@@ -62,6 +62,7 @@ import type {
 import {
   provisioningInstanceIdentityMatchesRequest,
   provisioningRecordMatchesRequest,
+  requireAcceptedMessageIdentityCompatible,
 } from '@kaicreator/domain-harness';
 import type { RuntimeObservationInstanceProvisioningStore } from '@kaicreator/domain-harness';
 
@@ -495,6 +496,31 @@ export class NodeSqliteRuntimeStore
       const instance = this.#requireInstanceRow(message.target);
       const existing = this.#getMessageRow(instance.internal_id, message.messageId);
       if (existing !== null) {
+        // A8 duplicate-compatibility boundary (fail closed BEFORE any write):
+        // a repeated messageId is only a valid idempotent replay when the whole
+        // AcceptedMessageIdentity tuple is compatible with the durable
+        // acceptance; an incompatible replay throws
+        // MESSAGE_IDENTITY_COLLISION and must not reuse the prior result.
+        requireAcceptedMessageIdentityCompatible(
+          message,
+          {
+            workflowId: instance.workflow_id,
+            instanceKey: instance.instance_key,
+            correlationId: instance.correlation_id,
+            packageId: instance.package_id,
+          },
+          {
+            workflowId: instance.workflow_id,
+            instanceKey: instance.instance_key,
+            messageId: existing.message_id,
+            type: existing.type,
+            payloadJson: existing.payload_json,
+            correlationId: existing.correlation_id,
+            causationId: existing.causation_id,
+            contractVersion: existing.contract_version,
+            packageId: existing.target_package_id,
+          },
+        );
         // Idempotent duplicate acceptance: the durable acceptance fact was
         // already committed (and observed, when enabled, exactly once).
         return {

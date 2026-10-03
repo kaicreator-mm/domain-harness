@@ -48,6 +48,7 @@ import type {
 import {
   provisioningInstanceIdentityMatchesRequest,
   provisioningRecordMatchesRequest,
+  requireAcceptedMessageIdentityCompatible,
 } from '@kaicreator/domain-harness';
 import type { JsonValue as CanonicalJsonValue } from '@kaicreator/domain-harness/v2';
 import { canonicalText, decodeJson, encodeJson } from './authority-shared.js';
@@ -573,6 +574,31 @@ export class ExpoSqliteRuntimeStore
       const instance = await requireInstance(transaction, message.target);
       const duplicate = await getMessageRow(transaction, instance.internal_id, message.messageId);
       if (duplicate !== null) {
+        // A8 duplicate-compatibility boundary (fail closed BEFORE any write):
+        // a repeated messageId is only a valid idempotent replay when the whole
+        // AcceptedMessageIdentity tuple is compatible with the durable
+        // acceptance; an incompatible replay throws
+        // MESSAGE_IDENTITY_COLLISION and must not reuse the prior result.
+        requireAcceptedMessageIdentityCompatible(
+          message,
+          {
+            workflowId: instance.workflow_id,
+            instanceKey: instance.instance_key,
+            correlationId: instance.correlation_id,
+            packageId: instance.package_id,
+          },
+          {
+            workflowId: instance.workflow_id,
+            instanceKey: instance.instance_key,
+            messageId: duplicate.message_id,
+            type: duplicate.type,
+            payloadJson: duplicate.payload_json,
+            correlationId: duplicate.correlation_id,
+            causationId: duplicate.causation_id,
+            contractVersion: duplicate.contract_version,
+            packageId: duplicate.target_package_id,
+          },
+        );
         // Idempotent duplicate acceptance: the durable fact (and its
         // observation, when enabled) already committed exactly once.
         return {
