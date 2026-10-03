@@ -1,6 +1,6 @@
 # DomainHarness
 
-DomainHarness is a portable TypeScript **Domain Runtime SDK** for target-compiled Domain Packages. The current development line is **v0.2**; v0.1 remains the historical shipped baseline.
+DomainHarness is a portable TypeScript **Domain Runtime SDK** for target-compiled Domain Packages. The current development line is **v0.5** (released at `main@a543e15e98c07a8987d5f4f63a1754344a215a80`); v0.1–v0.4 remain historical frozen baselines.
 
 ```text
 Build / CI:
@@ -238,7 +238,7 @@ npm test
 npm run build
 ```
 
-Task/PR CI is concern-local. A green task PR is not v0.2 Release Qualification; expensive cross-host/Hidden Validation and release closure remain version-level gates.
+Task/PR CI is concern-local. A green task PR is not a version Release Qualification; expensive cross-host/Hidden Validation and release closure remain version-level gates.
 
 ## v0.1 historical documentation
 
