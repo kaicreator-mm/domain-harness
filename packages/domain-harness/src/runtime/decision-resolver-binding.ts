@@ -1,6 +1,5 @@
 import { deriveDurableControlTurnId, type AdmissionDecisionSchema, type AdmissionTurnSource } from '../admission/index.js';
 import type { CompiledArtifactIdentity, BehaviorallyRelevantSemanticDependencies } from '../contracts/domain-data.js';
-import type { ContentDigest } from '../contracts/identity.js';
 import type { JsonObject, JsonSchema, JsonValue } from '../contracts/json.js';
 import type {
   DecisionResolverHarnessConfig,
@@ -341,7 +340,7 @@ export async function bindSemanticDecisionTurn<TResult extends JsonValue = JsonV
     // turn, so journaled resolver work and the admitted plan share identity.
     durableControlTurnId: deriveDurableControlTurnId(request.target, request.turn),
     // Exact declaration content identity (T-016 decision-contract digest).
-    semanticContractDigest: declaration.declarationDigest as ContentDigest,
+    semanticContractDigest: declaration.declarationDigest,
     nowEpochMs: Date.parse(request.now),
     currentSchema: decisionSchema,
     ...(promoted === undefined ? {} : { promoted }),
