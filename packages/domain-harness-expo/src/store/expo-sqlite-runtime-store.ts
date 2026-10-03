@@ -8,6 +8,7 @@ import type {
 import { migrateExpoRuntimeStore } from './migrations.js';
 import {
   absentRuntimeObservationStreamPage,
+  assertProcessedCommandTurnRevisionProgression,
   assembleRuntimeObservationPage,
   decodeRuntimeObservationCursor,
   normalizeRuntimeObservationLimit,
@@ -1321,6 +1322,11 @@ export class ExpoSqliteRuntimeStore
 
   public async commitProcessedCommandTurn(commit: ProcessedCommandTurnCommit): Promise<void> {
     this.assertOpen();
+    // Frozen A9 defensive structural guard (v0.6 T003): fail closed before any
+    // durable mutation when the supplied persistence command does not conform
+    // to the runtime-core normal progression rule N -> N+1. The store is a
+    // defensive contract boundary, not a semantic revision owner.
+    assertProcessedCommandTurnRevisionProgression(commit);
     await this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, commit.target);
       const message = await getMessageRow(transaction, instance.internal_id, commit.messageId);

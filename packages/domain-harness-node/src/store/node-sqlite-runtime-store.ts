@@ -22,6 +22,7 @@ import type {
 import { applyNodeSqliteMigrations } from './migrations.js';
 import {
   absentRuntimeObservationStreamPage,
+  assertProcessedCommandTurnRevisionProgression,
   assembleRuntimeObservationPage,
   canonicalJsonStringify,
   decodeRuntimeObservationCursor,
@@ -914,6 +915,12 @@ export class NodeSqliteRuntimeStore
   }
 
   async commitProcessedCommandTurn(commit: ProcessedCommandTurnCommit): Promise<void> {
+    // Frozen A9 defensive structural guard (v0.6 T003): fail closed before any
+    // durable mutation when the supplied persistence command does not conform
+    // to the runtime-core normal progression rule N -> N+1. The store is a
+    // defensive contract boundary, not a semantic revision owner.
+    assertProcessedCommandTurnRevisionProgression(commit);
+
     const transaction = this.#db.transaction(() => {
       const instance = this.#requireInstanceRow(commit.target);
       const message = this.#requireMessageRow(instance.internal_id, commit.messageId);
