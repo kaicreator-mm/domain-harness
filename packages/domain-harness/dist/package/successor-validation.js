@@ -1,5 +1,5 @@
 import { computeCanonicalJsonDigest, } from '../contracts/identity.js';
-import { DOMAIN_HARNESS_JSON_SCHEMA_V1 } from '../schema/domainharness-json-schema-v1.js';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1, DomainHarnessJsonSchemaV1Validator, } from '../schema/domainharness-json-schema-v1.js';
 import { SUCCESSOR_COMPILED_ARTIFACT_PROFILE, sameCompiledArtifactProfile, } from '../v2/contracts/compiled-artifact-profile.js';
 import { decodeCompiledWorkflowDefinitionForProfile, } from '../runtime/compiled-workflow-dispatch.js';
 import { decodeCompiledWorkflowDefinitionV3 } from '../runtime/compiled-workflow-ir-v3.js';
@@ -96,6 +96,76 @@ function validateSuccessorProjectionDependencyClosure(manifest) {
     }
 }
 /**
+ * v0.6 T001 (issue #497, frozen L2 A2/A7): package-level reference closure
+ * for compiled semantic decision declarations. Every declared query/read
+ * capability must be a compiled Tool with pure read semantics (`effect:
+ * 'none'` — mutation/effect exposure fails closed), every required
+ * projection must be declared in the manifest, and every required live
+ * revision source must be a declared Business Source. Structure is already
+ * validated by `validateManifestShape`; this closes the references against
+ * the exact manifest sections so an unsupported or undeclared reference can
+ * never silently degrade into "run deterministically as if absent".
+ *
+ * v0.6 T001 R1 repair (issue #508, review #505 P1): the closure also proves
+ * the declaration's own content integrity, independently of the compiler:
+ * - the embedded `resultSchema` is revalidated through the existing
+ *   DOMAIN_HARNESS_JSON_SCHEMA_V1 schema authority (never merely "is an
+ *   object"), so an off-contract/tampered schema fails admission even when
+ *   the outer `packageId` was recomputed over it;
+ * - the `declarationDigest` is recomputed from the exact canonical
+ *   descriptor body through the existing Runtime/package canonical-JSON
+ *   digest seam and compared against the durable digest, so mutation of
+ *   behaviorally relevant declaration material that retains a stale but
+ *   well-formed digest fails closed. The outer `packageId` recomputation
+ *   can never make a stale inner declaration digest acceptable.
+ */
+async function validateSuccessorSemanticDecisionClosure(manifest, sha256) {
+    if (manifest.semanticDecisions === undefined)
+        return;
+    const projectionIds = new Set(Object.keys(manifest.projections));
+    const businessSources = new Set((manifest.businessSources ?? []).map((descriptor) => descriptor.source));
+    const schemaValidator = new DomainHarnessJsonSchemaV1Validator();
+    for (const decision of manifest.semanticDecisions) {
+        for (const projectionId of decision.dependencyMaterial.requiredProjectionIds) {
+            if (!projectionIds.has(projectionId)) {
+                failInvalid(`semantic decision "${decision.decisionId}" requires undeclared projection "${projectionId}"`);
+            }
+        }
+        for (const source of decision.dependencyMaterial.requiredRevisionSourceIds) {
+            if (!businessSources.has(source)) {
+                failInvalid(`semantic decision "${decision.decisionId}" requires undeclared Business Source "${source}"`);
+            }
+        }
+        for (const capabilityId of decision.queryCapabilityIds) {
+            const tool = manifest.tools[capabilityId];
+            if (tool === undefined) {
+                failInvalid(`semantic decision "${decision.decisionId}" requires undeclared Tool capability "${capabilityId}"`);
+                continue;
+            }
+            if (tool.effect !== 'none') {
+                failInvalid(`semantic decision "${decision.decisionId}" exposes Tool "${capabilityId}" with mutation/effect semantics "${tool.effect}"; semantic reasoning is bounded to query/read-only capabilities`);
+            }
+        }
+        // Embedded result schema authority (review #505 P1 item 2): revalidate
+        // through the existing DOMAIN_HARNESS_JSON_SCHEMA_V1 profile interpreter.
+        try {
+            schemaValidator.normalizeSchema(decision.resultSchema);
+        }
+        catch (error) {
+            failInvalid(`semantic decision "${decision.decisionId}" resultSchema is not a valid ${DOMAIN_HARNESS_JSON_SCHEMA_V1} schema: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        // Declaration content identity (review #505 P1 item 1): recompute the
+        // digest over the exact canonical descriptor body (every field except the
+        // digest itself) with the portable digest seam and fail closed on any
+        // divergence from the durable compiled digest.
+        const { declarationDigest: declaredDigest, ...descriptorBody } = decision;
+        const recomputedDigest = await computeCanonicalJsonDigest(descriptorBody, sha256);
+        if (recomputedDigest !== declaredDigest) {
+            failInvalid(`semantic decision "${decision.decisionId}" declarationDigest does not match the canonical descriptor body (declared=${declaredDigest}, recomputed=${recomputedDigest})`);
+        }
+    }
+}
+/**
  * DomainHarness-owned complete successor ('0.3',2,3) package validator,
  * installed into Runtime activation by I-03-ASSEMBLY (L2 §2.3/§3).
  *
@@ -111,6 +181,11 @@ function validateSuccessorProjectionDependencyClosure(manifest) {
  * - Business Source schema declarations under the exact schema contract;
  * - package-recorded bounds against host-supported maxima (never exceeded,
  *   never truncated);
+ * - compiled semantic decision declarations: structure, exact manifest
+ *   section closure, embedded result schema revalidated under the existing
+ *   DOMAIN_HARNESS_JSON_SCHEMA_V1 authority, and the declarationDigest
+ *   recomputed from the exact canonical descriptor body (v0.6 T001 R1
+ *   repair, issue #508);
  * - the successor packageId over the canonical manifest identity material
  *   (L2-A §3.4 portable digest seam).
  */
@@ -176,6 +251,11 @@ export async function validateSuccessorCompiledPackage(value, policy) {
     // Projection dependency closure is an admission invariant (L2-A §3.7), not
     // a deferred projection-read failure.
     validateSuccessorProjectionDependencyClosure(manifest);
+    // Compiled semantic decision declarations close against the exact manifest
+    // sections and prove their own content integrity — recomputed
+    // declarationDigest and revalidated embedded result schema (v0.6 T001 /
+    // issue #497, R1 repair issue #508, frozen L2 A2/A7).
+    await validateSuccessorSemanticDecisionClosure(manifest, policy.sha256);
     // Host-side maxima are the compatibility authority; a successor-capable host
     // that omits them already failed policy normalization.
     assertPackageDataBoundsSupported(packageDataBounds, policy);

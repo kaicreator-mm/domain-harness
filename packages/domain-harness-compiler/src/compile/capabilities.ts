@@ -1,4 +1,5 @@
 import type { CapabilityId, LoadedRawDomainPackage, RawToolDefinition, TargetHostProfile } from '../raw/types.js';
+import { SEMANTIC_DECISION_CAPABILITY } from '@kaicreator/domain-harness/v2';
 
 export const COMPILER_REQUIRED_CAPABILITIES = {
   cryptoHashSha256: 'crypto-hash-sha256@1',
@@ -27,6 +28,11 @@ export function collectRequiredCapabilities(
     COMPILER_REQUIRED_CAPABILITIES.compiledPackageModule,
     ...declared,
   ]);
+  // v0.6 T001 (issue #497, A7 rule 4): a package with first-class semantic
+  // decision declarations requires the compiled semantic-decision capability,
+  // so a target profile without it fails closed instead of silently ignoring
+  // the declarations.
+  if ((raw.semanticDecisions?.size ?? 0) > 0) required.add(SEMANTIC_DECISION_CAPABILITY);
   for (const tool of tools) for (const capability of tool.requiredCapabilities ?? []) required.add(capability);
   for (const workflow of raw.workflows.values()) {
     for (const state of Object.values(workflow.states)) {
