@@ -156,7 +156,7 @@ test('CHM-C00: bind/attest — same assembly, same compiled corpus, same fixture
         assert.equal(productDelta, '', 'product surface must be byte-identical since the attested assembly for the committed evidence to stay current (packages/ product delta demands evidence re-capture)');
         console.error(`CHM-C00 evidence-currentness OK: attested assembly ${evidence.comparator.assemblyHead.slice(0, 10)} is an ancestor of live main ${liveMain.slice(0, 10)} with an empty product-surface delta (test-harness-only movement).`);
       } catch (error) {
-        if (error instanceof AssertionError) throw error;
+        if (error instanceof assert.AssertionError) throw error;
         if ((error as { status?: number }).status === 1) throw error;
         console.error('CHM-C00 evidence-currentness NOT_COMPARABLE_HEAD_OR_CORPUS: shallow push clone cannot resolve the attested assembly history (depth-1); the local/full-clone run asserts ancestry and the product-surface delta.');
       }
