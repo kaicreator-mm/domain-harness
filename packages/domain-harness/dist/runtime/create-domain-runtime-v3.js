@@ -1,21 +1,15 @@
 import { admitCentralDecision, CentralAdmissionError } from '../admission/index.js';
 import { DomainActivationBindingCoordinator, GovernanceExecutionCoordinator, } from '../governance/index.js';
+import { resolvePinnedPackage } from '../package/registry.js';
 import { RuntimeEvidenceCapture, } from '../runtime-evidence/index.js';
+import { resolveDecision } from '../decision-resolver/index.js';
+import { bindSemanticDecisionTurn, } from './decision-resolver-binding.js';
 import { createDomainRuntimeWithProcessCommandOutcomes, } from './create-domain-runtime.js';
-export class DomainRuntimeV3Error extends Error {
-    code;
-    constructor(code, message) {
-        super(message);
-        this.name = 'DomainRuntimeV3Error';
-        this.code = code;
-    }
-}
-function fail(code, message) {
-    throw new DomainRuntimeV3Error(code, message);
-}
+import { failV3 } from './runtime-v3-errors.js';
+export { DomainRuntimeV3Error, } from './runtime-v3-errors.js';
 function requirePort(value, name) {
     if (value === undefined || value === null) {
-        fail('RUNTIME_V3_AUTHORITY_REQUIRED', `v0.3 authority port '${name}' is required`);
+        failV3('RUNTIME_V3_AUTHORITY_REQUIRED', `v0.3 authority port '${name}' is required`);
     }
     return value;
 }
@@ -40,7 +34,13 @@ export async function createDomainRuntimeV3(options) {
     const effectJournal = requirePort(v3.effectJournal, 'v3.effectJournal');
     const effectTools = requirePort(v3.effectTools, 'v3.effectTools');
     const evidence = requirePort(v3.evidence, 'v3.evidence');
-    const runtime = await createDomainRuntimeWithProcessCommandOutcomes(options);
+    // R1 P1: the T004 declaration binding reads compiled semantic-decision
+    // declarations exclusively through the admission-validated package view the
+    // assembled Runtime itself executes against — never through the caller's
+    // retained registry references.
+    const validatedPackagesHolder = {};
+    const runtime = await createDomainRuntimeWithProcessCommandOutcomes(options, validatedPackagesHolder);
+    const validatedPackages = requirePort(validatedPackagesHolder.validatedPackages, 'validatedPackages');
     const sha256 = options.bindings.sha256;
     const activation = new DomainActivationBindingCoordinator(activationAuthority, exactPackageCdi, baselines, sha256);
     const governance = new GovernanceExecutionCoordinator(durableExecution, sha256);
@@ -99,6 +99,47 @@ export async function createDomainRuntimeV3(options) {
             throw error;
         }
     }
-    return { runtime, activation, governance, admitTurn, evidenceCapture };
+    /**
+     * v0.6 T004 bounded seam: declaration → existing resolveDecision (data
+     * only) → the existing `admitTurn` single path. No second resolver, no
+     * second admission path, no engine-state publication, no provider routing.
+     */
+    async function resolveAndAdmitTurn(request) {
+        const pin = await governance.requirePinnedExecution(request.workflowInstanceId);
+        const compiledPackage = resolvePinnedPackage(validatedPackages, pin.packageId);
+        const decisions = compiledPackage.manifest.semanticDecisions;
+        const declaration = decisions?.find((candidate) => candidate.decisionId === request.decisionId);
+        if (declaration === undefined) {
+            failV3('RUNTIME_V3_DECISION_BINDING_UNRESOLVED', decisions === undefined
+                ? `pinned package ${pin.packageId} carries no compiled semantic-decision declarations; decision "${request.decisionId}" cannot run`
+                : `no compiled semantic-decision declaration "${request.decisionId}" exists in pinned package ${pin.packageId}; fail closed`);
+        }
+        const binding = await bindSemanticDecisionTurn(request, {
+            declaration,
+            governancePin: pin,
+            namespace: v3.tenantScope ?? pin.domainId,
+            expression: options.bindings.expression,
+        });
+        // The resolver is proposal authority only: its output is data until
+        // Central Admission accepts it. Any resolver failure (schema, harness,
+        // currentness) throws and reaches admission never; a denial AFTER a
+        // successful resolution is final — the call below resolves exactly once
+        // and admits exactly once, with no fallback, retry or alternate path.
+        const resolved = await resolveDecision(binding.invocation, request.resolver, sha256);
+        return admitTurn({
+            target: request.target,
+            turn: request.turn,
+            trigger: request.trigger,
+            workflowInstanceId: request.workflowInstanceId,
+            definition: request.definition,
+            currentStateKey: request.currentStateKey,
+            context: request.context,
+            event: request.event,
+            resolved,
+            decisionSchema: binding.decisionSchema,
+            now: request.now,
+        });
+    }
+    return { runtime, activation, governance, admitTurn, resolveAndAdmitTurn, evidenceCapture };
 }
 //# sourceMappingURL=create-domain-runtime-v3.js.map

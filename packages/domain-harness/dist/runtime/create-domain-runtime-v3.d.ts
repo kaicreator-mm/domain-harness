@@ -4,12 +4,9 @@ import type { RuntimeEvidencePort } from '../contracts/runtime-evidence.js';
 import { DomainActivationBindingCoordinator, GovernanceExecutionCoordinator, type DomainActivationAuthority, type DurableExecutionStore, type ExactPackageCdiAuthority, type GovernanceBaselineStore } from '../governance/index.js';
 import { RuntimeEvidenceCapture, type RuntimeEvidenceCaptureContext } from '../runtime-evidence/index.js';
 import type { DomainRuntime } from '../v2/contracts/runtime.js';
+import { type ResolveAndAdmitTurnRequest } from './decision-resolver-binding.js';
 import { type CreateDomainRuntimeOptions } from './create-domain-runtime.js';
-export type DomainRuntimeV3ErrorCode = 'RUNTIME_V3_AUTHORITY_REQUIRED';
-export declare class DomainRuntimeV3Error extends Error {
-    readonly code: DomainRuntimeV3ErrorCode;
-    constructor(code: DomainRuntimeV3ErrorCode, message: string);
-}
+export { DomainRuntimeV3Error, type DomainRuntimeV3ErrorCode, } from './runtime-v3-errors.js';
 export interface CreateDomainRuntimeV3AuthorityOptions {
     /** T-003 Governance Baseline body/retention store. */
     readonly baselines: GovernanceBaselineStore;
@@ -53,6 +50,20 @@ export interface DomainRuntimeV3 {
      * (ADR-02) — the T-019 plan carries no engine state by contract.
      */
     admitTurn(request: CentralAdmissionRequest): Promise<CentralAdmissionOutcome>;
+    /**
+     * v0.6 T004: the bounded Runtime integration of the existing
+     * DecisionResolver into the existing Central Admission path. Binds the
+     * compiled semantic-decision declaration of the pinned package by stable
+     * `decisionId`, invokes the existing `resolveDecision()` (frozen order
+     * Rule → Exact Cache → Promoted Subworkflow → HarnessMachine, data only),
+     * and feeds the resolved result through the SAME `admitTurn` path above.
+     *
+     * Authority preservation: the resolver stays proposal authority only — a
+     * guard/hard-invariant/schema denial of the resolved result is final for
+     * the turn (no fallback, no retry, no bypass). A missing/incompatible
+     * declaration binding fails closed with `RUNTIME_V3_DECISION_BINDING_*`.
+     */
+    resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<CentralAdmissionOutcome>;
     /** T-020 capture bound to a caller-supplied exact authority context (shadow/rollback/metric points). */
     evidenceCapture(context: RuntimeEvidenceCaptureContext): RuntimeEvidenceCapture;
 }
