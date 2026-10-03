@@ -18,7 +18,7 @@
 
 DomainHarness v0.6 does **not** require a new adaptive runtime, planner runtime, second workflow engine, obligation solver, or second Fast Path engine.
 
-The released v0.5 code already contains the core execution spine needed by the Frozen Product:
+The released v0.5 code already contains the core mechanisms needed by the Frozen Product:
 
 ```text
 Decision request
@@ -36,13 +36,16 @@ Central Admission / current schema / hard invariants / guard
 existing durable control-turn + effect authority
 ```
 
+These mechanisms exist at the frozen base, but v0.5 does **not** yet expose them as one Runtime v3 `resolve → admit` entrypoint. v0.6 therefore requires a bounded Runtime integration delta (Concern C2) that composes the existing DecisionResolver with existing Admission authority; this is integration glue, not a new engine or authority.
+
 The v0.6 architecture delta is therefore intentionally small:
 
 1. **Preserve the existing DecisionResolver as the single decision-resolution pipeline.**
 2. **Add a first-class compiled Domain declaration/binding for an explicit bounded semantic decision point**, so Domain authors/compiler output can invoke the existing resolver/admission path without inventing custom host glue.
-3. **Add an explicit deterministic no-model/unavailable disposition** for a declared semantic decision when deterministic/reusable sources cannot resolve and model capability is unavailable.
-4. **Expose existing decision-resolution evidence through a stable public observation/receipt contract**, reusing existing telemetry and Runtime Observation infrastructure rather than creating a second telemetry subsystem.
-5. **Defer generic evidence-aware skipping of arbitrary deterministic work from v0.6.** Decision-level exact reuse remains IN and already supplies the high-ROI subset. General work skipping would require a new work-identity/currentness/side-effect model not present in the current Workflow contract and would recreate the scope that Product Freeze explicitly avoided.
+3. **Add the bounded Runtime v3 binding from the compiled decision declaration/current turn into the existing DecisionResolver and then existing Admission path.**
+4. **Add an explicit deterministic no-model/unavailable disposition** for a declared semantic decision when deterministic/reusable sources cannot resolve and model capability is unavailable.
+5. **Expose existing decision-resolution evidence through a stable public observation/receipt contract**, reusing existing telemetry and Runtime Observation infrastructure rather than creating a second telemetry subsystem.
+6. **Defer generic evidence-aware skipping of arbitrary deterministic work from v0.6.** Decision-level exact reuse remains IN and already supplies the high-ROI subset. General work skipping would require a new work-identity/currentness/side-effect model not present in the current Workflow contract and would recreate the scope that Product Freeze explicitly avoided.
 
 Architecture terminal direction:
 
@@ -81,11 +84,11 @@ The architecture MUST NOT reinterpret `LLM optional` as “every Domain decision
 
 ## 3. Current architecture evidence
 
-### 3.1 DecisionResolver is already the production Fast Path
+### 3.1 DecisionResolver is already the production Fast Path mechanism
 
 Evidence:
 
-- `packages/domain-harness/src/decision-resolver/decision-resolver.ts`
+- `packages/domain-harness/src/decision-resolver/resolver.ts`
 - `packages/domain-harness/src/decision-resolver/contracts.ts`
 - exported through `packages/domain-harness/src/public-v3/index.ts`
 
@@ -162,16 +165,16 @@ Mutation remains behind `AdmissionEffectToolPort` + durable effect journal. Deci
 
 **L2 conclusion:** model output MUST continue to enter the existing Admission path. No semantic-decision result can become a parallel transition/commit authority.
 
-### 3.4 Public v3 already exports the decision/admission spine
+### 3.4 Public v3 exports both mechanisms; Runtime v3 composition is a required delta
 
 Evidence:
 
 - `packages/domain-harness/src/public-v3/index.ts`
 - `packages/domain-harness/src/runtime/create-domain-runtime-v3.ts`
 
-The v3 public surface already exports DecisionResolver and Admission contracts. Runtime v3 already has an optional decision-resolution extension seam and creates a resolved-decision admission bridge when configured.
+The v3 public surface already exports DecisionResolver and Admission contracts. At the frozen base, however, `create-domain-runtime-v3.ts` exposes Admission through `admitTurn(request)` but does **not** configure or invoke DecisionResolver and does **not** provide a `resolve → admit` bridge.
 
-**L2 conclusion:** the missing productization is primarily **declaration/compilation and stable observation semantics**, not core resolver reachability.
+**L2 conclusion:** the missing productization includes **declaration/compilation, a required SMALL_BOUNDED_RUNTIME_EXTENSION that binds the compiled decision/current turn into the existing DecisionResolver and then existing Admission path, and stable observation semantics**. The underlying resolver and Admission authorities already exist; their production composition at the Runtime v3 entry point does not.
 
 ### 3.5 Workflow remains deterministic and explicit
 
@@ -218,7 +221,7 @@ O = OUT_OF_SCOPE / DEFERRED BY L2 PROPORTIONALITY DECISION
 | IFP-02 exact current reuse → no fresh model | A | Existing semantic cache/currentness remains authoritative. |
 | IFP-03 applicable promoted process before fresh reasoning | A | Existing promoted selection/pinning/execution remains authoritative. |
 | IFP-04 fresh semantics only after known mechanisms fail | A | Preserve current resolver order; no policy engine added. |
-| IFP-05 result remains structured data and re-enters guard authority | A | Existing resolver → Admission relationship remains mandatory. |
+| IFP-05 result remains structured data and re-enters guard authority | R | Existing resolver and Admission contracts are preserved; v0.6 adds the bounded Runtime composition between them. |
 | IFP-06 reused decision does not imply mutation occurred | N | Existing durable-effect separation already satisfies this. |
 | IFP-07 stale/identity/schema/authority mismatch prevents unsafe reuse | A | Existing cache/promotion/currentness fail-closed rules remain unchanged. |
 | IFP-08 ordinary deterministic workflows bypass model-oriented machinery | N | Existing Workflow runtime already works independently of DecisionResolver/Harness. |
@@ -232,7 +235,7 @@ O = OUT_OF_SCOPE / DEFERRED BY L2 PROPORTIONALITY DECISION
 | BSD-03 allowed read/query observations | C | Existing Harness capabilities reused; declaration may reference only allowed query capability identities. |
 | BSD-04 no direct mutation capability in reasoning | N | Existing Harness prohibition remains unchanged. |
 | BSD-05 model cannot set engine/runtime state id | N | Existing Decision/Event proposal contract remains unchanged. |
-| BSD-06 parent workflow/current guards decide transition | A | Existing Admission path remains the only transition gate. |
+| BSD-06 parent workflow/current guards decide transition | R | Existing Admission remains the transition authority; v0.6 adds only the bounded resolver→Admission Runtime binding. |
 | BSD-07 mutation behind durable effect authority | N | Existing effect authority remains unchanged. |
 | BSD-08 hard bounds/cancellation/failure | C | Existing `maxSteps`/failure semantics reused; bounded policy must be declared/compiled for first-class decisions. |
 | BSD-09 provider/model routing stays outside Harness | N | Existing ModelPort boundary remains unchanged. |
@@ -246,7 +249,7 @@ O = OUT_OF_SCOPE / DEFERRED BY L2 PROPORTIONALITY DECISION
 | OPT-02 deterministic Rule without model | A | Resolver can finish before Harness; productize the behavior. |
 | OPT-03 Exact Reuse without model | A | Resolver can finish before Harness; productize the behavior. |
 | OPT-04 non-model Promoted path without model | A | Existing promoted execution remains valid when the promoted process itself has no required semantic step. |
-| OPT-05 semantic-required + no model has declared unavailable behavior | P + C | Add a small declaration/public terminal contract; no special Runtime state machine. |
+| OPT-05 semantic-required + no model has declared unavailable behavior | P + C + R | Add declaration/public terminal contract and bind it through the bounded Runtime resolver/admission integration; no special Runtime state machine. |
 
 ### 4.4 Observability — OBS
 
@@ -328,13 +331,15 @@ It MUST NOT contain:
 
 ### Invocation shape
 
-A compiled decision point may be reached by an explicit deterministic Workflow/invocation/admission binding. The architecture does not require a new Workflow state kind. The binding produces the existing resolver request, then converts only a validated structured result into the existing Admission/event path.
+A compiled decision point may be reached by an explicit deterministic Workflow/invocation/admission binding. The architecture does not require a new Workflow state kind. The v0.6 Runtime integration constructs the existing resolver request, then converts only a validated structured result into the existing Admission/event path.
 
 ```text
 Deterministic Workflow point
   ↓ explicit compiled decision binding
 existing DecisionResolver
   ↓ structured Decision/Event proposal
+bounded v0.6 Runtime integration
+  ↓
 existing Central Admission
   ↓ current guard/invariant
 existing durable control/effect commit
@@ -476,6 +481,10 @@ AI Runtime / Host
   owns: provider/model routing, provider retry/fallback, model availability
   does not own: Domain business-control semantics
 
+v0.6 Runtime integration
+  owns: translating an explicit compiled semantic decision/current turn into the existing resolver invocation and passing only validated structured output to existing Admission
+  does not own: source-order policy, transition authority, business mutation, business truth
+
 Central Admission / Domain Workflow
   owns: current schema/invariant/guard admission decision
 
@@ -528,9 +537,9 @@ Rules:
 |---|---|---|---|
 | U-01 | Is a second Fast Path engine required? | Production DecisionResolver already implements required order and evidence. | STATIC_EVIDENCE_SUFFICIENT — NO. |
 | U-02 | Is a new semantic reasoning runtime required? | HarnessMachine already provides bounded structured reasoning/query semantics. | STATIC_EVIDENCE_SUFFICIENT — NO. |
-| U-03 | Is a new transition/mutation path required? | Central Admission + durable effect authority already consume resolved decisions as data. | STATIC_EVIDENCE_SUFFICIENT — NO. |
-| U-04 | Is a new Workflow `AdaptiveRegion` state required? | Existing explicit Workflow + resolver/admission binding can represent bounded decision invocation; Product excludes generic region. | STATIC_EVIDENCE_SUFFICIENT — NO. |
-| U-05 | Can no-model mode be supported without a new Runtime mode? | Resolver sources are ordered before Harness and Runtime decision extension is optional; declaration can provide deterministic unavailable disposition. | STATIC_EVIDENCE_SUFFICIENT — YES. |
+| U-03 | Is a new transition/mutation path required? | Central Admission + durable effect authority already consume resolved decisions as data; only bounded Runtime composition is missing. | STATIC_EVIDENCE_SUFFICIENT — NO new authority/path; C2 integration required. |
+| U-04 | Is a new Workflow `AdaptiveRegion` state required? | Existing explicit Workflow + bounded resolver/admission composition can represent semantic decision invocation; Product excludes generic region. | STATIC_EVIDENCE_SUFFICIENT — NO. |
+| U-05 | Can no-model mode be supported without a new Runtime mode? | Rule/Exact Reuse/Promoted sources are ordered before Harness; the bounded Runtime integration can complete these paths without model access and apply the declared unavailable disposition only when fresh semantics are required. | STATIC_EVIDENCE_SUFFICIENT — YES. |
 | U-06 | Is a new telemetry backend required? | Resolver/Admission already produce contract-level evidence and Runtime already has observation facilities. | STATIC_EVIDENCE_SUFFICIENT — NO. |
 | U-07 | Can generic arbitrary-work Direct Resolution stay bounded? | Current identity/currentness is decision/artifact scoped; Workflow has no generic skippable-work proof contract. | STATIC_EVIDENCE_SUFFICIENT — NO; DEFER. |
 
@@ -586,12 +595,15 @@ These are architecture concern boundaries only. They MUST NOT be treated as auth
 
 ### Concern C2 — Runtime binding to existing resolver/admission
 
+**Classification:** `R = SMALL_BOUNDED_RUNTIME_EXTENSION` (required v0.6 delta).
+
 - translate compiled declaration + current turn facts into existing resolver invocation;
 - preserve resolver order;
+- pass only validated structured output into existing Central Admission;
 - preserve Central Admission as transition gate;
 - no alternate commit path.
 
-This should be primarily integration glue, not a new engine.
+This is integration glue, not a new engine. It does not exist as a pre-wired Runtime v3 resolver→admission entrypoint at the frozen base.
 
 ### Concern C3 — Optional-model unavailable semantics
 
@@ -628,7 +640,7 @@ A future L2 Freeze may authorize Task DAG only if Fresh Independent Architecture
 
 1. existing DecisionResolver remains the single decision resolution authority;
 2. no major new Runtime subsystem is introduced;
-3. semantic decisions compile to bounded declarations and reuse existing resolver/admission;
+3. semantic decisions compile to bounded declarations and reuse existing resolver/admission authorities through the required bounded Runtime integration;
 4. ordinary deterministic workflows remain unchanged/first-class;
 5. model access is optional and late-bound;
 6. unresolved semantics without model has explicit deterministic fail/fallback behavior;
