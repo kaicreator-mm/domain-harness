@@ -5,6 +5,21 @@ import jsonata from 'jsonata';
 import { parse as parseYaml } from 'yaml';
 import { RawPackageDefinitionError } from './errors.js';
 import { validateChildGraph, validateWorkflowStructure } from './validation.js';
+/**
+ * Frozen resolver bypass vocabulary mirrored from the compiled semantic
+ * decision contract (v0.6 T001 / issue #497). The declaration can pin one of
+ * these reasons; it can never invent a new one. `satisfies` keeps this set
+ * compile-time exhaustive against the core union, so a core-side vocabulary
+ * change fails the compiler build instead of diverging silently.
+ */
+const SEMANTIC_DECISION_CACHE_BYPASS_REASONS = new Set(Object.keys({
+    'non-cacheable': true,
+    'time-sensitive': true,
+    'live-dependency-without-semantic-revision': true,
+    'dynamic-dependency-not-prebound': true,
+    'explicit-domain-policy': true,
+}));
+const SEMANTIC_DECISION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 function asRecord(value, label) {
     if (!value || typeof value !== 'object' || Array.isArray(value))
         throw new Error(`${label} must be an object`);
@@ -293,6 +308,187 @@ async function loadWorkflows(root, issues) {
     }
     return workflows;
 }
+/**
+ * v0.6 T001 (issue #497, frozen L2 A2/A7): closed-key structural parse of one
+ * authoring-form Semantic Decision Declaration. Provider/model names, engine
+ * state ids and Adaptive Region/Goal/Obligation/JIT material are
+ * unrepresentable: any key outside the closed set fails closed here.
+ */
+function parseSemanticDecision(value, label) {
+    const raw = asRecord(value, label);
+    assertOnlyKeys(raw, [
+        'decisionId',
+        'inputSelection',
+        'resultSchema',
+        'allowedOutcomes',
+        'allowedEventTypes',
+        'queryCapabilities',
+        'requiredProjections',
+        'requiredRevisionSources',
+        'cachePolicy',
+        'promotedReference',
+        'policy',
+        'unavailable',
+    ], label);
+    const decisionId = requiredString(raw, 'decisionId', label);
+    if (!SEMANTIC_DECISION_ID_PATTERN.test(decisionId)) {
+        throw new Error(`${label}.decisionId must match ${SEMANTIC_DECISION_ID_PATTERN.source}`);
+    }
+    const path = (key) => `${label}.${key}`;
+    const allowedOutcomes = raw.allowedOutcomes;
+    if (!Array.isArray(allowedOutcomes) || allowedOutcomes.length === 0
+        || !allowedOutcomes.every((entry) => typeof entry === 'string' && entry.length > 0)) {
+        throw new Error(`${path('allowedOutcomes')} must be a non-empty array of non-empty strings (finite allowed decision outcomes)`);
+    }
+    if (new Set(allowedOutcomes).size !== allowedOutcomes.length) {
+        throw new Error(`${path('allowedOutcomes')} must not contain duplicates`);
+    }
+    const allowedEventTypes = raw.allowedEventTypes;
+    if (!Array.isArray(allowedEventTypes) || allowedEventTypes.length === 0
+        || !allowedEventTypes.every((entry) => typeof entry === 'string' && entry.length > 0)) {
+        throw new Error(`${path('allowedEventTypes')} must be a non-empty array of non-empty strings (finite allowed Domain Event types)`);
+    }
+    if (new Set(allowedEventTypes).size !== allowedEventTypes.length) {
+        throw new Error(`${path('allowedEventTypes')} must not contain duplicates`);
+    }
+    const queryCapabilities = raw.queryCapabilities ?? [];
+    if (!Array.isArray(queryCapabilities)
+        || !queryCapabilities.every((entry) => typeof entry === 'string' && entry.length > 0)) {
+        throw new Error(`${path('queryCapabilities')} must be an array of non-empty strings (query/read-only capability identities)`);
+    }
+    if (new Set(queryCapabilities).size !== queryCapabilities.length) {
+        throw new Error(`${path('queryCapabilities')} must not contain duplicates`);
+    }
+    for (const key of ['requiredProjections', 'requiredRevisionSources']) {
+        const value0 = raw[key];
+        if (value0 === undefined)
+            continue;
+        if (!Array.isArray(value0) || !value0.every((entry) => typeof entry === 'string' && entry.length > 0)) {
+            throw new Error(`${path(key)} must be an array of non-empty strings`);
+        }
+        if (new Set(value0).size !== value0.length) {
+            throw new Error(`${path(key)} must not contain duplicates`);
+        }
+    }
+    let cachePolicy;
+    if (raw.cachePolicy !== undefined) {
+        const policyRaw = asRecord(raw.cachePolicy, path('cachePolicy'));
+        if (policyRaw.mode === 'eligible') {
+            assertOnlyKeys(policyRaw, ['mode'], path('cachePolicy'));
+            cachePolicy = { mode: 'eligible' };
+        }
+        else if (policyRaw.mode === 'bypass') {
+            assertOnlyKeys(policyRaw, ['mode', 'reason'], path('cachePolicy'));
+            if (typeof policyRaw.reason !== 'string' || !SEMANTIC_DECISION_CACHE_BYPASS_REASONS.has(policyRaw.reason)) {
+                throw new Error(`${path('cachePolicy')}.reason must be one of the frozen resolver bypass reasons: ${[...SEMANTIC_DECISION_CACHE_BYPASS_REASONS].sort().join(', ')}`);
+            }
+            cachePolicy = { mode: 'bypass', reason: policyRaw.reason };
+        }
+        else {
+            throw new Error(`${path('cachePolicy')}.mode must be 'eligible' or 'bypass'`);
+        }
+    }
+    let promotedReference;
+    if (raw.promotedReference !== undefined) {
+        const promotedRaw = asRecord(raw.promotedReference, path('promotedReference'));
+        if (promotedRaw.kind === 'version') {
+            assertOnlyKeys(promotedRaw, ['kind', 'artifactId', 'version'], path('promotedReference'));
+            promotedReference = {
+                kind: 'version',
+                artifactId: requiredString(promotedRaw, 'artifactId', path('promotedReference')),
+                version: requiredString(promotedRaw, 'version', path('promotedReference')),
+            };
+        }
+        else if (promotedRaw.kind === 'alias') {
+            assertOnlyKeys(promotedRaw, ['kind', 'artifactId', 'alias'], path('promotedReference'));
+            promotedReference = {
+                kind: 'alias',
+                artifactId: requiredString(promotedRaw, 'artifactId', path('promotedReference')),
+                alias: requiredString(promotedRaw, 'alias', path('promotedReference')),
+            };
+        }
+        else {
+            throw new Error(`${path('promotedReference')}.kind must be 'version' or 'alias'`);
+        }
+    }
+    const policyRaw = asRecord(raw.policy, path('policy'));
+    assertOnlyKeys(policyRaw, ['maxSteps'], path('policy'));
+    if (!Number.isInteger(policyRaw.maxSteps) || policyRaw.maxSteps <= 0) {
+        throw new Error(`${path('policy')}.maxSteps must be a positive integer (bounded Harness policy)`);
+    }
+    const unavailableRaw = asRecord(raw.unavailable, path('unavailable'));
+    let unavailable;
+    if (unavailableRaw.kind === 'fail-closed') {
+        assertOnlyKeys(unavailableRaw, ['kind'], path('unavailable'));
+        unavailable = { kind: 'fail-closed' };
+    }
+    else if (unavailableRaw.kind === 'declared-event') {
+        assertOnlyKeys(unavailableRaw, ['kind', 'eventType', 'outcome'], path('unavailable'));
+        const eventType = requiredString(unavailableRaw, 'eventType', path('unavailable'));
+        const outcome = requiredString(unavailableRaw, 'outcome', path('unavailable'));
+        // A3: the declared unavailable fallback must use the declaration's own
+        // finite vocabulary; an undeclared fallback can never be authored.
+        if (!allowedEventTypes.includes(eventType)) {
+            throw new Error(`${path('unavailable')}.eventType '${eventType}' is not in ${label}.allowedEventTypes`);
+        }
+        if (!allowedOutcomes.includes(outcome)) {
+            throw new Error(`${path('unavailable')}.outcome '${outcome}' is not in ${label}.allowedOutcomes`);
+        }
+        unavailable = { kind: 'declared-event', eventType, outcome };
+    }
+    else {
+        throw new Error(`${path('unavailable')}.kind must be 'fail-closed' or 'declared-event'`);
+    }
+    return {
+        decisionId,
+        inputSelection: requiredString(raw, 'inputSelection', label),
+        resultSchemaPath: requiredString(raw, 'resultSchema', label),
+        allowedOutcomes: [...allowedOutcomes],
+        allowedEventTypes: [...allowedEventTypes],
+        queryCapabilities: [...queryCapabilities],
+        ...(raw.requiredProjections === undefined ? {} : { requiredProjections: [...raw.requiredProjections] }),
+        ...(raw.requiredRevisionSources === undefined ? {} : { requiredRevisionSources: [...raw.requiredRevisionSources] }),
+        ...(cachePolicy === undefined ? {} : { cachePolicy }),
+        ...(promotedReference === undefined ? {} : { promotedReference }),
+        policy: { maxSteps: policyRaw.maxSteps },
+        unavailable,
+    };
+}
+async function loadSemanticDecisions(root, schemas, ajv, issues) {
+    const decisions = new Map();
+    let decisionsDir;
+    try {
+        decisionsDir = await safeExistingPath(root, 'decisions');
+    }
+    catch (error) {
+        if (error.code === 'ENOENT')
+            return decisions;
+        throw error;
+    }
+    const entries = (await readdir(decisionsDir, { withFileTypes: true }))
+        .filter((entry) => entry.isFile() && ['.yaml', '.yml'].includes(extname(entry.name)))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+        const sourcePath = await safeExistingPath(decisionsDir, entry.name);
+        try {
+            const declaration = parseSemanticDecision(await readYaml(sourcePath), `decision:${entry.name}`);
+            const existing = decisions.get(declaration.decisionId);
+            if (existing) {
+                issues.push(`decision:${entry.name}: duplicate decisionId '${declaration.decisionId}' (also declared by another decision file)`);
+                continue;
+            }
+            compileExpression(declaration.inputSelection, `decision:${declaration.decisionId}.inputSelection`, issues);
+            const schema = await loadJsonSchema(await safeExistingPath(root, declaration.resultSchemaPath), `decision:${declaration.decisionId}:result:${declaration.resultSchemaPath}`, schemas, ajv, issues);
+            if (!schema)
+                continue;
+            decisions.set(declaration.decisionId, declaration);
+        }
+        catch (error) {
+            issues.push(`decision:${entry.name}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+    return decisions;
+}
 export async function loadRawDomainPackage(options) {
     const root = await realpath(resolve(options.root));
     const issues = [];
@@ -308,6 +504,7 @@ export async function loadRawDomainPackage(options) {
     const schemas = new Map();
     const skills = await loadSkills(root, schemas, ajv, issues);
     const workflows = await loadWorkflows(root, issues);
+    const semanticDecisions = await loadSemanticDecisions(root, schemas, ajv, issues);
     const scripts = new Map();
     const childDependencies = new Map();
     for (const workflow of workflows.values()) {
@@ -378,5 +575,6 @@ export async function loadRawDomainPackage(options) {
         scripts,
         schemas,
         childDependencies,
+        semanticDecisions,
     };
 }
