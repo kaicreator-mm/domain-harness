@@ -108,12 +108,17 @@ test('CHM-C00: bind/attest — same assembly, same compiled corpus, same fixture
 
   assert.equal(evidence.comparator.assemblyHead, '770a132576312e553fd50ad301a1e27fd189b4bf');
   assert.equal(evidence.comparator.assemblyTree, 'bef145a632198f550e6d04fe5187946d2cb5b593');
-  // Live-main tripwire: when the ref is readable it MUST equal the attested
-  // assembly (no stale-pass transfer). Provider-managed shallow CI clones
-  // (Woodpecker depth-1) carry no origin/main ref — a missing ref is an
-  // environment fact routed to the typed NOT_COMPARABLE_HEAD_OR_CORPUS
-  // classification (fail-closed record, never a silent pass and never a
-  // thrown suite failure); local/full-clone runs still hard-assert it.
+  // Live-main tripwire — EVIDENCE CURRENTNESS, not literal head equality.
+  // The host-wave evidence binds the attested assembly; main legitimately
+  // advances with test-harness-only deltas. When origin/main is readable the
+  // tripwire requires (a) the attested assembly is an ancestor of live main
+  // (no history rewrite) AND (b) the product surface the evidence covers is
+  // byte-identical since the attested assembly (no packages/ delta) — any
+  // product change after the evidence HARD-FAILS here and demands re-capture
+  // (no stale-pass transfer). A missing ref (provider-managed shallow CI
+  // clones, Woodpecker depth-1) is an environment fact routed to the typed
+  // NOT_COMPARABLE_HEAD_OR_CORPUS classification (fail-closed record, never
+  // a silent pass and never a thrown suite failure).
   let liveMain: string | null = null;
   try {
     liveMain = execFileSync('git', ['rev-parse', '--verify', 'origin/main'], { encoding: 'utf8' }).trim();
@@ -121,7 +126,29 @@ test('CHM-C00: bind/attest — same assembly, same compiled corpus, same fixture
     console.error('CHM-C00 live-main tripwire NOT_COMPARABLE_HEAD_OR_CORPUS: origin/main not readable (shallow CI clone); the local bind/attest run asserts it.');
   }
   if (liveMain !== null) {
-    assert.equal(liveMain, evidence.comparator.assemblyHead, 'the attested assembly is still live main');
+    if (liveMain !== evidence.comparator.assemblyHead) {
+      execFileSync('git', ['merge-base', '--is-ancestor', evidence.comparator.assemblyHead, liveMain], { stdio: 'ignore' });
+      const productSurface = [
+        'packages/domain-harness/src',
+        'packages/domain-harness/dist',
+        'packages/domain-harness/package.json',
+        'packages/domain-harness-compiler/src',
+        'packages/domain-harness-compiler/dist',
+        'packages/domain-harness-compiler/package.json',
+        'packages/domain-harness-node/src',
+        'packages/domain-harness-node/dist',
+        'packages/domain-harness-node/package.json',
+        'packages/domain-harness-expo/src',
+        'packages/domain-harness-expo/package.json',
+      ];
+      const productDelta = execFileSync(
+        'git',
+        ['diff', '--stat', `${evidence.comparator.assemblyHead}..${liveMain}`, '--', ...productSurface],
+        { encoding: 'utf8' },
+      ).trim();
+      assert.equal(productDelta, '', 'product surface must be byte-identical since the attested assembly for the committed evidence to stay current (packages/ product delta demands evidence re-capture)');
+      console.error(`CHM-C00 evidence-currentness OK: attested assembly ${evidence.comparator.assemblyHead.slice(0, 10)} is an ancestor of live main ${liveMain.slice(0, 10)} with an empty product-surface delta (test-harness-only movement).`);
+    }
   }
 
   // The Node-side public-compiler output must be the SAME compiled artifact
