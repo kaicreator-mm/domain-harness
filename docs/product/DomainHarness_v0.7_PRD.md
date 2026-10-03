@@ -70,6 +70,21 @@ Domain Component
 
 The exact Kind/Profile/Facet taxonomy inside those families remains extensible and is not fully frozen by this PRD.
 
+### 3.1 Fail-closed behavior for required semantics
+
+An extensible taxonomy MUST NOT permit an older/current Runtime to silently ignore behaviorally material semantics that it does not understand.
+
+Before affected execution or effect authority is admitted:
+
+- every Component semantic contract, Kind/Profile/Facet semantics, version and other behaviorally required extension used by that execution MUST be understood and compatible with the executing DomainHarness;
+- every behaviorally required capability contract MUST be satisfiable under the admitted composition;
+- unknown, unsupported or materially incompatible **required behavior semantics** MUST fail closed;
+- required behavior semantics MUST NOT be silently dropped, downgraded, substituted, treated as advisory metadata, or preserved opaquely while execution continues as if the semantics were absent.
+
+Unknown extension material MAY be preserved or forwarded without being understood only when it is explicitly non-behavioral/non-material for the affected execution and cannot influence domain meaning, legality, authority, transition selection, Tool admission, effect semantics, durability or recovery.
+
+The concrete declaration format, compatibility negotiation, version-resolution algorithm, error taxonomy and opaque-extension representation are L2/implementation decisions. This section freezes only the user-visible Product safety property.
+
 ## 4. Semantic Component
 
 A Semantic Component defines domain meaning, constraints or behavior.
@@ -156,6 +171,8 @@ unless executable reference implementation proves that the simpler `requires/pro
 
 Capability identity and concrete implementation identity MUST remain distinguishable.
 
+A required capability that is missing, unknown, materially incompatible or ambiguously resolved MUST obey §3.1 and fail closed unless the admitted Definition itself supplies deterministic compatible selection semantics.
+
 ## 7. Component relations and composition
 
 A Domain Definition MUST support explicit relations sufficient to compose a complete Domain App definition, including at minimum:
@@ -165,6 +182,8 @@ A Domain Definition MUST support explicit relations sufficient to compose a comp
 - tool-to-tool requirements where needed;
 - capability `requires/provides` resolution;
 - identity/version/revision relations needed for deterministic admission and replay.
+
+Composition/admission MUST apply the fail-closed required-semantics rule in §3.1 before an affected execution can produce authoritative effects.
 
 The exact serialized representation and graph format are L2/implementation decisions.
 
@@ -198,7 +217,7 @@ The Microkernel owns only irreducible cross-component/runtime constitutional sem
 - component/package identity and integrity;
 - definition/component admission;
 - component dispatch/resolution;
-- dependency/compatibility resolution;
+- dependency/compatibility resolution, including §3.1 fail-closed required semantics;
 - runtime occurrence identity;
 - authoritative transition/admission boundary;
 - durable effect/outcome authority;
@@ -301,7 +320,19 @@ v0.7 itself does not authorize implementation migrations in those repositories u
 
 Product freeze of this PRD does not by itself freeze the final public SDK/SPI contract.
 
-Before final L2/SDK contract closure, v0.7 MUST validate the model with executable reference implementation evidence covering at least:
+Before final L2/SDK contract closure, v0.7 MUST validate the model with executable reference implementation evidence covering at least R1–R5 below.
+
+Each reference experiment MUST record:
+
+```text
+HYPOTHESIS=<what is being tested>
+SUCCESS=<observable success condition>
+NEGATIVE_OR_REJECTION=<at least one relevant fail-closed condition>
+RESULT=SUPPORTED|REFUTED|PARTIAL
+LIMITS=<what the experiment does not prove>
+```
+
+A positive-only demo is not sufficient evidence for final SDK/L2 contract closure where a materially relevant rejection, authority, effect or recovery boundary can be exercised.
 
 ### R1 — Neutral executable Domain App
 
@@ -315,21 +346,46 @@ Semantic Components
 
 and executed through the authoritative DomainHarness Runtime.
 
+The minimum journey MUST include a small UX intent/request entering through the admitted Domain App surface and reaching an authoritative Runtime outcome without giving UX transition/effect authority. It MUST also include at least one invalid or unauthorized UX request that is rejected before unauthorized state/effect authority is exercised.
+
+This experiment does not by itself prove the complete future UX contract or renderer taxonomy.
+
 ### R2 — Tool substitution
 
-Prove that a Tool can be replaced by a deterministic/fake implementation for simulation without rewriting the semantic graph.
+Prove that an **effectful** Tool can be replaced by a deterministic/fake implementation for simulation without rewriting the semantic graph.
+
+Evidence MUST show that:
+
+- the fake implementation satisfies the intended Tool/capability contract;
+- the real external effect does not occur in the simulation path;
+- an incompatible replacement is rejected rather than silently accepted;
+- authoritative Runtime/effect semantics remain intact.
+
+This experiment does not by itself decide whether substitution is encoded as Definition composition, simulation overlay, runtime assembly or another L2 mechanism.
 
 ### R3 — Agent Tool projection
 
 Prove that an Agent-visible Tool surface can be derived as a controlled exposure of a general Tool Component rather than requiring a second Agent-Tool ontology.
 
+Evidence MUST include an attempted invocation outside the Agent's admitted Tool exposure/operation/authority scope and show that it is rejected without widening Tool or Runtime authority.
+
+This experiment does not by itself define an Agent framework or Agent runtime occurrence model.
+
 ### R4 — Existing Workflow path
 
 Prove that at least one current Workflow path can execute behind generic Component dispatch while preserving one Runtime, admission/effect authority and recovery semantics.
 
+Evidence MUST exercise at least one failure/recovery or replay path and demonstrate that an already committed durable effect is not duplicated and that recovery continues to use the authoritative Runtime semantics rather than a second execution engine.
+
+This experiment does not require replacing the current Workflow engine merely to satisfy the Component abstraction.
+
 ### R5 — SDK self-bootstrap slice
 
 Move or represent at least one currently hard-coded standard semantic/tool concern through the same Component abstraction and demonstrate that doing so does not require domain-specific expansion of the Microkernel.
+
+The candidate concern MUST actually execute through the same public Component mechanism available to application Domain Definitions. Merely adding Component metadata around an unchanged private special-case path is not sufficient.
+
+Evidence MUST include a relevant unsupported/invalid registration or admission case that fails closed, and MUST state which Microkernel responsibilities remain irreducible after the slice.
 
 Any reference implementation finding that materially invalidates the Product assumptions above requires Product/L2 repair before final SDK contract freeze.
 
@@ -343,7 +399,8 @@ Requirements:
 - legacy authoring/package inputs may be adapted into the new Component model;
 - immutable historical package/runtime semantics must not be retroactively reinterpreted;
 - current consumers must have an explicit compatibility path rather than an undocumented flag day;
-- public ecosystem consumers must not be forced to depend on compiler-private `Raw*` types for the new model.
+- public ecosystem consumers must not be forced to depend on compiler-private `Raw*` types for the new model;
+- compatibility adapters MUST NOT silently reinterpret unknown/new required behavior semantics as optional legacy data in violation of §3.1.
 
 ## 17. Product invariants to freeze
 
@@ -365,6 +422,7 @@ I12 DomainHarness self-bootstrap means Standard Components use the same public C
 I13 DAC remains minimal cross-project coordination, not DomainHarness internal ontology owner
 I14 Freeze ontology, not final taxonomy/SPI/serialization
 I15 Reference implementation feedback is required before final SDK/L2 contract closure
+I16 Unknown/unsupported/incompatible required behavior semantics or required capability contracts fail closed before affected execution/effect authority; non-material opaque extensions cannot carry hidden required behavior
 ```
 
 ## 18. Explicit non-goals
@@ -390,7 +448,7 @@ v0.7 Product work is successful when:
 1. the above Product invariants pass fresh independent Product Review;
 2. Product Freeze records the ontology and boundaries without freezing unsupported taxonomy/implementation detail;
 3. L2 can derive a minimal microkernel and Component/Tool execution architecture from the PRD;
-4. the reference implementation questions are represented in the Task DAG and can falsify the design;
+4. the reference implementation questions are represented in the Task DAG with the §15 observable success, negative/rejection and limit requirements so they can falsify the design rather than merely demonstrate a happy path;
 5. current Runtime authority/durability/recovery semantics are preserved or any deliberate change is explicitly justified and reviewed;
 6. the resulting SDK model is sufficient for subsequent Forge/Simulator/UX/Creator adoption planning under DAC boundaries.
 
@@ -403,5 +461,5 @@ FRESH_PRODUCT_REVIEW=REQUIRED
 L2=BLOCKED
 TASK_DAG=BLOCKED
 IMPLEMENTATION=BLOCKED
-NEXT=FRESH_INDEPENDENT_PRODUCT_REVIEW
+NEXT=SUCCESSOR_FRESH_INDEPENDENT_PRODUCT_REVIEW
 ```
