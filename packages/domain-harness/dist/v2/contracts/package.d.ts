@@ -2,6 +2,7 @@ import type { JsonObject, JsonSchema, JsonValue } from '../../contracts/json.js'
 import type { CapabilityId } from './capability.js';
 import type { CompiledBusinessSourceDescriptor, CompiledDomainDataDescriptor, PackageDataBounds } from './package-data.js';
 import type { DomainHarnessJsonSchemaContractVersion } from '../../schema/domainharness-json-schema-v1.js';
+import type { CompiledSemanticDecisionDescriptor, SemanticDecisionContractVersion } from './semantic-decision.js';
 export type ToolEffectSemantics = 'none' | 'idempotent' | 'non-idempotent';
 export interface CompiledMessageContract {
     type: string;
@@ -69,6 +70,17 @@ export interface CompiledPackageManifest {
     readonly packageDataBounds?: PackageDataBounds;
     readonly domainData?: readonly CompiledDomainDataDescriptor[];
     readonly businessSources?: readonly CompiledBusinessSourceDescriptor[];
+    /**
+     * v0.6 T001 compiled first-class Semantic Decision Declarations (frozen L2
+     * A2/A7, issue #497). Successor-only material like the fields above: absent
+     * on every retained ('0.2',2,2) manifest. Presence requires the
+     * `SEMANTIC_DECISION_CAPABILITY` capability and the exact
+     * `SEMANTIC_DECISION_CONTRACT_VERSION_V1` declaration contract version; a
+     * host/target without the capability fails closed through the existing
+     * capability machinery instead of ignoring the declarations.
+     */
+    readonly semanticDecisionContractVersion?: SemanticDecisionContractVersion;
+    readonly semanticDecisions?: readonly CompiledSemanticDecisionDescriptor[];
 }
 /**
  * Invoke kinds executable by the portable engine at `executionEngineMajor` 2.

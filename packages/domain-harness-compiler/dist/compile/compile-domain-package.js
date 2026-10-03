@@ -1,11 +1,12 @@
 import jsonata from 'jsonata';
-import { DOMAIN_HARNESS_JSON_SCHEMA_V1, SUPPORTED_COMPILED_INVOKE_KINDS_V2, } from '@kaicreator/domain-harness/v2';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1, SEMANTIC_DECISION_CONTRACT_VERSION_V1, SUPPORTED_COMPILED_INVOKE_KINDS_V2, } from '@kaicreator/domain-harness/v2';
 import { canonicalJson } from '../package/canonical.js';
 import { assertCompiledPackageManifest, buildBindingDigests, buildCompiledPackageManifest, InvalidToolConfigError, toolConfigIssues, } from '../package/manifest.js';
 import { PUBLIC_COMPILER_OUTPUT_PROFILE } from '../package/profile.js';
 import { buildCompiledDomainDataSection } from '../package/domain-data.js';
 import { buildCompiledBusinessSourceSection, } from '../package/business-sources.js';
 import { assertTargetCapabilities, collectRequiredCapabilities } from './capabilities.js';
+import { compileSemanticDecisions } from './semantic-decisions.js';
 /**
  * Executable-artifact invariant (#167): a successful public v0.2 compilation
  * emits only workflow IR executable by executionEngineMajor 2. Legacy script
@@ -254,6 +255,15 @@ export function compileDomainPackage(input) {
     }
     const domainDataSection = buildCompiledDomainDataSection(input.domainData ?? [], input.target.packageDataBounds, projections);
     const businessSourceSection = buildCompiledBusinessSourceSection(input.businessSources ?? [], input.target.packageDataBounds, projections);
+    // v0.6 T001 (issue #497, frozen L2 A2/A7): first-class compiled semantic
+    // decision declarations. Absent when the raw package declares none, so
+    // existing deterministic packages compile unchanged (A7 rule 1/2).
+    const semanticDecisions = compileSemanticDecisions({
+        raw: input.raw,
+        tools,
+        projections,
+        businessSources: input.businessSources ?? [],
+    });
     const manifest = buildCompiledPackageManifest({
         formatVersion: PUBLIC_COMPILER_OUTPUT_PROFILE.formatVersion,
         runtimeContractMajor: PUBLIC_COMPILER_OUTPUT_PROFILE.runtimeContractMajor,
@@ -271,6 +281,10 @@ export function compileDomainPackage(input) {
         packageDataBounds: domainDataSection.packageDataBounds,
         domainData: domainDataSection.descriptors,
         businessSources: businessSourceSection.descriptors,
+        ...(semanticDecisions.length > 0 ? {
+            semanticDecisionContractVersion: SEMANTIC_DECISION_CONTRACT_VERSION_V1,
+            semanticDecisions,
+        } : {}),
         compatibility: {
             sourceSchemaVersion: input.raw.schemaVersion,
             legacyChildDependencies: Object.fromEntries([...input.raw.childDependencies.entries()]

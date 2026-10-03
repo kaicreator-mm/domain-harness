@@ -9,6 +9,7 @@ export * from './package-data.js';
 export * from './projection.js';
 export * from './query.js';
 export * from './runtime.js';
+export * from './semantic-decision.js';
 export * from './store.js';
 export * from './subscription.js';
 export * from './workflow.js';
