@@ -238,13 +238,15 @@ export function createDomainRuntime(options: CreateDomainRuntimeOptions): Promis
 /** Internal v3 assembly entrypoint; intentionally not re-exported by runtime/index.ts. */
 export function createDomainRuntimeWithProcessCommandOutcomes(
   options: CreateDomainRuntimeOptions,
+  out?: { validatedPackages?: PackageRegistry },
 ): Promise<DomainRuntime> {
-  return createDomainRuntimeInternal(options, 'v3-process-command');
+  return createDomainRuntimeInternal(options, 'v3-process-command', out);
 }
 
 async function createDomainRuntimeInternal(
   options: CreateDomainRuntimeOptions,
   processingMode: RuntimeProcessingMode,
+  out?: { validatedPackages?: PackageRegistry },
 ): Promise<DomainRuntime> {
   const processCommandStore: V3ProcessCommandStore | null =
     processingMode === 'v3-process-command' ? requireV3ProcessCommandStore(options.store) : null;
@@ -370,6 +372,9 @@ async function createDomainRuntimeInternal(
     activation.validatedPackages,
     options.packageRegistry.defaultPackageId,
   );
+  // v0.6 T004: let the v3 assembly reuse this exact admission-validated view
+  // for post-activation declaration reads (never the caller's registry).
+  if (out !== undefined) out.validatedPackages = runtimeRegistry;
 
   const lane = new PerInstanceSerializedLane();
   const instanceEngine = new WorkflowInstanceEngine(effectiveStore, { now, lane });

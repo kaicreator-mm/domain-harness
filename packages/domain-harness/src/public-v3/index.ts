@@ -93,6 +93,18 @@ export {
 export { admissionEffectToolPort } from '../runtime/admission-effect-tool-adapter.js';
 export type { AdmissionEffectToolAdapterOptions } from '../runtime/admission-effect-tool-adapter.js';
 
+// v0.6 T004 (issue #523): bounded Runtime DecisionResolver → Central Admission
+// integration. Types only — the binding adapter is internal; the public seam
+// is the `resolveAndAdmitTurn` method on the existing v3 runtime assembly.
+export type {
+  ResolveAndAdmitTurnRequest,
+  RuntimeDecisionResolverPorts,
+  RuntimeHarnessDecisionTurnMaterial,
+  RuntimePromotedDecisionTurnMaterial,
+  SemanticDecisionRuntimeAuthority,
+  SemanticDecisionRuntimeBinding,
+} from '../runtime/decision-resolver-binding.js';
+
 // Issue #305 / A2 I-002: DAC cross-layer reference adapter core — the
 // dependency-light public boundary for DAC-owned semantic lifecycle roles
 // (promotion decision / application selection / selected Domain Data /

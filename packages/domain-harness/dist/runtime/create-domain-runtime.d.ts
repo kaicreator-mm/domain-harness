@@ -73,5 +73,7 @@ export interface RuntimeObservationEnableOptions {
  */
 export declare function createDomainRuntime(options: CreateDomainRuntimeOptions): Promise<DomainRuntime>;
 /** Internal v3 assembly entrypoint; intentionally not re-exported by runtime/index.ts. */
-export declare function createDomainRuntimeWithProcessCommandOutcomes(options: CreateDomainRuntimeOptions): Promise<DomainRuntime>;
+export declare function createDomainRuntimeWithProcessCommandOutcomes(options: CreateDomainRuntimeOptions, out?: {
+    validatedPackages?: PackageRegistry;
+}): Promise<DomainRuntime>;
 //# sourceMappingURL=create-domain-runtime.d.ts.map
