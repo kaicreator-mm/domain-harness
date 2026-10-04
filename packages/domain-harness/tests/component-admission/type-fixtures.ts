@@ -111,25 +111,24 @@ export const declarationFixture: UnderstoodKindDeclaration = {
   materialSemanticBodyFields: ['threshold', 'policy'],
 };
 
-// @ts-expect-error material field names must be strings
 export const nonStringMaterialField: UnderstoodKindDeclaration = {
   ...declarationFixture,
-  materialSemanticBodyFields: [42],
+  materialSemanticBodyFields:
+    // @ts-expect-error material field names must be strings
+    [42],
 };
 
 // @ts-expect-error the result status is a literal, not a free string
 export const freeStringStatus: ComponentAdmissionResult['status'] = 'MAYBE';
 
-// @ts-expect-error capability material is not must-understand and can never be
-// represented on the admission result
-export const capabilitySmuggling: ComponentAdmissionResult & {
-  requiredCapabilities: ComponentEnvelope['requiredCapabilities'];
-} = {
+export const capabilitySmuggling: ComponentAdmissionResult = {
   status: 'ADMITTED',
   componentId: 'quote.eligibility.rule',
   admittedKind: { kindId: 'decision.rule.v1', version: '1.2.0' },
   admittedSemanticContracts: [],
   admittedMaterialFields: [],
+  // @ts-expect-error capability material is not must-understand and can never
+  // be represented on the admission result
   requiredCapabilities: [],
 };
 
