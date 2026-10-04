@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../../../packages/domain-harness-expo",
+    "outDir": "generated",
+    "declaration": true
+  },
+  "include": [
+    "../../../packages/domain-harness-expo/src/store/**/*.ts"
+  ]
+}

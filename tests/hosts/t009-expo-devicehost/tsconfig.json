@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": [
+    "App.tsx",
+    "index.ts",
+    "t009-device-validation.ts",
+    "t009-fixtures.ts",
+    "fixture-constants.ts",
+    "generated/**/*.d.ts"
+  ]
+}
