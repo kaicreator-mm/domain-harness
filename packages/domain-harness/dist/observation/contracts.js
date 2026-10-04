@@ -35,6 +35,14 @@ export const RUNTIME_OBSERVATION_EVENT_FAMILIES = [
     'TURN_RECOVERY_REQUIRED',
     'RECOVERY_COMMITTED',
     'INSTANCE_TERMINALIZED',
+    /**
+     * v0.6 T006 (issue #550, frozen L2 C4/A4): additive decision-receipt family.
+     * Envelope, cursor/gap read semantics, stream binding and epoch rules are
+     * reused verbatim from contract v1; the record carries the bounded public
+     * Decision Resolution Receipt in its `decisionReceipt` envelope field and
+     * confers no authority. See src/observation/decision-receipt.ts.
+     */
+    'DECISION_RECEIPT',
 ];
 export class RuntimeObservationError extends Error {
     code;

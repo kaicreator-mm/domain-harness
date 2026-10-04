@@ -10,6 +10,7 @@ import {
   deriveDurableControlTurnId,
 } from '../admission/index.js';
 import type { CompiledArtifactIdentity } from '../contracts/domain-data.js';
+import type { DomainIntelligencePackageIdentity } from '../contracts/domain-data.js';
 import type { JsonValue } from '../contracts/json.js';
 import type { RuntimeStoreProcessCommandExtension } from '../contracts/process-command.js';
 import type {
@@ -24,8 +25,17 @@ import {
   type ExactPackageCdiAuthority,
   type GovernanceBaselineStore,
 } from '../governance/index.js';
+import { runtimePackageIdentityFromManifest } from '../observation/contracts.js';
+import {
+  deriveDecisionResolutionReceipt,
+  isDecisionReceiptObservationStore,
+  type DecisionReceiptObservationStore,
+  type DecisionResolutionReceipt,
+  type DecisionResolutionTerminal,
+} from '../observation/decision-receipt.js';
 import { resolvePinnedPackage } from '../package/registry.js';
 import type { PackageRegistry } from '../v2/contracts/package.js';
+import type { WorkflowAddress } from '../v2/contracts/workflow.js';
 import {
   RuntimeEvidenceCapture,
   type RuntimeEvidenceCaptureContext,
@@ -36,6 +46,7 @@ import {
   bindSemanticDecisionTurn,
   declaredSemanticUnavailableOutcome,
   type ResolveAndAdmitTurnRequest,
+  type SemanticDecisionRuntimeBinding,
 } from './decision-resolver-binding.js';
 import {
   createDomainRuntimeWithProcessCommandOutcomes,
@@ -78,6 +89,16 @@ export interface CreateDomainRuntimeV3Options extends CreateDomainRuntimeOptions
   readonly v3: CreateDomainRuntimeV3AuthorityOptions;
 }
 
+/**
+ * v0.6 T006 (issue #550): the existing `CentralAdmissionOutcome` of one
+ * `resolveAndAdmitTurn` call, gaining ONLY the additive stable public
+ * Decision Resolution Receipt. Structurally assignable to
+ * `CentralAdmissionOutcome` — every existing consumer keeps working.
+ */
+export type ResolvedTurnAdmissionOutcome = CentralAdmissionOutcome & {
+  readonly receipt: DecisionResolutionReceipt;
+};
+
 export interface DomainRuntimeV3 {
   /** The ONE existing portable Runtime with v3-only T-009 processing enabled. */
   readonly runtime: DomainRuntime;
@@ -113,8 +134,16 @@ export interface DomainRuntimeV3 {
    * `declared-event` carries the declared outcome/eventType as data into this
    * SAME admission path. No fabricated answer, no undeclared fallback, no
    * provider/model routing.
+   *
+   * v0.6 T006: the return additionally carries the stable public Decision
+   * Resolution Receipt (additive field), derived only from existing
+   * contract-level facts. When Runtime Observation is enabled against a
+   * receipt-capable store, the same receipt is durably projected through the
+   * EXISTING observation stream (one additive `DECISION_RECEIPT` record);
+   * recording failure never alters the turn outcome — it surfaces through the
+   * existing secondary-channel observer semantics (`v3.onEvidenceError`).
    */
-  resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<CentralAdmissionOutcome>;
+  resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<ResolvedTurnAdmissionOutcome>;
   /** T-020 capture bound to a caller-supplied exact authority context (shadow/rollback/metric points). */
   evidenceCapture(context: RuntimeEvidenceCaptureContext): RuntimeEvidenceCapture;
 }
@@ -180,6 +209,43 @@ export async function createDomainRuntimeV3(
     }
   };
 
+  // v0.6 T006 (issue #550): receipt projection rides the EXISTING observation
+  // mechanics only. It exists when Runtime Observation is enabled AND the same
+  // store implements the additive decision-receipt append seam; anything else
+  // keeps the pre-T006 runtime surface (the receipt still rides the return).
+  const receiptStore: DecisionReceiptObservationStore | null =
+    options.observation?.mode === 'enabled' && isDecisionReceiptObservationStore(options.store)
+      ? options.store
+      : null;
+  const receiptObservedAt = (): string => (options.now === undefined ? new Date().toISOString() : options.now());
+
+  async function projectDecisionReceipt(
+    receipt: DecisionResolutionReceipt,
+    packageIdentity: DomainIntelligencePackageIdentity,
+    target: WorkflowAddress,
+  ): Promise<void> {
+    if (receiptStore === null) return;
+    try {
+      await receiptStore.recordDecisionReceipt({
+        target,
+        packageIdentity,
+        receipt,
+        observedAt: receiptObservedAt(),
+        ...(options.observation?.runtimeBindingRef === undefined
+          ? {}
+          : { runtimeBindingRef: options.observation.runtimeBindingRef }),
+        ...(options.observation?.runtimeActivationRef === undefined
+          ? {}
+          : { runtimeActivationRef: options.observation.runtimeActivationRef }),
+      });
+    } catch (error) {
+      // Receipt/observation failure can never strengthen or rewrite business
+      // truth (frozen L2 §7): the admission outcome stands and the failure
+      // surfaces through the EXISTING secondary-channel observer semantics.
+      swallowEvidenceError(error);
+    }
+  }
+
   async function admitTurn(request: CentralAdmissionRequest): Promise<CentralAdmissionOutcome> {
     const pin = await governance.requirePinnedExecution(request.workflowInstanceId);
     const capture = evidenceCapture({
@@ -241,8 +307,18 @@ export async function createDomainRuntimeV3(
    * declared outcome/eventType as data into the SAME Central Admission path —
    * guards/hard invariants/schema still apply and a denial is final. The
    * disposition is read only from the compiled declaration.
+   *
+   * v0.6 T006 (frozen L2 C4): every terminal of this seam additionally yields
+   * the stable public Decision Resolution Receipt — admitted/denied returns
+   * carry it as an additive return field; the semantic-unavailable terminal
+   * and a thrown resolver failure project their bounded-category receipt
+   * through the observation stream before the existing typed error surfaces.
+   * Receipts derive ONLY from existing contract facts. A binding that cannot
+   * be resolved fails closed BEFORE any declaration identity exists, so no
+   * receipt is projected for `RUNTIME_V3_DECISION_BINDING_UNRESOLVED`
+   * (documented receipt absence; the typed error is the surface).
    */
-  async function resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<CentralAdmissionOutcome> {
+  async function resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<ResolvedTurnAdmissionOutcome> {
     const pin = await governance.requirePinnedExecution(request.workflowInstanceId);
     const compiledPackage = resolvePinnedPackage(validatedPackages, pin.packageId);
     const decisions = compiledPackage.manifest.semanticDecisions;
@@ -255,12 +331,43 @@ export async function createDomainRuntimeV3(
           : `no compiled semantic-decision declaration "${request.decisionId}" exists in pinned package ${pin.packageId}; fail closed`,
       );
     }
-    const binding = await bindSemanticDecisionTurn(request, {
-      declaration,
-      governancePin: pin,
-      namespace: v3.tenantScope ?? pin.domainId,
-      expression: options.bindings.expression,
-    });
+    // T006 receipt identity: the SAME deterministic durable control-turn
+    // identity Central Admission and the effect journal derive for this turn,
+    // plus the exact compiled declaration content identity.
+    const receiptIdentity = {
+      decisionId: declaration.decisionId,
+      declarationDigest: declaration.declarationDigest,
+      durableControlTurnId: deriveDurableControlTurnId(request.target, request.turn),
+      target: request.target,
+      workflowInstanceId: request.workflowInstanceId,
+    };
+    const receiptPackageIdentity: DomainIntelligencePackageIdentity | undefined = receiptStore === null
+      ? undefined
+      : options.observation?.resolvePackageIdentity !== undefined
+        ? options.observation.resolvePackageIdentity(pin.packageId)
+        : runtimePackageIdentityFromManifest(compiledPackage.manifest);
+    const receiptFromTerminal = async (terminal: DecisionResolutionTerminal): Promise<DecisionResolutionReceipt> => {
+      const receipt = deriveDecisionResolutionReceipt(receiptIdentity, terminal);
+      if (receiptPackageIdentity !== undefined) {
+        await projectDecisionReceipt(receipt, receiptPackageIdentity, request.target);
+      }
+      return receipt;
+    };
+    let binding: SemanticDecisionRuntimeBinding<JsonValue>;
+    try {
+      binding = await bindSemanticDecisionTurn(request, {
+        declaration,
+        governancePin: pin,
+        namespace: v3.tenantScope ?? pin.domainId,
+        expression: options.bindings.expression,
+      });
+    } catch (error) {
+      // Post-declaration binding failure: the declaration identity exists, so
+      // the bounded decision-binding-incompatible failure class is projected
+      // (never a fabricated success) before the original error surfaces raw.
+      await receiptFromTerminal({ kind: 'resolver-failed', error });
+      throw error;
+    }
     // The resolver is proposal authority only: its output is data until
     // Central Admission accepts it. Any resolver failure (schema, harness,
     // currentness) throws and reaches admission never; a denial AFTER a
@@ -274,11 +381,18 @@ export async function createDomainRuntimeV3(
       // compiled declaration alone owns the disposition; anything else than
       // the declared behavior surfaces the original failure unchanged.
       const declared = declaredSemanticUnavailableOutcome<JsonValue>(declaration, error);
-      if (declared.kind === 'not-applicable') throw error;
+      if (declared.kind === 'not-applicable') {
+        // T006: bounded resolver-failure receipt (existing error class), then
+        // the original failure surfaces exactly as T004 left it.
+        await receiptFromTerminal({ kind: 'resolver-failed', error });
+        throw error;
+      }
       if (declared.kind === 'fail-closed') {
-        // Observable through the EXISTING failure-evidence channel (secondary;
-        // it never rewrites truth), then the typed unavailable terminal: no
-        // effect, no journal record, no fabricated answer.
+        // T006: the bounded semantic-unavailable receipt is projected through
+        // the EXISTING observation stream first, then the pre-existing
+        // failure-evidence capture and the typed unavailable terminal follow
+        // unchanged: no effect, no journal record, no fabricated answer.
+        await receiptFromTerminal({ kind: 'semantic-unavailable' });
         const capture = evidenceCapture({
           domainId: pin.domainId,
           packageId: pin.packageId,
@@ -300,7 +414,7 @@ export async function createDomainRuntimeV3(
       }
       resolved = declared.resolution;
     }
-    return admitTurn({
+    const outcome = await admitTurn({
       target: request.target,
       turn: request.turn,
       trigger: request.trigger,
@@ -313,6 +427,16 @@ export async function createDomainRuntimeV3(
       decisionSchema: binding.decisionSchema,
       now: request.now,
     });
+    // T006: the additive public receipt rides the existing return; its
+    // observation-stream projection (when enabled) never alters the outcome.
+    const receipt = await receiptFromTerminal({
+      kind: 'admission-outcome',
+      outcome,
+      ...(resolved.selectedArtifactIdentity === undefined
+        ? {}
+        : { selectedArtifact: resolved.selectedArtifactIdentity }),
+    });
+    return { ...outcome, receipt };
   }
 
   return { runtime, activation, governance, admitTurn, resolveAndAdmitTurn, evidenceCapture };
