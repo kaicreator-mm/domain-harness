@@ -116,7 +116,7 @@ export type AdmissionStatusIsAdmitted = Expect<
   Equal<ComponentAdmissionResult['status'], 'ADMITTED'>
 >;
 export type FailureClassesAreFrozen = Expect<
-  Equal<ComponentAdmissionFailureClass, 'KIND' | 'CONTRACT' | 'FIELD' | 'INPUT'>
+  Equal<ComponentAdmissionFailureClass, 'KIND' | 'CONTRACT' | 'CAPABILITY' | 'INPUT'>
 >;
 
 // TF8: tool operation material.
@@ -133,14 +133,19 @@ export type ToolDeclarationShape = Expect<
   Equal<keyof ToolOperationsDeclaration, 'operations' | 'providesCapabilities'>
 >;
 
-// TF9: the understood-Kind set is a readonly declaration array.
+// TF9: the understood-Kind set is a readonly declaration array; each
+// declaration carries the exact Kind, its understood contract refs, and the
+// mandatory closed-world Kind validator (#556).
 export type UnderstoodKindSetIsReadonlyArray = Expect<
   Equal<UnderstoodKindSet, readonly UnderstoodKindDeclaration[]>
 >;
 export type UnderstoodDeclarationShape = Expect<
   Equal<
     keyof UnderstoodKindDeclaration,
-    'kind' | 'understoodSemanticContracts' | 'materialSemanticBodyFields'
+    | 'kind'
+    | 'understoodSemanticContracts'
+    | 'understoodCapabilities'
+    | 'validateComponent'
   >
 >;
 
