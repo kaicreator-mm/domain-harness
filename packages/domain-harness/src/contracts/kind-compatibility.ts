@@ -5,8 +5,8 @@
  * A pure, deterministic, fail-closed decision function deciding whether one
  * required exact `KindRef` (kindId + exact version, the same type owned by
  * `src/contracts/component.ts`) is supported by a caller-supplied supported
- * set of exact KindRefs, with an explicit typed mismatch taxonomy when it is
- * not. The frozen L2 (v0.7 freeze + R2) sanctions exact/versioned Kind
+ * set of exact KindRefs, with an explicit, typed mismatch taxonomy when it
+ * is not. The frozen L2 (v0.7 freeze + R2) sanctions exact/versioned Kind
  * identity only: "Must-understand validation occurs at Definition admission
  * for the exact KindRef/version". There is deliberately no bounded
  * compatibility-range concept here — no range parsing, no semver evaluation;
@@ -80,8 +80,9 @@ export class KindCompatibilityError extends Error {
 }
 
 /**
- * The deterministic SUPPORTED decision: the exact matched KindRef as fresh
- * evidence. Nothing implementation-identity-shaped is representable here.
+ * The deterministic SUPPORTED decision: the exact matched KindRef as fresh,
+ * runtime-immutable evidence. Nothing implementation-identity-shaped is
+ * representable here.
  */
 export interface KindCompatibilityResult {
   readonly status: 'SUPPORTED';
@@ -265,8 +266,12 @@ export function decideKindCompatibility(
     );
   }
 
-  return {
-    status: 'SUPPORTED',
-    supportedKind: { kindId: matched.kindId, version: matched.version },
-  };
+  const supportedKind = Object.freeze({
+    kindId: matched.kindId,
+    version: matched.version,
+  });
+  return Object.freeze({
+    status: 'SUPPORTED' as const,
+    supportedKind,
+  });
 }
