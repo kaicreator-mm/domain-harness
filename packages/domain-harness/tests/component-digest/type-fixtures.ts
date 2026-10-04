@@ -32,7 +32,7 @@ declare const sha256Fixture: Sha256Port;
 // from src/contracts/component.js — no parallel digest-local envelope type.
 const materialFixture: ComponentSemanticDigestMaterial =
   componentSemanticDigestMaterial(envelopeFixture);
-async function digestEntryPointAcceptsComponentEnvelope(): Promise<ContentDigest> {
+export async function digestEntryPointAcceptsComponentEnvelope(): Promise<ContentDigest> {
   return computeComponentSemanticDigest(envelopeFixture, sha256Fixture);
 }
 
@@ -100,7 +100,6 @@ export type MaterialKindIsExactKindRef = Expect<
 >;
 
 // F6: implementation identity stays unrepresentable on a digest input literal.
-// @ts-expect-error assembly digest is not representable on the digest input
 export const smuggledAssemblyDigestFixture: ComponentEnvelope = {
   family: 'semantic',
   componentId: 'quote.eligibility.rule',
@@ -108,9 +107,9 @@ export const smuggledAssemblyDigestFixture: ComponentEnvelope = {
   requiredSemanticContracts: [],
   requiredCapabilities: [],
   semanticBody: { ok: true },
+  // @ts-expect-error assembly digest is not representable on the digest input
   assemblyDigest: 'sha256:abc',
 };
-// @ts-expect-error implementation id is not representable on the digest input
 export const smuggledImplementationFixture: ComponentEnvelope = {
   family: 'semantic',
   componentId: 'quote.eligibility.rule',
@@ -118,6 +117,7 @@ export const smuggledImplementationFixture: ComponentEnvelope = {
   requiredSemanticContracts: [],
   requiredCapabilities: [],
   semanticBody: { ok: true },
+  // @ts-expect-error implementation id is not representable on the digest input
   implementationId: 'rule-engine-impl@9',
 };
 

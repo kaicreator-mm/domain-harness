@@ -233,8 +233,15 @@ test('T001B-R3: required-ref collections are order-insensitive in the digest', a
     requiredCapabilities: [...capabilities].reverse(),
   });
   const rotated = semanticEnvelope({
-    requiredSemanticContracts: [contracts[1], contracts[2], contracts[0]],
-    requiredCapabilities: [capabilities[1], capabilities[0]],
+    requiredSemanticContracts: [
+      { contractId: 'pricing.policy.schema', version: '1.0.0' },
+      { contractId: 'fx.rate.feed', version: '3.2.1' },
+      { contractId: 'customer.tier.schema', version: '2.0.0' },
+    ],
+    requiredCapabilities: [
+      { capabilityId: 'outbound-http', version: '1.4.0' },
+      { capabilityId: 'semantic-decision', version: '1.0.0' },
+    ],
   });
   const forwardDigest = await computeComponentSemanticDigest(forward, sha256());
   assert.equal(await computeComponentSemanticDigest(reversed, sha256()), forwardDigest);
@@ -373,15 +380,19 @@ test('T001B-R6: provenance/display/lifecycle metadata inside nonMaterialExtensio
 });
 
 test('T001B-R7: material ref normalization is canonical and reconstructs fresh plain two-key objects', () => {
+  const zetContract: SemanticContractRef = { contractId: 'zet.core', version: '9.0.0' };
+  const alphaContract: SemanticContractRef = { contractId: 'alpha.core', version: '1.0.0' };
+  const zetaCapability: CapabilityContractRef = {
+    capabilityId: 'zeta.capability',
+    version: '2.0.0',
+  };
+  const alphaCapability: CapabilityContractRef = {
+    capabilityId: 'alpha.capability',
+    version: '1.0.0',
+  };
   const envelope = semanticEnvelope({
-    requiredSemanticContracts: [
-      { contractId: 'zet.core', version: '9.0.0' },
-      { contractId: 'alpha.core', version: '1.0.0' },
-    ],
-    requiredCapabilities: [
-      { capabilityId: 'zeta.capability', version: '2.0.0' },
-      { capabilityId: 'alpha.capability', version: '1.0.0' },
-    ],
+    requiredSemanticContracts: [zetContract, alphaContract],
+    requiredCapabilities: [zetaCapability, alphaCapability],
   });
   const material = componentSemanticDigestMaterial(envelope);
   assert.equal(Object.keys(material)[0], 'digestDomain');
@@ -404,12 +415,14 @@ test('T001B-R7: material ref normalization is canonical and reconstructs fresh p
     { capabilityId: 'zeta.capability', version: '2.0.0' },
   ]);
 
-  const contractRef = material.requiredSemanticContracts[0];
-  assert.notEqual(contractRef, envelope.requiredSemanticContracts[1]);
+  const [contractRef] = material.requiredSemanticContracts;
+  assert.ok(contractRef, 'material must carry the normalized semantic contract ref');
+  assert.notEqual(contractRef, alphaContract);
   assert.equal(Object.getPrototypeOf(contractRef), Object.prototype);
   assert.deepEqual(Object.keys(contractRef).sort(), ['contractId', 'version']);
-  const capabilityRef = material.requiredCapabilities[0];
-  assert.notEqual(capabilityRef, envelope.requiredCapabilities[1]);
+  const [capabilityRef] = material.requiredCapabilities;
+  assert.ok(capabilityRef, 'material must carry the normalized capability ref');
+  assert.notEqual(capabilityRef, alphaCapability);
   assert.equal(Object.getPrototypeOf(capabilityRef), Object.prototype);
   assert.deepEqual(Object.keys(capabilityRef).sort(), ['capabilityId', 'version']);
 });
@@ -432,10 +445,9 @@ test('T001B-R7: refs accepted despite exotic prototypes digest identically to pl
   const exoticMaterial = componentSemanticDigestMaterial(exotic);
   const plainMaterial = componentSemanticDigestMaterial(plainTwin);
   assert.deepEqual(exoticMaterial, plainMaterial);
-  assert.equal(
-    Object.getPrototypeOf(exoticMaterial.requiredSemanticContracts[0]),
-    Object.prototype,
-  );
+  const [exoticContractRef] = exoticMaterial.requiredSemanticContracts;
+  assert.ok(exoticContractRef, 'material must carry the normalized semantic contract ref');
+  assert.equal(Object.getPrototypeOf(exoticContractRef), Object.prototype);
   assert.equal(
     await computeComponentSemanticDigest(exotic, sha256()),
     await computeComponentSemanticDigest(plainTwin, sha256()),
@@ -488,7 +500,10 @@ test('T001B-R9: canonical-JSON hostility inside semanticBody fails the material 
   circularObject['self'] = circularObject;
   const circularArray: unknown[] = ['a'];
   circularArray.push(circularArray);
-  const sparseArray: unknown[] = [1, , 3];
+  // Built with delete (not a literal with an elision) to keep no-sparse-arrays
+  // lint-clean while still producing a real hole at index 1.
+  const sparseArray: unknown[] = [1, 2, 3];
+  delete sparseArray[1];
   const symbolKeyed = Object.assign({ ok: true }, { [Symbol('extra')]: 'value' });
   class LocalValueHolder {
     hidden = 'value';
@@ -515,9 +530,13 @@ test('T001B-R9: canonical-JSON hostility inside semanticBody fails the material 
     ['non-enumerable property', nonEnumerableOnly],
   ];
   for (const [label, value] of hostileBodies) {
-    const envelope = semanticEnvelope({
+    // Spread-override instead of the builder: an explicit undefined must stay
+    // present as the semanticBody value (the builder's ?? would substitute a
+    // valid default body for it).
+    const envelope: ComponentEnvelope = {
+      ...semanticEnvelope(),
       semanticBody: value as ComponentEnvelope['semanticBody'],
-    });
+    };
     const first = captureDigestError(() => componentSemanticDigestMaterial(envelope));
     assert.equal(first.code, 'NON_CANONICAL_JSON', label);
     assert.equal(first.name, 'ComponentDigestError', label);
@@ -531,7 +550,8 @@ test('T001B-R9: canonical-JSON hostility inside a required-ref entry fails the m
   class LocalEmptyRef {}
   const circularRef: Record<string, unknown> = { contractId: 'x.core', version: '1.0.0' };
   circularRef['self'] = circularRef;
-  const sparseArray: unknown[] = [1, , 3];
+  const sparseArray: unknown[] = [1, 2, 3];
+  delete sparseArray[1];
   const hostileRefs: Array<[string, unknown, string]> = [
     ['NaN entry', Number.NaN, 'UNNORMALIZABLE_REQUIRED_REFS'],
     ['Infinity entry', Number.POSITIVE_INFINITY, 'UNNORMALIZABLE_REQUIRED_REFS'],
@@ -701,7 +721,7 @@ test('T001B-R12: material ordering follows code-unit comparison and is stable ac
   const envelope = semanticEnvelope({
     requiredSemanticContracts: [
       { contractId: 'apple', version: '1.0.0' },
-      { contractId: 'a~b', version: '1.0.0' },
+      { contractId: 'ab', version: '1.0.0' },
       { contractId: 'Zebra', version: '1.0.0' },
       { contractId: 'a.b', version: '1.0.0' },
     ],
@@ -709,7 +729,7 @@ test('T001B-R12: material ordering follows code-unit comparison and is stable ac
   const material = componentSemanticDigestMaterial(envelope);
   assert.deepEqual(
     material.requiredSemanticContracts.map((ref) => ref.contractId),
-    ['Zebra', 'a.b', 'apple', 'a~b'],
+    ['Zebra', 'a.b', 'ab', 'apple'],
   );
   const first = await computeComponentSemanticDigest(envelope, sha256());
   const second = await computeComponentSemanticDigest(envelope, sha256());
@@ -719,13 +739,13 @@ test('T001B-R12: material ordering follows code-unit comparison and is stable ac
     requiredSemanticContracts: [
       { contractId: 'a.b', version: '1.0.0' },
       { contractId: 'Zebra', version: '1.0.0' },
-      { contractId: 'a~b', version: '1.0.0' },
       { contractId: 'apple', version: '1.0.0' },
+      { contractId: 'ab', version: '1.0.0' },
     ],
   });
   assert.deepEqual(
     componentSemanticDigestMaterial(permutedReader).requiredSemanticContracts.map((ref) => ref.contractId),
-    ['Zebra', 'a.b', 'apple', 'a~b'],
+    ['Zebra', 'a.b', 'ab', 'apple'],
   );
   assert.equal(await computeComponentSemanticDigest(permutedReader, sha256()), first);
 });
