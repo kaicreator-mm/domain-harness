@@ -16,6 +16,13 @@
  * - a normalized (order-insensitive) graph digest in its own versioned
  *   digest domain, composed from exact Component semantic digests and exact
  *   typed relations.
+ *
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578): the
+ * graph envelope and every relation are validated on descriptor-safe
+ * snapshots, so accessor-backed `components`/`relations` material is rejected
+ * before any authority use, and relation evidence used by later validation
+ * phases comes from validated snapshots rather than repeated caller reads.
  */
 import {
   validateComponentEnvelope,
@@ -33,6 +40,14 @@ import {
   type Sha256Port,
 } from './identity.js';
 import type { JsonValue } from './json.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeArraySnapshot,
+  safeRecordSnapshot,
+} from './record-safety.js';
 
 /**
  * Versioned Definition graph digest domain tag, owned exclusively by this
@@ -119,10 +134,6 @@ const RELATION_FIELDS = new Set<string>([
   'targetComponentId',
 ]);
 
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(
   code: DefinitionGraphContractErrorCode,
   path: string,
@@ -131,27 +142,13 @@ function fail(
   throw new DefinitionGraphContractError(code, `${path} ${reason}`);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
-}
-
-/** Rejects mutable selection tokens and `id@version` embedding; never normalizes. */
-function requireNonFloating(value: string, path: string): void {
-  if (
-    value.includes('@') ||
-    FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) ||
-    FLOATING_SELECTOR_PATTERN.test(value)
-  ) {
+/** Rejects mutable selection tokens, range operators and `id@version` embedding. */
+function requireNonFloatingIdentity(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value)) {
     fail(
       'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
       path,
-      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range) or an embedded `id@version`',
+      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range) or an embedded `id@version`',
     );
   }
 }
@@ -161,13 +158,13 @@ function requireGraphIdentity(value: unknown, path: string): void {
   if (typeof value !== 'string') {
     fail('INVALID_GRAPH_ID', path, 'must be a string');
   }
-  if (value.trim().length === 0) {
+  if (!isNonEmptyIdentityString(value)) {
     fail('INVALID_GRAPH_ID', path, 'must be a non-empty exact identity');
   }
-  if (value.includes('@')) {
+  if (carriesEmbeddedSelector(value)) {
     fail('INVALID_GRAPH_ID', path, 'must not embed a version selector (`id@version`)');
   }
-  requireNonFloating(value, path);
+  requireNonFloatingIdentity(value, path);
 }
 
 /**
@@ -183,18 +180,31 @@ function requireRelationIdentity(
   if (typeof value !== 'string') {
     fail(invalidCode, path, 'must be a string');
   }
-  if (value.trim().length === 0) {
+  if (!isNonEmptyIdentityString(value)) {
     fail(invalidCode, path, 'must be a non-empty exact identity');
   }
-  requireNonFloating(value, path);
+  if (carriesEmbeddedSelector(value)) {
+    fail(
+      'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
+      path,
+      'must be an exact identity, not an embedded `id@version` selector',
+    );
+  }
+  requireNonFloatingIdentity(value, path);
 }
 
-/** Structural validation of one relation entry (identity strings only). */
-function validateRelationStructure(relation: unknown, path: string): void {
-  if (!isPlainObject(relation)) {
-    fail('INVALID_RELATION', path, 'must be a plain object relation envelope');
+/**
+ * Structural validation of one relation entry (identity strings only) on a
+ * descriptor-safe snapshot. Returns the validated snapshot so later
+ * validation phases never re-read the caller-owned relation object.
+ */
+function validateRelationStructure(relation: unknown, path: string): Record<string, unknown> {
+  const result = safeRecordSnapshot(relation, path);
+  if (!result.ok) {
+    fail('INVALID_RELATION', path, describeRecordSafetyIssue(result.issue));
   }
-  const unexpectedField = ownKeys(relation).find((key) => !RELATION_FIELDS.has(key));
+  const candidate = result.snapshot;
+  const unexpectedField = Object.keys(candidate).find((key) => !RELATION_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_RELATION',
@@ -202,7 +212,6 @@ function validateRelationStructure(relation: unknown, path: string): void {
       `must not carry unknown field "${unexpectedField}" (implementation/assembly/runtime identity belongs to later concerns)`,
     );
   }
-  const candidate = relation;
   requireRelationIdentity(candidate.relationId, `${path}.relationId`, 'INVALID_RELATION_ID');
   requireRelationIdentity(candidate.relationKind, `${path}.relationKind`, 'INVALID_RELATION_KIND');
   requireRelationIdentity(
@@ -215,6 +224,7 @@ function validateRelationStructure(relation: unknown, path: string): void {
     `${path}.targetComponentId`,
     'INVALID_RELATION',
   );
+  return candidate;
 }
 
 /**
@@ -222,13 +232,20 @@ function validateRelationStructure(relation: unknown, path: string): void {
  * exact identities are always rejected — never silently normalized to a
  * default/current value. Component-envelope failures propagate the original
  * `ComponentContractError` unwrapped (single source of truth for component
- * codes).
+ * codes). Validation runs descriptor-safe on snapshots of the caller graph
+ * envelope and each relation (#578): accessor/symbol-keyed/non-enumerable
+ * material and exotic prototypes are typed rejections before any authority
+ * use, and later validation phases (dangling/duplicate/conflict) read
+ * validated snapshot evidence rather than re-reading caller objects. The
+ * caller input is never frozen or mutated.
  */
 export function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelope): void {
-  if (!isPlainObject(envelope)) {
-    fail('INVALID_GRAPH_ENVELOPE', 'definition graph envelope', 'must be a plain object');
+  const graphResult = safeRecordSnapshot(envelope, 'definition graph envelope');
+  if (!graphResult.ok) {
+    fail('INVALID_GRAPH_ENVELOPE', 'definition graph envelope', describeRecordSafetyIssue(graphResult.issue));
   }
-  const unexpectedField = ownKeys(envelope).find((key) => !GRAPH_FIELDS.has(key));
+  const view = graphResult.snapshot;
+  const unexpectedField = Object.keys(view).find((key) => !GRAPH_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_GRAPH_ENVELOPE',
@@ -237,26 +254,32 @@ export function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelop
     );
   }
 
-  const { graphId, components, relations, nonMaterialExtensions } = envelope as Record<string, unknown>;
+  const { graphId, components, relations, nonMaterialExtensions } = view;
 
   requireGraphIdentity(graphId, 'definition graph envelope.graphId');
 
-  if (!Array.isArray(components)) {
+  const componentsResult = safeArraySnapshot(components, 'definition graph envelope.components');
+  if (!componentsResult.ok) {
     fail(
       'INVALID_GRAPH_MATERIAL',
       'definition graph envelope.components',
-      'must be an array of bound Component envelopes',
+      componentsResult.issue.violation === 'NOT_AN_ARRAY'
+        ? 'must be an array of bound Component envelopes'
+        : describeRecordSafetyIssue(componentsResult.issue),
     );
   }
-  if (!Array.isArray(relations)) {
+  const relationsResult = safeArraySnapshot(relations, 'definition graph envelope.relations');
+  if (!relationsResult.ok) {
     fail(
       'INVALID_GRAPH_MATERIAL',
       'definition graph envelope.relations',
-      'must be an array of Definition relations',
+      relationsResult.issue.violation === 'NOT_AN_ARRAY'
+        ? 'must be an array of Definition relations'
+        : describeRecordSafetyIssue(relationsResult.issue),
     );
   }
-  const componentList = components as unknown[];
-  const relationList = relations as unknown[];
+  const componentList = componentsResult.snapshot;
+  const relationList = relationsResult.snapshot;
 
   const boundIds = new Set<string>();
   for (const [index, component] of componentList.entries()) {
@@ -272,66 +295,70 @@ export function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelop
     boundIds.add(componentId);
   }
 
+  const relationSnapshots: Record<string, unknown>[] = [];
   for (const [index, relation] of relationList.entries()) {
-    validateRelationStructure(relation, `definition graph envelope.relations[${index}]`);
+    relationSnapshots.push(
+      validateRelationStructure(relation, `definition graph envelope.relations[${index}]`),
+    );
   }
 
-  for (const [index, relation] of relationList.entries()) {
-    const candidate = relation as DefinitionRelation;
-    if (!boundIds.has(candidate.sourceComponentId)) {
+  for (const [index, snapshot] of relationSnapshots.entries()) {
+    const sourceComponentId = snapshot.sourceComponentId as string;
+    const targetComponentId = snapshot.targetComponentId as string;
+    if (!boundIds.has(sourceComponentId)) {
       fail(
         'DANGLING_COMPONENT_REF',
         `definition graph envelope.relations[${index}].sourceComponentId`,
-        `references "${candidate.sourceComponentId}", which is not a bound component of this graph`,
+        `references "${sourceComponentId}", which is not a bound component of this graph`,
       );
     }
-    if (!boundIds.has(candidate.targetComponentId)) {
+    if (!boundIds.has(targetComponentId)) {
       fail(
         'DANGLING_COMPONENT_REF',
         `definition graph envelope.relations[${index}].targetComponentId`,
-        `references "${candidate.targetComponentId}", which is not a bound component of this graph`,
+        `references "${targetComponentId}", which is not a bound component of this graph`,
       );
     }
   }
 
   const contentByRelationId = new Map<string, string>();
   const relationIdByTriple = new Map<string, string>();
-  for (const [index, relation] of relationList.entries()) {
-    const candidate = relation as DefinitionRelation;
+  for (const [index, snapshot] of relationSnapshots.entries()) {
+    const relationId = snapshot.relationId as string;
     const contentKey = JSON.stringify([
-      candidate.relationKind,
-      candidate.sourceComponentId,
-      candidate.targetComponentId,
+      snapshot.relationKind as string,
+      snapshot.sourceComponentId as string,
+      snapshot.targetComponentId as string,
     ]);
-    const seenContent = contentByRelationId.get(candidate.relationId);
+    const seenContent = contentByRelationId.get(relationId);
     if (seenContent !== undefined) {
       if (seenContent === contentKey) {
         fail(
           'DUPLICATE_RELATION',
           `definition graph envelope.relations[${index}]`,
-          `declares relationId "${candidate.relationId}" more than once (relations are included exactly once; the validator never deduplicates)`,
+          `declares relationId "${relationId}" more than once (relations are included exactly once; the validator never deduplicates)`,
         );
       }
       fail(
         'CONFLICTING_RELATION',
         `definition graph envelope.relations[${index}]`,
-        `reuses relationId "${candidate.relationId}" for differing kind/endpoints`,
+        `reuses relationId "${relationId}" for differing kind/endpoints`,
       );
     }
-    contentByRelationId.set(candidate.relationId, contentKey);
+    contentByRelationId.set(relationId, contentKey);
 
     const existingRelationId = relationIdByTriple.get(contentKey);
     if (existingRelationId !== undefined) {
       fail(
         'CONFLICTING_RELATION',
         `definition graph envelope.relations[${index}]`,
-        `declares the same (source, target, relationKind) triple under relationIds "${existingRelationId}" and "${candidate.relationId}"`,
+        `declares the same (source, target, relationKind) triple under relationIds "${existingRelationId}" and "${relationId}"`,
       );
     }
-    relationIdByTriple.set(contentKey, candidate.relationId);
+    relationIdByTriple.set(contentKey, relationId);
   }
 
-  if ('nonMaterialExtensions' in envelope) {
+  if ('nonMaterialExtensions' in view) {
     try {
       canonicalizeJson(nonMaterialExtensions);
     } catch {
@@ -368,7 +395,9 @@ function compareIds(a: string, b: string): number {
  * the exported pure T001B normalizer. `envelope.graphId`,
  * `envelope.components` and `envelope.relations` are never re-read after
  * that point, so a caller mutating its own graph while a digest promise is
- * pending can never produce a torn hybrid snapshot.
+ * pending can never produce a torn hybrid snapshot. Validation additionally
+ * guarantees the envelope carries no accessor-backed fields (#578), so the
+ * synchronous snapshot cannot observe validation-to-use drift either.
  */
 export async function computeDefinitionGraphDigest(
   envelope: DefinitionGraphEnvelope,

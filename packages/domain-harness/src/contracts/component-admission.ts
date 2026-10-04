@@ -10,6 +10,16 @@
  * this module. Runtime Assembly/dispatch successors own how the exact validator
  * implementation is selected and pinned; this seam only requires that the
  * validator matched to the exact KindRef is invoked before ADMITTED is returned.
+ *
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578). The
+ * understood-set index is built from descriptor-safe snapshots: exact refs
+ * indexed for admission decisions are fresh `{id, version}` value objects, so
+ * a caller mutating its own declarations after validation can never change
+ * an admission conclusion. The canonical exact-ref matrix rejects floating
+ * tokens (`latest`/`current`/`active`/`default`/`*`/`x`), range operators
+ * (`^ ~ < > | *`), x-range/partial versions (`1.x`, `x`, `1.`) and embedded
+ * `id@version` selectors.
  */
 import {
   validateComponentEnvelope,
@@ -20,6 +30,15 @@ import {
   type SemanticContractRef,
 } from './component.js';
 import type { JsonValue } from './json.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeArraySnapshot,
+  safeRecordSnapshot,
+} from './record-safety.js';
 
 /** Closed-world validator for one exact admitted Kind implementation. */
 export type ComponentKindValidator = (envelope: ComponentEnvelope) => void;
@@ -81,68 +100,63 @@ export interface ComponentAdmissionResult {
   readonly nonMaterialExtensions?: JsonValue;
 }
 
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*', 'x']);
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(code: ComponentAdmissionErrorCode, message: string): never {
   throw new ComponentAdmissionError(code, message);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
-}
-
-function isExactIdentity(value: unknown): value is string {
-  if (typeof value !== 'string' || value.trim().length === 0 || value.includes('@')) {
-    return false;
+/** Snapshot an understood-set record, mapping descriptor issues to the typed input failure. */
+function requireSafeRecord(value: unknown, description: string): Record<string, unknown> {
+  const result = safeRecordSnapshot(value, description);
+  if (!result.ok) {
+    fail('INVALID_UNDERSTOOD_KIND_SET', `${description} ${describeRecordSafetyIssue(result.issue)}`);
   }
-  return (
-    !FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) &&
-    !FLOATING_SELECTOR_PATTERN.test(value)
-  );
+  return result.snapshot;
 }
 
-function isExactVersion(value: unknown): value is string {
-  if (!isExactIdentity(value)) return false;
-  return !value
-    .trim()
-    .split('.')
-    .some((part) => part.length === 0 || part.toLowerCase() === 'x');
-}
-
+/**
+ * Snapshot one exact `{idField, version}` reference of the understood set.
+ * Structural defects (non-record, hidden properties, wrong keys, empty or
+ * `id@version`-embedding strings) are `INVALID_UNDERSTOOD_KIND_SET`.
+ */
 function requireExactUnderstoodRef(
   ref: unknown,
   description: string,
   idField: 'kindId' | 'contractId' | 'capabilityId',
-): void {
-  if (!isPlainObject(ref)) {
-    fail('INVALID_UNDERSTOOD_KIND_SET', `${description} must be an exact reference object`);
-  }
-  const keys = ownKeys(ref).sort();
+): Record<string, unknown> {
+  const candidate = requireSafeRecord(ref, description);
+  const keys = Object.keys(candidate).sort();
   if (keys.length !== 2 || !keys.includes(idField) || !keys.includes('version')) {
     fail(
       'INVALID_UNDERSTOOD_KIND_SET',
       `${description} must contain exactly {${idField}, version}`,
     );
   }
-  if (!isExactIdentity(ref[idField])) {
+  const id = candidate[idField];
+  const version = candidate.version;
+  if (
+    typeof id !== 'string' ||
+    !isNonEmptyIdentityString(id) ||
+    carriesEmbeddedSelector(id) ||
+    carriesFloatingOrRangeSemantics(id)
+  ) {
     fail(
       'INVALID_UNDERSTOOD_KIND_SET',
       `${description}.${idField} must be a non-empty exact identity without floating/range selection`,
     );
   }
-  if (!isExactVersion(ref.version)) {
+  if (
+    typeof version !== 'string' ||
+    !isNonEmptyIdentityString(version) ||
+    carriesEmbeddedSelector(version) ||
+    carriesFloatingOrRangeSemantics(version) ||
+    carriesXRangeVersionSemantics(version)
+  ) {
     fail(
       'INVALID_UNDERSTOOD_KIND_SET',
       `${description}.version must be an exact version without floating/range/x-range selection`,
     );
   }
+  return candidate;
 }
 
 function validateExactRefCollection(
@@ -150,14 +164,19 @@ function validateExactRefCollection(
   description: string,
   idField: 'contractId' | 'capabilityId',
 ): void {
-  if (!Array.isArray(values)) {
-    fail('INVALID_UNDERSTOOD_KIND_SET', `${description} must be an array of exact references`);
+  const result = safeArraySnapshot(values, description);
+  if (!result.ok) {
+    fail(
+      'INVALID_UNDERSTOOD_KIND_SET',
+      result.issue.violation === 'NOT_AN_ARRAY'
+        ? `${description} must be an array of exact references`
+        : `${description} ${describeRecordSafetyIssue(result.issue)}`,
+    );
   }
   const seen = new Set<string>();
-  for (const [index, ref] of values.entries()) {
+  for (const [index, ref] of result.snapshot.entries()) {
     const at = `${description}[${index}]`;
-    requireExactUnderstoodRef(ref, at, idField);
-    const candidate = ref as Record<string, unknown>;
+    const candidate = requireExactUnderstoodRef(ref, at, idField);
     const id = candidate[idField] as string;
     if (seen.has(id)) {
       fail('INVALID_UNDERSTOOD_KIND_SET', `${at} declares ${id} more than once`);
@@ -169,17 +188,21 @@ function validateExactRefCollection(
 function validateAndIndexUnderstoodSet(
   understoodKinds: UnderstoodKindSet,
 ): Map<string, UnderstoodKindDeclaration> {
-  if (!Array.isArray(understoodKinds)) {
-    fail('INVALID_UNDERSTOOD_KIND_SET', 'understood Kind set must be an array');
+  const setResult = safeArraySnapshot(understoodKinds, 'understood Kind set');
+  if (!setResult.ok) {
+    fail(
+      'INVALID_UNDERSTOOD_KIND_SET',
+      setResult.issue.violation === 'NOT_AN_ARRAY'
+        ? 'understood Kind set must be an array'
+        : `understood Kind set ${describeRecordSafetyIssue(setResult.issue)}`,
+    );
   }
 
   const index = new Map<string, UnderstoodKindDeclaration>();
-  for (const [entryIndex, entry] of understoodKinds.entries()) {
+  for (const [entryIndex, entry] of setResult.snapshot.entries()) {
     const at = `understood Kind set entry [${entryIndex}]`;
-    if (!isPlainObject(entry)) {
-      fail('INVALID_UNDERSTOOD_KIND_SET', `${at} must be a plain object`);
-    }
-    const keys = ownKeys(entry).sort();
+    const candidate = requireSafeRecord(entry, at);
+    const keys = Object.keys(candidate).sort();
     if (
       keys.length !== 4 ||
       !keys.includes('kind') ||
@@ -193,22 +216,27 @@ function validateAndIndexUnderstoodSet(
       );
     }
 
-    requireExactUnderstoodRef(entry.kind, `${at}.kind`, 'kindId');
+    const kindSnapshot = requireExactUnderstoodRef(candidate.kind, `${at}.kind`, 'kindId');
     validateExactRefCollection(
-      entry.understoodSemanticContracts,
+      candidate.understoodSemanticContracts,
       `${at}.understoodSemanticContracts`,
       'contractId',
     );
     validateExactRefCollection(
-      entry.understoodCapabilities,
+      candidate.understoodCapabilities,
       `${at}.understoodCapabilities`,
       'capabilityId',
     );
-    if (typeof entry.validateComponent !== 'function') {
+    if (typeof candidate.validateComponent !== 'function') {
       fail('INVALID_UNDERSTOOD_KIND_SET', `${at}.validateComponent must be a function`);
     }
 
-    const kind = entry.kind as KindRef;
+    // The admission index is built from fresh `{id, version}` value objects
+    // (descriptor-safe snapshots), never aliases of caller-owned refs.
+    const kind: KindRef = {
+      kindId: kindSnapshot.kindId as string,
+      version: kindSnapshot.version as string,
+    };
     const key = `${kind.kindId}@${kind.version}`;
     if (index.has(key)) {
       fail('INVALID_UNDERSTOOD_KIND_SET', `${at} declares exact Kind "${key}" more than once`);
@@ -216,11 +244,13 @@ function validateAndIndexUnderstoodSet(
 
     index.set(key, {
       kind,
-      understoodSemanticContracts:
-        entry.understoodSemanticContracts as readonly SemanticContractRef[],
-      understoodCapabilities:
-        entry.understoodCapabilities as readonly CapabilityContractRef[],
-      validateComponent: entry.validateComponent as ComponentKindValidator,
+      understoodSemanticContracts: (
+        candidate.understoodSemanticContracts as readonly SemanticContractRef[]
+      ).map((ref) => ({ contractId: ref.contractId, version: ref.version })),
+      understoodCapabilities: (
+        candidate.understoodCapabilities as readonly CapabilityContractRef[]
+      ).map((ref) => ({ capabilityId: ref.capabilityId, version: ref.version })),
+      validateComponent: candidate.validateComponent as ComponentKindValidator,
     });
   }
   return index;
@@ -256,7 +286,10 @@ function hasExactCapability(
  *
  * Base/Kind-validator errors propagate unchanged. This module never invents a
  * fallback, global registry, compatibility range, or generic top-level-field
- * substitute for the Kind's own semantic validation.
+ * substitute for the Kind's own semantic validation. The ADMITTED result
+ * carries fresh `{id, version}` ref copies (the caller's envelope and
+ * declarations are never aliased into admission evidence); the opaque
+ * `nonMaterialExtensions` pass-through keeps its original reference.
  */
 export function admitComponent(
   envelope: ComponentEnvelope,
@@ -307,8 +340,14 @@ export function admitComponent(
     status: 'ADMITTED',
     componentId,
     admittedKind: { kindId: kind.kindId, version: kind.version },
-    admittedSemanticContracts: [...requiredSemanticContracts],
-    admittedCapabilities: [...requiredCapabilities],
+    admittedSemanticContracts: requiredSemanticContracts.map((ref) => ({
+      contractId: ref.contractId,
+      version: ref.version,
+    })),
+    admittedCapabilities: requiredCapabilities.map((ref) => ({
+      capabilityId: ref.capabilityId,
+      version: ref.version,
+    })),
     ...('nonMaterialExtensions' in envelope && envelope.nonMaterialExtensions !== undefined
       ? { nonMaterialExtensions: envelope.nonMaterialExtensions }
       : {}),

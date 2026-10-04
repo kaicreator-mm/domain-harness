@@ -427,7 +427,7 @@ test('T001B-R7: material ref normalization is canonical and reconstructs fresh p
   assert.deepEqual(Object.keys(capabilityRef).sort(), ['capabilityId', 'version']);
 });
 
-test('T001B-R7: refs accepted despite exotic prototypes digest identically to plain-object twins', async () => {
+test('T001B-R7: exotic-prototype refs are rejected by envelope validation; intended null-prototype refs digest identically to plain-object twins (#588)', async () => {
   class ExoticContractRef {
     contractId = 'customer.tier.schema';
     version = '2.0.0';
@@ -441,16 +441,18 @@ test('T001B-R7: refs accepted despite exotic prototypes digest identically to pl
     requiredSemanticContracts: [new ExoticContractRef() as unknown as SemanticContractRef],
     requiredCapabilities: [new ExoticCapabilityRef() as unknown as CapabilityContractRef],
   });
-  validateComponentEnvelope(exotic);
-  const exoticMaterial = componentSemanticDigestMaterial(exotic);
-  const plainMaterial = componentSemanticDigestMaterial(plainTwin);
-  assert.deepEqual(exoticMaterial, plainMaterial);
-  const [exoticContractRef] = exoticMaterial.requiredSemanticContracts;
-  assert.ok(exoticContractRef, 'material must carry the normalized semantic contract ref');
-  assert.equal(Object.getPrototypeOf(exoticContractRef), Object.prototype);
-  assert.equal(
-    await computeComponentSemanticDigest(exotic, sha256()),
-    await computeComponentSemanticDigest(plainTwin, sha256()),
+  // #588 canonical posture: exotic/class prototypes are not contract input,
+  // so the digest gate now rejects them at envelope validation (typed
+  // ComponentContractError) before any digest material is built.
+  assert.throws(
+    () => validateComponentEnvelope(exotic),
+    (error: unknown) =>
+      error instanceof ComponentContractError && error.code === 'INVALID_SEMANTIC_CONTRACT_REF',
+  );
+  await assert.rejects(
+    computeComponentSemanticDigest(exotic, sha256()),
+    (error: unknown) =>
+      error instanceof ComponentContractError && error.code === 'INVALID_SEMANTIC_CONTRACT_REF',
   );
 
   const nullPrototypeRef = Object.assign(Object.create(null), {
@@ -459,7 +461,16 @@ test('T001B-R7: refs accepted despite exotic prototypes digest identically to pl
   }) as unknown as SemanticContractRef;
   const nullProtoEnvelope = semanticEnvelope({ requiredSemanticContracts: [nullPrototypeRef] });
   validateComponentEnvelope(nullProtoEnvelope);
-  assert.deepEqual(componentSemanticDigestMaterial(nullProtoEnvelope), plainMaterial);
+  const plainMaterial = componentSemanticDigestMaterial(plainTwin);
+  const nullProtoMaterial = componentSemanticDigestMaterial(nullProtoEnvelope);
+  assert.deepEqual(nullProtoMaterial, plainMaterial);
+  const [nullProtoContractRef] = nullProtoMaterial.requiredSemanticContracts;
+  assert.ok(nullProtoContractRef, 'material must carry the normalized semantic contract ref');
+  assert.equal(Object.getPrototypeOf(nullProtoContractRef), Object.prototype);
+  assert.equal(
+    await computeComponentSemanticDigest(nullProtoEnvelope, sha256()),
+    await computeComponentSemanticDigest(plainTwin, sha256()),
+  );
 });
 
 test('T001B-R8: the v0.7 Component digest domain is frozen, versioned, and separated from legacy artifact identity', async () => {

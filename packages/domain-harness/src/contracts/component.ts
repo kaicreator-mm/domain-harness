@@ -8,6 +8,14 @@
  * identity. This file owns only the smallest additive envelope for those
  * dimensions.
  *
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578):
+ * authority-bearing records must be ordinary/null-prototype objects of own
+ * enumerable data properties, and the canonical exact-ref matrix rejects
+ * floating tokens (`latest`/`current`/`active`/`default`/`*`/`x`), range
+ * operators (`^ ~ < > | *`), x-range/partial versions (`1.x`, `x`, `1.`) and
+ * embedded `id@version` selectors — validation only, never resolution.
+ *
  * Boundaries owned by successor tasks — intentionally absent here:
  * - content/graph digests (T001B/T001C);
  * - must-understand admission (T001D);
@@ -16,6 +24,15 @@
  */
 import { canonicalizeJson } from './identity.js';
 import type { JsonValue } from './json.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeArraySnapshot,
+  safeRecordSnapshot,
+} from './record-safety.js';
 
 /** The two frozen Product families a Domain Component belongs to. */
 export const COMPONENT_FAMILIES = Object.freeze(['semantic', 'tool'] as const);
@@ -99,16 +116,21 @@ const ENVELOPE_FIELDS = new Set<string>([
   'nonMaterialExtensions',
 ]);
 
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(code: ComponentContractErrorCode, path: string, reason: string): never {
   throw new ComponentContractError(code, `${path} ${reason}`);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+/** Snapshot an authority-bearing record, mapping descriptor issues to a typed failure. */
+function requireSafeRecord(
+  value: unknown,
+  path: string,
+  invalidCode: ComponentContractErrorCode,
+): Record<string, unknown> {
+  const result = safeRecordSnapshot(value, path);
+  if (!result.ok) {
+    fail(invalidCode, path, describeRecordSafetyIssue(result.issue));
+  }
+  return result.snapshot;
 }
 
 /** Exact identity string: non-empty, not an embedded `id@selector` form. */
@@ -120,10 +142,10 @@ function requireExactIdentityString(
   if (typeof value !== 'string') {
     fail(invalidCode, path, 'must be a string');
   }
-  if (value.trim().length === 0) {
+  if (!isNonEmptyIdentityString(value)) {
     fail(invalidCode, path, 'must be a non-empty exact identity');
   }
-  if (value.includes('@')) {
+  if (carriesEmbeddedSelector(value)) {
     fail(
       invalidCode,
       path,
@@ -132,26 +154,37 @@ function requireExactIdentityString(
   }
 }
 
-/** Rejects mutable selection tokens; never normalizes them to a default. */
-function requireNonFloating(value: string, path: string): void {
-  if (FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) || FLOATING_SELECTOR_PATTERN.test(value)) {
+/** Rejects mutable selection tokens and range operators; never normalizes. */
+function requireNonFloatingIdentity(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value)) {
     fail(
       'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
       path,
-      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range)',
+      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range)',
+    );
+  }
+}
+
+/**
+ * Rejects mutable selection tokens, range operators and x-range/partial
+ * version forms (`1.x`, `x`, `1.`); never normalizes them to a default.
+ */
+function requireExactVersion(value: string, path: string): void {
+  if (
+    carriesFloatingOrRangeSemantics(value) ||
+    carriesXRangeVersionSemantics(value)
+  ) {
+    fail(
+      'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
+      path,
+      'must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)',
     );
   }
 }
 
 function requireExactIdentity(value: unknown, path: string, invalidCode: ComponentContractErrorCode): void {
   requireExactIdentityString(value, path, invalidCode);
-  requireNonFloating(value as string, path);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
+  requireNonFloatingIdentity(value as string, path);
 }
 
 function requireExactRef(
@@ -160,10 +193,8 @@ function requireExactRef(
   idField: 'kindId' | 'contractId' | 'capabilityId',
   invalidCode: ComponentContractErrorCode,
 ): string {
-  if (!isPlainObject(ref)) {
-    fail(invalidCode, path, 'must be an exact reference object');
-  }
-  const keys = ownKeys(ref).sort();
+  const candidate = requireSafeRecord(ref, path, invalidCode);
+  const keys = Object.keys(candidate).sort();
   if (keys.length !== 2 || !keys.includes(idField) || !keys.includes('version')) {
     fail(
       invalidCode,
@@ -171,10 +202,10 @@ function requireExactRef(
       `must contain exactly {${idField}, version} (implementation/module identity is not part of a contract reference)`,
     );
   }
-  requireExactIdentity(ref[idField], `${path}.${idField}`, invalidCode);
-  requireExactIdentityString(ref.version, `${path}.version`, invalidCode);
-  requireNonFloating(ref.version as string, `${path}.version`);
-  return ref[idField] as string;
+  requireExactIdentity(candidate[idField], `${path}.${idField}`, invalidCode);
+  requireExactIdentityString(candidate.version, `${path}.version`, invalidCode);
+  requireExactVersion(candidate.version as string, `${path}.version`);
+  return candidate[idField] as string;
 }
 
 function requireExactRefCollection(
@@ -183,11 +214,18 @@ function requireExactRefCollection(
   idField: 'contractId' | 'capabilityId',
   invalidCode: ComponentContractErrorCode,
 ): void {
-  if (!Array.isArray(values)) {
-    fail(invalidCode, path, 'must be an array of exact references');
+  const result = safeArraySnapshot(values, path);
+  if (!result.ok) {
+    fail(
+      invalidCode,
+      path,
+      result.issue.violation === 'NOT_AN_ARRAY'
+        ? 'must be an array of exact references'
+        : describeRecordSafetyIssue(result.issue),
+    );
   }
   const seen = new Set<string>();
-  for (const [index, ref] of values.entries()) {
+  for (const [index, ref] of result.snapshot.entries()) {
     const id = requireExactRef(ref, `${path}[${index}]`, idField, invalidCode);
     if (seen.has(id)) {
       fail(invalidCode, `${path}[${index}]`, `declares ${id} more than once (exact refs only)`);
@@ -207,13 +245,15 @@ function requireJsonMaterial(value: unknown, path: string, invalidCode: Componen
 /**
  * Structural fail-closed validation of a Component envelope. Invalid exact
  * identities are always rejected — never silently normalized to a
- * default/current value.
+ * default/current value. Validation runs descriptor-safe on a snapshot of
+ * the caller envelope (#578): accessor/symbol-keyed/non-enumerable material
+ * and exotic prototypes are typed rejections, and no hidden getter can
+ * execute during validation or diagnostics. The caller input is never
+ * frozen or mutated.
  */
 export function validateComponentEnvelope(envelope: ComponentEnvelope): void {
-  if (!isPlainObject(envelope)) {
-    fail('INVALID_COMPONENT_ENVELOPE', 'component envelope', 'must be a plain object');
-  }
-  const unexpectedField = ownKeys(envelope).find((key) => !ENVELOPE_FIELDS.has(key));
+  const view = requireSafeRecord(envelope, 'component envelope', 'INVALID_COMPONENT_ENVELOPE');
+  const unexpectedField = Object.keys(view).find((key) => !ENVELOPE_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_COMPONENT_ENVELOPE',
@@ -222,9 +262,9 @@ export function validateComponentEnvelope(envelope: ComponentEnvelope): void {
     );
   }
 
-  const { family, componentId, kind } = envelope as Record<string, unknown>;
+  const { family, componentId, kind } = view;
   const { requiredSemanticContracts, requiredCapabilities, semanticBody, nonMaterialExtensions } =
-    envelope as Record<string, unknown>;
+    view;
 
   if (typeof family !== 'string' || !COMPONENT_FAMILIES.includes(family as ComponentFamily)) {
     fail(
@@ -249,7 +289,7 @@ export function validateComponentEnvelope(envelope: ComponentEnvelope): void {
     'INVALID_CAPABILITY_REF',
   );
   requireJsonMaterial(semanticBody, 'component envelope.semanticBody', 'INVALID_SEMANTIC_BODY');
-  if ('nonMaterialExtensions' in envelope) {
+  if ('nonMaterialExtensions' in view) {
     requireJsonMaterial(
       nonMaterialExtensions,
       'component envelope.nonMaterialExtensions',
