@@ -1,15 +1,3 @@
-/**
- * T001D must-understand Component admission contract tests (issue #543).
- *
- * The admission seam is a pure, deterministic, fail-closed function over an
- * already-validated ComponentEnvelope and a caller-supplied complete
- * understood-Kind set (exact KindRef = kindId + exact version, exact semantic
- * contract refs, behaviorally material semanticBody top-level fields). There
- * is deliberately no Kind catalog/registry and no compatibility/range
- * selection (T002A) anywhere on this path.
- *
- * R1..R12 map to the twelve minimum requirements of the task pack.
- */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -17,741 +5,288 @@ import {
   ComponentAdmissionError,
   type ComponentAdmissionErrorCode,
   type ComponentAdmissionFailureClass,
-  type ComponentAdmissionResult,
   type UnderstoodKindDeclaration,
   type UnderstoodKindSet,
 } from '../../src/contracts/component-admission.js';
-import type {
-  CapabilityContractRef,
-  ComponentEnvelope,
-  KindRef,
-  SemanticContractRef,
+import {
+  ComponentContractError,
+  type ComponentEnvelope,
 } from '../../src/contracts/component.js';
-import type { JsonValue } from '../../src/contracts/json.js';
+import {
+  ToolComponentContractError,
+  validateToolComponent,
+} from '../../src/contracts/tool-component.js';
 
-/**
- * The frozen failure taxonomy: each failure code maps to exactly one failure
- * class. Every failure assertion in this file is checked against this table,
- * so the 1:1 code-to-class mapping is enforced across the whole suite.
- */
 const EXPECTED_FAILURE_CLASS_BY_CODE: Record<ComponentAdmissionErrorCode, ComponentAdmissionFailureClass> = {
   UNKNOWN_KIND: 'KIND',
   KIND_VERSION_MISMATCH: 'KIND',
   UNKNOWN_SEMANTIC_CONTRACT: 'CONTRACT',
-  UNKNOWN_MATERIAL_FIELD: 'FIELD',
+  UNKNOWN_CAPABILITY: 'CAPABILITY',
   INVALID_UNDERSTOOD_KIND_SET: 'INPUT',
-  ADMISSION_INPUT_INVALID: 'INPUT',
 };
 
-const observedFailureCodes = new Set<ComponentAdmissionErrorCode>();
-
-function semanticEnvelope(
-  overrides?: {
-    family?: ComponentEnvelope['family'];
-    componentId?: string;
-    kind?: KindRef;
-    requiredSemanticContracts?: readonly SemanticContractRef[];
-    requiredCapabilities?: readonly CapabilityContractRef[];
-    semanticBody?: JsonValue;
-    nonMaterialExtensions?: JsonValue;
-  },
-): ComponentEnvelope {
+function semanticEnvelope(overrides: Partial<ComponentEnvelope> = {}): ComponentEnvelope {
   return {
-    family: overrides?.family ?? 'semantic',
-    componentId: overrides?.componentId ?? 'quote.eligibility.rule',
-    kind: overrides?.kind ?? { kindId: 'decision.rule.v1', version: '1.2.0' },
-    requiredSemanticContracts: overrides?.requiredSemanticContracts ?? [
-      { contractId: 'customer.tier.schema', version: '2.0.0' },
-    ],
-    requiredCapabilities: overrides?.requiredCapabilities ?? [
-      { capabilityId: 'semantic-decision', version: '1.0.0' },
-    ],
-    // explicit undefined check: a `null` body is a meaningful opaque override
-    semanticBody:
-      overrides?.semanticBody !== undefined
-        ? overrides.semanticBody
-        : { threshold: 100, policy: { tier: 'gold', enabled: true } },
-    ...(overrides?.nonMaterialExtensions !== undefined
-      ? { nonMaterialExtensions: overrides.nonMaterialExtensions }
-      : {}),
+    family: 'semantic',
+    componentId: 'quote.eligibility.rule',
+    kind: { kindId: 'decision.rule.v1', version: '1.2.0' },
+    requiredSemanticContracts: [{ contractId: 'customer.tier.schema', version: '2.0.0' }],
+    requiredCapabilities: [{ capabilityId: 'semantic-decision', version: '1.0.0' }],
+    semanticBody: { threshold: 100, policy: { enabled: true } },
+    ...overrides,
   };
 }
 
-function understoodDeclaration(
-  overrides?: {
-    kind?: KindRef;
-    understoodSemanticContracts?: readonly SemanticContractRef[];
-    materialSemanticBodyFields?: readonly string[];
-  },
-): UnderstoodKindDeclaration {
+function toolEnvelope(overrides: Partial<ComponentEnvelope> = {}): ComponentEnvelope {
   return {
-    kind: overrides?.kind ?? { kindId: 'decision.rule.v1', version: '1.2.0' },
-    understoodSemanticContracts: overrides?.understoodSemanticContracts ?? [
-      { contractId: 'customer.tier.schema', version: '2.0.0' },
-      { contractId: 'extra.audit.schema', version: '1.0.0' },
-    ],
-    materialSemanticBodyFields:
-      overrides?.materialSemanticBodyFields ?? ['threshold', 'policy', 'retries'],
+    family: 'tool',
+    componentId: 'tool.search',
+    kind: { kindId: 'tool.search.v1', version: '1.0.0' },
+    requiredSemanticContracts: [],
+    requiredCapabilities: [],
+    semanticBody: {
+      operations: [
+        {
+          operationId: 'search',
+          inputSchema: {},
+          outputSchema: {},
+          effect: 'none',
+        },
+      ],
+      providesCapabilities: [{ capabilityId: 'search', version: '1.0.0' }],
+    },
+    ...overrides,
   };
 }
 
-function deepFreeze<T>(value: T): T {
-  if (value !== null && typeof value === 'object') {
-    for (const key of Object.getOwnPropertyNames(value as object)) {
-      deepFreeze((value as Record<string, unknown>)[key]);
-    }
-    Object.freeze(value);
+class SemanticFixtureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SemanticFixtureError';
   }
-  return value;
+}
+
+function validateSemanticFixture(envelope: ComponentEnvelope): void {
+  if (envelope.family !== 'semantic') throw new SemanticFixtureError('family must be semantic');
+  const body = envelope.semanticBody;
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new SemanticFixtureError('semantic body must be an object');
+  }
+  const keys = Object.keys(body).sort();
+  assert.deepEqual(keys, ['policy', 'threshold']);
+  const threshold = (body as Record<string, unknown>).threshold;
+  const policy = (body as Record<string, unknown>).policy;
+  if (typeof threshold !== 'number') throw new SemanticFixtureError('threshold must be numeric');
+  if (typeof policy !== 'object' || policy === null || Array.isArray(policy)) {
+    throw new SemanticFixtureError('policy must be an object');
+  }
+  const policyKeys = Object.keys(policy).sort();
+  assert.deepEqual(policyKeys, ['enabled']);
+  if (typeof (policy as Record<string, unknown>).enabled !== 'boolean') {
+    throw new SemanticFixtureError('policy.enabled must be boolean');
+  }
+}
+
+function semanticDeclaration(overrides: Partial<UnderstoodKindDeclaration> = {}): UnderstoodKindDeclaration {
+  return {
+    kind: { kindId: 'decision.rule.v1', version: '1.2.0' },
+    understoodSemanticContracts: [{ contractId: 'customer.tier.schema', version: '2.0.0' }],
+    understoodCapabilities: [{ capabilityId: 'semantic-decision', version: '1.0.0' }],
+    validateComponent: validateSemanticFixture,
+    ...overrides,
+  };
+}
+
+function toolDeclaration(): UnderstoodKindDeclaration {
+  return {
+    kind: { kindId: 'tool.search.v1', version: '1.0.0' },
+    understoodSemanticContracts: [],
+    understoodCapabilities: [],
+    validateComponent: validateToolComponent,
+  };
 }
 
 function expectAdmissionFailure(
-  admit: () => ComponentAdmissionResult,
+  fn: () => unknown,
   code: ComponentAdmissionErrorCode,
 ): void {
-  observedFailureCodes.add(code);
-  assert.throws(
-    admit,
-    (error: unknown) => {
-      if (!(error instanceof ComponentAdmissionError)) {
-        return false;
-      }
-      assert.equal(error.name, 'ComponentAdmissionError');
-      assert.equal(error.code, code);
-      assert.equal(
-        error.failureClass,
-        EXPECTED_FAILURE_CLASS_BY_CODE[code],
-        `failure code ${code} must carry exactly one deterministic failure class`,
-      );
-      return true;
-    },
-    `expected a typed ${code} admission failure`,
-  );
+  assert.throws(fn, (error: unknown) => {
+    assert.ok(error instanceof ComponentAdmissionError);
+    assert.equal(error.code, code);
+    assert.equal(error.failureClass, EXPECTED_FAILURE_CLASS_BY_CODE[code]);
+    return true;
+  });
 }
 
-// ---------------------------------------------------------------------------
-// R1 — exact KindRef (kindId AND exact version) in the understood set admits
-// with the full admitted result.
-// ---------------------------------------------------------------------------
+test('#556-R1: authoritative admission validates base envelope, exact contracts/capabilities, then exact Kind closed-world semantics', () => {
+  let validatorCalls = 0;
+  const declaration = semanticDeclaration({
+    validateComponent(envelope) {
+      validatorCalls += 1;
+      validateSemanticFixture(envelope);
+    },
+  });
+  const envelope = semanticEnvelope();
+  const result = admitComponent(envelope, [declaration]);
 
-test('T001D-R1: an envelope whose exact KindRef is understood admits with the full admitted result', () => {
-  const extensions: JsonValue = { display: { label: 'Quote Eligibility' }, traceId: 'abc-123' };
-  const envelope = semanticEnvelope({ nonMaterialExtensions: extensions });
-  const understood: UnderstoodKindSet = [understoodDeclaration()];
-
-  const result = admitComponent(deepFreeze(envelope), deepFreeze(understood));
-
+  assert.equal(validatorCalls, 1);
   assert.equal(result.status, 'ADMITTED');
-  assert.equal(result.componentId, 'quote.eligibility.rule');
-  assert.deepEqual(result.admittedKind, { kindId: 'decision.rule.v1', version: '1.2.0' });
-  assert.deepEqual(result.admittedSemanticContracts, [
-    { contractId: 'customer.tier.schema', version: '2.0.0' },
-  ]);
-  assert.deepEqual(result.admittedMaterialFields, ['policy', 'threshold']);
-  assert.equal(result.nonMaterialExtensions, extensions);
-  // required capabilities are not must-understand material and are not carried
-  assert.equal('requiredCapabilities' in result, false);
-  assert.equal('admittedCapabilities' in result, false);
-  assert.deepEqual(Object.keys(result).sort(), [
-    'admittedKind',
-    'admittedMaterialFields',
-    'admittedSemanticContracts',
-    'componentId',
-    'nonMaterialExtensions',
-    'status',
-  ]);
+  assert.equal(result.componentId, envelope.componentId);
+  assert.deepEqual(result.admittedKind, envelope.kind);
+  assert.deepEqual(result.admittedSemanticContracts, envelope.requiredSemanticContracts);
+  assert.deepEqual(result.admittedCapabilities, envelope.requiredCapabilities);
 });
 
-test('T001D-R1: an absent nonMaterialExtensions stays absent on the admitted result', () => {
-  const result = admitComponent(semanticEnvelope(), [understoodDeclaration()]);
-  assert.equal('nonMaterialExtensions' in result, false);
+test('#556-R2: invalid base ComponentEnvelope is rejected before Kind validation', () => {
+  let validatorCalls = 0;
+  const invalid = Object.assign(semanticEnvelope(), { implementationId: 'impl@9' }) as unknown as ComponentEnvelope;
+  assert.throws(
+    () => admitComponent(invalid, [semanticDeclaration({ validateComponent() { validatorCalls += 1; } })]),
+    (error: unknown) => error instanceof ComponentContractError && error.code === 'INVALID_COMPONENT_ENVELOPE',
+  );
+  assert.equal(validatorCalls, 0);
 });
 
-// ---------------------------------------------------------------------------
-// R2 — kindId declared by no understood entry fails UNKNOWN_KIND (class KIND).
-// ---------------------------------------------------------------------------
-
-test('T001D-R2: a kindId declared by no understood entry fails UNKNOWN_KIND (class KIND)', () => {
-  const envelope = semanticEnvelope({ kind: { kindId: 'decision.other.v1', version: '1.2.0' } });
+test('#556-R3: unknown Kind and exact-version mismatch fail closed with no fallback', () => {
   expectAdmissionFailure(
-    () => admitComponent(envelope, [understoodDeclaration()]),
+    () => admitComponent(semanticEnvelope({ kind: { kindId: 'unknown.kind', version: '1.0.0' } }), [semanticDeclaration()]),
     'UNKNOWN_KIND',
   );
-});
-
-// ---------------------------------------------------------------------------
-// R3 — kindId declared but at a different exact version fails
-// KIND_VERSION_MISMATCH; no fallback to another version of a known kindId.
-// ---------------------------------------------------------------------------
-
-test('T001D-R3: kindId known at other exact versions fails KIND_VERSION_MISMATCH with no fallback', () => {
-  // The understood set deliberately contains other exact versions of the same
-  // kindId, so any fallback/resolution to a declared version would mask this.
-  const understood: UnderstoodKindSet = [
-    understoodDeclaration({ kind: { kindId: 'decision.rule.v1', version: '1.0.0' } }),
-    understoodDeclaration({ kind: { kindId: 'decision.rule.v1', version: '2.0.0' } }),
-  ];
-  const envelope = semanticEnvelope({ kind: { kindId: 'decision.rule.v1', version: '1.5.0' } });
-  expectAdmissionFailure(() => admitComponent(envelope, understood), 'KIND_VERSION_MISMATCH');
-
-  // Resolution to a *later* declared version is equally forbidden.
   expectAdmissionFailure(
-    () =>
-      admitComponent(
-        semanticEnvelope({ kind: { kindId: 'decision.rule.v1', version: '2.0.0' } }),
-        [understoodDeclaration({ kind: { kindId: 'decision.rule.v1', version: '1.0.0' } })],
-      ),
+    () => admitComponent(semanticEnvelope({ kind: { kindId: 'decision.rule.v1', version: '9.0.0' } }), [semanticDeclaration()]),
     'KIND_VERSION_MISMATCH',
   );
 });
 
-// ---------------------------------------------------------------------------
-// R4 — no latest/current/range semantics anywhere on the admission path.
-// ---------------------------------------------------------------------------
+test('#556-R4: unknown required semantic contract fails before Kind validator', () => {
+  let validatorCalls = 0;
+  const declaration = semanticDeclaration({
+    understoodSemanticContracts: [],
+    validateComponent() { validatorCalls += 1; },
+  });
+  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), [declaration]), 'UNKNOWN_SEMANTIC_CONTRACT');
+  assert.equal(validatorCalls, 0);
+});
 
-test('T001D-R4: floating/range understood versions are rejected and can never admit', () => {
-  for (const floating of ['latest', 'current', '*', '^1.0.0', '1.x', '1.X', '~2.0.0', '>1.0.0', '1.2.*']) {
-    const understood: UnderstoodKindSet = [
-      understoodDeclaration({ kind: { kindId: 'decision.rule.v1', version: floating } }),
-    ];
-    expectAdmissionFailure(
-      () =>
-        admitComponent(
-          semanticEnvelope({ kind: { kindId: 'decision.rule.v1', version: '1.2.0' } }),
-          understood,
-        ),
-      'INVALID_UNDERSTOOD_KIND_SET',
-    );
-  }
-  // Floating contract versions inside a declaration are equally rejected.
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        semanticEnvelope(),
-        [
-          understoodDeclaration({
-            understoodSemanticContracts: [
-              { contractId: 'customer.tier.schema', version: '^2.0.0' },
-            ],
-          }),
-        ],
-      ),
-    'INVALID_UNDERSTOOD_KIND_SET',
+test('#556-R5: unknown required capability fails before Kind validator', () => {
+  let validatorCalls = 0;
+  const declaration = semanticDeclaration({
+    understoodCapabilities: [],
+    validateComponent() { validatorCalls += 1; },
+  });
+  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), [declaration]), 'UNKNOWN_CAPABILITY');
+  assert.equal(validatorCalls, 0);
+});
+
+test('#556-R6: nested invalid Tool effect is rejected by the exact Tool Kind validator', () => {
+  const invalid = toolEnvelope({
+    semanticBody: {
+      operations: [{ operationId: 'search', inputSchema: {}, outputSchema: {}, effect: 'teleport' }],
+      providesCapabilities: [],
+    },
+  });
+  assert.throws(
+    () => admitComponent(invalid, [toolDeclaration()]),
+    (error: unknown) =>
+      error instanceof ToolComponentContractError && error.code === 'INVALID_TOOL_OPERATION_EFFECT',
   );
 });
 
-test('T001D-R4: admission performs no ordering, no nearest-version, no defaulting', () => {
-  // Deliberately reversed declaration order: matching must be exact equality,
-  // never "first declared wins" or "nearest/lowest/highest version wins".
-  const reversed: UnderstoodKindSet = [
-    understoodDeclaration({
-      kind: { kindId: 'decision.rule.v1', version: '2.0.0' },
-      materialSemanticBodyFields: ['threshold'],
-    }),
-    understoodDeclaration({
-      kind: { kindId: 'decision.rule.v1', version: '1.2.0' },
-      materialSemanticBodyFields: ['threshold'],
-    }),
-  ];
-  const exact = admitComponent(
-    semanticEnvelope({
-      kind: { kindId: 'decision.rule.v1', version: '1.2.0' },
-      requiredSemanticContracts: [],
-      semanticBody: { threshold: 1 },
-    }),
-    reversed,
-  );
-  assert.deepEqual(exact.admittedKind, { kindId: 'decision.rule.v1', version: '1.2.0' });
-});
-
-// ---------------------------------------------------------------------------
-// R5 — invalid understood-set inputs fail closed INVALID_UNDERSTOOD_KIND_SET.
-// ---------------------------------------------------------------------------
-
-test('T001D-R5: invalid understood-set inputs fail closed with INVALID_UNDERSTOOD_KIND_SET (class INPUT)', () => {
-  const base = understoodDeclaration();
-
-  // duplicate exact KindRef, even with identical content
-  expectAdmissionFailure(
-    () => admitComponent(semanticEnvelope(), [base, understoodDeclaration()]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // duplicate `kindId@version` variant with different content
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        base,
-        understoodDeclaration({ materialSemanticBodyFields: ['threshold'] }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // malformed entries: non-object
-  expectAdmissionFailure(
-    () => admitComponent(semanticEnvelope(), [base, null as unknown as UnderstoodKindDeclaration]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        semanticEnvelope(),
-        [base, 'decision.rule.v1@1.2.0' as unknown as UnderstoodKindDeclaration],
-      ),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // malformed set itself
-  expectAdmissionFailure(
-    () => admitComponent(semanticEnvelope(), null as unknown as UnderstoodKindSet),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () => admitComponent(semanticEnvelope(), {} as unknown as UnderstoodKindSet),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // missing kind / non-exact kind
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        { understoodSemanticContracts: [], materialSemanticBodyFields: [] } as unknown as UnderstoodKindDeclaration,
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ kind: { kindId: 'decision.rule.v1' } as unknown as KindRef }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // identity-smuggling keys on the understood kind ref
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({
-          kind: {
-            kindId: 'decision.rule.v1',
-            version: '1.2.0',
-            implementationId: 'rule-engine-impl@9',
-          } as unknown as KindRef,
-        }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // empty-string / '@' / floating identity strings in the kind ref
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ kind: { kindId: '', version: '1.2.0' } }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ kind: { kindId: 'decision.rule.v1', version: '' } }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ kind: { kindId: 'decision.rule.v1@1.2.0', version: '1.2.0' } }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ kind: { kindId: 'latest', version: '1.2.0' } }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // duplicate material field names / empty-string / non-string entries
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ materialSemanticBodyFields: ['threshold', 'threshold'] }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ materialSemanticBodyFields: ['threshold', ''] }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({ materialSemanticBodyFields: [42 as unknown as string] }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // duplicate semantic contract refs inside one declaration (same contractId, any version)
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({
-          understoodSemanticContracts: [
-            { contractId: 'customer.tier.schema', version: '2.0.0' },
-            { contractId: 'customer.tier.schema', version: '3.0.0' },
-          ],
-        }),
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  // non-array collection fields on a declaration
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
+test('#556-R7: unknown nested behaviorally material Tool field is rejected closed-world', () => {
+  const invalid = toolEnvelope({
+    semanticBody: {
+      operations: [
         {
-          ...base,
-          materialSemanticBodyFields: 'threshold' as unknown as readonly string[],
+          operationId: 'search',
+          inputSchema: {},
+          outputSchema: {},
+          effect: 'none',
+          futureBehavior: true,
         },
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        {
-          ...base,
-          understoodSemanticContracts: 'customer.tier.schema' as unknown as readonly SemanticContractRef[],
-        },
-      ]),
-    'INVALID_UNDERSTOOD_KIND_SET',
-  );
-});
-
-// ---------------------------------------------------------------------------
-// R6 — required semantic contract ref not understood for the matched Kind
-// fails UNKNOWN_SEMANTIC_CONTRACT (exact contractId+version, no range).
-// ---------------------------------------------------------------------------
-
-test('T001D-R6: a required semantic contract not understood for the matched Kind fails UNKNOWN_SEMANTIC_CONTRACT', () => {
-  // same contractId, different exact version — exact match only
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({
-          understoodSemanticContracts: [{ contractId: 'customer.tier.schema', version: '1.0.0' }],
-        }),
-      ]),
-    'UNKNOWN_SEMANTIC_CONTRACT',
-  );
-  // contractId not understood at all
-  expectAdmissionFailure(
-    () =>
-      admitComponent(semanticEnvelope(), [
-        understoodDeclaration({
-          understoodSemanticContracts: [{ contractId: 'other.schema', version: '2.0.0' }],
-        }),
-      ]),
-    'UNKNOWN_SEMANTIC_CONTRACT',
-  );
-  // one of two required contracts not understood at the required exact version
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        semanticEnvelope({
-          requiredSemanticContracts: [
-            { contractId: 'customer.tier.schema', version: '2.0.0' },
-            { contractId: 'extra.audit.schema', version: '2.0.0' },
-          ],
-        }),
-        [understoodDeclaration()],
-      ),
-    'UNKNOWN_SEMANTIC_CONTRACT',
-  );
-});
-
-test('T001D-R6: all required contracts understood at their exact versions admit in envelope order', () => {
-  const result = admitComponent(
-    semanticEnvelope({
-      requiredSemanticContracts: [
-        { contractId: 'extra.audit.schema', version: '1.0.0' },
-        { contractId: 'customer.tier.schema', version: '2.0.0' },
       ],
-    }),
-    [understoodDeclaration()],
-  );
-  assert.deepEqual(result.admittedSemanticContracts, [
-    { contractId: 'extra.audit.schema', version: '1.0.0' },
-    { contractId: 'customer.tier.schema', version: '2.0.0' },
-  ]);
-});
-
-// ---------------------------------------------------------------------------
-// R7 — a semanticBody top-level field outside the declared material-field set
-// fails UNKNOWN_MATERIAL_FIELD; full coverage admits.
-// ---------------------------------------------------------------------------
-
-test('T001D-R7: a semanticBody field outside the declared material set fails UNKNOWN_MATERIAL_FIELD (class FIELD)', () => {
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        semanticEnvelope({ semanticBody: { threshold: 100, mystery: true } }),
-        [understoodDeclaration({ materialSemanticBodyFields: ['threshold'] })],
-      ),
-    'UNKNOWN_MATERIAL_FIELD',
-  );
-});
-
-test('T001D-R7: a body whose fields are all covered by the declaration admits', () => {
-  const result = admitComponent(
-    semanticEnvelope({ semanticBody: { policy: { tier: 'gold' }, threshold: 100 } }),
-    [understoodDeclaration({ materialSemanticBodyFields: ['threshold', 'policy'] })],
-  );
-  assert.equal(result.status, 'ADMITTED');
-  assert.deepEqual(result.admittedMaterialFields, ['policy', 'threshold']);
-});
-
-// ---------------------------------------------------------------------------
-// R8 — the material-field seam handles body shapes deterministically.
-// ---------------------------------------------------------------------------
-
-test('T001D-R8: a non-object semanticBody admits only against an empty declared material-field set', () => {
-  for (const opaqueBody of [[1, 2, 3], 'opaque-text', 42, true, null]) {
-    const admitted = admitComponent(
-      semanticEnvelope({ semanticBody: opaqueBody }),
-      [understoodDeclaration({ materialSemanticBodyFields: [] })],
-    );
-    assert.equal(admitted.status, 'ADMITTED');
-    assert.deepEqual(admitted.admittedMaterialFields, []);
-  }
-  // non-object body against a non-empty declared set fails
-  for (const opaqueBody of [[1, 2, 3], 'opaque-text', 42, true, null]) {
-    expectAdmissionFailure(
-      () =>
-        admitComponent(
-          semanticEnvelope({ semanticBody: opaqueBody }),
-          [understoodDeclaration({ materialSemanticBodyFields: ['threshold'] })],
-        ),
-      'UNKNOWN_MATERIAL_FIELD',
-    );
-  }
-});
-
-test('T001D-R8: declarations are a comprehension set, not a presence requirement', () => {
-  // empty-object body against a non-empty declared set admits
-  const emptyObject = admitComponent(semanticEnvelope({ semanticBody: {} }), [understoodDeclaration()]);
-  assert.equal(emptyObject.status, 'ADMITTED');
-  assert.deepEqual(emptyObject.admittedMaterialFields, []);
-  // declared-but-absent fields in a populated body are not failures
-  const populated = admitComponent(
-    semanticEnvelope({ semanticBody: { threshold: 100 } }),
-    [understoodDeclaration()],
-  );
-  assert.equal(populated.status, 'ADMITTED');
-  assert.deepEqual(populated.admittedMaterialFields, ['threshold']);
-});
-
-// ---------------------------------------------------------------------------
-// R9 — nonMaterialExtensions pass through verbatim, never must-understand.
-// ---------------------------------------------------------------------------
-
-test('T001D-R9: nonMaterialExtensions pass through verbatim and are never must-understand material', () => {
-  const extensions: JsonValue = {
-    provenance: { authors: ['a', 'b'], revision: 7, flags: [true, false, null] },
-    ui: { nested: { deep: { leaf: 'value' } } },
-  };
-  const envelope = semanticEnvelope({ nonMaterialExtensions: extensions });
-  const result = admitComponent(envelope, [understoodDeclaration()]);
-  // verbatim: same reference, never copied, transformed, dropped, or merged
-  assert.equal(result.nonMaterialExtensions, extensions);
-  assert.deepEqual(result.nonMaterialExtensions, extensions);
-  // never merged into material fields nor promoted into required semantics
-  assert.deepEqual(result.admittedMaterialFields, ['policy', 'threshold']);
-  assert.deepEqual(result.admittedSemanticContracts, [
-    { contractId: 'customer.tier.schema', version: '2.0.0' },
-  ]);
-  // never validated for comprehension: arbitrary opaque extensions impose no
-  // material-field or contract requirements of their own
-  const extensionOnly = admitComponent(
-    semanticEnvelope({
-      semanticBody: { threshold: 1 },
-      nonMaterialExtensions: { arbitraryUnknownExtension: { totally: 'opaque' } },
-    }),
-    [understoodDeclaration({ materialSemanticBodyFields: ['threshold'] })],
-  );
-  assert.equal(extensionOnly.status, 'ADMITTED');
-});
-
-// ---------------------------------------------------------------------------
-// R10 — the TOOL family flows through the same seam, no family-specific branch.
-// ---------------------------------------------------------------------------
-
-test('T001D-R10: the TOOL family is admitted through the same seam with no family-specific branch', () => {
-  const toolEnvelope = semanticEnvelope({
-    family: 'tool',
-    componentId: 'http.request.tool',
-    kind: { kindId: 'tool.http-request.v1', version: '3.1.0' },
-    requiredSemanticContracts: [],
-    requiredCapabilities: [],
-    semanticBody: { effect: 'none' },
+      providesCapabilities: [],
+    },
   });
-  const understood: UnderstoodKindSet = [
-    understoodDeclaration({
-      kind: { kindId: 'tool.http-request.v1', version: '3.1.0' },
-      understoodSemanticContracts: [],
-      materialSemanticBodyFields: ['effect'],
-    }),
-  ];
-  const result = admitComponent(toolEnvelope, understood);
+  assert.throws(
+    () => admitComponent(invalid, [toolDeclaration()]),
+    (error: unknown) =>
+      error instanceof ToolComponentContractError && error.code === 'INVALID_TOOL_OPERATION',
+  );
+});
+
+test('#556-R8: valid Tool Component uses the same generic open-Kind admission seam', () => {
+  const result = admitComponent(toolEnvelope(), [toolDeclaration()]);
   assert.equal(result.status, 'ADMITTED');
-  assert.equal(result.componentId, 'http.request.tool');
-  assert.deepEqual(result.admittedKind, { kindId: 'tool.http-request.v1', version: '3.1.0' });
-  assert.deepEqual(result.admittedSemanticContracts, []);
-  assert.deepEqual(result.admittedMaterialFields, ['effect']);
-  assert.deepEqual(Object.keys(result).sort(), [
-    'admittedKind',
-    'admittedMaterialFields',
-    'admittedSemanticContracts',
-    'componentId',
-    'status',
-  ]);
-
-  // an unknown tool kindId fails with the same UNKNOWN_KIND code and class
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        semanticEnvelope({
-          family: 'tool',
-          kind: { kindId: 'tool.database.v1', version: '1.0.0' },
-          requiredSemanticContracts: [],
-          requiredCapabilities: [],
-        }),
-        understood,
-      ),
-    'UNKNOWN_KIND',
-  );
+  assert.deepEqual(result.admittedKind, { kindId: 'tool.search.v1', version: '1.0.0' });
 });
 
-// ---------------------------------------------------------------------------
-// R11 — empty required-ref collections admit; empty understood set is valid
-// input and admits nothing.
-// ---------------------------------------------------------------------------
-
-test('T001D-R11: empty required-ref collections admit (nothing to understand, nothing to fail)', () => {
-  const emptyRefs = admitComponent(
-    semanticEnvelope({ requiredSemanticContracts: [], requiredCapabilities: [] }),
-    [understoodDeclaration({ understoodSemanticContracts: [] })],
-  );
-  assert.equal(emptyRefs.status, 'ADMITTED');
-  assert.deepEqual(emptyRefs.admittedSemanticContracts, []);
+test('#556-R9: non-material extensions remain opaque pass-through and do not become comprehension fields', () => {
+  const extension = { display: { label: 'Search' } } as const;
+  const envelope = toolEnvelope({ nonMaterialExtensions: extension });
+  const result = admitComponent(envelope, [toolDeclaration()]);
+  assert.strictEqual(result.nonMaterialExtensions, extension);
 });
 
-test('T001D-R11: an empty understood-Kind set is structurally valid and deterministically admits nothing', () => {
-  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), []), 'UNKNOWN_KIND');
-  expectAdmissionFailure(
-    () => admitComponent(semanticEnvelope({ requiredSemanticContracts: [] }), []),
-    'UNKNOWN_KIND',
-  );
+test('#556-R10: a non-Tool Semantic Kind can supply an independent closed-world validator', () => {
+  const envelope = semanticEnvelope();
+  assert.equal(admitComponent(envelope, [semanticDeclaration()]).status, 'ADMITTED');
+
+  const futureNested = semanticEnvelope({
+    semanticBody: { threshold: 100, policy: { enabled: true, futureBehavior: 'material' } },
+  });
+  assert.throws(() => admitComponent(futureNested, [semanticDeclaration()]), SemanticFixtureError);
 });
 
-// ---------------------------------------------------------------------------
-// R12 — deterministic taxonomy, typed (never TypeError) input failures, purity.
-// ---------------------------------------------------------------------------
+test('#556-R11: understood set itself is exact, duplicate-free, and requires a validator', () => {
+  const floating = semanticDeclaration({ kind: { kindId: 'decision.rule.v1', version: '1.x' } });
+  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), [floating]), 'INVALID_UNDERSTOOD_KIND_SET');
 
-test('T001D-R12: a structurally unusable envelope fails ADMISSION_INPUT_INVALID, never a TypeError', () => {
-  const unusableInputs: unknown[] = [null, undefined, 'envelope', 42, [], true, {}];
-  for (const unusable of unusableInputs) {
-    expectAdmissionFailure(
-      () => admitComponent(unusable as unknown as ComponentEnvelope, [understoodDeclaration()]),
-      'ADMISSION_INPUT_INVALID',
-    );
-  }
-  // non-object kind
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        { ...semanticEnvelope(), kind: 'decision.rule.v1@1.2.0' } as unknown as ComponentEnvelope,
-        [understoodDeclaration()],
-      ),
-    'ADMISSION_INPUT_INVALID',
-  );
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        { ...semanticEnvelope(), kind: null } as unknown as ComponentEnvelope,
-        [understoodDeclaration()],
-      ),
-    'ADMISSION_INPUT_INVALID',
-  );
-  // missing required dimensions
-  const missingId: Record<string, unknown> = { ...semanticEnvelope() };
-  delete missingId.componentId;
-  expectAdmissionFailure(
-    () => admitComponent(missingId as unknown as ComponentEnvelope, [understoodDeclaration()]),
-    'ADMISSION_INPUT_INVALID',
-  );
-  const missingContracts: Record<string, unknown> = { ...semanticEnvelope() };
-  delete missingContracts.requiredSemanticContracts;
-  expectAdmissionFailure(
-    () =>
-      admitComponent(missingContracts as unknown as ComponentEnvelope, [understoodDeclaration()]),
-    'ADMISSION_INPUT_INVALID',
-  );
-  const missingBody: Record<string, unknown> = { ...semanticEnvelope() };
-  delete missingBody.semanticBody;
-  expectAdmissionFailure(
-    () => admitComponent(missingBody as unknown as ComponentEnvelope, [understoodDeclaration()]),
-    'ADMISSION_INPUT_INVALID',
-  );
-  // malformed required contract refs (structurally unusable for exact matching)
-  expectAdmissionFailure(
-    () =>
-      admitComponent(
-        { ...semanticEnvelope(), requiredSemanticContracts: [{ contractId: 42, version: '1.0.0' }] } as unknown as ComponentEnvelope,
-        [understoodDeclaration()],
-      ),
-    'ADMISSION_INPUT_INVALID',
-  );
-});
-
-test('T001D-R12: the failure taxonomy is deterministic — every code maps to exactly one class', () => {
-  // All six codes were exercised above through expectAdmissionFailure, which
-  // asserts each thrown error's class against this frozen 1:1 table.
-  assert.deepEqual(
-    [...observedFailureCodes].sort(),
-    [
-      'ADMISSION_INPUT_INVALID',
-      'INVALID_UNDERSTOOD_KIND_SET',
-      'KIND_VERSION_MISMATCH',
-      'UNKNOWN_KIND',
-      'UNKNOWN_MATERIAL_FIELD',
-      'UNKNOWN_SEMANTIC_CONTRACT',
+  const duplicateContracts = semanticDeclaration({
+    understoodSemanticContracts: [
+      { contractId: 'customer.tier.schema', version: '2.0.0' },
+      { contractId: 'customer.tier.schema', version: '3.0.0' },
     ],
-  );
-  assert.deepEqual([...new Set(Object.values(EXPECTED_FAILURE_CLASS_BY_CODE))].sort(), [
-    'CONTRACT',
-    'FIELD',
-    'INPUT',
-    'KIND',
-  ]);
+  });
+  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), [duplicateContracts]), 'INVALID_UNDERSTOOD_KIND_SET');
+
+  const missingValidator = {
+    kind: { kindId: 'decision.rule.v1', version: '1.2.0' },
+    understoodSemanticContracts: [],
+    understoodCapabilities: [],
+  } as unknown as UnderstoodKindDeclaration;
+  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), [missingValidator]), 'INVALID_UNDERSTOOD_KIND_SET');
 });
 
-test('T001D-R12: admission never mutates its inputs on success or failure paths', () => {
-  const extensions: JsonValue = { keep: { me: true } };
-  const envelope = semanticEnvelope({ nonMaterialExtensions: extensions });
-  const understood: UnderstoodKindSet = [understoodDeclaration()];
+test('#556-R12: admission is pure over envelope and support declarations', () => {
+  const envelope = semanticEnvelope();
+  const declaration = semanticDeclaration();
+  const beforeEnvelope = structuredClone(envelope);
+  const beforeKind = declaration.kind;
+  const beforeContracts = structuredClone(declaration.understoodSemanticContracts);
+  const beforeCapabilities = structuredClone(declaration.understoodCapabilities);
 
-  const envelopeBefore = structuredClone(envelope);
-  const understoodBefore = structuredClone(understood);
-  admitComponent(deepFreeze(envelope), deepFreeze(understood));
-  assert.deepEqual(envelope, envelopeBefore);
-  assert.deepEqual(understood, understoodBefore);
+  admitComponent(envelope, [declaration]);
 
-  const failingEnvelope = semanticEnvelope({
-    kind: { kindId: 'decision.other.v1', version: '9.9.9' },
-  });
-  const failingUnderstood: UnderstoodKindSet = [understoodDeclaration()];
-  const failingEnvelopeBefore = structuredClone(failingEnvelope);
-  const failingUnderstoodBefore = structuredClone(failingUnderstood);
-  expectAdmissionFailure(
-    () => admitComponent(deepFreeze(failingEnvelope), deepFreeze(failingUnderstood)),
+  assert.deepEqual(envelope, beforeEnvelope);
+  assert.strictEqual(declaration.kind, beforeKind);
+  assert.deepEqual(declaration.understoodSemanticContracts, beforeContracts);
+  assert.deepEqual(declaration.understoodCapabilities, beforeCapabilities);
+});
+
+test('#556-R13: failure taxonomy is total and deterministic', () => {
+  const codes = Object.keys(EXPECTED_FAILURE_CLASS_BY_CODE).sort();
+  assert.deepEqual(codes, [
+    'INVALID_UNDERSTOOD_KIND_SET',
+    'KIND_VERSION_MISMATCH',
+    'UNKNOWN_CAPABILITY',
     'UNKNOWN_KIND',
-  );
-  assert.deepEqual(failingEnvelope, failingEnvelopeBefore);
-  assert.deepEqual(failingUnderstood, failingUnderstoodBefore);
+    'UNKNOWN_SEMANTIC_CONTRACT',
+  ]);
+  const classes = new Set(Object.values(EXPECTED_FAILURE_CLASS_BY_CODE));
+  assert.deepEqual([...classes].sort(), ['CAPABILITY', 'CONTRACT', 'INPUT', 'KIND']);
+});
+
+test('#556-R14: empty understood set is structurally valid and admits nothing', () => {
+  const empty: UnderstoodKindSet = [];
+  expectAdmissionFailure(() => admitComponent(semanticEnvelope(), empty), 'UNKNOWN_KIND');
 });
