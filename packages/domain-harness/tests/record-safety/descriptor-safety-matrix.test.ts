@@ -111,7 +111,7 @@ function graphEnvelope(overrides: Partial<DefinitionGraphEnvelope> = {}): Defini
 
 test('#588-M1: ComponentEnvelope accessor kind is rejected before any authority use (zero getter executions)', () => {
   let kindReads = 0;
-  const envelope = semanticEnvelope() as Record<string, unknown>;
+  const envelope = semanticEnvelope() as unknown as Record<string, unknown>;
   delete envelope.kind;
   Object.defineProperty(envelope, 'kind', {
     enumerable: true,
@@ -134,7 +134,7 @@ test('#588-M1: ComponentEnvelope accessor kind is rejected before any authority 
 
 test('#588-M1: ComponentEnvelope accessor semanticBody is rejected as an envelope descriptor violation', () => {
   let bodyReads = 0;
-  const envelope = semanticEnvelope() as Record<string, unknown>;
+  const envelope = semanticEnvelope() as unknown as Record<string, unknown>;
   delete envelope.semanticBody;
   Object.defineProperty(envelope, 'semanticBody', {
     enumerable: true,
@@ -206,7 +206,7 @@ test('#588-M2: ToolOperationsDeclaration accessor providesCapabilities is reject
 test('#588-M3: DefinitionGraphEnvelope accessor components/relations are rejected before graph authority use', () => {
   for (const field of ['components', 'relations'] as const) {
     let reads = 0;
-    const graph = graphEnvelope() as Record<string, unknown>;
+    const graph = graphEnvelope() as unknown as Record<string, unknown>;
     delete graph[field];
     Object.defineProperty(graph, field, {
       enumerable: true,
@@ -243,7 +243,7 @@ test('#588-M3: an accessor-backed relation entry is a typed relation rejection',
     });
   }
   assert.throws(
-    () => validateDefinitionGraphEnvelope(graphEnvelope({ relations: [relation as DefinitionRelation] })),
+    () => validateDefinitionGraphEnvelope(graphEnvelope({ relations: [relation as unknown as DefinitionRelation] })),
     (error: unknown) =>
       error instanceof DefinitionGraphContractError && error.code === 'INVALID_RELATION',
   );
@@ -306,7 +306,7 @@ test('#588-M4: an accessor-backed requirement entry is a typed requirement rejec
     () =>
       validateToolResourceRequirements(toolEnvelope(), {
         componentId: 'tool.search',
-        requirements: [requirement as ToolResourceRequirementsDeclaration['requirements'][number]],
+        requirements: [requirement as unknown as ToolResourceRequirementsDeclaration['requirements'][number]],
       }),
     (error: unknown) =>
       error instanceof ResourceRequirementContractError &&
@@ -320,7 +320,7 @@ test('#588-M4: an accessor-backed requirement entry is a typed requirement rejec
 // ---------------------------------------------------------------------------
 
 test('#588-M5: symbol-keyed and non-enumerable hidden props are rejected on closed-world contracts', () => {
-  const symbolKeyed = semanticEnvelope() as Record<string, unknown>;
+  const symbolKeyed = semanticEnvelope() as unknown as Record<string, unknown>;
   Object.defineProperty(symbolKeyed, Symbol('hiddenAuthority'), {
     value: 'smuggled',
     enumerable: true,
@@ -331,7 +331,7 @@ test('#588-M5: symbol-keyed and non-enumerable hidden props are rejected on clos
       error instanceof ComponentContractError && error.code === 'INVALID_COMPONENT_ENVELOPE',
   );
 
-  const nonEnumerable = semanticEnvelope() as Record<string, unknown>;
+  const nonEnumerable = semanticEnvelope() as unknown as Record<string, unknown>;
   Object.defineProperty(nonEnumerable, 'hiddenAuthority', {
     value: 'smuggled',
     enumerable: false,
@@ -394,7 +394,7 @@ test('#588-M6: class-prototype contract records are rejected per the declared po
   );
 
   const declaration = understoodDeclaration();
-  (declaration as Record<string, unknown>).kind = new ClassKindRef();
+  (declaration as unknown as Record<string, unknown>).kind = new ClassKindRef();
   assert.throws(
     () => admitComponent(semanticEnvelope(), [declaration]),
     (error: unknown) =>
@@ -445,7 +445,7 @@ test('#588-M7: a getter that would drift between validation and use is never rea
   // snapshots; a hostile getter on the declaration kind cannot influence
   // either validation or the admission decision.
   let reads = 0;
-  const declaration = understoodDeclaration() as Record<string, unknown>;
+  const declaration = understoodDeclaration() as unknown as Record<string, unknown>;
   delete declaration.kind;
   Object.defineProperty(declaration, 'kind', {
     enumerable: true,
@@ -538,7 +538,7 @@ test('#557-M9: x-range/partial versions are now rejected in every previously-lax
     );
 
     const tool = toolEnvelope();
-    (tool.semanticBody as { providesCapabilities: CapabilityContractRef[] }).providesCapabilities =
+    (tool.semanticBody as unknown as { providesCapabilities: CapabilityContractRef[] }).providesCapabilities =
       [{ capabilityId: 'search', version }];
     assert.throws(
       () => validateToolComponent(tool),
