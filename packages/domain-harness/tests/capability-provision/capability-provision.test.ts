@@ -600,9 +600,10 @@ test('T003B-R14: selection evidence carries component identity + capability ref 
 // Module surface: only the typed error and the pure selection function.
 // ---------------------------------------------------------------------------
 
-test('T003B: the module exposes only the typed error and the selection function', () => {
+test('T003B: the module exposes the typed error and both selection functions', () => {
   assert.deepEqual(Object.keys(capabilityProvisionModule).sort(), [
     'CapabilityProvisionContractError',
+    'resolveCurrentCapabilityProvider',
     'selectCapabilityProvider',
   ]);
 });
