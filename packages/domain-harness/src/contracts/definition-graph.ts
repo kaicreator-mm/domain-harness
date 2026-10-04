@@ -22,7 +22,10 @@ import {
   type ComponentEnvelope,
   type ComponentId,
 } from './component.js';
-import { computeComponentSemanticDigest } from './component-digest.js';
+import {
+  componentSemanticDigestMaterial,
+  type ComponentSemanticDigestMaterial,
+} from './component-digest.js';
 import {
   canonicalizeJson,
   computeCanonicalJsonDigest,
@@ -355,6 +358,17 @@ function compareIds(a: string, b: string): number {
  * excluded and required semantic/capability reference collections retain the
  * same normalized set semantics at both Component and Definition identity
  * layers. Typed relations are included exactly once at graph level.
+ *
+ * Torn-snapshot safety (#555 FULL_REVIEW_SUPPLEMENT): `Sha256Port` is async
+ * and the caller owns the envelope, so after validation every
+ * authority-bearing value that enters graph material is snapshotted
+ * synchronously, before the first caller-visible async suspension —
+ * `graphId` (an immutable string), each relation copied field-by-field into
+ * a fresh record, and each Component's canonical digest material built via
+ * the exported pure T001B normalizer. `envelope.graphId`,
+ * `envelope.components` and `envelope.relations` are never re-read after
+ * that point, so a caller mutating its own graph while a digest promise is
+ * pending can never produce a torn hybrid snapshot.
  */
 export async function computeDefinitionGraphDigest(
   envelope: DefinitionGraphEnvelope,
@@ -362,21 +376,39 @@ export async function computeDefinitionGraphDigest(
 ): Promise<ContentDigest> {
   validateDefinitionGraphEnvelope(envelope);
 
-  const components: Array<{ componentId: ComponentId; componentSemanticDigest: ContentDigest }> = [];
-  for (const component of [...envelope.components].sort((a, b) =>
-    compareIds(a.componentId, b.componentId),
-  )) {
-    components.push({
+  // Synchronous admitted-graph snapshot — see the doc comment above.
+  const graphId: string = envelope.graphId;
+  const relationSnapshot: DefinitionRelation[] = envelope.relations
+    .map((relation) => ({
+      relationId: relation.relationId,
+      relationKind: relation.relationKind,
+      sourceComponentId: relation.sourceComponentId,
+      targetComponentId: relation.targetComponentId,
+    }))
+    .sort((a, b) => compareIds(a.relationId, b.relationId));
+  const componentMaterials: Array<{
+    componentId: ComponentId;
+    material: ComponentSemanticDigestMaterial;
+  }> = [...envelope.components]
+    .sort((a, b) => compareIds(a.componentId, b.componentId))
+    .map((component) => ({
       componentId: component.componentId,
-      componentSemanticDigest: await computeComponentSemanticDigest(component, sha256),
-    });
-  }
+      material: componentSemanticDigestMaterial(component),
+    }));
+
+  const components: Array<{ componentId: ComponentId; componentSemanticDigest: ContentDigest }> =
+    await Promise.all(
+      componentMaterials.map(async ({ componentId, material }) => ({
+        componentId,
+        componentSemanticDigest: await computeCanonicalJsonDigest(material, sha256),
+      })),
+    );
 
   const material = {
     domain: DEFINITION_GRAPH_DIGEST_DOMAIN,
-    graphId: envelope.graphId,
+    graphId,
     components,
-    relations: [...envelope.relations].sort((a, b) => compareIds(a.relationId, b.relationId)),
+    relations: relationSnapshot,
   };
   return computeCanonicalJsonDigest(material, sha256);
 }
