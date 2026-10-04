@@ -1,11 +1,13 @@
 import { deriveDurableControlTurnId, type AdmissionDecisionSchema, type AdmissionTurnSource } from '../admission/index.js';
 import type { CompiledArtifactIdentity, BehaviorallyRelevantSemanticDependencies } from '../contracts/domain-data.js';
 import type { JsonObject, JsonSchema, JsonValue } from '../contracts/json.js';
-import type {
-  DecisionResolverHarnessConfig,
-  DecisionResolverInvocation,
-  DecisionResolverPorts,
-  DecisionResolverPromotedConfig,
+import {
+  DecisionResolverError,
+  type DecisionResolverHarnessConfig,
+  type DecisionResolverInvocation,
+  type DecisionResolverPorts,
+  type DecisionResolverPromotedConfig,
+  type ResolvedDecision,
 } from '../decision-resolver/contracts.js';
 import type { HarnessExecutionJournalStore } from '../harness/execution-journal.js';
 import type { BusinessHarnessInput } from '../harness/contract.js';
@@ -19,6 +21,7 @@ import { DomainHarnessJsonSchemaV1Validator } from '../schema/domainharness-json
 import type {
   CompiledSemanticDecisionDescriptor,
   SemanticDecisionCachePolicy,
+  SemanticDecisionUnavailableDisposition,
 } from '../v2/contracts/semantic-decision.js';
 import type { ExpressionExecutorPort } from '../v2/contracts/host.js';
 import type { GovernanceExecutionPin } from '../governance/execution-binding.js';
@@ -351,5 +354,97 @@ export async function bindSemanticDecisionTurn<TResult extends JsonValue = JsonV
   return {
     invocation: invocation as DecisionResolverInvocation<TResult>,
     decisionSchema,
+  };
+}
+
+/**
+ * v0.6 T005 (issue #540, frozen L2 C3): the declared semantic-unavailable
+ * disposition applied at the T004 seam.
+ *
+ * When the existing resolver exhausted every deterministic source and reached
+ * the HarnessMachine stage with unusable model material — exactly its existing
+ * `DECISION_RESOLVER_HARNESS_UNCONFIGURED` availability signal — the compiled
+ * declaration's `unavailable` disposition decides what happens. The
+ * disposition is read ONLY from the compiled declaration; a host cannot
+ * inject or override it. No provider health check, retry, routing or
+ * undeclared fallback exists.
+ *
+ *   fail-closed    → `{ kind: 'fail-closed' }`: the caller raises the typed
+ *                    `RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE` terminal
+ *                    (L2 §7 SEMANTIC_INTELLIGENCE_UNAVAILABLE meaning: no
+ *                    fabricated answer, no mutation).
+ *   declared-event → `{ kind: 'declared-event', resolution }`: the declared
+ *                    outcome/eventType materialized as resolver-shaped DATA
+ *                    (source `declared-unavailable`, zero model calls) for the
+ *                    SAME Central Admission path — guards, hard invariants and
+ *                    the shared schema gate still apply, and an admission
+ *                    denial of it is final.
+ *
+ * Any other error (and, defensively, a declaration with no disposition
+ * material) is `not-applicable`: the original failure surfaces exactly as
+ * T004 left it.
+ */
+export type DeclaredSemanticUnavailableOutcome<TResult extends JsonValue = JsonValue> =
+  | { readonly kind: 'not-applicable' }
+  | { readonly kind: 'fail-closed'; readonly reason: string }
+  | { readonly kind: 'declared-event'; readonly resolution: ResolvedDecision<TResult> };
+
+export function declaredSemanticUnavailableOutcome<TResult extends JsonValue = JsonValue>(
+  declaration: CompiledSemanticDecisionDescriptor,
+  error: unknown,
+): DeclaredSemanticUnavailableOutcome<TResult> {
+  // The ONLY availability signal this disposition may consume is the existing
+  // resolver signal for "resolution reached the HarnessMachine fallback with
+  // unusable model material". Everything else surfaces raw.
+  if (!(error instanceof DecisionResolverError) || error.code !== 'DECISION_RESOLVER_HARNESS_UNCONFIGURED') {
+    return { kind: 'not-applicable' };
+  }
+  const disposition: SemanticDecisionUnavailableDisposition | undefined = declaration.unavailable;
+  if (disposition === undefined) {
+    // Defensive: the T001 compiled contract always materializes the
+    // disposition; absent material means no declared behavior exists, so the
+    // raw resolver failure is preserved instead of inventing one.
+    return { kind: 'not-applicable' };
+  }
+  if (disposition.kind === 'fail-closed') {
+    return {
+      kind: 'fail-closed',
+      reason: `semantic decision "${declaration.decisionId}" required fresh semantics (every deterministic source fell through) but model capability is unavailable for this binding and the compiled declaration declares the fail-closed unavailable disposition; no semantic answer is fabricated and no state changes (frozen L2 §7 SEMANTIC_INTELLIGENCE_UNAVAILABLE)`,
+    };
+  }
+  // Defensive fail-closed BEFORE any admission work: the declared event/outcome
+  // must be exactly the declaration's own compiled vocabulary. The T001
+  // compile/activation authorities already enforce this; a mismatching
+  // declaration can only be foreign/tampered material, and the runtime never
+  // invents or repairs vocabulary.
+  if (
+    !declaration.allowedEventTypes.includes(disposition.eventType)
+    || !declaration.allowedOutcomes.includes(disposition.outcome)
+  ) {
+    throw new DomainRuntimeV3Error(
+      'RUNTIME_V3_DECISION_BINDING_INCOMPATIBLE',
+      `semantic decision "${declaration.decisionId}" declares an unavailable disposition with event "${disposition.eventType}"/outcome "${disposition.outcome}" outside its own compiled allowedEventTypes [${declaration.allowedEventTypes.join(', ')}] / allowedOutcomes [${declaration.allowedOutcomes.join(', ')}]; fail closed before any admission work`,
+    );
+  }
+  return {
+    kind: 'declared-event',
+    resolution: {
+      source: 'declared-unavailable',
+      // The declared material carries exactly the declared outcome and event
+      // type — nothing else is invented (no data, no payload). The ONE shared
+      // declaration result schema re-validates it inside Central Admission.
+      structuredDecision: {
+        decision: { outcome: disposition.outcome },
+        event: { type: disposition.eventType },
+      } as unknown as TResult,
+      // Nothing produced this material: no producer artifact, no model calls,
+      // no journal evidence. The failed attempt's cache telemetry is not
+      // imputed; the declared material is not cache-derived.
+      provenance: {},
+      freshModelCallCount: 0,
+      llmAvoided: true,
+      cacheDisposition: { read: 'disabled' },
+      telemetry: [],
+    },
   };
 }

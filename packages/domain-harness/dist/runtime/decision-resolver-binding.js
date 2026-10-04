@@ -1,4 +1,5 @@
 import { deriveDurableControlTurnId } from '../admission/index.js';
+import { DecisionResolverError, } from '../decision-resolver/contracts.js';
 import { DomainHarnessJsonSchemaV1Validator } from '../schema/domainharness-json-schema-v1.js';
 import { DomainRuntimeV3Error } from './runtime-v3-errors.js';
 /**
@@ -172,6 +173,57 @@ export async function bindSemanticDecisionTurn(request, authority) {
     return {
         invocation: invocation,
         decisionSchema,
+    };
+}
+export function declaredSemanticUnavailableOutcome(declaration, error) {
+    // The ONLY availability signal this disposition may consume is the existing
+    // resolver signal for "resolution reached the HarnessMachine fallback with
+    // unusable model material". Everything else surfaces raw.
+    if (!(error instanceof DecisionResolverError) || error.code !== 'DECISION_RESOLVER_HARNESS_UNCONFIGURED') {
+        return { kind: 'not-applicable' };
+    }
+    const disposition = declaration.unavailable;
+    if (disposition === undefined) {
+        // Defensive: the T001 compiled contract always materializes the
+        // disposition; absent material means no declared behavior exists, so the
+        // raw resolver failure is preserved instead of inventing one.
+        return { kind: 'not-applicable' };
+    }
+    if (disposition.kind === 'fail-closed') {
+        return {
+            kind: 'fail-closed',
+            reason: `semantic decision "${declaration.decisionId}" required fresh semantics (every deterministic source fell through) but model capability is unavailable for this binding and the compiled declaration declares the fail-closed unavailable disposition; no semantic answer is fabricated and no state changes (frozen L2 §7 SEMANTIC_INTELLIGENCE_UNAVAILABLE)`,
+        };
+    }
+    // Defensive fail-closed BEFORE any admission work: the declared event/outcome
+    // must be exactly the declaration's own compiled vocabulary. The T001
+    // compile/activation authorities already enforce this; a mismatching
+    // declaration can only be foreign/tampered material, and the runtime never
+    // invents or repairs vocabulary.
+    if (!declaration.allowedEventTypes.includes(disposition.eventType)
+        || !declaration.allowedOutcomes.includes(disposition.outcome)) {
+        throw new DomainRuntimeV3Error('RUNTIME_V3_DECISION_BINDING_INCOMPATIBLE', `semantic decision "${declaration.decisionId}" declares an unavailable disposition with event "${disposition.eventType}"/outcome "${disposition.outcome}" outside its own compiled allowedEventTypes [${declaration.allowedEventTypes.join(', ')}] / allowedOutcomes [${declaration.allowedOutcomes.join(', ')}]; fail closed before any admission work`);
+    }
+    return {
+        kind: 'declared-event',
+        resolution: {
+            source: 'declared-unavailable',
+            // The declared material carries exactly the declared outcome and event
+            // type — nothing else is invented (no data, no payload). The ONE shared
+            // declaration result schema re-validates it inside Central Admission.
+            structuredDecision: {
+                decision: { outcome: disposition.outcome },
+                event: { type: disposition.eventType },
+            },
+            // Nothing produced this material: no producer artifact, no model calls,
+            // no journal evidence. The failed attempt's cache telemetry is not
+            // imputed; the declared material is not cache-derived.
+            provenance: {},
+            freshModelCallCount: 0,
+            llmAvoided: true,
+            cacheDisposition: { read: 'disabled' },
+            telemetry: [],
+        },
     };
 }
 //# sourceMappingURL=decision-resolver-binding.js.map

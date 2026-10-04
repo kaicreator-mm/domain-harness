@@ -14,7 +14,17 @@ import type { ExactSemanticCacheStore, ObservedDependencySet, RequiredSemanticPr
  * subworkflow → HarnessMachine. The resolver never reorders and never retries
  * a later source after an earlier source produced an admitted result.
  */
-export type DecisionResolverSource = 'rule' | 'exact-cache' | 'promoted-subworkflow' | 'harness-machine';
+export type DecisionResolverSource = 'rule' | 'exact-cache' | 'promoted-subworkflow' | 'harness-machine'
+/**
+ * v0.6 T005 (issue #540, frozen L2 C3): marker for decision material the
+ * RUNTIME carried from a compiled declaration's `declared-event`
+ * semantic-unavailable disposition into the SAME Central Admission path
+ * after the existing model-unavailability signal. It is never returned by
+ * `resolveDecision()` and never introduces a fifth resolver stage — the
+ * frozen source order above is unchanged; this value only keeps admission
+ * evidence honest (the material is declared, not a model/harness product).
+ */
+ | 'declared-unavailable';
 export type DecisionResolverErrorCode = 
 /** Deterministic rule contract/integrity error (frozen L2 §18). */
 'DECISION_RESOLVER_RULE_FAILED'

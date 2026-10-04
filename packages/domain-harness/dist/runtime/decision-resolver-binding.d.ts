@@ -1,7 +1,7 @@
 import { type AdmissionDecisionSchema, type AdmissionTurnSource } from '../admission/index.js';
 import type { CompiledArtifactIdentity, BehaviorallyRelevantSemanticDependencies } from '../contracts/domain-data.js';
 import type { JsonObject, JsonValue } from '../contracts/json.js';
-import type { DecisionResolverInvocation, DecisionResolverPorts } from '../decision-resolver/contracts.js';
+import { type DecisionResolverInvocation, type DecisionResolverPorts, type ResolvedDecision } from '../decision-resolver/contracts.js';
 import type { HarnessExecutionJournalStore } from '../harness/execution-journal.js';
 import type { BusinessHarnessInput } from '../harness/contract.js';
 import type { PromotedChildQueryExecutorPort } from '../promoted-child/runtime.js';
@@ -136,4 +136,41 @@ export interface SemanticDecisionRuntimeBinding<TResult extends JsonValue = Json
  * declaration material cannot be bound exactly.
  */
 export declare function bindSemanticDecisionTurn<TResult extends JsonValue = JsonValue>(request: ResolveAndAdmitTurnRequest<TResult>, authority: SemanticDecisionRuntimeAuthority): Promise<SemanticDecisionRuntimeBinding<TResult>>;
+/**
+ * v0.6 T005 (issue #540, frozen L2 C3): the declared semantic-unavailable
+ * disposition applied at the T004 seam.
+ *
+ * When the existing resolver exhausted every deterministic source and reached
+ * the HarnessMachine stage with unusable model material — exactly its existing
+ * `DECISION_RESOLVER_HARNESS_UNCONFIGURED` availability signal — the compiled
+ * declaration's `unavailable` disposition decides what happens. The
+ * disposition is read ONLY from the compiled declaration; a host cannot
+ * inject or override it. No provider health check, retry, routing or
+ * undeclared fallback exists.
+ *
+ *   fail-closed    → `{ kind: 'fail-closed' }`: the caller raises the typed
+ *                    `RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE` terminal
+ *                    (L2 §7 SEMANTIC_INTELLIGENCE_UNAVAILABLE meaning: no
+ *                    fabricated answer, no mutation).
+ *   declared-event → `{ kind: 'declared-event', resolution }`: the declared
+ *                    outcome/eventType materialized as resolver-shaped DATA
+ *                    (source `declared-unavailable`, zero model calls) for the
+ *                    SAME Central Admission path — guards, hard invariants and
+ *                    the shared schema gate still apply, and an admission
+ *                    denial of it is final.
+ *
+ * Any other error (and, defensively, a declaration with no disposition
+ * material) is `not-applicable`: the original failure surfaces exactly as
+ * T004 left it.
+ */
+export type DeclaredSemanticUnavailableOutcome<TResult extends JsonValue = JsonValue> = {
+    readonly kind: 'not-applicable';
+} | {
+    readonly kind: 'fail-closed';
+    readonly reason: string;
+} | {
+    readonly kind: 'declared-event';
+    readonly resolution: ResolvedDecision<TResult>;
+};
+export declare function declaredSemanticUnavailableOutcome<TResult extends JsonValue = JsonValue>(declaration: CompiledSemanticDecisionDescriptor, error: unknown): DeclaredSemanticUnavailableOutcome<TResult>;
 //# sourceMappingURL=decision-resolver-binding.d.ts.map

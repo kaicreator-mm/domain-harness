@@ -62,6 +62,14 @@ export interface DomainRuntimeV3 {
      * guard/hard-invariant/schema denial of the resolved result is final for
      * the turn (no fallback, no retry, no bypass). A missing/incompatible
      * declaration binding fails closed with `RUNTIME_V3_DECISION_BINDING_*`.
+     *
+     * v0.6 T005: deterministic-only / no-model operation stays first-class, and
+     * when fresh semantics are required but model capability is unavailable the
+     * compiled declaration's `unavailable` disposition is applied — `fail-closed`
+     * raises the typed `RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE` terminal;
+     * `declared-event` carries the declared outcome/eventType as data into this
+     * SAME admission path. No fabricated answer, no undeclared fallback, no
+     * provider/model routing.
      */
     resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<CentralAdmissionOutcome>;
     /** T-020 capture bound to a caller-supplied exact authority context (shadow/rollback/metric points). */
