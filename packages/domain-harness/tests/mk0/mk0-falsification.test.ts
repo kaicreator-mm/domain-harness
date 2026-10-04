@@ -429,7 +429,7 @@ test('MK0-12 candidate/currentness provider selection must NOT be misreported as
 // it when the corresponding repair merge lands.
 // ---------------------------------------------------------------------------
 
-test('KNOWN-#555 graph digest embeds whole envelopes instead of composing Component semantic digests', async () => {
+test('REPAIRED-#555 graph digest composes Component semantic digests (PR #558 / merge 222b12c)', async () => {
   const base = testSemanticComponent();
   const extended = {
     ...base,
@@ -443,14 +443,53 @@ test('KNOWN-#555 graph digest embeds whole envelopes instead of composing Compon
   ]);
   assert.equal(extendedComponentDigest, baseComponentDigest);
 
-  // ...but at this HEAD the graph digest drifts on the non-material change.
+  // ...and after the #555 repair the graph identity is unchanged too.
   const graphBase = testGraph({ components: [testSemanticComponent(), testToolComponent()] });
   const graphExtended = testGraph({ components: [extended, testToolComponent()] });
   const [ga, gb] = await Promise.all([
     computeDefinitionGraphDigest(graphBase, sha256),
     computeDefinitionGraphDigest(graphExtended, sha256),
   ]);
-  assert.notEqual(gb, ga, 'if equal, PR #558 repair landed — flip this probe and re-verify MK0');
+  assert.equal(gb, ga, 'non-material extension leaked back into graph identity (#555 regression)');
+
+  // Required-ref permutation inside a bound component no longer drifts graph
+  // identity — the pre-repair defect class (whole-envelope embedding).
+  const ordered = testGraph({
+    components: [
+      testSemanticComponent({
+        requiredSemanticContracts: [TEST_SEMANTIC_CONTRACT, TEST_SECOND_SEMANTIC_CONTRACT],
+        requiredCapabilities: [TEST_CAPABILITY, TEST_SECOND_CAPABILITY],
+      }),
+      testToolComponent(),
+    ],
+  });
+  const permutedRefs = testGraph({
+    components: [
+      testSemanticComponent({
+        requiredSemanticContracts: [TEST_SECOND_SEMANTIC_CONTRACT, TEST_SEMANTIC_CONTRACT],
+        requiredCapabilities: [TEST_SECOND_CAPABILITY, TEST_CAPABILITY],
+      }),
+      testToolComponent(),
+    ],
+  });
+  const [gc, gd] = await Promise.all([
+    computeDefinitionGraphDigest(ordered, sha256),
+    computeDefinitionGraphDigest(permutedRefs, sha256),
+  ]);
+  assert.equal(gd, gc, 'required-ref permutation drifted graph identity (#555 regression)');
+
+  // Material change inside a bound component still changes graph identity.
+  const materialized = testGraph({
+    components: [
+      {
+        ...testSemanticComponent(),
+        semanticBody: { fixtureMarker: 'material-change', notes: [] },
+      },
+      testToolComponent(),
+    ],
+  });
+  const ge = await computeDefinitionGraphDigest(materialized, sha256);
+  assert.notEqual(ge, ga, 'material semantic change stopped affecting graph identity');
 });
 
 test('KNOWN-#557 exact-version semantics drift across contract validators', () => {
