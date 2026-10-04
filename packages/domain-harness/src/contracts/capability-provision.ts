@@ -85,13 +85,15 @@ export interface CapabilityProviderEvidence {
 
 /**
  * Deterministic selection evidence. Component identity + capability ref only:
- * no Tool Implementation id, no module/package path, no assembly digest, no
- * pin, no runtime endpoint, no provider-routing identity is representable.
+ * no Tool Implementation id, module/package path, assembly digest, pin, runtime
+ * endpoint, or provider-routing identity is representable. Capability refs in
+ * successful evidence are fresh frozen values, never aliases of caller-owned
+ * request/graph objects.
  */
 export interface CapabilityProviderSelection {
   /** Graph identity the selection was derived from. */
   readonly graphId: string;
-  /** The exact required ref exactly as requested (never normalized). */
+  /** The exact required ref as immutable value evidence (never normalized). */
   readonly requiredCapability: CapabilityContractRef;
   /** The one Definition-selected Domain Tool provider. */
   readonly provider: CapabilityProviderEvidence;
@@ -117,6 +119,14 @@ function ownKeys(value: Record<string, unknown>): string[] {
 
 function compareIds(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** Copy one exact capability reference into immutable authority evidence. */
+function freezeCapabilityRef(ref: CapabilityContractRef): CapabilityContractRef {
+  return Object.freeze({
+    capabilityId: ref.capabilityId,
+    version: ref.version,
+  });
 }
 
 /**
@@ -227,6 +237,8 @@ function requireBoundConsumerId(
  * consulted). Failures are deterministic: ambiguity diagnostics are sorted by
  * componentId, and tool declaration validation runs in componentId order so
  * the surfaced `ToolComponentContractError` is permutation-invariant too.
+ * Successful evidence owns fresh frozen capability-ref values so later caller
+ * mutation cannot alter an already-completed provider-selection decision.
  */
 export function selectCapabilityProvider(
   graph: DefinitionGraphEnvelope,
@@ -298,13 +310,15 @@ export function selectCapabilityProvider(
     componentId: ComponentId;
     providesCapability: CapabilityContractRef;
   };
+  const requiredCapabilityEvidence = freezeCapabilityRef(requiredCapability);
+  const providedCapabilityEvidence = freezeCapabilityRef(selected.providesCapability);
   return Object.freeze({
     graphId: graph.graphId,
-    requiredCapability,
+    requiredCapability: requiredCapabilityEvidence,
     provider: Object.freeze({
       componentId: selected.componentId,
       family: 'tool' as const,
-      providesCapability: selected.providesCapability,
+      providesCapability: providedCapabilityEvidence,
     }),
   });
 }
