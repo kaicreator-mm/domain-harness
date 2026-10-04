@@ -9,6 +9,7 @@ import {
   computeCanonicalJsonDigest,
   type Sha256Port,
 } from '../../src/contracts/identity.js';
+import type { JsonValue } from '../../src/contracts/json.js';
 import {
   DEFINITION_GRAPH_DIGEST_DOMAIN,
   DefinitionGraphContractError,
@@ -236,36 +237,32 @@ test('T001C-R6: relations are included exactly once in graph identity — every 
 });
 
 test('T001C-R7: graph digest is deterministic and order-insensitive over relations and components', async () => {
-  const components = [
-    componentEnvelope('zeta.component'),
-    componentEnvelope('alpha.component'),
-    componentEnvelope('midway.component'),
-  ];
-  const relations = [
-    relation({
-      relationId: 'rel.c',
-      relationKind: 'clusters-with',
-      sourceComponentId: 'midway.component',
-      targetComponentId: 'alpha.component',
-    }),
-    relation({
-      relationId: 'rel.a',
-      relationKind: 'consumes',
-      sourceComponentId: 'alpha.component',
-      targetComponentId: 'midway.component',
-    }),
-    relation({
-      relationId: 'rel.b',
-      relationKind: 'depends-on',
-      sourceComponentId: 'zeta.component',
-      targetComponentId: 'zeta.component',
-    }),
-  ];
+  const zeta = componentEnvelope('zeta.component');
+  const alpha = componentEnvelope('alpha.component');
+  const midway = componentEnvelope('midway.component');
+  const relC = relation({
+    relationId: 'rel.c',
+    relationKind: 'clusters-with',
+    sourceComponentId: 'midway.component',
+    targetComponentId: 'alpha.component',
+  });
+  const relA = relation({
+    relationId: 'rel.a',
+    relationKind: 'consumes',
+    sourceComponentId: 'alpha.component',
+    targetComponentId: 'midway.component',
+  });
+  const relB = relation({
+    relationId: 'rel.b',
+    relationKind: 'depends-on',
+    sourceComponentId: 'zeta.component',
+    targetComponentId: 'zeta.component',
+  });
 
-  const base = graph({ components, relations });
+  const base = graph({ components: [zeta, alpha, midway], relations: [relC, relA, relB] });
   const permuted = graph({
-    components: [components[2], components[0], components[1]],
-    relations: [relations[2], relations[0], relations[1]],
+    components: [midway, zeta, alpha],
+    relations: [relB, relC, relA],
   });
 
   const first = await computeDefinitionGraphDigest(base, sha256);
@@ -470,7 +467,7 @@ test('T001C-R11: malformed graph and relation types are rejected with typed code
 
   // nonMaterialExtensions must stay portable JSON material.
   expectGraphFailure((envelope) => {
-    envelope.nonMaterialExtensions = (() => 'meta') as unknown as DefinitionGraphEnvelope['nonMaterialExtensions'];
+    envelope.nonMaterialExtensions = (() => 'meta') as unknown as JsonValue;
   }, 'INVALID_GRAPH_MATERIAL');
 });
 
@@ -501,13 +498,30 @@ test('T001C-R12: bound components are validated by delegating to validateCompone
       error.code === 'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
   );
 
-  // A non-envelope object in components fails at the component contract.
+  // A non-envelope object in components fails at the component contract
+  // (missing family), and an identity-smuggling envelope object fails the
+  // component contract's own unknown-field rule — both propagate unwrapped.
   assert.throws(
     () =>
       validateDefinitionGraphEnvelope(
         graph({
           components: [
             { componentId: 'x' } as unknown as ComponentEnvelope,
+          ],
+        }),
+      ),
+    (error: unknown) =>
+      error instanceof ComponentContractError &&
+      error.code === 'INVALID_COMPONENT_FAMILY',
+  );
+  assert.throws(
+    () =>
+      validateDefinitionGraphEnvelope(
+        graph({
+          components: [
+            Object.assign(componentEnvelope('quote.eligibility.rule'), {
+              implementationId: 'rule-engine-impl@9',
+            }) as unknown as ComponentEnvelope,
           ],
         }),
       ),
