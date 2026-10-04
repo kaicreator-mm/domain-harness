@@ -366,12 +366,30 @@ test('T001E: deterministic semantic round trip through ./v7 only', async () => {
     {
       kind: { kindId: 't001e.kind.rule', version: '1.0.0' },
       understoodSemanticContracts: [{ contractId: 't001e.contract.alpha', version: '2.0.0' }],
-      materialSemanticBodyFields: ['threshold', 'tier'],
+      understoodCapabilities: [{ capabilityId: 't001e.capability.alpha', version: '1.0.0' }],
+      // Closed-world Kind validator: the exact Kind implementation owns
+      // validation of its complete behaviorally material semanticBody.
+      validateComponent: (envelope) => {
+        const { threshold, tier } = envelope.semanticBody as {
+          threshold: unknown;
+          tier: unknown;
+        };
+        if (typeof threshold !== 'number' || typeof tier !== 'string') {
+          throw new Error(
+            't001e.kind.rule@1.0.0 material body must be { threshold: number, tier: string }',
+          );
+        }
+      },
     },
   ]);
   assert.equal(admission.status, 'ADMITTED');
   assert.deepEqual(admission.admittedKind, { kindId: 't001e.kind.rule', version: '1.0.0' });
-  assert.deepEqual(admission.admittedMaterialFields, ['threshold', 'tier']);
+  assert.deepEqual(admission.admittedSemanticContracts, [
+    { contractId: 't001e.contract.alpha', version: '2.0.0' },
+  ]);
+  assert.deepEqual(admission.admittedCapabilities, [
+    { capabilityId: 't001e.capability.alpha', version: '1.0.0' },
+  ]);
 
   const beta: ComponentEnvelope = {
     family: 'semantic',
