@@ -1,4 +1,5 @@
 import type { DomainIntelligencePackageIdentity } from '../contracts/domain-data.js';
+import type { DecisionResolutionReceipt } from './decision-receipt.js';
 import type { WorkflowLifecycle, WorkflowAddress, WorkflowInstanceSnapshot } from '../v2/contracts/workflow.js';
 import type { DomainMessage, MessageAcceptedAck } from '../v2/contracts/message.js';
 import type { CommitProcessedMessageRequest, FailMessageProcessingRequest, RuntimeStore, TerminalizeInstanceRequest } from '../v2/contracts/store.js';
@@ -33,7 +34,7 @@ export declare const RUNTIME_OBSERVATION_CONTRACT_VERSION: "runtime-observation/
  * `effectRef` envelope field is reserved for a future family and is never
  * populated by contract v1 emitters.
  */
-export declare const RUNTIME_OBSERVATION_EVENT_FAMILIES: readonly ["INSTANCE_OPENED", "MESSAGE_ACCEPTED", "TURN_COMMITTED", "TURN_RECOVERY_REQUIRED", "RECOVERY_COMMITTED", "INSTANCE_TERMINALIZED"];
+export declare const RUNTIME_OBSERVATION_EVENT_FAMILIES: readonly ["INSTANCE_OPENED", "MESSAGE_ACCEPTED", "TURN_COMMITTED", "TURN_RECOVERY_REQUIRED", "RECOVERY_COMMITTED", "INSTANCE_TERMINALIZED", "DECISION_RECEIPT"];
 export type RuntimeObservationEventFamily = (typeof RUNTIME_OBSERVATION_EVENT_FAMILIES)[number];
 /**
  * Exact identity of one observation stream.
@@ -80,6 +81,13 @@ export interface RuntimeObservationRecord {
     readonly lifecycleAfter?: WorkflowLifecycle;
     /** Reserved for `EFFECT_SETTLED`; never populated by contract v1 emitters. */
     readonly effectRef?: RuntimeObservationEffectRef;
+    /**
+     * v0.6 T006: the bounded public Decision Resolution Receipt. Populated ONLY
+     * on `DECISION_RECEIPT` records, never on the v1 commit-family records.
+     * Closed-shape JSON data (validated fail-closed at append); identities,
+     * categories and counts only — no payloads, no authority.
+     */
+    readonly decisionReceipt?: DecisionResolutionReceipt;
 }
 /**
  * Opaque durable continuation token. Encodes the exact stream identity and an
@@ -131,7 +139,12 @@ export interface RuntimeObservationIntent {
     readonly runtimeBindingRef?: string;
     readonly runtimeActivationRef?: string;
 }
-export type RuntimeObservationErrorCode = 'OBSERVATION_STORE_REQUIRED' | 'STREAM_IDENTITY_MISMATCH' | 'SEQUENCE_NOT_CONTIGUOUS' | 'INVALID_READ_LIMIT' | 'CURSOR_MALFORMED' | 'OBSERVATION_APPEND_FAILED';
+export type RuntimeObservationErrorCode = 'OBSERVATION_STORE_REQUIRED' | 'STREAM_IDENTITY_MISMATCH' | 'SEQUENCE_NOT_CONTIGUOUS' | 'INVALID_READ_LIMIT' | 'CURSOR_MALFORMED' | 'OBSERVATION_APPEND_FAILED'
+/**
+ * v0.6 T006: a `DECISION_RECEIPT` append presented a receipt that fails the
+ * bounded public shape authority — rejected before any durable state changes.
+ */
+ | 'DECISION_RECEIPT_INVALID';
 export declare class RuntimeObservationError extends Error {
     readonly code: RuntimeObservationErrorCode;
     constructor(code: RuntimeObservationErrorCode, message: string);

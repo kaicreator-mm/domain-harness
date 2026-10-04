@@ -74,7 +74,7 @@ export declare const HarnessMachine: import("xstate").StateMachine<HarnessContex
 } | {
     type: "mutationCapabilityRequested";
     params: unknown;
-}, never, "failed" | "cancelled" | "query" | "succeeded" | "prepare" | "model" | "handleModel" | "validateFinal" | "prepareQuery" | "authorizeQuery", string, BusinessHarnessInput, BusinessHarnessResult, import("xstate").EventObject, import("xstate").MetaObject, {
+}, never, "failed" | "cancelled" | "query" | "prepare" | "succeeded" | "model" | "handleModel" | "validateFinal" | "prepareQuery" | "authorizeQuery", string, BusinessHarnessInput, BusinessHarnessResult, import("xstate").EventObject, import("xstate").MetaObject, {
     id: "business-harness-machine";
     states: {
         readonly prepare: {};
@@ -124,7 +124,7 @@ export declare const BusinessHarnessMachine: import("xstate").StateMachine<Harne
 } | {
     type: "mutationCapabilityRequested";
     params: unknown;
-}, never, "failed" | "cancelled" | "query" | "succeeded" | "prepare" | "model" | "handleModel" | "validateFinal" | "prepareQuery" | "authorizeQuery", string, BusinessHarnessInput, BusinessHarnessResult, import("xstate").EventObject, import("xstate").MetaObject, {
+}, never, "failed" | "cancelled" | "query" | "prepare" | "succeeded" | "model" | "handleModel" | "validateFinal" | "prepareQuery" | "authorizeQuery", string, BusinessHarnessInput, BusinessHarnessResult, import("xstate").EventObject, import("xstate").MetaObject, {
     id: "business-harness-machine";
     states: {
         readonly prepare: {};

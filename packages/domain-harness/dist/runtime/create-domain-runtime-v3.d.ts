@@ -2,6 +2,7 @@ import type { AdmissionDurableEffectJournal, AdmissionEffectToolPort, CentralAdm
 import type { RuntimeStoreProcessCommandExtension } from '../contracts/process-command.js';
 import type { RuntimeEvidencePort } from '../contracts/runtime-evidence.js';
 import { DomainActivationBindingCoordinator, GovernanceExecutionCoordinator, type DomainActivationAuthority, type DurableExecutionStore, type ExactPackageCdiAuthority, type GovernanceBaselineStore } from '../governance/index.js';
+import { type DecisionResolutionReceipt } from '../observation/decision-receipt.js';
 import { RuntimeEvidenceCapture, type RuntimeEvidenceCaptureContext } from '../runtime-evidence/index.js';
 import type { DomainRuntime } from '../v2/contracts/runtime.js';
 import { type ResolveAndAdmitTurnRequest } from './decision-resolver-binding.js';
@@ -35,6 +36,15 @@ export interface CreateDomainRuntimeV3Options extends CreateDomainRuntimeOptions
     readonly store: CreateDomainRuntimeOptions['store'] & RuntimeStoreProcessCommandExtension;
     readonly v3: CreateDomainRuntimeV3AuthorityOptions;
 }
+/**
+ * v0.6 T006 (issue #550): the existing `CentralAdmissionOutcome` of one
+ * `resolveAndAdmitTurn` call, gaining ONLY the additive stable public
+ * Decision Resolution Receipt. Structurally assignable to
+ * `CentralAdmissionOutcome` — every existing consumer keeps working.
+ */
+export type ResolvedTurnAdmissionOutcome = CentralAdmissionOutcome & {
+    readonly receipt: DecisionResolutionReceipt;
+};
 export interface DomainRuntimeV3 {
     /** The ONE existing portable Runtime with v3-only T-009 processing enabled. */
     readonly runtime: DomainRuntime;
@@ -70,8 +80,16 @@ export interface DomainRuntimeV3 {
      * `declared-event` carries the declared outcome/eventType as data into this
      * SAME admission path. No fabricated answer, no undeclared fallback, no
      * provider/model routing.
+     *
+     * v0.6 T006: the return additionally carries the stable public Decision
+     * Resolution Receipt (additive field), derived only from existing
+     * contract-level facts. When Runtime Observation is enabled against a
+     * receipt-capable store, the same receipt is durably projected through the
+     * EXISTING observation stream (one additive `DECISION_RECEIPT` record);
+     * recording failure never alters the turn outcome — it surfaces through the
+     * existing secondary-channel observer semantics (`v3.onEvidenceError`).
      */
-    resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<CentralAdmissionOutcome>;
+    resolveAndAdmitTurn(request: ResolveAndAdmitTurnRequest): Promise<ResolvedTurnAdmissionOutcome>;
     /** T-020 capture bound to a caller-supplied exact authority context (shadow/rollback/metric points). */
     evidenceCapture(context: RuntimeEvidenceCaptureContext): RuntimeEvidenceCapture;
 }
