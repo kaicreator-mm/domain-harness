@@ -858,9 +858,9 @@ test('T006 5a: receipt records live in the existing durable ordered stream with 
   assert.equal(page1.records[0]!.sequence, 1);
   assert.ok(page1.nextCursor !== undefined);
   assert.equal(page1.gap, undefined);
-  const page2 = await fixture.store.readObservations({ stream, afterCursor: page1.nextCursor, limit: 1 });
+  const page2 = await fixture.store.readObservations({ stream, afterCursor: page1.nextCursor!, limit: 1 });
   assert.equal(page2.records[0]!.sequence, 2);
-  const page3 = await fixture.store.readObservations({ stream, afterCursor: page2.nextCursor, limit: 1 });
+  const page3 = await fixture.store.readObservations({ stream, afterCursor: page2.nextCursor!, limit: 1 });
   assert.equal(page3.records[0]!.sequence, 3);
   assert.equal(page3.highWatermark, 3);
   // A page that returned records always hands back the resume cursor; the
@@ -876,7 +876,7 @@ test('T006 5a: receipt records live in the existing durable ordered stream with 
   // closed with an explicit CURSOR_INVALID gap — unchanged semantics).
   const foreign = await fixture.store.readObservations({
     stream: { ...stream, epochId: '999' },
-    afterCursor: page1.nextCursor,
+    afterCursor: page1.nextCursor!,
   });
   assert.equal(foreign.records.length, 0);
   assert.equal(foreign.gap?.kind, 'CURSOR_INVALID');
