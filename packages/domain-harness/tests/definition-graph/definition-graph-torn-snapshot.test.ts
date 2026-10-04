@@ -15,6 +15,8 @@ import { createHash } from 'node:crypto';
 import type { ComponentEnvelope } from '../../src/contracts/component.js';
 import {
   computeDefinitionGraphDigest,
+  DefinitionGraphContractError,
+  validateDefinitionGraphEnvelope,
   type DefinitionGraphEnvelope,
   type DefinitionRelation,
 } from '../../src/contracts/definition-graph.js';
@@ -131,6 +133,13 @@ test('#555: mutation during the graph material digest cannot re-read envelope fi
   const expected = await computeDefinitionGraphDigest(untouched, realSha256);
 
   assert.equal(digest, expected, 'graph material comes from the pre-suspension snapshot only');
+
+  // Prove the mutation was real: the mutated graph is still a valid graph
+  // (empty component/relation sets are admissible), and its own fresh digest
+  // differs from the snapshot digest — so the equality above cannot be
+  // vacuous.
+  const mutatedDigest = await computeDefinitionGraphDigest(victim, realSha256);
+  assert.notEqual(mutatedDigest, digest, 'mutation must actually change graph identity');
 });
 
 test('#555: mutating the FIRST Component itself mid-flight still digests the admitted snapshot', async () => {
@@ -147,4 +156,24 @@ test('#555: mutating the FIRST Component itself mid-flight still digests the adm
   const expected = await computeDefinitionGraphDigest(untouched, realSha256);
 
   assert.equal(digest, expected, 'the admitted component snapshot wins over caller mutation');
+
+  // Prove the mutation was real. The mutated victim itself no longer
+  // validates — renaming the first component leaves the admitted relation
+  // dangling — and the mutated component material alone (same component ids,
+  // mutated semantic body) digests differently from the admitted snapshot.
+  // Either way the in-flight mutation had real identity consequences, so the
+  // equality above cannot be vacuous.
+  assert.throws(
+    () => validateDefinitionGraphEnvelope(victim),
+    (error: unknown) =>
+      error instanceof DefinitionGraphContractError && error.code === 'DANGLING_COMPONENT_REF',
+    'the renamed component must leave the admitted relation dangling',
+  );
+  const mutatedBodyGraph: DefinitionGraphEnvelope = {
+    graphId: 'graph.torn-snapshot',
+    components: [component('component.a', { semanticBody: { threshold: -1 } }), component('component.b')],
+    relations: [relation()],
+  };
+  const mutatedBodyDigest = await computeDefinitionGraphDigest(mutatedBodyGraph, realSha256);
+  assert.notEqual(mutatedBodyDigest, digest, 'mutation must actually change graph identity');
 });
