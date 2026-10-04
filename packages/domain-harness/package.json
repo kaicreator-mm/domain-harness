@@ -30,6 +30,11 @@
       "types": "./dist/public-v4/index.d.ts",
       "import": "./dist/public-v4/index.js",
       "require": "./dist/public-v4/index.js"
+    },
+    "./v7": {
+      "types": "./dist/public-v7/index.d.ts",
+      "import": "./dist/public-v7/index.js",
+      "require": "./dist/public-v7/index.js"
     }
   },
   "files": [
