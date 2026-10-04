@@ -63,23 +63,25 @@ function expectCompatibilityFailure(
   code: KindCompatibilityErrorCode,
 ): KindCompatibilityError {
   observedFailureCodes.add(code);
-  return assert.throws(
-    decide,
-    (error: unknown) => {
-      if (!(error instanceof KindCompatibilityError)) {
-        return false;
-      }
-      assert.equal(error.name, 'KindCompatibilityError');
-      assert.equal(error.code, code);
-      assert.equal(
-        error.failureClass,
-        EXPECTED_FAILURE_CLASS_BY_CODE[code],
-        `failure code ${code} must carry exactly one deterministic failure class`,
-      );
-      return true;
-    },
+  let thrown: unknown;
+  try {
+    decide();
+  } catch (error) {
+    thrown = error;
+  }
+  assert.ok(
+    thrown instanceof KindCompatibilityError,
     `expected a typed ${code} compatibility failure`,
-  ) as KindCompatibilityError;
+  );
+  const error = thrown as KindCompatibilityError;
+  assert.equal(error.name, 'KindCompatibilityError');
+  assert.equal(error.code, code);
+  assert.equal(
+    error.failureClass,
+    EXPECTED_FAILURE_CLASS_BY_CODE[code],
+    `failure code ${code} must carry exactly one deterministic failure class`,
+  );
+  return error;
 }
 
 // ---------------------------------------------------------------------------

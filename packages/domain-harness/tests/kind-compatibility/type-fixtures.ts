@@ -7,8 +7,8 @@
  * surfaces, smuggled result dimensions), and `@ts-expect-error` blocks prove
  * negative boundaries stay unrepresentable.
  */
+import { decideKindCompatibility } from '../../src/contracts/kind-compatibility.js';
 import type {
-  decideKindCompatibility,
   KindCompatibilityError,
   KindCompatibilityErrorCode,
   KindCompatibilityFailureClass,
