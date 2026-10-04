@@ -213,7 +213,15 @@ function validateAndIndexUnderstoodSet(
     if (index.has(key)) {
       fail('INVALID_UNDERSTOOD_KIND_SET', `${at} declares exact Kind "${key}" more than once`);
     }
-    index.set(key, entry as UnderstoodKindDeclaration);
+
+    index.set(key, {
+      kind,
+      understoodSemanticContracts:
+        entry.understoodSemanticContracts as readonly SemanticContractRef[],
+      understoodCapabilities:
+        entry.understoodCapabilities as readonly CapabilityContractRef[],
+      validateComponent: entry.validateComponent as ComponentKindValidator,
+    });
   }
   return index;
 }
