@@ -66,6 +66,10 @@ class SemanticFixtureError extends Error {
   }
 }
 
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 function validateSemanticFixture(envelope: ComponentEnvelope): void {
   if (envelope.family !== 'semantic') throw new SemanticFixtureError('family must be semantic');
   const body = envelope.semanticBody;
@@ -73,7 +77,9 @@ function validateSemanticFixture(envelope: ComponentEnvelope): void {
     throw new SemanticFixtureError('semantic body must be an object');
   }
   const keys = Object.keys(body).sort();
-  assert.deepEqual(keys, ['policy', 'threshold']);
+  if (!sameStrings(keys, ['policy', 'threshold'])) {
+    throw new SemanticFixtureError('semantic body carries unknown or missing material fields');
+  }
   const threshold = (body as Record<string, unknown>).threshold;
   const policy = (body as Record<string, unknown>).policy;
   if (typeof threshold !== 'number') throw new SemanticFixtureError('threshold must be numeric');
@@ -81,7 +87,9 @@ function validateSemanticFixture(envelope: ComponentEnvelope): void {
     throw new SemanticFixtureError('policy must be an object');
   }
   const policyKeys = Object.keys(policy).sort();
-  assert.deepEqual(policyKeys, ['enabled']);
+  if (!sameStrings(policyKeys, ['enabled'])) {
+    throw new SemanticFixtureError('policy carries unknown or missing material fields');
+  }
   if (typeof (policy as Record<string, unknown>).enabled !== 'boolean') {
     throw new SemanticFixtureError('policy.enabled must be boolean');
   }
@@ -106,10 +114,7 @@ function toolDeclaration(): UnderstoodKindDeclaration {
   };
 }
 
-function expectAdmissionFailure(
-  fn: () => unknown,
-  code: ComponentAdmissionErrorCode,
-): void {
+function expectAdmissionFailure(fn: () => unknown, code: ComponentAdmissionErrorCode): void {
   assert.throws(fn, (error: unknown) => {
     assert.ok(error instanceof ComponentAdmissionError);
     assert.equal(error.code, code);
@@ -187,8 +192,7 @@ test('#556-R6: nested invalid Tool effect is rejected by the exact Tool Kind val
   });
   assert.throws(
     () => admitComponent(invalid, [toolDeclaration()]),
-    (error: unknown) =>
-      error instanceof ToolComponentContractError && error.code === 'INVALID_TOOL_OPERATION_EFFECT',
+    (error: unknown) => error instanceof ToolComponentContractError && error.code === 'INVALID_TOOL_OPERATION_EFFECT',
   );
 });
 
@@ -209,8 +213,7 @@ test('#556-R7: unknown nested behaviorally material Tool field is rejected close
   });
   assert.throws(
     () => admitComponent(invalid, [toolDeclaration()]),
-    (error: unknown) =>
-      error instanceof ToolComponentContractError && error.code === 'INVALID_TOOL_OPERATION',
+    (error: unknown) => error instanceof ToolComponentContractError && error.code === 'INVALID_TOOL_OPERATION',
   );
 });
 
@@ -228,8 +231,7 @@ test('#556-R9: non-material extensions remain opaque pass-through and do not bec
 });
 
 test('#556-R10: a non-Tool Semantic Kind can supply an independent closed-world validator', () => {
-  const envelope = semanticEnvelope();
-  assert.equal(admitComponent(envelope, [semanticDeclaration()]).status, 'ADMITTED');
+  assert.equal(admitComponent(semanticEnvelope(), [semanticDeclaration()]).status, 'ADMITTED');
 
   const futureNested = semanticEnvelope({
     semanticBody: { threshold: 100, policy: { enabled: true, futureBehavior: 'material' } },
