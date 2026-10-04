@@ -49,7 +49,6 @@ import {
   createRegistryPromotedChildArtifactPort,
   createXStateHarnessMachineRunner,
   PromotedArtifactRegistry,
-  PromotedChildRuntime,
   RuntimeObservationError,
   RUNTIME_OBSERVATION_INITIAL_EPOCH_ID,
   runtimeObservationId,
@@ -1114,6 +1113,7 @@ async function runPhase1(control: ExpoSqliteDatabaseLike): Promise<T009Validatio
         workflowInstanceId: CMD_WORKFLOW_INSTANCE_ID,
         turn: { kind: 'message', sourceMessageId: 'cmd:b1' },
       }));
+      check(outcomeTurn.status === 'admitted', `J8 turn-admitted-before-commit (status=${String(outcomeTurn.status)})`, checks);
       const instance = await store8.getInstance(CMD_TARGET);
       const disposition = await store8.getMessageDisposition(CMD_TARGET, 'cmd:b1');
       if (instance === null || disposition === null) throw new Error('T009 device check failed: J8 durable state missing');
