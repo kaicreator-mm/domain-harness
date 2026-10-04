@@ -335,9 +335,12 @@ test('T008 J4a: no-model + required semantics + declared fail-closed → typed u
     assert.equal(fixture.authorities.admissionEffectJournal.getRecords().length, 0);
     const instance = await fixture.store.getInstance(target);
     assert.equal(instance?.stateRevision, 0, 'no semantic state mutation');
-    // Receipt durability through the REAL store is journey 6b's contract line
-    // (the seam probe lives there; it currently exposes the adapter gap).
-    assert.equal(isDecisionReceiptObservationStore(fixture.store), false, 'documented probe: the real store carries no receipt seam — see J6b');
+    // Receipt durability through the REAL store is journey 6b's contract line.
+    // The first wave documented the missing seam here (#594 J6b, probe ===false);
+    // the T008-R1 repair (#598/#600, v0.6 165cb4d) implemented
+    // DecisionReceiptObservationStore on the production store, so the seam is
+    // now expected on every fixture assembly (J6b proves receipt durability).
+    assert.equal(isDecisionReceiptObservationStore(fixture.store), true, 'the production node store implements the DecisionReceiptObservationStore seam (T008-R1 repair #598/#600)');
   } finally {
     fixture.close();
     disposeT594Directory(fixture);
