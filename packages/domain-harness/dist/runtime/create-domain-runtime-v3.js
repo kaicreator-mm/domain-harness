@@ -1,9 +1,9 @@
-import { admitCentralDecision, CentralAdmissionError } from '../admission/index.js';
+import { admitCentralDecision, CentralAdmissionError, deriveDurableControlTurnId, } from '../admission/index.js';
 import { DomainActivationBindingCoordinator, GovernanceExecutionCoordinator, } from '../governance/index.js';
 import { resolvePinnedPackage } from '../package/registry.js';
 import { RuntimeEvidenceCapture, } from '../runtime-evidence/index.js';
 import { resolveDecision } from '../decision-resolver/index.js';
-import { bindSemanticDecisionTurn, } from './decision-resolver-binding.js';
+import { bindSemanticDecisionTurn, declaredSemanticUnavailableOutcome, } from './decision-resolver-binding.js';
 import { createDomainRuntimeWithProcessCommandOutcomes, } from './create-domain-runtime.js';
 import { failV3 } from './runtime-v3-errors.js';
 export { DomainRuntimeV3Error, } from './runtime-v3-errors.js';
@@ -103,6 +103,18 @@ export async function createDomainRuntimeV3(options) {
      * v0.6 T004 bounded seam: declaration → existing resolveDecision (data
      * only) → the existing `admitTurn` single path. No second resolver, no
      * second admission path, no engine-state publication, no provider routing.
+     *
+     * v0.6 T005 (frozen L2 C3): deterministic-only / no-model operation stays
+     * first-class — Rule / Exact Cache / Promoted sources complete without any
+     * model access attempt. When fresh semantics are required (every
+     * deterministic source fell through) and model capability is unavailable
+     * (the existing resolver availability signal), the compiled declaration's
+     * `unavailable` disposition decides: `fail-closed` raises the typed
+     * RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE terminal (no fabricated
+     * answer, no effect, no journal record); `declared-event` carries the
+     * declared outcome/eventType as data into the SAME Central Admission path —
+     * guards/hard invariants/schema still apply and a denial is final. The
+     * disposition is read only from the compiled declaration.
      */
     async function resolveAndAdmitTurn(request) {
         const pin = await governance.requirePinnedExecution(request.workflowInstanceId);
@@ -125,7 +137,42 @@ export async function createDomainRuntimeV3(options) {
         // currentness) throws and reaches admission never; a denial AFTER a
         // successful resolution is final — the call below resolves exactly once
         // and admits exactly once, with no fallback, retry or alternate path.
-        const resolved = await resolveDecision(binding.invocation, request.resolver, sha256);
+        let resolved;
+        try {
+            resolved = await resolveDecision(binding.invocation, request.resolver, sha256);
+        }
+        catch (error) {
+            // T005: fresh semantics required + model capability unavailable. The
+            // compiled declaration alone owns the disposition; anything else than
+            // the declared behavior surfaces the original failure unchanged.
+            const declared = declaredSemanticUnavailableOutcome(declaration, error);
+            if (declared.kind === 'not-applicable')
+                throw error;
+            if (declared.kind === 'fail-closed') {
+                // Observable through the EXISTING failure-evidence channel (secondary;
+                // it never rewrites truth), then the typed unavailable terminal: no
+                // effect, no journal record, no fabricated answer.
+                const capture = evidenceCapture({
+                    domainId: pin.domainId,
+                    packageId: pin.packageId,
+                    governanceBaseline: pin.governanceBaseline,
+                    ...(v3.tenantScope === undefined ? {} : { tenantScope: v3.tenantScope }),
+                });
+                await capture
+                    .captureFailure({
+                    code: 'RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE',
+                    message: declared.reason,
+                    discriminator: deriveDurableControlTurnId(request.target, request.turn),
+                    sourceExecution: {
+                        workflowTarget: request.target.workflowId,
+                        workflowInstanceId: request.workflowInstanceId,
+                    },
+                })
+                    .catch(swallowEvidenceError);
+                failV3('RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE', declared.reason);
+            }
+            resolved = declared.resolution;
+        }
         return admitTurn({
             target: request.target,
             turn: request.turn,

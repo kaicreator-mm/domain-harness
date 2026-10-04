@@ -21,7 +21,19 @@ export type DomainRuntimeV3ErrorCode =
    * material, or a capability binding outside the declaration's query-only
    * identities). Fail closed before any resolver or admission work.
    */
-  | 'RUNTIME_V3_DECISION_BINDING_INCOMPATIBLE';
+  | 'RUNTIME_V3_DECISION_BINDING_INCOMPATIBLE'
+  /**
+   * v0.6 T005 (issue #540, frozen L2 C3): fresh semantics were required (every
+   * deterministic source fell through) but model capability was unavailable
+   * for this binding (existing resolver availability semantics:
+   * DECISION_RESOLVER_HARNESS_UNCONFIGURED) and the compiled declaration
+   * declares the `fail-closed` unavailable disposition. Its own stable public
+   * terminal — deliberately distinct from resolver failures, binding failures
+   * and admission denials — carrying the L2 §7
+   * SEMANTIC_INTELLIGENCE_UNAVAILABLE meaning: no fabricated answer, no
+   * undeclared fallback, no mutation.
+   */
+  | 'RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE';
 
 export class DomainRuntimeV3Error extends Error {
   readonly code: DomainRuntimeV3ErrorCode;

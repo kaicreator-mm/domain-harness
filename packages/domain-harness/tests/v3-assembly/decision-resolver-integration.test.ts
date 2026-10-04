@@ -1076,7 +1076,12 @@ test('T004 13b: declared dependency/currentness material is bound through the ex
   assert.equal(admitted.resolver.cacheRead, 'bypass', 'declared-but-unprebound live revision deterministically bypasses the cache');
 });
 
-test('T004 13c: reaching the Harness stage without a runner surfaces the existing resolver failure', async () => {
+test('T004 13c: reaching the Harness stage without a runner fails closed through the declared unavailable disposition (v0.6 T005, issue #540)', async () => {
+  // At the T004 base this surfaced raw DECISION_RESOLVER_HARNESS_UNCONFIGURED;
+  // T005 deliberately consumes declaration.unavailable (which T004 left
+  // untouched). The fixture declaration declares `fail-closed`, so the seam
+  // now raises the typed unavailable terminal instead of the raw resolver
+  // failure — the raw surface remains on the direct resolver path.
   const fixture = await integrationFixture([await quoteDecisionDescriptor()]);
   await pinInstance(fixture);
   await assert.rejects(
@@ -1084,9 +1089,11 @@ test('T004 13c: reaching the Harness stage without a runner surfaces the existin
       rule: new CapturingRule({ status: 'no-match' }),
       harness: harnessMaterial(new ScriptedModel([finalResponse('approve', {})])),
     })),
-    (error: unknown) => error instanceof DecisionResolverError
-      && error.code === 'DECISION_RESOLVER_HARNESS_UNCONFIGURED',
+    (error: unknown) => error instanceof DomainRuntimeV3Error
+      && error.code === 'RUNTIME_V3_SEMANTIC_INTELLIGENCE_UNAVAILABLE',
   );
+  assert.equal(fixture.tools.calls.length, 0);
+  assert.equal(fixture.journal.getRecords().length, 0);
 });
 
 /* ------------------------------------------------------------------------ */
