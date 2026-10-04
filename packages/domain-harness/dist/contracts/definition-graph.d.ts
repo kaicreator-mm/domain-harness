@@ -1,6 +1,6 @@
 /**
  * v0.7 typed Definition relation contract and normalized Definition graph
- * identity (issue #542, fine-grained DAG T001C).
+ * identity (issue #542, fine-grained DAG T001C; repaired by #555).
  *
  * The frozen L2 defines `Domain Definition = Domain Component Graph` with
  * normalized typed relations included exactly once in the graph digest and
@@ -14,15 +14,15 @@
  *   existing component contract unchanged; authority-bearing floating
  *   selectors are rejected anywhere in relation references;
  * - a normalized (order-insensitive) graph digest in its own versioned
- *   digest domain, through the existing canonical-JSON + Sha256Port seam.
+ *   digest domain, composed from exact Component semantic digests and exact
+ *   typed relations.
  *
- * Boundaries owned by successor tasks — intentionally absent here:
- * - per-Component content digests (T001B owns `contracts/component-digest.ts`);
- * - must-understand admission / non-emptiness decisions (T001D);
- * - public barrel exposure (T001E);
- * - Runtime Assembly, pins, capability resolution, tool runtime, and any
- *   runtime resolution of relations. Relations are pure Definition-plane
- *   contract identity; nothing here resolves, executes or looks anything up.
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578): the
+ * graph envelope and every relation are validated on descriptor-safe
+ * snapshots, so accessor-backed `components`/`relations` material is rejected
+ * before any authority use, and relation evidence used by later validation
+ * phases comes from validated snapshots rather than repeated caller reads.
  */
 import { type ComponentEnvelope, type ComponentId } from './component.js';
 import { type ContentDigest, type Sha256Port } from './identity.js';
@@ -86,21 +86,37 @@ export declare class DefinitionGraphContractError extends Error {
  * exact identities are always rejected — never silently normalized to a
  * default/current value. Component-envelope failures propagate the original
  * `ComponentContractError` unwrapped (single source of truth for component
- * codes).
+ * codes). Validation runs descriptor-safe on snapshots of the caller graph
+ * envelope and each relation (#578): accessor/symbol-keyed/non-enumerable
+ * material and exotic prototypes are typed rejections before any authority
+ * use, and later validation phases (dangling/duplicate/conflict) read
+ * validated snapshot evidence rather than re-reading caller objects. The
+ * caller input is never frozen or mutated.
  */
 export declare function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelope): void;
 /**
- * Normalized (order-insensitive) Definition graph digest through the
- * existing canonical-JSON + Sha256Port seam. The normalized material is
+ * Normalized (order-insensitive) Definition graph digest through the existing
+ * canonical-JSON + Sha256Port seam.
  *
- *     { domain: DEFINITION_GRAPH_DIGEST_DOMAIN, graphId,
- *       components sorted by componentId,
- *       relations sorted by relationId }
+ * Component semantic material is represented exactly once as
+ * `{ componentId, componentSemanticDigest }`. The content digest is delegated
+ * to T001B's canonical Component digest path, so non-material extensions stay
+ * excluded and required semantic/capability reference collections retain the
+ * same normalized set semantics at both Component and Definition identity
+ * layers. Typed relations are included exactly once at graph level.
  *
- * so relations and bound components enter the graph identity exactly once,
- * in a versioned digest domain owned by this file. The digest of an invalid
- * graph is never produced: validation runs first and fails closed.
- * Graph-level `nonMaterialExtensions` are excluded from the material.
+ * Torn-snapshot safety (#555 FULL_REVIEW_SUPPLEMENT): `Sha256Port` is async
+ * and the caller owns the envelope, so after validation every
+ * authority-bearing value that enters graph material is snapshotted
+ * synchronously, before the first caller-visible async suspension —
+ * `graphId` (an immutable string), each relation copied field-by-field into
+ * a fresh record, and each Component's canonical digest material built via
+ * the exported pure T001B normalizer. `envelope.graphId`,
+ * `envelope.components` and `envelope.relations` are never re-read after
+ * that point, so a caller mutating its own graph while a digest promise is
+ * pending can never produce a torn hybrid snapshot. Validation additionally
+ * guarantees the envelope carries no accessor-backed fields (#578), so the
+ * synchronous snapshot cannot observe validation-to-use drift either.
  */
 export declare function computeDefinitionGraphDigest(envelope: DefinitionGraphEnvelope, sha256: Sha256Port): Promise<ContentDigest>;
 //# sourceMappingURL=definition-graph.d.ts.map

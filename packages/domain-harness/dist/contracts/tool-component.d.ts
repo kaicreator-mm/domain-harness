@@ -47,8 +47,9 @@ export declare class ToolComponentContractError extends Error {
  * Structural fail-closed validation of one Tool Component. Runs the existing
  * `validateComponentEnvelope` first — its failures surface unchanged as
  * `ComponentContractError` — then applies Tool-specific structural validation
- * to `semanticBody` as exactly one `ToolOperationsDeclaration`. Invalid exact
- * identities are always rejected, never silently normalized.
+ * to a descriptor-safe snapshot of `semanticBody` as exactly one
+ * `ToolOperationsDeclaration` (#578). Invalid exact identities are always
+ * rejected, never silently normalized.
  */
 export declare function validateToolComponent(envelope: ComponentEnvelope): void;
 //# sourceMappingURL=tool-component.d.ts.map

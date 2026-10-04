@@ -20,12 +20,15 @@
  * `KIND_VERSION_NOT_SUPPORTED`, never a selection.
  *
  * Seam independence rule (normative): this module imports only the `KindRef`
- * type from `src/contracts/component.ts` and nothing else from the package.
- * It does not import, call, or modify `src/contracts/component-admission.ts`
- * and defines its own local exactness validation (mirroring the established
- * floating-selector/x-range discipline of `component.ts` and
- * `component-admission.ts`). It is not coupled to the v0.3 governance
- * admission (`src/admission/`) or legacy `COMPILED_ARTIFACT_KINDS`.
+ * TYPE from `src/contracts/component.ts` and nothing else from the package's
+ * admission or legacy seams. It does not import, call, or modify
+ * `src/contracts/component-admission.ts` and is not coupled to the v0.3
+ * governance admission (`src/admission/`) or legacy
+ * `COMPILED_ARTIFACT_KINDS`. Exactness validation and descriptor-safe input
+ * handling are delegated to the shared low-level primitive
+ * `record-safety.ts` (#557 + #578), the same internal seam consumed by the
+ * other v0.7 contract modules — one accepted/rejected matrix, not a third
+ * local helper family.
  *
  * No-registry / no-implementation-identity rule (normative): neither input
  * nor output carries implementation, module, provider, package-path,
@@ -40,6 +43,15 @@
  * exposure (T001E).
  */
 import type { KindRef } from './component.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeArraySnapshot,
+  safeRecordSnapshot,
+} from './record-safety.js';
 
 /**
  * Deterministic, fail-closed compatibility failure codes. Deliberately named
@@ -101,74 +113,57 @@ export interface KindCompatibilityResult {
  */
 export type SupportedKindSet = readonly KindRef[];
 
-/** Floating selection tokens never occur in an exact identity string. */
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*', 'x']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(code: KindCompatibilityErrorCode, message: string): never {
   throw new KindCompatibilityError(code, message);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
-}
-
-/** Exact identity string: non-empty, not an embedded `id@selector` form. */
-function isExactIdentityString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0 && !value.includes('@');
-}
-
-/** Mutable selection tokens; never normalized to a default. */
-function carriesFloatingOrRangeSemantics(value: string): boolean {
-  return (
-    FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) || FLOATING_SELECTOR_PATTERN.test(value)
-  );
-}
-
-/** Semver x-range/partial version parts (`1.x`, `1.`, `x`) are never exact. */
-function carriesXRangeSemantics(version: string): boolean {
-  return version
-    .trim()
-    .split('.')
-    .some((part) => part.length === 0 || part.toLowerCase() === 'x');
-}
-
 /**
- * Stage 1 (structural input): the ref must be a plain object carrying
- * exactly the own enumerable keys `{kindId, version}`, both non-empty strings
- * without an embedded `id@version` form. Structurally unusable input is a
- * typed `INVALID_COMPATIBILITY_INPUT`, never a TypeError.
+ * Stage 1 (structural input): the ref must be a descriptor-safe record
+ * carrying exactly the own enumerable data keys `{kindId, version}`, both
+ * non-empty strings without an embedded `id@version` form. Structurally
+ * unusable input is a typed `INVALID_COMPATIBILITY_INPUT`, never a
+ * TypeError, and no hidden getter executes during validation or diagnostics.
+ * Returns the validated snapshot for later stages.
  */
-function requireStructurallyExactKindRef(value: unknown, description: string): void {
-  if (!isPlainObject(value)) {
+function requireStructurallyExactKindRef(
+  value: unknown,
+  description: string,
+): Record<string, unknown> {
+  const result = safeRecordSnapshot(value, description);
+  if (!result.ok) {
     fail('INVALID_COMPATIBILITY_INPUT', `${description} must be an exact KindRef object`);
   }
-  const keys = ownKeys(value).sort();
+  const candidate = result.snapshot;
+  const keys = Object.keys(candidate).sort();
   if (keys.length !== 2 || !keys.includes('kindId') || !keys.includes('version')) {
     fail(
       'INVALID_COMPATIBILITY_INPUT',
       `${description} must contain exactly {kindId, version} (implementation/module identity is not part of a Kind reference)`,
     );
   }
-  if (!isExactIdentityString(value.kindId)) {
+  const kindId = candidate.kindId;
+  const version = candidate.version;
+  if (
+    typeof kindId !== 'string' ||
+    !isNonEmptyIdentityString(kindId) ||
+    carriesEmbeddedSelector(kindId)
+  ) {
     fail(
       'INVALID_COMPATIBILITY_INPUT',
       `${description}.kindId must be a non-empty exact identity without an embedded \`id@version\` selector`,
     );
   }
-  if (!isExactIdentityString(value.version)) {
+  if (
+    typeof version !== 'string' ||
+    !isNonEmptyIdentityString(version) ||
+    carriesEmbeddedSelector(version)
+  ) {
     fail(
       'INVALID_COMPATIBILITY_INPUT',
       `${description}.version must be a non-empty exact identity without an embedded \`id@version\` selector`,
     );
   }
+  return candidate;
 }
 
 /**
@@ -176,17 +171,19 @@ function requireStructurallyExactKindRef(value: unknown, description: string): v
  * floating/range/x-range selection semantics is a typed
  * `INCOMPATIBLE_KIND_REF` — rejected unconditionally, never resolved.
  */
-function requireExactRequiredKindRef(ref: KindRef): void {
-  if (carriesFloatingOrRangeSemantics(ref.kindId)) {
+function requireExactRequiredKindRef(candidate: Record<string, unknown>): void {
+  const kindId = candidate.kindId as string;
+  const version = candidate.version as string;
+  if (carriesFloatingOrRangeSemantics(kindId)) {
     fail(
       'INCOMPATIBLE_KIND_REF',
-      `required kindId "${ref.kindId}" encodes floating/range selection semantics (latest/current/active/default/*/range); only exact kindIds are decidable`,
+      `required kindId "${kindId}" encodes floating/range selection semantics (latest/current/active/default/*/x/range); only exact kindIds are decidable`,
     );
   }
-  if (carriesFloatingOrRangeSemantics(ref.version) || carriesXRangeSemantics(ref.version)) {
+  if (carriesFloatingOrRangeSemantics(version) || carriesXRangeVersionSemantics(version)) {
     fail(
       'INCOMPATIBLE_KIND_REF',
-      `required version "${ref.version}" encodes floating/range/x-range selection semantics (latest/current/active/default/*/range, 1.x, 1.); only exact versions are decidable`,
+      `required version "${version}" encodes floating/range/x-range selection semantics (latest/current/active/default/*/x/range, 1.x, 1.); only exact versions are decidable`,
     );
   }
 }
@@ -197,28 +194,35 @@ function requireExactRequiredKindRef(ref: KindRef): void {
  * exact KindRef entries are input failures before any lookup. Returns an
  * index keyed by the unambiguous `kindId@version` composite (`@` never occurs
  * inside exact identity strings); each indexed value is a fresh,
- * non-aliased KindRef.
+ * non-aliased KindRef snapshot, so later caller mutation cannot perturb the
+ * decision.
  */
 function validateAndIndexSupportedSet(supportedKinds: SupportedKindSet): Map<string, KindRef> {
-  if (!Array.isArray(supportedKinds)) {
-    fail('INVALID_COMPATIBILITY_INPUT', 'supported Kind set must be an array of exact KindRefs');
+  const setResult = safeArraySnapshot(supportedKinds, 'supported Kind set');
+  if (!setResult.ok) {
+    fail(
+      'INVALID_COMPATIBILITY_INPUT',
+      setResult.issue.violation === 'NOT_AN_ARRAY'
+        ? 'supported Kind set must be an array of exact KindRefs'
+        : `supported Kind set ${describeRecordSafetyIssue(setResult.issue)}`,
+    );
   }
   const index = new Map<string, KindRef>();
-  for (const [entryIndex, entry] of supportedKinds.entries()) {
+  for (const [entryIndex, entry] of setResult.snapshot.entries()) {
     const at = `supported Kind set entry [${entryIndex}]`;
-    requireStructurallyExactKindRef(entry, at);
-    const kindId = (entry as KindRef).kindId;
-    const version = (entry as KindRef).version;
+    const candidate = requireStructurallyExactKindRef(entry, at);
+    const kindId = candidate.kindId as string;
+    const version = candidate.version as string;
     if (carriesFloatingOrRangeSemantics(kindId)) {
       fail(
         'INVALID_COMPATIBILITY_INPUT',
-        `${at}.kindId must be an exact kindId, not a floating/range selector (latest/current/active/default/*/range)`,
+        `${at}.kindId must be an exact kindId, not a floating/range selector (latest/current/active/default/*/x/range)`,
       );
     }
-    if (carriesFloatingOrRangeSemantics(version) || carriesXRangeSemantics(version)) {
+    if (carriesFloatingOrRangeSemantics(version) || carriesXRangeVersionSemantics(version)) {
       fail(
         'INVALID_COMPATIBILITY_INPUT',
-        `${at}.version must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/range, 1.x, 1.)`,
+        `${at}.version must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)`,
       );
     }
     const key = `${kindId}@${version}`;
@@ -240,7 +244,9 @@ function validateAndIndexSupportedSet(supportedKinds: SupportedKindSet): Map<str
  *
  * Fixed validation order — structural input, required-ref exactness,
  * supported-set exactness/duplicates, exact lookup — makes the failure code
- * deterministic even when multiple defects coexist. Matching is exact on both
+ * deterministic even when multiple defects coexist. All validation runs on
+ * descriptor-safe snapshots (#578), so accessor-backed inputs cannot drift
+ * between validation and the exact lookup. Matching is exact on both
  * kindId and version: no fallback to another version of a known kindId, no
  * `latest`/`current`/`default`/ordering/nearest-version/lexical-selection
  * semantics of any kind, and no compatibility ranges (out of scope by the
@@ -250,19 +256,21 @@ export function decideKindCompatibility(
   requiredKind: KindRef,
   supportedKinds: SupportedKindSet,
 ): KindCompatibilityResult {
-  requireStructurallyExactKindRef(requiredKind, 'required Kind');
-  requireExactRequiredKindRef(requiredKind);
+  const required = requireStructurallyExactKindRef(requiredKind, 'required Kind');
+  requireExactRequiredKindRef(required);
   const supported = validateAndIndexSupportedSet(supportedKinds);
 
-  const key = `${requiredKind.kindId}@${requiredKind.version}`;
+  const key = `${required.kindId as string}@${required.version as string}`;
   const matched = supported.get(key);
   if (matched === undefined) {
-    const kindIdKnown = [...supported.values()].some((ref) => ref.kindId === requiredKind.kindId);
+    const kindIdKnown = [...supported.values()].some(
+      (ref) => ref.kindId === (required.kindId as string),
+    );
     fail(
       kindIdKnown ? 'KIND_VERSION_NOT_SUPPORTED' : 'KIND_NOT_SUPPORTED',
       kindIdKnown
-        ? `exact Kind "${key}" is not in the supported Kind set, which supports other exact versions of kindId "${requiredKind.kindId}"; compatibility never falls back to another version`
-        : `kindId "${requiredKind.kindId}" is not supported by the supported Kind set`,
+        ? `exact Kind "${key}" is not in the supported Kind set, which supports other exact versions of kindId "${required.kindId as string}"; compatibility never falls back to another version`
+        : `kindId "${required.kindId as string}" is not supported by the supported Kind set`,
     );
   }
 

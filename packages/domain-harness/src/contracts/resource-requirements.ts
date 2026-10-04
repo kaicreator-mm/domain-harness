@@ -15,6 +15,13 @@
  * typed errors, and the module exports no resolver, reader, or accessor that
  * could bind a requirement to a live resource.
  *
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578): the
+ * declaration and every requirement are validated on descriptor-safe
+ * snapshots, so accessor-backed declaration fields are rejected before any
+ * authority use, and no hidden getter can execute during validation or
+ * diagnostics.
+ *
  * Boundaries owned by successor tasks — intentionally absent here:
  * - runtime resource resolution, injection, binding, materialization (T005B);
  * - resource instance identity, currentness, and non-secret pins (T005C);
@@ -23,6 +30,15 @@
  * - graph/relation attachment of declarations to Components (T001C).
  */
 import type { ComponentEnvelope, ComponentId } from './component.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeArraySnapshot,
+  safeRecordSnapshot,
+} from './record-safety.js';
 import { validateToolComponent } from './tool-component.js';
 
 /**
@@ -95,22 +111,21 @@ const REQUIREMENT_FIELDS = new Set<string>([
   'required',
 ]);
 
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(code: ResourceRequirementContractErrorCode, path: string, reason: string): never {
   throw new ResourceRequirementContractError(code, `${path} ${reason}`);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
+/** Snapshot an authority-bearing record, mapping descriptor issues to a typed failure. */
+function requireSafeRecord(
+  value: unknown,
+  path: string,
+  invalidCode: ResourceRequirementContractErrorCode,
+): Record<string, unknown> {
+  const result = safeRecordSnapshot(value, path);
+  if (!result.ok) {
+    fail(invalidCode, path, describeRecordSafetyIssue(result.issue));
+  }
+  return result.snapshot;
 }
 
 /** Exact identity string: non-empty, not an embedded `id@selector` form. */
@@ -122,10 +137,10 @@ function requireExactIdentityString(
   if (typeof value !== 'string') {
     fail(invalidCode, path, 'must be a string');
   }
-  if (value.trim().length === 0) {
+  if (!isNonEmptyIdentityString(value)) {
     fail(invalidCode, path, 'must be a non-empty exact identity');
   }
-  if (value.includes('@')) {
+  if (carriesEmbeddedSelector(value)) {
     fail(
       invalidCode,
       path,
@@ -134,13 +149,24 @@ function requireExactIdentityString(
   }
 }
 
-/** Rejects mutable selection tokens; never normalizes them to a default. */
-function requireNonFloating(value: string, path: string): void {
-  if (FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) || FLOATING_SELECTOR_PATTERN.test(value)) {
+/** Rejects mutable selection tokens and range operators; never normalizes. */
+function requireNonFloatingIdentity(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value)) {
     fail(
       'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
       path,
-      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range)',
+      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range)',
+    );
+  }
+}
+
+/** Rejects floating/range/x-range version forms (`1.x`, `x`, `1.`); never normalizes. */
+function requireExactVersion(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value) || carriesXRangeVersionSemantics(value)) {
+    fail(
+      'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
+      path,
+      'must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)',
     );
   }
 }
@@ -151,14 +177,12 @@ function requireExactIdentity(
   invalidCode: ResourceRequirementContractErrorCode,
 ): void {
   requireExactIdentityString(value, path, invalidCode);
-  requireNonFloating(value as string, path);
+  requireNonFloatingIdentity(value as string, path);
 }
 
 function requireExactResourceContractRef(ref: unknown, path: string): void {
-  if (!isPlainObject(ref)) {
-    fail('INVALID_RESOURCE_CONTRACT_REF', path, 'must be an exact reference object');
-  }
-  const keys = ownKeys(ref).sort();
+  const candidate = requireSafeRecord(ref, path, 'INVALID_RESOURCE_CONTRACT_REF');
+  const keys = Object.keys(candidate).sort();
   if (keys.length !== 2 || !keys.includes('contractId') || !keys.includes('version')) {
     fail(
       'INVALID_RESOURCE_CONTRACT_REF',
@@ -166,28 +190,34 @@ function requireExactResourceContractRef(ref: unknown, path: string): void {
       'must contain exactly {contractId, version} (live values, endpoints, and provider identities are not part of a resource contract reference)',
     );
   }
-  requireExactIdentity(ref.contractId, `${path}.contractId`, 'INVALID_RESOURCE_CONTRACT_REF');
-  requireExactIdentityString(ref.version, `${path}.version`, 'INVALID_RESOURCE_CONTRACT_REF');
-  requireNonFloating(ref.version as string, `${path}.version`);
+  requireExactIdentity(candidate.contractId, `${path}.contractId`, 'INVALID_RESOURCE_CONTRACT_REF');
+  requireExactIdentityString(candidate.version, `${path}.version`, 'INVALID_RESOURCE_CONTRACT_REF');
+  requireExactVersion(candidate.version as string, `${path}.version`);
 }
 
 /**
- * The owner's operation identities, read from its already-validated
- * `ToolOperationsDeclaration`. Composition, not re-implemented operation
- * parsing: `validateToolComponent(owner)` has guaranteed the shape before this
- * runs.
+ * The owner's operation identities, read from the descriptor-safe snapshot
+ * of its already-validated `ToolOperationsDeclaration`. Composition, not
+ * re-implemented operation parsing: `validateToolComponent(owner)` has
+ * guaranteed the shape before this runs.
  */
-function ownerOperationIds(owner: ComponentEnvelope): Set<string> {
-  const body = owner.semanticBody as unknown as { operations?: unknown };
+function ownerOperationIds(ownerView: Record<string, unknown>): Set<string> {
   const ids = new Set<string>();
-  if (body !== null && typeof body === 'object' && Array.isArray(body.operations)) {
-    for (const operation of body.operations) {
-      if (
-        operation !== null &&
-        typeof operation === 'object' &&
-        typeof (operation as { operationId?: unknown }).operationId === 'string'
-      ) {
-        ids.add((operation as { operationId: string }).operationId);
+  const body = ownerView.semanticBody;
+  if (body !== null && typeof body === 'object' && Array.isArray(body)) {
+    return ids;
+  }
+  if (body !== null && typeof body === 'object') {
+    const operations = (body as Record<string, unknown>).operations;
+    if (Array.isArray(operations)) {
+      for (const operation of operations) {
+        if (
+          operation !== null &&
+          typeof operation === 'object' &&
+          typeof (operation as { operationId?: unknown }).operationId === 'string'
+        ) {
+          ids.add((operation as { operationId: string }).operationId);
+        }
       }
     }
   }
@@ -199,10 +229,8 @@ function validateRequirement(
   path: string,
   operationIds: Set<string>,
 ): string {
-  if (!isPlainObject(candidate)) {
-    fail('INVALID_RESOURCE_REQUIREMENT', path, 'must be a plain logical resource requirement object');
-  }
-  const unexpectedField = ownKeys(candidate).find((key) => !REQUIREMENT_FIELDS.has(key));
+  const requirement = requireSafeRecord(candidate, path, 'INVALID_RESOURCE_REQUIREMENT');
+  const unexpectedField = Object.keys(requirement).find((key) => !REQUIREMENT_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_RESOURCE_REQUIREMENT',
@@ -211,28 +239,28 @@ function validateRequirement(
     );
   }
 
-  requireExactIdentity(candidate.resourceKey, `${path}.resourceKey`, 'INVALID_RESOURCE_KEY');
+  requireExactIdentity(requirement.resourceKey, `${path}.resourceKey`, 'INVALID_RESOURCE_KEY');
 
-  if ('contract' in candidate) {
-    requireExactResourceContractRef(candidate.contract, `${path}.contract`);
+  if ('contract' in requirement) {
+    requireExactResourceContractRef(requirement.contract, `${path}.contract`);
   }
 
-  if ('operationId' in candidate) {
+  if ('operationId' in requirement) {
     requireExactIdentity(
-      candidate.operationId,
+      requirement.operationId,
       `${path}.operationId`,
       'INVALID_RESOURCE_REQUIREMENT_OPERATION',
     );
-    if (!operationIds.has(candidate.operationId as string)) {
+    if (!operationIds.has(requirement.operationId as string)) {
       fail(
         'INVALID_RESOURCE_REQUIREMENT_OPERATION',
         `${path}.operationId`,
-        `must reference an operation that exists on the owner Tool Component (${(candidate.operationId as string).trim()} is not one)`,
+        `must reference an operation that exists on the owner Tool Component (${(requirement.operationId as string).trim()} is not one)`,
       );
     }
   }
 
-  if (typeof candidate.required !== 'boolean') {
+  if (typeof requirement.required !== 'boolean') {
     fail(
       'INVALID_RESOURCE_REQUIREMENT',
       `${path}.required`,
@@ -240,7 +268,7 @@ function validateRequirement(
     );
   }
 
-  return candidate.resourceKey as string;
+  return requirement.resourceKey as string;
 }
 
 /**
@@ -248,7 +276,8 @@ function validateRequirement(
  * requirement declaration. Synchronous, pure, and total: it reads its two
  * arguments, performs no I/O, no environment access, no lookup, and no
  * mutation, and either returns `void` or throws a typed
- * `ResourceRequirementContractError`.
+ * `ResourceRequirementContractError`. Validation runs on descriptor-safe
+ * snapshots (#578); the caller input is never frozen or mutated.
  *
  * Composition: `validateToolComponent(owner)` runs first — its failures
  * surface unchanged as the existing `ComponentContractError` /
@@ -267,14 +296,13 @@ export function validateToolResourceRequirements(
 ): void {
   validateToolComponent(owner);
 
-  if (!isPlainObject(declaration)) {
-    fail(
-      'INVALID_RESOURCE_REQUIREMENTS_DECLARATION',
-      'tool resource requirements declaration',
-      'must be a plain declaration object',
-    );
-  }
-  const unexpectedField = ownKeys(declaration).find((key) => !DECLARATION_FIELDS.has(key));
+  const ownerView = requireSafeRecord(owner, 'component envelope', 'INVALID_RESOURCE_REQUIREMENT_OWNER');
+  const view = requireSafeRecord(
+    declaration,
+    'tool resource requirements declaration',
+    'INVALID_RESOURCE_REQUIREMENTS_DECLARATION',
+  );
+  const unexpectedField = Object.keys(view).find((key) => !DECLARATION_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_RESOURCE_REQUIREMENTS_DECLARATION',
@@ -284,29 +312,35 @@ export function validateToolResourceRequirements(
   }
 
   requireExactIdentity(
-    declaration.componentId,
+    view.componentId,
     'tool resource requirements declaration.componentId',
     'INVALID_RESOURCE_REQUIREMENT_OWNER',
   );
-  if (declaration.componentId !== owner.componentId) {
+  if (view.componentId !== ownerView.componentId) {
     fail(
       'INVALID_RESOURCE_REQUIREMENT_OWNER',
       'tool resource requirements declaration.componentId',
-      `must exactly match the owner Tool Component identity ${owner.componentId} (declarations are never silently rebound)`,
+      `must exactly match the owner Tool Component identity ${ownerView.componentId as string} (declarations are never silently rebound)`,
     );
   }
 
-  if (!Array.isArray(declaration.requirements)) {
+  const requirementsResult = safeArraySnapshot(
+    view.requirements,
+    'tool resource requirements declaration.requirements',
+  );
+  if (!requirementsResult.ok) {
     fail(
       'INVALID_RESOURCE_REQUIREMENTS_DECLARATION',
       'tool resource requirements declaration.requirements',
-      'must be an array of logical resource requirements (empty array = declares no requirements)',
+      requirementsResult.issue.violation === 'NOT_AN_ARRAY'
+        ? 'must be an array of logical resource requirements (empty array = declares no requirements)'
+        : describeRecordSafetyIssue(requirementsResult.issue),
     );
   }
 
-  const operationIds = ownerOperationIds(owner);
+  const operationIds = ownerOperationIds(ownerView);
   const seenResourceKeys = new Set<string>();
-  for (const [index, candidate] of declaration.requirements.entries()) {
+  for (const [index, candidate] of requirementsResult.snapshot.entries()) {
     const requirementPath = `tool resource requirements declaration.requirements[${index}]`;
     const resourceKey = validateRequirement(candidate, requirementPath, operationIds);
     if (seenResourceKeys.has(resourceKey)) {

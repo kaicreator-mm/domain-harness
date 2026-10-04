@@ -8,6 +8,12 @@
  * `ToolOperationsDeclaration` — a Tool carries operations; no second envelope
  * family and no Tool-specific envelope type exist here.
  *
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578):
+ * the Tool operations declaration and every operation are validated on
+ * descriptor-safe snapshots, so accessor-backed `operations` /
+ * `providesCapabilities` material is rejected before any authority use.
+ *
  * Boundaries owned by successor tasks — intentionally absent here:
  * - tool invocation runtime, authoritative-occurrence anchoring (T004);
  * - Domain Tool provider selection/catalogs (T003B);
@@ -19,6 +25,15 @@
  */
 import { canonicalizeJson } from './identity.js';
 import type { JsonValue } from './json.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeArraySnapshot,
+  safeRecordSnapshot,
+} from './record-safety.js';
 import {
   validateComponentEnvelope,
   type CapabilityContractRef,
@@ -108,22 +123,21 @@ const OPERATION_FIELDS = new Set<string>([
   'declaredExposure',
 ]);
 
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(code: ToolComponentContractErrorCode, path: string, reason: string): never {
   throw new ToolComponentContractError(code, `${path} ${reason}`);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
+/** Snapshot an authority-bearing record, mapping descriptor issues to a typed failure. */
+function requireSafeRecord(
+  value: unknown,
+  path: string,
+  invalidCode: ToolComponentContractErrorCode,
+): Record<string, unknown> {
+  const result = safeRecordSnapshot(value, path);
+  if (!result.ok) {
+    fail(invalidCode, path, describeRecordSafetyIssue(result.issue));
+  }
+  return result.snapshot;
 }
 
 /** Exact identity string: non-empty, not an embedded `id@selector` form. */
@@ -131,10 +145,10 @@ function requireExactIdentityString(value: unknown, path: string, invalidCode: T
   if (typeof value !== 'string') {
     fail(invalidCode, path, 'must be a string');
   }
-  if (value.trim().length === 0) {
+  if (!isNonEmptyIdentityString(value)) {
     fail(invalidCode, path, 'must be a non-empty exact identity');
   }
-  if (value.includes('@')) {
+  if (carriesEmbeddedSelector(value)) {
     fail(
       invalidCode,
       path,
@@ -143,13 +157,24 @@ function requireExactIdentityString(value: unknown, path: string, invalidCode: T
   }
 }
 
-/** Rejects mutable selection tokens; never normalizes them to a default. */
-function requireNonFloating(value: string, path: string): void {
-  if (FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) || FLOATING_SELECTOR_PATTERN.test(value)) {
+/** Rejects mutable selection tokens and range operators; never normalizes. */
+function requireNonFloatingIdentity(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value)) {
     fail(
       'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
       path,
-      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range)',
+      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range)',
+    );
+  }
+}
+
+/** Rejects floating/range/x-range version forms (`1.x`, `x`, `1.`); never normalizes. */
+function requireExactVersion(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value) || carriesXRangeVersionSemantics(value)) {
+    fail(
+      'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
+      path,
+      'must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)',
     );
   }
 }
@@ -160,7 +185,7 @@ function requireExactIdentity(
   invalidCode: ToolComponentContractErrorCode,
 ): void {
   requireExactIdentityString(value, path, invalidCode);
-  requireNonFloating(value as string, path);
+  requireNonFloatingIdentity(value as string, path);
 }
 
 function requireJsonMaterial(
@@ -176,10 +201,8 @@ function requireJsonMaterial(
 }
 
 function requireExactCapabilityRef(ref: unknown, path: string): void {
-  if (!isPlainObject(ref)) {
-    fail('INVALID_TOOL_CAPABILITY_PROVIDES', path, 'must be an exact reference object');
-  }
-  const keys = ownKeys(ref).sort();
+  const candidate = requireSafeRecord(ref, path, 'INVALID_TOOL_CAPABILITY_PROVIDES');
+  const keys = Object.keys(candidate).sort();
   if (keys.length !== 2 || !keys.includes('capabilityId') || !keys.includes('version')) {
     fail(
       'INVALID_TOOL_CAPABILITY_PROVIDES',
@@ -187,9 +210,9 @@ function requireExactCapabilityRef(ref: unknown, path: string): void {
       'must contain exactly {capabilityId, version} (implementation/module identity is not part of a capability reference)',
     );
   }
-  requireExactIdentity(ref.capabilityId, `${path}.capabilityId`, 'INVALID_TOOL_CAPABILITY_PROVIDES');
-  requireExactIdentityString(ref.version, `${path}.version`, 'INVALID_TOOL_CAPABILITY_PROVIDES');
-  requireNonFloating(ref.version as string, `${path}.version`);
+  requireExactIdentity(candidate.capabilityId, `${path}.capabilityId`, 'INVALID_TOOL_CAPABILITY_PROVIDES');
+  requireExactIdentityString(candidate.version, `${path}.version`, 'INVALID_TOOL_CAPABILITY_PROVIDES');
+  requireExactVersion(candidate.version as string, `${path}.version`);
 }
 
 function requireExactEffect(value: unknown, path: string): void {
@@ -203,10 +226,8 @@ function requireExactEffect(value: unknown, path: string): void {
 }
 
 function validateOperation(candidate: unknown, path: string): void {
-  if (!isPlainObject(candidate)) {
-    fail('INVALID_TOOL_OPERATION', path, 'must be a plain operation object');
-  }
-  const unexpectedField = ownKeys(candidate).find((key) => !OPERATION_FIELDS.has(key));
+  const operation = requireSafeRecord(candidate, path, 'INVALID_TOOL_OPERATION');
+  const unexpectedField = Object.keys(operation).find((key) => !OPERATION_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_TOOL_OPERATION',
@@ -215,7 +236,7 @@ function validateOperation(candidate: unknown, path: string): void {
     );
   }
 
-  const { operationId, inputSchema, outputSchema, effect } = candidate;
+  const { operationId, inputSchema, outputSchema, effect } = operation;
 
   requireExactIdentity(operationId, `${path}.operationId`, 'INVALID_TOOL_OPERATION_ID');
   requireJsonMaterial(inputSchema, `${path}.inputSchema`, 'INVALID_TOOL_OPERATION_INPUT');
@@ -223,14 +244,22 @@ function validateOperation(candidate: unknown, path: string): void {
   requireExactEffect(effect, `${path}.effect`);
 
   const seenFailures = new Set<string>();
-  if ('declaredFailures' in candidate) {
-    if (!Array.isArray(candidate.declaredFailures)) {
-      fail('INVALID_TOOL_OPERATION_FAILURE', `${path}.declaredFailures`, 'must be an array of exact failure-code identities');
+  if ('declaredFailures' in operation) {
+    const failures = operation.declaredFailures;
+    const failuresResult = safeArraySnapshot(failures, `${path}.declaredFailures`);
+    if (!failuresResult.ok) {
+      fail(
+        'INVALID_TOOL_OPERATION_FAILURE',
+        `${path}.declaredFailures`,
+        failuresResult.issue.violation === 'NOT_AN_ARRAY'
+          ? 'must be an array of exact failure-code identities'
+          : describeRecordSafetyIssue(failuresResult.issue),
+      );
     }
-    for (const [index, code] of candidate.declaredFailures.entries()) {
+    for (const [index, code] of failuresResult.snapshot.entries()) {
       const failurePath = `${path}.declaredFailures[${index}]`;
       requireExactIdentityString(code, failurePath, 'INVALID_TOOL_OPERATION_FAILURE');
-      requireNonFloating(code as string, failurePath);
+      requireNonFloatingIdentity(code as string, failurePath);
       if (seenFailures.has(code as string)) {
         fail(
           'INVALID_TOOL_OPERATION_FAILURE',
@@ -242,9 +271,9 @@ function validateOperation(candidate: unknown, path: string): void {
     }
   }
 
-  if ('declaredExposure' in candidate) {
+  if ('declaredExposure' in operation) {
     requireJsonMaterial(
-      candidate.declaredExposure,
+      operation.declaredExposure,
       `${path}.declaredExposure`,
       'INVALID_TOOL_OPERATION_EXPOSURE',
     );
@@ -252,14 +281,12 @@ function validateOperation(candidate: unknown, path: string): void {
 }
 
 function validateDeclaration(body: unknown): void {
-  if (!isPlainObject(body)) {
-    fail(
-      'INVALID_TOOL_COMPONENT_ENVELOPE',
-      'component envelope.semanticBody',
-      'must be exactly one Tool operations declaration object',
-    );
-  }
-  const unexpectedField = ownKeys(body).find((key) => !DECLARATION_FIELDS.has(key));
+  const declaration = requireSafeRecord(
+    body,
+    'component envelope.semanticBody',
+    'INVALID_TOOL_COMPONENT_ENVELOPE',
+  );
+  const unexpectedField = Object.keys(declaration).find((key) => !DECLARATION_FIELDS.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_TOOL_OPERATIONS',
@@ -268,17 +295,22 @@ function validateDeclaration(body: unknown): void {
     );
   }
 
-  const { operations, providesCapabilities } = body;
+  const { operations, providesCapabilities } = declaration;
 
-  if (!Array.isArray(operations) || operations.length < 1) {
+  const operationsResult = safeArraySnapshot(operations, 'tool operations declaration.operations');
+  if (!operationsResult.ok || operationsResult.snapshot.length < 1) {
     fail(
       'INVALID_TOOL_OPERATIONS',
       'tool operations declaration.operations',
-      'must be a non-empty array of operations ([1..*])',
+      operationsResult.ok
+        ? 'must be a non-empty array of operations ([1..*])'
+        : operationsResult.issue.violation === 'NOT_AN_ARRAY'
+          ? 'must be a non-empty array of operations ([1..*])'
+          : describeRecordSafetyIssue(operationsResult.issue),
     );
   }
   const seenOperationIds = new Set<string>();
-  for (const [index, candidate] of operations.entries()) {
+  for (const [index, candidate] of operationsResult.snapshot.entries()) {
     const operationPath = `tool operations declaration.operations[${index}]`;
     validateOperation(candidate, operationPath);
     const operationId = (candidate as { operationId: unknown }).operationId as string;
@@ -292,15 +324,21 @@ function validateDeclaration(body: unknown): void {
     seenOperationIds.add(operationId);
   }
 
-  if (!Array.isArray(providesCapabilities)) {
+  const providesResult = safeArraySnapshot(
+    providesCapabilities,
+    'tool operations declaration.providesCapabilities',
+  );
+  if (!providesResult.ok) {
     fail(
       'INVALID_TOOL_CAPABILITY_PROVIDES',
       'tool operations declaration.providesCapabilities',
-      'must be an array of exact capability references (empty array = provides nothing)',
+      providesResult.issue.violation === 'NOT_AN_ARRAY'
+        ? 'must be an array of exact capability references (empty array = provides nothing)'
+        : describeRecordSafetyIssue(providesResult.issue),
     );
   }
   const seenCapabilityIds = new Set<string>();
-  for (const [index, ref] of providesCapabilities.entries()) {
+  for (const [index, ref] of providesResult.snapshot.entries()) {
     const refPath = `tool operations declaration.providesCapabilities[${index}]`;
     requireExactCapabilityRef(ref, refPath);
     const capabilityId = (ref as { capabilityId: unknown }).capabilityId as string;
@@ -319,13 +357,15 @@ function validateDeclaration(body: unknown): void {
  * Structural fail-closed validation of one Tool Component. Runs the existing
  * `validateComponentEnvelope` first — its failures surface unchanged as
  * `ComponentContractError` — then applies Tool-specific structural validation
- * to `semanticBody` as exactly one `ToolOperationsDeclaration`. Invalid exact
- * identities are always rejected, never silently normalized.
+ * to a descriptor-safe snapshot of `semanticBody` as exactly one
+ * `ToolOperationsDeclaration` (#578). Invalid exact identities are always
+ * rejected, never silently normalized.
  */
 export function validateToolComponent(envelope: ComponentEnvelope): void {
   validateComponentEnvelope(envelope);
 
-  if (envelope.family !== 'tool') {
+  const view = requireSafeRecord(envelope, 'component envelope', 'INVALID_TOOL_COMPONENT_ENVELOPE');
+  if (view.family !== 'tool') {
     fail(
       'INVALID_TOOL_COMPONENT_FAMILY',
       'component envelope.family',
@@ -333,5 +373,5 @@ export function validateToolComponent(envelope: ComponentEnvelope): void {
     );
   }
 
-  validateDeclaration(envelope.semanticBody);
+  validateDeclaration(view.semanticBody);
 }

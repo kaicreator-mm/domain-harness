@@ -51,7 +51,11 @@ export declare class ComponentContractError extends Error {
 /**
  * Structural fail-closed validation of a Component envelope. Invalid exact
  * identities are always rejected — never silently normalized to a
- * default/current value.
+ * default/current value. Validation runs descriptor-safe on a snapshot of
+ * the caller envelope (#578): accessor/symbol-keyed/non-enumerable material
+ * and exotic prototypes are typed rejections, and no hidden getter can
+ * execute during validation or diagnostics. The caller input is never
+ * frozen or mutated.
  */
 export declare function validateComponentEnvelope(envelope: ComponentEnvelope): void;
 //# sourceMappingURL=component.d.ts.map

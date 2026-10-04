@@ -1,6 +1,6 @@
 /**
  * v0.7 typed Definition relation contract and normalized Definition graph
- * identity (issue #542, fine-grained DAG T001C).
+ * identity (issue #542, fine-grained DAG T001C; repaired by #555).
  *
  * The frozen L2 defines `Domain Definition = Domain Component Graph` with
  * normalized typed relations included exactly once in the graph digest and
@@ -14,18 +14,20 @@
  *   existing component contract unchanged; authority-bearing floating
  *   selectors are rejected anywhere in relation references;
  * - a normalized (order-insensitive) graph digest in its own versioned
- *   digest domain, through the existing canonical-JSON + Sha256Port seam.
+ *   digest domain, composed from exact Component semantic digests and exact
+ *   typed relations.
  *
- * Boundaries owned by successor tasks — intentionally absent here:
- * - per-Component content digests (T001B owns `contracts/component-digest.ts`);
- * - must-understand admission / non-emptiness decisions (T001D);
- * - public barrel exposure (T001E);
- * - Runtime Assembly, pins, capability resolution, tool runtime, and any
- *   runtime resolution of relations. Relations are pure Definition-plane
- *   contract identity; nothing here resolves, executes or looks anything up.
+ * Validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578): the
+ * graph envelope and every relation are validated on descriptor-safe
+ * snapshots, so accessor-backed `components`/`relations` material is rejected
+ * before any authority use, and relation evidence used by later validation
+ * phases comes from validated snapshots rather than repeated caller reads.
  */
 import { validateComponentEnvelope, } from './component.js';
+import { componentSemanticDigestMaterial, } from './component-digest.js';
 import { canonicalizeJson, computeCanonicalJsonDigest, } from './identity.js';
+import { carriesEmbeddedSelector, carriesFloatingOrRangeSemantics, describeRecordSafetyIssue, isNonEmptyIdentityString, safeArraySnapshot, safeRecordSnapshot, } from './record-safety.js';
 /**
  * Versioned Definition graph digest domain tag, owned exclusively by this
  * file. Distinct from any per-Component digest domain (T001B) and from the
@@ -48,24 +50,13 @@ const RELATION_FIELDS = new Set([
     'sourceComponentId',
     'targetComponentId',
 ]);
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
 function fail(code, path, reason) {
     throw new DefinitionGraphContractError(code, `${path} ${reason}`);
 }
-function isPlainObject(value) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function ownKeys(value) {
-    return Object.keys(value).filter((key) => Object.prototype.propertyIsEnumerable.call(value, key));
-}
-/** Rejects mutable selection tokens and `id@version` embedding; never normalizes. */
-function requireNonFloating(value, path) {
-    if (value.includes('@') ||
-        FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) ||
-        FLOATING_SELECTOR_PATTERN.test(value)) {
-        fail('FLOATING_AUTHORITY_REFERENCE_FORBIDDEN', path, 'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range) or an embedded `id@version`');
+/** Rejects mutable selection tokens, range operators and `id@version` embedding. */
+function requireNonFloatingIdentity(value, path) {
+    if (carriesFloatingOrRangeSemantics(value)) {
+        fail('FLOATING_AUTHORITY_REFERENCE_FORBIDDEN', path, 'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range) or an embedded `id@version`');
     }
 }
 /** Exact graph identity string: non-empty, not an embedded `id@selector` form. */
@@ -73,13 +64,13 @@ function requireGraphIdentity(value, path) {
     if (typeof value !== 'string') {
         fail('INVALID_GRAPH_ID', path, 'must be a string');
     }
-    if (value.trim().length === 0) {
+    if (!isNonEmptyIdentityString(value)) {
         fail('INVALID_GRAPH_ID', path, 'must be a non-empty exact identity');
     }
-    if (value.includes('@')) {
+    if (carriesEmbeddedSelector(value)) {
         fail('INVALID_GRAPH_ID', path, 'must not embed a version selector (`id@version`)');
     }
-    requireNonFloating(value, path);
+    requireNonFloatingIdentity(value, path);
 }
 /**
  * Exact relation reference identity: non-string/empty values fail with the
@@ -90,55 +81,73 @@ function requireRelationIdentity(value, path, invalidCode) {
     if (typeof value !== 'string') {
         fail(invalidCode, path, 'must be a string');
     }
-    if (value.trim().length === 0) {
+    if (!isNonEmptyIdentityString(value)) {
         fail(invalidCode, path, 'must be a non-empty exact identity');
     }
-    requireNonFloating(value, path);
-}
-/** Structural validation of one relation entry (identity strings only). */
-function validateRelationStructure(relation, path) {
-    if (!isPlainObject(relation)) {
-        fail('INVALID_RELATION', path, 'must be a plain object relation envelope');
+    if (carriesEmbeddedSelector(value)) {
+        fail('FLOATING_AUTHORITY_REFERENCE_FORBIDDEN', path, 'must be an exact identity, not an embedded `id@version` selector');
     }
-    const unexpectedField = ownKeys(relation).find((key) => !RELATION_FIELDS.has(key));
+    requireNonFloatingIdentity(value, path);
+}
+/**
+ * Structural validation of one relation entry (identity strings only) on a
+ * descriptor-safe snapshot. Returns the validated snapshot so later
+ * validation phases never re-read the caller-owned relation object.
+ */
+function validateRelationStructure(relation, path) {
+    const result = safeRecordSnapshot(relation, path);
+    if (!result.ok) {
+        fail('INVALID_RELATION', path, describeRecordSafetyIssue(result.issue));
+    }
+    const candidate = result.snapshot;
+    const unexpectedField = Object.keys(candidate).find((key) => !RELATION_FIELDS.has(key));
     if (unexpectedField !== undefined) {
         fail('INVALID_RELATION', path, `must not carry unknown field "${unexpectedField}" (implementation/assembly/runtime identity belongs to later concerns)`);
     }
-    const candidate = relation;
     requireRelationIdentity(candidate.relationId, `${path}.relationId`, 'INVALID_RELATION_ID');
     requireRelationIdentity(candidate.relationKind, `${path}.relationKind`, 'INVALID_RELATION_KIND');
     requireRelationIdentity(candidate.sourceComponentId, `${path}.sourceComponentId`, 'INVALID_RELATION');
     requireRelationIdentity(candidate.targetComponentId, `${path}.targetComponentId`, 'INVALID_RELATION');
+    return candidate;
 }
 /**
  * Structural fail-closed validation of a Definition graph envelope. Invalid
  * exact identities are always rejected — never silently normalized to a
  * default/current value. Component-envelope failures propagate the original
  * `ComponentContractError` unwrapped (single source of truth for component
- * codes).
+ * codes). Validation runs descriptor-safe on snapshots of the caller graph
+ * envelope and each relation (#578): accessor/symbol-keyed/non-enumerable
+ * material and exotic prototypes are typed rejections before any authority
+ * use, and later validation phases (dangling/duplicate/conflict) read
+ * validated snapshot evidence rather than re-reading caller objects. The
+ * caller input is never frozen or mutated.
  */
 export function validateDefinitionGraphEnvelope(envelope) {
-    if (!isPlainObject(envelope)) {
-        fail('INVALID_GRAPH_ENVELOPE', 'definition graph envelope', 'must be a plain object');
+    const graphResult = safeRecordSnapshot(envelope, 'definition graph envelope');
+    if (!graphResult.ok) {
+        fail('INVALID_GRAPH_ENVELOPE', 'definition graph envelope', describeRecordSafetyIssue(graphResult.issue));
     }
-    const unexpectedField = ownKeys(envelope).find((key) => !GRAPH_FIELDS.has(key));
+    const view = graphResult.snapshot;
+    const unexpectedField = Object.keys(view).find((key) => !GRAPH_FIELDS.has(key));
     if (unexpectedField !== undefined) {
         fail('INVALID_GRAPH_ENVELOPE', 'definition graph envelope', `must not carry unknown field "${unexpectedField}" (implementation/assembly/runtime identity belongs to later concerns)`);
     }
-    const { graphId, components, relations, nonMaterialExtensions } = envelope;
+    const { graphId, components, relations, nonMaterialExtensions } = view;
     requireGraphIdentity(graphId, 'definition graph envelope.graphId');
-    if (!Array.isArray(components)) {
-        fail('INVALID_GRAPH_MATERIAL', 'definition graph envelope.components', 'must be an array of bound Component envelopes');
+    const componentsResult = safeArraySnapshot(components, 'definition graph envelope.components');
+    if (!componentsResult.ok) {
+        fail('INVALID_GRAPH_MATERIAL', 'definition graph envelope.components', componentsResult.issue.violation === 'NOT_AN_ARRAY'
+            ? 'must be an array of bound Component envelopes'
+            : describeRecordSafetyIssue(componentsResult.issue));
     }
-    if (!Array.isArray(relations)) {
-        fail('INVALID_GRAPH_MATERIAL', 'definition graph envelope.relations', 'must be an array of Definition relations');
+    const relationsResult = safeArraySnapshot(relations, 'definition graph envelope.relations');
+    if (!relationsResult.ok) {
+        fail('INVALID_GRAPH_MATERIAL', 'definition graph envelope.relations', relationsResult.issue.violation === 'NOT_AN_ARRAY'
+            ? 'must be an array of Definition relations'
+            : describeRecordSafetyIssue(relationsResult.issue));
     }
-    const componentList = components;
-    const relationList = relations;
-    // Bound components: delegated unchanged to the existing component contract.
-    // A ComponentContractError propagates unwrapped. Binding is also kept
-    // unambiguous: the same componentId may not be bound twice, otherwise the
-    // order-insensitive normalized graph identity would not be well-defined.
+    const componentList = componentsResult.snapshot;
+    const relationList = relationsResult.snapshot;
     const boundIds = new Set();
     for (const [index, component] of componentList.entries()) {
         validateComponentEnvelope(component);
@@ -148,53 +157,44 @@ export function validateDefinitionGraphEnvelope(envelope) {
         }
         boundIds.add(componentId);
     }
-    // Per-relation structural validation first: exact identity strings only.
+    const relationSnapshots = [];
     for (const [index, relation] of relationList.entries()) {
-        validateRelationStructure(relation, `definition graph envelope.relations[${index}]`);
+        relationSnapshots.push(validateRelationStructure(relation, `definition graph envelope.relations[${index}]`));
     }
-    // Exact-endpoint rule: endpoints reference components bound in this same
-    // graph envelope. Missing bindings fail closed — no placeholder components
-    // are auto-created.
-    for (const [index, relation] of relationList.entries()) {
-        const candidate = relation;
-        if (!boundIds.has(candidate.sourceComponentId)) {
-            fail('DANGLING_COMPONENT_REF', `definition graph envelope.relations[${index}].sourceComponentId`, `references "${candidate.sourceComponentId}", which is not a bound component of this graph`);
+    for (const [index, snapshot] of relationSnapshots.entries()) {
+        const sourceComponentId = snapshot.sourceComponentId;
+        const targetComponentId = snapshot.targetComponentId;
+        if (!boundIds.has(sourceComponentId)) {
+            fail('DANGLING_COMPONENT_REF', `definition graph envelope.relations[${index}].sourceComponentId`, `references "${sourceComponentId}", which is not a bound component of this graph`);
         }
-        if (!boundIds.has(candidate.targetComponentId)) {
-            fail('DANGLING_COMPONENT_REF', `definition graph envelope.relations[${index}].targetComponentId`, `references "${candidate.targetComponentId}", which is not a bound component of this graph`);
+        if (!boundIds.has(targetComponentId)) {
+            fail('DANGLING_COMPONENT_REF', `definition graph envelope.relations[${index}].targetComponentId`, `references "${targetComponentId}", which is not a bound component of this graph`);
         }
     }
-    // Exactly-once rule, enforced by rejection (never deduplication):
-    // - a fully identical repetition of a relation is a DUPLICATE_RELATION;
-    // - one relationId reused for differing kind/endpoints is a
-    //   CONFLICTING_RELATION (the same logical identity cannot declare two
-    //   different relations);
-    // - the same (source, target, relationKind) triple under different
-    //   relationIds is a CONFLICTING_RELATION.
     const contentByRelationId = new Map();
     const relationIdByTriple = new Map();
-    for (const [index, relation] of relationList.entries()) {
-        const candidate = relation;
+    for (const [index, snapshot] of relationSnapshots.entries()) {
+        const relationId = snapshot.relationId;
         const contentKey = JSON.stringify([
-            candidate.relationKind,
-            candidate.sourceComponentId,
-            candidate.targetComponentId,
+            snapshot.relationKind,
+            snapshot.sourceComponentId,
+            snapshot.targetComponentId,
         ]);
-        const seenContent = contentByRelationId.get(candidate.relationId);
+        const seenContent = contentByRelationId.get(relationId);
         if (seenContent !== undefined) {
             if (seenContent === contentKey) {
-                fail('DUPLICATE_RELATION', `definition graph envelope.relations[${index}]`, `declares relationId "${candidate.relationId}" more than once (relations are included exactly once; the validator never deduplicates)`);
+                fail('DUPLICATE_RELATION', `definition graph envelope.relations[${index}]`, `declares relationId "${relationId}" more than once (relations are included exactly once; the validator never deduplicates)`);
             }
-            fail('CONFLICTING_RELATION', `definition graph envelope.relations[${index}]`, `reuses relationId "${candidate.relationId}" for differing kind/endpoints`);
+            fail('CONFLICTING_RELATION', `definition graph envelope.relations[${index}]`, `reuses relationId "${relationId}" for differing kind/endpoints`);
         }
-        contentByRelationId.set(candidate.relationId, contentKey);
+        contentByRelationId.set(relationId, contentKey);
         const existingRelationId = relationIdByTriple.get(contentKey);
         if (existingRelationId !== undefined) {
-            fail('CONFLICTING_RELATION', `definition graph envelope.relations[${index}]`, `declares the same (source, target, relationKind) triple under relationIds "${existingRelationId}" and "${candidate.relationId}"`);
+            fail('CONFLICTING_RELATION', `definition graph envelope.relations[${index}]`, `declares the same (source, target, relationKind) triple under relationIds "${existingRelationId}" and "${relationId}"`);
         }
-        relationIdByTriple.set(contentKey, candidate.relationId);
+        relationIdByTriple.set(contentKey, relationId);
     }
-    if ('nonMaterialExtensions' in envelope) {
+    if ('nonMaterialExtensions' in view) {
         try {
             canonicalizeJson(nonMaterialExtensions);
         }
@@ -207,25 +207,56 @@ function compareIds(a, b) {
     return a < b ? -1 : a > b ? 1 : 0;
 }
 /**
- * Normalized (order-insensitive) Definition graph digest through the
- * existing canonical-JSON + Sha256Port seam. The normalized material is
+ * Normalized (order-insensitive) Definition graph digest through the existing
+ * canonical-JSON + Sha256Port seam.
  *
- *     { domain: DEFINITION_GRAPH_DIGEST_DOMAIN, graphId,
- *       components sorted by componentId,
- *       relations sorted by relationId }
+ * Component semantic material is represented exactly once as
+ * `{ componentId, componentSemanticDigest }`. The content digest is delegated
+ * to T001B's canonical Component digest path, so non-material extensions stay
+ * excluded and required semantic/capability reference collections retain the
+ * same normalized set semantics at both Component and Definition identity
+ * layers. Typed relations are included exactly once at graph level.
  *
- * so relations and bound components enter the graph identity exactly once,
- * in a versioned digest domain owned by this file. The digest of an invalid
- * graph is never produced: validation runs first and fails closed.
- * Graph-level `nonMaterialExtensions` are excluded from the material.
+ * Torn-snapshot safety (#555 FULL_REVIEW_SUPPLEMENT): `Sha256Port` is async
+ * and the caller owns the envelope, so after validation every
+ * authority-bearing value that enters graph material is snapshotted
+ * synchronously, before the first caller-visible async suspension —
+ * `graphId` (an immutable string), each relation copied field-by-field into
+ * a fresh record, and each Component's canonical digest material built via
+ * the exported pure T001B normalizer. `envelope.graphId`,
+ * `envelope.components` and `envelope.relations` are never re-read after
+ * that point, so a caller mutating its own graph while a digest promise is
+ * pending can never produce a torn hybrid snapshot. Validation additionally
+ * guarantees the envelope carries no accessor-backed fields (#578), so the
+ * synchronous snapshot cannot observe validation-to-use drift either.
  */
 export async function computeDefinitionGraphDigest(envelope, sha256) {
     validateDefinitionGraphEnvelope(envelope);
+    // Synchronous admitted-graph snapshot — see the doc comment above.
+    const graphId = envelope.graphId;
+    const relationSnapshot = envelope.relations
+        .map((relation) => ({
+        relationId: relation.relationId,
+        relationKind: relation.relationKind,
+        sourceComponentId: relation.sourceComponentId,
+        targetComponentId: relation.targetComponentId,
+    }))
+        .sort((a, b) => compareIds(a.relationId, b.relationId));
+    const componentMaterials = [...envelope.components]
+        .sort((a, b) => compareIds(a.componentId, b.componentId))
+        .map((component) => ({
+        componentId: component.componentId,
+        material: componentSemanticDigestMaterial(component),
+    }));
+    const components = await Promise.all(componentMaterials.map(async ({ componentId, material }) => ({
+        componentId,
+        componentSemanticDigest: await computeCanonicalJsonDigest(material, sha256),
+    })));
     const material = {
         domain: DEFINITION_GRAPH_DIGEST_DOMAIN,
-        graphId: envelope.graphId,
-        components: [...envelope.components].sort((a, b) => compareIds(a.componentId, b.componentId)),
-        relations: [...envelope.relations].sort((a, b) => compareIds(a.relationId, b.relationId)),
+        graphId,
+        components,
+        relations: relationSnapshot,
     };
     return computeCanonicalJsonDigest(material, sha256);
 }
