@@ -1,6 +1,6 @@
 /**
  * v0.7 typed Definition relation contract and normalized Definition graph
- * identity (issue #542, fine-grained DAG T001C).
+ * identity (issue #542, fine-grained DAG T001C; repaired by #555).
  *
  * The frozen L2 defines `Domain Definition = Domain Component Graph` with
  * normalized typed relations included exactly once in the graph digest and
@@ -14,21 +14,18 @@
  *   existing component contract unchanged; authority-bearing floating
  *   selectors are rejected anywhere in relation references;
  * - a normalized (order-insensitive) graph digest in its own versioned
- *   digest domain, through the existing canonical-JSON + Sha256Port seam.
- *
- * Boundaries owned by successor tasks — intentionally absent here:
- * - per-Component content digests (T001B owns `contracts/component-digest.ts`);
- * - must-understand admission / non-emptiness decisions (T001D);
- * - public barrel exposure (T001E);
- * - Runtime Assembly, pins, capability resolution, tool runtime, and any
- *   runtime resolution of relations. Relations are pure Definition-plane
- *   contract identity; nothing here resolves, executes or looks anything up.
+ *   digest domain, composed from exact Component semantic digests and exact
+ *   typed relations.
  */
 import {
   validateComponentEnvelope,
   type ComponentEnvelope,
   type ComponentId,
 } from './component.js';
+import {
+  componentSemanticDigestMaterial,
+  type ComponentSemanticDigestMaterial,
+} from './component-digest.js';
 import {
   canonicalizeJson,
   computeCanonicalJsonDigest,
@@ -261,10 +258,6 @@ export function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelop
   const componentList = components as unknown[];
   const relationList = relations as unknown[];
 
-  // Bound components: delegated unchanged to the existing component contract.
-  // A ComponentContractError propagates unwrapped. Binding is also kept
-  // unambiguous: the same componentId may not be bound twice, otherwise the
-  // order-insensitive normalized graph identity would not be well-defined.
   const boundIds = new Set<string>();
   for (const [index, component] of componentList.entries()) {
     validateComponentEnvelope(component as ComponentEnvelope);
@@ -279,14 +272,10 @@ export function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelop
     boundIds.add(componentId);
   }
 
-  // Per-relation structural validation first: exact identity strings only.
   for (const [index, relation] of relationList.entries()) {
     validateRelationStructure(relation, `definition graph envelope.relations[${index}]`);
   }
 
-  // Exact-endpoint rule: endpoints reference components bound in this same
-  // graph envelope. Missing bindings fail closed — no placeholder components
-  // are auto-created.
   for (const [index, relation] of relationList.entries()) {
     const candidate = relation as DefinitionRelation;
     if (!boundIds.has(candidate.sourceComponentId)) {
@@ -305,13 +294,6 @@ export function validateDefinitionGraphEnvelope(envelope: DefinitionGraphEnvelop
     }
   }
 
-  // Exactly-once rule, enforced by rejection (never deduplication):
-  // - a fully identical repetition of a relation is a DUPLICATE_RELATION;
-  // - one relationId reused for differing kind/endpoints is a
-  //   CONFLICTING_RELATION (the same logical identity cannot declare two
-  //   different relations);
-  // - the same (source, target, relationKind) triple under different
-  //   relationIds is a CONFLICTING_RELATION.
   const contentByRelationId = new Map<string, string>();
   const relationIdByTriple = new Map<string, string>();
   for (const [index, relation] of relationList.entries()) {
@@ -367,28 +349,66 @@ function compareIds(a: string, b: string): number {
 }
 
 /**
- * Normalized (order-insensitive) Definition graph digest through the
- * existing canonical-JSON + Sha256Port seam. The normalized material is
+ * Normalized (order-insensitive) Definition graph digest through the existing
+ * canonical-JSON + Sha256Port seam.
  *
- *     { domain: DEFINITION_GRAPH_DIGEST_DOMAIN, graphId,
- *       components sorted by componentId,
- *       relations sorted by relationId }
+ * Component semantic material is represented exactly once as
+ * `{ componentId, componentSemanticDigest }`. The content digest is delegated
+ * to T001B's canonical Component digest path, so non-material extensions stay
+ * excluded and required semantic/capability reference collections retain the
+ * same normalized set semantics at both Component and Definition identity
+ * layers. Typed relations are included exactly once at graph level.
  *
- * so relations and bound components enter the graph identity exactly once,
- * in a versioned digest domain owned by this file. The digest of an invalid
- * graph is never produced: validation runs first and fails closed.
- * Graph-level `nonMaterialExtensions` are excluded from the material.
+ * Torn-snapshot safety (#555 FULL_REVIEW_SUPPLEMENT): `Sha256Port` is async
+ * and the caller owns the envelope, so after validation every
+ * authority-bearing value that enters graph material is snapshotted
+ * synchronously, before the first caller-visible async suspension —
+ * `graphId` (an immutable string), each relation copied field-by-field into
+ * a fresh record, and each Component's canonical digest material built via
+ * the exported pure T001B normalizer. `envelope.graphId`,
+ * `envelope.components` and `envelope.relations` are never re-read after
+ * that point, so a caller mutating its own graph while a digest promise is
+ * pending can never produce a torn hybrid snapshot.
  */
 export async function computeDefinitionGraphDigest(
   envelope: DefinitionGraphEnvelope,
   sha256: Sha256Port,
 ): Promise<ContentDigest> {
   validateDefinitionGraphEnvelope(envelope);
+
+  // Synchronous admitted-graph snapshot — see the doc comment above.
+  const graphId: string = envelope.graphId;
+  const relationSnapshot: DefinitionRelation[] = envelope.relations
+    .map((relation) => ({
+      relationId: relation.relationId,
+      relationKind: relation.relationKind,
+      sourceComponentId: relation.sourceComponentId,
+      targetComponentId: relation.targetComponentId,
+    }))
+    .sort((a, b) => compareIds(a.relationId, b.relationId));
+  const componentMaterials: Array<{
+    componentId: ComponentId;
+    material: ComponentSemanticDigestMaterial;
+  }> = [...envelope.components]
+    .sort((a, b) => compareIds(a.componentId, b.componentId))
+    .map((component) => ({
+      componentId: component.componentId,
+      material: componentSemanticDigestMaterial(component),
+    }));
+
+  const components: Array<{ componentId: ComponentId; componentSemanticDigest: ContentDigest }> =
+    await Promise.all(
+      componentMaterials.map(async ({ componentId, material }) => ({
+        componentId,
+        componentSemanticDigest: await computeCanonicalJsonDigest(material, sha256),
+      })),
+    );
+
   const material = {
     domain: DEFINITION_GRAPH_DIGEST_DOMAIN,
-    graphId: envelope.graphId,
-    components: [...envelope.components].sort((a, b) => compareIds(a.componentId, b.componentId)),
-    relations: [...envelope.relations].sort((a, b) => compareIds(a.relationId, b.relationId)),
+    graphId,
+    components,
+    relations: relationSnapshot,
   };
   return computeCanonicalJsonDigest(material, sha256);
 }
