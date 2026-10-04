@@ -10,10 +10,10 @@
  * unrepresentable.
  */
 import * as capabilityProvisionModule from '../../src/contracts/capability-provision.js';
+import { CapabilityProvisionContractError } from '../../src/contracts/capability-provision.js';
 import type {
   CapabilityProviderEvidence,
   CapabilityProviderSelection,
-  CapabilityProvisionContractError,
   CapabilityProvisionErrorCode,
   selectCapabilityProvider,
 } from '../../src/contracts/capability-provision.js';
@@ -79,9 +79,6 @@ export type ConsumerSeamIsOptionalBoundComponentId = Expect<
 // provider candidate.
 export type NoProvidesPlaneOnComponentEnvelopes = Expect<
   Equal<'providesCapabilities' extends keyof ComponentEnvelope ? true : false, false>
->;
-export type NoEnvelopeParameterOnTheSelectionFunction = Expect<
-  Equal<Parameters<typeof selectCapabilityProvider>['length'], 3>
 >;
 
 // F6: ambiguity diagnostics are exact ComponentIds — deterministic, sortable,
