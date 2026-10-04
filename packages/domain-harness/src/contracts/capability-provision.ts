@@ -63,6 +63,15 @@
  * Runtime enforcement of that conjunction lands with T003C/#575 and is
  * intentionally out of scope here.
  *
+ * Input validation consumes the shared descriptor-safe record primitive and
+ * unified exact-reference authority of `record-safety.ts` (#557 + #578, the
+ * PR-2 retrofit): the required capability ref and the optional consumer id
+ * are validated on descriptor-safe snapshots, so accessor-backed,
+ * symbol-keyed, non-enumerable or exotic-prototype input is rejected before
+ * any authority use, and downstream authority reads consume the validated
+ * snapshot — never the caller-owned object. The exported runtime surface is
+ * unchanged; no new public name is added.
+ *
  * Boundaries owned by successor tasks — intentionally absent here:
  * - assembly-plane implementation binding/registries/pins (T003C): assembly
  *   may never choose a different provider than this selection returns;
@@ -79,6 +88,14 @@ import {
   type DefinitionGraphEnvelope,
 } from './definition-graph.js';
 import { isContentDigest, type ContentDigest, type Sha256Port } from './identity.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  describeRecordSafetyIssue,
+  isNonEmptyIdentityString,
+  safeRecordSnapshot,
+} from './record-safety.js';
 import { validateToolComponent, type ToolOperationsDeclaration } from './tool-component.js';
 
 export type CapabilityProvisionErrorCode =
@@ -190,22 +207,8 @@ export interface CurrentCapabilityProviderSelection {
   readonly provider: CapabilityProviderEvidence;
 }
 
-const FLOATING_SELECTOR_TOKENS = new Set(['latest', 'current', 'active', 'default', '*']);
-/** Range/wildcard operators never occur in an exact identity string. */
-const FLOATING_SELECTOR_PATTERN = /[\^~<>|*]/;
-
 function fail(code: CapabilityProvisionErrorCode, path: string, reason: string): never {
   throw new CapabilityProvisionContractError(code, `${path} ${reason}`);
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function ownKeys(value: Record<string, unknown>): string[] {
-  return Object.keys(value).filter((key) =>
-    Object.prototype.propertyIsEnumerable.call(value, key),
-  );
 }
 
 function compareIds(a: string, b: string): number {
@@ -221,47 +224,76 @@ function freezeCapabilityRef(ref: CapabilityContractRef): CapabilityContractRef 
 }
 
 /**
- * Exact selection-input identity string, mirroring the component contract
- * convention unchanged: non-string/blank/`id@version` embedding fails
- * INVALID_SELECTION_INPUT; mutable selection tokens and range/wildcard
- * operators fail FLOATING_AUTHORITY_REFERENCE_FORBIDDEN. Never normalized.
+ * Structural stage of exact selection-input identity validation: the value
+ * must be a non-empty string without an embedded `id@version` selector form
+ * (the component contract convention, unchanged). Structurally unusable
+ * input is a typed `INVALID_SELECTION_INPUT`, never a TypeError, and no
+ * hidden getter executes during validation or diagnostics.
  */
-function requireExactSelectionIdentity(value: unknown, path: string): void {
+function requireExactSelectionIdentityString(value: unknown, path: string): void {
   if (typeof value !== 'string') {
     fail('INVALID_SELECTION_INPUT', path, 'must be a string');
   }
-  if (value.trim().length === 0) {
+  if (!isNonEmptyIdentityString(value)) {
     fail('INVALID_SELECTION_INPUT', path, 'must be a non-empty exact identity');
   }
-  if (value.includes('@')) {
+  if (carriesEmbeddedSelector(value)) {
     fail(
       'INVALID_SELECTION_INPUT',
       path,
       'must not embed a version selector (`id@version`); use the exact version field',
     );
   }
-  if (
-    FLOATING_SELECTOR_TOKENS.has(value.trim().toLowerCase()) ||
-    FLOATING_SELECTOR_PATTERN.test(value)
-  ) {
+}
+
+/**
+ * Exactness stage for identity strings: mutable selection tokens and
+ * range/wildcard operators are forbidden, never normalized — the shared
+ * unified matrix of `record-safety.ts` (#557), the same matrix the Tool
+ * declaration and graph seams consume.
+ */
+function requireNonFloatingSelectionIdentity(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value)) {
     fail(
       'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
       path,
-      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range)',
+      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range)',
     );
   }
 }
 
-/** Structural validation of the required ref: exactly {capabilityId, version}. */
-function requireExactSelectionRef(ref: CapabilityContractRef): void {
-  if (!isPlainObject(ref)) {
+/**
+ * Exactness stage for version strings: the identity matrix PLUS semver
+ * x-range/partial forms (`1.x`, `x`, `1.`), which are never exact.
+ * Validation only — never resolved against anything.
+ */
+function requireExactSelectionVersion(value: string, path: string): void {
+  if (carriesFloatingOrRangeSemantics(value) || carriesXRangeVersionSemantics(value)) {
     fail(
-      'INVALID_SELECTION_INPUT',
-      'requiredCapability',
-      'must be an exact {capabilityId, version} reference object',
+      'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
+      path,
+      'must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)',
     );
   }
-  const keys = ownKeys(ref).sort();
+}
+
+/**
+ * Structural validation of the required ref on a descriptor-safe snapshot
+ * (#578): an ordinary or null-prototype record carrying exactly the own
+ * enumerable data keys `{capabilityId, version}` (no accessor, no hidden
+ * symbol/non-enumerable material, no exotic prototype), both fields exact
+ * identity strings. Returns the validated snapshot: every downstream
+ * authority read (matching, evidence minting, diagnostics) consumes the
+ * snapshot, never the caller-owned object, so validation-to-use TOCTOU
+ * drift is impossible by construction.
+ */
+function requireExactSelectionRef(ref: CapabilityContractRef): Record<string, unknown> {
+  const result = safeRecordSnapshot(ref, 'requiredCapability');
+  if (!result.ok) {
+    fail('INVALID_SELECTION_INPUT', 'requiredCapability', describeRecordSafetyIssue(result.issue));
+  }
+  const candidate = result.snapshot;
+  const keys = Object.keys(candidate).sort();
   if (keys.length !== 2 || !keys.includes('capabilityId') || !keys.includes('version')) {
     fail(
       'INVALID_SELECTION_INPUT',
@@ -269,8 +301,14 @@ function requireExactSelectionRef(ref: CapabilityContractRef): void {
       'must contain exactly {capabilityId, version} (no extra identity, no embedded selector)',
     );
   }
-  requireExactSelectionIdentity(ref.capabilityId, 'requiredCapability.capabilityId');
-  requireExactSelectionIdentity(ref.version, 'requiredCapability.version');
+  requireExactSelectionIdentityString(candidate.capabilityId, 'requiredCapability.capabilityId');
+  requireNonFloatingSelectionIdentity(
+    candidate.capabilityId as string,
+    'requiredCapability.capabilityId',
+  );
+  requireExactSelectionIdentityString(candidate.version, 'requiredCapability.version');
+  requireExactSelectionVersion(candidate.version as string, 'requiredCapability.version');
+  return candidate;
 }
 
 /**
@@ -286,24 +324,21 @@ function requireBoundConsumerId(
   if (typeof consumerComponentId !== 'string') {
     fail('INVALID_SELECTION_INPUT', 'consumerComponentId', 'must be a string');
   }
-  if (consumerComponentId.trim().length === 0) {
+  if (!isNonEmptyIdentityString(consumerComponentId)) {
     fail('INVALID_SELECTION_INPUT', 'consumerComponentId', 'must be a non-empty exact identity');
   }
-  if (consumerComponentId.includes('@')) {
+  if (carriesEmbeddedSelector(consumerComponentId)) {
     fail(
       'INVALID_SELECTION_INPUT',
       'consumerComponentId',
       'must not embed a version selector (`id@version`)',
     );
   }
-  if (
-    FLOATING_SELECTOR_TOKENS.has(consumerComponentId.trim().toLowerCase()) ||
-    FLOATING_SELECTOR_PATTERN.test(consumerComponentId)
-  ) {
+  if (carriesFloatingOrRangeSemantics(consumerComponentId)) {
     fail(
       'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN',
       'consumerComponentId',
-      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/range)',
+      'must be an exact identity, not a floating/range selector (latest/current/active/default/*/x/range)',
     );
   }
   if (!graph.components.some((component) => component.componentId === consumerComponentId)) {
@@ -341,7 +376,9 @@ export function selectCapabilityProvider(
   // component envelope) propagates unwrapped.
   validateDefinitionGraphEnvelope(graph);
 
-  requireExactSelectionRef(requiredCapability);
+  const required = requireExactSelectionRef(requiredCapability);
+  const requiredCapabilityId = required.capabilityId as string;
+  const requiredCapabilityVersion = required.version as string;
   const excludedId =
     consumerComponentId === undefined
       ? undefined
@@ -370,8 +407,8 @@ export function selectCapabilityProvider(
     // the first exact match is THE match regardless of declaration order.
     for (const providesCapability of declaration.providesCapabilities) {
       if (
-        providesCapability.capabilityId === requiredCapability.capabilityId &&
-        providesCapability.version === requiredCapability.version
+        providesCapability.capabilityId === requiredCapabilityId &&
+        providesCapability.version === requiredCapabilityVersion
       ) {
         eligible.push({ componentId: component.componentId, providesCapability });
         break;
@@ -382,7 +419,7 @@ export function selectCapabilityProvider(
   if (eligible.length === 0) {
     throw new CapabilityProvisionContractError(
       'CAPABILITY_PROVIDER_NOT_FOUND',
-      `capability provider selection: no eligible Domain Tool Component of graph "${graph.graphId}" provides the exact capability ref (capabilityId=${requiredCapability.capabilityId} version=${requiredCapability.version}) — no fallback, no nearest version, no self-provision`,
+      `capability provider selection: no eligible Domain Tool Component of graph "${graph.graphId}" provides the exact capability ref (capabilityId=${requiredCapabilityId} version=${requiredCapabilityVersion}) — no fallback, no nearest version, no self-provision`,
     );
   }
 
@@ -392,7 +429,7 @@ export function selectCapabilityProvider(
       .sort(compareIds);
     throw new CapabilityProvisionContractError(
       'CAPABILITY_PROVIDER_AMBIGUOUS',
-      `capability provider selection: ${eligible.length} Domain Tool Components of graph "${graph.graphId}" provide the exact capability ref (capabilityId=${requiredCapability.capabilityId} version=${requiredCapability.version}) — Definition authority requires exactly one (no first-wins, no ordering, no priority)`,
+      `capability provider selection: ${eligible.length} Domain Tool Components of graph "${graph.graphId}" provide the exact capability ref (capabilityId=${requiredCapabilityId} version=${requiredCapabilityVersion}) — Definition authority requires exactly one (no first-wins, no ordering, no priority)`,
       conflictingProviderComponentIds,
     );
   }
@@ -401,7 +438,10 @@ export function selectCapabilityProvider(
     componentId: ComponentId;
     providesCapability: CapabilityContractRef;
   };
-  const requiredCapabilityEvidence = freezeCapabilityRef(requiredCapability);
+  const requiredCapabilityEvidence = freezeCapabilityRef({
+    capabilityId: requiredCapabilityId,
+    version: requiredCapabilityVersion,
+  });
   const providedCapabilityEvidence = freezeCapabilityRef(selected.providesCapability);
   return Object.freeze({
     graphId: graph.graphId,
@@ -468,7 +508,9 @@ export async function resolveCurrentCapabilityProvider(
   // validation mirror the candidate API exactly (its errors are shared).
   validateDefinitionGraphEnvelope(graph);
 
-  requireExactSelectionRef(requiredCapability);
+  const required = requireExactSelectionRef(requiredCapability);
+  const requiredCapabilityId = required.capabilityId as string;
+  const requiredCapabilityVersion = required.version as string;
   const consumerId = requireBoundConsumerId(graph, consumerComponentId);
 
   // Consumer requirement membership: the exact ref must be declared by the
@@ -479,8 +521,7 @@ export async function resolveCurrentCapabilityProvider(
   ) as ComponentEnvelope;
   const declaredRequirement = consumerEnvelope.requiredCapabilities.find(
     (ref: CapabilityContractRef) =>
-      ref.capabilityId === requiredCapability.capabilityId &&
-      ref.version === requiredCapability.version,
+      ref.capabilityId === requiredCapabilityId && ref.version === requiredCapabilityVersion,
   );
   if (declaredRequirement === undefined) {
     fail(
