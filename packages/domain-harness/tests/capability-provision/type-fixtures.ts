@@ -10,14 +10,16 @@
  * unrepresentable.
  */
 import * as capabilityProvisionModule from '../../src/contracts/capability-provision.js';
-import { CapabilityProvisionContractError } from '../../src/contracts/capability-provision.js';
+import {
+  CapabilityProvisionContractError,
+  resolveCurrentCapabilityProvider,
+} from '../../src/contracts/capability-provision.js';
 import type {
   CapabilityProviderEvidence,
   CapabilityProviderSelection,
   CapabilityProvisionErrorCode,
   CurrentCapabilityConsumerEvidence,
   CurrentCapabilityProviderSelection,
-  resolveCurrentCapabilityProvider,
   selectCapabilityProvider,
 } from '../../src/contracts/capability-provision.js';
 import type {
@@ -234,12 +236,12 @@ export type CurrentSelectionReturnsPromiseOfEvidence = Expect<
     Promise<CurrentCapabilityProviderSelection>
   >
 >;
-// @ts-expect-error the consumer id is required — an omitted consumer cannot
-// mint currentness-bound selection evidence (compile-time fail-closed).
 export const currentSelectionWithoutConsumer: Promise<CurrentCapabilityProviderSelection> =
   resolveCurrentCapabilityProvider(
     {} as DefinitionGraphEnvelope,
     {} as CapabilityContractRef,
+    // @ts-expect-error the consumer id is required — an omitted consumer cannot
+    // mint currentness-bound selection evidence (compile-time fail-closed).
     undefined,
     {} as ContentDigest,
     {} as Sha256Port,

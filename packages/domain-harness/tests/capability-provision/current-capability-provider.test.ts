@@ -544,6 +544,104 @@ test('#572-7: caller mutation of graph/request objects after selection cannot al
 });
 
 // ---------------------------------------------------------------------------
+// Fresh-review P2 (#572): the candidacy delegation and every authority-bearing
+// capture (requirement value, graphId, frozen evidence refs) are snapshotted
+// synchronously BEFORE the digest await, matching the #558 seam discipline.
+// A caller mutating its own graph while the digest promise is pending must
+// not mint torn hybrid evidence — the returned evidence must equal the one
+// derived from an untouched twin graph, and the mutation must be substantive.
+// ---------------------------------------------------------------------------
+
+test('#572-P2: caller mutation during the pending digest cannot tear the evidence', async () => {
+  const required: CapabilityContractRef = {
+    capabilityId: 'credit-rating-lookup',
+    version: '1.1.0',
+  };
+  const provided: CapabilityContractRef = {
+    capabilityId: 'credit-rating-lookup',
+    version: '1.1.0',
+  };
+  const consumer = semanticComponent({ requires: [required] });
+  const provider = toolComponent({
+    componentId: 'catalog.credit-rating.tool',
+    provides: [provided],
+  });
+  const graph = graphOf([consumer, provider]);
+  const digest = await digestOf(graph);
+
+  // Untouched twin: identical content, never mutated — the authority
+  // baseline the in-flight selection must match exactly.
+  const twin = graphOf([
+    semanticComponent({ requires: [CREDIT_RATING] }),
+    toolComponent({ componentId: 'catalog.credit-rating.tool' }),
+  ]);
+  const twinDigest = await digestOf(twin);
+  assert.equal(twinDigest, digest);
+  const baseline = await resolveCurrentCapabilityProvider(
+    twin,
+    CREDIT_RATING,
+    'quote.eligibility.rule',
+    twinDigest,
+    sha256,
+  );
+
+  // A Sha256Port that mutates the caller-owned graph the first time the
+  // digest computation enters the port: graphId, the consumer requirement
+  // and a later component's provider declaration all change while the
+  // digest promise is pending.
+  let mutated = false;
+  const mutatingSha256: Sha256Port = {
+    async digestUtf8(value: string): Promise<string> {
+      if (!mutated) {
+        mutated = true;
+        (graph as { graphId: string }).graphId = 'provision.mutated.graph';
+        (consumer.requiredCapabilities[0] as { version: string }).version =
+          '0.0.0-mutated';
+        const declaration = provider.semanticBody as unknown as ToolOperationsDeclaration;
+        (declaration.providesCapabilities[0] as { version: string }).version =
+          '0.0.0-mutated';
+      }
+      return createHash('sha256').update(value, 'utf8').digest('hex');
+    },
+  };
+
+  const selection = await resolveCurrentCapabilityProvider(
+    graph,
+    required,
+    'quote.eligibility.rule',
+    digest,
+    mutatingSha256,
+  );
+
+  // No torn hybrid: the evidence is exactly what the untouched twin graph
+  // yields — pre-mutation digest, requirement, provider and graphId.
+  assert.deepEqual(selection, baseline);
+  assert.equal(selection.graphId, 'provision.current.test.graph');
+  assert.deepEqual(selection.requiredCapability, CREDIT_RATING);
+  assert.deepEqual(selection.consumer.requiredCapability, CREDIT_RATING);
+  assert.deepEqual(selection.provider.providesCapability, CREDIT_RATING);
+  assert.equal(selection.definitionGraphDigest, digest);
+
+  // Negative control: the mutation is substantive. The mutated content has
+  // a different digest, and a selection over it genuinely fails closed — the
+  // consumer no longer declares the requested exact ref.
+  assert.equal(graph.graphId, 'provision.mutated.graph');
+  const mutatedDigest = await digestOf(graph);
+  assert.notEqual(mutatedDigest, digest);
+  await expectProvisionFailure(
+    () =>
+      resolveCurrentCapabilityProvider(
+        graph,
+        CREDIT_RATING,
+        'quote.eligibility.rule',
+        mutatedDigest,
+        sha256,
+      ),
+    'CONSUMER_CAPABILITY_NOT_REQUIRED',
+  );
+});
+
+// ---------------------------------------------------------------------------
 // R2 matrix 8: module surface — the candidate API re-exports/behavior is
 // unchanged, and the new seam is additive.
 // ---------------------------------------------------------------------------
