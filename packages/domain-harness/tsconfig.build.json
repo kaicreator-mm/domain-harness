@@ -10,6 +10,8 @@
   // (src/public-v3/index.ts), so the v0.3 module closure ships through the
   // same root closure; public-v3 is listed explicitly to anchor the ./v3
   // subpath declaration entry.
+  // T001E (#551): src/public-v7/index.ts anchors the ./v7 subpath
+  // declaration entry.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
@@ -20,6 +22,7 @@
   "include": [
     "src/index.ts",
     "src/public-v3/index.ts",
+    "src/public-v7/index.ts",
     "src/workflow/index.ts",
     "src/workflow/internal/xstate-adapter.ts"
   ]

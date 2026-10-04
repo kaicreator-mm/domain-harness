@@ -16,4 +16,11 @@ export * from './public-v3/index.js';
 // edited, relabeled or re-exported through it. Also reachable through the
 // explicit `./v4` export.
 export * from './public-v4/index.js';
+// Additive portable v0.7 successor surface (fine-grained DAG #534 T001E):
+// the Domain Component foundation — envelope/exact refs, Component and
+// Definition digests, must-understand admission, and the Tool Component
+// operation contract. Additive only; no historical v0.2/v0.3/v0.4 semantics
+// are edited, relabeled or re-exported through it. Also reachable through
+// the explicit `./v7` export.
+export * from './public-v7/index.js';
 //# sourceMappingURL=index.js.map

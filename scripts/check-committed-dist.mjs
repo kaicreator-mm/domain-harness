@@ -17,6 +17,7 @@ const shippedEntries = {
     'dist/index.d.ts',
     'dist/public-v2/index.js',
     'dist/public-v3/index.js',
+    'dist/public-v7/index.js',
     'dist/workflow/index.js',
   ],
   'packages/domain-harness-compiler': [
