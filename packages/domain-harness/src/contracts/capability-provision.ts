@@ -434,12 +434,23 @@ export function selectCapabilityProvider(
  *    unverified supplied digest is never written into evidence.
  *
  * Fail-closed order: graph validation -> ref/consumer exact validation ->
- * consumer requirement membership -> digest recompute/compare -> candidacy
- * (the existing `selectCapabilityProvider` core, which also excludes the
- * consumer itself from candidacy — never satisfied-by-self). Graph and tool
- * contract errors propagate unwrapped; provider NOT_FOUND/AMBIGUOUS semantics,
- * sorted ambiguity diagnostics and permutation invariance are identical to
- * the candidate API because the candidacy is delegated to it unchanged.
+ * consumer requirement membership -> candidacy (the existing
+ * `selectCapabilityProvider` core, which also excludes the consumer itself
+ * from candidacy — never satisfied-by-self) -> digest recompute/compare.
+ * Graph and tool contract errors propagate unwrapped; provider
+ * NOT_FOUND/AMBIGUOUS semantics, sorted ambiguity diagnostics and permutation
+ * invariance are identical to the candidate API because the candidacy is
+ * delegated to it unchanged.
+ *
+ * Snapshot discipline (#558 seam, extended by the fresh review of #572): the
+ * digest seam snapshots the graph synchronously at call time, and this
+ * function matches that discipline — candidacy and every authority-bearing
+ * capture (the requirement value, the graphId, the frozen evidence refs) run
+ * BEFORE the `await computeDefinitionGraphDigest` suspension. After the await
+ * only the digest comparison and the return remain, so a caller mutating its
+ * own graph while the digest promise is pending can never mint torn hybrid
+ * evidence (a digest certifying pre-mutation content alongside
+ * requirement/provider/graphId read from post-mutation content).
  *
  * Semantics: this mints Definition-currentness-bound selection evidence, NOT
  * admitted or runtime-authoritative evidence — must-understand admission and
@@ -479,6 +490,22 @@ export async function resolveCurrentCapabilityProvider(
     );
   }
 
+  // Candidacy is delegated unchanged to the candidate core: identical
+  // matching, zero-provider, ambiguity, sorted-diagnostics and permutation
+  // semantics, with the consumer excluded from candidacy (no self-provision).
+  // It runs BEFORE the digest await so the whole decision is snapshotted
+  // synchronously at call time (see the doc comment above).
+  const selection = selectCapabilityProvider(graph, requiredCapability, consumerId);
+
+  // Every authority-bearing value is captured and frozen before the await:
+  // the graphId, the declared requirement, and the evidence refs. Evidence
+  // owns fresh frozen values only — no aliases of caller-owned
+  // graph/envelope/request objects — so a later caller mutation cannot
+  // rewrite the completed decision, including one racing the pending digest.
+  const graphId = graph.graphId;
+  const requirementEvidence = freezeCapabilityRef(declaredRequirement);
+  const consumerRequirementEvidence = freezeCapabilityRef(declaredRequirement);
+
   // Currentness: the supplied digest is only a claim. Structurally invalid
   // claims fail closed; a valid claim that does not match the recomputed
   // digest of this exact graph content is stale/foreign and fails closed.
@@ -495,27 +522,17 @@ export async function resolveCurrentCapabilityProvider(
     fail(
       'DEFINITION_GRAPH_DIGEST_MISMATCH',
       'currentGraphDigest',
-      `does not match the recomputed Definition graph digest of graph "${graph.graphId}" — stale or foreign currentness claims are never promoted to selection evidence`,
+      `does not match the recomputed Definition graph digest of graph "${graphId}" — stale or foreign currentness claims are never promoted to selection evidence`,
     );
   }
 
-  // Candidacy is delegated unchanged to the candidate core: identical
-  // matching, zero-provider, ambiguity, sorted-diagnostics and permutation
-  // semantics, with the consumer excluded from candidacy (no self-provision).
-  const selection = selectCapabilityProvider(graph, requiredCapability, consumerId);
-
-  // Evidence owns fresh frozen values only — no aliases of caller-owned
-  // graph/envelope/request objects. The requirement evidence is copied from
-  // the validated graph declaration (not the caller's request object), so
-  // later caller mutation cannot rewrite the completed decision.
-  const requirementEvidence = freezeCapabilityRef(declaredRequirement);
   return Object.freeze({
-    graphId: graph.graphId,
+    graphId,
     definitionGraphDigest: recomputedDigest,
     requiredCapability: requirementEvidence,
     consumer: Object.freeze({
       componentId: consumerId,
-      requiredCapability: freezeCapabilityRef(declaredRequirement),
+      requiredCapability: consumerRequirementEvidence,
     }),
     provider: selection.provider,
   });
