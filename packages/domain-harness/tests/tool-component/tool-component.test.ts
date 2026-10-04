@@ -40,7 +40,7 @@ function operation(overrides?: {
 }
 
 function declaration(overrides?: {
-  operations?: readonly ToolOperationContract[];
+  operations?: ToolOperationsDeclaration['operations'];
   providesCapabilities?: readonly CapabilityContractRef[];
 }): ToolOperationsDeclaration {
   return {
@@ -105,6 +105,31 @@ function expectOperationFailure(
   expectDeclarationFailure((declaration) => {
     mutate(declaration.operations[0] as unknown as MutableOperation);
   }, code);
+}
+
+/**
+ * Non-portable JSON injected inside `semanticBody` is rejected by the
+ * envelope-first composition: `validateComponentEnvelope` runs first and its
+ * `INVALID_SEMANTIC_BODY` failure surfaces unchanged as
+ * `ComponentContractError` before any Tool-specific check runs.
+ */
+function expectEnvelopeSurfacedFailure(
+  mutate: (op: MutableOperation) => void,
+  code: string,
+): void {
+  const envelope = toolEnvelope() as unknown as MutableEnvelope;
+  const op = ((envelope.semanticBody as unknown as MutableDeclaration)
+    .operations[0]) as unknown as MutableOperation;
+  mutate(op);
+  assert.throws(
+    () => validateToolComponent(envelope as unknown as ComponentEnvelope),
+    (error: unknown) => {
+      assert.ok(error instanceof ComponentContractError, 'expected ComponentContractError');
+      assert.ok(!(error instanceof ToolComponentContractError));
+      assert.equal(error.code, code);
+      return true;
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -202,36 +227,41 @@ test('T003A-R3: input/output schemas are required portable JSON; {} is unconstra
   validateToolComponent(toolEnvelope({ semanticBody: rich as unknown as JsonValue }));
 });
 
-test('T003A-R3: absent or undefined input/output schemas are rejected', () => {
+test('T003A-R3: absent input/output schemas are Tool-typed rejections; undefined values are non-portable JSON', () => {
+  // Absent required material is portable JSON as a whole, so the Tool-level
+  // field validation rejects it with the typed field code.
   expectOperationFailure((op) => {
     delete (op as { inputSchema?: unknown }).inputSchema;
   }, 'INVALID_TOOL_OPERATION_INPUT');
   expectOperationFailure((op) => {
-    op.inputSchema = undefined as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_INPUT');
-  expectOperationFailure((op) => {
     delete (op as { outputSchema?: unknown }).outputSchema;
   }, 'INVALID_TOOL_OPERATION_OUTPUT');
-  expectOperationFailure((op) => {
+  // An explicitly-undefined value makes the whole semanticBody non-portable,
+  // so the envelope-first composition rejects it unchanged at the envelope
+  // layer before Tool-specific validation runs.
+  expectEnvelopeSurfacedFailure((op) => {
+    op.inputSchema = undefined as unknown as JsonValue;
+  }, 'INVALID_SEMANTIC_BODY');
+  expectEnvelopeSurfacedFailure((op) => {
     op.outputSchema = undefined as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_OUTPUT');
+  }, 'INVALID_SEMANTIC_BODY');
 });
 
-test('T003A-R3: non-portable input/output values are rejected', () => {
-  expectOperationFailure((op) => {
+test('T003A-R3: non-portable input/output values are rejected (envelope-first composition)', () => {
+  expectEnvelopeSurfacedFailure((op) => {
     op.inputSchema = Number.NaN as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_INPUT');
-  expectOperationFailure((op) => {
+  }, 'INVALID_SEMANTIC_BODY');
+  expectEnvelopeSurfacedFailure((op) => {
     op.inputSchema = (() => 'x') as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_INPUT');
-  expectOperationFailure((op) => {
+  }, 'INVALID_SEMANTIC_BODY');
+  expectEnvelopeSurfacedFailure((op) => {
     op.outputSchema = new Date('2024-01-01T00:00:00Z') as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_OUTPUT');
+  }, 'INVALID_SEMANTIC_BODY');
   const circular: unknown[] = [];
   circular.push(circular);
-  expectOperationFailure((op) => {
+  expectEnvelopeSurfacedFailure((op) => {
     op.outputSchema = circular as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_OUTPUT');
+  }, 'INVALID_SEMANTIC_BODY');
 });
 
 // ---------------------------------------------------------------------------
@@ -303,9 +333,11 @@ test('T003A-R5: missing, unknown, or case-mismatched effect values are rejected 
   expectOperationFailure((op) => {
     delete (op as { effect?: unknown }).effect;
   }, 'INVALID_TOOL_OPERATION_EFFECT');
-  expectOperationFailure((op) => {
+  // An undefined effect makes the whole semanticBody non-portable JSON — the
+  // envelope-first composition rejects it before Tool-specific validation.
+  expectEnvelopeSurfacedFailure((op) => {
     op.effect = undefined as unknown as ToolOperationEffect;
-  }, 'INVALID_TOOL_OPERATION_EFFECT');
+  }, 'INVALID_SEMANTIC_BODY');
   expectOperationFailure((op) => {
     op.effect = 'read-only' as unknown as ToolOperationEffect;
   }, 'INVALID_TOOL_OPERATION_EFFECT');
@@ -431,16 +463,16 @@ test('T003A-R7: validation outcome is identical for any portable declaredExposur
   validateToolComponent(toolEnvelope({ semanticBody: exotic as unknown as JsonValue }));
 });
 
-test('T003A-R7: non-portable declaredExposure is rejected', () => {
-  expectOperationFailure((op) => {
+test('T003A-R7: non-portable declaredExposure is rejected (envelope-first composition)', () => {
+  expectEnvelopeSurfacedFailure((op) => {
     op.declaredExposure = (() => 'authorize') as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_EXPOSURE');
-  expectOperationFailure((op) => {
+  }, 'INVALID_SEMANTIC_BODY');
+  expectEnvelopeSurfacedFailure((op) => {
     op.declaredExposure = new Map([['agentVisible', true]]) as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_EXPOSURE');
-  expectOperationFailure((op) => {
+  }, 'INVALID_SEMANTIC_BODY');
+  expectEnvelopeSurfacedFailure((op) => {
     op.declaredExposure = Number.POSITIVE_INFINITY as unknown as JsonValue;
-  }, 'INVALID_TOOL_OPERATION_EXPOSURE');
+  }, 'INVALID_SEMANTIC_BODY');
 });
 
 // ---------------------------------------------------------------------------
@@ -626,15 +658,15 @@ test('T003A-R12: operations must be a non-empty array of plain objects', () => {
     delete (decl as { operations?: unknown }).operations;
   }, 'INVALID_TOOL_OPERATIONS');
   expectDeclarationFailure((decl) => {
-    decl.operations = [];
+    decl.operations = [] as unknown as MutableDeclaration['operations'];
   }, 'INVALID_TOOL_OPERATIONS');
   expectDeclarationFailure((decl) => {
-    decl.operations = 'lookup.credit-rating' as unknown as ToolOperationContract[];
+    decl.operations = 'lookup.credit-rating' as unknown as MutableDeclaration['operations'];
   }, 'INVALID_TOOL_OPERATIONS');
   expectDeclarationFailure((decl) => {
     decl.operations = [null as unknown as ToolOperationContract];
   }, 'INVALID_TOOL_OPERATION');
   expectDeclarationFailure((decl) => {
     decl.operations = [{ operationId: 'lookup.credit-rating' } as unknown as ToolOperationContract];
-  }, 'INVALID_TOOL_OPERATION');
+  }, 'INVALID_TOOL_OPERATION_INPUT');
 });

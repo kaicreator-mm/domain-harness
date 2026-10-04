@@ -70,93 +70,93 @@ export const operationWithoutEffect: ToolOperationContract = {
   inputSchema: {},
   outputSchema: {},
 };
-// @ts-expect-error case-mismatched effect literals are unrepresentable
 export const operationWithCaseMismatchedEffect: ToolOperationContract = {
   ...operationFixture,
+  // @ts-expect-error case-mismatched effect literals are unrepresentable
   effect: 'IDEMPOTENT',
 };
 
 // F5: implementation/resource identity is unrepresentable on the declaration
 // (excess-property checking on object literals).
-// @ts-expect-error no implementation binding on the declaration
 export const declarationWithImplementation: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no implementation binding on the declaration
   implementation: 'tool-impl@9',
 };
-// @ts-expect-error no provider routing identity on the declaration
 export const declarationWithProvider: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no provider routing identity on the declaration
   provider: 'openai',
 };
-// @ts-expect-error no resource requirement declaration on the declaration
 export const declarationWithResources: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no resource requirement declaration on the declaration
   resources: { memory: '512Mi' },
 };
-// @ts-expect-error no assembly digest on the declaration
 export const declarationWithAssemblyDigest: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no assembly digest on the declaration
   assemblyDigest: 'sha256:abc',
 };
-// @ts-expect-error no activation identity on the declaration
 export const declarationWithActivation: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no activation identity on the declaration
   activation: 'on-demand',
 };
-// @ts-expect-error no endpoint identity on the declaration
 export const declarationWithEndpoint: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no endpoint identity on the declaration
   endpoint: 'https://internal.example',
 };
-// @ts-expect-error no secret/credential material on the declaration
 export const declarationWithSecrets: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no secret/credential material on the declaration
   secrets: ['api-key'],
 };
-// @ts-expect-error no binding identity on the declaration
 export const declarationWithBinding: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no binding identity on the declaration
   binding: 'pin-42',
 };
-// @ts-expect-error no module/package path on the declaration
 export const declarationWithModule: ToolOperationsDeclaration = {
   operations: [operationFixture],
   providesCapabilities: [],
+  // @ts-expect-error no module/package path on the declaration
   module: 'host/modules/tool.js',
 };
 
 // F6: implementation/resource identity is unrepresentable on an operation.
-// @ts-expect-error no implementation binding on an operation
 export const operationWithImplementation: ToolOperationContract = {
   ...operationFixture,
+  // @ts-expect-error no implementation binding on an operation
   implementation: 'tool-impl@9',
 };
-// @ts-expect-error no endpoint identity on an operation
 export const operationWithEndpoint: ToolOperationContract = {
   ...operationFixture,
+  // @ts-expect-error no endpoint identity on an operation
   endpoint: 'https://internal.example',
 };
-// @ts-expect-error no resource requirement on an operation
 export const operationWithResources: ToolOperationContract = {
   ...operationFixture,
+  // @ts-expect-error no resource requirement on an operation
   resources: { memory: '512Mi' },
 };
-// @ts-expect-error no provider routing identity on an operation
 export const operationWithProvider: ToolOperationContract = {
   ...operationFixture,
+  // @ts-expect-error no provider routing identity on an operation
   provider: 'openai',
 };
-// @ts-expect-error no secret material on an operation
 export const operationWithSecrets: ToolOperationContract = {
   ...operationFixture,
+  // @ts-expect-error no secret material on an operation
   secrets: ['api-key'],
 };
 
