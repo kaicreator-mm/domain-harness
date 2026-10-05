@@ -921,15 +921,24 @@ export async function sealRuntimeAssembly(
   });
   const assemblyDigest = await computeCanonicalJsonDigest(record, sha256);
 
+  // #641: the mapped authority arrays minted into sealed bindings are frozen
+  // at every level (outer array, mapped array, per-element ref). The mapped
+  // arrays themselves carry runtime authority through the admission
+  // declaration derived from them, so an unfrozen mapped array would let
+  // post-seal mutation of returned bindings alter admission behavior.
   const sealedBindings: readonly SealedKindImplementationBinding[] = Object.freeze(
     bindings.map((binding) =>
       Object.freeze({
         pin: binding.pin,
-        understoodSemanticContracts: binding.understoodSemanticContracts.map((ref) =>
-          Object.freeze({ contractId: ref.id, version: ref.version }),
+        understoodSemanticContracts: Object.freeze(
+          binding.understoodSemanticContracts.map((ref) =>
+            Object.freeze({ contractId: ref.id, version: ref.version }),
+          ),
         ),
-        understoodCapabilities: binding.understoodCapabilities.map((ref) =>
-          Object.freeze({ capabilityId: ref.id, version: ref.version }),
+        understoodCapabilities: Object.freeze(
+          binding.understoodCapabilities.map((ref) =>
+            Object.freeze({ capabilityId: ref.id, version: ref.version }),
+          ),
         ),
         validateComponent: binding.validateComponent,
       }),
