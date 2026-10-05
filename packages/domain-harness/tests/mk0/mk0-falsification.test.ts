@@ -25,7 +25,7 @@ import {
   computeDefinitionGraphDigest,
   type DefinitionGraphEnvelope,
 } from '../../src/contracts/definition-graph.js';
-import { admitComponent, type UnderstoodKindSet } from '../../src/contracts/component-admission.js';
+import { admitComponent } from '../../src/contracts/component-admission.js';
 import { validateToolComponent } from '../../src/contracts/tool-component.js';
 import { decideKindCompatibility } from '../../src/contracts/kind-compatibility.js';
 import {
@@ -492,31 +492,31 @@ test('REPAIRED-#555 graph digest composes Component semantic digests (PR #558 / 
   assert.notEqual(ge, ga, 'material semantic change stopped affecting graph identity');
 });
 
-test('KNOWN-#557 exact-version semantics drift across contract validators', () => {
+test('REPAIRED-#557 exact-version semantics unified across contract validators (#588 PR-1)', () => {
   const withXRangeVersion = testSemanticComponent();
   (withXRangeVersion as Mutable<ComponentEnvelope>).kind = {
     kindId: TEST_SEMANTIC_KIND.kindId,
     version: '1.x',
   };
-  // Envelope side: component.ts accepts `1.x` as if it were an exact version...
-  assert.doesNotThrow(() => validateComponentEnvelope(withXRangeVersion));
-  // ...so admission can only fail it as a version lookup miss, never structurally.
+  // Envelope side: the shared exact-reference authority now rejects `1.x`
+  // structurally (same seam as the admission understood-set validator).
   assert.throws(
-    () => admitComponent(withXRangeVersion, testUnderstoodKinds()),
+    () => validateComponentEnvelope(withXRangeVersion),
     (error: unknown) => {
-      assert.equal((error as { code: string }).code, 'KIND_VERSION_MISMATCH');
+      assert.equal((error as { code: string }).code, 'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN');
       return true;
     },
   );
-  // Understood-set side: the very same `1.x` form IS structurally rejected here.
-  const drifted = testUnderstoodKinds() as unknown as UnderstoodKindSet;
-  const firstDeclaration = drifted[0];
-  assert.ok(firstDeclaration !== undefined);
-  (firstDeclaration.kind as Mutable<KindRef>).version = '1.x';
+  // A non-material-but-still-invalid form like a trailing dot is rejected too.
+  const withTrailingDot = testSemanticComponent();
+  (withTrailingDot as Mutable<ComponentEnvelope>).kind = {
+    kindId: TEST_SEMANTIC_KIND.kindId,
+    version: '1.',
+  };
   assert.throws(
-    () => admitComponent(testSemanticComponent(), drifted),
+    () => validateComponentEnvelope(withTrailingDot),
     (error: unknown) => {
-      assert.equal((error as { code: string }).code, 'INVALID_UNDERSTOOD_KIND_SET');
+      assert.equal((error as { code: string }).code, 'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN');
       return true;
     },
   );
@@ -536,71 +536,74 @@ test('KNOWN-#576 tool providesCapabilities permutation drifts Component semantic
   assert.notEqual(b, a, 'if equal, #576 was repaired — flip this probe and re-verify');
 });
 
-test('KNOWN-#575 admitted evidence aliases caller-owned required refs', () => {
+test('REPAIRED-#575 admitted evidence is detached from caller-owned required refs', () => {
   const component = testSemanticComponent();
   const admitted = admitComponent(component, testUnderstoodKinds());
-  const requiredRef = component.requiredSemanticContracts[0];
-  assert.ok(requiredRef !== undefined);
-  const requiredView = requiredRef as unknown as Mutable<SemanticContractRef>;
-  requiredView.contractId = 'tampered.after.admission';
-  // At this HEAD the admitted evidence aliases the caller's ref object.
-  const admittedRef = admitted.admittedSemanticContracts[0];
-  assert.ok(admittedRef !== undefined);
-  assert.equal(
-    admittedRef.contractId,
-    'tampered.after.admission',
-    'if this fails, #575 evidence-immortality repair landed — flip this probe and re-verify MK0',
-  );
+  const requiredSemantic = component.requiredSemanticContracts[0];
+  const requiredCapability = component.requiredCapabilities[0];
+  assert.ok(requiredSemantic !== undefined && requiredCapability !== undefined);
+  (requiredSemantic as unknown as Mutable<SemanticContractRef>).contractId = 'tampered.after.admission';
+  (requiredCapability as unknown as Mutable<CapabilityContractRef>).capabilityId = 'tampered.after.admission';
+  // Admitted evidence must be fresh immutable values: caller mutation cannot
+  // leak into already-minted authority-shaped output.
+  const admittedSemantic = admitted.admittedSemanticContracts[0];
+  const admittedCapability = admitted.admittedCapabilities[0];
+  assert.ok(admittedSemantic !== undefined && admittedCapability !== undefined);
+  assert.equal(admittedSemantic.contractId, TEST_SEMANTIC_CONTRACT.contractId);
+  assert.equal(admittedCapability.capabilityId, TEST_CAPABILITY.capabilityId);
+  // Alias detach fixed (#575 aliasing gap). The remaining freeze gap is
+  // asserted as a sub-finding probe below.
 });
 
-test('KNOWN-#578 accessor-backed KindRef passes envelope validation (TOCTOU-able)', () => {
-  // Calibrate: count the total kindId reads of one successful admission with a
-  // benign counting getter, then replay with a getter that turns hostile only
-  // on the FINAL read — the one that builds the ADMITTED evidence. Every
-  // earlier read (envelope validation, admission kindKey lookup) still sees
-  // the benign value, so the minter never validated what it emitted.
-  let dryReads = 0;
-  const countingKind = Object.defineProperties(
-    {},
-    {
-      kindId: { enumerable: true, get: () => (dryReads += 1, TEST_SEMANTIC_KIND.kindId) },
-      version: { enumerable: true, get: () => TEST_SEMANTIC_KIND.version },
-    },
-  );
-  // Replay the EXACT call sequence of the hostile run below so the read
-  // budgets line up: one standalone envelope validation + one admission.
-  const dryComponent = {
-    ...testSemanticComponent(),
-    kind: countingKind as unknown as KindRef,
-  } as ComponentEnvelope;
-  assert.doesNotThrow(() => validateComponentEnvelope(dryComponent));
-  admitComponent(dryComponent, testUnderstoodKinds());
-  assert.ok(dryReads >= 2, `expected multiple kindId reads across validation and evidence, got ${dryReads}`);
+test('REMAINING-#575 admitted evidence is not yet runtime-frozen (sub-finding)', () => {
+  // #575 explicitly requires "runtime-freeze nested refs and arrays/result
+  // where they are authority evidence". The aliasing gap was repaired, but the
+  // freeze gap remains: the admitted result and its nested refs are fresh
+  // values yet still mutable by the holder.
+  const admitted = admitComponent(testSemanticComponent(), testUnderstoodKinds());
+  assert.ok(!Object.isFrozen(admitted), 'if frozen, #575 freeze gap is closed — flip this probe');
+  const admittedSemantic = admitted.admittedSemanticContracts[0];
+  assert.ok(admittedSemantic !== undefined);
+  assert.ok(!Object.isFrozen(admitted.admittedSemanticContracts), 'if frozen, close sub-finding');
+  assert.ok(!Object.isFrozen(admittedSemantic), 'if frozen, close sub-finding');
+  assert.ok(!Object.isFrozen(admitted.admittedKind), 'if frozen, close sub-finding');
+});
 
-  let hostileReads = 0;
+test('REPAIRED-#578 accessor/hidden-property inputs are structurally rejected (#588 PR-1)', () => {
+  // Accessor-backed KindRef: rejected at envelope validation, never reach admission.
+  let kindIdReads = 0;
   const accessorKind = Object.defineProperties(
     {},
     {
-      kindId: {
-        enumerable: true,
-        get() {
-          hostileReads += 1;
-          return hostileReads < dryReads ? TEST_SEMANTIC_KIND.kindId : 'tampered.by.getter';
-        },
-      },
+      kindId: { enumerable: true, get: () => (kindIdReads += 1, TEST_SEMANTIC_KIND.kindId) },
       version: { enumerable: true, get: () => TEST_SEMANTIC_KIND.version },
     },
   );
-  const component = {
+  const accessorComponent = {
     ...testSemanticComponent(),
     kind: accessorKind as unknown as KindRef,
   } as ComponentEnvelope;
-  assert.doesNotThrow(() => validateComponentEnvelope(component));
-  const admitted = admitComponent(component, testUnderstoodKinds());
-  assert.equal(admitted.status, 'ADMITTED');
-  assert.equal(
-    admitted.admittedKind.kindId,
-    'tampered.by.getter',
-    'if this fails, #578 accessor rejection landed — flip this probe and re-verify MK0',
+  assert.throws(
+    () => validateComponentEnvelope(accessorComponent),
+    (error: unknown) => {
+      assert.equal((error as { code: string }).code, 'INVALID_KIND_REF');
+      return true;
+    },
+  );
+  assert.equal(kindIdReads, 0, 'accessor was invoked before structural rejection');
+
+  // Symbol-keyed hidden material: also structurally rejected.
+  const symbolKey = Symbol('mk0.hidden');
+  const symbolKind = { ...TEST_SEMANTIC_KIND, [symbolKey]: 'hidden' } as unknown as KindRef;
+  const symbolComponent = {
+    ...testSemanticComponent(),
+    kind: symbolKind,
+  } as ComponentEnvelope;
+  assert.throws(
+    () => validateComponentEnvelope(symbolComponent),
+    (error: unknown) => {
+      assert.equal((error as { code: string }).code, 'INVALID_KIND_REF');
+      return true;
+    },
   );
 });
