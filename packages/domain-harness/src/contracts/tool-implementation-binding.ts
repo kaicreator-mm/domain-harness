@@ -373,7 +373,7 @@ function snapshotImplementationIdentity(
   return Object.freeze({
     implementationId,
     implementationVersion,
-    implementationDigest: candidate.implementationDigest as ContentDigest,
+    implementationDigest: candidate.implementationDigest,
   });
 }
 
@@ -505,7 +505,7 @@ function snapshotAssembly(value: unknown): {
   if (typeof value !== 'object' || value === null) {
     fail('INVALID_BINDING_INPUT', `${at} must be a SealedRuntimeAssembly ({ record, bindings, ... })`);
   }
-  const assemblyObject = value as object;
+  const assemblyObject = value;
   const recordValue = readAssemblyOwnDataProperty(assemblyObject, 'record');
   const assemblyDigest = readAssemblyOwnDataProperty(assemblyObject, 'assemblyDigest');
   const bindingsValue = readAssemblyOwnDataProperty(assemblyObject, 'bindings');
@@ -575,7 +575,7 @@ function snapshotAssembly(value: unknown): {
     } satisfies KindImplementationBindingInput;
   });
 
-  return { definitionGraphDigest: definitionGraphDigest as ContentDigest, bindings, priorSlots };
+  return { definitionGraphDigest: definitionGraphDigest, bindings, priorSlots };
 }
 
 /** Snapshot the prior §G evidence slots as fresh frozen identity material. */
@@ -595,7 +595,7 @@ function snapshotEvidenceSlots(
       if (!isContentDigest(view.bindingDigest)) {
         fail('INVALID_BINDING_INPUT', `${description}[${index}].bindingDigest must be a non-empty content digest string`);
       }
-      return Object.freeze({ subject, bindingDigest: view.bindingDigest as ContentDigest });
+      return Object.freeze({ subject, bindingDigest: view.bindingDigest });
     }),
   );
 }
@@ -643,7 +643,7 @@ function snapshotSelection(value: unknown): SnapshotSelection {
     `${at}.provider.providesCapability`,
   );
   return {
-    definitionGraphDigest: definitionGraphDigest as ContentDigest,
+    definitionGraphDigest: definitionGraphDigest,
     requiredCapability,
     providerComponentId,
     providesCapability,
