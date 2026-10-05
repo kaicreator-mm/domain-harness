@@ -77,8 +77,13 @@ function parseChunkedTag(text, tag) {
 }
 
 async function waitForMarker(launch) {
-  // Wait up to 10 minutes for exactly one terminal/armed marker on logcat.
-  const deadline = Date.now() + 10 * 60 * 1000;
+  // Wait up to 30 minutes for exactly one terminal/armed marker on logcat.
+  // The #458-era 10-minute window was calibrated on the warm v0.5-era
+  // emulator (launch-to-marker ~3 min); the T010-R1 re-capture measured a
+  // ~17.5-minute phase-1 launch on the cold shared AVD (v0.6 core on Hermes
+  // plus host-side ANR noise), so the window is widened — the two-phase
+  // protocol itself is unchanged.
+  const deadline = Date.now() + 30 * 60 * 1000;
   let armed = null;
   while (Date.now() < deadline) {
     spawnSync('sleep', ['2']);
