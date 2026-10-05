@@ -903,6 +903,204 @@ test('ordinary keys still copy exactly next to an own data `__proto__` key', () 
 });
 
 // ---------------------------------------------------------------------------
+// Frozen adversarial matrix completion (#774; audit #771 F1/F2/F3)
+//
+// The pins above are completed with the coverage the #771 differential audit
+// found missing on this branch: (F1) null-prototype INPUT records — accepted
+// by the record guard (`prototype !== Object.prototype && prototype !== null`)
+// — carrying an own data `__proto__` key; (F2) direct ungated provenance-
+// surface coverage (`historicalIdentity.config`), pinning the prior
+// escape-to-caller path explicitly instead of transitively; (F3) exact
+// canonical key order and data-property descriptor attributes for the
+// preserved key. Test-only: the accepted `canonicalCopy` semantics are
+// untouched.
+// ---------------------------------------------------------------------------
+
+/** `Object.prototype` baseline snapshot for the global integrity guard. */
+const OBJECT_PROTOTYPE_OWN_NAMES = Object.freeze([...Object.getOwnPropertyNames(Object.prototype)]);
+
+function assertGlobalPrototypeIntegrity(context: string): void {
+  assert.deepEqual(
+    [...Object.getOwnPropertyNames(Object.prototype)].sort(),
+    [...OBJECT_PROTOTYPE_OWN_NAMES].sort(),
+    `${context}: Object.prototype own-name set is untouched`,
+  );
+  assert.equal(
+    ({} as Record<string, unknown>).polluted,
+    undefined,
+    `${context}: no key leaked onto fresh plain objects`,
+  );
+}
+
+/**
+ * The preserved `__proto__` must be an ordinary own enumerable writable
+ * configurable DATA property with exactly `expectedValue` on a record whose
+ * prototype is still `Object.prototype` — never a prototype mutation, never
+ * a silent key drop, never an accessor.
+ */
+function assertOwnDataProtoProperty<T>(record: object, expectedValue: T, context: string): T {
+  const descriptor = Object.getOwnPropertyDescriptor(record, '__proto__');
+  assert.ok(
+    descriptor !== undefined,
+    `${context}: own data \`__proto__\` key is preserved (never lost to the inherited setter)`,
+  );
+  assert.equal(descriptor.get, undefined, `${context}: \`__proto__\` stays a data property, not an accessor`);
+  assert.equal(descriptor.set, undefined, `${context}: \`__proto__\` stays a data property, not an accessor`);
+  assert.equal(descriptor.enumerable, true, `${context}: \`__proto__\` is enumerable`);
+  assert.equal(descriptor.writable, true, `${context}: \`__proto__\` is writable`);
+  assert.equal(descriptor.configurable, true, `${context}: \`__proto__\` is configurable`);
+  assert.equal(
+    Object.getPrototypeOf(record),
+    Object.prototype,
+    `${context}: the copy's prototype stays Object.prototype (never the injected material)`,
+  );
+  assert.deepEqual(descriptor.value, expectedValue, `${context}: exact deep value preserved`);
+  return descriptor.value as T;
+}
+
+/** Null-prototype INPUT states record carrying an own data `__proto__` key. */
+function nullProtoStatesWithOwnDataProto(protoValue: unknown): RawWorkflow['states'] {
+  const states: Record<string, unknown> = Object.assign(
+    Object.create(null) as Record<string, unknown>,
+    statesInvoking('tool.pricing'),
+  );
+  Object.defineProperty(states, '__proto__', {
+    value: protoValue,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  return states as RawWorkflow['states'];
+}
+
+test('maps a null-prototype input record carrying an own data `__proto__` key with the key preserved on a plain output prototype', () => {
+  // Matrix F: the record guard explicitly accepts null-prototype inputs, so
+  // the preservation contract must hold through them too — pre-fix the
+  // inherited setter ran here exactly as on plain inputs.
+  const poisonValue: Record<string, unknown> = { poison: true };
+  const result = mapStates(nullProtoStatesWithOwnDataProto(poisonValue));
+  const states = mappedStates(result);
+
+  const preserved = assertOwnDataProtoProperty(states, { poison: true }, 'null-prototype input');
+  assert.notEqual(preserved, poisonValue, 'no alias into the caller-owned value survives');
+  assert.equal(
+    Object.getPrototypeOf(preserved as object),
+    Object.prototype,
+    'the preserved value is itself a plain copy',
+  );
+
+  validateDefinitionGraphEnvelope(result.graph);
+  assertGlobalPrototypeIntegrity('null-prototype input');
+});
+
+test('null-prototype input records map deterministically and stay caller-isolated with the preserved key', async () => {
+  const poisonValue: Record<string, unknown> = { poison: true };
+  const callerStates = nullProtoStatesWithOwnDataProto(poisonValue);
+  const result = mapStates(callerStates);
+  const digestBefore = await graphDigest(result.graph);
+
+  const second = mapStates(nullProtoStatesWithOwnDataProto({ poison: true }));
+  assert.equal(
+    JSON.stringify(mappedStates(result)),
+    JSON.stringify(mappedStates(second)),
+    'deterministic canonical serialization with the preserved key',
+  );
+  assert.equal(await graphDigest(result.graph), await graphDigest(second.graph), 'deterministic digest');
+
+  // Caller mutation of the null-prototype record — the would-be-prototype
+  // value and the own `__proto__` data key itself — never perturbs the product.
+  poisonValue.poison = false;
+  poisonValue.tainted = 'caller-mutation';
+  Object.defineProperty(callerStates, '__proto__', {
+    value: { replaced: true },
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+
+  assertOwnDataProtoProperty(mappedStates(result), { poison: true }, 'post-mutation null-prototype input');
+  assert.equal(await graphDigest(result.graph), digestBefore, 'product digest unchanged by caller mutation');
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+test('preserves an own data `__proto__` object value through the ungated provenance surface (historicalIdentity.config)', () => {
+  // historicalIdentity is the ungated surface: config material bypasses the
+  // envelope gate and reaches the caller as provenance evidence. Pre-fix the
+  // config copy lost the own key and its prototype was replaced by the
+  // injected material — corrupted evidence escaping every gate.
+  const config = JSON.parse('{"__proto__": {"polluted": "YES"}, "transport": "http-transport@1"}') as never;
+  const poisonValue = Object.getOwnPropertyDescriptor(config as object, '__proto__')!.value as Record<string, unknown>;
+  const result = mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ config })] }));
+
+  const provenance = result.provenance.components.find((entry) => entry.componentId === 'tool.pricing');
+  assert.ok(provenance, 'tool provenance is recorded');
+  const historicalConfig = (provenance.historicalIdentity as { config: object }).config;
+  const preserved = assertOwnDataProtoProperty(historicalConfig, { polluted: 'YES' }, 'provenance object value');
+  assert.notEqual(preserved, poisonValue, 'the provenance value is a copy, never caller-aliased');
+
+  // Provenance-only routing: ungated config material never enters Definition
+  // semantics.
+  assert.ok(!JSON.stringify(result.graph).includes('polluted'), 'ungated config material stays out of the graph');
+
+  validateDefinitionGraphEnvelope(result.graph);
+  assertGlobalPrototypeIntegrity('provenance object value');
+});
+
+test('preserves nested own data `__proto__` inside provenance config without inheritance pollution', () => {
+  // Pre-fix the nested provenance copy inherited caller-controlled material
+  // through the prototype swap: `nested.evil === true` outside every gate.
+  const config = JSON.parse(
+    '{"transport": "http-transport@1", "nested": {"__proto__": {"evil": true}, "keep": "raw"}}',
+  ) as never;
+  const result = mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ config })] }));
+
+  const provenance = result.provenance.components.find((entry) => entry.componentId === 'tool.pricing');
+  assert.ok(provenance, 'tool provenance is recorded');
+  const nested = (provenance.historicalIdentity as { config: { nested: object } }).config.nested;
+  const preserved = assertOwnDataProtoProperty(nested, { evil: true }, 'nested provenance');
+  assert.equal(
+    Object.getPrototypeOf(preserved as object),
+    Object.prototype,
+    'the preserved nested value is itself a plain copy',
+  );
+  assert.equal((nested as { keep?: unknown }).keep, 'raw', 'ordinary sibling keys still copy exactly');
+  assert.equal(
+    Object.getOwnPropertyDescriptor(nested, 'evil'),
+    undefined,
+    'caller material is NOT inherited through the preserved key (no prototype swap)',
+  );
+  assert.ok(!JSON.stringify(result.graph).includes('evil'), 'ungated nested material stays out of the graph');
+
+  validateDefinitionGraphEnvelope(result.graph);
+  assertGlobalPrototypeIntegrity('nested provenance');
+});
+
+test('pins exact canonical key order and data-property descriptor attributes for a preserved own data `__proto__`', () => {
+  // Sharpness over the order-insensitive pins above: `__proto__` sorts as an
+  // ordinary string key (code-unit order) and is recreated with the exact
+  // data descriptor the copy contract promises.
+  const result = mapStates(statesWithOwnDataProto({ poison: true }));
+  const states = mappedStates(result);
+
+  assert.deepEqual(
+    Object.keys(states),
+    ['__proto__', 'end', 'start'],
+    'exact canonical code-unit key order with the preserved key',
+  );
+
+  const descriptor = Object.getOwnPropertyDescriptor(states, '__proto__');
+  assert.ok(descriptor !== undefined, 'own `__proto__` descriptor present');
+  assert.equal(descriptor.enumerable, true, 'enumerable');
+  assert.equal(descriptor.writable, true, 'writable');
+  assert.equal(descriptor.configurable, true, 'configurable');
+  assert.equal(descriptor.get, undefined, 'data property, not an accessor');
+  assert.equal(descriptor.set, undefined, 'data property, not an accessor');
+  assert.deepEqual(descriptor.value, { poison: true });
+
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+// ---------------------------------------------------------------------------
 // Mutation isolation (PACK-A)
 // ---------------------------------------------------------------------------
 
