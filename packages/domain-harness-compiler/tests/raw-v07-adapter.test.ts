@@ -71,6 +71,21 @@ function workflow(overrides: Partial<RawWorkflow> = {}): RawWorkflow {
   };
 }
 
+/** Minimal workflow states invoking exactly one tool ref (key/id regression fixtures). */
+function statesInvoking(ref: string): RawWorkflow['states'] {
+  return {
+    start: {
+      id: 'start',
+      final: false,
+      invoke: { kind: 'tool', ref },
+      done: [{ target: 'end' }],
+      error: [],
+      events: {},
+    },
+    end: { id: 'end', final: true, done: [], error: [], events: {} },
+  };
+}
+
 function rawPackage(overrides: Partial<LoadedRawDomainPackage> = {}): LoadedRawDomainPackage {
   return {
     root: '/pkg',
@@ -596,6 +611,95 @@ test('rejects non-JSON Raw material instead of silently dropping it', () => {
       ),
     'NaN in schema material',
   );
+});
+
+// ---------------------------------------------------------------------------
+// Workflow Map key / id identity (loader invariant re-check; review P1-1)
+// ---------------------------------------------------------------------------
+
+test('rejects a workflow Map entry whose key is not the workflow id (single mismatch)', () => {
+  // Pre-fix this failed closed but was mis-attributed: the dangling relation
+  // source (bound by the MAP key) surfaced as MAPPING_CONTRACT_VIOLATION, i.e.
+  // "adapter defect", for what is invalid authoring input.
+  const mismatched = rawPackage({
+    workflows: new Map([['wf.wrong-key', workflow({ id: 'wf.order' })]]),
+  });
+  assert.throws(
+    () => mapRawV07AuthoringToComponentGraph(input({ raw: mismatched })),
+    (error: unknown) => {
+      assert.ok(error instanceof RawV07AdapterError, 'typed RawV07AdapterError');
+      assert.equal(error.code, 'INVALID_RAW_AUTHORING');
+      assert.equal(error.path, 'input.raw.workflows.wf.wrong-key');
+      return true;
+    },
+  );
+});
+
+test('rejects swapped workflow Map keys instead of silently cross-wiring invoke relations', () => {
+  // Two entries with swapped keys: pre-fix this mapped successfully with
+  // relations bound by the MAP key while component bodies were bound by
+  // workflow.id (relation wf.a -> tool.alpha on a body invoking tool.beta),
+  // passing every standard gate. The key===id assertion fails it typed.
+  const wfA = workflow({ id: 'wf.a', states: statesInvoking('tool.alpha') });
+  const wfB = workflow({ id: 'wf.b', states: statesInvoking('tool.beta') });
+  const swapped = rawPackage({
+    workflows: new Map([
+      ['wf.a', wfB], // key of wf.a, body of wf.b (invokes tool.beta)
+      ['wf.b', wfA], // key of wf.b, body of wf.a (invokes tool.alpha)
+    ]),
+  });
+  assert.throws(
+    () =>
+      mapRawV07AuthoringToComponentGraph(
+        input({ raw: swapped, tools: [tool({ toolId: 'tool.alpha' }), tool({ toolId: 'tool.beta' })] }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof RawV07AdapterError, 'typed RawV07AdapterError');
+      assert.equal(error.code, 'INVALID_RAW_AUTHORING');
+      assert.equal(error.path, 'input.raw.workflows.wf.a');
+      return true;
+    },
+  );
+});
+
+test('key-consistent workflow Maps still map with exact, non-cross-wired relations', () => {
+  // Normal flow guard for the key===id assertion: consistent entries emit one
+  // relation per workflow bound to that workflow's own invoke targets.
+  const wfA = workflow({ id: 'wf.a', states: statesInvoking('tool.alpha') });
+  const wfB = workflow({ id: 'wf.b', states: statesInvoking('tool.beta') });
+  const result = mapRawV07AuthoringToComponentGraph(
+    input({
+      raw: rawPackage({ workflows: new Map([['wf.a', wfA], ['wf.b', wfB]]) }),
+      tools: [tool({ toolId: 'tool.alpha' }), tool({ toolId: 'tool.beta' })],
+    }),
+  );
+  assert.deepEqual(
+    result.graph.relations.map((relation) => [relation.sourceComponentId, relation.targetComponentId]).sort(),
+    [
+      ['wf.a', 'tool.alpha'],
+      ['wf.b', 'tool.beta'],
+    ],
+  );
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+test('rejects a non-string raw root instead of silently defaulting the provenance sourceRoot', () => {
+  assert.throws(
+    () => mapRawV07AuthoringToComponentGraph(input({ raw: rawPackage({ root: 42 as never }) })),
+    (error: unknown) => {
+      assert.ok(error instanceof RawV07AdapterError, 'typed RawV07AdapterError');
+      assert.equal(error.code, 'INVALID_RAW_AUTHORING');
+      assert.equal(error.path, 'input.raw.root');
+      return true;
+    },
+  );
+});
+
+test('provenance records the raw source root verbatim', () => {
+  const result = mapRawV07AuthoringToComponentGraph(
+    input({ raw: rawPackage({ root: 'C:/pkg/checkout' }) }),
+  );
+  assert.equal(result.provenance.sourceRoot, 'C:/pkg/checkout');
 });
 
 // ---------------------------------------------------------------------------
