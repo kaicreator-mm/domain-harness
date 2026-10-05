@@ -1,8 +1,8 @@
 // #467 I-CROSS-HOST-1 corpus assembly: ONE compiled corpus shared by both
 // hosts. The Node side recompiles the Expo fixture sources through the SAME
 // public compiler entry the device build used (deterministic packageId), and
-// consumes the committed device-evidence fixture captured at the merged
-// assembly (real run, #458 comment 5963075917).
+// consumes the committed device-evidence fixture re-captured at the v0.6
+// candidate assembly (real run, T010-R1 #606).
 import { spawn } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -78,7 +78,7 @@ export interface ChmDeviceEvidence {
 
 export function loadDeviceEvidence(): ChmDeviceEvidence {
   const here = dirname(fileURLToPath(import.meta.url));
-  const path = join(here, 'fixtures', 'chm-device-evidence-770a1325.json');
+  const path = join(here, 'fixtures', 'chm-device-evidence-a45f9370.json');
   return JSON.parse(readFileSync(path, 'utf8')) as ChmDeviceEvidence;
 }
 
