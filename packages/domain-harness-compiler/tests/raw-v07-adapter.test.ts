@@ -37,6 +37,7 @@ import {
   RAW_V07_WORKFLOW_KIND,
   RawV07AdapterError,
   type RawV07AuthoringInput,
+  type RawV07GraphMappingResult,
 } from '../src/compat/raw-v07/index.js';
 
 const sha256: Sha256Port = {
@@ -700,6 +701,403 @@ test('provenance records the raw source root verbatim', () => {
     input({ raw: rawPackage({ root: 'C:/pkg/checkout' }) }),
   );
   assert.equal(result.provenance.sourceRoot, 'C:/pkg/checkout');
+});
+
+// ---------------------------------------------------------------------------
+// Own-data `__proto__` canonical copy preservation (post-merge review P1, #739)
+//
+// `canonicalCopy` reconstructs caller-controlled records key by key. An own
+// enumerable DATA `__proto__` key (e.g. from `JSON.parse`) must be preserved
+// as an own data property via prototype-safe definition — plain assignment
+// reaches the inherited `Object.prototype.__proto__` setter (object/null
+// values mutate the copy prototype, primitives are silently lost). Accessor
+// `__proto__` stays fail-closed with zero getter execution.
+// ---------------------------------------------------------------------------
+
+/** Workflow states with an added own enumerable data `__proto__` key. */
+function statesWithOwnDataProto(protoValue: unknown): RawWorkflow['states'] {
+  const states: Record<string, unknown> = { ...statesInvoking('tool.pricing') };
+  Object.defineProperty(states, '__proto__', {
+    value: protoValue,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  return states as RawWorkflow['states'];
+}
+
+function mapStates(states: RawWorkflow['states']): RawV07GraphMappingResult {
+  return mapRawV07AuthoringToComponentGraph(
+    input({ raw: rawPackage({ workflows: new Map([['wf.order', workflow({ states })]]) }) }),
+  );
+}
+
+function mappedStates(result: RawV07GraphMappingResult): Record<string, unknown> {
+  const mappedWorkflow = componentById(result.graph.components, 'wf.order');
+  const body = mappedWorkflow.semanticBody as unknown as { states: Record<string, unknown> };
+  return body.states;
+}
+
+test('preserves an own data `__proto__` object value as an own data property without prototype mutation', () => {
+  const result = mapStates(statesWithOwnDataProto({ poison: true }));
+  const states = mappedStates(result);
+
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(states, '__proto__'),
+    'own data `__proto__` survives as an own property (never silently lost to the setter)',
+  );
+  assert.deepEqual(states['__proto__'], { poison: true });
+  assert.equal(Object.getPrototypeOf(states), Object.prototype, 'copy prototype unchanged');
+  assert.equal(
+    Object.getPrototypeOf(states['__proto__'] as object),
+    Object.prototype,
+    'nested copied value keeps the plain prototype',
+  );
+
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+test('preserves an own data `__proto__` null value instead of nulling the copy prototype', () => {
+  const result = mapStates(statesWithOwnDataProto(null));
+  const states = mappedStates(result);
+
+  assert.ok(Object.prototype.hasOwnProperty.call(states, '__proto__'));
+  assert.equal(states['__proto__'], null);
+  assert.equal(
+    Object.getPrototypeOf(states),
+    Object.prototype,
+    'null must never become the copy prototype via the inherited setter',
+  );
+
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+test('preserves own data `__proto__` primitive values instead of silently dropping them', () => {
+  for (const poisonValue of ['poison', 42, false]) {
+    const result = mapStates(statesWithOwnDataProto(poisonValue));
+    const states = mappedStates(result);
+
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(states, '__proto__'),
+      `primitive ${String(poisonValue)} must survive as an own data property`,
+    );
+    assert.equal(states['__proto__'], poisonValue);
+    assert.equal(Object.getPrototypeOf(states), Object.prototype);
+  }
+});
+
+test('preserves nested own data `__proto__` values with an exact, deterministic canonical representation', async () => {
+  const nested = JSON.parse(
+    `{"__proto__":{"deep":{"__proto__":"inner-poison"}},"start":{"id":"start","final":false,"invoke":{"kind":"tool","ref":"tool.pricing"},"done":[{"target":"end"}],"error":[],"events":{}},"end":{"id":"end","final":true,"done":[],"error":[],"events":{}}}`,
+  ) as RawWorkflow['states'];
+
+  const result = mapStates(nested);
+  const states = mappedStates(result);
+
+  assert.ok(Object.prototype.hasOwnProperty.call(states, '__proto__'));
+  const copiedProto = states['__proto__'] as Record<string, unknown>;
+  // Expected value built by JSON.parse: an object literal `{ __proto__: ... }`
+  // would itself route through the setter instead of creating the own key.
+  assert.deepEqual(copiedProto, JSON.parse('{"deep":{"__proto__":"inner-poison"}}'));
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(copiedProto.deep as object, '__proto__'),
+    'nested own data `__proto__` survives recursively',
+  );
+  assert.equal(Object.getPrototypeOf(states), Object.prototype);
+  assert.equal(Object.getPrototypeOf(copiedProto), Object.prototype);
+
+  // Deterministic canonical representation: an independent mapping of the
+  // same material yields the identical serialization and the identical
+  // graph semantic digest.
+  const second = mapStates(JSON.parse(JSON.stringify(nested)) as RawWorkflow['states']);
+  const secondStates = mappedStates(second);
+  assert.equal(JSON.stringify(states), JSON.stringify(secondStates));
+  assert.equal(await graphDigest(result.graph), await graphDigest(second.graph));
+
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+test('mapping an own data `__proto__` never pollutes any shared/global surface', () => {
+  const protoNamesBefore = Object.getOwnPropertyNames(Object.prototype).sort();
+  const protoPropertyDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, '__proto__');
+
+  const result = mapStates(statesWithOwnDataProto({ poison: true }));
+  const states = mappedStates(result);
+  assert.ok(Object.prototype.hasOwnProperty.call(states, '__proto__'));
+
+  assert.deepEqual(
+    Object.getOwnPropertyNames(Object.prototype).sort(),
+    protoNamesBefore,
+    'Object.prototype key set untouched',
+  );
+  assert.deepEqual(
+    Object.getOwnPropertyDescriptor(Object.prototype, '__proto__'),
+    protoPropertyDescriptor,
+    'the inherited `__proto__` accessor itself stays exactly as it was',
+  );
+  const canary = JSON.parse('{"a":1}') as object;
+  assert.equal(Object.getPrototypeOf(canary), Object.prototype, 'fresh objects stay plain');
+});
+
+test('mutating the caller own-data `__proto__` material after mapping never perturbs the graph', async () => {
+  const hostile: Record<string, unknown> = { poison: true };
+  const states = statesWithOwnDataProto(hostile);
+  const shared = input({ raw: rawPackage({ workflows: new Map([['wf.order', workflow({ states })]]) }) });
+  const result = mapRawV07AuthoringToComponentGraph(shared);
+  const digestBefore = await graphDigest(result.graph);
+
+  // Caller-side mutation of the would-be-prototype value and of the source
+  // record's own `__proto__` property itself.
+  hostile.poison = false;
+  hostile.tainted = 'caller-mutation';
+  Object.defineProperty(states, '__proto__', {
+    value: { replaced: true },
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+
+  const mapped = mappedStates(result);
+  assert.deepEqual(mapped['__proto__'], { poison: true }, 'the copy is value-isolated from caller mutation');
+  assert.notEqual(mapped['__proto__'], hostile, 'no alias into caller-owned material survives');
+  assert.equal(Object.getPrototypeOf(mapped), Object.prototype, 'no caller object became the copy prototype');
+  assert.equal(await graphDigest(result.graph), digestBefore);
+});
+
+test('rejects accessor-backed `__proto__` fail-closed with zero getter execution', () => {
+  let getterExecutions = 0;
+  const states: Record<string, unknown> = { ...statesInvoking('tool.pricing') };
+  Object.defineProperty(states, '__proto__', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterExecutions += 1;
+      return { poison: true };
+    },
+    set() {
+      throw new Error('poison setter executed');
+    },
+  } as PropertyDescriptor);
+
+  assert.throws(
+    () => mapStates(states as RawWorkflow['states']),
+    (error: unknown) => {
+      assert.ok(error instanceof RawV07AdapterError, 'typed RawV07AdapterError');
+      assert.equal(error.code, 'NOT_TRANSLATABLE');
+      assert.equal(error.path, 'input.raw.workflows.wf.order.states.__proto__');
+      return true;
+    },
+  );
+  assert.equal(getterExecutions, 0, 'the hostile getter is never executed');
+});
+
+test('ordinary keys still copy exactly next to an own data `__proto__` key', () => {
+  const result = mapStates(statesWithOwnDataProto('poison'));
+  const states = mappedStates(result);
+
+  assert.deepEqual(Object.keys(states).sort(), ['__proto__', 'end', 'start']);
+  assert.deepEqual(states.start, statesInvoking('tool.pricing').start);
+  assert.deepEqual(states.end, { id: 'end', final: true, done: [], error: [], events: {} });
+
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+// ---------------------------------------------------------------------------
+// Frozen adversarial matrix completion (#774; audit #771 F1/F2/F3)
+//
+// The pins above are completed with the coverage the #771 differential audit
+// found missing on this branch: (F1) null-prototype INPUT records — accepted
+// by the record guard (`prototype !== Object.prototype && prototype !== null`)
+// — carrying an own data `__proto__` key; (F2) direct ungated provenance-
+// surface coverage (`historicalIdentity.config`), pinning the prior
+// escape-to-caller path explicitly instead of transitively; (F3) exact
+// canonical key order and data-property descriptor attributes for the
+// preserved key. Test-only: the accepted `canonicalCopy` semantics are
+// untouched.
+// ---------------------------------------------------------------------------
+
+/** `Object.prototype` baseline snapshot for the global integrity guard. */
+const OBJECT_PROTOTYPE_OWN_NAMES = Object.freeze([...Object.getOwnPropertyNames(Object.prototype)]);
+
+function assertGlobalPrototypeIntegrity(context: string): void {
+  assert.deepEqual(
+    [...Object.getOwnPropertyNames(Object.prototype)].sort(),
+    [...OBJECT_PROTOTYPE_OWN_NAMES].sort(),
+    `${context}: Object.prototype own-name set is untouched`,
+  );
+  assert.equal(
+    ({} as Record<string, unknown>).polluted,
+    undefined,
+    `${context}: no key leaked onto fresh plain objects`,
+  );
+}
+
+/**
+ * The preserved `__proto__` must be an ordinary own enumerable writable
+ * configurable DATA property with exactly `expectedValue` on a record whose
+ * prototype is still `Object.prototype` — never a prototype mutation, never
+ * a silent key drop, never an accessor.
+ */
+function assertOwnDataProtoProperty<T>(record: object, expectedValue: T, context: string): T {
+  const descriptor = Object.getOwnPropertyDescriptor(record, '__proto__');
+  assert.ok(
+    descriptor !== undefined,
+    `${context}: own data \`__proto__\` key is preserved (never lost to the inherited setter)`,
+  );
+  assert.equal(descriptor.get, undefined, `${context}: \`__proto__\` stays a data property, not an accessor`);
+  assert.equal(descriptor.set, undefined, `${context}: \`__proto__\` stays a data property, not an accessor`);
+  assert.equal(descriptor.enumerable, true, `${context}: \`__proto__\` is enumerable`);
+  assert.equal(descriptor.writable, true, `${context}: \`__proto__\` is writable`);
+  assert.equal(descriptor.configurable, true, `${context}: \`__proto__\` is configurable`);
+  assert.equal(
+    Object.getPrototypeOf(record),
+    Object.prototype,
+    `${context}: the copy's prototype stays Object.prototype (never the injected material)`,
+  );
+  assert.deepEqual(descriptor.value, expectedValue, `${context}: exact deep value preserved`);
+  return descriptor.value as T;
+}
+
+/** Null-prototype INPUT states record carrying an own data `__proto__` key. */
+function nullProtoStatesWithOwnDataProto(protoValue: unknown): RawWorkflow['states'] {
+  const states: Record<string, unknown> = Object.assign(
+    Object.create(null) as Record<string, unknown>,
+    statesInvoking('tool.pricing'),
+  );
+  Object.defineProperty(states, '__proto__', {
+    value: protoValue,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  return states as RawWorkflow['states'];
+}
+
+test('maps a null-prototype input record carrying an own data `__proto__` key with the key preserved on a plain output prototype', () => {
+  // Matrix F: the record guard explicitly accepts null-prototype inputs, so
+  // the preservation contract must hold through them too — pre-fix the
+  // inherited setter ran here exactly as on plain inputs.
+  const poisonValue: Record<string, unknown> = { poison: true };
+  const result = mapStates(nullProtoStatesWithOwnDataProto(poisonValue));
+  const states = mappedStates(result);
+
+  const preserved = assertOwnDataProtoProperty(states, { poison: true }, 'null-prototype input');
+  assert.notEqual(preserved, poisonValue, 'no alias into the caller-owned value survives');
+  assert.equal(
+    Object.getPrototypeOf(preserved as object),
+    Object.prototype,
+    'the preserved value is itself a plain copy',
+  );
+
+  validateDefinitionGraphEnvelope(result.graph);
+  assertGlobalPrototypeIntegrity('null-prototype input');
+});
+
+test('null-prototype input records map deterministically and stay caller-isolated with the preserved key', async () => {
+  const poisonValue: Record<string, unknown> = { poison: true };
+  const callerStates = nullProtoStatesWithOwnDataProto(poisonValue);
+  const result = mapStates(callerStates);
+  const digestBefore = await graphDigest(result.graph);
+
+  const second = mapStates(nullProtoStatesWithOwnDataProto({ poison: true }));
+  assert.equal(
+    JSON.stringify(mappedStates(result)),
+    JSON.stringify(mappedStates(second)),
+    'deterministic canonical serialization with the preserved key',
+  );
+  assert.equal(await graphDigest(result.graph), await graphDigest(second.graph), 'deterministic digest');
+
+  // Caller mutation of the null-prototype record — the would-be-prototype
+  // value and the own `__proto__` data key itself — never perturbs the product.
+  poisonValue.poison = false;
+  poisonValue.tainted = 'caller-mutation';
+  Object.defineProperty(callerStates, '__proto__', {
+    value: { replaced: true },
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+
+  assertOwnDataProtoProperty(mappedStates(result), { poison: true }, 'post-mutation null-prototype input');
+  assert.equal(await graphDigest(result.graph), digestBefore, 'product digest unchanged by caller mutation');
+  validateDefinitionGraphEnvelope(result.graph);
+});
+
+test('preserves an own data `__proto__` object value through the ungated provenance surface (historicalIdentity.config)', () => {
+  // historicalIdentity is the ungated surface: config material bypasses the
+  // envelope gate and reaches the caller as provenance evidence. Pre-fix the
+  // config copy lost the own key and its prototype was replaced by the
+  // injected material — corrupted evidence escaping every gate.
+  const config = JSON.parse('{"__proto__": {"polluted": "YES"}, "transport": "http-transport@1"}') as never;
+  const poisonValue = Object.getOwnPropertyDescriptor(config as object, '__proto__')!.value as Record<string, unknown>;
+  const result = mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ config })] }));
+
+  const provenance = result.provenance.components.find((entry) => entry.componentId === 'tool.pricing');
+  assert.ok(provenance, 'tool provenance is recorded');
+  const historicalConfig = (provenance.historicalIdentity as { config: object }).config;
+  const preserved = assertOwnDataProtoProperty(historicalConfig, { polluted: 'YES' }, 'provenance object value');
+  assert.notEqual(preserved, poisonValue, 'the provenance value is a copy, never caller-aliased');
+
+  // Provenance-only routing: ungated config material never enters Definition
+  // semantics.
+  assert.ok(!JSON.stringify(result.graph).includes('polluted'), 'ungated config material stays out of the graph');
+
+  validateDefinitionGraphEnvelope(result.graph);
+  assertGlobalPrototypeIntegrity('provenance object value');
+});
+
+test('preserves nested own data `__proto__` inside provenance config without inheritance pollution', () => {
+  // Pre-fix the nested provenance copy inherited caller-controlled material
+  // through the prototype swap: `nested.evil === true` outside every gate.
+  const config = JSON.parse(
+    '{"transport": "http-transport@1", "nested": {"__proto__": {"evil": true}, "keep": "raw"}}',
+  ) as never;
+  const result = mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ config })] }));
+
+  const provenance = result.provenance.components.find((entry) => entry.componentId === 'tool.pricing');
+  assert.ok(provenance, 'tool provenance is recorded');
+  const nested = (provenance.historicalIdentity as { config: { nested: object } }).config.nested;
+  const preserved = assertOwnDataProtoProperty(nested, { evil: true }, 'nested provenance');
+  assert.equal(
+    Object.getPrototypeOf(preserved as object),
+    Object.prototype,
+    'the preserved nested value is itself a plain copy',
+  );
+  assert.equal((nested as { keep?: unknown }).keep, 'raw', 'ordinary sibling keys still copy exactly');
+  assert.equal(
+    Object.getOwnPropertyDescriptor(nested, 'evil'),
+    undefined,
+    'caller material is NOT inherited through the preserved key (no prototype swap)',
+  );
+  assert.ok(!JSON.stringify(result.graph).includes('evil'), 'ungated nested material stays out of the graph');
+
+  validateDefinitionGraphEnvelope(result.graph);
+  assertGlobalPrototypeIntegrity('nested provenance');
+});
+
+test('pins exact canonical key order and data-property descriptor attributes for a preserved own data `__proto__`', () => {
+  // Sharpness over the order-insensitive pins above: `__proto__` sorts as an
+  // ordinary string key (code-unit order) and is recreated with the exact
+  // data descriptor the copy contract promises.
+  const result = mapStates(statesWithOwnDataProto({ poison: true }));
+  const states = mappedStates(result);
+
+  assert.deepEqual(
+    Object.keys(states),
+    ['__proto__', 'end', 'start'],
+    'exact canonical code-unit key order with the preserved key',
+  );
+
+  const descriptor = Object.getOwnPropertyDescriptor(states, '__proto__');
+  assert.ok(descriptor !== undefined, 'own `__proto__` descriptor present');
+  assert.equal(descriptor.enumerable, true, 'enumerable');
+  assert.equal(descriptor.writable, true, 'writable');
+  assert.equal(descriptor.configurable, true, 'configurable');
+  assert.equal(descriptor.get, undefined, 'data property, not an accessor');
+  assert.equal(descriptor.set, undefined, 'data property, not an accessor');
+  assert.deepEqual(descriptor.value, { poison: true });
+
+  validateDefinitionGraphEnvelope(result.graph);
 });
 
 // ---------------------------------------------------------------------------
