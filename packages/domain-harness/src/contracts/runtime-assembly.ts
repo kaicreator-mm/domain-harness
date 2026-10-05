@@ -283,6 +283,20 @@ export interface SealedKindImplementationBinding {
 const SEALED_ASSEMBLY_BRAND: unique symbol = Symbol('kaicreator.runtime-assembly.sealed');
 
 /**
+ * Module-private minting registry: the authoritative anti-forgery check. A
+ * property-style brand alone is bypassable — it is readable through the
+ * prototype chain (Object.create forgery) and the symbol is reflectively
+ * extractable from any self-sealed assembly (getOwnPropertySymbols theft),
+ * and the record/digest an attacker pairs with it are public serializable
+ * identity material by design (#587 §A). WeakSet membership is neither
+ * inheritable, reflectively extractable, nor reproducible from public
+ * material: only `sealRuntimeAssembly` can mint a member, so only a sealed
+ * Assembly can ever authorize an admission. The brand property is retained
+ * as a secondary, own-property-only (Object.hasOwn) defense in depth.
+ */
+const SEALED_ASSEMBLY_MINTS = new WeakSet<object>();
+
+/**
  * The sealed Runtime Assembly: the serializable record plus the assembly
  * digest and the trusted runtime binding handles associated with the exact
  * pins (#587 §A). Sealing grants identity and admission provenance only —
@@ -922,12 +936,14 @@ export async function sealRuntimeAssembly(
     ),
   );
 
-  return Object.freeze({
+  const sealed = Object.freeze({
     record,
     assemblyDigest,
     bindings: sealedBindings,
     [SEALED_ASSEMBLY_BRAND]: true as const,
   });
+  SEALED_ASSEMBLY_MINTS.add(sealed);
+  return sealed;
 }
 
 // ---------------------------------------------------------------------------
@@ -969,10 +985,21 @@ function snapshotEnvelope(envelope: ComponentEnvelope): ComponentEnvelope {
   return snapshot;
 }
 
+/**
+ * Authoritative sealed-Assembly guard (#575, fresh-review P1 repair). The
+ * module-private WeakSet mint registry is the authoritative test — it cannot
+ * be satisfied by prototype inheritance or symbol reflection, since only
+ * `sealRuntimeAssembly` ever adds a member. The unique-symbol brand is kept
+ * as defense in depth, but consulted as an OWN property only
+ * (`Object.hasOwn`), so a brand value inherited through a forged prototype
+ * chain contributes nothing.
+ */
 function isSealedAssembly(value: unknown): value is SealedRuntimeAssembly {
   return (
     typeof value === 'object' &&
     value !== null &&
+    SEALED_ASSEMBLY_MINTS.has(value) &&
+    Object.hasOwn(value, SEALED_ASSEMBLY_BRAND) &&
     (value as Record<typeof SEALED_ASSEMBLY_BRAND, unknown>)[SEALED_ASSEMBLY_BRAND] === true
   );
 }
@@ -1008,6 +1035,24 @@ export async function admitComponentWithAssembly(
     fail(
       'INVALID_ASSEMBLY_INPUT',
       'admission requires a SealedRuntimeAssembly minted by sealRuntimeAssembly; a caller-constructed assembly can never carry the sealed-Assembly brand',
+    );
+  }
+
+  // Defense-in-depth consistency re-derivation (fresh-review P1 repair): the
+  // sealed bindings' pin set must be exactly the record's serialized pin
+  // set. Every registry member minted by sealRuntimeAssembly satisfies this
+  // by construction (both derive from the same synchronous snapshot), so a
+  // mismatch indicates tampered module state and fails closed before any
+  // authority use.
+  const bindingPinKeys = assembly.bindings.map((binding) => pinSortKey(binding.pin)).sort();
+  const recordPinKeys = assembly.record.kindImplementations.map(pinSortKey).sort();
+  if (
+    bindingPinKeys.length !== recordPinKeys.length ||
+    bindingPinKeys.some((key, index) => key !== recordPinKeys[index])
+  ) {
+    fail(
+      'INVALID_ASSEMBLY_INPUT',
+      'the sealed Assembly\'s bindings do not correspond exactly to its serialized record pins; Assembly evidence is inconsistent and fails closed',
     );
   }
 
