@@ -21,6 +21,11 @@ import type {
   ToolOperationsDeclaration,
 } from '../../src/contracts/tool-component.js';
 import type { UnderstoodKindDeclaration, UnderstoodKindSet } from '../../src/contracts/component-admission.js';
+import type {
+  KindImplementationBindingInput,
+  KindImplementationPin,
+} from '../../src/contracts/runtime-assembly.js';
+import type { ToolResourceRequirementsDeclaration } from '../../src/contracts/resource-requirements.js';
 
 /** The neutral Semantic Kind under falsification. */
 export const TEST_SEMANTIC_KIND: KindRef = Object.freeze({
@@ -203,4 +208,115 @@ export class DeferredSha256Port implements Sha256Port {
       this.resolveFn('');
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// MK1A neutral fixtures (#586 campaign, T002B / Sealed Runtime Assembly)
+// ---------------------------------------------------------------------------
+
+/**
+ * TestSemanticKindImplementation A: the first neutral closed-world validator
+ * for TestSemanticKind. Its identity (implementationId + digest) enters the
+ * Assembly identity but never the Definition identity.
+ */
+export const TEST_SEMANTIC_KIND_IMPLEMENTATION_A: KindImplementationPin = Object.freeze({
+  kind: Object.freeze({ kindId: TEST_SEMANTIC_KIND.kindId, version: TEST_SEMANTIC_KIND.version }),
+  implementation: Object.freeze({
+    implementationId: 'mk1a.test-semantic-kind-implementation-a',
+    implementationVersion: '1.0.0',
+    implementationDigest: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  }),
+});
+
+/**
+ * TestSemanticKindImplementation B: the second neutral implementation, same
+ * exact KindRef but different opaque implementation identity. Swapping A for B
+ * must leave the Definition digest unchanged and change the Assembly digest.
+ */
+export const TEST_SEMANTIC_KIND_IMPLEMENTATION_B: KindImplementationPin = Object.freeze({
+  kind: Object.freeze({ kindId: TEST_SEMANTIC_KIND.kindId, version: TEST_SEMANTIC_KIND.version }),
+  implementation: Object.freeze({
+    implementationId: 'mk1a.test-semantic-kind-implementation-b',
+    implementationVersion: '1.0.0',
+    implementationDigest: 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',
+  }),
+});
+
+/** Closed-world validator A for TestSemanticKind bodies (fixture-side). */
+export function validateTestSemanticKindBodyA(envelope: ComponentEnvelope): void {
+  validateTestSemanticKindBody(envelope);
+  const body = envelope.semanticBody as { fixtureMarker?: unknown };
+  if (body.fixtureMarker !== 'mk1a-neutral-a' && body.fixtureMarker !== 'mk0-neutral') {
+    throw new Error('TestSemanticKindImplementation A closed-world violation: fixtureMarker must be mk1a-neutral-a');
+  }
+}
+
+/** Closed-world validator B for TestSemanticKind bodies (fixture-side). */
+export function validateTestSemanticKindBodyB(envelope: ComponentEnvelope): void {
+  validateTestSemanticKindBody(envelope);
+  const body = envelope.semanticBody as { fixtureMarker?: unknown };
+  if (body.fixtureMarker !== 'mk1a-neutral-b' && body.fixtureMarker !== 'mk0-neutral') {
+    throw new Error('TestSemanticKindImplementation B closed-world violation: fixtureMarker must be mk1a-neutral-b');
+  }
+}
+
+/** Sealing input for one exact KindImplementation of TestSemanticKind. */
+export function testSemanticKindImplementationBinding(
+  pin: KindImplementationPin,
+  validator: (envelope: ComponentEnvelope) => void,
+): KindImplementationBindingInput {
+  return {
+    pin,
+    understoodSemanticContracts: [{ ...TEST_SEMANTIC_CONTRACT }, { ...TEST_SECOND_SEMANTIC_CONTRACT }],
+    understoodCapabilities: [{ ...TEST_CAPABILITY }, { ...TEST_SECOND_CAPABILITY }],
+    validateComponent: validator,
+  };
+}
+
+/** A neutral T005A logical resource requirement declaration for the Tool. */
+export function testToolResourceRequirements(
+  componentId?: string,
+): ToolResourceRequirementsDeclaration {
+  return {
+    componentId: componentId ?? 'mk0.test.tool-component',
+    requirements: [
+      {
+        resourceKey: 'mk1a.test.resource-a',
+        contract: { contractId: 'mk1a.test-resource-contract-a', version: '1.0.0' },
+        required: true,
+      },
+    ],
+  };
+}
+
+/** A second neutral T005A declaration with permuted requirements. */
+export function testToolResourceRequirementsPermuted(
+  componentId?: string,
+): ToolResourceRequirementsDeclaration {
+  return {
+    componentId: componentId ?? 'mk0.test.tool-component',
+    requirements: [
+      {
+        resourceKey: 'mk1a.test.resource-b',
+        contract: { contractId: 'mk1a.test-resource-contract-b', version: '1.0.0' },
+        required: true,
+      },
+      {
+        resourceKey: 'mk1a.test.resource-a',
+        contract: { contractId: 'mk1a.test-resource-contract-a', version: '1.0.0' },
+        required: true,
+      },
+    ],
+  };
+}
+
+/** The neutral graph with one resource requirement on the Tool. */
+export function testGraphWithResourceRequirements(
+  overrides?: {
+    graphId?: string;
+    components?: readonly ComponentEnvelope[];
+    relations?: readonly DefinitionRelation[];
+  },
+): DefinitionGraphEnvelope {
+  return testGraph(overrides);
 }
