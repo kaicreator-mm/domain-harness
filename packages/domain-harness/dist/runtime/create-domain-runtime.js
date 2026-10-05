@@ -100,10 +100,10 @@ export function createDomainRuntime(options) {
     return createDomainRuntimeInternal(options, 'legacy');
 }
 /** Internal v3 assembly entrypoint; intentionally not re-exported by runtime/index.ts. */
-export function createDomainRuntimeWithProcessCommandOutcomes(options) {
-    return createDomainRuntimeInternal(options, 'v3-process-command');
+export function createDomainRuntimeWithProcessCommandOutcomes(options, out) {
+    return createDomainRuntimeInternal(options, 'v3-process-command', out);
 }
-async function createDomainRuntimeInternal(options, processingMode) {
+async function createDomainRuntimeInternal(options, processingMode, out) {
     const processCommandStore = processingMode === 'v3-process-command' ? requireV3ProcessCommandStore(options.store) : null;
     // Issue #312 observation composition: when enabled, every observation-v1
     // covered mutation flows through the observation-capable store. The frozen
@@ -208,6 +208,10 @@ async function createDomainRuntimeInternal(options, processingMode) {
     // owned deep-immutable canonical snapshots; retained 0.2/2/2 entries keep
     // their historical caller references (legacy validator identity).
     runtimeRegistry = new ValidatedPackageRegistry(activation.validatedPackages, options.packageRegistry.defaultPackageId);
+    // v0.6 T004: let the v3 assembly reuse this exact admission-validated view
+    // for post-activation declaration reads (never the caller's registry).
+    if (out !== undefined)
+        out.validatedPackages = runtimeRegistry;
     const lane = new PerInstanceSerializedLane();
     const instanceEngine = new WorkflowInstanceEngine(effectiveStore, { now, lane });
     const acceptance = new DomainMessageAcceptance({

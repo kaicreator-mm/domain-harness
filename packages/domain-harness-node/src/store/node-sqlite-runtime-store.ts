@@ -22,6 +22,8 @@ import type {
 import { applyNodeSqliteMigrations } from './migrations.js';
 import {
   absentRuntimeObservationStreamPage,
+  assertProcessedCommandTurnRevisionProgression,
+  assertValidDecisionResolutionReceipt,
   assembleRuntimeObservationPage,
   canonicalJsonStringify,
   decodeRuntimeObservationCursor,
@@ -30,6 +32,9 @@ import {
   runtimeObservationId,
   runtimeObservationStreamKey,
   RuntimeObservationError,
+  type DecisionReceiptObservationStore,
+  type DecisionReceiptRecordRequest,
+  type DecisionResolutionReceipt,
   type ObservationReadRow,
   type RuntimeObservationIntent,
   type RuntimeObservationPage,
@@ -62,6 +67,7 @@ import type {
 import {
   provisioningInstanceIdentityMatchesRequest,
   provisioningRecordMatchesRequest,
+  requireAcceptedMessageIdentityCompatible,
 } from '@kaicreator/domain-harness';
 import type { RuntimeObservationInstanceProvisioningStore } from '@kaicreator/domain-harness';
 
@@ -147,6 +153,11 @@ interface ObservationFact {
   readonly targetSequence?: number;
   readonly lifecycleBefore?: WorkflowLifecycle;
   readonly lifecycleAfter?: WorkflowLifecycle;
+  /**
+   * v0.6 T006: receipt envelope field — populated ONLY on DECISION_RECEIPT
+   * facts; v1 commit-family facts never set it (byte-compatible v1 records).
+   */
+  readonly decisionReceipt?: DecisionResolutionReceipt;
 }
 
 function encodeJson(value: JsonValue, label: string): string {
@@ -361,6 +372,7 @@ export class NodeSqliteRuntimeStore
   implements
     RuntimeStore,
     RuntimeObservationStore,
+    DecisionReceiptObservationStore,
     RuntimeStoreProcessCommandExtension,
     DurableExecutionStore,
     DurableControlStore,
@@ -495,6 +507,31 @@ export class NodeSqliteRuntimeStore
       const instance = this.#requireInstanceRow(message.target);
       const existing = this.#getMessageRow(instance.internal_id, message.messageId);
       if (existing !== null) {
+        // A8 duplicate-compatibility boundary (fail closed BEFORE any write):
+        // a repeated messageId is only a valid idempotent replay when the whole
+        // AcceptedMessageIdentity tuple is compatible with the durable
+        // acceptance; an incompatible replay throws
+        // MESSAGE_IDENTITY_COLLISION and must not reuse the prior result.
+        requireAcceptedMessageIdentityCompatible(
+          message,
+          {
+            workflowId: instance.workflow_id,
+            instanceKey: instance.instance_key,
+            correlationId: instance.correlation_id,
+            packageId: instance.package_id,
+          },
+          {
+            workflowId: instance.workflow_id,
+            instanceKey: instance.instance_key,
+            messageId: existing.message_id,
+            type: existing.type,
+            payloadJson: existing.payload_json,
+            correlationId: existing.correlation_id,
+            causationId: existing.causation_id,
+            contractVersion: existing.contract_version,
+            packageId: existing.target_package_id,
+          },
+        );
         // Idempotent duplicate acceptance: the durable acceptance fact was
         // already committed (and observed, when enabled, exactly once).
         return {
@@ -888,6 +925,12 @@ export class NodeSqliteRuntimeStore
   }
 
   async commitProcessedCommandTurn(commit: ProcessedCommandTurnCommit): Promise<void> {
+    // Frozen A9 defensive structural guard (v0.6 T003): fail closed before any
+    // durable mutation when the supplied persistence command does not conform
+    // to the runtime-core normal progression rule N -> N+1. The store is a
+    // defensive contract boundary, not a semantic revision owner.
+    assertProcessedCommandTurnRevisionProgression(commit);
+
     const transaction = this.#db.transaction(() => {
       const instance = this.#requireInstanceRow(commit.target);
       const message = this.#requireMessageRow(instance.internal_id, commit.messageId);
@@ -1689,6 +1732,46 @@ export class NodeSqliteRuntimeStore
     );
   }
 
+  /**
+   * v0.6 T008-R1 (issue #598): production half of the T006 decision-receipt
+   * seam — durable append of ONE `DECISION_RECEIPT` record into the existing
+   * ordered observation stream, with the SAME binding/contiguity rules as the
+   * covered v1 appends. The receipt is validated fail-closed
+   * (`DECISION_RECEIPT_INVALID`) BEFORE any durable state changes; the append
+   * is atomic per record inside one immediate transaction (a failed append
+   * allocates no sequence).
+   */
+  async recordDecisionReceipt(request: DecisionReceiptRecordRequest): Promise<RuntimeObservationRecord> {
+    assertValidDecisionResolutionReceipt(request.receipt);
+    const transaction = this.#db.transaction((): RuntimeObservationRecord => {
+      const records = this.#recordObservations(
+        request.target,
+        request.packageIdentity.packageId,
+        {
+          kind: 'DECISION_RECEIPT',
+          packageIdentity: request.packageIdentity,
+          observedAt: request.observedAt,
+          ...(request.runtimeBindingRef === undefined
+            ? {}
+            : { runtimeBindingRef: request.runtimeBindingRef }),
+          ...(request.runtimeActivationRef === undefined
+            ? {}
+            : { runtimeActivationRef: request.runtimeActivationRef }),
+        },
+        [{ kind: 'DECISION_RECEIPT', decisionReceipt: request.receipt }],
+      );
+      const record = records[0];
+      if (record === undefined) {
+        throw new RuntimeObservationError(
+          'OBSERVATION_APPEND_FAILED',
+          'decision receipt append produced no record',
+        );
+      }
+      return record;
+    });
+    return transaction.immediate();
+  }
+
   #applyMigrations(): void {
     applyNodeSqliteMigrations(this.#db);
   }
@@ -1847,6 +1930,9 @@ export class NodeSqliteRuntimeStore
         ...(fact.targetSequence === undefined ? {} : { targetSequence: fact.targetSequence }),
         ...(fact.lifecycleBefore === undefined ? {} : { lifecycleBefore: fact.lifecycleBefore }),
         ...(fact.lifecycleAfter === undefined ? {} : { lifecycleAfter: fact.lifecycleAfter }),
+        // v0.6 T008-R1: receipt envelope field — populated only on
+        // DECISION_RECEIPT appends; v1 record kinds stay byte-compatible.
+        ...(fact.decisionReceipt === undefined ? {} : { decisionReceipt: fact.decisionReceipt }),
       };
       insertRecord.run({
         workflowId: target.workflowId,
