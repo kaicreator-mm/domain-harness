@@ -444,6 +444,9 @@ export function mapRawV07AuthoringToComponentGraph(input) {
     }
     const domainId = requireExactIdentity(raw.domainId, 'input.raw.domainId');
     const maxSteps = requireMaxSteps(raw);
+    if (typeof raw.root !== 'string') {
+        fail('INVALID_RAW_AUTHORING', 'input.raw.root', 'must be a string; the provenance source root is never silently defaulted');
+    }
     const components = [];
     const declarations = [];
     const provenanceComponents = [];
@@ -480,6 +483,14 @@ export function mapRawV07AuthoringToComponentGraph(input) {
         provenanceComponents.push(mapped.provenance);
     }
     for (const [workflowId, wf] of raw.workflows.entries()) {
+        // Loader invariant (loadRawDomainPackage: workflows.set(id, workflow)): the
+        // Map key IS the workflow id. Components bind by workflow.id while invoke
+        // relations bind sourceComponentId by the Map key, so an unasserted
+        // mismatch would cross-wire relations against the wrong workflow body —
+        // the invariant is re-checked fail-closed like every other loader shape.
+        if (wf?.id !== workflowId) {
+            fail('INVALID_RAW_AUTHORING', `input.raw.workflows.${workflowId}`, `workflow map key '${workflowId}' must equal workflow.id '${String(wf?.id)}' (loader invariant); a key/id mismatch would cross-wire invoke relations against the wrong workflow body`);
+        }
         const mapped = mapWorkflow(wf, maxSteps, `input.raw.workflows.${workflowId}`);
         bind(mapped.envelope.componentId, `input.raw.workflows.${workflowId}.id`);
         components.push(mapped.envelope);
@@ -525,7 +536,7 @@ export function mapRawV07AuthoringToComponentGraph(input) {
     const provenance = {
         schemaVersion: RAW_V07_SUPPORTED_SCHEMA_VERSION,
         domainId,
-        sourceRoot: typeof raw.root === 'string' ? raw.root : '',
+        sourceRoot: raw.root,
         components: provenanceComponents.sort((a, b) => compareIds(a.componentId, b.componentId)),
     };
     // Standard envelope gate: the adapter creates no bypass around Component
