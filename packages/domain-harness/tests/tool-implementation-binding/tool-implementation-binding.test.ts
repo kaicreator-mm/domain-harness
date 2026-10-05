@@ -828,3 +828,206 @@ test('PACK-A T003C: a structurally broken Tool Component in the current graph fa
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// Fresh Review P1 regression (issue #607, repair authority
+// issuecomment-5990404552): §F/T005A resource requirement material must
+// survive the T003C successor reseal — no silent drop.
+// ---------------------------------------------------------------------------
+
+/** The exact §F declaration sealed into the fixtures below (declaration order
+ * deliberately differs from canonical order; T002B canonicalizes at seal). */
+function resourceRequirementsInput(
+  definitionGraph: DefinitionGraphEnvelope,
+): NonNullable<Parameters<typeof sealRuntimeAssembly>[0]['resourceRequirements']> {
+  const owner = definitionGraph.components.find((component) => component.componentId === 'tool.alpha');
+  assert.ok(owner, 'fixture: tool.alpha must be a component of the graph');
+  return [
+    {
+      owner,
+      declaration: {
+        componentId: 'tool.alpha',
+        requirements: [
+          { resourceKey: 'res.workspace-memory', required: true },
+          {
+            resourceKey: 'res.calc-endpoint',
+            contract: { contractId: 'contract.calc-endpoint', version: '1.0.0' },
+            operationId: 'op.add',
+            required: false,
+          },
+        ],
+      },
+    },
+  ];
+}
+
+async function sealedResourceBearingAssembly(
+  definitionGraph: DefinitionGraphEnvelope = graph(),
+): Promise<Awaited<ReturnType<typeof sealedBaseAssembly>>> {
+  return sealRuntimeAssembly(
+    {
+      definitionGraph,
+      kindImplementations: [kindBinding()],
+      resourceRequirements: resourceRequirementsInput(definitionGraph),
+    },
+    realSha256,
+  );
+}
+
+test('Fresh Review P1: a §F-bearing sealed Assembly keeps byte-identical resource requirement material across the T003C successor reseal; the assemblyDigest change is attributable to the binding evidence slot only', async () => {
+  const definitionGraph = graph();
+  const assembly = await sealedResourceBearingAssembly(definitionGraph);
+  const selection = await selectionFor(definitionGraph);
+
+  // Fixture sanity: the input Assembly really carries canonical §F material.
+  assert.equal(assembly.record.resourceRequirements.length, 1);
+  assert.deepEqual(
+    assembly.record.resourceRequirements[0]!.requirements.map((requirement) => requirement.resourceKey),
+    ['res.calc-endpoint', 'res.workspace-memory'],
+  );
+
+  const bound = await bindToolImplementation({
+    assembly,
+    selection: JSON.parse(JSON.stringify(selection)) as BindToolImplementationInput['selection'],
+    currentDefinitionGraph: definitionGraph,
+    implementations: [candidate('impl.calc.alpha')],
+    sha256: realSha256,
+  });
+
+  // 1. Material preservation: the successor record carries the SAME §F
+  //    material — exact fields, exact refs, canonical order.
+  assert.deepEqual(
+    bound.successorAssembly.record.resourceRequirements,
+    assembly.record.resourceRequirements,
+    'the successor reseal must not drop or alter sealed §F resource requirement material',
+  );
+  for (const material of bound.successorAssembly.record.resourceRequirements) {
+    assert.ok(Object.isFrozen(material));
+    for (const requirement of material.requirements) {
+      assert.ok(Object.isFrozen(requirement));
+    }
+  }
+
+  // 2. T003C adds/replaces ONLY its implementation-binding evidence slot:
+  //    every other record field is byte-identical to the input Assembly.
+  assert.equal(bound.successorAssembly.record.digestDomain, assembly.record.digestDomain);
+  assert.equal(
+    bound.successorAssembly.record.definitionGraphDigest,
+    assembly.record.definitionGraphDigest,
+    'Definition identity is unchanged by the binding transition',
+  );
+  assert.deepEqual(bound.successorAssembly.record.kindImplementations, assembly.record.kindImplementations);
+  assert.deepEqual(
+    bound.successorAssembly.record.implementationBindingEvidence.filter(
+      (slot) => slot.subject !== 'tool.alpha',
+    ),
+    assembly.record.implementationBindingEvidence,
+    'prior §G slots for other subjects are preserved exactly',
+  );
+  assert.equal(
+    bound.successorAssembly.record.implementationBindingEvidence.length,
+    assembly.record.implementationBindingEvidence.length + 1,
+    'exactly one §G slot — this subject — was added by T003C',
+  );
+  assert.deepEqual(
+    Object.keys(bound.successorAssembly.record).sort(),
+    Object.keys(assembly.record).sort(),
+    'no record field was added or removed by the successor reseal',
+  );
+
+  // 3. Definition identity is still the authoritatively recomputed graph digest.
+  const recomputedDigest = await computeDefinitionGraphDigest(definitionGraph, realSha256);
+  assert.equal(bound.successorAssembly.record.definitionGraphDigest, recomputedDigest);
+
+  // 4. Digest attribution: an independent reseal over the same graph, the same
+  //    exact pins, the same §F declaration material and the successor's §G
+  //    slots reproduces the successor assemblyDigest exactly. The identity
+  //    change is the T003C binding transition alone, not unrelated material
+  //    loss. (Before the P1 repair the successor was sealed with §F dropped,
+  //    so this attribution equality did not hold.)
+  const independent = await sealRuntimeAssembly(
+    {
+      definitionGraph,
+      kindImplementations: [kindBinding()],
+      resourceRequirements: resourceRequirementsInput(definitionGraph),
+      implementationBindingEvidence: bound.successorAssembly.record.implementationBindingEvidence,
+    },
+    realSha256,
+  );
+  assert.equal(
+    independent.assemblyDigest,
+    bound.successorAssembly.assemblyDigest,
+    'successor digest must be fully attributable to graph + pins + carried §F material + successor §G slots',
+  );
+  assert.notEqual(
+    bound.successorAssembly.assemblyDigest,
+    assembly.assemblyDigest,
+    'the binding transition itself changes the Assembly identity',
+  );
+});
+
+test('Fresh Review P1: an Assembly sealed without §F material yields a successor still sealed without it (no phantom material, no digest drift)', async () => {
+  const { input, assembly } = await bindFixture();
+  const bound = await bindToolImplementation(input);
+
+  assert.deepEqual(assembly.record.resourceRequirements, []);
+  assert.deepEqual(
+    bound.successorAssembly.record.resourceRequirements,
+    assembly.record.resourceRequirements,
+  );
+});
+
+test('Fresh Review P1: an assembly record missing resourceRequirements fails closed typed instead of silently binding', async () => {
+  const genuine = await sealedBaseAssembly();
+  const forgedRecord: Record<string, unknown> = {};
+  for (const key of Object.keys(genuine.record)) {
+    if (key !== 'resourceRequirements') {
+      forgedRecord[key] = (genuine.record as unknown as Record<string, unknown>)[key];
+    }
+  }
+  const forgedAssembly = {
+    record: forgedRecord,
+    assemblyDigest: genuine.assemblyDigest,
+    bindings: genuine.bindings,
+  } as unknown as BindToolImplementationInput['assembly'];
+  const selection = await selectionFor();
+
+  await expectBindingError(
+    bindToolImplementation({
+      assembly: forgedAssembly,
+      selection: JSON.parse(JSON.stringify(selection)) as BindToolImplementationInput['selection'],
+      currentDefinitionGraph: graph(),
+      implementations: [candidate('impl.calc.alpha')],
+      sha256: realSha256,
+    }),
+    'INVALID_BINDING_INPUT',
+  );
+});
+
+test('Fresh Review P1: corrupted §F material on the input assembly record fails closed typed instead of being carried', async () => {
+  const genuine = await sealedResourceBearingAssembly();
+  const forgedRecord = JSON.parse(JSON.stringify(genuine.record)) as Record<string, unknown>;
+  const materials = forgedRecord.resourceRequirements as Array<{
+    componentId: string;
+    requirements: Array<Record<string, unknown>>;
+  }>;
+  materials[0]!.requirements[0]!.unexpectedField = 'smuggled';
+  const forgedAssembly = {
+    record: forgedRecord,
+    assemblyDigest: genuine.assemblyDigest,
+    bindings: genuine.bindings,
+  } as unknown as BindToolImplementationInput['assembly'];
+  const definitionGraph = graph();
+  const selection = await selectionFor(definitionGraph);
+
+  await expectBindingError(
+    bindToolImplementation({
+      assembly: forgedAssembly,
+      selection: JSON.parse(JSON.stringify(selection)) as BindToolImplementationInput['selection'],
+      currentDefinitionGraph: definitionGraph,
+      implementations: [candidate('impl.calc.alpha')],
+      sha256: realSha256,
+    }),
+    'INVALID_BINDING_INPUT',
+  );
+});

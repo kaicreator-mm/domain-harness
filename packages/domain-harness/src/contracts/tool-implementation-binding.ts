@@ -72,6 +72,7 @@
 import type {
   CapabilityContractRef,
   ComponentId,
+  ComponentEnvelope,
 } from './component.js';
 import {
   computeDefinitionGraphDigest,
@@ -88,7 +89,9 @@ import type { CurrentCapabilityProviderSelection } from './capability-provision.
 import {
   sealRuntimeAssembly,
   type AssemblyImplementationBindingEvidence,
+  type AssemblyResourceRequirementsMaterial,
   type KindImplementationBindingInput,
+  type RuntimeAssemblyResourceRequirementBinding,
   type SealedRuntimeAssembly,
 } from './runtime-assembly.js';
 import { validateToolComponent } from './tool-component.js';
@@ -444,6 +447,7 @@ interface SnapshotCandidate {
 interface SnapshotBindRequest {
   readonly assemblyDefinitionDigest: ContentDigest;
   readonly assemblyBindings: readonly KindImplementationBindingInput[];
+  readonly assemblyResourceRequirements: readonly AssemblyResourceRequirementsMaterial[];
   readonly priorEvidenceSlots: readonly AssemblyImplementationBindingEvidence[];
   readonly selection: SnapshotSelection;
   readonly currentDefinitionGraph: DefinitionGraphEnvelope;
@@ -472,6 +476,12 @@ function requireSha256Port(value: unknown, path: string): Sha256Port {
  * WeakSet mint is module-private and deliberately not re-derived here — the
  * successor Assembly is minted by the genuine `sealRuntimeAssembly`, and the
  * mint verification remains owned by the T002B admission consumption path.
+ *
+ * Fresh Review P1 (#607): the sealed record's canonical #568/§F
+ * `resourceRequirements` material is snapshotted here too and carried through
+ * the successor reseal — an input Assembly sealed with T005A
+ * resource-requirement material must never silently lose it. A record not
+ * carrying the field is not a genuine T002B seal and fails closed typed.
  */
 /**
  * Read one own DATA property of the sealed Assembly without invoking hidden
@@ -499,6 +509,7 @@ function readAssemblyOwnDataProperty(value: object, key: string): unknown {
 function snapshotAssembly(value: unknown): {
   definitionGraphDigest: ContentDigest;
   bindings: readonly KindImplementationBindingInput[];
+  resourceRequirements: readonly AssemblyResourceRequirementsMaterial[];
   priorSlots: readonly AssemblyImplementationBindingEvidence[];
 } {
   const at = 'bind input.assembly';
@@ -511,8 +522,12 @@ function snapshotAssembly(value: unknown): {
   const bindingsValue = readAssemblyOwnDataProperty(assemblyObject, 'bindings');
 
   const recordView = requireSafeRecord(recordValue, `${at}.record`);
-  if (!('definitionGraphDigest' in recordView) || !('implementationBindingEvidence' in recordView)) {
-    fail('INVALID_BINDING_INPUT', `${at}.record must carry definitionGraphDigest and implementationBindingEvidence`);
+  if (
+    !('definitionGraphDigest' in recordView) ||
+    !('resourceRequirements' in recordView) ||
+    !('implementationBindingEvidence' in recordView)
+  ) {
+    fail('INVALID_BINDING_INPUT', `${at}.record must carry definitionGraphDigest, resourceRequirements and implementationBindingEvidence`);
   }
   if (typeof assemblyDigest !== 'string' || !isContentDigest(assemblyDigest)) {
     fail('INVALID_BINDING_INPUT', `${at}.assemblyDigest must be a non-empty content digest string`);
@@ -523,6 +538,10 @@ function snapshotAssembly(value: unknown): {
   }
 
   const priorSlots = snapshotEvidenceSlots(recordView.implementationBindingEvidence, `${at}.record.implementationBindingEvidence`);
+  const resourceRequirements = snapshotAssemblyResourceRequirements(
+    recordView.resourceRequirements,
+    `${at}.record.resourceRequirements`,
+  );
 
   const bindingViews = requireSafeArray(bindingsValue, `${at}.bindings`);
   const bindings = bindingViews.map((entry, index) => {
@@ -575,7 +594,7 @@ function snapshotAssembly(value: unknown): {
     } satisfies KindImplementationBindingInput;
   });
 
-  return { definitionGraphDigest: definitionGraphDigest, bindings, priorSlots };
+  return { definitionGraphDigest: definitionGraphDigest, bindings, resourceRequirements, priorSlots };
 }
 
 /** Snapshot the prior §G evidence slots as fresh frozen identity material. */
@@ -596,6 +615,95 @@ function snapshotEvidenceSlots(
         fail('INVALID_BINDING_INPUT', `${description}[${index}].bindingDigest must be a non-empty content digest string`);
       }
       return Object.freeze({ subject, bindingDigest: view.bindingDigest });
+    }),
+  );
+}
+
+/** Snapshot one exact `{contractId, version}` resource contract ref as a fresh frozen object. */
+function snapshotResourceContractRef(
+  value: unknown,
+  path: string,
+): { readonly contractId: string; readonly version: string } {
+  const candidate = requireSafeRecord(value, path);
+  const keys = Object.keys(candidate).sort();
+  if (keys.length !== 2 || !keys.includes('contractId') || !keys.includes('version')) {
+    fail('INVALID_BINDING_INPUT', `${path} must contain exactly { contractId, version }`);
+  }
+  const contractId = requireExactIdentityString(candidate.contractId, `${path}.contractId`);
+  requireNonFloatingIdentity(contractId, `${path}.contractId`);
+  const version = requireExactIdentityString(candidate.version, `${path}.version`);
+  requireNonFloatingIdentity(version, `${path}.version`);
+  requireExactVersion(version, `${path}.version`);
+  return Object.freeze({ contractId, version });
+}
+
+const ASSEMBLY_RESOURCE_MATERIAL_FIELDS = new Set<string>(['componentId', 'requirements']);
+
+const ASSEMBLY_RESOURCE_REQUIREMENT_FIELDS = new Set<string>([
+  'resourceKey',
+  'contract',
+  'operationId',
+  'required',
+]);
+
+/**
+ * Synchronously validate and snapshot the sealed record's canonical #568/§F
+ * resource requirement material as fresh frozen identity, for carry-through
+ * into the successor reseal. The canonical material already has exactly the
+ * T005A declaration shape (five normative requirement fields, order
+ * normalized by the T002B seal), so this is a faithful descriptor-safe copy,
+ * not a reinterpretation: unexpected fields, non-exact identities and
+ * non-boolean criticality fail closed typed instead of being silently
+ * dropped or normalized.
+ */
+function snapshotAssemblyResourceRequirements(
+  value: unknown,
+  description: string,
+): readonly AssemblyResourceRequirementsMaterial[] {
+  const entries = requireSafeArray(value, description);
+  return Object.freeze(
+    entries.map((entry, index) => {
+      const at = `${description}[${index}]`;
+      const view = requireSafeRecord(entry, at);
+      const unexpectedField = Object.keys(view).find((key) => !ASSEMBLY_RESOURCE_MATERIAL_FIELDS.has(key));
+      if (unexpectedField !== undefined) {
+        fail('INVALID_BINDING_INPUT', `${at} must contain exactly { componentId, requirements }; unexpected field "${unexpectedField}"`);
+      }
+      const componentId = requireExactIdentityString(view.componentId, `${at}.componentId`);
+      requireNonFloatingIdentity(componentId, `${at}.componentId`);
+      const requirements = requireSafeArray(view.requirements, `${at}.requirements`).map(
+        (candidate, requirementIndex) => {
+          const path = `${at}.requirements[${requirementIndex}]`;
+          const requirement = requireSafeRecord(candidate, path);
+          const unexpectedRequirementField = Object.keys(requirement).find(
+            (key) => !ASSEMBLY_RESOURCE_REQUIREMENT_FIELDS.has(key),
+          );
+          if (unexpectedRequirementField !== undefined) {
+            fail('INVALID_BINDING_INPUT', `${path} must not carry unknown field "${unexpectedRequirementField}" (live values, secrets, endpoints and handles are structurally unrepresentable)`);
+          }
+          const resourceKey = requireExactIdentityString(requirement.resourceKey, `${path}.resourceKey`);
+          requireNonFloatingIdentity(resourceKey, `${path}.resourceKey`);
+          if (typeof requirement.required !== 'boolean') {
+            fail('INVALID_BINDING_INPUT', `${path}.required must be a boolean (explicit criticality; no default, no coercion)`);
+          }
+          const material: {
+            resourceKey: string;
+            required: boolean;
+            contract?: { readonly contractId: string; readonly version: string };
+            operationId?: string;
+          } = { resourceKey, required: requirement.required };
+          if ('contract' in requirement && requirement.contract !== undefined) {
+            material.contract = snapshotResourceContractRef(requirement.contract, `${path}.contract`);
+          }
+          if ('operationId' in requirement && requirement.operationId !== undefined) {
+            const operationId = requireExactIdentityString(requirement.operationId, `${path}.operationId`);
+            requireNonFloatingIdentity(operationId, `${path}.operationId`);
+            material.operationId = operationId;
+          }
+          return Object.freeze(material);
+        },
+      );
+      return Object.freeze({ componentId, requirements: Object.freeze(requirements) });
     }),
   );
 }
@@ -782,6 +890,7 @@ function snapshotBindRequest(input: unknown): SnapshotBindRequest {
   return {
     assemblyDefinitionDigest: assembly.definitionGraphDigest,
     assemblyBindings: assembly.bindings,
+    assemblyResourceRequirements: assembly.resourceRequirements,
     priorEvidenceSlots: assembly.priorSlots,
     selection,
     currentDefinitionGraph: graphSnapshot,
@@ -950,6 +1059,34 @@ export async function bindToolImplementation(
   // slot added or REPLACED (a replacement changes the assemblyDigest while
   // the Definition identity stays unchanged). The input Assembly is never
   // mutated — the successor is a new sealed Assembly.
+  //
+  // Fresh Review P1: the sealed record's canonical §F resource requirement
+  // material is carried through the reseal. Each canonical entry maps 1:1
+  // onto the T005A declaration shape, so it is rebuilt as a
+  // { owner, declaration } binding over the exact owner component of the
+  // digest-verified graph snapshot; `sealRuntimeAssembly` re-validates and
+  // re-canonicalizes, yielding byte-identical record material. An owner
+  // absent from the verified graph snapshot is impossible for a genuine seal
+  // and fails closed typed rather than dropping the material.
+  const resourceRequirements: readonly RuntimeAssemblyResourceRequirementBinding[] =
+    request.assemblyResourceRequirements.map((material) => {
+      const owner: ComponentEnvelope | undefined = request.currentDefinitionGraph.components.find(
+        (component) => component.componentId === material.componentId,
+      );
+      if (owner === undefined) {
+        fail(
+          'INVALID_BINDING_INPUT',
+          `the sealed Assembly binds resource requirements to component "${material.componentId}", which is not a component of the current Definition graph snapshot — the successor reseal cannot faithfully carry §F material through a foreign graph`,
+        );
+      }
+      return Object.freeze({
+        owner,
+        declaration: Object.freeze({
+          componentId: material.componentId,
+          requirements: material.requirements,
+        }),
+      });
+    });
   const successorSlots: AssemblyImplementationBindingEvidence[] = [
     ...request.priorEvidenceSlots.filter(
       (slot) => slot.subject !== request.selection.providerComponentId,
@@ -963,6 +1100,7 @@ export async function bindToolImplementation(
     {
       definitionGraph: request.currentDefinitionGraph,
       kindImplementations: request.assemblyBindings,
+      resourceRequirements,
       implementationBindingEvidence: successorSlots,
       claimedDefinitionGraphDigest: definitionGraphDigest,
     },
