@@ -1005,6 +1005,17 @@ function isSealedAssembly(value: unknown): value is SealedRuntimeAssembly {
 }
 
 /**
+ * Read-only anti-forgery guard exported for the T002C assembly-activation seam
+ * (#617). It confirms membership in the module-private mint registry without
+ * exposing the brand symbol or the registry; it lets the activation authority
+ * prove a caller-supplied value is a genuine `SealedRuntimeAssembly` minted by
+ * `sealRuntimeAssembly`, but can never be used to mint or forge one.
+ */
+export function isSealedRuntimeAssembly(value: unknown): value is SealedRuntimeAssembly {
+  return isSealedAssembly(value);
+}
+
+/**
  * Authoritative Assembly-bound Component admission.
  *
  * The exact Kind support decision is consumed from the #573 frozen decision
