@@ -36,10 +36,27 @@
  *   (componentId, resourceKey) order. A failure is terminal — never retried,
  *   never substituted.
  *
+ * T005C resource-currentness capture (issue #656): a `resolved` provider
+ * response MAY carry a stable NON-SECRET resource-instance/currentness pin
+ * (`currentnessPin`: exact provider identity + exact resource identity +
+ * exact revision/currentness digest; field names are implementation detail).
+ * This module is the structural fence for that material: a closed field
+ * whitelist, exact non-floating identity strings and an exact resourceKey
+ * match are enforced synchronously right after the provider await, the
+ * captured snapshot is frozen/non-aliased, and no secret value, credential,
+ * live handle, connection object, function or provider object can ever be
+ * represented in it or in any diagnostic. Capture is ADDITIVE and
+ * capture-only: a required resource resolved without a pin still resolves
+ * (an invented/default/fallback pin would be a lie) — whether pinned evidence
+ * is mandatory for an occurrence is owned by the T005C activation gate, which
+ * consumes ONLY material produced/validated here.
+ *
  * Deliberately absent (successor-owned):
- * - resource instance identity, currentness pins and stable non-secret
- *   behaviorally relevant identity (T005C) — a resolved handle here is an
- *   OPAQUE runtime value, not authority or currentness evidence;
+ * - activation/execution-currentness integration of the captured evidence and
+ *   the required/optional currentness posture gate (T005C governance seam,
+ *   `governance/execution-binding.ts` + `governance/assembly-activation.ts`)
+ *   — resolution still grants nothing; a resolved handle remains an OPAQUE
+ *   runtime value and never becomes authority by itself;
  * - invocation request/admission and exposure authority (T004A) — resolution
  *   grants nothing; the caller decides, after resolution, whether to proceed;
  * - Assembly sealing/anti-forgery minting (T002B) — this module structurally
@@ -57,6 +74,7 @@
  * declaration contract from `resource-requirements.ts` (T005A).
  */
 import type { ComponentId } from './component.js';
+import type { ContentDigest } from './identity.js';
 import type { ResourceContractRef } from './resource-requirements.js';
 import type {
   AssemblyResourceRequirementsMaterial,
@@ -91,18 +109,60 @@ export interface ResourceResolutionRequest {
 }
 
 /**
+ * T005C (#656): stable NON-SECRET resource-instance/currentness pin material
+ * for one resolved resource, supplied by the provider on a `resolved`
+ * response. Exactly the three closed fields — the exact provider identity,
+ * the exact resource identity (which must equal the requirement's
+ * `resourceKey`) and one exact revision/content/currentness digest. Secret
+ * values, credentials, live handles, connection objects, functions/module
+ * paths and provider objects are structurally unrepresentable (closed
+ * whitelist of exact identity strings only; unknown fields fail closed).
+ */
+export interface ResourceCurrentnessPin {
+  /** Exact non-secret provider identity that attests the instance revision. */
+  readonly providerId: string;
+  /** Exact resource identity — must equal the requirement's `resourceKey`. */
+  readonly resourceKey: string;
+  /** Exact non-floating revision/content/currentness digest. */
+  readonly revisionDigest: ContentDigest;
+}
+
+/**
+ * T005C (#656): occurrence-level resource-currentness evidence consumed by
+ * the governance activation/execution-currentness seam: the exact owner
+ * component plus the stable non-secret instance pin resolved for it. This is
+ * the ONLY shape the T002C execution pin ever carries for resources — plain
+ * exact identity/digest material, never a live value, handle or provider
+ * object.
+ */
+export interface ResourceCurrentnessEvidence {
+  /** Exact owner component logical identity. */
+  readonly componentId: ComponentId;
+  /** Exact non-secret provider identity that attests the instance revision. */
+  readonly providerId: string;
+  /** Exact resource identity. */
+  readonly resourceKey: string;
+  /** Exact non-floating revision/content/currentness digest. */
+  readonly revisionDigest: ContentDigest;
+}
+
+/**
  * One provider response. The `handle` is an OPAQUE runtime value: this
  * module never inspects, serializes, or diagnoses it. `contract` on a
  * `resolved` response is the exact contract the provider claims to satisfy —
  * the kernel verifies the exact match against the Assembly requirement, it
  * never trusts the status string alone. `supportedContracts` on an
- * `incompatible` response is diagnostic-only identity material.
+ * `incompatible` response is diagnostic-only identity material. The optional
+ * T005C `currentnessPin` is stable non-secret instance/currentness evidence
+ * only (closed whitelist, exact identities/digest, structural secret/handle
+ * fence); it is capture-only here and carries no authority by itself.
  */
 export type ResourceProviderResponse =
   | {
       readonly status: 'resolved';
       readonly handle: unknown;
       readonly contract?: ResourceContractRef;
+      readonly currentnessPin?: ResourceCurrentnessPin;
     }
   | { readonly status: 'absent' }
   | { readonly status: 'incompatible'; readonly supportedContracts?: readonly ResourceContractRef[] };
@@ -131,12 +191,19 @@ export interface ResolveToolResourcesOptions {
 }
 
 /**
- * One resolved entry. `resolved` carries the opaque runtime handle;
+ * One resolved entry. `resolved` carries the opaque runtime handle and, when
+ * the provider supplied one, the T005C stable non-secret currentness pin as
+ * a frozen, non-aliased snapshot (T005C activation owns the posture gate);
  * `absent` is the explicit, first-class representation of an unmet OPTIONAL
  * requirement — never a default/ambient stand-in.
  */
 export type ResolvedResourceEntry =
-  | { readonly resourceKey: string; readonly status: 'resolved'; readonly handle: unknown }
+  | {
+      readonly resourceKey: string;
+      readonly status: 'resolved';
+      readonly handle: unknown;
+      readonly currentnessPin?: ResourceCurrentnessPin;
+    }
   | { readonly resourceKey: string; readonly status: 'absent' };
 
 /**
@@ -399,13 +466,61 @@ function snapshotRequirementsMaterial(
 // ---------------------------------------------------------------------------
 
 type SnapshotProviderResponse =
-  | { readonly status: 'resolved'; readonly handle: unknown; readonly contract?: ResourceContractRef }
+  | {
+      readonly status: 'resolved';
+      readonly handle: unknown;
+      readonly contract?: ResourceContractRef;
+      readonly currentnessPin?: ResourceCurrentnessPin;
+    }
   | { readonly status: 'absent' }
   | { readonly status: 'incompatible'; readonly supportedContracts?: readonly ResourceContractRef[] };
 
-const RESOLVED_RESPONSE_FIELDS = new Set<string>(['status', 'handle', 'contract']);
+const RESOLVED_RESPONSE_FIELDS = new Set<string>(['status', 'handle', 'contract', 'currentnessPin']);
 const INCOMPATIBLE_RESPONSE_FIELDS = new Set<string>(['status', 'supportedContracts']);
 const ABSENT_RESPONSE_FIELDS = new Set<string>(['status']);
+
+const CURRENTNESS_PIN_FIELDS = new Set<string>(['providerId', 'resourceKey', 'revisionDigest']);
+
+/**
+ * Synchronously validate and snapshot one T005C stable non-secret resource
+ * currentness pin immediately after its await. Closed three-field whitelist
+ * (`providerId`, `resourceKey`, `revisionDigest`) — a secret value,
+ * credential, live handle, connection object, function or provider object has
+ * NO representable field, and an unknown field (which is where such material
+ * would have to ride) fails closed with only the offending KEY name in the
+ * message. Identities must be exact (no floating/range/selector semantics, no
+ * embedded `id@selector` form) and the pin's `resourceKey` must exactly equal
+ * the requirement's key — a pin for a different resource is never evidence.
+ */
+function snapshotCurrentnessPin(
+  value: unknown,
+  path: string,
+  expectedResourceKey: string,
+): ResourceCurrentnessPin {
+  const view = requireSafeRecord(value, path, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
+  const unexpectedField = Object.keys(view).find((key) => !CURRENTNESS_PIN_FIELDS.has(key));
+  if (unexpectedField !== undefined) {
+    fail(
+      'INVALID_RESOURCE_PROVIDER_RESPONSE',
+      `${path} must contain exactly {providerId, resourceKey, revisionDigest}; unexpected field "${unexpectedField}" (secret values, credentials, live handles, connection objects, functions/module paths and provider objects are structurally unrepresentable in currentness evidence)`,
+    );
+  }
+  const providerId = requireExactIdentity(view.providerId, `${path}.providerId`, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
+  const resourceKey = requireExactIdentity(view.resourceKey, `${path}.resourceKey`, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
+  if (resourceKey !== expectedResourceKey) {
+    fail(
+      'INVALID_RESOURCE_PROVIDER_RESPONSE',
+      `${path}.resourceKey must exactly equal the requirement's resource identity "${expectedResourceKey}"; a pin for a different resource is never currentness evidence`,
+    );
+  }
+  const revisionDigest = requireExactIdentityString(
+    view.revisionDigest,
+    `${path}.revisionDigest`,
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+  requireExactVersion(revisionDigest, `${path}.revisionDigest`, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
+  return Object.freeze({ providerId, resourceKey, revisionDigest });
+}
 
 /**
  * Synchronously validate and snapshot one provider response immediately after
@@ -433,7 +548,7 @@ function snapshotProviderResponse(
     if (unexpectedField !== undefined) {
       fail(
         'INVALID_RESOURCE_PROVIDER_RESPONSE',
-        `${at} must contain exactly {status, handle, contract?}; unexpected field "${unexpectedField}" (provider responses cannot smuggle secret-bearing material into authority)`,
+        `${at} must contain exactly {status, handle, contract?, currentnessPin?}; unexpected field "${unexpectedField}" (provider responses cannot smuggle secret-bearing material into authority)`,
       );
     }
     if (!('handle' in view)) {
@@ -447,13 +562,25 @@ function snapshotProviderResponse(
         'INVALID_RESOURCE_PROVIDER_RESPONSE',
       );
     }
+    let currentnessPin: ResourceCurrentnessPin | undefined;
+    if ('currentnessPin' in view && view.currentnessPin !== undefined) {
+      currentnessPin = snapshotCurrentnessPin(
+        view.currentnessPin,
+        `${at}.currentnessPin`,
+        resourceKey,
+      );
+    }
     const response: {
       status: 'resolved';
       handle: unknown;
       contract?: ResourceContractRef;
+      currentnessPin?: ResourceCurrentnessPin;
     } = { status, handle: view.handle };
     if (contract !== undefined) {
       response.contract = contract;
+    }
+    if (currentnessPin !== undefined) {
+      response.currentnessPin = currentnessPin;
     }
     return Object.freeze(response);
   }
@@ -519,9 +646,11 @@ const RESOLUTION_OPTION_FIELDS = new Set<string>(['assembly', 'componentId', 'op
  *   terminal: no retry, no second provider, no downgrade/latest/default;
  * - an optional resource that is missing or incompatible is returned as an
  *   explicit `absent` entry — never an ambient/default fallback value;
- * - resolved handles are opaque runtime values (T005C owns stable non-secret
- *   behaviorally relevant identity). This result carries no authority, no
- *   currentness evidence, and is never digest/diagnostics material;
+ * - resolved handles are opaque runtime values; when the provider supplies a
+ *   T005C stable non-secret currentness pin it is validated (closed
+ *   whitelist, exact identities, exact resourceKey match) and captured as a
+ *   frozen/non-aliased snapshot on the entry — capture only, never authority
+ *   (the T005C activation/currentness gate consumes and owns the posture);
  * - torn-snapshot discipline: all Assembly material and options are
  *   snapshotted synchronously before the first provider suspension, and every
  *   provider response is snapshotted synchronously right after its await. The
@@ -683,6 +812,9 @@ export async function resolveToolResources(
           resourceKey: request.resourceKey,
           status: 'resolved',
           handle: response.handle,
+          ...(response.currentnessPin === undefined
+            ? {}
+            : { currentnessPin: response.currentnessPin }),
         }),
       );
       continue;
