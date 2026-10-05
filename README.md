@@ -1,6 +1,6 @@
 # DomainHarness
 
-DomainHarness is a portable TypeScript **Domain Runtime SDK** for target-compiled Domain Packages. The current development line is **v0.5** (released at `main@a543e15e98c07a8987d5f4f63a1754344a215a80`); v0.1–v0.4 remain historical frozen baselines.
+DomainHarness is a portable TypeScript **Domain Runtime SDK** for target-compiled Domain Packages. The current development line is **v0.6** (released at `main@a88a739d03e3eb3f4cb95756fcb483871943a353`); **v0.7** is the in-flight successor line; v0.1–v0.5 remain historical frozen baselines.
 
 ```text
 Build / CI:
