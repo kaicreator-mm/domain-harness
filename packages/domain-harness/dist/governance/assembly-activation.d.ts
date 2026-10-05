@@ -27,12 +27,21 @@
  *  - the pin carries no Tool/Workflow-specific semantics - only the generic
  *    content-addressed Assembly digest.
  *
- * T002D (#655) extends the SAME pin additively with the runtime authority
- * class (PRODUCTION | SIMULATION): when supplied at activation it is
- * synchronously snapshotted, woven into the pin digest and replayed exactly;
- * a SIMULATION-class pin can never satisfy production effect/publication
- * authority, and cross-class substitution fails closed. No second pin,
- * currentness or effect-authority plane is introduced.
+ * T002D (#655, repaired #688) extends the SAME pin additively with the
+ * runtime authority class (PRODUCTION | SIMULATION): every activation through
+ * this v0.7 class-bearing path MUST supply the exact canonical class up front
+ * (typed fail-closed on a missing or malformed class, synchronously before
+ * any currentness proof or durable bind - never defaulted, inferred or
+ * upgraded). The class is synchronously snapshotted, woven into the pin
+ * digest and replayed exactly: class-bearing replay/recovery verifies and
+ * preserves the exact pinned historical class unconditionally (a caller
+ * expectation is only an additional assertion), a SIMULATION-class pin can
+ * never satisfy production effect/publication authority, and cross-class
+ * substitution fails closed. Legacy class-less pins are historical/
+ * compatibility evidence only - they keep byte-identical digests and remain
+ * replayable as history, but they can never be newly minted through this
+ * activation path nor re-issued as v0.7 activation/currentness authority.
+ * No second pin, currentness or effect-authority plane is introduced.
  *
  * Boundary discipline (inward only): consumes the T002B sealed-Assembly port
  * (`runtime-assembly.ts`), the #555 repaired Definition graph digest seam, and
@@ -55,12 +64,16 @@ export interface ActivateAssemblyExecutionRequest {
     /** The sealed T002B Assembly (anti-forgery minted) to bind into the pin. */
     readonly assembly: SealedRuntimeAssembly;
     /**
-     * T002D (#655): the runtime authority class to activate under. Optional so
-     * pre-T002D activation callers keep their exact legacy behavior (and legacy
-     * digests); when supplied it is synchronously snapshotted and woven into the
-     * pin digest, so it becomes immutable activation/currentness evidence.
+     * T002D (#655, repaired #688): the exact canonical runtime authority class
+     * to activate under. REQUIRED on this v0.7 class-bearing activation path: a
+     * missing or malformed class fails typed (`AUTHORITY_CLASS_FORBIDDEN`)
+     * synchronously before any currentness proof or durable bind. The class is
+     * synchronously snapshotted and woven into the pin digest, so it becomes
+     * immutable activation/currentness evidence. It is never defaulted,
+     * inferred or upgraded (legacy class-less pins are historical evidence
+     * only and cannot be minted through this path).
      */
-    readonly authorityClass?: RuntimeAuthorityClass;
+    readonly authorityClass: RuntimeAuthorityClass;
     /** The live Definition graph the Assembly currentness is proven against. */
     readonly currentDefinitionGraph: DefinitionGraphEnvelope;
 }
@@ -95,10 +108,14 @@ export declare class AssemblyExecutionActivator {
      */
     activate(request: ActivateAssemblyExecutionRequest): Promise<GovernanceExecutionPin>;
     /**
-     * v0.7 activation gate: returns only after the exact assembly-bound pin is
-     * already durable. A durable pin that carries no exact `assemblyDigest`
-     * (a pre-T002C legacy pin) fails closed here - there is no silent fallback
-     * to non-assembly authority.
+     * v0.7 activation gate: returns only after the exact assembly-bound,
+     * class-bearing pin is already durable. A durable pin that carries no exact
+     * `assemblyDigest` (a pre-T002C legacy pin) fails closed here - there is no
+     * silent fallback to non-assembly authority. A durable pin that carries no
+     * exact canonical `authorityClass` (a pre-T002D legacy pin) also fails
+     * closed here (T002D repaired #688): legacy class-less pins are historical/
+     * compatibility evidence only and can never be re-issued as v0.7
+     * activation/currentness authority.
      */
     requireActivatedExecution(workflowInstanceId: string): Promise<GovernanceExecutionPin>;
     /**
@@ -117,10 +134,18 @@ export declare class AssemblyExecutionActivator {
      * Governance Baseline currentness are re-proven by the existing recovery
      * seam; the recovered pin's `assemblyDigest` must be present and exact, and
      * when an `expectedAssembly` is supplied it must match exactly (a replaced
-     * Assembly is never an acceptable replay target for an old pin). When an
-     * `expectedAuthorityClass` is supplied it must match the pinned class
-     * exactly (T002D #655): replay preserves the authority class and
-     * cross-class substitution fails closed.
+     * Assembly is never an acceptable replay target for an old pin).
+     *
+     * T002D (#655, repaired #688): class currentness is enforced
+     * UNCONDITIONALLY for class-bearing history. The exact pinned historical
+     * class is verified as canonical on every replay (in addition to being
+     * proven by the digest evidence) and is preserved verbatim in the recovered
+     * authority; a caller `expectedAuthorityClass` is only an ADDITIONAL
+     * assertion on top - omitting it can never bypass class currentness, and
+     * cross-class substitution fails closed. A legacy class-less pin (no
+     * `authorityClass` woven into its digest) replays as historical/
+     * compatibility evidence only: it can never gain or upgrade to a class,
+     * and any caller expectation fails closed against it.
      */
     recover(request: {
         readonly workflowInstanceId: string;

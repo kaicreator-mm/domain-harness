@@ -27,12 +27,21 @@
  *  - the pin carries no Tool/Workflow-specific semantics - only the generic
  *    content-addressed Assembly digest.
  *
- * T002D (#655) extends the SAME pin additively with the runtime authority
- * class (PRODUCTION | SIMULATION): when supplied at activation it is
- * synchronously snapshotted, woven into the pin digest and replayed exactly;
- * a SIMULATION-class pin can never satisfy production effect/publication
- * authority, and cross-class substitution fails closed. No second pin,
- * currentness or effect-authority plane is introduced.
+ * T002D (#655, repaired #688) extends the SAME pin additively with the
+ * runtime authority class (PRODUCTION | SIMULATION): every activation through
+ * this v0.7 class-bearing path MUST supply the exact canonical class up front
+ * (typed fail-closed on a missing or malformed class, synchronously before
+ * any currentness proof or durable bind - never defaulted, inferred or
+ * upgraded). The class is synchronously snapshotted, woven into the pin
+ * digest and replayed exactly: class-bearing replay/recovery verifies and
+ * preserves the exact pinned historical class unconditionally (a caller
+ * expectation is only an additional assertion), a SIMULATION-class pin can
+ * never satisfy production effect/publication authority, and cross-class
+ * substitution fails closed. Legacy class-less pins are historical/
+ * compatibility evidence only - they keep byte-identical digests and remain
+ * replayable as history, but they can never be newly minted through this
+ * activation path nor re-issued as v0.7 activation/currentness authority.
+ * No second pin, currentness or effect-authority plane is introduced.
  *
  * Boundary discipline (inward only): consumes the T002B sealed-Assembly port
  * (`runtime-assembly.ts`), the #555 repaired Definition graph digest seam, and
@@ -99,12 +108,13 @@ export class AssemblyExecutionActivator {
             fail('ASSEMBLY_NOT_SEALED', 'assembly activation requires a SealedRuntimeAssembly minted by sealRuntimeAssembly; a caller-constructed assembly can never carry the sealed-Assembly brand');
         }
         const assemblyDigest = requireExactAssemblyDigest(assemblyInput.assemblyDigest, 'assembly.assemblyDigest');
-        // T002D (#655): the authority class is snapshotted synchronously here,
-        // before any await, with the same torn-snapshot discipline as the
-        // Assembly digest (#617).
-        const authorityClass = request.authorityClass === undefined
-            ? undefined
-            : requireRuntimeAuthorityClass(request.authorityClass, 'authorityClass');
+        // T002D (#655, repaired #688): this v0.7 class-bearing activation path
+        // requires the exact canonical authority class up front. A missing or
+        // malformed class fails typed (`AUTHORITY_CLASS_FORBIDDEN`) here,
+        // synchronously before any await, currentness proof or durable bind -
+        // never defaulted, inferred or upgraded to PRODUCTION. The snapshot uses
+        // the same torn-snapshot discipline as the Assembly digest (#617).
+        const authorityClass = requireRuntimeAuthorityClass(request.authorityClass, 'authorityClass');
         // The sealed Assembly is deeply frozen at mint time, so its record digest
         // is already immutable; capture it synchronously as snapshot material.
         const assemblyDefinitionGraphDigest = assemblyInput.record.definitionGraphDigest;
@@ -124,7 +134,7 @@ export class AssemblyExecutionActivator {
             workflowInstanceId,
             binding,
             assemblyDigest,
-            ...(authorityClass === undefined ? {} : { authorityClass }),
+            authorityClass,
         }, this.#sha256);
         const disposition = await this.#store.bindGovernanceExecutionPin(pin);
         if (disposition === 'conflict') {
@@ -133,10 +143,14 @@ export class AssemblyExecutionActivator {
         return this.requireActivatedExecution(workflowInstanceId);
     }
     /**
-     * v0.7 activation gate: returns only after the exact assembly-bound pin is
-     * already durable. A durable pin that carries no exact `assemblyDigest`
-     * (a pre-T002C legacy pin) fails closed here - there is no silent fallback
-     * to non-assembly authority.
+     * v0.7 activation gate: returns only after the exact assembly-bound,
+     * class-bearing pin is already durable. A durable pin that carries no exact
+     * `assemblyDigest` (a pre-T002C legacy pin) fails closed here - there is no
+     * silent fallback to non-assembly authority. A durable pin that carries no
+     * exact canonical `authorityClass` (a pre-T002D legacy pin) also fails
+     * closed here (T002D repaired #688): legacy class-less pins are historical/
+     * compatibility evidence only and can never be re-issued as v0.7
+     * activation/currentness authority.
      */
     async requireActivatedExecution(workflowInstanceId) {
         const id = requireNonEmptyString(workflowInstanceId, 'workflowInstanceId');
@@ -148,6 +162,10 @@ export class AssemblyExecutionActivator {
         if (pin.assemblyDigest === undefined) {
             fail('MISSING_ASSEMBLY_DIGEST', `the durable pin for ${id} carries no exact assemblyDigest; the v0.7 assembly-activation gate requires the exact sealed Assembly identity (no silent fallback)`);
         }
+        if (pin.authorityClass === undefined) {
+            fail('AUTHORITY_CLASS_FORBIDDEN', `the durable pin for ${id} carries no authorityClass; the v0.7 activation/currentness gate requires an explicit canonical PRODUCTION|SIMULATION class, and a legacy class-less pin is historical/compatibility evidence only (never re-issued as v0.7 activation authority, never upgraded to PRODUCTION)`);
+        }
+        requireRuntimeAuthorityClass(pin.authorityClass, 'pin.authorityClass');
         return pin;
     }
     /**
@@ -172,10 +190,18 @@ export class AssemblyExecutionActivator {
      * Governance Baseline currentness are re-proven by the existing recovery
      * seam; the recovered pin's `assemblyDigest` must be present and exact, and
      * when an `expectedAssembly` is supplied it must match exactly (a replaced
-     * Assembly is never an acceptable replay target for an old pin). When an
-     * `expectedAuthorityClass` is supplied it must match the pinned class
-     * exactly (T002D #655): replay preserves the authority class and
-     * cross-class substitution fails closed.
+     * Assembly is never an acceptable replay target for an old pin).
+     *
+     * T002D (#655, repaired #688): class currentness is enforced
+     * UNCONDITIONALLY for class-bearing history. The exact pinned historical
+     * class is verified as canonical on every replay (in addition to being
+     * proven by the digest evidence) and is preserved verbatim in the recovered
+     * authority; a caller `expectedAuthorityClass` is only an ADDITIONAL
+     * assertion on top - omitting it can never bypass class currentness, and
+     * cross-class substitution fails closed. A legacy class-less pin (no
+     * `authorityClass` woven into its digest) replays as historical/
+     * compatibility evidence only: it can never gain or upgrade to a class,
+     * and any caller expectation fails closed against it.
      */
     async recover(request) {
         const workflowInstanceId = requireNonEmptyString(request.workflowInstanceId, 'workflowInstanceId');
@@ -202,8 +228,16 @@ export class AssemblyExecutionActivator {
         if (expectedAssembly !== undefined && expectedAssembly.assemblyDigest !== pin.assemblyDigest) {
             fail('ASSEMBLY_REPLAY_MISMATCH', `replay Assembly ${expectedAssembly.assemblyDigest} does not match the exact assemblyDigest pinned for ${workflowInstanceId}; a replaced Assembly cannot satisfy an old pin`);
         }
+        // T002D repaired (#688): unconditional class currentness for class-bearing
+        // history. The pinned class is re-asserted canonical on EVERY replay (the
+        // digest proof above already fails any rewrite of the class evidence);
+        // the caller expectation below is only an additional assertion, never the
+        // sole enforcement mechanism.
+        if (pin.authorityClass !== undefined) {
+            requireRuntimeAuthorityClass(pin.authorityClass, 'recovered pin authorityClass');
+        }
         if (expectedAuthorityClass !== undefined && pin.authorityClass !== expectedAuthorityClass) {
-            fail('AUTHORITY_CLASS_MISMATCH', `replay authority class ${JSON.stringify(expectedAuthorityClass)} does not match the class pinned for ${workflowInstanceId} (${JSON.stringify(pin.authorityClass ?? null)}); cross-class substitution fails closed and replay preserves the exact pinned class`);
+            fail('AUTHORITY_CLASS_MISMATCH', `replay authority class ${JSON.stringify(expectedAuthorityClass)} does not match the class pinned for ${workflowInstanceId} (${JSON.stringify(pin.authorityClass ?? null)}); cross-class substitution fails closed and replay preserves the exact pinned class (a legacy class-less pin can never gain a class)`);
         }
         return Object.freeze({
             pin,
