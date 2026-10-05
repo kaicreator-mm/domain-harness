@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import {
   admitComponent,
+  ComponentAdmissionError,
   computeDefinitionGraphDigest,
   validateDefinitionGraphEnvelope,
   validateToolComponent,
@@ -147,7 +148,7 @@ test('maps a Raw Tool into a Tool Component on the exact adapter Kind', () => {
     { capabilityId: 'http-transport', version: '1' },
   ]);
 
-  const body = mapped.semanticBody as {
+  const body = mapped.semanticBody as unknown as {
     operations: readonly Record<string, unknown>[];
     providesCapabilities: readonly unknown[];
   };
@@ -170,7 +171,7 @@ test('missing Raw inputSchema maps to the explicit unconstrained declaration', (
   delete (bare as { inputSchema?: unknown }).inputSchema;
   const result = mapRawV07AuthoringToComponentGraph(input({ tools: [bare] }));
   const mapped = componentById(result.graph.components, 'tool.pricing');
-  const body = mapped.semanticBody as { operations: readonly { inputSchema: unknown }[] };
+  const body = mapped.semanticBody as unknown as { operations: readonly { inputSchema: unknown }[] };
   assert.deepEqual(body.operations[0]?.inputSchema, {});
 });
 
@@ -217,6 +218,7 @@ test('binding-plane material never enters Definition semantics; it is preserved 
     input({
       tools: [
         tool({
+          requiredCapabilities: [],
           bindingCapability: 'http-transport@1',
           config: { transport: 'http-transport@1', path: '/price', method: 'POST' },
         }),
@@ -299,7 +301,7 @@ test('maps workflows and skills into semantic Components and emits exact invokes
     assert.equal(relation.relationKind, RAW_V07_INVOKES_RELATION_KIND);
   }
 
-  const body = mappedWorkflow.semanticBody as {
+  const body = mappedWorkflow.semanticBody as unknown as {
     initial: string;
     limits: { maxSteps: number };
     states: Record<string, unknown>;
@@ -329,7 +331,7 @@ test('maps projections into semantic Components with verbatim dependency materia
   const mapped = componentById(result.graph.components, 'proj.orderTotal');
   assert.equal(mapped.family, 'semantic');
   assert.deepEqual(mapped.kind, RAW_V07_PROJECTION_KIND);
-  const body = mapped.semanticBody as {
+  const body = mapped.semanticBody as unknown as {
     expression: string;
     dependencies: readonly unknown[];
     outputSchema: unknown;
@@ -366,10 +368,16 @@ test('same Raw mapped twice yields an identical graph and identical semantic dig
 });
 
 test('key/insertion-order-independent Raw still yields the same graph semantic digest', async () => {
-  const ordered = mapRawV07AuthoringToComponentGraph(input());
+  const sharedSchema = {
+    type: 'object',
+    properties: { a: { type: 'string' }, b: { type: 'number' } },
+  } as const;
+  const ordered = mapRawV07AuthoringToComponentGraph(
+    input({ tools: [tool({ inputSchema: sharedSchema as never })] }),
+  );
 
   const shuffledWorkflow = workflow();
-  const reorderedStates: RawWorkflow['states'] = {};
+  const reorderedStates: Record<string, RawWorkflow['states'][string]> = {};
   for (const stateId of ['end', 'start']) {
     const state = shuffledWorkflow.states[stateId];
     if (state) reorderedStates[stateId] = state;
@@ -378,10 +386,9 @@ test('key/insertion-order-independent Raw still yields the same graph semantic d
     workflows: new Map([['wf.order', { ...shuffledWorkflow, states: reorderedStates }]]),
   });
 
+  // Same schema content, different key order at every object level.
   const shuffledTool = tool({
-    // Same schema content, different key order; equivalent requiredCapabilities order.
     inputSchema: { properties: { b: { type: 'number' }, a: { type: 'string' } }, type: 'object' } as never,
-    requiredCapabilities: [],
   });
   const shuffled = mapRawV07AuthoringToComponentGraph(
     input({ raw: shuffledRaw, tools: [shuffledTool] }),
@@ -433,19 +440,19 @@ test('rejects Raw identities that cannot be represented exactly (never rewritten
 
 test('rejects capability identities outside the frozen name@N form', () => {
   assertNotTranslatable(
-    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['latest' as never] }] })),
+    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['latest'] as never })] })),
     'floating capability',
   );
   assertNotTranslatable(
-    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['cap@1.x' as never] }] })),
+    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['cap@1.x'] as never })] })),
     'x-range capability version',
   );
   assertNotTranslatable(
-    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['cap' as never] }] })),
+    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['cap'] as never })] })),
     'capability without exact version',
   );
   assertNotTranslatable(
-    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['cap@1', 'cap@2'] as never }] })),
+    () => mapRawV07AuthoringToComponentGraph(input({ tools: [tool({ requiredCapabilities: ['cap@1', 'cap@2'] as never })] })),
     'same capability id under two versions',
   );
 });
@@ -606,9 +613,13 @@ test('mutating the caller Raw after mapping never perturbs the produced graph', 
   (shared.raw as { domainId: string }).domainId = 'domain.tampered';
   (shared.raw.limits as { maxSteps: number }).maxSteps = 999;
   shared.raw.workflows.get('wf.order')!.initial = 'end';
-  (shared.raw.workflows.get('wf.order')!.states.start as { done: unknown[] }).done.length = 0;
+  const startState = shared.raw.workflows.get('wf.order')!.states.start;
+  if (startState === undefined) throw new Error('fixture state missing');
+  (startState as unknown as { done: unknown[] }).done.length = 0;
   (shared.tools as RawToolDefinition[])[0]!.toolId = 'tool.tampered';
-  (shared.tools as RawToolDefinition[])[0]!.requiredCapabilities.length = 0;
+  const sharedTool = (shared.tools as RawToolDefinition[])[0]!;
+  if (sharedTool.requiredCapabilities === undefined) throw new Error('fixture capabilities missing');
+  (sharedTool.requiredCapabilities as unknown as string[]).length = 0;
   (shared.tools as RawToolDefinition[])[0]!.config = { resourceKey: 'tampered' };
 
   assert.equal(result.graph.graphId, 'domain.orders');
@@ -629,7 +640,7 @@ test('the mapping holds no aliases into caller-owned Raw objects', () => {
   const result = mapRawV07AuthoringToComponentGraph(shared);
 
   const mappedWorkflow = componentById(result.graph.components, 'wf.order');
-  const body = mappedWorkflow.semanticBody as { states: Record<string, { done: unknown[] }> };
+  const body = mappedWorkflow.semanticBody as unknown as { states: Record<string, { done: unknown[] }> };
   assert.notEqual(body.states.start, shared.raw.workflows.get('wf.order')!.states.start);
 
   const provenance = result.provenance.components.find((entry) => entry.componentId === 'tool.pricing');
@@ -668,7 +679,11 @@ test('a Kind mismatch fails closed through the same generic seam', () => {
           validateComponent: () => undefined,
         },
       ]),
-    /UNKNOWN_KIND/,
+    (error: unknown) => {
+      assert.ok(error instanceof ComponentAdmissionError, 'typed ComponentAdmissionError');
+      assert.equal((error as ComponentAdmissionError).code, 'UNKNOWN_KIND');
+      return true;
+    },
   );
 });
 
