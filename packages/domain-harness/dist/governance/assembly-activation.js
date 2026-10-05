@@ -27,6 +27,13 @@
  *  - the pin carries no Tool/Workflow-specific semantics - only the generic
  *    content-addressed Assembly digest.
  *
+ * T002D (#655) extends the SAME pin additively with the runtime authority
+ * class (PRODUCTION | SIMULATION): when supplied at activation it is
+ * synchronously snapshotted, woven into the pin digest and replayed exactly;
+ * a SIMULATION-class pin can never satisfy production effect/publication
+ * authority, and cross-class substitution fails closed. No second pin,
+ * currentness or effect-authority plane is introduced.
+ *
  * Boundary discipline (inward only): consumes the T002B sealed-Assembly port
  * (`runtime-assembly.ts`), the #555 repaired Definition graph digest seam, and
  * the existing execution-binding authority. No concrete Workflow/XState,
@@ -34,7 +41,7 @@
  */
 import { computeDefinitionGraphDigest, validateDefinitionGraphEnvelope, } from '../contracts/definition-graph.js';
 import { isSealedRuntimeAssembly, } from '../contracts/runtime-assembly.js';
-import { GovernanceExecutionBindingError, assertDomainActivationBinding, cloneActivationBinding, createGovernanceExecutionPin, recoverGovernanceExecutionAuthority, requireExactAssemblyDigest, requireExactGovernanceBody, requireExactPackageCdi, validateGovernanceExecutionPin, } from './execution-binding.js';
+import { GovernanceExecutionBindingError, assertDomainActivationBinding, cloneActivationBinding, createGovernanceExecutionPin, recoverGovernanceExecutionAuthority, requireExactAssemblyDigest, requireExactGovernanceBody, requireExactPackageCdi, requireRuntimeAuthorityClass, validateGovernanceExecutionPin, } from './execution-binding.js';
 function fail(code, message) {
     throw new GovernanceExecutionBindingError(code, message);
 }
@@ -92,6 +99,12 @@ export class AssemblyExecutionActivator {
             fail('ASSEMBLY_NOT_SEALED', 'assembly activation requires a SealedRuntimeAssembly minted by sealRuntimeAssembly; a caller-constructed assembly can never carry the sealed-Assembly brand');
         }
         const assemblyDigest = requireExactAssemblyDigest(assemblyInput.assemblyDigest, 'assembly.assemblyDigest');
+        // T002D (#655): the authority class is snapshotted synchronously here,
+        // before any await, with the same torn-snapshot discipline as the
+        // Assembly digest (#617).
+        const authorityClass = request.authorityClass === undefined
+            ? undefined
+            : requireRuntimeAuthorityClass(request.authorityClass, 'authorityClass');
         // The sealed Assembly is deeply frozen at mint time, so its record digest
         // is already immutable; capture it synchronously as snapshot material.
         const assemblyDefinitionGraphDigest = assemblyInput.record.definitionGraphDigest;
@@ -106,7 +119,13 @@ export class AssemblyExecutionActivator {
         }
         await requireExactPackageCdi(binding, this.#packageCdiAuthority, 'PACKAGE_CDI_BINDING_MISMATCH');
         await requireExactGovernanceBody(binding, this.#baselines, this.#sha256, 'GOVERNANCE_BASELINE_BINDING_MISMATCH');
-        const pin = await createGovernanceExecutionPin({ workflowTarget, workflowInstanceId, binding, assemblyDigest }, this.#sha256);
+        const pin = await createGovernanceExecutionPin({
+            workflowTarget,
+            workflowInstanceId,
+            binding,
+            assemblyDigest,
+            ...(authorityClass === undefined ? {} : { authorityClass }),
+        }, this.#sha256);
         const disposition = await this.#store.bindGovernanceExecutionPin(pin);
         if (disposition === 'conflict') {
             fail('GOVERNANCE_EXECUTION_PIN_CONFLICT', `workflow instance ${pin.workflowInstanceId} is already bound to different execution authority; an Assembly replacement can never overwrite a pinned occurrence`);
@@ -132,18 +151,41 @@ export class AssemblyExecutionActivator {
         return pin;
     }
     /**
+     * T002D (#655) production effect/publication gate on the SAME pin hierarchy:
+     * durable production authoritative occurrence, durable business
+     * effect/publication and production journal authority are satisfied only by
+     * a pin carrying the exact `PRODUCTION` authority class. A SIMULATION-class
+     * pin may execute/observe under simulation semantics, but it can never mint
+     * production effect authority (fail closed BEFORE any effect/publication).
+     * A legacy class-less pin is never silently treated as production either.
+     */
+    async requireProductionEffectAuthority(workflowInstanceId) {
+        const pin = await this.requireActivatedExecution(workflowInstanceId);
+        if (pin.authorityClass !== 'PRODUCTION') {
+            fail('AUTHORITY_CLASS_MISMATCH', `workflow instance ${pin.workflowInstanceId} is pinned under authority class ${JSON.stringify(pin.authorityClass ?? null)}; only an exact PRODUCTION-class pin can satisfy production effect/publication authority, and no implicit or simulated class may be substituted`);
+        }
+        return pin;
+    }
+    /**
      * Replay/recovery: resolves the SAME exact Assembly identity the occurrence
      * was pinned under, never a mutable provider alias. Package/CDI and
      * Governance Baseline currentness are re-proven by the existing recovery
      * seam; the recovered pin's `assemblyDigest` must be present and exact, and
      * when an `expectedAssembly` is supplied it must match exactly (a replaced
-     * Assembly is never an acceptable replay target for an old pin).
+     * Assembly is never an acceptable replay target for an old pin). When an
+     * `expectedAuthorityClass` is supplied it must match the pinned class
+     * exactly (T002D #655): replay preserves the authority class and
+     * cross-class substitution fails closed.
      */
     async recover(request) {
         const workflowInstanceId = requireNonEmptyString(request.workflowInstanceId, 'workflowInstanceId');
         const expectedAssembly = request.expectedAssembly;
         if (expectedAssembly !== undefined && !isSealedRuntimeAssembly(expectedAssembly)) {
             fail('ASSEMBLY_NOT_SEALED', 'expectedAssembly must be a SealedRuntimeAssembly minted by sealRuntimeAssembly');
+        }
+        const expectedAuthorityClass = request.expectedAuthorityClass;
+        if (expectedAuthorityClass !== undefined) {
+            requireRuntimeAuthorityClass(expectedAuthorityClass, 'expectedAuthorityClass');
         }
         const recovered = await recoverGovernanceExecutionAuthority({
             workflowInstanceId,
@@ -159,6 +201,9 @@ export class AssemblyExecutionActivator {
         requireExactAssemblyDigest(pin.assemblyDigest, 'recovered pin assemblyDigest');
         if (expectedAssembly !== undefined && expectedAssembly.assemblyDigest !== pin.assemblyDigest) {
             fail('ASSEMBLY_REPLAY_MISMATCH', `replay Assembly ${expectedAssembly.assemblyDigest} does not match the exact assemblyDigest pinned for ${workflowInstanceId}; a replaced Assembly cannot satisfy an old pin`);
+        }
+        if (expectedAuthorityClass !== undefined && pin.authorityClass !== expectedAuthorityClass) {
+            fail('AUTHORITY_CLASS_MISMATCH', `replay authority class ${JSON.stringify(expectedAuthorityClass)} does not match the class pinned for ${workflowInstanceId} (${JSON.stringify(pin.authorityClass ?? null)}); cross-class substitution fails closed and replay preserves the exact pinned class`);
         }
         return Object.freeze({
             pin,

@@ -1,6 +1,8 @@
 import { computeCanonicalJsonDigest, isContentDigest, } from '../contracts/identity.js';
 import { assertGovernanceBaselineIdentity, assertGovernancePackageCdiBinding, sameGovernanceBaselineIdentity, verifyGovernanceBaselineBody, } from './identity.js';
 const FLOATING_AUTHORITY_TOKENS = new Set(['current', 'latest', 'active']);
+export const PRODUCTION_AUTHORITY_CLASS = 'PRODUCTION';
+export const SIMULATION_AUTHORITY_CLASS = 'SIMULATION';
 export class GovernanceExecutionBindingError extends Error {
     code;
     constructor(code, message) {
@@ -43,6 +45,19 @@ export function requireExactAssemblyDigest(value, field) {
         || normalized.startsWith('@latest')
         || normalized.startsWith('@active')) {
         throw new GovernanceExecutionBindingError('ASSEMBLY_DIGEST_FORBIDDEN', `${field} must be an exact content digest, not a floating selector or mutable alias ${JSON.stringify(value)}`);
+    }
+    return value;
+}
+/**
+ * T002D (#655): a runtime authority class bound into the execution pin must be
+ * exactly `PRODUCTION` or `SIMULATION` - never a floating selector, alias or
+ * derived/implicit value. The class is an explicit activation-plane fact, not
+ * derivable from Definition identity or implementation contents, and anything
+ * else fails closed.
+ */
+export function requireRuntimeAuthorityClass(value, field) {
+    if (value !== PRODUCTION_AUTHORITY_CLASS && value !== SIMULATION_AUTHORITY_CLASS) {
+        throw new GovernanceExecutionBindingError('AUTHORITY_CLASS_FORBIDDEN', `${field} must be exactly 'PRODUCTION' or 'SIMULATION'; ${JSON.stringify(value)} is forbidden`);
     }
     return value;
 }
@@ -183,7 +198,7 @@ export class DomainActivationBindingCoordinator {
         return binding;
     }
 }
-function bindingDigestMaterial(binding, assemblyDigest) {
+function bindingDigestMaterial(binding, assemblyDigest, authorityClass) {
     const base = {
         packageId: binding.packageId,
         domainIntelligenceContentDigest: binding.domainIntelligenceContentDigest,
@@ -196,14 +211,22 @@ function bindingDigestMaterial(binding, assemblyDigest) {
     };
     // T002C (#617): when an exact Assembly is bound, its digest becomes part of
     // the pin currentness material, so replacing the Assembly changes the pin.
-    return assemblyDigest === undefined ? base : { ...base, assemblyDigest };
+    // T002D (#655): likewise the runtime authority class becomes part of the pin
+    // currentness material when bound, so substituting the class changes the pin.
+    // Legacy pins carrying neither field keep their exact pre-T002C/T002D digest
+    // material (byte-identical legacy digests).
+    const withAssembly = assemblyDigest === undefined ? base : { ...base, assemblyDigest };
+    return authorityClass === undefined ? withAssembly : { ...withAssembly, authorityClass };
 }
-export async function computeGovernanceExecutionBindingDigest(binding, sha256, assemblyDigest) {
+export async function computeGovernanceExecutionBindingDigest(binding, sha256, assemblyDigest, authorityClass) {
     assertDomainActivationBinding(binding);
     if (assemblyDigest !== undefined) {
         requireExactAssemblyDigest(assemblyDigest, 'assemblyDigest');
     }
-    return computeCanonicalJsonDigest(bindingDigestMaterial(binding, assemblyDigest), sha256);
+    if (authorityClass !== undefined) {
+        requireRuntimeAuthorityClass(authorityClass, 'authorityClass');
+    }
+    return computeCanonicalJsonDigest(bindingDigestMaterial(binding, assemblyDigest, authorityClass), sha256);
 }
 export async function createGovernanceExecutionPin(request, sha256) {
     const workflowTarget = requireNonEmptyString(request.workflowTarget, 'workflowTarget');
@@ -211,17 +234,22 @@ export async function createGovernanceExecutionPin(request, sha256) {
     assertDomainActivationBinding(request.binding);
     // Synchronously resolved before the first await: the exact Assembly digest
     // (when supplied) is validated and captured here, never re-read after a
-    // suspension (#617 torn-snapshot discipline).
+    // suspension (#617 torn-snapshot discipline). T002D extends the same
+    // discipline to the authority class.
     const assemblyDigest = request.assemblyDigest === undefined
         ? undefined
         : requireExactAssemblyDigest(request.assemblyDigest, 'assemblyDigest');
+    const authorityClass = request.authorityClass === undefined
+        ? undefined
+        : requireRuntimeAuthorityClass(request.authorityClass, 'authorityClass');
     const binding = cloneActivationBinding(request.binding);
     return Object.freeze({
         ...binding,
         ...(assemblyDigest === undefined ? {} : { assemblyDigest }),
+        ...(authorityClass === undefined ? {} : { authorityClass }),
         workflowTarget,
         workflowInstanceId,
-        bindingDigest: await computeGovernanceExecutionBindingDigest(binding, sha256, assemblyDigest),
+        bindingDigest: await computeGovernanceExecutionBindingDigest(binding, sha256, assemblyDigest, authorityClass),
     });
 }
 function parsePinShape(value) {
@@ -232,9 +260,13 @@ function parsePinShape(value) {
     const assemblyDigest = value.assemblyDigest === undefined
         ? undefined
         : requireExactAssemblyDigest(value.assemblyDigest, 'assemblyDigest');
+    const authorityClass = value.authorityClass === undefined
+        ? undefined
+        : requireRuntimeAuthorityClass(value.authorityClass, 'authorityClass');
     return Object.freeze({
         ...binding,
         ...(assemblyDigest === undefined ? {} : { assemblyDigest }),
+        ...(authorityClass === undefined ? {} : { authorityClass }),
         workflowTarget: requireNonEmptyString(value.workflowTarget, 'workflowTarget'),
         workflowInstanceId: requireNonEmptyString(value.workflowInstanceId, 'workflowInstanceId'),
         bindingDigest: requireNonEmptyString(value.bindingDigest, 'bindingDigest'),
@@ -255,7 +287,7 @@ export async function validateGovernanceExecutionPin(value, sha256, expectedWork
         && pin.workflowInstanceId !== expectedWorkflowInstanceId) {
         throw new GovernanceExecutionBindingError('GOVERNANCE_EXECUTION_PIN_MISMATCH', `pin belongs to workflow instance ${pin.workflowInstanceId}, not ${expectedWorkflowInstanceId}`);
     }
-    const expectedDigest = await computeGovernanceExecutionBindingDigest(pin, sha256, pin.assemblyDigest);
+    const expectedDigest = await computeGovernanceExecutionBindingDigest(pin, sha256, pin.assemblyDigest, pin.authorityClass);
     if (pin.bindingDigest !== expectedDigest) {
         throw new GovernanceExecutionBindingError('INVALID_GOVERNANCE_EXECUTION_PIN', 'GovernanceExecutionPin bindingDigest does not match its exact authority tuple');
     }
@@ -269,6 +301,7 @@ function sameExecutionPin(left, right) {
         && left.domainIntelligenceContentDigest === right.domainIntelligenceContentDigest
         && sameGovernanceBaselineIdentity(left.governanceBaseline, right.governanceBaseline)
         && left.assemblyDigest === right.assemblyDigest
+        && left.authorityClass === right.authorityClass
         && left.bindingDigest === right.bindingDigest;
 }
 export class GovernanceExecutionCoordinator {

@@ -27,6 +27,13 @@
  *  - the pin carries no Tool/Workflow-specific semantics - only the generic
  *    content-addressed Assembly digest.
  *
+ * T002D (#655) extends the SAME pin additively with the runtime authority
+ * class (PRODUCTION | SIMULATION): when supplied at activation it is
+ * synchronously snapshotted, woven into the pin digest and replayed exactly;
+ * a SIMULATION-class pin can never satisfy production effect/publication
+ * authority, and cross-class substitution fails closed. No second pin,
+ * currentness or effect-authority plane is introduced.
+ *
  * Boundary discipline (inward only): consumes the T002B sealed-Assembly port
  * (`runtime-assembly.ts`), the #555 repaired Definition graph digest seam, and
  * the existing execution-binding authority. No concrete Workflow/XState,
@@ -36,7 +43,7 @@ import { type DefinitionGraphEnvelope } from '../contracts/definition-graph.js';
 import type { ContentDigest, Sha256Port } from '../contracts/identity.js';
 import { type SealedRuntimeAssembly } from '../contracts/runtime-assembly.js';
 import type { GovernanceBaselineBody, GovernanceBaselineStore } from './contracts.js';
-import { type DomainActivationBinding, type DurableExecutionStore, type ExactPackageCdiAuthority, type GovernanceBoundSnapshot, type GovernanceExecutionPin } from './execution-binding.js';
+import { type DomainActivationBinding, type DurableExecutionStore, type ExactPackageCdiAuthority, type GovernanceBoundSnapshot, type GovernanceExecutionPin, type RuntimeAuthorityClass } from './execution-binding.js';
 /** All-or-nothing assembly activation request for one runtime occurrence. */
 export interface ActivateAssemblyExecutionRequest {
     /** Exact workflow target (runtime occurrence identity). */
@@ -47,6 +54,13 @@ export interface ActivateAssemblyExecutionRequest {
     readonly binding: DomainActivationBinding;
     /** The sealed T002B Assembly (anti-forgery minted) to bind into the pin. */
     readonly assembly: SealedRuntimeAssembly;
+    /**
+     * T002D (#655): the runtime authority class to activate under. Optional so
+     * pre-T002D activation callers keep their exact legacy behavior (and legacy
+     * digests); when supplied it is synchronously snapshotted and woven into the
+     * pin digest, so it becomes immutable activation/currentness evidence.
+     */
+    readonly authorityClass?: RuntimeAuthorityClass;
     /** The live Definition graph the Assembly currentness is proven against. */
     readonly currentDefinitionGraph: DefinitionGraphEnvelope;
 }
@@ -88,16 +102,30 @@ export declare class AssemblyExecutionActivator {
      */
     requireActivatedExecution(workflowInstanceId: string): Promise<GovernanceExecutionPin>;
     /**
+     * T002D (#655) production effect/publication gate on the SAME pin hierarchy:
+     * durable production authoritative occurrence, durable business
+     * effect/publication and production journal authority are satisfied only by
+     * a pin carrying the exact `PRODUCTION` authority class. A SIMULATION-class
+     * pin may execute/observe under simulation semantics, but it can never mint
+     * production effect authority (fail closed BEFORE any effect/publication).
+     * A legacy class-less pin is never silently treated as production either.
+     */
+    requireProductionEffectAuthority(workflowInstanceId: string): Promise<GovernanceExecutionPin>;
+    /**
      * Replay/recovery: resolves the SAME exact Assembly identity the occurrence
      * was pinned under, never a mutable provider alias. Package/CDI and
      * Governance Baseline currentness are re-proven by the existing recovery
      * seam; the recovered pin's `assemblyDigest` must be present and exact, and
      * when an `expectedAssembly` is supplied it must match exactly (a replaced
-     * Assembly is never an acceptable replay target for an old pin).
+     * Assembly is never an acceptable replay target for an old pin). When an
+     * `expectedAuthorityClass` is supplied it must match the pinned class
+     * exactly (T002D #655): replay preserves the authority class and
+     * cross-class substitution fails closed.
      */
     recover(request: {
         readonly workflowInstanceId: string;
         readonly expectedAssembly?: SealedRuntimeAssembly;
+        readonly expectedAuthorityClass?: RuntimeAuthorityClass;
     }): Promise<RecoveredAssemblyExecution>;
 }
 //# sourceMappingURL=assembly-activation.d.ts.map
