@@ -27,6 +27,11 @@
  *   the validated own data values. Callers never re-read pluggable
  *   caller-owned objects after validation, so validation-to-use TOCTOU drift
  *   is impossible by construction. Caller input is never frozen or mutated;
+ * - an own enumerable data property named `__proto__` is preserved on the
+ *   snapshot as own data via `Object.defineProperty`; the inherited
+ *   `Object.prototype.__proto__` accessor is never invoked, so the key is
+ *   never silently swallowed and the snapshot prototype is never mutated
+ *   (#644);
  * - diagnostics identify the offending key from property descriptors only
  *   (`Object.getOwnPropertyDescriptor` / `Object.getOwnPropertySymbols` never
  *   execute getters), so a hidden getter cannot run as part of failure
@@ -145,7 +150,20 @@ export function safeRecordSnapshot(value: unknown, path: string): SafeRecordSnap
     if (!('value' in descriptor)) {
       return { ok: false, issue: { violation: 'ACCESSOR_PROPERTY', key } };
     }
-    snapshot[key] = descriptor.value;
+    if (key === '__proto__') {
+      // Assignment would dispatch to the inherited Object.prototype
+      // `__proto__` setter: the own key would be swallowed and the snapshot
+      // prototype replaced by the caller-controlled value. Own data in, own
+      // data out.
+      Object.defineProperty(snapshot, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    } else {
+      snapshot[key] = descriptor.value;
+    }
   }
   return { ok: true, snapshot };
 }

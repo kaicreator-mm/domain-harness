@@ -195,3 +195,157 @@ test('#588-P7: unified exact-ref matrix — version x-range/partial forms', () =
     assert.equal(carriesXRangeVersionSemantics(exact), false, `${exact} must be exact`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// #644 — safeRecordSnapshot own-`__proto__` safety.
+//
+// `snapshot[key] = value` on a fresh `{}` dispatches to the inherited
+// `Object.prototype.__proto__` SETTER when key === '__proto__': the own data
+// key is silently swallowed and the snapshot prototype is replaced by the
+// caller-controlled value (object), dropped (primitive), or nulled (`null`).
+// An own enumerable data `__proto__` must instead be preserved as own data via
+// defineProperty semantics — zero prototype mutation, zero accessor
+// invocation, zero global pollution.
+// ---------------------------------------------------------------------------
+
+function defineOwnDataProp(target: object, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+test('#644-P1: own enumerable data __proto__ is preserved as own data; no prototype mutation', () => {
+  const hostilePayload = Object.freeze({ polluted: 'authority-drift' });
+  const input: Record<string, unknown> = {};
+  defineOwnDataProp(input, '__proto__', hostilePayload);
+  defineOwnDataProp(input, 'kindId', 'decision.rule.v1');
+
+  // The own data key does not change the input's ordinary-prototype posture.
+  assert.equal(Object.getPrototypeOf(input), Object.prototype);
+
+  const result = safeRecordSnapshot(input, 'record');
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  // The own key is preserved on the snapshot (not silently swallowed).
+  assert.deepEqual(Object.getOwnPropertyNames(result.snapshot).sort(), ['__proto__', 'kindId']);
+  const protoDescriptor = Object.getOwnPropertyDescriptor(result.snapshot, '__proto__');
+  assert.ok(protoDescriptor !== undefined);
+  assert.equal(protoDescriptor.value, hostilePayload);
+  assert.equal(protoDescriptor.enumerable, true);
+  assert.equal(protoDescriptor.get, undefined);
+  assert.equal(protoDescriptor.set, undefined);
+  // Ordinary keys keep exact values.
+  assert.equal(result.snapshot.kindId, 'decision.rule.v1');
+  // Output prototype remains Object.prototype: the hostile payload neither
+  // replaced it nor polluted Object.prototype globally.
+  assert.equal(Object.getPrototypeOf(result.snapshot), Object.prototype);
+  assert.equal('polluted' in {}, false);
+});
+
+test('#644-P2: own data __proto__ with null / primitive values never drifts the output prototype', () => {
+  for (const hostileValue of [null, 'inherited-lie', 42]) {
+    const input: Record<string, unknown> = {};
+    defineOwnDataProp(input, '__proto__', hostileValue);
+    defineOwnDataProp(input, 'a', 1);
+    const result = safeRecordSnapshot(input, 'record');
+    assert.equal(result.ok, true, `value ${String(hostileValue)} must be accepted`);
+    if (!result.ok) continue;
+    // `null` must not turn the snapshot null-prototype; primitives must not
+    // be silently dropped by the inherited setter's no-op.
+    assert.equal(Object.getPrototypeOf(result.snapshot), Object.prototype);
+    assert.deepEqual(
+      Object.getOwnPropertyNames(result.snapshot).sort(),
+      ['__proto__', 'a'],
+      `value ${String(hostileValue)} must be preserved`,
+    );
+    const descriptor = Object.getOwnPropertyDescriptor(result.snapshot, '__proto__');
+    assert.ok(descriptor !== undefined);
+    assert.equal(descriptor.value, hostileValue);
+  }
+});
+
+test('#644-P3: null-prototype input with own data __proto__ is accepted and preserved', () => {
+  const input = Object.create(null) as Record<string, unknown>;
+  defineOwnDataProp(input, '__proto__', { evil: true });
+  defineOwnDataProp(input, 'componentId', 'a.b');
+  const result = safeRecordSnapshot(input, 'record');
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const descriptor = Object.getOwnPropertyDescriptor(result.snapshot, '__proto__');
+  assert.ok(descriptor !== undefined);
+  assert.deepEqual(descriptor.value, { evil: true });
+  assert.equal(result.snapshot.componentId, 'a.b');
+  assert.equal(Object.getPrototypeOf(result.snapshot), Object.prototype);
+});
+
+test('#644-P4: inherited prototype key is never snapshotted as own data', () => {
+  const input: Record<string, unknown> = { a: 1 };
+  const result = safeRecordSnapshot(input, 'record');
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(Object.getOwnPropertyNames(result.snapshot), ['a']);
+  assert.equal(Object.getPrototypeOf(result.snapshot), Object.prototype);
+  // The inherited accessor is not shadowed by an own data property.
+  assert.equal(Object.getOwnPropertyDescriptor(result.snapshot, '__proto__'), undefined);
+});
+
+test('#644-P5: own accessor __proto__ is rejected as ACCESSOR_PROPERTY without accessor execution', () => {
+  let accessorCalls = 0;
+  const input: Record<string, unknown> = {};
+  Object.defineProperty(input, '__proto__', {
+    enumerable: true,
+    get() {
+      accessorCalls += 1;
+      return { evil: true };
+    },
+    set() {
+      accessorCalls += 10;
+    },
+  });
+  const result = safeRecordSnapshot(input, 'record');
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.issue.violation, 'ACCESSOR_PROPERTY');
+  assert.equal(result.issue.key, '__proto__');
+  assert.equal(accessorCalls, 0);
+});
+
+test('#644-P6: custom-prototype hostile inputs stay EXOTIC_PROTOTYPE regardless of own keys', () => {
+  const hostileProto = { authority: 'forged' };
+  const input = Object.create(hostileProto) as Record<string, unknown>;
+  defineOwnDataProp(input, '__proto__', hostileProto);
+  const result = safeRecordSnapshot(input, 'record');
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.issue.violation, 'EXOTIC_PROTOTYPE');
+});
+
+test('#644-P7: ordinary records keep exact snapshot behavior; input alias cannot mutate output', () => {
+  const input: Record<string, unknown> = { kindId: 'x.y', version: '1.0.0', nested: { deep: true } };
+  const result = safeRecordSnapshot(input, 'record');
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.notEqual(result.snapshot, input);
+  assert.deepEqual(Object.getOwnPropertyNames(result.snapshot), ['kindId', 'version', 'nested']);
+  assert.deepEqual(result.snapshot, input);
+  // Post-snapshot input mutation never reaches the snapshot.
+  input.kindId = 'mutated';
+  defineOwnDataProp(input, '__proto__', { late: true });
+  assert.equal(result.snapshot.kindId, 'x.y');
+  assert.equal(Object.getOwnPropertyDescriptor(result.snapshot, '__proto__'), undefined);
+  assert.equal(Object.getPrototypeOf(result.snapshot), Object.prototype);
+  // Own-data __proto__ snapshots are equally alias-independent.
+  const hostile = {} as Record<string, unknown>;
+  defineOwnDataProp(hostile, '__proto__', { first: true });
+  const hostileResult = safeRecordSnapshot(hostile, 'record');
+  assert.equal(hostileResult.ok, true);
+  if (hostileResult.ok) {
+    defineOwnDataProp(hostile, '__proto__', { second: true });
+    const descriptor = Object.getOwnPropertyDescriptor(hostileResult.snapshot, '__proto__');
+    assert.ok(descriptor !== undefined);
+    assert.deepEqual(descriptor.value, { first: true });
+  }
+});
