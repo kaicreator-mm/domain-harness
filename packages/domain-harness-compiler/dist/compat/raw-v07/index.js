@@ -207,7 +207,18 @@ function canonicalCopy(value, path, ancestors) {
         if (descriptor.value === undefined) {
             fail('NOT_TRANSLATABLE', `${path}.${key}`, 'undefined is not portable JSON');
         }
-        output[key] = canonicalCopy(descriptor.value, `${path}.${key}`, ancestors);
+        // Prototype-safe definition: plain assignment on the key `__proto__`
+        // reaches the inherited Object.prototype setter instead of creating an own
+        // property — an object/null value would mutate the copy's prototype and a
+        // primitive value would be silently lost. defineProperty always creates
+        // the exact own enumerable data property and never invokes any setter, so
+        // an own data `__proto__` is preserved verbatim on a plain prototype.
+        Object.defineProperty(output, key, {
+            value: canonicalCopy(descriptor.value, `${path}.${key}`, ancestors),
+            enumerable: true,
+            writable: true,
+            configurable: true,
+        });
     }
     ancestors.delete(record);
     return output;
