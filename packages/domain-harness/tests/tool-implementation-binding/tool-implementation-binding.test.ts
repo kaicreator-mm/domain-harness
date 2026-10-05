@@ -158,7 +158,7 @@ async function bindFixture(
   const selection = await selectionFor(definitionGraph);
   const input: BindToolImplementationInput = {
     assembly,
-    selection,
+    selection: JSON.parse(JSON.stringify(selection)) as BindToolImplementationInput['selection'],
     currentDefinitionGraph: definitionGraph,
     implementations: candidates,
     sha256: realSha256,
@@ -203,12 +203,17 @@ test('PACK-A T003C 1: identical inputs -> identical binding evidence and success
 test('PACK-A T003C 1: candidate order and required-operation order permutations change nothing', async () => {
   const alpha = candidate('impl.calc.alpha');
   const bravo = candidate('impl.calc.bravo');
+  const pinAlpha = {
+    implementationId: 'impl.calc.alpha',
+    implementationVersion: '1.0.0',
+    implementationDigest: 'sha256:impl.calc.alpha-content',
+  };
 
   const forward = await bindToolImplementation(
-    (await bindFixture({ requiredOperations: ['op.add', 'op.sub'] }, [alpha, bravo])).input,
+    (await bindFixture({ requiredOperations: ['op.add', 'op.sub'], exactPin: pinAlpha }, [alpha, bravo])).input,
   );
   const reversed = await bindToolImplementation(
-    (await bindFixture({ requiredOperations: ['op.sub', 'op.add'] }, [bravo, alpha])).input,
+    (await bindFixture({ requiredOperations: ['op.sub', 'op.add'], exactPin: pinAlpha }, [bravo, alpha])).input,
   );
 
   assert.equal(forward.evidence.bindingDigest, reversed.evidence.bindingDigest);
@@ -331,17 +336,39 @@ test('PACK-A T003C 3: no compatible implementation fails MISSING_TOOL_IMPLEMENTA
   assert.match(error.message, /op\.sub/);
 });
 
-test('PACK-A T003C 3: an implementation missing a required operation fails INCOMPATIBLE_TOOL_IMPLEMENTATION', async () => {
+test('PACK-A T003C 3: an exactly pinned implementation missing a required operation fails INCOMPATIBLE_TOOL_IMPLEMENTATION', async () => {
   const partial = candidate('impl.calc.partial', { supportedOperations: ['op.add'] });
-  await expectBindingError(
+  const error = await expectBindingError(
     bindToolImplementation(
       (await bindFixture({ requiredOperations: ['op.add', 'op.sub'] }, [partial])).input,
+    ),
+    'MISSING_TOOL_IMPLEMENTATION',
+  );
+  assert.match(error.message, /op\.sub/);
+
+  // Pinning the incompatible candidate identifies it as the binding target —
+  // the failure is INCOMPATIBLE, never silently resolved or downgraded.
+  await expectBindingError(
+    bindToolImplementation(
+      (
+        await bindFixture(
+          {
+            requiredOperations: ['op.add', 'op.sub'],
+            exactPin: {
+              implementationId: 'impl.calc.partial',
+              implementationVersion: '1.0.0',
+              implementationDigest: 'sha256:impl.calc.partial-content',
+            },
+          },
+          [partial],
+        )
+      ).input,
     ),
     'INCOMPATIBLE_TOOL_IMPLEMENTATION',
   );
 
   // Without narrowing, the bound set is ALL operations the Tool declares, so
-  // the same candidate is still incompatible.
+  // the same candidate is still not compatible.
   await expectBindingError(
     bindToolImplementation((await bindFixture({}, [partial])).input),
     'MISSING_TOOL_IMPLEMENTATION',
@@ -567,7 +594,7 @@ test('PACK-A T003C 6: evidence binds DefinitionGraphDigest + exact Tool provider
   const evidenceSnapshot = JSON.parse(JSON.stringify(bound.evidence));
   (input.selection as { provider: { componentId: string } }).provider.componentId = 'tool.hacked';
   (input.selection as { definitionGraphDigest: string }).definitionGraphDigest = 'sha256:hacked';
-  (input.implementations as Array<{ implementation: { implementationId: string } }>)[0]!
+  (input.implementations as unknown as Array<{ implementation: { implementationId: string } }>)[0]!
     .implementation.implementationId = 'impl.hacked';
   assert.deepEqual(bound.evidence, evidenceSnapshot, 'later caller mutation cannot rewrite evidence');
   assert.notEqual(
@@ -664,7 +691,7 @@ test('PACK-A T003C: a selection naming a component outside the graph (or a non-T
   const semanticProvider = {
     ...genuine,
     provider: { ...genuine.provider, componentId: 'consumer.a', family: 'semantic' as const },
-  };
+  } as unknown as import('../../src/contracts/capability-provision.js').CurrentCapabilityProviderSelection;
   await expectBindingError(
     bindToolImplementation({
       assembly,
@@ -744,7 +771,7 @@ test('PACK-A T003C: floating/range/x-range identities fail FLOATING_AUTHORITY_RE
   );
   await expectBindingError(
     bindToolImplementation(
-      (await bindFixture({}, [candidate('impl.calc.alpha', {}, { implementationDigest: 'not-a-digest' })])).input,
+      (await bindFixture({}, [candidate('impl.calc.alpha', {}, { implementationDigest: '' })])).input,
     ),
     'INVALID_BINDING_INPUT',
   );

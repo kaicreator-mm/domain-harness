@@ -131,7 +131,9 @@ async function mutableFixture() {
   );
   const input: MutableBindInput = {
     assembly,
-    selection: selection as unknown as Record<string, unknown>,
+    // A fresh MUTABLE copy: the minted selection evidence is frozen, and the
+    // TOCTOU mutations below must be able to touch the caller's own input.
+    selection: JSON.parse(JSON.stringify(selection)) as Record<string, unknown>,
     currentDefinitionGraph: definitionGraph as unknown as MutableGraph,
     implementations: [candidate() as unknown as Record<string, unknown>],
     sha256: realSha256,
@@ -304,7 +306,7 @@ test('PACK-A T003C TOCTOU 4: accessor-backed candidates/selection fail closed wi
   await assert.rejects(
     bindToolImplementation({
       ...asBindInput(input),
-      selection: accessorSelection,
+      selection: accessorSelection as unknown as BindToolImplementationInput['selection'],
     }),
     (error: unknown) => {
       assert.equal((error as { name?: string }).name, 'ToolImplementationBindingError');
@@ -321,7 +323,7 @@ test('PACK-A T003C TOCTOU 4: symbol-keyed, non-enumerable and custom-prototype c
   const hostileSymbol = candidate() as unknown as Record<string, unknown>;
   Object.defineProperty(hostileSymbol, Symbol('hidden'), { value: true, enumerable: false });
   await assert.rejects(
-    bindToolImplementation({ ...asBindInput(input), implementations: [hostileSymbol] }),
+    bindToolImplementation({ ...asBindInput(input), implementations: [hostileSymbol as unknown as ToolImplementationCandidate] }),
     (error: unknown) => {
       assert.equal((error as { code?: string }).code, 'INVALID_BINDING_INPUT');
       return true;
@@ -331,7 +333,7 @@ test('PACK-A T003C TOCTOU 4: symbol-keyed, non-enumerable and custom-prototype c
   const hostileHidden = candidate() as unknown as Record<string, unknown>;
   Object.defineProperty(hostileHidden, 'hidden', { value: true, enumerable: false });
   await assert.rejects(
-    bindToolImplementation({ ...asBindInput(input), implementations: [hostileHidden] }),
+    bindToolImplementation({ ...asBindInput(input), implementations: [hostileHidden as unknown as ToolImplementationCandidate] }),
     (error: unknown) => {
       assert.equal((error as { code?: string }).code, 'INVALID_BINDING_INPUT');
       return true;
@@ -349,7 +351,7 @@ test('PACK-A T003C TOCTOU 4: symbol-keyed, non-enumerable and custom-prototype c
   await assert.rejects(
     bindToolImplementation({
       ...asBindInput(input),
-      implementations: [new CustomCandidate() as unknown as Record<string, unknown>],
+      implementations: [new CustomCandidate() as unknown as ToolImplementationCandidate],
     }),
     (error: unknown) => {
       assert.equal((error as { code?: string }).code, 'INVALID_BINDING_INPUT');
