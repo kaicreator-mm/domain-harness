@@ -1,4 +1,4 @@
-import { type Sha256Port } from '../contracts/identity.js';
+import { type ContentDigest, type Sha256Port } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
 import type { GovernanceBaselineAuthorityBinding, GovernanceBaselineBody, GovernanceBaselineStore, GovernancePackageCdiBinding } from './contracts.js';
 export type DomainActivationBinding = GovernanceBaselineAuthorityBinding;
@@ -6,6 +6,16 @@ export interface GovernanceExecutionPin extends DomainActivationBinding {
     readonly workflowTarget: string;
     readonly workflowInstanceId: string;
     readonly bindingDigest: string;
+    /**
+     * T002C (#617): the exact sealed Runtime Assembly digest this occurrence was
+     * activated under. Optional at the type level so pre-T002C (legacy v0.3)
+     * pins remain representable, but the v0.7 assembly-activation gate
+     * (#617 `AssemblyExecutionActivator`) requires it and fails closed when it
+     * is absent, stale, replaced or aliased. When present it is woven into
+     * `bindingDigest`, so any Assembly change changes the pin currentness.
+     * Never a Tool/Workflow-specific value - generic Assembly identity only.
+     */
+    readonly assemblyDigest?: ContentDigest;
 }
 export interface GovernanceBoundSnapshot {
     readonly workflowInstanceId: string;
@@ -41,23 +51,35 @@ export interface DurableExecutionStore {
 export interface ExactPackageCdiAuthority {
     resolveExactPackageCdi(binding: GovernancePackageCdiBinding): Promise<GovernancePackageCdiBinding | undefined>;
 }
-export type GovernanceExecutionBindingErrorCode = 'INVALID_DOMAIN_ACTIVATION_BINDING' | 'MISSING_DOMAIN_ACTIVATION_BINDING' | 'FLOATING_EXECUTION_AUTHORITY_FORBIDDEN' | 'INVALID_GOVERNANCE_EXECUTION_PIN' | 'GOVERNANCE_EXECUTION_PIN_MISSING' | 'GOVERNANCE_EXECUTION_PIN_CONFLICT' | 'GOVERNANCE_EXECUTION_PIN_MISMATCH' | 'SNAPSHOT_BEFORE_GOVERNANCE_PIN' | 'SNAPSHOT_GOVERNANCE_BINDING_MISMATCH' | 'PACKAGE_CDI_BINDING_MISMATCH' | 'PACKAGE_CDI_RECOVERY_MISMATCH' | 'GOVERNANCE_BASELINE_BINDING_MISMATCH' | 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH';
+export type GovernanceExecutionBindingErrorCode = 'INVALID_DOMAIN_ACTIVATION_BINDING' | 'MISSING_DOMAIN_ACTIVATION_BINDING' | 'FLOATING_EXECUTION_AUTHORITY_FORBIDDEN' | 'INVALID_GOVERNANCE_EXECUTION_PIN' | 'GOVERNANCE_EXECUTION_PIN_MISSING' | 'GOVERNANCE_EXECUTION_PIN_CONFLICT' | 'GOVERNANCE_EXECUTION_PIN_MISMATCH' | 'SNAPSHOT_BEFORE_GOVERNANCE_PIN' | 'SNAPSHOT_GOVERNANCE_BINDING_MISMATCH' | 'PACKAGE_CDI_BINDING_MISMATCH' | 'PACKAGE_CDI_RECOVERY_MISMATCH' | 'GOVERNANCE_BASELINE_BINDING_MISMATCH' | 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH' | 'ASSEMBLY_DIGEST_FORBIDDEN' | 'ASSEMBLY_NOT_SEALED' | 'MISSING_ASSEMBLY_DIGEST' | 'ASSEMBLY_DEFINITION_CURRENTNESS_MISMATCH' | 'ASSEMBLY_REPLAY_MISMATCH';
 export declare class GovernanceExecutionBindingError extends Error {
     readonly code: GovernanceExecutionBindingErrorCode;
     constructor(code: GovernanceExecutionBindingErrorCode, message: string);
 }
+/**
+ * T002C (#617): an Assembly digest bound into the execution pin must be an
+ * exact, non-empty content digest - never a floating selector or a mutable
+ * provider alias (`latest`/`current`/`active`/`alias:`/`@current`/...). The
+ * exact sealed Assembly is content-addressed, so its digest is the only
+ * acceptable identity; anything else fails closed.
+ */
+export declare function requireExactAssemblyDigest(value: unknown, field: string): ContentDigest;
+export declare function cloneActivationBinding(binding: DomainActivationBinding): DomainActivationBinding;
 export declare function assertDomainActivationBinding(binding: DomainActivationBinding): void;
+export declare function requireExactPackageCdi(binding: DomainActivationBinding, authority: ExactPackageCdiAuthority, errorCode?: Extract<GovernanceExecutionBindingErrorCode, 'PACKAGE_CDI_BINDING_MISMATCH' | 'PACKAGE_CDI_RECOVERY_MISMATCH'>): Promise<GovernancePackageCdiBinding>;
+export declare function requireExactGovernanceBody(binding: DomainActivationBinding, baselines: GovernanceBaselineStore, sha256: Sha256Port, errorCode?: Extract<GovernanceExecutionBindingErrorCode, 'GOVERNANCE_BASELINE_BINDING_MISMATCH' | 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH'>): Promise<GovernanceBaselineBody>;
 export declare class DomainActivationBindingCoordinator {
     #private;
     constructor(authority: DomainActivationAuthority, packageCdiAuthority: ExactPackageCdiAuthority, baselines: GovernanceBaselineStore, sha256: Sha256Port);
     publish(binding: DomainActivationBinding): Promise<DomainActivationBinding>;
     resolveForNewInstance(domainId: string): Promise<DomainActivationBinding>;
 }
-export declare function computeGovernanceExecutionBindingDigest(binding: DomainActivationBinding, sha256: Sha256Port): Promise<string>;
+export declare function computeGovernanceExecutionBindingDigest(binding: DomainActivationBinding, sha256: Sha256Port, assemblyDigest?: ContentDigest): Promise<string>;
 export declare function createGovernanceExecutionPin(request: {
     readonly workflowTarget: string;
     readonly workflowInstanceId: string;
     readonly binding: DomainActivationBinding;
+    readonly assemblyDigest?: ContentDigest;
 }, sha256: Sha256Port): Promise<GovernanceExecutionPin>;
 export declare function validateGovernanceExecutionPin(value: unknown, sha256: Sha256Port, expectedWorkflowInstanceId?: string): Promise<GovernanceExecutionPin>;
 export declare class GovernanceExecutionCoordinator {
@@ -67,6 +89,7 @@ export declare class GovernanceExecutionCoordinator {
         readonly workflowTarget: string;
         readonly workflowInstanceId: string;
         readonly binding: DomainActivationBinding;
+        readonly assemblyDigest?: ContentDigest;
     }): Promise<GovernanceExecutionPin>;
     /**
      * Gate to call immediately before an authoritative state-changing control
