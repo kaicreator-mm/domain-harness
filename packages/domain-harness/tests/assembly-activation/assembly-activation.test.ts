@@ -298,6 +298,9 @@ function activationRequest(input: {
     workflowInstanceId: OCCURRENCE.workflowInstanceId,
     binding: input.binding,
     assembly: input.assembly,
+    // T002D repaired (#688): the v0.7 class-bearing activation path requires
+    // an explicit canonical class; the T002C matrix exercises it explicitly.
+    authorityClass: 'SIMULATION' as const,
     currentDefinitionGraph: input.currentGraph,
   };
 }
