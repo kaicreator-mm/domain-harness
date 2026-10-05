@@ -257,6 +257,10 @@ function compareIds(left: string, right: string): number {
 // keys and preserved array order. Rejects (never silently drops) non-JSON
 // material, accessors, symbol keys, non-enumerable properties, exotic
 // prototypes and circular references. The result is fully caller-isolated.
+// Output records are built through own-data property definition (#681): an
+// own enumerable data `__proto__` key is preserved exactly as ordinary own
+// data — never through the `Object.prototype.__proto__` setter, so no
+// accepted key is dropped and no prototype is ever mutated.
 // ---------------------------------------------------------------------------
 
 function canonicalCopy(value: unknown, path: string, ancestors: Set<object>): JsonValue {
@@ -319,7 +323,20 @@ function canonicalCopy(value: unknown, path: string, ancestors: Set<object>): Js
     if (descriptor.value === undefined) {
       fail('NOT_TRANSLATABLE', `${path}.${key}`, 'undefined is not portable JSON');
     }
-    output[key] = canonicalCopy(descriptor.value, `${path}.${key}`, ancestors);
+    const copied = canonicalCopy(descriptor.value, `${path}.${key}`, ancestors);
+    // Own-data definition, never ordinary assignment (#681): assigning a key
+    // named `__proto__` on an `Object.prototype`-backed object would invoke
+    // the inherited `__proto__` setter — silently dropping the accepted key
+    // and swapping the copy's prototype to caller-controlled material.
+    // `defineProperty` preserves an own enumerable data `__proto__` exactly
+    // (no setter execution, no prototype mutation, no accessor execution)
+    // with the same ordinary canonical key ordering.
+    Object.defineProperty(output, key, {
+      value: copied,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   ancestors.delete(record);
   return output;
