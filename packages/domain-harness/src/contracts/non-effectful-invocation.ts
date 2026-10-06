@@ -16,10 +16,13 @@
  *  BEFORE the dispatch port runs — never rerouted, never fallen back to an
  *  effectful path (T004C owns effectful Central Admission);
  * - dispatch ONLY the runtime handle paired with the exact current
- *  implementation pin: the T003C binding evidence must agree with the
- *  re-admitted request on Tool Component, operation, Definition graph digest
- *  AND Assembly digest, and the admitted operation must be in the evidence's
- *  exact bound operation set. Stale or mismatched bindings fail before call;
+ *  implementation pin: the T003C-owned consumer verifier proves the binding's
+ *  mint authenticity, evidence digest and exact subject slot/currentness
+ *  against the SAME final sealed Assembly before the opaque handle is paired
+ *  and exposed, and the verified evidence must agree with the re-admitted
+ *  request on Tool Component, bound operation set, Definition graph digest
+ *  AND Assembly digest. Stale, mismatched or non-mint bindings fail before
+ *  call;
  * - the result is OBSERVATIONAL/COMPUTATIONAL output only: it cannot mutate
  *  authoritative Domain state, append the durable effect journal, mint an
  *  occurrence, or become business truth merely because a Tool returned it.
@@ -42,53 +45,40 @@
  *  non-portable Tool return fails closed typed.
  *
  * ---------------------------------------------------------------------------
- * P1-1 BINDING CONSTRAINT — explicit fail-closed provenance seam (T004A Fresh
- * Review issuecomment-5989725847, routed via #632)
+ * GENUINE PROVENANCE CONSUMPTION (#691 post-merge bounded repair; #589
+ * issuecomment-5993726738 §A2–A4/§C, executable #640, Fresh Review #685 P1-1
+ * and P1-2, Fresh Planning Review #671)
  *
- * `AdmittedToolInvocationRequest.assemblyDigest` (and `exposure.assemblyDigest`)
- * are CONTENT-CONSISTENCY proofs only: a self-consistent forged Assembly —
- * never passed through `sealRuntimeAssembly`, digest correctly self-computed —
- * passes every T004A content check (empirically demonstrated in the review).
- * The T002B mint registry (`SEALED_ASSEMBLY_MINTS`) and its
- * `isSealedAssembly` guard are MODULE-PRIVATE to runtime-assembly.ts, and no
- * currently exported T002B seam re-establishes object provenance
- * (`admitComponentWithAssembly` is a Kind-admission operation over one bound
- * component — not a general Assembly-authenticity check — and resealing proves
- * content consistency only, never mint provenance). Option (a) of the P1-1
- * constraint is therefore impossible without a T002B sibling export, which is
- * a SEPARATE bounded concern requiring controller authorization; nothing is
- * exported from runtime-assembly.ts here.
+ * The final Assembly's provenance is decided by the accepted T002B-owned
+ * `isSealedRuntimeAssembly` mint verifier consumed DIRECTLY over the exact
+ * final Assembly — the binding's own successor Assembly, which is the one and
+ * only dispatch anchor (exact contextual Assembly pin, #646/#658 posture: no
+ * host-held mint record, caller trust callback, latest/default/global current
+ * Assembly owner or content-consistency-only substitute exists, and no
+ * injected host decision can affirm a forgery). A self-consistent forged
+ * Assembly passes every T004A content check yet fails here with
+ * ASSEMBLY_PROVENANCE_UNVERIFIED before any dispatch.
  *
- * This module implements option (b): the missing mint-guard is EXPLICIT. The
- * dispatch boundary requires an injected `SealedAssemblyProvenanceGuard`
- * decision over the exact successor-Assembly object + digests before any Tool
- * call:
- * - a missing/ malformed guard or decision fails closed typed
- *   (INVALID_INVOCATION_INPUT);
- * - a denial, or a guard that throws, fails closed typed
- *   ASSEMBLY_PROVENANCE_UNVERIFIED — the kernel NEVER silently trusts the
- *   digest and never passes content-consistency off as mint proof;
- * - the composition layer (host) MUST wire this port to genuine mint
- *   authority — e.g. a future exported T002B mint-guard or host-held mint
- *   records. Until the T002B sibling export lands, every real dispatch
- *   carries this documented dependency; the boundary test pins that a
- *   content-consistent forgery with a denying guard never dispatches.
- *
- * Related explicit dependency (same shape, bounded here): the T003C sealed
- * binding's handle↔pin PAIRING is consumed as minted by `bindToolImplementation`;
- * the T003C sealing brand is module-private with no exported verifier, so this
- * module re-derives every identity dimension of the binding evidence and
- * trusts only the opaque handle reference itself. Because the effect=none
- * result is observational-only and grants no authority, a hypothetical forged
- * pairing cannot mint transition/effect authority through this path; the
- * exact pin that was dispatched is bound into the result for audit either way.
+ * The T003C binding authenticity/currentness semantics are CONSUMED, never
+ * re-derived: `verifyToolImplementationBinding` proves module-private mint
+ * membership, re-verifies the accepted v1 bindingDigest over the evidence
+ * material, and decides exact subject slot/currentness against the SAME
+ * final sealed Assembly BEFORE the opaque implementation handle is paired and
+ * exposed. Its typed failures (UNMINTED_TOOL_IMPLEMENTATION_BINDING,
+ * TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH,
+ * MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING, STALE_TOOL_IMPLEMENTATION_BINDING,
+ * TOOL_IMPLEMENTATION_PIN_MISMATCH) propagate unchanged — this module never
+ * re-owns those semantics. Only the verifier-returned handle is ever
+ * dispatched; a field-perfect lookalike of a genuine binding can never carry
+ * the mint registry membership and fails closed before any dispatch.
  *
  * Boundary discipline: validation consumes the shared descriptor-safe record
  * primitive and unified exact-reference authority of `record-safety.ts`
  * (#557 + #578), the T004A request-admission seam (re-admission; its typed
- * failures propagate unchanged), the T005B resource-resolution seam (its
- * typed failures propagate unchanged) and the T003C binding evidence shape
- * (identity re-derived here; the sealed-binding brand stays T003C-owned). No
+ * failures propagate unchanged), the T002B mint verifier and the T003C
+ * binding verification seam (both consumed directly; their typed failures
+ * propagate unchanged), and the T005B resource-resolution seam (its typed
+ * failures propagate unchanged). No
  * Workflow/XState/ToolRegistry/SQLite/Agent/UX/AI/HTTP/Search/Storage/node
  * import is permitted in this file, and no public barrel exposes it.
  */
@@ -101,7 +91,10 @@ import {
   type Sha256Port,
 } from './identity.js';
 import type { JsonValue } from './json.js';
-import type { SealedRuntimeAssembly } from './runtime-assembly.js';
+import {
+  isSealedRuntimeAssembly,
+  type SealedRuntimeAssembly,
+} from './runtime-assembly.js';
 import {
   admitToolInvocationRequest,
   type AdmittedToolInvocationRequest,
@@ -113,14 +106,14 @@ import {
   type ResolvedResourceEntry,
   type ResourceProvider,
 } from './resource-resolution.js';
-import type {
-  SealedToolImplementationBinding,
-  ToolImplementationIdentity,
+import {
+  verifyToolImplementationBinding,
+  type SealedToolImplementationBinding,
+  type ToolImplementationIdentity,
 } from './tool-implementation-binding.js';
 import {
   carriesEmbeddedSelector,
   carriesFloatingOrRangeSemantics,
-  carriesXRangeVersionSemantics,
   describeRecordSafetyIssue,
   isNonEmptyIdentityString,
   safeArraySnapshot,
@@ -156,33 +149,6 @@ export class NonEffectfulInvocationError extends Error {
 // ---------------------------------------------------------------------------
 // Injected host ports
 // ---------------------------------------------------------------------------
-
-/**
- * The decision of one sealed-Assembly provenance verification. A denial is an
- * expected outcome (not an exception path) and may carry a human-readable
- * reason that is propagated into the typed failure diagnostic.
- */
-export type AssemblyProvenanceDecision =
-  | { readonly verified: true }
-  | { readonly verified: false; readonly reason?: string };
-
-/**
- * Generic injected HOST_INTEGRATION port — the explicit fail-closed
- * replacement for the not-yet-exported T002B mint guard (see the module
- * docstring, P1-1 section). The kernel supplies the exact successor-Assembly
- * object presented for dispatch plus its exact digests; the trusted host
- * implementation (backed by genuine mint authority — a future T002B
- * mint-guard export or host-held mint records) returns a verified/denied
- * decision. The kernel never inspects the mint itself and never proceeds
- * without an affirmative, well-formed decision.
- */
-export interface SealedAssemblyProvenanceGuard {
-  verifyProvenance(query: {
-    readonly assembly: SealedRuntimeAssembly;
-    readonly assemblyDigest: ContentDigest;
-    readonly definitionGraphDigest: ContentDigest;
-  }): AssemblyProvenanceDecision;
-}
 
 /**
  * ONE generic dispatch query: the opaque implementation handle paired by the
@@ -223,13 +189,12 @@ export interface InvokeNonEffectfulToolInput {
    *  internally over the exact current state before any dispatch. */
   readonly request: AdmittedToolInvocationRequest;
   /** T003C sealed binding pairing the exact implementation pin with the
-   *  runtime handle; its successor Assembly is the dispatch anchor. */
+   *  runtime handle; its successor Assembly is the dispatch anchor whose
+   *  provenance is proven by the directly consumed T002B mint verifier. */
   readonly binding: SealedToolImplementationBinding;
   /** The live current Definition graph; currentness is authoritatively
    *  recomputed at re-admission. */
   readonly currentDefinitionGraph: DefinitionGraphEnvelope;
-  /** Injected sealed-Assembly provenance guard (the P1-1 fail-closed seam). */
-  readonly assemblyProvenance: SealedAssemblyProvenanceGuard;
   /** Injected Tool calling-convention port. */
   readonly dispatch: NonEffectfulToolDispatchPort;
   /** Optional injected T005B resource provider — REQUIRED when the sealed
@@ -374,20 +339,6 @@ function readOwnDataProperty(
   return descriptor.value;
 }
 
-/** Rejects floating/range/x-range version forms (`1.x`, `x`, `1.`). */
-function requireExactVersion(
-  value: string,
-  path: string,
-  code: NonEffectfulInvocationErrorCode,
-): void {
-  if (carriesFloatingOrRangeSemantics(value) || carriesXRangeVersionSemantics(value)) {
-    fail(
-      code,
-      `${path} must be an exact version, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)`,
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Request snapshot (dispatch intent; re-admitted authoritatively later)
 // ---------------------------------------------------------------------------
@@ -396,7 +347,6 @@ const INPUT_FIELDS = new Set<string>([
   'request',
   'binding',
   'currentDefinitionGraph',
-  'assemblyProvenance',
   'dispatch',
   'resourceProvider',
   'sha256',
@@ -486,90 +436,71 @@ function snapshotRequest(value: unknown): SnapshotRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Sealed binding snapshot (identity re-derived; handle captured by reference)
+// Dispatch-anchor snapshot (assembly provenance decided here; binding
+// authenticity delegated to the T003C consumer verifier)
 // ---------------------------------------------------------------------------
 
-const BINDING_FIELDS = new Set<string>(['evidence', 'successorAssembly', 'implementationHandle']);
-
-const EVIDENCE_FIELDS = new Set<string>([
-  'status',
-  'definitionGraphDigest',
-  'assemblyDigest',
-  'toolComponentId',
-  'providesCapability',
-  'implementation',
-  'supportedOperations',
-  'bindingDigest',
-]);
-
-interface SnapshotEvidence {
-  readonly definitionGraphDigest: ContentDigest;
-  readonly assemblyDigest: ContentDigest;
-  readonly toolComponentId: ComponentId;
-  readonly providesCapability: { readonly capabilityId: string; readonly version: string };
-  readonly implementation: ToolImplementationIdentity;
-  readonly supportedOperations: readonly string[];
-  readonly bindingDigest: ContentDigest;
-}
-
-interface SnapshotBinding {
-  readonly evidence: SnapshotEvidence;
+interface SnapshotDispatchAnchor {
   /** The exact successor-Assembly object — the dispatch anchor (reference). */
   readonly successorAssembly: SealedRuntimeAssembly;
-  /** Phase-1 own-data read of the successor Assembly digest (never re-read). */
-  readonly successorAssemblyDigest: ContentDigest;
-  /** Phase-1 own-data read of the paired handle (opaque, never re-read). */
-  readonly implementationHandle: unknown;
   /** Phase-1 count of Assembly requirements applicable to this operation. */
   readonly applicableRequirementCount: number;
 }
 
-/** Snapshot one exact `{capabilityId, version}` reference as a fresh frozen object. */
-function snapshotCapabilityRef(
-  value: unknown,
-  path: string,
-): { readonly capabilityId: string; readonly version: string } {
-  const candidate = requireSafeRecord(value, path, 'INVALID_BINDING_EVIDENCE');
-  const keys = Object.keys(candidate).sort();
-  if (keys.length !== 2 || !keys.includes('capabilityId') || !keys.includes('version')) {
-    fail('INVALID_BINDING_EVIDENCE', `${path} must contain exactly {capabilityId, version}`);
+/**
+ * Synchronously snapshot the dispatch anchor and prove its provenance. The
+ * dispatch anchor is the binding's OWN successor Assembly — the exact
+ * contextual Assembly pin (#646/#658 posture); there is no separate assembly
+ * input, no global current/latest Assembly owner and no other repair.
+ *
+ * #691 P1-1 repair: the anchor's provenance is decided by the accepted
+ * T002B-owned `isSealedRuntimeAssembly` mint verifier consumed DIRECTLY over
+ * this exact object. A self-consistent content forgery — never passed through
+ * `sealRuntimeAssembly` — fails ASSEMBLY_PROVENANCE_UNVERIFIED here, before
+ * the T004A re-admission that would otherwise accept its content checks. No
+ * host-held mint record, caller trust callback or content-consistency-only
+ * substitute can authorize the anchor.
+ *
+ * Binding AUTHENTICITY (module-private mint membership, v1 evidence digest,
+ * exact subject slot/currentness) is deliberately NOT re-derived here: it is
+ * consumed from the T003C-owned verifier in the async phase, before the
+ * opaque implementation handle is paired and exposed.
+ */
+function snapshotDispatchAnchor(value: unknown, request: SnapshotRequest): SnapshotDispatchAnchor {
+  const at = 'invocation input.binding';
+  if (typeof value !== 'object' || value === null) {
+    fail('INVALID_BINDING_EVIDENCE', `${at} must be the T003C sealed Tool implementation binding object`);
   }
-  const capabilityId = requireExactIdentity(candidate.capabilityId, `${path}.capabilityId`, 'INVALID_BINDING_EVIDENCE');
-  const version = requireExactIdentity(candidate.version, `${path}.version`, 'INVALID_BINDING_EVIDENCE');
-  requireExactVersion(version, `${path}.version`, 'INVALID_BINDING_EVIDENCE');
-  return Object.freeze({ capabilityId, version });
-}
-
-/** Snapshot the exact implementation pin as a fresh frozen object. */
-function snapshotImplementationPin(value: unknown, path: string): ToolImplementationIdentity {
-  const candidate = requireSafeRecord(value, path, 'INVALID_BINDING_EVIDENCE');
-  const keys = Object.keys(candidate).sort();
-  if (
-    keys.length !== 3 ||
-    !keys.includes('implementationId') ||
-    !keys.includes('implementationVersion') ||
-    !keys.includes('implementationDigest')
-  ) {
+  const successorAssembly = readOwnDataProperty(
+    value,
+    'successorAssembly',
+    'INVALID_BINDING_EVIDENCE',
+    at,
+  );
+  if (typeof successorAssembly !== 'object' || successorAssembly === null) {
+    fail('INVALID_BINDING_EVIDENCE', `${at}.successorAssembly must be the sealed successor Runtime Assembly object`);
+  }
+  if (!isSealedRuntimeAssembly(successorAssembly)) {
     fail(
-      'INVALID_BINDING_EVIDENCE',
-      `${path} must contain exactly {implementationId, implementationVersion, implementationDigest}`,
+      'ASSEMBLY_PROVENANCE_UNVERIFIED',
+      `the dispatch anchor (${at}.successorAssembly) is not a SealedRuntimeAssembly minted by sealRuntimeAssembly — the accepted T002B mint verifier is consumed directly over the exact final Assembly and a self-consistent content forgery can never supply the dispatch anchor`,
     );
   }
-  const implementationId = requireExactIdentity(candidate.implementationId, `${path}.implementationId`, 'INVALID_BINDING_EVIDENCE');
-  const implementationVersion = requireExactIdentity(
-    candidate.implementationVersion,
-    `${path}.implementationVersion`,
+  const successorRecord = readOwnDataProperty(
+    successorAssembly,
+    'record',
     'INVALID_BINDING_EVIDENCE',
+    `${at}.successorAssembly`,
   );
-  requireExactVersion(implementationVersion, `${path}.implementationVersion`, 'INVALID_BINDING_EVIDENCE');
-  if (!isContentDigest(candidate.implementationDigest)) {
-    fail('INVALID_BINDING_EVIDENCE', `${path}.implementationDigest must be a non-empty content digest string`);
-  }
-  return Object.freeze({
-    implementationId,
-    implementationVersion,
-    implementationDigest: candidate.implementationDigest,
-  });
+  const applicableRequirementCount = countApplicableRequirements(
+    successorRecord,
+    request.toolComponentId,
+    request.operationId,
+  );
+  return {
+    successorAssembly,
+    applicableRequirementCount,
+  };
 }
 
 /**
@@ -621,117 +552,6 @@ function countApplicableRequirements(
   return count;
 }
 
-/**
- * Synchronously validate and snapshot the sealed binding. The T003C sealing
- * brand is module-private and deliberately not re-derived here (see the
- * module docstring, P1-1 section): every identity dimension of the evidence
- * IS re-derived and cross-checked against the re-admitted request before
- * dispatch; only the opaque handle reference and the successor-Assembly
- * object are consumed as presented, both captured once in this synchronous
- * phase and never re-read after any suspension.
- */
-function snapshotBinding(value: unknown, request: SnapshotRequest): SnapshotBinding {
-  const at = 'invocation input.binding';
-  if (typeof value !== 'object' || value === null) {
-    fail('INVALID_BINDING_EVIDENCE', `${at} must be the T003C sealed Tool implementation binding`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  for (const key of Object.getOwnPropertyNames(descriptors)) {
-    if (!BINDING_FIELDS.has(key)) {
-      fail(
-        'INVALID_BINDING_EVIDENCE',
-        `${at} must carry exactly {evidence, successorAssembly, implementationHandle} plus its symbol brand; unexpected property "${key}"`,
-      );
-    }
-    const descriptor = descriptors[key]!;
-    if (!descriptor.enumerable || descriptor.get !== undefined || descriptor.set !== undefined) {
-      fail('INVALID_BINDING_EVIDENCE', `${at}.${key} must be an enumerable data property (hidden or accessor-backed properties are not contract input)`);
-    }
-  }
-  for (const required of BINDING_FIELDS) {
-    if (!(required in descriptors)) {
-      fail('INVALID_BINDING_EVIDENCE', `${at}.${required} is required (a sealed Tool implementation binding carries exactly { evidence, successorAssembly, implementationHandle })`);
-    }
-  }
-
-  const evidenceView = requireSafeRecord(descriptors.evidence!.value, `${at}.evidence`, 'INVALID_BINDING_EVIDENCE');
-  const unexpectedEvidenceField = Object.keys(evidenceView).find((key) => !EVIDENCE_FIELDS.has(key));
-  if (unexpectedEvidenceField !== undefined) {
-    fail(
-      'INVALID_BINDING_EVIDENCE',
-      `${at}.evidence must contain exactly the T003C binding evidence fields; unexpected field "${unexpectedEvidenceField}"`,
-    );
-  }
-  if (evidenceView.status !== 'BOUND') {
-    fail('INVALID_BINDING_EVIDENCE', `${at}.evidence.status must be exactly "BOUND"`);
-  }
-  if (!isContentDigest(evidenceView.definitionGraphDigest)) {
-    fail('INVALID_BINDING_EVIDENCE', `${at}.evidence.definitionGraphDigest must be a non-empty content digest string`);
-  }
-  if (!isContentDigest(evidenceView.assemblyDigest)) {
-    fail('INVALID_BINDING_EVIDENCE', `${at}.evidence.assemblyDigest must be a non-empty content digest string`);
-  }
-  const toolComponentId = requireExactIdentity(
-    evidenceView.toolComponentId,
-    `${at}.evidence.toolComponentId`,
-    'INVALID_BINDING_EVIDENCE',
-  );
-  const providesCapability = snapshotCapabilityRef(evidenceView.providesCapability, `${at}.evidence.providesCapability`);
-  const implementation = snapshotImplementationPin(evidenceView.implementation, `${at}.evidence.implementation`);
-  const supportedOperations = requireSafeArray(
-    evidenceView.supportedOperations,
-    `${at}.evidence.supportedOperations`,
-    'INVALID_BINDING_EVIDENCE',
-  ).map((operation, index) =>
-    requireExactIdentity(operation, `${at}.evidence.supportedOperations[${index}]`, 'INVALID_BINDING_EVIDENCE'),
-  );
-  if (!isContentDigest(evidenceView.bindingDigest)) {
-    fail('INVALID_BINDING_EVIDENCE', `${at}.evidence.bindingDigest must be a non-empty content digest string`);
-  }
-
-  const successorAssembly: unknown = descriptors.successorAssembly!.value;
-  if (typeof successorAssembly !== 'object' || successorAssembly === null) {
-    fail('INVALID_BINDING_EVIDENCE', `${at}.successorAssembly must be the sealed successor Runtime Assembly object`);
-  }
-  const successorAssemblyDigest = readOwnDataProperty(
-    successorAssembly,
-    'assemblyDigest',
-    'INVALID_BINDING_EVIDENCE',
-    `${at}.successorAssembly`,
-  );
-  if (typeof successorAssemblyDigest !== 'string' || !isContentDigest(successorAssemblyDigest)) {
-    fail('INVALID_BINDING_EVIDENCE', `${at}.successorAssembly.assemblyDigest must be a non-empty content digest string`);
-  }
-  const successorRecord = readOwnDataProperty(
-    successorAssembly,
-    'record',
-    'INVALID_BINDING_EVIDENCE',
-    `${at}.successorAssembly`,
-  );
-  const applicableRequirementCount = countApplicableRequirements(
-    successorRecord,
-    request.toolComponentId,
-    request.operationId,
-  );
-
-  const evidence: SnapshotEvidence = Object.freeze({
-    definitionGraphDigest: evidenceView.definitionGraphDigest,
-    assemblyDigest: evidenceView.assemblyDigest,
-    toolComponentId,
-    providesCapability,
-    implementation,
-    supportedOperations: Object.freeze([...supportedOperations]),
-    bindingDigest: evidenceView.bindingDigest,
-  });
-  return {
-    evidence,
-    successorAssembly: successorAssembly as SealedRuntimeAssembly,
-    successorAssemblyDigest,
-    implementationHandle: descriptors.implementationHandle!.value,
-    applicableRequirementCount,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // invokeNonEffectfulTool — the non-effectful dispatch boundary (PACK-C T004B)
 // ---------------------------------------------------------------------------
@@ -741,20 +561,28 @@ function snapshotBinding(value: unknown, request: SnapshotRequest): SnapshotBind
  * path.
  *
  * Deterministic fail-closed precedence: input shape, port shapes, request
- * snapshot, binding snapshot, then — after the single re-admission
- * suspension — the freshly derived effect gate (EFFECTFUL_OPERATION_REJECTED),
- * binding/request consistency (INVALID_BINDING_EVIDENCE), the injected
- * assembly-provenance decision (ASSEMBLY_PROVENANCE_UNVERIFIED), T005B
- * resource resolution (failures propagated unchanged) and finally the
- * dispatch. The Tool's own thrown failures propagate unchanged; only a
- * portable-JSON Tool return is snapshotted into the frozen observational
- * result.
+ * snapshot and the dispatch-anchor snapshot (where the directly consumed
+ * T002B mint verifier decides the final Assembly's provenance,
+ * ASSEMBLY_PROVENANCE_UNVERIFIED) — all synchronous — then, after the single
+ * re-admission suspension, the freshly derived effect gate
+ * (EFFECTFUL_OPERATION_REJECTED), the T003C-owned binding verification whose
+ * typed failures propagate unchanged
+ * (UNMINTED_TOOL_IMPLEMENTATION_BINDING, TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH,
+ * MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING, STALE_TOOL_IMPLEMENTATION_BINDING),
+ * T004B-owned dispatch consistency over the VERIFIED binding
+ * (INVALID_BINDING_EVIDENCE), T005B resource resolution (failures propagated
+ * unchanged) and finally the dispatch. The Tool's own thrown failures
+ * propagate unchanged; only a portable-JSON Tool return is snapshotted into
+ * the frozen observational result.
  *
  * Torn-snapshot discipline: every authority-bearing input is descriptor-safe
  * validated and synchronously snapshotted before the first `await` (the T004A
  * re-admission's own synchronous phase runs in the same tick, over the same
  * caller-owned graph object, before its first suspension); after any
- * suspension only module-owned snapshot material is read.
+ * suspension only module-owned snapshot material, the frozen genuine-mint
+ * anchor and the fresh frozen T003C-verified material are read — the
+ * dispatched handle is the verifier-paired reference, never a re-read of
+ * caller-owned state.
  */
 export async function invokeNonEffectfulTool(
   input: InvokeNonEffectfulToolInput,
@@ -765,28 +593,16 @@ export async function invokeNonEffectfulTool(
   if (unexpectedInputField !== undefined) {
     fail(
       'INVALID_INVOCATION_INPUT',
-      `non-effectful invocation input must contain exactly {request, binding, currentDefinitionGraph, assemblyProvenance, dispatch, resourceProvider?, sha256}; unexpected field "${unexpectedInputField}" (no transition, occurrence or journal material is representable)`,
+      `non-effectful invocation input must contain exactly {request, binding, currentDefinitionGraph, dispatch, resourceProvider?, sha256}; unexpected field "${unexpectedInputField}" (no transition, occurrence, journal or injected provenance-decision material is representable)`,
     );
   }
-  for (const required of ['request', 'binding', 'currentDefinitionGraph', 'assemblyProvenance', 'dispatch', 'sha256'] as const) {
+  for (const required of ['request', 'binding', 'currentDefinitionGraph', 'dispatch', 'sha256'] as const) {
     if (!(required in view) || view[required] === undefined) {
       fail('INVALID_INVOCATION_INPUT', `non-effectful invocation input.${required} is required`);
     }
   }
 
   const sha256 = requireSha256Port(view.sha256, 'non-effectful invocation input.sha256');
-
-  const provenanceGuard = view.assemblyProvenance;
-  if (
-    typeof provenanceGuard !== 'object' ||
-    provenanceGuard === null ||
-    typeof (provenanceGuard as SealedAssemblyProvenanceGuard).verifyProvenance !== 'function'
-  ) {
-    fail(
-      'INVALID_INVOCATION_INPUT',
-      'non-effectful invocation input.assemblyProvenance must be a SealedAssemblyProvenanceGuard ({ verifyProvenance({ assembly, assemblyDigest, definitionGraphDigest }): { verified: boolean, reason? } }) — the explicit fail-closed seam for the T002B mint guard',
-    );
-  }
 
   const dispatchPort = view.dispatch;
   if (
@@ -819,7 +635,7 @@ export async function invokeNonEffectfulTool(
   const graph = view.currentDefinitionGraph as DefinitionGraphEnvelope;
 
   const request = snapshotRequest(view.request);
-  const binding = snapshotBinding(view.binding, request);
+  const anchor = snapshotDispatchAnchor(view.binding, request);
 
   // ---- PHASE 2 (async): re-admission over the exact current state.
   //
@@ -837,7 +653,7 @@ export async function invokeNonEffectfulTool(
   });
   const admitted = await admitToolInvocationRequest(
     reconstructed,
-    { assembly: binding.successorAssembly, currentDefinitionGraph: graph },
+    { assembly: anchor.successorAssembly, currentDefinitionGraph: graph },
     sha256,
   );
 
@@ -850,73 +666,47 @@ export async function invokeNonEffectfulTool(
     );
   }
 
-  // Binding/request consistency: the exact handle pairs only with the exact
-  // current pin under the exact current identities.
-  const evidence = binding.evidence;
+  // ---- #691 P1-2 repair: T003C-owned binding verification BEFORE the opaque
+  // implementation handle is paired and exposed. The verifier proves
+  // module-private mint membership, re-verifies the accepted v1
+  // bindingDigest over the evidence material, and decides exact subject
+  // slot/currentness against the SAME final sealed Assembly (the anchor). Its
+  // typed failures propagate unchanged — this module never re-derives or
+  // re-owns those semantics.
+  const verified = await verifyToolImplementationBinding({
+    binding: view.binding as SealedToolImplementationBinding,
+    finalAssembly: anchor.successorAssembly,
+    sha256,
+  });
+
+  // Binding/request dispatch consistency over the VERIFIED material: the
+  // exact verifier-paired handle pairs only with the exact current pin under
+  // the exact current identities. (T003C deliberately never compares the
+  // historical mint-time evidence.assemblyDigest to the final Assembly; the
+  // cross-seam equality checks here consume only VERIFIED/ADMITTED material.)
+  const evidence = verified.evidence;
   if (evidence.toolComponentId !== admitted.toolComponentId) {
     fail(
       'INVALID_BINDING_EVIDENCE',
-      `the sealed binding evidence binds Tool Component "${evidence.toolComponentId}" but the admitted request targets "${admitted.toolComponentId}"; a binding can never dispatch another target's handle`,
+      `the verified binding pairs the handle of Tool Component "${evidence.toolComponentId}" but the admitted request targets "${admitted.toolComponentId}"; a binding can never dispatch another target's handle`,
     );
   }
-  if (evidence.definitionGraphDigest !== admitted.definitionGraphDigest) {
+  if (verified.currentness.definitionGraphDigest !== admitted.definitionGraphDigest) {
     fail(
       'INVALID_BINDING_EVIDENCE',
-      'the sealed binding evidence is bound to a different Definition graph digest than the authoritatively recomputed current digest; a stale binding fails closed before any Tool call',
+      'the verified binding currentness is anchored to a different Definition graph digest than the authoritatively recomputed current digest; a stale binding fails closed before any Tool call',
     );
   }
-  if (evidence.assemblyDigest !== admitted.assemblyDigest) {
+  if (verified.currentness.finalAssemblyDigest !== admitted.assemblyDigest) {
     fail(
       'INVALID_BINDING_EVIDENCE',
-      'the sealed binding evidence carries an assemblyDigest different from the admitted request; a binding minted into another successor Assembly fails closed before any Tool call',
-    );
-  }
-  if (evidence.assemblyDigest !== binding.successorAssemblyDigest) {
-    fail(
-      'INVALID_BINDING_EVIDENCE',
-      'the sealed binding evidence is not minted into its own successor Assembly; inconsistent binding evidence fails closed before any Tool call',
+      'the verified binding currentness is anchored to a different final Assembly digest than the admitted request; a binding verified against another successor Assembly fails closed before any Tool call',
     );
   }
   if (!evidence.supportedOperations.includes(admitted.operationId)) {
     fail(
       'INVALID_BINDING_EVIDENCE',
-      `the sealed binding evidence binds only operations (${evidence.supportedOperations.join(', ')}) and does not include the admitted operation "${admitted.operationId}"; the paired handle never dispatches outside the exact bound set`,
-    );
-  }
-
-  // P1-1 explicit fail-closed provenance seam (see module docstring): an
-  // affirmative, well-formed host decision over the exact assembly object is
-  // required before any Tool call. The kernel never silently trusts the
-  // digest.
-  const provenanceQuery = Object.freeze({
-    assembly: binding.successorAssembly,
-    assemblyDigest: admitted.assemblyDigest,
-    definitionGraphDigest: admitted.definitionGraphDigest,
-  });
-  let provenanceDecision: unknown;
-  try {
-    provenanceDecision = (provenanceGuard as SealedAssemblyProvenanceGuard).verifyProvenance(provenanceQuery);
-  } catch {
-    fail(
-      'ASSEMBLY_PROVENANCE_UNVERIFIED',
-      'the sealed-Assembly provenance guard threw; assembly provenance is unverifiable and the dispatch boundary fails closed (the T002B mint-guard export remains a separate bounded dependency)',
-    );
-  }
-  if (
-    typeof provenanceDecision !== 'object' ||
-    provenanceDecision === null ||
-    typeof (provenanceDecision as AssemblyProvenanceDecision).verified !== 'boolean'
-  ) {
-    fail(
-      'INVALID_INVOCATION_INPUT',
-      'assemblyProvenance.verifyProvenance must return { verified: boolean, reason?: string }',
-    );
-  }
-  if (!(provenanceDecision as AssemblyProvenanceDecision).verified) {
-    const reason = (provenanceDecision as { reason?: unknown }).reason;
-    fail(
-      'ASSEMBLY_PROVENANCE_UNVERIFIED',
-      `the sealed-Assembly provenance guard did not verify the assembly presented for dispatch${typeof reason === 'string' && reason.length > 0 ? `: ${reason}` : ''}; a content-consistent assemblyDigest is never silently trusted as T002B mint proof (P1-1 boundary)`,
+      `the verified binding binds only operations (${evidence.supportedOperations.join(', ')}) and does not include the admitted operation "${admitted.operationId}"; the paired handle never dispatches outside the exact bound set`,
     );
   }
 
@@ -926,27 +716,28 @@ export async function invokeNonEffectfulTool(
   if (resourceProvider !== undefined) {
     const resolved = await resolveToolResources(
       {
-        assembly: binding.successorAssembly,
+        assembly: anchor.successorAssembly,
         componentId: admitted.toolComponentId,
         operationId: admitted.operationId,
         provider: resourceProvider,
       },
     );
     resources = resolved.resources;
-  } else if (binding.applicableRequirementCount > 0) {
+  } else if (anchor.applicableRequirementCount > 0) {
     fail(
       'MISSING_RESOURCE_PROVIDER',
-      `the sealed Assembly carries ${binding.applicableRequirementCount} applicable resource requirement(s) for operation "${admitted.operationId}" of Tool Component "${admitted.toolComponentId}", but no ResourceProvider was injected; requirements fail closed before dispatch — no ambient, default, or fallback resource exists`,
+      `the sealed Assembly carries ${anchor.applicableRequirementCount} applicable resource requirement(s) for operation "${admitted.operationId}" of Tool Component "${admitted.toolComponentId}", but no ResourceProvider was injected; requirements fail closed before dispatch — no ambient, default, or fallback resource exists`,
     );
   } else {
     resources = new Map<string, ResolvedResourceEntry>();
   }
 
-  // ---- Dispatch: the paired handle, the frozen input snapshot, the resolved
-  // resources. Tool thrown failures propagate unchanged — never caught,
-  // wrapped or converted into an outcome.
+  // ---- Dispatch: the VERIFIER-PAIRED handle (exposed only after mint,
+  // evidence, final-slot and currentness verification succeeded), the frozen
+  // input snapshot, the resolved resources. Tool thrown failures propagate
+  // unchanged — never caught, wrapped or converted into an outcome.
   const dispatchQuery: NonEffectfulToolDispatchQuery = Object.freeze({
-    handle: binding.implementationHandle,
+    handle: verified.implementationHandle,
     operationId: admitted.operationId,
     input: admitted.input,
     resources,

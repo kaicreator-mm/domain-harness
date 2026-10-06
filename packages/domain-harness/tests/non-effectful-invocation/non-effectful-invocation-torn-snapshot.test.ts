@@ -206,7 +206,6 @@ test('PACK-C T004B torn snapshot: caller mutating request input, caller context 
     request: fx.admitted,
     binding: fx.binding,
     currentDefinitionGraph: fx.g,
-    assemblyProvenance: { verifyProvenance: () => ({ verified: true as const }) },
     dispatch,
     sha256: realSha256,
   };
@@ -242,7 +241,7 @@ test('PACK-C T004B torn snapshot: caller mutating request input, caller context 
   );
 });
 
-test('PACK-C T004B torn snapshot: the paired handle is captured synchronously and never re-read from caller-owned material', async () => {
+test('PACK-C T004B torn snapshot: the verifier-paired handle is dispatched unchanged and never re-read from caller-owned material', async () => {
   const fx = await fixture({ q: 1 });
   const observedHandles: unknown[] = [];
 
@@ -257,7 +256,6 @@ test('PACK-C T004B torn snapshot: the paired handle is captured synchronously an
     request: fx.admitted,
     binding: fx.binding,
     currentDefinitionGraph: fx.g,
-    assemblyProvenance: { verifyProvenance: () => ({ verified: true as const }) },
     dispatch,
     sha256: realSha256,
   });
@@ -362,7 +360,6 @@ test('PACK-C T004B torn snapshot: a mid-flight resourceProvider response mutatio
     request: admitted,
     binding,
     currentDefinitionGraph: g,
-    assemblyProvenance: { verifyProvenance: () => ({ verified: true as const }) },
     dispatch: {
       async dispatch(query) {
         calls.push(query);

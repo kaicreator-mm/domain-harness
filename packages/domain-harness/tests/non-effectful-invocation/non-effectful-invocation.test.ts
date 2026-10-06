@@ -1,7 +1,7 @@
 /**
  * T004B tests-first matrix — Non-effectful Tool invocation path
  * (issue #632, fine-grained DAG #534 T004B; authority #589 PACK-C T004B
- * section).
+ * section; #691 post-merge bounded repair).
  *
  * Covers the PACK-C T004B test list:
  *  - pure success: an operation classified `effect=none` dispatches the exact
@@ -13,8 +13,11 @@
  *  - exact implementation dispatch: the handle that runs is the handle paired
  *    with the exact pin in the T003C sealed binding, and the result binds
  *    that exact pin + binding digest for audit;
- *  - binding/request consistency matrix: evidence forged or mismatched
- *    against the admitted request fails closed before dispatch;
+ *  - #691 binding authenticity matrix: hand-built binding forgeries — however
+ *    field-perfect — fail closed at the T003C mint seam
+ *    (UNMINTED_TOOL_IMPLEMENTATION_BINDING propagates unchanged); a GENUINE
+ *    binding still fails INVALID_BINDING_EVIDENCE when its verified subject
+ *    or bound operation set does not match the admitted request;
  *  - required resources go through T005B resolution before dispatch; a
  *    resource failure is terminal and fails before the Tool call; assembly
  *    requirements without a provider fail closed;
@@ -37,6 +40,7 @@ import {
   type SealRuntimeAssemblyInput,
 } from '../../src/contracts/runtime-assembly.js';
 import {
+  ToolImplementationBindingError,
   bindToolImplementation,
   type SealedToolImplementationBinding,
   type ToolImplementationCandidate,
@@ -60,7 +64,6 @@ import {
   type InvokeNonEffectfulToolInput,
   type NonEffectfulToolDispatchPort,
   type NonEffectfulToolDispatchQuery,
-  type SealedAssemblyProvenanceGuard,
 } from '../../src/contracts/non-effectful-invocation.js';
 
 const realSha256: Sha256Port = {
@@ -105,6 +108,40 @@ function toolComponent(overrides: Partial<ComponentEnvelope> = {}): ComponentEnv
       providesCapabilities: [{ capabilityId: 'cap.calc', version: '1.0.0' }],
     },
     ...overrides,
+  };
+}
+
+/** A second consumer of the same Kind requiring a second capability. */
+function consumerB(): ComponentEnvelope {
+  return {
+    family: 'semantic',
+    componentId: 'consumer.b',
+    kind: { kindId: 'test.t004b-kind', version: '1.0.0' },
+    requiredSemanticContracts: [],
+    requiredCapabilities: [{ capabilityId: 'cap.calc2', version: '1.0.0' }],
+    semanticBody: { note: 'consumer-b' },
+  };
+}
+
+/** A second genuine Tool Component of the same Kind providing cap.calc2. */
+function toolComponentBeta(): ComponentEnvelope {
+  return {
+    family: 'tool',
+    componentId: 'tool.beta',
+    kind: { kindId: 'test.t004b-kind', version: '1.0.0' },
+    requiredSemanticContracts: [],
+    requiredCapabilities: [],
+    semanticBody: {
+      operations: [
+        {
+          operationId: 'op.beta.query',
+          inputSchema: { type: 'object' },
+          outputSchema: {},
+          effect: 'none',
+        },
+      ],
+      providesCapabilities: [{ capabilityId: 'cap.calc2', version: '1.0.0' }],
+    },
   };
 }
 
@@ -157,16 +194,6 @@ function caller(overrides: Partial<InvocationCallerContext> = {}): InvocationCal
   return { callerId: 'caller.session-1', callerKind: 'agent', attributes: { role: 'tester' }, ...overrides };
 }
 
-/** A provenance guard that records its queries and verifies everything. */
-function genuineGuard(seen?: unknown[]): SealedAssemblyProvenanceGuard {
-  return {
-    verifyProvenance(query) {
-      seen?.push(query);
-      return { verified: true };
-    },
-  };
-}
-
 /** A dispatch port that records its queries and returns a fixed output. */
 function recordingDispatch(
   calls: NonEffectfulToolDispatchQuery[],
@@ -192,6 +219,7 @@ async function fixture(
     input?: unknown;
     candidates?: readonly ToolImplementationCandidate[];
     exactPin?: ToolImplementationIdentity;
+    requiredOperations?: readonly string[];
     sealOverrides?: Partial<SealRuntimeAssemblyInput>;
   } = {},
 ): Promise<Fixture> {
@@ -216,6 +244,9 @@ async function fixture(
     currentDefinitionGraph: g,
     implementations: overrides.candidates ?? [candidate('impl.calc.alpha')],
     ...(overrides.exactPin !== undefined ? { exactPin: overrides.exactPin } : {}),
+    ...(overrides.requiredOperations !== undefined
+      ? { requiredOperations: overrides.requiredOperations }
+      : {}),
     sha256: realSha256,
   });
   const operationId = overrides.operationId ?? 'op.query';
@@ -254,7 +285,6 @@ function invocationInput(
     request: fx.admitted,
     binding: fx.binding,
     currentDefinitionGraph: fx.g,
-    assemblyProvenance: genuineGuard(),
     dispatch: recordingDispatch([]),
     sha256: realSha256,
     ...overrides,
@@ -273,6 +303,30 @@ function expectInvocationError(
       assert.ok(
         error instanceof NonEffectfulInvocationError,
         `expected NonEffectfulInvocationError, got ${String(error)}`,
+      );
+      assert.equal(error.code, code);
+      return error;
+    },
+  );
+}
+
+/**
+ * T003C typed binding failures propagate UNCHANGED through the non-effectful
+ * invocation boundary (#691 repair): T004B never re-owns the binding
+ * authenticity semantics, so their codes surface as thrown.
+ */
+function expectBindingError(
+  promise: Promise<unknown>,
+  code: string,
+): Promise<ToolImplementationBindingError> {
+  return promise.then(
+    () => {
+      throw new Error(`expected ToolImplementationBindingError(${code}), but invocation resolved`);
+    },
+    (error: unknown) => {
+      assert.ok(
+        error instanceof ToolImplementationBindingError,
+        `expected ToolImplementationBindingError, got ${String(error)}`,
       );
       assert.equal(error.code, code);
       return error;
@@ -385,74 +439,188 @@ test('PACK-C T004B exact dispatch: the handle paired with the exact pin runs —
 });
 
 // ---------------------------------------------------------------------------
-// PACK-C T004B: binding/request consistency matrix.
+// PACK-C T004B: binding authenticity + binding/request consistency matrix.
+//
+// #691 repair: binding AUTHENTICITY (module-private mint membership + evidence
+// digest + exact final-Assembly slot/currentness) is owned by the T003C
+// consumer verifier and its typed failures propagate UNCHANGED; hand-built
+// lookalikes — however field-perfect — can never dispatch. T004B owns only the
+// dispatch-gating consistency of a VERIFIED genuine binding against the
+// admitted request (subject alignment, bound-operation containment).
 // ---------------------------------------------------------------------------
 
-test('PACK-C T004B consistency matrix: forged or mismatched binding evidence fails closed before dispatch', async (t) => {
+test('PACK-C T004B consistency matrix: hand-built binding forgeries fail closed at the T003C mint seam before dispatch', async (t) => {
   const calls: NonEffectfulToolDispatchQuery[] = [];
   const fx = await fixture();
   const { binding } = fx;
 
-  await t.test('evidence bound to a different Tool Component fails INVALID_BINDING_EVIDENCE', async () => {
+  await t.test('a field-perfect lookalike of the genuine binding fails UNMINTED_TOOL_IMPLEMENTATION_BINDING', async () => {
+    // Byte-identical public content: every evidence field copied, the genuine
+    // successor Assembly and the genuine handle carried by reference. The
+    // module-private T003C mint registry is the only authority — content
+    // similarity contributes nothing.
+    const lookalike = {
+      evidence: { ...binding.evidence },
+      successorAssembly: binding.successorAssembly,
+      implementationHandle: binding.implementationHandle,
+    } as unknown as SealedToolImplementationBinding;
+    await expectBindingError(
+      invokeNonEffectfulTool(invocationInput(fx, { binding: lookalike, dispatch: recordingDispatch(calls) })),
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
+    );
+  });
+
+  await t.test('evidence bound to a different Tool Component fails UNMINTED_TOOL_IMPLEMENTATION_BINDING', async () => {
     const forged = {
       evidence: { ...binding.evidence, toolComponentId: 'tool.other' },
       successorAssembly: binding.successorAssembly,
       implementationHandle: binding.implementationHandle,
     } as unknown as SealedToolImplementationBinding;
-    await expectInvocationError(
+    await expectBindingError(
       invokeNonEffectfulTool(invocationInput(fx, { binding: forged, dispatch: recordingDispatch(calls) })),
-      'INVALID_BINDING_EVIDENCE',
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
     );
   });
 
-  await t.test('evidence carrying a different assembly digest fails INVALID_BINDING_EVIDENCE', async () => {
+  await t.test('evidence carrying a different assembly digest fails UNMINTED_TOOL_IMPLEMENTATION_BINDING', async () => {
     const forged = {
       evidence: { ...binding.evidence, assemblyDigest: 'sha256:foreign-assembly' },
       successorAssembly: binding.successorAssembly,
       implementationHandle: binding.implementationHandle,
     } as unknown as SealedToolImplementationBinding;
-    await expectInvocationError(
+    await expectBindingError(
       invokeNonEffectfulTool(invocationInput(fx, { binding: forged, dispatch: recordingDispatch(calls) })),
-      'INVALID_BINDING_EVIDENCE',
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
     );
   });
 
-  await t.test('evidence that dropped the admitted operation from the bound set fails INVALID_BINDING_EVIDENCE', async () => {
+  await t.test('evidence that dropped the admitted operation from the bound set fails UNMINTED_TOOL_IMPLEMENTATION_BINDING', async () => {
     const forged = {
       evidence: { ...binding.evidence, supportedOperations: ['op.mutate'] },
       successorAssembly: binding.successorAssembly,
       implementationHandle: binding.implementationHandle,
     } as unknown as SealedToolImplementationBinding;
-    await expectInvocationError(
+    await expectBindingError(
       invokeNonEffectfulTool(invocationInput(fx, { binding: forged, dispatch: recordingDispatch(calls) })),
-      'INVALID_BINDING_EVIDENCE',
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
     );
   });
 
-  await t.test('a binding not carrying sealed binding evidence fails INVALID_BINDING_EVIDENCE', async () => {
+  await t.test('a binding not carrying sealed binding evidence fails UNMINTED_TOOL_IMPLEMENTATION_BINDING', async () => {
     const forged = {
       successorAssembly: binding.successorAssembly,
       implementationHandle: binding.implementationHandle,
     } as unknown as SealedToolImplementationBinding;
-    await expectInvocationError(
+    await expectBindingError(
       invokeNonEffectfulTool(invocationInput(fx, { binding: forged, dispatch: recordingDispatch(calls) })),
-      'INVALID_BINDING_EVIDENCE',
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
     );
   });
 
-  await t.test('binding evidence with an empty binding digest fails INVALID_BINDING_EVIDENCE', async () => {
+  await t.test('binding evidence with an empty binding digest fails UNMINTED_TOOL_IMPLEMENTATION_BINDING', async () => {
     const forged = {
       evidence: { ...binding.evidence, bindingDigest: '' },
       successorAssembly: binding.successorAssembly,
       implementationHandle: binding.implementationHandle,
     } as unknown as SealedToolImplementationBinding;
-    await expectInvocationError(
+    await expectBindingError(
       invokeNonEffectfulTool(invocationInput(fx, { binding: forged, dispatch: recordingDispatch(calls) })),
-      'INVALID_BINDING_EVIDENCE',
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
     );
   });
 
-  assert.equal(calls.length, 0, 'no consistency failure may ever reach the dispatch port');
+  assert.equal(calls.length, 0, 'no authenticity failure may ever reach the dispatch port');
+});
+
+test('PACK-C T004B consistency: a GENUINE binding for a different Tool Component fails INVALID_BINDING_EVIDENCE before dispatch', async () => {
+  const calls: NonEffectfulToolDispatchQuery[] = [];
+  // tool.beta is a second genuine Tool Component of the SAME graph, bound
+  // genuinely into its own successor Assembly. The request targets tool.alpha
+  // and is admitted against bindingBeta's own successor Assembly (T004A is
+  // Definition-plane and does not consult binding slots): everything is
+  // genuine and current, but the verified binding's subject is tool.beta —
+  // a binding can never dispatch another target's handle.
+  const g = graph({
+    components: [
+      consumer(),
+      consumerB(),
+      toolComponent(),
+      toolComponentBeta(),
+    ],
+  });
+  const baseAssembly = await sealRuntimeAssembly(
+    { definitionGraph: g, kindImplementations: [kindBinding()] },
+    realSha256,
+  );
+  const digest = await computeDefinitionGraphDigest(g, realSha256);
+  const selectionBeta = await resolveCurrentCapabilityProvider(
+    g, { capabilityId: 'cap.calc2', version: '1.0.0' }, 'consumer.b', digest, realSha256,
+  );
+  const bindingBeta = await bindToolImplementation({
+    assembly: baseAssembly,
+    selection: JSON.parse(JSON.stringify(selectionBeta)),
+    currentDefinitionGraph: g,
+    implementations: [{
+      implementation: {
+        implementationId: 'impl.calc.beta',
+        implementationVersion: '1.0.0',
+        implementationDigest: 'sha256:impl.calc.beta-content',
+      },
+      supportedOperations: ['op.beta.query'],
+      handle: { id: 'handle.beta' },
+    }],
+    sha256: realSha256,
+  });
+  const exposure = await admitToolExposure(
+    {
+      toolComponentId: 'tool.alpha',
+      operationId: 'op.query',
+      caller: caller(),
+      assembly: bindingBeta.successorAssembly,
+      currentDefinitionGraph: g,
+      policy: ADMIT_ALL,
+    },
+    realSha256,
+  );
+  const admitted = await admitToolInvocationRequest(
+    {
+      toolComponentId: 'tool.alpha',
+      operationId: 'op.query',
+      input: { q: 1 },
+      caller: caller(),
+      definitionGraphDigest: bindingBeta.successorAssembly.record.definitionGraphDigest,
+      assemblyDigest: bindingBeta.successorAssembly.assemblyDigest,
+      exposure,
+    },
+    { assembly: bindingBeta.successorAssembly, currentDefinitionGraph: g },
+    realSha256,
+  );
+
+  await expectInvocationError(
+    invokeNonEffectfulTool({
+      request: admitted,
+      binding: bindingBeta,
+      currentDefinitionGraph: g,
+      dispatch: recordingDispatch(calls),
+      sha256: realSha256,
+    }),
+    'INVALID_BINDING_EVIDENCE',
+  );
+  assert.equal(calls.length, 0);
+});
+
+test('PACK-C T004B consistency: a GENUINE binding whose bound operation set excludes the admitted operation fails INVALID_BINDING_EVIDENCE', async () => {
+  const calls: NonEffectfulToolDispatchQuery[] = [];
+  const fx = await fixture({ requiredOperations: ['op.mutate'] });
+  assert.deepEqual([...fx.binding.evidence.supportedOperations], ['op.mutate']);
+
+  // op.query is declared by the same Tool Component and admits fine, but the
+  // verified binding pairs the handle only with the exact bound operation set.
+  await expectInvocationError(
+    invokeNonEffectfulTool(invocationInput(fx, { dispatch: recordingDispatch(calls) })),
+    'INVALID_BINDING_EVIDENCE',
+  );
+  assert.equal(calls.length, 0);
 });
 
 test('PACK-C T004B input matrix: the invocation input is closed-world and every required field is enforced', async () => {
@@ -463,7 +631,6 @@ test('PACK-C T004B input matrix: the invocation input is closed-world and every 
     'request',
     'binding',
     'currentDefinitionGraph',
-    'assemblyProvenance',
     'dispatch',
     'sha256',
   ] as const) {
@@ -482,18 +649,22 @@ test('PACK-C T004B input matrix: the invocation input is closed-world and every 
     'INVALID_INVOCATION_INPUT',
   );
 
+  // #691 repair: no injected provenance port exists — assembly provenance is
+  // decided by the directly consumed T002B mint verifier, and a second
+  // caller/host-supplied authority is structurally unrepresentable (even a
+  // well-formed affirming guard is rejected as an unexpected input field).
   await expectInvocationError(
     invokeNonEffectfulTool({
       ...base,
-      assemblyProvenance: null as unknown as SealedAssemblyProvenanceGuard,
-    }),
+      assemblyProvenance: { verifyProvenance: () => ({ verified: true as const }) },
+    } as unknown as InvokeNonEffectfulToolInput),
     'INVALID_INVOCATION_INPUT',
   );
   await expectInvocationError(
     invokeNonEffectfulTool({
       ...base,
-      assemblyProvenance: {} as unknown as SealedAssemblyProvenanceGuard,
-    }),
+      assemblyProvenance: null,
+    } as unknown as InvokeNonEffectfulToolInput),
     'INVALID_INVOCATION_INPUT',
   );
   await expectInvocationError(

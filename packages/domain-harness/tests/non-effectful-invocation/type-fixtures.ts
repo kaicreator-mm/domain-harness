@@ -1,25 +1,25 @@
 /**
  * T004B compile-time type fixtures (issue #632, fine-grained DAG #534 T004B;
- * authority #589 PACK-C T004B section).
+ * authority #589 PACK-C T004B section; #691 post-merge bounded repair).
  *
  * Proof-only fixtures: typechecked by `tsc -p tsconfig.test.json --noEmit`
  * but never executed. `Expect`/`Equal` force compile failures when the
  * non-effectful invocation contract regresses (taxonomy drift, mutable
- * authority surfaces, smuggled occurrence/journal material), and
- * `@ts-expect-error` blocks prove negative boundaries stay unrepresentable:
- * callers cannot mint a `SealedToolImplementationBinding` by hand (the
- * sealing brand is module-private to T003C), and the invocation result never
- * carries transition, occurrence or journal authority.
+ * authority surfaces, smuggled occurrence/journal/provenance-decision
+ * material), and `@ts-expect-error` blocks prove negative boundaries stay
+ * unrepresentable: callers cannot mint a `SealedToolImplementationBinding` by
+ * hand (the sealing brand is module-private to T003C), no injected
+ * provenance-decision field exists on the dispatch input (assembly provenance
+ * is the directly consumed T002B mint verifier, #691), and the invocation
+ * result never carries transition, occurrence or journal authority.
  */
 import type {
-  AssemblyProvenanceDecision,
   InvokeNonEffectfulToolInput,
   NonEffectfulInvocationError,
   NonEffectfulInvocationErrorCode,
   NonEffectfulToolDispatchPort,
   NonEffectfulToolDispatchQuery,
   NonEffectfulToolInvocationResult,
-  SealedAssemblyProvenanceGuard,
 } from '../../src/contracts/non-effectful-invocation.js';
 import type { AdmittedToolInvocationRequest } from '../../src/contracts/invocation-request.js';
 import type { SealedToolImplementationBinding } from '../../src/contracts/tool-implementation-binding.js';
@@ -34,6 +34,9 @@ type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 // F1: the failure taxonomy is exactly the seven T004B categories.
+// ASSEMBLY_PROVENANCE_UNVERIFIED survives the #691 repair with a new, genuine
+// authority: it is now decided by the directly consumed T002B mint verifier
+// over the exact final Assembly, never by a caller/host-supplied decision.
 export type ErrorCodesExactly = Expect<
   Equal<
     NonEffectfulInvocationErrorCode,
@@ -49,7 +52,9 @@ export type ErrorCodesExactly = Expect<
 export type ErrorCodeField = Expect<Equal<NonEffectfulInvocationError['code'], NonEffectfulInvocationErrorCode>>;
 
 // F2: the dispatch input is the closed PACK-C field set — no occurrence,
-// activation, journal or transition material is representable.
+// activation, journal, transition or injected provenance-decision material is
+// representable (#691: the `assemblyProvenance` field was removed as
+// authority together with its guard port).
 export type InputShape = Expect<
   Equal<
     InvokeNonEffectfulToolInput,
@@ -57,7 +62,6 @@ export type InputShape = Expect<
       readonly request: AdmittedToolInvocationRequest;
       readonly binding: SealedToolImplementationBinding;
       readonly currentDefinitionGraph: DefinitionGraphEnvelope;
-      readonly assemblyProvenance: SealedAssemblyProvenanceGuard;
       readonly dispatch: NonEffectfulToolDispatchPort;
       readonly resourceProvider?: import('../../src/contracts/resource-resolution.js').ResourceProvider;
       readonly sha256: Sha256Port;
@@ -65,25 +69,9 @@ export type InputShape = Expect<
   >
 >;
 
-// F3: the provenance guard is one generic injected port (the P1-1 fail-closed
-// seam): exact assembly identity flows in, a verified/denied decision flows
-// out — never a mint, never a handle.
-export type ProvenanceGuardShape = Expect<
-  Equal<
-    AssemblyProvenanceDecision,
-    { readonly verified: true } | { readonly verified: false; readonly reason?: string }
-  >
->;
-export type GuardQueryIsIdentityOnly = Expect<
-  Equal<
-    Parameters<SealedAssemblyProvenanceGuard['verifyProvenance']>[0],
-    {
-      readonly assembly: import('../../src/contracts/runtime-assembly.js').SealedRuntimeAssembly;
-      readonly assemblyDigest: ContentDigest;
-      readonly definitionGraphDigest: ContentDigest;
-    }
-  >
->;
+// F3 (removed with the #691 repair): the injected provenance-guard port
+// fixtures are gone — the guard type no longer exists on the module, and F2's
+// exact-shape equality proves no injected provenance field can reappear.
 
 // F4: the dispatch port query carries the opaque paired handle plus
 // operation/input/resource snapshots — no caller context, no authority
