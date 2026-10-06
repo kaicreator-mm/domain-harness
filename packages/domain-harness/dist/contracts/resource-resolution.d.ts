@@ -35,6 +35,12 @@
  *   suspension; each provider response is synchronously snapshotted
  *   immediately after its await. The caller's objects are never re-read after
  *   an await, and the caller's objects are never frozen or mutated;
+ * - provider-response inspection is contained (#794): a hostile response
+ *   object — e.g. a Proxy whose descriptor/ownKeys/get traps throw, or an
+ *   engine Proxy-invariant TypeError — cannot escape the synchronous response
+ *   snapshot as an untyped provider-controlled exception. Every such escape
+ *   fails closed as a deterministic typed INVALID_RESOURCE_PROVIDER_RESPONSE
+ *   whose fixed message never echoes the caught value's text;
  * - no provider downgrade/latest/default/order fallback: exactly one injected
  *   provider is consulted, exactly once per requirement, in canonical
  *   (componentId, resourceKey) order. A failure is terminal — never retried,
@@ -161,7 +167,10 @@ export type ResourceProviderResponse = {
  * per resolution call by the host; the core never selects, ranks, caches, or
  * fallbacks between providers. `resolve` may be async; a synchronous throw
  * or a rejection surfaces as `RESOURCE_PROVIDER_FAILURE` (typed) — the
- * provider's own error text is never propagated (redaction discipline).
+ * provider's own error text is never propagated (redaction discipline). A
+ * hostile response object that throws during the response snapshot/inspection
+ * fails closed the same way as typed `INVALID_RESOURCE_PROVIDER_RESPONSE`
+ * (#794) — its trap/error text is never propagated either.
  */
 export interface ResourceProvider {
     readonly resolve: (request: ResourceResolutionRequest) => Promise<ResourceProviderResponse>;

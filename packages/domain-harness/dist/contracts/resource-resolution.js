@@ -442,7 +442,26 @@ export async function resolveToolResources(options) {
             // NEVER propagated; only the exact Assembly identity participates.
             fail('RESOURCE_PROVIDER_FAILURE', `the injected ResourceProvider failed while resolving resource "${request.resourceKey}" for component "${componentId}" (required=${request.required}); the failure is terminal — no retry, no fallback provider, no downgrade`);
         }
-        const response = snapshotProviderResponse(raw, request.resourceKey);
+        // Proxy-trap containment (#794): the resolve() catch above contains the
+        // provider CALL, but the response OBJECT is inspected here, outside that
+        // catch. A hostile Proxy response can throw from its descriptor/ownKeys/
+        // get traps (or trip an engine Proxy-invariant TypeError) during
+        // `snapshotProviderResponse`. Every escape from that inspection path is
+        // provider-controlled: our own typed fail-closed paths (including #643's
+        // and #837's redacted classifications) pass through unchanged as
+        // ResourceResolutionError, and anything else fails closed as a
+        // deterministic typed error whose fixed message never echoes the caught
+        // value's text, name, or properties.
+        let response;
+        try {
+            response = snapshotProviderResponse(raw, request.resourceKey);
+        }
+        catch (error) {
+            if (error instanceof ResourceResolutionError) {
+                throw error;
+            }
+            fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `resource provider response for "${request.resourceKey}" could not be safely inspected (hostile response object); failing closed: provider-controlled trap/error material is never propagated`);
+        }
         if (response.status === 'resolved') {
             const requiredContract = request.contract;
             const satisfiedContract = response.contract;
