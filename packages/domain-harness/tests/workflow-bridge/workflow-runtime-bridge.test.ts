@@ -20,9 +20,14 @@
  *     - unreferenced ("dead") states are accepted as inert states (the
  *       existing boundary maps a state without transitions to a state
  *       without `on`);
- *     - duplicate (event, from) transitions are preserved in declaration
- *       order and resolve first-declared-first in the existing engine
- *       (deterministic, never rejected);
+ *     - duplicate (event, from) transitions carry an explicit canonical
+ *       route identity in the existing engine-neutral route-selection shape
+ *       (sourceStateId, routeClass 'event', routeIndex, eventType);
+ *       event-only selection among more than one eligible route fails
+ *       typed/closed — never first-declared, never array position 0;
+ *     - route grouping is collision-free for identifiers carrying U+0000
+ *       (escaped group keys): distinct (source, event) pairs never merge,
+ *       so canonical tables and explicit selections stay exact;
  *     - self-transitions behave as ordinary engine self-transitions;
  * - representation limits of the existing engine fail typed and closed at
  *   COMPILE time (never a fallback to Raw/legacy semantics):
@@ -55,6 +60,7 @@ import {
   compileWorkflowComponent,
   runCompiledWorkflow,
   type CompiledWorkflowArtifact,
+  type WorkflowBridgeEvent,
 } from '../../src/adapters/workflow-runtime-bridge.js';
 
 const realSha256: Sha256Port = {
@@ -183,7 +189,7 @@ async function compileFixture(body: BodySpec = LINEAR_BODY): Promise<{
 function run(
   fx: Fixture,
   artifact: CompiledWorkflowArtifact,
-  events: readonly { type: string }[],
+  events: readonly WorkflowBridgeEvent[],
 ) {
   return runCompiledWorkflow({
     artifact,
@@ -233,11 +239,35 @@ test('PACK-C T007B: the compiled artifact binds the exact admission evidence and
   });
   assert.ok(artifact.identity.componentSemanticDigest.length > 0);
 
+  // Every compiled transition carries its canonical explicit route identity
+  // (single routes are routeIndex 0 of their (from, event) group).
+  assert.deepEqual(artifact.routes, [
+    {
+      transitionId: 't-finish',
+      sourceStateId: 'middle',
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: 'finish',
+    },
+    {
+      transitionId: 't-advance',
+      sourceStateId: 'start',
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: 'advance',
+    },
+  ]);
+
   // Digest material is provably free of engine handles: the whole artifact is
-  // JSON-serializable plain data, frozen, with exactly one own key.
-  assert.deepEqual(Object.keys(artifact), ['identity']);
+  // JSON-serializable plain data, frozen, with exactly the identity and the
+  // canonical explicit route table as own keys.
+  assert.deepEqual(Object.keys(artifact), ['identity', 'routes']);
   assert.ok(Object.isFrozen(artifact));
   assert.ok(Object.isFrozen(artifact.identity));
+  assert.ok(Object.isFrozen(artifact.routes));
+  for (const route of artifact.routes) {
+    assert.ok(Object.isFrozen(route));
+  }
   assert.deepEqual(JSON.parse(JSON.stringify(artifact)), artifact);
 });
 
@@ -318,22 +348,190 @@ test('PACK-C T007B: P2-2 policy — dead (unreferenced) states are inert per exi
   assert.equal((await run(fx, artifact, [{ type: 'finish' }])).stateId, 'done');
 });
 
-test('PACK-C T007B: P2-2 policy — duplicate (event, from) transitions resolve first-declared-first, deterministically', async () => {
-  const body: BodySpec = {
-    initial: 'start',
-    states: ['start', 'a', 'b'],
-    transitions: [
-      { transitionId: 't-first', from: 'start', to: 'a', event: 'go' },
-      { transitionId: 't-second', from: 'start', to: 'b', event: 'go' },
-    ],
-  };
-  const { fixture: fx, artifact } = await compileFixture(body);
+// Duplicate (from, event) transitions: two semantic routes for one event.
+const DUPLICATE_BODY_DECLARED_FIRST: BodySpec = {
+  initial: 'start',
+  states: ['start', 'a', 'b', 'done'],
+  transitions: [
+    { transitionId: 't-first', from: 'start', to: 'a', event: 'go' },
+    { transitionId: 't-second', from: 'start', to: 'b', event: 'go' },
+    { transitionId: 't-finish', from: 'a', to: 'done', event: 'finish' },
+  ],
+};
 
-  // Existing engine semantics: both transitions share the event route in
-  // declaration order and the first one wins — stable across repeated runs.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    assert.equal((await run(fx, artifact, [{ type: 'go' }])).stateId, 'a');
+// The same semantic transitions in a permuted declaration order: the
+// semantic-transition -> compiled-route identity mapping must not move.
+const DUPLICATE_BODY_PERMUTED: BodySpec = {
+  initial: 'start',
+  states: ['start', 'a', 'b', 'done'],
+  transitions: [
+    { transitionId: 't-second', from: 'start', to: 'b', event: 'go' },
+    { transitionId: 't-finish', from: 'a', to: 'done', event: 'finish' },
+    { transitionId: 't-first', from: 'start', to: 'a', event: 'go' },
+  ],
+};
+
+// Canonical explicit route identity: routeIndex is assigned by transitionId
+// order within each (from, event) group and rows are sorted by
+// (sourceStateId, eventType, routeIndex) — never by declaration position.
+const CANONICAL_DUPLICATE_ROUTES = [
+  {
+    transitionId: 't-finish',
+    sourceStateId: 'a',
+    routeClass: 'event',
+    routeIndex: 0,
+    eventType: 'finish',
+  },
+  {
+    transitionId: 't-first',
+    sourceStateId: 'start',
+    routeClass: 'event',
+    routeIndex: 0,
+    eventType: 'go',
+  },
+  {
+    transitionId: 't-second',
+    sourceStateId: 'start',
+    routeClass: 'event',
+    routeIndex: 1,
+    eventType: 'go',
+  },
+];
+
+test('PACK-C T007B: duplicate (event, from) transitions carry an explicit canonical route identity, invariant under declaration permutation', async () => {
+  const declaredFirst = await compileFixture(DUPLICATE_BODY_DECLARED_FIRST);
+  const permuted = await compileFixture(DUPLICATE_BODY_PERMUTED);
+
+  // The two components are semantically identical but NOT digest-identical
+  // (declaration order is part of the semantic digest), so the identical
+  // route table below is a structural guarantee, not a digest coincidence.
+  assert.notEqual(
+    declaredFirst.artifact.identity.componentSemanticDigest,
+    permuted.artifact.identity.componentSemanticDigest,
+  );
+
+  assert.deepEqual(declaredFirst.artifact.routes, CANONICAL_DUPLICATE_ROUTES);
+  assert.deepEqual(permuted.artifact.routes, CANONICAL_DUPLICATE_ROUTES);
+});
+
+test('PACK-C T007B: event-only selection with duplicate eligible routes fails typed and closed, deterministically (never array position 0)', async () => {
+  const declaredFirst = await compileFixture(DUPLICATE_BODY_DECLARED_FIRST);
+  const permuted = await compileFixture(DUPLICATE_BODY_PERMUTED);
+
+  const messages: string[] = [];
+  for (const compiled of [declaredFirst, permuted]) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await assert.rejects(
+        run(compiled.fixture, compiled.artifact, [{ type: 'go' }]),
+        (error: unknown) => {
+          assert.ok(error instanceof WorkflowBridgeError);
+          assert.equal(error.code, 'WORKFLOW_EVENT_ROUTE_AMBIGUOUS');
+          assert.equal(error.failureClass, 'POLICY');
+          messages.push(error.message);
+          return true;
+        },
+      );
+    }
   }
+
+  // Deterministic and permutation-invariant: the typed failure names the
+  // canonical route identities and never depends on declaration order.
+  assert.equal(new Set(messages).size, 1);
+});
+
+test('PACK-C T007B: execution with an explicit route identity selects exactly that route, independent of declaration permutation', async () => {
+  for (const compiled of [
+    await compileFixture(DUPLICATE_BODY_DECLARED_FIRST),
+    await compileFixture(DUPLICATE_BODY_PERMUTED),
+  ]) {
+    const { fixture: fx, artifact } = compiled;
+    assert.equal(
+      (
+        await run(fx, artifact, [
+          { type: 'go', route: { sourceStateId: 'start', routeIndex: 0 } },
+        ])
+      ).stateId,
+      'a',
+    );
+    assert.equal(
+      (
+        await run(fx, artifact, [
+          { type: 'go', route: { sourceStateId: 'start', routeIndex: 1 } },
+        ])
+      ).stateId,
+      'b',
+    );
+    // The explicit route identity composes with the rest of the graph; the
+    // follow-up 'finish' is a plain event-only send on a single-route state
+    // of a machine that also carries an ambiguous route group.
+    assert.equal(
+      (
+        await run(fx, artifact, [
+          { type: 'go', route: { sourceStateId: 'start', routeIndex: 0 } },
+          { type: 'finish' },
+        ])
+      ).stateId,
+      'done',
+    );
+  }
+});
+
+test('PACK-C T007B: an explicit route identity that does not resolve to exactly one eligible route fails typed and closed', async () => {
+  const { fixture: fx, artifact } = await compileFixture(DUPLICATE_BODY_DECLARED_FIRST);
+
+  const invalidSelections: readonly WorkflowBridgeEvent[] = [
+    // routeIndex outside the canonical route group
+    { type: 'go', route: { sourceStateId: 'start', routeIndex: 2 } },
+    { type: 'go', route: { sourceStateId: 'start', routeIndex: -1 } },
+    { type: 'go', route: { sourceStateId: 'start', routeIndex: 0.5 } },
+    // route identity names a state the run is not at
+    { type: 'go', route: { sourceStateId: 'elsewhere', routeIndex: 0 } },
+    // event with no eligible route at all from the current state
+    { type: 'finish', route: { sourceStateId: 'start', routeIndex: 0 } },
+  ];
+  for (const event of invalidSelections) {
+    await assert.rejects(run(fx, artifact, [event]), (error: unknown) => {
+      assert.ok(error instanceof WorkflowBridgeError);
+      assert.equal(error.code, 'WORKFLOW_ROUTE_SELECTION_INVALID');
+      assert.equal(error.failureClass, 'POLICY');
+      return true;
+    });
+  }
+});
+
+test('PACK-C T007B: single-route event behavior is unchanged and explicit identity stays optional', async () => {
+  const { fixture: fx, artifact } = await compileFixture(DUPLICATE_BODY_DECLARED_FIRST);
+
+  // 'finish' has exactly one eligible route from 'a': a plain event-only send.
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: 'go', route: { sourceStateId: 'start', routeIndex: 0 } },
+        { type: 'finish' },
+      ])
+    ).stateId,
+    'done',
+  );
+  // An explicit single-route identity resolves to that one route.
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: 'go', route: { sourceStateId: 'start', routeIndex: 0 } },
+        { type: 'finish', route: { sourceStateId: 'a', routeIndex: 0 } },
+      ])
+    ).stateId,
+    'done',
+  );
+  // An event no transition consumes still leaves the actor unchanged.
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: 'go', route: { sourceStateId: 'start', routeIndex: 0 } },
+        { type: 'unknown-event' },
+      ])
+    ).stateId,
+    'a',
+  );
 });
 
 test('PACK-C T007B: self-transitions behave as ordinary existing-engine self-transitions', async () => {
@@ -444,6 +642,124 @@ test('PACK-C T007B: a caller-constructed artifact is not a minted artifact and n
     assert.ok(error instanceof WorkflowBridgeError);
     assert.equal(error.code, 'UNTRUSTED_COMPILED_WORKFLOW_ARTIFACT');
     assert.equal(error.failureClass, 'TRUST');
+    return true;
+  });
+});
+
+// Regression pin (fresh review #649 issuecomment-6023502859, P1-1): identity
+// strings may legally carry U+0000, so a raw `sourceStateId\0eventType` group
+// key is not injective — ("a\0b", "c") and ("a", "b\0c") collapse into ONE
+// group, corrupting the published route table AND silently executing the
+// wrong route for an explicit selection. The fixture is the review's repro
+// vector plus an entry transition so both collided pairs are executable.
+const NUL_STATE = 'a\u0000b';
+const NUL_EVENT = 'b\u0000c';
+
+const NUL_BODY: BodySpec = {
+  initial: 'a',
+  states: ['a', NUL_STATE, 'xa', 'y', 'z'],
+  transitions: [
+    { transitionId: 't0', from: 'a', to: NUL_STATE, event: 'enter' },
+    { transitionId: 't1', from: NUL_STATE, to: 'xa', event: 'c' },
+    { transitionId: 't2', from: 'a', to: 'y', event: NUL_EVENT },
+    { transitionId: 't3', from: 'a', to: 'z', event: NUL_EVENT },
+  ],
+};
+
+test('PACK-C T007B: route groups stay distinct for identifiers carrying U+0000 (no group-key collision)', async () => {
+  const { fixture: fx, artifact } = await compileFixture(NUL_BODY);
+
+  // Compile: the two distinct (source, event) pairs keep separate routeIndex
+  // spaces — the table is NOT a merged group over the collided raw join.
+  assert.deepEqual(artifact.routes, [
+    {
+      transitionId: 't2',
+      sourceStateId: 'a',
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: NUL_EVENT,
+    },
+    {
+      transitionId: 't3',
+      sourceStateId: 'a',
+      routeClass: 'event',
+      routeIndex: 1,
+      eventType: NUL_EVENT,
+    },
+    {
+      transitionId: 't0',
+      sourceStateId: 'a',
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: 'enter',
+    },
+    {
+      transitionId: 't1',
+      sourceStateId: NUL_STATE,
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: 'c',
+    },
+  ]);
+
+  // Execute: explicit selection inside the ("a", "b\0c") group resolves
+  // exactly the named route (pre-repair, merged index 1 executed t3 -> z).
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: NUL_EVENT, route: { sourceStateId: 'a', routeIndex: 0 } },
+      ])
+    ).stateId,
+    'y',
+  );
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: NUL_EVENT, route: { sourceStateId: 'a', routeIndex: 1 } },
+      ])
+    ).stateId,
+    'z',
+  );
+
+  // A routeIndex outside the TRUE group fails typed and closed (pre-repair
+  // the collided merged bounds admitted it and the send fell through inert).
+  await assert.rejects(
+    run(fx, artifact, [{ type: NUL_EVENT, route: { sourceStateId: 'a', routeIndex: 2 } }]),
+    (error: unknown) => {
+      assert.ok(error instanceof WorkflowBridgeError);
+      assert.equal(error.code, 'WORKFLOW_ROUTE_SELECTION_INVALID');
+      assert.equal(error.failureClass, 'POLICY');
+      return true;
+    },
+  );
+
+  // Explicit identity stays bound to the current state even with NUL-carrying
+  // identifiers in play.
+  await assert.rejects(
+    run(fx, artifact, [
+      { type: 'c', route: { sourceStateId: NUL_STATE, routeIndex: 0 } },
+    ]),
+    (error: unknown) => {
+      assert.ok(error instanceof WorkflowBridgeError);
+      assert.equal(error.code, 'WORKFLOW_ROUTE_SELECTION_INVALID');
+      assert.equal(error.failureClass, 'POLICY');
+      return true;
+    },
+  );
+
+  // Event-only execution of the NUL-carrying single route ("a\0b", "c") is
+  // NOT blocked by a collided foreign group: enter the state, then it runs.
+  assert.equal((await run(fx, artifact, [{ type: 'enter' }, { type: 'c' }])).stateId, 'xa');
+
+  // Event-only selection among the duplicate routes of ("a", "b\0c") still
+  // fails typed, naming exactly the two REAL canonical routes.
+  await assert.rejects(run(fx, artifact, [{ type: NUL_EVENT }]), (error: unknown) => {
+    assert.ok(error instanceof WorkflowBridgeError);
+    assert.equal(error.code, 'WORKFLOW_EVENT_ROUTE_AMBIGUOUS');
+    assert.equal(error.failureClass, 'POLICY');
+    assert.ok(error.message.includes('2 eligible routes'), error.message);
+    assert.ok(error.message.includes('t2#0, t3#1'), error.message);
+    assert.ok(!error.message.includes('t1#'), error.message);
     return true;
   });
 });
