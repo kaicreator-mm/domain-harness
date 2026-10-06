@@ -2,6 +2,7 @@ export * from './capability.js';
 export * from './compiled-artifact-profile.js';
 export * from './effect.js';
 export * from './host.js';
+export * from './message-identity.js';
 export * from './message.js';
 export * from './package.js';
 export * from './package-data.js';

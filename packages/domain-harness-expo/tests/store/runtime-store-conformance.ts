@@ -48,6 +48,9 @@ export const runtimeStoreConformanceChecks: readonly string[] = [
   'restart-persistence',
   'unresolved-mailbox-enumeration',
   'retained-package-pin-filter',
+  'accepted-identity-compatible-replay',
+  'accepted-identity-collision-fail-closed',
+  'accepted-identity-collision-restart-persistence',
 ];
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -86,6 +89,31 @@ async function expectReject(action: () => Promise<unknown>, message: string): Pr
     rejected = true;
   }
   assert(rejected, message);
+}
+
+/**
+ * A8 collision category check: the rejection must carry the stable
+ * MESSAGE_IDENTITY_COLLISION code, so a collision is distinguishable from a
+ * valid duplicate ack (a returned value) and from unrelated SQLite/storage
+ * failures (any other error code/message).
+ */
+async function expectIdentityCollision(
+  action: () => Promise<unknown>,
+  message: string,
+): Promise<void> {
+  let code: unknown;
+  let rejected = false;
+  try {
+    await action();
+  } catch (error) {
+    rejected = true;
+    code = (error as { code?: unknown }).code;
+  }
+  assert(rejected, message);
+  assert(
+    code === 'MESSAGE_IDENTITY_COLLISION',
+    `${message} (expected code MESSAGE_IDENTITY_COLLISION, got ${String(code)})`,
+  );
 }
 
 function assertDurableDuplicateAck(
@@ -627,6 +655,193 @@ export async function runRuntimeStoreConformance(
       'retained package pin disappeared while live instances still pin it',
     );
     checks.push('retained-package-pin-filter');
+
+    // A8 (v0.6 T002): durable accepted-message identity and duplicate
+    // compatibility. A repeated target+messageId is only a valid idempotent
+    // replay when the whole AcceptedMessageIdentity tuple is compatible with
+    // the durable acceptance; incompatible material fails closed with
+    // MESSAGE_IDENTITY_COLLISION before any durable write.
+    const identity = makeInstance('identity');
+    await store.createInstance(identity);
+    const identityFirst = await store.acceptMessage({
+      messageId: 'id-1',
+      target: identity.address,
+      type: 'increment',
+      payload: { b: 2, a: 1 },
+      causationId: 'cause-1',
+      contractVersion: '1',
+    });
+    // Key-order-different payload plus an explicit correlation equal to the
+    // instance correlation is the same logical message: durable duplicate ack,
+    // no new sequence, no new observation.
+    const identityReplay = await store.acceptMessage({
+      messageId: 'id-1',
+      target: identity.address,
+      type: 'increment',
+      payload: { a: 1, b: 2 },
+      correlationId: identity.correlationId,
+      causationId: 'cause-1',
+      contractVersion: '1',
+    });
+    assertDurableDuplicateAck(identityReplay, identityFirst, 'canonical payload replay ');
+    const identitySecond = await store.acceptMessage({
+      messageId: 'id-2',
+      target: identity.address,
+      type: 'increment',
+      payload: { a: 1, b: 2 },
+    });
+    assert(
+      identitySecond.targetSequence === identityFirst.targetSequence + 1,
+      'compatible identity replay allocated a new target sequence',
+    );
+    checks.push('accepted-identity-compatible-replay');
+
+    const identitySnapshotBeforeCollision = await store.getInstance(identity.address);
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'decrement',
+          payload: { a: 1, b: 2 },
+          causationId: 'cause-1',
+          contractVersion: '1',
+        }),
+      'same messageId with a different type was replayed as a duplicate',
+    );
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'increment',
+          payload: { a: 1, b: 3 },
+          causationId: 'cause-1',
+          contractVersion: '1',
+        }),
+      'same messageId with a different payload was replayed as a duplicate',
+    );
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'increment',
+          payload: { b: 2, a: 1 },
+          correlationId: 'other-correlation',
+          causationId: 'cause-1',
+          contractVersion: '1',
+        }),
+      'same messageId with a different effective correlation was replayed as a duplicate',
+    );
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'increment',
+          payload: { a: 1, b: 2 },
+          contractVersion: '1',
+        }),
+      'same messageId with an absent causationId was replayed over a present one',
+    );
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'increment',
+          payload: { a: 1, b: 2 },
+          causationId: 'cause-2',
+          contractVersion: '1',
+        }),
+      'same messageId with a different causationId was replayed as a duplicate',
+    );
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'increment',
+          payload: { a: 1, b: 2 },
+          causationId: 'cause-1',
+        }),
+      'same messageId with an absent contractVersion was replayed over a present one',
+    );
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'increment',
+          payload: { a: 1, b: 2 },
+          causationId: 'cause-1',
+          contractVersion: '2',
+        }),
+      'same messageId with a different contractVersion was replayed as a duplicate',
+    );
+
+    const identityAfterCollisions = await store.getInstance(identity.address);
+    assert(
+      identityAfterCollisions?.stateRevision === identitySnapshotBeforeCollision?.stateRevision &&
+        jsonEqual(identityAfterCollisions?.state, identitySnapshotBeforeCollision?.state),
+      'identity collision mutated workflow state',
+    );
+    assert(
+      (await store.getMessageDisposition(identity.address, 'id-1'))?.disposition === 'accepted',
+      'identity collision mutated the durable message disposition',
+    );
+    const identityThird = await store.acceptMessage({
+      messageId: 'id-3',
+      target: identity.address,
+      type: 'increment',
+      payload: null,
+    });
+    assert(
+      identityThird.targetSequence === identitySecond.targetSequence + 1,
+      'identity collision advanced the target sequence',
+    );
+    assertDurableDuplicateAck(
+      await store.acceptMessage({
+        messageId: 'id-1',
+        target: identity.address,
+        type: 'increment',
+        payload: { b: 2, a: 1 },
+        causationId: 'cause-1',
+        contractVersion: '1',
+      }),
+      identityFirst,
+      'post-collision valid duplicate replay ',
+    );
+    checks.push('accepted-identity-collision-fail-closed');
+
+    store = await harness.reopen(store);
+    await expectIdentityCollision(
+      () =>
+        store.acceptMessage({
+          messageId: 'id-1',
+          target: identity.address,
+          type: 'decrement',
+          payload: { a: 1, b: 2 },
+          causationId: 'cause-1',
+          contractVersion: '1',
+        }),
+      'identity collision protection disappeared after close/reopen',
+    );
+    assertDurableDuplicateAck(
+      await store.acceptMessage({
+        messageId: 'id-1',
+        target: identity.address,
+        type: 'increment',
+        payload: { a: 1, b: 2 },
+        correlationId: identity.correlationId,
+        causationId: 'cause-1',
+        contractVersion: '1',
+      }),
+      identityFirst,
+      'post-restart valid duplicate replay ',
+    );
+    checks.push('accepted-identity-collision-restart-persistence');
 
     assert(
       jsonEqual(checks, runtimeStoreConformanceChecks),
