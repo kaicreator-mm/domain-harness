@@ -13,11 +13,112 @@ export class ResourceResolutionError extends Error {
 function fail(code, message) {
     throw new ResourceResolutionError(code, message);
 }
+// ---------------------------------------------------------------------------
+// Provider-controlled key/symbol diagnostic redaction (issue #643)
+// ---------------------------------------------------------------------------
+/**
+ * Own-key names that are identifier-shaped but never echoed: they are
+ * prototype-pollution / confused-deputy names, not debugging material.
+ */
+const NON_ECHOABLE_KEY_NAMES = new Set([
+    '__proto__',
+    'prototype',
+    'constructor',
+    '__defineGetter__',
+    '__defineSetter__',
+    '__lookupGetter__',
+    '__lookupSetter__',
+]);
+/**
+ * Hard pre-scan length cap (#837 P1_02): a provider-controlled key longer
+ * than this is classified from its LENGTH alone — before any Set lookup,
+ * regex, or per-character scan touches its content. The cap stays above
+ * realistic secret-shaped key material, so bounded keys still receive their
+ * full shape classification.
+ */
+const DIAGNOSTIC_KEY_MAX_LENGTH = 128;
+/** Identifier-shaped own-key shape class (classified, never echoed; #837). */
+const IDENTIFIER_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+/** Small numeric array-index own-key shape class (classified, never echoed). */
+const NUMERIC_INDEX_KEY_PATTERN = /^[0-9]{1,6}$/;
+/** Control characters (C0 range + DEL) never reach a diagnostic. */
+function containsControlCharacter(key) {
+    for (let index = 0; index < key.length; index += 1) {
+        const code = key.charCodeAt(index);
+        if (code <= 0x1f || code === 0x7f) {
+            return true;
+        }
+    }
+    return false;
+}
+/**
+ * Shape-only detection of common secret material in KEY NAMES (never values):
+ * `sk-(live|test)-…` API keys, `Bearer …` tokens, and JWT forms (`eyJ…` or
+ * `<header>.eyJ<payload>`). Detection runs on the key name only; the matched
+ * material itself is never copied into a diagnostic.
+ */
+const SECRET_SHAPED_KEY_PATTERN = /(?:sk-(?:live|test)-|bearer[ _-]|eyJ[A-Za-z0-9_-]{6,}|[A-Za-z0-9_-]{2,}\.eyJ)/i;
+/**
+ * Bounded, non-secret, deterministic classification of one provider-controlled
+ * own-key name for failure diagnostics (#643, #837). Provider-controlled key
+ * names may themselves BE the secret (`sk-…` keys), prototype-pollution
+ * material (`__proto__`/`constructor`), control-character payloads, or plain
+ * identifier/credential material (`accessToken`, `password`, unrecognized
+ * token forms) — none of it is debugging material, so NOTHING is echoed
+ * verbatim: every key is reduced to a fixed shape-class label plus its length.
+ * The hard length cap runs FIRST (#837 P1_02): an overlong key is classified
+ * from its length alone, before any Set lookup, regex, or per-character scan
+ * touches its content; only bounded-size input undergoes shape
+ * classification. The same input always classifies identically, and no
+ * character of the key beyond its length ever reaches a diagnostic.
+ */
+function classifyDiagnosticKey(key) {
+    if (key.length > DIAGNOSTIC_KEY_MAX_LENGTH) {
+        return `<redacted:overlong,len=${key.length}>`;
+    }
+    if (NON_ECHOABLE_KEY_NAMES.has(key)) {
+        return `<redacted:prototype-name,len=${key.length}>`;
+    }
+    if (SECRET_SHAPED_KEY_PATTERN.test(key)) {
+        return `<redacted:secret-shaped,len=${key.length}>`;
+    }
+    if (containsControlCharacter(key)) {
+        return `<redacted:control-character,len=${key.length}>`;
+    }
+    if (IDENTIFIER_KEY_PATTERN.test(key)) {
+        return `<redacted:identifier,len=${key.length}>`;
+    }
+    if (NUMERIC_INDEX_KEY_PATTERN.test(key)) {
+        return `<redacted:index,len=${key.length}>`;
+    }
+    return `<redacted:non-identifier,len=${key.length}>`;
+}
+/**
+ * Consumer-local rendering of one descriptor-safety issue for THIS module's
+ * diagnostics (#643). `safeRecordSnapshot`/`safeArraySnapshot` issues may carry
+ * provider-controlled material: a SYMBOL_KEYED_PROPERTY issue names the symbol
+ * via `String(symbol)` (embedding the provider-controlled description), and
+ * the string issue keys are provider-controlled key names. Here that material
+ * is classified, never echoed: only the violation kind, fixed phrasing, and a
+ * bounded deterministic classification participate.
+ */
+function describeResolutionSafetyIssue(issue) {
+    if (issue.violation === 'SYMBOL_KEYED_PROPERTY') {
+        return 'must not carry symbol-keyed properties (hidden properties are not contract input; symbol descriptions are provider-controlled and never diagnosed)';
+    }
+    if (issue.key === undefined) {
+        return describeRecordSafetyIssue(issue);
+    }
+    return describeRecordSafetyIssue({
+        violation: issue.violation,
+        key: classifyDiagnosticKey(issue.key),
+    });
+}
 /** Snapshot one authority-bearing record, mapping descriptor issues to a typed failure. */
 function requireSafeRecord(value, description, code) {
     const result = safeRecordSnapshot(value, description);
     if (!result.ok) {
-        fail(code, `${description} ${describeRecordSafetyIssue(result.issue)}`);
+        fail(code, `${description} ${describeResolutionSafetyIssue(result.issue)}`);
     }
     return result.snapshot;
 }
@@ -25,7 +126,7 @@ function requireSafeRecord(value, description, code) {
 function requireSafeArray(value, description, code) {
     const result = safeArraySnapshot(value, description);
     if (!result.ok) {
-        fail(code, `${description} ${describeRecordSafetyIssue(result.issue)}`);
+        fail(code, `${description} ${describeResolutionSafetyIssue(result.issue)}`);
     }
     return result.snapshot;
 }
@@ -147,8 +248,10 @@ const CURRENTNESS_PIN_FIELDS = new Set(['providerId', 'resourceKey', 'revisionDi
  * (`providerId`, `resourceKey`, `revisionDigest`) — a secret value,
  * credential, live handle, connection object, function or provider object has
  * NO representable field, and an unknown field (which is where such material
- * would have to ride) fails closed with only the offending KEY name in the
- * message. Identities must be exact (no floating/range/selector semantics, no
+ * would have to ride) fails closed with only a bounded, non-secret,
+ * deterministic CLASSIFICATION of the offending key name in the message —
+ * the key name itself may be the secret material and is never echoed (#643).
+ * Identities must be exact (no floating/range/selector semantics, no
  * embedded `id@selector` form) and the pin's `resourceKey` must exactly equal
  * the requirement's key — a pin for a different resource is never evidence.
  */
@@ -156,7 +259,7 @@ function snapshotCurrentnessPin(value, path, expectedResourceKey) {
     const view = requireSafeRecord(value, path, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
     const unexpectedField = Object.keys(view).find((key) => !CURRENTNESS_PIN_FIELDS.has(key));
     if (unexpectedField !== undefined) {
-        fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${path} must contain exactly {providerId, resourceKey, revisionDigest}; unexpected field "${unexpectedField}" (secret values, credentials, live handles, connection objects, functions/module paths and provider objects are structurally unrepresentable in currentness evidence)`);
+        fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${path} must contain exactly {providerId, resourceKey, revisionDigest}; unexpected field "${classifyDiagnosticKey(unexpectedField)}" (secret values, credentials, live handles, connection objects, functions/module paths and provider objects are structurally unrepresentable in currentness evidence)`);
     }
     const providerId = requireExactIdentity(view.providerId, `${path}.providerId`, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
     const resourceKey = requireExactIdentity(view.resourceKey, `${path}.resourceKey`, 'INVALID_RESOURCE_PROVIDER_RESPONSE');
@@ -172,7 +275,9 @@ function snapshotCurrentnessPin(value, path, expectedResourceKey) {
  * its await. Closed-world whitelists per status; exact refs only; handles are
  * kept as opaque references and never diagnosed. A provider cannot smuggle
  * secret-bearing fields into authority — unknown fields fail closed and only
- * the offending KEY name (never a value) participates in the message.
+ * a bounded, non-secret, deterministic classification of the offending key
+ * name (never the name itself, never a value) participates in the message
+ * (#643).
  */
 function snapshotProviderResponse(raw, resourceKey) {
     const at = `resource provider response for "${resourceKey}"`;
@@ -184,7 +289,7 @@ function snapshotProviderResponse(raw, resourceKey) {
     if (status === 'resolved') {
         const unexpectedField = Object.keys(view).find((key) => !RESOLVED_RESPONSE_FIELDS.has(key));
         if (unexpectedField !== undefined) {
-            fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} must contain exactly {status, handle, contract?, currentnessPin?}; unexpected field "${unexpectedField}" (provider responses cannot smuggle secret-bearing material into authority)`);
+            fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} must contain exactly {status, handle, contract?, currentnessPin?}; unexpected field "${classifyDiagnosticKey(unexpectedField)}" (provider responses cannot smuggle secret-bearing material into authority)`);
         }
         if (!('handle' in view)) {
             fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} resolved status must carry a handle`);
@@ -209,7 +314,7 @@ function snapshotProviderResponse(raw, resourceKey) {
     if (status === 'incompatible') {
         const unexpectedField = Object.keys(view).find((key) => !INCOMPATIBLE_RESPONSE_FIELDS.has(key));
         if (unexpectedField !== undefined) {
-            fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} must contain exactly {status, supportedContracts?}; unexpected field "${unexpectedField}"`);
+            fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} must contain exactly {status, supportedContracts?}; unexpected field "${classifyDiagnosticKey(unexpectedField)}"`);
         }
         if (!('supportedContracts' in view) || view.supportedContracts === undefined) {
             return Object.freeze({ status });
@@ -220,7 +325,7 @@ function snapshotProviderResponse(raw, resourceKey) {
     }
     const unexpectedField = Object.keys(view).find((key) => !ABSENT_RESPONSE_FIELDS.has(key));
     if (unexpectedField !== undefined) {
-        fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} must contain exactly {status}; unexpected field "${unexpectedField}"`);
+        fail('INVALID_RESOURCE_PROVIDER_RESPONSE', `${at} must contain exactly {status}; unexpected field "${classifyDiagnosticKey(unexpectedField)}"`);
     }
     return Object.freeze({ status });
 }
@@ -256,7 +361,9 @@ const RESOLUTION_OPTION_FIELDS = new Set(['assembly', 'componentId', 'operationI
  *   caller mutating its own objects mid-resolution cannot affect the result;
  * - redaction: no error message ever contains a provider handle, a provider
  *   thrown-message, or any provider-supplied value — only exact identity
- *   strings from the Assembly material.
+ *   strings from the Assembly material; provider-controlled own-key names and
+ *   symbol descriptions appear only as bounded, non-secret, deterministic
+ *   classifications (#643).
  */
 export async function resolveToolResources(options) {
     // ---- PHASE 1 (synchronous): validate and snapshot all authority material.
