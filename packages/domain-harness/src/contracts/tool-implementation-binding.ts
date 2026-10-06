@@ -87,6 +87,7 @@ import {
 } from './identity.js';
 import type { CurrentCapabilityProviderSelection } from './capability-provision.js';
 import {
+  isSealedRuntimeAssembly,
   sealRuntimeAssembly,
   type AssemblyImplementationBindingEvidence,
   type AssemblyResourceRequirementsMaterial,
@@ -120,6 +121,21 @@ const TOOL_IMPLEMENTATION_BINDING_EVIDENCE_DOMAIN =
  * substitute/default/latest resolution, and no diagnostic ever serializes
  * implementation handles, secret values or live objects (only exact identity
  * strings participate).
+ *
+ * Consumer-verifier additions (#640; #589 §A A1–A4) — the five frozen
+ * deterministic failures downstream consumers (T003E/T004B) rely on:
+ * - `UNMINTED_TOOL_IMPLEMENTATION_BINDING`: an authority use over an object
+ *   that is not a member of the module-private mint registry;
+ * - `TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH`: the verified evidence
+ *   material is malformed, not canonical, or its recomputed v1 bindingDigest
+ *   does not equal `evidence.bindingDigest`;
+ * - `MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING`: no final-Assembly slot for
+ *   the exact subject exists (never repaired by another slot/alias);
+ * - `STALE_TOOL_IMPLEMENTATION_BINDING`: the subject slot was replaced by a
+ *   different bindingDigest, or the final Assembly's Definition identity no
+ *   longer matches the evidence;
+ * - `TOOL_IMPLEMENTATION_PIN_MISMATCH`: a consumer-supplied expected exact
+ *   implementation pin does not equal the verified evidence pin.
  */
 export type ToolImplementationBindingErrorCode =
   | 'INVALID_BINDING_INPUT'
@@ -127,7 +143,12 @@ export type ToolImplementationBindingErrorCode =
   | 'MISSING_TOOL_IMPLEMENTATION'
   | 'AMBIGUOUS_TOOL_IMPLEMENTATION'
   | 'INCOMPATIBLE_TOOL_IMPLEMENTATION'
-  | 'DEFINITION_GRAPH_DIGEST_MISMATCH';
+  | 'DEFINITION_GRAPH_DIGEST_MISMATCH'
+  | 'UNMINTED_TOOL_IMPLEMENTATION_BINDING'
+  | 'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH'
+  | 'MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING'
+  | 'STALE_TOOL_IMPLEMENTATION_BINDING'
+  | 'TOOL_IMPLEMENTATION_PIN_MISMATCH';
 
 export class ToolImplementationBindingError extends Error {
   readonly code: ToolImplementationBindingErrorCode;
@@ -243,6 +264,20 @@ export interface ToolImplementationBindingEvidence {
 const SEALED_TOOL_BINDING_BRAND: unique symbol = Symbol(
   'kaicreator.tool-implementation-binding.sealed',
 );
+
+/**
+ * Module-private mint registry for `SealedToolImplementationBinding` (#640;
+ * #589 §A A1 — the T002B sealed-Assembly precedent). A property-style brand
+ * alone is bypassable: it is readable through the prototype chain
+ * (Object.create forgery) and the symbol is reflectively extractable from any
+ * genuine binding (getOwnPropertySymbols theft). WeakSet membership is
+ * neither inheritable, reflectively extractable, nor reproducible from public
+ * material: only `bindToolImplementation` can mint a member, so only a
+ * genuine binding can ever authorize a consumer's authority use. The brand is
+ * retained as a secondary, own-property-only (`Object.hasOwn`) defense in
+ * depth.
+ */
+const SEALED_TOOL_BINDING_MINTS = new WeakSet<object>();
 
 /**
  * The sealed Tool implementation binding: the serializable evidence, the
@@ -1124,5 +1159,593 @@ export async function bindToolImplementation(
     implementationHandle: chosen.hasHandle ? chosen.handle : undefined,
     [SEALED_TOOL_BINDING_BRAND]: true as const,
   });
+  // #640 A1: `bindToolImplementation` remains the ONLY mint path and
+  // registers the final frozen sealed binding exactly once before return.
+  SEALED_TOOL_BINDING_MINTS.add(sealed);
   return sealed;
+}
+
+// ---------------------------------------------------------------------------
+// Consumer-verifiable authenticity/currentness seam (#640; #589 §A A1–A5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only synchronous mint-membership verifier/type guard (#589 §A A1 —
+ * the T002B `isSealedRuntimeAssembly` precedent). The module-private WeakSet
+ * mint registry is the authoritative test — it cannot be satisfied by
+ * prototype inheritance or symbol reflection, since only
+ * `bindToolImplementation` ever adds a member. The unique-symbol brand is
+ * kept as defense in depth, but consulted as an OWN property only
+ * (`Object.hasOwn`), so a brand value inherited through a forged prototype
+ * chain or stolen by symbol reflection contributes nothing: brand, property
+ * shape and copied field values alone are never sufficient.
+ *
+ * The guard can never be used to mint or forge a member; consumers (T003E
+ * closure, T004B admission) rely on it to prove a caller-supplied binding is
+ * a genuine `bindToolImplementation` mint before any authority use.
+ */
+export function isSealedToolImplementationBinding(
+  value: unknown,
+): value is SealedToolImplementationBinding {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    SEALED_TOOL_BINDING_MINTS.has(value) &&
+    Object.hasOwn(value, SEALED_TOOL_BINDING_BRAND) &&
+    (value as Record<typeof SEALED_TOOL_BINDING_BRAND, unknown>)[SEALED_TOOL_BINDING_BRAND] === true
+  );
+}
+
+/**
+ * Fresh frozen, non-aliased verified currentness material (#589 §A A3.5):
+ * carries the exact Definition identity, the CURRENT final Assembly digest,
+ * the exact T003C subject and the exact verified bindingDigest. No handle,
+ * provider object or invocation field is representable.
+ */
+export interface VerifiedToolImplementationCurrentness {
+  readonly status: 'CURRENT';
+  /** Exact Definition identity, equal to the verified evidence's graph digest. */
+  readonly definitionGraphDigest: ContentDigest;
+  /** Content digest of the exact current final Assembly currentness was decided against. */
+  readonly finalAssemblyDigest: ContentDigest;
+  /** The exact T003C subject (`evidence.toolComponentId`). */
+  readonly subject: ComponentId;
+  /** The exact verified bindingDigest matched in the final Assembly slot. */
+  readonly bindingDigest: ContentDigest;
+}
+
+/**
+ * Fresh frozen, non-aliased verified evidence: the descriptor-safe snapshot
+ * of the verified evidence material plus the final-Assembly currentness
+ * decided against the exact current final Assembly (#589 §A A2/A3). Never
+ * carries a runtime handle.
+ */
+export interface VerifiedToolImplementationBindingEvidence {
+  readonly status: 'VERIFIED';
+  /** The verified evidence snapshot (v1 digest material + provenance fields). */
+  readonly evidence: ToolImplementationBindingEvidence;
+  /** The verified final-Assembly currentness. */
+  readonly currentness: VerifiedToolImplementationCurrentness;
+}
+
+/** Input of the T003C-owned evidence verifier (#589 §A A2). */
+export interface VerifyToolImplementationBindingEvidenceInput {
+  /**
+   * The authority-bearing evidence material to verify. Descriptor-safely
+   * snapshotted synchronously before the first `await`; unsafe hidden or
+   * accessor structure fails the deterministic invalid-input taxonomy before
+   * evidence verification, and malformed/non-canonical/digest-mismatching
+   * material fails `TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH`.
+   */
+  readonly evidence: unknown;
+  /** The exact current final sealed Assembly (genuine T002B mint). */
+  readonly finalAssembly: SealedRuntimeAssembly;
+  /** The Sha256Port used for the authoritative v1 digest recomputation. */
+  readonly sha256: Sha256Port;
+}
+
+/** Input of the binding verification path (#589 §A A4). */
+export interface VerifyToolImplementationBindingInput {
+  /** The exact sealed binding to verify — must be a module-private mint. */
+  readonly binding: SealedToolImplementationBinding;
+  /** The exact current final sealed Assembly (genuine T002B mint). */
+  readonly finalAssembly: SealedRuntimeAssembly;
+  /**
+   * Optional consumer-supplied exact implementation pin (all three identity
+   * fields) that must equal the verified evidence pin exactly; a mismatch
+   * fails `TOOL_IMPLEMENTATION_PIN_MISMATCH`. Never resolved against
+   * candidates, ordering, latest or any other lookup.
+   */
+  readonly expectedImplementationPin?: ToolImplementationIdentity;
+  /** The Sha256Port used for the authoritative v1 digest recomputation. */
+  readonly sha256: Sha256Port;
+}
+
+/**
+ * Fresh frozen, non-aliased verified binding (#589 §A A4): the verified
+ * evidence and currentness material, plus the ORIGINAL opaque runtime
+ * implementation handle reference — exposed/paired only after mint, evidence,
+ * final-slot and exact-pin verification all succeeded. The handle remains
+ * outside every semantic digest and never supplies authority/currentness.
+ */
+export interface VerifiedToolImplementationBinding {
+  readonly status: 'VERIFIED_CURRENT';
+  /** The verified evidence snapshot (never carries the handle). */
+  readonly evidence: ToolImplementationBindingEvidence;
+  /** The verified final-Assembly currentness. */
+  readonly currentness: VerifiedToolImplementationCurrentness;
+  /** The original opaque handle reference, paired after full verification. */
+  readonly implementationHandle: unknown;
+}
+
+/** Deep descriptor-safe structure capture: presence/type stay data, unsafe structure fails. */
+function captureDescriptorSafeStructure(value: unknown, description: string): unknown {
+  if (Array.isArray(value)) {
+    const entries = requireSafeArray(value, description);
+    return Object.freeze(entries.map((entry, index) => captureDescriptorSafeStructure(entry, `${description}[${index}]`)));
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  const view = requireSafeRecord(value, description);
+  const captured: Record<string, unknown> = {};
+  for (const key of Object.keys(view)) {
+    captured[key] = captureDescriptorSafeStructure(view[key], `${description}.${key}`);
+  }
+  return Object.freeze(captured);
+}
+
+/** Evidence material content check: non-empty content digest or typed mismatch. */
+function requireEvidenceDigest(value: unknown, path: string): ContentDigest {
+  if (typeof value !== 'string' || !isContentDigest(value)) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${path} must be a non-empty content digest string (malformed evidence material fails closed)`,
+    );
+  }
+  return value;
+}
+
+/** Evidence material content check: exact non-floating identity or typed mismatch. */
+function requireEvidenceIdentity(value: unknown, path: string): string {
+  if (typeof value !== 'string') {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${path} must be a string`);
+  }
+  if (!isNonEmptyIdentityString(value)) {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${path} must be a non-empty exact identity`);
+  }
+  if (carriesEmbeddedSelector(value) || carriesFloatingOrRangeSemantics(value)) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${path} must be an exact identity, never an embedded selector or floating/range form`,
+    );
+  }
+  return value;
+}
+
+/** Evidence material content check: exact closed `{capabilityId, version}` ref or typed mismatch. */
+function requireEvidenceCapabilityRef(value: unknown, path: string): CapabilityContractRef {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${path} must contain exactly {capabilityId, version}`);
+  }
+  const view = value as Record<string, unknown>;
+  const keys = Object.keys(view).sort();
+  if (keys.length !== 2 || !keys.includes('capabilityId') || !keys.includes('version')) {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${path} must contain exactly {capabilityId, version}`);
+  }
+  const capabilityId = requireEvidenceIdentity(view.capabilityId, `${path}.capabilityId`);
+  const version = requireEvidenceIdentity(view.version, `${path}.version`);
+  if (carriesXRangeVersionSemantics(version)) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${path}.version must be an exact version, never an x-range/partial form`,
+    );
+  }
+  return Object.freeze({ capabilityId, version });
+}
+
+/** Evidence material content check: exact closed implementation pin or typed mismatch. */
+function requireEvidenceImplementation(value: unknown, path: string): ToolImplementationIdentity {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${path} must contain exactly {implementationId, implementationVersion, implementationDigest}`,
+    );
+  }
+  const view = value as Record<string, unknown>;
+  const keys = Object.keys(view).sort();
+  if (
+    keys.length !== 3 ||
+    !keys.includes('implementationId') ||
+    !keys.includes('implementationVersion') ||
+    !keys.includes('implementationDigest')
+  ) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${path} must contain exactly {implementationId, implementationVersion, implementationDigest}; unexpected or missing field (module paths, provider objects and function identity are never part of a Tool implementation pin)`,
+    );
+  }
+  const implementationId = requireEvidenceIdentity(view.implementationId, `${path}.implementationId`);
+  const implementationVersion = requireEvidenceIdentity(
+    view.implementationVersion,
+    `${path}.implementationVersion`,
+  );
+  if (carriesXRangeVersionSemantics(implementationVersion)) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${path}.implementationVersion must be an exact version, never an x-range/partial form`,
+    );
+  }
+  const implementationDigest = requireEvidenceDigest(
+    view.implementationDigest,
+    `${path}.implementationDigest`,
+  );
+  return Object.freeze({ implementationId, implementationVersion, implementationDigest });
+}
+
+/**
+ * Evidence material content check: exact operation identities, duplicate-free
+ * and ALREADY order-normalized (strictly ascending) — the accepted v1
+ * material is canonical, so an unsorted or duplicated set is a typed
+ * mismatch, never silently re-normalized.
+ */
+function requireEvidenceOperations(value: unknown, path: string): readonly string[] {
+  if (!Array.isArray(value)) {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${path} must be an order-normalized operation identity array`);
+  }
+  const seen = new Set<string>();
+  const operations = value.map((entry, index) => {
+    const operation = requireEvidenceIdentity(entry, `${path}[${index}]`);
+    if (seen.has(operation)) {
+      fail(
+        'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+        `${path}[${index}] declares ${operation} more than once (duplicate operations are malformed evidence material)`,
+      );
+    }
+    seen.add(operation);
+    return operation;
+  });
+  let previous: string | undefined;
+  for (const operation of operations) {
+    if (previous !== undefined && lexicalCompare(previous, operation) !== -1) {
+      fail(
+        'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+        `${path} must be order-normalized (strictly ascending); unsorted operation material is never silently re-normalized`,
+      );
+    }
+    previous = operation;
+  }
+  return Object.freeze([...operations]);
+}
+
+/**
+ * Validate the captured evidence structure against the exact closed accepted
+ * v1 material and freeze it as fresh non-aliased evidence. Every deviation
+ * (unknown/missing field, wrong status, non-digest, floating ref, non-sorted
+ * operations) fails `TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH`
+ * deterministically (#589 §A A2).
+ */
+function validateAndFreezeEvidenceMaterial(
+  captured: unknown,
+  at: string,
+): ToolImplementationBindingEvidence {
+  if (captured === null || typeof captured !== 'object' || Array.isArray(captured)) {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${at} must be a record carrying the exact closed v1 evidence material`);
+  }
+  const view = captured as Record<string, unknown>;
+  const keys = Object.keys(view).sort().join(',');
+  if (
+    keys !==
+    'assemblyDigest,bindingDigest,definitionGraphDigest,implementation,providesCapability,status,supportedOperations,toolComponentId'
+  ) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      `${at} must contain exactly {status, definitionGraphDigest, assemblyDigest, toolComponentId, providesCapability, implementation, supportedOperations, bindingDigest}; unexpected, missing or renamed field`,
+    );
+  }
+  if (view.status !== 'BOUND') {
+    fail('TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH', `${at}.status must be exactly 'BOUND'`);
+  }
+  const definitionGraphDigest = requireEvidenceDigest(view.definitionGraphDigest, `${at}.definitionGraphDigest`);
+  const assemblyDigest = requireEvidenceDigest(view.assemblyDigest, `${at}.assemblyDigest`);
+  const toolComponentId = requireEvidenceIdentity(view.toolComponentId, `${at}.toolComponentId`);
+  const providesCapability = requireEvidenceCapabilityRef(view.providesCapability, `${at}.providesCapability`);
+  const implementation = requireEvidenceImplementation(view.implementation, `${at}.implementation`);
+  const supportedOperations = requireEvidenceOperations(view.supportedOperations, `${at}.supportedOperations`);
+  const bindingDigest = requireEvidenceDigest(view.bindingDigest, `${at}.bindingDigest`);
+  return Object.freeze({
+    status: 'BOUND' as const,
+    definitionGraphDigest,
+    assemblyDigest,
+    toolComponentId,
+    providesCapability,
+    implementation,
+    supportedOperations,
+    bindingDigest,
+  });
+}
+
+/**
+ * Synchronously snapshot the exact current final Assembly material for
+ * currentness verification. Final-Assembly authenticity remains T002B-owned:
+ * the input must be a genuine `sealRuntimeAssembly` mint, proven through the
+ * accepted read-only T002B guard (never re-derived here). The record digest
+ * material and the §G evidence slots are descriptor-safe captured as fresh
+ * frozen identity material; unsafe structure fails the deterministic
+ * invalid-input taxonomy before evidence verification (#589 §A A2/A5).
+ */
+function snapshotFinalAssemblyMaterial(value: unknown): {
+  readonly assemblyDigest: ContentDigest;
+  readonly definitionGraphDigest: ContentDigest;
+  readonly slots: readonly AssemblyImplementationBindingEvidence[];
+} {
+  const at = 'verification input.finalAssembly';
+  if (typeof value !== 'object' || value === null) {
+    fail('INVALID_BINDING_INPUT', `${at} must be a SealedRuntimeAssembly ({ record, assemblyDigest, ... })`);
+  }
+  if (!isSealedRuntimeAssembly(value)) {
+    fail(
+      'INVALID_BINDING_INPUT',
+      `${at} must be a SealedRuntimeAssembly minted by sealRuntimeAssembly — final-Assembly authenticity remains T002B-owned and a caller-constructed lookalike can never supply currentness authority`,
+    );
+  }
+  const recordValue = readAssemblyOwnDataProperty(value, 'record');
+  const assemblyDigest = readAssemblyOwnDataProperty(value, 'assemblyDigest');
+  const recordView = requireSafeRecord(recordValue, `${at}.record`);
+  if (
+    !('definitionGraphDigest' in recordView) ||
+    !('implementationBindingEvidence' in recordView)
+  ) {
+    fail('INVALID_BINDING_INPUT', `${at}.record must carry definitionGraphDigest and implementationBindingEvidence`);
+  }
+  if (typeof assemblyDigest !== 'string' || !isContentDigest(assemblyDigest)) {
+    fail('INVALID_BINDING_INPUT', `${at}.assemblyDigest must be a non-empty content digest string`);
+  }
+  const definitionGraphDigest = recordView.definitionGraphDigest;
+  if (typeof definitionGraphDigest !== 'string' || !isContentDigest(definitionGraphDigest)) {
+    fail('INVALID_BINDING_INPUT', `${at}.record.definitionGraphDigest must be a non-empty content digest string`);
+  }
+  const slots = snapshotEvidenceSlots(
+    recordView.implementationBindingEvidence,
+    `${at}.record.implementationBindingEvidence`,
+  );
+  return Object.freeze({ assemblyDigest, definitionGraphDigest, slots });
+}
+
+/**
+ * Decide final-Assembly currentness (#589 §A A3) — only reached after the
+ * evidence digest has been verified. The exact subject slot is located by
+ * exact subject identity (`subject === evidence.toolComponentId`) with NO
+ * first/latest/default/order/alias fallback; the slot digest and the final
+ * Assembly's Definition identity must match the evidence exactly. The
+ * historical mint-time `evidence.assemblyDigest` is deliberately never
+ * compared to the final Assembly digest: it remains provenance, and a
+ * faithful later reseal that preserves the binding slot stays CURRENT.
+ */
+function decideFinalAssemblyCurrentness(
+  evidence: ToolImplementationBindingEvidence,
+  finalAssembly: ReturnType<typeof snapshotFinalAssemblyMaterial>,
+): VerifiedToolImplementationCurrentness {
+  const matches = finalAssembly.slots.filter(
+    (slot) => slot.subject === evidence.toolComponentId,
+  );
+  if (matches.length === 0) {
+    fail(
+      'MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING',
+      `the current final Assembly carries no implementation-binding evidence slot for subject "${evidence.toolComponentId}" — a missing slot is never repaired by another subject's slot, an alias, an ordering position or the historical mint-time assemblyDigest`,
+    );
+  }
+  const subjectSlot = matches[0];
+  if (
+    matches.length > 1 ||
+    subjectSlot === undefined ||
+    subjectSlot.bindingDigest !== evidence.bindingDigest
+  ) {
+    fail(
+      'STALE_TOOL_IMPLEMENTATION_BINDING',
+      `the current final Assembly's slot for subject "${evidence.toolComponentId}" does not carry the verified bindingDigest — a replaced slot fails closed; no historical Assembly lookup or mutable alias repairs it`,
+    );
+  }
+  if (finalAssembly.definitionGraphDigest !== evidence.definitionGraphDigest) {
+    fail(
+      'STALE_TOOL_IMPLEMENTATION_BINDING',
+      "the current final Assembly's Definition identity no longer matches the verified evidence's DefinitionGraphDigest — a binding over a different graph is stale and fails closed",
+    );
+  }
+  return Object.freeze({
+    status: 'CURRENT' as const,
+    definitionGraphDigest: evidence.definitionGraphDigest,
+    finalAssemblyDigest: finalAssembly.assemblyDigest,
+    subject: evidence.toolComponentId,
+    bindingDigest: evidence.bindingDigest,
+  });
+}
+
+/**
+ * Shared T003C-owned evidence/currentness verification core (#589 §A A2/A3):
+ * validates the exact closed v1 material, recomputes the accepted v1
+ * `bindingDigest` with T003C-owned semantics (consumers never copy the
+ * algorithm), then decides currentness against the exact current final
+ * Assembly. Only module-owned snapshot material is read; the single `await`
+ * is the digest recomputation.
+ */
+async function verifyEvidenceAndCurrentness(
+  capturedEvidence: unknown,
+  finalAssembly: ReturnType<typeof snapshotFinalAssemblyMaterial>,
+  sha256: Sha256Port,
+): Promise<{ readonly evidence: ToolImplementationBindingEvidence; readonly currentness: VerifiedToolImplementationCurrentness }> {
+  const evidence = validateAndFreezeEvidenceMaterial(capturedEvidence, 'verification input.evidence');
+  const recomputedBindingDigest = await computeCanonicalJsonDigest(
+    {
+      digestDomain: TOOL_IMPLEMENTATION_BINDING_EVIDENCE_DOMAIN,
+      definitionGraphDigest: evidence.definitionGraphDigest,
+      toolComponentId: evidence.toolComponentId,
+      providesCapability: evidence.providesCapability,
+      implementation: evidence.implementation,
+      supportedOperations: evidence.supportedOperations,
+    },
+    sha256,
+  );
+  if (recomputedBindingDigest !== evidence.bindingDigest) {
+    fail(
+      'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH',
+      'the recomputed accepted v1 bindingDigest does not equal evidence.bindingDigest — tampered, non-canonical or foreign evidence material fails closed deterministically',
+    );
+  }
+  return Object.freeze({
+    evidence,
+    currentness: decideFinalAssemblyCurrentness(evidence, finalAssembly),
+  });
+}
+
+/**
+ * The T003C-owned consumer evidence verifier (#640; #589 §A A2): owns ALL
+ * parsing/canonicalization/digest reconstruction for
+ * `ToolImplementationBindingEvidence`. T003E/T004B call this seam and never
+ * copy the digest algorithm.
+ *
+ * Pipeline: descriptor-safe structure capture of the evidence and the exact
+ * final Assembly material synchronously before the first `await` (unsafe
+ * hidden/accessor structure fails INVALID_BINDING_INPUT here, with zero
+ * getter executions); exact closed v1 material validation
+ * (`TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH`); authoritative v1 digest
+ * recomputation and exact-equality check; then final-Assembly currentness by
+ * exact Definition identity, exact subject slot and exact bindingDigest match
+ * (missing → `MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING`, replaced/foreign
+ * → `STALE_TOOL_IMPLEMENTATION_BINDING`). The returned evidence and
+ * currentness are fresh frozen and non-aliased; `evidence.assemblyDigest`
+ * remains historical provenance and is never compared to the final Assembly.
+ */
+export async function verifyToolImplementationBindingEvidence(
+  input: VerifyToolImplementationBindingEvidenceInput,
+): Promise<VerifiedToolImplementationBindingEvidence> {
+  const inputView = requireSafeRecord(input, 'verification input');
+  const unexpectedField = Object.keys(inputView).find(
+    (key) => key !== 'evidence' && key !== 'finalAssembly' && key !== 'sha256',
+  );
+  if (unexpectedField !== undefined) {
+    fail(
+      'INVALID_BINDING_INPUT',
+      `verification input must not carry unknown field "${unexpectedField}"`,
+    );
+  }
+  if (!('evidence' in inputView)) {
+    fail('INVALID_BINDING_INPUT', 'verification input.evidence is required');
+  }
+  if (!('finalAssembly' in inputView)) {
+    fail('INVALID_BINDING_INPUT', 'verification input.finalAssembly is required');
+  }
+  // Synchronous snapshot phase — nothing caller-owned is read after the
+  // digest recomputation suspension (#589 §A A5).
+  const capturedEvidence = captureDescriptorSafeStructure(
+    inputView.evidence,
+    'verification input.evidence',
+  );
+  const finalAssembly = snapshotFinalAssemblyMaterial(inputView.finalAssembly);
+  const sha256 = requireSha256Port(inputView.sha256, 'verification input.sha256');
+
+  const verified = await verifyEvidenceAndCurrentness(capturedEvidence, finalAssembly, sha256);
+  return Object.freeze({
+    status: 'VERIFIED' as const,
+    evidence: verified.evidence,
+    currentness: verified.currentness,
+  });
+}
+
+/**
+ * The T003C binding verification path over the exact
+ * `SealedToolImplementationBinding` object (#640; #589 §A A4): first proves
+ * module-private mint membership (`UNMINTED_TOOL_IMPLEMENTATION_BINDING`),
+ * then verifies the embedded evidence with the A2/A3 semantics against the
+ * exact current final Assembly, then requires any consumer-supplied expected
+ * exact implementation pin to equal the verified evidence pin exactly
+ * (`TOOL_IMPLEMENTATION_PIN_MISMATCH`) — only then is the ORIGINAL opaque
+ * `implementationHandle` reference paired with the fresh verified evidence.
+ *
+ * The handle, module path, function identity and registry objects remain
+ * outside every semantic digest and never supply authority/currentness; no
+ * lookup by implementation id, registry order, latest/default or first match
+ * exists. Torn-snapshot discipline (#589 §A A5): all authority material is
+ * synchronously snapshotted before the first `await`, and the returned
+ * structures are fresh frozen and non-aliased.
+ */
+export async function verifyToolImplementationBinding(
+  input: VerifyToolImplementationBindingInput,
+): Promise<VerifiedToolImplementationBinding> {
+  const inputView = requireSafeRecord(input, 'verification input');
+  const unexpectedField = Object.keys(inputView).find(
+    (key) =>
+      key !== 'binding' && key !== 'finalAssembly' && key !== 'expectedImplementationPin' && key !== 'sha256',
+  );
+  if (unexpectedField !== undefined) {
+    fail(
+      'INVALID_BINDING_INPUT',
+      `verification input must not carry unknown field "${unexpectedField}"`,
+    );
+  }
+  if (!('binding' in inputView)) {
+    fail('INVALID_BINDING_INPUT', 'verification input.binding is required');
+  }
+  if (!('finalAssembly' in inputView)) {
+    fail('INVALID_BINDING_INPUT', 'verification input.finalAssembly is required');
+  }
+
+  // A4 step 1: module-private mint membership is the authoritative
+  // authenticity test. Brand/property shape alone is never sufficient.
+  const bindingValue: unknown = inputView.binding;
+  if (typeof bindingValue !== 'object' || bindingValue === null) {
+    fail('INVALID_BINDING_INPUT', 'verification input.binding must be a SealedToolImplementationBinding object');
+  }
+  if (!isSealedToolImplementationBinding(bindingValue)) {
+    fail(
+      'UNMINTED_TOOL_IMPLEMENTATION_BINDING',
+      'verification input.binding is not a member of the module-private bindToolImplementation mint registry — a hand-built, field-copied, symbol-stolen or deserialized lookalike can never carry binding authority',
+    );
+  }
+  const binding: SealedToolImplementationBinding = bindingValue;
+
+  // Synchronous snapshot phase — everything authority-bearing is captured
+  // before the first `await` (#589 §A A5).
+  const capturedEvidence = captureDescriptorSafeStructure(
+    binding.evidence,
+    'verification input.binding.evidence',
+  );
+  const finalAssembly = snapshotFinalAssemblyMaterial(inputView.finalAssembly);
+  const expectedPin =
+    inputView.expectedImplementationPin === undefined
+      ? undefined
+      : snapshotImplementationIdentity(
+          inputView.expectedImplementationPin,
+          'verification input.expectedImplementationPin',
+        );
+  const sha256 = requireSha256Port(inputView.sha256, 'verification input.sha256');
+
+  // A4 step 2: embedded evidence verification (A2) + final-Assembly
+  // currentness (A3) against the exact current final Assembly.
+  const verified = await verifyEvidenceAndCurrentness(capturedEvidence, finalAssembly, sha256);
+
+  // A4 step 3: any consumer-supplied expected exact pin must equal the
+  // verified evidence pin exactly — all three identity fields, never resolved
+  // against candidates, ordering or latest.
+  if (expectedPin !== undefined) {
+    const evidencePin = verified.evidence.implementation;
+    if (
+      expectedPin.implementationId !== evidencePin.implementationId ||
+      expectedPin.implementationVersion !== evidencePin.implementationVersion ||
+      expectedPin.implementationDigest !== evidencePin.implementationDigest
+    ) {
+      fail(
+        'TOOL_IMPLEMENTATION_PIN_MISMATCH',
+        `the consumer-supplied expected exact implementation pin (implementationId=${expectedPin.implementationId} version=${expectedPin.implementationVersion}) does not equal the verified evidence pin (implementationId=${evidencePin.implementationId} version=${evidencePin.implementationVersion}) — the pin is never resolved against candidates, ordering, latest or first match`,
+      );
+    }
+  }
+
+  // A4 step 4: only now is the original opaque handle reference paired.
+  return Object.freeze({
+    status: 'VERIFIED_CURRENT' as const,
+    evidence: verified.evidence,
+    currentness: verified.currentness,
+    implementationHandle: binding.implementationHandle,
+  });
 }
