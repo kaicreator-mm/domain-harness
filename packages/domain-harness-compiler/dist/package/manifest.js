@@ -1,4 +1,4 @@
-import { DOMAIN_HARNESS_JSON_SCHEMA_V1 } from '@kaicreator/domain-harness/v2';
+import { DOMAIN_HARNESS_JSON_SCHEMA_V1, SEMANTIC_DECISION_CAPABILITY, SEMANTIC_DECISION_CONTRACT_VERSION_V1, semanticDecisionManifestIssues, } from '@kaicreator/domain-harness/v2';
 import { canonicalJson, sha256Canonical, sha256Text } from './canonical.js';
 /**
  * Closed logical binding config schema: the complete set of compile-time fields
@@ -162,6 +162,10 @@ export function assertCompiledPackageManifest(manifest) {
             issues.push('domainData is successor-only material and must be absent on a 0.2/2/2 manifest');
         if (manifest.businessSources !== undefined)
             issues.push('businessSources is successor-only material and must be absent on a 0.2/2/2 manifest');
+        if (manifest.semanticDecisions !== undefined)
+            issues.push('semanticDecisions is successor-only material and must be absent on a 0.2/2/2 manifest');
+        if (manifest.semanticDecisionContractVersion !== undefined)
+            issues.push('semanticDecisionContractVersion is successor-only material and must be absent on a 0.2/2/2 manifest');
     }
     if (isSuccessorTuple) {
         if (manifest.schemaContractVersion !== DOMAIN_HARNESS_JSON_SCHEMA_V1) {
@@ -172,6 +176,7 @@ export function assertCompiledPackageManifest(manifest) {
             issues.push('domainData descriptors are required on a 0.3/2/3 manifest');
         if (manifest.businessSources === undefined)
             issues.push('businessSources descriptors are required on a 0.3/2/3 manifest');
+        issues.push(...semanticDecisionManifestPlacementIssues(manifest));
     }
     const requiredSet = new Set(manifest.requiredCapabilities);
     if (requiredSet.size !== manifest.requiredCapabilities.length)
@@ -208,6 +213,32 @@ export function assertCompiledPackageManifest(manifest) {
         issues.push(`packageId mismatch: expected '${expectedId}'`);
     if (issues.length)
         throw new CompiledManifestValidationError(issues);
+}
+/**
+ * v0.6 T001 (issue #497, frozen L2 A2/A7) manifest placement rules for
+ * compiled semantic decision declarations: version and descriptors are
+ * present together under the exact frozen declaration contract version, the
+ * compiled semantic-decision capability is declared, and every descriptor
+ * passes the compiler-independent structural validation. Unsupported or
+ * malformed material fails closed here instead of being silently ignored.
+ */
+function semanticDecisionManifestPlacementIssues(manifest) {
+    const decisions = manifest.semanticDecisions;
+    const version = manifest.semanticDecisionContractVersion;
+    if (decisions === undefined && version === undefined)
+        return [];
+    if (decisions === undefined || version === undefined) {
+        return ['semanticDecisionContractVersion and semanticDecisions must be present together'];
+    }
+    const issues = [];
+    if (version !== SEMANTIC_DECISION_CONTRACT_VERSION_V1) {
+        issues.push(`semanticDecisionContractVersion must be exactly ${String(SEMANTIC_DECISION_CONTRACT_VERSION_V1)}`);
+    }
+    if (!manifest.requiredCapabilities.includes(SEMANTIC_DECISION_CAPABILITY)) {
+        issues.push(`semantic-decision declarations require capability '${SEMANTIC_DECISION_CAPABILITY}' in requiredCapabilities`);
+    }
+    issues.push(...semanticDecisionManifestIssues(decisions));
+    return issues;
 }
 const PACKAGE_DATA_BOUND_KEYS = [
     'maxDomainDataEntries',

@@ -1,4 +1,5 @@
 import { IdentityContractError, canonicalizeJson, } from '../contracts/identity.js';
+import { SEMANTIC_DECISION_CAPABILITY, SEMANTIC_DECISION_CONTRACT_VERSION_V1, semanticDecisionManifestIssues, } from '../v2/contracts/semantic-decision.js';
 import { CompiledWorkflowIrError, decodeCompiledWorkflowDefinition, } from '../runtime/compiled-workflow-ir.js';
 import { PackageActivationError } from './errors.js';
 function isRecord(value) {
@@ -171,6 +172,43 @@ function validateProjections(projections) {
         assertJsonSerializable(outputSchema, `projection "${projectionKey}" outputSchema`);
     }
 }
+/**
+ * v0.6 T001 (issue #497, frozen L2 A7): semantic-decision manifest material
+ * is successor-only and always fail-closed. A manifest on any profile other
+ * than exactly ('0.3',2,3) must not carry it; a successor manifest carries
+ * the declaration contract version and descriptors together, under the exact
+ * frozen contract version, with the compiled semantic-decision capability
+ * declared. Structure is revalidated independently of the compiler, so a
+ * hand-built or tampered manifest fails activation here instead of being
+ * silently ignored at runtime.
+ */
+function validateSemanticDecisionMaterial(manifest) {
+    const decisions = manifest.semanticDecisions;
+    const version = manifest.semanticDecisionContractVersion;
+    if (decisions === undefined && version === undefined)
+        return;
+    const isSuccessorTuple = manifest.formatVersion === '0.3'
+        && manifest.runtimeContractMajor === 2
+        && manifest.executionEngineMajor === 3;
+    if (!isSuccessorTuple) {
+        failInvalid('semantic-decision manifest material is successor-only and must be absent on a 0.2/2/2 manifest');
+    }
+    if (decisions === undefined || version === undefined) {
+        failInvalid('semanticDecisionContractVersion and semanticDecisions must be present together');
+    }
+    if (version !== SEMANTIC_DECISION_CONTRACT_VERSION_V1) {
+        failInvalid(`semanticDecisionContractVersion must be exactly ${SEMANTIC_DECISION_CONTRACT_VERSION_V1}`);
+    }
+    const issues = semanticDecisionManifestIssues(decisions);
+    if (issues.length > 0)
+        failInvalid(issues.join('; '));
+    const capabilities = Array.isArray(manifest.requiredCapabilities)
+        ? manifest.requiredCapabilities
+        : [];
+    if (!capabilities.includes(SEMANTIC_DECISION_CAPABILITY)) {
+        failInvalid(`semantic-decision declarations require capability "${SEMANTIC_DECISION_CAPABILITY}" in requiredCapabilities`);
+    }
+}
 export function validateManifestShape(value, decodeWorkflow = decodeCompiledWorkflowDefinition) {
     if (!isRecord(value))
         failInvalid('compiled package manifest must be an object');
@@ -202,6 +240,7 @@ export function validateManifestShape(value, decodeWorkflow = decodeCompiledWork
             failInvalid('compiled package compatibility must be an object');
         assertJsonSerializable(value.compatibility, 'compiled package compatibility');
     }
+    validateSemanticDecisionMaterial(value);
     validateWorkflows(workflows, decodeWorkflow);
     validateTools(tools, bindingDigests);
     validateProjections(projections);

@@ -12,6 +12,14 @@ export {
   type CompileDomainPackageResult,
 } from './compile/compile-domain-package.js';
 
+// v0.6 T001 (issue #497, frozen L2 A2/A7): first-class semantic decision
+// declaration compilation. The compiled descriptor types have exactly one
+// authoritative owner: the core v2 contracts (re-exported below).
+export {
+  SemanticDecisionCompileError,
+  compileSemanticDecisions,
+} from './compile/semantic-decisions.js';
+
 // I-03-ASSEMBLY public successor compile material: the exact output profile the
 // public compiler emits, plus the Domain Data / Business Source entry shapes
 // and their fail-closed compile errors (L2-A §3.6/§3.7).
@@ -64,9 +72,18 @@ export type {
   LogicalToolBindingConfig,
   RawProjectionDefinition,
   RawProjectionDependency,
+  RawSemanticDecisionDeclaration,
   RawToolDefinition,
   TargetHostProfile,
   ToolEffectSemantics,
 } from './raw/types.js';
 
 export type { CompiledPackageManifest } from './package/manifest.js';
+export type {
+  CompiledSemanticDecisionDescriptor,
+  SemanticDecisionCacheBypassReason,
+  SemanticDecisionCachePolicy,
+  SemanticDecisionContractVersion,
+  SemanticDecisionPromotedReference,
+  SemanticDecisionUnavailableDisposition,
+} from '@kaicreator/domain-harness/v2';

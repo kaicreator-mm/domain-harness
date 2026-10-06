@@ -13,6 +13,7 @@ import type {
 } from '../raw/types.js';
 import {
   DOMAIN_HARNESS_JSON_SCHEMA_V1,
+  SEMANTIC_DECISION_CONTRACT_VERSION_V1,
   SUPPORTED_COMPILED_INVOKE_KINDS_V2,
 } from '@kaicreator/domain-harness/v2';
 import { canonicalJson } from '../package/canonical.js';
@@ -35,6 +36,7 @@ import {
   type BusinessSourceCompileEntry,
 } from '../package/business-sources.js';
 import { assertTargetCapabilities, collectRequiredCapabilities } from './capabilities.js';
+import { compileSemanticDecisions } from './semantic-decisions.js';
 
 export interface CompileDomainPackageInput {
   raw: LoadedRawDomainPackage;
@@ -376,6 +378,16 @@ export function compileDomainPackage(input: CompileDomainPackageInput): CompileD
     projections,
   );
 
+  // v0.6 T001 (issue #497, frozen L2 A2/A7): first-class compiled semantic
+  // decision declarations. Absent when the raw package declares none, so
+  // existing deterministic packages compile unchanged (A7 rule 1/2).
+  const semanticDecisions = compileSemanticDecisions({
+    raw: input.raw,
+    tools,
+    projections,
+    businessSources: input.businessSources ?? [],
+  });
+
   const manifest = buildCompiledPackageManifest({
     formatVersion: PUBLIC_COMPILER_OUTPUT_PROFILE.formatVersion,
     runtimeContractMajor: PUBLIC_COMPILER_OUTPUT_PROFILE.runtimeContractMajor,
@@ -393,6 +405,10 @@ export function compileDomainPackage(input: CompileDomainPackageInput): CompileD
     packageDataBounds: domainDataSection.packageDataBounds,
     domainData: domainDataSection.descriptors,
     businessSources: businessSourceSection.descriptors,
+    ...(semanticDecisions.length > 0 ? {
+      semanticDecisionContractVersion: SEMANTIC_DECISION_CONTRACT_VERSION_V1,
+      semanticDecisions,
+    } : {}),
     compatibility: {
       sourceSchemaVersion: input.raw.schemaVersion,
       legacyChildDependencies: Object.fromEntries(
