@@ -145,7 +145,7 @@ function declaration(
   return {
     decisionId: 'decision.orderTotal',
     source: 'promoted-subworkflow',
-    artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', contentDigest: 'digest-promoted-order' },
+    artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', version: '3.1.0', contentDigest: 'digest-promoted-order' },
     ...overrides,
   };
 }
@@ -330,7 +330,7 @@ test('decision-source evidence is canonicalized by the frozen resolver source or
         declaration({
           decisionId: 'a.decision',
           source: 'promoted-subworkflow',
-          artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', contentDigest: 'digest-promoted-order' },
+          artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', version: '3.1.0', contentDigest: 'digest-promoted-order' },
         }),
       ],
     }),
@@ -401,6 +401,7 @@ test('historical identity and currentness are preserved byte-exact as mapping pr
   assert.deepEqual(result.provenance.decisionSources[0].artifact, {
     kind: 'promoted-subworkflow',
     artifactId: 'promoted.orderDecision',
+    version: '3.1.0',
     contentDigest: 'digest-promoted-order',
   });
 });
@@ -623,6 +624,51 @@ test('rule and exact-cache continue to bind no compat artifact — carrying one 
   }
 });
 
+test('a declaration fails closed when the artifact bound under the same id/digest carries the other compat kind', () => {
+  // The declaration's own kind is well-formed for its source family, so Phase 3
+  // accepts it; the artifact actually bound under that id/digest belongs to the
+  // other compat family. Resolution by id + digest alone would accept this —
+  // exact bound identity requires the kind to correspond.
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          decisionSources: [
+            declaration({ artifact: { kind: 'promoted-subworkflow', artifactId: 'harness.orderDecision', contentDigest: 'digest-harness-order' } }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /CONFLICTING_COMPAT_IDENTITY/);
+      assert.match(error.message, /harness\.orderDecision/);
+      return true;
+    },
+    'a promoted-subworkflow declaration binds only an exact promoted-subworkflow artifact',
+  );
+
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          decisionSources: [
+            declaration({
+              source: 'harness-machine',
+              artifact: { kind: 'harness-config', artifactId: 'promoted.orderDecision', contentDigest: 'digest-promoted-order' },
+            }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /CONFLICTING_COMPAT_IDENTITY/);
+      assert.match(error.message, /promoted\.orderDecision/);
+      return true;
+    },
+    'a harness-machine declaration binds only an exact harness-config artifact',
+  );
+});
+
 test('a declaration binding an artifact missing from the mapping input fails typed — never dangling, never skipped', () => {
   assert.throws(
     () =>
@@ -739,7 +785,7 @@ test('a declaration binding a stale revision fails typed as stale', () => {
       mapHarnessConfigPromotedSubworkflowToComponentGraph(
         input({
           decisionSources: [
-            declaration({ artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', contentDigest: 'digest-promoted-old' } }),
+            declaration({ artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', version: '3.1.0', contentDigest: 'digest-promoted-old' } }),
           ],
         }),
       ),
@@ -748,6 +794,99 @@ test('a declaration binding a stale revision fails typed as stale', () => {
       assert.match(error.message, /STALE_COMPAT_IDENTITY/);
       return true;
     },
+  );
+});
+
+test('a declaration claiming a different version than the bound artifact fails closed — version is part of the exact identity', () => {
+  // Same kind/artifactId/contentDigest, different claimed version: the bound
+  // revision is 3.1.0; claiming 3.2.0 is exact historical identity drift —
+  // never ignored, normalized or inferred.
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          decisionSources: [
+            declaration({ artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', version: '3.2.0', contentDigest: 'digest-promoted-order' } }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /STALE_COMPAT_IDENTITY/);
+      assert.match(error.message, /3\.2\.0/);
+      assert.match(error.message, /3\.1\.0/);
+      return true;
+    },
+    'promoted-subworkflow source family: version drift fails closed',
+  );
+
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          harnessConfigs: [
+            harnessConfig({ identity: { kind: 'harness-config', artifactId: 'harness.orderDecision', version: '2.0.0', contentDigest: 'digest-harness-order' } }),
+          ],
+          decisionSources: [
+            declaration({
+              source: 'harness-machine',
+              artifact: { kind: 'harness-config', artifactId: 'harness.orderDecision', version: '2.1.0', contentDigest: 'digest-harness-order' },
+            }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /STALE_COMPAT_IDENTITY/);
+      assert.match(error.message, /2\.1\.0/);
+      assert.match(error.message, /2\.0\.0/);
+      return true;
+    },
+    'harness-machine source family: version drift fails closed',
+  );
+});
+
+test('a declaration whose version presence differs from the bound artifact fails closed — version is never inferred', () => {
+  // Omitting the version does not widen the binding to any revision of the
+  // bound artifact...
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          decisionSources: [
+            declaration({ artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', contentDigest: 'digest-promoted-order' } }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /STALE_COMPAT_IDENTITY/);
+      assert.match(error.message, /3\.1\.0/);
+      return true;
+    },
+    'an unversioned claim never binds a versioned artifact',
+  );
+
+  // ...and claiming a version where the bound artifact carries none is drift.
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          decisionSources: [
+            declaration({
+              source: 'harness-machine',
+              artifact: { kind: 'harness-config', artifactId: 'harness.orderDecision', version: '9.9.9', contentDigest: 'digest-harness-order' },
+            }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /STALE_COMPAT_IDENTITY/);
+      assert.match(error.message, /9\.9\.9/);
+      return true;
+    },
+    'a versioned claim never binds an unversioned artifact',
   );
 });
 

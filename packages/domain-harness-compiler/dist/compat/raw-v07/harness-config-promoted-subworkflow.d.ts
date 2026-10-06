@@ -33,8 +33,11 @@
  *   deterministic and required: `promoted-subworkflow` binds exactly one
  *   exact `promoted-subworkflow` artifact identity, `harness-machine` binds
  *   exactly one exact `harness-config` artifact identity, `rule` /
- *   `exact-cache` bind none — a missing required binding fails typed, it is
- *   never inferred, defaulted or chosen by order;
+ *   `exact-cache` bind none — resolution requires full exact identity
+ *   equality with the bound artifact (kind + artifactId + optional version +
+ *   contentDigest): a missing required binding fails typed, a bound-kind or
+ *   version mismatch fails closed exactly like digest drift, and nothing is
+ *   ever inferred, normalized, defaulted or chosen by order;
  * - exact historical identity/currentness (kind, artifactId, version,
  *   contentDigest) is preserved verbatim as mapping provenance — historical
  *   identity is never rewritten (strangler, not rewrite).
@@ -130,9 +133,11 @@ export interface CompatDecisionSourceDeclaration {
      * Exact bound compat artifact (closed identity) — required exactly for the
      * artifact-bearing sources: `promoted-subworkflow` binds exactly one
      * `promoted-subworkflow` identity, `harness-machine` binds exactly one
-     * `harness-config` identity; `rule` / `exact-cache` bind none. A missing
-     * required binding fails typed — never inferred, defaulted or chosen by
-     * config order.
+     * `harness-config` identity; `rule` / `exact-cache` bind none. The declared
+     * identity must equal the full exact bound identity (kind + artifactId +
+     * optional version + contentDigest): a missing required binding fails
+     * typed, a bound-kind or version mismatch fails closed exactly like digest
+     * drift — never inferred, normalized, defaulted or chosen by config order.
      */
     readonly artifact?: CompatHistoricalArtifactIdentity;
 }

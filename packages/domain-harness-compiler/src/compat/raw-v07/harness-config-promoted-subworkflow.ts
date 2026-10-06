@@ -33,8 +33,11 @@
  *   deterministic and required: `promoted-subworkflow` binds exactly one
  *   exact `promoted-subworkflow` artifact identity, `harness-machine` binds
  *   exactly one exact `harness-config` artifact identity, `rule` /
- *   `exact-cache` bind none — a missing required binding fails typed, it is
- *   never inferred, defaulted or chosen by order;
+ *   `exact-cache` bind none — resolution requires full exact identity
+ *   equality with the bound artifact (kind + artifactId + optional version +
+ *   contentDigest): a missing required binding fails typed, a bound-kind or
+ *   version mismatch fails closed exactly like digest drift, and nothing is
+ *   ever inferred, normalized, defaulted or chosen by order;
  * - exact historical identity/currentness (kind, artifactId, version,
  *   contentDigest) is preserved verbatim as mapping provenance — historical
  *   identity is never rewritten (strangler, not rewrite).
@@ -197,9 +200,11 @@ export interface CompatDecisionSourceDeclaration {
    * Exact bound compat artifact (closed identity) — required exactly for the
    * artifact-bearing sources: `promoted-subworkflow` binds exactly one
    * `promoted-subworkflow` identity, `harness-machine` binds exactly one
-   * `harness-config` identity; `rule` / `exact-cache` bind none. A missing
-   * required binding fails typed — never inferred, defaulted or chosen by
-   * config order.
+   * `harness-config` identity; `rule` / `exact-cache` bind none. The declared
+   * identity must equal the full exact bound identity (kind + artifactId +
+   * optional version + contentDigest): a missing required binding fails
+   * typed, a bound-kind or version mismatch fails closed exactly like digest
+   * drift — never inferred, normalized, defaulted or chosen by config order.
    */
   readonly artifact?: CompatHistoricalArtifactIdentity;
 }
@@ -875,8 +880,12 @@ export function mapHarnessConfigPromotedSubworkflowToComponentGraph(input: Compa
 
   // Phase 4 — resolve declared artifact bindings against the bound identities:
   // `rule` / `exact-cache` bind none (Phase 3 rejected any binding they carry);
-  // the artifact-bearing sources always carry one. missing -> typed missing;
-  // digest drift -> typed stale; never repaired.
+  // the artifact-bearing sources always carry one. Resolution requires the
+  // full exact bound identity — kind + artifactId + optional version +
+  // contentDigest (the per-clause checks below are exactly `identityEquals`
+  // against the bound artifact): missing -> typed missing; bound-kind
+  // mismatch -> typed conflicting; digest or version drift -> typed stale.
+  // Never repaired, inferred, normalized or chosen by order.
   for (const declaration of validatedDeclarations) {
     if (declaration.artifact === undefined) continue;
     const bound = boundIdentities.get(declaration.artifact.artifactId);
@@ -887,11 +896,27 @@ export function mapHarnessConfigPromotedSubworkflowToComponentGraph(input: Compa
         `binds '${declaration.artifact.artifactId}', which is not part of this mapping input; a dangling binding is never emitted`,
       );
     }
+    if (bound.kind !== declaration.artifact.kind) {
+      fail(
+        'CONFLICTING_COMPAT_IDENTITY',
+        `${declaration.path}.artifact`,
+        `binds '${declaration.artifact.artifactId}' as kind '${declaration.artifact.kind}' but the bound identity is kind '${bound.kind}'; a decision source binds only an exact artifact of its own family`,
+      );
+    }
     if (bound.contentDigest !== declaration.artifact.contentDigest) {
       fail(
         'STALE_COMPAT_IDENTITY',
         `${declaration.path}.artifact`,
         `binds '${declaration.artifact.artifactId}' at digest '${declaration.artifact.contentDigest}' but the bound identity carries '${bound.contentDigest}'; historical currentness is exact`,
+      );
+    }
+    if (bound.version !== declaration.artifact.version) {
+      const declaredVersion = declaration.artifact.version === undefined ? '<unversioned>' : declaration.artifact.version;
+      const boundVersion = bound.version === undefined ? '<unversioned>' : bound.version;
+      fail(
+        'STALE_COMPAT_IDENTITY',
+        `${declaration.path}.artifact`,
+        `binds '${declaration.artifact.artifactId}' at version '${declaredVersion}' but the bound identity carries '${boundVersion}'; version is part of the exact historical identity and is never ignored, normalized or inferred`,
       );
     }
   }
