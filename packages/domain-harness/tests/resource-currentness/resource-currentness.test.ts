@@ -475,7 +475,11 @@ test('T005B seam: the pin whitelist is closed — secret-bearing/unknown fields 
     resolveToolResources(resolutionOptions(assembly, withSecret.provider)),
     'INVALID_RESOURCE_PROVIDER_RESPONSE',
   );
-  assert.match(secretError.message, /accessToken/, 'the offending KEY name participates');
+  assert.ok(
+    !secretError.message.includes('accessToken'),
+    'the offending KEY name itself is provider-controlled and is never echoed verbatim (#837 P1_01)',
+  );
+  assert.match(secretError.message, /<redacted:/, 'a bounded deterministic key classification participates');
   assert.ok(
     !secretError.message.includes('sk-live-SUPER-SECRET-123'),
     'the secret VALUE never enters diagnostics',

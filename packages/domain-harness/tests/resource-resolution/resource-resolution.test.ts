@@ -564,7 +564,12 @@ test('T005B redaction: a smuggled secret-bearing provider-response field fails c
   );
 
   assert.ok(!error.message.includes('hunter2'), 'secret value leaked into diagnostics');
-  assert.ok(error.message.includes('apiKey'), 'only the offending key name participates');
+  assert.ok(
+    !error.message.includes('apiKey'),
+    'the offending key name itself is provider-controlled and is never echoed verbatim (#837 P1_01)',
+  );
+  assert.ok(error.message.includes('<redacted:'), 'bounded deterministic key classification participates');
+  assert.ok(error.message.includes('unexpected field'), 'fixed diagnostic context preserved');
 });
 
 test('T005B redaction: incompatible-response supportedContracts never enter the INCOMPATIBLE_RESOURCE message', async () => {
@@ -1197,6 +1202,100 @@ test('T005B #643 redaction: classification is deterministic — identical hostil
   assert.equal(first.code, 'INVALID_RESOURCE_PROVIDER_RESPONSE', 'typed code is stable');
   assert.equal(first.message, second.message, 'same hostile input => identical bounded diagnostic');
   assert.ok(first.message.length < 400, 'diagnostic stays bounded');
+});
+
+// ---------------------------------------------------------------------------
+// #837 bounded repair R1 — the classification-only closure: NO provider-
+// controlled key material is echoed verbatim (not even short plain
+// identifiers), and the hard length cap runs BEFORE any content scan.
+// ---------------------------------------------------------------------------
+
+test('T005B #837 P1_01: short plain provider identifier keys are classified, never echoed verbatim', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const plainIdentifierKeys = ['accessToken', 'password', 'sessionToken'];
+
+  for (const plainKey of plainIdentifierKeys) {
+    const { provider } = providerStub(
+      () =>
+        withOwnKey({ status: 'resolved', handle: 'h' }, plainKey, 'material') as ResourceProviderResponse,
+    );
+
+    const error = await expectResolutionError(
+      resolveToolResources(options(assembly, provider)),
+      'INVALID_RESOURCE_PROVIDER_RESPONSE',
+    );
+
+    assert.ok(!error.message.includes(plainKey), `provider-controlled key leaked: ${error.message}`);
+    assert.ok(error.message.includes('unexpected field'), 'fixed diagnostic context preserved');
+    assert.ok(error.message.includes('<redacted:'), 'bounded deterministic classification participates');
+  }
+});
+
+test('T005B #837 P1_01: identifier-shaped token keys outside the secret recognizer are classified, never echoed verbatim', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  // Identifier-SHAPED credential material the previous recognizer did not
+  // cover (no `sk-`/`Bearer`/JWT marker): the closed classification-only
+  // path must still never echo it.
+  const tokenKeys = ['ghp_16C7e42F292c6912E7710c838347Ae178B4a', 'AKIAIOSFODNN7EXAMPLE'];
+
+  for (const tokenKey of tokenKeys) {
+    const { provider } = providerStub(
+      () =>
+        withOwnKey({ status: 'resolved', handle: 'h' }, tokenKey, 'material') as ResourceProviderResponse,
+    );
+
+    const error = await expectResolutionError(
+      resolveToolResources(options(assembly, provider)),
+      'INVALID_RESOURCE_PROVIDER_RESPONSE',
+    );
+
+    assert.ok(!error.message.includes(tokenKey), `provider-controlled key leaked: ${error.message}`);
+    assert.ok(error.message.includes('unexpected field'), 'fixed diagnostic context preserved');
+    assert.ok(error.message.includes('<redacted:'), 'bounded deterministic classification participates');
+  }
+});
+
+test('T005B #837 P1_02: an overlong hostile key is length-gated BEFORE any content scan (bounded deterministic overlong classification)', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  // The hostile key embeds control-character AND secret-shaped material well
+  // past any sane length boundary: if any content scan ran before the hard
+  // length cap, the classification would name that material instead of the
+  // overlong bound.
+  const overlongHostileKey = `${'a'.repeat(4096)}\u0000sk-live-4eC39HqLyjWDarjtT1zdp7dc`;
+  const makeProvider = (): ResourceProvider => ({
+    async resolve(): Promise<ResourceProviderResponse> {
+      return withOwnKey(
+        { status: 'resolved', handle: 'h' },
+        overlongHostileKey,
+        'x',
+      ) as ResourceProviderResponse;
+    },
+  });
+
+  const first = await expectResolutionError(
+    resolveToolResources(options(assembly, makeProvider())),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+  const second = await expectResolutionError(
+    resolveToolResources(options(assembly, makeProvider())),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+
+  assert.ok(first.message.includes('<redacted:overlong'), 'the hard pre-scan length gate classifies overlong keys from their length alone');
+  assert.ok(
+    !first.message.includes('<redacted:control-character'),
+    'no content-sensitive scan may run before the length gate',
+  );
+  assert.ok(
+    !first.message.includes('<redacted:secret-shaped'),
+    'no content-sensitive scan may run before the length gate',
+  );
+  assert.ok(!first.message.includes('sk-live'), 'overlong key content leaked');
+  assert.ok(!first.message.includes('\u0000'), 'control character leaked');
+  assert.ok(!first.message.includes('aaaa'), 'overlong key fragment leaked');
+  assert.equal(first.code, 'INVALID_RESOURCE_PROVIDER_RESPONSE', 'typed code is stable');
+  assert.equal(first.message, second.message, 'same hostile input => identical bounded diagnostic');
+  assert.ok(first.message.length < 400, 'diagnostic stays bounded regardless of key length');
 });
 
 test('T005B #643 regression: legitimate resolution behavior is unchanged (contract match, pin capture, provider replacement semantics)', async () => {

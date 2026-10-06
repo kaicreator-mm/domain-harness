@@ -29,10 +29,18 @@ const NON_ECHOABLE_KEY_NAMES = new Set([
     '__lookupGetter__',
     '__lookupSetter__',
 ]);
-/** Identifier-shaped own-key names up to this length are safe debugging material. */
-const VERBATIM_KEY_MAX_LENGTH = 64;
-const VERBATIM_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const VERBATIM_INDEX_PATTERN = /^[0-9]{1,6}$/;
+/**
+ * Hard pre-scan length cap (#837 P1_02): a provider-controlled key longer
+ * than this is classified from its LENGTH alone — before any Set lookup,
+ * regex, or per-character scan touches its content. The cap stays above
+ * realistic secret-shaped key material, so bounded keys still receive their
+ * full shape classification.
+ */
+const DIAGNOSTIC_KEY_MAX_LENGTH = 128;
+/** Identifier-shaped own-key shape class (classified, never echoed; #837). */
+const IDENTIFIER_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+/** Small numeric array-index own-key shape class (classified, never echoed). */
+const NUMERIC_INDEX_KEY_PATTERN = /^[0-9]{1,6}$/;
 /** Control characters (C0 range + DEL) never reach a diagnostic. */
 function containsControlCharacter(key) {
     for (let index = 0; index < key.length; index += 1) {
@@ -52,22 +60,24 @@ function containsControlCharacter(key) {
 const SECRET_SHAPED_KEY_PATTERN = /(?:sk-(?:live|test)-|bearer[ _-]|eyJ[A-Za-z0-9_-]{6,}|[A-Za-z0-9_-]{2,}\.eyJ)/i;
 /**
  * Bounded, non-secret, deterministic classification of one provider-controlled
- * own-key name for failure diagnostics (#643). Provider-controlled key names
- * may themselves BE the secret (`sk-…` keys), prototype-pollution material
- * (`__proto__`/`constructor`), or control-character payloads, so only short
- * plain identifier keys (and small numeric array indices) are echoed verbatim;
- * everything else is replaced by a fixed category label plus the bounded
- * length. The same input always classifies identically, and no character of
- * the key beyond its length ever reaches a diagnostic.
+ * own-key name for failure diagnostics (#643, #837). Provider-controlled key
+ * names may themselves BE the secret (`sk-…` keys), prototype-pollution
+ * material (`__proto__`/`constructor`), control-character payloads, or plain
+ * identifier/credential material (`accessToken`, `password`, unrecognized
+ * token forms) — none of it is debugging material, so NOTHING is echoed
+ * verbatim: every key is reduced to a fixed shape-class label plus its length.
+ * The hard length cap runs FIRST (#837 P1_02): an overlong key is classified
+ * from its length alone, before any Set lookup, regex, or per-character scan
+ * touches its content; only bounded-size input undergoes shape
+ * classification. The same input always classifies identically, and no
+ * character of the key beyond its length ever reaches a diagnostic.
  */
 function classifyDiagnosticKey(key) {
+    if (key.length > DIAGNOSTIC_KEY_MAX_LENGTH) {
+        return `<redacted:overlong,len=${key.length}>`;
+    }
     if (NON_ECHOABLE_KEY_NAMES.has(key)) {
         return `<redacted:prototype-name,len=${key.length}>`;
-    }
-    if (VERBATIM_KEY_PATTERN.test(key)) {
-        return key.length <= VERBATIM_KEY_MAX_LENGTH
-            ? key
-            : `<redacted:overlong-identifier,len=${key.length}>`;
     }
     if (SECRET_SHAPED_KEY_PATTERN.test(key)) {
         return `<redacted:secret-shaped,len=${key.length}>`;
@@ -75,8 +85,11 @@ function classifyDiagnosticKey(key) {
     if (containsControlCharacter(key)) {
         return `<redacted:control-character,len=${key.length}>`;
     }
-    if (VERBATIM_INDEX_PATTERN.test(key)) {
-        return key;
+    if (IDENTIFIER_KEY_PATTERN.test(key)) {
+        return `<redacted:identifier,len=${key.length}>`;
+    }
+    if (NUMERIC_INDEX_KEY_PATTERN.test(key)) {
+        return `<redacted:index,len=${key.length}>`;
     }
     return `<redacted:non-identifier,len=${key.length}>`;
 }
