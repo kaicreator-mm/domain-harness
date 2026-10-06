@@ -17,19 +17,33 @@ import type { CurrentCapabilityProviderSelection } from '../../src/contracts/cap
 import type { SealedRuntimeAssembly } from '../../src/contracts/runtime-assembly.js';
 import {
   bindToolImplementation,
+  isSealedToolImplementationBinding,
+  verifyToolImplementationBinding,
+  verifyToolImplementationBindingEvidence,
   type BindToolImplementationInput,
   type SealedToolImplementationBinding,
   type ToolImplementationBindingError,
   type ToolImplementationBindingErrorCode,
   type ToolImplementationBindingEvidence,
   type ToolImplementationCandidate,
+  type VerifiedToolImplementationBinding,
+  type VerifiedToolImplementationBindingEvidence,
+  type VerifiedToolImplementationCurrentness,
+  type VerifyToolImplementationBindingEvidenceInput,
+  type VerifyToolImplementationBindingInput,
 } from '../../src/contracts/tool-implementation-binding.js';
 
 type Expect<T extends true> = T;
 type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
-// F1: the failure taxonomy is exactly the six T003C categories.
+// F1: the failure taxonomy is exactly the six T003C bind categories plus the
+// five frozen consumer-verifier categories required by #589 §A (A1–A4): the
+// mint-authenticity failure (UNMINTED_TOOL_IMPLEMENTATION_BINDING), the
+// evidence-verification failure (TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH),
+// the two final-Assembly currentness failures
+// (MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING / STALE_TOOL_IMPLEMENTATION_BINDING)
+// and the exact-pin pairing failure (TOOL_IMPLEMENTATION_PIN_MISMATCH).
 export type ErrorCodesExactly = Expect<
   Equal<
     ToolImplementationBindingErrorCode,
@@ -39,6 +53,11 @@ export type ErrorCodesExactly = Expect<
     | 'AMBIGUOUS_TOOL_IMPLEMENTATION'
     | 'INCOMPATIBLE_TOOL_IMPLEMENTATION'
     | 'DEFINITION_GRAPH_DIGEST_MISMATCH'
+    | 'UNMINTED_TOOL_IMPLEMENTATION_BINDING'
+    | 'TOOL_IMPLEMENTATION_BINDING_EVIDENCE_MISMATCH'
+    | 'MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING'
+    | 'STALE_TOOL_IMPLEMENTATION_BINDING'
+    | 'TOOL_IMPLEMENTATION_PIN_MISMATCH'
   >
 >;
 export type ErrorCodeField = Expect<
@@ -162,4 +181,117 @@ export const bindInputFixture: BindToolImplementationInput = {
     implementationDigest: 'sha256:alpha',
   },
   sha256: {} as Sha256Port,
+};
+
+// ---------------------------------------------------------------------------
+// #640 consumer-verifier seam fixtures (authority #589 §A A1–A5).
+// ---------------------------------------------------------------------------
+
+// F7: the mint-membership guard is a read-only synchronous type guard.
+export type MintGuardShape = Expect<
+  Equal<
+    typeof isSealedToolImplementationBinding,
+    (value: unknown) => value is SealedToolImplementationBinding
+  >
+>;
+
+// F8: the evidence verifier takes the unknown evidence material, the exact
+// final Assembly and the Sha256Port; it never takes or returns a handle.
+export type EvidenceVerifierSeamShape = Expect<
+  Equal<
+    typeof verifyToolImplementationBindingEvidence,
+    (input: VerifyToolImplementationBindingEvidenceInput) => Promise<VerifiedToolImplementationBindingEvidence>
+  >
+>;
+export const evidenceVerifierInputFixture: VerifyToolImplementationBindingEvidenceInput = {
+  evidence: {} as ToolImplementationBindingEvidence,
+  finalAssembly: {} as SealedRuntimeAssembly,
+  sha256: {} as Sha256Port,
+};
+
+// F9: the binding verifier takes the exact sealed binding, the exact final
+// Assembly, an optional consumer-supplied exact pin and the Sha256Port.
+export type BindingVerifierSeamShape = Expect<
+  Equal<
+    typeof verifyToolImplementationBinding,
+    (input: VerifyToolImplementationBindingInput) => Promise<VerifiedToolImplementationBinding>
+  >
+>;
+export const bindingVerifierInputFixture: VerifyToolImplementationBindingInput = {
+  binding: {} as SealedToolImplementationBinding,
+  finalAssembly: {} as SealedRuntimeAssembly,
+  expectedImplementationPin: {
+    implementationId: 'impl.alpha',
+    implementationVersion: '1.0.0',
+    implementationDigest: 'sha256:alpha',
+  },
+  sha256: {} as Sha256Port,
+};
+
+// F10: the verified currentness material carries exactly the current final
+// identity — status, Definition identity, current final assemblyDigest,
+// exact subject and exact bindingDigest.
+export type CurrentnessShape = Expect<
+  Equal<
+    VerifiedToolImplementationCurrentness,
+    {
+      readonly status: 'CURRENT';
+      readonly definitionGraphDigest: ContentDigest;
+      readonly finalAssemblyDigest: ContentDigest;
+      readonly subject: string;
+      readonly bindingDigest: ContentDigest;
+    }
+  >
+>;
+
+// F11: the verified evidence structure is identity-only currentness material
+// (no handle is representable on it) and the verified binding adds exactly
+// the opaque handle reference.
+export type VerifiedEvidenceShape = Expect<
+  Equal<
+    VerifiedToolImplementationBindingEvidence,
+    {
+      readonly status: 'VERIFIED';
+      readonly evidence: ToolImplementationBindingEvidence;
+      readonly currentness: VerifiedToolImplementationCurrentness;
+    }
+  >
+>;
+export type VerifiedBindingShape = Expect<
+  Equal<
+    VerifiedToolImplementationBinding,
+    {
+      readonly status: 'VERIFIED_CURRENT';
+      readonly evidence: ToolImplementationBindingEvidence;
+      readonly currentness: VerifiedToolImplementationCurrentness;
+      readonly implementationHandle: unknown;
+    }
+  >
+>;
+export const verifiedEvidenceHandleSmuggling: VerifiedToolImplementationBindingEvidence = {
+  status: 'VERIFIED',
+  evidence: {
+    status: 'BOUND',
+    definitionGraphDigest: 'sha256:graph',
+    assemblyDigest: 'sha256:assembly',
+    toolComponentId: 'tool.alpha',
+    providesCapability: { capabilityId: 'cap.a', version: '1.0.0' },
+    implementation: {
+      implementationId: 'impl.alpha',
+      implementationVersion: '1.0.0',
+      implementationDigest: 'sha256:alpha',
+    },
+    supportedOperations: ['op.a'],
+    bindingDigest: 'sha256:evidence',
+  },
+  currentness: {
+    status: 'CURRENT',
+    definitionGraphDigest: 'sha256:graph',
+    finalAssemblyDigest: 'sha256:final',
+    subject: 'tool.alpha',
+    bindingDigest: 'sha256:evidence',
+  },
+  // @ts-expect-error the verified evidence structure never pairs or carries
+  // the opaque runtime handle
+  implementationHandle: { connection: 'live' },
 };
