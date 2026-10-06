@@ -44,8 +44,14 @@
  *
  * - unreferenced ("dead") states are accepted as inert states — the existing
  *   boundary maps a state without transitions to a state without `on`;
- * - duplicate (event, from) transitions are preserved in declaration order
- *   and resolve first-declared-first in the existing engine (deterministic);
+ * - duplicate (event, from) transitions are representable only through
+ *   explicit route identity: every compiled route carries the existing
+ *   engine-neutral route-selection shape (sourceStateId, routeClass 'event',
+ *   routeIndex, eventType) with the routeIndex assigned canonically by
+ *   transitionId order within each (from, event) group. Execution either
+ *   names the exact route identity or — for more than one eligible route —
+ *   fails typed/closed: never first-declared, never array/object/insertion/
+ *   lexical/first-registered authority, never XState-incidental order;
  * - self-transitions are ordinary engine self-transitions;
  * - representation limits of the existing engine fail closed at compile:
  *   eventless transitions have no trigger in the existing trigger model, and
@@ -74,15 +80,18 @@ import type {
 import {
   adaptDomainWorkflowToXState,
   createDomainXStateEvent,
+  type XStateMachineBoundaryConfig,
 } from '../workflow/internal/xstate-adapter.js';
 import { WORKFLOW_KIND_REF } from './workflow-kind.js';
 
-/** Fail-closed Workflow runtime bridge failure taxonomy (#620). */
+/** Fail-closed Workflow runtime bridge failure taxonomy (#620, #649). */
 export type WorkflowBridgeErrorCode =
   | 'WORKFLOW_BRIDGE_KIND_MISMATCH'
   | 'WORKFLOW_KIND_IMPLEMENTATION_NOT_BOUND'
   | 'WORKFLOW_EVENTLESS_TRANSITION_UNSUPPORTED'
   | 'WORKFLOW_EVENT_NOT_ENGINE_COMPATIBLE'
+  | 'WORKFLOW_EVENT_ROUTE_AMBIGUOUS'
+  | 'WORKFLOW_ROUTE_SELECTION_INVALID'
   | 'WORKFLOW_COMPILATION_FAILED'
   | 'WORKFLOW_ENGINE_STATE_NOT_REPRESENTABLE'
   | 'UNTRUSTED_COMPILED_WORKFLOW_ARTIFACT'
@@ -96,6 +105,8 @@ const FAILURE_CLASS_BY_CODE: Record<WorkflowBridgeErrorCode, WorkflowBridgeFailu
   WORKFLOW_KIND_IMPLEMENTATION_NOT_BOUND: 'KIND',
   WORKFLOW_EVENTLESS_TRANSITION_UNSUPPORTED: 'POLICY',
   WORKFLOW_EVENT_NOT_ENGINE_COMPATIBLE: 'POLICY',
+  WORKFLOW_EVENT_ROUTE_AMBIGUOUS: 'POLICY',
+  WORKFLOW_ROUTE_SELECTION_INVALID: 'POLICY',
   WORKFLOW_COMPILATION_FAILED: 'ENGINE',
   WORKFLOW_ENGINE_STATE_NOT_REPRESENTABLE: 'ENGINE',
   UNTRUSTED_COMPILED_WORKFLOW_ARTIFACT: 'TRUST',
@@ -143,20 +154,62 @@ export interface CompiledWorkflowArtifactIdentity {
 }
 
 /**
- * A compiled Workflow artifact: plain frozen identity data only. The engine
- * machine handle is held in a module-private registry keyed by this object
- * (see COMPILED_HANDLES below), so engine objects can never leak into
- * serializable material, and a caller-constructed look-alike is not an
- * artifact (see COMPILED_MINTS).
+ * Explicit route identity of one compiled Workflow transition, in the
+ * existing engine-neutral route-selection shape (sourceStateId, route class,
+ * routeIndex, event identity — the compiled control machine's RouteSelection
+ * vocabulary): bridge routes are always of the event route class.
+ */
+export interface CompiledWorkflowRoute {
+  readonly transitionId: string;
+  readonly sourceStateId: string;
+  readonly routeClass: 'event';
+  readonly routeIndex: number;
+  readonly eventType: string;
+}
+
+/**
+ * A compiled Workflow artifact: plain frozen data only. The identity is the
+ * whole digest material of the artifact; the canonical explicit route table
+ * (below) is plain frozen route-identity data. The engine machine handle is
+ * held in a module-private registry keyed by this object (see COMPILED_HANDLES
+ * below), so engine objects can never leak into serializable material, and a
+ * caller-constructed look-alike is not an artifact (see COMPILED_MINTS).
  */
 export interface CompiledWorkflowArtifact {
   readonly identity: CompiledWorkflowArtifactIdentity;
+  /**
+   * Canonical explicit route identity of every compiled transition — the
+   * semantic-transition -> compiled-route mapping. routeIndex is assigned by
+   * transitionId order within each (sourceStateId, eventType) group and rows
+   * are sorted by (sourceStateId, eventType, routeIndex), so the table is
+   * invariant under semantic-transition declaration permutation.
+   */
+  readonly routes: readonly CompiledWorkflowRoute[];
+}
+
+/**
+ * Explicit route selection supplied with one bridge event, in the existing
+ * engine-neutral route-selection shape: the event type is the route's event
+ * identity and bridge routes are always of the event route class, so the
+ * selection names the source state and the canonical routeIndex.
+ */
+export interface WorkflowBridgeRouteSelection {
+  readonly sourceStateId: string;
+  readonly routeIndex: number;
 }
 
 /** One caller-neutral domain event applied to a running compiled Workflow. */
 export interface WorkflowBridgeEvent {
   readonly type: string;
   readonly payload?: JsonObject;
+  /**
+   * Explicit route identity. Required whenever the current state carries more
+   * than one eligible route for the event type — an event-only send among
+   * duplicates fails typed/closed and never picks a declaration/array
+   * position. Optional for single-route events and validated against the
+   * compiled canonical route table whenever present.
+   */
+  readonly route?: WorkflowBridgeRouteSelection;
 }
 
 /** Compile input: the live Component, its sealed Assembly and currentness. */
@@ -198,6 +251,8 @@ export interface WorkflowRunResult {
 
 interface CompiledWorkflowHandle {
   readonly machine: AnyStateMachine;
+  /** Explicit routes grouped by `sourceStateId\0eventType`, canonical order. */
+  readonly routesBySourceEvent: ReadonlyMap<string, readonly CompiledWorkflowRoute[]>;
 }
 
 /**
@@ -210,6 +265,21 @@ const COMPILED_MINTS = new WeakSet<object>();
 
 /** Engine handles keyed by the minted artifact; never exposed, never digested. */
 const COMPILED_HANDLES = new WeakMap<CompiledWorkflowArtifact, CompiledWorkflowHandle>();
+
+/**
+ * Route-selection marks: for the one send they belong to, the bridge-minted
+ * engine event is marked with the caller-validated explicit routeIndex.
+ * Guards of duplicate (from, event) route candidates pass only for exactly
+ * the marked route, so the engine's candidate-array order can never choose —
+ * no first-wins by construction. Marks live on the per-send event object
+ * (WeakMap) and never touch any identity or digest material.
+ */
+const ROUTE_SELECTION_MARKS = new WeakMap<object, number>();
+
+/** Route group key of one (source state, event type) pair. */
+function routeGroupKey(sourceStateId: string, eventType: string): string {
+  return `${sourceStateId}\u0000${eventType}`;
+}
 
 // ---------------------------------------------------------------------------
 // Exact Kind binding resolution (descriptor-safe, no getter execution)
@@ -411,20 +481,52 @@ function requireEngineCompatibleEvent(event: string, transitionId: string): void
 }
 
 /**
+ * Explicit-route plan of one compiled body: the canonical route table (rows
+ * sorted by (sourceStateId, eventType, routeIndex)) plus the same routes
+ * grouped by source state and event type for run-time selection checks.
+ */
+interface CompiledRoutePlan {
+  readonly table: readonly CompiledWorkflowRoute[];
+  readonly bySourceEvent: ReadonlyMap<string, readonly CompiledWorkflowRoute[]>;
+}
+
+/** Private translation result: the engine-neutral definition plus its routes. */
+interface CompiledTranslation {
+  readonly definition: DomainWorkflowDefinition;
+  readonly routes: CompiledRoutePlan;
+}
+
+/** Code-unit string order — deterministic, locale-independent, stable. */
+function byStringIdentity(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
  * Translate the validated closed-world semantic material into the existing
- * engine-neutral Domain Workflow definition, privately. Transitions are
- * grouped under their declared source state in declaration order — the
- * existing boundary preserves that order per event route, so duplicate
- * (event, from) transitions resolve first-declared-first, and dead states map
- * to states without transitions, exactly as the shipped engine already
- * behaves. Eventless transitions have no trigger in the existing trigger
- * model and fail typed/closed here.
+ * engine-neutral Domain Workflow definition, privately, together with the
+ * canonical explicit route plan. Transitions are grouped under their declared
+ * source state; duplicate (event, from) transitions keep full semantic
+ * representability through explicit route identity: each member of a
+ * (sourceStateId, eventType) group receives the routeIndex of its position in
+ * the group's transitionId order (code-unit order — deterministic and
+ * invariant under declaration permutation; single-route groups are routeIndex
+ * 0). The engine's candidate-array order is never selection authority:
+ * ambiguous event-only execution fails typed/closed at run time (see
+ * runCompiledWorkflow) and explicit identities are bound to the engine guards
+ * at compile time (see bindExplicitRouteSelectionGuards). Dead states map to
+ * states without transitions, exactly as the shipped engine already behaves.
+ * Eventless transitions have no trigger in the existing trigger model and
+ * fail typed/closed here.
  */
 function translateToDomainDefinition(
   componentId: ComponentId,
   body: WorkflowSemanticBodyView,
-): DomainWorkflowDefinition {
+): CompiledTranslation {
   const transitionsBySource = new Map<string, DomainWorkflowTransition[]>();
+  const declaredBySourceEvent = new Map<
+    string,
+    readonly { transitionId: string; from: string; event: string }[]
+  >();
 
   for (const transition of body.transitions) {
     if (transition.event === undefined) {
@@ -441,7 +543,42 @@ function translateToDomainDefinition(
       targetState: transition.to,
     });
     transitionsBySource.set(transition.from, list);
+
+    const groupKey = routeGroupKey(transition.from, transition.event);
+    const group = declaredBySourceEvent.get(groupKey) ?? [];
+    declaredBySourceEvent.set(groupKey, [
+      ...group,
+      { transitionId: transition.transitionId, from: transition.from, event: transition.event },
+    ]);
   }
+
+  // Canonical explicit route identity per (sourceStateId, eventType) group:
+  // routeIndex by transitionId order, never by declaration position.
+  const bySourceEvent = new Map<string, CompiledWorkflowRoute[]>();
+  const table: CompiledWorkflowRoute[] = [];
+  for (const [groupKey, declared] of declaredBySourceEvent) {
+    const canonical = [...declared].sort((left, right) =>
+      byStringIdentity(left.transitionId, right.transitionId),
+    );
+    const rows: CompiledWorkflowRoute[] = canonical.map((member, routeIndex) => ({
+      transitionId: member.transitionId,
+      sourceStateId: member.from,
+      routeClass: 'event',
+      routeIndex,
+      eventType: member.event,
+    }));
+    bySourceEvent.set(groupKey, rows);
+    table.push(...rows);
+  }
+  // Row order itself is canonical: (sourceStateId, eventType, routeIndex).
+  table.sort(
+    (left, right) =>
+      left.sourceStateId !== right.sourceStateId
+        ? byStringIdentity(left.sourceStateId, right.sourceStateId)
+        : left.eventType !== right.eventType
+          ? byStringIdentity(left.eventType, right.eventType)
+          : left.routeIndex - right.routeIndex,
+  );
 
   const states: DomainWorkflowDefinition['states'] = body.states.map((stateId) => {
     const transitions = transitionsBySource.get(stateId);
@@ -449,11 +586,97 @@ function translateToDomainDefinition(
   });
 
   return {
-    workflowKey: componentId,
-    initialState: body.initial,
-    initialContext: {},
-    states,
+    definition: {
+      workflowKey: componentId,
+      initialState: body.initial,
+      initialContext: {},
+      states,
+    },
+    routes: { table, bySourceEvent },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Explicit route identity binding (compile-time guard seam)
+// ---------------------------------------------------------------------------
+
+/** Module-private structural views of the boundary's (unexported) configs. */
+type BoundaryStateConfig = XStateMachineBoundaryConfig['states'][string];
+type BoundaryTransitionConfig = NonNullable<BoundaryStateConfig['on']>[string][number];
+
+/**
+ * Bind explicit route identities to the engine's compiled transition guards:
+ * for a (source state, event type) group with more than one eligible route,
+ * every compiled candidate passes only for exactly the explicitly marked
+ * route (ROUTE_SELECTION_MARKS), so the engine's candidate-array order can
+ * never decide — no first-wins, no incidental-order authority. An event-only
+ * send among duplicates never reaches the engine at all (run-time typed
+ * failure first); unmarked candidates passing nothing keeps that invariant
+ * true even under a raw engine send. Single-route groups keep the ordinary
+ * existing-engine guards — their behavior is unchanged.
+ */
+function bindExplicitRouteSelectionGuards(
+  config: XStateMachineBoundaryConfig,
+  definition: DomainWorkflowDefinition,
+): void {
+  for (const state of definition.states) {
+    const configState = config.states[state.stateKey];
+    if (configState?.on === undefined) {
+      continue;
+    }
+    const declaredByEvent = new Map<string, DomainWorkflowTransition[]>();
+    for (const transition of state.transitions ?? []) {
+      if (transition.trigger.kind !== 'event') {
+        fail(
+          'WORKFLOW_COMPILATION_FAILED',
+          `transition "${transition.transitionKey}" carries a non-event trigger; the closed-world Workflow translation only produces event triggers`,
+        );
+      }
+      const group = declaredByEvent.get(transition.trigger.eventType) ?? [];
+      group.push(transition);
+      declaredByEvent.set(transition.trigger.eventType, group);
+    }
+
+    for (const [eventType, declared] of declaredByEvent) {
+      if (declared.length <= 1) {
+        continue;
+      }
+      const candidates = configState.on[eventType];
+      if (!Array.isArray(candidates) || candidates.length !== declared.length) {
+        fail(
+          'WORKFLOW_COMPILATION_FAILED',
+          `the engine boundary translation drifted for state "${state.stateKey}" event "${eventType}": ${declared.length} semantic routes vs ${candidates === undefined ? 'no' : String(candidates.length)} compiled candidates`,
+        );
+      }
+      const canonicalIndex = new Map<DomainWorkflowTransition, number>();
+      [...declared]
+        .sort((left, right) => byStringIdentity(left.transitionKey, right.transitionKey))
+        .forEach((transition, routeIndex) => canonicalIndex.set(transition, routeIndex));
+      // The boundary's transition configs are immutable; duplicate-route
+      // candidates are re-minted with identity-bound guards, so the engine's
+      // candidate-array order is never selection authority.
+      const wrapped: BoundaryTransitionConfig[] = candidates.map(
+        (candidate, declaredIndex) => {
+          const declaredMember: DomainWorkflowTransition | undefined = declared[declaredIndex];
+          const routeIndex =
+            declaredMember === undefined ? undefined : canonicalIndex.get(declaredMember);
+          if (declaredMember === undefined || routeIndex === undefined) {
+            fail(
+              'WORKFLOW_COMPILATION_FAILED',
+              `the engine boundary candidate order drifted for state "${state.stateKey}" event "${eventType}"`,
+            );
+          }
+          const originalGuard = candidate.guard;
+          return {
+            target: candidate.target,
+            guard: (args: Parameters<typeof originalGuard>[0]) =>
+              originalGuard(args) && ROUTE_SELECTION_MARKS.get(args.event) === routeIndex,
+          };
+        },
+      );
+      configState.on[eventType] = wrapped;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -533,11 +756,22 @@ export async function compileWorkflowComponent(
   const componentSemanticDigest = await computeComponentSemanticDigest(component, input.sha256);
 
   const body = readSemanticBody(component);
-  const definition = translateToDomainDefinition(evidence.componentId, body);
+  const translation = translateToDomainDefinition(evidence.componentId, body);
+
+  let config: XStateMachineBoundaryConfig;
+  try {
+    config = adaptDomainWorkflowToXState(translation.definition);
+  } catch (error) {
+    fail(
+      'WORKFLOW_COMPILATION_FAILED',
+      `the existing workflow runtime could not compile the admitted semantic material: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  bindExplicitRouteSelectionGuards(config, translation.definition);
 
   let machine: AnyStateMachine;
   try {
-    const config = adaptDomainWorkflowToXState(definition);
     machine = createMachine(config as unknown as Parameters<typeof createMachine>[0]);
   } catch (error) {
     fail(
@@ -555,10 +789,78 @@ export async function compileWorkflowComponent(
       assemblyDigest: evidence.assemblyDigest,
       kindImplementation: evidence.admittedKindImplementation,
     }),
+    routes: Object.freeze(translation.routes.table.map((route) => Object.freeze(route))),
   });
   COMPILED_MINTS.add(artifact);
-  COMPILED_HANDLES.set(artifact, Object.freeze({ machine }));
+  COMPILED_HANDLES.set(
+    artifact,
+    Object.freeze({ machine, routesBySourceEvent: translation.routes.bySourceEvent }),
+  );
   return artifact;
+}
+
+// ---------------------------------------------------------------------------
+// Run-time explicit route resolution (event-only ambiguity fails closed)
+// ---------------------------------------------------------------------------
+
+/** Canonical route identities of one group, in deterministic canonical order. */
+function describeCanonicalRoutes(group: readonly CompiledWorkflowRoute[]): string {
+  return group.map((route) => `${route.transitionId}#${route.routeIndex}`).join(', ');
+}
+
+/**
+ * Resolve one explicit route identity against the compiled canonical route
+ * table for the CURRENT state: exactly one eligible route must match, or the
+ * execution fails typed/closed (deterministic — never array-position
+ * guessing, never a silently ignored selection).
+ */
+function requireExplicitRouteResolution(
+  routesBySourceEvent: ReadonlyMap<string, readonly CompiledWorkflowRoute[]>,
+  currentStateId: string,
+  eventType: string,
+  route: WorkflowBridgeRouteSelection,
+): number {
+  const routeView =
+    typeof route === 'object' && route !== null
+      ? (route as unknown as Record<string, unknown>)
+      : undefined;
+  const sourceStateId =
+    typeof routeView?.sourceStateId === 'string' ? routeView.sourceStateId : undefined;
+  const routeIndex = typeof routeView?.routeIndex === 'number' ? routeView.routeIndex : undefined;
+  if (sourceStateId === undefined || routeIndex === undefined || !Number.isInteger(routeIndex)) {
+    fail(
+      'WORKFLOW_ROUTE_SELECTION_INVALID',
+      `the explicit route identity for event "${eventType}" is not a valid {sourceStateId, routeIndex} selection (the source state must be the current state and the routeIndex a non-negative integer); refusing to guess a route`,
+    );
+  }
+  if (sourceStateId !== currentStateId) {
+    fail(
+      'WORKFLOW_ROUTE_SELECTION_INVALID',
+      `the explicit route identity names source state "${sourceStateId}" but the run is at "${currentStateId}"; route identity is bound to the current state`,
+    );
+  }
+  const group = routesBySourceEvent.get(routeGroupKey(sourceStateId, eventType));
+  if (group === undefined || routeIndex < 0 || routeIndex >= group.length) {
+    fail(
+      'WORKFLOW_ROUTE_SELECTION_INVALID',
+      `the explicit route identity {sourceStateId: "${sourceStateId}", routeIndex: ${routeIndex}} does not resolve to exactly one eligible route for event "${eventType}" from "${currentStateId}" (canonical routes: ${group === undefined ? 'none' : describeCanonicalRoutes(group)})`,
+    );
+  }
+  return routeIndex;
+}
+
+/** Read the actor's current flat state id; non-flat values fail typed. */
+function currentFlatStateId(actor: {
+  readonly getSnapshot: () => { readonly value: unknown };
+}): string {
+  const value: unknown = actor.getSnapshot().value;
+  if (typeof value !== 'string') {
+    fail(
+      'WORKFLOW_ENGINE_STATE_NOT_REPRESENTABLE',
+      'the existing engine reported a non-flat state value for a closed-world flat Workflow definition',
+    );
+  }
+  return value;
 }
 
 /**
@@ -579,7 +881,15 @@ export async function compileWorkflowComponent(
  *   any mismatch is `STALE_COMPILED_WORKFLOW_ARTIFACT`;
  * - only then does a fresh actor of the privately held engine machine apply
  *   the caller-neutral domain events in order through the existing engine
- *   event-provenance factory.
+ *   event-provenance factory. Duplicate (from, event) route groups never
+ *   resolve by declaration or candidate-array order: an event whose current
+ *   state carries more than one eligible route must name the explicit route
+ *   identity (`{sourceStateId, routeIndex}`) and then executes exactly that
+ *   route, independent of any permutation; an event-only send among
+ *   duplicates fails typed/closed (`WORKFLOW_EVENT_ROUTE_AMBIGUOUS`) before
+ *   any transition executes, and an explicit identity that does not resolve
+ *   to exactly one eligible route fails typed/closed
+ *   (`WORKFLOW_ROUTE_SELECTION_INVALID`).
  */
 export async function runCompiledWorkflow(
   input: RunCompiledWorkflowInput,
@@ -639,18 +949,36 @@ export async function runCompiledWorkflow(
   const actor = createActor(handle.machine).start();
   try {
     for (const event of input.events) {
+      const currentStateId = currentFlatStateId(actor);
+      let selectedRouteIndex: number | undefined;
+      if (event.route !== undefined) {
+        selectedRouteIndex = requireExplicitRouteResolution(
+          handle.routesBySourceEvent,
+          currentStateId,
+          event.type,
+          event.route,
+        );
+      } else {
+        const group = handle.routesBySourceEvent.get(routeGroupKey(currentStateId, event.type));
+        if (group !== undefined && group.length > 1) {
+          fail(
+            'WORKFLOW_EVENT_ROUTE_AMBIGUOUS',
+            `event-only selection is ambiguous: source state "${currentStateId}" carries ${group.length} eligible routes for event "${event.type}" (canonical route identity: ${describeCanonicalRoutes(group)}); supply the explicit route identity {sourceStateId, routeIndex} — the bridge never resolves duplicate routes by declaration or candidate-array order`,
+          );
+        }
+      }
       // Engine event provenance is minted here, by the existing boundary
       // factory — the bridge never forwards raw caller event objects.
-      actor.send(createDomainXStateEvent({ type: event.type, ...(event.payload === undefined ? {} : { payload: event.payload }) }));
+      const mintedEvent = createDomainXStateEvent({
+        type: event.type,
+        ...(event.payload === undefined ? {} : { payload: event.payload }),
+      });
+      if (selectedRouteIndex !== undefined) {
+        ROUTE_SELECTION_MARKS.set(mintedEvent, selectedRouteIndex);
+      }
+      actor.send(mintedEvent);
     }
-    const value: unknown = actor.getSnapshot().value;
-    if (typeof value !== 'string') {
-      fail(
-        'WORKFLOW_ENGINE_STATE_NOT_REPRESENTABLE',
-        'the existing engine reported a non-flat state value for a closed-world flat Workflow definition',
-      );
-    }
-    return Object.freeze({ stateId: value });
+    return Object.freeze({ stateId: currentFlatStateId(actor) });
   } finally {
     actor.stop();
   }
