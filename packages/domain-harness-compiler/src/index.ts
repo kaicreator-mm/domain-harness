@@ -1,6 +1,23 @@
 /** Build-time compiler package and stable public API. */
 export const DOMAIN_HARNESS_COMPILER_PACKAGE = '@kaicreator/domain-harness-compiler' as const;
 
+// T008C — compiler/public compatibility lane (PACK-B #589, thin issue #791).
+// Versioned compatibility commitment for the Raw/compiler root export
+// inventory below: the frozen legacy commitments (build API, semantic-decision
+// compile API restored by T000-SD/PR #843, script migration/bundling API) stay
+// available on this one barrel and only ever extend additively. This is not a
+// competing successor surface: the v0.7 `/v7` public rebind/current exports
+// stay owned by `@kaicreator/domain-harness/v7`, the authoritative semantic
+// decision contracts stay owned by `@kaicreator/domain-harness/v2`, and the
+// internal raw-v07 compat modules stay internal. The legacy compiler path may
+// adapt into v0.7 representation but never gains authority over successor
+// Component/Assembly semantics. Compatibility is proven from the packed
+// tarball (tests/public-consumer.test.ts), not source-only imports. Bump only
+// for a breaking change to the committed inventory; additive exports and the
+// one frozen value below do not bump it.
+export const COMPILER_PUBLIC_API_VERSION = 'compiler-public-api.v1' as const;
+
+
 export {
   loadRawDomainPackage,
   type LoadRawDomainPackageOptions,
