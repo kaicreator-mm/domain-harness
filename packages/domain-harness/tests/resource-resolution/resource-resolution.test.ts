@@ -1298,6 +1298,171 @@ test('T005B #837 P1_02: an overlong hostile key is length-gated BEFORE any conte
   assert.ok(first.message.length < 400, 'diagnostic stays bounded regardless of key length');
 });
 
+// ---------------------------------------------------------------------------
+// #794 Proxy-trap containment — hostile provider-response objects fail closed
+// ---------------------------------------------------------------------------
+//
+// A provider.resolve() throw/rejection is typed/contained
+// (RESOURCE_PROVIDER_FAILURE), but a hostile Proxy RETURNED as the response
+// can throw during `snapshotProviderResponse` / descriptor inspection, which
+// runs after that catch (#772 adjacent-probes evidence, #775 P1-1). Every
+// escape from the response-inspection path must be a deterministic typed
+// ResourceResolutionError whose fixed message never echoes the provider-
+// controlled trap/error material (its message, name, or any property).
+
+/** Provider-controlled hostile marker material that must never reach a diagnostic. */
+const TRAP_MARKER = 'hunter2-sk-live-51H8xQ2eZvKYlo2C';
+
+/** One hostile response Proxy whose named trap throws provider-controlled material. */
+function trapThrowingProxy(trap: string): unknown {
+  return new Proxy(
+    { status: 'resolved', handle: 'h' },
+    {
+      [trap](): never {
+        throw new Error(`${trap} trap threw ${TRAP_MARKER}`);
+      },
+    },
+  );
+}
+
+/** One hostile ARRAY Proxy whose get('length') trap throws provider-controlled material. */
+function trapThrowingArrayProxy(): unknown {
+  return new Proxy([VALID_PIN], {
+    get(_target, property): never {
+      throw new Error(`get trap (${String(property)}) threw ${TRAP_MARKER}`);
+    },
+  });
+}
+
+/** Assert one provider response object is contained: typed, fixed, non-echoing. */
+async function expectTrapContained(
+  response: unknown,
+): Promise<ResourceResolutionError> {
+  const assembly = await sealedAssembly([requirement()]);
+  const { provider } = providerStub(() => response as ResourceProviderResponse);
+  const error = await expectResolutionError(
+    resolveToolResources(options(assembly, provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+  assert.ok(
+    !error.message.includes(TRAP_MARKER),
+    `provider-controlled trap/error material leaked: ${error.message}`,
+  );
+  assert.ok(
+    error.message.includes('runtime.postgres.cluster'),
+    'only the exact sealed-Assembly identity participates',
+  );
+  return error;
+}
+
+test('T005B #794: a hostile getOwnPropertyDescriptor trap during response snapshot fails closed typed', async () => {
+  await expectTrapContained(trapThrowingProxy('getOwnPropertyDescriptor'));
+});
+
+test('T005B #794: a hostile ownKeys trap during response snapshot fails closed typed', async () => {
+  await expectTrapContained(trapThrowingProxy('ownKeys'));
+});
+
+test('T005B #794: a hostile get trap during array snapshot (supportedContracts length read) fails closed typed', async () => {
+  // The response root is consumed through its plain descriptor snapshot, so a
+  // root-level get trap is only ever dispatched by the await's thenable
+  // unwrapping. A get trap DOES dispatch inside the inspection path when a
+  // nested array is snapshotted (`safeArraySnapshot` reads `value.length`).
+  await expectTrapContained({
+    status: 'incompatible',
+    supportedContracts: trapThrowingArrayProxy(),
+  });
+});
+
+test('T005B #794: an all-throwing get trap (including "then") is contained typed and non-leaking', async () => {
+  // A root Proxy whose get trap throws for everything — including the `then`
+  // probe the await performs — is contained by the provider-call boundary as a
+  // typed RESOURCE_PROVIDER_FAILURE with a fixed message. This guards that
+  // containment: the provider-controlled trap text must never surface.
+  const assembly = await sealedAssembly([requirement()]);
+  const { provider } = providerStub(
+    () => trapThrowingProxy('get') as ResourceProviderResponse,
+  );
+  const error = await expectResolutionError(
+    resolveToolResources(options(assembly, provider)),
+    'RESOURCE_PROVIDER_FAILURE',
+  );
+  assert.ok(
+    !error.message.includes(TRAP_MARKER),
+    `provider-controlled trap material leaked: ${error.message}`,
+  );
+});
+
+test('T005B #794 negative control: a has trap cannot influence inspection (the response is consumed through its plain descriptor snapshot)', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const { provider } = providerStub(
+    () => trapThrowingProxy('has') as ResourceProviderResponse,
+  );
+
+  const result = await resolveToolResources(options(assembly, provider));
+
+  assert.deepEqual(result.resources.get('runtime.postgres.cluster'), {
+    resourceKey: 'runtime.postgres.cluster',
+    status: 'resolved',
+    handle: 'h',
+  });
+});
+
+test('T005B #794: an engine proxy-invariant TypeError during response inspection fails closed typed', async () => {
+  // Duplicate ownKeys entries make the ENGINE throw a TypeError before any
+  // trap throws — still an untyped escape from the inspection path unless it
+  // is contained like every other provider-controlled failure.
+  const invariantHostile = new Proxy(
+    { status: 'resolved', handle: 'h' },
+    { ownKeys: () => ['status', 'status', 'handle'] },
+  );
+  const error = await expectTrapContained(invariantHostile);
+  assert.ok(error.message.length < 400, 'contained diagnostic stays bounded');
+});
+
+test('T005B #794: a hostile Proxy nested in currentnessPin/supportedContracts fails closed typed', async () => {
+  // T005C pin seam: a hostile Proxy riding as the pin material.
+  await expectTrapContained({
+    status: 'resolved',
+    handle: 'h',
+    currentnessPin: trapThrowingProxy('getOwnPropertyDescriptor'),
+  });
+  // supportedContracts diagnostic seam: a hostile Proxy riding as one ref.
+  await expectTrapContained({
+    status: 'incompatible',
+    supportedContracts: [trapThrowingProxy('ownKeys')],
+  });
+});
+
+test('T005B #794: containment is deterministic and bounded for the same hostile input', async () => {
+  const first = await expectTrapContained(trapThrowingProxy('getOwnPropertyDescriptor'));
+  const second = await expectTrapContained(trapThrowingProxy('getOwnPropertyDescriptor'));
+
+  assert.equal(first.code, 'INVALID_RESOURCE_PROVIDER_RESPONSE', 'typed code is stable');
+  assert.equal(first.message, second.message, 'same hostile input => identical fixed diagnostic');
+  assert.ok(first.message.length < 400, 'diagnostic stays bounded');
+});
+
+test('T005B #794 negative control: a transparent Proxy wrapping a legitimate response resolves unchanged', async () => {
+  const assembly = await sealedAssembly([requirement({ contract: POSTGRES_CONTRACT })]);
+  const handle = { connection: 'opaque-host-object' };
+  const { provider } = providerStub(() =>
+    new Proxy(
+      { status: 'resolved', handle, contract: POSTGRES_CONTRACT, currentnessPin: VALID_PIN },
+      {},
+    ) as unknown as ResourceProviderResponse,
+  );
+
+  const result = await resolveToolResources(options(assembly, provider));
+
+  assert.deepEqual(result.resources.get('runtime.postgres.cluster'), {
+    resourceKey: 'runtime.postgres.cluster',
+    status: 'resolved',
+    handle,
+    currentnessPin: VALID_PIN,
+  });
+});
+
 test('T005B #643 regression: legitimate resolution behavior is unchanged (contract match, pin capture, provider replacement semantics)', async () => {
   const assembly = await sealedAssembly([requirement({ contract: POSTGRES_CONTRACT })]);
   const handle = { connection: 'opaque-host-object' };

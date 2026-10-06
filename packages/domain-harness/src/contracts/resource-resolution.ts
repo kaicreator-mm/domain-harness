@@ -35,6 +35,12 @@
  *   suspension; each provider response is synchronously snapshotted
  *   immediately after its await. The caller's objects are never re-read after
  *   an await, and the caller's objects are never frozen or mutated;
+ * - provider-response inspection is contained (#794): a hostile response
+ *   object — e.g. a Proxy whose descriptor/ownKeys/get traps throw, or an
+ *   engine Proxy-invariant TypeError — cannot escape the synchronous response
+ *   snapshot as an untyped provider-controlled exception. Every such escape
+ *   fails closed as a deterministic typed INVALID_RESOURCE_PROVIDER_RESPONSE
+ *   whose fixed message never echoes the caught value's text;
  * - no provider downgrade/latest/default/order fallback: exactly one injected
  *   provider is consulted, exactly once per requirement, in canonical
  *   (componentId, resourceKey) order. A failure is terminal — never retried,
@@ -177,7 +183,10 @@ export type ResourceProviderResponse =
  * per resolution call by the host; the core never selects, ranks, caches, or
  * fallbacks between providers. `resolve` may be async; a synchronous throw
  * or a rejection surfaces as `RESOURCE_PROVIDER_FAILURE` (typed) — the
- * provider's own error text is never propagated (redaction discipline).
+ * provider's own error text is never propagated (redaction discipline). A
+ * hostile response object that throws during the response snapshot/inspection
+ * fails closed the same way as typed `INVALID_RESOURCE_PROVIDER_RESPONSE`
+ * (#794) — its trap/error text is never propagated either.
  */
 export interface ResourceProvider {
   readonly resolve: (request: ResourceResolutionRequest) => Promise<ResourceProviderResponse>;
@@ -903,7 +912,28 @@ export async function resolveToolResources(
       );
     }
 
-    const response = snapshotProviderResponse(raw, request.resourceKey);
+    // Proxy-trap containment (#794): the resolve() catch above contains the
+    // provider CALL, but the response OBJECT is inspected here, outside that
+    // catch. A hostile Proxy response can throw from its descriptor/ownKeys/
+    // get traps (or trip an engine Proxy-invariant TypeError) during
+    // `snapshotProviderResponse`. Every escape from that inspection path is
+    // provider-controlled: our own typed fail-closed paths (including #643's
+    // and #837's redacted classifications) pass through unchanged as
+    // ResourceResolutionError, and anything else fails closed as a
+    // deterministic typed error whose fixed message never echoes the caught
+    // value's text, name, or properties.
+    let response: SnapshotProviderResponse;
+    try {
+      response = snapshotProviderResponse(raw, request.resourceKey);
+    } catch (error) {
+      if (error instanceof ResourceResolutionError) {
+        throw error;
+      }
+      fail(
+        'INVALID_RESOURCE_PROVIDER_RESPONSE',
+        `resource provider response for "${request.resourceKey}" could not be safely inspected (hostile response object); failing closed: provider-controlled trap/error material is never propagated`,
+      );
+    }
 
     if (response.status === 'resolved') {
       const requiredContract = request.contract;
