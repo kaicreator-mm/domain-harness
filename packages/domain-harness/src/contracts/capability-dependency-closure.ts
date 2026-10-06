@@ -1,79 +1,91 @@
 /**
  * v0.7 Tool-to-Tool required Capability closure (issue #630, fine-grained DAG
- * T003E; authority #589 PACK-B).
+ * T003E; authority #589 PACK-B; bounded repair #651).
  *
  * The Microkernel seam that computes the deterministic dependency closure of
- * one admitted root Tool's `requiresCapabilities`: every Tool the root
- * transitively requires is selected through the T003B Definition-plane
- * provider selection (consumed, never re-implemented) and bound to exactly
- * one compatible exact Tool implementation through the T003C Assembly-plane
- * binding (consumed, never re-implemented), threading the sealed Runtime
- * Assembly through each T003C successor reseal. The Microkernel owns exact
- * closure evidence/currentness here — never concrete Tool semantics: no
- * provider selection logic, no binding decision logic, no invocation, no
+ * one admitted root Tool's `requiresCapabilities` as EVIDENCE/COMPOSITION
+ * ONLY, against ONE unchanged final Runtime Assembly: the root Tool is seeded
+ * through the accepted T002B Assembly-bound admission seam, every required
+ * Capability is selected through the T003B Definition-plane provider
+ * selection (consumed, never re-implemented), and every selected dependency
+ * Tool is consumed through the shared T003C consumer-verifier seam (#640) —
+ * the caller supplies the exact ALREADY-MINTED dependency binding for each
+ * dependency, and T003E verifies each against that SAME final Assembly. The
+ * Microkernel owns exact closure evidence here — never concrete Tool
+ * semantics: no provider selection logic, no binding decision logic, no
+ * minting of new bindings, no resealing of Assemblies, no invocation, no
  * resource resolution and no ToolRegistry authority exists in this file.
  *
- * Normative rules owned here, without exception (#589 PACK-B T003E):
+ * Normative rules owned here, without exception (#589 PACK-B T003E, as
+ * repaired by #651):
  * - the closure is derived ONLY from the root Tool's declared
  *   `requiredCapabilities` (exact {capabilityId, version} refs, already
  *   exactness-validated by the graph envelope contract at entry); traversal
  *   is normalized by exact identity — required refs are visited in sorted
  *   exact order and every emitted list (entries, edges) is sorted by exact
  *   identity, never by source/registry insertion order;
+ * - the seed Tool is admitted through the accepted T002B
+ *   `admitComponentWithAssembly` seam against the one exact final
+ *   Assembly/current Definition; seed admission identity must match root
+ *   Tool + current DefinitionGraphDigest + final assemblyDigest, and stale
+ *   or foreign material fails with the T002B-owned typed taxonomy
+ *   (ASSEMBLY_ADMISSION_*) before any traversal;
  * - each required ref is resolved by the corrected T003B currentness-bound
  *   selection (`resolveCurrentCapabilityProvider`, consumer excluded from
  *   candidacy — no silent self-provision); zero or multiple providers
  *   propagates the original typed `CapabilityProvisionContractError`
- *   unwrapped;
- * - each newly visited provider Tool is bound by T003C to exactly one
- *   compatible exact implementation; missing/ambiguous/incompatible
- *   propagates the original typed `ToolImplementationBindingError`
- *   unwrapped. An optional per-subject exact pin resolves ambiguity the same
- *   way T003C resolves it — never first/latest/default/ordering;
+ *   unwrapped (0/1/>1 fail-closed semantics preserved);
+ * - each selected dependency Tool consumes the accepted #640 T003C
+ *   consumer-verification seam (`isSealedToolImplementationBinding` +
+ *   `verifyToolImplementationBinding`) against that SAME unchanged final
+ *   Assembly. T003E MUST NOT call the T003C mint/bind path to choose or bind
+ *   a new implementation and MUST NOT reproduce T003C digest/currentness
+ *   rules. The caller supplies the exact already-minted dependency
+ *   binding(s): bindings are located BY EXACT SUBJECT IDENTITY — no lookup
+ *   by latest/default/order/id alias, never first-wins — and a selected
+ *   provider without a supplied binding, an unminted lookalike, a missing or
+ *   replaced final-Assembly slot, a stale Definition identity or an
+ *   exact-pin mismatch fails with the owning typed taxonomy
+ *   (`ToolImplementationBindingError`) unwrapped;
  * - a provider reached again through another edge is recorded as an edge but
- *   bound exactly once (diamond sharing);
+ *   consumed exactly once (diamond sharing);
  * - capability dependency cycles are rejected as `CAPABILITY_DEPENDENCY_CYCLE`
  *   in v0.7: any selected provider already on the current traversal stack
  *   fails closed with the exact cycle path. No lazy/runtime recursion
  *   semantics are invented;
- * - closure evidence binds the exact DefinitionGraphDigest (authoritatively
- *   recomputed before any traversal) AND the exact final successor
- *   assemblyDigest (the T002B sealed Assembly carrying every closure §G
- *   binding slot). It is fresh/frozen/non-aliasing and contains the exact
- *   selected dependency graph needed by the runtime — but NO live
- *   implementation handles or functions in identity: handles are paired with
- *   their exact pins OUTSIDE the evidence, on the sealed result;
+ * - T003E NEVER reseals or mutates the Assembly: the input `finalAssembly`
+ *   identity is the input/currentness authority, not a T003E output — the
+ *   sealed result carries no successor Assembly at all;
+ * - closure evidence binds the exact final DefinitionGraphDigest + the exact
+ *   final assemblyDigest (both the unchanged input identity) + the seed
+ *   admission identity + the exact selected dependency graph (entries with
+ *   the exact verified implementation identities/bindingDigests + edges). It
+ *   is fresh/frozen/non-aliasing and contains NO live implementation handles
+ *   or functions in identity: handles are paired with their exact verified
+ *   pins OUTSIDE the evidence, on the sealed result (the original opaque
+ *   reference exposed only after full verification by the T003C seam);
  * - the root Tool's OWN implementation binding is intentionally NOT part of
  *   the closure: the closure covers exactly the tools the root requires.
  *   Binding the root itself is the caller's T003C concern;
  * - NO invocation occurs in T003E. Closure evidence grants no invocation,
  *   occurrence or effect authority.
  *
- * Authority closure: the sealed base Assembly (T002B) is caller-supplied
- * assembly-plane material; currentness is proven by authoritatively
- * recomputing the Definition graph digest through the #555 seam before any
- * traversal and requiring it to equal the digest recorded in the sealed
- * Assembly — a stale or foreign graph or assembly fails closed with
- * `DEFINITION_GRAPH_DIGEST_MISMATCH` before any closure evidence is minted.
- * Per-edge currentness (T003B selection digest + T003C assembly/selection
- * digest conjunction) re-verifies the same digest through the consumed
- * authority paths.
- *
  * Torn-snapshot discipline (#587 §E, same as #555/T003C): every
  * authority-bearing caller input is descriptor-safe validated and
- * synchronously snapshotted before the first `await`; the Definition graph is
- * deep-copied into module-owned state and the candidate/pin collections are
- * copied into module-owned arrays before any suspension, so a caller mutating
- * its own graph, candidates or pins while a digest promise is pending can
- * never mint torn or hybrid closure evidence.
+ * synchronously snapshotted before the first `await` — the Definition graph
+ * is deep-copied into module-owned state and the dependency-binding claimed
+ * subjects are captured own-data-only (zero getter executions) into a
+ * module-owned map before any suspension, so a caller mutating its own
+ * graph, bindings or pins while a digest promise is pending can never mint
+ * torn or hybrid closure evidence.
  *
  * Boundary: validation consumes the shared descriptor-safe record primitive
  * and unified exact-reference authority of `record-safety.ts` (#557 + #578),
- * the #555 graph contract and digest seam, the T003A Tool declaration
- * validator, the T003B currentness-bound provider selection and the T003C
- * exact implementation binding — all imported, never reimplemented. No
- * Workflow/XState/ToolRegistry/SQLite/Agent/UX/AI/HTTP/Search/Storage import
- * is permitted in this file.
+ * the #555 graph contract seam, the T003A Tool declaration validator, the
+ * T002B Assembly-bound admission seam, the T003B currentness-bound provider
+ * selection and the #640 T003C consumer-verifier seam — all imported, never
+ * reimplemented. No Workflow/XState/ToolRegistry/SQLite/Agent/UX/AI/HTTP/
+ * Search/Storage import is permitted in this file.
  */
 import type {
   CapabilityContractRef,
@@ -81,7 +93,6 @@ import type {
   ComponentId,
 } from './component.js';
 import {
-  computeDefinitionGraphDigest,
   validateDefinitionGraphEnvelope,
   type DefinitionGraphEnvelope,
 } from './definition-graph.js';
@@ -92,11 +103,16 @@ import {
   type Sha256Port,
 } from './identity.js';
 import { resolveCurrentCapabilityProvider } from './capability-provision.js';
-import type { SealedRuntimeAssembly } from './runtime-assembly.js';
+import {
+  admitComponentWithAssembly,
+  type SealedRuntimeAssembly,
+} from './runtime-assembly.js';
 import { validateToolComponent } from './tool-component.js';
 import {
-  bindToolImplementation,
-  type ToolImplementationCandidate,
+  isSealedToolImplementationBinding,
+  ToolImplementationBindingError,
+  verifyToolImplementationBinding,
+  type SealedToolImplementationBinding,
   type ToolImplementationIdentity,
 } from './tool-implementation-binding.js';
 import {
@@ -111,19 +127,27 @@ import {
 /**
  * Versioned closure-evidence digest domain tag, owned exclusively by this
  * file. Sibling to, and never borrowed by, the T001B/T001C/T002B/T003C
- * digest domains: any future change to the evidence material shape is a NEW
- * domain tag; historical closure identities never change retroactively.
+ * digest domains. The #651 bounded repair changed the evidence material
+ * shape (seed admission bound in, input final Assembly identity bound in
+ * place of a successor Assembly), so the domain tag advances per this
+ * module's own rule: any material shape change is a NEW domain tag and
+ * historical closure identities never change retroactively.
  */
 const CAPABILITY_DEPENDENCY_CLOSURE_EVIDENCE_DOMAIN =
-  'kaicreator.capability-dependency-closure.evidence.v1';
+  'kaicreator.capability-dependency-closure.evidence.v2';
 
 /**
- * Fail-closed closure failure taxonomy (#589 PACK-B T003E). Every failure is
- * typed and terminal — none carries or suggests a substitute/default/latest
- * resolution, and no diagnostic ever serializes implementation handles,
- * secret values or live objects (only exact identity strings participate).
- * T003B/T003C failures propagate under their own typed error classes
- * unwrapped, exactly as those modules define them.
+ * Fail-closed closure failure taxonomy (#589 PACK-B T003E, as repaired by
+ * #651). Every failure is typed and terminal — none carries or suggests a
+ * substitute/default/latest resolution, and no diagnostic ever serializes
+ * implementation handles, secret values or live objects (only exact identity
+ * strings participate).
+ *
+ * T003B selection failures propagate under `CapabilityProvisionContractError`,
+ * seed admission/currentness failures under the T002B-owned
+ * `RuntimeAssemblyError`, and dependency-binding authority failures under the
+ * T003C-owned `ToolImplementationBindingError` — each unwrapped, exactly as
+ * those modules define them. This taxonomy covers only T003E-owned failures.
  */
 export type CapabilityDependencyClosureErrorCode =
   | 'INVALID_CLOSURE_INPUT'
@@ -131,8 +155,7 @@ export type CapabilityDependencyClosureErrorCode =
   | 'ROOT_COMPONENT_NOT_FOUND'
   | 'ROOT_NOT_TOOL_COMPONENT'
   | 'DUPLICATE_EXACT_PIN_SUBJECT'
-  | 'CAPABILITY_DEPENDENCY_CYCLE'
-  | 'DEFINITION_GRAPH_DIGEST_MISMATCH';
+  | 'CAPABILITY_DEPENDENCY_CYCLE';
 
 export class CapabilityDependencyClosureError extends Error {
   readonly code: CapabilityDependencyClosureErrorCode;
@@ -155,12 +178,16 @@ export class CapabilityDependencyClosureError extends Error {
   }
 }
 
-/** One exact per-subject authoritative pin resolving implementation
- * ambiguity for exactly one closure provider Tool. */
+/**
+ * One exact per-subject expected pin: the consumer-supplied exact
+ * implementation identity that the verified binding evidence pin must equal
+ * exactly (all three fields) for that closure provider Tool — never resolved
+ * against candidates, ordering, latest or any other lookup.
+ */
 export interface CapabilityClosureExactPin {
-  /** The exact closure provider Tool Component the pin authorizes. */
+  /** The exact closure provider Tool Component the pin is expected for. */
   readonly toolComponentId: ComponentId;
-  /** The exact authoritative implementation pin (id/version/content digest). */
+  /** The exact expected implementation pin (id/version/content digest). */
   readonly pin: ToolImplementationIdentity;
 }
 
@@ -168,17 +195,29 @@ export interface CapabilityClosureExactPin {
  * snapshotted at call time; the caller's objects are never frozen or
  * mutated. */
 export interface CapabilityDependencyClosureInput {
-  /** The sealed base Runtime Assembly (never mutated; T002B seal). */
+  /**
+   * The ONE exact current final sealed Runtime Assembly — the unchanged
+   * input/currentness authority of the whole closure. Never mutated, never
+   * resealed, never replaced by a T003E output.
+   */
   readonly assembly: SealedRuntimeAssembly;
   /** The exact admitted root Tool Component whose closure is computed. */
   readonly rootComponentId: ComponentId;
   /** The live Definition graph; its digest is authoritatively recomputed. */
   readonly currentDefinitionGraph: DefinitionGraphEnvelope;
-  /** The offered Tool implementation candidates for the closure providers. */
-  readonly implementations: readonly ToolImplementationCandidate[];
   /**
-   * Optional exact per-subject pins resolving ambiguity. Each subject may
-   * carry at most one pin; duplicates fail closed typed.
+   * The caller-supplied, ALREADY-MINTED dependency bindings (the accepted
+   * #640 sealed binding objects) for the closure's dependency Tools. Each
+   * selected provider consumes the binding whose exact subject identity
+   * (`evidence.toolComponentId`) equals the provider ComponentId — no lookup
+   * by latest/default/order/id alias, never first-wins; at most one binding
+   * per claimed subject. Missing supply fails the owning typed taxonomy.
+   */
+  readonly dependencyBindings: readonly SealedToolImplementationBinding[];
+  /**
+   * Optional exact per-subject expected pins. Each subject may carry at most
+   * one pin; duplicates fail closed typed. A supplied pin must equal the
+   * verified binding evidence pin exactly.
    */
   readonly exactPins?: readonly CapabilityClosureExactPin[];
   /** The Sha256Port used for every authoritative digest recomputation. */
@@ -195,22 +234,44 @@ export interface CapabilityClosureEdge {
   readonly providerComponentId: ComponentId;
 }
 
-/** One bound closure provider Tool: exact identity + exact implementation. */
+/** One consumed closure provider Tool: exact identity + exact verified pin. */
 export interface CapabilityClosureEntry {
-  /** Exact ComponentId of the bound provider Tool. */
+  /** Exact ComponentId of the consumed provider Tool. */
   readonly toolComponentId: ComponentId;
-  /** The exact ref through which the provider was first bound (sorted-traversal deterministic). */
+  /** The exact ref through which the provider was first consumed (sorted-traversal deterministic). */
   readonly boundCapability: CapabilityContractRef;
-  /** The exact implementation pin (id/version/content digest). */
+  /** The exact VERIFIED implementation pin (id/version/content digest). */
   readonly implementation: ToolImplementationIdentity;
-  /** The T003C binding evidence digest for this provider. */
+  /** The exact verified T003C binding evidence digest for this provider. */
   readonly bindingDigest: ContentDigest;
 }
 
 /**
+ * The seed admission identity bound into the closure evidence: the exact
+ * T002B Assembly-bound admission of the root Tool against the one unchanged
+ * final Assembly/current Definition.
+ */
+export interface CapabilityClosureSeedAdmission {
+  /** Exact ComponentId of the admitted root Tool. */
+  readonly componentId: ComponentId;
+  /** Exact Definition identity the admission was bound to. */
+  readonly definitionGraphDigest: ContentDigest;
+  /** Exact final Assembly digest the admission was bound to. */
+  readonly assemblyDigest: ContentDigest;
+  /** The exact admitted Kind ref. */
+  readonly admittedKind: { readonly kindId: string; readonly version: string };
+  /** The exact sealed KindImplementation provenance of the admission. */
+  readonly admittedKindImplementation: {
+    readonly kind: { readonly kindId: string; readonly version: string };
+    readonly implementation: ToolImplementationIdentity;
+  };
+}
+
+/**
  * Serializable, content-addressed closure evidence. Fresh, frozen,
- * non-aliasing; binds the exact DefinitionGraphDigest + the exact final
- * successor assemblyDigest + the exact selected dependency graph (entries +
+ * non-aliasing; binds the exact final DefinitionGraphDigest + the exact final
+ * assemblyDigest (both the UNCHANGED INPUT identity — never a T003E output)
+ * + the seed admission + the exact selected dependency graph (entries +
  * edges, identity-normalized). No handle, secret, endpoint, provider object
  * or invocation field is representable.
  */
@@ -218,11 +279,13 @@ export interface CapabilityDependencyClosureEvidence {
   readonly status: 'CLOSED';
   /** Exact ComponentId of the admitted root Tool. */
   readonly rootComponentId: ComponentId;
-  /** Exact Definition graph content digest, authoritatively recomputed. */
+  /** Exact Definition graph content digest — the unchanged input identity. */
   readonly definitionGraphDigest: ContentDigest;
-  /** Digest of the final successor Assembly carrying every closure slot. */
+  /** Digest of the exact INPUT final Assembly — unchanged input identity. */
   readonly assemblyDigest: ContentDigest;
-  /** Bound provider Tools, sorted by exact ComponentId. */
+  /** The exact T002B Assembly-bound seed admission identity. */
+  readonly seedAdmission: CapabilityClosureSeedAdmission;
+  /** Consumed provider Tools, sorted by exact ComponentId. */
   readonly entries: readonly CapabilityClosureEntry[];
   /** Selected dependency edges, sorted by exact identity. */
   readonly edges: readonly CapabilityClosureEdge[];
@@ -233,14 +296,15 @@ export interface CapabilityDependencyClosureEvidence {
 /**
  * Opaque runtime handle paired with one exact closure provider pin, OUTSIDE
  * every digest material — the runtime pairing the evidence deliberately
- * excludes from identity.
+ * excludes from identity. The handle reference is the ORIGINAL exposed only
+ * after full T003C verification.
  */
 export interface CapabilityClosureHandlePair {
-  /** Exact ComponentId of the bound provider Tool. */
+  /** Exact ComponentId of the consumed provider Tool. */
   readonly toolComponentId: ComponentId;
-  /** The exact implementation pin the handle is paired with. */
+  /** The exact verified implementation pin the handle is paired with. */
   readonly implementation: ToolImplementationIdentity;
-  /** Opaque runtime handle; undefined when the candidate carried none. */
+  /** Opaque runtime handle; undefined when the mint carried none. */
   readonly handle: unknown;
 }
 
@@ -254,17 +318,16 @@ const SEALED_CAPABILITY_CLOSURE_BRAND: unique symbol = Symbol(
 );
 
 /**
- * The sealed capability dependency closure: the serializable evidence, the
- * final successor sealed Assembly (carrying every §G closure slot) and the
- * runtime implementation handles paired with their exact pins outside digest
- * material. Minted only by `closeCapabilityDependencies`.
+ * The sealed capability dependency closure: the serializable evidence and
+ * the runtime implementation handles paired with their exact verified pins
+ * outside digest material. Minted only by `closeCapabilityDependencies`.
+ * There is deliberately NO Assembly output: the input final Assembly remains
+ * the one unchanged authority.
  */
 export interface SealedCapabilityDependencyClosure {
   /** Serializable content-addressed closure evidence. */
   readonly evidence: CapabilityDependencyClosureEvidence;
-  /** The final successor sealed Assembly (or the base Assembly when the closure is empty). */
-  readonly successorAssembly: SealedRuntimeAssembly;
-  /** Opaque runtime handles paired with the exact pins (never digest material). */
+  /** Opaque runtime handles paired with the exact verified pins (never digest material). */
   readonly implementationHandles: readonly CapabilityClosureHandlePair[];
   readonly [SEALED_CAPABILITY_CLOSURE_BRAND]: true;
 }
@@ -333,20 +396,20 @@ function freezeCapabilityRef(ref: CapabilityContractRef): CapabilityContractRef 
 }
 
 /**
- * Read one own DATA property of the sealed Assembly without invoking hidden
- * getters (same discipline as T003C): a genuine sealed Assembly carries the
- * module-private brand symbol, which the descriptor-safe record primitive
- * rejects for contract input records, so own data-descriptor reads are used.
+ * Read one own DATA property of an authority-bearing object without invoking
+ * hidden getters (same discipline as T003C): accessor-backed or inherited
+ * properties are rejected before any authority use, so no hidden getter ever
+ * executes and no caller-owned re-read can occur after the snapshot.
  */
-function readAssemblyOwnDataProperty(value: object, key: string): unknown {
+function readOwnDataProperty(value: object, key: string, path: string): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
   if (descriptor === undefined) {
-    fail('INVALID_CLOSURE_INPUT', `closure input.assembly.${key} is required`);
+    fail('INVALID_CLOSURE_INPUT', `${path}.${key} is required`);
   }
   if (descriptor.get !== undefined || descriptor.set !== undefined) {
     fail(
       'INVALID_CLOSURE_INPUT',
-      `closure input.assembly.${key} must be a data property, not accessor-backed`,
+      `${path}.${key} must be a data property, not accessor-backed`,
     );
   }
   return descriptor.value;
@@ -367,7 +430,7 @@ const INPUT_FIELDS = new Set<string>([
   'assembly',
   'rootComponentId',
   'currentDefinitionGraph',
-  'implementations',
+  'dependencyBindings',
   'exactPins',
   'sha256',
 ]);
@@ -380,7 +443,7 @@ const PIN_FIELDS = new Set<string>([
   'implementationDigest',
 ]);
 
-/** Snapshot one exact implementation pin as fresh frozen identity material. */
+/** Snapshot one exact expected implementation pin as fresh frozen identity material. */
 function snapshotPin(value: unknown, path: string): ToolImplementationIdentity {
   const view = requireSafeRecord(value, path);
   const unexpectedField = Object.keys(view).find((key) => !PIN_FIELDS.has(key));
@@ -407,14 +470,23 @@ function snapshotPin(value: unknown, path: string): ToolImplementationIdentity {
   });
 }
 
+/**
+ * One claimed dependency binding: the ORIGINAL caller-supplied object (handed
+ * to the T003C verifier, which re-snapshots it with its own discipline) plus
+ * the synchronously captured claimed subject used for exact-identity routing.
+ */
+interface SnapshotDependencyBindingClaimant {
+  readonly binding: SealedToolImplementationBinding;
+  readonly subject: ComponentId;
+}
+
 /** A fully snapshotted closure request: module-owned material only. */
 interface SnapshotClosureRequest {
   readonly assembly: SealedRuntimeAssembly;
-  readonly assemblyDigest: ContentDigest;
-  readonly assemblyDefinitionDigest: ContentDigest;
   readonly rootComponentId: ComponentId;
+  readonly rootComponent: ComponentEnvelope;
   readonly currentDefinitionGraph: DefinitionGraphEnvelope;
-  readonly implementations: readonly ToolImplementationCandidate[];
+  readonly claimantsBySubject: ReadonlyMap<ComponentId, SnapshotDependencyBindingClaimant>;
   readonly pinsBySubject: ReadonlyMap<ComponentId, ToolImplementationIdentity>;
   readonly sha256: Sha256Port;
 }
@@ -424,10 +496,13 @@ interface SnapshotClosureRequest {
  * safe, fail-closed, no caller-owned re-read after return). The current
  * Definition graph envelope is validated through the existing contract and
  * deep-copied into module-owned snapshot state (the T003C discipline); the
- * root Tool is validated through the T003A declaration validator (its errors
- * propagate unchanged). The candidate array is shallow-copied so its
- * membership is fixed at call time — every downstream bind re-snapshots the
- * candidates through T003C's own descriptor-safe path.
+ * root Tool is located on the module-owned snapshot and validated through the
+ * T003A declaration validator (its errors propagate unchanged). The
+ * dependency-binding claimed subjects are captured own-data-only BEFORE any
+ * suspension: a genuine mint's evidence is fresh frozen module material; any
+ * other object's CLAIMED subject is read without executing getters and is
+ * routed to the T003C verifier, which fails it closed as unminted if it is
+ * ever selected. Duplicate claimed subjects fail closed (never first-wins).
  */
 function snapshotClosureRequest(input: unknown): SnapshotClosureRequest {
   const at = 'closure input';
@@ -445,26 +520,16 @@ function snapshotClosureRequest(input: unknown): SnapshotClosureRequest {
   if (!('currentDefinitionGraph' in inputView)) {
     fail('INVALID_CLOSURE_INPUT', `${at}.currentDefinitionGraph is required`);
   }
-  if (!('implementations' in inputView)) {
-    fail('INVALID_CLOSURE_INPUT', `${at}.implementations is required`);
+  if (!('dependencyBindings' in inputView)) {
+    fail('INVALID_CLOSURE_INPUT', `${at}.dependencyBindings is required`);
   }
 
-  // Sealed Assembly: own-data reads only; the T002B seal is immutable by
-  // construction, so holding the reference across suspensions is safe.
+  // The sealed Assembly is immutable by construction (T002B mint); holding
+  // the reference across suspensions is safe and the T002B/T003C seams own
+  // its authenticity/currentness validation.
   const assemblyValue = inputView.assembly;
-  if (typeof assemblyValue !== 'object' || assemblyValue === null) {
-    fail('INVALID_CLOSURE_INPUT', `${at}.assembly must be a SealedRuntimeAssembly ({ record, bindings, ... })`);
-  }
-  const assemblyObject = assemblyValue;
-  const recordValue = readAssemblyOwnDataProperty(assemblyObject, 'record');
-  const assemblyDigest = readAssemblyOwnDataProperty(assemblyObject, 'assemblyDigest');
-  if (typeof assemblyDigest !== 'string' || !isContentDigest(assemblyDigest)) {
-    fail('INVALID_CLOSURE_INPUT', `${at}.assemblyDigest must be a non-empty content digest string`);
-  }
-  const recordView = requireSafeRecord(recordValue, `${at}.assembly.record`);
-  const assemblyDefinitionDigest = recordView.definitionGraphDigest;
-  if (typeof assemblyDefinitionDigest !== 'string' || !isContentDigest(assemblyDefinitionDigest)) {
-    fail('INVALID_CLOSURE_INPUT', `${at}.assembly.record.definitionGraphDigest must be a non-empty content digest string`);
+  if (typeof assemblyValue !== 'object' || assemblyValue === null || Array.isArray(assemblyValue)) {
+    fail('INVALID_CLOSURE_INPUT', `${at}.assembly must be a SealedRuntimeAssembly ({ record, assemblyDigest, ... })`);
   }
 
   const rootComponentId = requireExactIdentityString(inputView.rootComponentId, `${at}.rootComponentId`);
@@ -475,9 +540,9 @@ function snapshotClosureRequest(input: unknown): SnapshotClosureRequest {
   // DefinitionGraphContractError (and the ComponentContractError it
   // composes) propagate unchanged.
   validateDefinitionGraphEnvelope(currentDefinitionGraph);
-  // Deep-copy the validated graph into module-owned snapshot state: the
-  // digest recomputation and every consumed authority path run after async
-  // suspensions and must never re-read caller-owned graph material.
+  // Deep-copy the validated graph into module-owned snapshot state: the seed
+  // admission digest recomputation, every selection and the traversal run
+  // after async suspensions and must never re-read caller-owned material.
   const graphSnapshot = JSON.parse(
     JSON.stringify(currentDefinitionGraph),
   ) as DefinitionGraphEnvelope;
@@ -502,9 +567,48 @@ function snapshotClosureRequest(input: unknown): SnapshotClosureRequest {
   // Tool declaration validation propagates the unchanged T003A error.
   validateToolComponent(rootComponent);
 
-  const implementations = Object.freeze(
-    requireSafeArray(inputView.implementations, `${at}.implementations`).slice(),
-  ) as readonly ToolImplementationCandidate[];
+  // Dependency bindings: capture the claimed subject of every supplied
+  // binding synchronously (own-data reads only, zero getter executions) and
+  // reject duplicate claimed subjects deterministically before any await.
+  const claimantsBySubject = new Map<ComponentId, SnapshotDependencyBindingClaimant>();
+  const bindingEntries = requireSafeArray(inputView.dependencyBindings, `${at}.dependencyBindings`);
+  for (const [index, entry] of bindingEntries.entries()) {
+    const bindingAt = `${at}.dependencyBindings[${index}]`;
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      fail('INVALID_CLOSURE_INPUT', `${bindingAt} must be a SealedToolImplementationBinding object`);
+    }
+    let subject: ComponentId;
+    if (isSealedToolImplementationBinding(entry)) {
+      // Genuine mint: the evidence field is fresh frozen module material.
+      subject = entry.evidence.toolComponentId;
+    } else {
+      // Not (yet) proven a mint: read the CLAIMED subject own-data only.
+      // The T003C verifier will fail this object closed as unminted if its
+      // subject is ever selected; the claimed subject is routing material
+      // only and never authority.
+      const evidenceValue = readOwnDataProperty(entry, 'evidence', `${bindingAt}.evidence`);
+      if (typeof evidenceValue !== 'object' || evidenceValue === null || Array.isArray(evidenceValue)) {
+        fail('INVALID_CLOSURE_INPUT', `${bindingAt}.evidence must be a record`);
+      }
+      const subjectValue = readOwnDataProperty(
+        evidenceValue,
+        'toolComponentId',
+        `${bindingAt}.evidence`,
+      );
+      subject = requireExactIdentityString(subjectValue, `${bindingAt}.evidence.toolComponentId`);
+      requireNonFloatingIdentity(subject, `${bindingAt}.evidence.toolComponentId`);
+    }
+    if (claimantsBySubject.has(subject)) {
+      fail(
+        'INVALID_CLOSURE_INPUT',
+        `${bindingAt} claims subject "${subject}", which is already claimed by an earlier dependency binding — exactly one binding per claimed subject, never first-wins`,
+      );
+    }
+    claimantsBySubject.set(subject, {
+      binding: entry as SealedToolImplementationBinding,
+      subject,
+    });
+  }
 
   const pinsBySubject = new Map<ComponentId, ToolImplementationIdentity>();
   if (inputView.exactPins !== undefined) {
@@ -522,7 +626,7 @@ function snapshotClosureRequest(input: unknown): SnapshotClosureRequest {
       if (pinsBySubject.has(subject)) {
         fail(
           'DUPLICATE_EXACT_PIN_SUBJECT',
-          `${pinAt}.toolComponentId "${subject}" carries a second exact pin — each closure subject resolves ambiguity through at most one exact authoritative pin`,
+          `${pinAt}.toolComponentId "${subject}" carries a second exact pin — each closure subject resolves its expected pin through at most one exact authoritative pin`,
         );
       }
       pinsBySubject.set(subject, pin);
@@ -530,12 +634,11 @@ function snapshotClosureRequest(input: unknown): SnapshotClosureRequest {
   }
 
   return {
-    assembly: assemblyObject as SealedRuntimeAssembly,
-    assemblyDigest: assemblyDigest,
-    assemblyDefinitionDigest: assemblyDefinitionDigest,
+    assembly: assemblyValue as SealedRuntimeAssembly,
     rootComponentId,
+    rootComponent,
     currentDefinitionGraph: graphSnapshot,
-    implementations,
+    claimantsBySubject,
     pinsBySubject,
     sha256: requireSha256Port(inputView.sha256, `${at}.sha256`),
   };
@@ -580,51 +683,77 @@ function compareEdges(a: CapabilityClosureEdge, b: CapabilityClosureEdge): numbe
 
 /**
  * Compute the deterministic capability dependency closure of one admitted
- * root Tool and bind every transitively required provider Tool to exactly
- * one compatible exact implementation.
+ * root Tool as evidence/composition only, against ONE unchanged final
+ * Assembly.
  *
- * Authority boundary: the sealed input Assembly is never mutated. Each
- * provider binding is minted by T003C as fresh/frozen evidence, threading
- * the successor Assembly through the traversal; the final successor carries
- * one §G slot per closure provider. When the closure is empty (the root
- * declares no required capabilities) the base Assembly is returned
- * unchanged.
+ * Authority boundary: the input Assembly is NEVER mutated or resealed and no
+ * successor Assembly exists — the sealed result carries the evidence and the
+ * verified handle pairs only. The seed is admitted through the T002B
+ * Assembly-bound admission seam (currentness T002B-owned:
+ * ASSEMBLY_ADMISSION_*); each provider binding is CONSUMED through the
+ * shared T003C consumer-verifier seam against the SAME final Assembly
+ * (missing supply / unminted / missing or replaced slot / stale identity /
+ * pin mismatch propagate the owning T003C taxonomy unwrapped).
  *
- * Fail-closed precedence: input shape + assembly/root/graph/pin snapshot,
- * graph + root Tool declaration validation (propagated unchanged), the
- * authoritative currentness recomputation (DEFINITION_GRAPH_DIGEST_MISMATCH),
- * then the traversal: per-edge T003B provider selection (missing/ambiguous
- * propagate unwrapped), cycle rejection (CAPABILITY_DEPENDENCY_CYCLE),
- * per-provider T003C binding (missing/ambiguous/incompatible propagate
- * unwrapped). Never downgrades a failure.
+ * Fail-closed precedence: input shape + graph/root/pin/binding snapshot
+ * (all synchronous, zero getter executions), then seed admission, then the
+ * traversal: per-edge T003B provider selection (missing/ambiguous propagate
+ * unwrapped), cycle rejection (CAPABILITY_DEPENDENCY_CYCLE), per-provider
+ * T003C verification. Never downgrades a failure.
  *
  * Torn-snapshot discipline: everything authority-bearing is synchronously
- * snapshotted before the first `await`; after the currentness suspension
- * only module-owned snapshot material is read.
+ * snapshotted before the first `await`; after that only module-owned
+ * snapshot material and frozen mint material are read.
  */
 export async function closeCapabilityDependencies(
   input: CapabilityDependencyClosureInput,
 ): Promise<SealedCapabilityDependencyClosure> {
   const request = snapshotClosureRequest(input);
 
-  // ---- Async phase: authoritative currentness first.
-  const definitionGraphDigest = await computeDefinitionGraphDigest(
-    request.currentDefinitionGraph,
-    request.sha256,
+  // ---- Seed admission (T002B Assembly-bound, against the ONE unchanged
+  // final Assembly). The current Definition digest is authoritatively
+  // recomputed inside the seam and must equal the digest recorded in the
+  // final Assembly; stale/foreign graphs or unbound Kinds fail with the
+  // T002B-owned taxonomy before any traversal.
+  const admission = await admitComponentWithAssembly(
+    request.rootComponent,
+    request.assembly,
+    {
+      currentDefinitionGraph: request.currentDefinitionGraph,
+      sha256: request.sha256,
+    },
   );
-  if (definitionGraphDigest !== request.assemblyDefinitionDigest) {
-    fail(
-      'DEFINITION_GRAPH_DIGEST_MISMATCH',
-      'the current Definition graph digest does not match the exact digest bound in the sealed Assembly; stale or foreign graphs fail closed before any closure evidence is minted',
-    );
-  }
+  const definitionGraphDigest = admission.definitionGraphDigest;
+
+  // Seed admission identity bound into the evidence (fresh frozen,
+  // non-aliasing, identity only).
+  const seedAdmission = Object.freeze({
+    componentId: admission.componentId,
+    definitionGraphDigest: admission.definitionGraphDigest,
+    assemblyDigest: admission.assemblyDigest,
+    admittedKind: Object.freeze({
+      kindId: admission.admittedKind.kindId,
+      version: admission.admittedKind.version,
+    }),
+    admittedKindImplementation: Object.freeze({
+      kind: Object.freeze({
+        kindId: admission.admittedKindImplementation.kind.kindId,
+        version: admission.admittedKindImplementation.kind.version,
+      }),
+      implementation: Object.freeze({
+        implementationId: admission.admittedKindImplementation.implementation.implementationId,
+        implementationVersion:
+          admission.admittedKindImplementation.implementation.implementationVersion,
+        implementationDigest: admission.admittedKindImplementation.implementation.implementationDigest,
+      }),
+    }),
+  });
 
   // ---- Traversal (identity-normalized DFS over exact required refs).
   const visited = new Map<ComponentId, CapabilityClosureEntry>();
   const edges: CapabilityClosureEdge[] = [];
   const handles: CapabilityClosureHandlePair[] = [];
   const stack: ComponentId[] = [];
-  let cursor: SealedRuntimeAssembly = request.assembly;
 
   const visit = async (toolComponentId: ComponentId): Promise<void> => {
     stack.push(toolComponentId);
@@ -660,40 +789,46 @@ export async function closeCapabilityDependencies(
           cyclePath,
         );
       }
-      // Diamond sharing: an already-bound provider is recorded as an edge
-      // but bound exactly once.
+      // Diamond sharing: an already-consumed provider is recorded as an edge
+      // but consumed exactly once.
       if (visited.has(providerComponentId)) {
         continue;
       }
 
-      // T003C exact implementation binding on the threaded successor
-      // Assembly; missing/ambiguous/incompatible propagate unwrapped. The
-      // optional pin is attached only when present (`exactOptionalPropertyTypes`
-      // discipline — an explicit undefined optional is not assignable).
+      // Exact dependency binding consumption: locate the caller-supplied
+      // already-minted binding BY EXACT SUBJECT IDENTITY (no lookup by
+      // latest/default/order/id alias, never first-wins) and verify it
+      // through the shared T003C consumer-verifier seam against the SAME
+      // unchanged final Assembly. T003E never mints a binding.
+      const claimant = request.claimantsBySubject.get(providerComponentId);
+      if (claimant === undefined) {
+        throw new ToolImplementationBindingError(
+          'MISSING_CURRENT_TOOL_IMPLEMENTATION_BINDING',
+          `capability dependency closure: no already-minted dependency binding was supplied for the selected provider "${providerComponentId}" — the caller supplies the exact verified authority inputs for every required dependency; the closure never mints a new binding and never looks one up by latest/default/order/id alias`,
+        );
+      }
       const exactPin = request.pinsBySubject.get(providerComponentId);
-      const binding = await bindToolImplementation({
-        assembly: cursor,
-        selection,
-        currentDefinitionGraph: request.currentDefinitionGraph,
-        implementations: request.implementations,
-        ...(exactPin !== undefined ? { exactPin } : {}),
+      const verified = await verifyToolImplementationBinding({
+        binding: claimant.binding,
+        finalAssembly: request.assembly,
+        ...(exactPin !== undefined ? { expectedImplementationPin: exactPin } : {}),
         sha256: request.sha256,
       });
-      cursor = binding.successorAssembly;
+
       visited.set(
         providerComponentId,
         Object.freeze({
           toolComponentId: providerComponentId,
           boundCapability: freezeCapabilityRef(ref),
-          implementation: binding.evidence.implementation,
-          bindingDigest: binding.evidence.bindingDigest,
+          implementation: verified.evidence.implementation,
+          bindingDigest: verified.evidence.bindingDigest,
         }),
       );
       handles.push(
         Object.freeze({
           toolComponentId: providerComponentId,
-          implementation: binding.evidence.implementation,
-          handle: binding.implementationHandle,
+          implementation: verified.evidence.implementation,
+          handle: verified.implementationHandle,
         }),
       );
       await visit(providerComponentId);
@@ -703,7 +838,9 @@ export async function closeCapabilityDependencies(
 
   await visit(request.rootComponentId);
 
-  // ---- Evidence: identity-normalized, fresh frozen, non-aliasing.
+  // ---- Evidence: identity-normalized, fresh frozen, non-aliasing. The
+  // bound assemblyDigest is the UNCHANGED INPUT final Assembly identity —
+  // never a T003E output.
   const entries = Object.freeze(
     [...visited.values()].sort((a, b) => lexicalCompare(a.toolComponentId, b.toolComponentId)),
   );
@@ -711,8 +848,9 @@ export async function closeCapabilityDependencies(
   const evidenceMaterial = Object.freeze({
     digestDomain: CAPABILITY_DEPENDENCY_CLOSURE_EVIDENCE_DOMAIN,
     definitionGraphDigest,
-    assemblyDigest: cursor.assemblyDigest,
+    assemblyDigest: admission.assemblyDigest,
     rootComponentId: request.rootComponentId,
+    seedAdmission,
     entries,
     edges: sortedEdges,
   });
@@ -722,7 +860,8 @@ export async function closeCapabilityDependencies(
     status: 'CLOSED' as const,
     rootComponentId: request.rootComponentId,
     definitionGraphDigest,
-    assemblyDigest: cursor.assemblyDigest,
+    assemblyDigest: admission.assemblyDigest,
+    seedAdmission,
     entries,
     edges: sortedEdges,
     closureDigest,
@@ -730,7 +869,6 @@ export async function closeCapabilityDependencies(
 
   return Object.freeze({
     evidence,
-    successorAssembly: cursor,
     implementationHandles: Object.freeze(handles),
     [SEALED_CAPABILITY_CLOSURE_BRAND]: true as const,
   });
