@@ -235,6 +235,27 @@ test('PACK-C T004B kernel boundary: no forbidden concrete import and no branch o
     );
   }
 
+  // #691 repair pins — shared verifier consumption is structural, not
+  // incidental: the T002B mint verifier is consumed DIRECTLY over the exact
+  // final Assembly, and the T003C consumer verifier gates the pairing and
+  // exposure of the opaque implementation handle. No injected provenance
+  // decision seam exists anywhere in the module.
+  assert.match(
+    source,
+    /isSealedRuntimeAssembly\(/,
+    'the T002B mint verifier must be consumed directly over the exact final Assembly',
+  );
+  assert.match(
+    source,
+    /verifyToolImplementationBinding\(/,
+    'the T003C consumer verifier must gate the pairing/exposure of the implementation handle',
+  );
+  assert.doesNotMatch(
+    source,
+    /SealedAssemblyProvenanceGuard|AssemblyProvenanceDecision|verifyProvenance/,
+    'no injected provenance-decision seam may exist after the #691 repair',
+  );
+
   // Caller-plane neutrality: the kernel never switches on callerKind or
   // caller identity — provenance strings are data, never branch targets.
   const bodyWithoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
@@ -273,7 +294,6 @@ test('PACK-C T004B no-authority proof: the observational result and the closed i
     request: fx.admitted,
     binding: fx.binding,
     currentDefinitionGraph: fx.g,
-    assemblyProvenance: { verifyProvenance: () => ({ verified: true as const }) },
     dispatch,
     sha256: realSha256,
   };
