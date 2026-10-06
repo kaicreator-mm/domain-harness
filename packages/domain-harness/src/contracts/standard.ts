@@ -43,6 +43,20 @@
  * - no eligible candidate is a typed `STANDARD_*_CANDIDATE_ABSENT` failure —
  *   a candidate is never invented locally.
  *
+ * #653 P2 hardening (bootstrap candidate safety + permutation determinism):
+ * - R1: any malformed or unsafe candidate structure — the candidate record
+ *   itself or authority-bearing nested descriptor/pin material (accessor/
+ *   exotic/hidden/symbol-keyed material, malformed shapes) — is a
+ *   deterministic typed invalid-input failure with no silent-skip path;
+ * - D4: the selected candidate is returned fresh, frozen and non-aliased;
+ *   caller mutation after selection cannot change the material consumed by
+ *   T006B/T006C;
+ * - D5/G1: selection is invariant under candidate-pool permutation — the
+ *   PACK-C canonical exact ComponentRef primary key is preserved, with the
+ *   exact reference-implementation identity as the deterministic
+ *   tie-breaker only, and exact duplicate semantic candidates deduplicate
+ *   by exact identity.
+ *
  * #652 P1 repair (authority/currentness closure, T006A):
  * - D1: `sealStandardSet` resolves every entry against a REQUIRED
  *   verification-only descriptor context (never `StandardSetRecord`/setDigest
@@ -1505,6 +1519,12 @@ export async function verifyStandardSetCurrentness(
  * One bootstrap-candidate input: a Standard descriptor plus, when one has
  * been accepted on the integration HEAD, its reference implementation pin.
  * The selector never invents missing pins or descriptors.
+ *
+ * #653 R1: the candidate record and its authority-bearing nested material
+ * (descriptor, reference implementation pin) are fail-closed contract input —
+ * a malformed or unsafe structure is a deterministic typed invalid-input
+ * failure, never silently skipped and never reinterpreted as mere
+ * ineligibility.
  */
 export interface StandardBootstrapCandidate {
   readonly descriptor: StandardComponentDescriptor;
@@ -1536,14 +1556,39 @@ export function canonicalComponentRef(ref: ExactComponentRef): string {
  * Standard descriptor, its component is of the requested ordinary family,
  * AND an accepted reference implementation is supplied whose exact KindRef
  * matches the descriptor's component Kind. Among eligible candidates the
- * lexicographically smallest canonical exact ComponentRef wins (ties break
- * by classification, standardId, descriptorVersion — full determinism under
- * input permutation); the returned object is the caller's own candidate,
- * untouched. This selection is for FIXTURE CONSTRUCTION ONLY — the function
- * is pure and never performs runtime provider selection, binding or
- * dispatch. When nothing is eligible the family-specific typed
- * STANDARD_*_CANDIDATE_ABSENT failure is thrown and the caller must return
- * to ChatGPT Web — a candidate is NEVER invented locally.
+ * lexicographically smallest canonical exact ComponentRef wins.
+ *
+ * #653 D4/D5 hardening (BOUNDED PLANNING AMENDMENT #653@6011791871):
+ * - R1 — candidate safety is absolute: EVERY candidate record is
+ *   descriptor-safely snapshotted before eligibility inspection, and so is
+ *   every authority-bearing nested material it carries. Accessor/exotic/
+ *   hidden/symbol-keyed material, a malformed descriptor shape, a malformed
+ *   pin shape or any other unsafe structural input is a deterministic typed
+ *   invalid-input failure (`StandardContractError`) — there is NO
+ *   silent-skip path and malformed input is never reinterpreted as merely
+ *   "ineligible". Valid but genuinely ineligible candidates (wrong family,
+ *   no accepted implementation yet, pin Kind not matching the exact component
+ *   Kind) remain an ordinary filter decided only after the whole pool is
+ *   examined;
+ * - D4 — the returned candidate is fresh, frozen and non-aliased: it is
+ *   rebuilt exclusively from module-owned snapshot material, so caller
+ *   mutation after selection can never change what T006B/T006C consume, and
+ *   the caller input is never frozen or mutated;
+ * - D5/G1 — the PACK-C primary key (lexicographically smallest canonical
+ *   exact ComponentRef) is preserved and never preceded or altered; the
+ *   exact reference-implementation identity participates ONLY as the
+ *   deterministic tie-breaker after the descriptor-side keys
+ *   (classification, standardId, descriptorVersion), removing
+ *   stable-sort/input-position authority when otherwise-equal candidates
+ *   share the same canonical exact ComponentRef. Exact duplicate semantic
+ *   candidates deduplicate by exact identity — never first/latest/default
+ *   selection.
+ *
+ * This selection is for FIXTURE CONSTRUCTION ONLY — the function is pure and
+ * never performs runtime provider selection, binding or dispatch. When
+ * nothing is eligible the family-specific typed STANDARD_*_CANDIDATE_ABSENT
+ * failure is thrown and the caller must return to ChatGPT Web — a candidate
+ * is NEVER invented locally.
  */
 export function selectStandardBootstrapCandidate(
   candidates: readonly StandardBootstrapCandidate[],
@@ -1561,57 +1606,118 @@ export function selectStandardBootstrapCandidate(
   }
 
   interface EligibleEntry {
-    readonly candidate: StandardBootstrapCandidate;
-    readonly sortKey: string;
+    readonly identityKey: string;
+    readonly snapshot: SnapshotDescriptor;
+    readonly pinSnapshot: KindImplementationPin;
   }
   const eligible: EligibleEntry[] = [];
-  for (const candidate of list.snapshot) {
-    // Defense in depth: an invalid descriptor is ineligible, never fatal to
-    // the whole pool (eligibility is a filter, and the terminal state is
-    // decided only after the whole pool is examined).
-    let snapshot: SnapshotDescriptor;
-    try {
-      snapshot = snapshotDescriptor(
-        (candidate as StandardBootstrapCandidate | null | undefined)?.descriptor,
+  const seenIdentities = new Set<string>();
+  for (const [index, entry] of list.snapshot.entries()) {
+    const at = `standard bootstrap candidate [${index}]`;
+    // #653 R1 — the candidate record itself is authority-bearing input and
+    // must be an ordinary descriptor-safe record: accessor/exotic/hidden/
+    // symbol-keyed material fails closed typed before any field is read
+    // (a hidden getter can never execute as part of validation or failure).
+    const view = requireSafeRecord(entry, at, 'INVALID_STANDARD_SET_INPUT');
+    const unexpectedCandidateField = Object.keys(view).find(
+      (key) => key !== 'descriptor' && key !== 'referenceImplementation',
+    );
+    if (unexpectedCandidateField !== undefined) {
+      fail(
+        'INVALID_STANDARD_SET_INPUT',
+        at,
+        `must contain exactly {descriptor, referenceImplementation?}; unexpected field "${unexpectedCandidateField}"`,
       );
-    } catch {
-      continue;
     }
-    if (!(STANDARD_CLASSIFICATIONS as readonly string[]).includes(snapshot.classification)) {
-      continue;
+    if (!('descriptor' in view) || view.descriptor === undefined) {
+      fail(
+        'INVALID_STANDARD_SET_INPUT',
+        `${at}.descriptor`,
+        'is required (a candidate without descriptor material is malformed authority-bearing input; it fails closed — it is never silently skipped)',
+      );
     }
+    // #653 R1 — a malformed/unsafe nested descriptor is a deterministic typed
+    // invalid-input failure (the descriptor snapshot's own typed codes
+    // propagate unchanged); it is never reinterpreted as ineligibility.
+    const snapshot = snapshotDescriptor(view.descriptor);
+
+    // Genuinely ineligible: another family's pool never sees this candidate.
     if (snapshot.component.family !== family) {
       continue;
     }
-    const pin = (candidate as StandardBootstrapCandidate).referenceImplementation;
-    if (pin === undefined || pin === null) {
+
+    // Absence of an accepted reference implementation is legitimate
+    // ineligibility; a PRESENT pin is authority-bearing nested material —
+    // #653 R1: its malformed/unsafe shape fails closed typed (an explicit
+    // `null` is malformed structure, not absence).
+    if (!('referenceImplementation' in view) || view.referenceImplementation === undefined) {
       continue;
     }
-    let pinSnapshot: KindImplementationPin;
-    try {
-      pinSnapshot = snapshotPin(pin, 'candidate.referenceImplementation');
-    } catch {
-      continue;
-    }
+    const pinSnapshot = snapshotPin(view.referenceImplementation, `${at}.referenceImplementation`);
+
+    // Genuinely ineligible: the accepted implementation must be bound to the
+    // descriptor's exact component Kind.
     if (
       pinSnapshot.kind.kindId !== snapshot.component.kind.kindId ||
       pinSnapshot.kind.version !== snapshot.component.kind.version
     ) {
       continue;
     }
-    const ref = { family: snapshot.component.family, componentId: snapshot.component.componentId, kind: snapshot.component.kind };
-    eligible.push({
-      candidate: candidate as StandardBootstrapCandidate,
-      sortKey:
-        `${canonicalComponentRef(ref)}|${snapshot.classification}|${snapshot.standardId}|${snapshot.descriptorVersion}`,
-    });
+
+    // #653 D5/G1 — full deterministic identity key: the PACK-C primary key
+    // (canonical exact ComponentRef) first, then the descriptor-side
+    // tie-breakers, then the exact reference-implementation identity LAST.
+    // The pin identity never replaces, precedes or alters the primary key.
+    const ref = {
+      family: snapshot.component.family,
+      componentId: snapshot.component.componentId,
+      kind: snapshot.component.kind,
+    };
+    const identityKey = [
+      canonicalComponentRef(ref),
+      snapshot.classification,
+      snapshot.standardId,
+      snapshot.descriptorVersion,
+      pinSnapshot.implementation.implementationId,
+      pinSnapshot.implementation.implementationVersion,
+      pinSnapshot.implementation.implementationDigest,
+    ].join('|');
+    // Exact duplicate semantic candidates deduplicate by exact identity —
+    // the identity key covers the full descriptor digest material and the
+    // full pin identity, so equal keys are indistinguishable candidates and
+    // no first/latest/default/input-position selection ever occurs.
+    if (seenIdentities.has(identityKey)) {
+      continue;
+    }
+    seenIdentities.add(identityKey);
+    eligible.push({ identityKey, snapshot, pinSnapshot });
   }
 
   if (eligible.length === 0) {
     throw new StandardCandidateAbsentError(family);
   }
-  // Code-unit total order; Array.prototype.sort is stable (ECMAScript 2019+),
-  // so full key ties resolve deterministically in input order.
-  eligible.sort((a, b) => lexicalCompare(a.sortKey, b.sortKey));
-  return eligible[0]!.candidate;
+  // Code-unit total order over unique semantic identities — the same
+  // candidate multiset selects identically under any input permutation.
+  eligible.sort((a, b) => lexicalCompare(a.identityKey, b.identityKey));
+  const winner = eligible[0]!;
+  // #653 D4 — fresh, frozen, non-aliased return rebuilt exclusively from
+  // module-owned snapshot material: caller mutation after selection can
+  // never change the material consumed by T006B/T006C, and the caller input
+  // is never frozen or mutated.
+  return Object.freeze({
+    descriptor: Object.freeze({
+      standardId: winner.snapshot.standardId,
+      classification: winner.snapshot.classification,
+      descriptorVersion: winner.snapshot.descriptorVersion,
+      component: Object.freeze({
+        family: winner.snapshot.component.family,
+        componentId: winner.snapshot.component.componentId,
+        kind: Object.freeze({
+          kindId: winner.snapshot.component.kind.kindId,
+          version: winner.snapshot.component.kind.version,
+        }),
+      }),
+    }),
+    referenceImplementation: winner.pinSnapshot,
+  });
 }
