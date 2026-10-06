@@ -43,14 +43,39 @@
  * activation path nor re-issued as v0.7 activation/currentness authority.
  * No second pin, currentness or effect-authority plane is introduced.
  *
+ * T005C (#656) extends the SAME pin additively with the exact stable
+ * NON-SECRET resource-instance/currentness evidence: the activation request
+ * may carry, per behaviorally relevant resource occurrence, the evidence
+ * produced/validated by the accepted T005B resource seam (`resolveToolResources`
+ * currentness pins - exact provider/resource identity + exact revision/
+ * currentness digest; this layer never re-owns provider selection/resolution).
+ * The evidence is synchronously validated, order-normalized and snapshotted
+ * before any await, woven into the pin digest, and enforced as coverage: a
+ * REQUIRED component-scope requirement of the sealed Assembly fails typed
+ * (`RESOURCE_CURRENTNESS_PIN_REQUIRED`) before any durable bind when no
+ * stable non-secret pin was supplied - hashing/serializing live values is
+ * forbidden, so a provider that cannot produce an exact pin fails closed;
+ * evidence outside the exact sealed Assembly requirement material fails typed
+ * (`INVALID_RESOURCE_CURRENTNESS`); an OPTIONAL requirement stays outside
+ * exact occurrence currentness exactly when the owning declaration's explicit
+ * `required: false` posture permits and no pin is supplied (an optional pin
+ * that IS supplied participates in currentness). Replay/recovery verifies the
+ * exact pinned evidence and accepts an additional caller expectation only as
+ * an assertion; a resource revision/provider replacement therefore invalidates
+ * the affected occurrence's currentness truthfully while Definition identity
+ * and the sealed logical `resourceRequirements` stay untouched. There is no
+ * third resource registry/currentness hierarchy and no
+ * latest/default/first/order fallback.
+ *
  * Boundary discipline (inward only): consumes the T002B sealed-Assembly port
- * (`runtime-assembly.ts`), the #555 repaired Definition graph digest seam, and
- * the existing execution-binding authority. No concrete Workflow/XState,
- * ToolRegistry, storage or provider import is permitted here.
+ * (`runtime-assembly.ts`), the #555 repaired Definition graph digest seam, the
+ * T005B-validated evidence material (types only), and the existing
+ * execution-binding authority. No concrete Workflow/XState, ToolRegistry,
+ * storage or provider import is permitted here.
  */
 import { computeDefinitionGraphDigest, validateDefinitionGraphEnvelope, } from '../contracts/definition-graph.js';
 import { isSealedRuntimeAssembly, } from '../contracts/runtime-assembly.js';
-import { GovernanceExecutionBindingError, assertDomainActivationBinding, cloneActivationBinding, createGovernanceExecutionPin, recoverGovernanceExecutionAuthority, requireExactAssemblyDigest, requireExactGovernanceBody, requireExactPackageCdi, requireRuntimeAuthorityClass, validateGovernanceExecutionPin, } from './execution-binding.js';
+import { GovernanceExecutionBindingError, assertDomainActivationBinding, cloneActivationBinding, createGovernanceExecutionPin, normalizeResourceCurrentnessEvidence, recoverGovernanceExecutionAuthority, requireExactAssemblyDigest, requireExactGovernanceBody, requireExactPackageCdi, requireRuntimeAuthorityClass, sameResourceCurrentnessEvidence, validateGovernanceExecutionPin, } from './execution-binding.js';
 function fail(code, message) {
     throw new GovernanceExecutionBindingError(code, message);
 }
@@ -59,6 +84,49 @@ function requireNonEmptyString(value, field) {
         fail('INVALID_DOMAIN_ACTIVATION_BINDING', `${field} must be a non-empty string`);
     }
     return value;
+}
+/**
+ * T005C (#656) resource-currentness coverage gate, proven synchronously
+ * against the deeply frozen sealed Assembly record (torn-safe - the record is
+ * immutable at mint time). Exact coverage, never a registry:
+ *  - every supplied evidence entry must correspond to exactly one requirement
+ *    of the sealed Assembly (any criticality, any scope) - evidence outside
+ *    the exact sealed material fails typed (`INVALID_RESOURCE_CURRENTNESS`);
+ *  - every REQUIRED component-scope requirement (no `operationId`) must carry
+ *    exactly one evidence entry, or the gate fails typed
+ *    (`RESOURCE_CURRENTNESS_PIN_REQUIRED`) before any durable bind - there is
+ *    no default/fallback pin and live values are never hashed or serialized;
+ *  - an OPTIONAL requirement (explicit `required: false` posture of the
+ *    owning declaration) may stay outside occurrence currentness when no pin
+ *    is supplied; operation-scoped requirements are pinned exactly when the
+ *    host supplies their operation resolution evidence.
+ */
+function requireResourceCurrentnessCoverage(record, evidence) {
+    const requiredKeys = new Set();
+    const knownKeys = new Set();
+    for (const material of record.resourceRequirements) {
+        for (const requirement of material.requirements) {
+            const key = `${material.componentId}\u0000${requirement.resourceKey}`;
+            knownKeys.add(key);
+            if (requirement.required && requirement.operationId === undefined) {
+                requiredKeys.add(key);
+            }
+        }
+    }
+    for (const entry of evidence) {
+        const key = `${entry.componentId}\u0000${entry.resourceKey}`;
+        if (!knownKeys.has(key)) {
+            fail('INVALID_RESOURCE_CURRENTNESS', `resource-currentness evidence for component "${entry.componentId}" resource "${entry.resourceKey}" does not correspond to any requirement of the exact sealed Assembly; evidence outside the sealed Assembly material fails closed and no parallel resource identity/registry exists`);
+        }
+    }
+    for (const key of requiredKeys) {
+        if (!evidence.some((entry) => `${entry.componentId}\u0000${entry.resourceKey}` === key)) {
+            const separatorIndex = key.indexOf('\u0000');
+            const componentId = key.slice(0, separatorIndex);
+            const resourceKey = key.slice(separatorIndex + 1);
+            fail('RESOURCE_CURRENTNESS_PIN_REQUIRED', `the sealed Assembly requires resource "${resourceKey}" of component "${componentId}" and its exact runtime revision/currentness is behaviorally relevant for this occurrence, but no stable non-secret resource-currentness evidence was supplied; activation fails closed before any durable bind (hashing or serializing live values is forbidden - the T005B resource seam must produce an exact pin)`);
+        }
+    }
 }
 /**
  * Atomic assembly activation authority. Reuses the ONE existing
@@ -118,6 +186,17 @@ export class AssemblyExecutionActivator {
         // The sealed Assembly is deeply frozen at mint time, so its record digest
         // is already immutable; capture it synchronously as snapshot material.
         const assemblyDefinitionGraphDigest = assemblyInput.record.definitionGraphDigest;
+        // T005C (#656): the resource-currentness evidence is validated,
+        // order-normalized and frozen synchronously (same torn-snapshot
+        // discipline as the Assembly digest and authority class), and its
+        // coverage is proven synchronously against the deeply frozen sealed
+        // record - no await has happened, so no torn or hybrid resource
+        // currentness can ever participate. A REQUIRED component-scope
+        // requirement without a stable non-secret pin, or evidence outside the
+        // exact sealed Assembly material, fails closed HERE, before any
+        // currentness proof or durable bind.
+        const resourceCurrentness = normalizeResourceCurrentnessEvidence(request.resourceCurrentness, 'resourceCurrentness');
+        requireResourceCurrentnessCoverage(assemblyInput.record, resourceCurrentness ?? []);
         // Synchronous descriptor-safe graph validation (the #555 seam snapshots
         // the admitted graph internally before its first await, so the digest in
         // PHASE 2 is torn-safe).
@@ -135,6 +214,9 @@ export class AssemblyExecutionActivator {
             binding,
             assemblyDigest,
             authorityClass,
+            // T005C (#656): the exact, synchronously normalized evidence snapshot
+            // is woven into the pin digest — never a caller-owned re-read.
+            ...(resourceCurrentness === undefined ? {} : { resourceCurrentness }),
         }, this.#sha256);
         const disposition = await this.#store.bindGovernanceExecutionPin(pin);
         if (disposition === 'conflict') {
@@ -185,6 +267,25 @@ export class AssemblyExecutionActivator {
         return pin;
     }
     /**
+     * T005C (#656) occurrence-currentness gate on the SAME pin hierarchy: given
+     * the FRESH resource-currentness evidence of a new exact resolution, returns
+     * only when it exactly equals the evidence durably pinned for the occurrence.
+     * A resource revision/provider replacement therefore invalidates the
+     * affected occurrence's activation/execution currentness truthfully, and a
+     * pin that carries no evidence can never satisfy an expectation — no
+     * default/fallback, no latest/first/order selection, and no hybrid evidence
+     * (the fresh material is validated and order-normalized before the durable
+     * pin is read, so a caller mutating its own array mid-await cannot help).
+     */
+    async requireResourceCurrentness(workflowInstanceId, expectedResourceCurrentness) {
+        const expected = normalizeResourceCurrentnessEvidence(expectedResourceCurrentness, 'expectedResourceCurrentness');
+        const pin = await this.requireActivatedExecution(workflowInstanceId);
+        if (!sameResourceCurrentnessEvidence(pin.resourceCurrentness, expected)) {
+            fail('RESOURCE_CURRENTNESS_MISMATCH', `the fresh resource-currentness evidence does not exactly match the evidence pinned for ${workflowInstanceId}; a stale, replaced or missing exact resource revision fails closed before the affected execution/effect`);
+        }
+        return pin;
+    }
+    /**
      * Replay/recovery: resolves the SAME exact Assembly identity the occurrence
      * was pinned under, never a mutable provider alias. Package/CDI and
      * Governance Baseline currentness are re-proven by the existing recovery
@@ -202,6 +303,15 @@ export class AssemblyExecutionActivator {
      * `authorityClass` woven into its digest) replays as historical/
      * compatibility evidence only: it can never gain or upgrade to a class,
      * and any caller expectation fails closed against it.
+     *
+     * T005C (#656): the exact pinned resource-currentness evidence is verified
+     * UNCONDITIONALLY for evidence-bearing history (it is woven into the pin
+     * digest, so any durable tampering fails the digest proof first). A caller
+     * `expectedResourceCurrentness` is only an ADDITIONAL assertion on top: a
+     * stale, replaced or missing exact resource revision fails typed
+     * (`RESOURCE_CURRENTNESS_MISMATCH`), and currentness can never be asserted
+     * onto a pin that carries no evidence (no default/fallback, no
+     * latest/first/order selection).
      */
     async recover(request) {
         const workflowInstanceId = requireNonEmptyString(request.workflowInstanceId, 'workflowInstanceId');
@@ -213,6 +323,9 @@ export class AssemblyExecutionActivator {
         if (expectedAuthorityClass !== undefined) {
             requireRuntimeAuthorityClass(expectedAuthorityClass, 'expectedAuthorityClass');
         }
+        // T005C (#656): the caller expectation is validated and order-normalized
+        // synchronously, before any await — same torn-snapshot discipline.
+        const expectedResourceCurrentness = normalizeResourceCurrentnessEvidence(request.expectedResourceCurrentness, 'expectedResourceCurrentness');
         const recovered = await recoverGovernanceExecutionAuthority({
             workflowInstanceId,
             store: this.#store,
@@ -238,6 +351,14 @@ export class AssemblyExecutionActivator {
         }
         if (expectedAuthorityClass !== undefined && pin.authorityClass !== expectedAuthorityClass) {
             fail('AUTHORITY_CLASS_MISMATCH', `replay authority class ${JSON.stringify(expectedAuthorityClass)} does not match the class pinned for ${workflowInstanceId} (${JSON.stringify(pin.authorityClass ?? null)}); cross-class substitution fails closed and replay preserves the exact pinned class (a legacy class-less pin can never gain a class)`);
+        }
+        // T005C (#656): the caller resource-currentness expectation is only an
+        // ADDITIONAL assertion on top of the unconditional digest proof — a pin
+        // that carries no evidence can never satisfy an expectation, and any
+        // stale/replaced/missing exact revision fails typed (no fallback).
+        if (expectedResourceCurrentness !== undefined
+            && !sameResourceCurrentnessEvidence(pin.resourceCurrentness, expectedResourceCurrentness)) {
+            fail('RESOURCE_CURRENTNESS_MISMATCH', `replay resource-currentness evidence does not exactly match the evidence pinned for ${workflowInstanceId}; a stale, replaced or missing exact resource revision fails closed, and currentness can never be asserted onto a pin that carries none (no default/fallback, no latest/first/order selection)`);
         }
         return Object.freeze({
             pin,

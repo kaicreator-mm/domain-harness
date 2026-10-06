@@ -5,6 +5,13 @@ import {
   type Sha256Port,
 } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
+import type { ResourceCurrentnessEvidence } from '../contracts/resource-resolution.js';
+import {
+  carriesEmbeddedSelector,
+  carriesFloatingOrRangeSemantics,
+  carriesXRangeVersionSemantics,
+  isNonEmptyIdentityString,
+} from '../contracts/record-safety.js';
 import type {
   GovernanceBaselineAuthorityBinding,
   GovernanceBaselineBody,
@@ -62,6 +69,22 @@ export interface GovernanceExecutionPin extends DomainActivationBinding {
    * production journal authority.
    */
   readonly authorityClass?: RuntimeAuthorityClass;
+  /**
+   * T005C (#656): the exact stable NON-SECRET resource-instance/currentness
+   * evidence this occurrence was activated under — one frozen, order-
+   * normalized entry per resource occurrence whose exact runtime revision is
+   * behaviorally relevant. Optional at the type level so pre-T005C (legacy)
+   * pins remain representable and keep their byte-identical legacy digests;
+   * when present every entry is woven into `bindingDigest`, so any resource
+   * revision/provider replacement changes the occurrence's activation/
+   * execution currentness. Entries carry exact identity/digest material only
+   * (produced/validated by the T005B resource seam) — secret values,
+   * credentials, live handles, connection objects, functions/module paths and
+   * provider objects are structurally unrepresentable, and no second resource
+   * registry/currentness hierarchy exists: this field IS the resource
+   * currentness authority, on the ONE existing pin.
+   */
+  readonly resourceCurrentness?: readonly ResourceCurrentnessEvidence[];
 }
 
 export interface GovernanceBoundSnapshot {
@@ -125,7 +148,10 @@ export type GovernanceExecutionBindingErrorCode =
   | 'ASSEMBLY_DEFINITION_CURRENTNESS_MISMATCH'
   | 'ASSEMBLY_REPLAY_MISMATCH'
   | 'AUTHORITY_CLASS_FORBIDDEN'
-  | 'AUTHORITY_CLASS_MISMATCH';
+  | 'AUTHORITY_CLASS_MISMATCH'
+  | 'INVALID_RESOURCE_CURRENTNESS'
+  | 'RESOURCE_CURRENTNESS_PIN_REQUIRED'
+  | 'RESOURCE_CURRENTNESS_MISMATCH';
 
 export class GovernanceExecutionBindingError extends Error {
   readonly code: GovernanceExecutionBindingErrorCode;
@@ -208,6 +234,138 @@ export function requireRuntimeAuthorityClass(value: unknown, field: string): Run
     );
   }
   return value as RuntimeAuthorityClass;
+}
+
+/** Code-unit comparison only; `localeCompare` is forbidden in this module. */
+function lexicalCompare(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+const RESOURCE_CURRENTNESS_ENTRY_FIELDS = new Set<string>([
+  'componentId',
+  'providerId',
+  'resourceKey',
+  'revisionDigest',
+]);
+
+/**
+ * One exact, non-floating identity string of the T005C resource-currentness
+ * evidence. Secrets and live values are excluded STRUCTURALLY: only the four
+ * closed whitelist fields exist at all, each restricted to non-empty exact
+ * identity strings (no embedded `id@selector` form, no floating/range
+ * selector); an object, array, function, symbol-keyed or empty value can
+ * never be evidence.
+ */
+function requireExactResourceCurrentnessIdentity(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !isNonEmptyIdentityString(value)) {
+    throw new GovernanceExecutionBindingError(
+      'INVALID_RESOURCE_CURRENTNESS',
+      `${field} must be a non-empty exact identity string`,
+    );
+  }
+  if (carriesEmbeddedSelector(value)) {
+    throw new GovernanceExecutionBindingError(
+      'INVALID_RESOURCE_CURRENTNESS',
+      `${field} must not embed a version selector (\`id@version\`); use the exact digest field`,
+    );
+  }
+  if (carriesFloatingOrRangeSemantics(value) || carriesXRangeVersionSemantics(value)) {
+    throw new GovernanceExecutionBindingError(
+      'INVALID_RESOURCE_CURRENTNESS',
+      `${field} must be an exact identity/digest, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)`,
+    );
+  }
+  return value;
+}
+
+/**
+ * T005C (#656): validate, order-normalize (componentId, then resourceKey) and
+ * deep-freeze one occurrence's resource-currentness evidence. This is the
+ * SINGLE normalizer for the material carried on `GovernanceExecutionPin
+ * .resourceCurrentness`: the governance seam consumes ONLY stable non-secret
+ * evidence produced/validated by the T005B resource seam, re-validates it
+ * defensively here (durable pin material is untrusted store data), and never
+ * invents, defaults or falls back to any evidence. Duplicate
+ * (componentId, resourceKey) entries fail closed — never first-wins.
+ */
+export function normalizeResourceCurrentnessEvidence(
+  value: readonly ResourceCurrentnessEvidence[] | undefined,
+  field: string,
+): readonly ResourceCurrentnessEvidence[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new GovernanceExecutionBindingError(
+      'INVALID_RESOURCE_CURRENTNESS',
+      `${field} must be an array of resource-currentness evidence entries`,
+    );
+  }
+  const seen = new Set<string>();
+  const entries = value.map((candidate, index) => {
+    const at = `${field}[${index}]`;
+    if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) {
+      throw new GovernanceExecutionBindingError(
+        'INVALID_RESOURCE_CURRENTNESS',
+        `${at} must be an object with exactly {componentId, providerId, resourceKey, revisionDigest}`,
+      );
+    }
+    const view = candidate as Record<string, unknown>;
+    const unexpectedField = Object.keys(view).find(
+      (key) => !RESOURCE_CURRENTNESS_ENTRY_FIELDS.has(key),
+    );
+    if (unexpectedField !== undefined) {
+      throw new GovernanceExecutionBindingError(
+        'INVALID_RESOURCE_CURRENTNESS',
+        `${at} must contain exactly {componentId, providerId, resourceKey, revisionDigest}; unexpected field "${unexpectedField}" (secret values, credentials, live handles, connection objects, functions/module paths and provider objects are structurally unrepresentable in currentness evidence)`,
+      );
+    }
+    const componentId = requireExactResourceCurrentnessIdentity(view.componentId, `${at}.componentId`);
+    const providerId = requireExactResourceCurrentnessIdentity(view.providerId, `${at}.providerId`);
+    const resourceKey = requireExactResourceCurrentnessIdentity(view.resourceKey, `${at}.resourceKey`);
+    const revisionDigest = requireExactResourceCurrentnessIdentity(view.revisionDigest, `${at}.revisionDigest`);
+    const key = `${componentId}\u0000${resourceKey}`;
+    if (seen.has(key)) {
+      throw new GovernanceExecutionBindingError(
+        'INVALID_RESOURCE_CURRENTNESS',
+        `${at} declares ${componentId}/${resourceKey} more than once (duplicate resource-currentness evidence is never first-wins)`,
+      );
+    }
+    seen.add(key);
+    return Object.freeze({ componentId, providerId, resourceKey, revisionDigest });
+  });
+  entries.sort(
+    (a, b) =>
+      lexicalCompare(a.componentId, b.componentId) || lexicalCompare(a.resourceKey, b.resourceKey),
+  );
+  return Object.freeze(entries);
+}
+
+/**
+ * T005C (#656): exact equality of two (already order-normalized) resource-
+ * currentness evidence sets. `undefined` on both sides is equal; an evidence-
+ * less pin can never equal a pin that carries evidence, and any per-entry
+ * difference (provider, resource or exact revision digest) is a mismatch —
+ * stale, replaced and missing evidence are all typed failures, never a
+ * fallback.
+ */
+export function sameResourceCurrentnessEvidence(
+  left: readonly ResourceCurrentnessEvidence[] | undefined,
+  right: readonly ResourceCurrentnessEvidence[] | undefined,
+): boolean {
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((entry, index) => {
+    const other = right[index] as ResourceCurrentnessEvidence;
+    return entry.componentId === other.componentId
+      && entry.providerId === other.providerId
+      && entry.resourceKey === other.resourceKey
+      && entry.revisionDigest === other.revisionDigest;
+  });
 }
 
 function cloneGovernanceIdentity(
@@ -445,6 +603,7 @@ function bindingDigestMaterial(
   binding: DomainActivationBinding,
   assemblyDigest?: ContentDigest,
   authorityClass?: RuntimeAuthorityClass,
+  resourceCurrentness?: readonly ResourceCurrentnessEvidence[],
 ): object {
   const base = {
     packageId: binding.packageId,
@@ -460,10 +619,16 @@ function bindingDigestMaterial(
   // the pin currentness material, so replacing the Assembly changes the pin.
   // T002D (#655): likewise the runtime authority class becomes part of the pin
   // currentness material when bound, so substituting the class changes the pin.
-  // Legacy pins carrying neither field keep their exact pre-T002C/T002D digest
-  // material (byte-identical legacy digests).
+  // T005C (#656): likewise the exact stable non-secret resource-currentness
+  // evidence becomes part of the pin currentness material when bound, so any
+  // resource revision/provider replacement changes the occurrence currentness.
+  // Legacy pins carrying none of these fields keep their exact pre-T002C/
+  // T002D/T005C digest material (byte-identical legacy digests).
   const withAssembly = assemblyDigest === undefined ? base : { ...base, assemblyDigest };
-  return authorityClass === undefined ? withAssembly : { ...withAssembly, authorityClass };
+  const withClass = authorityClass === undefined ? withAssembly : { ...withAssembly, authorityClass };
+  return resourceCurrentness === undefined
+    ? withClass
+    : { ...withClass, resourceCurrentness };
 }
 
 export async function computeGovernanceExecutionBindingDigest(
@@ -471,6 +636,7 @@ export async function computeGovernanceExecutionBindingDigest(
   sha256: Sha256Port,
   assemblyDigest?: ContentDigest,
   authorityClass?: RuntimeAuthorityClass,
+  resourceCurrentness?: readonly ResourceCurrentnessEvidence[],
 ): Promise<string> {
   assertDomainActivationBinding(binding);
   if (assemblyDigest !== undefined) {
@@ -479,8 +645,12 @@ export async function computeGovernanceExecutionBindingDigest(
   if (authorityClass !== undefined) {
     requireRuntimeAuthorityClass(authorityClass, 'authorityClass');
   }
+  const currentness =
+    resourceCurrentness === undefined
+      ? undefined
+      : normalizeResourceCurrentnessEvidence(resourceCurrentness, 'resourceCurrentness');
   return computeCanonicalJsonDigest(
-    bindingDigestMaterial(binding, assemblyDigest, authorityClass),
+    bindingDigestMaterial(binding, assemblyDigest, authorityClass, currentness),
     sha256,
   );
 }
@@ -492,6 +662,7 @@ export async function createGovernanceExecutionPin(
     readonly binding: DomainActivationBinding;
     readonly assemblyDigest?: ContentDigest;
     readonly authorityClass?: RuntimeAuthorityClass;
+    readonly resourceCurrentness?: readonly ResourceCurrentnessEvidence[];
   },
   sha256: Sha256Port,
 ): Promise<GovernanceExecutionPin> {
@@ -504,7 +675,10 @@ export async function createGovernanceExecutionPin(
   // Synchronously resolved before the first await: the exact Assembly digest
   // (when supplied) is validated and captured here, never re-read after a
   // suspension (#617 torn-snapshot discipline). T002D extends the same
-  // discipline to the authority class.
+  // discipline to the authority class; T005C extends it to the exact
+  // resource-currentness evidence (validated, order-normalized and frozen
+  // synchronously — a caller mutating its own array mid-flight can never mint
+  // hybrid evidence).
   const assemblyDigest =
     request.assemblyDigest === undefined
       ? undefined
@@ -513,11 +687,16 @@ export async function createGovernanceExecutionPin(
     request.authorityClass === undefined
       ? undefined
       : requireRuntimeAuthorityClass(request.authorityClass, 'authorityClass');
+  const resourceCurrentness =
+    request.resourceCurrentness === undefined
+      ? undefined
+      : normalizeResourceCurrentnessEvidence(request.resourceCurrentness, 'resourceCurrentness');
   const binding = cloneActivationBinding(request.binding);
   return Object.freeze({
     ...binding,
     ...(assemblyDigest === undefined ? {} : { assemblyDigest }),
     ...(authorityClass === undefined ? {} : { authorityClass }),
+    ...(resourceCurrentness === undefined ? {} : { resourceCurrentness }),
     workflowTarget,
     workflowInstanceId,
     bindingDigest: await computeGovernanceExecutionBindingDigest(
@@ -525,6 +704,7 @@ export async function createGovernanceExecutionPin(
       sha256,
       assemblyDigest,
       authorityClass,
+      resourceCurrentness,
     ),
   });
 }
@@ -545,10 +725,22 @@ function parsePinShape(value: unknown): GovernanceExecutionPin {
     value.authorityClass === undefined
       ? undefined
       : requireRuntimeAuthorityClass(value.authorityClass, 'authorityClass');
+  // T005C (#656): defensively re-validate durably stored evidence (store data
+  // is untrusted): closed whitelist, exact identities, order-normalized. A
+  // parse failure is wrapped into INVALID_GOVERNANCE_EXECUTION_PIN by the
+  // validate wrapper, never interpreted as evidence-less authority.
+  const resourceCurrentness =
+    value.resourceCurrentness === undefined
+      ? undefined
+      : normalizeResourceCurrentnessEvidence(
+          value.resourceCurrentness as readonly ResourceCurrentnessEvidence[],
+          'pin.resourceCurrentness',
+        );
   return Object.freeze({
     ...binding,
     ...(assemblyDigest === undefined ? {} : { assemblyDigest }),
     ...(authorityClass === undefined ? {} : { authorityClass }),
+    ...(resourceCurrentness === undefined ? {} : { resourceCurrentness }),
     workflowTarget: requireNonEmptyString(value.workflowTarget, 'workflowTarget'),
     workflowInstanceId: requireNonEmptyString(value.workflowInstanceId, 'workflowInstanceId'),
     bindingDigest: requireNonEmptyString(value.bindingDigest, 'bindingDigest'),
@@ -586,6 +778,7 @@ export async function validateGovernanceExecutionPin(
     sha256,
     pin.assemblyDigest,
     pin.authorityClass,
+    pin.resourceCurrentness,
   );
   if (pin.bindingDigest !== expectedDigest) {
     throw new GovernanceExecutionBindingError(
@@ -605,6 +798,7 @@ function sameExecutionPin(left: GovernanceExecutionPin, right: GovernanceExecuti
     && sameGovernanceBaselineIdentity(left.governanceBaseline, right.governanceBaseline)
     && left.assemblyDigest === right.assemblyDigest
     && left.authorityClass === right.authorityClass
+    && sameResourceCurrentnessEvidence(left.resourceCurrentness, right.resourceCurrentness)
     && left.bindingDigest === right.bindingDigest;
 }
 
@@ -623,6 +817,7 @@ export class GovernanceExecutionCoordinator {
     readonly binding: DomainActivationBinding;
     readonly assemblyDigest?: ContentDigest;
     readonly authorityClass?: RuntimeAuthorityClass;
+    readonly resourceCurrentness?: readonly ResourceCurrentnessEvidence[];
   }): Promise<GovernanceExecutionPin> {
     const pin = await createGovernanceExecutionPin(request, this.#sha256);
     const disposition = await this.#store.bindGovernanceExecutionPin(pin);

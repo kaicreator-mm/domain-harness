@@ -1,5 +1,6 @@
 import { type ContentDigest, type Sha256Port } from '../contracts/identity.js';
 import type { JsonValue } from '../contracts/json.js';
+import type { ResourceCurrentnessEvidence } from '../contracts/resource-resolution.js';
 import type { GovernanceBaselineAuthorityBinding, GovernanceBaselineBody, GovernanceBaselineStore, GovernancePackageCdiBinding } from './contracts.js';
 /**
  * T002D (#655): runtime authority class of an activation/execution occurrence.
@@ -39,6 +40,22 @@ export interface GovernanceExecutionPin extends DomainActivationBinding {
      * production journal authority.
      */
     readonly authorityClass?: RuntimeAuthorityClass;
+    /**
+     * T005C (#656): the exact stable NON-SECRET resource-instance/currentness
+     * evidence this occurrence was activated under — one frozen, order-
+     * normalized entry per resource occurrence whose exact runtime revision is
+     * behaviorally relevant. Optional at the type level so pre-T005C (legacy)
+     * pins remain representable and keep their byte-identical legacy digests;
+     * when present every entry is woven into `bindingDigest`, so any resource
+     * revision/provider replacement changes the occurrence's activation/
+     * execution currentness. Entries carry exact identity/digest material only
+     * (produced/validated by the T005B resource seam) — secret values,
+     * credentials, live handles, connection objects, functions/module paths and
+     * provider objects are structurally unrepresentable, and no second resource
+     * registry/currentness hierarchy exists: this field IS the resource
+     * currentness authority, on the ONE existing pin.
+     */
+    readonly resourceCurrentness?: readonly ResourceCurrentnessEvidence[];
 }
 export interface GovernanceBoundSnapshot {
     readonly workflowInstanceId: string;
@@ -74,7 +91,7 @@ export interface DurableExecutionStore {
 export interface ExactPackageCdiAuthority {
     resolveExactPackageCdi(binding: GovernancePackageCdiBinding): Promise<GovernancePackageCdiBinding | undefined>;
 }
-export type GovernanceExecutionBindingErrorCode = 'INVALID_DOMAIN_ACTIVATION_BINDING' | 'MISSING_DOMAIN_ACTIVATION_BINDING' | 'FLOATING_EXECUTION_AUTHORITY_FORBIDDEN' | 'INVALID_GOVERNANCE_EXECUTION_PIN' | 'GOVERNANCE_EXECUTION_PIN_MISSING' | 'GOVERNANCE_EXECUTION_PIN_CONFLICT' | 'GOVERNANCE_EXECUTION_PIN_MISMATCH' | 'SNAPSHOT_BEFORE_GOVERNANCE_PIN' | 'SNAPSHOT_GOVERNANCE_BINDING_MISMATCH' | 'PACKAGE_CDI_BINDING_MISMATCH' | 'PACKAGE_CDI_RECOVERY_MISMATCH' | 'GOVERNANCE_BASELINE_BINDING_MISMATCH' | 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH' | 'ASSEMBLY_DIGEST_FORBIDDEN' | 'ASSEMBLY_NOT_SEALED' | 'MISSING_ASSEMBLY_DIGEST' | 'ASSEMBLY_DEFINITION_CURRENTNESS_MISMATCH' | 'ASSEMBLY_REPLAY_MISMATCH' | 'AUTHORITY_CLASS_FORBIDDEN' | 'AUTHORITY_CLASS_MISMATCH';
+export type GovernanceExecutionBindingErrorCode = 'INVALID_DOMAIN_ACTIVATION_BINDING' | 'MISSING_DOMAIN_ACTIVATION_BINDING' | 'FLOATING_EXECUTION_AUTHORITY_FORBIDDEN' | 'INVALID_GOVERNANCE_EXECUTION_PIN' | 'GOVERNANCE_EXECUTION_PIN_MISSING' | 'GOVERNANCE_EXECUTION_PIN_CONFLICT' | 'GOVERNANCE_EXECUTION_PIN_MISMATCH' | 'SNAPSHOT_BEFORE_GOVERNANCE_PIN' | 'SNAPSHOT_GOVERNANCE_BINDING_MISMATCH' | 'PACKAGE_CDI_BINDING_MISMATCH' | 'PACKAGE_CDI_RECOVERY_MISMATCH' | 'GOVERNANCE_BASELINE_BINDING_MISMATCH' | 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH' | 'ASSEMBLY_DIGEST_FORBIDDEN' | 'ASSEMBLY_NOT_SEALED' | 'MISSING_ASSEMBLY_DIGEST' | 'ASSEMBLY_DEFINITION_CURRENTNESS_MISMATCH' | 'ASSEMBLY_REPLAY_MISMATCH' | 'AUTHORITY_CLASS_FORBIDDEN' | 'AUTHORITY_CLASS_MISMATCH' | 'INVALID_RESOURCE_CURRENTNESS' | 'RESOURCE_CURRENTNESS_PIN_REQUIRED' | 'RESOURCE_CURRENTNESS_MISMATCH';
 export declare class GovernanceExecutionBindingError extends Error {
     readonly code: GovernanceExecutionBindingErrorCode;
     constructor(code: GovernanceExecutionBindingErrorCode, message: string);
@@ -95,6 +112,26 @@ export declare function requireExactAssemblyDigest(value: unknown, field: string
  * else fails closed.
  */
 export declare function requireRuntimeAuthorityClass(value: unknown, field: string): RuntimeAuthorityClass;
+/**
+ * T005C (#656): validate, order-normalize (componentId, then resourceKey) and
+ * deep-freeze one occurrence's resource-currentness evidence. This is the
+ * SINGLE normalizer for the material carried on `GovernanceExecutionPin
+ * .resourceCurrentness`: the governance seam consumes ONLY stable non-secret
+ * evidence produced/validated by the T005B resource seam, re-validates it
+ * defensively here (durable pin material is untrusted store data), and never
+ * invents, defaults or falls back to any evidence. Duplicate
+ * (componentId, resourceKey) entries fail closed — never first-wins.
+ */
+export declare function normalizeResourceCurrentnessEvidence(value: readonly ResourceCurrentnessEvidence[] | undefined, field: string): readonly ResourceCurrentnessEvidence[] | undefined;
+/**
+ * T005C (#656): exact equality of two (already order-normalized) resource-
+ * currentness evidence sets. `undefined` on both sides is equal; an evidence-
+ * less pin can never equal a pin that carries evidence, and any per-entry
+ * difference (provider, resource or exact revision digest) is a mismatch —
+ * stale, replaced and missing evidence are all typed failures, never a
+ * fallback.
+ */
+export declare function sameResourceCurrentnessEvidence(left: readonly ResourceCurrentnessEvidence[] | undefined, right: readonly ResourceCurrentnessEvidence[] | undefined): boolean;
 export declare function cloneActivationBinding(binding: DomainActivationBinding): DomainActivationBinding;
 export declare function assertDomainActivationBinding(binding: DomainActivationBinding): void;
 export declare function requireExactPackageCdi(binding: DomainActivationBinding, authority: ExactPackageCdiAuthority, errorCode?: Extract<GovernanceExecutionBindingErrorCode, 'PACKAGE_CDI_BINDING_MISMATCH' | 'PACKAGE_CDI_RECOVERY_MISMATCH'>): Promise<GovernancePackageCdiBinding>;
@@ -105,13 +142,14 @@ export declare class DomainActivationBindingCoordinator {
     publish(binding: DomainActivationBinding): Promise<DomainActivationBinding>;
     resolveForNewInstance(domainId: string): Promise<DomainActivationBinding>;
 }
-export declare function computeGovernanceExecutionBindingDigest(binding: DomainActivationBinding, sha256: Sha256Port, assemblyDigest?: ContentDigest, authorityClass?: RuntimeAuthorityClass): Promise<string>;
+export declare function computeGovernanceExecutionBindingDigest(binding: DomainActivationBinding, sha256: Sha256Port, assemblyDigest?: ContentDigest, authorityClass?: RuntimeAuthorityClass, resourceCurrentness?: readonly ResourceCurrentnessEvidence[]): Promise<string>;
 export declare function createGovernanceExecutionPin(request: {
     readonly workflowTarget: string;
     readonly workflowInstanceId: string;
     readonly binding: DomainActivationBinding;
     readonly assemblyDigest?: ContentDigest;
     readonly authorityClass?: RuntimeAuthorityClass;
+    readonly resourceCurrentness?: readonly ResourceCurrentnessEvidence[];
 }, sha256: Sha256Port): Promise<GovernanceExecutionPin>;
 export declare function validateGovernanceExecutionPin(value: unknown, sha256: Sha256Port, expectedWorkflowInstanceId?: string): Promise<GovernanceExecutionPin>;
 export declare class GovernanceExecutionCoordinator {
@@ -123,6 +161,7 @@ export declare class GovernanceExecutionCoordinator {
         readonly binding: DomainActivationBinding;
         readonly assemblyDigest?: ContentDigest;
         readonly authorityClass?: RuntimeAuthorityClass;
+        readonly resourceCurrentness?: readonly ResourceCurrentnessEvidence[];
     }): Promise<GovernanceExecutionPin>;
     /**
      * Gate to call immediately before an authoritative state-changing control

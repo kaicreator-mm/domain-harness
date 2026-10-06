@@ -76,7 +76,21 @@ export const requestEndpointSmuggling: ResourceResolutionRequest = {
 export type ResponseUnion = Expect<
   Equal<
     ResourceProviderResponse,
-    | { readonly status: 'resolved'; readonly handle: unknown; readonly contract?: { readonly contractId: string; readonly version: string } }
+    | {
+        readonly status: 'resolved';
+        readonly handle: unknown;
+        readonly contract?: { readonly contractId: string; readonly version: string };
+        // T005C (#656): optional stable NON-SECRET currentness pin, captured
+        // as a closed three-field exact-identity whitelist (provider/resource
+        // identity + exact revision digest); secrets, credentials, live
+        // handles, connection objects, functions/module paths and provider
+        // objects remain structurally unrepresentable on ANY variant.
+        readonly currentnessPin?: {
+          readonly providerId: string;
+          readonly resourceKey: string;
+          readonly revisionDigest: string;
+        };
+      }
     | { readonly status: 'absent' }
     | { readonly status: 'incompatible'; readonly supportedContracts?: readonly { readonly contractId: string; readonly version: string }[] }
   >
@@ -103,7 +117,19 @@ export type ResultShape = Expect<
 export type EntryUnion = Expect<
   Equal<
     ResolvedResourceEntry,
-    | { readonly resourceKey: string; readonly status: 'resolved'; readonly handle: unknown }
+    | {
+        readonly resourceKey: string;
+        readonly status: 'resolved';
+        readonly handle: unknown;
+        // T005C (#656): frozen non-aliased snapshot of the provider's stable
+        // non-secret currentness pin when supplied (capture only — never
+        // authority; the T005C activation gate owns the posture).
+        readonly currentnessPin?: {
+          readonly providerId: string;
+          readonly resourceKey: string;
+          readonly revisionDigest: string;
+        };
+      }
     | { readonly resourceKey: string; readonly status: 'absent' }
   >
 >;
