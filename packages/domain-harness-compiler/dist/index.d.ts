@@ -1,5 +1,6 @@
 /** Build-time compiler package and stable public API. */
 export declare const DOMAIN_HARNESS_COMPILER_PACKAGE: "@kaicreator/domain-harness-compiler";
+export declare const COMPILER_PUBLIC_API_VERSION: "compiler-public-api.v1";
 export { loadRawDomainPackage, type LoadRawDomainPackageOptions, } from './raw/load-raw-package.js';
 export { compileDomainPackage, type CompileDomainPackageInput, type CompileDomainPackageResult, } from './compile/compile-domain-package.js';
 export { SemanticDecisionCompileError, compileSemanticDecisions, } from './compile/semantic-decisions.js';
