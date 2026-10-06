@@ -187,3 +187,47 @@ test('#618 boundary 3: a Standard-classified Component is admitted through the S
   );
   assert.equal((withDescriptor as unknown as Record<string, unknown>).effect, undefined);
 });
+
+test('#652 boundary 4: Standard consumes the accepted generic verifiers — it never re-owns their algorithms', () => {
+  const source = readFileSync(CONTRACTS_DIR + 'standard.ts', 'utf8');
+
+  // D2/D3 consume the frozen generic authority by import: T002B admission and
+  // the accepted #640 T003C consumer verifier.
+  assert.match(
+    source,
+    /import\s*\{[^}]*admitComponentWithAssembly[^}]*\}\s*from\s*'\.\/runtime-assembly\.js'/,
+    'Standard must consume the generic T002B Assembly-bound admission path',
+  );
+  assert.match(
+    source,
+    /import\s*\{[^}]*verifyToolImplementationBinding[^}]*\}\s*from\s*'\.\/tool-implementation-binding\.js'/,
+    'Standard must consume the accepted #640 T003C consumer verifier',
+  );
+
+  // Standard never reproduces the T003C digest algorithm or its domain tag,
+  // and never re-owns the v1 binding evidence material shape.
+  assert.doesNotMatch(source, /TOOL_IMPLEMENTATION_BINDING_EVIDENCE_DOMAIN/);
+  assert.doesNotMatch(
+    source,
+    /digestDomain:\s*'kaicreator\.tool-implementation-binding/,
+    'Standard must not re-declare the T003C evidence digest domain',
+  );
+
+  // No Standard-specific authority surface was added by the repair: no
+  // provider registry, no admission/activation/effect mint, no second
+  // Runtime.
+  for (const forbidden of [
+    'sealRuntimeAssembly(',
+    'bindToolImplementation(',
+    'resolveCurrentCapabilityProvider(',
+    'selectCurrentProvider',
+    'activateComponent',
+  ]) {
+    const escaped = forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.doesNotMatch(
+      source,
+      new RegExp(`\\b${escaped}`),
+      `Standard must never own the authority path: ${forbidden}`,
+    );
+  }
+});
