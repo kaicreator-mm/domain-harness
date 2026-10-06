@@ -10,7 +10,11 @@
  *  - torn-snapshot discipline: caller/async mutation during resolution cannot
  *    change the synchronously snapshotted requirement material;
  *  - hostile descriptor input on every authority-bearing surface;
- *  - provider replacement with zero core source edits (injected port only).
+ *  - provider replacement with zero core source edits (injected port only);
+ *  - #643: provider-controlled key names / symbol descriptions / secret-shaped
+ *    key material are classified (never echoed) in
+ *    INVALID_RESOURCE_PROVIDER_RESPONSE diagnostics; the typed code and fixed
+ *    diagnostic context stay stable; legitimate resolution is unchanged.
  *
  * Composition note: assemblies are GENUINELY sealed through
  * `sealRuntimeAssembly` (T002B) with T005A declarations over a real Tool
@@ -1002,4 +1006,220 @@ test('T005B all-or-nothing: one required failure means no resolution result is p
   // requirement must never be requested after the terminal required failure.
   await expectResolutionError(resolveToolResources(options(assembly, provider)), 'MISSING_REQUIRED_RESOURCE');
   assert.ok(askedAfterFailure <= 1, 'resolution continued after a terminal required failure');
+});
+
+// ---------------------------------------------------------------------------
+// Provider-controlled key/symbol diagnostic redaction (issue #643)
+// ---------------------------------------------------------------------------
+//
+// A provider controls the own-key names of the objects it returns. Those names
+// may BE the secret material (`sk-…` keys), prototype-pollution material
+// (`__proto__` / `constructor`), control-character payloads, or symbol
+// descriptions — none of it may reach an INVALID_RESOURCE_PROVIDER_RESPONSE
+// diagnostic. Only bounded, non-secret, deterministic classifications may
+// participate; the typed code and fixed diagnostic context stay stable.
+
+/** Attach one own enumerable data property without invoking magic setters. */
+function withOwnKey(target: Record<string, unknown>, key: string | symbol, value: unknown): unknown {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  return target;
+}
+
+const VALID_PIN = {
+  providerId: 'postgres.provider',
+  resourceKey: 'runtime.postgres.cluster',
+  revisionDigest: 'sha256:pg-revision-0001',
+};
+
+test('T005B #643 redaction: a provider-controlled __proto__ own key is classified, never echoed', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const { provider } = providerStub(
+    () =>
+      withOwnKey({ status: 'resolved', handle: 'h' }, '__proto__', 'polluting-material') as ResourceProviderResponse,
+  );
+
+  const error = await expectResolutionError(
+    resolveToolResources(options(assembly, provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+
+  assert.ok(!error.message.includes('__proto__'), `provider-controlled key leaked: ${error.message}`);
+  assert.ok(error.message.includes('unexpected field'), 'fixed diagnostic context preserved');
+  assert.ok(
+    error.message.includes('<redacted:prototype-name'),
+    'bounded deterministic classification participates',
+  );
+});
+
+test('T005B #643 redaction: a provider-controlled constructor-name own key is classified, never echoed', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const { provider } = providerStub(
+    () => ({ status: 'resolved', handle: 'h', constructor: 'confused-deputy' }) as unknown as ResourceProviderResponse,
+  );
+
+  const error = await expectResolutionError(
+    resolveToolResources(options(assembly, provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+
+  assert.ok(!error.message.includes('"constructor"'), `provider-controlled key leaked: ${error.message}`);
+  assert.ok(error.message.includes('unexpected field'), 'fixed diagnostic context preserved');
+  assert.ok(error.message.includes('<redacted:prototype-name'), 'bounded deterministic classification');
+});
+
+test('T005B #643 redaction: a control-character own key is classified, never echoed raw', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const hostileKey = "evil\u001fkey";
+  const { provider } = providerStub(
+    () =>
+      withOwnKey({ status: 'resolved', handle: 'h' }, hostileKey, 'x') as ResourceProviderResponse,
+  );
+
+  const error = await expectResolutionError(
+    resolveToolResources(options(assembly, provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+
+  assert.ok(!error.message.includes("\u001f"), "control character reached the diagnostic");
+  assert.ok(!error.message.includes('evil'), `provider-controlled key leaked: ${error.message}`);
+  assert.ok(error.message.includes('<redacted:'), 'bounded deterministic classification participates');
+});
+
+test('T005B #643 redaction: secret-shaped own keys (sk-/Bearer/JWT forms) never enter diagnostics', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const secretKeys = [
+    'sk-live-4eC39HqLyjWDarjtT1zdp7dc',
+    'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJVadQssw5c',
+    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
+  ];
+
+  for (const secretKey of secretKeys) {
+    const { provider } = providerStub(
+      () => withOwnKey({ status: 'resolved', handle: 'h' }, secretKey, 'x') as ResourceProviderResponse,
+    );
+
+    const error = await expectResolutionError(
+      resolveToolResources(options(assembly, provider)),
+      'INVALID_RESOURCE_PROVIDER_RESPONSE',
+    );
+
+    assert.ok(!error.message.includes(secretKey), `secret-shaped key leaked: ${error.message}`);
+    assert.ok(!error.message.includes('eyJ'), 'JWT material leaked into diagnostics');
+    assert.ok(!error.message.includes('sk-live'), 'API-key material leaked into diagnostics');
+    assert.ok(error.message.includes('unexpected field'), 'fixed diagnostic context preserved');
+    assert.ok(error.message.includes('<redacted:secret-shaped'), 'bounded deterministic classification');
+  }
+});
+
+test('T005B #643 redaction: a symbol-keyed provider response never leaks its description', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const { provider } = providerStub(
+    () =>
+      withOwnKey({ status: 'resolved', handle: 'h' }, Symbol('sk-live-4eC39HqLyjWDarjt'), 'x') as ResourceProviderResponse,
+  );
+
+  const error = await expectResolutionError(
+    resolveToolResources(options(assembly, provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+
+  assert.ok(!error.message.includes('sk-live'), `symbol description leaked: ${error.message}`);
+  assert.ok(!error.message.includes('Symbol(sk-live'), 'symbol description leaked');
+  assert.ok(
+    error.message.includes('symbol-keyed properties'),
+    'fixed diagnostic context (violation kind) preserved',
+  );
+});
+
+test('T005B #643 redaction: secret-shaped or symbol-keyed currentness-pin material is classified, never echoed', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+
+  // Secret-shaped KEY name on an otherwise valid pin.
+  const withSecretKey = providerStub(
+    () =>
+      ({
+        status: 'resolved',
+        handle: 'h',
+        currentnessPin: withOwnKey({ ...VALID_PIN }, 'sk-test-abcdef0123456789', 'x'),
+      }) as unknown as ResourceProviderResponse,
+  );
+  const secretError = await expectResolutionError(
+    resolveToolResources(options(assembly, withSecretKey.provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+  assert.ok(!secretError.message.includes('sk-test-abcdef0123456789'), `pin key leaked: ${secretError.message}`);
+  assert.ok(secretError.message.includes('unexpected field'), 'fixed diagnostic context preserved');
+  assert.ok(secretError.message.includes('<redacted:secret-shaped'), 'bounded deterministic classification');
+
+  // Symbol-keyed hidden material on an otherwise valid pin.
+  const withSymbol = providerStub(
+    () =>
+      ({
+        status: 'resolved',
+        handle: 'h',
+        currentnessPin: withOwnKey({ ...VALID_PIN }, Symbol('bearer-token-material'), 'x'),
+      }) as unknown as ResourceProviderResponse,
+  );
+  const symbolError = await expectResolutionError(
+    resolveToolResources(options(assembly, withSymbol.provider)),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+  assert.ok(!symbolError.message.includes('bearer-token-material'), `symbol description leaked: ${symbolError.message}`);
+  assert.ok(symbolError.message.includes('symbol-keyed properties'), 'fixed diagnostic context preserved');
+});
+
+test('T005B #643 redaction: classification is deterministic — identical hostile responses produce byte-identical diagnostics', async () => {
+  const assembly = await sealedAssembly([requirement()]);
+  const makeProvider = (): ResourceProvider => ({
+    async resolve(): Promise<ResourceProviderResponse> {
+      return withOwnKey(
+        { status: 'resolved', handle: 'h' },
+        'sk-live-4eC39HqLyjWDarjtT1zdp7dc',
+        'x',
+      ) as ResourceProviderResponse;
+    },
+  });
+
+  const first = await expectResolutionError(
+    resolveToolResources(options(assembly, makeProvider())),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+  const second = await expectResolutionError(
+    resolveToolResources(options(assembly, makeProvider())),
+    'INVALID_RESOURCE_PROVIDER_RESPONSE',
+  );
+
+  assert.equal(first.code, 'INVALID_RESOURCE_PROVIDER_RESPONSE', 'typed code is stable');
+  assert.equal(first.message, second.message, 'same hostile input => identical bounded diagnostic');
+  assert.ok(first.message.length < 400, 'diagnostic stays bounded');
+});
+
+test('T005B #643 regression: legitimate resolution behavior is unchanged (contract match, pin capture, provider replacement semantics)', async () => {
+  const assembly = await sealedAssembly([requirement({ contract: POSTGRES_CONTRACT })]);
+  const handle = { connection: 'opaque-host-object' };
+  const { provider, calls } = providerStub(() => ({
+    status: 'resolved',
+    handle,
+    contract: POSTGRES_CONTRACT,
+    currentnessPin: VALID_PIN,
+  }));
+
+  const result = await resolveToolResources(options(assembly, provider));
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(result.resources.get('runtime.postgres.cluster'), {
+    resourceKey: 'runtime.postgres.cluster',
+    status: 'resolved',
+    handle,
+    currentnessPin: VALID_PIN,
+  });
+  assert.ok(
+    Object.isFrozen(result.resources.get('runtime.postgres.cluster')),
+    'resolved entry remains a frozen snapshot',
+  );
 });

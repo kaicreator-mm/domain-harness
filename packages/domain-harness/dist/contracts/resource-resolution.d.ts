@@ -23,7 +23,11 @@
  *   this module produces: error messages carry only exact identity strings
  *   (resourceKey / contractId / version) from the sealed Assembly material.
  *   A provider's thrown error message, returned handle, and any unknown
- *   provider-response values are NEVER propagated into messages. Handles are
+ *   provider-response values are NEVER propagated into messages. Provider-
+ *   controlled own-key names and symbol descriptions are not echoed either
+ *   (#643): they may themselves be secret-shaped (`sk-…`), prototype-pollution
+ *   (`__proto__`), or control-character material, so diagnostics carry only a
+ *   bounded, non-secret, deterministic classification of them. Handles are
  *   runtime-only references inside the result map and are never serialized;
  * - torn-snapshot discipline (same as #587 §E): every authority-bearing input
  *   (options, Assembly record requirement material) is descriptor-safe
@@ -207,7 +211,9 @@ export interface ResolvedToolResources {
  * and terminal — none carries or suggests a substitute/default/latest
  * resolution, and no diagnostic ever serializes provider handles, secret
  * values, or provider-supplied free text (only exact identity strings from
- * the sealed Assembly material participate).
+ * the sealed Assembly material participate). Provider-controlled own-key
+ * names and symbol descriptions participate only as bounded, non-secret,
+ * deterministic classifications (#643) — never verbatim.
  */
 export type ResourceResolutionErrorCode = 'INVALID_RESOLUTION_INPUT' | 'INVALID_RESOURCE_PROVIDER_RESPONSE' | 'MISSING_REQUIRED_RESOURCE' | 'INCOMPATIBLE_RESOURCE' | 'RESOURCE_PROVIDER_FAILURE';
 export declare class ResourceResolutionError extends Error {
@@ -242,7 +248,9 @@ export declare class ResourceResolutionError extends Error {
  *   caller mutating its own objects mid-resolution cannot affect the result;
  * - redaction: no error message ever contains a provider handle, a provider
  *   thrown-message, or any provider-supplied value — only exact identity
- *   strings from the Assembly material.
+ *   strings from the Assembly material; provider-controlled own-key names and
+ *   symbol descriptions appear only as bounded, non-secret, deterministic
+ *   classifications (#643).
  */
 export declare function resolveToolResources(options: ResolveToolResourcesOptions): Promise<ResolvedToolResources>;
 //# sourceMappingURL=resource-resolution.d.ts.map
