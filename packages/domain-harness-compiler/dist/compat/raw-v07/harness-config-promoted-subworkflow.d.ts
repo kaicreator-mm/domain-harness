@@ -29,7 +29,12 @@
  *   declarations map to canonical evidence sorted by that frozen order — the
  *   declaration shape is closed (no priority/order/weight field exists), the
  *   source union is closed (unknown/inferred names fail), and input config
- *   order can never alter the recorded authority;
+ *   order can never alter the recorded authority. The binding rule is
+ *   deterministic and required: `promoted-subworkflow` binds exactly one
+ *   exact `promoted-subworkflow` artifact identity, `harness-machine` binds
+ *   exactly one exact `harness-config` artifact identity, `rule` /
+ *   `exact-cache` bind none — a missing required binding fails typed, it is
+ *   never inferred, defaulted or chosen by order;
  * - exact historical identity/currentness (kind, artifactId, version,
  *   contentDigest) is preserved verbatim as mapping provenance — historical
  *   identity is never rewritten (strangler, not rewrite).
@@ -121,7 +126,14 @@ export interface CompatHistoricalHarnessConfig {
 export interface CompatDecisionSourceDeclaration {
     readonly decisionId: string;
     readonly source: CompatDecisionResolverSource;
-    /** Exact bound compat artifact when the source binds one (closed identity). */
+    /**
+     * Exact bound compat artifact (closed identity) — required exactly for the
+     * artifact-bearing sources: `promoted-subworkflow` binds exactly one
+     * `promoted-subworkflow` identity, `harness-machine` binds exactly one
+     * `harness-config` identity; `rule` / `exact-cache` bind none. A missing
+     * required binding fails typed — never inferred, defaulted or chosen by
+     * config order.
+     */
     readonly artifact?: CompatHistoricalArtifactIdentity;
 }
 /** Adapter input: historical compat material plus the explicit graph identity. */
@@ -136,6 +148,7 @@ export interface CompatMappingInput {
 export interface CompatMappedDecisionSource {
     readonly decisionId: string;
     readonly source: CompatDecisionResolverSource;
+    /** Exact bound compat artifact; present exactly for the artifact-bearing sources. */
     readonly artifact?: CompatHistoricalArtifactIdentity;
 }
 /** Provenance record of one mapped Component's exact historical identity. */

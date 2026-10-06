@@ -29,7 +29,12 @@
  *   declarations map to canonical evidence sorted by that frozen order — the
  *   declaration shape is closed (no priority/order/weight field exists), the
  *   source union is closed (unknown/inferred names fail), and input config
- *   order can never alter the recorded authority;
+ *   order can never alter the recorded authority. The binding rule is
+ *   deterministic and required: `promoted-subworkflow` binds exactly one
+ *   exact `promoted-subworkflow` artifact identity, `harness-machine` binds
+ *   exactly one exact `harness-config` artifact identity, `rule` /
+ *   `exact-cache` bind none — a missing required binding fails typed, it is
+ *   never inferred, defaulted or chosen by order;
  * - exact historical identity/currentness (kind, artifactId, version,
  *   contentDigest) is preserved verbatim as mapping provenance — historical
  *   identity is never rewritten (strangler, not rewrite).
@@ -548,7 +553,10 @@ export function mapHarnessConfigPromotedSubworkflowToComponentGraph(input) {
     }));
     // Phase 3 — decision-source declarations: closed shape, closed source union,
     // explicit bindings. The recorded authority is the frozen source identity;
-    // input order is erased by canonicalization.
+    // input order is erased by canonicalization. The binding rule is required
+    // and deterministic per source: an artifact-bearing source without exactly
+    // one exact artifact identity fails typed here — a source claim is never
+    // recorded without its exact historical currentness evidence.
     const sourceOrderIndex = new Map(COMPAT_DECISION_RESOLVER_SOURCE_ORDER.map((source, index) => [source, index]));
     const validatedDeclarations = [];
     const declaredDecisions = new Map();
@@ -570,18 +578,29 @@ export function mapHarnessConfigPromotedSubworkflowToComponentGraph(input) {
             fail('CONFLICTING_COMPAT_IDENTITY', path, `decision '${decisionId}' is declared under conflicting sources ('${existingSource}' and '${source}'); the authoritative source is never reassigned by config order`);
         }
         declaredDecisions.set(decisionId, source);
+        const expectedKind = source === 'promoted-subworkflow'
+            ? 'promoted-subworkflow'
+            : source === 'harness-machine'
+                ? 'harness-config'
+                : undefined;
         let artifact;
-        if (entry.artifact !== undefined) {
-            const expectedKind = source === 'promoted-subworkflow' ? 'promoted-subworkflow' : source === 'harness-machine' ? 'harness-config' : undefined;
-            if (expectedKind === undefined) {
+        if (expectedKind === undefined) {
+            if (entry.artifact !== undefined) {
                 fail('NOT_TRANSLATABLE', `${path}.artifact`, `source '${source}' binds no compat artifact; carrying one is ambiguous historical semantics`);
             }
+        }
+        else if (entry.artifact === undefined) {
+            fail('NOT_TRANSLATABLE', `${path}.artifact`, `source '${source}' binds exactly one '${expectedKind}' artifact; a missing binding is never inferred, defaulted or chosen by config order`);
+        }
+        else {
             artifact = requireHistoricalIdentity(entry.artifact, expectedKind, `${path}.artifact`);
         }
         validatedDeclarations.push({ decisionId, source, artifact, path });
     }
     // Phase 4 — resolve declared artifact bindings against the bound identities:
-    // missing -> typed missing; digest drift -> typed stale; never repaired.
+    // `rule` / `exact-cache` bind none (Phase 3 rejected any binding they carry);
+    // the artifact-bearing sources always carry one. missing -> typed missing;
+    // digest drift -> typed stale; never repaired.
     for (const declaration of validatedDeclarations) {
         if (declaration.artifact === undefined)
             continue;

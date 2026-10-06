@@ -327,13 +327,24 @@ test('decision-source evidence is canonicalized by the frozen resolver source or
       decisionSources: [
         declaration({ decisionId: 'b.decision', source: 'harness-machine', artifact: { kind: 'harness-config', artifactId: 'harness.orderDecision', contentDigest: 'digest-harness-order' } }),
         declaration(),
-        declaration({ decisionId: 'a.decision', source: 'promoted-subworkflow' }),
+        declaration({
+          decisionId: 'a.decision',
+          source: 'promoted-subworkflow',
+          artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.orderDecision', contentDigest: 'digest-promoted-order' },
+        }),
       ],
     }),
   );
   assert.deepEqual(
     result.provenance.decisionSources.map((entry) => `${entry.source}:${entry.decisionId}`),
     ['promoted-subworkflow:a.decision', 'promoted-subworkflow:decision.orderTotal', 'harness-machine:b.decision'],
+  );
+  // Every artifact-bearing source carries its exact artifact binding evidence
+  // (artifactId + contentDigest) — source identity without currentness is
+  // never emitted.
+  assert.deepEqual(
+    result.provenance.decisionSources.find((entry) => entry.decisionId === 'b.decision')?.artifact,
+    { kind: 'harness-config', artifactId: 'harness.orderDecision', contentDigest: 'digest-harness-order' },
   );
 });
 
@@ -549,6 +560,85 @@ test('a declaration source never binds an artifact of the wrong compat kind', ()
     (error: unknown) => {
       assert.ok(error instanceof Error);
       assert.match(error.message, /NOT_TRANSLATABLE/);
+      return true;
+    },
+  );
+});
+
+test('artifact-bearing sources require exactly one exact artifact binding — a missing binding fails typed', () => {
+  const promotedMissingArtifact: CompatDecisionSourceDeclaration = {
+    decisionId: 'decision.orderTotal',
+    source: 'promoted-subworkflow',
+  };
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({ decisionSources: [promotedMissingArtifact] }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /NOT_TRANSLATABLE/);
+      assert.match(error.message, /decisionSources\[0\]\.artifact/);
+      assert.match(error.message, /promoted-subworkflow/);
+      return true;
+    },
+    'promoted-subworkflow binds exactly one promoted-subworkflow artifact; absence is never accepted',
+  );
+
+  const machineMissingArtifact: CompatDecisionSourceDeclaration = {
+    decisionId: 'decision.machine',
+    source: 'harness-machine',
+  };
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({ decisionSources: [machineMissingArtifact] }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /NOT_TRANSLATABLE/);
+      assert.match(error.message, /decisionSources\[0\]\.artifact/);
+      assert.match(error.message, /harness-machine/);
+      return true;
+    },
+    'harness-machine binds exactly one harness-config artifact; absence is never accepted',
+  );
+});
+
+test('rule and exact-cache continue to bind no compat artifact — carrying one fails typed', () => {
+  for (const source of ['rule', 'exact-cache'] as const) {
+    assert.throws(
+      () =>
+        mapHarnessConfigPromotedSubworkflowToComponentGraph(
+          input({ decisionSources: [declaration({ source })] }),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /NOT_TRANSLATABLE/);
+        assert.match(error.message, /decisionSources\[0\]\.artifact/);
+        return true;
+      },
+      `source '${source}' must reject a compat artifact binding`,
+    );
+  }
+});
+
+test('a declaration binding an artifact missing from the mapping input fails typed — never dangling, never skipped', () => {
+  assert.throws(
+    () =>
+      mapHarnessConfigPromotedSubworkflowToComponentGraph(
+        input({
+          decisionSources: [
+            declaration({
+              artifact: { kind: 'promoted-subworkflow', artifactId: 'promoted.ghost', contentDigest: 'digest-ghost' },
+            }),
+          ],
+        }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /MISSING_REFERENCED_COMPAT_ARTIFACT/);
+      assert.match(error.message, /promoted\.ghost/);
       return true;
     },
   );
