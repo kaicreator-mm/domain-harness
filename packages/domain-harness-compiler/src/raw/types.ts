@@ -4,6 +4,7 @@ import type {
   JsonPrimitive,
   JsonSchema,
   JsonValue,
+  SemanticDecisionCacheBypassReason,
   TargetHostProfile,
   ToolEffectSemantics,
 } from '@kaicreator/domain-harness/v2';
@@ -96,6 +97,39 @@ export interface LoadedRawDomainPackage {
   scripts: ReadonlyMap<string, string>;
   schemas: ReadonlyMap<string, JsonSchema>;
   childDependencies: ReadonlyMap<string, readonly string[]>;
+  /**
+   * v0.6 T001 (issue #497, frozen L2 A2): authoring-form first-class Semantic
+   * Decision Declarations loaded from `decisions/*.yaml`. Always populated by
+   * the loader (empty when the package declares none); optional on hand-built
+   * raw packages so existing deterministic authoring remains unchanged.
+   */
+  semanticDecisions?: ReadonlyMap<string, RawSemanticDecisionDeclaration>;
+}
+
+/**
+ * v0.6 T001 authoring form of the first-class Semantic Decision Declaration
+ * (frozen L2 A2/A7). Closed key set enforced at load time; provider/model
+ * names, engine state ids and Adaptive Region/Goal/Obligation/JIT material
+ * are unrepresentable — any unknown key fails closed. Exact-reuse/cache,
+ * promoted-known-process, query-capability and currentness references are
+ * resolved only against existing compiler/resolver authority at compile time.
+ */
+export interface RawSemanticDecisionDeclaration {
+  decisionId: string;
+  /** JSONata input-selection authority over the invoking workflow context. */
+  inputSelection: string;
+  /** Package-root-relative path of the structured result JSON Schema. */
+  resultSchemaPath: string;
+  allowedOutcomes: readonly string[];
+  allowedEventTypes: readonly string[];
+  /** Read-only Tool identities allowed to the bounded Harness reasoning. */
+  queryCapabilities: readonly string[];
+  requiredProjections?: readonly string[];
+  requiredRevisionSources?: readonly string[];
+  cachePolicy?: { mode: 'eligible' } | { mode: 'bypass'; reason: SemanticDecisionCacheBypassReason };
+  promotedReference?: { kind: 'version'; artifactId: string; version: string } | { kind: 'alias'; artifactId: string; alias: string };
+  policy: { maxSteps: number };
+  unavailable: { kind: 'fail-closed' } | { kind: 'declared-event'; eventType: string; outcome: string };
 }
 
 /**

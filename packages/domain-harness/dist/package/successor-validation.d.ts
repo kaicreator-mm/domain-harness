@@ -23,6 +23,11 @@ export declare const SUCCESSOR_WORKFLOW_DECODER_EXTENSIONS: CompiledWorkflowDeco
  * - Business Source schema declarations under the exact schema contract;
  * - package-recorded bounds against host-supported maxima (never exceeded,
  *   never truncated);
+ * - compiled semantic decision declarations: structure, exact manifest
+ *   section closure, embedded result schema revalidated under the existing
+ *   DOMAIN_HARNESS_JSON_SCHEMA_V1 authority, and the declarationDigest
+ *   recomputed from the exact canonical descriptor body (v0.6 T001 R1
+ *   repair, issue #508);
  * - the successor packageId over the canonical manifest identity material
  *   (L2-A §3.4 portable digest seam).
  */
