@@ -251,7 +251,7 @@ export interface WorkflowRunResult {
 
 interface CompiledWorkflowHandle {
   readonly machine: AnyStateMachine;
-  /** Explicit routes grouped by `sourceStateId\0eventType`, canonical order. */
+  /** Explicit routes grouped by collision-free (sourceStateId, eventType) keys, canonical order. */
   readonly routesBySourceEvent: ReadonlyMap<string, readonly CompiledWorkflowRoute[]>;
 }
 
@@ -276,9 +276,26 @@ const COMPILED_HANDLES = new WeakMap<CompiledWorkflowArtifact, CompiledWorkflowH
  */
 const ROUTE_SELECTION_MARKS = new WeakMap<object, number>();
 
+/**
+ * Route group key of one (source state, event type) pair — collision-free.
+ * Identity strings may legally carry U+0000 (the closed-world validator admits
+ * any non-empty string), so a raw `source\0event` join is not injective:
+ * ("a\0b", "c") and ("a", "b\0c") would collapse into ONE group and corrupt
+ * both the published route table and explicit-selection execution. Each part
+ * is therefore escaped for backslash and U+0000 before joining on a raw
+ * U+0000 separator: escaped parts never contain a raw U+0000, so the join is
+ * injective and the separator unambiguous. Identifiers without either
+ * character (the corpus universe) take the identical raw join — zero drift.
+ */
+function escapeRouteGroupKeyPart(part: string): string {
+  return part.includes('\\') || part.includes('\u0000')
+    ? part.replaceAll('\\', '\\\\').replaceAll('\u0000', '\\0')
+    : part;
+}
+
 /** Route group key of one (source state, event type) pair. */
 function routeGroupKey(sourceStateId: string, eventType: string): string {
-  return `${sourceStateId}\u0000${eventType}`;
+  return `${escapeRouteGroupKeyPart(sourceStateId)}\u0000${escapeRouteGroupKeyPart(eventType)}`;
 }
 
 // ---------------------------------------------------------------------------

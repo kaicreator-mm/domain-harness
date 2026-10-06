@@ -20,11 +20,14 @@
  *     - unreferenced ("dead") states are accepted as inert states (the
  *       existing boundary maps a state without transitions to a state
  *       without `on`);
-   *     - duplicate (event, from) transitions carry an explicit canonical
-   *       route identity in the existing engine-neutral route-selection shape
-   *       (sourceStateId, routeClass 'event', routeIndex, eventType);
-   *       event-only selection among more than one eligible route fails
-   *       typed/closed — never first-declared, never array position 0;
+ *     - duplicate (event, from) transitions carry an explicit canonical
+ *       route identity in the existing engine-neutral route-selection shape
+ *       (sourceStateId, routeClass 'event', routeIndex, eventType);
+ *       event-only selection among more than one eligible route fails
+ *       typed/closed — never first-declared, never array position 0;
+ *     - route grouping is collision-free for identifiers carrying U+0000
+ *       (escaped group keys): distinct (source, event) pairs never merge,
+ *       so canonical tables and explicit selections stay exact;
  *     - self-transitions behave as ordinary engine self-transitions;
  * - representation limits of the existing engine fail typed and closed at
  *   COMPILE time (never a fallback to Raw/legacy semantics):
@@ -639,6 +642,124 @@ test('PACK-C T007B: a caller-constructed artifact is not a minted artifact and n
     assert.ok(error instanceof WorkflowBridgeError);
     assert.equal(error.code, 'UNTRUSTED_COMPILED_WORKFLOW_ARTIFACT');
     assert.equal(error.failureClass, 'TRUST');
+    return true;
+  });
+});
+
+// Regression pin (fresh review #649 issuecomment-6023502859, P1-1): identity
+// strings may legally carry U+0000, so a raw `sourceStateId\0eventType` group
+// key is not injective — ("a\0b", "c") and ("a", "b\0c") collapse into ONE
+// group, corrupting the published route table AND silently executing the
+// wrong route for an explicit selection. The fixture is the review's repro
+// vector plus an entry transition so both collided pairs are executable.
+const NUL_STATE = 'a\u0000b';
+const NUL_EVENT = 'b\u0000c';
+
+const NUL_BODY: BodySpec = {
+  initial: 'a',
+  states: ['a', NUL_STATE, 'xa', 'y', 'z'],
+  transitions: [
+    { transitionId: 't0', from: 'a', to: NUL_STATE, event: 'enter' },
+    { transitionId: 't1', from: NUL_STATE, to: 'xa', event: 'c' },
+    { transitionId: 't2', from: 'a', to: 'y', event: NUL_EVENT },
+    { transitionId: 't3', from: 'a', to: 'z', event: NUL_EVENT },
+  ],
+};
+
+test('PACK-C T007B: route groups stay distinct for identifiers carrying U+0000 (no group-key collision)', async () => {
+  const { fixture: fx, artifact } = await compileFixture(NUL_BODY);
+
+  // Compile: the two distinct (source, event) pairs keep separate routeIndex
+  // spaces — the table is NOT a merged group over the collided raw join.
+  assert.deepEqual(artifact.routes, [
+    {
+      transitionId: 't2',
+      sourceStateId: 'a',
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: NUL_EVENT,
+    },
+    {
+      transitionId: 't3',
+      sourceStateId: 'a',
+      routeClass: 'event',
+      routeIndex: 1,
+      eventType: NUL_EVENT,
+    },
+    {
+      transitionId: 't0',
+      sourceStateId: 'a',
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: 'enter',
+    },
+    {
+      transitionId: 't1',
+      sourceStateId: NUL_STATE,
+      routeClass: 'event',
+      routeIndex: 0,
+      eventType: 'c',
+    },
+  ]);
+
+  // Execute: explicit selection inside the ("a", "b\0c") group resolves
+  // exactly the named route (pre-repair, merged index 1 executed t3 -> z).
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: NUL_EVENT, route: { sourceStateId: 'a', routeIndex: 0 } },
+      ])
+    ).stateId,
+    'y',
+  );
+  assert.equal(
+    (
+      await run(fx, artifact, [
+        { type: NUL_EVENT, route: { sourceStateId: 'a', routeIndex: 1 } },
+      ])
+    ).stateId,
+    'z',
+  );
+
+  // A routeIndex outside the TRUE group fails typed and closed (pre-repair
+  // the collided merged bounds admitted it and the send fell through inert).
+  await assert.rejects(
+    run(fx, artifact, [{ type: NUL_EVENT, route: { sourceStateId: 'a', routeIndex: 2 } }]),
+    (error: unknown) => {
+      assert.ok(error instanceof WorkflowBridgeError);
+      assert.equal(error.code, 'WORKFLOW_ROUTE_SELECTION_INVALID');
+      assert.equal(error.failureClass, 'POLICY');
+      return true;
+    },
+  );
+
+  // Explicit identity stays bound to the current state even with NUL-carrying
+  // identifiers in play.
+  await assert.rejects(
+    run(fx, artifact, [
+      { type: 'c', route: { sourceStateId: NUL_STATE, routeIndex: 0 } },
+    ]),
+    (error: unknown) => {
+      assert.ok(error instanceof WorkflowBridgeError);
+      assert.equal(error.code, 'WORKFLOW_ROUTE_SELECTION_INVALID');
+      assert.equal(error.failureClass, 'POLICY');
+      return true;
+    },
+  );
+
+  // Event-only execution of the NUL-carrying single route ("a\0b", "c") is
+  // NOT blocked by a collided foreign group: enter the state, then it runs.
+  assert.equal((await run(fx, artifact, [{ type: 'enter' }, { type: 'c' }])).stateId, 'xa');
+
+  // Event-only selection among the duplicate routes of ("a", "b\0c") still
+  // fails typed, naming exactly the two REAL canonical routes.
+  await assert.rejects(run(fx, artifact, [{ type: NUL_EVENT }]), (error: unknown) => {
+    assert.ok(error instanceof WorkflowBridgeError);
+    assert.equal(error.code, 'WORKFLOW_EVENT_ROUTE_AMBIGUOUS');
+    assert.equal(error.failureClass, 'POLICY');
+    assert.ok(error.message.includes('2 eligible routes'), error.message);
+    assert.ok(error.message.includes('t2#0, t3#1'), error.message);
+    assert.ok(!error.message.includes('t1#'), error.message);
     return true;
   });
 });
