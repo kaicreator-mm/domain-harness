@@ -12,6 +12,7 @@ import {
   type PrepareProcessedCommandTurnRequest,
   type PreparedProcessedCommandTurn,
   type ProcessedCommandResolution,
+  type ProcessedCommandTurnCommit,
   type ProcessedCommandTurnCurrentState,
   type RejectedCommandOutcome,
 } from '../contracts/process-command.js';
@@ -268,6 +269,46 @@ function assertRequestIdentity(
 }
 
 /**
+ * Frozen A9 structural guard (v0.6 T003).
+ *
+ * REVISION_OWNER=RUNTIME_CORE
+ * NORMAL_TRANSITION_RULE=EXACT_N_TO_N_PLUS_1
+ * STORE_ROLE=DEFENSIVE_CONTRACT_BOUNDARY_NOT_SEMANTIC_OWNER
+ *
+ * A conforming RuntimeStore MUST run this before any durable write of a
+ * `ProcessedCommandTurnCommit`. It creates no second revision authority: it
+ * only proves that the supplied persistence command conforms to the revision
+ * Runtime/core already derived (expectedStateRevision -> expectedStateRevision
+ * + 1). The store chooses no alternate next revision and adds no business
+ * semantics.
+ *
+ * Failure semantics: stable, deterministic, externally diagnosable — always
+ * `ProcessCommandContractError` with code `STATE_REVISION_MISMATCH`.
+ */
+export function assertProcessedCommandTurnRevisionProgression(
+  commit: ProcessedCommandTurnCommit,
+): void {
+  if (!Number.isSafeInteger(commit.expectedStateRevision) || commit.expectedStateRevision < 0) {
+    fail(
+      'STATE_REVISION_MISMATCH',
+      `nonconforming processed-command state revision: expectedStateRevision must be a safe non-negative integer, got ${String(commit.expectedStateRevision)}`,
+    );
+  }
+  if (commit.expectedStateRevision >= Number.MAX_SAFE_INTEGER) {
+    fail(
+      'STATE_REVISION_MISMATCH',
+      'nonconforming processed-command state revision: expectedStateRevision must permit one safe revision advance',
+    );
+  }
+  if (commit.nextStateRevision !== commit.expectedStateRevision + 1) {
+    fail(
+      'STATE_REVISION_MISMATCH',
+      `nonconforming processed-command state revision: normal commit must advance exactly ${String(commit.expectedStateRevision)} -> ${String(commit.expectedStateRevision + 1)}, got ${String(commit.nextStateRevision)}`,
+    );
+  }
+}
+
+/**
  * Prepare one deterministic atomic processed-command write.
  *
  * Idempotent replay of an already-processed command returns the exact durable
@@ -352,6 +393,8 @@ export function prepareProcessedCommandTurn(
     updatedAt: request.updatedAt,
     ...(output === undefined ? {} : { output }),
   };
+  // The core-derived commit must itself satisfy the structural store guard.
+  assertProcessedCommandTurnRevisionProgression(commit);
 
   return { kind: 'commit', commit };
 }
