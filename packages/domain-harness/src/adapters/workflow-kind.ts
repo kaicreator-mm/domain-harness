@@ -373,6 +373,11 @@ export function createWorkflowKindImplementation(
       ? snapshotExactRefCollection(view.understoodCapabilities, 'descriptor.understoodCapabilities', 'capabilityId')
       : Object.freeze([] as ReadonlyArray<{ id: string; version: string }>);
 
+  // #642: the mapped authority arrays minted into the returned binding are
+  // frozen at every level (mapped array, per-element ref). The mapped arrays
+  // themselves carry authority into sealed binding material, so an unfrozen
+  // mapped array would let post-return caller mutation (e.g. push) alter the
+  // evidence later sealed by the Assembly seam.
   return Object.freeze({
     pin: Object.freeze({
       kind: Object.freeze({ kindId: WORKFLOW_KIND_REF.kindId, version: WORKFLOW_KIND_REF.version }),
@@ -382,11 +387,15 @@ export function createWorkflowKindImplementation(
         implementationDigest: implementationView.implementationDigest,
       }),
     }),
-    understoodSemanticContracts: understoodSemanticContracts.map((ref) =>
-      Object.freeze({ contractId: ref.id, version: ref.version }),
+    understoodSemanticContracts: Object.freeze(
+      understoodSemanticContracts.map((ref) =>
+        Object.freeze({ contractId: ref.id, version: ref.version }),
+      ),
     ),
-    understoodCapabilities: understoodCapabilities.map((ref) =>
-      Object.freeze({ capabilityId: ref.id, version: ref.version }),
+    understoodCapabilities: Object.freeze(
+      understoodCapabilities.map((ref) =>
+        Object.freeze({ capabilityId: ref.id, version: ref.version }),
+      ),
     ),
     validateComponent: validateWorkflowComponent,
   });
