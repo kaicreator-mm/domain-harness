@@ -38,8 +38,6 @@ import {
 import { AggregationRefused, isAncestor } from '../t009r/t009r-aggregator.js';
 import type { Manifest } from '../t009r/t009r-aggregator.js';
 import { T010A_FREEZE_RECORD } from '../fixtures/t010a-neutral-definition.freeze.js';
-import { execFileSync } from 'node:child_process';
-import { REPO_ROOT } from './t011-disposition.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = join(HERE, '..', 't009r', 't009r-e1-e10-evidence-manifest.json');
@@ -50,10 +48,6 @@ function loadJson(path: string): unknown {
 }
 
 const result = dispositionMatrix(loadJson(MANIFEST_PATH), loadJson(E11_BINDING_PATH));
-
-function currentHead(): string {
-  return execFileSync('git', ['-C', REPO_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-}
 
 // ---------------------------------------------------------------------------
 // Positive path — the complete E1..E11 disposition matrix.
@@ -149,7 +143,7 @@ describe('T011 disposition — complete matrix E1..E11 (positive path)', () => {
     assert.ok(!serialized.includes('967ef6917ba18832aad108f08d416553f6f9aebb'));
   });
 
-  test('all merge anchors sit on accepted ancestry: E1-E10 of 2b50ba01, E11 merge is the T011 base head itself', () => {
+  test('all merge anchors sit on accepted ancestry: E1-E10 of 2b50ba01; E11 merge anchor binds the T011 base head exactly', () => {
     for (const row of result.matrix) {
       if (row.gate === 'E11') continue;
       assert.ok(
@@ -157,7 +151,15 @@ describe('T011 disposition — complete matrix E1..E11 (positive path)', () => {
         `${row.gate} merge on t009r integration ancestry`,
       );
     }
-    assert.ok(isAncestor('05a72d64fbc28cb2993df195daf65cd5d26541bd', currentHead()));
+    // E11's anchor is bound by EXACT IDENTITY to the T011 base head (the
+    // accepted #921 merge record): ancestry-relative-to-HEAD assertions are
+    // deliberately NOT used — CI clones --depth=1 --filter=tree:0 (HEAD is a
+    // shallow root), so only exact-identity binding is history-independent.
+    const e11 = result.matrix.find((r) => r.gate === 'E11')!;
+    const binding = loadJson(E11_BINDING_PATH) as E11Binding;
+    assert.equal(e11.mergeCommit, '05a72d64fbc28cb2993df195daf65cd5d26541bd');
+    assert.equal(binding.t011BaseHead, e11.mergeCommit);
+    assert.ok(isAncestor(e11.mergeCommit, binding.t011BaseHead), 'E11 merge anchor on its declared base ancestry');
   });
 
   test('NO aggregate verdict anywhere in the output (no averaging / majority / test-count confidence / coercion surface)', () => {
