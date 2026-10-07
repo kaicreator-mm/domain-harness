@@ -1,21 +1,39 @@
 /**
- * v0.7 renderer-neutral UX Tool request adapter (issue #907, gate for the
- * frozen #703 T004E packet; fine-grained DAG #534 T004E; controller #537
- * LOCAL_FIRST_MAX_SAFE_PARALLELISM).
+ * v0.7 renderer-neutral UX Tool request adapter (issue #907 successor repair;
+ * gate for the frozen #703 T004E packet; fine-grained DAG #534 T004E;
+ * controller #537 LOCAL_FIRST_MAX_SAFE_PARALLELISM).
  *
  * ADAPTER, not Microkernel semantics: the UX plane is a caller/provenance
  * plane, NEVER an authority owner. This module owns exactly the concern the
  * #703 frozen packet assigns to T004E — and nothing else:
  *
- * - TRANSLATION: `queryUxTool` / `invokeUxToolEffectfully` translate
- *   renderer-neutral UX intent (exact Tool Component + operation + portable
- *   JSON input + caller provenance + the UX-claimed exact current Definition
- *   graph digest) into the GENERIC caller-neutral T004A admission seam. The
- *   current authoritative Definition graph and the sealed T003C binding are
- *   TRUSTED HOST COMPOSITION inputs, never UX material; the adapter re-proves
- *   Definition currentness itself (authoritative digest recomputation) and the
- *   consumed T004A/T004B/T004C seams independently re-prove Definition AND
- *   Assembly AND exposure currentness on every call;
+ * - TWO-PLANE SEAM: `queryUxTool(intent, host)` /
+ *   `invokeUxToolEffectfully(intent, host)` structurally separate the
+ *   closed-world PORTABLE UX INTENT (`UxToolRequestIntent`: exact Tool
+ *   Component + operation + portable JSON input + caller provenance + the two
+ *   UX-claimed exact-current digest claims) from the TRUSTED HOST
+ *   COMPOSITION (the exact current Definition graph, the INDEPENDENTLY
+ *   supplied current sealed Assembly + current T003C sealed binding, the
+ *   injected dispatch/resource ports and — effectful only — the
+ *   already-authoritative occurrence/Central Admission material). No
+ *   authority-bearing host object is representable on the portable intent
+ *   plane: any such field (or hostile accessor/prototype substitute) fails
+ *   closed typed (INVALID_UX_REQUEST_INPUT) before any admission or dispatch;
+ *
+ * - INDEPENDENT CURRENTNESS ANCHORS: the host composition supplies
+ *   `currentAssembly` and `currentBinding` as INDEPENDENT anchors. The
+ *   adapter never derives the consumed Assembly from the binding's
+ *   `successorAssembly`. Before any generic admission it re-proves, in exact
+ *   order: (A1/A2) the authoritative recomputed Definition graph digest
+ *   equals the UX-claimed digest; (A3) the captured current Assembly digest
+ *   equals the UX-claimed expected assembly digest — so a byte-stable
+ *   Definition V1 -> V2 implementation/binding/Assembly replacement refuses
+ *   the stale V1 intent UX_REQUEST_STALE even though the graph digest is
+ *   unchanged; (A4) the captured current binding's successor assembly digest
+ *   equals the captured current Assembly digest — a torn/stale host
+ *   composition refuses. The consumed T004A/T004B/T004C seams still
+ *   independently re-prove Definition AND Assembly AND exposure currentness
+ *   on every call;
  * - PURE ROUTE: `queryUxTool` invokes ONLY operations whose frozen effect
  *   class (derived from the EXACT current graph, never from UX material) is
  *   exactly `none`, through the generic T004A exposure/request admission and
@@ -37,18 +55,23 @@
  *   module-internal and fixed (declarative `declaredExposure.audiences`
  *   containing the exact `ux` audience is input to the T004A-owned decision,
  *   never a substitute for it, and can never be selected or minted by UX);
- * - FRESHNESS: both seams verify the UX-claimed exact current Definition graph
- *   digest against the authoritatively recomputed digest BEFORE any generic
+ * - FRESHNESS: both seams verify BOTH UX-claimed digest claims against the
+ *   authoritatively recomputed/captured current state BEFORE any generic
  *   admission, and refuse UX_REQUEST_STALE on any drift — no latest/default/
- *   order/alias fallback exists anywhere in this module.
+ *   order/alias fallback exists anywhere in this module. All caller-owned
+ *   material is snapshotted synchronously before the first `await`: later
+ *   mutations of the caller's intent object or top-level host replacements
+ *   cannot swap captured material (no torn authority read).
  *
  * Authority rules enforced here without exception (#703 frozen packet):
  * - UX owns NO Runtime/journal/admission/currentness authority: the closed-
- *   world input shapes admit no occurrence, activation/pin, admitted-exposure
- *   evidence or policy, implementation binding/handle, resource authority,
- *   journal/effect/idempotency, or governance material — any such field (or
- *   hostile accessor/prototype substitute) fails closed typed
- *   (INVALID_UX_REQUEST_INPUT) before any admission or dispatch;
+ *   world two-plane shapes admit no occurrence, activation/pin,
+ *   admitted-exposure evidence or policy, implementation binding/handle,
+ *   resource authority, journal/effect/idempotency, or governance material on
+ *   the UX intent — any such field (or hostile accessor/prototype substitute)
+ *   fails closed typed (INVALID_UX_REQUEST_INPUT) before any admission or
+ *   dispatch; trusted host composition may legally carry exactly its own
+ *   field set and nothing else;
  * - the caller is provenance only: `uxSessionId` becomes the generic
  *   `{ callerId, callerKind: 'ux' }` caller context and the kernel never
  *   branches on it (no UX branch exists in the Microkernel — proven by the
@@ -79,6 +102,7 @@ import {
 } from '../contracts/definition-graph.js';
 import {
   canonicalJsonStringify,
+  isContentDigest,
   type ContentDigest,
   type Sha256Port,
 } from '../contracts/identity.js';
@@ -208,6 +232,14 @@ function requireExactIdentity(value: unknown, path: string): string {
   return value;
 }
 
+/** Consume the existing content-digest convention (no new digest semantics). */
+function requireContentDigest(value: unknown, path: string): ContentDigest {
+  if (!isContentDigest(value)) {
+    fail('INVALID_UX_REQUEST_INPUT', `${path} must be a non-empty content digest string`);
+  }
+  return value;
+}
+
 /** Validate one portable-JSON material field, returning a canonical deep copy. */
 function requireJsonMaterial(value: unknown, path: string): JsonValue {
   try {
@@ -281,30 +313,39 @@ const UX_PLANE_EXPOSURE_POLICY: ToolExposureAdmissionPolicy = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// Shared seam input snapshots
+// Two-plane seam snapshots: portable intent vs trusted host composition
 // ---------------------------------------------------------------------------
 
-const QUERY_INPUT_FIELDS = new Set([
+/**
+ * The closed-world PORTABLE UX intent plane: exactly six UX-owned fields.
+ * Everything else — every authority-bearing host object, occurrence,
+ * journal, admission-evidence, policy, pin, handle or idempotency lookalike —
+ * is structurally unrepresentable here.
+ */
+const UX_INTENT_FIELDS = new Set([
   'uxSessionId',
   'toolComponentId',
   'operationId',
   'input',
   'expectedDefinitionGraphDigest',
-  'binding',
+  'expectedAssemblyDigest',
+]);
+
+/** The closed-world trusted host composition for the pure query seam. */
+const QUERY_HOST_FIELDS = new Set([
   'currentDefinitionGraph',
+  'currentAssembly',
+  'currentBinding',
   'dispatch',
   'resourceProvider',
   'sha256',
 ]);
 
-const EFFECTFUL_INPUT_FIELDS = new Set([
-  'uxSessionId',
-  'toolComponentId',
-  'operationId',
-  'input',
-  'expectedDefinitionGraphDigest',
-  'binding',
+/** The closed-world trusted host composition for the effectful seam. */
+const EFFECTFUL_HOST_FIELDS = new Set([
   'currentDefinitionGraph',
+  'currentAssembly',
+  'currentBinding',
   'activator',
   'admissionRequest',
   'admissionPorts',
@@ -314,39 +355,174 @@ const EFFECTFUL_INPUT_FIELDS = new Set([
   'sha256',
 ]);
 
-interface UxSeamSnapshot {
+/** The synchronously validated, module-owned portable intent snapshot. */
+interface UxToolRequestIntentSnapshot {
   readonly uxSessionId: string;
-  readonly toolComponentId: ComponentId;
+  readonly toolComponentId: string;
   readonly operationId: string;
   readonly input: JsonValue;
-  readonly expectedDefinitionGraphDigest: string;
+  readonly expectedDefinitionGraphDigest: ContentDigest;
+  readonly expectedAssemblyDigest: ContentDigest;
   readonly caller: InvocationCallerContext;
-  readonly graph: DefinitionGraphEnvelope;
-  readonly sha256: Sha256Port;
-  readonly effect: ToolOperationEffect;
 }
 
 /**
- * Synchronously validate the shared seam material against the seam's
- * closed-world input field set: any unexpected field — occurrence, journal,
- * admission evidence, pin, handle or other authority lookalike — refuses
- * typed BEFORE any admission or dispatch, and hostile accessors/prototypes
- * are rejected by the descriptor-safe snapshot itself.
+ * Synchronously snapshot and validate the PORTABLE UX intent against its
+ * closed-world field set: any unexpected field — any authority-bearing host
+ * object (current/binding/graph/dispatch/resource/sha256/activator/
+ * admission/effect-routing material), occurrence, journal, admission
+ * evidence, pin, handle or idempotency lookalike — refuses typed
+ * INVALID_UX_REQUEST_INPUT BEFORE any admission or dispatch, and hostile
+ * accessors/prototypes are rejected by the descriptor-safe snapshot itself.
  */
-function snapshotSeamInput(
-  input: unknown,
+function snapshotUxToolRequestIntent(
+  intent: unknown,
+  label: string,
+): UxToolRequestIntentSnapshot {
+  const view = requireSafeRecord(intent, `${label} intent`);
+  const unexpectedField = Object.keys(view).find((key) => !UX_INTENT_FIELDS.has(key));
+  if (unexpectedField !== undefined) {
+    fail(
+      'INVALID_UX_REQUEST_INPUT',
+      `${label} intent must contain exactly {${[...UX_INTENT_FIELDS].join(', ')}}; unexpected field "${unexpectedField}" — no host authority object (current/binding assembly, graph, dispatch, resource, sha256, activator, admission, effect routing), occurrence, journal, admission-evidence, pin, handle or idempotency material is representable on the portable UX plane`,
+    );
+  }
+  for (const required of UX_INTENT_FIELDS) {
+    if (!(required in view) || view[required] === undefined) {
+      fail('INVALID_UX_REQUEST_INPUT', `${label} intent.${required} is required`);
+    }
+  }
+  const uxSessionId = requireExactIdentity(view['uxSessionId'], `${label} intent.uxSessionId`);
+  const toolComponentId = requireExactIdentity(
+    view['toolComponentId'],
+    `${label} intent.toolComponentId`,
+  );
+  const operationId = requireExactIdentity(view['operationId'], `${label} intent.operationId`);
+  const input = requireJsonMaterial(view['input'], `${label} intent.input`);
+  const expectedDefinitionGraphDigest = requireExactIdentity(
+    view['expectedDefinitionGraphDigest'],
+    `${label} intent.expectedDefinitionGraphDigest`,
+  );
+  requireContentDigest(
+    expectedDefinitionGraphDigest,
+    `${label} intent.expectedDefinitionGraphDigest`,
+  );
+  const expectedAssemblyDigest = requireExactIdentity(
+    view['expectedAssemblyDigest'],
+    `${label} intent.expectedAssemblyDigest`,
+  );
+  requireContentDigest(expectedAssemblyDigest, `${label} intent.expectedAssemblyDigest`);
+
+  const caller: InvocationCallerContext = deepFreezeValue({
+    callerId: uxSessionId,
+    callerKind: UX_CALLER_KIND,
+  });
+  return deepFreezeValue({
+    uxSessionId,
+    toolComponentId,
+    operationId,
+    input,
+    expectedDefinitionGraphDigest,
+    expectedAssemblyDigest,
+    caller,
+  });
+}
+
+/**
+ * Synchronously snapshot the TRUSTED HOST COMPOSITION against its own exact
+ * closed-world field set: the host plane may legally carry exactly its own
+ * trusted authority composition and nothing else — UX intent material or any
+ * other unexpected field refuses typed INVALID_UX_REQUEST_INPUT before any
+ * admission or dispatch.
+ */
+function snapshotUxHostComposition(
+  host: unknown,
   fields: ReadonlySet<string>,
   label: string,
 ): Record<string, unknown> {
-  const view = requireSafeRecord(input, `${label} input`);
+  const view = requireSafeRecord(host, `${label} host composition`);
   const unexpectedField = Object.keys(view).find((key) => !fields.has(key));
   if (unexpectedField !== undefined) {
     fail(
       'INVALID_UX_REQUEST_INPUT',
-      `${label} input must contain exactly {${[...fields].join(', ')}}; unexpected field "${unexpectedField}" (no occurrence, journal, admission-evidence, pin, handle or effect-routing material is representable)`,
+      `${label} host composition must contain exactly {${[...fields].join(', ')}}; unexpected field "${unexpectedField}" (trusted host composition may carry exactly its own field set — UX intent material and every other authority lookalike refuse)`,
     );
   }
   return view;
+}
+
+/** The synchronously captured, independently trusted current-host anchors. */
+interface UxCurrentHostAnchors {
+  readonly currentDefinitionGraph: DefinitionGraphEnvelope;
+  readonly sha256: Sha256Port;
+  readonly currentAssembly: SealedRuntimeAssembly;
+  readonly currentAssemblyDigest: ContentDigest;
+  readonly currentBinding: SealedToolImplementationBinding;
+  readonly currentBindingSuccessorAssembly: SealedRuntimeAssembly;
+  readonly currentBindingSuccessorAssemblyDigest: ContentDigest;
+}
+
+/**
+ * Synchronously capture the INDEPENDENT current-host anchors BEFORE the first
+ * await: the exact current Definition graph reference, the sha256 port, the
+ * independently supplied current sealed Assembly reference plus its exact
+ * assemblyDigest value, and the current T003C sealed binding reference plus
+ * its successor Assembly reference and exact digest value. The adapter does
+ * not reimplement T002B/T003C mint verification — the consumed
+ * T004A/T004B/T004C owners still perform their accepted provenance/
+ * currentness verification; this capture only establishes the independently
+ * supplied current-Assembly/current-binding relation frozen by #907 and
+ * guarantees no torn read can swap any anchor after the seam has entered.
+ */
+function snapshotUxCurrentHostAnchors(
+  hostView: Record<string, unknown>,
+  label: string,
+): UxCurrentHostAnchors {
+  const currentDefinitionGraph = hostView['currentDefinitionGraph'];
+  if (typeof currentDefinitionGraph !== 'object' || currentDefinitionGraph === null) {
+    fail('INVALID_UX_REQUEST_INPUT', `${label}.currentDefinitionGraph must be the exact current Definition graph envelope (trusted host composition input)`);
+  }
+  const sha256 = requireSha256Port(hostView['sha256'], `${label}.sha256`);
+
+  const currentAssembly = hostView['currentAssembly'];
+  if (typeof currentAssembly !== 'object' || currentAssembly === null) {
+    fail('INVALID_UX_REQUEST_INPUT', `${label}.currentAssembly must be the sealed current Runtime Assembly object (trusted host composition input)`);
+  }
+  const currentAssemblyDigest = requireContentDigest(
+    readOwnDataProperty(currentAssembly, 'assemblyDigest', `${label}.currentAssembly`),
+    `${label}.currentAssembly.assemblyDigest`,
+  );
+
+  const currentBinding = hostView['currentBinding'];
+  if (typeof currentBinding !== 'object' || currentBinding === null) {
+    fail('INVALID_UX_REQUEST_INPUT', `${label}.currentBinding must be the T003C sealed Tool implementation binding object (trusted host composition input)`);
+  }
+  const currentBindingSuccessorAssembly = readOwnDataProperty(
+    currentBinding,
+    'successorAssembly',
+    `${label}.currentBinding`,
+  );
+  if (typeof currentBindingSuccessorAssembly !== 'object' || currentBindingSuccessorAssembly === null) {
+    fail('INVALID_UX_REQUEST_INPUT', `${label}.currentBinding.successorAssembly must be the sealed successor Runtime Assembly object`);
+  }
+  const currentBindingSuccessorAssemblyDigest = requireContentDigest(
+    readOwnDataProperty(
+      currentBindingSuccessorAssembly,
+      'assemblyDigest',
+      `${label}.currentBinding.successorAssembly`,
+    ),
+    `${label}.currentBinding.successorAssembly.assemblyDigest`,
+  );
+
+  return {
+    currentDefinitionGraph: currentDefinitionGraph as DefinitionGraphEnvelope,
+    sha256,
+    currentAssembly: currentAssembly as SealedRuntimeAssembly,
+    currentAssemblyDigest,
+    currentBinding: currentBinding as SealedToolImplementationBinding,
+    currentBindingSuccessorAssembly: currentBindingSuccessorAssembly as SealedRuntimeAssembly,
+    currentBindingSuccessorAssemblyDigest,
+  };
 }
 
 /**
@@ -399,102 +575,75 @@ function resolveCurrentUxOperation(
 }
 
 /**
- * Shared synchronous seam gate: closed-world shape, exact identities,
- * portable-JSON input snapshot, the UX-claimed current graph digest, and the
- * seam routing gate over the effect class derived from the EXACT current
- * graph (`requireEffectNone` routes the pure seam; its inverse routes the
- * effectful seam). All refusal happens BEFORE any admission or dispatch.
+ * The seam routing gate over the effect class derived from the EXACT current
+ * host graph (`requireEffectNone` routes the pure seam; its inverse routes
+ * the effectful seam). Refusal happens BEFORE any admission or dispatch.
  */
-function requireUxSeamSnapshot(
-  view: Record<string, unknown>,
-  requiredFields: readonly string[],
-  label: string,
+function requireUxOperationRoute(
+  intentSnapshot: UxToolRequestIntentSnapshot,
+  currentDefinitionGraph: DefinitionGraphEnvelope,
   requireEffectNone: boolean,
-): UxSeamSnapshot {
-  for (const required of requiredFields) {
-    if (!(required in view) || view[required] === undefined) {
-      fail('INVALID_UX_REQUEST_INPUT', `${label} input.${required} is required`);
-    }
-  }
-  const uxSessionId = requireExactIdentity(view['uxSessionId'], `${label} input.uxSessionId`);
-  const toolComponentId = requireExactIdentity(
-    view['toolComponentId'],
-    `${label} input.toolComponentId`,
+): void {
+  const { effect } = resolveCurrentUxOperation(
+    currentDefinitionGraph,
+    intentSnapshot.toolComponentId,
+    intentSnapshot.operationId,
   );
-  const operationId = requireExactIdentity(view['operationId'], `${label} input.operationId`);
-  const input = requireJsonMaterial(view['input'], `${label} input.input`);
-  const expectedDefinitionGraphDigest = requireExactIdentity(
-    view['expectedDefinitionGraphDigest'],
-    `${label} input.expectedDefinitionGraphDigest`,
-  );
-  const graph = view['currentDefinitionGraph'] as DefinitionGraphEnvelope;
-  const sha256 = requireSha256Port(view['sha256'], `${label} input.sha256`);
-
-  const { effect } = resolveCurrentUxOperation(graph, toolComponentId, operationId);
   if (requireEffectNone && effect !== 'none') {
     fail(
       'UX_MUTATION_REFUSED',
-      `operation "${operationId}" of Tool Component "${toolComponentId}" is classified "${effect}" and is mutation-capable; the UX query seam invokes only effect=none operations and refuses mutation before any admission or dispatch — mutation-capable intent must enter the generic T004A request and route through the T004C authoritative occurrence / Central Admission path (no UX mutation shortcut exists)`,
+      `operation "${intentSnapshot.operationId}" of Tool Component "${intentSnapshot.toolComponentId}" is classified "${effect}" and is mutation-capable; the UX query seam invokes only effect=none operations and refuses mutation before any admission or dispatch — mutation-capable intent must enter the generic T004A request and route through the T004C authoritative occurrence / Central Admission path (no UX mutation shortcut exists)`,
     );
   }
   if (!requireEffectNone && effect === 'none') {
     fail(
       'UX_EFFECTLESS_OPERATION_REFUSED',
-      `operation "${operationId}" of Tool Component "${toolComponentId}" is classified "none" and is not mutation-capable; the UX effectful seam accepts only mutation-capable intent and refuses effectless operations before any admission — observational use belongs to the UX query seam`,
+      `operation "${intentSnapshot.operationId}" of Tool Component "${intentSnapshot.toolComponentId}" is classified "none" and is not mutation-capable; the UX effectful seam accepts only mutation-capable intent and refuses effectless operations before any admission — observational use belongs to the UX query seam`,
     );
   }
-
-  const caller: InvocationCallerContext = deepFreezeValue({
-    callerId: uxSessionId,
-    callerKind: UX_CALLER_KIND,
-  });
-  return {
-    uxSessionId,
-    toolComponentId,
-    operationId,
-    input,
-    expectedDefinitionGraphDigest,
-    caller,
-    graph,
-    sha256,
-    effect,
-  };
 }
 
 /**
  * Authoritatively verify the UX-claimed currentness BEFORE any generic
- * admission: the exact current Definition graph digest is recomputed and must
- * equal the digest claimed by the UX request. Any drift means the UX intent
- * was shaped against older state and can never authorize or route current
- * execution — fail closed, no rebind, no latest/default fallback.
+ * admission, in exact order over the synchronously captured anchors:
+ *  A1 recompute the exact current Definition graph digest;
+ *  A2 it must equal the digest claimed by the UX intent;
+ *  A3 the independently supplied current Assembly digest must equal the
+ *     assembly digest claimed by the UX intent (a byte-stable Definition
+ *     V1 -> V2 implementation/binding/Assembly replacement therefore refuses
+ *     the stale V1 intent even though the graph digest is unchanged);
+ *  A4 the current binding's successor assembly digest must equal the current
+ *     Assembly digest (a torn/stale host composition refuses).
+ * Any drift means the UX intent was shaped against older state and can never
+ * authorize or route current execution — fail closed, no rebind, no
+ * latest/default fallback.
  */
-async function requireUxRequestFresh(seam: UxSeamSnapshot): Promise<void> {
-  const currentDigest = await computeDefinitionGraphDigest(seam.graph, seam.sha256);
-  if (currentDigest !== seam.expectedDefinitionGraphDigest) {
+async function requireUxRequestFresh(
+  intentSnapshot: UxToolRequestIntentSnapshot,
+  anchors: UxCurrentHostAnchors,
+): Promise<void> {
+  const currentDigest = await computeDefinitionGraphDigest(
+    anchors.currentDefinitionGraph,
+    anchors.sha256,
+  );
+  if (currentDigest !== intentSnapshot.expectedDefinitionGraphDigest) {
     fail(
       'UX_REQUEST_STALE',
       'the exact current Definition graph digest no longer matches the digest claimed by the UX request; the UX intent describes older state and can never authorize current execution — re-shape the intent against the exact current graph',
     );
   }
-}
-
-/** Snapshot the dispatch binding's successor Assembly reference (read-only). */
-function snapshotBindingAnchor(binding: unknown): SealedRuntimeAssembly {
-  if (typeof binding !== 'object' || binding === null) {
-    fail('INVALID_UX_REQUEST_INPUT', 'seam input.binding must be the T003C sealed Tool implementation binding object');
+  if (anchors.currentAssemblyDigest !== intentSnapshot.expectedAssemblyDigest) {
+    fail(
+      'UX_REQUEST_STALE',
+      'the exact current Runtime Assembly digest no longer matches the assembly digest claimed by the UX request; the UX intent was shaped against a superseded implementation/binding of the same Definition and can never authorize current execution (a byte-stable Definition implementation replacement refuses the stale intent) — re-shape the intent against the exact current assembly',
+    );
   }
-  const successorAssembly = readOwnDataProperty(
-    binding,
-    'successorAssembly',
-    'seam input.binding',
-  );
-  if (typeof successorAssembly !== 'object' || successorAssembly === null) {
-    fail('INVALID_UX_REQUEST_INPUT', 'seam input.binding.successorAssembly must be the sealed successor Runtime Assembly object');
+  if (anchors.currentBindingSuccessorAssemblyDigest !== anchors.currentAssemblyDigest) {
+    fail(
+      'UX_REQUEST_STALE',
+      'the current Tool implementation binding no longer resolves to the independently supplied current Runtime Assembly; the trusted host composition is torn or stale and refuses before any admission or dispatch',
+    );
   }
-  // Provenance of the sealed Assembly object itself is re-proved downstream by
-  // the consumed T004A/T004B/T004C seams (T002B mint verifier) before any
-  // dispatch or effect.
-  return successorAssembly as SealedRuntimeAssembly;
 }
 
 /** Validate one injected dispatch port (T004B or T004C calling convention). */
@@ -512,7 +661,7 @@ function requireDispatchPort(
   return value as { readonly dispatch: (query: unknown) => Promise<unknown> };
 }
 
-/** Validate the optional injected T005B resource provider. */
+/** Validate the optional injected T005B resource provider (host plane view). */
 function requireResourceProviderField(
   view: Record<string, unknown>,
   label: string,
@@ -526,7 +675,7 @@ function requireResourceProviderField(
     candidate === null ||
     typeof (candidate as ResourceProvider).resolve !== 'function'
   ) {
-    fail('INVALID_UX_REQUEST_INPUT', `${label} input.resourceProvider must be a ResourceProvider ({ resolve(request): Promise<ResourceProviderResponse> })`);
+    fail('INVALID_UX_REQUEST_INPUT', `${label}.resourceProvider must be a ResourceProvider ({ resolve(request): Promise<ResourceProviderResponse> })`);
   }
   return candidate as ResourceProvider;
 }
@@ -535,10 +684,13 @@ function requireResourceProviderField(
 // queryUxTool — the renderer-neutral UX QUERY-ONLY seam (T004A -> T004B)
 // ---------------------------------------------------------------------------
 
-/** Complete query-seam input. All UX material is synchronously snapshotted
- * before the first `await`; the seam is structurally read-only — no effectful
- * routing option exists. */
-export interface QueryUxToolInput {
+/**
+ * The closed-world PORTABLE UX intent. UX-owned material only — exact
+ * identities, portable JSON input and the two exact-current digest claims.
+ * No authority-bearing host object is representable on this plane; trusted
+ * host composition travels exclusively through the separate host parameter.
+ */
+export interface UxToolRequestIntent {
   /** Exact UX session identity (provenance only, never authority). */
   readonly uxSessionId: string;
   /** Exact Tool Component id bound in the current graph. */
@@ -550,10 +702,24 @@ export interface QueryUxToolInput {
   /** The exact current Definition graph digest the UX intent was shaped
    *  against; verified by authoritative recomputation before admission. */
   readonly expectedDefinitionGraphDigest: ContentDigest;
-  /** T003C sealed binding pairing the exact implementation pin + handle. */
-  readonly binding: SealedToolImplementationBinding;
+  /** The exact current Runtime Assembly digest the UX intent was shaped
+   *  against; verified against the independently supplied host
+   *  `currentAssembly` before admission, so a byte-stable Definition
+   *  implementation/binding replacement refuses the stale intent. */
+  readonly expectedAssemblyDigest: ContentDigest;
+}
+
+/** The trusted host composition consumed by the pure query seam. */
+export interface QueryUxToolHostComposition {
   /** The live current Definition graph (trusted host composition input). */
   readonly currentDefinitionGraph: DefinitionGraphEnvelope;
+  /** The independently supplied current sealed Runtime Assembly — the ONLY
+   *  Assembly anchor the T004A admission consumes; never derived from the
+   *  binding's successor assembly. */
+  readonly currentAssembly: SealedRuntimeAssembly;
+  /** The current T003C sealed binding (its successor assembly digest must
+   *  equal the current Assembly digest, or the composition refuses stale). */
+  readonly currentBinding: SealedToolImplementationBinding;
   /** Injected Tool calling-convention port (the effect=none dispatch). */
   readonly dispatch: NonEffectfulToolDispatchPort;
   /** Optional injected T005B resource provider. */
@@ -567,74 +733,78 @@ export interface QueryUxToolInput {
  * T004A -> T004B path.
  *
  * Deterministic fail-closed precedence, every refusal BEFORE any dispatch:
- * closed-world input shape (no occurrence/journal/admission/evidence field is
- * representable), exact identities, portable-JSON input snapshot, membership
- * + exposure gate (UX_OPERATION_NOT_EXPOSED) and the query-only effect gate
+ * closed-world portable-intent shape (no host authority object is
+ * representable on the UX plane), closed-world host shape, exact identities,
+ * digest claims, portable-JSON input snapshot and the synchronous capture of
+ * the independent currentAssembly/currentBinding anchors + ports (all before
+ * the first await), then Definition envelope validation, membership +
+ * exposure gate (UX_OPERATION_NOT_EXPOSED) and the query-only effect gate
  * (UX_MUTATION_REFUSED) — all synchronous, all derived from the EXACT current
- * graph — then UX currentness (UX_REQUEST_STALE), then the generic T004A
- * exposure admission over the exact current state (policy decision over the
- * exact current contract; typed failures propagate unchanged), the T004A
- * request admission, and finally the T004B effect=none invocation, which
+ * host graph — then the UX currentness gates A1-A4 (UX_REQUEST_STALE), then
+ * the generic T004A exposure admission over the exact current state (policy
+ * decision over the exact current contract; typed failures propagate
+ * unchanged), the T004A request admission anchored on the host
+ * currentAssembly, and finally the T004B effect=none invocation, which
  * independently re-admits the request, re-derives the effect class, verifies
  * the T003C binding and dispatches only the verified handle. The returned
  * result is the T004B OBSERVED-only outcome: UX may project it but can never
  * rewrite, upgrade or substitute it as business/runtime truth.
  */
 export async function queryUxTool(
-  input: QueryUxToolInput,
+  intent: UxToolRequestIntent,
+  host: QueryUxToolHostComposition,
 ): Promise<NonEffectfulToolInvocationResult> {
-  // ---- PHASE 1 (synchronous): validate, snapshot and gate all material.
-  const view = snapshotSeamInput(input, QUERY_INPUT_FIELDS, 'ux tool query');
-  const seam = requireUxSeamSnapshot(
-    view,
-    ['uxSessionId', 'toolComponentId', 'operationId', 'input', 'expectedDefinitionGraphDigest', 'binding', 'currentDefinitionGraph', 'dispatch', 'sha256'],
-    'ux tool query',
-    true,
-  );
-  const anchor = snapshotBindingAnchor(view['binding']);
-  const resourceProvider = requireResourceProviderField(view, 'ux tool query');
-  const dispatch = requireDispatchPort(view['dispatch'], 'ux tool query input.dispatch');
+  // ---- S0 (synchronous): snapshot + validate the portable intent ONLY.
+  const intentSnapshot = snapshotUxToolRequestIntent(intent, 'ux tool query');
+  // ---- S1 (synchronous): snapshot the trusted host composition ONLY.
+  const hostView = snapshotUxHostComposition(host, QUERY_HOST_FIELDS, 'ux tool query');
+  // ---- S2 (synchronous): capture the independent anchors + ports pre-await.
+  const anchors = snapshotUxCurrentHostAnchors(hostView, 'ux tool query host');
+  const resourceProvider = requireResourceProviderField(hostView, 'ux tool query host');
+  const dispatch = requireDispatchPort(hostView['dispatch'], 'ux tool query host.dispatch');
 
+  // ---- S3 (synchronous): envelope + routing gate over the exact host graph.
   // Graph envelope failures propagate the original DefinitionGraphContractError.
-  validateDefinitionGraphEnvelope(seam.graph);
+  validateDefinitionGraphEnvelope(anchors.currentDefinitionGraph);
+  requireUxOperationRoute(intentSnapshot, anchors.currentDefinitionGraph, true);
 
-  // ---- PHASE 2 (async): UX currentness, then the generic T004A seam.
-  await requireUxRequestFresh(seam);
+  // ---- A1-A4 (async): the UX currentness gates, then the generic T004A seam.
+  await requireUxRequestFresh(intentSnapshot, anchors);
 
   const exposure = await admitToolExposure(
     {
-      toolComponentId: seam.toolComponentId,
-      operationId: seam.operationId,
-      caller: seam.caller,
-      assembly: anchor,
-      currentDefinitionGraph: seam.graph,
+      toolComponentId: intentSnapshot.toolComponentId,
+      operationId: intentSnapshot.operationId,
+      caller: intentSnapshot.caller,
+      assembly: anchors.currentAssembly,
+      currentDefinitionGraph: anchors.currentDefinitionGraph,
       policy: UX_PLANE_EXPOSURE_POLICY,
     },
-    seam.sha256,
+    anchors.sha256,
   );
   const admitted = await admitToolInvocationRequest(
     {
-      toolComponentId: seam.toolComponentId,
-      operationId: seam.operationId,
-      input: seam.input,
-      caller: seam.caller,
+      toolComponentId: intentSnapshot.toolComponentId,
+      operationId: intentSnapshot.operationId,
+      input: intentSnapshot.input,
+      caller: intentSnapshot.caller,
       definitionGraphDigest: exposure.definitionGraphDigest,
       assemblyDigest: exposure.assemblyDigest,
       exposure,
     },
-    { assembly: anchor, currentDefinitionGraph: seam.graph },
-    seam.sha256,
+    { assembly: anchors.currentAssembly, currentDefinitionGraph: anchors.currentDefinitionGraph },
+    anchors.sha256,
   );
 
-  // ---- PHASE 3: the generic T004B effect=none path — the only dispatch this
-  // seam can ever reach, and only for the exact verified binding handle.
+  // ---- The generic T004B effect=none path — the only dispatch this seam can
+  // ever reach, and only for the exact verified binding handle.
   return await invokeNonEffectfulTool({
     request: admitted,
-    binding: view['binding'] as SealedToolImplementationBinding,
-    currentDefinitionGraph: seam.graph,
+    binding: anchors.currentBinding,
+    currentDefinitionGraph: anchors.currentDefinitionGraph,
     dispatch: dispatch,
     ...(resourceProvider === undefined ? {} : { resourceProvider }),
-    sha256: seam.sha256,
+    sha256: anchors.sha256,
   });
 }
 
@@ -644,29 +814,22 @@ export async function queryUxTool(
 // ---------------------------------------------------------------------------
 
 /**
- * Complete effectful-seam input: UX intent material + TRUSTED HOST
- * COMPOSITION authority inputs only. The occurrence authority
- * (`activator` + `admissionRequest` + `admissionPorts`) is supplied by the
- * host and consumed by the accepted T004C seam verbatim — this module
- * neither supplies, mints, copies from UX material, nor re-owns any of it,
- * and it exposes NO journal access of its own.
+ * The trusted host composition consumed by the effectful seam: the current
+ * graph/Assembly/binding anchors plus the already-authoritative occurrence
+ * authority (`activator` + `admissionRequest` + `admissionPorts`). The
+ * adapter neither supplies, mints, copies from UX material, nor re-owns any
+ * of it, and it exposes NO journal access of its own.
  */
-export interface InvokeUxToolEffectfullyInput {
-  /** Exact UX session identity (provenance only, never authority). */
-  readonly uxSessionId: string;
-  /** Exact Tool Component id bound in the current graph. */
-  readonly toolComponentId: ComponentId;
-  /** Exact mutation-capable operation identity. */
-  readonly operationId: string;
-  /** Portable JSON input material — intent only, never authority. */
-  readonly input: JsonValue;
-  /** The exact current Definition graph digest the UX intent was shaped
-   *  against; verified by authoritative recomputation before admission. */
-  readonly expectedDefinitionGraphDigest: ContentDigest;
-  /** T003C sealed binding pairing the exact implementation pin + handle. */
-  readonly binding: SealedToolImplementationBinding;
+export interface EffectfulUxToolHostComposition {
   /** The live current Definition graph (trusted host composition input). */
   readonly currentDefinitionGraph: DefinitionGraphEnvelope;
+  /** The independently supplied current sealed Runtime Assembly — the ONLY
+   *  Assembly anchor the T004A admission consumes; never derived from the
+   *  binding's successor assembly. */
+  readonly currentAssembly: SealedRuntimeAssembly;
+  /** The current T003C sealed binding (its successor assembly digest must
+   *  equal the current Assembly digest, or the composition refuses stale). */
+  readonly currentBinding: SealedToolImplementationBinding;
   /** The accepted T002C/T002D/T005C activation authority (host composition
    *  input; consumed by T004C for its existing occurrence/pin gates, never
    *  re-owned and never used to mint or overwrite an occurrence). */
@@ -693,15 +856,18 @@ export interface InvokeUxToolEffectfullyInput {
  * T004A -> T004C path exactly once.
  *
  * Deterministic fail-closed precedence, every refusal BEFORE any admission
- * or effect: closed-world input shape (no occurrence/journal/admission-
- * evidence field is representable on the UX material), exact identities,
- * portable-JSON input snapshot, membership + exposure gate
- * (UX_OPERATION_NOT_EXPOSED), the mutation-capable effect gate
- * (UX_EFFECTLESS_OPERATION_REFUSED — effect classification is re-derived
- * from the EXACT current graph, never trusted from UX material) — all
- * synchronous — then UX currentness (UX_REQUEST_STALE), then the generic
- * T004A exposure admission (policy decision over the exact current contract)
- * and request admission (typed failures propagate unchanged). The admitted
+ * or effect: closed-world portable-intent shape (no host authority object is
+ * representable on the UX plane), closed-world host shape, exact identities,
+ * digest claims, portable-JSON input snapshot, the synchronous capture of the
+ * independent currentAssembly/currentBinding anchors + the occurrence/
+ * admission ports (all before the first await), then Definition envelope
+ * validation, membership + exposure gate (UX_OPERATION_NOT_EXPOSED), the
+ * mutation-capable effect gate (UX_EFFECTLESS_OPERATION_REFUSED — effect
+ * classification is re-derived from the EXACT current graph, never trusted
+ * from UX material) — all synchronous — then the UX currentness gates A1-A4
+ * (UX_REQUEST_STALE), then the generic T004A exposure admission (policy
+ * decision over the exact current contract) and request admission anchored on
+ * the host currentAssembly (typed failures propagate unchanged). The admitted
  * generic request is then routed through the accepted T004C seam exactly
  * once, against the already-authoritative occurrence / Central Admission
  * material supplied by trusted host composition: exactly one existing
@@ -711,79 +877,79 @@ export interface InvokeUxToolEffectfullyInput {
  * upgrade or substitute it as business/runtime truth.
  */
 export async function invokeUxToolEffectfully(
-  input: InvokeUxToolEffectfullyInput,
+  intent: UxToolRequestIntent,
+  host: EffectfulUxToolHostComposition,
 ): Promise<EffectfulToolInvocationResult> {
-  // ---- PHASE 1 (synchronous): validate, snapshot and gate all material.
-  const view = snapshotSeamInput(input, EFFECTFUL_INPUT_FIELDS, 'ux tool effectful');
-  const seam = requireUxSeamSnapshot(
-    view,
-    ['uxSessionId', 'toolComponentId', 'operationId', 'input', 'expectedDefinitionGraphDigest', 'binding', 'currentDefinitionGraph', 'activator', 'admissionRequest', 'admissionPorts', 'effectType', 'dispatch', 'sha256'],
-    'ux tool effectful',
-    false,
-  );
-  const anchor = snapshotBindingAnchor(view['binding']);
-  const resourceProvider = requireResourceProviderField(view, 'ux tool effectful');
-  const dispatch = requireDispatchPort(view['dispatch'], 'ux tool effectful input.dispatch');
-  const activator = view['activator'];
+  // ---- S0 (synchronous): snapshot + validate the portable intent ONLY.
+  const intentSnapshot = snapshotUxToolRequestIntent(intent, 'ux tool effectful');
+  // ---- S1 (synchronous): snapshot the trusted host composition ONLY.
+  const hostView = snapshotUxHostComposition(host, EFFECTFUL_HOST_FIELDS, 'ux tool effectful');
+  // ---- S2 (synchronous): capture the independent anchors + ports pre-await.
+  const anchors = snapshotUxCurrentHostAnchors(hostView, 'ux tool effectful host');
+  const resourceProvider = requireResourceProviderField(hostView, 'ux tool effectful host');
+  const dispatch = requireDispatchPort(hostView['dispatch'], 'ux tool effectful host.dispatch');
+  const activator = hostView['activator'];
   if (typeof activator !== 'object' || activator === null) {
-    fail('INVALID_UX_REQUEST_INPUT', 'ux tool effectful input.activator must be the accepted AssemblyExecutionActivator object (trusted host composition input)');
+    fail('INVALID_UX_REQUEST_INPUT', 'ux tool effectful host.activator must be the accepted AssemblyExecutionActivator object (trusted host composition input)');
   }
-  const admissionRequest = view['admissionRequest'];
+  const admissionRequest = hostView['admissionRequest'];
   if (typeof admissionRequest !== 'object' || admissionRequest === null) {
-    fail('INVALID_UX_REQUEST_INPUT', 'ux tool effectful input.admissionRequest must be the CentralAdmissionRequest turn material of the already-authoritative occurrence (trusted host composition input)');
+    fail('INVALID_UX_REQUEST_INPUT', 'ux tool effectful host.admissionRequest must be the CentralAdmissionRequest turn material of the already-authoritative occurrence (trusted host composition input)');
   }
-  const admissionPorts = requireSafeRecord(view['admissionPorts'], 'ux tool effectful input.admissionPorts');
+  const admissionPorts = requireSafeRecord(hostView['admissionPorts'], 'ux tool effectful host.admissionPorts');
   for (const required of ['governance', 'baselines', 'effectJournal'] as const) {
     if (!(required in admissionPorts) || admissionPorts[required] === undefined) {
-      fail('INVALID_UX_REQUEST_INPUT', `ux tool effectful input.admissionPorts.${required} is required (Central Admission ports are trusted host composition input; the effect-tools port is installed only inside the T004C owner)`);
+      fail('INVALID_UX_REQUEST_INPUT', `ux tool effectful host.admissionPorts.${required} is required (Central Admission ports are trusted host composition input; the effect-tools port is installed only inside the T004C owner)`);
     }
   }
-  const effectType = requireExactIdentity(view['effectType'], 'ux tool effectful input.effectType');
+  const effectType = requireExactIdentity(hostView['effectType'], 'ux tool effectful host.effectType');
 
+  // ---- S3 (synchronous): envelope + routing gate over the exact host graph.
   // Graph envelope failures propagate the original DefinitionGraphContractError.
-  validateDefinitionGraphEnvelope(seam.graph);
+  validateDefinitionGraphEnvelope(anchors.currentDefinitionGraph);
+  requireUxOperationRoute(intentSnapshot, anchors.currentDefinitionGraph, false);
 
-  // ---- PHASE 2 (async): UX currentness, then the generic T004A seam.
-  await requireUxRequestFresh(seam);
+  // ---- A1-A4 (async): the UX currentness gates, then the generic T004A seam.
+  await requireUxRequestFresh(intentSnapshot, anchors);
 
   const exposure = await admitToolExposure(
     {
-      toolComponentId: seam.toolComponentId,
-      operationId: seam.operationId,
-      caller: seam.caller,
-      assembly: anchor,
-      currentDefinitionGraph: seam.graph,
+      toolComponentId: intentSnapshot.toolComponentId,
+      operationId: intentSnapshot.operationId,
+      caller: intentSnapshot.caller,
+      assembly: anchors.currentAssembly,
+      currentDefinitionGraph: anchors.currentDefinitionGraph,
       policy: UX_PLANE_EXPOSURE_POLICY,
     },
-    seam.sha256,
+    anchors.sha256,
   );
   const admitted = await admitToolInvocationRequest(
     {
-      toolComponentId: seam.toolComponentId,
-      operationId: seam.operationId,
-      input: seam.input,
-      caller: seam.caller,
+      toolComponentId: intentSnapshot.toolComponentId,
+      operationId: intentSnapshot.operationId,
+      input: intentSnapshot.input,
+      caller: intentSnapshot.caller,
       definitionGraphDigest: exposure.definitionGraphDigest,
       assemblyDigest: exposure.assemblyDigest,
       exposure,
     },
-    { assembly: anchor, currentDefinitionGraph: seam.graph },
-    seam.sha256,
+    { assembly: anchors.currentAssembly, currentDefinitionGraph: anchors.currentDefinitionGraph },
+    anchors.sha256,
   );
 
-  // ---- PHASE 3: the generic T004C effectful path exactly once — the only
-  // effect this seam can ever produce, under the host-supplied authoritative
-  // occurrence and the ONE existing Central Admission path.
+  // ---- The generic T004C effectful path exactly once — the only effect this
+  // seam can ever produce, under the host-supplied authoritative occurrence
+  // and the ONE existing Central Admission path.
   return await invokeEffectfulTool({
     request: admitted,
-    binding: view['binding'] as SealedToolImplementationBinding,
-    currentDefinitionGraph: seam.graph,
+    binding: anchors.currentBinding,
+    currentDefinitionGraph: anchors.currentDefinitionGraph,
     activator: activator as AssemblyExecutionActivator,
     admissionRequest: admissionRequest as CentralAdmissionRequest,
-    admissionPorts: view['admissionPorts'] as EffectfulAdmissionPorts,
+    admissionPorts: hostView['admissionPorts'] as EffectfulAdmissionPorts,
     effectType,
     dispatch: dispatch,
     ...(resourceProvider === undefined ? {} : { resourceProvider }),
-    sha256: seam.sha256,
+    sha256: anchors.sha256,
   });
 }

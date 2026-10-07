@@ -1,7 +1,8 @@
 /**
  * T004E executable boundary proof — renderer-neutral UX adapter owns no
- * authority plane (issue #907; frozen authority #703 packet @6039795443;
- * readiness currentness @6041211039; DAG #534 T004E).
+ * authority plane (issue #907 successor repair; frozen authority #703 packet
+ * @6039795443; repair authority #907@6044218852 / #907@6045266317 /
+ * #907@6045787985; DAG #534 T004E).
  *
  * TESTS-ONLY reference evidence. SOURCE_MUTATION=NONE.
  *
@@ -19,9 +20,21 @@
  *  - FIXED_EXPOSURE_POLICY: the ToolExposureAdmissionPolicy consumed by the
  *    T004A seam is module-internal (T004E MUST NOT expose a UX-supplied
  *    policy): no seam input field can select or mint it;
- *  - CLOSED_WORLD_INPUTS: the seam input field sets are exactly the frozen
- *    closed-world sets — no occurrence/journal/admission-evidence/policy
- *    field is representable;
+ *  - TWO_PLANE_SURFACE (P1-2): the exported surface is exactly the two
+ *    two-argument seams `queryUxTool(intent, host)` /
+ *    `invokeUxToolEffectfully(intent, host)` with the portable closed-world
+ *    `UxToolRequestIntent` structurally separate from the trusted host
+ *    compositions — the former single-flat-input types are entirely absent
+ *    (no alias, no compatibility overload);
+ *  - CLOSED_WORLD_FIELD_SETS: the intent field set is exactly the six
+ *    portable fields; each host field set is exactly its trusted composition
+ *    set; no field is shared between the two planes;
+ *  - INDEPENDENT_CURRENT_ANCHORS (P1-1): both host compositions carry
+ *    `currentAssembly` + `currentBinding` as independent anchors, the T004A
+ *    anchor is the host currentAssembly (never derived from
+ *    `currentBinding.successorAssembly`), and an exact
+ *    successor-assembly-digest vs current-assembly-digest currentness gate
+ *    runs before any owner dispatch;
  *  - NO_MICROKERNEL_BRANCH: the consumed generic kernel seams never branch on
  *    the caller plane (no `callerKind === 'ux'` branch, no ux/agent literal).
  */
@@ -112,7 +125,7 @@ test('T004E.B2 renderer neutrality: no React/RN/DOM/native renderer or domain-ux
   );
 });
 
-test('T004E.B3 exported surface: exactly two seams + typed error + caller-kind constant — the exposure policy is NOT exported and no evidence-minting export exists', () => {
+test('T004E.B3 exported surface: exactly the two two-plane seams + typed error + caller-kind constant + the two-plane contract types; the old single-flat-input types are entirely absent', () => {
   const exported = [
     ...adapterSource.matchAll(/export\s+(?:async\s+function|function|class|const|type|interface)\s+([A-Za-z0-9_]+)/g),
   ].map((match) => match[1]!);
@@ -127,9 +140,34 @@ test('T004E.B3 exported surface: exactly two seams + typed error + caller-kind c
   for (const seam of ['queryUxTool', 'invokeUxToolEffectfully'] as const) {
     assert.ok(exported.includes(seam), `the frozen T004E seam ${seam} must be exported`);
   }
-  for (const symbol of ['UxToolRequestError', 'UxToolRequestErrorCode', 'UX_CALLER_KIND'] as const) {
+  for (const symbol of [
+    'UxToolRequestError',
+    'UxToolRequestErrorCode',
+    'UX_CALLER_KIND',
+    'UxToolRequestIntent',
+    'QueryUxToolHostComposition',
+    'EffectfulUxToolHostComposition',
+  ] as const) {
     assert.ok(exported.includes(symbol), `${symbol} must be exported`);
   }
+  // The former single-flat-input types MUST disappear entirely — no alias,
+  // no compatibility overload, no surviving mention anywhere in the module.
+  assert.doesNotMatch(
+    adapterSource,
+    /\b(QueryUxToolInput|InvokeUxToolEffectfullyInput)\b/,
+    'the single-flat-input surface is the P1-2 structural defect and must not survive as an alias/overload/comment',
+  );
+  // Both seams are two-argument (intent, host) signatures.
+  assert.match(
+    adapterSource,
+    /export\s+async\s+function\s+queryUxTool\(\s*intent:\s*UxToolRequestIntent,\s*host:\s*QueryUxToolHostComposition,?\s*\)/,
+    'queryUxTool must be the two-plane (intent, host) seam',
+  );
+  assert.match(
+    adapterSource,
+    /export\s+async\s+function\s+invokeUxToolEffectfully\(\s*intent:\s*UxToolRequestIntent,\s*host:\s*EffectfulUxToolHostComposition,?\s*\)/,
+    'invokeUxToolEffectfully must be the two-plane (intent, host) seam',
+  );
   // The exposure admission policy is module-internal: T004E MUST NOT expose a
   // UX-supplied ToolExposureAdmissionPolicy.
   assert.doesNotMatch(
@@ -139,7 +177,7 @@ test('T004E.B3 exported surface: exactly two seams + typed error + caller-kind c
   );
 });
 
-test('T004E.B4 closed-world input field sets: the seam inputs admit exactly the frozen field sets — no occurrence/journal/admission-evidence/policy field is representable', () => {
+test('T004E.B4 two-plane closed-world field sets: the intent set is exactly the six portable fields; the host sets are exactly the trusted composition sets; no field is shared between planes', () => {
   const readFieldSet = (name: string): string[] => {
     const match = adapterSource.match(
       new RegExp(`${name}\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)`),
@@ -147,52 +185,152 @@ test('T004E.B4 closed-world input field sets: the seam inputs admit exactly the 
     assert.ok(match, `${name} field set must be present in the adapter source`);
     return [...match![1]!.matchAll(/'([^']+)'/g)].map((entry) => entry[1]!).sort();
   };
+  const intentFields = readFieldSet('UX_INTENT_FIELDS');
+  const queryHostFields = readFieldSet('QUERY_HOST_FIELDS');
+  const effectfulHostFields = readFieldSet('EFFECTFUL_HOST_FIELDS');
+
+  // The portable intent plane: exactly the six UX-owned fields.
   assert.deepEqual(
-    readFieldSet('QUERY_INPUT_FIELDS'),
+    intentFields,
     [
-      'binding',
-      'currentDefinitionGraph',
-      'dispatch',
+      'expectedAssemblyDigest',
       'expectedDefinitionGraphDigest',
       'input',
       'operationId',
-      'resourceProvider',
-      'sha256',
       'toolComponentId',
       'uxSessionId',
     ],
-    'the query seam input must be the exact frozen closed-world set',
+    'the UX intent field set must be exactly the six portable fields',
+  );
+
+  // The trusted host composition planes: exactly their own field sets.
+  assert.deepEqual(
+    queryHostFields,
+    [
+      'currentAssembly',
+      'currentBinding',
+      'currentDefinitionGraph',
+      'dispatch',
+      'resourceProvider',
+      'sha256',
+    ],
+    'the query host composition field set must be the exact trusted set',
   );
   assert.deepEqual(
-    readFieldSet('EFFECTFUL_INPUT_FIELDS'),
+    effectfulHostFields,
     [
       'activator',
       'admissionPorts',
       'admissionRequest',
-      'binding',
+      'currentAssembly',
+      'currentBinding',
       'currentDefinitionGraph',
       'dispatch',
       'effectType',
-      'expectedDefinitionGraphDigest',
-      'input',
-      'operationId',
       'resourceProvider',
       'sha256',
-      'toolComponentId',
-      'uxSessionId',
     ],
-    'the effectful seam input must be the exact frozen closed-world set',
+    'the effectful host composition field set must be the exact trusted set',
   );
-  // Neither set can carry exposure-policy/evidence or journal material under
-  // any spelling.
-  for (const set of ['QUERY_INPUT_FIELDS', 'EFFECTFUL_INPUT_FIELDS'] as const) {
-    for (const field of readFieldSet(set)) {
-      assert.doesNotMatch(
-        field,
-        /policy|evidence|journal|occurrence|pin|handle|idempotency/i,
-        `no authority-bearing field may appear in ${set}: ${field}`,
-      );
+
+  // Authority-name prohibition applies to the INTENT plane: apart from the
+  // two pinned digest claims, no intent field may carry an authority name.
+  for (const field of intentFields) {
+    if (field === 'expectedAssemblyDigest' || field === 'expectedDefinitionGraphDigest') {
+      continue;
     }
+    assert.doesNotMatch(
+      field,
+      /assembly|binding|dispatch|resource|sha256|activator|admission|effect|policy|evidence|journal|occurrence|pin|handle|idempotency/i,
+      `no authority-bearing field may appear on the portable UX intent plane: ${field}`,
+    );
+  }
+
+  // No intent field is duplicated into either host set: the two planes share
+  // zero fields — structural separation, not labeling.
+  for (const field of intentFields) {
+    assert.ok(
+      !queryHostFields.includes(field) && !effectfulHostFields.includes(field),
+      `intent field "${field}" must not be representable on a host composition (and vice versa)`,
+    );
+  }
+
+  // The host sets intentionally carry the trusted authority composition,
+  // including the independent currentness anchors.
+  for (const set of [queryHostFields, effectfulHostFields]) {
+    for (const required of ['currentAssembly', 'currentBinding', 'currentDefinitionGraph', 'sha256'] as const) {
+      assert.ok(set.includes(required), `every host composition must carry ${required}`);
+    }
+  }
+});
+
+test('T004E.B7 independent Assembly/current-binding anchors (P1-1 structural proof): the T004A anchor is the host currentAssembly, never derived from the binding, and an exact successor-digest vs current-digest gate runs before owner dispatch', () => {
+  // The portable intent carries the expected assembly digest claim.
+  assert.match(
+    adapterSource,
+    /export\s+interface\s+UxToolRequestIntent\s*\{[\s\S]*?expectedAssemblyDigest\s*:\s*ContentDigest;/,
+    'UxToolRequestIntent must carry the portable expectedAssemblyDigest claim',
+  );
+
+  // Both trusted host compositions carry the independent anchors.
+  for (const iface of ['QueryUxToolHostComposition', 'EffectfulUxToolHostComposition'] as const) {
+    const match = adapterSource.match(
+      new RegExp(`export\\s+interface\\s+${iface}\\s*\\{([\\s\\S]*?)\\n\\}`),
+    );
+    assert.ok(match, `${iface} must be present in the adapter source`);
+    assert.match(match![1]!, /currentAssembly\s*:\s*SealedRuntimeAssembly;/, `${iface} must carry the independent currentAssembly anchor`);
+    assert.match(match![1]!, /currentBinding\s*:\s*SealedToolImplementationBinding;/, `${iface} must carry the independent currentBinding anchor`);
+  }
+
+  // The binding-derived sole anchor helper is gone.
+  assert.ok(
+    !adapterSource.includes('snapshotBindingAnchor'),
+    'the binding-derived sole Assembly anchor helper must be absent',
+  );
+
+  // All four T004A calls (exposure + request admission, both seams) anchor on
+  // the independent host currentAssembly...
+  const anchorCalls = adapterSource.match(/assembly:\s*anchors\.currentAssembly\b/g) ?? [];
+  assert.equal(
+    anchorCalls.length,
+    4,
+    'all four T004A calls (exposure + request admission on both seams) must anchor on the independently captured host currentAssembly',
+  );
+  // ...never on the binding or its successor assembly.
+  assert.ok(
+    !adapterSource.includes('assembly: anchors.currentBinding.successorAssembly') &&
+      !adapterSource.includes('assembly: anchors.currentBindingSuccessorAssembly'),
+    'the T004A Assembly anchor must never be derived from the current binding or its successor assembly',
+  );
+
+  // The exact currentness gates exist: expected assembly digest vs the
+  // independently captured current assembly digest, and the binding's
+  // successor assembly digest vs the current assembly digest.
+  assert.match(
+    adapterSource,
+    /anchors\.currentAssemblyDigest\s*!==\s*intentSnapshot\.expectedAssemblyDigest/,
+    'A3: the intent-expected assembly digest must be checked against the independently captured current assembly digest',
+  );
+  assert.match(
+    adapterSource,
+    /anchors\.currentBindingSuccessorAssemblyDigest\s*!==\s*anchors\.currentAssemblyDigest/,
+    'A4: the current binding successor assembly digest must equal the current assembly digest',
+  );
+
+  // And both gates run BEFORE the owner dispatch in each seam.
+  for (const [seam, dispatchCall] of [
+    ['queryUxTool', 'invokeNonEffectfulTool({'],
+    ['invokeUxToolEffectfully', 'invokeEffectfulTool({'],
+  ] as const) {
+    const seamStart = adapterSource.indexOf(`export async function ${seam}`);
+    assert.ok(seamStart >= 0, `${seam} must be present`);
+    const seamBody = adapterSource.slice(seamStart);
+    const freshIndex = seamBody.indexOf('await requireUxRequestFresh(intentSnapshot, anchors);');
+    const dispatchIndex = seamBody.indexOf(dispatchCall);
+    assert.ok(
+      freshIndex >= 0 && dispatchIndex >= 0 && freshIndex < dispatchIndex,
+      `${seam} must complete the UX currentness gates before any owner dispatch`,
+    );
   }
 });
 

@@ -1,11 +1,18 @@
 /**
  * T004E tests-first matrix — renderer-neutral UX Tool request adapter
- * (issue #907; frozen authority #703 packet @6039795443 + currentness
- * @6041211039; fine-grained DAG #534 T004E).
+ * (issue #907 successor repair; frozen authority #703 packet @6039795443 +
+ * currentness @6041211039; repair authority #907@6044218852 /
+ * #907@6045266317 / #907@6045787985; fine-grained DAG #534 T004E).
  *
- * Covers the #703 frozen mandatory test list, adapted from the T004D
- * structural precedent (tests/e4 + tests/agent-tool-projection) to UX
- * provenance:
+ * Two-plane contract (#907@6045787985): every seam call is
+ * `queryUxTool(intent, host)` / `invokeUxToolEffectfully(intent, host)` —
+ * the portable closed-world UX intent is structurally separate from the
+ * trusted host composition, and the host currentness anchors
+ * (`currentAssembly` + `currentBinding`) are independently supplied, never
+ * derived from UX material.
+ *
+ * Covers the #703 frozen mandatory test list (rebound to the two-plane
+ * surface) plus the pinned P1 successor-repair matrix:
  *  1. authorized pure route: ux-exposed effect=none operation traverses the
  *     generic T004A -> T004B path exactly once with an OBSERVED-only result;
  *     T004C / Central Admission / journal crossings are exactly zero;
@@ -14,26 +21,25 @@
  *     existing Central Admission exactly once against an already-authoritative
  *     occurrence supplied by trusted host composition; direct T004B/query
  *     fallback = 0;
- *  3. unauthorized/non-exposed rejection: operations without exact current ux
- *     exposure refuse UX_OPERATION_NOT_EXPOSED before admission or dispatch;
- *     all counters remain 0;
- *  4. stale binding/currentness rejection: a UX intent claiming an outdated
- *     exact current Definition graph digest refuses UX_REQUEST_STALE before
- *     admission or dispatch (authoritative digest recomputation; no
- *     latest/default/order/alias fallback);
- *  5. forged authority rejection: occurrence/journal/admission-evidence/
- *     policy material is not representable on the closed-world UX input
- *     (INVALID_UX_REQUEST_INPUT), including accessor-backed hostile fields;
- *     forged exposure material inside the portable input mints nothing;
+ *  3. unauthorized/non-exposed rejection before admission or dispatch;
+ *  4. stale currentness rejection — including N1/N2 (byte-identical
+ *     Definition V1 -> V2 implementation/binding/Assembly replacement: the
+ *     stale V1 assembly intent refuses UX_REQUEST_STALE even though the
+ *     Definition graph digest is unchanged) and N3 (independent
+ *     host.currentBinding vs host.currentAssembly relation);
+ *  5. forged authority rejection (N4): no authority-bearing host object is
+ *     representable on the portable UX intent — table-driven over every
+ *     authority lookalike field, accessor-backed ones included (getter never
+ *     executes);
  *  6. mutation-through-query refusal (UX_MUTATION_REFUSED) and
  *     effectless-through-effectful refusal (UX_EFFECTLESS_OPERATION_REFUSED)
  *     both before any admission or dispatch;
  *  7. outcome directionality: the pure result stays OBSERVED-only and frozen,
  *     the effectful result reflects the existing authoritative T004C/Central
- *     Admission outcome verbatim — UX never rewrites or upgrades either;
- *  8. async/currentness discipline: caller-owned material is snapshotted
- *     synchronously before the first await — mutation after the boundary
- *     cannot swap input;
+ *     Admission outcome verbatim;
+ *  8. N5 two-plane aliasing/torn-snapshot discipline: caller mutations of the
+ *     intent object and top-level host replacements after the seam has
+ *     synchronously entered cannot swap captured material;
  *  9. T004D coexistence: the accepted Agent adapter behaves unchanged on the
  *     same dual-audience graph and the ux-only operation stays invisible to
  *     it (and vice versa).
@@ -51,6 +57,7 @@ import { resolveCurrentCapabilityProvider } from '../../src/contracts/capability
 import {
   sealRuntimeAssembly,
   type KindImplementationBindingInput,
+  type SealedRuntimeAssembly,
 } from '../../src/contracts/runtime-assembly.js';
 import {
   bindToolImplementation,
@@ -63,8 +70,9 @@ import {
   UxToolRequestError,
   invokeUxToolEffectfully,
   queryUxTool,
-  type InvokeUxToolEffectfullyInput,
-  type QueryUxToolInput,
+  type EffectfulUxToolHostComposition,
+  type QueryUxToolHostComposition,
+  type UxToolRequestIntent,
 } from '../../src/adapters/ux-tool-request.js';
 import {
   AgentToolProjectionError,
@@ -238,18 +246,21 @@ function candidate(
 
 // ---------------------------------------------------------------------------
 // The composite fixture: graph + sealed binding + exact current digest claim.
+// The current Assembly anchor is the binding's successor assembly.
 // ---------------------------------------------------------------------------
 
 export interface UxFixture {
   readonly g: DefinitionGraphEnvelope;
   readonly binding: SealedToolImplementationBinding;
   readonly graphDigest: string;
+  /** The independently consumable current Assembly anchor (host plane). */
+  readonly currentAssembly: SealedRuntimeAssembly;
 }
 
-export async function uxFixture(
-  overrides: { graph?: DefinitionGraphEnvelope } = {},
+async function sealFixture(
+  g: DefinitionGraphEnvelope,
+  implementation: ToolImplementationCandidate,
 ): Promise<UxFixture> {
-  const g = overrides.graph ?? graph();
   const baseAssembly = await sealRuntimeAssembly(
     { definitionGraph: g, kindImplementations: [kindBinding()] },
     realSha256,
@@ -266,25 +277,92 @@ export async function uxFixture(
     assembly: baseAssembly,
     selection: JSON.parse(JSON.stringify(selection)),
     currentDefinitionGraph: g,
-    implementations: [candidate({ handle: { kind: 'runtime-handle', id: 'handle.t004e#1' } })],
+    implementations: [implementation],
     sha256: realSha256,
   });
-  return { g, binding, graphDigest: digest };
+  return { g, binding, graphDigest: digest, currentAssembly: binding.successorAssembly };
 }
 
-export function uxQueryInput(
+export async function uxFixture(
+  overrides: { graph?: DefinitionGraphEnvelope } = {},
+): Promise<UxFixture> {
+  return sealFixture(
+    overrides.graph ?? graph(),
+    candidate({ handle: { kind: 'runtime-handle', id: 'handle.t004e#1' } }),
+  );
+}
+
+/**
+ * The pinned P1-1 replacement counterexample fixture: GENUINE V1 and V2
+ * T003C bindings/Assemblies sealed over the SAME graph object — byte-stable
+ * Definition content (identical DefinitionGraphDigest) while the
+ * implementation/binding/Assembly evidence differs.
+ */
+export async function uxReplacementFixture(): Promise<{
+  readonly v1: UxFixture;
+  readonly v2: UxFixture;
+}> {
+  const g = graph();
+  const v1 = await sealFixture(
+    g,
+    candidate({ handle: { kind: 'runtime-handle', id: 'handle.t004e#1' } }),
+  );
+  const v2 = await sealFixture(
+    g,
+    candidate({
+      implementation: {
+        implementationId: 'impl.t004e.beta',
+        implementationVersion: '2.0.0',
+        implementationDigest: 'sha256:impl.t004e.beta-content',
+      },
+      handle: { kind: 'runtime-handle', id: 'handle.t004e#2' },
+    }),
+  );
+  // The Definition plane is byte-identical across both revisions...
+  assert.equal(v1.graphDigest, v2.graphDigest);
+  assert.equal(v1.g, v2.g);
+  // ...while the implementation/binding/Assembly evidence genuinely differs.
+  assert.notEqual(
+    v1.currentAssembly.assemblyDigest,
+    v2.currentAssembly.assemblyDigest,
+    'the replacement fixture must exercise two distinct Assembly digests',
+  );
+  assert.notEqual(
+    v1.binding.evidence.implementation.implementationId,
+    v2.binding.evidence.implementation.implementationId,
+  );
+  assert.notEqual(v1.binding.evidence.bindingDigest, v2.binding.evidence.bindingDigest);
+  return { v1, v2 };
+}
+
+// ---------------------------------------------------------------------------
+// Two-plane seam fixture helpers: portable intent vs trusted host composition.
+// ---------------------------------------------------------------------------
+
+export function uxIntent(
   fx: UxFixture,
-  counters: UxCounters,
-  overrides: Partial<QueryUxToolInput> = {},
-): QueryUxToolInput {
+  overrides: Partial<UxToolRequestIntent> = {},
+): UxToolRequestIntent {
   return {
     uxSessionId: UX_SESSION_ID,
     toolComponentId: 'tool.t004e',
     operationId: 'ux.visible.read',
     input: { expression: '1+1' },
     expectedDefinitionGraphDigest: fx.graphDigest,
-    binding: fx.binding,
+    expectedAssemblyDigest: fx.currentAssembly.assemblyDigest,
+    ...overrides,
+  };
+}
+
+export function queryHost(
+  fx: UxFixture,
+  counters: UxCounters,
+  overrides: Partial<QueryUxToolHostComposition> = {},
+): QueryUxToolHostComposition {
+  return {
     currentDefinitionGraph: fx.g,
+    currentAssembly: fx.currentAssembly,
+    currentBinding: fx.binding,
     dispatch: {
       async dispatch(query: unknown) {
         counters.nonEffectfulCalls.push(query);
@@ -323,7 +401,7 @@ test('T004E authorized pure route: a ux-exposed effect=none operation admits thr
   const counters = makeCounters();
   const fx = await uxFixture();
 
-  const result = await queryUxTool(uxQueryInput(fx, counters));
+  const result = await queryUxTool(uxIntent(fx), queryHost(fx, counters));
 
   assert.equal(result.status, 'OBSERVED');
   assert.equal(result.toolComponentId, 'tool.t004e');
@@ -355,7 +433,7 @@ test('T004E unauthorized/non-exposed rejection: operations without exact current
     const counters = makeCounters();
     const fx = await uxFixture();
     await expectUxError(
-      queryUxTool(uxQueryInput(fx, counters, { operationId: 'ux.hidden.read' })),
+      queryUxTool(uxIntent(fx, { operationId: 'ux.hidden.read' }), queryHost(fx, counters)),
       'UX_OPERATION_NOT_EXPOSED',
     );
     assertNoWork(counters, 'a hidden operation must never reach admission or dispatch');
@@ -365,7 +443,7 @@ test('T004E unauthorized/non-exposed rejection: operations without exact current
     const counters = makeCounters();
     const fx = await uxFixture();
     await expectUxError(
-      queryUxTool(uxQueryInput(fx, counters, { operationId: 'ux.hidden.agent-only' })),
+      queryUxTool(uxIntent(fx, { operationId: 'ux.hidden.agent-only' }), queryHost(fx, counters)),
       'UX_OPERATION_NOT_EXPOSED',
     );
     assertNoWork(counters, 'an agent-only operation must be invisible to the UX plane');
@@ -375,7 +453,7 @@ test('T004E unauthorized/non-exposed rejection: operations without exact current
     const counters = makeCounters();
     const fx = await uxFixture();
     await expectUxError(
-      queryUxTool(uxQueryInput(fx, counters, { operationId: 'ux.forged.op' })),
+      queryUxTool(uxIntent(fx, { operationId: 'ux.forged.op' }), queryHost(fx, counters)),
       'UX_OPERATION_NOT_EXPOSED',
     );
     assertNoWork(counters, 'a fabricated operation identity must refuse before any admission');
@@ -385,7 +463,7 @@ test('T004E unauthorized/non-exposed rejection: operations without exact current
     const counters = makeCounters();
     const fx = await uxFixture();
     await expectUxError(
-      queryUxTool(uxQueryInput(fx, counters, { toolComponentId: 'tool.forged' })),
+      queryUxTool(uxIntent(fx, { toolComponentId: 'tool.forged' }), queryHost(fx, counters)),
       'UX_OPERATION_NOT_EXPOSED',
     );
     assertNoWork(counters, 'an unbound Tool Component must refuse before any admission');
@@ -396,7 +474,7 @@ test('T004E unauthorized/non-exposed rejection: operations without exact current
     const fx = await uxFixture();
     const host = await effectfulHost(fx, counters);
     await expectUxError(
-      invokeUxToolEffectfully(host.input({ operationId: 'ux.hidden.read' })),
+      invokeUxToolEffectfully(host.intent({ operationId: 'ux.hidden.read' }), host.host()),
       'UX_OPERATION_NOT_EXPOSED',
     );
     assertNoWork(counters, 'the effectful seam must refuse hidden operations before admission');
@@ -412,7 +490,10 @@ test('T004E query-seam mutation refusal: a mutation-capable operation presented 
   const fx = await uxFixture();
 
   await expectUxError(
-    queryUxTool(uxQueryInput(fx, counters, { operationId: 'ux.visible.write', input: { amount: 42 } })),
+    queryUxTool(
+      uxIntent(fx, { operationId: 'ux.visible.write', input: { amount: 42 } }),
+      queryHost(fx, counters),
+    ),
     'UX_MUTATION_REFUSED',
   );
   assertNoWork(
@@ -431,7 +512,7 @@ test('T004E effectful-seam effectless refusal: an effect=none operation presente
   const host = await effectfulHost(fx, counters);
 
   await expectUxError(
-    invokeUxToolEffectfully(host.input({ operationId: 'ux.visible.read' })),
+    invokeUxToolEffectfully(host.intent({ operationId: 'ux.visible.read' }), host.host()),
     'UX_EFFECTLESS_OPERATION_REFUSED',
   );
   assertNoWork(
@@ -465,7 +546,7 @@ test('T004E stale currentness rejection: a UX intent claiming an outdated exact 
     // The UX intent still claims the digest of revision A while the exact
     // current graph is revision B.
     await expectUxError(
-      queryUxTool(uxQueryInput(fx, counters, { currentDefinitionGraph: movedGraph })),
+      queryUxTool(uxIntent(fx), queryHost(fx, counters, { currentDefinitionGraph: movedGraph })),
       'UX_REQUEST_STALE',
     );
     assertNoWork(counters, 'a stale claimed digest must refuse before any admission or dispatch');
@@ -476,18 +557,39 @@ test('T004E stale currentness rejection: a UX intent claiming an outdated exact 
     const fx = await uxFixture();
     await expectUxError(
       queryUxTool(
-        uxQueryInput(fx, counters, { expectedDefinitionGraphDigest: 'sha256:stale-claim' }),
+        uxIntent(fx, { expectedDefinitionGraphDigest: 'sha256:stale-claim' }),
+        queryHost(fx, counters),
       ),
       'UX_REQUEST_STALE',
     );
     assertNoWork(counters, 'a mismatched claimed digest must refuse before any admission');
   });
 
+  await t.test('a flatly wrong claimed assembly digest refuses too', async () => {
+    const counters = makeCounters();
+    const fx = await uxFixture();
+    await expectUxError(
+      queryUxTool(
+        uxIntent(fx, { expectedAssemblyDigest: 'sha256:stale-assembly-claim' }),
+        queryHost(fx, counters),
+      ),
+      'UX_REQUEST_STALE',
+    );
+    assertNoWork(counters, 'a mismatched claimed assembly digest must refuse before any admission');
+  });
+
   await t.test('floating/latest selector claims are not exact identities', async () => {
     const counters = makeCounters();
     const fx = await uxFixture();
     await expectUxError(
-      queryUxTool(uxQueryInput(fx, counters, { expectedDefinitionGraphDigest: 'latest' })),
+      queryUxTool(
+        uxIntent(fx, { expectedDefinitionGraphDigest: 'latest' }),
+        queryHost(fx, counters),
+      ),
+      'INVALID_UX_REQUEST_INPUT',
+    );
+    await expectUxError(
+      queryUxTool(uxIntent(fx, { expectedAssemblyDigest: 'latest' }), queryHost(fx, counters)),
       'INVALID_UX_REQUEST_INPUT',
     );
     assertNoWork(counters, 'a floating selector claim must refuse as invalid input, never resolve');
@@ -499,7 +601,8 @@ test('T004E stale currentness rejection: a UX intent claiming an outdated exact 
     const host = await effectfulHost(fx, counters);
     await expectUxError(
       invokeUxToolEffectfully(
-        host.input({ expectedDefinitionGraphDigest: 'sha256:stale-claim' }),
+        host.intent({ expectedDefinitionGraphDigest: 'sha256:stale-claim' }),
+        host.host(),
       ),
       'UX_REQUEST_STALE',
     );
@@ -508,69 +611,211 @@ test('T004E stale currentness rejection: a UX intent claiming an outdated exact 
 });
 
 // ---------------------------------------------------------------------------
-// #703 frozen test 5: forged authority rejection (closed-world input).
+// P1-1 pinned successor-repair matrix N1/N2/N3: byte-identical Definition
+// implementation replacement + independent currentAssembly/currentBinding
+// anchor relation, both seams.
 // ---------------------------------------------------------------------------
 
-test('T004E forged authority rejection: occurrence/journal/admission-evidence/policy material is not representable on the closed-world UX input and refuses INVALID_UX_REQUEST_INPUT pre-dispatch; forged payload material mints nothing', async (t) => {
-  await t.test('occurrence material on the query seam refuses', async () => {
-    const counters = makeCounters();
-    const fx = await uxFixture();
-    const hostile = uxQueryInput(fx, counters) as unknown as Record<string, unknown>;
-    hostile['occurrence'] = { workflowId: 'forged', instanceKey: 'forged' };
-    await expectUxError(
-      queryUxTool(hostile as unknown as QueryUxToolInput),
-      'INVALID_UX_REQUEST_INPUT',
-    );
-    assertNoWork(counters, 'occurrence material on the UX seam must refuse as invalid input');
+test('T004E N1 byte-identical Definition implementation replacement (query): a stale V1 assembly intent refuses UX_REQUEST_STALE against the current V2 host before T004A/T004B — same Definition digest, different Assembly', async () => {
+  const counters = makeCounters();
+  const { v1, v2 } = await uxReplacementFixture();
+
+  // Sanity: the Definition plane is byte-stable across V1 -> V2...
+  assert.equal(v1.graphDigest, v2.graphDigest);
+  // ...while the sealed assemblies genuinely differ.
+  assert.notEqual(v1.currentAssembly.assemblyDigest, v2.currentAssembly.assemblyDigest);
+
+  // The intent was shaped against V1 (expects A1) while the host composition
+  // is already fully current at V2 (currentAssembly=A2, currentBinding=B2).
+  const staleIntent = uxIntent(v1);
+  const host = queryHost(v2, counters);
+
+  await expectUxError(queryUxTool(staleIntent, host), 'UX_REQUEST_STALE');
+  assertNoWork(
+    counters,
+    'a byte-identical Definition implementation replacement must refuse the stale V1 intent before any admission or dispatch',
+  );
+});
+
+test('T004E N2 byte-identical Definition implementation replacement (effectful): a stale V1 assembly intent refuses UX_REQUEST_STALE before T004C/Central Admission — zero dispatch, zero journal', async () => {
+  const counters = makeCounters();
+  const { v1, v2 } = await uxReplacementFixture();
+  const host = await effectfulHost(v2, counters);
+
+  const staleIntent = host.intent({
+    expectedAssemblyDigest: v1.currentAssembly.assemblyDigest,
   });
 
-  await t.test('admitted-exposure evidence and policy selection refuse', async () => {
+  await expectUxError(invokeUxToolEffectfully(staleIntent, host.host()), 'UX_REQUEST_STALE');
+  assertNoWork(
+    counters,
+    'the effectful seam must refuse the stale V1 intent before T004C/Central Admission — no effect, no journal record',
+  );
+});
+
+test('T004E N3 stale host binding vs current assembly: when host.currentBinding.successorAssembly no longer names host.currentAssembly, BOTH seams refuse UX_REQUEST_STALE before any dispatch/effect/journal', async (t) => {
+  const { v1, v2 } = await uxReplacementFixture();
+
+  await t.test('query seam', async () => {
     const counters = makeCounters();
-    const fx = await uxFixture();
-    const hostile = uxQueryInput(fx, counters) as unknown as Record<string, unknown>;
-    hostile['exposureEvidence'] = { status: 'ADMITTED', minted: true };
-    await expectUxError(
-      queryUxTool(hostile as unknown as QueryUxToolInput),
-      'INVALID_UX_REQUEST_INPUT',
-    );
-    const hostile2 = uxQueryInput(fx, counters) as unknown as Record<string, unknown>;
-    hostile2['policy'] = { decideAdmission: () => ({ admitted: true }) };
-    await expectUxError(
-      queryUxTool(hostile2 as unknown as QueryUxToolInput),
-      'INVALID_UX_REQUEST_INPUT',
-    );
-    assertNoWork(counters, 'UX can never supply exposure evidence or select an admission policy');
+    const host = queryHost(v2, counters, { currentBinding: v1.binding });
+    await expectUxError(queryUxTool(uxIntent(v2), host), 'UX_REQUEST_STALE');
+    assertNoWork(counters, 'a torn host composition must refuse before any dispatch');
   });
 
-  await t.test('journal/effect/idempotency authority material refuses', async () => {
+  await t.test('effectful seam', async () => {
     const counters = makeCounters();
+    const host = await effectfulHost(v2, counters, { binding: v1.binding });
+    await expectUxError(invokeUxToolEffectfully(host.intent(), host.host()), 'UX_REQUEST_STALE');
+    assertNoWork(counters, 'a torn host composition must refuse before any effect or journal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1/P2 positive controls over the replacement fixture: the CURRENT V2
+// composition remains fully usable on both seams.
+// ---------------------------------------------------------------------------
+
+test('T004E P1 current V2 positive (query): an intent anchored to the current assembly/binding traverses T004A -> T004B exactly once, OBSERVED-only', async () => {
+  const counters = makeCounters();
+  const { v2 } = await uxReplacementFixture();
+
+  const result = await queryUxTool(uxIntent(v2), queryHost(v2, counters));
+
+  assert.equal(result.status, 'OBSERVED');
+  assert.deepEqual(result.output, { answer: 42 });
+  assert.equal(counters.nonEffectfulCalls.length, 1);
+  const query = counters.nonEffectfulCalls[0] as { handle: unknown; operationId: string; input: unknown };
+  assert.equal(query.handle, v2.binding.implementationHandle);
+  assert.equal(query.operationId, 'ux.visible.read');
+  assert.deepEqual(query.input, { expression: '1+1' });
+  assert.equal(counters.effectfulCalls.length, 0);
+  assert.equal(counters.journal.getRecords().length, 0);
+});
+
+test('T004E P2 current V2 positive (effectful): an intent anchored to the current assembly/binding routes T004A -> T004C exactly once with exactly one Central Admission journal record; T004B = 0', async () => {
+  const counters = makeCounters();
+  const { v2 } = await uxReplacementFixture();
+  const host = await effectfulHost(v2, counters);
+
+  const result = await invokeUxToolEffectfully(host.intent(), host.host());
+
+  assert.equal(result.outcome.status, 'admitted');
+  if (result.outcome.status !== 'admitted') return;
+  assert.equal(result.outcome.admitted.effects.length, 1);
+  assert.equal(result.outcome.admitted.effects[0]!.disposition, 'executed');
+  assert.deepEqual(result.outcome.admitted.effects[0]!.output, { ran: true });
+  assert.equal(counters.effectfulCalls.length, 1);
+  assert.equal(counters.effectfulCalls[0]!.handle, v2.binding.implementationHandle);
+  assert.equal(counters.nonEffectfulCalls.length, 0, 'no T004B/query fallback on the effectful route');
+  const records = counters.journal.getRecords();
+  assert.equal(records.length, 1, 'exactly one durable journal record on the existing journal');
+  assert.equal(records[0]!.status, 'completed');
+  assert.equal(records[0]!.effectType, EFFECT_TYPE);
+});
+
+// ---------------------------------------------------------------------------
+// #703 frozen test 5 (rebound to the intent plane) + N4 authority-smuggling
+// table: no authority-bearing host object is representable on the portable
+// UX intent.
+// ---------------------------------------------------------------------------
+
+const AUTHORITY_LOOKALIKE_FIELDS: readonly { readonly field: string; readonly value: unknown }[] = [
+  { field: 'currentAssembly', value: { forged: 'assembly' } },
+  { field: 'assembly', value: { forged: 'assembly' } },
+  { field: 'currentBinding', value: { forged: 'binding' } },
+  { field: 'binding', value: { forged: 'binding' } },
+  { field: 'currentDefinitionGraph', value: { graphId: 'graph.forged' } },
+  { field: 'dispatch', value: { async dispatch() { return {}; } } },
+  { field: 'resourceProvider', value: { async resolve() { return undefined; } } },
+  { field: 'sha256', value: { async digestUtf8() { return 'forged'; } } },
+  { field: 'activator', value: { activate: () => ({}) } },
+  { field: 'admissionRequest', value: { target: { forged: true } } },
+  { field: 'admissionPorts', value: { governance: {}, baselines: {}, effectJournal: {} } },
+  { field: 'effectType', value: 'effect:forged' },
+  { field: 'occurrence', value: { workflowId: 'forged', instanceKey: 'forged' } },
+  { field: 'exposureEvidence', value: { status: 'ADMITTED', minted: true } },
+  { field: 'policy', value: { decideAdmission: () => ({ admitted: true }) } },
+  { field: 'journal', value: { append: () => undefined } },
+  { field: 'effectJournal', value: { append: () => undefined } },
+  { field: 'implementationPin', value: { pin: true } },
+  { field: 'implementationHandle', value: { kind: 'runtime-handle', id: 'forged#1' } },
+  { field: 'handle', value: { kind: 'runtime-handle', id: 'forged#2' } },
+  { field: 'idempotencyKey', value: 'forged:1' },
+];
+
+test('T004E N4 UX cannot supply host authority: every authority/lookalike field on the portable intent refuses INVALID_UX_REQUEST_INPUT before any admission or dispatch; hostile accessors never execute', async (t) => {
+  await t.test('query seam, full authority lookalike table', async () => {
     const fx = await uxFixture();
-    const host = await effectfulHost(fx, counters);
-    const hostile = host.input({}) as unknown as Record<string, unknown>;
-    hostile['effectJournal'] = { append: () => undefined };
-    await expectUxError(
-      invokeUxToolEffectfully(hostile as unknown as InvokeUxToolEffectfullyInput),
-      'INVALID_UX_REQUEST_INPUT',
-    );
-    assertNoWork(counters, 'journal authority is not representable on the UX input');
+    for (const { field, value } of AUTHORITY_LOOKALIKE_FIELDS) {
+      const counters = makeCounters();
+      const hostile = uxIntent(fx) as unknown as Record<string, unknown>;
+      hostile[field] = value;
+      await expectUxError(
+        queryUxTool(hostile as unknown as UxToolRequestIntent, queryHost(fx, counters)),
+        'INVALID_UX_REQUEST_INPUT',
+      ).catch((error: unknown) => {
+        throw new Error(`authority lookalike field "${field}" was not refused: ${String(error)}`);
+      });
+      assertNoWork(counters, `authority lookalike "${field}" must mint zero work`);
+    }
   });
 
-  await t.test('accessor-backed hostile fields are rejected descriptor-safe', async () => {
+  await t.test('effectful seam spot rows share the same intent gate', async () => {
+    for (const field of ['currentAssembly', 'admissionPorts', 'handle'] as const) {
+      const counters = makeCounters();
+      const fx = await uxFixture();
+      const host = await effectfulHost(fx, counters);
+      const hostile = host.intent() as unknown as Record<string, unknown>;
+      hostile[field] = { forged: true };
+      await expectUxError(
+        invokeUxToolEffectfully(
+          hostile as unknown as UxToolRequestIntent,
+          host.host(),
+        ),
+        'INVALID_UX_REQUEST_INPUT',
+      );
+      assertNoWork(counters, `authority lookalike "${field}" must mint zero work on the effectful seam`);
+    }
+  });
+
+  await t.test('accessor-backed hostile extra fields are rejected descriptor-safe and never execute', async () => {
     const counters = makeCounters();
     const fx = await uxFixture();
-    const base = uxQueryInput(fx, counters) as unknown as Record<string, unknown>;
+    const base = uxIntent(fx) as unknown as Record<string, unknown>;
     const hostile = { ...base };
+    let getterRuns = 0;
     Object.defineProperty(hostile, 'occurrence', {
       enumerable: true,
       get() {
+        getterRuns += 1;
         return { forged: true };
       },
     });
     await expectUxError(
-      queryUxTool(hostile as unknown as QueryUxToolInput),
+      queryUxTool(hostile as unknown as UxToolRequestIntent, queryHost(fx, counters)),
       'INVALID_UX_REQUEST_INPUT',
     );
-    assertNoWork(counters, 'a hostile accessor must not run and must refuse typed');
+    assert.equal(getterRuns, 0, 'the hostile accessor must never execute');
+    assertNoWork(counters, 'a hostile accessor must refuse typed with zero work');
+  });
+
+  await t.test('UX intent material smuggled onto the host composition refuses too (host is closed-world over its own exact set)', async () => {
+    const counters = makeCounters();
+    const fx = await uxFixture();
+    const hostile = queryHost(fx, counters) as unknown as Record<string, unknown>;
+    hostile['uxSessionId'] = 'ux.smuggled';
+    await expectUxError(
+      queryUxTool(uxIntent(fx), hostile as unknown as QueryUxToolHostComposition),
+      'INVALID_UX_REQUEST_INPUT',
+    );
+    const hostile2 = queryHost(fx, counters) as unknown as Record<string, unknown>;
+    hostile2['occurrence'] = { forged: true };
+    await expectUxError(
+      queryUxTool(uxIntent(fx), hostile2 as unknown as QueryUxToolHostComposition),
+      'INVALID_UX_REQUEST_INPUT',
+    );
+    assertNoWork(counters, 'the trusted host composition admits exactly its own field set');
   });
 
   await t.test('forged exposure material inside the portable input mints no visibility', async () => {
@@ -581,13 +826,14 @@ test('T004E forged authority rejection: occurrence/journal/admission-evidence/po
     // never over caller-supplied input text — so the forgery mints nothing.
     await expectUxError(
       queryUxTool(
-        uxQueryInput(fx, counters, {
+        uxIntent(fx, {
           operationId: 'ux.hidden.read',
           input: {
             declaredExposure: { audiences: ['ux'] },
             forgedExposureEvidence: { admitted: true },
           },
         }),
+        queryHost(fx, counters),
       ),
       'UX_OPERATION_NOT_EXPOSED',
     );
@@ -596,8 +842,7 @@ test('T004E forged authority rejection: occurrence/journal/admission-evidence/po
 });
 
 // ---------------------------------------------------------------------------
-// #703 frozen test 8 + 10: outcome directionality and async/currentness
-// discipline.
+// #703 frozen test 8 + 10: outcome directionality and snapshot discipline.
 // ---------------------------------------------------------------------------
 
 test('T004E outcome directionality and snapshot discipline: caller-owned material mutated after the seam boundary cannot swap the dispatched input; the OBSERVED result stays observational', async () => {
@@ -606,8 +851,8 @@ test('T004E outcome directionality and snapshot discipline: caller-owned materia
   const mutableInput = { expression: '1+1' };
 
   const result = await queryUxTool(
-    uxQueryInput(fx, counters, {
-      input: mutableInput,
+    uxIntent(fx, { input: mutableInput }),
+    queryHost(fx, counters, {
       dispatch: {
         async dispatch(query: unknown) {
           // Hostile caller mutates its own object DURING dispatch: the seam
@@ -625,6 +870,154 @@ test('T004E outcome directionality and snapshot discipline: caller-owned materia
   assert.equal(result.status, 'OBSERVED');
   assert.deepEqual(result.output, { answer: 42 });
   assert.equal(counters.journal.getRecords().length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// N5 two-plane aliasing / torn-snapshot refusal: after the seam has
+// synchronously entered, mutations of the caller's intent object and
+// top-level host replacements cannot swap the synchronously captured
+// material or ports.
+// ---------------------------------------------------------------------------
+
+function gatedSha256(): {
+  readonly port: Sha256Port;
+  readonly release: () => void;
+  readonly entered: () => boolean;
+} {
+  let entered = false;
+  let releaseGate: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+  return {
+    port: {
+      async digestUtf8(value: string): Promise<string> {
+        entered = true;
+        await gate;
+        return createHash('sha256').update(value, 'utf8').digest('hex');
+      },
+    },
+    release(): void {
+      releaseGate();
+    },
+    entered(): boolean {
+      return entered;
+    },
+  };
+}
+
+test('T004E N5 two-plane aliasing (query): mutations after the synchronous capture — intent fields, nested input, top-level host currentAssembly/currentBinding/currentDefinitionGraph/dispatch/sha256 — cannot swap captured material', async () => {
+  const counters = makeCounters();
+  const fx = await uxFixture();
+  const postMutation: unknown[] = [];
+  const gate = gatedSha256();
+
+  const intentRecord = uxIntent(fx) as unknown as Record<string, unknown>;
+  const mutableInput = { expression: '1+1' };
+  intentRecord['input'] = mutableInput;
+  const hostRecord = queryHost(fx, counters, { sha256: gate.port }) as unknown as Record<
+    string,
+    unknown
+  >;
+
+  const promise = queryUxTool(
+    intentRecord as unknown as UxToolRequestIntent,
+    hostRecord as unknown as QueryUxToolHostComposition,
+  );
+  // Let the seam synchronously enter and reach the awaited digest point.
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.ok(gate.entered(), 'sanity: the seam reached the awaited digest point');
+
+  // Hostile caller mutates its own intent object and replaces top-level host
+  // references AFTER the seam has synchronously captured everything.
+  intentRecord['uxSessionId'] = 'ux.hijack';
+  intentRecord['toolComponentId'] = 'tool.hijack';
+  intentRecord['operationId'] = 'ux.hidden.read';
+  intentRecord['input'] = { hijacked: true };
+  mutableInput.expression = 'hijacked-too';
+  intentRecord['expectedDefinitionGraphDigest'] = 'sha256:torn-read';
+  intentRecord['expectedAssemblyDigest'] = 'sha256:torn-assembly';
+  hostRecord['currentAssembly'] = {
+    assemblyDigest: 'sha256:fake-current',
+  } as unknown as SealedRuntimeAssembly;
+  hostRecord['currentBinding'] = {
+    successorAssembly: hostRecord['currentAssembly'],
+  } as unknown as SealedToolImplementationBinding;
+  hostRecord['currentDefinitionGraph'] = graph({ graphId: 'graph.hijack' });
+  hostRecord['dispatch'] = {
+    async dispatch(query: unknown) {
+      postMutation.push(query);
+      return { hijacked: true };
+    },
+  };
+  hostRecord['sha256'] = realSha256;
+
+  gate.release();
+  const result = await promise;
+
+  assert.equal(result.status, 'OBSERVED');
+  assert.deepEqual(result.output, { answer: 42 });
+  assert.equal(counters.nonEffectfulCalls.length, 1, 'the originally captured dispatch port ran');
+  const query = counters.nonEffectfulCalls[0] as { handle: unknown; operationId: string; input: unknown };
+  assert.equal(query.operationId, 'ux.visible.read', 'the captured intent target is immutable');
+  assert.deepEqual(query.input, { expression: '1+1' }, 'the captured intent input snapshot is immutable');
+  assert.equal(query.handle, fx.binding.implementationHandle, 'the original binding handle dispatched');
+  assert.equal(postMutation.length, 0, 'a replaced top-level dispatch port must never be used');
+  assert.equal(counters.effectfulCalls.length, 0);
+  assert.equal(counters.journal.getRecords().length, 0);
+});
+
+test('T004E N5 two-plane aliasing (effectful): the effectful seam uses only the synchronously captured intent and original host references/ports', async () => {
+  const counters = makeCounters();
+  const fx = await uxFixture();
+  const postMutation: unknown[] = [];
+  const gate = gatedSha256();
+  const host = await effectfulHost(fx, counters);
+
+  const intentRecord = host.intent() as unknown as Record<string, unknown>;
+  const hostRecord = host.host({ sha256: gate.port }) as unknown as Record<string, unknown>;
+
+  const promise = invokeUxToolEffectfully(
+    intentRecord as unknown as UxToolRequestIntent,
+    hostRecord as unknown as EffectfulUxToolHostComposition,
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.ok(gate.entered(), 'sanity: the seam reached the awaited digest point');
+
+  intentRecord['operationId'] = 'ux.hidden.read';
+  intentRecord['input'] = { hijacked: true };
+  intentRecord['expectedAssemblyDigest'] = 'sha256:torn-assembly';
+  hostRecord['currentAssembly'] = {
+    assemblyDigest: 'sha256:fake-current',
+  } as unknown as SealedRuntimeAssembly;
+  hostRecord['currentBinding'] = {
+    successorAssembly: hostRecord['currentAssembly'],
+  } as unknown as SealedToolImplementationBinding;
+  hostRecord['dispatch'] = {
+    async dispatch(query: unknown) {
+      postMutation.push(query);
+      return { hijacked: true };
+    },
+  };
+  hostRecord['admissionPorts'] = { forged: true };
+  hostRecord['effectType'] = 'effect:hijacked';
+
+  gate.release();
+  const result = await promise;
+
+  assert.equal(result.outcome.status, 'admitted');
+  assert.equal(counters.effectfulCalls.length, 1, 'the originally captured effectful dispatch ran');
+  const query = counters.effectfulCalls[0]!;
+  assert.equal(query.operationId, 'ux.visible.write', 'the captured intent target is immutable');
+  assert.deepEqual(query.input, { amount: 42 }, 'the captured intent input snapshot is immutable');
+  assert.equal(query.handle, fx.binding.implementationHandle);
+  assert.equal(postMutation.length, 0, 'a replaced top-level dispatch port must never be used');
+  assert.equal(counters.nonEffectfulCalls.length, 0);
+  const records = counters.journal.getRecords();
+  assert.equal(records.length, 1, 'exactly one journal record through the originally captured ports');
+  assert.equal(records[0]!.effectType, EFFECT_TYPE, 'the captured effect type is immutable');
 });
 
 // ---------------------------------------------------------------------------
@@ -703,12 +1096,22 @@ async function governanceBody(): Promise<GovernanceBaselineBody> {
  * plane can never supply or forge. Mirrors the T004D evidence harness.
  */
 interface EffectfulHost {
-  readonly input: (
-    overrides?: Partial<InvokeUxToolEffectfullyInput>,
-  ) => InvokeUxToolEffectfullyInput;
+  readonly intent: (overrides?: Partial<UxToolRequestIntent>) => UxToolRequestIntent;
+  readonly host: (
+    overrides?: Partial<EffectfulUxToolHostComposition>,
+  ) => EffectfulUxToolHostComposition;
 }
 
-async function effectfulHost(fx: UxFixture, counters: UxCounters): Promise<EffectfulHost> {
+async function effectfulHost(
+  fx: UxFixture,
+  counters: UxCounters,
+  parts: {
+    readonly assembly?: SealedRuntimeAssembly;
+    readonly binding?: SealedToolImplementationBinding;
+  } = {},
+): Promise<EffectfulHost> {
+  const assembly = parts.assembly ?? fx.currentAssembly;
+  const binding = parts.binding ?? fx.binding;
   const b1 = await governanceBody();
   const baselines = new MemoryGovernanceBaselineStore();
   await baselines.putBody(b1);
@@ -729,7 +1132,7 @@ async function effectfulHost(fx: UxFixture, counters: UxCounters): Promise<Effec
       domainIntelligenceContentDigest: 'cdi-t004e-1',
       governanceBaseline: b1.identity,
     },
-    assembly: fx.binding.successorAssembly,
+    assembly,
     authorityClass: 'PRODUCTION',
     currentDefinitionGraph: fx.g,
   });
@@ -804,15 +1207,20 @@ async function effectfulHost(fx: UxFixture, counters: UxCounters): Promise<Effec
   };
 
   return {
-    input(overrides: Partial<InvokeUxToolEffectfullyInput> = {}): InvokeUxToolEffectfullyInput {
-      return {
-        uxSessionId: UX_SESSION_ID,
-        toolComponentId: 'tool.t004e',
+    intent(overrides: Partial<UxToolRequestIntent> = {}): UxToolRequestIntent {
+      return uxIntent(fx, {
         operationId: 'ux.visible.write',
         input: { amount: 42 },
-        expectedDefinitionGraphDigest: fx.graphDigest,
-        binding: fx.binding,
+        ...overrides,
+      });
+    },
+    host(
+      overrides: Partial<EffectfulUxToolHostComposition> = {},
+    ): EffectfulUxToolHostComposition {
+      return {
         currentDefinitionGraph: fx.g,
+        currentAssembly: assembly,
+        currentBinding: binding,
         activator,
         admissionRequest,
         admissionPorts: { governance: coordinator, baselines, effectJournal: counters.journal },
@@ -835,7 +1243,7 @@ test('T004E authorized mutation/effect route: ux mutation intent is admitted onl
   const fx = await uxFixture();
   const host = await effectfulHost(fx, counters);
 
-  const result = await invokeUxToolEffectfully(host.input());
+  const result = await invokeUxToolEffectfully(host.intent(), host.host());
 
   // The effect executed through the existing Central Admission outcome...
   assert.equal(result.outcome.status, 'admitted');
