@@ -12,7 +12,8 @@
  *     the admitted intent `complete`; one Tool Component providing the small
  *     exact capability used by the Workflow; >=1 effect=none operation and
  *     one effectful operation; one explicit relation/capability dependency
- *     exercising graph composition and Tool closure;
+ *     exercising Definition graph composition/identity only (never
+ *     provider-selection or authorization authority);
  *  2. the admitted intent is must-understand: Assembly-bound admission
  *     passes the frozen semantics and fails closed on any unknown or
  *     unadmitted intent;
@@ -28,6 +29,15 @@
  *  6. fixture names live in the test namespace and carry no Standard
  *     Component contract material (non-product, non-Standard,
  *     non-self-referential).
+ *
+ * Capability semantics are exactly: Workflow requiredCapability -> T003B
+ * exact Domain Tool provider selection -> T003C exact Tool
+ * implementation/currentness binding. T003E Tool-to-Tool closure is NOT
+ * CLAIMED / NOT EXERCISED by T010A — T003E/E5 remains its sole owner. The
+ * exact fixture freeze record
+ * (`tests/fixtures/t010a-neutral-definition.freeze.ts`, issue #908 P1-2) is
+ * recomputed through the accepted public APIs and deep-compared below; any
+ * identity drift fails closed instead of refreshing the record.
  *
  * ENVIRONMENT=LOCAL_AGENT (ZCode kimi-executor, kimi-for-coding).
  * SOURCE_MUTATION=NONE (tests-only write set).
@@ -107,6 +117,7 @@ import {
   t010aWorkflowComponent,
   type T010aAssemblyBundle,
 } from '../fixtures/t010a-neutral-definition.js';
+import { T010A_FREEZE_RECORD } from '../fixtures/t010a-neutral-definition.freeze.js';
 
 // ---------------------------------------------------------------------------
 // Frozen-bullet 1: neutral Definition shape, graph composition and the
@@ -405,10 +416,13 @@ async function boundFixture(): Promise<BoundFixture> {
 }
 
 // ---------------------------------------------------------------------------
-// Frozen-bullet 1/5: capability/Tool closure through the same public ports.
+// Frozen-bullet 1/5: Workflow requiredCapability -> T003B exact provider
+// selection -> T003C exact implementation/currentness binding, through the
+// same public ports. T003E Tool-to-Tool closure is NOT CLAIMED / NOT
+// EXERCISED by T010A (T003E/E5 remains its sole owner).
 // ---------------------------------------------------------------------------
 
-test('T010A bullet 1/5: capability dependency closes to exactly the one Tool through the public T003B/T003C ports', async () => {
+test('T010A bullet 1/5: the Workflow requiredCapability resolves to exactly the one Tool provider via T003B and binds the exact implementation via T003C', async () => {
   const bundle = await buildT010aAssembly();
 
   // Exactly one compatible provider; selection is deterministic across
@@ -487,6 +501,186 @@ test('T010A bullet 5: exact Tool implementation binds through the T003C port; th
     sha256: t010aSha256,
   });
   assert.equal(verified.implementationHandle, executor);
+});
+
+// ---------------------------------------------------------------------------
+// Issue #908 P1-1 guard: T003E Tool-to-Tool closure is NOT CLAIMED / NOT
+// EXERCISED by T010A. T003E/E5 remains the sole owner of Tool-to-Tool
+// closure evidence; this fixture binds no second Tool and no
+// self-provision edge.
+// ---------------------------------------------------------------------------
+
+test('T010A guard: T003E Tool-to-Tool closure is NOT CLAIMED / NOT EXERCISED by T010A (sole owner: T003E/E5)', () => {
+  const graph = t010aDefinitionGraph();
+
+  // Exactly one Workflow + one Tool + one explicit relation; the relation
+  // source is the Workflow Semantic Component — there is no Tool->Tool edge
+  // and no second Tool / self-provision edge to close over.
+  assert.equal(graph.components.filter((component) => component.family === 'tool').length, 1);
+  assert.equal(
+    graph.components.filter((component) => component.family === 'semantic').length,
+    1,
+  );
+  assert.equal(graph.relations.length, 1);
+  assert.equal(graph.relations[0]!.sourceComponentId, T010A_WORKFLOW_COMPONENT_ID);
+  assert.equal(graph.relations[0]!.targetComponentId, T010A_TOOL_COMPONENT_ID);
+  assert.equal(graph.relations[0]!.relationKind, 'uses-capability');
+
+  // The relation is Definition graph composition/identity only: it records
+  // across which endpoints the Workflow's capability dependency composes.
+  // Its presence/order/kind/endpoints are never provider-selection or
+  // authorization authority — selection authority is exclusively the T003B
+  // port over the consumer's declared requiredCapabilities.
+  const workflow = graph.components.find(
+    (component) => component.componentId === T010A_WORKFLOW_COMPONENT_ID,
+  )!;
+  assert.deepEqual(workflow.requiredCapabilities, [T010A_CAPABILITY]);
+});
+
+// ---------------------------------------------------------------------------
+// Issue #908 P1-2: the ONE literal source-controlled freeze record is
+// recomputed through the accepted public APIs and deep-compared. Any change
+// to the DefinitionGraphDigest, a KindImplementation pin, the T003C binding
+// evidence/bindingDigest, or the final Assembly digest/currentness slot
+// fails this test — the expected record is never auto-refreshed.
+// ---------------------------------------------------------------------------
+
+test('T010A freeze record: recomputation through the accepted public APIs deep-matches the literal freeze record', async () => {
+  const graph = t010aDefinitionGraph();
+  const bundle = await buildT010aAssembly();
+
+  // T003B: the Workflow's exact requiredCapability resolves to the one
+  // Domain Tool provider (deterministically, order-independent).
+  const selection = await resolveCurrentCapabilityProvider(
+    graph,
+    T010A_CAPABILITY,
+    T010A_WORKFLOW_COMPONENT_ID,
+    bundle.definitionGraphDigest,
+    t010aSha256,
+  );
+  assert.equal(selection.provider.componentId, T010A_TOOL_COMPONENT_ID);
+  assert.equal(selection.provider.family, 'tool');
+  assert.deepEqual(selection.requiredCapability, T010A_CAPABILITY);
+
+  // T003C: the exact Tool implementation binds into the successor Assembly.
+  const binding = await bindT010aTool(bundle, new T010aTestExecutor());
+
+  const workflow = graph.components.find(
+    (component) => component.componentId === T010A_WORKFLOW_COMPONENT_ID,
+  )!;
+  const tool = graph.components.find(
+    (component) => component.componentId === T010A_TOOL_COMPONENT_ID,
+  )!;
+  const toolBody = tool.semanticBody as unknown as {
+    operations: readonly { operationId: string; effect: string }[];
+  };
+
+  // Recompute the exact freeze-record identity through the same accepted
+  // APIs that produced the literal (no local canonicalization/digest code).
+  const recomputed = {
+    schema: 't010a.freeze-record/v1',
+    semantic: {
+      graphId: graph.graphId,
+      workflowComponentId: workflow.componentId,
+      toolComponentId: tool.componentId,
+      relationId: graph.relations[0]!.relationId,
+      relationKind: graph.relations[0]!.relationKind,
+      workflowKindRef: workflow.kind,
+      toolKindRef: tool.kind,
+      capabilityRef: T010A_CAPABILITY,
+      operations: toolBody.operations.map((operation) => ({
+        operationId: operation.operationId,
+        effect: operation.effect,
+      })),
+    },
+    definition: {
+      definitionGraphDigest: bundle.definitionGraphDigest,
+    },
+    kindImplementation: {
+      // Both roles bind the SAME accepted pin; roles recorded explicitly.
+      workflowRole: bundle.assembly.record.kindImplementations[0]!,
+      toolRole: bundle.assembly.record.kindImplementations[0]!,
+    },
+    toolBinding: binding.evidence,
+    finalAssembly: {
+      assemblyDigest: binding.successorAssembly.assemblyDigest,
+      definitionGraphDigest: binding.successorAssembly.record.definitionGraphDigest,
+      kindImplementations: binding.successorAssembly.record.kindImplementations,
+      implementationBindingEvidence:
+        binding.successorAssembly.record.implementationBindingEvidence,
+    },
+  };
+
+  assert.deepEqual(recomputed, T010A_FREEZE_RECORD);
+
+  // T003C currentness: the public consumer verifier accepts the binding
+  // against the exact final successor Assembly under the exact pin, and the
+  // Assembly's §G evidence slot carries exactly this binding's bindingDigest
+  // — the frozen T003C binding IS the current final-Assembly slot.
+  const verified = await verifyToolImplementationBinding({
+    binding,
+    finalAssembly: binding.successorAssembly,
+    expectedImplementationPin: T010A_TOOL_IMPLEMENTATION,
+    sha256: t010aSha256,
+  });
+  assert.equal(verified.implementationHandle, binding.implementationHandle);
+  assert.deepEqual(binding.successorAssembly.record.implementationBindingEvidence, [
+    {
+      subject: T010A_TOOL_COMPONENT_ID,
+      bindingDigest: binding.evidence.bindingDigest,
+    },
+  ]);
+  assert.equal(
+    binding.successorAssembly.record.definitionGraphDigest,
+    bundle.definitionGraphDigest,
+  );
+});
+
+test('T010A freeze record: serializable data only — no handle/function/executor/recorder/resource-handle/secret/host-ambient material', () => {
+  // JSON round-trip is identity: the record is pure serializable data.
+  assert.deepEqual(JSON.parse(JSON.stringify(T010A_FREEZE_RECORD)), T010A_FREEZE_RECORD);
+
+  // Negative key/value walk: runtime handles, functions, executors,
+  // effect recorders, ResourceProvider handles, secrets/tokens/connections,
+  // Central Admission journal objects, host paths and host-supplied
+  // timestamps/ambient identity are structurally absent.
+  const forbiddenKeyMarkers = [
+    'handle',
+    'secret',
+    'token',
+    'connection',
+    'executor',
+    'recorder',
+    'journal',
+    'hostpath',
+    'timestamp',
+  ];
+  const visit = (value: unknown, path: string): void => {
+    if (Array.isArray(value)) {
+      for (const [index, entry] of value.entries()) {
+        visit(entry, `${path}[${index}]`);
+      }
+      return;
+    }
+    if (typeof value === 'object' && value !== null) {
+      for (const [key, entry] of Object.entries(value)) {
+        const lowerKey = key.toLowerCase();
+        for (const marker of forbiddenKeyMarkers) {
+          assert.ok(
+            !lowerKey.includes(marker),
+            `freeze record key "${path}.${key}" must not contain runtime/ambient marker "${marker}"`,
+          );
+        }
+        visit(entry, `${path}.${key}`);
+      }
+      return;
+    }
+    assert.ok(
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean',
+      `freeze record leaf at ${path} must be serializable scalar data`,
+    );
+  };
+  visit(T010A_FREEZE_RECORD, 'record');
 });
 
 // ---------------------------------------------------------------------------
