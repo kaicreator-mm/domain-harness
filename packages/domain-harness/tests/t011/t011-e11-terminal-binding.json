@@ -1,0 +1,48 @@
+{
+  "schema": "v0.7/t011-e11-terminal-binding",
+  "schemaVersion": 1,
+  "gate": "E11",
+  "gateIssue": 921,
+  "pr": 922,
+  "verdict": "SUPPORTED",
+  "currentness": "CURRENT",
+  "productImpact": "NONE",
+  "l2Impact": "NONE",
+  "sdkImpact": "NONE",
+  "subjectHead": "3694c6878d0fe72b67f50f9ca676f319ce045830",
+  "subjectTree": "4c30463a21f495389f3118f2ef8a787c1a830ed4",
+  "mergeCommit": "05a72d64fbc28cb2993df195daf65cd5d26541bd",
+  "t011BaseHead": "05a72d64fbc28cb2993df195daf65cd5d26541bd",
+  "mergedAt": "2026-10-07T22:22:12Z",
+  "terminalCommentIds": {
+    "builderEvidence": "6047764502",
+    "freshReview": "6047975173",
+    "validation": "6048043527",
+    "mergeRecord": "6048065030"
+  },
+  "fixtureDigests": {
+    "FREEZE_DEFINITION_GRAPH_DIGEST": "030402bf802340d77f1ed88a3a4858dc2202b9b16bc590038d45cbf26b97825c",
+    "FREEZE_BINDING_DIGEST": "8f5220bfc9c2e41c44cd06cdf36a5369662806a6e311fb1b5e338d2b2df86a87",
+    "FREEZE_FINAL_ASSEMBLY_DIGEST": "400d668f9f806b7b7266c78b2322ffdf13bde07c8aa87a86edd9d78398d677c0"
+  },
+  "acceptedLimits": [
+    {
+      "id": "L-E11-REPRESENTATIVE_SUBSET",
+      "text": "E11 proves the unauthorized path as a representative re-derived subset (R1-R6 + I3/I4), not all 58 accepted T010C rows; the full 58-row matrix authority remains the accepted T010C suite.",
+      "materiality": "NON_MATERIAL",
+      "acceptanceAuthority": "#725 T010D aggregation/disposition-only contract; #921 validation terminal 6048043527 LIMITS#1; #921 fresh review 6047975173 D3"
+    },
+    {
+      "id": "L-E11-DERIVED_VARIANT",
+      "text": "E11 adapter-level R2 currentness row executes on a LABELLED derived exposure-material variant (asserted-different Definition graph digest); the frozen identity stays pinned by the executable Part A deep-match against the landed T010A freeze record.",
+      "materiality": "NON_MATERIAL",
+      "acceptanceAuthority": "mirrors the accepted T010C gate-isolation adjudication (#915); #921 validation terminal 6048043527 LIMITS#2; #921 fresh review 6047975173 D1"
+    },
+    {
+      "id": "L-E11-STABLE_SQLITE_BINARY",
+      "text": "better-sqlite3 stable prebuilt native binary reused from the known-stable dh-e4-896 worktree (node_modules-only, version-matched 12.11.1, install-scripts policy); never tracked, no result impact.",
+      "materiality": "NON_MATERIAL",
+      "acceptanceAuthority": "environment disclosure accepted across gates (E4 terminal #896, #921 validation terminal DEVIATIONS#2, #921 fresh review D-note)"
+    }
+  ]
+}
