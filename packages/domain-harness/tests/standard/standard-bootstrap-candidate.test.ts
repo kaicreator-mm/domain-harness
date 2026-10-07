@@ -41,9 +41,11 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { ComponentEnvelope } from '../../src/contracts/component.js';
 import type {
   KindImplementationPin,
 } from '../../src/contracts/runtime-assembly.js';
+import type { ToolOperationEffect } from '../../src/contracts/tool-component.js';
 import {
   STANDARD_TOOL_CANDIDATE_ABSENT,
   STANDARD_SEMANTIC_CANDIDATE_ABSENT,
@@ -99,6 +101,46 @@ function candidate(
   };
 }
 
+// ---------------------------------------------------------------------------
+// #820 helpers — ordinary Tool Component contracts consumed through the
+// verification-only eligibility context (effect classification is owned by
+// contracts/tool-component.ts; Standard introduces no effect taxonomy).
+// ---------------------------------------------------------------------------
+
+function toolOperation(
+  operationId: string,
+  effect: ToolOperationEffect,
+): { operationId: string; inputSchema: Record<string, never>; outputSchema: Record<string, never>; effect: ToolOperationEffect } {
+  return { operationId, inputSchema: {}, outputSchema: {}, effect };
+}
+
+/** A valid ordinary Tool Component contract envelope for one exact ref. */
+function toolContract(
+  ref: ExactComponentRef,
+  operations: readonly ReturnType<typeof toolOperation>[],
+): ComponentEnvelope {
+  return {
+    family: 'tool',
+    componentId: ref.componentId,
+    kind: { kindId: ref.kind.kindId, version: ref.kind.version },
+    requiredSemanticContracts: [],
+    requiredCapabilities: [],
+    semanticBody: {
+      operations: operations.map((operation) => ({ ...operation })),
+      providesCapabilities: [],
+    },
+  } as unknown as ComponentEnvelope;
+}
+
+/** The #820 verification-only context: exact ComponentRef -> Tool contract. */
+function toolContractOptions(
+  entries: readonly { ref: ExactComponentRef; contract: ComponentEnvelope }[],
+): { toolContracts: { component: ExactComponentRef; contract: ComponentEnvelope }[] } {
+  return {
+    toolContracts: entries.map((entry) => ({ component: entry.ref, contract: entry.contract })),
+  };
+}
+
 test('#618 candidate 1: eligibility requires published/supported classification AND an accepted reference implementation bound to the exact Kind', () => {
   const eligible = candidate();
   const noImplementation: StandardBootstrapCandidate = { descriptor: descriptor() };
@@ -143,11 +185,29 @@ test('#618 candidate 2: family classification is the ordinary Component family �
   );
   assert.equal(semanticWinner.descriptor.component.componentId, 'component.a-semantic');
 
+  // #820: tool-family eligibility consumes the verification-only Tool-contract
+  // context (effect=none binding) — the #618 tool-pool case is preserved with
+  // both Tool contracts bound and each carrying a pure operation.
+  const toolContext = toolContractOptions([
+    {
+      ref: toolA.descriptor.component,
+      contract: toolContract(toolA.descriptor.component, [toolOperation('op.read', 'none')]),
+    },
+    {
+      ref: toolZ.descriptor.component,
+      contract: toolContract(toolZ.descriptor.component, [toolOperation('op.read', 'none')]),
+    },
+  ]);
   const toolWinner = selectStandardBootstrapCandidate(
     [semanticA, toolZ, semanticZ, toolA],
     'tool',
+    toolContext,
   );
   assert.equal(toolWinner.descriptor.component.componentId, 'component.a-tool');
+  // The selected candidate shape is unchanged — the verification-only context
+  // never leaks into the returned material (D4 freshness discipline holds).
+  assert.deepEqual(toolWinner.descriptor, toolA.descriptor);
+  assert.deepEqual(toolWinner.referenceImplementation, toolA.referenceImplementation);
 });
 
 test('#618 candidate 3: the lexicographically smallest canonical exact ComponentRef wins — fixture construction only', () => {
@@ -588,4 +648,358 @@ test('#653 D5: exact duplicate semantic candidates deduplicate by exact identity
   const withDupReversed = selectStandardBootstrapCandidate([other, duplicateB, duplicateA], 'semantic');
   assert.equal(withDupForward.descriptor.component.componentId, 'component.aaa-dup');
   assert.deepEqual(withDupForward, withDupReversed);
+});
+
+// ---------------------------------------------------------------------------
+// #820 effect=none bootstrap eligibility binding — ordinary Tool-contract
+// context consumed verification-only; effect=none is a PRE-SELECTION
+// eligibility filter, never a ranking authority (#653 G1 untouched).
+// ---------------------------------------------------------------------------
+
+test('#820: a lexicographically-smaller effectful-only Tool candidate can never mask a larger valid pure Tool candidate', () => {
+  const refEffectful = componentRef({ family: 'tool', componentId: 'component.a-effectful' });
+  const refPure = componentRef({ family: 'tool', componentId: 'component.z-pure' });
+  const effectfulOnly = candidate({ component: refEffectful });
+  const pure = candidate({ component: refPure });
+  const options = toolContractOptions([
+    {
+      ref: refEffectful,
+      contract: toolContract(refEffectful, [toolOperation('op.mutate', 'non-idempotent')]),
+    },
+    { ref: refPure, contract: toolContract(refPure, [toolOperation('op.read', 'none')]) },
+  ]);
+
+  const winner = selectStandardBootstrapCandidate([effectfulOnly, pure], 'tool', options);
+  assert.equal(winner.descriptor.component.componentId, 'component.z-pure');
+  assert.ok(
+    canonicalComponentRef(refEffectful) < canonicalComponentRef(refPure),
+    'sanity: the effectful-only candidate really is the lexicographically smaller ref',
+  );
+});
+
+test('#820: all otherwise-valid Tool candidates effectful-only => typed STANDARD_TOOL_CANDIDATE_ABSENT', () => {
+  const refA = componentRef({ family: 'tool', componentId: 'component.a-effectful' });
+  const refB = componentRef({ family: 'tool', componentId: 'component.b-effectful' });
+  const options = toolContractOptions([
+    { ref: refA, contract: toolContract(refA, [toolOperation('op.write', 'non-idempotent')]) },
+    { ref: refB, contract: toolContract(refB, [toolOperation('op.retry-write', 'idempotent')]) },
+  ]);
+
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate(
+        [candidate({ component: refA }), candidate({ component: refB })],
+        'tool',
+        options,
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardCandidateAbsentError);
+      assert.equal(error.code, STANDARD_TOOL_CANDIDATE_ABSENT);
+      assert.equal(error.family, 'tool');
+      return true;
+    },
+  );
+});
+
+test('#820: one Tool with multiple operations including at least one effect=none operation is eligible', () => {
+  const ref = componentRef({ family: 'tool', componentId: 'component.mixed-ops' });
+  const options = toolContractOptions([
+    {
+      ref,
+      contract: toolContract(ref, [
+        toolOperation('op.write', 'non-idempotent'),
+        toolOperation('op.read', 'none'),
+        toolOperation('op.refresh', 'idempotent'),
+      ]),
+    },
+  ]);
+
+  const winner = selectStandardBootstrapCandidate([candidate({ component: ref })], 'tool', options);
+  assert.equal(winner.descriptor.component.componentId, 'component.mixed-ops');
+});
+
+test('#820: malformed/unsafe Tool eligibility context fails closed typed — never silently skipped', () => {
+  const ref = componentRef({ family: 'tool', componentId: 'component.ctx-hostile' });
+  const eligible = candidate({ component: ref });
+  const validOptions = toolContractOptions([
+    { ref, contract: toolContract(ref, [toolOperation('op.read', 'none')]) },
+  ]);
+
+  // Context is not an array.
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: 'not-an-array' as unknown as never,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'INVALID_TOOL_CONTRACT_CONTEXT');
+      return true;
+    },
+  );
+
+  // Unknown options field — closed-world options record.
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        ...validOptions,
+        effectAuthority: true,
+      } as unknown as never),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'INVALID_TOOL_CONTRACT_CONTEXT');
+      return true;
+    },
+  );
+
+  // Accessor-backed context entry: the getter never executes and the whole
+  // call fails closed.
+  let getterExecutions = 0;
+  const hostileEntry: unknown = {};
+  Object.defineProperty(hostileEntry, 'component', {
+    enumerable: true,
+    get() {
+      getterExecutions += 1;
+      return ref;
+    },
+  });
+  Object.defineProperty(hostileEntry, 'contract', {
+    enumerable: true,
+    value: toolContract(ref, [toolOperation('op.read', 'none')]),
+  });
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [hostileEntry as never],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'INVALID_TOOL_CONTRACT_CONTEXT');
+      return true;
+    },
+  );
+  assert.equal(getterExecutions, 0);
+
+  // Unknown field on a context entry.
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [
+          {
+            component: ref,
+            contract: toolContract(ref, [toolOperation('op.read', 'none')]),
+            runtimeShortcut: 'forbidden',
+          } as never,
+        ],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'INVALID_TOOL_CONTRACT_CONTEXT');
+      assert.match((error as StandardContractError).message, /unexpected field "runtimeShortcut"/);
+      return true;
+    },
+  );
+
+  // A semantic-family binding is not Tool eligibility material.
+  const semanticRef = componentRef({ componentId: 'component.semantic-binding' });
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [
+          {
+            component: semanticRef,
+            contract: toolContract(ref, [toolOperation('op.read', 'none')]),
+          },
+        ],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'INVALID_TOOL_CONTRACT_CONTEXT');
+      return true;
+    },
+  );
+
+  // A contract that fails the accepted generic Tool contract path surfaces
+  // the Tool contract's OWN typed failure unchanged
+  // (validateToolComponent is consumed, never re-owned).
+  const invalidEffectContract = {
+    family: 'tool',
+    componentId: ref.componentId,
+    kind: { kindId: ref.kind.kindId, version: ref.kind.version },
+    requiredSemanticContracts: [],
+    requiredCapabilities: [],
+    semanticBody: {
+      operations: [{ operationId: 'op.read', inputSchema: {}, outputSchema: {}, effect: 'pure' }],
+      providesCapabilities: [],
+    },
+  } as unknown as ComponentEnvelope;
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [{ component: ref, contract: invalidEffectContract }],
+      }),
+    (error: unknown) => {
+      assert.equal((error as { name: string }).name, 'ToolComponentContractError');
+      assert.equal((error as { code: string }).code, 'INVALID_TOOL_OPERATION_EFFECT');
+      return true;
+    },
+  );
+});
+
+
+test('#820: missing/duplicate/exact-ref-mismatched Tool context fails closed typed', () => {
+  const ref = componentRef({ family: 'tool', componentId: 'component.bound-tool' });
+  const eligible = candidate({ component: ref });
+  const contract = toolContract(ref, [toolOperation('op.read', 'none')]);
+
+  // Missing context entirely: an otherwise-eligible Tool candidate needs its
+  // exact-ref contract binding to decide effect eligibility.
+  assert.throws(
+    () => selectStandardBootstrapCandidate([eligible], 'tool'),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'STANDARD_TOOL_CONTRACT_MISSING');
+      return true;
+    },
+  );
+  assert.throws(
+    () => selectStandardBootstrapCandidate([eligible], 'tool', { toolContracts: [] }),
+    (error: unknown) => error instanceof StandardContractError,
+  );
+
+  // Duplicate bindings for the same exact ComponentRef — never first-wins.
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [
+          { component: ref, contract },
+          { component: ref, contract },
+        ],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'DUPLICATE_TOOL_CONTRACT_CONTEXT');
+      return true;
+    },
+  );
+
+  // The bound contract must BE the contract for the declared exact reference
+  // — an envelope carrying another component's identity fails closed.
+  const otherRef = componentRef({ family: 'tool', componentId: 'component.other-tool' });
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [
+          { component: ref, contract: toolContract(otherRef, [toolOperation('op.read', 'none')]) },
+        ],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'STANDARD_TOOL_CONTRACT_REF_MISMATCH');
+      return true;
+    },
+  );
+
+  // A binding for an unrelated ref does not satisfy the candidate — the
+  // candidate's OWN exact ref must be bound.
+  assert.throws(
+    () =>
+      selectStandardBootstrapCandidate([eligible], 'tool', {
+        toolContracts: [{ component: otherRef, contract }],
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof StandardContractError);
+      assert.equal(error.code, 'STANDARD_TOOL_CONTRACT_MISSING');
+      return true;
+    },
+  );
+});
+
+test('#820: reversed input permutation preserves the same pure candidate under #653 deterministic tie-break semantics', () => {
+  const refEffectful = componentRef({ family: 'tool', componentId: 'component.a-effectful' });
+  const refPureB = componentRef({ family: 'tool', componentId: 'component.b-pure' });
+  const refPureC = componentRef({ family: 'tool', componentId: 'component.c-pure' });
+  const options = toolContractOptions([
+    {
+      ref: refEffectful,
+      contract: toolContract(refEffectful, [toolOperation('op.write', 'non-idempotent')]),
+    },
+    { ref: refPureB, contract: toolContract(refPureB, [toolOperation('op.read', 'none')]) },
+    { ref: refPureC, contract: toolContract(refPureC, [toolOperation('op.read', 'none')]) },
+  ]);
+  const pool = [
+    candidate({ component: refEffectful }),
+    candidate({ component: refPureC }),
+    candidate({ component: refPureB }),
+  ];
+
+  const forward = selectStandardBootstrapCandidate(pool, 'tool', options);
+  const reversed = selectStandardBootstrapCandidate(pool.slice().reverse(), 'tool', options);
+  assert.deepEqual(forward, reversed);
+  assert.equal(forward.descriptor.component.componentId, 'component.b-pure');
+
+  // Context permutation must not change the outcome either: bindings for the
+  // same exact refs in reversed order select the identical candidate.
+  const reversedOptions = toolContractOptions([
+    { ref: refPureC, contract: toolContract(refPureC, [toolOperation('op.read', 'none')]) },
+    { ref: refPureB, contract: toolContract(refPureB, [toolOperation('op.read', 'none')]) },
+    {
+      ref: refEffectful,
+      contract: toolContract(refEffectful, [toolOperation('op.write', 'non-idempotent')]),
+    },
+  ]);
+  assert.deepEqual(selectStandardBootstrapCandidate(pool, 'tool', reversedOptions), forward);
+});
+
+test('#820: Semantic-family selection remains unchanged and never consults the Tool-contract context', () => {
+  const semanticA = candidate({ component: componentRef({ componentId: 'component.a-semantic' }) });
+  const semanticZ = candidate({ component: componentRef({ componentId: 'component.z-semantic' }) });
+  const toolRef = componentRef({ family: 'tool', componentId: 'component.a-tool' });
+  const toolCandidate = candidate({ component: toolRef });
+
+  // A semantic selection succeeds with Tool-contract context present and
+  // completely ignores it — Semantic acquires no Tool/effect semantics. The
+  // context below is well-formed but binds a ref no descriptor refers to.
+  const ignoredContext = toolContractOptions([
+    { ref: toolRef, contract: toolContract(toolRef, [toolOperation('op.read', 'none')]) },
+  ]);
+  const winner = selectStandardBootstrapCandidate(
+    [toolCandidate, semanticZ, semanticA],
+    'semantic',
+    ignoredContext,
+  );
+  assert.equal(winner.descriptor.component.componentId, 'component.a-semantic');
+
+  // Tool candidates remain ordinary family-filtered pool members for a
+  // semantic request — unchanged #618 behavior.
+  assert.throws(
+    () => selectStandardBootstrapCandidate([toolCandidate], 'semantic'),
+    (error: unknown) => error instanceof StandardCandidateAbsentError,
+  );
+});
+
+test('#820: effect eligibility is a pre-selection filter only — never a ranking authority and never returned material', () => {
+  const refA = componentRef({ family: 'tool', componentId: 'component.a-pure' });
+  const refB = componentRef({ family: 'tool', componentId: 'component.b-pure' });
+  const options = toolContractOptions([
+    // The lexicographically-larger ref carries the RICHER pure contract; the
+    // winner must still be decided by the PACK-C primary key alone.
+    { ref: refA, contract: toolContract(refA, [toolOperation('op.read', 'none')]) },
+    {
+      ref: refB,
+      contract: toolContract(refB, [
+        toolOperation('op.read', 'none'),
+        toolOperation('op.read-2', 'none'),
+      ]),
+    },
+  ]);
+  const candidateA = candidate({ component: refA });
+  const candidateB = candidate({ component: refB });
+
+  const winner = selectStandardBootstrapCandidate([candidateB, candidateA], 'tool', options);
+  assert.equal(winner.descriptor.component.componentId, 'component.a-pure');
+  // #653 D4 discipline: the returned material is exactly the candidate shape —
+  // no contract, effect or context material leaks into the result.
+  assert.deepEqual(Object.keys(winner).sort(), ['descriptor', 'referenceImplementation']);
+  assert.deepEqual(winner, selectStandardBootstrapCandidate([candidateA, candidateB], 'tool', options));
 });
