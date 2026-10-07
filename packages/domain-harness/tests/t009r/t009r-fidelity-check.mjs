@@ -91,7 +91,7 @@ function checkRow(g, label) {
   const id = label;
   // 1. issue closed
   const state = ghJson([`repos/${GH_REPO}/issues/${g.issue}`, '--jq', '.state']);
-  if (state === 'CLOSED') pass(id, `issue #${g.issue} CLOSED`);
+  if (state.toUpperCase() === 'CLOSED') pass(id, `issue #${g.issue} CLOSED`);
   else fail(id, `issue #${g.issue} state=${state} (expected CLOSED)`);
 
   // 2. comments live (paginated; retried via ghRobust)
@@ -155,13 +155,17 @@ for (const g of MANIFEST.gates) {
 // chain's merge record must name the superseded issue (no local-only supersession).
 for (const s of MANIFEST.supersededRows ?? []) {
   const label = `${s.gate}:superseded#${s.issue}`;
-  const comments = checkRow(s, label);
+  checkRow(s, label);
   const successor = MANIFEST.gates.find((g) => g.gate === s.gate);
   if (!successor) {
     fail(label, `no live gate row for superseded gate ${s.gate}`);
     continue;
   }
-  const mr = comments.find((c) => String(c.id) === String(s.supersededBy?.mergeRecordCommentId));
+  // The supersession record lives on the SUCCESSOR issue's merge record.
+  const successorComments = JSON.parse(
+    ghRobust([`--paginate`, `repos/${GH_REPO}/issues/${successor.issue}/comments`]),
+  );
+  const mr = successorComments.find((c) => String(c.id) === String(s.supersededBy?.mergeRecordCommentId));
   if (!mr) {
     fail(label, `successor merge record ${s.supersededBy?.mergeRecordCommentId} NOT FOUND on issue #${successor.issue}`);
   } else if (mr.body.includes(`#${s.issue}`)) {
