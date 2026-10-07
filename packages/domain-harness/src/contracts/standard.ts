@@ -57,6 +57,30 @@
  *   tie-breaker only, and exact duplicate semantic candidates deduplicate
  *   by exact identity.
  *
+ * #820 effect=none bootstrap eligibility binding (successor of #653, routed
+ * by #589@6001774220 §4 with owner separated by #819 R2):
+ * - for family="tool", each otherwise-eligible candidate's descriptor exact
+ *   ComponentRef must bind to exactly one ordinary Tool Component contract
+ *   through the caller-supplied verification-only context, validated through
+ *   the accepted generic Tool contract path (`validateToolComponent`, whose
+ *   typed failures propagate unchanged) — Standard owns no effect taxonomy
+ *   (effect classification stays in `contracts/tool-component.ts`);
+ * - eligibility requires at least one accepted operation with
+ *   `effect === "none"`, evaluated as a PRE-SELECTION filter — never a
+ *   ranking authority: the #653 G1 PACK-C primary key and
+ *   implementation-identity tie-break are untouched, so an effectful-only
+ *   lexicographically-smaller Tool candidate can never mask a valid pure
+ *   candidate, and a valid effectful-only Tool candidate is simply
+ *   ineligible;
+ * - malformed/unsafe, missing, duplicate or exact-ref-mismatched
+ *   authority-bearing Tool-contract context fails closed with a
+ *   deterministic typed invalid-input outcome — never silently skipped,
+ *   never converted into input-order authority;
+ * - Semantic-family behavior is unchanged: the context is never consulted
+ *   for a semantic request and Semantic acquires no Tool/effect semantics;
+ * - no Tool candidate surviving every check preserves the typed
+ *   STANDARD_TOOL_CANDIDATE_ABSENT terminal.
+ *
  * #652 P1 repair (authority/currentness closure, T006A):
  * - D1: `sealStandardSet` resolves every entry against a REQUIRED
  *   verification-only descriptor context (never `StandardSetRecord`/setDigest
@@ -121,6 +145,7 @@ import type {
 } from './runtime-assembly.js';
 import { verifyToolImplementationBinding } from './tool-implementation-binding.js';
 import type { SealedToolImplementationBinding } from './tool-implementation-binding.js';
+import { validateToolComponent } from './tool-component.js';
 import {
   carriesEmbeddedSelector,
   carriesFloatingOrRangeSemantics,
@@ -177,7 +202,12 @@ export type StandardContractErrorCode =
   | 'STANDARD_SET_TOOL_BINDING_REQUIRED'
   | 'STANDARD_SET_IMPLEMENTATION_CURRENTNESS_MISMATCH'
   | 'STANDARD_SET_TOOL_BINDING_CURRENTNESS_MISMATCH'
-  | 'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN';
+  | 'FLOATING_AUTHORITY_REFERENCE_FORBIDDEN'
+  // #820 effect=none eligibility context taxonomy additions:
+  | 'INVALID_TOOL_CONTRACT_CONTEXT'
+  | 'DUPLICATE_TOOL_CONTRACT_CONTEXT'
+  | 'STANDARD_TOOL_CONTRACT_MISSING'
+  | 'STANDARD_TOOL_CONTRACT_REF_MISMATCH';
 
 export class StandardContractError extends Error {
   readonly code: StandardContractErrorCode;
@@ -1535,6 +1565,44 @@ export interface StandardBootstrapCandidate {
 }
 
 /**
+ * One verification-only binding of an exact ordinary Component reference to
+ * its ordinary Tool Component contract (#820). The context exists solely so
+ * the bootstrap selector can decide Tool `effect=none` eligibility: the
+ * descriptor's exact `ComponentRef` must resolve to exactly one contract,
+ * structurally validated through the accepted generic Tool contract path.
+ * This material is NOT Standard descriptor/Set/Assembly identity material
+ * and grants no provider, runtime, admission or effect authority.
+ */
+export interface StandardToolContractContextEntry {
+  /** The exact ComponentRef whose Tool contract is bound here (tool family
+   * only — a semantic binding is not Tool eligibility material). */
+  readonly component: ExactComponentRef;
+  /** The ordinary Tool Component contract envelope for that exact reference.
+   * Its envelope identity (family/componentId/Kind) must equal the declared
+   * exact reference byte/semantically. */
+  readonly contract: ComponentEnvelope;
+}
+
+/**
+ * Optional selector input carrying the verification-only Tool-contract
+ * eligibility context (#820). Consulted ONLY for tool-family selection; a
+ * semantic-family request never reads it, so Semantic-family behavior is
+ * unchanged and acquires no Tool/effect semantics.
+ */
+export interface StandardBootstrapSelectionOptions {
+  /**
+   * Exact ComponentRef -> ordinary Tool Component contract bindings used to
+   * decide `effect=none` eligibility. Each binding must be unique per exact
+   * ComponentRef (duplicates fail closed, never first-wins); a Tool
+   * candidate whose exact ref has no binding fails closed typed — no
+   * closest/latest/default lookup. Authority-bearing context: malformed/
+   * unsafe, missing, duplicate or exact-ref-mismatched material is a
+   * deterministic typed invalid-input failure.
+   */
+  readonly toolContracts?: readonly StandardToolContractContextEntry[];
+}
+
+/**
  * Canonical exact ComponentRef text: the deterministic ordering key of the
  * bootstrap-candidate eligibility rule. Code-unit comparison over the
  * canonical JSON material — total, locale-independent, and identical across
@@ -1546,6 +1614,152 @@ export function canonicalComponentRef(ref: ExactComponentRef): string {
     componentId: ref.componentId,
     kind: { kindId: ref.kind.kindId, version: ref.kind.version },
   });
+}
+
+// ---------------------------------------------------------------------------
+// #820 — verification-only Tool-contract eligibility context (snapshot-once,
+// fail-closed, duplicate-ref detection before any candidate is inspected)
+// ---------------------------------------------------------------------------
+
+const TOOL_CONTRACT_BINDING_FIELDS = new Set<string>(['component', 'contract']);
+
+const SELECTION_OPTIONS_FIELDS = new Set<string>(['toolContracts']);
+
+/**
+ * Snapshot the declared exact ComponentRef of one Tool-contract context
+ * entry. The context is Tool eligibility material only: the family is
+ * restricted to 'tool' (a semantic binding can never satisfy Tool effect
+ * eligibility) and every identity is exact — no floating/range/embedded
+ * selector survives (#557/#578 shared primitives, never reimplemented).
+ */
+function snapshotToolContractRef(value: unknown, path: string): ExactComponentRef {
+  const view = requireSafeRecord(value, path, 'INVALID_TOOL_CONTRACT_CONTEXT');
+  const unexpectedField = Object.keys(view).find((key) => !COMPONENT_REF_FIELDS.has(key));
+  if (unexpectedField !== undefined) {
+    fail(
+      'INVALID_TOOL_CONTRACT_CONTEXT',
+      path,
+      `must contain exactly {family, componentId, kind}; unexpected field "${unexpectedField}" (implementation/assembly/runtime identity is unrepresentable on a Component reference)`,
+    );
+  }
+  if (view.family !== 'tool') {
+    fail(
+      'INVALID_TOOL_CONTRACT_CONTEXT',
+      `${path}.family`,
+      "must be 'tool' in a Tool-contract eligibility context (a semantic binding is not Tool eligibility material; Semantic-family selection never consults this context)",
+    );
+  }
+  const componentId = requireExactIdentityString(
+    view.componentId,
+    `${path}.componentId`,
+    'INVALID_TOOL_CONTRACT_CONTEXT',
+  );
+  // Kind-side exactness decision — consumed from kind-compatibility.ts (#573).
+  let kind: KindRef;
+  try {
+    const decision = decideKindCompatibility(view.kind as KindRef, [view.kind as KindRef]);
+    kind = { kindId: decision.supportedKind.kindId, version: decision.supportedKind.version };
+  } catch (error) {
+    const reason = error instanceof KindCompatibilityError ? error.message : String(error);
+    fail(
+      'INVALID_TOOL_CONTRACT_CONTEXT',
+      `${path}.kind`,
+      `is not an exact, decidable KindRef: ${reason}`,
+    );
+  }
+  return Object.freeze({ family: 'tool', componentId, kind });
+}
+
+interface SnapshotToolContractBinding {
+  readonly ref: ExactComponentRef;
+  readonly key: string;
+  /** Descriptor-safe snapshot of the contract envelope (validated lazily per
+   * referenced candidate through the accepted generic Tool contract path). */
+  readonly contract: Record<string, unknown>;
+}
+
+/**
+ * Synchronously validate and snapshot the #820 verification-only Tool-
+ * contract context. Runs BEFORE any candidate is inspected, so malformed/
+ * unsafe structure and duplicate exact refs fail the whole call closed
+ * deterministically — never silently skipped, never converted into
+ * input-order authority. Returns undefined when no context was supplied.
+ */
+function snapshotToolContractContext(
+  options: StandardBootstrapSelectionOptions | undefined,
+): Map<string, SnapshotToolContractBinding> | undefined {
+  if (options === undefined) {
+    return undefined;
+  }
+  const optionsView = requireSafeRecord(
+    options,
+    'standard bootstrap selection options',
+    'INVALID_TOOL_CONTRACT_CONTEXT',
+  );
+  const unexpectedOptionField = Object.keys(optionsView).find(
+    (key) => !SELECTION_OPTIONS_FIELDS.has(key),
+  );
+  if (unexpectedOptionField !== undefined) {
+    fail(
+      'INVALID_TOOL_CONTRACT_CONTEXT',
+      'standard bootstrap selection options',
+      `must contain exactly {toolContracts?}; unexpected field "${unexpectedOptionField}" (no provider/registry/dispatch option is representable on the selector)`,
+    );
+  }
+  const contextArray = safeArraySnapshot(
+    'toolContracts' in optionsView ? optionsView.toolContracts : [],
+    'standard bootstrap tool contract context',
+  );
+  if (!contextArray.ok) {
+    fail(
+      'INVALID_TOOL_CONTRACT_CONTEXT',
+      'standard bootstrap tool contract context',
+      contextArray.issue.violation === 'NOT_AN_ARRAY'
+        ? 'must be an array of exact ComponentRef -> ordinary Tool Component contract bindings'
+        : describeRecordSafetyIssue(contextArray.issue),
+    );
+  }
+  const byKey = new Map<string, SnapshotToolContractBinding>();
+  for (const [index, entry] of contextArray.snapshot.entries()) {
+    const at = `standard bootstrap tool contract context [${index}]`;
+    const view = requireSafeRecord(entry, at, 'INVALID_TOOL_CONTRACT_CONTEXT');
+    const unexpectedField = Object.keys(view).find(
+      (key) => !TOOL_CONTRACT_BINDING_FIELDS.has(key),
+    );
+    if (unexpectedField !== undefined) {
+      fail(
+        'INVALID_TOOL_CONTRACT_CONTEXT',
+        at,
+        `must contain exactly {component, contract}; unexpected field "${unexpectedField}"`,
+      );
+    }
+    if (!('component' in view) || view.component === undefined) {
+      fail(
+        'INVALID_TOOL_CONTRACT_CONTEXT',
+        `${at}.component`,
+        'is required (a Tool-contract binding without its exact ComponentRef is malformed authority-bearing context; it fails closed)',
+      );
+    }
+    if (!('contract' in view) || view.contract === undefined) {
+      fail(
+        'INVALID_TOOL_CONTRACT_CONTEXT',
+        `${at}.contract`,
+        'is required (a Tool-contract binding without its ordinary Tool Component contract is malformed authority-bearing context; it fails closed)',
+      );
+    }
+    const ref = snapshotToolContractRef(view.component, `${at}.component`);
+    const contract = requireSafeRecord(view.contract, `${at}.contract`, 'INVALID_TOOL_CONTRACT_CONTEXT');
+    const key = canonicalComponentRef(ref);
+    if (byKey.has(key)) {
+      fail(
+        'DUPLICATE_TOOL_CONTRACT_CONTEXT',
+        at,
+        `binds the exact ComponentRef already bound by another context entry (ambiguous Tool-contract resolution fails closed; never first-wins, no closest/latest/default lookup)`,
+      );
+    }
+    byKey.set(key, { ref, key, contract });
+  }
+  return byKey;
 }
 
 /**
@@ -1589,10 +1803,31 @@ export function canonicalComponentRef(ref: ExactComponentRef): string {
  * nothing is eligible the family-specific typed STANDARD_*_CANDIDATE_ABSENT
  * failure is thrown and the caller must return to ChatGPT Web — a candidate
  * is NEVER invented locally.
+ *
+ * #820 (Tool effect=none eligibility binding, SOURCE=#589@6001774220 §4):
+ * for `family="tool"`, an otherwise-eligible candidate must additionally
+ * pass the ordinary Tool `effect=none` eligibility filter BEFORE it enters
+ * the ordering pool. The descriptor's exact `ComponentRef` binds to exactly
+ * one ordinary Tool Component contract through the caller-supplied
+ * verification-only `options.toolContracts` context; the bound contract is
+ * validated through the accepted generic Tool contract path
+ * (`validateToolComponent`, whose typed failures propagate unchanged) and
+ * must carry at least one accepted operation with `effect === "none"`.
+ * Effect classification is owned by `contracts/tool-component.ts` — no
+ * Standard-owned effect taxonomy exists. A valid effectful-only Tool
+ * candidate is simply ineligible (an ordinary filter — never reinterpreted
+ * malformed structure); malformed/unsafe, missing, duplicate or
+ * exact-ref-mismatched authority-bearing context fails closed typed. The
+ * filter runs pre-selection: it never participates in the identity key, so
+ * the #653 G1 PACK-C primary key and implementation-identity tie-break are
+ * untouched and an effectful-only lexicographically-smaller Tool candidate
+ * can never mask a valid pure candidate. Semantic-family selection never
+ * consults the context and is fully unchanged.
  */
 export function selectStandardBootstrapCandidate(
   candidates: readonly StandardBootstrapCandidate[],
   family: ComponentFamily,
+  options?: StandardBootstrapSelectionOptions,
 ): StandardBootstrapCandidate {
   const list = safeArraySnapshot(candidates, 'standard bootstrap candidates');
   if (!list.ok) {
@@ -1604,6 +1839,12 @@ export function selectStandardBootstrapCandidate(
         : describeRecordSafetyIssue(list.issue),
     );
   }
+
+  // #820 — snapshot the verification-only Tool-contract context BEFORE any
+  // candidate is inspected: malformed/unsafe structure and duplicate exact
+  // refs fail the whole call closed, deterministically and independent of
+  // candidate order. Consulted only for tool-family selection.
+  const toolContractContext = family === 'tool' ? snapshotToolContractContext(options) : undefined;
 
   interface EligibleEntry {
     readonly identityKey: string;
@@ -1662,6 +1903,64 @@ export function selectStandardBootstrapCandidate(
       pinSnapshot.kind.version !== snapshot.component.kind.version
     ) {
       continue;
+    }
+
+    // #820 — Tool effect=none eligibility (pre-selection filter): the
+    // candidate's descriptor exact ComponentRef must resolve to exactly one
+    // ordinary Tool Component contract in the verification-only context.
+    // Missing context/ binding is a deterministic typed fail-closed outcome —
+    // never a silent skip, never input-order authority.
+    if (family === 'tool') {
+      const binding = toolContractContext?.get(canonicalComponentRef(snapshot.component));
+      if (binding === undefined) {
+        fail(
+          'STANDARD_TOOL_CONTRACT_MISSING',
+          `${at}.descriptor.component`,
+          `has no ordinary Tool Component contract bound to its exact ComponentRef in the verification-only eligibility context (missing Tool-contract context fails closed; no closest/latest/default lookup)`,
+        );
+      }
+
+      // Exact-ref match: the bound contract envelope must BE the contract for
+      // the declared exact reference — identity, not proximity.
+      const contractKind = requireSafeRecord(
+        binding.contract.kind,
+        `${at} tool contract.kind`,
+        'INVALID_TOOL_CONTRACT_CONTEXT',
+      );
+      if (
+        binding.contract.family !== 'tool' ||
+        binding.contract.componentId !== binding.ref.componentId ||
+        contractKind.kindId !== binding.ref.kind.kindId ||
+        contractKind.version !== binding.ref.kind.version
+      ) {
+        fail(
+          'STANDARD_TOOL_CONTRACT_REF_MISMATCH',
+          `${at} tool contract`,
+          `is bound to exact ComponentRef ${binding.key} but its envelope identity does not equal that exact reference (a Tool-contract binding must carry the contract OF its declared exact ComponentRef; mismatched authority-bearing context fails closed)`,
+        );
+      }
+
+      // Structural validation through the accepted generic Tool contract
+      // path — consumed, never re-owned: its typed failures propagate
+      // unchanged. The snapshot (not the caller object) is validated.
+      validateToolComponent(binding.contract as unknown as ComponentEnvelope);
+
+      // Effect eligibility: at least one accepted operation with
+      // effect === "none". The generic validation above has already proven
+      // the semanticBody/operations material descriptor-safe, so this read is
+      // over validated plain data.
+      const bodyView = requireSafeRecord(
+        binding.contract.semanticBody,
+        `${at} tool contract.semanticBody`,
+        'INVALID_TOOL_CONTRACT_CONTEXT',
+      );
+      const operations = bodyView.operations as readonly { effect?: unknown }[];
+      const hasPureOperation = operations.some((operation) => operation.effect === 'none');
+      if (!hasPureOperation) {
+        // A valid effectful-only Tool candidate is simply ineligible — an
+        // ordinary filter decided only after the whole pool is examined.
+        continue;
+      }
     }
 
     // #653 D5/G1 — full deterministic identity key: the PACK-C primary key
