@@ -62,7 +62,7 @@ describe('T009R aggregator — committed refreshed manifest (positive path)', ()
 
   test('old #898 E7 row recorded as SUPERSEDED disposition — recorded, never averaged, never silently dropped', () => {
     assert.equal(result.superseded.length, 1);
-    const s = result.superseded[0];
+    const s = result.superseded[0]!;
     assert.equal(s.gate, 'E7');
     assert.equal(s.issue, 898);
     assert.equal(s.pr, 903);
@@ -153,7 +153,7 @@ describe('T009R aggregator — negative controls (fail-closed demonstrations)', 
 describe('T009R aggregator — rerun-specific supersession fail-closed paths', () => {
   test('old #898 E7 row presented as CURRENT (not superseded) is refused — AGG_SUPERSEDED_INVALID', () => {
     const m = loadJson(MANIFEST_PATH) as Manifest;
-    m.supersededRows![0].disposition = 'CURRENT';
+    m.supersededRows![0]!.disposition = 'CURRENT';
     assert.throws(() => aggregateManifest(m), /AGG_SUPERSEDED_INVALID/);
   });
 
@@ -187,13 +187,13 @@ describe('T009R aggregator — rerun-specific supersession fail-closed paths', (
 
   test('supersession chain pointing at the wrong successor merge is refused', () => {
     const m = loadJson(MANIFEST_PATH) as Manifest;
-    m.supersededRows![0].supersededBy!.mergeCommit = '967ef6917ba18832aad108f08d416553f6f9aebb';
+    m.supersededRows![0]!.supersededBy!.mergeCommit = '967ef6917ba18832aad108f08d416553f6f9aebb';
     assert.throws(() => aggregateManifest(m), /AGG_SUPERSEDED_CHAIN_BROKEN/);
   });
 
   test('superseded row reusing a live gate comment id is refused — AGG_CONFLICT', () => {
     const m = loadJson(MANIFEST_PATH) as Manifest;
-    m.supersededRows![0].terminalCommentIds.builderEvidence = '6044280062';
+    m.supersededRows![0]!.terminalCommentIds.builderEvidence = '6044280062';
     assert.throws(() => aggregateManifest(m), /AGG_CONFLICT/);
   });
 });
