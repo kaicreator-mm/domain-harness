@@ -17,7 +17,16 @@
  *   (`op.t010a.record`, effect `idempotent`);
  * - one explicit typed graph relation (`rel.t010a.wf-uses-tool`) plus the
  *   exact requires/provides capability dependency, so Definition graph
- *   composition and capability/Tool closure are exercised;
+ *   composition/identity is exercised. The relation's
+ *   presence/order/kind/endpoints are NEVER provider-selection or
+ *   authorization authority — it is graph composition/identity material
+ *   only. Capability semantics are exercised exactly as: Workflow
+ *   requiredCapability -> T003B exact Domain Tool provider selection ->
+ *   T003C exact Tool implementation/currentness binding (see `bindT010aTool`
+ *   below). T003E Tool-to-Tool closure is NOT CLAIMED / NOT EXERCISED by
+ *   T010A — T003E/E5 remains the sole owner of Tool-to-Tool closure
+ *   evidence, and this fixture deliberately binds no second Tool and no
+ *   self-provision edge;
  * - exact Kind/Tool implementations and a test ResourceProvider bound
  *   through the SAME public Assembly ports (`sealRuntimeAssembly`,
  *   `resolveCurrentCapabilityProvider`, `bindToolImplementation`,
@@ -447,10 +456,14 @@ export async function buildT010aAssembly(
 }
 
 /**
- * Capability/Tool closure: the Workflow's exact required capability is
- * resolved to its current provider through the public T003B port (exactly
- * one compatible provider — never registry-order/first-wins), and the exact
- * Tool implementation is bound through the public T003C port. The sealed
+ * T003B/T003C capability binding (exact and currentness-bound — NOT Tool
+ * closure): the Workflow's exact required capability is resolved to its
+ * current Domain Tool provider through the public T003B port (exactly one
+ * compatible provider — never registry-order/first-wins), and the exact
+ * Tool implementation is bound through the public T003C port. T003E
+ * Tool-to-Tool closure is NOT CLAIMED / NOT EXERCISED here; the explicit
+ * Workflow->Tool graph relation is Definition graph composition/identity
+ * only, never provider-selection or authorization authority. The sealed
  * binding pairs the executor handle OUTSIDE every digest material.
  */
 export async function bindT010aTool(
