@@ -30,4 +30,4 @@ Runnable sample: `node experiments/v08-package-first-bootstrap/demo.mjs`. No ins
 
 ## Decision posture
 
-Gate A requires A1–A6 **and actual Build Host validation**. The included sandbox test evidence is useful implementation evidence, but cannot substitute for project's designated Build Host. Gate B, v0.7 behavioral parity, release qualification and independent reviewer are separate and unexecuted. See `evidence/decision.md`.
+Gate A is demonstrated by an actual clean GitHub-hosted Linux Build Host on exact commit `21382c66eb1c05b0d21e9aa4006f0b1b66e3bc86`: **19/19 PASS**, including an independent derived Capability dependency-cycle falsification test, with a completed approval + learning smoke demonstration. That is **not** the project's designated Windows/ECF Build Host. Gate B, v0.7 behavioral parity, release qualification and genuinely independent read-only review are separate and unexecuted. See `evidence/decision.md` and the final #938 exact-SHA terminal for the latest test run.

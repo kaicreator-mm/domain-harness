@@ -19,14 +19,14 @@
 
 | Check | Observed sandbox evidence | Acceptance posture |
 | --- | --- | --- |
-| A1 true Kernel-origin bootstrap | trusted Kernel pin; Kernel executable linker stages SDK/Business; missing Kernel impl refuses | PASS (sandbox only) |
-| A2 deterministic link and refusal | exact Git blob bytes + package version/dependency + selected provider, digest; negative vectors refuse | PASS (sandbox only) |
-| A3 nodes and Capability scopes | 0 WAIT, 1 selection, N priority routing; approval and learning execute through bound rule/action | PASS (sandbox only) |
-| A4 mutation/outcome sketch | single in-memory revision path; refused commit has no mutation; explicit UNKNOWN/CANCELLED and duplicate refusal | PASS (toy sketch only) |
-| A5 version and occurrence isolation | Business-only version change makes new digest/branching; old receipts retain old assembly; rebind refused | PASS (sandbox only) |
-| A6 real consumption and repeatability | actual implementation substitution changes approval result; single fresh-checkout Node test command | PARTIAL (designated Build Host not run) |
+| A1 true Kernel-origin bootstrap | trusted Kernel pin; Kernel executable linker stages SDK/Business; missing Kernel impl refuses | PASS (sandbox + real Linux CI host) |
+| A2 deterministic link and refusal | exact Git blob bytes + package version/dependency + selected provider, digest; negative vectors refuse | PASS (sandbox + real Linux CI host) |
+| A3 nodes and Capability scopes | 0 WAIT, 1 selection, N priority routing; approval and learning execute through bound rule/action | PASS (sandbox + real Linux CI host) |
+| A4 mutation/outcome sketch | single in-memory revision path; refused commit has no mutation; explicit UNKNOWN/CANCELLED and duplicate refusal | PASS (toy sketch on real Linux CI host; NOT production journal) |
+| A5 version and occurrence isolation | Business-only version change makes new digest/branching; old receipts retain old assembly; rebind refused | PASS (sandbox + real Linux CI host) |
+| A6 real consumption and repeatability | actual implementation substitution changes approval result; single fresh-checkout Node test command | PASS (real GitHub Actions Linux Build Host; designated Windows/ECF NOT_RUN) |
 
-`DEMO_ARCHITECTURE_VERDICT=PARTIAL` until independently verified on a real authorized Build Host. `REAL_DESIGNATED_BUILD_HOST_TESTS=NOT_RUN`. `GATE_B_V07_BEHAVIORAL_PARITY=NOT_TESTED`. `RELEASE_PASS=NO`. `INDEPENDENT_READ_ONLY_REVIEW=NOT_RUN`.
+`DEMO_ARCHITECTURE_VERDICT=PASS` for bounded **architecture feasibility only** (A1–A6 tested on a real hosted Linux Build Host). `REAL_TESTS=PASS_GITHUB_ACTIONS_UBUNTU_NODE22`. `PROJECT_DESIGNATED_WINDOWS_ECF_TESTS=NOT_RUN`. `GATE_B_V07_BEHAVIORAL_PARITY=NOT_TESTED`. `RELEASE_PASS=NO`. `INDEPENDENT_READ_ONLY_REVIEW=NOT_RUN`.
 
 ## Hypotheses for any future v0.8 L1 decision (NOT an implementation authorization)
 
@@ -47,3 +47,10 @@ No full v0.8 SDK, PRD, version branch, Task DAG or main merge is proposed by thi
 - Materialization-run: https://github.com/kaicreator-mm/domain-harness/actions/runs/37769708024 ; isolated GitHub-hosted Linux x86_64, Node v22.23.3, 18/18 PASS, exit 0. Tested transport/input SHA 577d54b46d17289235ecc20cdb8452d424de5431; resulting published source SHA 947a606cf47eba151a99a151000f299f8f27050f. Exact checked-out source contents and TAP output are preserved in `evidence/actions-test.tap`.
 - A later standalone exact-SHA direct-source workflow checks the final branch head and includes the additional Component Capability cycle falsification test. Its terminal status/run URL is recorded in #938, **not preclaimed here**.
 - Linux hosted runner **is an actual Build Host**, but not the project's Windows workstation or ECF Woodpecker VM. `PROJECT_DESIGNATED_BUILD_HOST_TESTS=NOT_RUN` remains true.
+
+## Gate A final direct-source execution snapshot
+
+- Exact tested source commit: `21382c66eb1c05b0d21e9aa4006f0b1b66e3bc86` / tree `c9fe89d17dd8c392aea22fa8bc477418fc5c329d`.
+- GitHub Actions Linux real Build Host: https://github.com/kaicreator-mm/domain-harness/actions/runs/37770008591 ; Node v22.23.3; `node --test experiments/v08-package-first-bootstrap/tests/spike.test.mjs`; tests `19/19 PASS`, `0 FAIL`, exit code `0`; both approval and learning smoke demonstrations executed successfully.
+- The latest documentation-only commit is revalidated by an exact-SHA GitHub Actions run; its run URL is written to the #938 terminal after completion. Never confuse its code SHA with the earlier tested code SHA.
+- This is an **architecture spike** only: the real GitHub hosted Ubuntu runner is not the repository's designated Windows/ECF Build Host, and no production-equivalence or release gate is implied.
