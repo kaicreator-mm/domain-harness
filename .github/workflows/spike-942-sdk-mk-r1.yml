@@ -47,7 +47,7 @@ jobs:
           cd "$RUNNER_TEMP/v07"
           npm ci --ignore-scripts --no-audit --no-fund
           cd packages/domain-harness
-          node --import tsx --test --test-isolation=none \
+          node --import tsx --test \
             tests/runtime-assembly/runtime-assembly-torn-snapshot.test.ts \
             tests/runtime-assembly/runtime-assembly-identity.test.ts \
             tests/component-admission/component-admission.test.ts \
