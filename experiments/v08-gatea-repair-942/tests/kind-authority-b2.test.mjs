@@ -55,7 +55,7 @@ async function prepare(){
   const b1Host=establishTrustedB1Host({root:base.root,approvedPins:base.pins});
   const host=establishTrustedPackageKindHost({root,approvedPins:pins,b1Host});
   const select=p=>({packageId:p.id,kindRef:{kindId:p.kind,version:'1.0.0'},componentId:p.component});
-  return {root,pins,host,select};
+  return {root,pins,host,select,b1Host};
 }
 test('K1: distinct Kind/Workflow Package profiles via SAME neutral host + real B1 Seal',async()=>{
   const f=await prepare();
@@ -84,6 +84,37 @@ test('K1: tampered wrong existing handler/owner rejected at trust root',async()=
   await writeFile(path,JSON.stringify(mf));
   await assert.rejects(()=>f.host.seal(f.select(p)),e=>e?.code==='E_APPROVED_BYTES');
   await assert.rejects(()=>f.host.seal({...f.select(p),approvedPins:{}}),e=>e?.code==='E_APPROVED_BYTES');
+});
+test('K1: host-reattested WRONG existing export and component owner refuse at exact identity gate',async()=>{
+  const f=await prepare(),p=pkgs[0],path=join(f.root,p.id,'manifest.json');
+  const original=JSON.parse(await readFile(path,'utf8'));
+  async function attempt(mutator,code){
+    const manifest=globalThis.structuredClone(original);
+    mutator(manifest);
+    const bytes=JSON.stringify(manifest,null,2)+'\n';
+    await writeFile(path,bytes);
+    const reapproved={...f.pins,[p.id]:{...f.pins[p.id],manifestSha256:sha(bytes)}};
+    const privilegedHost=establishTrustedPackageKindHost({
+      root:f.root,approvedPins:reapproved,b1Host:f.b1Host
+    });
+    await assert.rejects(()=>privilegedHost.seal(f.select(p)),error=>error?.code===code);
+  }
+  await attempt(m=>{m.bKinds[0].implementationId='impl.escalation.v1';},'E_SELECTED_HANDLER_IDENTITY');
+  await attempt(m=>{m.bKinds[0].componentId='another-owner';},'E_KIND_OWNER');
+  await attempt(m=>{m.bKinds[0].operationId='write';},'E_SELECTED_OPERATION');
+});
+test('K1: reattested B Package has no valid effectful authority fallback',async()=>{
+  const f=await prepare(),p=pkgs[0],path=join(f.root,p.id,'manifest.json');
+  const m=JSON.parse(await readFile(path,'utf8'));
+  m.bCandidate.components[0].operations[0].effect='non-idempotent';
+  m.bCandidate.integrity=packageDigest(m.bCandidate,{'modules/impl.mjs':p.module});
+  const bytes=JSON.stringify(m,null,2)+'\n';
+  await writeFile(path,bytes);
+  const reapproved={...f.pins,[p.id]:{...f.pins[p.id],manifestSha256:sha(bytes)}};
+  const sealed=await establishTrustedPackageKindHost({
+    root:f.root,approvedPins:reapproved,b1Host:f.b1Host}).seal(f.select(p));
+  assert.throws(()=>sealed.invoke({operationId:'run',input:{score:80}}),
+    e=>e?.code==='E_EFFECT_ADMISSION_REQUIRED');
 });
 test('K1: post-Seal physical module mutation does not replace captured callable',async()=>{
   const f=await prepare(),p=pkgs[0],sealed=await f.host.seal(f.select(p));
@@ -139,6 +170,38 @@ test('A1: SIMULATION cannot be upgraded into real PRODUCTION effect',async()=>{
     e=>e?.code==='AUTHORITY_CLASS_MISMATCH');
   assert.equal(calls.length,0);
   assert.equal(fx.journal.getRecords().length,0);
+});
+test('A1: true accepted T002C missing occurrence pin refuses before dispatch',async()=>{
+  const fx=await nativeFixture({skipActivation:true}),calls=[];
+  await assert.rejects(()=>invokeWithExistingV07Authority(
+    invocationInput(fx,{dispatch:recordingDispatch(calls)})),
+    e=>e?.code==='GOVERNANCE_EXECUTION_PIN_MISSING');
+  assert.equal(calls.length,0);assert.equal(fx.journal.getRecords().length,0);
+});
+test('A1: real T003C rejects manufactured lookalike binding mint',async()=>{
+  const fx=await nativeFixture(),calls=[];
+  const forged={evidence:{...fx.binding.evidence},
+    successorAssembly:fx.binding.successorAssembly,
+    implementationHandle:fx.binding.implementationHandle};
+  await assert.rejects(()=>invokeWithExistingV07Authority(
+    invocationInput(fx,{binding:forged,dispatch:recordingDispatch(calls)})),
+    e=>e?.code==='UNMINTED_TOOL_IMPLEMENTATION_BINDING');
+  assert.equal(calls.length,0);assert.equal(fx.journal.getRecords().length,0);
+});
+test('A1: real T004A request assembly currentness mismatch refuses',async()=>{
+  const fx=await nativeFixture(),calls=[];
+  const stale={...fx.admitted,assemblyDigest:'sha256:stale-assembly'};
+  await assert.rejects(()=>invokeWithExistingV07Authority(
+    invocationInput(fx,{request:stale,dispatch:recordingDispatch(calls)})),
+    e=>e?.code==='ASSEMBLY_CURRENTNESS_MISMATCH');
+  assert.equal(calls.length,0);assert.equal(fx.journal.getRecords().length,0);
+});
+test('A1: real Central Admission rejects unbound effect type',async()=>{
+  const fx=await nativeFixture(),calls=[];
+  await assert.rejects(()=>invokeWithExistingV07Authority(
+    invocationInput(fx,{effectType:'effect:unbound',dispatch:recordingDispatch(calls)})),
+    e=>e?.code==='ADMISSION_EFFECT_TOOL_UNBOUND');
+  assert.equal(calls.length,0);assert.equal(fx.journal.getRecords().length,0);
 });
 test('A1: effect=none operation denied at real effectful path',async()=>{
   const fx=await nativeFixture({operationId:'op.query',effect:'none'}),calls=[];
