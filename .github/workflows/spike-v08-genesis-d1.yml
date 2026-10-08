@@ -1,0 +1,46 @@
+name: V08 Genesis D1 hand-authored Package falsification
+on:
+  push:
+    branches:
+      - spike/v08-genesis-seed-971-d1
+  pull_request:
+    paths:
+      - 'experiments/v08-genesis-seed-d1/**'
+      - '.github/workflows/spike-v08-genesis-d1.yml'
+  workflow_dispatch:
+jobs:
+  genesis-fast:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          echo "exact HEAD=$(git rev-parse HEAD)"
+          echo "exact TREE=$(git rev-parse HEAD^{tree})"
+          sha256sum experiments/v08-genesis-seed-d1/packages/*/modules/*.mjs
+      - run: npm ci
+      - run: npm run build
+      - run: node --test experiments/v08-genesis-seed-d1/tests/genesis.test.mjs
+      - run: node experiments/v08-genesis-seed-d1/run.mjs
+  genesis-full:
+    runs-on: ubuntu-24.04
+    steps:
+      # Historical v0.7 tests assert git-object ancestry; a shallow clone is not valid.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Consistent with independently reviewed B1 R2 full-repo host.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: |
+          echo "exact HEAD=$(git rev-parse HEAD)"
+          echo "exact TREE=$(git rev-parse HEAD^{tree})"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: node --test experiments/v08-genesis-seed-d1/tests/genesis.test.mjs
