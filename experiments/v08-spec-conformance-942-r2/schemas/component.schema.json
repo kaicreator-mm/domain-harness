@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "v0.8 internal research candidate component.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "componentId",
+    "packageId",
+    "kindRef",
+    "semanticBody",
+    "requiredSemanticContracts",
+    "requiresCapabilities",
+    "providesCapabilities",
+    "relations",
+    "operations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "ucb/1"
+    },
+    "componentId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+    },
+    "packageId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+    },
+    "kindRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kindId",
+        "version"
+      ],
+      "properties": {
+        "kindId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "semanticBody": {},
+    "requiredSemanticContracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contractId",
+          "version"
+        ],
+        "properties": {
+          "contractId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+          }
+        }
+      }
+    },
+    "requiresCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capabilityId",
+          "version",
+          "operations"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+            }
+          }
+        }
+      }
+    },
+    "providesCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capabilityId",
+          "version",
+          "operations"
+        ],
+        "properties": {
+          "capabilityId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+            }
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relationKind",
+          "target"
+        ],
+        "properties": {
+          "relationKind": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "packageId",
+              "componentId",
+              "digest"
+            ],
+            "properties": {
+              "packageId": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+              },
+              "componentId": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "inputSchema",
+          "outputSchema",
+          "failures",
+          "effect",
+          "callers",
+          "exposure"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+          },
+          "inputSchema": {
+            "type": "object"
+          },
+          "outputSchema": {
+            "type": "object"
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+            },
+            "uniqueItems": true
+          },
+          "effect": {
+            "enum": [
+              "none",
+              "idempotent",
+              "non-idempotent"
+            ]
+          },
+          "callers": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._/-]*$"
+            }
+          },
+          "exposure": {
+            "enum": [
+              "host",
+              "component",
+              "internal"
+            ]
+          }
+        }
+      }
+    },
+    "nonMaterialExtensions": {}
+  }
+}
