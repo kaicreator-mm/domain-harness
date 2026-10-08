@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - spike/v08-spec-conformance-942-r1
+  pull_request:
+    branches:
+      - spike/v08-sdk-packageization-mk-942-r1
   workflow_dispatch:
 permissions:
   contents: read
