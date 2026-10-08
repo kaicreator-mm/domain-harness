@@ -1,0 +1,102 @@
+V0_7_T012 SUCCESSOR RERUN — RUN LOG SUMMARY (gate #926, candidate 29dba90b)
+=============================================================================
+
+CONTROLLER=#537 LOCAL_FIRST_MAX_SAFE_PARALLELISM. AUTHORITY=#537@6052473158
+RELEASED_BOUNDED (FULL_T012_RERUN_REQUIRED=YES). GATE=#926.
+SUCCESSOR OF: executor terminal BOUNDED_REBIND_REQUIRED (run at e3a63222),
+validation terminal 6050727553, fresh review 6050780141, merge record
+6050799379. SUBJECT: T012-D1-repaired tree (PR #931 merge), /v7/execution
+execution facade landed. WORKTREE=C:\xDev\kAiCreator\domain-harness\dh-t012r-926
+(branch task/dh-t012r-926 @ 29dba90bfaa0185fcbd9cd695db72f55d5e80806, rev-parse
+verified; version/v0.7 tip == candidate verified via gh api, not via the
+stale local-mirror origin remote).
+
+LANE A (worktree, 29dba90b)
+  npm ci ............................................... exit 0
+    (better-sqlite3/esbuild install scripts policy-blocked as before;
+     better-sqlite3 binding via disclosed same-host prebuilt, sha256
+     e75b8c02…, identical to the prior run's disclosure)
+  npm run build (incl. committed-dist check) ............. exit 0
+  npm run typecheck ...................................... exit 0
+  npm run lint ........................................... exit 0
+  core tests: first full-workspace attempt died mid-suite
+    abruptly (exit 1, NO failure summary) — infra flake class;
+    isolated rerun: pass 2913 / fail 0, exit 0 ............. GREEN
+  compiler tests ................................ pass 172 / fail 0
+  expo typecheck (tsc x2) .................................. exit 0
+  node-host tests ............................... pass 175 / fail 0
+  root tests (assembly/conformance/compiler/hosts/migration
+    + script runners) ........................ pass 62+9 / fail 0, exit 0
+  NOTE: first full-run attempt also caught a genuine CI-portability defect
+    in MY OWN evidence file (n02b-types.ts tripped the core test tsconfig
+    noUnusedLocals + an outdated 2-arg signature) — fixed in the evidence
+    file (tests-only write set), rerun green. Same class as prior run's
+    pipeline-999 lesson. Validator patched no product source.
+
+PACKED_CANDIDATE_BINDING (npm pack -w x4 after build, at 29dba90b)
+  core     f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332  884711 B   (was d045145c… 780889 B — repair touched core only)
+  node     549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78   34447 B   (byte-identical to prior run)
+  compiler 3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480   58592 B   (byte-identical to prior run)
+  expo     d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1   35656 B   (byte-identical to prior run)
+  set sha256 (digests joined '\n', pack order) = 0b5772fc7aaf57373759bf9c11b3f9294d60fbfcb22aa56c991fa7924fd3d98e
+  sha256sum -c OK at bind AND at N13 final recheck.
+
+CLEAN_INSTALL / NO_WORKSPACE_SHORTCUT (clean room
+  C:\xDev\kAiCreator\_tmp\dh-t012r-926-cleanroom\, external consumer)
+  npm install from ../tarballs/*.tgz only; 33 substitution assertions green;
+  zero symlinks; realpaths inside consumer; no src/; 10 declared
+  subpaths/conditions import+require resolve (9 prior + NEW ./v7/execution);
+  8 deep-import ERR_PACKAGE_PATH_NOT_EXPORTED negatives green (all Tool-plane
+  owner paths + src/index.ts — T008C closedness preserved by the repair);
+  consumer tsc strict nodenext skipLibCheck:false exit 0 incl. the extended
+  ./v7/execution value+type surface exercise.
+
+T010_JOURNEYS (38 rows, exit 0) — FROM PACKED PUBLIC BYTES
+  030402bf… via packed /v7 ................................ MATCH
+  8f5220bf… via packed ./v7/execution T003C binding ....... MATCH (was NOT RECOMPUTABLE)
+  400d668f… via packed ./v7/execution final Assembly ...... MATCH (was NOT RECOMPUTABLE)
+  freeze-record deep-match through packed seams ........... EXACT
+  10/10 Tool-plane seams PRESENT on ./v7/execution; ABSENT from the other 6
+    declared subpaths (60 absence checks — the prior run's SURFACE_GAP block
+    is now a closedness POSITIVE)
+  T010B authorized: T004A exposure+invocation admitted -> ONE PRODUCTION
+    occurrence pinned to 400d668f… -> invokeEffectfulTool ONE dispatch ->
+    authoritative Runtime DONE, ONE durable journal record, T005C resource
+    re-proof exact, frozen result carries no live handle
+  T010B pure route: invokeNonEffectfulTool OBSERVED-only; zero journal;
+    zero effects (prior run N06 PARTIAL -> now PASS)
+  T010C rows all TYPED with zero counters + byte-stable state:
+    UX_OPERATION_NOT_EXPOSED (x3), AGENT_OPERATION_NOT_PROJECTED,
+    TOOL_COMPONENT_NOT_BOUND, DEFINITION_CURRENTNESS_MISMATCH,
+    UNMINTED_TOOL_IMPLEMENTATION_BINDING, GOVERNANCE_EXECUTION_PIN_MISSING,
+    RESOURCE_CURRENTNESS_MISMATCH, UX_MUTATION_REFUSED,
+    AUTHORITY_CLASS_MISMATCH, AUTHORITY_CLASS_FORBIDDEN,
+    AMBIGUOUS_TOOL_IMPLEMENTATION, MISSING_TOOL_IMPLEMENTATION,
+    INVALID_UX_REQUEST_INPUT (x3 floating identities)
+  prior publicly-expressible negatives unchanged green (schema, no-candidate,
+    pin-missing, effect-tool-unbound, journal-conflict, forged pin
+    currentness, exactness helpers, in-process replay idempotent)
+  1 honest OBSERVATION retained: /v3 Central Admission alone does not gate
+    authority class; enforcement is T004C-owned and executed green above.
+
+TOOL_EFFECT_RECOVERY / REAL_SQLITE / RESTART_REPLAY (n03-sqlite, exit 0)
+  real file-backed SQLite 3.53.2 (WAL, synchronous=FULL, foreign_keys);
+  PRODUCTION pin + exact currentness + completed effect durable;
+  close-all + NEW-process reopen byte-intact;
+  N09 SIGKILL pre-commit -> replay executionCount=1 exactly-once;
+  N10 SIGKILL post-commit -> disposition=replayed executionCount=1.
+
+RERUN_CURRENTNESS (N13)
+  sha256sum -c: 4 tarballs byte-identical to N00 binding;
+  all consumer cases rerun exit 0; consumer tsc exit 0;
+  gh api version/v0.7 tip == 29dba90b == candidate (terminal-time check).
+
+HOST_IDENTITY / INFRA_FAILURE_POLICY
+  Windows 10.0.26200 x64; node v24.21.0 (ABI 137); npm 11.19.0;
+  better-sqlite3 12.11.1 binding sha256 e75b8c02… (DISCLOSED same-host
+  prebuilt from dh-e4-896, hash identical to prior disclosure);
+  SQLite 3.53.2. better-sqlite3 install-script block disclosed, NOT
+  converted to PASS/FAIL; mid-suite load flake recorded, not promoted;
+  zero UNAVAILABLE-to-PASS conversions.
+
+MICROKERNEL_SOURCE_DIFF=0 (evidence write set only: tests/t012r/).

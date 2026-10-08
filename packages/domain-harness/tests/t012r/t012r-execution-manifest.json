@@ -1,0 +1,86 @@
+{
+  "schema": "v0.7/t012r-execution-manifest",
+  "schemaVersion": 1,
+  "gate": "T012",
+  "gateIssue": 926,
+  "runKind": "SUCCESSOR_RERUN",
+  "supersedes": [
+    "executor terminal BOUNDED_REBIND_REQUIRED (#926@6050392834 run at e3a63222)",
+    "independent validation terminal CONFIRMED (#926@6050727553)",
+    "fresh independent review (#926@6050780141)",
+    "merge record (#926@6050799379)"
+  ],
+  "adjudication": "#537@6052473158 RELEASED_BOUNDED — FULL_T012_RERUN_REQUIRED=YES on the T012-D1-repaired candidate",
+  "frozenContracts": ["#728 T012 readiness (CLOSED=approved)", "#589 PACK-E", "#924/#931 T012-D1 repair merged at 29dba90b"],
+  "role": "REAL_HOST_VALIDATION_EXECUTABLE",
+  "candidate": {
+    "commit": "29dba90bfaa0185fcbd9cd695db72f55d5e80806",
+    "branch": "version/v0.7",
+    "currentness": "verified via gh api repos/kaicreator-mm/domain-harness/branches/version/v0.7 at claim AND at terminal time (tip == 29dba90b == candidate; the worktree origin remote points at the local mirror and was NOT used for currentness)",
+    "treeBinding": "packed artifact bytes are the authoritative subject (per #728 section 1)",
+    "packedArtifacts": [
+      { "name": "kaicreator-domain-harness-0.2.0.tgz", "size": 884711, "sha256": "f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332" },
+      { "name": "kaicreator-domain-harness-node-0.2.0.tgz", "size": 34447, "sha256": "549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78" },
+      { "name": "kaicreator-domain-harness-compiler-0.2.0.tgz", "size": 58592, "sha256": "3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480" },
+      { "name": "kaicreator-domain-harness-expo-0.2.0.tgz", "size": 35656, "sha256": "d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1" }
+    ],
+    "packedTarballSetSha256": "0b5772fc7aaf57373759bf9c11b3f9294d60fbfcb22aa56c991fa7924fd3d98e",
+    "packedTarballSetMethod": "sha256 over the 4 per-tarball digests in npm pack workspace order joined with '\\n' (same construction as n00-host-identity.json; per-tarball digests are authoritative per #728)",
+    "packProvenance": "npm pack -w x4 at 29dba90b after npm ci + npm run build (committed-dist check green); node/compiler/expo tarballs byte-identical to the prior run (the bounded repair touched core only), core differs d045145c… -> f9400728… as expected",
+    "priorRunDigestDelta": "core d045145cd2dd…f12 (780889B) -> f9400728bc99…d332 (884711B); node 54926261…, compiler 3a254c62…, expo d4c6ef8a… unchanged"
+  },
+  "hostIdentity": {
+    "source": "clean-room artifacts/n00-host-identity.json",
+    "node": "v24.21.0",
+    "nodeAbi": "137",
+    "npm": "11.19.0",
+    "platform": "win32 x64 (Windows 10.0.26200)",
+    "betterSqlite3": "12.11.1",
+    "betterSqlite3NativeBindingSha256": "e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e",
+    "sqliteVersion": "3.53.2"
+  },
+  "t010FixtureBinding": {
+    "fixture": "T010A neutral definition (accepted 407b9ae4 via PR #910), transcribed into the clean consumer (tests/t012r/consumer-src/fixture.mjs, identical to the prior run's transcription)",
+    "FREEZE_DEFINITION_GRAPH_DIGEST": "030402bf802340d77f1ed88a3a4858dc2202b9b16bc590038d45cbf26b97825c",
+    "FREEZE_BINDING_DIGEST": "8f5220bfc9c2e41c44cd06cdf36a5369662806a6e311fb1b5e338d2b2df86a87",
+    "FREEZE_FINAL_ASSEMBLY_DIGEST": "400d668f9f806b7b7266c78b2322ffdf13bde07c8aa87a86edd9d78398d677c0",
+    "digestMatchThroughPackedBytes": {
+      "definitionGraphDigest": "MATCH (recomputed via packed /v7 computeDefinitionGraphDigest in the clean consumer)",
+      "bindingDigest": "MATCH (recomputed via packed ./v7/execution bindToolImplementation evidence at the repaired candidate — T012-D1 cured)",
+      "finalAssemblyDigest": "MATCH (recomputed via packed ./v7/execution successor sealed Assembly at the repaired candidate — T012-D1 cured)"
+    }
+  },
+  "matrix": [
+    { "id": "T12R-N00", "verdict": "PASS", "detail": "candidate/tree/tarball-digest/host-identity binding (n00-host-identity.json); version/v0.7 tip verified via gh api at bind and at terminal" },
+    { "id": "T12R-N01", "verdict": "PASS", "detail": "Lane A: npm ci + build (committed-dist check) + typecheck + lint green; core 2913/2913 (isolated rerun exit 0 after one full-run attempt died mid-suite abruptly with NO failure summary — recorded as infra flake, same class as the prior run's N17 disclosure, isolated rerun green); compiler 172/172; expo typecheck exit 0; node 175/175; root 62+9 pass 0 fail" },
+    { "id": "T12R-N02", "verdict": "PASS", "detail": "external tarball-only consumer: 33 substitution assertions green (24 prior + 9 new ./v7/execution rows: 3 resolution + 3 realpath/no-symlink/no-src + has-dist/no-src for core facade file + import/require); 10 declared subpaths/conditions import+require resolve (9 prior + new ./v7/execution); 8 deep-import ERR_PACKAGE_PATH_NOT_EXPORTED negatives still green; tsc strict nodenext skipLibCheck:false exit 0 incl. the ./v7/execution value+type surface exercise" },
+    { "id": "T12R-N03", "verdict": "PASS", "detail": "real file-backed better-sqlite3 (sqlite 3.53.2, WAL, synchronous=FULL, foreign_keys): PRODUCTION pin + exact resource currentness + completed effect durable; close-all + NEW-process reopen byte-intact" },
+    { "id": "T12R-N04", "verdict": "PASS", "detail": "authorized journey FULLY executed through packed public bytes: occurrence + Central Admission DONE (prior run) PLUS T010B stages 2-6 through ./v7/execution — T004A exposure/invocation admission against frozen digests, ONE PRODUCTION occurrence pinned to assemblyDigest 400d668f…, invokeEffectfulTool ONE dispatch -> authoritative Runtime DONE with ONE durable journal record; frozen triple 030402bf…/8f5220bf…/400d668f… all MATCH; 10/10 seams present on ./v7/execution and absent from the other 6 subpaths (60 absence checks)" },
+    { "id": "T12R-N05", "verdict": "PASS", "detail": "unauthorized matrix: all prior publicly-expressible rows green PLUS T010C R1 (UX_OPERATION_NOT_EXPOSED query/effectful/forged-op, AGENT_OPERATION_NOT_PROJECTED, TOOL_COMPONENT_NOT_BOUND), R2 (DEFINITION_CURRENTNESS_MISMATCH at T004B re-admission), R3 (UNMINTED_TOOL_IMPLEMENTATION_BINDING, GOVERNANCE_EXECUTION_PIN_MISSING, RESOURCE_CURRENTNESS_MISMATCH), R4 (UX_MUTATION_REFUSED), R5 (AUTHORITY_CLASS_MISMATCH, AUTHORITY_CLASS_FORBIDDEN), R6 (AMBIGUOUS/MISSING_TOOL_IMPLEMENTATION, INVALID_UX_REQUEST_INPUT floating identities) — every refusal TYPED with zero counters and byte-stable durable state" },
+    { "id": "T12R-N06", "verdict": "PASS", "detail": "pure effect=none Tool path EXECUTED via invokeNonEffectfulTool (packed ./v7/execution): OBSERVED-only result, zero journal records, zero effects, no DONE/transition authority; authority-split typed refusals both directions (prior run N06 PARTIAL -> PASS)" },
+    { "id": "T12R-N07", "verdict": "PASS", "detail": "effectful path via invokeEffectfulTool (packed ./v7/execution): exactly ONE dispatch of the verified paired handle, DONE read from Runtime outcome only; T005C resource re-proof exact; live handle never leaks into the frozen result" },
+    { "id": "T12R-N08", "verdict": "PASS", "detail": "resource currentness: exact frozen non-secret pin bound into the PRODUCTION occurrence; forged revisionDigest refuses typed at the public pin seam AND at the T005C occurrence re-proof (RESOURCE_CURRENTNESS_MISMATCH, now executed through packed bytes); sameResourceCurrentnessEvidence exact-match/mismatch proven" },
+    { "id": "T12R-N09", "verdict": "PASS", "detail": "parent-controlled SIGKILL after durable 'started' record, before effect completion: cross-process replay completed the exact effect identity with executionCount=1 (no partial/duplicate authority)" },
+    { "id": "T12R-N10", "verdict": "PASS", "detail": "SIGKILL after durable completion before caller ack: replay disposition=replayed, executionCount=1 (outcome-unknown resolved by exact idempotency identity, never blind duplicate)" },
+    { "id": "T12R-N11", "verdict": "PASS", "detail": "restart/replay resolves exact Definition/Assembly/Tool/resource evidence, never latest/default/order fallback: in-process exact-turn replay (disposition=replayed, zero re-invocation), cross-process replay after real kill, typed AMBIGUOUS/MISSING binding refusals, floating identities refused" },
+    { "id": "T12R-N12", "verdict": "PASS", "detail": "no-workspace-shortcut: zero symlinks; realpaths inside consumer; no src/; 8 deep-import ERR_PACKAGE_PATH_NOT_EXPORTED negatives incl. every Tool-plane owner path and src/index.ts; 10 declared subpath/condition rows resolve from installed packed bytes only" },
+    { "id": "T12R-N13", "verdict": "PASS", "detail": "final recheck: sha256sum -c OK (4 tarballs byte-identical to N00); all consumer cases rerun exit 0 (n02-resolution, n00-host-identity, t010-journeys 38 rows, n03-sqlite, consumer tsc); version/v0.7 tip re-verified via gh api == 29dba90b" }
+  ],
+  "honestObservations": [
+    "T010-neg-authority-class-boundary remains an OBSERVATION row: the public /v3 Central Admission plane alone does not gate authority class (outcome=admitted for a SIMULATION pin); AUTHORITY_CLASS_MISMATCH enforcement is T004C-owned and is now EXECUTED green via ./v7/execution (row T010c-r5-simulation-class-refused) — recorded, not promoted",
+    "first full-workspace npm test attempt died mid-core-suite abruptly (exit 1, no failure summary, 142 checkmarks); isolated core rerun green 2913/2913 exit 0 — timing/load sensitivity on this host, same class as the prior run's disclosed N17 flake; recorded as infra note, not a product defect"
+  ],
+  "infraNotes": [
+    "better-sqlite3 native binding installed via the disclosed shared-worktree prebuilt binary (policy-blocked install script); hash e75b8c02… identical to the prior run's disclosure; real native SQLite 3.53.2 executed",
+    "DEEPSEEK_API_KEY not required for T012R",
+    "currentness reads use gh api against GitHub directly (worktree origin points at the local mirror and is stale by design)"
+  ],
+  "defects": [],
+  "timestamps": {
+    "packedAtUtc": "2026-10-08T07:10Z",
+    "validatedAtUtc": "2026-10-08T07:15Z..08:05Z",
+    "finalRecheckAtUtc": "2026-10-08T08:05Z"
+  },
+  "MICROKERNEL_SOURCE_DIFF": 0,
+  "verdictPreview": "PASS (READY_FOR_INDEPENDENT_VALIDATION_AND_FRESH_REVIEW)"
+}
