@@ -6,6 +6,7 @@ on:
   pull_request:
     branches:
       - main
+      - spike/v08-gatea-b1-trusted-binding-955-r2
 permissions:
   contents: read
 jobs:
