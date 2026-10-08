@@ -198,7 +198,14 @@ test('T004E.B4 closed-world input field sets: the seam inputs admit exactly the 
 
 test('T004E.B5 no public barrel exposure: no module under src/ imports the UX adapter — there is no UX-specific runtime/registry path into the kernel', () => {
   const srcRoot = fileURLToPath(new URL('../../src', import.meta.url));
+  // T012-D1 bounded repair (gate #930, adjudication #537@6052473158): the
+  // ONE composition-only public facade src/public-v7/execution.ts is the
+  // single declared src-level reference to the UX adapter — it re-exports
+  // queryUxTool/invokeUxToolEffectfully unchanged and consumes nothing. Every
+  // other src module must remain adapter-free.
+  const FACADE = 'src/public-v7/execution.ts';
   const offenders: string[] = [];
+  const facadeReferences: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = `${dir}/${entry.name}`;
@@ -207,16 +214,25 @@ test('T004E.B5 no public barrel exposure: no module under src/ imports the UX ad
       } else if (entry.name.endsWith('.ts')) {
         const source = readFileSync(full, 'utf8');
         if (/adapters\/ux-tool-request/.test(source)) {
-          offenders.push(full);
+          if (full.endsWith(FACADE)) {
+            facadeReferences.push(full);
+          } else {
+            offenders.push(full);
+          }
         }
       }
     }
   };
   walk(srcRoot);
+  assert.equal(
+    facadeReferences.length,
+    1,
+    'the adjudicated composition-only facade must be the one declared src-level reference to the UX adapter',
+  );
   assert.deepEqual(
     offenders,
     [],
-    'the UX adapter must not be re-exported or consumed by any src module (adapter-only boundary)',
+    'the UX adapter must not be re-exported or consumed by any src module other than the ./v7/execution facade (adapter-only boundary)',
   );
 });
 

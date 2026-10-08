@@ -98,7 +98,14 @@ test('E4.B2 V12 exported surface: exactly three seams + typed error + caller-kin
 
 test('E4.B3 V12 no public barrel exposure: no module under src/ imports the Agent adapter — there is no Agent-specific runtime/registry path into the kernel', () => {
   const srcRoot = fileURLToPath(new URL('../../src', import.meta.url));
+  // T012-D1 bounded repair (gate #930, adjudication #537@6052473158): the
+  // ONE composition-only public facade src/public-v7/execution.ts is the
+  // single declared src-level reference to the Agent adapter — it re-exports
+  // projectAgentToolSurface/queryAgentTool/admitAgentMutationIntent unchanged
+  // and consumes nothing. Every other src module must remain adapter-free.
+  const FACADE = 'src/public-v7/execution.ts';
   const offenders: string[] = [];
+  const facadeReferences: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = `${dir}/${entry.name}`;
@@ -107,16 +114,25 @@ test('E4.B3 V12 no public barrel exposure: no module under src/ imports the Agen
       } else if (entry.name.endsWith('.ts')) {
         const source = readFileSync(full, 'utf8');
         if (/adapters\/agent-tool-projection/.test(source)) {
-          offenders.push(full);
+          if (full.endsWith(FACADE)) {
+            facadeReferences.push(full);
+          } else {
+            offenders.push(full);
+          }
         }
       }
     }
   };
   walk(srcRoot);
+  assert.equal(
+    facadeReferences.length,
+    1,
+    'the adjudicated composition-only facade must be the one declared src-level reference to the Agent adapter',
+  );
   assert.deepEqual(
     offenders,
     [],
-    'the Agent adapter must not be re-exported or consumed by any src module (adapter-only boundary)',
+    'the Agent adapter must not be re-exported or consumed by any src module other than the ./v7/execution facade (adapter-only boundary)',
   );
 });
 
