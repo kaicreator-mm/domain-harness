@@ -1,5 +1,6 @@
 import { SpikeError } from '../bootstrap.mjs';
 export const implementations={
+ 'learning.workflow.impl@1':ctx=>({resolve(){return structuredClone(ctx.definition)}}),
  'learning.action.impl@1':ctx=>({run({action,facts}){switch(action){
   case 'lesson':return {outcome:'SUCCESS',facts:{learned:true,mastery:facts.progress}};
   case 'badge':return {outcome:'SUCCESS',facts:{badge:'completed',done:true}};

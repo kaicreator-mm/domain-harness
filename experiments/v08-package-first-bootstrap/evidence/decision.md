@@ -54,3 +54,12 @@ No full v0.8 SDK, PRD, version branch, Task DAG or main merge is proposed by thi
 - GitHub Actions Linux real Build Host: https://github.com/kaicreator-mm/domain-harness/actions/runs/37770008591 ; Node v22.23.3; `node --test experiments/v08-package-first-bootstrap/tests/spike.test.mjs`; tests `19/19 PASS`, `0 FAIL`, exit code `0`; both approval and learning smoke demonstrations executed successfully.
 - The latest documentation-only commit is revalidated by an exact-SHA GitHub Actions run; its run URL is written to the #938 terminal after completion. Never confuse its code SHA with the earlier tested code SHA.
 - This is an **architecture spike** only: the real GitHub hosted Ubuntu runner is not the repository's designated Windows/ECF Build Host, and no production-equivalence or release gate is implied.
+
+## Bounded repair / independent review follow-up (PR #940)
+
+- Review source: https://github.com/kaicreator-mm/domain-harness/issues/938#issuecomment-6059040182
+- P1-F1: 3- and 4-Package closed composition tested with exact caller-supplied dependency pins, real support capability consumption, orphan/duplicate/missing/cycle refusal. No dynamic/plugin registry.
+- P1-F2: business Workflow moved from manifest top-level into `workflow.definition@1` Semantic Component with bound `business.workflow@1.resolve` operation, consumed through SDK scoped context; malformed/missing/manifest bypass and implementation-replacement probes added.
+- P2-L1: SUCCESS commit-before-receipt failure is **diagnosed, deliberately not fixed**. Injected failure and duplicate receipt demonstrate committed revision without matching receipt; no durable parity claim.
+- Local isolated Node 22 test command: `node --test experiments/v08-package-first-bootstrap/tests/spike.test.mjs`. Local dry run: 24/24 PASS, smoke approval+learning PASS; this is NOT a substitute for exact-new-SHA real-host evidence. See GitHub Issue #938 follow-up terminal / GitHub Actions run for exact commit result after push.
+- Gate B v0.7 behavioral parity: NOT_TESTED; production durable journal/central admission/host isolation: NOT_PROVEN; draft PR not merge-authorized.

@@ -21,21 +21,40 @@ export const implementations={
   function stage(p){if(sealed)fail('E_SEALED');check(p);staged.push(p)}
   return {
    stageKernel(p){if(staged.length||p.manifest.id!=='kernel')fail('E_BOOT');stage(p)},
-   async link(sel){const p=await seed.readExact(sel);stage(p);return {id:p.manifest.id,digest:p.digest}},
-   async seal(){
+   async link(sel){const p=await seed.readExact(sel);stage(p);return {id:p.manifest.id,version:p.manifest.version,digest:p.digest,dependencies:cp(p.manifest.dependencies)}},
+   async seal({businessId}={}){
     if(sealed)fail('E_SEALED');
-    if(staged.length!==3||staged[0].manifest.id!=='kernel'||staged[1].manifest.id!=='sdk')fail('E_LAYERS');
+    if(staged.length<3||staged.length>8||staged[0].manifest.id!=='kernel'||staged[1].manifest.id!=='sdk'
+      ||!businessId||['kernel','sdk'].includes(businessId))fail('E_LAYERS');
     const packages=new Map(staged.map(p=>[p.manifest.id,p]));const graph=new Map();
     for(const p of staged){graph.set(p.manifest.id,p.manifest.dependencies.map(d=>d.id));for(const d of p.manifest.dependencies){const target=packages.get(d.id);if(!target||target.manifest.version!==d.version)fail('E_DEP_VERSION')}}
     const busy=new Set(),done=new Set();
     function visit(id){if(busy.has(id))fail('E_CYCLE');if(done.has(id))return;busy.add(id);for(const d of graph.get(id)||[])visit(d);busy.delete(id);done.add(id)}
     for(const id of graph.keys())visit(id);
+    if(!packages.has(businessId))fail('E_BUSINESS');
+    const reachable=new Set();
+    function close(id){if(reachable.has(id))return;reachable.add(id);for(const dep of graph.get(id)||[])close(dep)}
+    close(businessId);
+    if(!reachable.has('sdk')||!reachable.has('kernel')||reachable.size!==staged.length)fail('E_ORPHAN_PACKAGE');
+    // Canonical dependency-first order, independent of the caller's support-pin order.
+    const order=[];const orderedSeen=new Set();
+    function orderVisit(id){if(orderedSeen.has(id))return;orderedSeen.add(id);for(const dep of [...graph.get(id)].sort())orderVisit(dep);order.push(packages.get(id))}
+    orderVisit(businessId);
     const bindings=new Map(),selections=new Map();
     for(const p of staged){
      for(const c of p.manifest.components)for(const cap of c.provides){if(bindings.has(cap.id))fail('E_AMBIGUOUS_PROVIDER');bindings.set(cap.id,{pkg:p,component:c,ops:cap.operations,ref:ref(p.manifest,c)})}
      for(const [cap,provider] of Object.entries(p.manifest.selections)){if(selections.has(cap))fail('E_SELECTION_DUPLICATE');selections.set(cap,provider)}
     }
     if(selections.size!==bindings.size)fail('E_BINDING');
+    const wfProvider=bindings.get('business.workflow@1'),actionProvider=bindings.get('business.action@1');
+    if(!wfProvider||!actionProvider||wfProvider.pkg.manifest.id!==businessId
+      ||actionProvider.pkg.manifest.id!==businessId)fail('E_BUSINESS_WORKFLOW');
+    if(staged.some(p=>Object.hasOwn(p.manifest,'workflow')))fail('E_WORKFLOW_GRAPH','top-level workflow forbidden');
+    const wc=wfProvider.component,wf=wc.body;
+    if(wc.kind!=='semantic'||wc.kindRef!=='workflow.definition@1'
+      ||!wf||typeof wf.id!=='string'||!Array.isArray(wf.nodes)||!wf.nodes.length||!wf.endWhen
+      ||wf.nodes.some(n=>!n.when||typeof n.id!=='string'||typeof n.action!=='string'||!Number.isInteger(n.priority)))
+      fail('E_WORKFLOW_GRAPH');
     for(const [cap,b] of bindings)if(selections.get(cap)!==b.ref)fail('E_BINDING');
     for(const p of staged)for(const c of p.manifest.components)for(const req of c.requires){const b=bindings.get(req.id);if(!b)fail('E_MISSING_CAPABILITY',req.id);if(req.operations.some(op=>!b.ops.includes(op)))fail('E_OPERATION')}
     // The derived requires/provides graph is also acyclic (package DAG alone is insufficient).
@@ -50,18 +69,17 @@ export const implementations={
     }
     for(const cap of capEdges.keys())visitCap(cap);
     const ordered=[...bindings.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-    const identity={packages:staged.map(p=>({id:p.manifest.id,version:p.manifest.version,definition:p.manifest.definitionId,digest:p.digest,module:p.manifest.moduleDigest})),bindings:ordered.map(([cap,b])=>({cap,ref:b.ref,operations:[...b.ops].sort()}))};
+    const identity={packages:order.map(p=>({id:p.manifest.id,version:p.manifest.version,definition:p.manifest.definitionId,digest:p.digest,module:p.manifest.moduleDigest})),bindings:ordered.map(([cap,b])=>({cap,ref:b.ref,operations:[...b.ops].sort()}))};
     const assembly=deepFreeze({...cp(identity),digest:seed.sha256(JSON.stringify(identity))});
     const modules=new Map();for(const p of staged)modules.set(p.manifest.id,await seed.loadModule(p));
     for(const [,b] of ordered)if(typeof modules.get(b.pkg.manifest.id).implementations?.[b.component.implementation]!=='function')fail('E_IMPLEMENTATION');
-    const wf=cp(staged[2].manifest.workflow);
-    if(!wf||!Array.isArray(wf.nodes)||!wf.nodes.length||!wf.endWhen||wf.nodes.some(n=>!n.when||typeof n.action!=='string'||!Number.isInteger(n.priority)))fail('E_WORKFLOW');
     sealed=true;
-    return Object.freeze({assembly,activate({failCommit=false}={}){
-     const store={revision:0,facts:{},effects:[],failCommit};const bound=new Map();
+    return Object.freeze({assembly,activate({failCommit=false,failReceipt=false}={}){
+     const store={revision:0,facts:{},effects:[],failCommit,failReceipt};const bound=new Map();
      for(const [cap,b] of ordered){
       const scope=Object.freeze({
        ...(b.pkg.manifest.id==='kernel'&&b.component.id!=='loader'?{store}:{}),
+       ...(b.component.kindRef==='workflow.definition@1'?{definition:deepFreeze(cp(b.component.body))}:{}),
        invoke(target,operation,args){
         if(!b.component.requires.some(r=>r.id===target&&r.operations.includes(operation)))fail('E_SCOPE');
         const called=bound.get(target);if(!called||!called.ops.includes(operation))fail('E_OPERATION');
@@ -74,11 +92,11 @@ export const implementations={
      }
      const workflow=bound.get('workflow.run@1')?.instance,state=bound.get('state.commit@1')?.instance,effect=bound.get('effect.record@1')?.instance,action=bound.get('business.action@1')?.instance;
      if(!workflow||!state||!effect||!action)fail('E_MISSING_CAPABILITY');
-     return Object.freeze({assembly,dispatch(input={}){return workflow.run({workflow:cp(wf),input:cp(input),assemblyDigest:assembly.digest})},snapshot(){return state.read()},receipts(){return effect.list()},probeUnauthorized(){return action.probeUnauthorized()},rebind(){fail('E_SEALED')}});
+     return Object.freeze({assembly,dispatch(input={}){return workflow.run({input:cp(input),assemblyDigest:assembly.digest})},snapshot(){return state.read()},receipts(){return effect.list()},probeUnauthorized(){return action.probeUnauthorized()},rebind(){fail('E_SEALED')}});
     }});
    }
   };
  },
  'kernel.state.impl@1':ctx=>({read(){return {revision:ctx.store.revision,facts:cp(ctx.store.facts)}},commit({expectedRevision,facts}){if(ctx.store.failCommit||expectedRevision!==ctx.store.revision||!facts||typeof facts!=='object')fail('E_ADMISSION');ctx.store.facts={...ctx.store.facts,...cp(facts)};ctx.store.revision++;return this.read()}}),
- 'kernel.effect.impl@1':ctx=>({record({key,outcome,assemblyDigest}){if(ctx.store.effects.some(r=>r.key===key))fail('E_EFFECT_DUPLICATE');if(!['SUCCESS','UNKNOWN','CANCELLED','FAILED'].includes(outcome))fail('E_EFFECT_OUTCOME');const r={key,outcome,assemblyDigest,seq:ctx.store.effects.length+1};ctx.store.effects.push(r);return cp(r)},list(){return cp(ctx.store.effects)}})
+ 'kernel.effect.impl@1':ctx=>({record({key,outcome,assemblyDigest}){if(ctx.store.failReceipt)fail('E_EFFECT_RECORD','injected receipt failure after SUCCESS state commit');if(ctx.store.effects.some(r=>r.key===key))fail('E_EFFECT_DUPLICATE');if(!['SUCCESS','UNKNOWN','CANCELLED','FAILED'].includes(outcome))fail('E_EFFECT_OUTCOME');const r={key,outcome,assemblyDigest,seq:ctx.store.effects.length+1};ctx.store.effects.push(r);return cp(r)},list(){return cp(ctx.store.effects)}})
 };

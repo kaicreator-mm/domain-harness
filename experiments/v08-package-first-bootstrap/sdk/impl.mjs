@@ -1,7 +1,8 @@
 import { SpikeError } from '../bootstrap.mjs';
 export const implementations={
  'sdk.rule.impl@1':()=>({test({when,facts}){const x=facts[when.field];switch(when.op){case 'always':return true;case 'eq':return x===when.value;case 'gte':return typeof x==='number'&&x>=when.value;case 'lt':return typeof x==='number'&&x<when.value;case 'present':return Object.hasOwn(facts,when.field);default:throw new SpikeError('E_RULE')}}}),
- 'sdk.workflow.impl@1':ctx=>({run({workflow,input,assemblyDigest}){
+ 'sdk.workflow.impl@1':ctx=>({run({input,assemblyDigest}){
+  const workflow=ctx.invoke('business.workflow@1','resolve',{});
   let facts={...input};const decisions=[],visited=new Set();
   const eligible=n=>ctx.invoke('rule.eval@1','test',{when:n.when,facts});
   for(let step=0;step<8;step++){

@@ -57,5 +57,5 @@
     "effect.record@1": "kernel@0.0.1/effect#kernel.effect.impl@1"
   },
   "module": "impl.mjs",
-  "moduleDigest": "55eb3d99ec2dfbb2edbafd51d4279a9bfabc2bff"
+  "moduleDigest": "ed03ee1d18d6db96ec60c3985e797ee7a415f3da"
 }

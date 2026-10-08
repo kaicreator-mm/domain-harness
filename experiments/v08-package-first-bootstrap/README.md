@@ -31,3 +31,9 @@ Runnable sample: `node experiments/v08-package-first-bootstrap/demo.mjs`. No ins
 ## Decision posture
 
 Gate A is demonstrated by an actual clean GitHub-hosted Linux Build Host on exact commit `21382c66eb1c05b0d21e9aa4006f0b1b66e3bc86`: **19/19 PASS**, including an independent derived Capability dependency-cycle falsification test, with a completed approval + learning smoke demonstration. That is **not** the project's designated Windows/ECF Build Host. Gate B, v0.7 behavioral parity, release qualification and genuinely independent read-only review are separate and unexecuted. See `evidence/decision.md` and the final #938 exact-SHA terminal for the latest test run.
+
+## Follow-up #938 bounded repair — composition, Component Workflow, receipt diagnosis
+
+- A controlled fourth package can be linked **only** through the Business Package's exact declared dependency, with a caller-supplied `dependencyPins` map. The bounded loader checks the dependency closure before activation; unlisted dependencies, duplicate IDs, orphans and cycles fail closed. The three-package cases remain unchanged. No network or dynamic registry was added.
+- Workflow definition now resides inside the Business Package's `workflow.definition@1` **Semantic Component**, exposed as `business.workflow@1.resolve` and consumed by SDK Workflow through its scoped capability context. Kernel refuses missing/malformed or top-level manifest workflow shortcuts. Assembly pins that component's provider and package bytes.
+- **P2 diagnostic, not a production fix:** the toy commits a SUCCESS state revision before effect receipt. An injected receipt failure leaves revision=1 and zero receipts; redispatch after a successful run can increment revision again before duplicate-receipt refusal. Production Gate B must design/test admission + journal-first intent, commit/receipt ordering, idempotency/recovery and UNKNOWN outcomes as one authority path; this spike does not claim parity.

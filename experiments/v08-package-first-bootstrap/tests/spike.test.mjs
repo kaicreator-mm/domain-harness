@@ -82,7 +82,7 @@ test('A4: unauthorized component invocation and admission failure do not commit'
 });
 test('A4: UNKNOWN and CANCELLED stop without commit and are not blindly retried',async()=>{
  for(const [action,status] of [['unknown','UNKNOWN'],['cancel','CANCELLED']])await sandbox(async d=>{
-  const business=await editManifest(d,'business-approval',m=>{m.workflow.nodes[0].action=action});
+  const business=await editManifest(d,'business-approval',m=>{m.components.find(c=>c.id==='workflow').body.nodes[0].action=action});
   const r=await bootstrap({root:d,sdk:pins.sdk,business});const out=r.dispatch({score:75});
   assert.equal(out.status,status);assert.equal(r.snapshot().revision,0);assert.equal(r.receipts()[0].outcome,status);
   assert.throws(()=>r.dispatch({score:75}),error('E_EFFECT_DUPLICATE'));
@@ -91,8 +91,9 @@ test('A4: UNKNOWN and CANCELLED stop without commit and are not blindly retried'
 test('A5: business-only version and declared node change creates new immutable assembly',async()=>sandbox(async d=>{
  const old=await boot();const oldReceipt=old.dispatch({score:75});assert.equal(oldReceipt.facts.approved,true);
  const business=await editManifest(d,'business-approval',m=>{
-  m.version='1.1.0';m.definitionId='approval.definition@2';m.workflow.nodes[0].when.value=80;
+  m.version='1.1.0';m.definitionId='approval.definition@2';m.components.find(c=>c.id==='workflow').body.nodes[0].when.value=80;
   m.selections['business.action@1']='approval@1.1.0/action#approval.action.impl@1';
+  m.selections['business.workflow@1']='approval@1.1.0/workflow#approval.workflow.impl@1';
  });
  const newer=await bootstrap({root:d,sdk:pins.sdk,business});const changed=newer.dispatch({score:75});
  assert.notEqual(old.assembly.digest,newer.assembly.digest);assert.notEqual(changed.facts.approved,true);
@@ -125,4 +126,81 @@ test('A2: derived Component Capability cycle fails before activation',async()=>s
   m.components[0].requires.push({id:'workflow.run@1',operations:['run']});
  });
  await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_CAPABILITY_CYCLE'));
+}));
+
+test('P1-F1: four-package declared dependency closure and real support capability consumption',async()=>sandbox(async d=>{
+ const actionFile=join(d,'business-approval','impl.mjs');
+ let source=await readFile(actionFile,'utf8');
+ source=source.replace("case 'review':return", "case 'review':ctx.invoke('support.flag@1','read',{});return");
+ assert.ok(source.includes("case 'review':ctx.invoke('support.flag@1','read',{});return"));
+ await writeFile(actionFile,source);
+ const business=await editManifest(d,'business-approval',m=>{
+  m.moduleDigest=blobSHA(source);
+  m.dependencies.push({id:'support',version:'1.0.0'});
+  m.components[0].requires.push({id:'support.flag@1',operations:['read']});
+ });
+ const r=await bootstrap({root:d,sdk:pins.sdk,business,dependencyPins:{support:pins.support}});
+ assert.deepEqual(r.assembly.packages.map(p=>p.id),['kernel','sdk','support','approval']);
+ assert.ok(r.assembly.bindings.some(b=>b.cap==='support.flag@1'&&b.ref.startsWith('support@')));
+ assert.equal(r.dispatch({score:75}).status,'COMPLETE');
+ const repeat=await bootstrap({root:d,sdk:pins.sdk,business,dependencyPins:{support:pins.support}});
+ assert.equal(repeat.assembly.digest,r.assembly.digest);
+}));
+test('P1-F1: missing, duplicate, unreferenced and cyclic fourth Package fail closed',async()=>sandbox(async d=>{
+ await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business:pins.approval,dependencyPins:{support:pins.support}}),error('E_ORPHAN_PACKAGE'));
+ const business=await editManifest(d,'business-approval',m=>m.dependencies.push({id:'support',version:'1.0.0'}));
+ await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_DEP_PIN'));
+ await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business,dependencyPins:{support:pins.sdk}}),error('E_DUPLICATE_PACKAGE'));
+ const support=await editManifest(d,'support',m=>m.dependencies.push({id:'approval',version:'1.0.0'}));
+ await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business,dependencyPins:{support}}),error('E_CYCLE'));
+}));
+test('P1-F2: workflow is admitted Semantic Component and typed binding; no top-level manifest shortcut',async()=>{
+ const runtime=await boot();
+ assert.ok(runtime.assembly.bindings.some(b=>b.cap==='business.workflow@1'&&b.ref.startsWith('approval@')));
+ await sandbox(async d=>{
+  const business=await editManifest(d,'business-approval',m=>{
+   const c=m.components.find(x=>x.id==='workflow');c.kind='tool';
+  });
+  await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_WORKFLOW_GRAPH'));
+ });
+ await sandbox(async d=>{
+  const business=await editManifest(d,'business-approval',m=>{delete m.components.find(x=>x.id==='workflow').body});
+  await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_WORKFLOW_GRAPH'));
+ });
+ await sandbox(async d=>{
+  const business=await editManifest(d,'business-approval',m=>{m.workflow={id:'bypass',nodes:[]}});
+  await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_WORKFLOW_GRAPH'));
+ });
+ await sandbox(async d=>{
+  const business=await editManifest(d,'business-approval',m=>{
+   m.components=m.components.filter(c=>c.id!=='workflow');
+   delete m.selections['business.workflow@1'];
+  });
+  await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_BUSINESS_WORKFLOW'));
+ });
+});
+test('P2-L1 diagnostic: SUCCESS state commit then receipt failure is explicitly divergent (toy only)',async()=>{
+ const r=await boot('approval',{failReceipt:true});
+ assert.throws(()=>r.dispatch({score:75}),error('E_EFFECT_RECORD'));
+ assert.equal(r.snapshot().revision,1, 'state changed before receipt could be recorded');
+ assert.deepEqual(r.receipts(),[], 'receipt absent despite state mutation');
+ const duplicate=await boot();duplicate.dispatch({score:75});
+ assert.equal(duplicate.snapshot().revision,2);
+ assert.throws(()=>duplicate.dispatch({score:75}),error('E_EFFECT_DUPLICATE'));
+ assert.equal(duplicate.snapshot().revision,3);
+ assert.equal(duplicate.receipts().length,2);
+});
+
+test('P1-F2: replacing Workflow Semantic Component executable changes routing (not metadata-only)',async()=>sandbox(async d=>{
+ const old=await boot();assert.equal(old.dispatch({score:75}).facts.approved,true);
+ const file=join(d,'business-approval','impl.mjs');
+ const original=await readFile(file,'utf8');
+ const edited=original.replace('return structuredClone(ctx.definition)',
+  'const flow=structuredClone(ctx.definition);flow.nodes[0].when.value=80;return flow');
+ assert.notEqual(edited,original);
+ await writeFile(file,edited);
+ const business=await editManifest(d,'business-approval',m=>{m.moduleDigest=blobSHA(edited)});
+ const r=await bootstrap({root:d,sdk:pins.sdk,business});
+ assert.notEqual(r.assembly.digest,old.assembly.digest);
+ assert.notEqual(r.dispatch({score:75}).facts.approved,true);
 }));

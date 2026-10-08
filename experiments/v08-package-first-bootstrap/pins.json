@@ -1,18 +1,22 @@
 {
   "kernel": {
     "path": "kernel",
-    "digest": "0572fea887d98c7d69d8553ca1eb97cfa7a43ba9"
+    "digest": "1b12e709aefff88971e7dad45754d1a6a9c0db8b"
   },
   "sdk": {
     "path": "sdk",
-    "digest": "29dcef34c42a86534b0e07f37f754967de9006f5"
+    "digest": "cc871232411fb29b6f4cae2f9241d6d0a878a92f"
   },
   "approval": {
     "path": "business-approval",
-    "digest": "789bb51a70913eff71e44fca93620f9df136b212"
+    "digest": "c2ea6fc3efac2b2b4e1d3da3b0191950ea339ae2"
   },
   "learning": {
     "path": "business-learning",
-    "digest": "bd668dd7e81b7b86d17a1e62f1a114bec71c4024"
+    "digest": "7e406029392b9cb1bbb8b5de95b1dfdd12b4ff9e"
+  },
+  "support": {
+    "path": "support",
+    "digest": "b47aa27bbbe920c3d6e8619ae720774e92bd8fdf"
   }
 }

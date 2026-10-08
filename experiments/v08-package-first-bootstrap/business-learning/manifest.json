@@ -23,41 +23,57 @@
         }
       ],
       "requires": []
+    },
+    {
+      "id": "workflow",
+      "kind": "semantic",
+      "implementation": "learning.workflow.impl@1",
+      "provides": [
+        {
+          "id": "business.workflow@1",
+          "operations": [
+            "resolve"
+          ]
+        }
+      ],
+      "requires": [],
+      "kindRef": "workflow.definition@1",
+      "body": {
+        "id": "learning.flow@1",
+        "endWhen": {
+          "field": "done",
+          "op": "eq",
+          "value": true
+        },
+        "nodes": [
+          {
+            "id": "lesson",
+            "priority": 0,
+            "when": {
+              "field": "progress",
+              "op": "gte",
+              "value": 0
+            },
+            "action": "lesson"
+          },
+          {
+            "id": "badge",
+            "priority": 1,
+            "when": {
+              "field": "mastery",
+              "op": "gte",
+              "value": 80
+            },
+            "action": "badge"
+          }
+        ]
+      }
     }
   ],
   "selections": {
-    "business.action@1": "learning@1.0.0/action#learning.action.impl@1"
+    "business.action@1": "learning@1.0.0/action#learning.action.impl@1",
+    "business.workflow@1": "learning@1.0.0/workflow#learning.workflow.impl@1"
   },
   "module": "impl.mjs",
-  "moduleDigest": "3187f3528eabb0e4fb1670b247e8573d8163faf6",
-  "workflow": {
-    "id": "learning.flow@1",
-    "endWhen": {
-      "field": "done",
-      "op": "eq",
-      "value": true
-    },
-    "nodes": [
-      {
-        "id": "lesson",
-        "priority": 0,
-        "when": {
-          "field": "progress",
-          "op": "gte",
-          "value": 0
-        },
-        "action": "lesson"
-      },
-      {
-        "id": "badge",
-        "priority": 1,
-        "when": {
-          "field": "mastery",
-          "op": "gte",
-          "value": 80
-        },
-        "action": "badge"
-      }
-    ]
-  }
+  "moduleDigest": "58bef7ee75fe05a8e15a37ce694ca5afd5c5c944"
 }

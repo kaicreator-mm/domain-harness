@@ -60,6 +60,12 @@
             "read",
             "commit"
           ]
+        },
+        {
+          "id": "business.workflow@1",
+          "operations": [
+            "resolve"
+          ]
         }
       ]
     }
@@ -69,5 +75,5 @@
     "workflow.run@1": "sdk@0.0.1/workflow#sdk.workflow.impl@1"
   },
   "module": "impl.mjs",
-  "moduleDigest": "b6e7488b101507088823b76ed81e1c6ef14cb45b"
+  "moduleDigest": "d238638553d730d6e7bc9a692a852c976f68ff56"
 }
