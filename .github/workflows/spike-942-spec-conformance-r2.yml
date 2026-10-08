@@ -1,0 +1,50 @@
+name: V08 SPEC 942 R3 Graph identity and Array record-safety (research only)
+on:
+  push:
+    branches:
+      - spike/v08-spec-conformance-942-r2-947-r3
+  pull_request:
+    branches:
+      - spike/v08-spec-conformance-942-r1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  successor-conformance-and-old-gap-witnesses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact checked-out subject provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'EXACT_SUBJECT=%s\n' "$(git rev-parse HEAD)"
+          printf 'EXACT_TREE=%s\n' "$(git rev-parse HEAD^{tree})"
+          printf 'EVENT=%s\n' "$GITHUB_EVENT_NAME"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f experiments/v08-spec-conformance-942-r2/tests/r3-adversarial.test.mjs
+          node --version
+          uname -a
+      - name: Original 29 scoped candidate test groups
+        run: node --test experiments/v08-spec-conformance-942-r2/tests/conformance.test.mjs
+      - name: Five existing hostile witnesses (architectural FAIL, not conformance PASS)
+        run: |
+          node --test experiments/v08-spec-conformance-942-r2/tests/known-gaps.test.mjs
+          echo "5_GAP_WITNESSES_REPRODUCED != ARCHITECTURAL_PASS"
+      - name: R3 new Graph+Array adversarial conformance regressions
+        run: node --test experiments/v08-spec-conformance-942-r2/tests/r3-adversarial.test.mjs
+      - name: Clear research-only status boundary
+        run: |
+          echo "R3_P1_LOCAL_VALIDATOR_REPAIR=SUBJECT_TO_FRESH_REVIEW"
+          echo "PR944_F1_F2_F3_AND_PR945_K1=OPEN"
+          echo "TECH_GATE_1=FAIL"
+          echo "B_NATIVE_RUNTIME=NOT_PROVEN"
+          echo "V07_PRODUCTION_EQUIVALENCE=NOT_TESTED"
+          echo "MERGE=NO"
