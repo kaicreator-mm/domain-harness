@@ -12,7 +12,7 @@ permissions:
 jobs:
   b1-exact-source-ubuntu-node22:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,6 +32,15 @@ jobs:
           node -v
           uname -a
           test -f experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+      - name: Real full repository gate parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npm run lint
+          npm run typecheck
+          npm test
       - name: B1 F2/F3/F1 actual fail-closed tests
         run: node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
       - name: Explicit non-approval
