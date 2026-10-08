@@ -1,0 +1,85 @@
+{
+  "schema": "v0.7/t014-closure-manifest",
+  "schemaVersion": 1,
+  "gate": "T014",
+  "gateIssue": 936,
+  "controllerIssue": 537,
+  "readinessContractIssue": 731,
+  "frozenPlanIssue": 589,
+  "role": "CLOSURE_EXECUTABLE",
+  "capturedAtUtc": "2026-10-08T09:19Z",
+  "environment": {
+    "host": "Windows 10.0.26200 x64, AMD Ryzen 7 7840HS",
+    "node": "v24.21.0 (ABI 137)",
+    "npm": "11.19.0",
+    "betterSqlite3": "12.11.1 via disclosed same-host prebuilt binding from dh-e4-896 (install script policy-blocked; binding sha256 e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e == all prior disclosures; real native SQLite 3.53.2 executed)",
+    "currentness": "gh api / direct GitHub only; local-mirror origin never used"
+  },
+
+  "candidate": {
+    "commit": "3493fe3d7fb43b35e160ea12ef1d555937a9f0e8",
+    "tree": "8d8db37738df4d44275bd3d15db402bebb9a6b5d",
+    "identityProof": "t014-candidate-identity.json — all 4 packed tarball sha256 values + set digest 0b5772fc…98e at 3493fe3d are EXACTLY the accepted T012r/T013s real-host bytes bound at 29dba90b; byte identity PROVEN (tests-only delta, zero non-test path changes)"
+  },
+
+  "dimensions": {
+    "CANDIDATE_IDENTITY": {
+      "verdict": "PASS",
+      "evidence": "t014-candidate-identity.json"
+    },
+    "FULL_REGRESSION": {
+      "verdict": "PASS",
+      "recordedAt": "3493fe3d (worktree dh-t014-936, isolated lanes)",
+      "counts": {
+        "build_committedDistCheck": "exit 0 (shipped dist trees present, tracked and fresh)",
+        "workspace_typecheck": "exit 0",
+        "core": "2913/2913 pass 0 fail exit 0",
+        "compiler": "172/172 pass 0 fail",
+        "node_host": "175/175 pass 0 fail",
+        "expo_typecheck_tsc_x2": "exit 0",
+        "root": "62/62 + 9/9 pass 0 fail",
+        "lint": "exit 0 (0 errors, 1 warning — disclosed T014-L3)"
+      },
+      "parityWithAccepted": "counts EXACTLY match the accepted T012r validation/review records (core 2913, compiler 172, node 175, root 62+9); the 23 added evidence files are included in the 2913"
+    },
+    "PACKAGE_CLEAN_CONSUMER": {
+      "verdict": "PASS",
+      "record": "clean room C:\\xDev\\kAiCreator\\_tmp\\dh-t014-936-cleanroom\\; fresh npm pack x4 at the candidate -> external tarball-only consumer (real directories, zero symlinks, realpaths inside consumer, no src/); n02-resolution exit 0 (33 substitution assertions + 10 declared subpath/condition rows incl. ./v7/execution import+require + 8 deep-import ERR_PACKAGE_PATH_NOT_EXPORTED negatives); consumer tsc strict nodenext skipLibCheck:false exit 0 incl. ./v7/execution value+type surface; export map exactly 7 keys (., ./v2, ./workflow, ./v3, ./v4, ./v7, ./v7/execution), zero wildcards; check-committed-dist fresh"
+    },
+    "CRITICAL_JOURNEYS": {
+      "verdict": "PASS",
+      "record": "accepted t010/t012r consumer programs re-run from the fresh packed bytes in the clean consumer: t010-journeys.mjs 38 rows exit 0 (37 PASS + 1 honest OBSERVATION retained: T010-neg-authority-class-boundary, T004C-owned enforcement executed green via ./v7/execution); frozen digest triple recomputed through packed public surfaces — definitionGraphDigest 030402bf… MATCH, bindingDigest 8f5220bf… MATCH via ./v7/execution, finalAssemblyDigest 400d668f… MATCH via successor sealed Assembly; freeze-record deep-match EXACT; T010B authorized journey: exposure+invocation admission -> ONE PRODUCTION occurrence pinned to 400d668f… -> invokeEffectfulTool ONE dispatch -> authoritative Runtime DONE with exactly ONE durable journal record; refusal matrix all classes typed zero-counter (R1..R6 incl. UX_OPERATION_NOT_EXPOSED, AGENT_OPERATION_NOT_PROJECTED, TOOL_COMPONENT_NOT_BOUND, DEFINITION_CURRENTNESS_MISMATCH, UNMINTED_TOOL_IMPLEMENTATION_BINDING, GOVERNANCE_EXECUTION_PIN_MISSING, RESOURCE_CURRENTNESS_MISMATCH, UX_MUTATION_REFUSED, AUTHORITY_CLASS_MISMATCH, AUTHORITY_CLASS_FORBIDDEN, AMBIGUOUS_TOOL_IMPLEMENTATION, MISSING_TOOL_IMPLEMENTATION, INVALID_UX_REQUEST_INPUT)"
+    },
+    "FAILURE_RECOVERY": {
+      "verdict": "PASS",
+      "record": "n03-sqlite 4 rows exit 0 from packed bytes with real file-backed SQLite 3.53.2 (WAL, synchronous=FULL, foreign_keys): cross-process NEW-process reopen byte-intact; SIGKILL pre-commit replay executionCount=1 (no partial/duplicate authority); SIGKILL post-commit disposition=replayed executionCount=1 (outcome-unknown resolved by exact idempotency identity); in-process exact-turn replay zero re-invocation covered by the 38-row matrix"
+    },
+    "E1_E11_CURRENTNESS": {
+      "verdict": "PASS",
+      "evidence": "t014-currentness-matrix.json — t009r 24/24, t011 32/32, e11 15/15 isolated at the candidate; all accepted terminal comments exist live; live version/v0.7 tip == candidate; superseded E7 #898 row still superseded; no accepted evidence became stale after candidate freeze"
+    },
+    "REAL_HOST_MATRIX": {
+      "verdict": "PASS",
+      "transfer": "the accepted T012r and T013s outcomes transfer to the closure candidate ONLY through the proven packed-byte identity (all 4 tarball sha256 + set digest identical): T012r = #926 validation 6055952342 CONFIRMED + fresh review 6056299928 PASS, PR #935 merged 83f26aca (Node real host: packed binding, clean install, journeys, tool-effect recovery, SQLite crash/recovery/replay, resource currentness, Lane A full matrix); T013s = #933 validation 6056300003 CONFIRMED + fresh review 6055582709 PASS, PR #934 merged 3493fe3d (Expo/Hermes on-device AVD Android 16/API 36, Hermes bytecode hbc artifact cf2fd5de…, 36/36 vectors on both Hermes and Node twin, zero node-import leaks across all 7 entries incl. /v7/execution, N/A matrix evolution repair-justified)"
+    },
+    "HIDDEN_VALIDATION_POLICY": {
+      "verdict": "PASS",
+      "record": "read LIVE at execution time: ai-development-standard main@7929012f36a2202dcc2edc7a414b8163adc7afbd (identical to the ADS audited in #731 — no drift). Per standards/RELEASE_STANDARD.md: Hidden Validation is independent evidence (not proof of permanent completeness) and normally targets the FROZEN candidate; pre-Hidden/Final-Closeout/RQ the declared ref SHA and tree must still match the freeze record; any required content change after freeze invalidates affected evidence and requires Hidden rerun + new closeout + new RQ; old evidence remains valid only for its old candidate/pack identities; escaped defects found after a prior Hidden PASS are classified (OUT_OF_SCOPE | VISIBLE_TEST_GAP | HIDDEN_PACK_BLIND_SPOT | BOTH_VISIBLE_AND_HIDDEN_GAP | PACK_DEFECT | PRODUCT_DEFECT_NOT_SUITABLE_FOR_HIDDEN); strengthened packs get a new immutable private pack identity; sequence = dependency-complete visible closure -> Candidate Freeze -> Hidden Validation -> Final Closeout -> Release Qualification -> Repository Integration. T014 performs Stage1 visible closure + identity/currentness binding only; Candidate Freeze, Hidden Validation, Final Closeout, T015 L2/SDK closure, T016 RQ and repository integration remain controller-owned later gates. NOT_RUN/BLOCKED can never become PASS."
+    },
+    "VISIBLE_P0_P1_ZERO": { "verdict": "PASS", "record": "P0=0, P1=0 across all T014 lanes; infra failures would be BLOCKED/UNAVAILABLE never PASS — none occurred" },
+    "LIMITS_CARRY_FORWARD": { "verdict": "PASS", "evidence": "t014-carried-limits-register.json — 12 bounded entries (1 P2 label-bookkeeping, P3 evidence-precision/hygiene/host-flake/scan-evadability/observation classes), none blocking, none locally repaired" },
+    "INDEPENDENCE": { "verdict": "PASS", "record": "closure validator and fresh reviewer are controller-owned gates on #936 (independent of this executor); this executor repairs nothing and merges nothing" },
+    "REPAIR_INVALIDATES_CANDIDATE": { "verdict": "PASS", "record": "any candidate/content change after freeze invalidates prior closure evidence and requires successor closure (applied live: the T012-D1 repair moved the candidate 943fe5df->29dba90b and forced full T012/T013 successor reruns; T014 binds the post-repair candidate)" },
+    "PR_PASS_NOT_CLOSURE_PASS": { "verdict": "PASS", "record": "this PR carries tests/evidence only; PR CI green + PR merge are NOT Version Closure PASS; closure verdict requires the controller-owned independent Validation + Fresh Review gates on #936" },
+    "PRODUCT_L2_DAG": { "verdict": "PASS", "record": "write set is 5 evidence files under tests/t014/ only; MICROKERNEL_SOURCE_DIFF=0; no Product/L2/DAG semantic" }
+  },
+
+  "writeSet": [
+    "packages/domain-harness/tests/t014/t014-closure-manifest.json",
+    "packages/domain-harness/tests/t014/t014-candidate-identity.json",
+    "packages/domain-harness/tests/t014/t014-currentness-matrix.json",
+    "packages/domain-harness/tests/t014/t014-carried-limits-register.json",
+    "packages/domain-harness/tests/t014/t014-run-record.txt"
+  ],
+  "MICROKERNEL_SOURCE_DIFF": 0
+}

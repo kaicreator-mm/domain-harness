@@ -1,0 +1,110 @@
+{
+  "schema": "v0.7/t014-carried-limits-register",
+  "schemaVersion": 1,
+  "gate": "T014",
+  "gateIssue": 936,
+  "capturedAtUtc": "2026-10-08T09:19Z",
+  "semantics": "Every entry is a bounded, explicitly-carried-forward P2/P3 (or recorded observation) from the accepted v0.7 session chain. NONE is a P0/P1. NONE blocks closure. NONE is locally repaired by T014 (closure never repairs source; any defect found at closure routes to a bounded repair lane + successor closure, which would invalidate the candidate per the live ADS immutability rule).",
+
+  "limits": [
+    {
+      "id": "T014-L1",
+      "severity": "P2",
+      "class": "evidence-label-bookkeeping",
+      "origin": "T011 both-gates finding (#924 merge record 6049387303, P2 DISPOSITION)",
+      "description": "tests/t011/t011-e11-terminal-binding.json labels comment 6047764502 as 'builderEvidence'; that comment is the E11 VALIDATION_CLAIM. The actual E11 builder terminal is 6047217691 (uncited).",
+      "disposition": "All cited ids authentic; the disposition never branches on the label; found independently by BOTH gates. Fix to ride the next tests-only PR."
+    },
+    {
+      "id": "T014-L2",
+      "severity": "P3",
+      "class": "evidence-citation-precision",
+      "origin": "T013s fresh review P3-1 (#933@6055582709)",
+      "description": "T013s terminal/report cite 't013s-hermes-run.json entryImportCounts' for all SEVEN on-device entry import counts; that JSON records only five (root and ./v7 on-device counts absent). The all-7 claim is fully covered elsewhere (installed-consumer counts in t013s-package-hashes.json, static import-graph walk incl. ./v7/execution, hbc scan).",
+      "disposition": "No dimension weakened; citation to be tightened in any successor documentation."
+    },
+    {
+      "id": "T014-L3",
+      "severity": "P3",
+      "class": "evidence-citation-precision",
+      "origin": "T012r independent validation P3 hygiene (a) (#926@6055952342)",
+      "description": "1 eslint warning: unused eslint-disable directive in tests/t012r/consumer-src/fixture-toolplane.mjs. Lint exits 0 (0 errors, 1 warning).",
+      "disposition": "Documentation/hygiene only; cosmetic fix rides a future evidence revision."
+    },
+    {
+      "id": "T014-L4",
+      "severity": "P3",
+      "class": "evidence-citation-precision",
+      "origin": "T012r independent validation P3 hygiene (b) (#926@6055952342)",
+      "description": "t012r-cleanroom-setup.json says the n02-npm-ls.json sha256 is 'recorded in t012r-artifact-hashes.txt' — it is not (clean-room artifact, not a committed blob; the 12-entry index is complete).",
+      "disposition": "Documentation imprecision only; recommend fixing the sentence in a future evidence revision."
+    },
+    {
+      "id": "T014-L5",
+      "severity": "P3",
+      "class": "host-load-flake",
+      "origin": "T012r executor + independently re-observed by BOTH the T012r validator and the T012r fresh reviewer (#926@6055952342 deviation 2, #926@6056299928 P3-1)",
+      "description": "Full-workspace parallel test runs on this host class can die mid-suite abruptly (no failure summary) or flake 2 compiler E8b tests under load. Isolated lane reruns are fully green every time; exact-head CI pipelines are the authoritative full green.",
+      "disposition": "Timing/host sensitivity disclosure, NOT a product defect; recorded, never promoted. T014 ran per-lane isolated (all green first try) + committed-dist check + CI as the authoritative full gate."
+    },
+    {
+      "id": "T014-L6",
+      "severity": "P3",
+      "class": "scan-evadability",
+      "origin": "E7R successor evidence (gate #913 accepted chain)",
+      "description": "E7R-4 whole-src-tree Standard-import scan is regex evadability-limited: dynamic-import evasion is not covered; the 7-module token list omits contracts/invocation-request.ts; src/v2/* and src/tool/* are unscanned for Standard tokens.",
+      "disposition": "Source is clean at this head (scan genuinely extends the landed E7P-6 scan); bounded hardening backlog, non-blocking."
+    },
+    {
+      "id": "T014-L7",
+      "severity": "P3",
+      "class": "carried-observation",
+      "origin": "T013s executor P3-2, verified present by the T013s validator and reviewer (#933@6056300003, #933@6055582709 P3-2)",
+      "description": "Operation-scoped resource requirements resolve only via operation-scoped resolveToolResources.",
+      "disposition": "Recorded behavior observation, not a defect."
+    },
+    {
+      "id": "T014-L8",
+      "severity": "OBSERVATION",
+      "class": "architecture-observation",
+      "origin": "accepted t010/t012r journey matrices (honest OBSERVATION row, retained in the 38-row run)",
+      "description": "The public /v3 Central Admission plane alone does not gate authority class (outcome=admitted for a SIMULATION pin); AUTHORITY_CLASS_MISMATCH enforcement is T004C-owned and is EXECUTED green via ./v7/execution (row T010c-r5-simulation-class-refused).",
+      "disposition": "Recorded, not promoted; enforcement ownership explicitly exercised."
+    },
+    {
+      "id": "T014-L9",
+      "severity": "P3",
+      "class": "bookkeeping",
+      "origin": "T012-D1 repair terminal P2 DISPOSITION (#930@6054426102)",
+      "description": "82 vs 81 facade type-count citation (the anchor is one include + three comment lines).",
+      "disposition": "Bookkeeping, non-blocking."
+    },
+    {
+      "id": "T014-L10",
+      "severity": "P3",
+      "class": "environment-naming",
+      "origin": "T013s validator deviation 3 (#933@6056300003)",
+      "description": "Environment-identity host string says 'Windows 11 Pro build 10.0.26200'; the host is Windows 10.0.26200 — cosmetic naming variance only.",
+      "disposition": "Cosmetic; recorded."
+    },
+    {
+      "id": "T014-L11",
+      "severity": "P3",
+      "class": "toolchain-skew-disclosure",
+      "origin": "T013s fresh review (#933@6055582709)",
+      "description": "Expo Go 57.0.9 embeds RN 0.86.2 while the consumer declares RN 0.86.3 — normal Expo Go runtime-vs-consumer skew, disclosed.",
+      "disposition": "Disclosed, expected skew; no action."
+    },
+    {
+      "id": "T014-L12",
+      "severity": "P3",
+      "class": "infra-disclosure",
+      "origin": "T013s validation INFRA_FAILURE_POLICY (#933@6056300003)",
+      "description": "Consumer-side tooling events during T013s: Metro port 8081->8082 rerouting (disclosed + logcat-corroborated), stale adb server required kill-server/restart, one dev-mode device load failure resolved by --no-dev + 10.0.2.2 alias.",
+      "disposition": "All consumer-side tooling, none candidate-attributable; no UNAVAILABLE classification was abused. Recorded for successor real-host runs."
+    }
+  ],
+
+  "zeroRule": "Visible P0=0 and P1=0 at the candidate (all lanes below). Infra/environment failures would be BLOCKED/UNAVAILABLE, never PASS — none occurred in the T014 run.",
+  "MICROKERNEL_SOURCE_DIFF": 0
+}

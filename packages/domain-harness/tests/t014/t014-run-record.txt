@@ -1,0 +1,119 @@
+V0_7_T014 VERSION CLOSURE — EXECUTOR RUN RECORD (gate issue #936, candidate 3493fe3d)
+====================================================================================
+CONTROLLER=#537. AUTHORITY=#731 (readiness, CLOSED=approved) + #589 PACK-E.
+WORKTREE=C:\xDev\kAiCreator\domain-harness\dh-t014-936 (branch task/dh-t014-936 @
+3493fe3d7fb43b35e160ea12ef1d555937a9f0e8, rev-parse verified; stay-put honored).
+CLEAN ROOM=C:\xDev\kAiCreator\_tmp\dh-t014-936-cleanroom\ (git-archive extract of
+3493fe3d; own npm ci/build/pack/install; ZERO reuse of other tasks' artifacts).
+CURRENTNESS: gh api / direct GitHub only (local-mirror origin stale-by-design).
+TIMESTAMP=2026-10-08T09:05Z..09:19Z. HOST=Windows 10.0.26200 x64, node v24.21.0,
+npm 11.19.0. better-sqlite3 12.11.1 via disclosed same-host prebuilt from
+dh-e4-896 (sha256 e75b8c02…a91e == all prior disclosures; install script
+policy-blocked); real native SQLite 3.53.2 executed.
+
+STEP 1 — ACCEPTED CHAIN READ LIVE (gh api)
+  #936 gate body, #731 readiness + full terminal archive,
+  #924@6049387303 (T011 merge record), #930@6054426102 (T012-D1 repair accepted,
+  NEW_CANDIDATE=29dba90b), #926@6055952342 (T012r VALIDATION CONFIRMED),
+  #926@6056299928 (T012r FRESH REVIEW PASS), #933@6056300003 (T013s VALIDATION
+  CONFIRMED), #933@6055582709 (T013s FRESH REVIEW PASS) — ALL READ.
+  Live branches/version/v0.7 tip = 3493fe3d == closure candidate (09:05Z).
+
+STEP 2 — ANCESTRY + SCOPE PROOF
+  git merge-base --is-ancestor 29dba90b 3493fe3d ....... PASS
+  git log 29dba90b..3493fe3d: 70cb943 (t012r evid, PR#935), 83f26ac (merge #935),
+  d263f14 (t013s evid, PR#934), 3493fe3 (merge #934 = tip)
+  git diff --name-only 29dba90b..3493fe3d: 23 files, ALL under
+  packages/domain-harness/tests/; outside tests/ = EMPTY ........ tests-only delta
+  candidate tree 8d8db37738df4d44275bd3d15db402bebb9a6b5d
+
+STEP 3 — PACKED-BYTE IDENTITY (clean room, own pack at 3493fe3d)
+  npm ci --ignore-scripts ............................... exit 0
+  prebuilt better_sqlite3.node installed (hash == disclosure), sqlite 3.53.2 OK
+  npm run build (committed-dist check; clean-room git snapshot first)  exit 0
+  check-committed-dist: shipped dist trees present, tracked and fresh
+  npm run typecheck ..................................... exit 0
+  npm pack --workspaces --pack-destination artifacts/pack
+  core      f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332  884711B  == accepted MATCH
+  node      549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78  34447B   == accepted MATCH
+  compiler  3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480  58592B   == accepted MATCH
+  expo      d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1  35656B   == accepted MATCH
+  set sha256 (core\nnode\ncompiler\nexpo order, \n join, no trailing NL)
+            = 0b5772fc7aaf57373759bf9c11b3f9294d60fbfcb22aa56c991fa7924fd3d98e
+            == accepted 0b5772fc…98e MATCH
+  => BYTE_IDENTITY_PROVEN: real-host evidence transfers to 3493fe3d.
+
+STEP 4 — FULL REGRESSION (worktree dh-t014-936 @ 3493fe3d, isolated lanes)
+  npm ci --ignore-scripts + disclosed prebuilt binding ....... sqlite 3.53.2 OK
+  npm run build (committed-dist check) ........................ exit 0
+  npm run typecheck ........................................... exit 0
+  core      (packages/domain-harness npm test): 2913/2913 pass 0 fail exit 0
+  compiler                                               172/172 pass 0 fail
+  node-host                                              175/175 pass 0 fail
+  expo typecheck (tsc x2) ..................................... exit 0
+  root      (npm run test:root) 62/62 + 9/9 pass 0 fail
+  lint      0 errors, 1 warning (disclosed T014-L3 t012r consumer-src) exit 0
+  All counts EXACTLY match the accepted T012r validation/review records.
+
+STEP 5 — PACKAGE_CLEAN_CONSUMER (clean consumer from the fresh pack)
+  external tarball-only install: real dirs, 0 symlinks, realpaths inside
+  consumer, no src/ ........................................... PASS
+  export map installed package.json: exactly 7 keys
+  (., ./v2, ./workflow, ./v3, ./v4, ./v7, ./v7/execution), zero wildcards .. PASS
+  import('@kaicreator/domain-harness/v7/execution') -> 25 runtime exports . PASS
+  n02-resolution.mjs .......................................... exit 0
+  n02b-types consumer tsc strict nodenext skipLibCheck:false .. exit 0
+
+STEP 6 — CRITICAL JOURNEYS + FAILURE_RECOVERY (packed bytes, clean consumer)
+  t010-journeys.mjs: 38 rows exit 0 (37 PASS + 1 honest OBSERVATION
+  T010-neg-authority-class-boundary; T004C enforcement EXECUTED green via
+  ./v7/execution) ............................................. PASS
+  frozen triple through packed public surfaces:
+    definitionGraphDigest 030402bf802340d77f1ed88a3a4858dc2202b9b16bc590038d45cbf26b97825c MATCH
+    bindingDigest         8f5220bfc9c2e41c44cd06cdf36a5369662806a6e311fb1b5e338d2b2df86a87 MATCH
+    finalAssemblyDigest   400d668f9f806b7b7266c78b2322ffdf13bde07c8aa87a86edd9d78398d677c0 MATCH
+  freeze-record deep-match EXACT; T010B authorized DONE exactly ONE journal
+  record; refusal matrix R1..R6 all typed zero-counter ......... PASS
+  n03-sqlite.mjs 4 rows exit 0 (real SQLite 3.53.2 WAL+FULL+fk; cross-process
+  reopen byte-intact; SIGKILL pre-commit replay executionCount=1; SIGKILL
+  post-commit disposition=replayed executionCount=1) ......... PASS
+
+STEP 7 — E1_E11 CURRENTNESS (live vs current ancestry)
+  t009r aggregator isolated 24/24 | t011 disposition 32/32 | e11 15/15
+  accepted terminal comments 6049387303/6054426102/6055952342/6056299928/
+  6056300003/6055582709 all exist live (gh api 09:05Z)
+  superseded E7 #898 row still SUPERSEDED (fail-closed tests re-executed)
+  live ADS main = 7929012f36a2202dcc2edc7a414b8163adc7afbd (no drift since
+  the #731 audits) ........................................... CURRENT
+
+STEP 8 — REAL_HOST_MATRIX TRANSFER
+  T012r (validation 6055952342 CONFIRMED + review 6056299928 PASS, PR #935
+  merge 83f26aca) and T013s (validation 6056300003 CONFIRMED + review
+  6055582709 PASS, PR #934 merge 3493fe3d) transfer via the STEP-3 proven
+  packed-byte identity ........................................ PASS
+
+STEP 9 — HIDDEN_VALIDATION_POLICY (live ADS read at execution time)
+  RELEASE_STANDARD.md @7929012f: Hidden = independent evidence, targets the
+  frozen candidate; SHA/tree recheck before Hidden/Closeout/RQ; any required
+  post-freeze content change -> Hidden rerun + new closeout + new RQ; old
+  evidence valid only for old identities; escaped-defect classification
+  taxonomy; strengthened packs get new immutable pack identity; sequence
+  visible-closure -> Freeze -> Hidden -> Final Closeout -> RQ -> Integration.
+  T014 = Stage1 visible closure + identity/currentness binding ONLY.
+  Freeze/Hidden/Closeout/T015/T016 remain controller-owned ...... PASS
+
+STEP 10 — LIMITS CARRY_FORWARD
+  t014-carried-limits-register.json: 12 bounded entries
+  (P2 x1: t011 binding-JSON builderEvidence label; P3 x10: t013s
+  entryImportCounts citation nit, t012r eslint-disable warning, t012r
+  artifact-hashes sentence, host load-flake class, E7R-4 regex-evadability,
+  operation-scoped resource observation, 82v81 type-count citation,
+  environment naming, Expo Go RN skew, T013s infra disclosures;
+  OBSERVATION x1: /v3 authority-class boundary). None blocking; none
+  locally repaired.
+
+VERDICT PREVIEW: all 14 #731 dimensions PASS at the exact candidate with
+P0=0 P1=0. PR/task PASS != Closure PASS: independent Validation + Fresh
+Review on #936 are controller-owned next gates. MERGE=NO (executor does not
+merge). Any defect found by those gates routes to bounded repair +
+successor closure (candidate invalidation), never local repair.
