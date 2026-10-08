@@ -166,8 +166,9 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
      if(!match)reject('E_UNDECLARED_CAPABILITY_USE');
    }
    if(handler.op.effect!=='none')reject('E_EFFECT_AUTHORITY_UNAVAILABLE');
-   await current(handler);
+   // Snapshot input BEFORE first async Host I/O to close caller TOCTOU.
    const stable=snap(input);
+   await current(handler);
    dispatchCount++;
    const invokeCapability=async ({capabilityId,version,operationId,input:childInput})=>{
      const cap=handler.component.requiresCapabilities.find(c=>

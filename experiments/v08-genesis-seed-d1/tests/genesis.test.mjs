@@ -107,9 +107,15 @@ test('G11 absent Provider in actual Package graph refuses',async()=>{
  sdk.manifest.components.find(c=>c.componentId==='sdk-rule').providesCapabilities=[];
  repin(sdk);
  const biz=v.find(x=>x.manifest.packageId==='genesis.business.smoke');
- biz.manifest.dependencies[0].digest=sdk.manifest.integrity;repin(biz);
- assert.throws(()=>verifyDefinitionGraph(v),e=>
-   ['E_MISSING_PROVIDER','E_RELATION_TARGET'].includes(e?.code));
+ // Rebind the real physical relation/import digest to the *mutated* Rule identity;
+ // otherwise E_RELATION_TARGET would mask the intended missing-Provider gate.
+ const rule=sdk.manifest.components.find(c=>c.componentId==='sdk-rule');
+ const ruleDigest=componentDigest(rule);
+ biz.manifest.dependencies[0].digest=sdk.manifest.integrity;
+ biz.manifest.imports[0].digest=ruleDigest;
+ biz.manifest.components.find(c=>c.componentId==='smoke-run').relations[0].target.digest=ruleDigest;
+ repin(biz);
+ assert.throws(()=>verifyDefinitionGraph(v),isError('E_MISSING_PROVIDER'));
 });
 test('G12 duplicate Provider on actual SDK candidate refuses ambiguity',async()=>{
  const v=await rawEntries(),sdk=v.find(x=>x.manifest.packageId==='genesis.sdk');
@@ -152,9 +158,10 @@ test('G16 caller cannot self-certify or inject authority at Host or invoke',asyn
 });
 test('G17 untrusted input mutation has no effect on sealed Assembly',async()=>{
  const host=await establishGenesisHost(),input={score:70};
- const result=await host.invoke({packageId:'genesis.sdk',componentId:'sdk-rule',
+ const pending=host.invoke({packageId:'genesis.sdk',componentId:'sdk-rule',
    operationId:'evaluate',input});
- input.score=-100;
+ input.score=-100; // racing mutation must not change already-snapshotted input
+ const result=await pending;
  assert.equal(result,true);assert.equal(host.assembly.packages.length,3);
 });
 test('G18 unknown selected package/Component/operation fails closed',async()=>{
