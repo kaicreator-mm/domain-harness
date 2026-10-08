@@ -12,9 +12,9 @@ Canonical manifest serialization is recursively sorted JSON with one terminal ne
 ## Exact trusted candidates
 | Package | Candidate integrity SHA-256 |
 | --- | --- |
-| genesis.kernel | `sha256:cb2f2a0abe6d09fd013e7acb0c4cb8d8c732470300d42943dd7dce10395d6472` |
-| genesis.sdk | `sha256:0658feeef2be0935431b8174a9d754bb500c45ba68601b40bd7afa8a1e9ea30f` |
-| genesis.business.smoke | `sha256:919a31abb1471e7042d60d96f2257e7d5a8ca76dbbc534094e48eb5665327885` |
+| genesis.kernel | `sha256:38c13d4a317e754dfa0ed344f584cd3aa74c67cd3938d39963e52697ed5bc3a2` |
+| genesis.sdk | `sha256:1833a217993cb61587b5b0b65c3128d23bc0253baa3591336e72c575ce5c1a28` |
+| genesis.business.smoke | `sha256:7f310dae4e619d4f9f1d1ea2cc2e8369be142e45b44d1c981895496533d7c57c` |
 
 These are immutable reference seed digests; use `sha256sum packages/*/modules/*.mjs` and `git hash-object` to reproduce physical bytes. The exact root commit/tree is supplied by CI, not hardcoded into the Package.
 
