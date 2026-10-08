@@ -1,0 +1,97 @@
+{
+  "schema": "t013s-validation-report/v1",
+  "gate": "V0_7_T013_EXPO_HERMES_REAL_HOST_VALIDATION",
+  "successorRerun": {
+    "marker": "SUCCESSOR RERUN per adjudication #537@6052473158 (SUCCESSOR_T013_RERUN_REQUIRED=YES, OLD_T013_PASS_TRANSFER=NO)",
+    "issue": 933,
+    "supersededChain": "issue #927 terminals (executor 6050421646, validation 6050820019, review 6050735206, merge 6051000030) + in-tree evidence tests/t013/ — recipe/harness precedent only; NO verdict transferred",
+    "candidateRepair": "T012-D1 facade (gate #930, PR #931, merge record #930@6054426102, defect #926)"
+  },
+  "frozenContracts": ["#589 PACK-E T013", "#729 readiness", "#736 preflight", "#537@6052473158 adjudication"],
+  "candidate": {
+    "commit": "29dba90bfaa0185fcbd9cd695db72f55d5e80806",
+    "tree": "9b41896bc8ad95b84a6a101eb5072ad6533e9644",
+    "treeNote": "tree matches the #930 repair terminal TREE exactly",
+    "t011Prerequisite": "T012_T013_AUTHORIZED=YES (carried from #924; adjudication #537@6052473158 directly mandates this rerun)"
+  },
+  "verdicts": {
+    "PACKAGED_CANDIDATE_BINDING": {
+      "verdict": "PASS",
+      "evidence": "exact npm pack from clean worktree at 29dba90b; sha256 f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332 (byte-identical to the #930 repair terminal's packed tarball); npm shasum ba3f95cb960125d52a0a547eba5973d52d04dbb1; integrity sha512-KLD4SciwZtBGBE1UKqgOaokXs/dpK5GkqJXJ2fZs7mdggf8A+44cZsbAL+bAm9kDZvs5ni+18cQu1nRz949rDQ==; installed as real directory into isolated Expo consumer (clean-room dh-t013s-933); installed package.json hash bound"
+    },
+    "EXPO_HERMES_ENV_BIND": {
+      "verdict": "PASS",
+      "evidence": "REUSED genuine environment from #927: AVD dh_t013_927 (Android 16, API 36, x86_64, emulator-5556, cold-booted, WHPX) with Expo Go 57.0.9 (versionCode 444, on-device dumpsys proof); Expo SDK 57.0.27 / Expo CLI 57.0.28 / RN 0.86.3 / Metro 0.84.5 / hermes-compiler 250829098.0.17; HermesInternal present on device ('for RN 0.86.2'); logcat captured index.bundle request with transform.engine=hermes&transform.bytecode=1"
+    },
+    "INSTALL_BUNDLE_IMPORT": {
+      "verdict": "PASS",
+      "evidence": "tarball installed (npm) into clean consumer; Metro exported Android Hermes bytecode bundle (magic c61fbc03, sha256 cf2fd5de...c38ef, 3347126 bytes); runtime import of ALL SEVEN declared entries under Hermes on-device: root 518 / v2 66 / workflow 11 / v3 436 / v4 23 / v7 15 / v7Execution 25 exports, zero import errors (t013s-hermes-run.json entryImportCounts/entryImportErrors) — INCLUDING the NEW ./v7/execution facade, which imports AND executes under Hermes (9/9 execution vectors PASS on-device)"
+    },
+    "IDENTITY_ADMISSION_RUNTIME": {
+      "verdict": "PASS",
+      "evidence": "executed ON DEVICE under Hermes (not TypeScript-compile-only): base 27-vector suite re-run UNMODIFIED from #927 — component digest determinism (key-order shuffle, ref-order shuffle, componentId exclusion, nonMaterialExtensions exclusion, semantic-change sensitivity), graph digest order-insensitivity, must-understand admission positives + UNKNOWN_KIND / KIND_VERSION_MISMATCH / UNKNOWN_CAPABILITY / validator-failure propagation / understood-set snapshot safety; every result byte-identical to Node twin; the four frozen #927 portable-journey identities (wf 055b1078...c797, tool 8bffd4b6...b1a, graph 352329d3...c6d0, pin 10b1ca36...) reproduced exactly"
+    },
+    "SEALED_ASSEMBLY_PURE_TOOL": {
+      "verdict": "PASS",
+      "evidence": "NOW EXECUTED ON-HOST THROUGH THE DECLARED SURFACE (the repair's delta): via ./v7/execution under Hermes — sealRuntimeAssembly mints a sealed neutral Assembly over the t013 graph (assemblyDigest cbe6f738...619d; forged object rejected by isSealedRuntimeAssembly); admitComponentWithAssembly ADMITS both components and rejects a hostile unknown-intent component (validator failure propagates unchanged); resolveCurrentCapabilityProvider selects the exact tool provider; bindToolImplementation + verifyToolImplementationBinding bind/verify the exact pin (bindingDigest bfc22311...f82, VERIFIED_CURRENT); admitToolExposure + admitToolInvocationRequest admit the effect=none invocation; pure Tool contract negatives still pass via /v7. Effectful T004C journey not exercised (Central Admission ports stay on ./v3; N/A matrix row)"
+    },
+    "PORTABLE_JOURNEY": {
+      "verdict": "PASS",
+      "evidence": "strongest neutral non-effectful journey genuinely supported, EXTENDED by the repair: compose+validate neutral 2-component 1-relation graph -> bind exact digests (wf 055b1078...c797, tool 8bffd4b6...b1a, graph 352329d3...c6d0, sealed assembly cbe6f738...619d) -> seal -> assembly-bound admission both components -> current provider selection -> exact implementation bind+verify -> exposure/invocation admission -> invokeNonEffectfulTool OBSERVED through the injected in-memory dispatch (exact executor handle, 1 dispatch) -> effectful operation refused EFFECTFUL_OPERATION_REJECTED BEFORE any dispatch (0 dispatches) -> resource resolution carrying the exact T005C currentness pin, with an INCOMPATIBLE_RESOURCE fail-closed probe. All identities byte-identical across Hermes and both Node ports"
+    },
+    "NO_NODE_IMPORT_LEAK": {
+      "verdict": "PASS",
+      "evidence": "NOW COVERING ALL SEVEN ENTRIES INCL. ./v7/execution: static — import-graph walk over installed tarball, zero node:*/better-sqlite3/worker_threads externals from every entry, sqlite-store.js and script-executor.js unreachable (t013s-import-graph.json); bundle — zero leak strings in Hermes bytecode index-88460519...hbc; runtime — all 7 entries import and execute under Hermes on-device with zero errors; deep-import authority blocked ERR_PACKAGE_PATH_NOT_EXPORTED (Node consumer probe)"
+    },
+    "NODE_ONLY_NA_MATRIX": {
+      "verdict": "PASS",
+      "evidence": "explicit NOT_APPLICABLE rows (better-sqlite3 store, node:worker_threads executor) with boundary evidence incl. the new entry; sealed-Assembly authoring row UPGRADED from NOT_APPLICABLE_FOR_T013_SCOPE to APPLICABLE_AND_EXECUTED_ON_HOST via the declared ./v7/execution facade; effectful T004C row explicit NOT_EXERCISED_ON_HOST with ./v3 ownership; no polyfill/shim/deep-import anywhere; only injected host code is the unchanged Sha256Port adapter + in-memory neutral host behavior ports the frozen seams require"
+    },
+    "T000_E8B_PARITY_BOUNDARY": {
+      "verdict": "PASS",
+      "evidence": "Expo durable-store accepted-message parity remains T000/E8b-owned; this gate demands no Expo store semantics and claims no Node/Expo store parity; boundary recorded in t013s-na-matrix.json; ownership non-overlapping (unchanged from #927)"
+    },
+    "INFRA_FAILURE_POLICY": {
+      "verdict": "PASS",
+      "evidence": "no environment inability encountered; port 8081 was occupied by another task's dev server on this shared host — ordinary consumer-side tooling constraint, fixed by using port 8082 with matching adb reverse; no candidate-attributable failure ever observed; no UNAVAILABLE|INFRA_FAILURE classification needed"
+    },
+    "RERUN_CURRENTNESS": {
+      "verdict": "FAIL",
+      "evidence": "authoritative GitHub re-read (git ls-remote + gh api, 2026-10-08T~07:30Z) immediately before terminal: origin/version/v0.7 == bd2f2f976dac796035308b0fae875d7d22cd0e72 (Merge PR #918, committed 2026-10-07T21:31:59Z), which does NOT contain the candidate 29dba90b, its parent chain (943fe5d #928, 476bf1c), or any repair-chain commit — the remote branch was rewound/force-pushed BACKWARD after PR #931 merged (gh pr view 931: state=MERGED, mergeCommit=29dba90b, mergedAt=2026-10-08T07:01:30Z). DRIFT, not a validation failure: every execution dimension of this gate binds the exact adjudicated ENTRY_BASE bytes 29dba90b (verified present on origin via the GitHub commits API), and those bytes are byte-identical to the repair builder's packed tarball. This is a controller-owned branch-currentness event; this gate cannot and does not force-push."
+    },
+    "PRODUCT_L2_DAG": {
+      "verdict": "PASS",
+      "evidence": "write set is tests/evidence-only under packages/domain-harness/tests/t013s/; MICROKERNEL_SOURCE_DIFF=0; no src/dist touch; frozen #517/#526 planning semantics cited only, never rewritten"
+    }
+  },
+  "runRecords": {
+    "hermesVectors": "36/36 PASS on device (Expo Go 57.0.9, Hermes for RN 0.86.2): 27/27 base (#927 suite, unmodified) + 9/9 new /v7/execution journeys",
+    "nodeTwinPureJsPort": "36/36 PASS, byte-identical to Hermes (collector-verified JSON equality of the full outcome)",
+    "nodeTwinCryptoPort": "36/36 PASS, byte-identical; proves pure-JS SHA-256 adapter is FIPS-true",
+    "sha256KnownAnswer": "4/4 vectors match node:crypto",
+    "deviceEntryImport": "7/7 declared entries import under Hermes with zero errors"
+  },
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0,
+    "P3": [
+      "P3-1 (OBSOLETE, resolved by repair): the #927 P3-1 recorded that sealed-Assembly authoring seams were not exported from any declared entry — the T012-D1 facade (#930) is exactly the bounded closure of that observation, and this rerun now EXECUTES those seams on-device through ./v7/execution (9/9 PASS).",
+      "P3-2 (OBSERVATION, not a defect): operation-scoped resource requirements (operationId narrowing in the sealed Assembly) resolve only through an operation-scoped resolveToolResources call; component-scope resolution intentionally skips them. Verified behavior on both hosts and recorded as an explicit vector (EXECUTION_JOURNEY_RESOURCE_RESOLUTION)."
+    ]
+  },
+  "result": "BLOCKED_CURRENTNESS",
+  "resultNote": "All eleven execution dimensions PASS on the exact adjudicated candidate bytes 29dba90b (36/36 vectors under Hermes on-device, byte-identical Node twin, all leak/boundary/NA-matrix legs green). RERUN_CURRENTNESS=FAIL solely because the remote version/v0.7 branch was rewound after the #931 merge and no longer contains the candidate. Per-byte validation evidence stands; controller must restore branch currentness (re-merge/rebase the #928/#931 chain or adjudicate the rewind) — a successor currentness re-read then completes this gate without re-execution.",
+  "evidenceFilesNote": "evidenceFiles sha256 values are computed over the committed LF git-blob bytes (git cat-file blob | sha256sum), not working-tree bytes; t013s-hermes-logcat.txt was CRLF-normalized at capture and t013s-node-twin-output.log is force-added past the root .gitignore *.log rule.",
+  "evidenceFiles": {
+    "t013s-package-hashes.json": "0f83f713cb747fd8cc5351c32dd9e96dcf5ad02a611ed97cc2bcaf93ca7aa865",
+    "t013s-environment-identity.json": "51de520356a67f029faeb2197a8a2b3ad289c672abbd184382f4765349f044ad",
+    "t013s-portable-surface-manifest.json": "a0cc20b0a05d9df99be0117b7c57df29abfdd4929091d79effd8b66f8066eb18",
+    "t013s-na-matrix.json": "01562f24d16e6798c8232c0006c68376d83731d330b62b263e3dc46e7abe4ed9",
+    "t013s-import-graph.json": "4ea15e3af76834a35257443f69044aa4c64f3054370dc4b8d7d1642853b0675a",
+    "t013s-hermes-run.json": "6a7fcefba26055f15049b32dca4ee78970bd139f3a371a036d2aac8cbe42b5cb",
+    "t013s-node-twin-output.log": "3f1c2298a9d510ff26ce648674be5ee3be81778995a7877c59e82cc992f344ce",
+    "t013s-hermes-logcat.txt": "31586ce956de4f145a32c252128cc2410cbc314fd0c2a405201a71fd8981a9da",
+    "t013s-device-screenshot.png": "35c91d5fb7b04d08df12bb0bcefc51a6af0b6feb83eb3c5068935e8c4e8f156b"
+  }
+}

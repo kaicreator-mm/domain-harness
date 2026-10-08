@@ -1,0 +1,37 @@
+{
+  "schema": "t013s-node-only-na-matrix/v1",
+  "candidate": "29dba90bfaa0185fcbd9cd695db72f55d5e80806",
+  "rule": "Node-only storage/effect facilities are explicit NOT_APPLICABLE only where the frozen package/host boundary says so; no silent polyfill, no inferred parity (frozen #589 T013 + #729).",
+  "matrix": [
+    {
+      "facility": "dist/persistence/sqlite-store.js (better-sqlite3-backed durable runtime store)",
+      "status": "NOT_APPLICABLE",
+      "boundaryEvidence": "static top-level `import Database from 'better-sqlite3'`; NOT reachable from any of the 7 declared package entries (import-graph walk incl. the NEW ./v7/execution, t013s-import-graph.json); absent from the Hermes bytecode bundle (string scan of index-*.hbc)",
+      "ownership": "Node storage authority lives in the separate @kaicreator/domain-harness-node package (own better-sqlite3 dependency); Expo host durable-store parity is T000/E8b-owned and stays OUT OF THIS GATE (non-overlapping)"
+    },
+    {
+      "facility": "dist/script/script-executor.js (lazy node:worker_threads script execution)",
+      "status": "NOT_APPLICABLE",
+      "boundaryEvidence": "lazy `await import('node:worker_threads')`; NOT reachable from any of the 7 declared package entries; absent from the Hermes bytecode bundle",
+      "ownership": "Node-only effectful script execution; no Expo equivalent claimed or inferred"
+    },
+    {
+      "facility": "sealed Assembly AUTHORING + assembly-bound admission execution (sealRuntimeAssembly / admitComponentWithAssembly / bindToolImplementation / admitToolInvocationRequest / invokeNonEffectfulTool / resolveToolResources) AND the UX/Agent adapter seams",
+      "status": "APPLICABLE_AND_EXECUTED_ON_HOST",
+      "boundaryEvidence": "WAS NOT_EXPORTED on the #927 candidate (recorded NOT_APPLICABLE_FOR_T013_SCOPE there); on the repaired candidate the T012-D1 facade declares ./v7/execution as the public home, so this gate now EXECUTES the full neutral journey under Hermes on-device: 9/9 execution vectors PASS (seal, assembly-bound admission both components + hostile rejection, current provider selection, exact bind + consumer verification, exposure + invocation admission, non-effectful OBSERVED dispatch, effectful refused before dispatch with zero dispatches, resource resolution with exact currentness pin + INCOMPATIBLE_RESOURCE fail-closed probe), byte-identical to the Node twin",
+      "ownership": "T012-D1 repair (#930) owns the promotion decision; this gate validates the declared surface only"
+    },
+    {
+      "facility": "effectful invocation (invokeEffectfulTool, T004C) + governance/Central Admission port journeys",
+      "status": "NOT_EXERCISED_ON_HOST",
+      "boundaryEvidence": "invokeEffectfulTool IS runtime-imported via ./v7/execution (IMPORT_SURFACE_V7_EXECUTION PASS) but its genuine journey requires the Central Admission durable-effect ports; the facade contract deliberately keeps CentralAdmissionRequest/Outcome + port interfaces on ./v3 only, and the #729 portable-journey scope permits only neutral NON-EFFECTFUL journeys. Same posture as the #927 run; no Expo durable-effect semantics claimed or inferred.",
+      "ownership": "Central Admission durable effect authority is Node-side (T004C prerequisite, accepted #880); exact host evidence demanded at the proper gate; T000/E8b owns Expo store parity (non-overlapping)"
+    },
+    {
+      "facility": "in-memory governance adapter seams (MemoryGovernanceBaselineStore, createGovernanceBaselineBody, createGovernanceExecutionPin, VolatileAdmissionEffectJournal)",
+      "status": "APPLICABLE_AND_EXECUTED_ON_HOST",
+      "boundaryEvidence": "root-entry public seams; re-executed under Hermes on the emulator in the base suite (GOVERNANCE_BASELINE_BODY_AND_STORE, GOVERNANCE_EXECUTION_PIN_MINT, VOLATILE_EFFECT_JOURNAL_IN_MEMORY, all PASS, byte-identical to Node twin)"
+    }
+  ],
+  "polyfillDisclosure": "NONE. No shim, polyfill, deep import, or route downgrade was used anywhere in the validation consumer; the only injected host code is the Sha256Port adapter (t013-pure-js-sha256-fips180-4/1.0.0, unchanged from #927), which the package's frozen seam design requires hosts to provide, plus in-memory neutral host behavior ports (executor dispatch, resource provider, admission policy) that the frozen seams require hosts to inject."
+}
