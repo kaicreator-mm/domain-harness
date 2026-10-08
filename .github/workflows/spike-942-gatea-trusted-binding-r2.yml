@@ -10,17 +10,17 @@ on:
 permissions:
   contents: read
 jobs:
-  b1-exact-source-ubuntu-node22:
+  b1-exact-source-ubuntu-node24:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Exact checked-out commit and tree identity
         shell: bash
         run: |
@@ -32,6 +32,10 @@ jobs:
           node -v
           uname -a
           test -f experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+      # Historical baseline/aggregate tests resolve anchored Git ancestry and
+      # git-object snapshots. Full checkout is required; never skip those checks.
+      # Woodpecker verify runs Node 24.x, while the prior B1 bounded adversarial
+      # baseline was independently green on Actions Node 22 at exact source SHA.
       - name: Real full repository gate parity
         shell: bash
         run: |
