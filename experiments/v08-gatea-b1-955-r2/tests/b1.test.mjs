@@ -100,9 +100,9 @@ test('R2 P1 declared Operation/export mismatch fails before Seal',async()=>{
   const fixture=await createFixture({wrongOperationExport:true});
   await assert.rejects(()=>seal(fixture),e=>e?.code==='E_SELECTED_OPERATION_CONTRACT');
 });
-test('R2 P1 wrong candidate module SHA fails after reattested physical pins',async()=>{
+test('R2 P1 wrong candidate module SHA fails at selected physical byte binding',async()=>{
   const fixture=await createFixture({wrongCandidateModuleSha:true});
-  await assert.rejects(()=>seal(fixture),e=>e?.code==='E_IMPLEMENTATION_DIGEST');
+  await assert.rejects(()=>seal(fixture),e=>e?.code==='E_SELECTED_MODULE_BYTES');
 });
 test('R2 P2 provider exists but exact Kind does not understand required capability',async()=>{
   const fixture=await createFixture({missingUnderstoodCapability:true});
