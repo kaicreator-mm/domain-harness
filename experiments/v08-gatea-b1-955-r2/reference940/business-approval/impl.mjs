@@ -1,6 +1,6 @@
 import { SpikeError } from '../bootstrap.mjs';
 export const implementations={
- 'approval.workflow.impl@1':ctx=>({resolve(){return structuredClone(ctx.definition)}}),
+ 'approval.workflow.impl@1':ctx=>({resolve(){return globalThis.structuredClone(ctx.definition)}}),
  'approval.action.impl@1':ctx=>({run({action,facts}){switch(action){
   case 'review':return {outcome:'SUCCESS',facts:{approved:facts.score>=70}};
   case 'auto':return {outcome:'SUCCESS',facts:{approved:false,done:true}};

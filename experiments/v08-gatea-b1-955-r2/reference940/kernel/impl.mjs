@@ -1,6 +1,6 @@
 import { SpikeError } from '../bootstrap.mjs';
 const fail=(code,msg)=>{throw new SpikeError(code,msg||code)};
-const cp=x=>structuredClone(x);
+const cp=x=>globalThis.structuredClone(x);
 const deepFreeze=x=>{if(x&&typeof x==='object'&&!Object.isFrozen(x)){for(const v of Object.values(x))deepFreeze(v);Object.freeze(x)}return x};
 const ref=(p,c)=>p.id+'@'+p.version+'/'+c.id+'#'+c.implementation;
 export const implementations={

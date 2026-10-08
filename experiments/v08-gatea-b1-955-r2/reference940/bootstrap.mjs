@@ -4,7 +4,7 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 export class SpikeError extends Error{constructor(code,detail=code){super(detail);this.name='SpikeError';this.code=code}}
 export const blobSHA=bytes=>{const b=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes);return createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex')};
-export const TRUSTED_KERNEL_BLOB='1b12e709aefff88971e7dad45754d1a6a9c0db8b';
+export const TRUSTED_KERNEL_BLOB='2603c0f8f5d99be875a6686f150732b9543ca3d1';
 export async function bootstrap({root=fileURLToPath(new URL('.',import.meta.url)),sdk,business,kernel,dependencyPins={},failCommit=false,failReceipt=false}={}){
  const trusted={path:'kernel',digest:TRUSTED_KERNEL_BLOB};
  if(kernel&&(kernel.path!==trusted.path||kernel.digest!==trusted.digest))throw new SpikeError('E_BOOT_PIN');

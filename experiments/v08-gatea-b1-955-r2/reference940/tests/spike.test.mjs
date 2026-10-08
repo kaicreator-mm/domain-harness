@@ -4,7 +4,7 @@ import {mkdtemp,cp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {bootstrap,blobSHA,SpikeError} from '../bootstrap.mjs';
+import {bootstrap,blobSHA} from '../bootstrap.mjs';
 import pins from '../pins.json' with {type:'json'};
 const root=fileURLToPath(new URL('../',import.meta.url));
 const boot=(which='approval',more={})=>bootstrap({root,sdk:pins.sdk,business:pins[which],...more});
@@ -195,8 +195,8 @@ test('P1-F2: replacing Workflow Semantic Component executable changes routing (n
  const old=await boot();assert.equal(old.dispatch({score:75}).facts.approved,true);
  const file=join(d,'business-approval','impl.mjs');
  const original=await readFile(file,'utf8');
- const edited=original.replace('return structuredClone(ctx.definition)',
-  'const flow=structuredClone(ctx.definition);flow.nodes[0].when.value=80;return flow');
+ const edited=original.replace('return globalThis.structuredClone(ctx.definition)',
+  'const flow=globalThis.structuredClone(ctx.definition);flow.nodes[0].when.value=80;return flow');
  assert.notEqual(edited,original);
  await writeFile(file,edited);
  const business=await editManifest(d,'business-approval',m=>{m.moduleDigest=blobSHA(edited)});

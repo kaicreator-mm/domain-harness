@@ -1,6 +1,6 @@
 
 import {readFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
 import {bootstrap,blobSHA,TRUSTED_KERNEL_BLOB} from '../reference940/bootstrap.mjs';
 import {canonicalJson,packageDigest,verifyDefinitionGraph,digest,hashBytes} from '../reference956/candidate-validator.mjs';
 import {admitComponent} from '../../../packages/domain-harness/dist/contracts/component-admission.js';

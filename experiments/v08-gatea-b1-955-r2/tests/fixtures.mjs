@@ -106,7 +106,7 @@ export const kindValidators={
   manifests.support.bCandidate=support.manifest;
   if(four)manifests['business-approval'].dependencies.push({id:'support',version:'1.0.0'});
   if(duplicateProvider){
-    const more=structuredClone(rule);more.componentId='another-rule';more.providesCapabilities=[cap('rule.score',['test'])];
+    const more=globalThis.structuredClone(rule);more.componentId='another-rule';more.providesCapabilities=[cap('rule.score',['test'])];
     sdk.manifest.components.push(more);
     sdk.manifest.integrity=packageDigest(sdk.manifest,sdk.artifacts);
     manifests.sdk.bCandidate=sdk.manifest;

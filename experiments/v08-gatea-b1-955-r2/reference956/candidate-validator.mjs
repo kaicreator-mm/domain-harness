@@ -107,7 +107,7 @@ export function validateComponent(c,understood=understoodStandard){
 }
 export function componentDigest(c,understood=understoodStandard){
   validateComponent(c,understood);
-  const {componentId,packageId,relations,nonMaterialExtensions,...material}=c;
+  const {componentId:_componentId,packageId:_packageId,relations:_relations,nonMaterialExtensions:_nonMaterialExtensions,...material}=c;
   const normalized={...material,requiredSemanticContracts:[...c.requiredSemanticContracts].sort((a,b)=>cmp(ref(a,'contractId'),ref(b,'contractId'))),
     requiresCapabilities:[...c.requiresCapabilities].sort((a,b)=>cmp(capability(a),capability(b))),
     providesCapabilities:[...c.providesCapabilities].sort((a,b)=>cmp(capability(a),capability(b))),
@@ -115,7 +115,7 @@ export function componentDigest(c,understood=understoodStandard){
   return 'sha256:'+digest({domain:'dh.ucb.component-semantic.candidate/1',material:normalized});
 }
 export function packageDigest(m,artifactBytes){
-  const {integrity,...rest}=m;
+  const {integrity:_integrity,...rest}=m;
   const digests=m.implementations.map(x=>{
     const bytes=artifactBytes[x.path];if(typeof bytes!=='string')deny('E_ARTIFACT_MISSING',x.path);
     return {path:x.path,sha256:hashBytes(Buffer.from(bytes,'utf8'))};

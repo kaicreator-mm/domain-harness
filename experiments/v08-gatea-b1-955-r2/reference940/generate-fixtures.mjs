@@ -1,6 +1,5 @@
 // Reproducible development helper. It does NOT run during bootstrap.
 import {readFile,writeFile} from 'node:fs/promises';
-import {join} from 'node:path';
 import {blobSHA} from './bootstrap.mjs';
 const dir=new URL('.',import.meta.url);
 const cap=(id,...operations)=>({id,operations});

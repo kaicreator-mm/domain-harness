@@ -37,3 +37,9 @@ Host-attested physical `bKinds` explicitly maps exact KindRef to candidate Compo
 Material B `requiresCapabilities` is mapped to v0.7 `requiredCapabilities`; the byte-attested exact Kind `capabilities` declaration supplies v0.7 `understoodCapabilities`. B provider/operation availability does not imply Kind understanding: a fully available provider with a Kind that does not understand the requirement is rejected as `UNKNOWN_CAPABILITY`. Other original F1/F2/F3, graph-vector, 3/4-package and seal regression cases remain exercised.
 
 Trusted Host realm/intrinsics is an explicit assumption; this research does not authorize B2, v0.7 native T002/T004, Tech Gate 1, Product Freeze or merge.
+
+### R2 full CI lint-compatibility provenance (current copy is derivative)
+
+Independent #955 Woodpecker diagnosis #6067056788 found repo lint blocked by unused bindings and `structuredClone` absent from root ESLint globals. Within **this R2 subtree only**, unused imports/destructuring aliases were corrected and references to Node `structuredClone` qualified as `globalThis.structuredClone`; the #940 test substitution strings were adjusted. Current copied `reference940/**` and `reference956/candidate-validator.mjs` are therefore **lint-normalized derivatives, no longer byte-identical**. The original *pre-edit* copy matched tree `cb9dddec6f2e5460803d1f6c1d74525adcf59ad5`. PR #940/#956 and original #961 are unchanged. Independent reviewer must inspect the semantic equivalence of these narrow lint edits.
+
+Altered physical module bytes have fresh attested digests in R2-only `reference940/{kernel,business-approval,business-learning}/manifest.json`, `reference940/pins.json`, and `reference940/bootstrap.mjs`'s trusted kernel SHA. No byte check or Host trust root is bypassed; the #940 linker algorithm and #956 graph semantics are otherwise reused. Real full npm build/lint/typecheck/test and fresh Actions CI are required at the new exact HEAD.

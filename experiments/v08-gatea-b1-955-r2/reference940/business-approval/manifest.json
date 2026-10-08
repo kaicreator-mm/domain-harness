@@ -94,5 +94,5 @@
     "business.workflow@1": "approval@1.0.0/workflow#approval.workflow.impl@1"
   },
   "module": "impl.mjs",
-  "moduleDigest": "84fbf3e6053d45dfe71e7ee39e5ad74ed97dcec5"
+  "moduleDigest": "f358d58d63b6e82f3f8746ad00203f1739b2554f"
 }

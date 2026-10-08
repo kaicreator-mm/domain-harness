@@ -1,7 +1,7 @@
 {
   "kernel": {
     "path": "kernel",
-    "digest": "1b12e709aefff88971e7dad45754d1a6a9c0db8b"
+    "digest": "2603c0f8f5d99be875a6686f150732b9543ca3d1"
   },
   "sdk": {
     "path": "sdk",
@@ -9,11 +9,11 @@
   },
   "approval": {
     "path": "business-approval",
-    "digest": "c2ea6fc3efac2b2b4e1d3da3b0191950ea339ae2"
+    "digest": "09ec388f260f87aafc43caa05293809ad6e56fe6"
   },
   "learning": {
     "path": "business-learning",
-    "digest": "7e406029392b9cb1bbb8b5de95b1dfdd12b4ff9e"
+    "digest": "b9111ffe526b35f9608e6d9a1adba99dbce2166b"
   },
   "support": {
     "path": "support",

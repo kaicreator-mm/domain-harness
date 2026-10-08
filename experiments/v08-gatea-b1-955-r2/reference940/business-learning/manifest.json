@@ -75,5 +75,5 @@
     "business.workflow@1": "learning@1.0.0/workflow#learning.workflow.impl@1"
   },
   "module": "impl.mjs",
-  "moduleDigest": "58bef7ee75fe05a8e15a37ce694ca5afd5c5c944"
+  "moduleDigest": "bfd245b080664c81f58c9f1f2fdb4bbf3d3c2236"
 }
