@@ -1,0 +1,18 @@
+{
+  "kernel": {
+    "path": "kernel",
+    "digest": "a56d4f6ccfea720eb178cf446b3f68733c25f019"
+  },
+  "sdk": {
+    "path": "sdk",
+    "digest": "29dcef34c42a86534b0e07f37f754967de9006f5"
+  },
+  "approval": {
+    "path": "business-approval",
+    "digest": "789bb51a70913eff71e44fca93620f9df136b212"
+  },
+  "learning": {
+    "path": "business-learning",
+    "digest": "bd668dd7e81b7b86d17a1e62f1a114bec71c4024"
+  }
+}

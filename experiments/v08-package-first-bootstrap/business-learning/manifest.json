@@ -1,0 +1,63 @@
+{
+  "id": "learning",
+  "version": "1.0.0",
+  "definitionId": "learning.definition@1",
+  "dependencies": [
+    {
+      "id": "sdk",
+      "version": "0.0.1"
+    }
+  ],
+  "components": [
+    {
+      "id": "action",
+      "kind": "tool",
+      "implementation": "learning.action.impl@1",
+      "provides": [
+        {
+          "id": "business.action@1",
+          "operations": [
+            "run",
+            "probeUnauthorized"
+          ]
+        }
+      ],
+      "requires": []
+    }
+  ],
+  "selections": {
+    "business.action@1": "learning@1.0.0/action#learning.action.impl@1"
+  },
+  "module": "impl.mjs",
+  "moduleDigest": "3187f3528eabb0e4fb1670b247e8573d8163faf6",
+  "workflow": {
+    "id": "learning.flow@1",
+    "endWhen": {
+      "field": "done",
+      "op": "eq",
+      "value": true
+    },
+    "nodes": [
+      {
+        "id": "lesson",
+        "priority": 0,
+        "when": {
+          "field": "progress",
+          "op": "gte",
+          "value": 0
+        },
+        "action": "lesson"
+      },
+      {
+        "id": "badge",
+        "priority": 1,
+        "when": {
+          "field": "mastery",
+          "op": "gte",
+          "value": 80
+        },
+        "action": "badge"
+      }
+    ]
+  }
+}

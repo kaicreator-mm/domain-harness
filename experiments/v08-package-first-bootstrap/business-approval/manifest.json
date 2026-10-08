@@ -1,0 +1,82 @@
+{
+  "id": "approval",
+  "version": "1.0.0",
+  "definitionId": "approval.definition@1",
+  "dependencies": [
+    {
+      "id": "sdk",
+      "version": "0.0.1"
+    }
+  ],
+  "components": [
+    {
+      "id": "action",
+      "kind": "tool",
+      "implementation": "approval.action.impl@1",
+      "provides": [
+        {
+          "id": "business.action@1",
+          "operations": [
+            "run",
+            "probeUnauthorized"
+          ]
+        }
+      ],
+      "requires": []
+    }
+  ],
+  "selections": {
+    "business.action@1": "approval@1.0.0/action#approval.action.impl@1"
+  },
+  "module": "impl.mjs",
+  "moduleDigest": "d131270caef6543be0b85bc169b8cafa9d5dd4ee",
+  "workflow": {
+    "id": "approval.flow@1",
+    "endWhen": {
+      "field": "done",
+      "op": "eq",
+      "value": true
+    },
+    "nodes": [
+      {
+        "id": "review",
+        "priority": 1,
+        "when": {
+          "field": "score",
+          "op": "gte",
+          "value": 50
+        },
+        "action": "review"
+      },
+      {
+        "id": "auto",
+        "priority": 1,
+        "when": {
+          "field": "score",
+          "op": "lt",
+          "value": 50
+        },
+        "action": "auto"
+      },
+      {
+        "id": "audit",
+        "priority": 0,
+        "when": {
+          "field": "approved",
+          "op": "present"
+        },
+        "action": "audit"
+      },
+      {
+        "id": "notice",
+        "priority": 2,
+        "when": {
+          "field": "score",
+          "op": "gte",
+          "value": 0
+        },
+        "action": "notice"
+      }
+    ]
+  }
+}

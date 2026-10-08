@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: A1: real kernel linker loads SDK and business; deterministic assembly pins
+ok 1 - A1: real kernel linker loads SDK and business; deterministic assembly pins
+  ---
+  duration_ms: 141.432863
+  type: 'test'
+  ...
+# Subtest: A3: approval has N eligible candidates, deterministic route, scoped rule/tool
+ok 2 - A3: approval has N eligible candidates, deterministic route, scoped rule/tool
+  ---
+  duration_ms: 4.28174
+  type: 'test'
+  ...
+# Subtest: A3: zero eligible WAIT and one eligible route, no arbitrary fallback
+ok 3 - A3: zero eligible WAIT and one eligible route, no arbitrary fallback
+  ---
+  duration_ms: 9.733787
+  type: 'test'
+  ...
+# Subtest: A3: different learning business on unchanged kernel and SDK
+ok 4 - A3: different learning business on unchanged kernel and SDK
+  ---
+  duration_ms: 11.061775
+  type: 'test'
+  ...
+# Subtest: A1: missing kernel file and tampered trusted manifest fail before activation
+ok 5 - A1: missing kernel file and tampered trusted manifest fail before activation
+  ---
+  duration_ms: 18.782897
+  type: 'test'
+  ...
+# Subtest: A2: changed manifest digest refuses pre-activation
+ok 6 - A2: changed manifest digest refuses pre-activation
+  ---
+  duration_ms: 14.53178
+  type: 'test'
+  ...
+# Subtest: A2/A6: implementation tampering refuses unless explicitly repinned
+ok 7 - A2/A6: implementation tampering refuses unless explicitly repinned
+  ---
+  duration_ms: 27.080347
+  type: 'test'
+  ...
+# Subtest: A2: duplicate provider and selection conflict fail closed
+ok 8 - A2: duplicate provider and selection conflict fail closed
+  ---
+  duration_ms: 13.873156
+  type: 'test'
+  ...
+# Subtest: A2: incompatible exact dependency version
+ok 9 - A2: incompatible exact dependency version
+  ---
+  duration_ms: 14.636555
+  type: 'test'
+  ...
+# Subtest: A2: cross-package cycle rejected before activation
+ok 10 - A2: cross-package cycle rejected before activation
+  ---
+  duration_ms: 20.535692
+  type: 'test'
+  ...
+# Subtest: A2: absent needed capability and invalid provider pin
+ok 11 - A2: absent needed capability and invalid provider pin
+  ---
+  duration_ms: 28.445146
+  type: 'test'
+  ...
+# Subtest: A2: operation mismatch and malformed component envelope
+ok 12 - A2: operation mismatch and malformed component envelope
+  ---
+  duration_ms: 26.552513
+  type: 'test'
+  ...
+# Subtest: A4: unauthorized component invocation and admission failure do not commit
+ok 13 - A4: unauthorized component invocation and admission failure do not commit
+  ---
+  duration_ms: 5.291059
+  type: 'test'
+  ...
+# Subtest: A4: UNKNOWN and CANCELLED stop without commit and are not blindly retried
+ok 14 - A4: UNKNOWN and CANCELLED stop without commit and are not blindly retried
+  ---
+  duration_ms: 32.484919
+  type: 'test'
+  ...
+# Subtest: A5: business-only version and declared node change creates new immutable assembly
+ok 15 - A5: business-only version and declared node change creates new immutable assembly
+  ---
+  duration_ms: 20.572833
+  type: 'test'
+  ...
+# Subtest: A6: implementation replacement (not metadata-only) changes execution
+ok 16 - A6: implementation replacement (not metadata-only) changes execution
+  ---
+  duration_ms: 26.969649
+  type: 'test'
+  ...
+# Subtest: A1: kernel manifest is immutable trusted anchor
+ok 17 - A1: kernel manifest is immutable trusted anchor
+  ---
+  duration_ms: 11.298856
+  type: 'test'
+  ...
+# Subtest: A5: exposed assembly graph cannot be mutated or rebound
+ok 18 - A5: exposed assembly graph cannot be mutated or rebound
+  ---
+  duration_ms: 2.799367
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 503.656295
