@@ -50,3 +50,25 @@ jobs:
           echo "TECH_GATE_1=NOT_SELF_APPROVED"
           echo "PRODUCT_FREEZE=BLOCKED"
           echo "MERGE=NO"
+
+  b2-fast-falsifiers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: exact SHA tree and real B2 tests first (not full repo gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "EXACT_SHA=$(git rev-parse HEAD)"
+          echo "EXACT_TREE=$(git rev-parse HEAD^{tree})"
+          npm ci
+          npm run build
+          node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
