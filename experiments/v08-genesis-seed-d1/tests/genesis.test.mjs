@@ -4,7 +4,7 @@ import {mkdtemp,cp,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {establishGenesisHost} from '../host/bootstrap.mjs';
+import {establishGenesisHost,verifySelectedHandlerIdentity} from '../host/bootstrap.mjs';
 import {TRUST_ROOTS} from '../host/trust-roots.mjs';
 import {hashBytes,packageDigest,componentDigest,verifyPackage,
   verifyDefinitionGraph,canonicalJson} from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
@@ -173,4 +173,27 @@ test('G18 unknown selected package/Component/operation fails closed',async()=>{
  await assert.rejects(host.invoke({packageId:'attacker',componentId:'sdk-rule',
    operationId:'evaluate',input:{score:100}}),isError('E_OPERATION_NOT_DECLARED'));
  assert.equal(host.stats().dispatchCount,before);
+});
+
+test('G19 reattested wrong-but-existing physical Handler refuses at callable selector',async()=>{
+ const v=await rawEntries(),sdk=v.find(x=>x.manifest.packageId==='genesis.sdk');
+ // Replace genuine rule module bytes with the genuine, existing decision module,
+ // then attest that new byte identity coherently (no stale-HASH masking).
+ sdk.artifacts['modules/rule.mjs']=sdk.artifacts['modules/decision.mjs'];
+ sdk.manifest.implementations.find(i=>i.componentId==='sdk-rule').sha256=
+   sha(sdk.artifacts['modules/rule.mjs']);
+ repin(sdk);
+ const biz=v.find(x=>x.manifest.packageId==='genesis.business.smoke');
+ biz.manifest.dependencies[0].digest=sdk.manifest.integrity;repin(biz);
+ assert.ok(verifyDefinitionGraph(v).digest);
+ await assert.rejects(verifySelectedHandlerIdentity(sdk),isError('E_SELECTED_HANDLER_EXPORT'));
+});
+test('G20 reattested wrong-existing Component owner refuses at selector',async()=>{
+ const v=await rawEntries(),sdk=v.find(x=>x.manifest.packageId==='genesis.sdk');
+ sdk.manifest.implementations.find(i=>i.componentId==='sdk-rule').componentId='sdk-decision';
+ repin(sdk);
+ const biz=v.find(x=>x.manifest.packageId==='genesis.business.smoke');
+ biz.manifest.dependencies[0].digest=sdk.manifest.integrity;repin(biz);
+ assert.ok(verifyDefinitionGraph(v).digest);
+ await assert.rejects(verifySelectedHandlerIdentity(sdk),isError('E_SELECTED_COMPONENT_OWNER'));
 });

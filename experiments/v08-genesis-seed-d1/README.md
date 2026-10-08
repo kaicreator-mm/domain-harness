@@ -59,5 +59,6 @@ The dedicated workflow `.github/workflows/spike-v08-genesis-d1.yml` independentl
 | G14–G15 | post-Seal module/manifest mutation |
 | G16 | bootstrap self-certification / authority injection |
 | G17–G18 | input mutation and unknown physical identity |
+| G19–G20 | **valid-context independently re-pinned** wrong-but-existing Handler and Component owner; candidate package+dependency graph passes, selected-callable stage rejects |
 
 **Honest boundary:** B1's current `dhpkg/0.8-candidate-1` is still a *research candidate*, and its `KindCatalog` provenance/semantic validators are not yet a native frozen v0.8 Package API. A successful D1 physical-binary proof is bounded, not production conformance. The distinct #960 A1/native joining gap and fresh independent D1 Review remain open until separately proven. No Product Freeze, Tech Gate approval, v0.7 modification or merge.

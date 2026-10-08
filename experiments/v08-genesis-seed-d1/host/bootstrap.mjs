@@ -60,6 +60,33 @@ function trustedCatalog(entries){
  if(!own(registry,'std.schema@1.0.0'))reject('E_SCHEMA_KIND_NOT_INSTALLED');
  return {registry,kindSet};
 }
+// Producer-neutral identity checker. Pure inspection is NOT Host approval.
+// Real Host invokes this only AFTER external root pins and byte verification.
+// Offline tests re-sign mutated candidates to force the exact selector stage.
+export async function verifySelectedHandlerIdentity({manifest,artifacts}){
+ verifyPackage(manifest,artifacts,understoodStandard);
+ for(const comp of manifest.components){
+   const candidates=manifest.implementations.filter(impl=>impl.componentId===comp.componentId);
+   if(comp.operations.length && candidates.length===0)
+     reject('E_SELECTED_COMPONENT_OWNER',comp.componentId);
+   if(candidates.length>1)reject('E_SELECTED_HANDLER_AMBIGUOUS',comp.componentId);
+   if(!comp.operations.length && candidates.length)
+     reject('E_SCHEMA_HANDLER_FORBIDDEN',comp.componentId);
+   if(!candidates.length)continue;
+   const selected=candidates[0];
+   const source=artifacts[selected.path];
+   if(typeof source!=='string'||reHash(source)!==selected.sha256)
+     reject('E_SELECTED_MODULE_BYTES',selected.path);
+   const loaded=await import('data:text/javascript;base64,'+Buffer.from(source,'utf8').toString('base64'));
+   for(const op of comp.operations){
+     if(op.effect!=='none')reject('E_EFFECT_AUTHORITY_UNAVAILABLE');
+     if(typeof loaded[op.operationId]!=='function')
+       reject('E_SELECTED_HANDLER_EXPORT',comp.componentId+':'+op.operationId);
+   }
+ }
+ return Object.freeze({verified:true});
+}
+
 // Host-authorized package list comes exclusively from this module's trusted anchor.
 // The caller supplies a *physical root*, not digest, Kind or permission authority.
 export async function establishGenesisHost({root=sourceRoot,...override}={}){
@@ -98,6 +125,8 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
    admitComponent(schemaComponent(c),kindSet);
  }
  const graph=verifyDefinitionGraph(physical,{},registry);
+ // Exact Kind->Component->Implementation->callable inspection of Root-approved bytes.
+ for(const entry of physical)await verifySelectedHandlerIdentity(entry);
  const handlers=new Map();
  for(const {manifest,artifacts,dir} of manifests.values()){
    for(const comp of manifest.components){
