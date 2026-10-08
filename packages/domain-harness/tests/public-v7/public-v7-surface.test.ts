@@ -299,13 +299,16 @@ test('T001E: the two v0.7 digest domain tags are pairwise-distinct frozen versio
 // Pack test 7: additive-only exports diff guard.
 // ---------------------------------------------------------------------------
 
-test('T001E: package.json exports diff is exactly one additive ./v7 key; version stays 0.2.0', () => {
+test('T001E: package.json exports diff is exactly the additive ./v7 keys; version stays 0.2.0', () => {
   const packageJsonPath = fileURLToPath(new URL('../../package.json', import.meta.url));
   const parsed = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
     version: string;
     exports: Record<string, Record<string, string>>;
   };
   assert.equal(parsed.version, '0.2.0');
+  // T001E added './v7'; T012-D1 bounded repair (gate #930, adjudication
+  // #537@6052473158) added exactly one further additive key './v7/execution'
+  // with types/import/require — no legacy target modified, none reordered.
   assert.deepEqual(Object.keys(parsed.exports), [
     '.',
     './v2',
@@ -313,6 +316,7 @@ test('T001E: package.json exports diff is exactly one additive ./v7 key; version
     './v3',
     './v4',
     './v7',
+    './v7/execution',
   ]);
   // Pinned pre-change legacy targets (byte-identical, unmodified, unreordered).
   assert.deepEqual(parsed.exports['.'], {
@@ -340,11 +344,16 @@ test('T001E: package.json exports diff is exactly one additive ./v7 key; version
     import: './dist/public-v4/index.js',
     require: './dist/public-v4/index.js',
   });
-  // The one additive key.
+  // The additive v0.7 keys (T001E ./v7; T012-D1 ./v7/execution).
   assert.deepEqual(parsed.exports['./v7'], {
     types: './dist/public-v7/index.d.ts',
     import: './dist/public-v7/index.js',
     require: './dist/public-v7/index.js',
+  });
+  assert.deepEqual(parsed.exports['./v7/execution'], {
+    types: './dist/public-v7/execution.d.ts',
+    import: './dist/public-v7/execution.js',
+    require: './dist/public-v7/execution.js',
   });
 });
 

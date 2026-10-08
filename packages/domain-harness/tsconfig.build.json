@@ -12,6 +12,9 @@
   // subpath declaration entry.
   // T001E (#551): src/public-v7/index.ts anchors the ./v7 subpath
   // declaration entry.
+  // T012-D1 (#930): src/public-v7/execution.ts anchors the additive
+  // ./v7/execution subpath declaration entry (bounded repair; the owner
+  // leaf modules it re-exports are pulled in as its import closure).
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
@@ -23,6 +26,7 @@
     "src/index.ts",
     "src/public-v3/index.ts",
     "src/public-v7/index.ts",
+    "src/public-v7/execution.ts",
     "src/workflow/index.ts",
     "src/workflow/internal/xstate-adapter.ts"
   ]

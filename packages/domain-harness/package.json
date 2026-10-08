@@ -35,6 +35,11 @@
       "types": "./dist/public-v7/index.d.ts",
       "import": "./dist/public-v7/index.js",
       "require": "./dist/public-v7/index.js"
+    },
+    "./v7/execution": {
+      "types": "./dist/public-v7/execution.d.ts",
+      "import": "./dist/public-v7/execution.js",
+      "require": "./dist/public-v7/execution.js"
     }
   },
   "files": [
