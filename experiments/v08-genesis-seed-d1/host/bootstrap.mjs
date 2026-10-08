@@ -66,7 +66,7 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
  if(Object.keys(override).length)reject('E_UNTRUSTED_HOST_OVERRIDE');
  if(typeof root!=='string'||!root)reject('E_HOST_ROOT');
  const packageRoot=resolve(root);
- const physical=[],manifests=new Map(),modules=new Map();
+ const physical=[],manifests=new Map();
  for(const [id,pin] of Object.entries(TRUST_ROOTS)){
    const dir=resolve(packageRoot,pin.directory);
    if(!dir.startsWith(packageRoot+sep))reject('E_HOST_ROOT');

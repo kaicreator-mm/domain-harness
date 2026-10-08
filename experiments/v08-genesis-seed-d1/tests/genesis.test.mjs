@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {establishGenesisHost} from '../host/bootstrap.mjs';
 import {TRUST_ROOTS} from '../host/trust-roots.mjs';
 import {hashBytes,packageDigest,componentDigest,verifyPackage,
-  verifyDefinitionGraph,understoodStandard} from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
+  verifyDefinitionGraph,canonicalJson} from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
 const packages=fileURLToPath(new URL('../packages/',import.meta.url));
 const sha=s=>'sha256:'+hashBytes(Buffer.from(s,'utf8'));
 const isError=c=>e=>e?.code===c;
@@ -73,10 +73,12 @@ test('G05 mutated actual module byte is refused by Host before dispatch',async()
  await assert.rejects(establishGenesisHost({root}),isError('E_MODULE_BYTES'));
 }));
 test('G06 forged manifest/integrity cannot create its own Host pin',async()=>clonePackages(async root=>{
- const path=join(root,'sdk/manifest.json'),m=JSON.parse(await readFile(path,'utf8'));
- m.components[1].semanticBody.threshold=0;
- await writeFile(path,JSON.stringify(m)+'\n');
- await assert.rejects(establishGenesisHost({root}),e=>['E_HOST_MANIFEST_PIN','E_MANIFEST_NONCANONICAL'].includes(e?.code));
+ const path=join(root,'sdk/manifest.json');
+ const sdk=(await rawEntries(root)).find(x=>x.manifest.packageId==='genesis.sdk');
+ sdk.manifest.components[1].semanticBody.threshold=0;
+ repin(sdk); // attacker also updates self-declared digest, not trusted Host pins
+ await writeFile(path,canonicalJson(sdk.manifest)+'\n');
+ await assert.rejects(establishGenesisHost({root}),isError('E_HOST_MANIFEST_PIN'));
 }));
 test('G07 wrong-but-existing Handler request rejects rather than silently choose another',async()=>{
  const host=await establishGenesisHost(),before=host.stats().dispatchCount;
@@ -85,10 +87,12 @@ test('G07 wrong-but-existing Handler request rejects rather than silently choose
  assert.equal(host.stats().dispatchCount,before);
 });
 test('G08 wrong Component owner in real manifest rejected at Host trust pin',async()=>clonePackages(async root=>{
- const p=join(root,'sdk/manifest.json'),m=JSON.parse(await readFile(p,'utf8'));
- m.implementations[0].componentId='sdk-decision';
- await writeFile(p,JSON.stringify(m)+'\n');
- await assert.rejects(establishGenesisHost({root}),e=>['E_MANIFEST_NONCANONICAL','E_HOST_MANIFEST_PIN'].includes(e?.code));
+ const p=join(root,'sdk/manifest.json');
+ const sdk=(await rawEntries(root)).find(x=>x.manifest.packageId==='genesis.sdk');
+ sdk.manifest.implementations[0].componentId='sdk-decision';
+ repin(sdk); // signer of Package is NOT root of Host trust
+ await writeFile(p,canonicalJson(sdk.manifest)+'\n');
+ await assert.rejects(establishGenesisHost({root}),isError('E_HOST_MANIFEST_PIN'));
 }));
 test('G09 unknown mandatory Kind refused by producer-neutral candidate validator',async()=>{
  const v=await rawEntries(),sdk=v.find(x=>x.manifest.packageId==='genesis.sdk');
@@ -119,7 +123,7 @@ test('G11 absent Provider in actual Package graph refuses',async()=>{
 });
 test('G12 duplicate Provider on actual SDK candidate refuses ambiguity',async()=>{
  const v=await rawEntries(),sdk=v.find(x=>x.manifest.packageId==='genesis.sdk');
- const other=structuredClone(sdk.manifest.components.find(c=>c.componentId==='sdk-rule'));
+ const other=JSON.parse(JSON.stringify(sdk.manifest.components.find(c=>c.componentId==='sdk-rule')));
  other.componentId='sdk-rule-copy';
  sdk.manifest.components.push(other);repin(sdk);
  const biz=v.find(x=>x.manifest.packageId==='genesis.business.smoke');
