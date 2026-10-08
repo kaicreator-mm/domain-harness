@@ -1,0 +1,45 @@
+{
+  "schema": "t013s-portable-surface-manifest/v1",
+  "candidate": "29dba90bfaa0185fcbd9cd695db72f55d5e80806 (T012-D1-repaired; facade = src/public-v7/execution.ts, merge record #930@6054426102)",
+  "declaredPackageEntries": {
+    ".": { "exportCount": 518, "role": "retained legacy/root surface (UNCHANGED vs #927 candidate)" },
+    "./v2": { "exportCount": 66, "role": "retained legacy surface (UNCHANGED)" },
+    "./workflow": { "exportCount": 11, "role": "retained legacy surface (UNCHANGED)" },
+    "./v3": { "exportCount": 436, "role": "retained legacy surface (UNCHANGED)" },
+    "./v4": { "exportCount": 23, "role": "retained legacy surface (UNCHANGED)" },
+    "./v7": { "exportCount": 15, "role": "declared host-portable v0.7 public SDK contract (UNCHANGED)" },
+    "./v7/execution": { "exportCount": 25, "role": "NEW declared public subpath for the accepted T010 Tool-plane seams (T012-D1 bounded repair): Runtime Assembly (T002B), capability-provider currentness (T003B), Tool implementation binding (T003C), exposure/invocation admission (T004A), non/effectful invocation (T004B/T004C), resource resolution (T005C), UX Tool adapter (T004E), Agent Tool adapter (T004D)" }
+  },
+  "v7ExecutionDeclaredRuntimeExports": {
+    "functions": [
+      "sealRuntimeAssembly", "isSealedRuntimeAssembly", "admitComponentWithAssembly",
+      "resolveCurrentCapabilityProvider",
+      "bindToolImplementation", "verifyToolImplementationBinding",
+      "admitToolExposure", "admitToolInvocationRequest",
+      "invokeNonEffectfulTool", "invokeEffectfulTool",
+      "resolveToolResources",
+      "queryUxTool", "invokeUxToolEffectfully",
+      "projectAgentToolSurface", "queryAgentTool", "admitAgentMutationIntent"
+    ],
+    "typedErrorClasses": [
+      "RuntimeAssemblyError", "CapabilityProvisionContractError",
+      "ToolImplementationBindingError", "InvocationRequestError",
+      "NonEffectfulInvocationError", "EffectfulInvocationError",
+      "ResourceResolutionError", "UxToolRequestError", "AgentToolProjectionError"
+    ],
+    "typeExports": "minimal transitive public type closure (owner input/output/option/result types, error-code types, shared foundation types incl. JsonValue/JsonObject) — TypeScript-erasable, correctly absent at runtime; import-surface vector asserts all 25 runtime names present with zero missing"
+  },
+  "changeVsPriorRun": {
+    "oldRunIssue": 927,
+    "oldCandidate": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+    "whatChanged": "Exactly ONE additive change: the ./v7/execution declared subpath (src/public-v7/execution.ts + package.json exports entry + tracked dist artifacts). All six pre-existing entries are byte-identical in behavior: the #927 base suite (27 vectors incl. SURFACE_BOUNDARY_ASSEMBLY_AUTHORING) re-executes UNMODIFIED on this candidate and passes 27/27 on both hosts, and the four frozen portable-journey identities (wf 055b1078..., tool 8bffd4b6..., graph 352329d3..., governance pin 10b1ca36...) are byte-identical to the #927 run record.",
+    "whatTheRepairEnables": "The frozen T010 journey seams are now publicly reachable through the declared package surface: this rerun EXECUTES them under Hermes on-device (seal -> assembly-bound admission -> current provider selection -> exact implementation bind + consumer verification -> exposure/invocation admission -> non-effectful invocation OBSERVED -> effectful refused before dispatch -> resource resolution with currentness pin), which the #927 run could only record as NOT_EXPORTED."
+  },
+  "facadeScopeNotes": {
+    "compositionOnly": "every runtime name is re-exported unchanged from an already-reviewed owner leaf module; nothing reimplemented (verified by the repair builder's identity tests and re-exercised here through public calls only)",
+    "deepImportBoundary": "owner leaf paths remain ERR_PACKAGE_PATH_NOT_EXPORTED (Node consumer require.resolve probe); exports map declares exactly ./v7/execution",
+    "governancePorts": "CentralAdmissionRequest/Outcome + Central Admission port interfaces remain reachable via ./v3 only and are deliberately NOT re-promoted (facade header contract); the effectful T004C journey is therefore NOT exercised on-host — same N/A posture as the #927 run, ownership non-overlapping"
+  },
+  "rootPublicAdapterSeamsExercised": "unchanged from #927 (admitComponent, validateToolComponent, graph/component digests, AssemblyExecutionActivator governance deps, in-memory baseline store/pin/effect-journal) — all re-executed in the base suite",
+  "importGraphNodeOnlyExternals": "zero node:* / better-sqlite3 / worker_threads externals reachable from ANY of the 7 entries (t013s-import-graph.json); ./v7/execution reaches 24 dist files incl. runtime-assembly + non-effectful-invocation owner modules, NOT sqlite-store/script-executor"
+}
