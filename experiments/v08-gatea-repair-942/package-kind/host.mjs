@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { verifyPackage, verifyDefinitionGraph, hashBytes, canonicalJson } from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
+import { verifyPackage, verifyDefinitionGraph, canonicalJson } from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
 import { admitComponent } from '../../../packages/domain-harness/dist/contracts/component-admission.js';
 import { decideKindCompatibility } from '../../../packages/domain-harness/dist/contracts/kind-compatibility.js';
 
