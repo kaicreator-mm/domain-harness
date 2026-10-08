@@ -115,26 +115,26 @@ test('S-PKG-011 incompatible target ABI refused',()=>{
  bad(()=>verifyPackage(n,sdk.artifacts),'E_TARGET_ABI');
 });
 test('S-COMP-001 five valid standard kinds and unknown kind refusal',()=>{
- for(const kind of STANDARD_KINDS){const c=C('p','x',kind.slice(4));good(()=>validateComponent(c));}
- bad(()=>validateComponent(C('p','x','unregistered')),'E_UNKNOWN_KIND');
+ for(const kind of STANDARD_KINDS){const c=C('p','sample',kind.slice(4));good(()=>validateComponent(c));}
+ bad(()=>validateComponent(C('p','sample','unregistered')),'E_UNKNOWN_KIND');
 });
 test('S-COMP-002 pure Schema without operations and duplicate operations rejected',()=>{
  const schema=C('p','pure','schema');good(()=>validateComponent(schema));
- const c=C('p','x','operation',{operations:[OP(),OP()]});
+ const c=C('p','sample','operation',{operations:[OP(),OP()]});
  bad(()=>validateComponent(c),'E_DUPLICATE_OPERATION');
 });
 test('S-COMP-003 required semantic unknown rejects and matched understood succeeds',()=>{
- const c=C('p','x','rule',{requiredSemanticContracts:[{contractId:'policy.strict',version:'1.0.0'}]});
+ const c=C('p','sample','rule',{requiredSemanticContracts:[{contractId:'policy.strict',version:'1.0.0'}]});
  bad(()=>validateComponent(c),'E_UNKNOWN_SEMANTIC_CONTRACT');
  good(()=>validateComponent(c,{...understoodStandard,'std.rule@1.0.0':['policy.strict@1.0.0']}));
 });
 test('S-COMP-004 incompatible Kind versions and non-exact refs refused',()=>{
- const c=C('p','x','schema');good(()=>validateComponent(c));
+ const c=C('p','sample','schema');good(()=>validateComponent(c));
  c.kindRef.version='2.0.0';bad(()=>validateComponent(c),'E_UNKNOWN_KIND');
  c.kindRef.version='latest';bad(()=>validateComponent(c),'E_EXACT_REF');
 });
 test('S-COMP-005 semantic digest deterministic, material vs non-material extension',()=>{
- const c=C('p','x','schema',{semanticBody:{z:1,a:2}});
+ const c=C('p','sample','schema',{semanticBody:{z:1,a:2}});
  const original=componentDigest(c);
  c.semanticBody={a:2,z:1};assert.equal(componentDigest(c),original);
  c.nonMaterialExtensions={note:'n'};assert.equal(componentDigest(c),original);
@@ -146,16 +146,16 @@ test('S-COMP-006 semantic digest separated from logical Component ID',()=>{
  assert.notEqual(c.componentId,d.componentId);
 });
 test('S-COMP-007 invalid operation effect and bogus provided operation refused',()=>{
- const c=C('p','x','operation',{operations:[OP()]});good(()=>validateComponent(c));
+ const c=C('p','sample','operation',{operations:[OP()]});good(()=>validateComponent(c));
  c.operations[0].effect='unbounded';bad(()=>validateComponent(c),'E_EFFECT_CLASS');
- const x=C('p','x','operation',{operations:[OP()],providesCapabilities:[R('call',['missing'])]});
+ const x=C('p','sample','operation',{operations:[OP()],providesCapabilities:[R('call',['missing'])]});
  bad(()=>validateComponent(x),'E_UNDECLARED_OPERATION');
 });
 test('S-COMP-008 duplicate required Capability and unknown fields refused',()=>{
- const c=C('p','x','rule',{requiresCapabilities:[R('math.check',['compute'])]});
+ const c=C('p','sample','rule',{requiresCapabilities:[R('math.check',['compute'])]});
  good(()=>validateComponent(c));
  c.requiresCapabilities.push(R('math.check',['compute']));bad(()=>validateComponent(c),'E_DUPLICATE_CAPABILITY');
- const x=C('p','x','schema');x.hiddenAuthority=true;bad(()=>validateComponent(x),'E_COMPONENT_FIELD');
+ const x=C('p','sample','schema');x.hiddenAuthority=true;bad(()=>validateComponent(x),'E_COMPONENT_FIELD');
 });
 test('S-GRAPH-001 declared cross-Package imports/exports and zero Provider refusal',()=>{
  good(base);
@@ -197,8 +197,8 @@ test('S-GRAPH-006 wrong capability version rejected and Graph dependency cycle d
  remint(y.app);bad(()=>verifyDefinitionGraph([y.sdk,y.app]),'E_GRAPH_CYCLE');
 });
 test('S-OP-001 three effect classifications with invalid effect rejection',()=>{
- for(const effect of ['none','idempotent','non-idempotent'])good(()=>validateComponent(C('p','x','operation',{operations:[OP('go',effect)]})));
- bad(()=>validateComponent(C('p','x','operation',{operations:[OP('go','always')]})),'E_EFFECT_CLASS');
+ for(const effect of ['none','idempotent','non-idempotent'])good(()=>validateComponent(C('p','sample','operation',{operations:[OP('go',effect)]})));
+ bad(()=>validateComponent(C('p','sample','operation',{operations:[OP('go','always')]})),'E_EFFECT_CLASS');
 });
 test('S-OP-002 typed input and output validation',()=>{
  const op=OP();good(()=>validatePayload(op.inputSchema,{value:4}));
