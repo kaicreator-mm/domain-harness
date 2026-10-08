@@ -72,3 +72,5 @@ jobs:
           npm ci
           npm run build
           node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
+      - name: B1 26-case attested predecessor regression (isolated from inherited full-suite failure)
+        run: node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
