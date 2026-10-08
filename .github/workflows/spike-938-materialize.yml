@@ -1,0 +1,43 @@
+name: Spike 938 isolated package-first runnable demo
+on:
+  push:
+    branches:
+      - spike/v08-package-first-bootstrap-938
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  isolated-spike:
+    if: github.ref == 'refs/heads/spike/v08-package-first-bootstrap-938'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Materialize pinned source and execute Node tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node experiments/v08-package-first-bootstrap/rehydrate.mjs
+          mkdir -p experiments/v08-package-first-bootstrap/evidence
+          {
+            echo 'host=GitHub Actions ubuntu-latest (NOT project-designated Windows/ECF host)'
+            echo "node=$(node --version)"
+            echo "os=$(uname -s)"
+            echo "arch=$(uname -m)"
+            echo "tested_input_sha=$GITHUB_SHA"
+          } > experiments/v08-package-first-bootstrap/evidence/actions-host.txt
+          node --test experiments/v08-package-first-bootstrap/tests/spike.test.mjs | tee experiments/v08-package-first-bootstrap/evidence/actions-test.tap
+      - name: Publish tested individual source files on isolated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add experiments/v08-package-first-bootstrap/
+          if ! git diff --cached --quiet; then
+            git commit -m 'spike(#938): publish tested source and real runner evidence'
+            git push origin HEAD:spike/v08-package-first-bootstrap-938
+          fi
