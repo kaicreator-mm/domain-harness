@@ -1,0 +1,91 @@
+# T016 — Run Log Summary (release-qualification executor, gate #943)
+
+Date: 2026-10-08. Environment: Windows/Git Bash, node v24.21.0, npm 11.19.0.
+Worktree: `dh-t016-943` (branch `task/dh-t016-943`).
+
+## Disclosure
+
+better-sqlite3 trap: `npm ci --ignore-scripts` policy-blocks the native build;
+the stable same-host prebuilt `better_sqlite3.node` (sha256
+`e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e`, identical to
+the binary disclosed and accepted in T012r/T013s/T014/T015) was copied from the
+shared worktree `dh-e4-896`. Same host ABI (node 24, x64, win32).
+
+## Regression (lane tip, worktree)
+
+Full `npm test` at the committed lane tip (exit 0):
+
+```text
+core       (@kaicreator/domain-harness)          2924 / 2924   pass  (incl. 5 t016 contract assertions)
+compiler   (@kaicreator/domain-harness-compiler)  172 / 172    pass
+node       (@kaicreator/domain-harness-node)      175 / 175    pass
+root tsx   (tests/assembly|conformance|compiler|hosts/node|migration/v01-expr|tools/remote)  62 / 62  pass
+root mjs   (tests/migration/v01-script|tools/script)                                          9 / 9   pass
+TOTAL                                                   3342 / 3342   pass 0 fail
+```
+
+Gates: `npm run lint` exit 0 (0 errors; 1 pre-existing unused-eslint-disable
+warning), `npm run typecheck` exit 0, `npm run build` + committed-dist check green.
+
+Flake record (honest): two transient failures occurred in earlier re-runs and
+went green on immediate single re-runs — (1) `N14` out-of-process
+process-death durability counter (first full run), (2) `T-022 V9/V16` crash-worker
+module-load SyntaxError naming an export that exists in both src and dist
+(isolated node re-run). Both are the known host-load-flake class already carried
+as a bounded P3 in the accepted T014 carried-limits register; the final full run
+above is 100% green with zero failures.
+
+## Clean-room re-pack x4 (build-then-pack) at the lane tip
+
+Method (identical to the accepted T015 clean room): fresh `git archive` extract
+of the lane tip into `C:\xDev\kAiCreator\_tmp\dh-t016-943\cleanroom`, own
+`npm ci --ignore-scripts` + disclosed prebuilt, `npm run build`,
+`node scripts/check-committed-dist.mjs` (green), `npm pack --workspaces`.
+
+```text
+kaicreator-domain-harness-0.2.0.tgz           f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332  MATCH
+kaicreator-domain-harness-node-0.2.0.tgz      549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78  MATCH
+kaicreator-domain-harness-compiler-0.2.0.tgz  3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480  MATCH
+kaicreator-domain-harness-expo-0.2.0.tgz      d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1  MATCH
+packedTarballSetSha256 (digests joined '\n', order core,node,compiler,expo)
+                                              0b5772fc7aaf57373759bf9c11b3f9294d60fbfcb22aa56c991fa7924fd3d98e  MATCH
+```
+
+All five packed identities are EXACTLY the accepted T012r/T013s/T014/T015 bytes.
+Re-pack ran at lane commit `5908117` (this commit amends it adding only the two
+evidence files under `tests/t016/`, which are outside every package `files`
+list, so the packed-byte proof transfers verbatim to the amended tip — the
+scratch-merge pack below re-proves it at the amended tree).
+
+## Scratch integration simulation (predicted integrated tree)
+
+Method: scratch repo fetched `gh-main` (535fd26) and the lane; `git merge --no-commit --no-ff lane`
+produced exactly 4 content conflicts — `.dev-standard/PROJECT_OVERRIDES.md`,
+`README.md`, `packages/domain-harness-expo/src/store/expo-sqlite-runtime-store.ts`,
+`packages/domain-harness-node/src/store/node-sqlite-runtime-store.ts` — plus 45
+main-only files absent from the lane (v0.6-superseded tooling/sources). Resolution
+policy (v0.4 tree-identical bridge precedent, PROJECT_OVERRIDES line 15):
+qualified v0.7 tree wins; the 4 conflicts resolve to the LANE side; the 45
+main-only files are removed (they are class (c) v0.7-superseded; keeping them
+would resurrect v0.6-only modules against the v0.7 graph and break the build).
+
+Result: `git diff lane scratch` is EMPTY — the predicted integrated tree is
+byte-identical to the lane tree:
+
+```text
+SCRATCH_MERGE_COMMIT=945031e3a47237c5fd677f30dfeaaf8177557fd5 (pre-amend scratch run)
+PREDICTED_INTEGRATED_TREE=219efc4e8b93a670fc31220851d6d58d50b0a940 (== lane tree)
+```
+
+The scratch tree built green (`npm run build`, exit 0) and `npm pack --workspaces`
+after that build reproduced EXACTLY the four accepted tarball digests above —
+the integrated state ships the qualified release bytes bit-for-bit. (The expo/node
+packages do not commit `dist/`; packing them requires the build first — build-then-pack,
+as everywhere in this chain. A pack attempted without the build produces an
+incomplete tarball; that attempt was discarded and is disclosed here.)
+
+## Freeze rebind status
+
+STOP per ADS RELEASE_STANDARD §4/§11 — owner disposition pending. See
+`t016-rq-record.md` "Freeze rebind" for the verbatim rule citations. No RQ
+terminal issued; no PR opened; branch pushed for durability only.
