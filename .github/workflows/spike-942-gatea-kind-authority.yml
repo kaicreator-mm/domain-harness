@@ -1,0 +1,51 @@
+name: V08 #960 Gate-A B2 isolated K1/A1 (research only)
+on:
+  push:
+    branches:
+      - spike/v08-gatea-kind-authority-960-r1
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  b2-full-source-and-native-authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: exact checkout SHA/tree (branch vs synthetic PR)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
+          echo "EXACT_SHA=$(git rev-parse HEAD)"
+          echo "EXACT_TREE=$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --version
+      - name: Full repository gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: B1 predecessor regression on exact checked-out tree
+        run: node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+      - name: B2 K1 and real accepted v0.7 T004C positive/negative
+        run: node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
+      - name: Scope limits
+        run: |
+          echo "B2_RESEARCH_ONLY=YES"
+          echo "NATIVE_B_TO_V07_T003C_IDENTITY=NOT_PROVEN"
+          echo "TECH_GATE_1=NOT_SELF_APPROVED"
+          echo "PRODUCT_FREEZE=BLOCKED"
+          echo "MERGE=NO"
