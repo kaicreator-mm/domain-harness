@@ -71,7 +71,7 @@ test('K1: distinct Kind/Workflow Package profiles via SAME neutral host + real B
 test('K1: unknown version, unapproved provider and foreign Component fail closed',async()=>{
   const f=await prepare();
   await assert.rejects(()=>f.host.seal({...f.select(pkgs[0]),kindRef:{kindId:'demo.approval',version:'2.0.0'}}),
-    e=>e?.code==='E_SELECTED_KIND');
+    e=>e?.code==='E_UNKNOWN_KIND');
   await assert.rejects(()=>f.host.seal({packageId:'foreign',kindRef:{kindId:'demo.approval',version:'1.0.0'},componentId:'approve-flow'}),
     e=>e?.code==='E_UNAPPROVED_PACKAGE');
   await assert.rejects(()=>f.host.seal({...f.select(pkgs[0]),componentId:'escalate-flow'}),
