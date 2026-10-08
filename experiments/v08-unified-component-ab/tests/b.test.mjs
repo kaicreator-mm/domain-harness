@@ -86,7 +86,7 @@ test('P03 missing, duplicate and version-mismatched Provider fail closed',async(
  cs=cs.filter(c=>c.componentId!=='rule');
  assert.throws(()=>sealB({...inputs,components:cs}),error('E_MISSING_PROVIDER'));
  cs=structuredClone(inputs.components);
- cs.find(c=>c.componentId==='action').providedCapabilities.push(cap('rule.check',['perform']));
+ cs.find(c=>c.componentId==='action').providesCapabilities.push(cap('rule.check',['perform']));
  assert.throws(()=>sealB({...inputs,components:cs}),error('E_AMBIGUOUS_PROVIDER'));
  cs=structuredClone(inputs.components);
  cs.find(c=>c.componentId==='decision').requiresCapabilities[0].version='2.0.0';

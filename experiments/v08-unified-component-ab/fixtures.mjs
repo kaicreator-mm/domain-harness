@@ -37,7 +37,6 @@ const impl = (c,handlers) => ({
 });
 export function implementationsFor(components) {
  return components.map(c=>{
-  const body=c.semanticBody;
   let handlers={};
   switch(c.componentId){
    case 'schema': handlers={};break;
@@ -45,7 +44,7 @@ export function implementationsFor(components) {
     test:(ctx,{value})=>{
       const schema=ctx.semantic('schema');
       if (schema.numberInput!==true) throw new Error('schema mismatch');
-      return {eligible:value>=body.threshold};
+      return {eligible:value>=ctx.self().threshold};
     }
    };break;
    case 'decision': handlers={
@@ -63,7 +62,7 @@ export function implementationsFor(components) {
       return {status:'COMPLETE',facts:output.facts,selected:choice.selected};
     }
    };break;
-   case 'action': handlers={perform:(_,{selected})=>({facts:{[body.field]:true,choice:selected}})};break;
+   case 'action': handlers={perform:(ctx,{selected})=>({facts:{[ctx.self().field]:true,choice:selected}})};break;
    case 'notice':handlers={send:(_,{message})=>({accepted:message.length>0})};break;
    default:handlers={};
   }

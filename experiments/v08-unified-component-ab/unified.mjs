@@ -163,6 +163,7 @@ export function sealB({ packages, components, implementations, entryCapabilities
     if (!implementation)deny('E_MISSING_IMPLEMENTATION');
     const ctx=Object.freeze({
       assemblyDigest:assembly.digest,
+      self:()=>snapshot(c.semanticBody),
       invoke:(cap,operation,args)=>execute(c.componentId,cap,operation,args,assembly.digest),
       semantic: targetId => {
         if(!c.relations.some(r=>r.targetComponentId===targetId))deny('E_UNAUTHORIZED_SEMANTIC');
