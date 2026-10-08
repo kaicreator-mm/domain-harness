@@ -15,7 +15,7 @@ const baseComponent=(packageId,componentId,kindId,semanticBody,requiredSemanticC
 const cap=(capabilityId,ops)=>({capabilityId,version:'1.0.0',operations:ops});
 const makeCandidate=(id,version,deps,components,exports=[],imports=[],source=null)=> {
   const artifacts=source?{'modules/impl.mjs':source}:{};
-  const implementations=source?[{implementationId:'sdk.rule.impl@1',componentId:'sdk-rule',path:'modules/impl.mjs',sha256:'sha256:'+hashBytes(Buffer.from(source))}]:[];
+  const implementations=source?[{implementationId:'sdk.rule.impl.v1',componentId:'sdk-rule',path:'modules/impl.mjs',sha256:'sha256:'+hashBytes(Buffer.from(source))}]:[];
   const manifest={formatVersion:'dhpkg/0.8-candidate-1',packageId:id,packageVersion:version,targetAbi:'dh.node22/1',
     hostRequirements:[],dependencies:deps,imports,exports,components,implementations,integrity:''};
   manifest.integrity=packageDigest(manifest,artifacts);

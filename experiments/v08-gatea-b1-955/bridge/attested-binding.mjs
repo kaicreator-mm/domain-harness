@@ -102,7 +102,7 @@ export async function sealAttestedB1({root,hostPins,four=false}){
     // Every selected B handler MUST name the exact same module bytes in the #940
     // attested physical package, and must not arrive as a caller JS function.
     for(const impl of m.implementations){
-      if(impl.path!=='modules/impl.mjs'||impl.implementationId!=='sdk.rule.impl@1'||id!=='sdk')fail('E_B_HANDLER_OWNER');
+      if(impl.path!=='modules/impl.mjs'||impl.implementationId!=='sdk.rule.impl.v1'||id!=='sdk')fail('E_B_HANDLER_OWNER');
     }
     entries.push({manifest:m,artifacts});
   }
