@@ -1,0 +1,27 @@
+name: Spike 938 isolated package-first executable tests
+on:
+  push:
+    branches:
+      - spike/v08-package-first-bootstrap-938
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-spike:
+    if: github.ref == 'refs/heads/spike/v08-package-first-bootstrap-938'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Execute exactly checked-out spike source and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --version
+          node --test experiments/v08-package-first-bootstrap/tests/spike.test.mjs
+          node experiments/v08-package-first-bootstrap/demo.mjs
