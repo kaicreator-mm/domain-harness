@@ -2,7 +2,7 @@
   "registryVersion": "candidate/1",
   "source": "issue#942",
   "nonNormative": true,
-  "preExecution": true,
+  "preExecution": false,
   "contractRuleCount": 29,
   "negativeWitnessCount": 5,
   "entries": [
@@ -15,9 +15,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-001:refused-side",
       "EXPECTED_ERROR": "E_PACKAGE_IDENTITY",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-002",
@@ -28,9 +28,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-002:refused-side",
       "EXPECTED_ERROR": "E_FORMAT_VERSION;E_PACKAGE_IDENTITY",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-003",
@@ -41,9 +41,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-003:refused-side",
       "EXPECTED_ERROR": "E_NONCANONICAL_JSON;E_RECORD_SAFETY",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-004",
@@ -54,9 +54,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-004:refused-side",
       "EXPECTED_ERROR": "E_IMPLEMENTATION_DIGEST",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-005",
@@ -67,9 +67,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-005:refused-side",
       "EXPECTED_ERROR": "E_PACKAGE_INTEGRITY",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-006",
@@ -80,9 +80,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-006:refused-side",
       "EXPECTED_ERROR": "E_PACKAGE_INTEGRITY;E_ARTIFACT_MISSING",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-007",
@@ -93,9 +93,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-007:refused-side",
       "EXPECTED_ERROR": "E_ILLEGAL_EXPORT;E_DUPLICATE_EXPORT",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-008",
@@ -106,9 +106,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-008:refused-side",
       "EXPECTED_ERROR": "E_ILLEGAL_IMPORT",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-009",
@@ -119,9 +119,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-009:refused-side",
       "EXPECTED_ERROR": "E_MISSING_DEPENDENCY;E_DEPENDENCY_PIN",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-010",
@@ -132,9 +132,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-010:refused-side",
       "EXPECTED_ERROR": "E_DUPLICATE_DEPENDENCY;E_DUPLICATE_PACKAGE",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-PKG-011",
@@ -145,9 +145,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-PKG-011:refused-side",
       "EXPECTED_ERROR": "E_TARGET_ABI",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-001",
@@ -158,9 +158,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-001:refused-side",
       "EXPECTED_ERROR": "E_UNKNOWN_KIND",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-002",
@@ -171,9 +171,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-002:refused-side",
       "EXPECTED_ERROR": "E_DUPLICATE_OPERATION",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-003",
@@ -184,9 +184,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-003:refused-side",
       "EXPECTED_ERROR": "E_UNKNOWN_SEMANTIC_CONTRACT",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-004",
@@ -197,9 +197,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-004:refused-side",
       "EXPECTED_ERROR": "E_UNKNOWN_KIND;E_EXACT_REF",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-005",
@@ -210,9 +210,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-005:refused-side",
       "EXPECTED_ERROR": "DIGEST_MISMATCH_EXPECTED_ON_MATERIAL_CHANGE",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-006",
@@ -223,9 +223,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-006:refused-side",
       "EXPECTED_ERROR": "IDENTITY_SEPARATION",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-007",
@@ -236,9 +236,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-007:refused-side",
       "EXPECTED_ERROR": "E_EFFECT_CLASS;E_UNDECLARED_OPERATION",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-COMP-008",
@@ -249,9 +249,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-COMP-008:refused-side",
       "EXPECTED_ERROR": "E_DUPLICATE_CAPABILITY;E_COMPONENT_FIELD",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-GRAPH-001",
@@ -262,9 +262,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-GRAPH-001:refused-side",
       "EXPECTED_ERROR": "E_MISSING_PROVIDER",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-GRAPH-002",
@@ -275,9 +275,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-GRAPH-002:refused-side",
       "EXPECTED_ERROR": "E_RELATION_TARGET;E_UNDECLARED_IMPORT",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-GRAPH-003",
@@ -288,9 +288,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-GRAPH-003:refused-side",
       "EXPECTED_ERROR": "E_UNEXPORTED_REFERENCE",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-GRAPH-004",
@@ -301,9 +301,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-GRAPH-004:refused-side",
       "EXPECTED_ERROR": "GRAPH_DIGEST_EQUAL",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-GRAPH-005",
@@ -314,9 +314,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-GRAPH-005:refused-side",
       "EXPECTED_ERROR": "E_AMBIGUOUS_PROVIDER;E_PROVIDER_SELECTION",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-GRAPH-006",
@@ -327,9 +327,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-GRAPH-006:refused-side",
       "EXPECTED_ERROR": "E_MISSING_PROVIDER;E_GRAPH_CYCLE",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-OP-001",
@@ -340,9 +340,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-OP-001:refused-side",
       "EXPECTED_ERROR": "E_EFFECT_CLASS",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-OP-002",
@@ -353,9 +353,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-OP-002:refused-side",
       "EXPECTED_ERROR": "E_INPUT_SCHEMA;E_OUTPUT_SCHEMA",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-OP-003",
@@ -366,9 +366,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-OP-003:refused-side",
       "EXPECTED_ERROR": "E_UNDECLARED_FAILURE;E_CALLER_DENIED",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "S-OP-004",
@@ -379,9 +379,9 @@
       "INVALID_FIXTURE": "tests/conformance.test.mjs#S-OP-004:refused-side",
       "EXPECTED_ERROR": "E_ADMISSION_REQUIRED",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "AWAIT_REAL_HOST"
+      "ACTUAL_RESULT": "PASS_BOUNDED_CANDIDATE_VALIDATOR",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "RESEARCH_CONTRACT_TEST_ONLY_NOT_NATIVE_INTEGRATION"
     },
     {
       "RULE_ID": "X-GAP-01",
@@ -392,9 +392,9 @@
       "INVALID_FIXTURE": "tests/known-gaps.test.mjs#1",
       "EXPECTED_ERROR": "should refuse but current #944 sealB accepts",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "EXPECTED_GAP_NOT_PASS"
+      "ACTUAL_RESULT": "EXPECTED_GAP_REPRODUCED (underlying #944 conformance FAIL)",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "REQUIRES_OWNER_REPAIR_AND_FRESH_REVIEW"
     },
     {
       "RULE_ID": "X-GAP-02",
@@ -405,9 +405,9 @@
       "INVALID_FIXTURE": "tests/known-gaps.test.mjs#2",
       "EXPECTED_ERROR": "should refuse but current #944 sealB accepts",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "EXPECTED_GAP_NOT_PASS"
+      "ACTUAL_RESULT": "EXPECTED_GAP_REPRODUCED (underlying #944 conformance FAIL)",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "REQUIRES_OWNER_REPAIR_AND_FRESH_REVIEW"
     },
     {
       "RULE_ID": "X-GAP-03",
@@ -418,9 +418,9 @@
       "INVALID_FIXTURE": "tests/known-gaps.test.mjs#3",
       "EXPECTED_ERROR": "should refuse but current #944 sealB accepts",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "EXPECTED_GAP_NOT_PASS"
+      "ACTUAL_RESULT": "EXPECTED_GAP_REPRODUCED (underlying #944 conformance FAIL)",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "REQUIRES_OWNER_REPAIR_AND_FRESH_REVIEW"
     },
     {
       "RULE_ID": "X-GAP-04",
@@ -431,9 +431,9 @@
       "INVALID_FIXTURE": "tests/known-gaps.test.mjs#4",
       "EXPECTED_ERROR": "should refuse but current #944 sealB accepts",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "EXPECTED_GAP_NOT_PASS"
+      "ACTUAL_RESULT": "EXPECTED_GAP_REPRODUCED (underlying #944 conformance FAIL)",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "REQUIRES_OWNER_REPAIR_AND_FRESH_REVIEW"
     },
     {
       "RULE_ID": "X-GAP-05",
@@ -444,9 +444,17 @@
       "INVALID_FIXTURE": "tests/known-gaps.test.mjs#5",
       "EXPECTED_ERROR": "should refuse but current #944 sealB accepts",
       "TEST_COMMAND": "node --test experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs",
-      "ACTUAL_RESULT": "NOT_RUN",
-      "EVIDENCE_SHA": null,
-      "DISPOSITION": "EXPECTED_GAP_NOT_PASS"
+      "ACTUAL_RESULT": "EXPECTED_GAP_REPRODUCED (underlying #944 conformance FAIL)",
+      "EVIDENCE_SHA": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+      "DISPOSITION": "REQUIRES_OWNER_REPAIR_AND_FRESH_REVIEW"
     }
-  ]
+  ],
+  "evidence": {
+    "tested_sha": "ecedde8e2ff5f2f880bfe776780ec2023408a8a0",
+    "tree": "cde94d4990de8f1e5e20585cc4a8290ad63d4796",
+    "host": "GitHub Actions Ubuntu x86_64 Node 22",
+    "ci_run": "https://github.com/kaicreator-mm/domain-harness/actions/runs/37800153300",
+    "contract_tests": "29/29",
+    "gap_witnesses": "5/5"
+  }
 }
