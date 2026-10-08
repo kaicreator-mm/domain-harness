@@ -1,0 +1,47 @@
+name: V08 SPEC 942 conformance only (no production-equivalence claim)
+on:
+  push:
+    branches:
+      - spike/v08-spec-conformance-942-r1
+  pull_request:
+    branches:
+      - spike/v08-sdk-packageization-mk-942-r1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate-schema-and-known-negative-witnesses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact subject and pinned ancestor verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'EXACT_SUBJECT=%s\n' "$(git rev-parse HEAD)"
+          printf 'EXACT_TREE=%s\n' "$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f experiments/v08-unified-component-ab/unified.mjs
+          node --version
+          uname -a
+      - name: Contract validator and golden/negative tests
+        run: |
+          node --test experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs
+      - name: Reproduce known candidate P1 without reporting conformance success
+        run: |
+          node --test experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs
+          echo "EXPECTED_GAP_REPRODUCED != CONFORMANCE_PASS"
+      - name: Machine-readable status boundary
+        run: |
+          echo "SPEC_CONTRACT_CHECKS=BOUNDED"
+          echo "REVIEW_944_P1=UNRESOLVED"
+          echo "NATIVE_B_PACKAGE_INTEGRATION=BLOCKED_BY_P1"
+          echo "V07_PRODUCTION_EQUIVALENCE=NOT_TESTED"
+          echo "FORMAL_V08_L2_FREEZE=NO"

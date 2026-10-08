@@ -1,0 +1,98 @@
+{
+  "classification": "PRE_RESEARCH_ONLY",
+  "p0": 0,
+  "p1": 5,
+  "p2": 4,
+  "gaps": [
+    {
+      "GAP_ID": "GAP-SPEC-01",
+      "SEVERITY": "P1",
+      "AMBIGUOUS_RULE": "Implementation Digest must pin actually invoked handler",
+      "CONFLICTING_INTERPRETATIONS": "Recorded implementationDigest alone is enough | selected callable must be attested and immutable",
+      "EXECUTABLE_COUNTEREXAMPLE": "known-gaps P1-F1: post-seal Rule handler substitution changes workflow result without Assembly digest change",
+      "MINIMUM_SPEC_CORRECTION": "Freeze/copy trusted callable ownership and verify selected module bytes at existing v0.7 T002/T004 seal",
+      "V07_REUSE": "runtime-assembly.ts; tool-implementation-binding.ts",
+      "REQUIRES_NEW_DEMO": "YES"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-02",
+      "SEVERITY": "P1",
+      "AMBIGUOUS_RULE": "Package digest must attest executed B Components, imports and exports",
+      "CONFLICTING_INTERPRETATIONS": "Caller asserted package list is trusted | verified package closure is the only source of B definitions and handlers",
+      "EXECUTABLE_COUNTEREXAMPLE": "known-gaps P1-F2: fabricated package SHA and missing import/export declarations still seal and invoke",
+      "MINIMUM_SPEC_CORRECTION": "Bind B declarations and implementation bytes from #940 verified linker output; prohibit independent caller arrays",
+      "V07_REUSE": "package/validation.ts; domain-data-integrity.ts; #940 bootstrap",
+      "REQUIRES_NEW_DEMO": "YES"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-03",
+      "SEVERITY": "P1",
+      "AMBIGUOUS_RULE": "Required Semantic Contract and Kind must be understood",
+      "CONFLICTING_INTERPRETATIONS": "Array shape suffices | exact versioned Kind validator must admit all material semantics",
+      "EXECUTABLE_COUNTEREXAMPLE": "known-gaps P1-F3/F3b: unknown semantic contract and unknown material Kind enter sealed candidate",
+      "MINIMUM_SPEC_CORRECTION": "Reuse exact understood Kind + required contract admission with closed-world validator before binding",
+      "V07_REUSE": "component-admission.ts; kind-compatibility.ts",
+      "REQUIRES_NEW_DEMO": "NO"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-04",
+      "SEVERITY": "P1",
+      "AMBIGUOUS_RULE": "Effectful Operation may only enter Runtime-owned Admission",
+      "CONFLICTING_INTERPRETATIONS": "Any injected effectAuthority is fine | only trusted v0.7 scoped Occurrence authority may commit an effect",
+      "EXECUTABLE_COUNTEREXAMPLE": "known-gaps fifth test: caller-injected toy effectAuthority authorizes notification",
+      "MINIMUM_SPEC_CORRECTION": "Use actual v0.7 scoped invocation and journal-first admission; do not add toy Journal",
+      "V07_REUSE": "admission/admission.ts; effect-journal.ts; effectful-invocation.ts",
+      "REQUIRES_NEW_DEMO": "NO"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-05",
+      "SEVERITY": "P1",
+      "AMBIGUOUS_RULE": "Microkernel contains no Business Workflow/Action semantic special cases",
+      "CONFLICTING_INTERPRETATIONS": "Special-case dispatch is required in Kernel | Standard Kind Package provides semantic behavior",
+      "EXECUTABLE_COUNTEREXAMPLE": "PR #945 KPK-01 / MK-01; #938 kernel branches business.workflow/action",
+      "MINIMUM_SPEC_CORRECTION": "Route via admitted Kind/Provider in existing linker; no new dispatch subsystem",
+      "V07_REUSE": "runtime-assembly.ts; workflow-kind.ts; #940/#945 reports",
+      "REQUIRES_NEW_DEMO": "NO"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-06",
+      "SEVERITY": "P2",
+      "AMBIGUOUS_RULE": "Manifest set-like arrays have stable canonical representation",
+      "CONFLICTING_INTERPRETATIONS": "All arrays are material order | declared sets sort before signing",
+      "EXECUTABLE_COUNTEREXAMPLE": "Not fully tested: packageDigest canonicalizes record keys but package collections currently remain order-sensitive",
+      "MINIMUM_SPEC_CORRECTION": "Define code-unit normalized dependencies/imports/exports/components and pinned golden vectors, retaining order of semantic arrays",
+      "V07_REUSE": "identity.ts; component-digest.ts",
+      "REQUIRES_NEW_DEMO": "NO"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-07",
+      "SEVERITY": "P2",
+      "AMBIGUOUS_RULE": "Complete input/output and declared failure ABI",
+      "CONFLICTING_INTERPRETATIONS": "Subset type projector is sufficient | full schema and error/unknown failure mapping required",
+      "EXECUTABLE_COUNTEREXAMPLE": "Only primitive type/required checks verified; nested JSON Schema and failure provenance NOT_TESTED",
+      "MINIMUM_SPEC_CORRECTION": "Pin supported JSON Schema dialect and typed failure fallback; test nested invalids and unknown errors",
+      "V07_REUSE": "tool-operations; effectful/non-effectful invocation",
+      "REQUIRES_NEW_DEMO": "NO"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-08",
+      "SEVERITY": "P2",
+      "AMBIGUOUS_RULE": "Package dependency DAG and lifecycle are fully conformed",
+      "CONFLICTING_INTERPRETATIONS": "No cycle signable with exact hash closure | preflight must classify cycles and activation cleanup",
+      "EXECUTABLE_COUNTEREXAMPLE": "Package cycle and diamond activation/partial rollback on attested new B closure NOT_TESTED",
+      "MINIMUM_SPEC_CORRECTION": "Two-phase dependency-DAG validation, provider-first activation, reverse cleanup, idempotent Dispose; use #940 and v0.7 accepted contract",
+      "V07_REUSE": "capability-dependency-closure.ts; package/activation.ts",
+      "REQUIRES_NEW_DEMO": "NO"
+    },
+    {
+      "GAP_ID": "GAP-SPEC-09",
+      "SEVERITY": "P2",
+      "AMBIGUOUS_RULE": "Legacy A/B and production Gate B parity",
+      "CONFLICTING_INTERPRETATIONS": "Green toy tests imply v0.7 state/effect/replay equivalence | accepted production oracle mandatory",
+      "EXECUTABLE_COUNTEREXAMPLE": "#944 A lacks real T002/T004; #945 59 source oracles do not execute v0.8 production B",
+      "MINIMUM_SPEC_CORRECTION": "Run Gate B v0.7 differential on existing Runtime, fault/UNKNOWN/recovery/host consumer; do not create Journal",
+      "V07_REUSE": "component-digest.ts; runtime-assembly.ts; admission and recovery",
+      "REQUIRES_NEW_DEMO": "NO"
+    }
+  ]
+}
