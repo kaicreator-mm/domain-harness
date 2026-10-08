@@ -1,0 +1,17 @@
+{
+  "name": "t012r-clean-consumer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "T012 PACK-E clean external packed consumer (successor rerun, issue #926). Installs ONLY the T011-authorized packed tarballs; no workspace resolution, no file: refs to repository source.",
+  "dependencies": {
+    "@kaicreator/domain-harness": "../tarballs/kaicreator-domain-harness-0.2.0.tgz",
+    "@kaicreator/domain-harness-compiler": "../tarballs/kaicreator-domain-harness-compiler-0.2.0.tgz",
+    "@kaicreator/domain-harness-expo": "../tarballs/kaicreator-domain-harness-expo-0.2.0.tgz",
+    "@kaicreator/domain-harness-node": "../tarballs/kaicreator-domain-harness-node-0.2.0.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3"
+  }
+}
