@@ -21,7 +21,7 @@ const makeCandidate=(id,version,deps,components,exports=[],imports=[],source=nul
   manifest.integrity=packageDigest(manifest,artifacts);
   return {manifest,artifacts};
 };
-export async function createFixture({four=false,duplicateProvider=false,unknownKind=false,unknownSemantic=false,wrongKindVersion=false,invalidBody=false,invalidImport=false,wrongDependencyVersion=false,missingProvider=false}={}){
+export async function createFixture({four=false,duplicateProvider=false,unknownKind=false,unknownSemantic=false,wrongKindVersion=false,invalidBody=false,invalidImport=false,wrongDependencyVersion=false,missingProvider=false,wrongKindImplementation=false}={}){
   const root=await mkdtemp(join(tmpdir(),'v08-b1-'));
   await cp(reference,root,{recursive:true});
   const manifests={};const modules={};
@@ -34,7 +34,23 @@ export async function createFixture({four=false,duplicateProvider=false,unknownK
   const sdkSource=modules.sdk.replace("import { SpikeError } from '../bootstrap.mjs';",
     "class SpikeError extends Error { constructor(code){ super(code); this.code=code; } }");
   if(sdkSource===modules.sdk)throw new Error('fixture SDK import adaptation missing');
-  modules.sdk=sdkSource;manifests.sdk.moduleDigest=blobSHA(Buffer.from(sdkSource));
+  const validatorCode=String.raw`
+export const kindValidators={
+ 'std.rule@1.0.0':env=>{
+   const b=env.semanticBody;
+   if(!b||Object.keys(b).sort().join(',')!=='operator,threshold'
+     ||b.operator!=='gte'||typeof b.threshold!=='number'||!Number.isFinite(b.threshold))
+     throw Object.assign(new Error('invalid material Rule semantics'),{code:'E_KIND_SEMANTIC_BODY'});
+ },
+ 'std.schema@1.0.0':env=>{
+   const b=env.semanticBody;
+   if(!b||b.type!=='object'||Object.keys(b).join(',')!=='type')
+     throw Object.assign(new Error('invalid material Schema semantics'),{code:'E_KIND_SEMANTIC_BODY'});
+ }
+};
+`;
+  modules.sdk=sdkSource+validatorCode;
+  manifests.sdk.moduleDigest=blobSHA(Buffer.from(modules.sdk));
   const rule=baseComponent('sdk','sdk-rule',
     unknownKind?'uninstalled.behavior':'std.rule',
     invalidBody?{threshold:'seventy'}:{threshold:70,operator:'gte'},
@@ -52,6 +68,7 @@ export async function createFixture({four=false,duplicateProvider=false,unknownK
   });
   const schema=baseComponent('approval','approval-schema','std.schema',{type:'object'},[],[cap('rule.score',['test'])],[],
     [{relationKind:'depends-on',target:{packageId:'sdk',componentId:'sdk-rule',digest:ruleDigest}}],[]);
+  schema.nonMaterialExtensions={label:'inert decorative hint'};
   const supportSchema=baseComponent('support','support-schema','std.schema',{type:'object'});
   const kernel=makeCandidate('kernel','0.0.1',[],[]);
   const sdk=makeCandidate('sdk','0.0.1',[{packageId:'kernel',version:'0.0.1',digest:kernel.manifest.integrity}],
@@ -64,7 +81,7 @@ export async function createFixture({four=false,duplicateProvider=false,unknownK
   const business=makeCandidate('approval','1.0.0',deps,[schema],[],imported);
   manifests.sdk.bCandidate=sdk.manifest;
   manifests.sdk.bKinds=[
-    {kindId:'std.rule',version:'1.0.0',implementationId:'sdk.rule.impl@1',semantics:['sc.rule.threshold@1.0.0']},
+    {kindId:'std.rule',version:'1.0.0',implementationId:wrongKindImplementation?'sdk.missing.impl@1':'sdk.rule.impl@1',semantics:['sc.rule.threshold@1.0.0']},
     {kindId:'std.schema',version:'1.0.0',implementationId:null,semantics:[]}
   ];
   manifests['business-approval'].bCandidate=business.manifest;

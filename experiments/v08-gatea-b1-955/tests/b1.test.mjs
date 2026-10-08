@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {createFixture} from './fixtures.mjs';
-import {sealAttestedB1,admitGraphVector} from '../bridge/attested-binding.mjs';
-const seal=(f,extra={})=>sealAttestedB1({root:f.root,hostPins:f.pins,...extra});
+import {establishTrustedB1Host,admitGraphVector} from '../bridge/attested-binding.mjs';
+const seal=(f,extra={})=>establishTrustedB1Host({root:f.root,approvedPins:f.pins}).seal(extra);
 const mustReject=async (options,code)=> {
   const f=await createFixture(options);
   await assert.rejects(()=>seal(f,{four:!!options.four}),e=>e?.code===code,'expected typed refusal '+code);
@@ -29,10 +29,13 @@ test('F2 wrong verified Module bytes are refused before B Rule module import',as
   await writeFile(p,(await readFile(p,'utf8'))+'\n// hostile substitute\n');
   await assert.rejects(()=>seal(f),e=>e?.code==='E_MODULE_BYTES');
 });
-test('F2 signed-looking caller Package selector cannot override host approved pin',async()=>{
-  const f=await createFixture();const other=structuredClone(f.pins);
-  other.sdk.digest='0'.repeat(40);
-  await assert.rejects(()=>sealAttestedB1({root:f.root,hostPins:other}),e=>e?.code==='E_HOST_PIN');
+test('F2 caller cannot forge selected Package digest after Host trust establishment',async()=>{
+  const f=await createFixture();
+  const host=establishTrustedB1Host({root:f.root,approvedPins:f.pins});
+  f.pins.sdk.digest='0'.repeat(40); // mutate caller object, NOT original Host snapshot
+  await assert.rejects(()=>host.seal({sdk:{path:'sdk',digest:'0'.repeat(40)}}),
+    e=>e?.code==='E_UNTRUSTED_SELECTION');
+  const s=await host.seal();assert.equal(s.invokeRule({score:80}),true);
 });
 test('F2 physical Manifest byte substitution detected, not merely candidate digest',async()=>{
   const f=await createFixture();const p=join(f.root,'business-approval','manifest.json');
@@ -46,6 +49,7 @@ test('F2 missing selected provider fails before invocation',async()=>mustReject(
 test('F3 uninstalled behavior Kind fails v0.7 compatibility',async()=>mustReject({unknownKind:true},'KIND_NOT_SUPPORTED'));
 test('F3 no range fallback for incompatible materially required Kind version',async()=>mustReject({wrongKindVersion:true},'KIND_VERSION_NOT_SUPPORTED'));
 test('F3 unknown materially required semantic contract rejects before seal',async()=>mustReject({unknownSemantic:true},'UNKNOWN_SEMANTIC_CONTRACT'));
+test('F3 installed executable Kind requires approved physical KindImplementation',async()=>mustReject({wrongKindImplementation:true},'E_KIND_IMPLEMENTATION'));
 test('F3 installed Kind rejects wrong semanticBody shape',async()=>mustReject({invalidBody:true},'E_KIND_SEMANTIC_BODY'));
 test('F3 runtime typed rule input denial',async()=>{
   const f=await createFixture();const s=await seal(f);
@@ -53,7 +57,7 @@ test('F3 runtime typed rule input denial',async()=>{
   assert.throws(()=>s.invokeRule({score:Number.NaN}),{code:'E_NONCANONICAL_JSON'});
 });
 test('F1 post-seal caller pin and module file reassignment cannot replace captured executable',async()=>{
-  const f=await createFixture();const s=await seal(f);const d=s.assembly.digest;
+  const f=await createFixture();const host=establishTrustedB1Host({root:f.root,approvedPins:f.pins});const s=await host.seal();const d=s.assembly.digest;
   f.pins.sdk.digest='0'.repeat(40);
   const p=join(f.root,'sdk','impl.mjs');
   await writeFile(p,'globalThis.__unexpected=1; export const implementations={};');
@@ -61,7 +65,7 @@ test('F1 post-seal caller pin and module file reassignment cannot replace captur
   assert.equal(s.invokeRule({score:0}),false);
   assert.equal(s.assembly.digest,d);
   assert.equal(Object.isFrozen(s.assembly),true);
-  await assert.rejects(()=>seal(f),e=>['E_HOST_PIN','E_MODULE_BYTES'].includes(e?.code));
+  await assert.rejects(()=>host.seal(),e=>e?.code==='E_MODULE_BYTES');
 });
 test('F1 repeated sealed Rule invocation preserves selected original semantics',async()=>{
   const f=await createFixture();const s=await seal(f);

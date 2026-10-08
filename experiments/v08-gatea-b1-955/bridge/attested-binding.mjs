@@ -34,38 +34,41 @@ const kernelProjection=()=>{
   m.integrity=packageDigest(m,{});return {manifest:m,artifacts:{}};
 };
 function makeAdmission(sdkPhysical,module){
+  // The complete understood Kind set and executable Kind validators come from
+  // the SAME attested SDK physical module/manifest; no Kernel enum or registry.
   const declarations=snapshot(sdkPhysical.m.bKinds||[]);
   const map=Object.create(null);
   const kindSet=[];
   for(const kind of declarations){
-    if(!['std.rule','std.schema'].includes(kind.kindId)||kind.version!=='1.0.0'
-      ||typeof kind.implementationId!=='object'&&typeof kind.implementationId!=='string')
+    if(typeof kind.kindId!=='string'||typeof kind.version!=='string'
+       ||!Array.isArray(kind.semantics)||
+       (kind.implementationId!==null&&typeof kind.implementationId!=='string'))
       fail('E_UNTRUSTED_KIND');
     const exact=kind.kindId+'@'+kind.version;
     if(Object.hasOwn(map,exact))fail('E_DUPLICATE_KIND');
-    if(kind.kindId==='std.rule'){
-      if(kind.implementationId!=='sdk.rule.impl@1'||typeof module.implementations?.[kind.implementationId]!=='function')fail('E_KIND_IMPLEMENTATION');
-      if(kind.semantics.length!==1||kind.semantics[0]!=='sc.rule.threshold@1.0.0')fail('E_KIND_SEMANTICS');
-    }else if(kind.implementationId!==null||kind.semantics.length)fail('E_KIND_IMPLEMENTATION');
+    const validateComponent=module.kindValidators?.[exact];
+    if(typeof validateComponent!=='function')fail('E_KIND_VALIDATOR');
+    if(kind.implementationId!==null&&typeof module.implementations?.[kind.implementationId]!=='function')
+      fail('E_KIND_IMPLEMENTATION');
+    if(kind.semantics.some(x=>typeof x!=='string'||!x.includes('@')))fail('E_KIND_SEMANTICS');
     map[exact]=kind.semantics;
-    const understoodSemanticContracts=kind.semantics.map(x=>{const [contractId,version]=x.split('@');return {contractId,version}});
+    const understoodSemanticContracts=kind.semantics.map(x=>{
+      const tokens=x.split('@');
+      if(tokens.length!==2)fail('E_KIND_SEMANTICS');
+      return {contractId:tokens[0],version:tokens[1]};
+    });
     kindSet.push({
       kind:{kindId:kind.kindId,version:kind.version},
       understoodSemanticContracts,understoodCapabilities:[],
-      validateComponent(env){
-        const body=env.semanticBody;
-        if(kind.kindId==='std.rule' && (!body||Object.keys(body).sort().join(',')!=='operator,threshold'
-          ||body.operator!=='gte'||typeof body.threshold!=='number'||!Number.isFinite(body.threshold)))
-          fail('E_KIND_SEMANTIC_BODY');
-        if(kind.kindId==='std.schema'&&(!body||body.type!=='object'||Object.keys(body).join(',')!=='type'))
-          fail('E_KIND_SEMANTIC_BODY');
-      }
+      validateComponent // actual byte-verified installed SDK validator, v0.7 invokes it
     });
   }
-  if(kindSet.length!==2)fail('E_REQUIRED_KINDS');
+  if(!kindSet.some(x=>x.kind.kindId==='std.rule'&&x.kind.version==='1.0.0') ||
+     !kindSet.some(x=>x.kind.kindId==='std.schema'&&x.kind.version==='1.0.0'))
+    fail('E_REQUIRED_KINDS');
   return {map,kindSet};
 }
-export async function sealAttestedB1({root,hostPins,four=false}){
+async function sealAttestedB1({root,hostPins,four=false}){
   // Host-supplied pin set is authority; a caller cannot authorize a new digest
   // merely by changing an untrusted selector. No user JS implementation input.
   const pins=snapshot(hostPins);
@@ -142,5 +145,24 @@ export async function sealAttestedB1({root,hostPins,four=false}){
     },
     invokeSchema(){fail('E_OPERATION_NOT_DECLARED');},
     rebind(){fail('E_SEALED');}
+  });
+}
+
+/**
+ * Privileged HOST construction step. Only host-owned provisioning calls this
+ * constructor with approved exact pins; untrusted callers receive at most
+ * the returned seal capability and can never supply/re-sign Package selectors.
+ */
+export function establishTrustedB1Host({root,approvedPins}){
+  const pins=snapshot(approvedPins); // private immutable value snapshot at trust establishment
+  if(typeof root!=='string'||!root)fail('E_HOST_ROOT');
+  if(pins.kernel?.digest!==TRUSTED_KERNEL_BLOB)fail('E_KERNEL_ROOT');
+  return Object.freeze({
+    seal(request={}){
+      const options=snapshot(request);
+      for(const k of Object.keys(options))if(k!=='four')fail('E_UNTRUSTED_SELECTION');
+      if('four' in options && typeof options.four!=='boolean')fail('E_UNTRUSTED_SELECTION');
+      return sealAttestedB1({root,hostPins:pins,four:options.four===true});
+    }
   });
 }
