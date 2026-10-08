@@ -102,15 +102,13 @@ writeFileSync(retainedFile, JSON.stringify({ manifest: canonicalizeForHash(fixtu
 
 const head = git(['rev-parse', 'HEAD']);
 const tree = git(['rev-parse', 'HEAD^{tree}']);
-// The fixtures bind the assembly the wave tests: the checkout HEAD itself
-// (T009 devicehost binding convention). On the v0.6 program line the
-// candidate commit IS the assembly; the #458-era merge-base(HEAD,
-// origin/main) binding would attestation-bind the v0.5 fork point (origin/main
-// is the released v0.5 line), misstating the product surface the device ran.
-// The wave branch's own diff is tests/hosts/** only, so the product tree at
-// HEAD is exactly the attested product surface.
-const assemblyHead = head;
-const assemblyTree = tree;
+// The fixtures bind to the MERGED ASSEMBLY the product material comes from
+// (merge-base with origin/main), not to the harness-only branch head: the
+// SX-E16 cross-host comparator must equal the Node wave's TESTED_HEAD.
+// This branch's diff is purely tests/hosts/successor-expo/**, so the product
+// tree at HEAD is byte-identical to the assembly base.
+const assemblyHead = git(['merge-base', 'HEAD', 'origin/main']);
+const assemblyTree = git(['rev-parse', `${assemblyHead}^{tree}`]);
 
 // Embed a JSON document into a single-quoted TS string literal. Backslashes
 // (including JSON's own \" sequences) must be doubled or the emitted literal

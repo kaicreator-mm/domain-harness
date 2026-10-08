@@ -13,4 +13,3 @@ coverage/
 *.sqlite-wal
 .DS_Store
 dist-legacy-test/
-*.tsbuildinfo

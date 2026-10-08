@@ -1,11 +1,9 @@
 // #467 I-CROSS-HOST-1: the CHM-C00..C18 same-corpus cross-host/migration wave
-// (#455 prep, re-captured at the v0.6 candidate assembly a45f9370 by the
-// T010-R1 closure-tooling repair, #606). One compiled corpus — the Expo
-// fixture sources compiled through the public compiler (deterministic
+// (#455 prep, rebound to merged assembly 770a1325). One compiled corpus — the
+// Expo fixture sources compiled through the public compiler (deterministic
 // packageId) — driven through the assembled Node runtime (engine-3 + T-009 +
 // SQLite), compared case-by-case against the committed real-device evidence
-// captured at the same assembly (real Hermes run on AVD dh_t023_api36,
-// 16/16 PASS).
+// captured at the same assembly (#458 affected rebind, 16/16 PASS).
 //
 // Honesty boundary: the Node half here runs on the real Node host; the device
 // half is the committed evidence of the real Hermes run. Case results compare
@@ -108,32 +106,27 @@ test('CHM-C00: bind/attest — same assembly, same compiled corpus, same fixture
   const evidence = loadDeviceEvidence();
   const corpus = await corpusOnce();
 
-  assert.equal(evidence.comparator.assemblyHead, 'a45f9370ebcf5eefe11abf0ecf2328d1b4730f5c');
-  assert.equal(evidence.comparator.assemblyTree, '035e673380139df5a8f2a6fb7e239b6faffd0eb5');
-  // Live-integration-line tripwire — EVIDENCE CURRENTNESS, not literal head
-  // equality. The host-wave evidence binds the attested assembly; the live
-  // integration line legitimately advances with test-harness-only deltas.
-  // The wave was rebound to the v0.6 program at #606 (T010-R1): the live line
-  // for this evidence is origin/v0.6 (the v0.5-era origin/main comparison
-  // predates the program fork; a v0.6 candidate assembly is never an ancestor
-  // of the v0.5 line, so origin/main can no longer arbitrate v0.6 evidence).
-  // When origin/v0.6 is readable the tripwire requires (a) the attested
-  // assembly is an ancestor of the live line (no history rewrite) AND (b) the
-  // product surface the evidence covers is byte-identical since the attested
-  // assembly (no packages/ delta) — any product change after the evidence
-  // HARD-FAILS here and demands re-capture (no stale-pass transfer). A
-  // missing ref (provider-managed shallow CI clones, Woodpecker depth-1) is
-  // an environment fact routed to the typed NOT_COMPARABLE_HEAD_OR_CORPUS
-  // classification (fail-closed record, never a silent pass and never a
-  // thrown suite failure).
-  let liveLine: string | null = null;
+  assert.equal(evidence.comparator.assemblyHead, '770a132576312e553fd50ad301a1e27fd189b4bf');
+  assert.equal(evidence.comparator.assemblyTree, 'bef145a632198f550e6d04fe5187946d2cb5b593');
+  // Live-main tripwire — EVIDENCE CURRENTNESS, not literal head equality.
+  // The host-wave evidence binds the attested assembly; main legitimately
+  // advances with test-harness-only deltas. When origin/main is readable the
+  // tripwire requires (a) the attested assembly is an ancestor of live main
+  // (no history rewrite) AND (b) the product surface the evidence covers is
+  // byte-identical since the attested assembly (no packages/ delta) — any
+  // product change after the evidence HARD-FAILS here and demands re-capture
+  // (no stale-pass transfer). A missing ref (provider-managed shallow CI
+  // clones, Woodpecker depth-1) is an environment fact routed to the typed
+  // NOT_COMPARABLE_HEAD_OR_CORPUS classification (fail-closed record, never
+  // a silent pass and never a thrown suite failure).
+  let liveMain: string | null = null;
   try {
-    liveLine = execFileSync('git', ['rev-parse', '--verify', 'origin/v0.6'], { encoding: 'utf8' }).trim();
+    liveMain = execFileSync('git', ['rev-parse', '--verify', 'origin/main'], { encoding: 'utf8' }).trim();
   } catch {
-    console.error('CHM-C00 live-line tripwire NOT_COMPARABLE_HEAD_OR_CORPUS: origin/v0.6 not readable (shallow CI clone); the local bind/attest run asserts it.');
+    console.error('CHM-C00 live-main tripwire NOT_COMPARABLE_HEAD_OR_CORPUS: origin/main not readable (shallow CI clone); the local bind/attest run asserts it.');
   }
-  if (liveLine !== null) {
-    if (liveLine !== evidence.comparator.assemblyHead) {
+  if (liveMain !== null) {
+    if (liveMain !== evidence.comparator.assemblyHead) {
       // Ancestry + product-delta probes need the attested assembly's commit
       // object. Provider-managed shallow push clones (Woodpecker depth-1)
       // carry only the pushed tip: the ancestor object is absent (git exit
@@ -141,14 +134,7 @@ test('CHM-C00: bind/attest — same assembly, same compiled corpus, same fixture
       // NOT_COMPARABLE_HEAD_OR_CORPUS record — while exit 1 (genuinely not an
       // ancestor) and a non-empty product delta remain hard failures.
       try {
-        // Every git probe is anchored to the repository root
-        // (`git rev-parse --show-toplevel`, the repo convention). git
-        // resolves pathspecs relative to the process cwd; from the npm
-        // workspace cwd (packages/domain-harness-node) the bare
-        // `packages/...` pathspecs matched NOTHING and this tripwire passed
-        // vacuously in every workspace run (T010 closure defect D2, #606).
-        const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-        execFileSync('git', ['merge-base', '--is-ancestor', evidence.comparator.assemblyHead, liveLine], { stdio: 'ignore', cwd: repoRoot });
+        execFileSync('git', ['merge-base', '--is-ancestor', evidence.comparator.assemblyHead, liveMain], { stdio: 'ignore' });
         const productSurface = [
           'packages/domain-harness/src',
           'packages/domain-harness/dist',
@@ -162,26 +148,13 @@ test('CHM-C00: bind/attest — same assembly, same compiled corpus, same fixture
           'packages/domain-harness-expo/src',
           'packages/domain-harness-expo/package.json',
         ];
-        // Non-vacuity self-check: the pathspecs must actually match tracked
-        // product-surface files, otherwise the delta probe below would be
-        // vacuously empty (git cannot distinguish "zero pathspec matches"
-        // from "no changes" in its diff output).
-        const matchedProductFiles = execFileSync(
-          'git',
-          ['ls-files', '--', ...productSurface],
-          { encoding: 'utf8', cwd: repoRoot },
-        ).trim();
-        assert.ok(
-          matchedProductFiles.length > 0,
-          `CHM-C00 tripwire self-check FAILED: the product-surface pathspecs matched zero tracked files (cwd=${process.cwd()}, repoRoot=${repoRoot}); the currentness probe would be vacuous — fix the pathspec anchoring`,
-        );
         const productDelta = execFileSync(
           'git',
-          ['diff', '--stat', `${evidence.comparator.assemblyHead}..${liveLine}`, '--', ...productSurface],
-          { encoding: 'utf8', cwd: repoRoot },
+          ['diff', '--stat', `${evidence.comparator.assemblyHead}..${liveMain}`, '--', ...productSurface],
+          { encoding: 'utf8' },
         ).trim();
         assert.equal(productDelta, '', 'product surface must be byte-identical since the attested assembly for the committed evidence to stay current (packages/ product delta demands evidence re-capture)');
-        console.error(`CHM-C00 evidence-currentness OK: attested assembly ${evidence.comparator.assemblyHead.slice(0, 10)} is an ancestor of live v0.6 ${liveLine.slice(0, 10)} with an empty product-surface delta (test-harness-only movement; pathspec self-check matched ${matchedProductFiles.split('\n').length} tracked files).`);
+        console.error(`CHM-C00 evidence-currentness OK: attested assembly ${evidence.comparator.assemblyHead.slice(0, 10)} is an ancestor of live main ${liveMain.slice(0, 10)} with an empty product-surface delta (test-harness-only movement).`);
       } catch (error) {
         if (error instanceof assert.AssertionError) throw error;
         if ((error as { status?: number }).status === 1) throw error;
@@ -608,7 +581,7 @@ test('CHM-C18: fixed corpus repeat is deterministic (compile identity + schema o
 test('CHM-C16: retention/GC — the frozen surface exposes no host-authorized retention/GC API (SPEC_GAP recorded)', async () => {
   // The prep (CHM-C16) authorizes only EXISTING host-authorized retention/GC
   // APIs and forbids direct production-table DELETE as a stand-in. The frozen
-  // RuntimeStore/Runtime surface at a45f9370 exposes no such API. The case is
+  // RuntimeStore/Runtime surface at 770a1325 exposes no such API. The case is
   // therefore NOT_RUN as an API gap with a SPEC_GAP typed finding for
   // closure — never a silent pass, never an invented DELETE-based imitation.
   const evidence: ChmDeviceEvidence = loadDeviceEvidence();

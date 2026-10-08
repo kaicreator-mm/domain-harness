@@ -1,0 +1,55 @@
+{
+  "schema": "v0.7/t014-candidate-identity",
+  "schemaVersion": 1,
+  "gate": "T014",
+  "gateIssue": 936,
+  "controllerIssue": 537,
+  "readinessContractIssue": 731,
+  "frozenPlanIssue": 589,
+  "role": "CLOSURE_EXECUTABLE",
+  "capturedAtUtc": "2026-10-08T09:19Z",
+  "capturedBy": "CLOSURE EXECUTOR issue #936, worktree dh-t014-936; currentness via gh api / direct GitHub only (worktree origin is the stale-by-design local mirror and was never used)",
+
+  "closureCandidate": {
+    "commit": "3493fe3d7fb43b35e160ea12ef1d555937a9f0e8",
+    "branch": "version/v0.7",
+    "tree": "8d8db37738df4d44275bd3d15db402bebb9a6b5d",
+    "liveTipVerifiedVia": "gh api repos/kaicreator-mm/domain-harness/branches/version/v0.7 at 2026-10-08T09:05Z == 3493fe3d7fb43b35e160ea12ef1d555937a9f0e8 (exact match)"
+  },
+
+  "priorRealHostValidatedCandidate": {
+    "commit": "29dba90bfaa0185fcbd9cd695db72f55d5e80806",
+    "tree": "9b41896bc7ad95b84a6a101eb5072ad6533e9644",
+    "binding": "packed package bytes are the authoritative subject per #728 section 1; T012r validation #926@6055952342 and T013s validation #933@6056300003 independently re-derived these exact 4 tarball digests at 29dba90b"
+  },
+
+  "ancestryAndScopeProof": {
+    "method": "git merge-base --is-ancestor 29dba90b 3493fe3d (PASS) + git log/diff in worktree at the candidate",
+    "interveningCommits": [
+      { "sha": "70cb943a862189fefc8f986c0c39776922de4f9e", "subject": "test(t012r): node real-host rerun on repaired candidate (issue #926), PR #935" },
+      { "sha": "83f26aca", "subject": "Merge pull request #935 from kaicreator-mm/task/dh-t012r-926" },
+      { "sha": "d263f14f0b27a5a16e6bc7df0eb07a6d314d8649", "subject": "test(t013s): Expo/Hermes successor rerun evidence on repaired candidate 29dba90b (issue #933), PR #934" },
+      { "sha": "3493fe3d", "subject": "Merge pull request #934 from kaicreator-mm/task/dh-i934-val" }
+    ],
+    "diffFileCount": 23,
+    "diffScope": "ALL 23 changed files are under packages/domain-harness/tests/ (t012r/ + t013s/ evidence only); git diff --name-only 29dba90b..3493fe3d outside packages/domain-harness/tests/ = EMPTY",
+    "conclusion": "the candidate freeze delta is tests-only evidence additions: src/, dist/, package.json, package-lock.json and every non-test path are byte-identical between 29dba90b and 3493fe3d"
+  },
+
+  "packedByteIdentityProof": {
+    "method": "clean room C:\\xDev\\kAiCreator\\_tmp\\dh-t014-936-cleanroom\\ populated by git archive of 3493fe3d (no checkout, no CRLF mutation authority); own npm ci --ignore-scripts; better-sqlite3 via disclosed same-host prebuilt from dh-e4-896 (sha256 e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e, identical to all prior disclosures); npm run build (committed-dist check green after clean-room git snapshot); npm pack --workspaces",
+    "tarballs": [
+      { "name": "kaicreator-domain-harness-0.2.0.tgz", "sizeBytes": 884711, "sha256": "f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332", "acceptedSha256": "f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332", "match": true },
+      { "name": "kaicreator-domain-harness-node-0.2.0.tgz", "sizeBytes": 34447, "sha256": "549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78", "acceptedSha256": "549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78", "match": true },
+      { "name": "kaicreator-domain-harness-compiler-0.2.0.tgz", "sizeBytes": 58592, "sha256": "3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480", "acceptedSha256": "3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480", "match": true },
+      { "name": "kaicreator-domain-harness-expo-0.2.0.tgz", "sizeBytes": 35656, "sha256": "d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1", "acceptedSha256": "d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1", "match": true }
+    ],
+    "packedTarballSetSha256": "0b5772fc7aaf57373759bf9c11b3f9294d60fbfcb22aa56c991fa7924fd3d98e",
+    "acceptedPackedTarballSetSha256": "0b5772fc7aaf57373759bf9c11b3f9294d60fbfcb22aa56c991fa7924fd3d98e",
+    "setSha256Match": true,
+    "setSha256Method": "sha256 over the 4 per-tarball digests in npm pack workspace order (core, node, compiler, expo) joined with '\\n', no trailing newline (identical construction to the accepted t012r manifest)",
+    "verdict": "BYTE_IDENTITY_PROVEN: all 4 tarball sha256 values and the set digest re-packed at 3493fe3d are EXACTLY the accepted real-host-validated bytes from 29dba90b; closure evidence legally transfers across the candidate identity"
+  },
+
+  "MICROKERNEL_SOURCE_DIFF": 0
+}

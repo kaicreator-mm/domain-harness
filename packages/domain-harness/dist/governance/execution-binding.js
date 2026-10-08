@@ -1,6 +1,9 @@
-import { computeCanonicalJsonDigest, } from '../contracts/identity.js';
+import { computeCanonicalJsonDigest, isContentDigest, } from '../contracts/identity.js';
+import { carriesEmbeddedSelector, carriesFloatingOrRangeSemantics, carriesXRangeVersionSemantics, isNonEmptyIdentityString, } from '../contracts/record-safety.js';
 import { assertGovernanceBaselineIdentity, assertGovernancePackageCdiBinding, sameGovernanceBaselineIdentity, verifyGovernanceBaselineBody, } from './identity.js';
 const FLOATING_AUTHORITY_TOKENS = new Set(['current', 'latest', 'active']);
+export const PRODUCTION_AUTHORITY_CLASS = 'PRODUCTION';
+export const SIMULATION_AUTHORITY_CLASS = 'SIMULATION';
 export class GovernanceExecutionBindingError extends Error {
     code;
     constructor(code, message) {
@@ -25,6 +28,135 @@ function assertExactAuthorityToken(value, field) {
         throw new GovernanceExecutionBindingError('FLOATING_EXECUTION_AUTHORITY_FORBIDDEN', `${field} must be exact; floating selector ${JSON.stringify(value)} is forbidden`);
     }
 }
+/**
+ * T002C (#617): an Assembly digest bound into the execution pin must be an
+ * exact, non-empty content digest - never a floating selector or a mutable
+ * provider alias (`latest`/`current`/`active`/`alias:`/`@current`/...). The
+ * exact sealed Assembly is content-addressed, so its digest is the only
+ * acceptable identity; anything else fails closed.
+ */
+export function requireExactAssemblyDigest(value, field) {
+    if (typeof value !== 'string' || value.trim().length === 0 || !isContentDigest(value)) {
+        throw new GovernanceExecutionBindingError('ASSEMBLY_DIGEST_FORBIDDEN', `${field} must be a non-empty exact content digest`);
+    }
+    const normalized = value.trim().toLowerCase();
+    if (FLOATING_AUTHORITY_TOKENS.has(normalized)
+        || normalized.startsWith('alias:')
+        || normalized.startsWith('@current')
+        || normalized.startsWith('@latest')
+        || normalized.startsWith('@active')) {
+        throw new GovernanceExecutionBindingError('ASSEMBLY_DIGEST_FORBIDDEN', `${field} must be an exact content digest, not a floating selector or mutable alias ${JSON.stringify(value)}`);
+    }
+    return value;
+}
+/**
+ * T002D (#655): a runtime authority class bound into the execution pin must be
+ * exactly `PRODUCTION` or `SIMULATION` - never a floating selector, alias or
+ * derived/implicit value. The class is an explicit activation-plane fact, not
+ * derivable from Definition identity or implementation contents, and anything
+ * else fails closed.
+ */
+export function requireRuntimeAuthorityClass(value, field) {
+    if (value !== PRODUCTION_AUTHORITY_CLASS && value !== SIMULATION_AUTHORITY_CLASS) {
+        throw new GovernanceExecutionBindingError('AUTHORITY_CLASS_FORBIDDEN', `${field} must be exactly 'PRODUCTION' or 'SIMULATION'; ${JSON.stringify(value)} is forbidden`);
+    }
+    return value;
+}
+/** Code-unit comparison only; `localeCompare` is forbidden in this module. */
+function lexicalCompare(left, right) {
+    return left < right ? -1 : left > right ? 1 : 0;
+}
+const RESOURCE_CURRENTNESS_ENTRY_FIELDS = new Set([
+    'componentId',
+    'providerId',
+    'resourceKey',
+    'revisionDigest',
+]);
+/**
+ * One exact, non-floating identity string of the T005C resource-currentness
+ * evidence. Secrets and live values are excluded STRUCTURALLY: only the four
+ * closed whitelist fields exist at all, each restricted to non-empty exact
+ * identity strings (no embedded `id@selector` form, no floating/range
+ * selector); an object, array, function, symbol-keyed or empty value can
+ * never be evidence.
+ */
+function requireExactResourceCurrentnessIdentity(value, field) {
+    if (typeof value !== 'string' || !isNonEmptyIdentityString(value)) {
+        throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${field} must be a non-empty exact identity string`);
+    }
+    if (carriesEmbeddedSelector(value)) {
+        throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${field} must not embed a version selector (\`id@version\`); use the exact digest field`);
+    }
+    if (carriesFloatingOrRangeSemantics(value) || carriesXRangeVersionSemantics(value)) {
+        throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${field} must be an exact identity/digest, not a floating/range/x-range selector (latest/current/active/default/*/x/range, 1.x, 1.)`);
+    }
+    return value;
+}
+/**
+ * T005C (#656): validate, order-normalize (componentId, then resourceKey) and
+ * deep-freeze one occurrence's resource-currentness evidence. This is the
+ * SINGLE normalizer for the material carried on `GovernanceExecutionPin
+ * .resourceCurrentness`: the governance seam consumes ONLY stable non-secret
+ * evidence produced/validated by the T005B resource seam, re-validates it
+ * defensively here (durable pin material is untrusted store data), and never
+ * invents, defaults or falls back to any evidence. Duplicate
+ * (componentId, resourceKey) entries fail closed — never first-wins.
+ */
+export function normalizeResourceCurrentnessEvidence(value, field) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (!Array.isArray(value)) {
+        throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${field} must be an array of resource-currentness evidence entries`);
+    }
+    const seen = new Set();
+    const entries = value.map((candidate, index) => {
+        const at = `${field}[${index}]`;
+        if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) {
+            throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${at} must be an object with exactly {componentId, providerId, resourceKey, revisionDigest}`);
+        }
+        const view = candidate;
+        const unexpectedField = Object.keys(view).find((key) => !RESOURCE_CURRENTNESS_ENTRY_FIELDS.has(key));
+        if (unexpectedField !== undefined) {
+            throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${at} must contain exactly {componentId, providerId, resourceKey, revisionDigest}; unexpected field "${unexpectedField}" (secret values, credentials, live handles, connection objects, functions/module paths and provider objects are structurally unrepresentable in currentness evidence)`);
+        }
+        const componentId = requireExactResourceCurrentnessIdentity(view.componentId, `${at}.componentId`);
+        const providerId = requireExactResourceCurrentnessIdentity(view.providerId, `${at}.providerId`);
+        const resourceKey = requireExactResourceCurrentnessIdentity(view.resourceKey, `${at}.resourceKey`);
+        const revisionDigest = requireExactResourceCurrentnessIdentity(view.revisionDigest, `${at}.revisionDigest`);
+        const key = `${componentId}\u0000${resourceKey}`;
+        if (seen.has(key)) {
+            throw new GovernanceExecutionBindingError('INVALID_RESOURCE_CURRENTNESS', `${at} declares ${componentId}/${resourceKey} more than once (duplicate resource-currentness evidence is never first-wins)`);
+        }
+        seen.add(key);
+        return Object.freeze({ componentId, providerId, resourceKey, revisionDigest });
+    });
+    entries.sort((a, b) => lexicalCompare(a.componentId, b.componentId) || lexicalCompare(a.resourceKey, b.resourceKey));
+    return Object.freeze(entries);
+}
+/**
+ * T005C (#656): exact equality of two (already order-normalized) resource-
+ * currentness evidence sets. `undefined` on both sides is equal; an evidence-
+ * less pin can never equal a pin that carries evidence, and any per-entry
+ * difference (provider, resource or exact revision digest) is a mismatch —
+ * stale, replaced and missing evidence are all typed failures, never a
+ * fallback.
+ */
+export function sameResourceCurrentnessEvidence(left, right) {
+    if (left === undefined || right === undefined) {
+        return left === right;
+    }
+    if (left.length !== right.length) {
+        return false;
+    }
+    return left.every((entry, index) => {
+        const other = right[index];
+        return entry.componentId === other.componentId
+            && entry.providerId === other.providerId
+            && entry.resourceKey === other.resourceKey
+            && entry.revisionDigest === other.revisionDigest;
+    });
+}
 function cloneGovernanceIdentity(identity) {
     const base = {
         domainId: identity.domainId,
@@ -36,7 +168,7 @@ function cloneGovernanceIdentity(identity) {
         ? base
         : { ...base, version: identity.version });
 }
-function cloneActivationBinding(binding) {
+export function cloneActivationBinding(binding) {
     return Object.freeze({
         domainId: binding.domainId,
         packageId: binding.packageId,
@@ -104,7 +236,7 @@ function asPackageCdi(binding) {
         domainIntelligenceContentDigest: binding.domainIntelligenceContentDigest,
     };
 }
-async function requireExactPackageCdi(binding, authority, errorCode = 'PACKAGE_CDI_RECOVERY_MISMATCH') {
+export async function requireExactPackageCdi(binding, authority, errorCode = 'PACKAGE_CDI_RECOVERY_MISMATCH') {
     const expected = asPackageCdi(binding);
     const resolved = await authority.resolveExactPackageCdi(expected);
     if (resolved === undefined || !samePackageCdi(resolved, expected)) {
@@ -112,7 +244,7 @@ async function requireExactPackageCdi(binding, authority, errorCode = 'PACKAGE_C
     }
     return resolved;
 }
-async function requireExactGovernanceBody(binding, baselines, sha256, errorCode = 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH') {
+export async function requireExactGovernanceBody(binding, baselines, sha256, errorCode = 'GOVERNANCE_BASELINE_RECOVERY_MISMATCH') {
     const body = await baselines.getBody(binding.governanceBaseline);
     if (body === undefined) {
         throw new GovernanceExecutionBindingError(errorCode, 'exact Governance Baseline body required by the execution binding is missing');
@@ -162,8 +294,8 @@ export class DomainActivationBindingCoordinator {
         return binding;
     }
 }
-function bindingDigestMaterial(binding) {
-    return {
+function bindingDigestMaterial(binding, assemblyDigest, authorityClass, resourceCurrentness) {
+    const base = {
         packageId: binding.packageId,
         domainIntelligenceContentDigest: binding.domainIntelligenceContentDigest,
         governanceBaseline: {
@@ -173,21 +305,63 @@ function bindingDigestMaterial(binding) {
             contentDigest: binding.governanceBaseline.contentDigest,
         },
     };
+    // T002C (#617): when an exact Assembly is bound, its digest becomes part of
+    // the pin currentness material, so replacing the Assembly changes the pin.
+    // T002D (#655): likewise the runtime authority class becomes part of the pin
+    // currentness material when bound, so substituting the class changes the pin.
+    // T005C (#656): likewise the exact stable non-secret resource-currentness
+    // evidence becomes part of the pin currentness material when bound, so any
+    // resource revision/provider replacement changes the occurrence currentness.
+    // Legacy pins carrying none of these fields keep their exact pre-T002C/
+    // T002D/T005C digest material (byte-identical legacy digests).
+    const withAssembly = assemblyDigest === undefined ? base : { ...base, assemblyDigest };
+    const withClass = authorityClass === undefined ? withAssembly : { ...withAssembly, authorityClass };
+    return resourceCurrentness === undefined
+        ? withClass
+        : { ...withClass, resourceCurrentness };
 }
-export async function computeGovernanceExecutionBindingDigest(binding, sha256) {
+export async function computeGovernanceExecutionBindingDigest(binding, sha256, assemblyDigest, authorityClass, resourceCurrentness) {
     assertDomainActivationBinding(binding);
-    return computeCanonicalJsonDigest(bindingDigestMaterial(binding), sha256);
+    if (assemblyDigest !== undefined) {
+        requireExactAssemblyDigest(assemblyDigest, 'assemblyDigest');
+    }
+    if (authorityClass !== undefined) {
+        requireRuntimeAuthorityClass(authorityClass, 'authorityClass');
+    }
+    const currentness = resourceCurrentness === undefined
+        ? undefined
+        : normalizeResourceCurrentnessEvidence(resourceCurrentness, 'resourceCurrentness');
+    return computeCanonicalJsonDigest(bindingDigestMaterial(binding, assemblyDigest, authorityClass, currentness), sha256);
 }
 export async function createGovernanceExecutionPin(request, sha256) {
     const workflowTarget = requireNonEmptyString(request.workflowTarget, 'workflowTarget');
     const workflowInstanceId = requireNonEmptyString(request.workflowInstanceId, 'workflowInstanceId');
     assertDomainActivationBinding(request.binding);
+    // Synchronously resolved before the first await: the exact Assembly digest
+    // (when supplied) is validated and captured here, never re-read after a
+    // suspension (#617 torn-snapshot discipline). T002D extends the same
+    // discipline to the authority class; T005C extends it to the exact
+    // resource-currentness evidence (validated, order-normalized and frozen
+    // synchronously — a caller mutating its own array mid-flight can never mint
+    // hybrid evidence).
+    const assemblyDigest = request.assemblyDigest === undefined
+        ? undefined
+        : requireExactAssemblyDigest(request.assemblyDigest, 'assemblyDigest');
+    const authorityClass = request.authorityClass === undefined
+        ? undefined
+        : requireRuntimeAuthorityClass(request.authorityClass, 'authorityClass');
+    const resourceCurrentness = request.resourceCurrentness === undefined
+        ? undefined
+        : normalizeResourceCurrentnessEvidence(request.resourceCurrentness, 'resourceCurrentness');
     const binding = cloneActivationBinding(request.binding);
     return Object.freeze({
         ...binding,
+        ...(assemblyDigest === undefined ? {} : { assemblyDigest }),
+        ...(authorityClass === undefined ? {} : { authorityClass }),
+        ...(resourceCurrentness === undefined ? {} : { resourceCurrentness }),
         workflowTarget,
         workflowInstanceId,
-        bindingDigest: await computeGovernanceExecutionBindingDigest(binding, sha256),
+        bindingDigest: await computeGovernanceExecutionBindingDigest(binding, sha256, assemblyDigest, authorityClass, resourceCurrentness),
     });
 }
 function parsePinShape(value) {
@@ -195,8 +369,24 @@ function parsePinShape(value) {
         throw new GovernanceExecutionBindingError('INVALID_GOVERNANCE_EXECUTION_PIN', 'GovernanceExecutionPin must be an object');
     }
     const binding = parseDomainActivationBinding(value);
+    const assemblyDigest = value.assemblyDigest === undefined
+        ? undefined
+        : requireExactAssemblyDigest(value.assemblyDigest, 'assemblyDigest');
+    const authorityClass = value.authorityClass === undefined
+        ? undefined
+        : requireRuntimeAuthorityClass(value.authorityClass, 'authorityClass');
+    // T005C (#656): defensively re-validate durably stored evidence (store data
+    // is untrusted): closed whitelist, exact identities, order-normalized. A
+    // parse failure is wrapped into INVALID_GOVERNANCE_EXECUTION_PIN by the
+    // validate wrapper, never interpreted as evidence-less authority.
+    const resourceCurrentness = value.resourceCurrentness === undefined
+        ? undefined
+        : normalizeResourceCurrentnessEvidence(value.resourceCurrentness, 'pin.resourceCurrentness');
     return Object.freeze({
         ...binding,
+        ...(assemblyDigest === undefined ? {} : { assemblyDigest }),
+        ...(authorityClass === undefined ? {} : { authorityClass }),
+        ...(resourceCurrentness === undefined ? {} : { resourceCurrentness }),
         workflowTarget: requireNonEmptyString(value.workflowTarget, 'workflowTarget'),
         workflowInstanceId: requireNonEmptyString(value.workflowInstanceId, 'workflowInstanceId'),
         bindingDigest: requireNonEmptyString(value.bindingDigest, 'bindingDigest'),
@@ -217,7 +407,7 @@ export async function validateGovernanceExecutionPin(value, sha256, expectedWork
         && pin.workflowInstanceId !== expectedWorkflowInstanceId) {
         throw new GovernanceExecutionBindingError('GOVERNANCE_EXECUTION_PIN_MISMATCH', `pin belongs to workflow instance ${pin.workflowInstanceId}, not ${expectedWorkflowInstanceId}`);
     }
-    const expectedDigest = await computeGovernanceExecutionBindingDigest(pin, sha256);
+    const expectedDigest = await computeGovernanceExecutionBindingDigest(pin, sha256, pin.assemblyDigest, pin.authorityClass, pin.resourceCurrentness);
     if (pin.bindingDigest !== expectedDigest) {
         throw new GovernanceExecutionBindingError('INVALID_GOVERNANCE_EXECUTION_PIN', 'GovernanceExecutionPin bindingDigest does not match its exact authority tuple');
     }
@@ -230,6 +420,9 @@ function sameExecutionPin(left, right) {
         && left.packageId === right.packageId
         && left.domainIntelligenceContentDigest === right.domainIntelligenceContentDigest
         && sameGovernanceBaselineIdentity(left.governanceBaseline, right.governanceBaseline)
+        && left.assemblyDigest === right.assemblyDigest
+        && left.authorityClass === right.authorityClass
+        && sameResourceCurrentnessEvidence(left.resourceCurrentness, right.resourceCurrentness)
         && left.bindingDigest === right.bindingDigest;
 }
 export class GovernanceExecutionCoordinator {

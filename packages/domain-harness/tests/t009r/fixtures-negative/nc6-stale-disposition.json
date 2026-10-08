@@ -1,0 +1,386 @@
+{
+  "schema": "v0.7/t009-evidence-manifest",
+  "schemaVersion": 1,
+  "gate": "T009",
+  "controllerIssue": 537,
+  "readinessContractIssue": 720,
+  "frozenPlanIssue": 589,
+  "aggregatorGateIssue": 919,
+  "integrationHead": "2b50ba01860e28b76c9eff8e825756555fcff32b",
+  "capturedAt": "2026-10-07T19:09:25Z",
+  "capturedBy": "EVIDENCE_BUILDER issue #919, worktree dh-t009r-919, fresh LIVE gh reads of all 11 gate issues (#895 #887 #875 #896 #876 #897 #913 #877 #873 #878 #899) plus superseded #898; ported from proven parked aggregator design PR #909 / branch task/dh-t009-905",
+  "semantics": {
+    "passMeaning": "T009=PASS means completeness+currentness of the E1-E10 evidence matrix ONLY; not architecture acceptance, not Release PASS",
+    "noAveraging": true,
+    "noMajorityVote": true,
+    "noSeveritySuppression": true,
+    "noPassCoercion": true,
+    "staleOrReplacedEvidenceBlocksAggregation": true,
+    "duplicateOrConflictingEvidenceFailsClosed": true,
+    "deterministicOrdering": true,
+    "successor": "T011 architecture gate disposition (#727 handoff); T009 does not decide T011",
+    "supersededRowHandling": "manifest-level supersededRows[] records replaced rows (disposition SUPERSEDED): recorded, never averaged, never silently dropped; a superseded row can NEVER satisfy its gate \u2014 only the authoritative exact-current successor chain can; E7 is satisfied ONLY by the #913 successor chain",
+    "predecessorManifest": "supersedes parked NONCONSUMABLE_PRECOMPUTE PR #909 (branch task/dh-t009-905, manifest integrationHead 20b65cbc, old E7 row #898 treated as CURRENT)"
+  },
+  "gateOrder": [
+    "E1",
+    "E2",
+    "E3",
+    "E4",
+    "E5",
+    "E6",
+    "E7",
+    "E8a",
+    "E8b",
+    "E9",
+    "E10"
+  ],
+  "gates": [
+    {
+      "gate": "E1",
+      "issue": 895,
+      "pr": 900,
+      "verdict": "SUPPORTED",
+      "currentness": "SUCCESSOR_RERUN_ACCEPTED",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "1ee38da62e51053ee7df923956703f829413406a",
+      "subjectTree": "b8739609650708225fc90b70bf1de0fc0df034fd",
+      "mergeCommit": "c9768091285f322da0f3b3c060d5bcb975f1d32e",
+      "mergedAt": "2026-10-07T14:25:42Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6038951284",
+        "validation": "6039802398",
+        "freshReview": "6039832435",
+        "mergeRecord": "6040107198"
+      },
+      "fixtureDigests": {
+        "fixtureKind": "e1.test.checklist-gate@1.0.0",
+        "originEvidenceCommit": "27925afa1d4dc793e5d18ae85f0c677cbeeecbc8"
+      },
+      "staleReplacedDisposition": "SUCCESSOR RERUN: original E1 evidence (terminal 5992760176 @ subject f9c1e75f7689093a21efae5dbc0239ce3a71d37c, evidence commit 27925afa) went stale under 101 commits of drift; successor rerun terminal 6038951284 accepted at current head. Predecessor SUPPORTED verdict superseded, not averaged.",
+      "notes": "Successor-rerun gate; validation PASS (3078/3078, port fidelity); fresh review SUPPORTED P0=0 P1=0 P2=3; CI pipeline 979 success on exact head."
+    },
+    {
+      "gate": "E2",
+      "issue": 887,
+      "pr": 891,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "3738e374cd8a67a08bd7dea8265acb3a5bc9c3cb",
+      "subjectTree": "988e6374ffbc52330c69da5f0ef8131ebfefdedd",
+      "mergeCommit": "c42f4bc37cbedf4e0ddee448617c904e43922603",
+      "mergedAt": "2026-10-07T11:15:14Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6036039917",
+        "fixtureFreeze": "6035393791",
+        "validation": "6036402906",
+        "freshReview": "6036722458",
+        "mergeRecord": "6036770347"
+      },
+      "fixtureDigests": {
+        "MANIFEST_CANONICAL_JSON_SHA256": "1b9e3f467d1cae182940513e7546b697bac940617b4e19041b7724d6a9b9cf94",
+        "KIND_PIN": "impl.e2.kind@1.0.0#sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "TOOL_PIN": "impl.e2.tool@1.0.0#sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "staleReplacedDisposition": "CURRENT: bounded drift absorbed post-merge (base cb7eba1e -> c6e17854, T004D adapter files disjoint from the single E2 evidence test file); WEB currentness audit 6036827800 = NO_IMPACT. F-01 freeze precedes all results.",
+      "notes": "17-experiment matrix all SUPPORTED; validation CONFIRMED (6 frozen digests byte-exact + 3 disjoint reconstructions); fresh review PASS P0=0 P1=0 P2=2; CI pipeline 970 success."
+    },
+    {
+      "gate": "E3",
+      "issue": 875,
+      "pr": 882,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "d14c1e556810f2255e9dab7e330689a58a66b366",
+      "subjectTree": "1adf398707b308fd819bd33b6e1fb36b62c0eef4",
+      "mergeCommit": "aa4b4fd1345fe3bdbd66c59220faf15e7f6237fc",
+      "mergedAt": "2026-10-07T01:23:18Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6028552352",
+        "validation": "6028813157",
+        "freshReview": "6028839277",
+        "mergeRecord": "6028857609"
+      },
+      "fixtureDigests": {
+        "PROD_PIN": "impl.e3.prod@1.0.0#sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "SIM_PIN": "impl.e3.sim@1.0.0#sha256:4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "staleReplacedDisposition": "CURRENT: no drift (base == merge-time HEAD). Terminal correction 6028556083 fixed SUBJECT_HEAD transcription only, no content change.",
+      "notes": "9-experiment matrix all SUPPORTED; validation PASS/SUPPORTED (9/9 rerun, 6 captured digests byte-identical, full 2535/2535); fresh review PASS/SUPPORTED P0=0 P1=0 P2=3; CI pipeline 965 success."
+    },
+    {
+      "gate": "E4",
+      "issue": 896,
+      "pr": 901,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "c9611ac9775eabae3099578eb391389f699e037d",
+      "subjectTree": "34f0561b7125d2ecdb2bec6fda5a610ab7039bdd",
+      "mergeCommit": "08aee5e6f723220137f5749fae1d784d9bf417b1",
+      "mergedAt": "2026-10-07T14:29:27Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6039511391",
+        "validation": "6040097575",
+        "freshReview": "6039929599",
+        "mergeRecord": "6040149859"
+      },
+      "fixtureDigests": {
+        "fixtureFiles": "packages/domain-harness/tests/e4/{e4-agent-tool-projection-evidence,e4-no-agent-authority-boundary}.test.ts",
+        "visibleEffectPinnedRow": "EFFECTFUL_AGENT_ROUTE=SUPPORTED_PASS (V14/V15/V16, conditional T004D branch)"
+      },
+      "staleReplacedDisposition": "CURRENT: parents c9768091 (post-E1) + c9611ac9 verified via GitHub API; T004D was base at c6e17854. Validator ENV_DEVIATION disclosed: better-sqlite3 stable binary swap, toolchain-only, no result impact.",
+      "notes": "FROZEN_FIVE_MATRIX + NO_AGENT_AUTHORITY + TESTS_ONLY_BOUND + CURRENT_DEFINITION_ASSEMBLY_EXPOSURE_BINDING all SUPPORTED; suite 23/23; validation CONFIRMED (core 2673/2673, 2 independent reconstructions 11/11); fresh review PASS P0=0 P1=0 P2=2; CI pipeline 977 success."
+    },
+    {
+      "gate": "E5",
+      "issue": 876,
+      "pr": 883,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT_REBIND_RECORDED",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "a4eb16f34cb3d8f18259ccce7a7c9931b5a94a55",
+      "subjectTree": "342a6309b8c9967c5ea9a3db60b8c2f3cfb628ff",
+      "mergeCommit": "5885c7d2eb1d64c41ef5bb6da445887ccbaa53ff",
+      "mergedAt": "2026-10-07T01:33:55Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6028622834",
+        "validation": "6028810525",
+        "freshReview": "6028962852",
+        "mergeRecord": "6028977938"
+      },
+      "fixtureDigests": {
+        "PRIMARY_PIN": "impl.e5.primary@1.0.0#sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "ALTERNATE_PIN": "impl.e5.alt@1.0.0#sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "MANIFEST_CANONICAL_JSON_SHA256": "6d8b50d5 (short; anchored as KNOWN_LIMITS constant, never consumed by any digest computation)"
+      },
+      "staleReplacedDisposition": "CURRENT with recorded rebind: HEAD_LEASE rebind recorded in builder terminal (current-head rerun). Drift base b5540e6e -> aa4b4fd (#882 E3 evidence file only, disjoint).",
+      "notes": "24-experiment matrix all SUPPORTED; validation PASS/SUPPORTED (8 digests byte-identical, disjoint t.alpha/beta/gamma structural generalization, manifest-sha forensics); fresh review PASS/SUPPORTED P0=0 P1=0 P2=3; CI pipeline 966 success."
+    },
+    {
+      "gate": "E6",
+      "issue": 897,
+      "pr": 902,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "9b88d42691fd5849a36f8dfd017e8540aadc7b7a",
+      "subjectTree": "fa027f7ef7800ee1e92d77a2b923b0f219545a42",
+      "mergeCommit": "edbf0ed3de05cca4bea0c62291d3abc9dd12cde6",
+      "mergedAt": "2026-10-07T14:07:15Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6039236493",
+        "validation": "6039907518",
+        "freshReview": "6039655290",
+        "mergeRecord": "6039730247"
+      },
+      "fixtureDigests": {
+        "WORKFLOW_ENGINE_DIGEST_V1": "sha256:workflow-engine-e6-v1",
+        "WORKFLOW_ENGINE_DIGEST_V2": "sha256:workflow-engine-e6-v2"
+      },
+      "staleReplacedDisposition": "CURRENT: no drift (base 02dc8b913 == merge-time HEAD). Synthesis model gate: consumed-from-T007C with exact citation chain + newly-proven 8/8 disjoint fixture. Controller post-merge honesty note 6040097951 recorded (validation terminal arrived post-merge).",
+      "notes": "Builder terminal + fresh review PASS P0=0 P1=0 P2=0 (reviewer mutant -> exactly A3 red); validation terminal VERDICT recorded; core 2658/2658; CI pipeline 978 success."
+    },
+    {
+      "gate": "E7",
+      "issue": 913,
+      "pr": 916,
+      "verdict": "SUPPORTED",
+      "currentness": "SUCCESSOR_RERUN_ACCEPTED",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "c47b3247ffecd3c0bd88b07eac33b28b80a97356",
+      "subjectTree": "fa517542d69e44e3368782402133828e03739ed3",
+      "mergeCommit": "2b50ba01860e28b76c9eff8e825756555fcff32b",
+      "mergedAt": "2026-10-07T19:02:47Z",
+      "mergedAtSource": "MERGE_RECORD #913@6044823037 MERGED_AT (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6044280062",
+        "validation": "6044639949",
+        "freshReview": "6044792324",
+        "mergeRecord": "6044823037"
+      },
+      "fixtureDigests": {
+        "definitionGraphDigest": "0e7353207aa7139dc225ab1debb505f020ab08d6d6c673d872fc1c160f607343",
+        "descriptorDigestApproval": "d277acadfbf027baa3bef0dca8f58c1c356019ddf84793f97b085564bed085a4",
+        "descriptorDigestTool": "70a007e5e8156311c6310bb979424ffb758f297a8f9840e0f26bcc58dbd11893",
+        "assemblyBaseDigest": "98054cc9996b193f4a3b413cb22aefb7f875938c0b3d64f1b338687a3320db87",
+        "assemblySuccessorDigest": "545b7d03f4bc6b7235969ee656c8562cde5aa08d83e79f203292d00a39b6cb35",
+        "toolBindingDigest": "6f61b451a6b658f7b6ab9dd67523c4fdeaefa344fbed3041db4498a05ca6ea0b"
+      },
+      "staleReplacedDisposition": "SUPERSEDES the old E7 row (#898/PR#903, merge 967ef691): adjudicated NONCONSUMABLE / authority-inadmissible (#713@6041458190 gap: synthetic candidates + missing real T004B witness; #537@6043943145 rediscovery record) and redispatched as this successor rerun. The #898 row is recorded in supersededRows[] below \u2014 never averaged, never silently dropped. This row is the ONLY admissible E7 evidence: authority-admissible rerun over REAL production candidates landed by PR #912 (kaicreator.standard.component.approval-workflow / .canonical-digest), with E7R-5 real T004B invocation witness. Currentness: #913@6044234067 intervening-merge audit = NO_IMPACT for claim base 59a5b2d6 through integration head; no rebind needed at claim (claim base == ENTRY_BASE).",
+      "notes": "E7R-1..5 5/5 over real PR #912 candidates; tests/e7 13/13; standard 67/67; core 2727/2727; validation CONFIRMED #913@6044639949 (six frozen digests byte-equal, own counting-port witness, mutation reproduced); fresh review PASS P0=0 P1=0 P2=2 #913@6044792324 (own mutations M1/M2 red, 6/6 digests recomputed); exact-head CI pipeline 988 success first run; MERGE_RECORD #913@6044823037 E7_DISPOSITION=AUTHORITY_ADMISSIBLE_ACCEPTED."
+    },
+    {
+      "gate": "E8a",
+      "issue": 877,
+      "pr": 884,
+      "verdict": "SUPPORTED",
+      "currentness": "STALE_PENDING_RERUN",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "4d27ded63120920045695945f4c7b921f98f59f4",
+      "subjectTree": "009c2617392048c1cd20720462145d18ee55f52e",
+      "mergeCommit": "cb7eba1e1527f3e1677a4f3ecd14607d8175dc9d",
+      "mergedAt": "2026-10-07T02:33:15Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6029349438",
+        "validation": "6029734136",
+        "freshReview": "6029656782",
+        "mergeRecord": "6029677228",
+        "postMergeValidationArrival": "6029749851"
+      },
+      "fixtureDigests": {
+        "DefinitionGraphDigest": "937120e69a3ea6abe897394440be082fae3b372f5c589f495394db06a807d904",
+        "CorrespondenceDigest": "9cb7248bf00684977528139e7a780bcf491be2c02f4c13406e249b8acd666f6c",
+        "E8A_FREEZE_RECORD": "byte-identical between builder terminal and validator rerun (builder-local tarball shas core=d045145cd2dd3eb66006875e7bd082fe5352e9d66548cf31734de0955eb2ff12, compiler=3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480; host-specific per KNOWN_LIMITS #3)"
+      },
+      "staleReplacedDisposition": "CURRENT with recorded rebind: explicit currentness rebind recorded in builder terminal. Validation terminal arrived POST-merge (6029749851 documents disposition: merge authorized on builder terminal + fresh review + reviewer's independent full re-execution, all pre-merge). E10-review cb7eba1e observation later resolved as stale-remote artifact (cb7eba1e IS this merge; no external push).",
+      "notes": "10-dim matrix all SUPPORTED; tarball SHA freeze; fresh review SUPPORTED P0=0 P1=0 P2=5; validation SUPPORTED 19/19 byte-identical + independent refactor Parts A/B/C with disjoint fixtures; compiler 168/168 + core 2535/2535 + node 156/156; CI pipeline 967 infra flake (N08b shared-worker race, present at base) dispositioned."
+    },
+    {
+      "gate": "E8b",
+      "issue": 873,
+      "pr": 893,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "1622bc513b17b9f0785cba95bbab243ba1f1c562",
+      "subjectTree": "d9f45fe8ab4eedee3f7727d43f99f19d246f2b07",
+      "mergeCommit": "92b71a9f38cb5b642c84116a7ddf3b8441466d5f",
+      "mergedAt": "2026-10-07T11:17:19Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6036391742",
+        "fixtureFreeze": "6026578855",
+        "validation": "6036992409",
+        "freshReview": "6036756515",
+        "mergeRecord": "6036799726"
+      },
+      "fixtureDigests": {
+        "historicalIdentityBaseline": "git blob equality with frozen v0.6 baseline 7c367188 (byte-exact, independently reproduced by fresh review)",
+        "deviceEvidence": "Android API 36 emulator, Hermes release APK, force-stop/relaunch PASS with processRestartPersistence:true (logcat two-PID/two-timestamp corroboration)"
+      },
+      "staleReplacedDisposition": "CURRENT: bounded drift absorbed post-merge (base cb7eba1e -> c42f4bc3, T004D adapter + E2 evidence file disjoint from E8b's 4 node/compiler test files); WEB currentness audit 6036829096 = NO_IMPACT. Final v0.6 reconciliation gate.",
+      "notes": "3 vectors + real Expo/Hermes device evidence; fresh review SUPPORTED P0=0 P1=0 P2=2 (all 23 tests re-run green, tarball SHA256s byte-exact); validation terminal SUPPORTED; CI pipeline 972 success."
+    },
+    {
+      "gate": "E9",
+      "issue": 878,
+      "pr": 885,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "e8f01dfe60c2524d58d18aa6a89ba93bedba93ae",
+      "subjectTree": "18a0cf878d62d6b68125632381746e7b08b15529",
+      "mergeCommit": "bdc6c447fb17288a094fb77c0ea30667c403cfb2",
+      "mergedAt": "2026-10-07T02:29:50Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6029449239",
+        "validation": "6029775510",
+        "freshReview": "6029602994",
+        "mergeRecord": "6029636002"
+      },
+      "fixtureDigests": {
+        "MANIFEST_ID": "E9_RUNTIME_RESOURCE_INJECTION_V1",
+        "MANIFEST_VERSION": "1",
+        "MANIFEST_CANONICAL_JSON_SHA256": "58d4930a02f8ead3d9e0c8ef80ddabc85da078ab26c65d0750eff38c58917fc0",
+        "DEFINITION_FIXTURE": "e9.resource.definition.v1",
+        "PIN_DIGEST_DOMAIN": "e9-pin-v1",
+        "AUTHORITY_CLASS": "PRODUCTION",
+        "REAL_HOST_POSTURE": "REQUIRED"
+      },
+      "staleReplacedDisposition": "CURRENT: no rebind needed (HEAD_LEASE honored, subject == base 5885c7d at validation). Validation terminal arrived post-merge (6029783742 documents VERDICT=CONFIRMED arrival).",
+      "notes": "21 tests / 10 spec cells all SUPPORTED; real-host better-sqlite3 + full T004B/C chain via the ONE Central Admission; fresh review SUPPORTED P0=0 P1=0 P2=2 (5 mutation experiments killed, 7 frozen digests byte-reproduced, full 2580/2580); validation CONFIRMED; CI pipeline 968 success."
+    },
+    {
+      "gate": "E10",
+      "issue": 899,
+      "pr": 904,
+      "verdict": "SUPPORTED",
+      "currentness": "CURRENT",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "7cce209013037188bd5590ee62fda50bf296b843",
+      "subjectTree": "06c22a7fba9cd91725ca9e70e73c95ead040b782",
+      "mergeCommit": "20b65cbc89170c1b02037385e98bb915ca578546",
+      "mergedAt": "2026-10-07T15:58:34Z",
+      "mergedAtSource": "git committer date of mergeCommit (UTC)",
+      "terminalCommentIds": {
+        "builderEvidence": "6040759939",
+        "builderCorrection": "6040768822",
+        "validation": "6041634546",
+        "freshReview": "6041633204",
+        "mergeRecord": "6041674174"
+      },
+      "fixtureDigests": {
+        "fixtureGitBlob": "c5eea24aff18e9c63e4e3f3530caf6cc242dfa01",
+        "fixtureSha256": "c79e3514762a51cb8e81e21eb498948f1061babbf7de2ceedf4efdce96b86455"
+      },
+      "staleReplacedDisposition": "CURRENT: parents 967ef691 (post-E7) + 7cce2090 verified via GitHub API. Review cb7eba1e observation resolved as stale-remote artifact (no external push; authoritative tip chain c9768091->08aee5e6->967ef691->20b65cbc controller-owned). Process note: GLM-5.3 pool exhausted at dispatch, gates ran on Kimi pool per fallback.",
+      "notes": "14/14; core 2705/2705; validation CONFIRMED (3 spot-checks val.replay.* 3/3; both builder mutations reproduced exactly M1->12/14, M2->13/14); fresh review PASS P0=0 P1=0 P2=2 (own mutations REV-A/REV-B each 13/14); CI success first run. FINAL E-GATE."
+    }
+  ],
+  "supersededRows": [
+    {
+      "gate": "E7",
+      "disposition": "SUPERSEDED",
+      "issue": 898,
+      "pr": 903,
+      "verdict": "SUPPORTED",
+      "productImpact": "NONE",
+      "l2Impact": "NONE",
+      "sdkImpact": "NONE",
+      "subjectHead": "b31d0dc3a6043130936db3dffd38ed2802b411f1",
+      "subjectTree": "0e77c0fbd9aae3abdefa042e731fe02605cdcb73",
+      "mergeCommit": "967ef6917ba18832aad108f08d416553f6f9aebb",
+      "mergedAt": "2026-10-07T15:41:53Z",
+      "terminalCommentIds": {
+        "builderEvidence": "6040707122",
+        "validation": "6041304240",
+        "freshReview": "6041248179",
+        "mergeRecord": "6041376789"
+      },
+      "fixtureDigests": {
+        "validatorSpotcheckNamespace": "val.standard.* (3/3: plane-split digest invariance, stale/forged typed codes, #820 eligibility filter non-maskable + order-invariant)",
+        "M1MutantOutcome": "exactly 7/8 with only E7-4 killed (reproduced by validator)"
+      },
+      "supersededBy": {
+        "issue": 913,
+        "pr": 916,
+        "mergeCommit": "2b50ba01860e28b76c9eff8e825756555fcff32b",
+        "mergeRecordCommentId": "6044823037"
+      },
+      "record": "Old E7 row superseded by the #913 successor chain: PR #903 evidence used SYNTHETIC standard-component candidates and carried no real T004B invocation witness \u2014 adjudicated authority-inadmissible per #713@6041458190 and redispatched per #537@6043943145; #913@6044823037 records E7_DISPOSITION=AUTHORITY_ADMISSIBLE_ACCEPTED. This row is RECORDED ONLY: its SUPPORTED verdict must NOT be averaged with, counted alongside, or substituted for the successor verdict; E7 currentness is satisfied solely by the #913 row above. Recorded, never averaged, never silently dropped."
+    }
+  ]
+}

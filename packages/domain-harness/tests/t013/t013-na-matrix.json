@@ -1,0 +1,31 @@
+{
+  "schema": "t013-node-only-na-matrix/v1",
+  "candidate": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+  "rule": "Node-only storage/effect facilities are explicit NOT_APPLICABLE only where the frozen package/host boundary says so; no silent polyfill, no inferred parity (frozen #589 T013 + #729).",
+  "matrix": [
+    {
+      "facility": "dist/persistence/sqlite-store.js (better-sqlite3-backed durable runtime store)",
+      "status": "NOT_APPLICABLE",
+      "boundaryEvidence": "static top-level `import Database from 'better-sqlite3'`; NOT reachable from any of the 6 declared package entries (import-graph walk, t013-import-graph.json); absent from the Hermes bytecode bundle (string scan of index-*.hbc)",
+      "ownership": "Node storage authority lives in the separate @kaicreator/domain-harness-node package (own better-sqlite3 dependency); Expo host durable-store parity is T000/E8b-owned and stays OUT OF THIS GATE (non-overlapping)"
+    },
+    {
+      "facility": "dist/script/script-executor.js (lazy node:worker_threads script execution)",
+      "status": "NOT_APPLICABLE",
+      "boundaryEvidence": "lazy `await import('node:worker_threads')`; NOT reachable from any of the 6 declared package entries; absent from the Hermes bytecode bundle",
+      "ownership": "Node-only effectful script execution; no Expo equivalent claimed or inferred"
+    },
+    {
+      "facility": "sealed Assembly AUTHORING + assembly-bound admission execution (sealRuntimeAssembly / admitComponentWithAssembly / bindToolImplementation / admitToolInvocationRequest / invokeNonEffectfulTool)",
+      "status": "NOT_APPLICABLE_FOR_T013_SCOPE",
+      "boundaryEvidence": "NOT exported from any declared package entry (runtime-verified on Node AND Hermes; exports-map deep import blocked ERR_PACKAGE_PATH_NOT_EXPORTED); frozen T013 scope limits validation to 'sealed Assembly/pure Tool/adapter seams that are in the declared portable surface'",
+      "ownership": "controller/T015 SDK closure owns whether this seam enters the declared public package surface; this gate records the fact and executes everything the declared surface actually supports"
+    },
+    {
+      "facility": "in-memory governance adapter seams (MemoryGovernanceBaselineStore, createGovernanceBaselineBody, createGovernanceExecutionPin, VolatileAdmissionEffectJournal)",
+      "status": "APPLICABLE_AND_EXECUTED_ON_HOST",
+      "boundaryEvidence": "root-entry public seams; executed under Hermes on the emulator (vectors GOVERNANCE_BASELINE_BODY_AND_STORE, GOVERNANCE_EXECUTION_PIN_MINT, VOLATILE_EFFECT_JOURNAL_IN_MEMORY, all PASS, byte-identical to Node twin)"
+    }
+  ],
+  "polyfillDisclosure": "NONE. No shim, polyfill, deep import, or route downgrade was used anywhere in the validation consumer; the only injected host code is the Sha256Port adapter (t013-pure-js-sha256-fips180-4/1.0.0), which the package's frozen seam design requires hosts to provide."
+}

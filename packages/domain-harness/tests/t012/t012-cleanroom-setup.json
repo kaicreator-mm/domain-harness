@@ -1,0 +1,48 @@
+{
+  "schema": "v0.7/t012-cleanroom-setup",
+  "schemaVersion": 1,
+  "cleanRoomRoot": "C:\\xDev\\kAiCreator\\_tmp\\dh-t012-926-cleanroom",
+  "layout": {
+    "tarballs/": "four packed candidate tarballs + SHA256SUMS.txt (sha256sum -c verified at N00 and again at N13)",
+    "consumer/": "external packed consumer (outside the repository worktree)",
+    "consumer/node_modules/": "tarball-only install; real directories, zero symlinks, zero workspace leakage (n02-resolution.json)",
+    "artifacts/": "run artifacts, logs, preserved post-crash SQLite DB + execution-count file"
+  },
+  "installMethod": {
+    "command": "npm install (consumer package.json references ../tarballs/*.tgz; npm copies tarball contents into node_modules — no npm link, no workspace resolution, no NODE_PATH, no file: reference back to repository source)",
+    "consumerPackageJsonSha256": "aad1483e41d51662bddc7bdaffc043fb25aaf9f82f7e7f6590cf629de4122e71",
+    "consumerPackageLockSha256": "3991cc9ed2a08cb1bc49a646dfe59822b2ceed96b48ba36c73fdd69969853b7d"
+  },
+  "noWorkspaceSubstitutionProof": {
+    "everyPackageIsRealDirectory": true,
+    "noSymlinks": true,
+    "realpathsInsideConsumer": true,
+    "noSrcDirectories": true,
+    "deepImportsRefuse": "ERR_PACKAGE_PATH_NOT_EXPORTED (8 negative probes incl. all T010 Tool-plane seams and src/index.ts)",
+    "npmLsArtifact": "clean-room artifacts/n02-npm-ls.json (sha256 recorded in artifact-hashes)"
+  },
+  "nativeBinding": {
+    "package": "better-sqlite3@12.11.1 (resolved from npm registry by the consumer install)",
+    "installScript": "prebuild-install || node-gyp rebuild — POLICY-BLOCKED by npm allowScripts in this environment",
+    "appliedBinary": "prebuilt better_sqlite3.node (sha256 e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e) copied from the shared worktree dh-e4-896 (same host, ABI 137, x64 win32)",
+    "disclosure": "real native binding executing real SQLite 3.53.2 on this host; no suppression of SQLite capability — only the download/build step was replaced by a same-host prebuilt binary",
+    "smokeTest": "SELECT sqlite_version() -> 3.53.2 in both workspace and consumer"
+  },
+  "typecheckPosture": {
+    "compiler": "typescript 5.8.3 (consumer devDependency)",
+    "tsconfig": "strict, module/moduleResolution nodenext, skipLibCheck:false, types:[node]",
+    "result": "exit 0 (TSC-PASS)"
+  },
+  "laneAWorkspace": {
+    "worktree": "C:\\xDev\\kAiCreator\\domain-harness\\dh-t012-926",
+    "branch": "task/dh-t012-926",
+    "head": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+    "commands": [
+      "npm ci (better-sqlite3/esbuild install scripts policy-blocked; better-sqlite3 binding via same disclosed prebuilt)",
+      "npm run build (incl. scripts/check-committed-dist.mjs: shipped dist trees present, tracked and fresh)",
+      "npm run typecheck (exit 0)",
+      "npm run lint (exit 0)",
+      "npm test (core 2904/2904; compiler 172/172; expo typecheck; node 175/175 after one N17 parallel-load flake isolated green; root 9/9)"
+    ]
+  }
+}
