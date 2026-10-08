@@ -1,0 +1,57 @@
+name: Spike 942 SDK packageization and minimal microkernel falsification R1
+on:
+  push:
+    branches:
+      - spike/v08-sdk-packageization-mk-942-r1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-and-oracle:
+    if: github.ref == 'refs/heads/spike/v08-sdk-packageization-mk-942-r1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Checkout fixed references as detached read-only oracle trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SUBJECT_HEAD=$GITHUB_SHA"
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin beea9cdd29c51a046b8612871aa53be54b966e7c
+          git worktree add --detach "$RUNNER_TEMP/ref938" beea9cdd29c51a046b8612871aa53be54b966e7c
+          git fetch --no-tags --depth=1 origin 86110c616b8cb18c730553e4cdab7ef555214521
+          git worktree add --detach "$RUNNER_TEMP/v07" 86110c616b8cb18c730553e4cdab7ef555214521
+          test "$(git -C "$RUNNER_TEMP/ref938" rev-parse HEAD)" = "beea9cdd29c51a046b8612871aa53be54b966e7c"
+          test "$(git -C "$RUNNER_TEMP/v07" rev-parse HEAD)" = "86110c616b8cb18c730553e4cdab7ef555214521"
+          node --version
+          uname -a
+      - name: Run isolated packageization positives and expected falsification witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          export REFERENCE_938_ROOT="$RUNNER_TEMP/ref938/experiments/v08-package-first-bootstrap"
+          node --test experiments/v08-sdk-packageization-mk-942-r1/tests/validation.test.mjs
+      - name: Run accepted v0.7 source oracles (not v0.8 production parity)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/v07"
+          npm ci --ignore-scripts --no-audit --no-fund
+          cd packages/domain-harness
+          node --import tsx --test --test-isolation=none \
+            tests/runtime-assembly/runtime-assembly-torn-snapshot.test.ts \
+            tests/runtime-assembly/runtime-assembly-identity.test.ts \
+            tests/component-admission/component-admission.test.ts \
+            tests/assembly-activation/assembly-activation.test.ts \
+            tests/effectful-invocation/effectful-invocation-recovery.test.ts \
+            tests/admission/effects.test.ts \
+            tests/non-effectful-invocation/non-effectful-invocation-torn-snapshot.test.ts
