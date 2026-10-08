@@ -74,15 +74,17 @@
     ]
   },
   "result": "PASS",
+  "hashNormalizationNote": "evidenceFiles sha256 values are computed over the committed LF git-blob bytes (git cat-file blob | sha256sum), not working-tree bytes; the working-tree t013-hermes-logcat.txt carries CRLF from adb logcat capture, and the repo checks out CRLF — the committed blob is the normalization of record.",
   "evidenceFiles": {
-    "t013-package-hashes.json": "59931cb05561285a1c3a41d8198e2faf3b80c6527c34d83fd17f920899df6919",
+    "t013-package-hashes.json": "7e7bdaf3bcc66ae0d74164746acc4b440e44f08ba74434e936b6e752956447b1",
     "t013-environment-identity.json": "b110ea1f054cea5b68a9575679b06c17588c1fbceb4da48befe73594fec69bf7",
     "t013-portable-surface-manifest.json": "1ec39a427411ef9210d1568b791edf72792278fd465a88f0c4cb9e474d27dff4",
     "t013-na-matrix.json": "67bca74fd7773443cca5729bb95f1d4a24049b1691e67ab3f6bebb6c67c568ac",
     "t013-import-graph.json": "9dbc1a7264a0dd8d9c7f679eea9b1d81b7afb3d6287500c70f4baec2f9d01f27",
     "t013-hermes-run.json": "ea0878799b2e3cd0d28fa59016742a09812f72a788a982668d12aad1f91e5274",
     "t013-node-twin-output.log": "4888b8695c68a00abcaec8aba4fa7721864b3382fcff722271c7f3da3c501715",
-    "t013-hermes-logcat.txt": "f479514885dbc69ae4133cbb3bdaabb20bdbd343495ca3907376ee86b06ecb34",
+    "t013-node-twin-output.log": "4888b8695c68a00abcaec8aba4fa7721864b3382fcff722271c7f3da3c501715",
+    "t013-hermes-logcat.txt": "b2bcd7325f0e108c52d5c147e28c5d8465eeb767aa938c830c970f8c17e55970",
     "t013-device-screenshot.png": "d8bf4e51347b31be77a5e6a370cb9a3fd7910faa607c1792fd4dd510b2e49d69"
   }
 }

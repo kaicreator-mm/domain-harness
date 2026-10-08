@@ -9,7 +9,7 @@
     "sizeBytes": 780889,
     "sha256": "d045145cd2dd3eb66006875e7bd082fe5352e9d66548cf31734de0955eb2ff12",
     "npmShasum": "bdaa3a4a1bba164c37921f38fa9caeb009a882c8",
-    "npmIntegrity": "sha512-zzOP+qcZmT7ZT9YxWco6YOGBOhVQHquqdJCEG+GWctT8K+ifQwcL+LPLVoKmwTZooWctHFFg=="
+    "npmIntegrity": "sha512-zzOP+qcZmT7ZTPbeNt6efZ7hMSysrAof0Sk+oni+tn5u+EEt3QyEgv9Ikdx9gRU6+oWj3QVBEgwTZooWctHFFg=="
   },
   "install": {
     "route": "npm install <tarball path> into an isolated create-expo-app blank consumer (no workspace/symlink authority); real directory under node_modules",
