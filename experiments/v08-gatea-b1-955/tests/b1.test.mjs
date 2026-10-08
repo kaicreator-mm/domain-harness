@@ -33,7 +33,7 @@ test('F2 caller cannot forge selected Package digest after Host trust establishm
   const f=await createFixture();
   const host=establishTrustedB1Host({root:f.root,approvedPins:f.pins});
   f.pins.sdk.digest='0'.repeat(40); // mutate caller object, NOT original Host snapshot
-  await assert.rejects(()=>host.seal({sdk:{path:'sdk',digest:'0'.repeat(40)}}),
+  assert.throws(()=>host.seal({sdk:{path:'sdk',digest:'0'.repeat(40)}}),
     e=>e?.code==='E_UNTRUSTED_SELECTION');
   const s=await host.seal();assert.equal(s.invokeRule({score:80}),true);
 });
