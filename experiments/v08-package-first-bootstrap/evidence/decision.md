@@ -41,3 +41,9 @@
 | Redundant dynamic generic SDK registry/LLM router (if any) | RETIRE hypothesis | confirm actual usage, no blanket retirement |
 
 No full v0.8 SDK, PRD, version branch, Task DAG or main merge is proposed by this spike.
+
+## Independent Linux Build Host verification (GitHub Actions)
+
+- Materialization-run: https://github.com/kaicreator-mm/domain-harness/actions/runs/37769708024 ; isolated GitHub-hosted Linux x86_64, Node v22.23.3, 18/18 PASS, exit 0. Tested transport/input SHA 577d54b46d17289235ecc20cdb8452d424de5431; resulting published source SHA 947a606cf47eba151a99a151000f299f8f27050f. Exact checked-out source contents and TAP output are preserved in `evidence/actions-test.tap`.
+- A later standalone exact-SHA direct-source workflow checks the final branch head and includes the additional Component Capability cycle falsification test. Its terminal status/run URL is recorded in #938, **not preclaimed here**.
+- Linux hosted runner **is an actual Build Host**, but not the project's Windows workstation or ECF Woodpecker VM. `PROJECT_DESIGNATED_BUILD_HOST_TESTS=NOT_RUN` remains true.

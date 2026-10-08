@@ -38,6 +38,17 @@ export const implementations={
     if(selections.size!==bindings.size)fail('E_BINDING');
     for(const [cap,b] of bindings)if(selections.get(cap)!==b.ref)fail('E_BINDING');
     for(const p of staged)for(const c of p.manifest.components)for(const req of c.requires){const b=bindings.get(req.id);if(!b)fail('E_MISSING_CAPABILITY',req.id);if(req.operations.some(op=>!b.ops.includes(op)))fail('E_OPERATION')}
+    // The derived requires/provides graph is also acyclic (package DAG alone is insufficient).
+    const capEdges=new Map([...bindings].map(([cap,b])=>[cap,b.component.requires.map(req=>req.id)]));
+    const visitingCaps=new Set(),resolvedCaps=new Set();
+    function visitCap(cap){
+      if(visitingCaps.has(cap))fail('E_CAPABILITY_CYCLE',cap);
+      if(resolvedCaps.has(cap))return;
+      visitingCaps.add(cap);
+      for(const dep of capEdges.get(cap)||[])visitCap(dep);
+      visitingCaps.delete(cap);resolvedCaps.add(cap);
+    }
+    for(const cap of capEdges.keys())visitCap(cap);
     const ordered=[...bindings.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
     const identity={packages:staged.map(p=>({id:p.manifest.id,version:p.manifest.version,definition:p.manifest.definitionId,digest:p.digest,module:p.manifest.moduleDigest})),bindings:ordered.map(([cap,b])=>({cap,ref:b.ref,operations:[...b.ops].sort()}))};
     const assembly=deepFreeze({...cp(identity),digest:seed.sha256(JSON.stringify(identity))});

@@ -119,3 +119,10 @@ test('A5: exposed assembly graph cannot be mutated or rebound',async()=>{
  assert.equal(r.assembly.bindings[0].ref,first);
  assert.throws(()=>r.rebind(),error('E_SEALED'));
 });
+
+test('A2: derived Component Capability cycle fails before activation',async()=>sandbox(async d=>{
+ const business=await editManifest(d,'business-approval',m=>{
+  m.components[0].requires.push({id:'workflow.run@1',operations:['run']});
+ });
+ await assert.rejects(bootstrap({root:d,sdk:pins.sdk,business}),error('E_CAPABILITY_CYCLE'));
+}));

@@ -1,7 +1,7 @@
 {
   "kernel": {
     "path": "kernel",
-    "digest": "a56d4f6ccfea720eb178cf446b3f68733c25f019"
+    "digest": "0572fea887d98c7d69d8553ca1eb97cfa7a43ba9"
   },
   "sdk": {
     "path": "sdk",
