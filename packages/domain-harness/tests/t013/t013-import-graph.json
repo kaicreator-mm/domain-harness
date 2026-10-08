@@ -1,0 +1,71 @@
+{
+  "pkgDir": "C:\\xDev\\kAiCreator\\_tmp\\dh-t013-927-cleanroom\\expo-app\\node_modules\\@kaicreator\\domain-harness",
+  "report": {
+    ".": {
+      "reachableFiles": 186,
+      "targets": {
+        "dist/contracts/runtime-assembly.js": true,
+        "dist/contracts/non-effectful-invocation.js": false,
+        "dist/persistence/sqlite-store.js": false,
+        "dist/script/script-executor.js": false
+      },
+      "nodeOnlyExternals": [],
+      "externalCount": 4
+    },
+    "./v2": {
+      "reachableFiles": 79,
+      "targets": {
+        "dist/contracts/runtime-assembly.js": false,
+        "dist/contracts/non-effectful-invocation.js": false,
+        "dist/persistence/sqlite-store.js": false,
+        "dist/script/script-executor.js": false
+      },
+      "nodeOnlyExternals": [],
+      "externalCount": 3
+    },
+    "./workflow": {
+      "reachableFiles": 2,
+      "targets": {
+        "dist/contracts/runtime-assembly.js": false,
+        "dist/contracts/non-effectful-invocation.js": false,
+        "dist/persistence/sqlite-store.js": false,
+        "dist/script/script-executor.js": false
+      },
+      "nodeOnlyExternals": [],
+      "externalCount": 0
+    },
+    "./v3": {
+      "reachableFiles": 166,
+      "targets": {
+        "dist/contracts/runtime-assembly.js": true,
+        "dist/contracts/non-effectful-invocation.js": false,
+        "dist/persistence/sqlite-store.js": false,
+        "dist/script/script-executor.js": false
+      },
+      "nodeOnlyExternals": [],
+      "externalCount": 4
+    },
+    "./v4": {
+      "reachableFiles": 4,
+      "targets": {
+        "dist/contracts/runtime-assembly.js": false,
+        "dist/contracts/non-effectful-invocation.js": false,
+        "dist/persistence/sqlite-store.js": false,
+        "dist/script/script-executor.js": false
+      },
+      "nodeOnlyExternals": [],
+      "externalCount": 0
+    },
+    "./v7": {
+      "reachableFiles": 8,
+      "targets": {
+        "dist/contracts/runtime-assembly.js": false,
+        "dist/contracts/non-effectful-invocation.js": false,
+        "dist/persistence/sqlite-store.js": false,
+        "dist/script/script-executor.js": false
+      },
+      "nodeOnlyExternals": [],
+      "externalCount": 0
+    }
+  }
+}

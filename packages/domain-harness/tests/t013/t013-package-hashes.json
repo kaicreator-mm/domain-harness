@@ -1,0 +1,44 @@
+{
+  "schema": "t013-package-hashes/v1",
+  "candidate": {
+    "commit": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+    "package": "@kaicreator/domain-harness",
+    "version": "0.2.0",
+    "packRoute": "npm pack --pack-destination (worktree packages/domain-harness, clean tree at candidate commit)",
+    "tarball": "kaicreator-domain-harness-0.2.0.tgz",
+    "sizeBytes": 780889,
+    "sha256": "d045145cd2dd3eb66006875e7bd082fe5352e9d66548cf31734de0955eb2ff12",
+    "npmShasum": "bdaa3a4a1bba164c37921f38fa9caeb009a882c8",
+    "npmIntegrity": "sha512-zzOP+qcZmT7ZTPbeNt6efZ7hMSysrAof0Sk+oni+tn5u+EEt3QyEgv9Ikdx9gRU6+oWj3QVBEgwTZooWctHFFg=="
+  },
+  "install": {
+    "route": "npm install <tarball path> into an isolated create-expo-app blank consumer (no workspace/symlink authority); real directory under node_modules",
+    "installedPackageJsonSha256": "15f6285884ba004650939843e8957aeca5ed999665a868389c91dd77d972eeaf",
+    "installedEntryExportCounts": {
+      ".": 518,
+      "./v2": 66,
+      "./workflow": 11,
+      "./v3": 436,
+      "./v4": 23,
+      "./v7": 15
+    },
+    "consumerPackageJsonSha256": "1dbc30fd58b7242ddb5d3d1f9ad9c6109266d31b7d4e201e0595ec371d47aad6",
+    "consumerLockfileSha256": "59cd5a65cf05db350fff9cf2c55cc6af63e1985e13689c793727c8e2e67f1c11"
+  },
+  "expoGoApk": {
+    "version": "57.0.9",
+    "versionCode": 444,
+    "source": "https://github.com/expo/expo-go-releases/releases/download/Expo-Go-57.0.9/Expo-Go-57.0.9.apk (per-SDK androidClientUrl from api.expo.dev v2/versions sdkVersions[57.0.0], per #736 operational note 1)",
+    "sha256": "14c18828a3d04e43922245920bd941b978fd1c7a5aec88a0188032f0bb4972ce",
+    "sizeBytes": 208916626
+  },
+  "hermesBytecodeBundle": {
+    "file": "dist-export/_expo/static/js/android/index-430d462b126002e2257845971f2e189a.hbc",
+    "producedBy": "npx expo export --platform android (Metro 0.84.5, Hermes bytecode output)",
+    "sha256": "b9480a21f791a82222854238332744e8dc3777a1ae0674c92b21378ffdb14522",
+    "sizeBytes": 3158920,
+    "magicHex": "c61fbc03",
+    "magicMeaning": "Hermes bytecode magic (verified at offset 0)",
+    "nodeOnlyLeakStringScan": "zero matches for better-sqlite3 | node:* builtins | worker_threads | sqlite-store | script-executor"
+  }
+}
