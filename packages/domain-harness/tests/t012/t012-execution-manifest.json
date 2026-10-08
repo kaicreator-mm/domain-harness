@@ -1,0 +1,88 @@
+{
+  "schema": "v0.7/t012-execution-manifest",
+  "schemaVersion": 1,
+  "gate": "T012",
+  "gateIssue": 926,
+  "frozenContracts": ["#728 T012 readiness (CLOSED=approved)", "#589 PACK-E", "#735 host preflight (CLOSED)", "#924 T011 disposition (CLOSED)"],
+  "t011Authorization": {
+    "terminal": "#924 merge record 6049387303",
+    "T012_T013_AUTHORIZED": "YES",
+    "authorizedAt": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e"
+  },
+  "role": "REAL_HOST_VALIDATION_EXECUTABLE",
+  "candidate": {
+    "commit": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+    "branch": "version/v0.7",
+    "verifiedBy": "git rev-parse HEAD in worktree dh-t012-926 (branch task/dh-t012-926)",
+    "treeBinding": "packed artifact bytes are the authoritative subject (per #728 section 1)",
+    "packedArtifacts": [
+      { "name": "kaicreator-domain-harness-0.2.0.tgz", "size": 780889, "sha256": "d045145cd2dd3eb66006875e7bd082fe5352e9d66548cf31734de0955eb2ff12" },
+      { "name": "kaicreator-domain-harness-node-0.2.0.tgz", "size": 34447, "sha256": "549262618bc3bc7961f325271d7cd000bc2a6fea9e337d2f1e3fd1222ad83c78" },
+      { "name": "kaicreator-domain-harness-compiler-0.2.0.tgz", "size": 58592, "sha256": "3a254c6288736553afe2a7294172cb41a9aa4563e9345995613bdb816a030480" },
+      { "name": "kaicreator-domain-harness-expo-0.2.0.tgz", "size": 35656, "sha256": "d4c6ef8ae7b9d19b447e3b859607e464814c338553327136e53a9dd72c40bde1" }
+    ],
+    "packedTarballSetSha256": "0524a651815edb41cc2f1a44be6a34a4a94e06c8149c56fc275dd8f48122a3fd",
+    "packProvenance": "npm pack -w @kaicreator/domain-harness -w @kaicreator/domain-harness-node -w @kaicreator/domain-harness-compiler -w @kaicreator/domain-harness-expo at e3a63222 after npm run build (committed-dist check green)"
+  },
+  "hostIdentity": {
+    "source": "clean-room artifacts/n00-host-identity.json (sha256 1a065be63f95d607d07bd901e52bbcbef0d403d8236462c9dc68ded97bbd2533)",
+    "node": "v24.21.0",
+    "nodeAbi": "137",
+    "npm": "11.19.0",
+    "platform": "win32 x64 (Windows 10.0.26200)",
+    "cpu": "x64 host CPU",
+    "betterSqlite3": "12.11.1",
+    "betterSqlite3NativeBindingSha256": "e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e",
+    "betterSqlite3NativeBindingProvenance": "DISCLOSED TRAP: prebuilt better_sqlite3.node copied from shared worktree C:\\xDev\\kAiCreator\\domain-harness\\dh-e4-896\\node_modules\\better-sqlite3@12.11.1 (source binary sha256 e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e); npm install script prebuild-install was policy-blocked (allowScripts) in both the workspace and the clean consumer; same host ABI 137 x64 win32; the packed candidate's better-sqlite3 dependency itself resolved from the npm registry (12.11.1) with install-script suppression disclosed, not suppressed to fake a capability the host lacks: the binding is a real native binary executing real SQLite 3.53.2 on this host",
+    "sqliteVersion": "3.53.2"
+  },
+  "t010FixtureBinding": {
+    "fixture": "T010A neutral definition (accepted 407b9ae4 via PR #910), transcribed into the clean consumer (tests/t012/consumer-src/fixture.mjs)",
+    "FREEZE_DEFINITION_GRAPH_DIGEST": "030402bf802340d77f1ed88a3a4858dc2202b9b16bc590038d45cbf26b97825c",
+    "FREEZE_BINDING_DIGEST": "8f5220bfc9c2e41c44cd06cdf36a5369662806a6e311fb1b5e338d2b2df86a87",
+    "FREEZE_FINAL_ASSEMBLY_DIGEST": "400d668f9f806b7b7266c78b2322ffdf13bde07c8aa87a86edd9d78398d677c0",
+    "digestMatchThroughPackedBytes": {
+      "definitionGraphDigest": "MATCH (recomputed via packed /v7 computeDefinitionGraphDigest in the clean consumer)",
+      "bindingDigest": "NOT RECOMPUTABLE through the packed public surface (T003C seam not exported at this candidate)",
+      "finalAssemblyDigest": "NOT RECOMPUTABLE through the packed public surface (T002B/T003C seams not exported at this candidate)"
+    }
+  },
+  "matrix": [
+    { "id": "T12-N00", "verdict": "PASS", "detail": "candidate/tree/tarball-digest/host-identity binding (n00-host-identity.json)" },
+    { "id": "T12-N01", "verdict": "PASS", "detail": "Lane A: npm ci + build (committed-dist check) + typecheck + lint green; core 2904/2904, compiler 172/172, expo typecheck, node 175/175 (one N17 timing flake under full-workspace parallel load, isolated rerun green), root 9/9" },
+    { "id": "T12-N02", "verdict": "PASS", "detail": "external tarball-only consumer: no symlinks, realpaths inside consumer, no src/, all 9 declared subpaths/conditions import+require resolve, tsc skipLibCheck:false strict nodenext green" },
+    { "id": "T12-N03", "verdict": "PASS", "detail": "real file-backed better-sqlite3 (sqlite 3.53.2, WAL, synchronous=FULL): PRODUCTION pin + exact resource currentness + completed effect durable; NEW-process reopen byte-intact" },
+    { "id": "T12-N04", "verdict": "PARTIAL", "detail": "authorized journey executed through packed public surface to authoritative Runtime DONE (occurrence + Central Admission plane; frozen digest 030402bf matched); Tool-binding/exposure/invocation stages (T010B stages 2/3/5) NOT executable — seams absent from declared export map (60 absence checks + 8 ERR_PACKAGE_PATH_NOT_EXPORTED negatives)" },
+    { "id": "T12-N05", "verdict": "PARTIAL", "detail": "unauthorized matrix executed for every publicly-expressible row (schema denial, no-candidate denial, missing pin, unbound effect tool, journal conflict, forged resource currentness, definition drift, invalid tool effect); t010c R1/R3/R4/R5/R6 rows that require the private T004A/T004C/T004E/T003C seams are NOT executable through the packed public surface" },
+    { "id": "T12-N06", "verdict": "PARTIAL", "detail": "effect=none Tool path is private at this candidate (invokeNonEffectfulTool not exported): pure-path OBSERVED-only semantics not exercisable through packed public bytes; effectless-admission rows not publicly expressible" },
+    { "id": "T12-N07", "verdict": "PASS", "detail": "effectful path executed only through the admitted occurrence + Central Admission durable-effect authority: exactly ONE dispatch, ONE journal record, DONE read from Runtime outcome only (never from tool return)" },
+    { "id": "T12-N08", "verdict": "PASS", "detail": "resource currentness: exact frozen non-secret pin bound into the PRODUCTION occurrence; forged revisionDigest refuses typed at the public pin seam; sameResourceCurrentnessEvidence exact-match/mismatch proven; T005C provider re-proof itself is a private seam (recorded)" },
+    { "id": "T12-N09", "verdict": "PASS", "detail": "parent-controlled SIGKILL after durable 'started' record, before effect completion: cross-process replay completed the exact effect identity with executionCount=1 (no partial/duplicate authority)" },
+    { "id": "T12-N10", "verdict": "PASS", "detail": "SIGKILL after durable completion before caller ack: replay disposition=replayed, executionCount=1 (outcome-unknown resolved by exact idempotency identity, never blind duplicate)" },
+    { "id": "T12-N11", "verdict": "PASS", "detail": "restart/replay resolves exact Definition/Assembly/Tool/resource evidence, never latest/default/order fallback: exact-turn replay in-process (disposition=replayed) and cross-process after real kill; adversarial same-identity conflicting record refuses ADMISSION_EFFECT_JOURNAL_CONFLICT" },
+    { "id": "T12-N12", "verdict": "PARTIAL", "detail": "publicly-expressible negatives all green; stale/mismatched Assembly/exposure/implementation-pin negatives are owned by the private T004A/T003C seams (not executable through packed public bytes at this candidate)" },
+    { "id": "T12-N13", "verdict": "PASS", "detail": "final recheck: all consumer cases rerun green (exit 0); tarball sha256 set byte-identical to N00 binding (sha256sum -c OK)" }
+  ],
+  "defects": [
+    {
+      "id": "T012-D1",
+      "severity": "P1",
+      "kind": "PRODUCT_PACKAGING_SURFACE_GAP",
+      "statement": "The accepted T010 Domain-App journey seams are not reachable from the packed public surface of @kaicreator/domain-harness at e3a63222. sealRuntimeAssembly, resolveCurrentCapabilityProvider, bindToolImplementation, verifyToolImplementationBinding, admitToolExposure, admitToolInvocationRequest, invokeEffectfulTool, invokeNonEffectfulTool, resolveToolResources and the ux-tool-request adapter are absent from every declared subpath ('.', /v2, /workflow, /v3, /v4, /v7) and deep imports refuse ERR_PACKAGE_PATH_NOT_EXPORTED (the accepted T008C boundary asserts this closedness as intended). Consequence: the frozen T010B/T010C journeys cannot be executed by a clean packed consumer; frozen digests 8f5220bf… and 400d668f… are not recomputable through packed public bytes.",
+      "evidence": "tests/t012/consumer-src/t010-journeys.mjs (60 absence checks), artifacts n02-resolution.json deep-import negatives",
+      "boundedRepair": "Additive-only public export promotion of the accepted Tool/invocation contract seams (e.g. extend the /v7 successor surface or add a dedicated declared subpath), preserving T008C deep-import closedness and additive-only evolution; then rebuild the candidate (any candidate byte change invalidates T012) and re-run the full T012 matrix."
+    }
+  ],
+  "infraNotes": [
+    "better-sqlite3 native binding installed via the disclosed shared-worktree prebuilt binary (policy-blocked install script); disclosed, not converted to PASS or FAIL — the SQLite proof executes a real native binding on this host",
+    "DEEPSEEK_API_KEY not required for T012",
+    "One full-workspace parallel-load timing flake in node-host N17 (SQLITE_BUSY competition window); isolated and suite reruns green 175/175 — recorded, not promoted to product defect"
+  ],
+  "timestamps": {
+    "packedAtUtc": "2026-10-08T00:30Z",
+    "validatedAtUtc": "2026-10-08T00:35Z..00:55Z",
+    "finalRecheckAtUtc": "2026-10-08T01:00Z"
+  },
+  "MICROKERNEL_SOURCE_DIFF": 0,
+  "verdictPreview": "BOUNDED_REBIND_REQUIRED"
+}

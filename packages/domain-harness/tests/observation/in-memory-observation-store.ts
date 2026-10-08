@@ -7,15 +7,12 @@
 import {
   absentRuntimeObservationStreamPage,
   assembleRuntimeObservationPage,
-  assertValidDecisionResolutionReceipt,
   decodeRuntimeObservationCursor,
   normalizeRuntimeObservationLimit,
   RUNTIME_OBSERVATION_INITIAL_EPOCH_ID,
   runtimeObservationId,
   runtimeObservationStreamKey,
   RuntimeObservationError,
-  type DecisionReceiptRecordRequest,
-  type DecisionResolutionReceipt,
   type RuntimeObservationIntent,
   type RuntimeObservationPage,
   type RuntimeObservationReadRequest,
@@ -521,41 +518,6 @@ export class InMemoryObservationStore implements RuntimeObservationStore, Runtim
     return instance;
   }
 
-  /**
-   * v0.6 T006 (issue #550): additive decision-receipt append seam — same
-   * binding/contiguity/fail-closed rules as the covered v1 appends, one
-   * `DECISION_RECEIPT` record per call.
-   */
-  async recordDecisionReceipt(request: DecisionReceiptRecordRequest): Promise<RuntimeObservationRecord> {
-    // Fail closed BEFORE any durable state changes.
-    assertValidDecisionResolutionReceipt(request.receipt);
-    const records = this.#appendObservations(
-      request.target,
-      request.packageIdentity.packageId,
-      {
-        kind: 'DECISION_RECEIPT',
-        packageIdentity: request.packageIdentity,
-        observedAt: request.observedAt,
-        ...(request.runtimeBindingRef === undefined
-          ? {}
-          : { runtimeBindingRef: request.runtimeBindingRef }),
-        ...(request.runtimeActivationRef === undefined
-          ? {}
-          : { runtimeActivationRef: request.runtimeActivationRef }),
-      },
-      [{ kind: 'DECISION_RECEIPT' }],
-      request.receipt,
-    );
-    const record = records[0];
-    if (record === undefined) {
-      throw new RuntimeObservationError(
-        'OBSERVATION_APPEND_FAILED',
-        'decision receipt append produced no record',
-      );
-    }
-    return record;
-  }
-
   async resetRecoveryWithObservation(
     target: WorkflowAddress,
     updatedAt: string,
@@ -662,7 +624,6 @@ export class InMemoryObservationStore implements RuntimeObservationStore, Runtim
     boundPackageId: string,
     intent: RuntimeObservationIntent | undefined,
     facts: ReadonlyArray<ObservationFact>,
-    decisionReceipt?: DecisionResolutionReceipt,
   ): RuntimeObservationRecord[] {
     if (intent === undefined || facts.length === 0) return [];
     if (this.#failNextAppend) {
@@ -717,11 +678,6 @@ export class InMemoryObservationStore implements RuntimeObservationStore, Runtim
         ...(fact.targetSequence === undefined ? {} : { targetSequence: fact.targetSequence }),
         ...(fact.lifecycleBefore === undefined ? {} : { lifecycleBefore: fact.lifecycleBefore }),
         ...(fact.lifecycleAfter === undefined ? {} : { lifecycleAfter: fact.lifecycleAfter }),
-        // v0.6 T006: receipt envelope field — populated only on
-        // DECISION_RECEIPT appends (facts carry exactly one record there).
-        ...(fact.kind === 'DECISION_RECEIPT' && decisionReceipt !== undefined
-          ? { decisionReceipt }
-          : {}),
       };
       records.push(record);
       lastSequence = sequence;

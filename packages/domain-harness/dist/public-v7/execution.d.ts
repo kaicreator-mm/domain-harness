@@ -1,0 +1,26 @@
+export { sealRuntimeAssembly, isSealedRuntimeAssembly, admitComponentWithAssembly, RuntimeAssemblyError, } from '../contracts/runtime-assembly.js';
+export type { RuntimeAssemblyErrorCode, KindImplementationPin, KindImplementationBindingInput, AssemblyResourceRequirement, AssemblyResourceRequirementsMaterial, RuntimeAssemblyResourceRequirementBinding, AssemblyImplementationBindingEvidence, SealRuntimeAssemblyInput, RuntimeAssemblyRecord, SealedKindImplementationBinding, SealedRuntimeAssembly, AssemblyBoundComponentAdmission, AdmitComponentWithAssemblyOptions, } from '../contracts/runtime-assembly.js';
+export { resolveCurrentCapabilityProvider, CapabilityProvisionContractError, } from '../contracts/capability-provision.js';
+export type { CapabilityProvisionErrorCode, CapabilityProviderEvidence, CapabilityProviderSelection, CurrentCapabilityConsumerEvidence, CurrentCapabilityProviderSelection, } from '../contracts/capability-provision.js';
+export { bindToolImplementation, verifyToolImplementationBinding, ToolImplementationBindingError, } from '../contracts/tool-implementation-binding.js';
+export type { ToolImplementationBindingErrorCode, ToolImplementationIdentity, ToolImplementationCandidate, BindToolImplementationInput, ToolImplementationBindingEvidence, SealedToolImplementationBinding, VerifiedToolImplementationCurrentness, VerifiedToolImplementationBindingEvidence, VerifyToolImplementationBindingInput, VerifiedToolImplementationBinding, } from '../contracts/tool-implementation-binding.js';
+export { admitToolExposure, admitToolInvocationRequest, InvocationRequestError, } from '../contracts/invocation-request.js';
+export type { InvocationRequestErrorCode, InvocationCallerContext, ToolExposureAdmissionDecision, ToolExposureAdmissionPolicy, AdmitToolExposureInput, AdmittedToolExposure, ToolInvocationRequest, AdmitToolInvocationRequestOptions, AdmittedToolInvocationRequest, } from '../contracts/invocation-request.js';
+export { invokeNonEffectfulTool, NonEffectfulInvocationError, } from '../contracts/non-effectful-invocation.js';
+export type { NonEffectfulInvocationErrorCode, NonEffectfulToolDispatchQuery, NonEffectfulToolDispatchPort, InvokeNonEffectfulToolInput, NonEffectfulToolInvocationResult, } from '../contracts/non-effectful-invocation.js';
+export { invokeEffectfulTool, EffectfulInvocationError, } from '../contracts/effectful-invocation.js';
+export type { EffectfulInvocationErrorCode, EffectfulAdmissionPorts, EffectfulToolDispatchQuery, EffectfulToolDispatchPort, InvokeEffectfulToolInput, EffectfulToolInvocationResult, } from '../contracts/effectful-invocation.js';
+export { resolveToolResources, ResourceResolutionError, } from '../contracts/resource-resolution.js';
+export type { ResourceResolutionErrorCode, ResourceResolutionRequest, ResourceCurrentnessPin, ResourceCurrentnessEvidence, ResourceProviderResponse, ResourceProvider, ResolveToolResourcesOptions, ResolvedResourceEntry, ResolvedToolResources, } from '../contracts/resource-resolution.js';
+export { queryUxTool, invokeUxToolEffectfully, UxToolRequestError, } from '../adapters/ux-tool-request.js';
+export type { UxToolRequestErrorCode, QueryUxToolInput, InvokeUxToolEffectfullyInput, } from '../adapters/ux-tool-request.js';
+export { projectAgentToolSurface, queryAgentTool, admitAgentMutationIntent, AgentToolProjectionError, } from '../adapters/agent-tool-projection.js';
+export type { AgentToolProjectionErrorCode, AgentProjectedOperation, AgentProjectedTool, AgentToolSurfaceProjection, ProjectAgentToolSurfaceInput, AgentToolQueryInput, AdmitAgentMutationIntentInput, } from '../adapters/agent-tool-projection.js';
+export type { ComponentEnvelope, ComponentId, KindRef, CapabilityContractRef, SemanticContractRef, } from '../contracts/component.js';
+export type { ComponentKindValidator } from '../contracts/component-admission.js';
+export type { DefinitionGraphEnvelope } from '../contracts/definition-graph.js';
+export type { ContentDigest, Sha256Port } from '../contracts/identity.js';
+export type { JsonObject, JsonValue } from '../contracts/json.js';
+export type { ResourceContractRef, ToolResourceRequirementsDeclaration, } from '../contracts/resource-requirements.js';
+export type { ToolOperationContract, ToolOperationEffect, } from '../contracts/tool-component.js';
+//# sourceMappingURL=execution.d.ts.map

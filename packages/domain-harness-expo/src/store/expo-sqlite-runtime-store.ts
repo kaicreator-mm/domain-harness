@@ -8,8 +8,6 @@ import type {
 import { migrateExpoRuntimeStore } from './migrations.js';
 import {
   absentRuntimeObservationStreamPage,
-  assertProcessedCommandTurnRevisionProgression,
-  assertValidDecisionResolutionReceipt,
   assembleRuntimeObservationPage,
   decodeRuntimeObservationCursor,
   normalizeRuntimeObservationLimit,
@@ -17,9 +15,6 @@ import {
   runtimeObservationId,
   runtimeObservationStreamKey,
   RuntimeObservationError,
-  type DecisionReceiptObservationStore,
-  type DecisionReceiptRecordRequest,
-  type DecisionResolutionReceipt,
   type ObservationReadRow,
   type RuntimeObservationIntent,
   type RuntimeObservationPage,
@@ -51,6 +46,7 @@ import type {
   RuntimeStoreProcessCommandExtension,
 } from '@kaicreator/domain-harness';
 import {
+  assertProcessedCommandTurnRevisionProgression,
   provisioningInstanceIdentityMatchesRequest,
   provisioningRecordMatchesRequest,
   requireAcceptedMessageIdentityCompatible,
@@ -446,7 +442,6 @@ export class ExpoSqliteRuntimeStore
   implements
     RuntimeStoreLike,
     RuntimeObservationStore,
-    DecisionReceiptObservationStore,
     RuntimeStoreProcessCommandExtension,
     DurableExecutionStore,
     DurableControlStore,
@@ -1280,47 +1275,6 @@ export class ExpoSqliteRuntimeStore
     });
   }
 
-  /**
-   * v0.6 T008-R1 (issue #598): production half of the T006 decision-receipt
-   * seam — durable append of ONE `DECISION_RECEIPT` record into the existing
-   * ordered observation stream, with the SAME binding/contiguity rules as the
-   * covered v1 appends (mirrors the Node reference adapter decision-for-
-   * decision). The receipt is validated fail-closed (`DECISION_RECEIPT_INVALID`)
-   * BEFORE any durable state changes; the append is atomic per record inside
-   * one exclusive transaction (a failed append allocates no sequence).
-   */
-  public async recordDecisionReceipt(request: DecisionReceiptRecordRequest): Promise<RuntimeObservationRecord> {
-    this.assertOpen();
-    assertValidDecisionResolutionReceipt(request.receipt);
-    const records = await this.writes.run(async (transaction) =>
-      recordObservations(
-        transaction,
-        request.target,
-        request.packageIdentity.packageId,
-        {
-          kind: 'DECISION_RECEIPT',
-          packageIdentity: request.packageIdentity,
-          observedAt: request.observedAt,
-          ...(request.runtimeBindingRef === undefined
-            ? {}
-            : { runtimeBindingRef: request.runtimeBindingRef }),
-          ...(request.runtimeActivationRef === undefined
-            ? {}
-            : { runtimeActivationRef: request.runtimeActivationRef }),
-        },
-        [{ kind: 'DECISION_RECEIPT', decisionReceipt: request.receipt }],
-      ),
-    );
-    const record = records[0];
-    if (record === undefined) {
-      throw new RuntimeObservationError(
-        'OBSERVATION_APPEND_FAILED',
-        'decision receipt append produced no record',
-      );
-    }
-    return record;
-  }
-
   // ---------------------------------------------------------------------
   // T-009 RuntimeStoreProcessCommandExtension (same durability domain)
   // ---------------------------------------------------------------------
@@ -1373,6 +1327,7 @@ export class ExpoSqliteRuntimeStore
     // to the runtime-core normal progression rule N -> N+1. The store is a
     // defensive contract boundary, not a semantic revision owner.
     assertProcessedCommandTurnRevisionProgression(commit);
+
     await this.writes.run(async (transaction) => {
       const instance = await requireInstance(transaction, commit.target);
       const message = await getMessageRow(transaction, instance.internal_id, commit.messageId);
@@ -1849,11 +1804,6 @@ interface ObservationFact {
   readonly targetSequence?: number;
   readonly lifecycleBefore?: WorkflowLifecycle;
   readonly lifecycleAfter?: WorkflowLifecycle;
-  /**
-   * v0.6 T008-R1: receipt envelope field — populated ONLY on DECISION_RECEIPT
-   * facts; v1 commit-family facts never set it (byte-compatible v1 records).
-   */
-  readonly decisionReceipt?: DecisionResolutionReceipt;
 }
 
 /**
@@ -1944,9 +1894,6 @@ async function recordObservations(
       ...(fact.targetSequence === undefined ? {} : { targetSequence: fact.targetSequence }),
       ...(fact.lifecycleBefore === undefined ? {} : { lifecycleBefore: fact.lifecycleBefore }),
       ...(fact.lifecycleAfter === undefined ? {} : { lifecycleAfter: fact.lifecycleAfter }),
-      // v0.6 T008-R1: receipt envelope field — populated only on
-      // DECISION_RECEIPT appends; v1 record kinds stay byte-compatible.
-      ...(fact.decisionReceipt === undefined ? {} : { decisionReceipt: fact.decisionReceipt }),
     };
     await transaction.runAsync(
       `INSERT INTO dh_v3_observation_records(

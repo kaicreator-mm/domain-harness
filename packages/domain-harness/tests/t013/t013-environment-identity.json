@@ -1,0 +1,45 @@
+{
+  "schema": "t013-environment-identity/v1",
+  "host": {
+    "os": "Windows 11 Pro build 10.0.26200 x64",
+    "hostnameRole": "DESKTOP-5K3AHE4 local real host (same fleet as #736 preflight)",
+    "node": "v24.21.0",
+    "npm": "11.19.0",
+    "packageManager": "npm (consumer uses npm; repo lockfile is package-lock.json)"
+  },
+  "expoToolchain": {
+    "template": "create-expo-app blank (isolated scratch consumer, clean-room)",
+    "expoSdk": "57.0.27",
+    "expoCli": "57.0.28",
+    "reactNative": "0.86.3 (consumer dependency)",
+    "react": "19.2.3",
+    "metro": "0.84.5",
+    "hermesCompiler": "250829098.0.17 (hermes-compiler, react-native 0.86 toolchain)",
+    "metroConfig": "absent (Expo SDK 57 defaults; no metro.config.js in consumer)"
+  },
+  "executionRoute": {
+    "kind": "EXPO_GO",
+    "expoGoVersion": "57.0.9 (versionCode 444)",
+    "devServer": "npx expo start --port 8081, adb reverse tcp:8081, exp://127.0.0.1:8081",
+    "bundleUrlProof": "logcat captured index.bundle request with transform.engine=hermes&transform.bytecode=1"
+  },
+  "device": {
+    "avd": "dh_t013_927 (created for this gate from system-images;android-36;google_apis;x86_64, API 36 rev 7)",
+    "serial": "emulator-5556",
+    "androidRelease": "16",
+    "apiLevel": 36,
+    "abi": "x86_64",
+    "emulatorAccel": "WHPX (per #736 preflight, usable on this host)"
+  },
+  "hermesRuntimeProof": {
+    "hermesInternalPresent": true,
+    "hermesVersion": "for RN 0.86.2 (Expo Go 57.0.9 embedded runtime, reported by HermesInternal.getRuntimeProperties())",
+    "reactNativeVersionOnDevice": "0.86.2",
+    "source": "T013_ENGINE_JSON record in t013-hermes-logcat.txt"
+  },
+  "sha256PortImplementation": {
+    "id": "t013-pure-js-sha256-fips180-4/1.0.0",
+    "kind": "pure JavaScript FIPS 180-4 SHA-256, harness-side host adapter implementing the package's portable Sha256Port seam",
+    "correctnessProof": "4 known-answer vectors (empty, abc, 448-bit, quick-brown-fox) verified in t013-node-twin-output.log against node:crypto; identical digest results across pure-JS and node:crypto ports AND across Hermes and Node hosts"
+  }
+}

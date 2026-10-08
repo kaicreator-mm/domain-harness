@@ -1,0 +1,65 @@
+{
+  "schema": "t013-portable-surface-manifest/v1",
+  "candidate": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+  "declaredPackageEntries": {
+    ".": { "sha256ofEntryFile": "na", "exportCount": 518, "role": "retained legacy/root surface" },
+    "./v2": { "exportCount": 66, "role": "retained legacy surface" },
+    "./workflow": { "exportCount": 11, "role": "retained legacy surface" },
+    "./v3": { "exportCount": 436, "role": "retained legacy surface" },
+    "./v4": { "exportCount": 23, "role": "retained legacy surface" },
+    "./v7": { "exportCount": 15, "role": "declared host-portable v0.7 public SDK contract (#589 PACK-E T013/T015: 'public /v7 SDK contract and explicitly retained legacy surfaces')" }
+  },
+  "v7DeclaredFunctions": [
+    "COMPONENT_FAMILIES",
+    "COMPONENT_SEMANTIC_DIGEST_DOMAIN_V0_7",
+    "DEFINITION_GRAPH_DIGEST_DOMAIN",
+    "admitComponent",
+    "componentSemanticDigestMaterial",
+    "computeComponentSemanticDigest",
+    "computeDefinitionGraphDigest",
+    "validateComponentEnvelope",
+    "validateDefinitionGraphEnvelope",
+    "validateToolComponent",
+    "ComponentAdmissionError",
+    "ComponentContractError",
+    "ComponentDigestError",
+    "DefinitionGraphContractError",
+    "ToolComponentContractError"
+  ],
+  "rootPublicAdapterSeamsExercised": [
+    "admitComponent",
+    "validateToolComponent",
+    "computeDefinitionGraphDigest",
+    "computeComponentSemanticDigest",
+    "AssemblyExecutionActivator (public sealed-Assembly-consuming type; loads on host)",
+    "GovernanceExecutionCoordinator",
+    "MemoryGovernanceBaselineStore",
+    "createGovernanceBaselineBody",
+    "createGovernanceExecutionPin",
+    "VolatileAdmissionEffectJournal",
+    "requireExactAssemblyDigest"
+  ],
+  "sealedAssemblyAuthoringNotDeclaredExported": {
+    "functions": [
+      "sealRuntimeAssembly",
+      "admitComponentWithAssembly",
+      "isSealedRuntimeAssembly",
+      "resolveCurrentCapabilityProvider",
+      "bindToolImplementation",
+      "admitToolExposure",
+      "admitToolInvocationRequest",
+      "invokeNonEffectfulTool"
+    ],
+    "observed": "absent from ALL SIX declared entries' runtime export surfaces (verified on Node and under Hermes, vector SURFACE_BOUNDARY_ASSEMBLY_AUTHORING); absent from every dist barrel (grep over dist/*/index.js and dist/index.js); deep subpath import blocked by the package exports map with ERR_PACKAGE_PATH_NOT_EXPORTED (Node 24 consumer)",
+    "frozenScopeEffect": "#589 PACK-E T013 freezes scope to 'sealed Assembly/pure Tool/adapter seams that are in the declared portable surface'. The sealed-Assembly AUTHORING/admission-execution seam is therefore OUT OF T013 SCOPE (recorded, not silently treated as executed); the sealed-Assembly contract MODULE is included on-host via the root/v3 entry import graphs and loads under Hermes. Ownership of whether that authoring seam should become public package surface belongs to the controller/T015 SDK closure, NOT this gate.",
+    "importGraphInclusion": {
+      "dist/contracts/runtime-assembly.js": {
+        "reachableFrom": [".", "./v3"],
+        "reachableFileCounts": { ".": 186, "./v3": 166 },
+        "evidence": "t013-import-graph.json"
+      },
+      "dist/contracts/non-effectful-invocation.js": { "reachableFrom": [] }
+    }
+  },
+  "importGraphNodeOnlyExternals": "zero node:* / better-sqlite3 / worker_threads externals reachable from ANY of the 6 entries (see t013-import-graph.json)"
+}

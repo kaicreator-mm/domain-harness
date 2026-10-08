@@ -1,0 +1,50 @@
+{
+  "schema": "v0.7/t012r-cleanroom-setup",
+  "schemaVersion": 1,
+  "successorOf": "tests/t012/t012-cleanroom-setup.json (prior run at e3a63222, BOUNDED_REBIND_REQUIRED)",
+  "cleanRoomRoot": "C:\\xDev\\kAiCreator\\_tmp\\dh-t012r-926-cleanroom",
+  "layout": {
+    "tarballs/": "four packed candidate tarballs at 29dba90b + SHA256SUMS.txt (sha256sum -c verified at N00 bind and again at N13 final recheck)",
+    "consumer/": "external packed consumer (outside the repository worktree), sources copied verbatim from the committed tests/t012r/consumer-src/",
+    "consumer/node_modules/": "tarball-only install; real directories, zero symlinks, zero workspace leakage (n02-resolution.json)",
+    "artifacts/": "run artifacts: n00-host-identity.json, n02-resolution.json, n02-npm-ls.json, n03-sqlite.json, t010-journeys.json, preserved post-crash SQLite DB + execution-count file"
+  },
+  "installMethod": {
+    "command": "npm install (consumer package.json references ../tarballs/*.tgz; npm copies tarball contents into node_modules — no npm link, no workspace resolution, no NODE_PATH, no file: reference back to repository source)",
+    "consumerPackageJsonSha256": "ed13e18f819d09497ef90fe2fe113951aedf29b91b0095619d5437030eb95fb9",
+    "consumerPackageLockSha256": "92e44231a68665438ea7a5258b848c625ba65ed97459b9ae4d1b8fc4298b79d9"
+  },
+  "noWorkspaceSubstitutionProof": {
+    "everyPackageIsRealDirectory": true,
+    "noSymlinks": true,
+    "realpathsInsideConsumer": true,
+    "noSrcDirectories": true,
+    "declaredSubpathCount": 10,
+    "deepImportsRefuse": "ERR_PACKAGE_PATH_NOT_EXPORTED (8 negative probes incl. all T010 Tool-plane owner paths and src/index.ts — green again at the repaired candidate)",
+    "npmLsArtifact": "clean-room artifacts/n02-npm-ls.json (sha256 recorded in t012r-artifact-hashes.txt)"
+  },
+  "nativeBinding": {
+    "package": "better-sqlite3@12.11.1 (resolved from npm registry by the consumer install)",
+    "installScript": "prebuild-install || node-gyp rebuild --release — POLICY-BLOCKED by npm allowScripts in this environment",
+    "appliedBinary": "prebuilt better_sqlite3.node (sha256 e75b8c024a85179d8e0e51203a8b8867916e9a51327ce3953db5f8483cc9a91e) copied from the shared worktree dh-e4-896 (same host, ABI 137, x64 win32); hash byte-identical to the prior run's disclosure",
+    "disclosure": "real native binding executing real SQLite 3.53.2 on this host; no suppression of SQLite capability — only the download/build step was replaced by a same-host prebuilt binary",
+    "smokeTest": "SELECT sqlite_version() -> 3.53.2 in both workspace and consumer"
+  },
+  "typecheckPosture": {
+    "compiler": "typescript 5.8.3 (consumer devDependency)",
+    "tsconfig": "strict, module/moduleResolution nodenext, skipLibCheck:false, types:[node]",
+    "result": "exit 0 (TSC-PASS) — including the extended ./v7/execution value+type surface exercise"
+  },
+  "laneAWorkspace": {
+    "worktree": "C:\\xDev\\kAiCreator\\domain-harness\\dh-t012r-926",
+    "branch": "task/dh-t012r-926",
+    "head": "29dba90bfaa0185fcbd9cd695db72f55d5e80806",
+    "commands": [
+      "npm ci (better-sqlite3/esbuild install scripts policy-blocked; better-sqlite3 binding via the disclosed same-host prebuilt, hash identical to the prior run)",
+      "npm run build (exit 0; incl. scripts/check-committed-dist.mjs committed-dist check)",
+      "npm run typecheck (exit 0)",
+      "npm run lint (exit 0)",
+      "npm test (counts recorded in t012r-execution-manifest.json)"
+    ]
+  }
+}

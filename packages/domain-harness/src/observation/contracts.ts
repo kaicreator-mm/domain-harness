@@ -1,5 +1,4 @@
 import type { DomainIntelligencePackageIdentity } from '../contracts/domain-data.js';
-import type { DecisionResolutionReceipt } from './decision-receipt.js';
 import type { WorkflowLifecycle, WorkflowAddress, WorkflowInstanceSnapshot } from '../v2/contracts/workflow.js';
 import type { DomainMessage, MessageAcceptedAck } from '../v2/contracts/message.js';
 import type {
@@ -49,14 +48,6 @@ export const RUNTIME_OBSERVATION_EVENT_FAMILIES = [
   'TURN_RECOVERY_REQUIRED',
   'RECOVERY_COMMITTED',
   'INSTANCE_TERMINALIZED',
-  /**
-   * v0.6 T006 (issue #550, frozen L2 C4/A4): additive decision-receipt family.
-   * Envelope, cursor/gap read semantics, stream binding and epoch rules are
-   * reused verbatim from contract v1; the record carries the bounded public
-   * Decision Resolution Receipt in its `decisionReceipt` envelope field and
-   * confers no authority. See src/observation/decision-receipt.ts.
-   */
-  'DECISION_RECEIPT',
 ] as const;
 
 export type RuntimeObservationEventFamily = (typeof RUNTIME_OBSERVATION_EVENT_FAMILIES)[number];
@@ -108,13 +99,6 @@ export interface RuntimeObservationRecord {
   readonly lifecycleAfter?: WorkflowLifecycle;
   /** Reserved for `EFFECT_SETTLED`; never populated by contract v1 emitters. */
   readonly effectRef?: RuntimeObservationEffectRef;
-  /**
-   * v0.6 T006: the bounded public Decision Resolution Receipt. Populated ONLY
-   * on `DECISION_RECEIPT` records, never on the v1 commit-family records.
-   * Closed-shape JSON data (validated fail-closed at append); identities,
-   * categories and counts only — no payloads, no authority.
-   */
-  readonly decisionReceipt?: DecisionResolutionReceipt;
 }
 
 /**
@@ -182,12 +166,7 @@ export type RuntimeObservationErrorCode =
   | 'SEQUENCE_NOT_CONTIGUOUS'
   | 'INVALID_READ_LIMIT'
   | 'CURSOR_MALFORMED'
-  | 'OBSERVATION_APPEND_FAILED'
-  /**
-   * v0.6 T006: a `DECISION_RECEIPT` append presented a receipt that fails the
-   * bounded public shape authority — rejected before any durable state changes.
-   */
-  | 'DECISION_RECEIPT_INVALID';
+  | 'OBSERVATION_APPEND_FAILED';
 
 export class RuntimeObservationError extends Error {
   readonly code: RuntimeObservationErrorCode;

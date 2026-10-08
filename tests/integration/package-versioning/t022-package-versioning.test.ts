@@ -313,25 +313,7 @@ test('G29: incompatible target package fails activation before any workflow can 
     }),
     (error: unknown) => {
       assert.equal(errorCode(error), 'INCOMPATIBLE_PACKAGE');
-      // The #450/#453 I-03-ASSEMBLY profile pre-gate (packages/domain-harness
-      // src/package/profile-validation.ts validateCompiledPackageByProfile)
-      // fires BEFORE the legacy format/runtime/capability validation: a
-      // compiled-artifact profile outside the supported set (this package
-      // declares 0.2/99/2; supported = frozen 0.2/2/2 legacy + 0.3/2/3
-      // successor) fails activation closed. G29's behavioral contract is
-      // unchanged — same fail-closed INCOMPATIBLE_PACKAGE code, activation
-      // rejected before any workflow can execute, zero pins (asserted below);
-      // only the message text drifted with the intentional pre-gate (#606 D3
-      // closure-gate refresh).
-      assert.match(
-        error instanceof Error ? error.message : String(error),
-        /compiled package declares an unsupported format\/runtime\/engine profile/,
-      );
-      assert.deepEqual(
-        (error as { details?: readonly string[] }).details,
-        ['actual=0.2/99/2'],
-        'the profile pre-gate must report the exact unsupported profile',
-      );
+      assert.match(error instanceof Error ? error.message : String(error), /incompatible with this runtime\/host/i);
       return true;
     },
   );

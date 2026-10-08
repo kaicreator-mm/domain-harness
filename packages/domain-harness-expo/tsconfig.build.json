@@ -2,7 +2,6 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "declaration": true,
-    "outDir": "dist",
-    "tsBuildInfoFile": "../../node_modules/.cache/tsc/domain-harness-expo.build.tsbuildinfo"
+    "outDir": "dist"
   }
 }

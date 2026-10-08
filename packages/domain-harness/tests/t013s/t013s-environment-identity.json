@@ -1,0 +1,46 @@
+{
+  "schema": "t013s-environment-identity/v1",
+  "successorOf": "t013-environment-identity/v1 (#927 run; same recipe, same AVD fleet, new clean-room)",
+  "host": {
+    "os": "Windows 11 Pro build 10.0.26200 x64",
+    "hostnameRole": "DESKTOP-5K3AHE4 local real host (same fleet as #736 preflight and the #927 run)",
+    "node": "v24.21.0",
+    "npm": "11.19.0",
+    "packageManager": "npm (consumer uses npm; repo lockfile is package-lock.json)"
+  },
+  "expoToolchain": {
+    "template": "create-expo-app blank (isolated scratch consumer clone in clean-room C:\\xDev\\kAiCreator\\_tmp\\dh-t013s-933-cleanroom; NEVER inside the workspace repo)",
+    "expoSdk": "57.0.27",
+    "expoCli": "57.0.28",
+    "reactNative": "0.86.3 (consumer dependency)",
+    "react": "19.2.3",
+    "metro": "0.84.5",
+    "hermesCompiler": "250829098.0.17 (hermes-compiler, react-native 0.86 toolchain)",
+    "metroConfig": "absent (Expo SDK 57 defaults; no metro.config.js in consumer)"
+  },
+  "executionRoute": {
+    "kind": "EXPO_GO",
+    "expoGoVersion": "57.0.9 (versionCode 444)",
+    "devServer": "npx expo start --port 8082 (port 8081 occupied by another task's dev server on this shared host; CI=1 non-interactive), adb -s emulator-5556 reverse tcp:8082 tcp:8082, exp://127.0.0.1:8082",
+    "bundleUrlProof": "logcat captured index.bundle request with transform.engine=hermes&transform.bytecode=1 (t013s-hermes-logcat.txt)"
+  },
+  "device": {
+    "avd": "dh_t013_927 (REUSED from the accepted #927 run; created for that gate from system-images;android-36;google_apis;x86_64, API 36 rev 7; cold-booted fresh for this rerun, -no-snapshot-save)",
+    "serial": "emulator-5556 (this rerun; emulator-5554 concurrently hosts another task's dh_t023_api36 and was left untouched)",
+    "androidRelease": "16",
+    "apiLevel": 36,
+    "abi": "x86_64",
+    "emulatorAccel": "WHPX (Windows Hypervisor Platform, operational)"
+  },
+  "hermesRuntimeProof": {
+    "hermesInternalPresent": true,
+    "hermesVersion": "for RN 0.86.2 (Expo Go 57.0.9 embedded runtime, reported by HermesInternal.getRuntimeProperties())",
+    "reactNativeVersionOnDevice": "0.86.2",
+    "source": "T013S_ENGINE_JSON record in t013s-hermes-logcat.txt"
+  },
+  "sha256PortImplementation": {
+    "id": "t013-pure-js-sha256-fips180-4/1.0.0 (UNCHANGED from the #927 run — identical harness-side file)",
+    "kind": "pure JavaScript FIPS 180-4 SHA-256, harness-side host adapter implementing the package's portable Sha256Port seam",
+    "correctnessProof": "4 known-answer vectors (empty, abc, 448-bit, quick-brown-fox) verified in t013s-node-twin-output.log against node:crypto; identical digest results across pure-JS and node:crypto ports AND across Hermes and Node hosts (Hermes outcome byte-identical to the pure-JS Node port, collector-verified)"
+  }
+}

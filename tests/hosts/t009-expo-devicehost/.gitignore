@@ -1,7 +1,0 @@
-generated/
-vendor/
-fixture-constants.ts
-node_modules/
-.expo/
-android/
-evidence/

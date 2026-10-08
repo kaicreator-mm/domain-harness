@@ -1,0 +1,53 @@
+{
+  "schema": "t013s-package-hashes/v1",
+  "candidate": {
+    "commit": "29dba90bfaa0185fcbd9cd695db72f55d5e80806",
+    "tree": "9b41896bc8ad95b84a6a101eb5072ad6533e9644",
+    "package": "@kaicreator/domain-harness",
+    "version": "0.2.0",
+    "packRoute": "npm pack --pack-destination (worktree packages/domain-harness, clean tree at candidate commit; packed twice by repair builder #930 with byte-identical result, hash re-verified at this execution)",
+    "tarball": "kaicreator-domain-harness-0.2.0.tgz",
+    "sizeBytes": 884711,
+    "sha256": "f9400728bc99f8516c2f7f69db55cf8589d29e79127a77a36c2fb44f08a2d332",
+    "npmShasum": "ba3f95cb960125d52a0a547eba5973d52d04dbb1",
+    "npmIntegrity": "sha512-KLD4SciwZtBGBE1UKqgOaokXs/dpK5GkqJXJ2fZs7mdggf8A+44cZsbAL+bAm9kDZvs5ni+18cQu1nRz949rDQ==",
+    "consistencyWithRepairBuilder": "sha256/size match the #930 terminal EVIDENCE_TERMINAL packed core tarball EXACTLY (f9400728...884711 bytes) — the packaged bytes the repair builder validated are byte-identical to this gate's installed candidate"
+  },
+  "install": {
+    "route": "npm install <tarball path> into an isolated create-expo-app blank consumer clone (clean-room C:\\xDev\\kAiCreator\\_tmp\\dh-t013s-933-cleanroom\\expo-app; no workspace/symlink authority); real directory under node_modules",
+    "installedPackageJsonSha256": "cb7df7ef7f5648a15c5b4e8fa67a38acb015975dd76586d9eb58e8325b5ba3b4",
+    "installedEntryExportCounts": {
+      ".": 518,
+      "./v2": 66,
+      "./workflow": 11,
+      "./v3": 436,
+      "./v4": 23,
+      "./v7": 15,
+      "./v7/execution": 25
+    },
+    "entryExportCountNotes": {
+      "./v7/execution": "25 runtime exports = 16 functions + 9 typed error classes; the facade's pure-type exports (owner input/output/option/result types, error-code types, shared foundation types) are TypeScript-erasable and correctly absent at runtime"
+    },
+    "consumerPackageJsonSha256": "1dbc30fd58b7242ddb5d3d1f9ad9c6109266d31b7d4e201e0595ec371d47aad6",
+    "consumerLockfileSha256": "915b3c365545a295b824bc6762fd83a3d77dfcce27efb450fd7df6cbcca77f50",
+    "deepImportAuthority": "require.resolve('@kaicreator/domain-harness/dist/contracts/runtime-assembly.js') in the Node consumer -> ERR_PACKAGE_PATH_NOT_EXPORTED (owner leaf paths remain closed per accepted T008C boundary); declared subpath ./v7/execution resolves"
+  },
+  "expoGoApk": {
+    "version": "57.0.9",
+    "versionCode": 444,
+    "source": "https://github.com/expo/expo-go-releases/releases/download/Expo-Go-57.0.9/Expo-Go-57.0.9.apk (per-SDK androidClientUrl from api.expo.dev v2/versions sdkVersions[57.0.0], per #736 operational note 1; APK retained from the #927 clean-room, sha256 re-verified identical)",
+    "sha256": "14c18828a3d04e43922245920bd941b978fd1c7a5aec88a0188032f0bb4972ce",
+    "sizeBytes": 208916626,
+    "onDeviceProof": "adb shell dumpsys package host.exp.exponent: versionName=57.0.9 versionCode=444"
+  },
+  "hermesBytecodeBundle": {
+    "file": "dist/_expo/static/js/android/index-88460519a0f3f63a2923d4a5466451d0.hbc",
+    "producedBy": "npx expo export --platform android (Metro 0.84.5, Hermes bytecode output, Expo SDK 57 defaults; no metro.config.js in consumer)",
+    "sha256": "cf2fd5defd8fe14be6a30d5d104f86a2a24c3959105514e17b9f1b373c8c38ef",
+    "sizeBytes": 3347126,
+    "magicHex": "c61fbc03",
+    "magicMeaning": "Hermes bytecode magic (verified at offset 0)",
+    "nodeOnlyLeakStringScan": "zero matches for better-sqlite3 | worker_threads | sqlite-store | script-executor | node:* builtins",
+    "devServerBytecodeProof": "logcat captured index.bundle request with transform.engine=hermes&transform.bytecode=1 (t013s-hermes-logcat.txt)"
+  }
+}

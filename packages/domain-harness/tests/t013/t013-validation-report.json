@@ -1,0 +1,90 @@
+{
+  "schema": "t013-validation-report/v1",
+  "gate": "V0_7_T013_EXPO_HERMES_REAL_HOST_VALIDATION",
+  "issue": 927,
+  "frozenContracts": ["#589 PACK-E T013", "#729 readiness", "#736 preflight"],
+  "candidate": {
+    "commit": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e",
+    "tree": "749655fdad73210e92d02c8b8322ed5be3e093c0",
+    "note": "tree recomputed via git rev-parse HEAD^{tree} at execution",
+    "t011Prerequisite": "T012_T013_AUTHORIZED=YES accepted at e3a63222 (#924 merge record 6049387303)"
+  },
+  "verdicts": {
+    "PACKAGED_CANDIDATE_BINDING": {
+      "verdict": "PASS",
+      "evidence": "exact npm pack from clean worktree at e3a63222; sha256 d045145cd2dd3eb66006875e7bd082fe5352e9d66548cf31734de0955eb2ff12; npm shasum bdaa3a4a1bba164c37921f38fa9caeb009a882c8; installed as real directory into isolated Expo consumer; installed package.json hash bound"
+    },
+    "EXPO_HERMES_ENV_BIND": {
+      "verdict": "PASS",
+      "evidence": "Expo SDK 57.0.27 / Expo CLI 57.0.28 / RN 0.86.3 / Metro 0.84.5 / hermes-compiler 250829098.0.17; Expo Go 57.0.9 (versionCode 444) on AVD dh_t013_927 (Android 16, API 36, x86_64, emulator-5556); HermesInternal present on device ('for RN 0.86.2')"
+    },
+    "INSTALL_BUNDLE_IMPORT": {
+      "verdict": "PASS",
+      "evidence": "tarball installed (npm) into clean consumer; Metro exported Android Hermes bytecode bundle (magic c61fbc03, sha256 b9480a21...14522); runtime import of ALL SIX declared entries under Hermes: root 518 / v2 66 / workflow 11 / v3 436 / v4 23 / v7 15 exports, zero import errors (t013-hermes-run.json entryImportCounts)"
+    },
+    "IDENTITY_ADMISSION_RUNTIME": {
+      "verdict": "PASS",
+      "evidence": "executed ON DEVICE under Hermes (not TypeScript-compile-only): Component digest determinism (key-order shuffle, ref-order shuffle, componentId exclusion, nonMaterialExtensions exclusion, semantic-change sensitivity), graph digest order-insensitivity, must-understand admission positives + UNKNOWN_KIND / KIND_VERSION_MISMATCH / UNKNOWN_CAPABILITY / validator-failure propagation / understood-set snapshot safety; every result byte-identical to Node twin"
+    },
+    "SEALED_ASSEMBLY_PURE_TOOL": {
+      "verdict": "PASS",
+      "evidence": "executed on host to the FULL extent of the declared portable surface (frozen scope: seams 'that are in the declared portable surface'): pure Tool contract validation (positive + effect-case/empty-ops/duplicate-op negatives) via /v7; sealed-Assembly contract module included on-host via root/v3 import graphs and loads under Hermes; public in-memory governance adapter seams (baseline body+store, execution pin mint, volatile effect journal) execute on host byte-identical to Node. RECORDED FINDING (not a defect claim): sealed-Assembly AUTHORING/admission-execution functions are not exported from any declared entry (runtime-verified both hosts; exports map blocks deep import) — out of frozen T013 scope, owned by controller/T015 (see t013-portable-surface-manifest.json)"
+    },
+    "PORTABLE_JOURNEY": {
+      "verdict": "PASS",
+      "evidence": "strongest neutral non-effectful journey genuinely supported by the declared surface, executed under Hermes: compose+validate neutral 2-component 1-relation Definition graph -> bind exact component digests (wf 055b1078...c797, tool 8bffd4b6...b1a) and graph digest (352329d3...c6d0) -> must-understand admission of both components (validator run-counters prove execution) -> hostile unknown-intent component rejected by the same gate. All identities byte-identical across Hermes and both Node ports"
+    },
+    "NO_NODE_IMPORT_LEAK": {
+      "verdict": "PASS",
+      "evidence": "static: import-graph walk from all 6 entries over installed tarball — zero node:*/better-sqlite3/worker_threads externals; sqlite-store.js and script-executor.js unreachable from every entry. bundle: zero leak strings in Hermes bytecode. runtime: all 6 entries import and execute under Hermes with zero errors. Deep-import authority blocked: ERR_PACKAGE_PATH_NOT_EXPORTED"
+    },
+    "NODE_ONLY_NA_MATRIX": {
+      "verdict": "PASS",
+      "evidence": "explicit NOT_APPLICABLE rows for better-sqlite3 store and node:worker_threads executor with boundary evidence; no polyfill/shim/deep-import used anywhere; only injected host code is the Sha256Port adapter the frozen seam design requires (correctness proven against node:crypto known-answer vectors)"
+    },
+    "T000_E8B_PARITY_BOUNDARY": {
+      "verdict": "PASS",
+      "evidence": "Expo durable-store accepted-message parity is T000/E8b-owned; this gate demands no Expo store semantics and claims no Node/Expo store parity; boundary recorded in t013-na-matrix.json; ownership non-overlapping"
+    },
+    "INFRA_FAILURE_POLICY": {
+      "verdict": "PASS",
+      "evidence": "no environment inability encountered; one Metro watcher staleness + one Metro dynamic-import limitation were ordinary consumer-side tooling issues, fixed in the harness (server bounce / static entry imports) and re-run to green; no candidate-attributable failure ever observed; no UNAVAILABLE|INFRA_FAILURE classification needed"
+    },
+    "RERUN_CURRENTNESS": {
+      "verdict": "PASS",
+      "evidence": "authoritative GitHub re-read (gh api + direct https fetch) immediately before close: origin/version/v0.7 == e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e == candidate; no drift"
+    },
+    "PRODUCT_L2_DAG": {
+      "verdict": "PASS",
+      "evidence": "write set is tests/evidence-only under packages/domain-harness/tests/t013/; MICROKERNEL_SOURCE_DIFF=0; no src/dist touch; frozen #517/#526 planning semantics cited only, never rewritten"
+    }
+  },
+  "runRecords": {
+    "hermesVectors": "27/27 PASS on device (Expo Go 57.0.9, Hermes for RN 0.86.2)",
+    "nodeTwinPureJsPort": "27/27 PASS, byte-identical to Hermes",
+    "nodeTwinCryptoPort": "27/27 PASS, byte-identical; proves pure-JS SHA-256 adapter is FIPS-true",
+    "sha256KnownAnswer": "4/4 vectors match node:crypto"
+  },
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0,
+    "P3": [
+      "P3-1: sealed-Assembly authoring/admission-execution seam (sealRuntimeAssembly, admitComponentWithAssembly, bindToolImplementation, admitToolInvocationRequest, invokeNonEffectfulTool, isSealedRuntimeAssembly) is not exported from any declared package entry on this candidate. Frozen T013 scope excludes it (declared surface only); recorded for controller/T015 SDK-closure ownership. This is an observation, not a defect verdict."
+    ]
+  },
+  "result": "PASS",
+  "hashNormalizationNote": "evidenceFiles sha256 values are computed over the committed LF git-blob bytes (git cat-file blob | sha256sum), not working-tree bytes; the working-tree t013-hermes-logcat.txt carries CRLF from adb logcat capture, and the repo checks out CRLF — the committed blob is the normalization of record.",
+  "evidenceFiles": {
+    "t013-package-hashes.json": "7e7bdaf3bcc66ae0d74164746acc4b440e44f08ba74434e936b6e752956447b1",
+    "t013-environment-identity.json": "b110ea1f054cea5b68a9575679b06c17588c1fbceb4da48befe73594fec69bf7",
+    "t013-portable-surface-manifest.json": "1ec39a427411ef9210d1568b791edf72792278fd465a88f0c4cb9e474d27dff4",
+    "t013-na-matrix.json": "67bca74fd7773443cca5729bb95f1d4a24049b1691e67ab3f6bebb6c67c568ac",
+    "t013-import-graph.json": "9dbc1a7264a0dd8d9c7f679eea9b1d81b7afb3d6287500c70f4baec2f9d01f27",
+    "t013-hermes-run.json": "ea0878799b2e3cd0d28fa59016742a09812f72a788a982668d12aad1f91e5274",
+    "t013-node-twin-output.log": "4888b8695c68a00abcaec8aba4fa7721864b3382fcff722271c7f3da3c501715",
+    "t013-node-twin-output.log": "4888b8695c68a00abcaec8aba4fa7721864b3382fcff722271c7f3da3c501715",
+    "t013-hermes-logcat.txt": "b2bcd7325f0e108c52d5c147e28c5d8465eeb767aa938c830c970f8c17e55970",
+    "t013-device-screenshot.png": "d8bf4e51347b31be77a5e6a370cb9a3fd7910faa607c1792fd4dd510b2e49d69"
+  }
+}

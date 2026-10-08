@@ -1,0 +1,40 @@
+{
+  "schema": "v0.7/t014-currentness-matrix",
+  "schemaVersion": 1,
+  "gate": "T014",
+  "gateIssue": 936,
+  "capturedAtUtc": "2026-10-08T09:19Z",
+  "currentnessRule": "ALL live reads via gh api / direct GitHub; the worktree origin (local _mirror) is stale-by-design and was never used",
+
+  "acceptedChain": [
+    { "link": "T011 architecture disposition", "issue": 924, "mergeCommit": "e3a63222d7caf7fdab0dd2bb585ddd6871e77a2e", "terminal": "#924@6049387303 (controller merge record, T012_T013_AUTHORIZED=YES)", "liveStatus": "comment 6049387303 exists (gh api verified 2026-10-08T09:05Z); e3a63222 is ancestor of 3493fe3d" },
+    { "link": "T012-D1 bounded repair", "issue": 930, "mergeCommit": "29dba90bfaa0185fcbd9cd695db72f55d5e80806", "terminal": "#930@6054426102 (BOUNDED REPAIR ACCEPTED; NEW_CANDIDATE=29dba90b)", "liveStatus": "comment 6054426102 exists; 29dba90b is ancestor of 3493fe3d" },
+    { "link": "T012r Node real-host successor rerun", "issue": 926, "pr": 935, "mergeCommit": "83f26aca", "validation": "#926@6055952342 CONFIRMED", "review": "#926@6056299928 PASS (P0=0 P1=0 P2=0 P3=1 host load-flake class)", "liveStatus": "both comments exist; PR #935 MERGED (merge commit 83f26aca, ancestor of 3493fe3d)" },
+    { "link": "T013s Expo/Hermes successor rerun", "issue": 933, "pr": 934, "mergeCommit": "3493fe3d7fb43b35e160ea12ef1d555937a9f0e8", "validation": "#933@6056300003 CONFIRMED", "review": "#933@6055582709 PASS (P0=0 P1=0 P2=0 P3=2)", "liveStatus": "both comments exist; PR #934 MERGED (merge commit = the closure candidate tip itself)" }
+  ],
+
+  "e1_e11_rows": {
+    "authority": "accepted t009r manifest (tests/t009r/t009r-e1-e10-evidence-manifest.json) consumed by the t011 disposition via import; E11 via committed binding t011-e11-terminal-binding.json",
+    "rerunAtCandidate": {
+      "t009r_aggregator": "24/24 pass 0 fail (isolated, at 3493fe3d)",
+      "t011_disposition": "32/32 pass 0 fail (isolated, at 3493fe3d; includes live ancestry checks, REFUTED-injection HOLD routing, superseded-row fail-closed re-execution)",
+      "e11_binding": "15/15 pass 0 fail (isolated, at 3493fe3d)"
+    },
+    "staleCheck": "nothing accepted became stale after candidate freeze: the only post-29dba90b commits are the accepted t012r/t013s evidence merges themselves (23 files, all under tests/); all 12 E1-E11 rows remain SUPPORTED verbatim with Product/L2/SDK impact NONE per row",
+    "supersededRows": "E7 old row #898 remains disposition SUPERSEDED (recorded, never averaged, can never satisfy its gate); E7 is satisfied ONLY by the accepted #913 successor chain — re-verified by the t009r aggregator fail-closed tests at the candidate"
+  },
+
+  "liveAds": {
+    "repo": "kaicreator-mm/ai-development-standard",
+    "liveMain": "7929012f36a2202dcc2edc7a414b8163adc7afbd",
+    "driftSince731Audit": "NONE — identical to the ADS snapshot audited at #731@6026544872 and #731@6037618823; PACK-E imports the live ADS closure protocol at execution time, so the frozen #731 contract is not stale",
+    "keyDocsRead": ["standards/RELEASE_STANDARD.md", "checklists/version-closure.md (referenced via #731)", "standards/EXECUTION_ARCHITECTURE_STANDARD.md (referenced via #731)"]
+  },
+
+  "branchTipBinding": {
+    "version/v0.7": "3493fe3d7fb43b35e160ea12ef1d555937a9f0e8 (gh api branches tip at 2026-10-08T09:05Z == closure candidate)",
+    "openPrsAgainstVersionV07": "none affecting the candidate (PRs #935/#934 MERGED; no post-freeze content change exists on GitHub)"
+  },
+
+  "verdict": "CURRENTNESS_PASS — every accepted predecessor/evidence row re-verified live against current ancestry at the exact candidate; superseded rows still superseded; no post-freeze drift"
+}
