@@ -19,7 +19,13 @@ Canonical manifest serialization is recursively sorted JSON with one terminal ne
 These are immutable reference seed digests; use `sha256sum packages/*/modules/*.mjs` and `git hash-object` to reproduce physical bytes. The exact root commit/tree is supplied by CI, not hardcoded into the Package.
 
 ## Run on Node 22+/trusted GitHub Actions host
-From the repository root:
+**One-command complete reproduction** (from the repository root):
+
+```bash
+bash experiments/v08-genesis-seed-d1/verify.sh
+```
+
+Or use the individual commands:
 
 ```bash
 npm ci
