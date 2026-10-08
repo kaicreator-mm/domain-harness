@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {establishGenesisHost,verifySelectedHandlerIdentity} from '../host/bootstrap.mjs';
+import {admitComponent} from '../../../packages/domain-harness/dist/contracts/component-admission.js';
 import {TRUST_ROOTS} from '../host/trust-roots.mjs';
 import {hashBytes,packageDigest,componentDigest,verifyPackage,
   verifyDefinitionGraph,canonicalJson} from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
@@ -196,4 +197,26 @@ test('G20 reattested wrong-existing Component owner refuses at selector',async()
  biz.manifest.dependencies[0].digest=sdk.manifest.integrity;repin(biz);
  assert.ok(verifyDefinitionGraph(v).digest);
  await assert.rejects(verifySelectedHandlerIdentity(sdk),isError('E_SELECTED_COMPONENT_OWNER'));
+});
+
+test('G21 unknown mandatory Capability denied by accepted v0.7 admission at intended gate',async()=>{
+ const entries=await rawEntries(),sdk=entries.find(x=>x.manifest.packageId==='genesis.sdk');
+ const rule=sdk.manifest.components.find(c=>c.componentId==='sdk-rule');
+ const understood=sdk.manifest.components.find(c=>c.componentId==='sdk-schema')
+   .semanticBody.kindCatalog.find(k=>k.kindId==='std.rule');
+ rule.requiresCapabilities.push({capabilityId:'capability.uninstalled',version:'1.0.0',
+   operations:['evaluate']});
+ repin(sdk);
+ assert.equal(verifyPackage(sdk.manifest,sdk.artifacts).digest,sdk.manifest.integrity);
+ const before=0;let kindValidatorVisits=before;
+ const kindSet=[{kind:{kindId:understood.kindId,version:understood.version},
+   understoodSemanticContracts:[],
+   understoodCapabilities:understood.understoodCapabilities.map(s=>{
+     const [capabilityId,version]=s.split('@');return {capabilityId,version};
+   }),validateComponent(){kindValidatorVisits++;}}];
+ const envelope={family:'semantic',componentId:rule.componentId,kind:rule.kindRef,
+   semanticBody:rule.semanticBody,requiredSemanticContracts:rule.requiredSemanticContracts,
+   requiredCapabilities:rule.requiresCapabilities.map(({capabilityId,version})=>({capabilityId,version}))};
+ assert.throws(()=>admitComponent(envelope,kindSet),isError('UNKNOWN_CAPABILITY'));
+ assert.equal(kindValidatorVisits,before);
 });
