@@ -1,0 +1,34 @@
+T012 RUN LOG SUMMARY (issue #926, candidate e3a63222, packed tarballs)
+All commands executed on host: Windows 10.0.26200 x64, node v24.21.0 (ABI 137), npm 11.19.0.
+Lane B executed from C:\xDev\kAiCreator\_tmp\dh-t012-926-cleanroom\consumer (external packed consumer).
+Full logs preserved under the clean room: artifacts\final-recheck\*.log and artifacts\*.json.
+
+LANE A — exact-candidate repository lane (worktree dh-t012-926 @ e3a63222)
+  npm ci                                    exit 0 (install scripts for better-sqlite3/esbuild policy-blocked; disclosed prebuilt binding applied)
+  npm run build                             exit 0 (check-committed-dist: shipped dist trees present, tracked and fresh)
+  npm run typecheck                         exit 0
+  npm run lint                              exit 0
+  npm test (full workspace)                 node-host N17 flake under parallel load (1 fail), isolated rerun PASS; node suite rerun 175/175 PASS
+  npm test -w @kaicreator/domain-harness   exit 0 — tests 2904 pass 2904 fail 0
+  npm test -w @kaicreator/domain-harness-compiler exit 0 — pass 172 fail 0
+  npm test -w @kaicreator/domain-harness-expo     exit 0 — typecheck PASS
+  npm test -w @kaicreator/domain-harness-node     exit 0 — tests 175 pass 175 fail 0
+  npm run test:root                       exit 0 — tests 9 pass 9 fail 0
+  npm pack -w (all 4 packages)            4 tarballs; sha256 recorded in tarballs\SHA256SUMS.txt (sha256sum -c OK at N00 and N13)
+
+LANE B — clean external packed-consumer lane (final-recheck exits, second run)
+  node src/n02-resolution.mjs             exit 0 — consumer-outside-repo, 24 no-symlink/realpath/no-src assertions, 9 subpath/condition imports (import+require) PASS, 8 deep-import ERR_PACKAGE_PATH_NOT_EXPORTED negatives PASS
+  tsc -p tsconfig.json                    exit 0 — strict nodenext skipLibCheck:false over packed .d.ts (TSC-PASS)
+  node src/t010-journeys.mjs              exit 0 — 18 rows: digest 030402bf MATCH through packed /v7; authorized journey -> DONE; ONE journal; replay=replayed; 8 negative rows PASS; 1 SURFACE_GAP row (Tool plane absent from export map); 1 OBSERVATION row (authority-class gate is T004C-owned)
+  node src/n03-sqlite.mjs                 exit 0 — 4 rows: real SQLite file (3.53.2, WAL, synchronous=FULL); cross-process reopen PASS; SIGKILL mid-execute -> replay exactly-once (executionCount=1); SIGKILL post-commit -> replay disposition=replayed, executionCount=1
+  sha256sum -c tarballs/SHA256SUMS.txt    OK x4 (N13 candidate bytes byte-identical)
+
+KEY EVIDENCE LINES (final recheck)
+  T010-stage0-definition-graph-digest PASS — computeDefinitionGraphDigest(packed /v7)=030402bf… matches frozen
+  SURFACE_GAP T010-tool-plane-not-public — 10 seams x 6 subpaths absent; 8 deep imports refuse ERR_PACKAGE_PATH_NOT_EXPORTED
+  T12-N09-crash-pre-commit PASS — SIGKILL after durable 'started', replay executionCount=1
+  T12-N10-crash-post-commit PASS — SIGKILL after durable completion, replay disposition=replayed executionCount=1
+
+HONESTY DISCLOSURES
+  - better-sqlite3 native binding: same-host prebuilt binary from shared worktree dh-e4-896 (policy-blocked install script); real native SQLite 3.53.2 executed; disclosed in manifest + setup record.
+  - T010B/T010C full-fidelity journeys are NOT executable through the packed public surface at this candidate (P1 packaging-surface gap, T012-D1): verdict BOUNDED_REBIND_REQUIRED, never patched by the validator (MICROKERNEL_SOURCE_DIFF=0).
