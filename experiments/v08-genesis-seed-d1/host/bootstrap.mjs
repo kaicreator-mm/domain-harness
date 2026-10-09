@@ -15,6 +15,13 @@ export class GenesisError extends Error {
 }
 const reject=(code,detail)=>{throw new GenesisError(code,detail)};
 const snap=x=>JSON.parse(canonicalJson(x));
+function deepFreeze(value){
+ if(value && typeof value==='object' && !Object.isFrozen(value)){
+   for(const key of Reflect.ownKeys(value))deepFreeze(value[key]);
+   Object.freeze(value);
+ }
+ return value;
+}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 const sourceRoot=fileURLToPath(new URL('../packages/',import.meta.url));
 const reHash=s=>'sha256:'+hashBytes(Buffer.from(s,'utf8'));
@@ -146,7 +153,7 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
        if(typeof fn!=='function')reject('E_SELECTED_HANDLER_EXPORT',comp.componentId+':'+op.operationId);
        handlers.set(q(comp.packageId,comp.componentId)+'/'+op.operationId,
          Object.freeze({fn,component:comp,op,source:code,sha:def.sha256,dir,path:def.path,
-           identity:Object.freeze({packageId:manifest.packageId,componentId:comp.componentId,
+           identity:deepFreeze({packageId:manifest.packageId,componentId:comp.componentId,
              kindRef:snap(comp.kindRef),implementationId:def.implementationId,
              modulePath:def.path,moduleSha256:def.sha256,operationId:op.operationId})}));
      }
@@ -167,19 +174,43 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
  });
  if(seed.graphDigest!==graph.digest||seed.packages.length!==physical.length)
    reject('E_KERNEL_LINK_RESULT');
- const assembly=Object.freeze({
+ const assembly=deepFreeze({
    digest:'sha256:'+digest({domain:'dh.genesis.sealed-assembly.candidate/1',graph:graph.digest,
      packages:seed.packages,bindings:seed.bindings,
      selected:[...handlers.values()].map(x=>x.identity).sort((a,b)=>
        canonicalJson(a)<canonicalJson(b)?-1:canonicalJson(a)>canonicalJson(b)?1:0)}),
    graphDigest:graph.digest,packages:Object.freeze(seed.packages),bindings:Object.freeze(seed.bindings)
  });
- async function current(h){
-   const exact=await readFile(join(h.dir,h.path),'utf8').catch(()=>reject('E_SEALED_MODULE_CHANGED'));
-   if(reHash(exact)!==h.sha)reject('E_SEALED_MODULE_CHANGED');
-   const p=manifests.get(h.component.packageId);
-   const m=await readFile(join(p.dir,'manifest.json'),'utf8').catch(()=>reject('E_SEALED_MANIFEST_CHANGED'));
-   if(m!==p.raw.toString('utf8'))reject('E_SEALED_MANIFEST_CHANGED');
+ // D1 R2: the seal covers the entire selected Assembly, not only the invoked
+ // Handler. Re-read physical bytes from every member on EVERY admission. Cached
+ // imported callables never prove file currentness. The Host remains responsible
+ // for immutable deployment roots during validation/dispatch (not a JS sandbox).
+ async function currentAssembly(){
+   const fresh=[];
+   for(const [id,p] of manifests){
+     const raw=await readFile(join(p.dir,'manifest.json'))
+       .catch(()=>reject('E_SEALED_MANIFEST_CHANGED',id));
+     if(!raw.equals(p.raw))reject('E_SEALED_MANIFEST_CHANGED',id);
+     const artifacts=Object.create(null);
+     for(const spec of p.manifest.implementations){
+       const bytes=await readFile(join(p.dir,safePath(spec.path)))
+         .catch(()=>reject('E_SEALED_MODULE_CHANGED',id+':'+spec.path));
+       if('sha256:'+hashBytes(bytes)!==spec.sha256 ||
+          !bytes.equals(Buffer.from(p.artifacts[spec.path],'utf8')))
+         reject('E_SEALED_MODULE_CHANGED',id+':'+spec.path);
+       artifacts[spec.path]=bytes.toString('utf8');
+     }
+     const manifest=JSON.parse(raw.toString('utf8'));
+     const verified=verifyPackage(manifest,artifacts,understoodStandard);
+     if(verified.digest!==p.manifest.integrity ||
+        verified.digest!==TRUST_ROOTS[id].packageDigest)
+       reject('E_SEALED_PACKAGE_CHANGED',id);
+     fresh.push({manifest,artifacts});
+   }
+   // Verify dependency pins and the entire B1 linked provider/import graph anew,
+   // then compare its root against the exact graph bound by this sealed occurrence.
+   const rechecked=verifyDefinitionGraph(fresh,{},registry);
+   if(rechecked.digest!==graph.digest)reject('E_SEALED_GRAPH_CHANGED');
  }
  let dispatchCount=0;
  async function invoke(packageId,componentId,operationId,input,capabilityParent=null){
@@ -197,7 +228,7 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
    if(handler.op.effect!=='none')reject('E_EFFECT_AUTHORITY_UNAVAILABLE');
    // Snapshot input BEFORE first async Host I/O to close caller TOCTOU.
    const stable=snap(input);
-   await current(handler);
+   await currentAssembly();
    dispatchCount++;
    const invokeCapability=async ({capabilityId,version,operationId,input:childInput})=>{
      const cap=handler.component.requiresCapabilities.find(c=>
@@ -214,10 +245,13 @@ export async function establishGenesisHost({root=sourceRoot,...override}={}){
    return handler.fn({input:stable,semanticBody:snap(handler.component.semanticBody),invokeCapability});
  }
  return Object.freeze({
-   assembly, selected:Object.freeze([...handlers.values()].map(h=>h.identity)),
+   assembly, selected:deepFreeze([...handlers.values()].map(h=>h.identity)),
    invoke:async ({packageId,componentId,operationId,input,...untrusted})=>{
      if(Object.keys(untrusted).length)reject('E_UNTRUSTED_INVOKE_AUTHORITY');
-     return invoke(packageId,componentId,operationId,input);
+     // Snapshot synchronously before the first async filesystem read.
+     const stable=snap(input);
+     await currentAssembly();
+     return invoke(packageId,componentId,operationId,stable);
    },
    invokeSchema:()=>reject('E_OPERATION_NOT_DECLARED'),
    rebind:()=>reject('E_SEALED'),
