@@ -1,0 +1,117 @@
+name: V08 #987 B2 R4 K1+A1 trusted integrated native Host (research only)
+on:
+  push:
+    branches:
+      - spike/v08-b2-r4-integrated-host-987
+  pull_request:
+    branches:
+      - spike/v08-gatea-kind-authority-960-r2
+permissions:
+  contents: read
+jobs:
+  r4-full-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        node-version: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Exact immutable checkout subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "EVENT=$GITHUB_EVENT_NAME"
+          echo "EXACT_SHA=$(git rev-parse HEAD)"
+          echo "EXACT_TREE=$(git rev-parse HEAD^{tree})"
+          echo "MERGE_PARENTS=$(git log -1 --format='%P')"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --version
+      - name: Full repository build lint types and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: R4-15 immutable reviewed B1 regression
+        run: node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+      - name: R4-15 original B2 R1 regression
+        run: node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
+      - name: R4-15 R2 native physical B regression (unchanged, attributed e11a051)
+        run: node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2-r2.test.mjs
+      - name: R4-15 K1 K3 regression (unchanged, attributed 3fde560)
+        run: node --import tsx --test experiments/v08-b2-r3-k1/tests/k1-assembly.test.mjs
+      - name: R4-15 A1 A3 regression (unchanged, attributed 0ef92f9)
+        run: node --import tsx --test experiments/v08-b2-r3-a1/tests/kind-authority-b2-r3-a1.test.mjs
+      - name: R4-01..R4-16 integrated Host falsification matrix
+        run: node --import tsx --test experiments/v08-b2-r4-integrated-host/tests/r4-integration.test.mjs
+      - name: R4-01 original D1 Genesis regression G01-G26 (exact pinned commit f87cfd, read-only extraction)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin +refs/pull/978/head:refs/remotes/origin/pr-978
+          test "$(git rev-parse refs/remotes/origin/pr-978)" = f87cfdfcf9fd252cc757c02e77d155afa5572303
+          git -c core.autocrlf=false -c core.eol=lf archive refs/remotes/origin/pr-978 -- experiments/v08-genesis-seed-d1 | tar -x
+          node --test experiments/v08-genesis-seed-d1/tests/genesis.test.mjs
+          rm -rf experiments/v08-genesis-seed-d1
+      - name: R4-15 K1 business manifests remain byte-reproducible (unchanged authoring tool)
+        shell: bash
+        run: |
+          set -euo pipefail
+          before=$(sha256sum experiments/v08-b2-r3-k1/business/claim/manifest.json experiments/v08-b2-r3-k1/business/charge/manifest.json)
+          node experiments/v08-b2-r3-k1/tools/author-business.mjs > /dev/null
+          after=$(sha256sum experiments/v08-b2-r3-k1/business/claim/manifest.json experiments/v08-b2-r3-k1/business/charge/manifest.json)
+          test "$before" = "$after"
+      - name: Research gates never self-approve
+        run: |
+          echo "NO_SECOND_RUNTIME_OR_JOURNAL=YES"
+          echo "ORIGINAL_V07_STATE_EFFECT_JOURNAL=SOLE_AUTHORITY"
+          echo "P1A_DESCRIPTOR_SAFE_INGRESS=ENFORCED"
+          echo "P1B_PRIVILEGED_CHANNEL=REMOVED_FROM_BUSINESS_PATH_LAB_TEST_ONLY"
+          echo "INTEGRATION_BLOCKED_DISCIPLINE=ENFORCED"
+          echo "D1_KERNEL_SHA256_PRESERVED=sha256:38c13d4a317e754dfa0ed344f584cd3aa74c67cd3938d39963e52697ed5bc3a2"
+          echo "D1_SDK_SHA256_PRESERVED=sha256:1833a217993cb61587b5b0b65c3128d23bc0253baa3591336e72c575ce5c1a28"
+          echo "DURABLE_RESTART_RECOVERY=NOT_PROVEN"
+          echo "D2_972=HOLD_UNTIL_R4_REVIEW"
+          echo "TECH_GATE_1=NOT_SELF_APPROVED"
+          echo "PRODUCT_FREEZE=BLOCKED"
+          echo "MERGE=NO"
+  r4-fast-falsifiers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        node-version: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Build and source-bound adversarial suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "EXACT_SHA=$(git rev-parse HEAD)"
+          echo "EXACT_TREE=$(git rev-parse HEAD^{tree})"
+          echo "MERGE_PARENTS=$(git log -1 --format='%P')"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci
+          npm run build
+          node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+          node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
+          node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2-r2.test.mjs
+          node --import tsx --test experiments/v08-b2-r3-k1/tests/k1-assembly.test.mjs
+          node --import tsx --test experiments/v08-b2-r3-a1/tests/kind-authority-b2-r3-a1.test.mjs
+          node --import tsx --test experiments/v08-b2-r4-integrated-host/tests/r4-integration.test.mjs
