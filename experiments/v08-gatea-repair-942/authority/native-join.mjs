@@ -122,6 +122,7 @@ export async function joinPhysicalBToNativeV07({trustedBHost,selector,occurrence
     binding:activationBinding,assembly:binding.successorAssembly,
     authorityClass:'PRODUCTION',currentDefinitionGraph:graph
   });
+  let dispatchCount=0;
   const baseRequest=Object.freeze({
     request:admitted,binding,currentDefinitionGraph:graph,
     activator:fx.activator,admissionRequest:fx.admissionRequest,
@@ -129,6 +130,7 @@ export async function joinPhysicalBToNativeV07({trustedBHost,selector,occurrence
     dispatch:{async dispatch(query){
       if(query.handle!==physical.handler || query.operationId!==operation.operationId)
         deny('E_NATIVE_DISPATCH_HANDLE');
+      dispatchCount++;
       return query.handle(query.input);
     }},
     sha256
@@ -140,6 +142,7 @@ export async function joinPhysicalBToNativeV07({trustedBHost,selector,occurrence
     moduleSha256:physical.moduleSha256,
     operationId:operation.operationId,
     journal:fx.journal,
+    getDispatchCount(){return dispatchCount;},
     async invoke(overrides={}){
       // This is a Host byte-currentness gate, not a second effect authority.
       await physicalSeal.requirePhysicalCurrentness();
