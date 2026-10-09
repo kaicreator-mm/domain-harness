@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { verifyPackage, verifyDefinitionGraph, canonicalJson } from '../../v08-gatea-b1-955-r2/reference956/candidate-validator.mjs';
 import { admitComponent } from '../../../packages/domain-harness/dist/contracts/component-admission.js';
 import { decideKindCompatibility } from '../../../packages/domain-harness/dist/contracts/kind-compatibility.js';
+import { bindSelectedOperation } from '../kernel/neutral-kernel.mjs';
 
 export class B2Error extends Error {
   constructor(code){ super(code); this.code=code; this.name='B2Error'; }
@@ -86,15 +87,30 @@ export function establishTrustedPackageKindHost({root,approvedPins,b1Host}){
         implementationId:declaration.implementationId,operationId:declaration.operationId
       }))),baseAssemblyDigest:b1.assembly.digest,packageDigest:m.integrity,
         kindRef:Object.freeze(snap(kindRef)),componentId,operationId:declaration.operationId});
+      // Actual selected operation now travels through the SAME derived
+      // neutral Kernel bind/dispatch, not an independent Host-only invocation.
+      // In this bounded research the Kernel module itself is repository-code
+      // trusted; this does NOT replace the old #940 physically attested root.
+      const kernel = bindSelectedOperation({
+        assembly,component:snap(component),operation:snap(operation[0]),selectedMethod
+      });
       return Object.freeze({
-        assembly,
-        invoke({operationId,input}={}){
-          if(operationId!==declaration.operationId)deny('E_OPERATION_SCOPE');
-          // Pure-path only; no caller-supplied effectAuthority, no custom Journal.
-          if(operation[0].effect!=='none')deny('E_EFFECT_ADMISSION_REQUIRED');
-          return selectedMethod(snap(input));
-        },
-        rebind(){deny('E_SEALED');}
+        ...kernel,
+        // Trusted provenance export for the separate native v0.7 bridge.
+        // Only available on effectful Operations; it is DATA + selected
+        // physical callable, never a permission decision or fake T003C mint.
+        nativeSelection(){
+          if(operation[0].effect==='none')deny('E_EFFECTLESS_NATIVE_SELECTION');
+          return Object.freeze({
+            packageId,manifestSha256:approved.manifestSha256,
+            moduleSha256:approved.moduleSha256,
+            kindRef:Object.freeze(snap(kindRef)),
+            component:Object.freeze(snap(component)),
+            implementation:Object.freeze(snap(impls[0])),
+            operation:Object.freeze(snap(operation[0])),
+            handler:selectedMethod
+          });
+        }
       });
     }
   });
