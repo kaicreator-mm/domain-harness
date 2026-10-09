@@ -96,6 +96,18 @@ export function establishTrustedPackageKindHost({root,approvedPins,b1Host}){
       });
       return Object.freeze({
         ...kernel,
+        // Exact Host-owned physical byte currentness before a native effect.
+        // The accepted T004C still owns the ONLY effect authority.
+        async requirePhysicalCurrentness(){
+          const [newManifest,newModule]=await Promise.all([
+            readFile(join(root,packageId,'manifest.json')),
+            readFile(join(root,packageId,'modules','impl.mjs'))
+          ]);
+          if(sha(newManifest)!==approved.manifestSha256 ||
+             sha(newModule)!==approved.moduleSha256)
+            deny('E_APPROVED_BYTES_STALE');
+          return true;
+        },
         // Trusted provenance export for the separate native v0.7 bridge.
         // Only available on effectful Operations; it is DATA + selected
         // physical callable, never a permission decision or fake T003C mint.
