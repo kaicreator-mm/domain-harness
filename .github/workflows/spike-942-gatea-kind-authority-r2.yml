@@ -1,0 +1,75 @@
+name: V08 #960 B2 R2 neutral Kernel and physical native Authority (research only)
+on:
+  push:
+    branches:
+      - spike/v08-gatea-kind-authority-960-r2
+  pull_request:
+    branches:
+      - spike/v08-gatea-kind-authority-960-r1
+permissions:
+  contents: read
+jobs:
+  b2-r2-full-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Exact immutable checkout subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "EVENT=$GITHUB_EVENT_NAME"
+          echo "EXACT_SHA=$(git rev-parse HEAD)"
+          echo "EXACT_TREE=$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --version
+      - name: Full repository build lint types and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: Immutable reviewed B1 regression
+        run: node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+      - name: Original B2 R1 regression
+        run: node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
+      - name: R2 native physical B to existing T003C T004C and Journal
+        run: node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2-r2.test.mjs
+      - name: Research gates never self-approve
+        run: |
+          echo "NO_SECOND_RUNTIME_OR_JOURNAL=YES"
+          echo "TECH_GATE_1=NOT_SELF_APPROVED"
+          echo "PRODUCT_FREEZE=BLOCKED"
+          echo "MERGE=NO"
+  b2-r2-fast-falsifiers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build and source-bound adversarial suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "EXACT_SHA=$(git rev-parse HEAD)"
+          echo "EXACT_TREE=$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci
+          npm run build
+          node --test experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs
+          node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2.test.mjs
+          node --import tsx --test experiments/v08-gatea-repair-942/tests/kind-authority-b2-r2.test.mjs
