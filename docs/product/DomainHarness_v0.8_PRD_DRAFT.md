@@ -85,7 +85,7 @@ R01–R12 and CJ01–CJ03 retained below are **also mandatory** unless explicitl
 
 **R1/R2 → R3 Product authority correction:** R1 product remains a verified embedded DomainHarness SDK, R2 broadened v0.8 to real domain-specific Harness Apps + Engineering dogfood + 100% *in-scope* reusable Package-routed semantics, **retained**; later explicit user G0 hand-authored Genesis overrides R2's mandatory semantic generator-first/only and changes D1, J1/J4, SELF01/02, R13/R14/R21, D2/D3 and IN/OUT. Forge owns normal subsequent Domain Package candidate generation, not first Bootstrap. R2 exact source and #968 NEEDS_REVISION remain immutable historical facts; new R3 text review and actual native experiments are required. No unearned Product PASS.
 
-**CURRENT:** `R2_PRODUCT_REVIEW=NOT_RUN`; `ACTUAL_GENERATED_PACKAGE_EXECUTION=NOT_RUN`; `ENGINEERING_DOGFOOD_EXECUTION=NOT_RUN`; `EXTERNAL_ORACLE=NOT_RUN`; `PRODUCT_P1_PROD_01=OPEN`; `NATIVE_B_TO_V07_T002_T004=NOT_PROVEN`; `TECH_GATE_1=FAIL`; `PRODUCT_FREEZE=BLOCKED`; `L2=NO`; `FORMAL_IMPL=NO`; `MERGE=NO`.
+**R3 CURRENTNESS / NOT A FREEZE:** `R2_PRODUCT_REVIEW=#968_NEEDS_REVISION`; `R3_PRODUCT_REVIEW=#977_PENDING`; `D1_971_BUILDER=REAL_HAND_AUTHORED_PHYSICAL_21_OF_21`; `D1_975_FRESH_REVIEW=NEEDS_REVISION_P1_CROSS_PACKAGE_CURRENTNESS`; `B2_970_FRESH_REVIEW=NEEDS_REVISION_K1_PARTIAL_NATIVE_JOIN_NOT_PROVEN`; `D2_FACADE=NOT_RUN`; `D3_ENGINEERING_DOGFOOD=NOT_RUN`; `EXTERNAL_ORACLE=NOT_RUN`; `PRODUCT_P1_PROD_01=OPEN`; `TECH_GATE_1=FAIL`; `PRODUCT_FREEZE=BLOCKED`; `L2=NO`; `FORMAL_IMPL=NO`; `MERGE=NO`.
 
 ---
 
