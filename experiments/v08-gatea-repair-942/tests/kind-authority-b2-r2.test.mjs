@@ -2,7 +2,7 @@
 // Host and script tests are research-only, with original v0.7 authority.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp,mkdir,readFile,writeFile } from 'node:fs/promises';
+import { mkdtemp,mkdir,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
