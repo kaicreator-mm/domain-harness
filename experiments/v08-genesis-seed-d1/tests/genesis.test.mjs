@@ -220,3 +220,85 @@ test('G21 unknown mandatory Capability denied by accepted v0.7 admission at inte
  assert.throws(()=>admitComponent(envelope,kindSet),isError('UNKNOWN_CAPABILITY'));
  assert.equal(kindValidatorVisits,before);
 });
+
+
+test('G22 sealed SDK invoke refuses changes to uninvolved Kernel manifest AND module',async()=>{
+ for(const attack of ['manifest','module']){
+   await clonePackages(async root=>{
+     const host=await establishGenesisHost({root});
+     assert.equal(host.stats().dispatchCount,0);
+     const path=attack==='manifest'?join(root,'kernel/manifest.json'):
+       join(root,'kernel/modules/link.mjs');
+     const content=await readFile(path,'utf8');
+     // Both are valid bytes, but neither belongs to the sealed occurrence.
+     await writeFile(path,content+(attack==='manifest'?' ':'\n// valid-but-different Link'));
+     await assert.rejects(host.invoke({packageId:'genesis.sdk',componentId:'sdk-rule',
+       operationId:'evaluate',input:{score:99}}),
+       isError(attack==='manifest'?'E_SEALED_MANIFEST_CHANGED':'E_SEALED_MODULE_CHANGED'));
+     assert.equal(host.stats().dispatchCount,0,'rejection must precede handler/effect/journal');
+   });
+ }
+});
+
+test('G23 sealed Business parent refuses uninvolved SDK dependency module changes',async()=>{
+ await clonePackages(async root=>{
+   const host=await establishGenesisHost({root}),before=host.stats().dispatchCount;
+   const path=join(root,'sdk/modules/rule.mjs');
+   const original=await readFile(path,'utf8');
+   await writeFile(path,original+'\n// valid alternate rule source');
+   await assert.rejects(host.invoke({packageId:'genesis.business.smoke',componentId:'smoke-run',
+     operationId:'run',input:{score:88}}),isError('E_SEALED_MODULE_CHANGED'));
+   assert.equal(host.stats().dispatchCount,before,'no parent dispatch before SDK currentness');
+   // Independently reattested *candidate* cohort: structurally coherent Package
+   // + dependency digests; still NOT authorized by original external Host roots.
+   const v=await rawEntries(root),sdk=v.find(x=>x.manifest.packageId==='genesis.sdk');
+   sdk.manifest.implementations.find(i=>i.path==='modules/rule.mjs').sha256=
+     sha(sdk.artifacts['modules/rule.mjs']);
+   repin(sdk);
+   const biz=v.find(x=>x.manifest.packageId==='genesis.business.smoke');
+   biz.manifest.dependencies[0].digest=sdk.manifest.integrity;
+   repin(biz);
+   assert.ok(verifyDefinitionGraph(v).digest,'repinned candidate graph is well-formed');
+   assert.notEqual(sdk.manifest.integrity,TRUST_ROOTS['genesis.sdk'].packageDigest);
+   await writeFile(join(root,'sdk/manifest.json'),canonicalJson(sdk.manifest)+'\n');
+   await writeFile(join(root,'business-smoke/manifest.json'),canonicalJson(biz.manifest)+'\n');
+   await assert.rejects(establishGenesisHost({root}),isError('E_HOST_MANIFEST_PIN'));
+   await assert.rejects(host.invoke({packageId:'genesis.business.smoke',componentId:'smoke-run',
+     operationId:'run',input:{score:88}}),isError('E_SEALED_MANIFEST_CHANGED'));
+   assert.equal(host.stats().dispatchCount,before);
+ });
+});
+
+test('G24 post-seal nested selected KindRef cannot diverge from private callable',async()=>{
+ const host=await establishGenesisHost(),selected=host.selected.find(x=>x.componentId==='sdk-rule');
+ const kind=selected.kindRef.kindId,assembly=host.assembly.digest;
+ assert.equal(Object.isFrozen(selected),true);
+ assert.equal(Object.isFrozen(selected.kindRef),true);
+ assert.throws(()=>{selected.kindRef.kindId='evil.rule'},TypeError);
+ assert.throws(()=>{host.assembly.packages[0].digest='sha256:0'},TypeError);
+ if(host.assembly.bindings.length)
+   assert.throws(()=>{host.assembly.bindings[0].provider='attacker'},TypeError);
+ assert.equal(selected.kindRef.kindId,kind);
+ assert.equal(host.assembly.digest,assembly);
+ assert.equal(await host.invoke({packageId:'genesis.sdk',componentId:'sdk-rule',
+   operationId:'evaluate',input:{score:99}}),true);
+});
+
+test('G25 caller/exposure are not external grants: Host accepts no caller authority',async()=>{
+ const host=await establishGenesisHost(),before=host.stats().dispatchCount;
+ await assert.rejects(host.invoke({packageId:'genesis.sdk',componentId:'sdk-rule',
+   operationId:'evaluate',input:{score:99},caller:'business'}),
+   isError('E_UNTRUSTED_INVOKE_AUTHORITY'));
+ assert.equal(host.stats().dispatchCount,before);
+ // Internal-only API: package callers/exposure metadata is NOT end-user auth.
+});
+
+test('G26 import regex bypass candidate is blocked by external bytes, not a sandbox',async()=>{
+ const candidate="export async function evaluate(){return import /* comment */ ('node:fs')}";
+ const heuristic=/\bimport\s*(?:\(|['"{*])|\brequire\s*\(/;
+ assert.equal(heuristic.test(candidate),false,'lexical heuristic is bypassable');
+ await clonePackages(async root=>{
+   await writeFile(join(root,'sdk/modules/rule.mjs'),candidate);
+   await assert.rejects(establishGenesisHost({root}),isError('E_MODULE_BYTES'));
+ });
+});
