@@ -1,0 +1,11 @@
+{
+  "falsifier": "KPK-10",
+  "rejections": [
+    "LOAD_NOT_A_SEALED_ROOT",
+    "LOAD_PRODUCER_UNTRUSTED",
+    "LOAD_KIND_ABI_MISMATCH",
+    "MODULE_IDENTITY_MISMATCH (identity impostor)",
+    "MODULE_IDENTITY_MISMATCH (missing mechanism export)"
+  ],
+  "note": "all failures occur at producer/build or Host installation; the Microkernel runs no semantic legality engine"
+}

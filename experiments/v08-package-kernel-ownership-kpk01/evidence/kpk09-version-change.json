@@ -1,0 +1,15 @@
+{
+  "falsifier": "KPK-09 (revised scope: no cross-version replay/rolling upgrade required)",
+  "v1": {
+    "packageId": "kernel-vnext@1.0.0",
+    "moduleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+    "closureDigest": "29b323c66f3e7305c0576155475107b7fa43b3a022c1426eb257f374449d96df"
+  },
+  "v2": {
+    "packageId": "kernel-vnext@2.0.0",
+    "moduleSha256": "80228942099b0a9b579f82bb3d2489707641e393218591ef1618d4a744fc38b7",
+    "closureDigest": "1ebf0c52f92206d3350e0d2153728bc6f642c6b209a53f93b3e4c7e28a3bf75a"
+  },
+  "unchangedNonKernelPackages": true,
+  "scopeNote": "no old-occurrence continuation, no cross-version journal replay — explicitly out of scope per user direction 6093427821"
+}

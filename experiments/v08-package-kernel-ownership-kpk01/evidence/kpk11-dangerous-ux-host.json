@@ -1,0 +1,11 @@
+{
+  "falsifier": "KPK-11",
+  "proven": [
+    "transport accepts plain-JSON intents only (INTENT_NOT_JSON on callable smuggling)",
+    "no commit/journal/admission route is representable from UX (INTENT_UNBOUND)",
+    "runtime object frozen; no privileged members exposed; port replacement throws",
+    "host doc store reachable only through the kernel closure (kernel-namespaced keys only)",
+    "direct host-store tampering: deny path grants nothing; admit path fails closed at CAS with the effect still durably journaled"
+  ],
+  "boundary": "single-realm route/capability isolation proven; same-realm arbitrary-code sandbox explicitly NOT claimed"
+}

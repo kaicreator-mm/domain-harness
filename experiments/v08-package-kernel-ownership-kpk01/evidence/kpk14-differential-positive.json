@@ -1,0 +1,118 @@
+{
+  "falsifier": "KPK-14",
+  "scope": "bounded same-business-effect semantic reference (user scope 6093427821)",
+  "original": {
+    "module": "packages/domain-harness/src/admission/index.js @ main 3c71b9138056babfafbc7de1349b5924483f2203",
+    "admittedPlan": {
+      "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
+      "governanceBindingDigest": "2e9acdf25adfb4570c19a1efa50d6df00168a23938f9437d58493054d8c6e141",
+      "transitionKey": "approve",
+      "targetState": "approved",
+      "effects": [
+        {
+          "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1",
+          "effectType": "effect:reserve",
+          "disposition": "executed",
+          "idempotencyKey": "reserve:quote:1",
+          "output": {
+            "reserved": true,
+            "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1"
+          }
+        }
+      ],
+      "resolver": {
+        "source": "harness-machine",
+        "llmAvoided": false,
+        "freshModelCallCount": 1,
+        "cacheRead": "disabled",
+        "telemetryEventCount": 0
+      }
+    },
+    "journalRow": {
+      "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1",
+      "target": {
+        "workflowId": "order-quote",
+        "instanceKey": "instance:42"
+      },
+      "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
+      "operationOrdinal": 1,
+      "effectType": "effect:reserve",
+      "effectSemantics": "non-idempotent",
+      "status": "completed",
+      "attempt": 1,
+      "input": {
+        "reservation": "quote",
+        "amount": 42
+      },
+      "idempotencyKey": "reserve:quote:1",
+      "startedAt": "2026-09-21T07:00:00.000Z",
+      "output": {
+        "reserved": true,
+        "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1"
+      },
+      "completedAt": "2026-09-21T07:00:00.000Z"
+    },
+    "effectToolCalls": 1
+  },
+  "packageOwned": {
+    "kernelModule": "kernel-vnext@1.0.0 (data:-instantiated sealed bytes)",
+    "admittedPlan": {
+      "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
+      "governanceBindingDigest": "bf3c9b54762d090ac262cd64f61b5bf0c24a008a6d968d679db8676dcabe9dda",
+      "transitionKey": "approve",
+      "targetState": "approved",
+      "effects": [
+        {
+          "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1",
+          "effectType": "effect:reserve",
+          "disposition": "executed",
+          "idempotencyKey": "reserve:quote:1",
+          "output": {
+            "reserved": true,
+            "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1"
+          }
+        }
+      ],
+      "resolver": {
+        "source": "harness-machine",
+        "llmAvoided": false,
+        "freshModelCallCount": 1,
+        "cacheRead": "disabled",
+        "telemetryEventCount": 0
+      }
+    },
+    "journalRow": {
+      "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1",
+      "target": {
+        "workflowId": "order-quote",
+        "instanceKey": "instance:42"
+      },
+      "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
+      "operationOrdinal": 1,
+      "effectType": "effect:reserve",
+      "effectSemantics": "non-idempotent",
+      "status": "completed",
+      "attempt": 1,
+      "input": {
+        "reservation": "quote",
+        "amount": 42
+      },
+      "idempotencyKey": "reserve:quote:1",
+      "startedAt": "2026-09-21T07:00:00.000Z",
+      "output": {
+        "reserved": true,
+        "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1"
+      },
+      "completedAt": "2026-09-21T07:00:00.000Z"
+    },
+    "resourceCalls": 1
+  },
+  "agreedFields": [
+    "transitionKey",
+    "targetState",
+    "durableControlTurnId",
+    "resolver evidence",
+    "effects[]",
+    "journal row (deep-equal)"
+  ]
+}

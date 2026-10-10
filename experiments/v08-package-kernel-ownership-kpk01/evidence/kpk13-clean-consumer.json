@@ -1,0 +1,23 @@
+{
+  "falsifier": "KPK-13",
+  "consumerCommand": "node consumer\\demo-consumer.mjs",
+  "nodeVersion": "v22.23.3",
+  "roundTrip": {
+    "consumer": "stock-node public consumer (no compiledApp, no runtime compilation)",
+    "loadedKernel": "kernel-vnext@1.0.0",
+    "kernelModuleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+    "decision": {
+      "status": "admitted",
+      "turn": "turn:order-quote:instance%3A42:message:msg%3Ademo-1",
+      "transition": "approve",
+      "targetState": "approved",
+      "effect": "executed"
+    },
+    "instanceState": {
+      "stateKey": "approved",
+      "context": {}
+    },
+    "journalRows": 1,
+    "observedReceipts": 1
+  }
+}

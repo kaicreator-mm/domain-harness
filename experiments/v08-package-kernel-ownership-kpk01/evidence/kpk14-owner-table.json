@@ -1,0 +1,56 @@
+{
+  "falsifier": "KPK-14",
+  "ownerTable": [
+    {
+      "concern": "admission decision (schema→invariants→guard→transition)",
+      "owner": "kernel-vnext@1.0.0 (migrated admitCentralDecision)",
+      "source": "admission/admission.ts@v07 955ecf1f"
+    },
+    {
+      "concern": "guard/hard-invariant predicate evaluation",
+      "owner": "kernel-vnext@1.0.0 (migrated predicate engine)",
+      "source": "workflow/predicate.ts@v07"
+    },
+    {
+      "concern": "durable effect journal semantics",
+      "owner": "kernel-vnext@1.0.0 (migrated begin/complete + KernelDurableEffectJournal)",
+      "source": "admission/effect-journal.ts@v07 c6ae1f98"
+    },
+    {
+      "concern": "state transition commit + revision discipline",
+      "owner": "kernel-vnext@1.0.0 (migrated WorkflowInstanceEngine)",
+      "source": "engine/workflow-instance-engine.ts@v07 10829999"
+    },
+    {
+      "concern": "rule interpretation",
+      "owner": "standard-sdk@1.0.0",
+      "source": "new SDK package (no v0.7 owner existed at this seam)"
+    },
+    {
+      "concern": "business policy (guards, effects, roles)",
+      "owner": "business-order-approval@1.0.0",
+      "source": "mirrors v0.7 admission golden fixtures"
+    },
+    {
+      "concern": "raw durable storage / crypto / clock / physical resources",
+      "owner": "Host ports",
+      "source": "generic primitives only"
+    },
+    {
+      "concern": "loading/wiring/UX transport",
+      "owner": "Microkernel",
+      "source": "no mechanism code (KPK-02)"
+    }
+  ],
+  "pinnedOriginalSources": {
+    "baseCommit": "3c71b9138056babfafbc7de1349b5924483f2203",
+    "versionV07": "86110c616b8cb18c730553e4cdab7ef555214521",
+    "admissionTsBlob": "955ecf1fcd9e7ceb4478e46a1c2f5f4d0266fa4e",
+    "admissionContractsBlob": "2b441f1fd4aaa5d0944131283de92153ae878a86",
+    "effectJournalBlob": "c6ae1f98c1e0c0cb5582df16ff3075c93c1f5fc2",
+    "engineBlob": "108299995ba1b4be2366becd500fc1cd24d57c44",
+    "laneBlob": "d5a94501648f547ef408870c16b0ce6297fc81b5",
+    "instanceRepoBlob": "3e2252967aea56d8ef698001f02dc301f4f5925d"
+  },
+  "executingKernelModuleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548"
+}

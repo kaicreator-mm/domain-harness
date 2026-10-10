@@ -1,0 +1,13 @@
+{
+  "falsifier": "KPK-02",
+  "receiptStatus": "admitted",
+  "mechanismFunctionNames": [
+    "admitCentralDecision",
+    "executeEffectIntents",
+    "VolatileAdmissionEffectJournal",
+    "WorkflowInstanceEngine",
+    "deriveDurableControlTurnId"
+  ],
+  "journalRowCount": 1,
+  "note": "host-side process of this test never imports any v0.7 module; executing mechanism proven non-aliased to host sources"
+}

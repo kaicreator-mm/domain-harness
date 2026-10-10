@@ -1,0 +1,17 @@
+{
+  "name": "@domain-harness-experiment/v08-package-kernel-ownership-kpk01",
+  "version": "0.8.0-experiment.1",
+  "private": true,
+  "description": "Bounded pre-freeze architecture experiment (#993): a physically selected Kernel Domain Package owns the v0.7-derived State/Admission/Effect/Journal/Replay mechanism behind DomainHarness.load(package).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test tests/kpk01-source-ownership.test.mjs tests/kpk02-thin-loader.test.mjs tests/kpk03-fixed-closure.test.mjs tests/kpk04-golden-positive.test.mjs tests/kpk05-negative-guard.test.mjs tests/kpk06-unknown.test.mjs tests/kpk07-recovery.test.mjs tests/kpk08-two-business.test.mjs tests/kpk09-kernel-version.test.mjs tests/kpk10-raw-manifest.test.mjs tests/kpk11-dangerous-ux.test.mjs tests/kpk12-fast-path.test.mjs tests/kpk13-clean-consumer.test.mjs",
+    "test:differential": "node --import tsx --test tests/kpk14-differential.test.mjs",
+    "test:all": "npm test && npm run test:differential",
+    "consumer": "node consumer/demo-consumer.mjs",
+    "regen:kernel-v2": "node src/producer/payload/generate-kernel-v2.mjs"
+  }
+}

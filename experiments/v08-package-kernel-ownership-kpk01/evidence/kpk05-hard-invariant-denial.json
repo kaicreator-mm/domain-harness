@@ -1,0 +1,32 @@
+{
+  "falsifier": "KPK-05",
+  "denial": {
+    "reason": "hard-invariant",
+    "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A150",
+    "governanceBindingDigest": "bf3c9b54762d090ac262cd64f61b5bf0c24a008a6d968d679db8676dcabe9dda",
+    "invariantId": "inv:cap-100",
+    "resolver": {
+      "source": "harness-machine",
+      "llmAvoided": false,
+      "freshModelCallCount": 1,
+      "cacheRead": "disabled",
+      "telemetryEventCount": 0
+    }
+  },
+  "resourceCalls": 0,
+  "journalRows": 0,
+  "attribution": {
+    "kernel": {
+      "packageId": "kernel-vnext@1.0.0",
+      "moduleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+      "generation": "1"
+    },
+    "business": {
+      "packageId": "business-order-approval@1.0.0",
+      "policyId": "order-approval"
+    },
+    "sdk": {
+      "packageId": "standard-sdk@1.0.0"
+    }
+  }
+}

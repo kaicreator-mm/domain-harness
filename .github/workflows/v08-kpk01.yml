@@ -1,0 +1,48 @@
+name: v08-kpk01
+
+# Isolated executable architecture experiment for issue #993.
+# Runs the KPK-01..KPK-14 falsifier matrix on real Node 22 and Node 24.
+on:
+  push:
+    branches: ['task/dh-i993-kpk01**']
+    paths:
+      - 'experiments/v08-package-kernel-ownership-kpk01/**'
+      - '.github/workflows/v08-kpk01.yml'
+      - 'packages/domain-harness/src/**'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'experiments/v08-package-kernel-ownership-kpk01/**'
+      - '.github/workflows/v08-kpk01.yml'
+      - 'packages/domain-harness/src/**'
+      - 'package-lock.json'
+
+jobs:
+  kpk01-matrix:
+    name: KPK-01 falsifiers (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install (npm ci, lockfile authoritative)
+        run: npm ci
+      - name: Stock-Node falsifiers KPK-01..KPK-13 (no runtime compilation)
+        run: npm --prefix experiments/v08-package-kernel-ownership-kpk01 test
+      - name: Differential falsifier KPK-14 (imports original frozen v0.7 TS via tsx)
+        run: node --import tsx --test experiments/v08-package-kernel-ownership-kpk01/tests/kpk14-differential.test.mjs
+      - name: Public consumer demo on stock Node
+        run: node experiments/v08-package-kernel-ownership-kpk01/consumer/demo-consumer.mjs
+      - name: Upload machine-readable evidence receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kpk01-evidence-node${{ matrix.node }}
+          path: experiments/v08-package-kernel-ownership-kpk01/evidence/
+          if-no-files-found: error

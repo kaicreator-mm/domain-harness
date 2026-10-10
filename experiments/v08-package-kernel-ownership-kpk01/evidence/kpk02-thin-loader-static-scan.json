@@ -1,0 +1,49 @@
+{
+  "falsifier": "KPK-02",
+  "scannedHostSideFiles": [
+    "src\\microkernel\\contracts.mjs",
+    "src\\microkernel\\load.mjs",
+    "src\\host\\file-host.mjs",
+    "src\\host\\memory-host.mjs",
+    "src\\ux\\ux-client.mjs",
+    "src\\producer\\build-package.mjs",
+    "index.mjs"
+  ],
+  "businessAgnosticFiles": [
+    "src\\microkernel\\contracts.mjs",
+    "src\\microkernel\\load.mjs",
+    "src\\host\\file-host.mjs",
+    "src\\host\\memory-host.mjs",
+    "src\\producer\\build-package.mjs",
+    "index.mjs"
+  ],
+  "forbiddenImportPatterns": [
+    "/from\\s+['\"][^'\"]*packages\\/domain-harness/",
+    "/from\\s+['\"][^'\"]*admission\\/(admission|effect-journal|contracts)/",
+    "/from\\s+['\"][^'\"]*workflow\\/predicate/",
+    "/from\\s+['\"][^'\"]*engine\\/workflow-instance-engine/"
+  ],
+  "forbiddenEngineIdentifiers": [
+    "admitCentralDecision",
+    "VolatileAdmissionEffectJournal",
+    "invokeEffectfulTool",
+    "WorkflowInstanceEngine",
+    "PerInstanceSerializedLane",
+    "executeEffectIntents",
+    "createDomainRuntime",
+    "sealRuntimeAssembly",
+    "bindToolImplementation"
+  ],
+  "forbiddenBusinessTokens": [
+    "order-quote",
+    "QUOTE_DECIDED",
+    "approval",
+    "parts-sale",
+    "PARTS_REQUESTED",
+    "guard:amount-ok",
+    "inv:cap-100",
+    "effect:reserve",
+    "stockOnHand"
+  ],
+  "violations": []
+}

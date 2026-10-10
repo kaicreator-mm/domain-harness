@@ -1,0 +1,7 @@
+{
+  "falsifier": "KPK-12",
+  "digestOpsAtInstall": 3,
+  "digestOpsPerNewInstanceOpenPlusFirstOccurrence": 3,
+  "digestOpsPerOccurrenceOnExistingInstance": 1,
+  "note": "no whole-package rehash and no provider resolution anywhere on the invoke path"
+}

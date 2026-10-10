@@ -1,0 +1,24 @@
+{
+  "falsifier": "KPK-08",
+  "sharedKernelSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+  "sharedSdkSha256": "19c2893dd393bacff9691719e53f142b3f5df742a662d066df9aa245d3661736",
+  "approval": {
+    "packageId": "business-order-approval@1.0.0",
+    "outcome": {
+      "transitionKey": "approve",
+      "effectType": "effect:reserve"
+    },
+    "callerRolePolicy": "requester-only",
+    "hardInvariant": "inv:cap-100 (amount ≤ 100)"
+  },
+  "parts": {
+    "packageId": "business-parts-sale@1.0.0",
+    "outcome": {
+      "transitionKey": "reserve",
+      "effectType": "effect:reserve-stock"
+    },
+    "callerRolePolicy": "clerk-only",
+    "hardInvariant": "inv:qty-positive (qty ≥ 1)",
+    "guardSemantics": "context-dependent (event.qty ≤ context.stockOnHand)"
+  }
+}
