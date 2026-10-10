@@ -45,5 +45,16 @@
     "effect:reserve",
     "stockOnHand"
   ],
+  "fixtureProvisioningException": {
+    "keys": [
+      "ledger",
+      "warehouse"
+    ],
+    "allowedOnlyIn": [
+      "src/host/memory-host.mjs",
+      "src/host/file-host.mjs"
+    ],
+    "note": "test-only physical-resource provisioning at the Host adapter seam; asserted to appear nowhere else on the business-agnostic host side (review P2-3 annotation)"
+  },
   "violations": []
 }

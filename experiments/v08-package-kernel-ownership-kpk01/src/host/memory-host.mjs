@@ -102,6 +102,11 @@ export function createMemoryHost({ now } = {}) {
         failNextResource = null;
         throw new Error(`physical resource ${resourceKey}.${operation} timed out after dispatch (uncertain outcome)`);
       }
+      // Test-only fixture provisioning (review P2-3 annotation): `ledger` /
+      // `warehouse` are the experiment's physical-resource fixtures —
+      // business provisioning at the resource seam, NOT host-side business
+      // policy. KPK-02 asserts these keys appear nowhere else on the
+      // business-agnostic host side.
       if (resourceKey === 'ledger' && operation === 'reserve') {
         return { reserved: true, effectId: payload.effectId };
       }

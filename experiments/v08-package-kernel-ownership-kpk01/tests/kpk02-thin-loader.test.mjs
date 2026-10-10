@@ -42,6 +42,19 @@ const FORBIDDEN_BUSINESS_TOKENS = [
   'order-quote', 'QUOTE_DECIDED', 'approval', 'parts-sale', 'PARTS_REQUESTED',
   'guard:amount-ok', 'inv:cap-100', 'effect:reserve', 'stockOnHand',
 ];
+/**
+ * Accepted test-fixture provisioning exception (review P2-3): the memory/file
+ * Host adapters hardcode `ledger`/`warehouse` physical-resource fixtures —
+ * test-only business provisioning at the resource seam, NOT host-side
+ * business policy, and therefore deliberately NOT in FORBIDDEN_BUSINESS_TOKENS
+ * (which asserts the business-AGNOSTIC files carry no business logic). What
+ * the scan DOES tighten: these fixture keys may appear ONLY in the two Host
+ * adapter files and nowhere else on the business-agnostic host side.
+ */
+const FIXTURE_PROVISIONING_KEYS = ['ledger', 'warehouse'];
+const FIXTURE_PROVISIONING_FILES = new Set([
+  'src/host/memory-host.mjs', 'src/host/file-host.mjs',
+]);
 
 async function listFiles(entries) {
   const { stat } = await import('node:fs/promises');
@@ -85,6 +98,12 @@ test('KPK-02: static scan — the Microkernel/Host/producer import none of the o
       for (const token of FORBIDDEN_BUSINESS_TOKENS) {
         if (source.includes(token)) violations.push(`${path.relative(EXPERIMENT_ROOT, file)}: business special-case token ${token}`);
       }
+      const rel = path.relative(EXPERIMENT_ROOT, file).split(path.sep).join('/');
+      for (const key of FIXTURE_PROVISIONING_KEYS) {
+        if (source.includes(key) && !FIXTURE_PROVISIONING_FILES.has(rel)) {
+          violations.push(`${rel}: fixture provisioning key ${key} outside the host adapter seam`);
+        }
+      }
     }
   }
   assert.deepEqual(violations, []);
@@ -95,6 +114,11 @@ test('KPK-02: static scan — the Microkernel/Host/producer import none of the o
     forbiddenImportPatterns: FORBIDDEN_IMPORTS.map(String),
     forbiddenEngineIdentifiers: FORBIDDEN_ENGINE_IDENTIFIERS,
     forbiddenBusinessTokens: FORBIDDEN_BUSINESS_TOKENS,
+    fixtureProvisioningException: {
+      keys: FIXTURE_PROVISIONING_KEYS,
+      allowedOnlyIn: [...FIXTURE_PROVISIONING_FILES],
+      note: 'test-only physical-resource provisioning at the Host adapter seam; asserted to appear nowhere else on the business-agnostic host side (review P2-3 annotation)',
+    },
     violations: [],
   });
 });

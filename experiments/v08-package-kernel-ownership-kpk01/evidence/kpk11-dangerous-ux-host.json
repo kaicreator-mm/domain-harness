@@ -5,7 +5,27 @@
     "no commit/journal/admission route is representable from UX (INTENT_UNBOUND)",
     "runtime object frozen; no privileged members exposed; port replacement throws",
     "host doc store reachable only through the kernel closure (kernel-namespaced keys only)",
-    "direct host-store tampering: deny path grants nothing; admit path fails closed at CAS with the effect still durably journaled"
+    "INSTANCE-document tampering by a raw Host-store writer: deny path grants nothing; admit path fails closed at CAS (HOST_CAS_CONFLICT) with the effect still durably journaled"
   ],
-  "boundary": "single-realm route/capability isolation proven; same-realm arbitrary-code sandbox explicitly NOT claimed"
+  "notProven": [
+    "DURABLE-JOURNAL integrity against a hostile Host-store writer: a forged completed journal envelope (kernelModuleSha256 copied from the public mechanism identity) is ACCEPTED as authoritative — replayed output, ZERO resource dispatches, state transition commits on top. Adversarially documented below as the honest current behavior, NOT a protection.",
+    "Kernel-keyed journal MAC / hostile-store integrity design: registered Product follow-up, REQUIRED before any unqualified production durability or security claim."
+  ],
+  "adversarialJournalTamper": {
+    "threat": "raw Host durable-journal document writer (inside the explicitly trusted Host-store premise of this experiment)",
+    "forgedJournalDocKey": "kpk01:effect-journal:turn:order-quote:instance%3A42:message:msg%3A1/effect/1",
+    "moduleShaSource": "public runtime.query({kind:\"mechanism\"}) — the envelope digest is not secret and not an integrity proof",
+    "observedBehavior": {
+      "receiptStatus": "admitted",
+      "transitionKey": "approve",
+      "effectDisposition": "replayed",
+      "forgedOutputAccepted": true,
+      "realResourceCalls": 0,
+      "journalRows": 1,
+      "instanceStateKey": "approved",
+      "instanceStateRevision": 1
+    },
+    "asymmetry": "instance-document tamper fails closed at CAS; journal-document tamper is accepted (no kernel-side MAC)"
+  },
+  "boundary": "single-realm route/capability isolation proven; same-realm arbitrary-code sandbox explicitly NOT claimed; durable-journal integrity vs a Host-store writer explicitly NOT claimed (trusted-store premise; kernel-keyed MAC = Product follow-up)"
 }

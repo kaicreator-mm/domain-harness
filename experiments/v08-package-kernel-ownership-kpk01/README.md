@@ -78,7 +78,7 @@ node --import tsx --test tests/kpk14-differential.test.mjs    # npm run test:dif
 | KPK-08 | two Business domains on identical kernel+sdk bytes, different guards/effects/roles/invariants; no hot swap interference | **PASS** |
 | KPK-09 | kernel byte/version change (revised scope): truthful new digest/closure identity; v1-pinned occurrences fail typed under v2; active v1 runtime never hot-swapped | **PASS** (cross-version replay/rolling upgrade out of scope per user direction) |
 | KPK-10 | raw/unqualified manifests: producer rejects wrong kind/provider/ABI before load; load rejects unsealed/impostor/stripped modules typed | **PASS** |
-| KPK-11 | dangerous UX/Host: intents are JSON-only; no commit route; runtime frozen, no port replacement; host-store tampering fails closed at CAS with effects still journaled | **PASS (route/capability isolation)** — single-realm arbitrary-code sandbox explicitly NOT claimed |
+| KPK-11 | dangerous UX/Host: intents are JSON-only; no commit route; runtime frozen, no port replacement; **instance-document** host-store tampering fails closed at CAS with effects still journaled; the parallel **journal-document** tamper path is adversarially documented as ACCEPTED (forged completed effect replayed as authoritative — see honest boundaries) | **PASS (route/capability isolation)** — durable-journal integrity vs a Host-store writer = NOT_PROVEN (no kernel-keyed MAC); single-realm arbitrary-code sandbox explicitly NOT claimed |
 | KPK-12 | fast path: 3 digests at install, 0 whole-package rehash per invoke (only the v0.7-mandated per-admission pinned-baseline re-verification); mutated bytes fail install | **PASS** |
 | KPK-13 | clean public consumer on stock Node, no `compiledApp`, no runtime compilation | **PASS** |
 | KPK-14 | independent differential: same material executed through the ORIGINAL frozen v0.7 `admitCentralDecision`/`VolatileAdmissionEffectJournal` (imported live) and through the loaded package — admitted plans, journal rows (byte-identical under the fixed clock), denial taxonomy and UNKNOWN taxonomy agree | **PASS (bounded)** — same-business-effect/deny/current-version-safety reference only |
@@ -97,6 +97,21 @@ MICROKERNEL_DYNAMIC_ADMISSION_OWNER=PHYSICALLY_SELECTED_KERNEL_PACKAGE_ONLY
 
 ## Honest boundaries (NOT_PROVEN / out of scope)
 
+- **Durable-journal integrity against a hostile Host-store writer:
+  NOT_PROVEN.** Within this experiment's explicitly trusted-Host-store
+  premise, the KPK-11 adversarial boundary test documents the actual
+  behavior: a raw journal-document writer can forge a completed effect
+  envelope (copying the public `kernelModuleSha256`) that the
+  current-version kernel replays as authoritative — attacker-controlled
+  output, ZERO real resource dispatches, state transition commits on top.
+  The instance-document path fails closed at CAS; the journal-document
+  path does not (the module-SHA envelope refuses cross-version replay but
+  is not an integrity proof — the digest is public and copyable). Closing
+  this requires a separate integrity design (kernel-keyed MAC or
+  equivalent) plus executable proof — a registered Product
+  decision/implementation gate that MUST precede any unqualified
+  production durability/security claim; it is deliberately NOT added in
+  this bounded experiment.
 - **Cross-version journal replay / rolling upgrade / old-occurrence
   continuation**: out of scope by user direction (#993@6093427821). The v2
   successor only demonstrates truthful new identity + typed refusal of
@@ -104,7 +119,24 @@ MICROKERNEL_DYNAMIC_ADMISSION_OWNER=PHYSICALLY_SELECTED_KERNEL_PACKAGE_ONLY
 - **Legacy v0.7 public-API parity**: not claimed; KPK-04/KPK-14 are bounded
   same-business-effect semantic references.
 - **Real OS crash-mid-write / multi-process store contention**: not
-  simulated (KPK-07 boundary).
+  simulated (KPK-07 boundary; `FileDocStore` CAS is read-check-write +
+  rename, single-process-safe only).
+- **Producer authentication is not cryptographic**: the `system-producer:`
+  gate is a prefix-string check under a trusted-channel premise;
+  `LOAD_PRODUCER_UNTRUSTED` enforces exactly that prefix and nothing more.
+  A forged fully self-consistent root with a spoofed producerId loads and
+  runs (verified in review).
+- **`runtime.kernelRuntime` escape hatch (documented surface)**: the public
+  frozen runtime object exposes the internal occurrence runtime via this
+  getter. Direct calls bypass ONLY the UX transport checks (plain-JSON
+  intent validation and sealed intent-type binding); business binding,
+  caller-role authorization and SDK plain-JSON gates still hold inside the
+  kernel and no authority escalates (verified in review).
+- **Test-Host business fixture keys**: the memory/file Host adapters
+  hardcode `ledger`/`warehouse` resource fixtures — test-only business
+  provisioning at the physical-resource seam, annotated as an accepted
+  exception in KPK-02's static scan, which asserts these keys never appear
+  in the Microkernel/producer/public API.
 - **Sandboxing arbitrary same-realm JavaScript**: not claimed; what is proven
   is route/capability isolation from every public surface.
 - **Production package tooling**: the producer here is a test-only G0 system

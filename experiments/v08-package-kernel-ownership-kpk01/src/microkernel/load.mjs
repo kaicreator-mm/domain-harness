@@ -165,6 +165,12 @@ export async function load(packageRoot, options = {}) {
   );
 
   const runtime = {
+    // Documented surface (review P2-2): exposes the internal occurrence
+    // runtime. Direct calls bypass ONLY the UX transport checks below
+    // (plain-JSON validation + sealed intent-type binding); business
+    // binding, caller-role authorization and SDK plain-JSON gates still
+    // hold inside the kernel and no authority escalates. Deliberately not
+    // hidden in this bounded experiment.
     get kernelRuntime() {
       return kernelRuntime;
     },

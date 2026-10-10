@@ -1,7 +1,7 @@
 {
   "falsifier": "KPK-13",
   "consumerCommand": "node consumer\\demo-consumer.mjs",
-  "nodeVersion": "v22.23.3",
+  "nodeVersion": "v24.21.0",
   "roundTrip": {
     "consumer": "stock-node public consumer (no compiledApp, no runtime compilation)",
     "loadedKernel": "kernel-vnext@1.0.0",

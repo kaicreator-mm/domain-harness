@@ -78,6 +78,11 @@ export function assertSealedShape(root) {
   if (root.formatVersion !== ROOT_FORMAT_VERSION) {
     throw new MicrokernelError('LOAD_FORMAT_UNSUPPORTED', `root formatVersion ${root.formatVersion} is not ${ROOT_FORMAT_VERSION}`);
   }
+  // Trusted-channel premise (review P2-1 qualification): this is a
+  // prefix-STRING check, not cryptographic producer authentication. A
+  // forged fully self-consistent root that spoofs the producerId passes it;
+  // LOAD_PRODUCER_UNTRUSTED delivers exactly this prefix check and nothing
+  // more (documented in README honest boundaries).
   if (!root.build.producerId.startsWith('system-producer:')) {
     throw new MicrokernelError('LOAD_PRODUCER_UNTRUSTED', `root was not produced by a controlled system producer (${root.build.producerId})`);
   }

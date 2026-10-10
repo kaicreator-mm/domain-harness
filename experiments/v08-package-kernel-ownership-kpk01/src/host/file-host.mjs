@@ -31,6 +31,11 @@ function docFileName(key) {
   return `${createHash('sha256').update(key, 'utf8').digest('hex').slice(0, 24)}.json`;
 }
 
+// Single-process-safe ONLY (review P2-4 qualification): CAS here is
+// read-check-write + atomic rename, which serializes writers inside ONE
+// process; concurrent multi-process writers can interleave between read and
+// rename. Multi-process store contention is an explicit KPK-07 boundary,
+// recorded wherever this seam is cited.
 export class FileDocStore {
   #dir;
   #fault = null;
@@ -136,6 +141,11 @@ export function createFileHost(dir, { now } = {}) {
         failNextResource = null;
         throw new Error(`physical resource ${resourceKey}.${operation} timed out after dispatch (uncertain outcome)`);
       }
+      // Test-only fixture provisioning (review P2-3 annotation): `ledger` /
+      // `warehouse` are the experiment's physical-resource fixtures —
+      // business provisioning at the resource seam, NOT host-side business
+      // policy. KPK-02 asserts these keys appear nowhere else on the
+      // business-agnostic host side.
       if (resourceKey === 'ledger' && operation === 'reserve') {
         return { reserved: true, effectId: payload.effectId };
       }

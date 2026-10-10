@@ -34,7 +34,17 @@ carries the same attribution in its header.
   bounded replacement for the NOT-migrated 1094-line T004C host composition).
 - `KernelDurableEffectJournal` — the v0.7 journal semantics ported over the
   generic Host doc-store port, plus a `kernelModuleSha256` envelope (typed
-  code unavailability across kernel versions).
+  code unavailability across kernel versions). **Scoped claim (review P1-1):
+  the envelope binds journal records to kernel module bytes but is NOT an
+  integrity proof against a hostile Host-store writer** — the digest is
+  public (visible via the runtime mechanism identity) and copyable, so a
+  forged completed journal envelope is accepted and replayed as
+  authoritative under the experiment's trusted-store premise
+  (adversarially documented by KPK-11; only the instance-document tamper
+  path fails closed at CAS). Durable-journal integrity vs a Host-store
+  writer = NOT_PROVEN; a kernel-keyed MAC (or equivalent) is a registered
+  Product follow-up required before any production durability/security
+  claim.
 - `KernelGovernancePinStore` — the T-014 “pin required for EVERY admission”
   gate over the Host doc port, binding the occurrence to the exact kernel
   module bytes.
