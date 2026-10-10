@@ -1178,6 +1178,10 @@ export async function admitCentralDecision(request, ports) {
 //     port, resource, doc store or UX payload participates in resolution.
 // ===========================================================================
 
+// Controller 093: reject hostile JSON-declared own destination keys at Kernel
+// wiring before any effect-input assignment / journal / resource dispatch.
+const EFFECT_DESTINATION_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const EFFECT_DESTINATION_FORBIDDEN = new Set(['__proto__', 'prototype', 'constructor']);
 const ADMISSION_EFFECT_IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TEMPLATE_PLACEHOLDER_PATTERN = /^[A-Za-z0-9_]+$/;
 const TEMPLATE_LITERAL_PATTERN = /^[A-Za-z0-9._:-]*$/;
@@ -1263,6 +1267,9 @@ function snapshotEffectBinding(intent, authorizedKeys) {
     invalidEffectBinding('inputFrom must be a non-empty object of field bindings');
   }
   for (const [field, spec] of Object.entries(inputFrom)) {
+    if (!EFFECT_DESTINATION_NAME.test(field) || EFFECT_DESTINATION_FORBIDDEN.has(field)) {
+      invalidEffectBinding(`inputFrom destination field ${JSON.stringify(field)} must be a safe 1..64-character ASCII identifier, excluding prototype-sensitive names`);
+    }
     validateEffectBindingPath(spec, field, authorizedKeys);
   }
   if (intent.idempotencyKeyFrom !== undefined) {

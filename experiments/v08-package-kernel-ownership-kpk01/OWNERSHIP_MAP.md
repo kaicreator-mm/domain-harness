@@ -71,3 +71,6 @@ carries the same attribution in its header.
 The successor module `kernel-mechanism-v2.mjs` is generated from v1 by
 `generate-kernel-v2.mjs`; its only deltas are documented there and in
 `MIGRATION_MAP.json`.
+
+
+Controller 093 Kernel destination-field P2-1: new module digests on unchanged experimental module labels after own-key fail-closed wiring hardening. kernel-vnext@1.1.0 SHA256 `c87b1b7ac5df64734d7c0835a368bbcac84cd3a15294e9e8633407e2b211d756`; controlled kernel-vnext@2.0.0 SHA256 `49b04915570719c5cb8f89c17da49ef0bdefb459bda3cd290df9c827df59229e`. The original reviewer proof at bf132c1 does not transfer to the changed bytes. P2-2 shared-baseline openInstance concurrency remains OUT OF SCOPE; no production authority change or formal Freeze.

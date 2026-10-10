@@ -163,3 +163,6 @@ MICROKERNEL_DYNAMIC_ADMISSION_OWNER=PHYSICALLY_SELECTED_KERNEL_PACKAGE_ONLY
   is route/capability isolation from every public surface.
 - **Production package tooling**: the producer here is a test-only G0 system
   fixture, not domain-forge/domain-simulator/domain-ai-creator/DAC.
+
+### Controller 093 bounded P2-1 (Kernel Effect destination own-key)
+At Kernel wiring, JSON-declared dynamic `inputFrom` destination keys must be 1..64-character ASCII identifiers; `__proto__`, `prototype`, `constructor`, Unicode, control characters and oversized names fail typed with `ADMISSION_EFFECT_BINDING_INVALID` before journal/resource dispatch. Tests KPK-15m..o cover own-key JSON.parse, nested binding descriptors, missing references, no prototype setter, and honest duplicate-key behavior: after JSON.parse, duplicate raw keys have already been normalized; detecting raw duplicate spellings requires an upstream strict producer parser (NOT_PROVEN in this bounded change). v1 and generated v2 Kernel module SHA-256 **change**; source version strings are retained for this single-concern experimental P2 patch; the module digests, not the label alone, pin execution identity. All original dynamic approval/inventory, UNKNOWN, replay and golden behavior remains under KPK-15a..l. Preexisting concurrent openInstance P2-2 is still OUT OF SCOPE; no L2/Freeze/merge.

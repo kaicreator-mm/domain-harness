@@ -614,3 +614,83 @@ test('KPK-15l: a decision-source inputFrom field resolves from the typed decisio
     journalInput: journal[0].input,
   });
 });
+
+ 
+// Controller 093 / KPK-15 P2-1: JSON.parse preserves own "__proto__"
+// destination keys; Kernel wiring must refuse them with the typed contract.
+test('KPK-15m: hostile JSON own-key, prototype-sensitive, oversized and Unicode Effect destinations fail at wiring', async () => {
+  const spec = '{"source":"event","path":["payload","amount"]}';
+  const unsafe = ['__proto__', 'prototype', 'constructor', 'bad.key', 'bad-key', 'bad key',
+    'a\\nline', 'a\\u0000x', 'fiéld', '字段', 'a\\u200Bz', 'x'.repeat(65), 'x'.repeat(300), ''];
+  for (const name of unsafe) {
+    const key = name.replaceAll('\\n', '\n').replaceAll('\\u0000', '\u0000').replaceAll('\\u200B', '\u200B');
+    const policy = getApprovalPolicy();
+    const intent = policy.intentBindings.submitQuoteDecisionDynamic.definition.states[0].transitions
+      .find((x) => x.transitionKey === 'approve').effectIntents[0];
+    intent.inputFrom = JSON.parse('{"amount":' + spec + ',' + JSON.stringify(key) + ':' + spec + '}');
+    assert.equal(Object.prototype.hasOwnProperty.call(intent.inputFrom, key), true);
+    const host = createMemoryHost({ now: fixedNow });
+    assert.throws(() => createOccurrenceRuntime({
+      moduleIdentity: { packageId: 'kernel-vnext@1.1.0', moduleSha256: 'test:p2-invalid' },
+      hostPorts: host, sdkEndpoint: { packageId: 'standard-sdk@1.0.0', interpret },
+      businessEndpoint: policy, observe: () => {},
+    }), isTyped('ADMISSION_EFFECT_BINDING_INVALID'), JSON.stringify(key));
+    assert.equal(host.resources.callCount(), 0);
+    assert.equal(Object.prototype.pollutedByEffectBinding, undefined);
+  }
+  await writeEvidence('kpk15-destination-key-p2', {
+    falsifier: 'KPK-15m (Controller 093 P2-1)',
+    outcome: 'all hostile JSON own-property destinations fail typed during kernel wiring',
+    rejected: unsafe.length, errorCode: 'ADMISSION_EFFECT_BINDING_INVALID',
+    resourceCalls: 0,
+    rawDuplicateJSON: 'NOT_PROVEN: JSON.parse drops duplicate raw field spellings before object wiring',
+  });
+});
+
+test('KPK-15n: safe JSON nested binding descriptors preserve actual effect/journal/idempotency', async () => {
+  const policy = getApprovalPolicy();
+  const intent = policy.intentBindings.submitQuoteDecisionDynamic.definition.states[0].transitions
+    .find((x) => x.transitionKey === 'approve').effectIntents[0];
+  intent.inputFrom = JSON.parse('{"amount":{"source":"event","path":["payload","amount"]},' +
+    '"requestId":{"source":"event","path":["payload","requestId"]}}');
+  const host = createMemoryHost({ now: fixedNow });
+  const runtime = createOccurrenceRuntime({
+    moduleIdentity: { packageId: 'kernel-vnext@1.1.0', moduleSha256: 'test:p2-valid' },
+    hostPorts: host, sdkEndpoint: { packageId: 'standard-sdk@1.0.0', interpret },
+    businessEndpoint: policy, observe: () => {},
+  });
+  const target = { workflowId: 'order-quote', instanceKey: 'instance:p2-key' };
+  await runtime.openInstance({ target, correlationId: 'corr:p2' });
+  const r = await runtime.submitOccurrence({
+    kind: 'kpk01/intent', intentType: 'submitQuoteDecisionDynamic', target,
+    messageId: 'msg:p2', input: { amount: 29, requestId: 'P2-1' }, caller: { role: 'requester' },
+  });
+  assert.equal(r.status, 'admitted');
+  assert.equal(r.admitted.effects[0].idempotencyKey, 'reserve:quote:P2-1');
+  assert.deepEqual((await runtime.getJournalRecords())[0].input, { amount: 29, requestId: 'P2-1' });
+  assert.deepEqual(host.resources.calls()[0].payload, {
+    amount: 29, requestId: 'P2-1', effectId: r.admitted.effects[0].effectId,
+  });
+});
+
+test('KPK-15o: empty/missing and JSON-normalized duplicate destination behaviors are explicit', () => {
+  const rig = (fields) => {
+    const p = getApprovalPolicy();
+    p.intentBindings.submitQuoteDecisionDynamic.definition.states[0].transitions
+      .find((x) => x.transitionKey === 'approve').effectIntents[0].inputFrom = fields;
+    return () => createOccurrenceRuntime({
+      moduleIdentity: { packageId: 'kernel-vnext@1.1.0', moduleSha256: 'test:p2-missing' },
+      hostPorts: createMemoryHost({ now: fixedNow }),
+      sdkEndpoint: { packageId: 'standard-sdk@1.0.0', interpret },
+      businessEndpoint: p, observe: () => {},
+    });
+  };
+  assert.throws(rig(JSON.parse('{}')), isTyped('ADMISSION_EFFECT_BINDING_INVALID'));
+  assert.throws(rig(JSON.parse('{"amount":{"source":"event","path":["payload","amount"]}}')),
+    isTyped('ADMISSION_EFFECT_BINDING_INVALID'), 'idempotency placeholder references missing field');
+  const parsed = JSON.parse('{"amount":{"source":"event","path":["payload","amount"]},' +
+    '"amount":{"source":"event","path":["payload","amount"]},' +
+    '"requestId":{"source":"event","path":["payload","requestId"]}}');
+  assert.deepEqual(Object.keys(parsed), ['amount', 'requestId']);
+  assert.doesNotThrow(rig(parsed), 'duplicate raw spellings are normalized by JSON.parse before wiring');
+});
