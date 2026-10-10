@@ -17,7 +17,7 @@
     "package": {
       "reason": "hard-invariant",
       "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
-      "governanceBindingDigest": "a3bcfb053cda8f827484b480d07e0ce62d9e7568b5a4243d74a9c278814c74f9",
+      "governanceBindingDigest": "23b03d422bab6cc5ac4bc0f0c9277672b327e9b64a52026157c45bec1b6efd0f",
       "invariantId": "inv:cap-100",
       "resolver": {
         "source": "harness-machine",
@@ -46,7 +46,7 @@
     "package": {
       "reason": "guard",
       "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
-      "governanceBindingDigest": "a3bcfb053cda8f827484b480d07e0ce62d9e7568b5a4243d74a9c278814c74f9",
+      "governanceBindingDigest": "23b03d422bab6cc5ac4bc0f0c9277672b327e9b64a52026157c45bec1b6efd0f",
       "transitionKey": "approve",
       "guardId": "guard:amount-ok",
       "resolver": {

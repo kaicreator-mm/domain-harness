@@ -1,0 +1,8 @@
+{
+  "falsifier": "KPK-15m (Controller 093 P2-1)",
+  "outcome": "all hostile JSON own-property destinations fail typed during kernel wiring",
+  "rejected": 14,
+  "errorCode": "ADMISSION_EFFECT_BINDING_INVALID",
+  "resourceCalls": 0,
+  "rawDuplicateJSON": "NOT_PROVEN: JSON.parse drops duplicate raw field spellings before object wiring"
+}

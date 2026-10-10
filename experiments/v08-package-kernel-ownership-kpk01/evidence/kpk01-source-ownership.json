@@ -1,7 +1,7 @@
 {
   "falsifier": "KPK-01",
   "kernelPackageId": "kernel-vnext@1.1.0",
-  "moduleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7",
+  "moduleSha256": "c87b1b7ac5df64734d7c0835a368bbcac84cd3a15294e9e8633407e2b211d756",
   "executingFunctionsContainedInSealedBytes": [
     "admitCentralDecision",
     "executeEffectIntents",

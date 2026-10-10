@@ -1,7 +1,7 @@
 {
   "falsifier": "KPK-03",
   "rootPackageId": "app:order-approval@1.0.0",
-  "closureDigest": "c799edfb63c27c675adac681579e980416c8b8f26514713da932c99648fdb8d5",
+  "closureDigest": "329395fab7d15e2af91d5cf194e3e329976ce93f60ba9e7c83700f491ed61c5c",
   "fixedIntentBindings": [
     "submitQuoteDecision",
     "submitQuoteDecisionStrict",

@@ -3,7 +3,7 @@
   "denial": {
     "reason": "hard-invariant",
     "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A150",
-    "governanceBindingDigest": "a3bcfb053cda8f827484b480d07e0ce62d9e7568b5a4243d74a9c278814c74f9",
+    "governanceBindingDigest": "23b03d422bab6cc5ac4bc0f0c9277672b327e9b64a52026157c45bec1b6efd0f",
     "invariantId": "inv:cap-100",
     "resolver": {
       "source": "harness-machine",
@@ -18,7 +18,7 @@
   "attribution": {
     "kernel": {
       "packageId": "kernel-vnext@1.1.0",
-      "moduleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7",
+      "moduleSha256": "c87b1b7ac5df64734d7c0835a368bbcac84cd3a15294e9e8633407e2b211d756",
       "generation": "1"
     },
     "business": {
