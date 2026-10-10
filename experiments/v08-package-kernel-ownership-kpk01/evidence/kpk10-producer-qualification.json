@@ -1,0 +1,5 @@
+{
+  "falsifier": "KPK-10",
+  "wrongKindRejected": "PRODUCER_KIND_MISMATCH/PRODUCER_EXPORT_MISSING",
+  "wrongProviderRejected": "PRODUCER_KIND_MISMATCH/PRODUCER_ABI_MISMATCH"
+}

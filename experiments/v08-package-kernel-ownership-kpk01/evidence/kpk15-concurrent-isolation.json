@@ -1,0 +1,6 @@
+{
+  "falsifier": "KPK-15i",
+  "crossInstanceSameBusinessKey": "both admitted, distinct effectIds, one booking each, zero cross-replay/conflict",
+  "sameInstanceConcurrentDuplicate": "exactly one execution; second submission is a typed terminal-state denial",
+  "honestRemainingLimit": "GLOBAL cross-instance business-key uniqueness is NOT kernel-enforced: the effect journal is occurrence-scoped per instance/turn (v0.7 semantics preserved); a business needing a global unique constraint must own it outside this seam"
+}

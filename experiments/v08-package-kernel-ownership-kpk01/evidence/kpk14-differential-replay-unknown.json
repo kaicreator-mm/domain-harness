@@ -1,0 +1,24 @@
+{
+  "falsifier": "KPK-14",
+  "replay": {
+    "original": {
+      "disposition": "replayed",
+      "toolCalls": 1
+    },
+    "package": {
+      "disposition": "replayed",
+      "resourceCalls": 1
+    }
+  },
+  "unknownTaxonomy": {
+    "originalSeededAmbiguity": "ADMISSION_EFFECT_AMBIGUOUS",
+    "packagePhysicalFaultPath": [
+      "ADMISSION_EFFECT_JOURNAL_CONFLICT (uncertain)",
+      "ADMISSION_EFFECT_AMBIGUOUS (retry forbidden)"
+    ],
+    "dispatchCounts": {
+      "original": 0,
+      "package": 1
+    }
+  }
+}

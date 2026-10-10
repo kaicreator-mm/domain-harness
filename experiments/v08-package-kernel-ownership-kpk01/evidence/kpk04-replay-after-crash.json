@@ -1,0 +1,8 @@
+{
+  "falsifier": "KPK-04",
+  "crashPoint": "Host doc-store fault at the instance state commit (after durable effect completion)",
+  "replayDisposition": "replayed",
+  "resourceCallsTotal": 1,
+  "journalRowsTotal": 1,
+  "committedStateKey": "approved"
+}

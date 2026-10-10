@@ -1,0 +1,11 @@
+{
+  "falsifier": "KPK-15e",
+  "refusedAtInstallation": [
+    "unauthorized event path payload.secret",
+    "unauthorized decision path data.secret",
+    "eval-ish template placeholder {process.exit(1)}",
+    "unknown template placeholder {nope}",
+    "static input + inputFrom dual authority"
+  ],
+  "errorCode": "ADMISSION_EFFECT_BINDING_INVALID (CentralAdmissionError, raised inside createOccurrenceRuntime wiring at the DomainHarness.load installation boundary)"
+}
