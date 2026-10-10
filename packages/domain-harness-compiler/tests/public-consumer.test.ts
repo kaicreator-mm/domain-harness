@@ -21,13 +21,13 @@
  *   imports stay closed by the package `exports` map;
  * - the packed dist runtime inventory is exercised by direct evaluation.
  */
-import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { stagePackedWorkspaces } from './packed-fixture-stage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, '..');
@@ -62,29 +62,22 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('packed compiler exposes the stable root build API to a clean consumer', () => {
+test('packed compiler exposes the stable root build API to a clean consumer', async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-compiler-consumer-'));
-  const packDirectory = join(root, 'packs');
   const consumerDirectory = join(root, 'consumer');
 
   try {
-    mkdirSync(packDirectory, { recursive: true });
     mkdirSync(consumerDirectory, { recursive: true });
 
     // The compiler artifact depends on the authoritative core contracts (#164),
     // so the clean consumer installs both packed tarballs. Type-only imports are
     // erased in dist, but package.json dependencies must resolve for real.
-    runNpm(['run', 'build', '--workspace', '@kaicreator/domain-harness'], REPO_ROOT);
-    runNpm(
-      ['pack', '--workspace', '@kaicreator/domain-harness', '--pack-destination', packDirectory],
-      REPO_ROOT,
-    );
-    runNpm(['pack', '--pack-destination', packDirectory], PACKAGE_ROOT);
-    const tarballs = readdirSync(packDirectory)
-      .filter((name) => name.endsWith('.tgz'))
-      .sort()
-      .map((name) => join(packDirectory, name));
-    assert.equal(tarballs.length, 2);
+    // #953 (Controller 090): the tarballs come from the shared immutable stage
+    // (tests/packed-fixture-stage.ts) instead of an in-test rebuild + live-dist
+    // pack, which raced the parallel e8a/e8b fixtures on the shared workspace
+    // dist (Woodpecker 1083/1 npm pack unexpected EOF).
+    const staged = await stagePackedWorkspaces();
+    const tarballs = [staged.coreTarball.path, staged.compilerTarball.path];
 
     writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
       name: 'domain-harness-compiler-clean-consumer',

@@ -24,10 +24,22 @@ interface ChildOutcome {
   readonly instanceDisposition?: string;
   readonly provisioningDisposition?: string;
   readonly stateRevision?: number;
+  /** Present when the child died through the fail-closed reporting entry (#953). */
+  readonly error?: { readonly name: string; readonly message: string; readonly stack: string };
 }
 
-function runChild(args: readonly string[], options: { readonly killAt?: string; readonly killSignalFile?: string } = {}):
-    Promise<{ readonly code: number | null; readonly stdout: string; readonly killed: boolean }> {
+interface ChildResult {
+  readonly code: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly killed: boolean;
+  readonly timedOut: boolean;
+}
+
+function runChild(
+  args: readonly string[],
+  options: { readonly killAt?: string; readonly killSignalFile?: string; readonly timeoutMs?: number } = {},
+): Promise<ChildResult> {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(process.execPath, ['--import', 'tsx', CHILD, ...args], {
       cwd: process.cwd(),
@@ -36,14 +48,30 @@ function runChild(args: readonly string[], options: { readonly killAt?: string; 
       // parent must run as a plain process, not inherit NODE_TEST_CONTEXT.
       env: { ...process.env, NODE_TEST_CONTEXT: undefined, SX_BUSY_TIMEOUT_MS: '30000' },
     });
+    // stdout stays pure machine-readable JSON; stderr is captured separately
+    // so interleaved loader noise can never corrupt a report line, and stays
+    // available verbatim for failure diagnostics (#953).
     let stdout = '';
+    let stderr = '';
     let killed = false;
+    let timedOut = false;
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
     });
     child.stderr.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
+      stderr += chunk.toString('utf8');
     });
+    const watchdog = options.timeoutMs === undefined ? undefined : setTimeout(() => {
+      // #953: a hung worker used to hang the whole suite until the runner
+      // timeout with zero diagnostics; kill it and let the reporting
+      // assertions below surface the exit state plus captured output.
+      timedOut = true;
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        /* raced exit */
+      }
+    }, options.timeoutMs);
     if (options.killAt !== undefined && options.killSignalFile !== undefined) {
       const timer = setInterval(() => {
         if (!existsSync(options.killSignalFile!)) return;
@@ -65,9 +93,32 @@ function runChild(args: readonly string[], options: { readonly killAt?: string; 
       }, 25);
       child.on('exit', () => clearInterval(timer));
     }
+    // Fires only when the process could not be spawned at all (the N08 race
+    // loop retries exactly this class once; everything else resolves below).
     child.on('error', rejectPromise);
-    child.on('close', (code) => resolvePromise({ code, stdout, killed }));
+    child.on('close', (code) => {
+      if (watchdog !== undefined) clearTimeout(watchdog);
+      resolvePromise({ code, stdout, stderr, killed, timedOut });
+    });
   });
+}
+
+/** Parse the last machine-readable JSON line a worker printed, if any. */
+function workerOutcome(stdout: string): ChildOutcome | undefined {
+  const lines = stdout.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('{'));
+  if (lines.length === 0) return undefined;
+  return JSON.parse(lines[lines.length - 1]!) as ChildOutcome;
+}
+
+/** #953: full per-worker forensics for assertion failures — exit code, kill/timeout state, real stderr/stdout tails. */
+function workerDiagnostics(result: ChildResult): Record<string, unknown> {
+  return {
+    code: result.code,
+    killed: result.killed,
+    timedOut: result.timedOut,
+    stderrTail: result.stderr.slice(-2000),
+    stdoutTail: result.stdout.slice(-2000),
+  };
 }
 
 async function bootRuntimeOn(path: string, options: { readonly observation?: boolean } = {}) {
@@ -96,26 +147,47 @@ test('N08: 8 real OS processes racing one provisioning key converge to exactly o
     const { store } = await bootRuntimeOn(path);
     store.close();
   }
-  let results: Array<{ code: number | null; stdout: string; killed: boolean }>;
+  const spawnWorker = (index: number): Promise<ChildResult> => {
+    const workerArgs = ['ensure', path, join(tmpdir(), `dh457-n08-marker-${index}`), 'sx:n08:key-42', 'n08-shared'];
+    const launch = (): Promise<ChildResult> => runChild(workerArgs, { timeoutMs: 120_000 });
+    return launch().catch((error: unknown) => {
+      // #953: runChild rejects ONLY when the OS could not spawn the process
+      // at all — such a worker never touched the provisioning seam, so ONE
+      // bounded retry cannot mask a genuine seam defect. Every other failure
+      // class (structured worker error report, silent death, watchdog) fails
+      // the assertions below with full diagnostics instead.
+      console.error('N08_SPAWN_RETRY', index, String(error));
+      return launch();
+    });
+  };
+  let results: readonly ChildResult[];
   try {
     // Staggered ramp-up (~1s window): the 8 ensure transactions still race
     // concurrently, but the tsx/migration startup storm on slower hosts no
     // longer trips busy timeouts before the race even begins.
     results = await Promise.all(Array.from({ length: WORKERS }, (_, index) =>
-      new Promise<{ code: number | null; stdout: string; killed: boolean }>((resolveStagger) => {
+      new Promise<void>((resolveStagger) => {
         setTimeout(resolveStagger, index * 150);
-      }).then(() =>
-        runChild(['ensure', path, join(tmpdir(), `dh457-n08-marker-${index}`), 'sx:n08:key-42', 'n08-shared']))));
+      }).then(() => spawnWorker(index))));
   } catch (error) {
     console.error('N08_RACE_ERROR', error);
     throw error;
   }
 
-  const outcomes = results
-    .map((result) => result.stdout.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('{')))
-    .filter((lines) => lines.length > 0)
-    .map((lines) => JSON.parse(lines[lines.length - 1]!) as ChildOutcome);
-  assert.equal(outcomes.length, WORKERS, `every worker must report: ${JSON.stringify(results.map((r) => r.stdout.slice(0, 200)))}`);
+  const reports = results.map((result) => ({ result, outcome: workerOutcome(result.stdout) }));
+  const silent = reports.filter((report) => report.outcome === undefined);
+  assert.equal(
+    silent.length,
+    0,
+    `every worker must report a machine-readable outcome; silent workers with full diagnostics: ${JSON.stringify(silent.map((report) => workerDiagnostics(report.result)), null, 2)}`,
+  );
+  const errored = reports.filter((report) => report.outcome?.error !== undefined);
+  assert.equal(
+    errored.length,
+    0,
+    `no worker may fail; structured child errors with full diagnostics: ${JSON.stringify(errored.map((report) => ({ error: report.outcome?.error, ...workerDiagnostics(report.result) })), null, 2)}`,
+  );
+  const outcomes = reports.map((report) => report.outcome!);
   const created = outcomes.filter((outcome) => outcome.instanceDisposition === 'created');
   const existing = outcomes.filter((outcome) => outcome.instanceDisposition === 'existing');
   assert.equal(created.length, 1, 'exactly one worker materializes the instance');
@@ -140,12 +212,12 @@ test('N08b: conflicting same-key ensure requests with a changed address fail clo
     const { store } = await bootRuntimeOn(path);
     store.close();
   }
-  const first = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-first'), 'sx:n08b:key', 'n08b-target']);
+  const first = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-first'), 'sx:n08b:key', 'n08b-target'], { timeoutMs: 120_000 });
   const firstOutcome = JSON.parse(first.stdout.split(LINE_SPLIT).filter((line) => line.startsWith('{')).pop()!) as ChildOutcome;
   assert.equal(firstOutcome.instanceDisposition, 'created');
 
   const conflicting = await Promise.all([0, 1, 2, 3].map((index) =>
-    runChild(['ensure', path, join(tmpdir(), `dh457-n08b-c${index}`), 'sx:n08b:key', `n08b-OTHER-${index}`])));
+    runChild(['ensure', path, join(tmpdir(), `dh457-n08b-c${index}`), 'sx:n08b:key', `n08b-OTHER-${index}`], { timeoutMs: 120_000 })));
   for (const result of conflicting) {
     assert.notEqual(result.code, 0, 'a conflicting same-key request must fail closed');
     assert.match(result.stdout, /already/i, `failure names the conflicting provisioning key: ${result.stdout.slice(0, 200)}`);
@@ -157,7 +229,7 @@ test('N08b: conflicting same-key ensure requests with a changed address fail clo
   sql.close();
 
   // The EXACT original request still converges after the conflicts.
-  const replay = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-replay'), 'sx:n08b:key', 'n08b-target']);
+  const replay = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-replay'), 'sx:n08b:key', 'n08b-target'], { timeoutMs: 120_000 });
   const replayOutcome = JSON.parse(replay.stdout.split(LINE_SPLIT).filter((line) => line.startsWith('{')).pop()!) as ChildOutcome;
   assert.equal(replayOutcome.instanceDisposition, 'existing');
 }, 180_000);
@@ -239,7 +311,7 @@ test('N10: real taskkill crash windows around the durable commit', async () => {
 
       const killed = await runChild(
         ['ensure-armed', path, marker, stage, `sx:n10:${stage}`, `n10-${stage}`],
-        { killAt: 'at-barrier', killSignalFile: marker },
+        { killAt: 'at-barrier', killSignalFile: marker, timeoutMs: 120_000 },
       );
       assert.equal(killed.killed, true, `${stage}: the worker was really killed by taskkill /F`);
       assert.notEqual(killed.code, 0, `${stage}: killed worker exits abnormally`);
@@ -258,7 +330,7 @@ test('N10: real taskkill crash windows around the durable commit', async () => {
       sql.close();
 
       // Reopen from a NEW OS process with the exact same request.
-      const retry = await runChild(['ensure', path, join(dir, 'retry-marker'), `sx:n10:${stage}`, `n10-${stage}`]);
+      const retry = await runChild(['ensure', path, join(dir, 'retry-marker'), `sx:n10:${stage}`, `n10-${stage}`], { timeoutMs: 120_000 });
       const retryOutcome = JSON.parse(
         retry.stdout.split('\n').filter((line) => line.startsWith('{')).pop()!,
       ) as ChildOutcome;

@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
+import { stagePackedWorkspaces } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 function sha256File(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
@@ -34,15 +35,17 @@ test('N18: clean packed consumer — public entries, real SQLite, successor jour
     return;
   }
   const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
-  const packDir = mkdtempSync(join(tmpdir(), 'dh457-n18-pack-'));
-  execFileSync('npm', ['run', 'build', '-w', '@kaicreator/domain-harness-node'], { cwd: repoRoot, shell: process.platform === 'win32', stdio: 'pipe' });
-  execFileSync('npm', ['pack', '-w', '@kaicreator/domain-harness', '--pack-destination', packDir], { cwd: repoRoot, shell: process.platform === 'win32' });
-  execFileSync('npm', ['pack', '-w', '@kaicreator/domain-harness-node', '--pack-destination', packDir], { cwd: repoRoot, shell: process.platform === 'win32' });
-  execFileSync('npm', ['pack', '-w', '@kaicreator/domain-harness-compiler', '--pack-destination', packDir], { cwd: repoRoot, shell: process.platform === 'win32' });
-  const coreTgz = join(packDir, 'kaicreator-domain-harness-0.2.0.tgz');
-  const nodeTgz = join(packDir, 'kaicreator-domain-harness-node-0.2.0.tgz');
-  const compilerTgz = join(packDir, 'kaicreator-domain-harness-compiler-0.2.0.tgz');
-  assert.ok(existsSync(coreTgz) && existsSync(nodeTgz) && existsSync(compilerTgz), 'all three tarballs packed from the tested tree');
+  // #953 (Controller 090): pack from the shared immutable stage instead of
+  // rebuilding the live workspaces mid-suite — the in-test
+  // `npm run build -w @kaicreator/domain-harness-node` rewrote the shared
+  // packages/domain-harness/dist while the parallel N08 workers were loading
+  // modules from that same dist (Woodpecker 1083/1 race family). The stage
+  // builds core+node into private outDirs and packs read-only staged copies.
+  const staged = await stagePackedWorkspaces({ includeNodePackage: true });
+  const coreTgz = staged.coreTarball.path;
+  const nodeTgz = staged.nodeTarball?.path;
+  const compilerTgz = staged.compilerTarball.path;
+  assert.ok(coreTgz && nodeTgz && compilerTgz, 'all three tarballs packed from the tested tree');
   const coreSha = sha256File(coreTgz);
   const nodeSha = sha256File(nodeTgz);
 
