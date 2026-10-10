@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test tests/kpk01-source-ownership.test.mjs tests/kpk02-thin-loader.test.mjs tests/kpk03-fixed-closure.test.mjs tests/kpk04-golden-positive.test.mjs tests/kpk05-negative-guard.test.mjs tests/kpk06-unknown.test.mjs tests/kpk07-recovery.test.mjs tests/kpk08-two-business.test.mjs tests/kpk09-kernel-version.test.mjs tests/kpk10-raw-manifest.test.mjs tests/kpk11-dangerous-ux.test.mjs tests/kpk12-fast-path.test.mjs tests/kpk13-clean-consumer.test.mjs",
+    "test": "node --test tests/kpk01-source-ownership.test.mjs tests/kpk02-thin-loader.test.mjs tests/kpk03-fixed-closure.test.mjs tests/kpk04-golden-positive.test.mjs tests/kpk05-negative-guard.test.mjs tests/kpk06-unknown.test.mjs tests/kpk07-recovery.test.mjs tests/kpk08-two-business.test.mjs tests/kpk09-kernel-version.test.mjs tests/kpk10-raw-manifest.test.mjs tests/kpk11-dangerous-ux.test.mjs tests/kpk12-fast-path.test.mjs tests/kpk13-clean-consumer.test.mjs tests/kpk15-dynamic-effect-binding.test.mjs",
     "test:differential": "node --import tsx --test tests/kpk14-differential.test.mjs",
     "test:all": "npm test && npm run test:differential",
     "consumer": "node consumer/demo-consumer.mjs",

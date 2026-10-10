@@ -1,14 +1,14 @@
 {
   "falsifier": "KPK-09 (revised scope: no cross-version replay/rolling upgrade required)",
   "v1": {
-    "packageId": "kernel-vnext@1.0.0",
-    "moduleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
-    "closureDigest": "29b323c66f3e7305c0576155475107b7fa43b3a022c1426eb257f374449d96df"
+    "packageId": "kernel-vnext@1.1.0",
+    "moduleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7",
+    "closureDigest": "c799edfb63c27c675adac681579e980416c8b8f26514713da932c99648fdb8d5"
   },
   "v2": {
     "packageId": "kernel-vnext@2.0.0",
-    "moduleSha256": "80228942099b0a9b579f82bb3d2489707641e393218591ef1618d4a744fc38b7",
-    "closureDigest": "1ebf0c52f92206d3350e0d2153728bc6f642c6b209a53f93b3e4c7e28a3bf75a"
+    "moduleSha256": "b0d5a252c95998b4b2f36688f00a9533081eb9be241316185722066d62f98aa7",
+    "closureDigest": "2279d15807b2590924add5037a822504b800d99daa1712bf5448a1046adc7093"
   },
   "unchangedNonKernelPackages": true,
   "scopeNote": "no old-occurrence continuation, no cross-version journal replay — explicitly out of scope per user direction 6093427821"

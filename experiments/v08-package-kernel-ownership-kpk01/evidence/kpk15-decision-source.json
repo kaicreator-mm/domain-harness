@@ -1,0 +1,8 @@
+{
+  "falsifier": "KPK-15l",
+  "binding": "amount ← decision.data.amount (rule-authorized); requestId ← event.payload.requestId",
+  "journalInput": {
+    "amount": 45,
+    "requestId": "APX-D1"
+  }
+}

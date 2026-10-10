@@ -1,0 +1,41 @@
+{
+  "falsifier": "KPK-15a (Controller 090 repair)",
+  "repairedDefect": "#972@6096530583 CELL1 / #972@6098188937 §C static per-request effect payload",
+  "request1": {
+    "amount": 30,
+    "requestId": "APX-R1"
+  },
+  "request2": {
+    "amount": 40,
+    "requestId": "APX-R2"
+  },
+  "effectPortInputs": [
+    {
+      "amount": 30,
+      "requestId": "APX-R1",
+      "effectId": "turn:order-quote:instance%3Adyn-a:message:msg%3Adyn-a1/effect/1"
+    },
+    {
+      "amount": 40,
+      "requestId": "APX-R2",
+      "effectId": "turn:order-quote:instance%3Adyn-b:message:msg%3Adyn-b1/effect/1"
+    }
+  ],
+  "journalInputs": [
+    {
+      "input": {
+        "amount": 30,
+        "requestId": "APX-R1"
+      },
+      "idempotencyKey": "reserve:quote:APX-R1"
+    },
+    {
+      "input": {
+        "amount": 40,
+        "requestId": "APX-R2"
+      },
+      "idempotencyKey": "reserve:quote:APX-R2"
+    }
+  ],
+  "perRequestDistinct": true
+}

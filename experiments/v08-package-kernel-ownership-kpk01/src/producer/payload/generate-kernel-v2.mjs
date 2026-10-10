@@ -48,7 +48,7 @@ const SUCCESSOR_HEADER = `/**
 const deltas = [
   // Replace the v1 header block (first /** ... */ comment) with the successor header.
   [/^\/\*\*[\s\S]*?\*\/\n/, SUCCESSOR_HEADER],
-  [/export const MODULE_ID = 'kernel-vnext@1\.0\.0';/, "export const MODULE_ID = 'kernel-vnext@2.0.0';"],
+  [/export const MODULE_ID = 'kernel-vnext@1\.1\.0';/, "export const MODULE_ID = 'kernel-vnext@2.0.0';"],
   [/export const KERNEL_GENERATION = '1';/, "export const KERNEL_GENERATION = '2';"],
   [
     // \u0020{N} avoids eslint no-regex-spaces on literal indentation runs.

@@ -3,22 +3,22 @@
   "ownerTable": [
     {
       "concern": "admission decision (schema→invariants→guard→transition)",
-      "owner": "kernel-vnext@1.0.0 (migrated admitCentralDecision)",
+      "owner": "kernel-vnext@1.1.0 (migrated admitCentralDecision)",
       "source": "admission/admission.ts@v07 955ecf1f"
     },
     {
       "concern": "guard/hard-invariant predicate evaluation",
-      "owner": "kernel-vnext@1.0.0 (migrated predicate engine)",
+      "owner": "kernel-vnext@1.1.0 (migrated predicate engine)",
       "source": "workflow/predicate.ts@v07"
     },
     {
       "concern": "durable effect journal semantics",
-      "owner": "kernel-vnext@1.0.0 (migrated begin/complete + KernelDurableEffectJournal)",
+      "owner": "kernel-vnext@1.1.0 (migrated begin/complete + KernelDurableEffectJournal)",
       "source": "admission/effect-journal.ts@v07 c6ae1f98"
     },
     {
       "concern": "state transition commit + revision discipline",
-      "owner": "kernel-vnext@1.0.0 (migrated WorkflowInstanceEngine)",
+      "owner": "kernel-vnext@1.1.0 (migrated WorkflowInstanceEngine)",
       "source": "engine/workflow-instance-engine.ts@v07 10829999"
     },
     {
@@ -52,5 +52,5 @@
     "laneBlob": "d5a94501648f547ef408870c16b0ce6297fc81b5",
     "instanceRepoBlob": "3e2252967aea56d8ef698001f02dc301f4f5925d"
   },
-  "executingKernelModuleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548"
+  "executingKernelModuleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7"
 }

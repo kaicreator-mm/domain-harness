@@ -22,10 +22,15 @@ function makeIntent(intentType) {
 export const approvalIntents = {
   submitQuoteDecision: makeIntent('submitQuoteDecision'),
   submitQuoteDecisionStrict: makeIntent('submitQuoteDecisionStrict'),
+  submitQuoteDecisionDynamic: makeIntent('submitQuoteDecisionDynamic'),
 };
 
 export const partsIntents = {
   requestParts: makeIntent('requestParts'),
+};
+
+export const inventoryIntents = {
+  reserveStock: makeIntent('reserveStock'),
 };
 
 export function createApprovalUx(runtime, { instanceKey = 'instance:42' } = {}) {
@@ -44,6 +49,22 @@ export function createApprovalUx(runtime, { instanceKey = 'instance:42' } = {}) 
         target: target(),
         messageId,
         input: { amount },
+        caller: { role },
+      });
+    },
+    /**
+     * [Controller 090 repair] Typed dynamic intent: the per-request
+     * amount/requestId flow through rule-authorized admission into the
+     * kernel-resolved per-occurrence effect input and idempotency key
+     * (the UX still holds no effect authority — it only submits data).
+     */
+    async submitQuoteDynamic({ amount, requestId, messageId, role = 'requester' }) {
+      return runtime.send({
+        kind: 'kpk01/intent',
+        intentType: 'submitQuoteDecisionDynamic',
+        target: target(),
+        messageId,
+        input: { amount, requestId },
         caller: { role },
       });
     },
@@ -74,6 +95,41 @@ export function createPartsUx(runtime, { instanceKey = 'instance:7' } = {}) {
         target: target(),
         messageId,
         input: { qty, partNo },
+        caller: { role },
+      });
+    },
+    observe(listener) {
+      return runtime.observe(listener);
+    },
+    async getInstance() {
+      return runtime.query({ kind: 'instance', target: target() });
+    },
+    async getJournal() {
+      return runtime.query({ kind: 'journal' });
+    },
+  };
+}
+
+/**
+ * [Controller 090 repair] Typed UX client for the inventory-reservation
+ * domain: per-request sku/qty/reservationId flow through the same
+ * Microkernel transport; the kernel resolves the dynamic effect input and
+ * 'inv:{reservationId}' idempotency key after admission. No UX effect
+ * authority exists on this path.
+ */
+export function createInventoryUx(runtime, { instanceKey = 'instance:inv-1' } = {}) {
+  const target = () => ({ workflowId: 'inventory-reservation', instanceKey });
+  return {
+    async openInstance({ correlationId } = {}) {
+      return runtime.openInstance({ target: target(), correlationId });
+    },
+    async reserveStock({ sku, qty, reservationId, messageId, role = 'planner' }) {
+      return runtime.send({
+        kind: 'kpk01/intent',
+        intentType: 'reserveStock',
+        target: target(),
+        messageId,
+        input: { sku, qty, reservationId },
         caller: { role },
       });
     },

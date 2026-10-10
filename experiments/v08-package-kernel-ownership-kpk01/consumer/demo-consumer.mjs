@@ -27,6 +27,15 @@ ux.observe((receipt) => receipts.push(receipt));
 await ux.openInstance({ correlationId: 'demo:1' });
 const decision = await ux.submitQuote({ amount: 42, messageId: 'msg:demo-1' });
 
+// [Controller 090 repair] One typed DYNAMIC intent through the same public
+// transport: the per-request amount/requestId reach the effect port and the
+// idempotency key via the kernel-resolved binding — still no UX effect
+// authority, no compiledApp, no runtime compilation.
+const dynamicUx = createApprovalUx(runtime, { instanceKey: 'instance:43' });
+await dynamicUx.openInstance({ correlationId: 'demo:2' });
+const dynamicDecision = await dynamicUx.submitQuoteDynamic({ amount: 27, requestId: 'DEMO-R1', messageId: 'msg:demo-2' });
+const ledgerCalls = host.resources.calls();
+
 const instance = await ux.getInstance();
 const journal = await ux.getJournal();
 const mechanism = await runtime.query({ kind: 'mechanism' });
@@ -41,6 +50,11 @@ console.log(JSON.stringify({
     transition: decision.admitted?.transitionKey,
     targetState: decision.admitted?.targetState,
     effect: decision.admitted?.effects?.[0]?.disposition,
+  },
+  dynamicDecision: {
+    status: dynamicDecision.status,
+    effectIdempotencyKey: dynamicDecision.admitted?.effects?.[0]?.idempotencyKey,
+    ledgerPayload: ledgerCalls.at(-1)?.payload,
   },
   instanceState: instance.state,
   journalRows: journal.length,

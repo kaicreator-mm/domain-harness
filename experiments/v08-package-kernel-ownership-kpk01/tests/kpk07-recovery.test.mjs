@@ -46,7 +46,7 @@ test('KPK-07: durable restart recovers journal/pin/instance and replays without 
     const host2 = createFileHost(dir, { now: () => NOW });
     const runtime2 = await load(pkg, { hostPorts: host2 });
     const mechanism = await runtime2.query({ kind: 'mechanism' });
-    assert.equal(mechanism.moduleId, 'kernel-vnext@1.0.0');
+    assert.equal(mechanism.moduleId, 'kernel-vnext@1.1.0');
 
     const instance = await runtime2.query({ kind: 'instance', target });
     assert.equal(instance.state.stateKey, 'approved');

@@ -1,10 +1,12 @@
 {
   "falsifier": "KPK-01",
-  "kernelPackageId": "kernel-vnext@1.0.0",
-  "moduleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+  "kernelPackageId": "kernel-vnext@1.1.0",
+  "moduleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7",
   "executingFunctionsContainedInSealedBytes": [
     "admitCentralDecision",
     "executeEffectIntents",
+    "resolveAdmissionEffectIntents",
+    "wireAdmissionEffectBindings",
     "VolatileAdmissionEffectJournal",
     "WorkflowInstanceEngine",
     "deriveDurableControlTurnId"

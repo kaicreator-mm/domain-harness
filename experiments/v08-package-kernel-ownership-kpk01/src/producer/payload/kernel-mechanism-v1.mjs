@@ -1,7 +1,17 @@
 /**
  * ============================================================================
- * Kernel Domain Package — vnext v1.0.0 mechanism module (experiment KPK-01)
+ * Kernel Domain Package — vnext v1.1.0 mechanism module (experiment KPK-01)
  * ============================================================================
+ *
+ * [Controller 090 repair, #993] v1.1.0 supersedes the reviewed v1.0.0 sealed
+ * bytes (digest 275b2ca7…) with ONE bounded addition: the kernel-owned,
+ * data-only, allowlisted per-occurrence dynamic Admission Effect input and
+ * business idempotency-key binding (section "[Controller 090 bounded
+ * repair]" below). That section is NEW kernel-owned code — NOT a v0.7
+ * migration — and closes the #972-documented contract limitation that the
+ * effect side only ever saw the transition-declared STATIC intent payload
+ * (#972@6096530583 CELL1, #972@6098188937 §C). The v1.0.0 independent
+ * review does NOT transfer to these mutated bytes.
  *
  * This module is the PHYSICAL executable mechanism implementation of a
  * versioned Kernel Domain Package for the #993 bounded architecture
@@ -49,7 +59,7 @@
  *   getSnapshot, getJournalRecords, getMechanismIdentity, counters, stop }
  */
 
-export const MODULE_ID = 'kernel-vnext@1.0.0';
+export const MODULE_ID = 'kernel-vnext@1.1.0';
 export const PACKAGE_KIND = 'kernel';
 export const ABI_VERSION = 'kpk01-kernel-abi/1';
 export const KERNEL_GENERATION = '1';
@@ -1136,8 +1146,19 @@ export async function admitCentralDecision(request, ports) {
     return deny('guard', turnId, pinned.bindingDigest, resolver, selection.rejected);
   }
 
-  const effects = await executeEffectIntents(
+  // [Controller 090 repair] Per-occurrence dynamic effect input/idempotency
+  // binding is resolved HERE: after authorized transition admission, before
+  // any journal write or effect dispatch. Static intents pass through with
+  // exact v0.7 behavior; dynamic failures fail closed typed with zero
+  // journal/resource activity.
+  const effectIntents = resolveAdmissionEffectIntents(
     selection.admitted.effectIntents ?? [],
+    request,
+    ports.effectBindings,
+  );
+
+  const effects = await executeEffectIntents(
+    effectIntents,
     request,
     ports,
     turnId,
@@ -1154,6 +1175,325 @@ export async function admitCentralDecision(request, ports) {
       resolver,
     },
   };
+}
+
+// ===========================================================================
+// [Controller 090 bounded repair (#993) — kernel-owned NEW mechanism code,
+// NOT a v0.7 migration] Per-occurrence dynamic Admission Effect input
+// binding and business idempotency-key binding (data-only, allowlisted,
+// wiring-pinned).
+//
+// Closes the #972-documented contract limitation (#972@6096530583 CELL1,
+// #972@6098188937 §C): the sealed kernel previously journaled and dispatched
+// the transition-declared STATIC `intent.input`/`intent.idempotencyKey` on
+// every occurrence, so per-request business data (approval amount/requestId,
+// inventory sku/qty) could never reach the effect side. A Business package
+// may now declare on a transition effect intent:
+//
+//   inputFrom:          { <effectField>: { source: 'event'|'decision', path } }
+//   idempotencyKeyFrom: { template: 'reserve:quote:{requestId}' }
+//
+// Rules — all enforced by THIS kernel module, no other component gains
+// authority:
+//   - `event` paths may only address the rule-authorized projection
+//     (['type'] or ['payload', <payloadFromInput key>]); `decision` paths
+//     only the typed decision shape (['outcome'] or ['data', <same
+//     authorized key>], because the Standard SDK projects decision.data
+//     from the same authorized payload projection).
+//   - Template literals are restricted to [A-Za-z0-9._:-]; every
+//     {placeholder} must reference a declared inputFrom field.
+//   - Static `input` and `inputFrom` (resp. `idempotencyKey` and
+//     `idempotencyKeyFrom`) are mutually exclusive authorities.
+//   - Validation happens ONCE at wiring (createOccurrenceRuntime — inside
+//     the trusted DomainHarness.load installation boundary) and the
+//     validated declaration is deep-frozen into a WeakMap keyed by the
+//     exact intent objects: live mutation after wiring is IGNORED (the
+//     snapshot is authoritative) and NEW binding syntax appearing on an
+//     intent that was never wired fails typed at resolution
+//     (ADMISSION_EFFECT_BINDING_UNVALIDATED).
+//   - Resolution happens ONLY inside admitCentralDecision AFTER authorized
+//     transition admission and BEFORE any journal write or effect dispatch;
+//     a resolved idempotency key must match [A-Za-z0-9][A-Za-z0-9._:-]{0,127}
+//     or the occurrence fails typed BEFORE the journal. Nothing is
+//     string-evaluated; the resolved input must be canonical JSON; no Host
+//     port, resource, doc store or UX payload participates in resolution.
+// ===========================================================================
+
+const ADMISSION_EFFECT_IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const TEMPLATE_PLACEHOLDER_PATTERN = /^[A-Za-z0-9_]+$/;
+const TEMPLATE_LITERAL_PATTERN = /^[A-Za-z0-9._:-]*$/;
+
+function invalidEffectBinding(message) {
+  throw new CentralAdmissionError('ADMISSION_EFFECT_BINDING_INVALID', message);
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+/** Parse a key template into literal/placeholder segments (validated shapes only). */
+function parseEffectKeyTemplate(template) {
+  const segments = [];
+  let index = 0;
+  while (index < template.length) {
+    const open = template.indexOf('{', index);
+    if (open === -1) {
+      const tail = template.slice(index);
+      if (tail.length > 0) segments.push({ literal: tail });
+      break;
+    }
+    const literal = template.slice(index, open);
+    if (literal.length > 0) segments.push({ literal });
+    const close = template.indexOf('}', open + 1);
+    if (close === -1) {
+      invalidEffectBinding('idempotencyKeyFrom.template has an unterminated {placeholder}');
+    }
+    const placeholder = template.slice(open + 1, close);
+    if (!TEMPLATE_PLACEHOLDER_PATTERN.test(placeholder)) {
+      invalidEffectBinding(`idempotencyKeyFrom.template placeholder {${placeholder}} is not a plain field name`);
+    }
+    segments.push({ placeholder });
+    index = close + 1;
+  }
+  if (segments.length === 0) invalidEffectBinding('idempotencyKeyFrom.template is empty');
+  return segments;
+}
+
+function validatedAuthorizedKeys(rule) {
+  const projection = rule?.payloadFromInput;
+  if (!isPlainObject(projection)) {
+    invalidEffectBinding(`rule ${String(rule?.ruleId)}: payloadFromInput must be an object to authorize a dynamic effect binding`);
+  }
+  return new Set(Object.keys(projection));
+}
+
+function validateEffectBindingPath(spec, field, authorizedKeys) {
+  if (!isPlainObject(spec)) invalidEffectBinding(`inputFrom.${field} must be an object`);
+  for (const key of Object.keys(spec)) {
+    if (key !== 'source' && key !== 'path') {
+      invalidEffectBinding(`inputFrom.${field} may only declare source and path`);
+    }
+  }
+  if (spec.source !== 'event' && spec.source !== 'decision') {
+    invalidEffectBinding(`inputFrom.${field}.source must be 'event' or 'decision'`);
+  }
+  const path = spec.path;
+  if (
+    !Array.isArray(path)
+    || path.length === 0
+    || path.length > 2
+    || path.some((segment) => typeof segment !== 'string' || segment.length === 0)
+  ) {
+    invalidEffectBinding(`inputFrom.${field}.path must be one or two non-empty string segments`);
+  }
+  const withinEventProjection = (path.length === 1 && path[0] === 'type')
+    || (path.length === 2 && path[0] === 'payload' && authorizedKeys.has(path[1]));
+  const withinDecisionShape = (path.length === 1 && path[0] === 'outcome')
+    || (path.length === 2 && path[0] === 'data' && authorizedKeys.has(path[1]));
+  const allowed = spec.source === 'event' ? withinEventProjection : withinDecisionShape;
+  if (!allowed) {
+    invalidEffectBinding(
+      `inputFrom.${field} ${spec.source} path [${path.join(', ')}] is outside the rule-authorized projection`,
+    );
+  }
+}
+
+function snapshotEffectBinding(intent, authorizedKeys) {
+  const inputFrom = intent.inputFrom;
+  if (!isPlainObject(inputFrom) || Object.keys(inputFrom).length === 0) {
+    invalidEffectBinding('inputFrom must be a non-empty object of field bindings');
+  }
+  for (const [field, spec] of Object.entries(inputFrom)) {
+    validateEffectBindingPath(spec, field, authorizedKeys);
+  }
+  if (intent.idempotencyKeyFrom !== undefined) {
+    if (!isPlainObject(intent.idempotencyKeyFrom) || Object.keys(intent.idempotencyKeyFrom).some((key) => key !== 'template')) {
+      invalidEffectBinding('idempotencyKeyFrom may only declare template');
+    }
+    const template = intent.idempotencyKeyFrom.template;
+    if (typeof template !== 'string' || template.length === 0 || template.length > 128) {
+      invalidEffectBinding('idempotencyKeyFrom.template must be a 1..128 character string');
+    }
+    for (const segment of parseEffectKeyTemplate(template)) {
+      if (segment.literal !== undefined && !TEMPLATE_LITERAL_PATTERN.test(segment.literal)) {
+        invalidEffectBinding(
+          `idempotencyKeyFrom.template literal "${segment.literal}" contains characters outside [A-Za-z0-9._:-]`,
+        );
+      }
+      if (segment.placeholder !== undefined && !hasOwn(inputFrom, segment.placeholder)) {
+        invalidEffectBinding(
+          `idempotencyKeyFrom.template placeholder {${segment.placeholder}} is not a declared inputFrom field`,
+        );
+      }
+    }
+  }
+  let frozenInputFrom;
+  try {
+    frozenInputFrom = cloneDataOnlyForPreparation(inputFrom, '$effectInputFrom');
+  } catch (error) {
+    invalidEffectBinding(`inputFrom must be JSON data only: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  deepFreezePreparedData(frozenInputFrom);
+  const snapshot = { inputFrom: frozenInputFrom };
+  if (intent.idempotencyKeyFrom !== undefined) {
+    snapshot.idempotencyKeyFrom = Object.freeze({ template: intent.idempotencyKeyFrom.template });
+  }
+  return Object.freeze(snapshot);
+}
+
+function definitionDeclaresDynamicBinding(definition) {
+  for (const state of definition?.states ?? []) {
+    for (const transition of state.transitions ?? []) {
+      for (const intent of transition.effectIntents ?? []) {
+        if (hasOwn(intent, 'inputFrom') || hasOwn(intent, 'idempotencyKeyFrom')) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Wiring-time validation of every dynamic effect-intent binding reachable
+ * from the business policy, executed once inside createOccurrenceRuntime
+ * (the trusted DomainHarness.load installation boundary). A malformed,
+ * unauthorized or ambiguous declaration fails the load typed BEFORE any
+ * instance can exist (KPK-10-class installation refusal; the producer and
+ * Microkernel keep NO duplicate semantic validator).
+ */
+function wireAdmissionEffectBindings(businessEndpoint) {
+  const registry = new WeakMap();
+
+  const wireDefinition = (definition, rule, intentType) => {
+    for (const state of definition?.states ?? []) {
+      for (const transition of state.transitions ?? []) {
+        for (const intent of transition.effectIntents ?? []) {
+          if (!hasOwn(intent, 'inputFrom') && !hasOwn(intent, 'idempotencyKeyFrom')) continue;
+          if (hasOwn(intent, 'input') && hasOwn(intent, 'inputFrom')) {
+            invalidEffectBinding(`intent ${intentType}, transition ${transition.transitionKey}: static input and inputFrom are mutually exclusive`);
+          }
+          if (hasOwn(intent, 'idempotencyKey') && hasOwn(intent, 'idempotencyKeyFrom')) {
+            invalidEffectBinding(`intent ${intentType}, transition ${transition.transitionKey}: static idempotencyKey and idempotencyKeyFrom are mutually exclusive`);
+          }
+          if (hasOwn(intent, 'idempotencyKeyFrom') && !hasOwn(intent, 'inputFrom')) {
+            invalidEffectBinding(`intent ${intentType}, transition ${transition.transitionKey}: idempotencyKeyFrom requires inputFrom (placeholders reference declared fields)`);
+          }
+          const snapshot = snapshotEffectBinding(intent, validatedAuthorizedKeys(rule));
+          const existing = registry.get(intent);
+          if (existing !== undefined) {
+            if (canonicalJsonStringify(existing) !== canonicalJsonStringify(snapshot)) {
+              invalidEffectBinding(`intent ${intentType}: the same effect intent object is wired against conflicting rule authorizations`);
+            }
+          } else {
+            registry.set(intent, snapshot);
+          }
+        }
+      }
+    }
+  };
+
+  for (const [intentType, binding] of Object.entries(businessEndpoint.intentBindings ?? {})) {
+    const rule = (businessEndpoint.rules ?? {})[binding.ruleId];
+    const definition = binding.definition ?? businessEndpoint.workflowDefinition;
+    if (rule === undefined) {
+      if (definitionDeclaresDynamicBinding(definition)) {
+        invalidEffectBinding(`intent ${intentType}: a dynamic effect binding requires rule ${String(binding.ruleId)} to exist`);
+      }
+      continue;
+    }
+    wireDefinition(definition, rule, intentType);
+  }
+  return registry;
+}
+
+const BINDING_VALUE_MISSING = Symbol('kpk01.effect-binding.missing');
+
+function readBindingPath(root, path) {
+  let current = root;
+  for (const segment of path) {
+    if (current === null || typeof current !== 'object' || !hasOwn(current, segment)) {
+      return BINDING_VALUE_MISSING;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+/**
+ * Resolve the per-occurrence dynamic effect inputs and idempotency keys for
+ * the ADMITTED transition's effect intents. Called only from
+ * admitCentralDecision AFTER authorized transition admission and BEFORE any
+ * journal write or effect dispatch. Intents without dynamic declarations
+ * pass through untouched (exact v0.7 static behavior). The wiring snapshot
+ * is the ONLY trusted declaration source; a per-occurrence failure fails
+ * closed typed with zero journal/resource activity.
+ */
+function resolveAdmissionEffectIntents(intents, request, wiring) {
+  if (intents.length === 0) return intents;
+  return intents.map((intent) => {
+    if (!hasOwn(intent, 'inputFrom') && !hasOwn(intent, 'idempotencyKeyFrom')) {
+      return intent; // static intent — v0.7-identical passthrough
+    }
+    const snapshot = wiring?.get(intent);
+    if (snapshot === undefined) {
+      throw new CentralAdmissionError(
+        'ADMISSION_EFFECT_BINDING_UNVALIDATED',
+        `effect intent for ${intent.effectType} carries dynamic-binding syntax that was never validated at wiring; post-wiring injected declarations are refused`,
+      );
+    }
+    const decision = request.resolved?.structuredDecision?.decision;
+    const input = {};
+    for (const [field, spec] of Object.entries(snapshot.inputFrom)) {
+      const root = spec.source === 'event' ? request.event : decision;
+      const value = root === undefined || root === null
+        ? BINDING_VALUE_MISSING
+        : readBindingPath(root, spec.path);
+      if (value === BINDING_VALUE_MISSING) {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_BINDING_UNRESOLVED',
+          `effect input field ${field} (${spec.source} path ${spec.path.join('.')}) is not present on this occurrence; dynamic bindings fail closed before any journal write`,
+        );
+      }
+      try {
+        canonicalizeJson(value);
+      } catch (error) {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_BINDING_UNRESOLVED',
+          `effect input field ${field} must be canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      input[field] = value;
+    }
+    let idempotencyKey;
+    if (snapshot.idempotencyKeyFrom !== undefined) {
+      let composed = '';
+      for (const segment of parseEffectKeyTemplate(snapshot.idempotencyKeyFrom.template)) {
+        if (segment.literal !== undefined) {
+          composed += segment.literal;
+          continue;
+        }
+        const value = input[segment.placeholder];
+        if (value === null || typeof value === 'object' || typeof value === 'function' || typeof value === 'bigint' || typeof value === 'symbol') {
+          throw new CentralAdmissionError(
+            'ADMISSION_EFFECT_IDEMPOTENCY_KEY_INVALID',
+            `idempotency key placeholder {${segment.placeholder}} must compose from a string, number or boolean value`,
+          );
+        }
+        composed += String(value);
+      }
+      if (!ADMISSION_EFFECT_IDEMPOTENCY_KEY_PATTERN.test(composed)) {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_IDEMPOTENCY_KEY_INVALID',
+          `resolved idempotency key is not a safe token ([A-Za-z0-9][A-Za-z0-9._:-]{0,127}); refusing before any journal write`,
+        );
+      }
+      idempotencyKey = composed;
+    }
+    return {
+      effectType: intent.effectType,
+      input,
+      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+    };
+  });
 }
 
 // ===========================================================================
@@ -1780,6 +2120,13 @@ export function createOccurrenceRuntime(options) {
   const pinStore = new KernelGovernancePinStore(docs, sha256, moduleIdentity.moduleSha256);
   const baselines = new KernelBaselineStore(docs);
 
+  // [Controller 090 repair] One-time wiring validation of every dynamic
+  // effect-intent binding, at this trusted installation boundary: a
+  // malformed/unauthorized/ambiguous declaration fails the load typed
+  // BEFORE any instance can exist. The frozen snapshots registered here
+  // are the only declaration source trusted at admission time.
+  const effectBindings = wireAdmissionEffectBindings(businessEndpoint);
+
   async function bindGovernance(target) {
     const workflowInstanceId = `${target.workflowId}:${target.instanceKey}`;
     const identity = await computeGovernanceBaselineIdentity({
@@ -1897,6 +2244,7 @@ export function createOccurrenceRuntime(options) {
         sha256,
         effectJournal,
         effectTools,
+        effectBindings,
         trace: counters,
       });
 
@@ -1969,6 +2317,8 @@ export function createOccurrenceRuntime(options) {
       mechanismFunctions: {
         admitCentralDecision: admitCentralDecision.toString(),
         executeEffectIntents: executeEffectIntents.toString(),
+        resolveAdmissionEffectIntents: resolveAdmissionEffectIntents.toString(),
+        wireAdmissionEffectBindings: wireAdmissionEffectBindings.toString(),
         VolatileAdmissionEffectJournal: VolatileAdmissionEffectJournal.toString(),
         WorkflowInstanceEngine: WorkflowInstanceEngine.toString(),
         deriveDurableControlTurnId: deriveDurableControlTurnId.toString(),

@@ -1,0 +1,46 @@
+{
+  "falsifier": "KPK-15b (Controller 090 repair, second distinct domain)",
+  "request1": {
+    "sku": "SKU-BOLT-2",
+    "qty": 8,
+    "reservationId": "INV-R1"
+  },
+  "request2": {
+    "sku": "SKU-GEAR-9",
+    "qty": 3,
+    "reservationId": "INV-R2"
+  },
+  "bookingPortInputs": [
+    {
+      "sku": "SKU-BOLT-2",
+      "qty": 8,
+      "reservationId": "INV-R1",
+      "effectId": "turn:inventory-reservation:instance%3Ainv-a:message:msg%3Ainv-a1/effect/1"
+    },
+    {
+      "sku": "SKU-GEAR-9",
+      "qty": 3,
+      "reservationId": "INV-R2",
+      "effectId": "turn:inventory-reservation:instance%3Ainv-b:message:msg%3Ainv-b1/effect/1"
+    }
+  ],
+  "journalInputs": [
+    {
+      "input": {
+        "sku": "SKU-BOLT-2",
+        "qty": 8,
+        "reservationId": "INV-R1"
+      },
+      "idempotencyKey": "inv:INV-R1"
+    },
+    {
+      "input": {
+        "sku": "SKU-GEAR-9",
+        "qty": 3,
+        "reservationId": "INV-R2"
+      },
+      "idempotencyKey": "inv:INV-R2"
+    }
+  ],
+  "kernelModule": "kernel-vnext@1.1.0"
+}

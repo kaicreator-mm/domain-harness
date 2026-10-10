@@ -275,7 +275,7 @@ test('KPK-14: positive approval — admitted plans and journal rows agree semant
       effectToolCalls: v07.tools.calls.length,
     },
     packageOwned: {
-      kernelModule: 'kernel-vnext@1.0.0 (data:-instantiated sealed bytes)',
+      kernelModule: 'kernel-vnext@1.1.0 (data:-instantiated sealed bytes)',
       admittedPlan: receipt.admitted,
       journalRow: pkgRows[0],
       resourceCalls: pkg.host.resources.callCount(),
@@ -399,15 +399,15 @@ test('KPK-14: owner table — which side executed what (no Host proxy)', async (
 
   assert.equal(receipt.attribution.kernel.moduleSha256, kernelPkgSha);
   assert.equal(mechanism.moduleSha256, kernelPkgSha);
-  assert.equal(mechanism.moduleId, 'kernel-vnext@1.0.0');
+  assert.equal(mechanism.moduleId, 'kernel-vnext@1.1.0');
 
   await writeEvidence('kpk14-owner-table', {
     falsifier: 'KPK-14',
     ownerTable: [
-      { concern: 'admission decision (schema→invariants→guard→transition)', owner: 'kernel-vnext@1.0.0 (migrated admitCentralDecision)', source: 'admission/admission.ts@v07 955ecf1f' },
-      { concern: 'guard/hard-invariant predicate evaluation', owner: 'kernel-vnext@1.0.0 (migrated predicate engine)', source: 'workflow/predicate.ts@v07' },
-      { concern: 'durable effect journal semantics', owner: 'kernel-vnext@1.0.0 (migrated begin/complete + KernelDurableEffectJournal)', source: 'admission/effect-journal.ts@v07 c6ae1f98' },
-      { concern: 'state transition commit + revision discipline', owner: 'kernel-vnext@1.0.0 (migrated WorkflowInstanceEngine)', source: 'engine/workflow-instance-engine.ts@v07 10829999' },
+      { concern: 'admission decision (schema→invariants→guard→transition)', owner: 'kernel-vnext@1.1.0 (migrated admitCentralDecision)', source: 'admission/admission.ts@v07 955ecf1f' },
+      { concern: 'guard/hard-invariant predicate evaluation', owner: 'kernel-vnext@1.1.0 (migrated predicate engine)', source: 'workflow/predicate.ts@v07' },
+      { concern: 'durable effect journal semantics', owner: 'kernel-vnext@1.1.0 (migrated begin/complete + KernelDurableEffectJournal)', source: 'admission/effect-journal.ts@v07 c6ae1f98' },
+      { concern: 'state transition commit + revision discipline', owner: 'kernel-vnext@1.1.0 (migrated WorkflowInstanceEngine)', source: 'engine/workflow-instance-engine.ts@v07 10829999' },
       { concern: 'rule interpretation', owner: 'standard-sdk@1.0.0', source: 'new SDK package (no v0.7 owner existed at this seam)' },
       { concern: 'business policy (guards, effects, roles)', owner: 'business-order-approval@1.0.0', source: 'mirrors v0.7 admission golden fixtures' },
       { concern: 'raw durable storage / crypto / clock / physical resources', owner: 'Host ports', source: 'generic primitives only' },

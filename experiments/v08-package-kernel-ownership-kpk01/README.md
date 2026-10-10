@@ -16,14 +16,15 @@ occurrence mechanism, migrated from the accepted frozen v0.7 sources:
 
 | Mechanism concern | Owner (executing code) | v0.7 lineage (see `MIGRATION_MAP.json`) |
 |---|---|---|
-| Admission decision (schema → pinned hard invariants → guard → transition) | `kernel-vnext@1.0.0` | `admission/admission.ts` `admitCentralDecision` |
-| Guard / hard-invariant predicate evaluation | `kernel-vnext@1.0.0` | `workflow/predicate.ts` |
-| Pinned Governance Baseline identity/digest verification | `kernel-vnext@1.0.0` | `governance/identity.ts` (bounded subset) |
-| Durable effect journal (identity, re-begin, idempotent complete, fail-closed) | `kernel-vnext@1.0.0` | `admission/effect-journal.ts` |
-| Deterministic Durable Control Turn identity | `kernel-vnext@1.0.0` | `admission/admission.ts` `deriveDurableControlTurnId` |
-| State-transition commit + revision discipline + per-instance serialization | `kernel-vnext@1.0.0` | `engine/workflow-instance-engine.ts` + `per-instance-serialized-lane.ts` + `instance/persistent-workflow-instance.ts` |
+| Admission decision (schema → pinned hard invariants → guard → transition) | `kernel-vnext@1.1.0` | `admission/admission.ts` `admitCentralDecision` |
+| Guard / hard-invariant predicate evaluation | `kernel-vnext@1.1.0` | `workflow/predicate.ts` |
+| Pinned Governance Baseline identity/digest verification | `kernel-vnext@1.1.0` | `governance/identity.ts` (bounded subset) |
+| Durable effect journal (identity, re-begin, idempotent complete, fail-closed) | `kernel-vnext@1.1.0` | `admission/effect-journal.ts` |
+| Deterministic Durable Control Turn identity | `kernel-vnext@1.1.0` | `admission/admission.ts` `deriveDurableControlTurnId` |
+| **Per-occurrence dynamic Effect input + business idempotency-key binding** (Controller 090 repair) | `kernel-vnext@1.1.0` | **NEW kernel-owned code — NOT a v0.7 migration** (design proven in #972 scratch @6097768812 Candidate A) |
+| State-transition commit + revision discipline + per-instance serialization | `kernel-vnext@1.1.0` | `engine/workflow-instance-engine.ts` + `per-instance-serialized-lane.ts` + `instance/persistent-workflow-instance.ts` |
 | Rule interpretation (deterministic, LLM-free) | `standard-sdk@1.0.0` | new SDK package at this seam |
-| Business policy (workflow definitions, guards, roles, effect handlers) | `business-order-approval@1.0.0` / `business-parts-sale@1.0.0` | mirrors the v0.7 admission golden fixtures |
+| Business policy (workflow definitions, guards, roles, effect handlers) | `business-order-approval@1.0.0` / `business-parts-sale@1.0.0` / `business-inventory-reservation@1.0.0` | mirrors the v0.7 admission golden fixtures (approval); parts/inventory materially distinct domains |
 | Raw durable storage / SHA-256 / clock / physical resources | **Host ports** (generic primitives only) | — |
 | Loading, byte verification, endpoint wiring, UX transport | **Microkernel** (NO mechanism code) | — |
 
@@ -43,14 +44,15 @@ src/
   host/               generic Host ports + memory/file adapters (KPK-07)
   producer/           test-only system producer: build-package.mjs (D)
   producer/payload/   the physical package payload modules:
-                       kernel-mechanism-v1.mjs  (B, migrated v0.7 mechanism)
+                       kernel-mechanism-v1.mjs  (B, migrated v0.7 mechanism + Controller 090 dynamic binding)
                        kernel-mechanism-v2.mjs  (B, controlled successor, generated)
                        sdk-standard.mjs         (C)
-                       business-approval.mjs    (C, mirrors v0.7 golden fixtures)
+                       business-approval.mjs    (C, mirrors v0.7 golden fixtures + dynamic intent)
                        business-parts.mjs       (C, materially different domain)
+                       business-inventory.mjs   (C, Controller 090 dynamic-binding second domain)
   ux/                 typed UX clients (E)
 consumer/             stock-Node public consumer demo (KPK-13)
-tests/                KPK-01 … KPK-14 executable falsifier matrix
+tests/                KPK-01 … KPK-15 executable falsifier matrix
 evidence/             machine-readable receipts written by every falsifier
 ```
 
@@ -82,6 +84,7 @@ node --import tsx --test tests/kpk14-differential.test.mjs    # npm run test:dif
 | KPK-12 | fast path: 3 digests at install, 0 whole-package rehash per invoke (only the v0.7-mandated per-admission pinned-baseline re-verification); mutated bytes fail install | **PASS** |
 | KPK-13 | clean public consumer on stock Node, no `compiledApp`, no runtime compilation | **PASS** |
 | KPK-14 | independent differential: same material executed through the ORIGINAL frozen v0.7 `admitCentralDecision`/`VolatileAdmissionEffectJournal` (imported live) and through the loaded package — admitted plans, journal rows (byte-identical under the fixed clock), denial taxonomy and UNKNOWN taxonomy agree | **PASS (bounded)** — same-business-effect/deny/current-version-safety reference only |
+| KPK-15 | **[Controller 090 repair]** per-occurrence dynamic Effect input + business idempotency binding: two domains (approval amount/requestId, inventory sku/qty/reservationId) yield per-request DISTINCT effect port inputs, journal inputs and keys; forged caller / out-of-limit / schema-path-template injection (typed, at installation) / idempotency-key injection (typed, before journal) / post-admission payload mutation (typed JOURNAL_CONFLICT) / replay (zero double dispatch) / UNKNOWN (AMBIGUOUS, no blind retry) / concurrent cross-instance isolation / digest+binding tamper refusal; static-intent v0.7 goldens untouched | **PASS** (evidence: `kpk15-*.json`) |
 
 ## Provenance truth flags (per #993 preflight 6086996409)
 
@@ -97,6 +100,25 @@ MICROKERNEL_DYNAMIC_ADMISSION_OWNER=PHYSICALLY_SELECTED_KERNEL_PACKAGE_ONLY
 
 ## Honest boundaries (NOT_PROVEN / out of scope)
 
+- **[Controller 090 repair scope] Per-occurrence dynamic Effect binding**:
+  the kernel-vnext@1.1.0 mechanism resolves data-only, allowlisted,
+  wiring-pinned `inputFrom`/`idempotencyKeyFrom` declarations per occurrence
+  (after authorized admission, before any journal write). NOT repaired and
+  NOT relabeled by that change (all remain open):
+  - **post-final duplicate in-response readback** — a duplicate submit after
+    completion still returns a typed `no-candidate-transition` denial without
+    the completed outcome in the response; the separate journal query remains
+    the readback path (#972@6096530583 Cell 2);
+  - **misleading model-free receipt vocabulary** — the Standard SDK still
+    reports `source:'harness-machine', llmAvoided:false,
+    freshModelCallCount:1` for deterministic model-free decisions (deliberate
+    v0.7 golden vocabulary; no model port exists at all);
+  - **mandatory Host durability** — unchanged (see KPK-07 boundary);
+  - **GLOBAL cross-instance business-key uniqueness is NOT kernel-enforced**
+    — the effect journal remains occurrence-scoped per instance/turn (v0.7
+    semantics preserved): two instances admitting the same business key stay
+    isolated (KPK-15i) but do not globally deduplicate; a business needing a
+    global unique constraint must own it outside this seam.
 - **Durable-journal integrity against a hostile Host-store writer:
   NOT_PROVEN.** Within this experiment's explicitly trusted-Host-store
   premise, the KPK-11 adversarial boundary test documents the actual
@@ -133,10 +155,10 @@ MICROKERNEL_DYNAMIC_ADMISSION_OWNER=PHYSICALLY_SELECTED_KERNEL_PACKAGE_ONLY
   caller-role authorization and SDK plain-JSON gates still hold inside the
   kernel and no authority escalates (verified in review).
 - **Test-Host business fixture keys**: the memory/file Host adapters
-  hardcode `ledger`/`warehouse` resource fixtures — test-only business
-  provisioning at the physical-resource seam, annotated as an accepted
-  exception in KPK-02's static scan, which asserts these keys never appear
-  in the Microkernel/producer/public API.
+  hardcode `ledger`/`warehouse`/`booking` resource fixtures — test-only
+  business provisioning at the physical-resource seam, annotated as an
+  accepted exception in KPK-02's static scan, which asserts these keys never
+  appear in the Microkernel/producer/public API.
 - **Sandboxing arbitrary same-realm JavaScript**: not claimed; what is proven
   is route/capability isolation from every public surface.
 - **Production package tooling**: the producer here is a test-only G0 system

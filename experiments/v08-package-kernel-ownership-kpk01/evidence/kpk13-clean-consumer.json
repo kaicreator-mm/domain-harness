@@ -4,8 +4,8 @@
   "nodeVersion": "v24.21.0",
   "roundTrip": {
     "consumer": "stock-node public consumer (no compiledApp, no runtime compilation)",
-    "loadedKernel": "kernel-vnext@1.0.0",
-    "kernelModuleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+    "loadedKernel": "kernel-vnext@1.1.0",
+    "kernelModuleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7",
     "decision": {
       "status": "admitted",
       "turn": "turn:order-quote:instance%3A42:message:msg%3Ademo-1",
@@ -13,11 +13,20 @@
       "targetState": "approved",
       "effect": "executed"
     },
+    "dynamicDecision": {
+      "status": "admitted",
+      "effectIdempotencyKey": "reserve:quote:DEMO-R1",
+      "ledgerPayload": {
+        "amount": 27,
+        "requestId": "DEMO-R1",
+        "effectId": "turn:order-quote:instance%3A43:message:msg%3Ademo-2/effect/1"
+      }
+    },
     "instanceState": {
       "stateKey": "approved",
       "context": {}
     },
-    "journalRows": 1,
-    "observedReceipts": 1
+    "journalRows": 2,
+    "observedReceipts": 2
   }
 }

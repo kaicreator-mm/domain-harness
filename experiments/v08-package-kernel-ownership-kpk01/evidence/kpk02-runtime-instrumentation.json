@@ -4,6 +4,8 @@
   "mechanismFunctionNames": [
     "admitCentralDecision",
     "executeEffectIntents",
+    "resolveAdmissionEffectIntents",
+    "wireAdmissionEffectBindings",
     "VolatileAdmissionEffectJournal",
     "WorkflowInstanceEngine",
     "deriveDurableControlTurnId"

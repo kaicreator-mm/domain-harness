@@ -44,7 +44,7 @@ test('KPK-01: executing mechanism functions are physically instantiated from the
   // Receipt attribution points at the selected package, not a Host engine.
   const receipt = await runtime.send(quoteIntent({ amount: 42 }));
   assert.equal(receipt.status, 'admitted');
-  assert.equal(receipt.attribution.kernel.packageId, 'kernel-vnext@1.0.0');
+  assert.equal(receipt.attribution.kernel.packageId, 'kernel-vnext@1.1.0');
   assert.equal(receipt.attribution.kernel.moduleSha256, kernelPkg.moduleSha256);
 
   // Measured mechanism call counts (dynamic ownership proof).

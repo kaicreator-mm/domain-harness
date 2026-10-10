@@ -22,7 +22,7 @@ test('KPK-03: the producer validates once and emits a ready sealed root with fix
   assert.equal(pkg.bindings.filter((b) => b.role === 'rule-interpreter').length, 1);
   assert.equal(pkg.bindings.filter((b) => b.role === 'business-policy').length, 1);
   const intents = pkg.bindings.filter((b) => b.role === 'intent').map((b) => b.intentType).sort();
-  assert.deepEqual(intents, ['submitQuoteDecision', 'submitQuoteDecisionStrict']);
+  assert.deepEqual(intents, ['submitQuoteDecision', 'submitQuoteDecisionDynamic', 'submitQuoteDecisionStrict']);
   assert.match(pkg.build.closureDigest, /^[0-9a-f]{64}$/);
 
   // Sealed roots are frozen: post-build mutation attempts throw (in strict

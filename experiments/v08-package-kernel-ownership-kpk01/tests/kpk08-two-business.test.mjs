@@ -129,7 +129,7 @@ test('KPK-08: installing the second business root leaves the first runtime behav
   });
   assert.equal(approved.status, 'admitted');
   assert.equal(approved.admitted.targetState, 'approved');
-  assert.equal(approved.attribution.kernel.packageId, 'kernel-vnext@1.0.0');
+  assert.equal(approved.attribution.kernel.packageId, 'kernel-vnext@1.1.0');
 
   // Approval intents remain unbound on the parts runtime and vice versa.
   await assert.rejects(

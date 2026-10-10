@@ -73,7 +73,7 @@ test('KPK-10: load rejects raw/unsealed manifests with typed installation errors
   const impostor = JSON.parse(JSON.stringify(pkg));
   impostor.packages[2] = { ...impostor.packages[2], packageId: 'business-order-approval@1.0.0' };
   impostor.packages[2].moduleSource = impostor.packages[2].moduleSource
-    .replace("export const MODULE_ID = 'business-order-approval@1.0.0';", "export const MODULE_ID = 'kernel-vnext@1.0.0';");
+    .replace("export const MODULE_ID = 'business-order-approval@1.0.0';", "export const MODULE_ID = 'kernel-vnext@1.1.0';");
   impostor.packages[2].moduleSha256 = (await import('node:crypto'))
     .createHash('sha256').update(impostor.packages[2].moduleSource, 'utf8').digest('hex');
   await assert.rejects(

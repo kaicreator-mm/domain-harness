@@ -27,13 +27,19 @@ test('KPK-13: the stock-Node public consumer performs a full typed UX round trip
 
   const output = JSON.parse(result.stdout);
   assert.equal(output.consumer.includes('stock-node'), true);
-  assert.equal(output.loadedKernel, 'kernel-vnext@1.0.0');
+  assert.equal(output.loadedKernel, 'kernel-vnext@1.1.0');
   assert.match(output.kernelModuleSha256, /^[0-9a-f]{64}$/);
   assert.equal(output.decision.status, 'admitted');
   assert.equal(output.decision.transition, 'approve');
   assert.equal(output.decision.effect, 'executed');
-  assert.equal(output.journalRows, 1);
-  assert.equal(output.observedReceipts, 1);
+  // [Controller 090 repair] the dynamic intent round trip: per-request data
+  // reaches the effect port through the kernel-resolved binding.
+  assert.equal(output.dynamicDecision.status, 'admitted');
+  assert.equal(output.dynamicDecision.effectIdempotencyKey, 'reserve:quote:DEMO-R1');
+  assert.deepEqual(output.dynamicDecision.ledgerPayload.amount, 27);
+  assert.deepEqual(output.dynamicDecision.ledgerPayload.requestId, 'DEMO-R1');
+  assert.equal(output.journalRows, 2);
+  assert.equal(output.observedReceipts, 2);
   assert.equal(output.instanceState.stateKey, 'approved');
 
   // The public API surface contains no compiledApp parameter and no compile step.

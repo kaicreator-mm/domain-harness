@@ -1,6 +1,6 @@
 {
   "falsifier": "KPK-08",
-  "sharedKernelSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548",
+  "sharedKernelSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7",
   "sharedSdkSha256": "19c2893dd393bacff9691719e53f142b3f5df742a662d066df9aa245d3661736",
   "approval": {
     "packageId": "business-order-approval@1.0.0",

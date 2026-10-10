@@ -48,6 +48,25 @@ carries the same attribution in its header.
 - `KernelGovernancePinStore` — the T-014 “pin required for EVERY admission”
   gate over the Host doc port, binding the occurrence to the exact kernel
   module bytes.
+- `wireAdmissionEffectBindings` / `resolveAdmissionEffectIntents` /
+  `snapshotEffectBinding` (**Controller 090 bounded repair, kernel-vnext
+  v1.1.0**) — the per-occurrence dynamic Admission Effect input and business
+  idempotency-key binding. NEW kernel-owned code (NOT a v0.7 migration; the
+  data-only declarative design was first proven executable in the #972
+  scratch remedy @6097768812 Candidate A and is here sealed into the
+  package-owned mechanism): `inputFrom`/`idempotencyKeyFrom` declarations
+  are validated once at wiring inside `createOccurrenceRuntime` (the trusted
+  `DomainHarness.load` installation boundary — event paths confined to the
+  rule-`payloadFromInput`-authorized projection, decision paths to the typed
+  decision shape, template literals to `[A-Za-z0-9._:-]` with placeholders ⊆
+  declared fields, static/dynamic authority mutually exclusive,
+  deep-frozen snapshots keyed by intent-object identity) and resolved ONLY
+  inside `admitCentralDecision` AFTER authorized transition admission and
+  BEFORE any journal write or effect dispatch (resolved keys must match
+  `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`; post-wiring live mutation is ignored,
+  injected syntax fails typed `ADMISSION_EFFECT_BINDING_UNVALIDATED`).
+  Falsified by KPK-15; the v1.0.0 independent review does NOT transfer to
+  the mutated v1.1.0 bytes.
 
 The successor module `kernel-mechanism-v2.mjs` is generated from v1 by
 `generate-kernel-v2.mjs`; its only deltas are documented there and in

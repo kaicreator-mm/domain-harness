@@ -3,7 +3,7 @@
   "scope": "bounded same-business-effect semantic reference (user scope 6093427821: no legacy API parity claim)",
   "admitted": {
     "durableControlTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
-    "governanceBindingDigest": "bf3c9b54762d090ac262cd64f61b5bf0c24a008a6d968d679db8676dcabe9dda",
+    "governanceBindingDigest": "a3bcfb053cda8f827484b480d07e0ce62d9e7568b5a4243d74a9c278814c74f9",
     "transitionKey": "approve",
     "targetState": "approved",
     "effects": [

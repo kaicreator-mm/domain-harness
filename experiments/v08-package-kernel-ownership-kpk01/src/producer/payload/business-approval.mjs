@@ -18,6 +18,15 @@
  *     idempotencyKey 'reserve:quote:1'
  *   - decision schema: {decision:{outcome,data}, event:{type,payload}}
  *
+ * [Controller 090 repair, additive] ONE new intent binding
+ * `submitQuoteDecisionDynamic` (rule `rule:quote-decision-request`
+ * authorizing payload {amount, requestId}) whose approve transition declares
+ * the kernel's data-only dynamic effect binding:
+ *   inputFrom        {amount, requestId} ← rule-authorized event projection
+ *   idempotencyKeyFrom 'reserve:quote:{requestId}'
+ * The STATIC definitions above stay untouched so the v0.7 golden anchors
+ * (KPK-04/KPK-14) keep comparing against identical declared behavior.
+ *
  * This package owns business policy ONLY. It contains no admission/journal/
  * state-transition mechanism code and imports nothing from the kernel: the
  * loaded Kernel Package invokes it through its sealed endpoint.
@@ -34,7 +43,7 @@ export const ENDPOINTS = [
 ];
 
 /** Intent types this policy binds (sealed into the root package by the producer). */
-export const INTENT_TYPES = ['submitQuoteDecision', 'submitQuoteDecisionStrict'];
+export const INTENT_TYPES = ['submitQuoteDecision', 'submitQuoteDecisionStrict', 'submitQuoteDecisionDynamic'];
 /** Effect types this policy declares handlers for. */
 export const EFFECT_TYPES = ['effect:reserve'];
 
@@ -110,6 +119,54 @@ const decisionSchema = {
   },
 };
 
+/**
+ * [Controller 090 repair] Dynamic-binding definition: same workflow family
+ * as makeDefinition({omitReject:true}) — the unguarded 'reject' fallback
+ * transition is deliberately OMITTED so the GUARD denial path stays
+ * reachable for the dynamic intent (amount 75 must deny on
+ * guard:amount-ok, not fall through to 'rejected'). The approve
+ * transition's effect intent declares inputFrom/idempotencyKeyFrom instead
+ * of static input/idempotencyKey; the kernel validates this declaration
+ * once at wiring against rule:quote-decision-request's authorized payload
+ * projection {amount, requestId} and resolves the per-occurrence values
+ * after admission, before the journal. The STATIC definitions above stay
+ * untouched so the v0.7 golden anchors (KPK-04/KPK-14) keep comparing
+ * against identical declared behavior.
+ */
+function makeDynamicDefinition() {
+  return {
+    workflowKey: 'order-quote',
+    initialState: 'review',
+    initialContext: {},
+    guards: [GUARD_AMOUNT_OK],
+    states: [
+      {
+        stateKey: 'review',
+        transitions: [
+          {
+            transitionKey: 'approve',
+            trigger: { kind: 'event', eventType: 'QUOTE_DECIDED' },
+            targetState: 'approved',
+            guardId: 'guard:amount-ok',
+            effectIntents: [
+              {
+                effectType: 'effect:reserve',
+                inputFrom: {
+                  amount: { source: 'event', path: ['payload', 'amount'] },
+                  requestId: { source: 'event', path: ['payload', 'requestId'] },
+                },
+                idempotencyKeyFrom: { template: 'reserve:quote:{requestId}' },
+              },
+            ],
+          },
+        ],
+      },
+      { stateKey: 'approved', kind: 'final' },
+      { stateKey: 'rejected', kind: 'final' },
+    ],
+  };
+}
+
 export function getPolicy() {
   return {
     packageId: MODULE_ID,
@@ -123,6 +180,7 @@ export function getPolicy() {
     initialContext: {},
     rules: {
       'rule:quote-decision': { ruleId: 'rule:quote-decision', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount' } },
+      'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },
     },
     intentBindings: {
       submitQuoteDecision: {
@@ -135,6 +193,12 @@ export function getPolicy() {
         ruleId: 'rule:quote-decision',
         roles: ['requester'],
         definition: makeDefinition({ omitReject: true }),
+      },
+      submitQuoteDecisionDynamic: {
+        trigger: { kind: 'event', eventType: 'QUOTE_DECIDED' },
+        ruleId: 'rule:quote-decision-request',
+        roles: ['requester'],
+        definition: makeDynamicDefinition(),
       },
     },
     effectBindings: {

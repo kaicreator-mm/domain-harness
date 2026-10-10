@@ -1,14 +1,14 @@
 {
   "falsifier": "KPK-01 (KPK-09 overlap)",
   "v1": {
-    "moduleId": "kernel-vnext@1.0.0",
-    "moduleSha256": "275b2ca73ade71165aa14ea19d920c4f0808fb1b1dc4c14cc16896c049e56548"
+    "moduleId": "kernel-vnext@1.1.0",
+    "moduleSha256": "3cfb9bf8e52858c0ce3ff9a7996456d416eb0a7ec2f86152e0a3697a0ae943f7"
   },
   "v2": {
     "moduleId": "kernel-vnext@2.0.0",
-    "moduleSha256": "80228942099b0a9b579f82bb3d2489707641e393218591ef1618d4a744fc38b7"
+    "moduleSha256": "b0d5a252c95998b4b2f36688f00a9533081eb9be241316185722066d62f98aa7"
   },
-  "unchangedNonKernelShas": "19c2893dd393bacff9691719e53f142b3f5df742a662d066df9aa245d3661736,3d625bc0e3d2a673a96faaeb1ba02eddaf76a3d7e5a3c6c308ce759d5e514f17",
+  "unchangedNonKernelShas": "12ab776b298858e1a4b768a0867d3f399d6eded3b0e20e1f2826f05475a511a6,19c2893dd393bacff9691719e53f142b3f5df742a662d066df9aa245d3661736",
   "amount5": {
     "v1": "admitted",
     "v2": "denied",
