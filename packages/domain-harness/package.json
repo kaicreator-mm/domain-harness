@@ -45,6 +45,11 @@
       "types": "./dist/public-v8/index.d.ts",
       "import": "./dist/public-v8/index.js",
       "require": "./dist/public-v8/index.js"
+    },
+    "./v8/host": {
+      "types": "./dist/host-v8/index.d.ts",
+      "import": "./dist/host-v8/index.js",
+      "require": "./dist/host-v8/index.js"
     }
   },
   "files": [
