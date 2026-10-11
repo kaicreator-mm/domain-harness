@@ -13,7 +13,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "src/qualified-package/payload/*.mjs"
   ],
   "engines": {
     "node": ">=22"
