@@ -6,68 +6,20 @@
 // barriers before/after the durable commit and reopens with a NEW process.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { spawn, execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileSuccessor, freshDbPath, openStore, rawSql, createNodeHost, fixedBusinessSnapshots, CRM_SNAPSHOT, HOST_MAXIMA, retainedLegacyPackage } from './helper.ts';
 import { createNodeDomainRuntime } from '../../src/index.js';
 import { StaticPackageRegistry } from '@kaicreator/domain-harness';
+import { assertHealthyWorkerReports, spawnReportedChild, withSpawnOnlyRetry, type ChildResult } from './worker-oracle.ts';
 
 const CHILD = resolve(join(fileURLToPath(import.meta.url), '..', 'fixtures', 'child.ts'));
-const LINE_SPLIT = String.fromCharCode(10);
 const WORKERS = 8;
 
-interface ChildOutcome {
-  readonly pid: number;
-  readonly instanceDisposition?: string;
-  readonly provisioningDisposition?: string;
-  readonly stateRevision?: number;
-}
-
-function runChild(args: readonly string[], options: { readonly killAt?: string; readonly killSignalFile?: string } = {}):
-    Promise<{ readonly code: number | null; readonly stdout: string; readonly killed: boolean }> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', CHILD, ...args], {
-      cwd: process.cwd(),
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // Strip the test-runner worker identity: a child of a `node --test`
-      // parent must run as a plain process, not inherit NODE_TEST_CONTEXT.
-      env: { ...process.env, NODE_TEST_CONTEXT: undefined, SX_BUSY_TIMEOUT_MS: '30000' },
-    });
-    let stdout = '';
-    let killed = false;
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-    });
-    if (options.killAt !== undefined && options.killSignalFile !== undefined) {
-      const timer = setInterval(() => {
-        if (!existsSync(options.killSignalFile!)) return;
-        try {
-          const stages = readFileSync(options.killSignalFile, 'utf8');
-          if (!stages.includes(`${child.pid}:${options.killAt}`)) return;
-          // Real OS kill per platform (prep N00: Windows taskkill /F /T,
-          // POSIX PID-targeted SIGKILL).
-          if (process.platform === 'win32') {
-            execFileSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore' });
-          } else {
-            process.kill(child.pid, 'SIGKILL');
-          }
-          killed = true;
-        } catch {
-          /* raced exit */
-        }
-        clearInterval(timer);
-      }, 25);
-      child.on('exit', () => clearInterval(timer));
-    }
-    child.on('error', rejectPromise);
-    child.on('close', (code) => resolvePromise({ code, stdout, killed }));
-  });
+function runChild(args: readonly string[], options: Parameters<typeof spawnReportedChild>[2] = {}): Promise<ChildResult> {
+  return spawnReportedChild(CHILD, args, options);
 }
 
 async function bootRuntimeOn(path: string, options: { readonly observation?: boolean } = {}) {
@@ -96,30 +48,36 @@ test('N08: 8 real OS processes racing one provisioning key converge to exactly o
     const { store } = await bootRuntimeOn(path);
     store.close();
   }
-  let results: Array<{ code: number | null; stdout: string; killed: boolean }>;
+  const spawnWorker = (index: number): Promise<ChildResult> => {
+    const workerArgs = ['ensure', path, join(tmpdir(), `dh457-n08-marker-${index}`), 'sx:n08:key-42', 'n08-shared'];
+    // #953 (P1-01): the retry is spawn-only — runChild rejects with
+    // SpawnFailure exclusively when the OS could not start the process, so a
+    // worker that never existed is relaunched once. Every LAUNCHED worker,
+    // including one that printed a valid report and then exited 137 / was
+    // killed / timed out, RESOLVES with its exit state and must fail the
+    // strict oracle below with full diagnostics — it is never replayed.
+    return withSpawnOnlyRetry(() => runChild(workerArgs, { timeoutMs: 120_000 }), `N08 worker ${index}`);
+  };
+  let results: readonly ChildResult[];
   try {
     // Staggered ramp-up (~1s window): the 8 ensure transactions still race
     // concurrently, but the tsx/migration startup storm on slower hosts no
     // longer trips busy timeouts before the race even begins.
     results = await Promise.all(Array.from({ length: WORKERS }, (_, index) =>
-      new Promise<{ code: number | null; stdout: string; killed: boolean }>((resolveStagger) => {
+      new Promise<void>((resolveStagger) => {
         setTimeout(resolveStagger, index * 150);
-      }).then(() =>
-        runChild(['ensure', path, join(tmpdir(), `dh457-n08-marker-${index}`), 'sx:n08:key-42', 'n08-shared']))));
+      }).then(() => spawnWorker(index))));
   } catch (error) {
     console.error('N08_RACE_ERROR', error);
     throw error;
   }
 
-  const outcomes = results
-    .map((result) => result.stdout.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('{')))
-    .filter((lines) => lines.length > 0)
-    .map((lines) => JSON.parse(lines[lines.length - 1]!) as ChildOutcome);
-  assert.equal(outcomes.length, WORKERS, `every worker must report: ${JSON.stringify(results.map((r) => r.stdout.slice(0, 200)))}`);
-  const created = outcomes.filter((outcome) => outcome.instanceDisposition === 'created');
-  const existing = outcomes.filter((outcome) => outcome.instanceDisposition === 'existing');
-  assert.equal(created.length, 1, 'exactly one worker materializes the instance');
-  assert.equal(existing.length, WORKERS - 1, 'all other workers converge onto the existing instance');
+  // #953 (P1-01) strict oracle: all 8 workers must have exited cleanly
+  // (code 0, no signal, not killed, not timed out) AND printed exactly one
+  // correctly shaped, pid-correlated, error-free report each — BEFORE the
+  // disposition counts are even considered. A worker that reports success
+  // JSON and then dies abnormally fails closed here.
+  assertHealthyWorkerReports(results, { workers: WORKERS, created: 1, existing: WORKERS - 1 });
 
   const sql = rawSql(path);
   const keyRows = sql.rows('SELECT provisioning_key, record_json FROM dh_v3_provisioning_keys') as Array<{ provisioning_key: string; record_json: string }>;
@@ -140,12 +98,11 @@ test('N08b: conflicting same-key ensure requests with a changed address fail clo
     const { store } = await bootRuntimeOn(path);
     store.close();
   }
-  const first = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-first'), 'sx:n08b:key', 'n08b-target']);
-  const firstOutcome = JSON.parse(first.stdout.split(LINE_SPLIT).filter((line) => line.startsWith('{')).pop()!) as ChildOutcome;
-  assert.equal(firstOutcome.instanceDisposition, 'created');
+  const first = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-first'), 'sx:n08b:key', 'n08b-target'], { timeoutMs: 120_000 });
+  assertHealthyWorkerReports([first], { workers: 1, created: 1, existing: 0 });
 
   const conflicting = await Promise.all([0, 1, 2, 3].map((index) =>
-    runChild(['ensure', path, join(tmpdir(), `dh457-n08b-c${index}`), 'sx:n08b:key', `n08b-OTHER-${index}`])));
+    runChild(['ensure', path, join(tmpdir(), `dh457-n08b-c${index}`), 'sx:n08b:key', `n08b-OTHER-${index}`], { timeoutMs: 120_000 })));
   for (const result of conflicting) {
     assert.notEqual(result.code, 0, 'a conflicting same-key request must fail closed');
     assert.match(result.stdout, /already/i, `failure names the conflicting provisioning key: ${result.stdout.slice(0, 200)}`);
@@ -157,9 +114,8 @@ test('N08b: conflicting same-key ensure requests with a changed address fail clo
   sql.close();
 
   // The EXACT original request still converges after the conflicts.
-  const replay = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-replay'), 'sx:n08b:key', 'n08b-target']);
-  const replayOutcome = JSON.parse(replay.stdout.split(LINE_SPLIT).filter((line) => line.startsWith('{')).pop()!) as ChildOutcome;
-  assert.equal(replayOutcome.instanceDisposition, 'existing');
+  const replay = await runChild(['ensure', path, join(tmpdir(), 'dh457-n08b-replay'), 'sx:n08b:key', 'n08b-target'], { timeoutMs: 120_000 });
+  assertHealthyWorkerReports([replay], { workers: 1, created: 0, existing: 1 });
 }, 180_000);
 
 test('N09: a REAL durable-table failure at the covered boundary leaves zero partial commits', async () => {
@@ -239,7 +195,7 @@ test('N10: real taskkill crash windows around the durable commit', async () => {
 
       const killed = await runChild(
         ['ensure-armed', path, marker, stage, `sx:n10:${stage}`, `n10-${stage}`],
-        { killAt: 'at-barrier', killSignalFile: marker },
+        { killAt: 'at-barrier', killSignalFile: marker, timeoutMs: 120_000 },
       );
       assert.equal(killed.killed, true, `${stage}: the worker was really killed by taskkill /F`);
       assert.notEqual(killed.code, 0, `${stage}: killed worker exits abnormally`);
@@ -258,14 +214,12 @@ test('N10: real taskkill crash windows around the durable commit', async () => {
       sql.close();
 
       // Reopen from a NEW OS process with the exact same request.
-      const retry = await runChild(['ensure', path, join(dir, 'retry-marker'), `sx:n10:${stage}`, `n10-${stage}`]);
-      const retryOutcome = JSON.parse(
-        retry.stdout.split('\n').filter((line) => line.startsWith('{')).pop()!,
-      ) as ChildOutcome;
-      if (stage === 'before-ensure') {
-        assert.equal(retryOutcome.instanceDisposition, 'created', 'window A retry materializes cleanly');
-      } else {
-        assert.equal(retryOutcome.instanceDisposition, 'existing', 'window B retry returns the committed instance without reset');
+      const retry = await runChild(['ensure', path, join(dir, 'retry-marker'), `sx:n10:${stage}`, `n10-${stage}`], { timeoutMs: 120_000 });
+      const retryOutcome = assertHealthyWorkerReports(
+        [retry],
+        stage === 'before-ensure' ? { workers: 1, created: 1, existing: 0 } : { workers: 1, created: 0, existing: 1 },
+      )[0]!;
+      if (stage === 'after-commit') {
         assert.equal(retryOutcome.stateRevision, 0, 'window B retry never resets progressed state');
       }
 

@@ -61,11 +61,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { stagePackedWorkspaces } from './packed-fixture-stage.js';
 import {
   admitComponent,
   ComponentAdmissionError,
@@ -1169,10 +1170,6 @@ function runNpm(args: readonly string[], cwd: string): string {
   } as Parameters<typeof execFileSync>[1]) as string;
 }
 
-function sha256File(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
 interface ConsumerFixture {
   readonly root: string;
   readonly consumerDirectory: string;
@@ -1182,32 +1179,22 @@ interface ConsumerFixture {
 
 let consumerPromise: Promise<ConsumerFixture> | undefined;
 
-/** Pack the committed core+compiler dist once and stand up a clean consumer. */
+/**
+ * Pack the committed core+compiler dist once and stand up a clean consumer.
+ * #953 (Controller 090): the tarballs come from the shared immutable stage
+ * (tests/packed-fixture-stage.ts) — no in-test rebuild of the live shared
+ * workspace dist and no pack racing a parallel rewrite.
+ */
 function consumerFixture(): Promise<ConsumerFixture> {
   if (consumerPromise !== undefined) return consumerPromise;
   consumerPromise = (async (): Promise<ConsumerFixture> => {
     const root = mkdtempSync(join(tmpdir(), 'domain-harness-e8a-consumer-'));
-    const packDirectory = join(root, 'packs');
     const consumerDirectory = join(root, 'consumer');
     try {
-      mkdirSync(packDirectory, { recursive: true });
       mkdirSync(consumerDirectory, { recursive: true });
-
-      runNpm(['run', 'build', '--workspace', '@kaicreator/domain-harness'], REPO_ROOT);
-      runNpm(
-        ['pack', '--workspace', '@kaicreator/domain-harness', '--pack-destination', packDirectory],
-        REPO_ROOT,
-      );
-      runNpm(['pack', '--pack-destination', packDirectory], PACKAGE_ROOT);
-      const tarballs = readdirSync(packDirectory)
-        .filter((name) => name.endsWith('.tgz'))
-        .sort()
-        .map((name) => join(packDirectory, name));
-      assert.equal(tarballs.length, 2);
-      const coreTarball = tarballs.find((name) => name.includes('domain-harness-0.2.0'))!;
-      const compilerTarball = tarballs.find((name) => name.includes('compiler'))!;
-      const coreTarballSha256 = sha256File(coreTarball);
-      const compilerTarballSha256 = sha256File(compilerTarball);
+      const staged = await stagePackedWorkspaces();
+      const coreTarballSha256 = staged.coreTarball.sha256;
+      const compilerTarballSha256 = staged.compilerTarball.sha256;
 
       writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
         name: 'domain-harness-e8a-clean-consumer',
@@ -1216,14 +1203,14 @@ function consumerFixture(): Promise<ConsumerFixture> {
       }, null, 2));
 
       runNpm(
-        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', ...tarballs],
+        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', staged.coreTarball.path, staged.compilerTarball.path],
         consumerDirectory,
       );
 
       console.log('E8A_PACKED_ARTIFACTS', JSON.stringify({
-        coreTarball: coreTarball.split(/[\\/]/).pop(),
+        coreTarball: staged.coreTarball.fileName,
         coreTarballSha256,
-        compilerTarball: compilerTarball.split(/[\\/]/).pop(),
+        compilerTarball: staged.compilerTarball.fileName,
         compilerTarballSha256,
       }));
 

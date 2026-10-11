@@ -52,15 +52,24 @@
  *
  * Fixture identity: E8B_FINAL_V06_COMPAT_V1 (#873 freeze,
  * MANIFEST_SHA256=10354b6d51962938ed5e9ca56960f9335bbd0a0598665f669a0f4d31bd7b84c4).
+ *
+ * #953 (Controller 090): the packed candidate tarballs now come from the
+ * shared immutable stage (tests/packed-fixture-stage.ts) instead of an
+ * in-test `npm run build -w @kaicreator/domain-harness` + live-dist
+ * `npm pack` — the parallel test files used to rewrite the shared dist while
+ * packing it (Woodpecker 1083/1: npm pack unexpected EOF). Every vector below
+ * still installs the packed tarballs into its own fresh clean consumer and
+ * keeps every reference assertion.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { stagePackedWorkspaces } from './packed-fixture-stage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, '..');
@@ -106,16 +115,11 @@ function runGit(args: readonly string[]): string {
   return run('git', args, REPO_ROOT);
 }
 
-function sha256File(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
 function gitBlobSha256(revisionPath: string): string {
   return createHash('sha256').update(runGit(['show', revisionPath]), 'utf8').digest('hex');
 }
 
 interface ConsumerFixture {
-  readonly root: string;
   readonly consumerDirectory: string;
   readonly coreTarballSha256: string;
   readonly compilerTarballSha256: string;
@@ -124,36 +128,18 @@ interface ConsumerFixture {
 let consumerPromise: Promise<ConsumerFixture> | undefined;
 
 /**
- * Pack the committed candidate core+compiler dist ONCE per run, record the
- * tarball SHA256 identities BEFORE any behavioral vector consumes them
- * (#873 DERIVED_ARTIFACT_RULE), install them into a fresh clean consumer.
+ * Install the staged candidate core+compiler tarballs ONCE per run into a
+ * fresh clean consumer, recording the tarball SHA256 identities BEFORE any
+ * behavioral vector consumes them (#873 DERIVED_ARTIFACT_RULE). The tarballs
+ * are the immutable per-process stage from packed-fixture-stage.ts — no
+ * live workspace dist is written or packed here.
  */
 function consumerFixture(): Promise<ConsumerFixture> {
   if (consumerPromise !== undefined) return consumerPromise;
   consumerPromise = (async (): Promise<ConsumerFixture> => {
-    const root = mkdtempSync(join(tmpdir(), 'domain-harness-e8b-consumer-'));
-    const packDirectory = join(root, 'packs');
-    const consumerDirectory = join(root, 'consumer');
+    const staged = await stagePackedWorkspaces();
+    const consumerDirectory = mkdtempSync(join(tmpdir(), 'domain-harness-e8b-consumer-'));
     try {
-      mkdirSync(packDirectory, { recursive: true });
-      mkdirSync(consumerDirectory, { recursive: true });
-
-      runNpm(['run', 'build', '--workspace', '@kaicreator/domain-harness'], REPO_ROOT);
-      runNpm(
-        ['pack', '--workspace', '@kaicreator/domain-harness', '--pack-destination', packDirectory],
-        REPO_ROOT,
-      );
-      runNpm(['pack', '--pack-destination', packDirectory], PACKAGE_ROOT);
-      const tarballs = readdirSync(packDirectory)
-        .filter((name) => name.endsWith('.tgz'))
-        .sort()
-        .map((name) => join(packDirectory, name));
-      assert.equal(tarballs.length, 2);
-      const coreTarball = tarballs.find((name) => name.includes('domain-harness-0.2.0'))!;
-      const compilerTarball = tarballs.find((name) => name.includes('compiler'))!;
-      const coreTarballSha256 = sha256File(coreTarball);
-      const compilerTarballSha256 = sha256File(compilerTarball);
-
       writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
         name: 'domain-harness-e8b-clean-consumer',
         private: true,
@@ -161,21 +147,25 @@ function consumerFixture(): Promise<ConsumerFixture> {
       }, null, 2));
 
       runNpm(
-        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', ...tarballs],
+        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', staged.coreTarball.path, staged.compilerTarball.path],
         consumerDirectory,
       );
 
       console.log('E8B_PACKED_ARTIFACTS', JSON.stringify({
-        coreTarball: coreTarball.split(/[\\/]/).pop(),
-        coreTarballSha256,
-        compilerTarball: compilerTarball.split(/[\\/]/).pop(),
-        compilerTarballSha256,
+        coreTarball: staged.coreTarball.fileName,
+        coreTarballSha256: staged.coreTarball.sha256,
+        compilerTarball: staged.compilerTarball.fileName,
+        compilerTarballSha256: staged.compilerTarball.sha256,
         subjectHead: runGit(['rev-parse', 'HEAD']).trim(),
       }));
 
-      return { root, consumerDirectory, coreTarballSha256, compilerTarballSha256 };
+      return {
+        consumerDirectory,
+        coreTarballSha256: staged.coreTarball.sha256,
+        compilerTarballSha256: staged.compilerTarball.sha256,
+      };
     } catch (error) {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(consumerDirectory, { recursive: true, force: true });
       throw error;
     }
   })();
@@ -350,7 +340,7 @@ if (typeof compiler.compileSemanticDecisions !== 'function') throw new Error('pa
       consumerDirectory,
     );
   } finally {
-    rmSync(fxConsumer.root, { recursive: true, force: true });
+    rmSync(fxConsumer.consumerDirectory, { recursive: true, force: true });
     consumerPromise = undefined;
   }
 }, { timeout: 600000 });
@@ -492,7 +482,7 @@ console.log('E8B_SD_VECTOR', JSON.stringify({
     assert.ok(marker, 'consumer script did not emit E8B_SD_VECTOR');
     console.log(marker);
   } finally {
-    rmSync(fxConsumer.root, { recursive: true, force: true });
+    rmSync(fxConsumer.consumerDirectory, { recursive: true, force: true });
     consumerPromise = undefined;
   }
 }, { timeout: 600000 });
@@ -546,7 +536,7 @@ if (v2.isSupportedCompiledArtifactProfile({ formatVersion: '0.4', runtimeContrac
       consumerDirectory,
     );
   } finally {
-    rmSync(fxConsumer.root, { recursive: true, force: true });
+    rmSync(fxConsumer.consumerDirectory, { recursive: true, force: true });
     consumerPromise = undefined;
   }
 }, { timeout: 600000 });
@@ -603,7 +593,7 @@ console.log('E8B_AUTHORITY_GATE', JSON.stringify({ code: rejected.code }));
       consumerDirectory,
     );
   } finally {
-    rmSync(fxConsumer.root, { recursive: true, force: true });
+    rmSync(fxConsumer.consumerDirectory, { recursive: true, force: true });
     consumerPromise = undefined;
   }
 }, { timeout: 600000 });
