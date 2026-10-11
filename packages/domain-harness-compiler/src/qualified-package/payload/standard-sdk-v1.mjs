@@ -313,3 +313,155 @@ export function createHostBoundModelResolver(hostModelPort, options = {}) {
     },
   });
 }
+
+/**
+ * Retention: v0.7 ProjectionService @86110c6 blob 52b3127..., reduced to
+ * the Standard-package-owned *deterministic projection* boundary.
+ *
+ * All source reads/currentness and exposure admission belong to K + trusted
+ * Host. This method cannot read them or mint a provenance revision. It
+ * consumes ONLY snapshots with exact K-attested revision selectors and yields
+ * an inert projection candidate. Revision mismatch is fail-closed.
+ */
+export function projectRetainedRead(rawDeclaration, rawSnapshots) {
+  const declaration = record(data(rawDeclaration), 'projection declaration');
+  const snapshots = record(data(rawSnapshots), 'projection snapshots');
+  const id = ident(declaration.projectionId, 'projectionId');
+  const dependencies = declaration.dependencies;
+  if (!Array.isArray(dependencies) || dependencies.length === 0 || dependencies.length > MAX_CASES) {
+    fail('SDK_PROJECTION_INVALID', 'projection requires a bounded non-empty dependency list');
+  }
+  const assembled = Object.create(null);
+  const revisions = Object.create(null);
+  const keys = new Set();
+  for (const dependency of dependencies) {
+    record(dependency, 'projection dependency');
+    const name = ident(dependency.name, 'projection dependency name');
+    if (keys.has(name)) fail('SDK_PROJECTION_INVALID', 'ambiguous duplicate projection source');
+    keys.add(name);
+    const source = snapshots[name];
+    if (source === undefined) fail('SDK_PROJECTION_MISSING', 'projection dependency is unavailable');
+    record(source, 'projection source');
+    const revision = ident(source.revision, 'projection source revision');
+    const expected = ident(dependency.expectedRevision, 'projection expected revision');
+    if (revision !== expected) fail('SDK_PROJECTION_STALE', 'the supplied source revision differs from the pinned projection');
+    if (!Object.hasOwn(source, 'value')) fail('SDK_PROJECTION_MISSING', 'projection source contains no value');
+    assembled[name] = source.value;
+    revisions[name] = revision;
+  }
+  const fields = record(declaration.fields, 'projection fields');
+  const candidate = Object.create(null);
+  for (const [outputName, sourceName] of Object.entries(fields)) {
+    ident(outputName, 'projection output');
+    if (typeof sourceName !== 'string' || !Object.hasOwn(assembled, sourceName)) {
+      fail('SDK_PROJECTION_INVALID', 'a projected field must reference a declared source');
+    }
+    candidate[outputName] = assembled[sourceName];
+  }
+  return {
+    kind: 'projection',
+    projectionId: id,
+    candidate,
+    sourceRevisions: revisions,
+    revisionEvidence: { status: 'unmeasured' }, // only H can attest a revision digest
+    authority: 'proposal-only',
+  };
+}
+
+/**
+ * Retention of the v0.7 resolver ordering (resolver.ts@86110c6
+ * blob 25e8a621...): Rule -> Exact Cache -> Promoted -> Harness.
+ * This does NOT execute any source. K passes current qualified observations;
+ * the Standard SDK emits only a selected candidate. An unqualified cache
+ * hit, stale promoted artifact, or missing harness is never auto-admitted.
+ */
+export function resolveRetainedDecision(rawSelection) {
+  const selected = record(data(rawSelection), 'decision source selection');
+  const id = ident(selected.decisionId, 'decisionId');
+  const observations = record(selected.observations ?? {}, 'decision observations');
+  const sources = ['rule', 'exact-cache', 'promoted-subworkflow', 'harness-machine'];
+  for (const source of sources) {
+    const observation = observations[source];
+    if (observation === undefined) continue;
+    record(observation, 'decision observation');
+    switch (observation.status) {
+      case 'not-applicable':
+      case 'miss':
+        continue;
+      case 'revoked-deny':
+      case 'failed':
+        fail('SDK_DECISION_SOURCE_REFUSED', `source ${source} refuses or failed`);
+        break;
+      case 'match':
+        if (!Object.hasOwn(observation, 'candidate')) fail('SDK_DECISION_SOURCE_INVALID', 'matching source has no candidate');
+        if (source === 'exact-cache' && observation.exactCurrent !== true) {
+          fail('SDK_DECISION_SOURCE_REFUSED', 'cache hit has no exact-currentness evidence');
+        }
+        if (source === 'promoted-subworkflow' && observation.artifactCurrent !== true) {
+          fail('SDK_DECISION_SOURCE_REFUSED', 'promoted child is not verified current');
+        }
+        return {
+          kind: 'decision-source',
+          decisionId: id,
+          selectedSource: source,
+          candidate: observation.candidate,
+          provenance: { sdkModule: MODULE_ID, authority: 'proposal-only' },
+          modelCallEvidence: { status: 'unsupported' },
+        };
+      default:
+        fail('SDK_DECISION_SOURCE_INVALID', 'unknown resolver source disposition');
+    }
+  }
+  fail('SDK_DECISION_HARNESS_UNCONFIGURED', 'no admitted resolver candidate; no unbounded retries or invented fallback');
+}
+
+/**
+ * Agent-safe Operation exposure projection ported from the frozen
+ * v0.7 agent-tool-projection.ts@86110c6 blob 70932bed...
+ * An S projection is never admission. Mutation-capable operations MUST NOT
+ * acquire a query route merely because they were listed for an agent.
+ */
+export function projectRetainedAgentTools(rawOperations) {
+  const operations = data(rawOperations);
+  if (!Array.isArray(operations) || operations.length > MAX_CASES) {
+    fail('SDK_TOOL_SURFACE_INVALID', 'operations must be a bounded list');
+  }
+  const tools = [];
+  const seen = new Set();
+  for (const operation of operations) {
+    record(operation, 'operation descriptor');
+    const id = ident(operation.operationId, 'operationId');
+    if (seen.has(id)) fail('SDK_TOOL_SURFACE_INVALID', 'duplicate operation');
+    seen.add(id);
+    if (operation.agentExposed !== true) continue;
+    if (operation.effectClass !== 'none') {
+      fail('SDK_AGENT_MUTATION_REFUSED', 'agent read-only projection rejects effectful operation');
+    }
+    tools.push({ operationId: id, effectClass: 'none', authority: 'projection-only' });
+  }
+  return { kind: 'agent-tool-surface', tools, authority: 'projection-only' };
+}
+
+/**
+ * #v0.6 NF05/NF06 retained decision handoff as inert data: exact assembly
+ * qualification and durable append are K-owned, not Standard SDK authority.
+ */
+export function makeRetainedDecisionReceipt(rawResolution) {
+  const resolution = record(data(rawResolution), 'decision resolution');
+  const decisionId = ident(resolution.decisionId, 'decisionId');
+  const turnId = ident(resolution.turnId, 'turnId');
+  const source = ident(resolution.source, 'decision source');
+  if (!Object.hasOwn(resolution, 'decision')) {
+    fail('SDK_DECISION_RECEIPT_INVALID', 'decision receipt has no resolved decision');
+  }
+  return {
+    kind: 'decision-receipt-proposal',
+    eventType: 'DECISION_RECEIPT',
+    decisionId,
+    turnId,
+    source,
+    decision: resolution.decision,
+    authority: 'proposal-only',
+    durableAppend: 'required-by-kernel',
+  };
+}
