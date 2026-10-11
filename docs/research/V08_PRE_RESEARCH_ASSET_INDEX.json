@@ -111,7 +111,8 @@
         947
       ],
       "pr": [
-        948
+        948,
+        956
       ],
       "exact_head": "f97610a904c7969836165b65ab53e575bd67d43b",
       "asset_type": [
@@ -130,8 +131,19 @@
       "consumer": "BUILD Compiler/ABI contract",
       "guards": [
         "Known-gap green is NOT conformance PASS",
-        "Graph qualified-ID collision, dangerous JS descriptor/accessor negatives must be preserved"
-      ]
+        "Graph qualified-ID collision, dangerous JS descriptor/accessor negatives must be preserved",
+        "Do not port #948 r1 pre-repair graph/array validator as authoritative; #956 R3 repaired negatives and implementation source are pinned separately"
+      ],
+      "successor_pin": {
+        "pr": 956,
+        "exact_head": "16037896d02fe5ba07159d07d4922375dc8553be",
+        "role": "POST_R1_P1_GRAPH_TUPLE_AND_ARRAY_RECORD_SAFETY_REPAIR",
+        "asset_paths": [
+          "experiments/v08-spec-conformance-942-r2/tests/r3-adversarial.test.mjs",
+          "experiments/v08-spec-conformance-942-r2/candidate-validator.mjs",
+          "experiments/v08-spec-conformance-942-r2/tests/conformance.test.mjs"
+        ]
+      }
     },
     {
       "id": "R04_ATTESTED_BINDING",
