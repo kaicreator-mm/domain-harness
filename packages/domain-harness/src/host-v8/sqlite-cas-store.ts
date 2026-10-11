@@ -181,7 +181,19 @@ export class SqliteCasStore implements CasDocumentStore {
  * native binding loads only where the physical store is actually used.
  */
 export async function openSqliteCasStore(options: SqliteCasStoreOptions): Promise<SqliteCasStore> {
-  const { default: Database } = await import('better-sqlite3');
+  let Database: typeof import('better-sqlite3');
+  try {
+    Database = (await import('better-sqlite3')).default;
+  } catch (error) {
+    // Typed driver-unavailable failure (independent-review P2-2, PR #1011):
+    // better-sqlite3 is a root devDependency, so an external installation
+    // without it must surface a Host code with an install hint, not a raw
+    // module-not-found from the dynamic import.
+    throw new HostBoundaryError(
+      'HOST_STORE_DRIVER_UNAVAILABLE',
+      `the physical SQLite CAS store requires better-sqlite3 (^12), which is not resolvable from this installation; add it to your dependencies to use openSqliteCasStore (${String(error instanceof Error ? error.message : error)})`,
+    );
+  }
   const db: SqliteDatabase = new Database(options.path);
   db.pragma('journal_mode = WAL');
   // WAL + synchronous=NORMAL: every transaction is durable against PROCESS

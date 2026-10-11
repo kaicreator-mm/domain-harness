@@ -73,6 +73,14 @@ export interface UxQueryRequest {
 
 /** UX-scoped document namespace: reads/writes never cross this prefix. */
 export function uxDocumentNamespace(tenantId: string, appId: string): string {
+  // Namespace-delimiter guard (independent-review P1-1, PR #1011): ':' is
+  // the join separator, so separator-bearing ids would collide namespaces
+  // across apps AND tenants. Credentials are already charset-restricted at
+  // assertCredentialShape; this re-guards the construction site itself
+  // (defense in depth for host-context callers).
+  if (tenantId.includes(':') || appId.includes(':')) {
+    throw new HostBoundaryError('HOST_IDENTITY_ID_MALFORMED', "uxDocumentNamespace ids must not contain ':' (the UX document namespace delimiter)");
+  }
   return `ux:${tenantId}:${appId}:`;
 }
 
@@ -195,10 +203,16 @@ export function createUxTransport(deps: TransportDeps, channel: { readonly crede
       const principal = await deps.authenticate(channel.credential);
       const key = requireString(parsed, 'key', 'UX_QUERY_MALFORMED', 'query');
       const namespace = uxDocumentNamespace(principal.tenantId, principal.appId);
+      // Namespace isolation invariant: the prefix check is only
+      // collision-free because tenantId/appId cannot contain the ':'
+      // delimiter — assertCredentialShape refuses separator-bearing
+      // credential ids (HOST_IDENTITY_ID_MALFORMED) and
+      // uxDocumentNamespace re-guards the construction, so a cross-tenant
+      // or cross-app document read has no representable route.
       if (!key.startsWith(namespace)) {
         throw new HostBoundaryError(
           'HOST_SCOPE_DENIED',
-          `document ${key} is outside the authenticated namespace ${namespace}; cross-tenant reads have no representable route`,
+          `document ${key} is outside the authenticated namespace ${namespace}; cross-tenant reads are refused`,
         );
       }
       const doc = await deps.readScopedDoc(key);

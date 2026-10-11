@@ -328,6 +328,51 @@ test('V08-ABI-B01-N2 cross-tenant / cross-app / cross-instance are refused with 
   );
 });
 
+test('V08-ABI-B01-N2-repair separator-bearing tenant/app ids are refused typed and cannot collide namespaces', async () => {
+  // Independent-review P1-1 regression (PR #1011): without the charset
+  // restriction the namespace join `ux:<tenantId>:<appId>:` collides across
+  // apps AND tenants — (t1, a1) could read (t1, a1:sub) documents, and
+  // (t1:a1, sub) has EXACTLY the namespace of (t1, a1:sub). Both exploit
+  // paths must be refused typed at the authoritative credential shape check
+  // (and at transport construction, which shape-checks eagerly).
+  // Path A — cross-app collision: appId bearing the delimiter.
+  const crossApp = grant({ grantId: 'grant-b01-n2-appsep', appId: 'a1:sub' });
+  await refuseCredential(host, crossApp, 'HOST_IDENTITY_ID_MALFORMED');
+  assert.throws(
+    () => createHostUxTransport(host, crossApp),
+    (error: unknown) => error instanceof HostBoundaryError && (error as HostBoundaryError).code === 'HOST_IDENTITY_ID_MALFORMED',
+  );
+  // Path B — cross-tenant collision: tenantId bearing the delimiter.
+  const crossTenant = grant({ grantId: 'grant-b01-n2-tenantsep', tenantId: 't1:a1', appId: 'sub' });
+  await refuseCredential(host, crossTenant, 'HOST_IDENTITY_ID_MALFORMED');
+  assert.throws(
+    () => createHostUxTransport(host, crossTenant),
+    (error: unknown) => error instanceof HostBoundaryError && (error as HostBoundaryError).code === 'HOST_IDENTITY_ID_MALFORMED',
+  );
+  // Namespace construction re-guards (defense in depth for host-context callers).
+  for (const [tenantId, appId] of [['t1', 'a1:sub'], ['t1:a1', 'sub']] as const) {
+    assert.throws(
+      () => uxDocumentNamespace(tenantId, appId),
+      (error: unknown) => error instanceof HostBoundaryError && (error as HostBoundaryError).code === 'HOST_IDENTITY_ID_MALFORMED',
+      `uxDocumentNamespace(${tenantId}, ${appId}) must refuse the delimiter`,
+    );
+  }
+  // Positive control: separator-free ids still construct the namespace.
+  assert.equal(uxDocumentNamespace('t1', 'a1'), 'ux:t1:a1:');
+});
+
+test('V08-ABI-B01-N3-repair length-equal multibyte attestation is typed-forged, never a bare RangeError', async () => {
+  // Independent-review P2-1 regression (PR #1011): a credential attestation
+  // with the SAME string length but a DIFFERENT UTF-8 byte length used to
+  // make timingSafeEqual throw a raw RangeError outside the typed taxonomy.
+  const material = grant({ grantId: 'grant-b01-mb' });
+  const prefix = 'hmac-sha256:';
+  assert.equal(material.issuerAttestation.slice(prefix.length).length, 64);
+  const multibyte = { ...material, issuerAttestation: `${prefix}${'a'.repeat(32)}${'é'.repeat(32)}` };
+  assert.equal(multibyte.issuerAttestation.length, material.issuerAttestation.length, 'the probe must be code-unit-length-equal');
+  await refuseCredential(host, multibyte, 'HOST_CREDENTIAL_FORGED');
+});
+
 test('V08-ABI-B01-N3 stale and revoked grants: expired / future / stale / revoked never authenticate', async () => {
   await refuseCredential(host, grant({ grantId: 'grant-b01-n3a', expiresAt: new Date(Date.now() - 1000).toISOString() }), 'HOST_CREDENTIAL_EXPIRED');
   await refuseCredential(host, grant({ grantId: 'grant-b01-n3b', issuedAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() }), 'HOST_CREDENTIAL_NOT_YET_VALID');

@@ -104,6 +104,18 @@ export function assertCredentialShape(value) {
             throw new HostBoundaryError('HOST_CREDENTIAL_MALFORMED', `credential field ${field} must be a non-empty string`);
         }
     }
+    // Namespace-delimiter guard (independent-review P1-1, PR #1011): tenantId
+    // and appId are joined into UX document namespaces (`ux:<t>:<a>:`), so a
+    // ':' inside either id collides namespaces across apps AND tenants —
+    // e.g. (t1, a1) would read (t1, a1:sub) documents, and (t1:a1, sub) has
+    // EXACTLY the namespace of (t1, a1:sub). Refused typed at the
+    // authoritative shape check; uxDocumentNamespace re-guards construction.
+    for (const field of ['tenantId', 'appId']) {
+        const value = snapshot[field];
+        if (typeof value === 'string' && value.includes(':')) {
+            throw new HostBoundaryError('HOST_IDENTITY_ID_MALFORMED', `credential ${field} must not contain ':' (the UX document namespace delimiter); issuers must mint separator-free ids`);
+        }
+    }
     const roles = snapshot.roles;
     if (!Array.isArray(roles) || roles.length === 0 || !roles.every((role) => typeof role === 'string' && role.length > 0)) {
         throw new HostBoundaryError('HOST_CREDENTIAL_MALFORMED', 'credential roles must be a non-empty array of non-empty strings');
@@ -145,7 +157,14 @@ export class HostIdentityVerifier {
         }
         const expected = `hmac-sha256:${createHmac('sha256', secret).update(presented.proofDigest, 'utf8').digest('hex')}`;
         const given = presented.issuerAttestation;
-        const forged = given.length !== expected.length || !timingSafeEqual(Buffer.from(given, 'utf8'), Buffer.from(expected, 'utf8'));
+        // UTF-8 byte-length precheck (independent-review P2-1, PR #1011): a
+        // code-unit-length-equal multibyte attestation has a DIFFERENT byte
+        // length, which would make timingSafeEqual throw a bare RangeError
+        // outside the typed error taxonomy. Comparing bytes first keeps every
+        // mismatch inside HOST_CREDENTIAL_FORGED.
+        const givenBytes = Buffer.from(given, 'utf8');
+        const expectedBytes = Buffer.from(expected, 'utf8');
+        const forged = givenBytes.length !== expectedBytes.length || !timingSafeEqual(givenBytes, expectedBytes);
         if (forged) {
             throw new HostBoundaryError('HOST_CREDENTIAL_FORGED', `credential attestation does not verify against the trusted issuer secret; a keyless-minted principal never authenticates`);
         }
