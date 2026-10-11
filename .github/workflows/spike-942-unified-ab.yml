@@ -1,0 +1,46 @@
+name: Spike 942 isolated unified Component A-B validation
+on:
+  push:
+    branches:
+      - spike/v08-unified-component-ab-942
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-unified:
+    if: github.ref == 'refs/heads/spike/v08-unified-component-ab-942'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch exact read-only v0.7 and #938 references
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin 86110c616b8cb18c730553e4cdab7ef555214521
+          git worktree add --detach "$RUNNER_TEMP/v07" 86110c616b8cb18c730553e4cdab7ef555214521
+          git fetch --no-tags --depth=1 origin beea9cdd29c51a046b8612871aa53be54b966e7c
+          git worktree add --detach "$RUNNER_TEMP/ref938" beea9cdd29c51a046b8612871aa53be54b966e7c
+          test "$(git -C "$RUNNER_TEMP/v07" rev-parse HEAD)" = "86110c616b8cb18c730553e4cdab7ef555214521"
+          test "$(git -C "$RUNNER_TEMP/ref938" rev-parse HEAD)" = "beea9cdd29c51a046b8612871aa53be54b966e7c"
+          node --version
+      - name: Install TS runner for genuine v0.7 source (not a source copy)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run A real v0.7 oracle plus B conformance and reference package loader
+        shell: bash
+        env:
+          V07_ROOT: ${{ runner.temp }}/v07
+          REFERENCE_938_ROOT: ${{ runner.temp }}/ref938/experiments/v08-package-first-bootstrap
+        run: |
+          set -euo pipefail
+          echo "EXACT_TEST_SUBJECT=$GITHUB_SHA"
+          echo "A_ORACLE=86110c616b8cb18c730553e4cdab7ef555214521"
+          echo "PACKAGE_REFERENCE=beea9cdd29c51a046b8612871aa53be54b966e7c"
+          node --import tsx --test experiments/v08-unified-component-ab/tests/*.test.mjs
