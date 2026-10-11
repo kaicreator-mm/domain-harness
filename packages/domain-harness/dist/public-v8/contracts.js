@@ -246,10 +246,38 @@ export function assertQualifiedRoot(root) {
         if (!Array.isArray(endpointsValue) || endpointsValue.length === 0) {
             throw new QualifiedPackageError('LOAD_NOT_A_QUALIFIED_ROOT', `package ${pkg.packageId} must declare a non-empty endpoints array`);
         }
+        for (const endpoint of endpointsValue) {
+            if (!isPlainStringRecord(endpoint) || typeof endpoint.endpointId !== 'string' || endpoint.endpointId.length === 0 || typeof endpoint.kind !== 'string') {
+                throw new QualifiedPackageError('LOAD_NOT_A_QUALIFIED_ROOT', `package ${pkg.packageId} declares a malformed endpoint entry (endpointId/kind must be non-empty strings)`);
+            }
+        }
     }
     const packageIds = snapshot.packages.map((pkg) => pkg.packageId);
     if (new Set(packageIds).size !== packageIds.length) {
         throw new QualifiedPackageError('LOAD_DUPLICATE_PACKAGE', 'root closure contains duplicate packageIds');
+    }
+    const packagesById = new Map(snapshot.packages.map((pkg) => [pkg.packageId, pkg]));
+    // Binding integrity (P1-BIND-02, re-checked at load): every K/S/B role and
+    // intent binding must target an EXISTING endpoint of a package of the
+    // CORRECT kind, with the ABI-required endpoint kind. Binding a role to a
+    // wrong-kind package or a dangling endpointId fails closed here, before
+    // any trust verification or executable import.
+    function requireRoleBindingTarget(role, packageId, endpointId) {
+        const target = packagesById.get(packageId);
+        if (target === undefined) {
+            throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role ${role} binds unknown package ${packageId}`);
+        }
+        if (target.kind !== role) {
+            throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role ${role} binds package ${packageId} of kind ${target.kind}; the role requires a ${role} package`);
+        }
+        const endpoint = target.endpoints.find((candidate) => candidate.endpointId === endpointId);
+        if (endpoint === undefined) {
+            throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role ${role} binds endpoint ${endpointId} which package ${packageId} does not declare`);
+        }
+        const abi = V8_QUALIFIED_ABI[target.abiVersion];
+        if (abi !== undefined && !abi.requiredEndpointKinds.includes(endpoint.kind)) {
+            throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role ${role} endpoint ${endpointId} has kind ${endpoint.kind}; ABI ${target.abiVersion} requires one of [${abi.requiredEndpointKinds.join(', ')}]`);
+        }
     }
     for (const role of ['kernel', 'standard-sdk']) {
         const bound = snapshot.bindings.filter((binding) => binding.role === role);
@@ -257,23 +285,36 @@ export function assertQualifiedRoot(root) {
         if (bound.length !== 1 || only === undefined) {
             throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role ${role} must be bound to exactly one package (found ${bound.length})`);
         }
-        if (!packageIds.includes(only.packageId)) {
-            throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role ${role} binds unknown package ${only.packageId}`);
-        }
+        requireRoleBindingTarget(role, only.packageId, only.endpointId);
     }
     const businessBound = snapshot.bindings.filter((binding) => binding.role === 'business');
     if (businessBound.length < 1) {
         throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', 'at least one business package must be selected (K/S/multiple-B closure)');
     }
     for (const bound of businessBound) {
-        if (!packageIds.includes(bound.packageId)) {
-            throw new QualifiedPackageError('LOAD_ROLE_BINDING_INVALID', `role business binds unknown package ${bound.packageId}`);
-        }
+        requireRoleBindingTarget('business', bound.packageId, bound.endpointId);
     }
     const intentBindings = snapshot.bindings.filter((binding) => binding.role === 'intent');
     const intentKeys = intentBindings.map((binding) => binding.intentType);
     if (new Set(intentKeys).size !== intentKeys.length) {
         throw new QualifiedPackageError('LOAD_INTENT_BINDING_AMBIGUOUS', 'an intent type is bound to more than one provider in this sealed closure');
+    }
+    for (const binding of intentBindings) {
+        // An intent provider must be a business package reached through one of
+        // its declared business-policy endpoints (the load-side correspondence;
+        // the BUILD-side additionally proves the package advertises the intent).
+        const target = packagesById.get(binding.packageId);
+        if (target === undefined) {
+            throw new QualifiedPackageError('LOAD_INTENT_BINDING_INVALID', `intent ${binding.intentType} binds unknown package ${binding.packageId}`);
+        }
+        if (target.kind !== 'business') {
+            throw new QualifiedPackageError('LOAD_INTENT_BINDING_INVALID', `intent ${binding.intentType} binds package ${binding.packageId} of kind ${target.kind}; intent providers must be business packages`);
+        }
+        const endpoint = target.endpoints.find((candidate) => candidate.endpointId === binding.endpointId);
+        const abi = V8_QUALIFIED_ABI[target.abiVersion];
+        if (endpoint === undefined || (abi !== undefined && !abi.requiredEndpointKinds.includes(endpoint.kind))) {
+            throw new QualifiedPackageError('LOAD_INTENT_BINDING_INVALID', `intent ${binding.intentType} binds endpoint ${binding.endpointId} which package ${binding.packageId} does not provide as a business endpoint`);
+        }
     }
     const subjectDigest = computeSubjectDigest({
         rootPackageId: snapshot.rootPackageId,

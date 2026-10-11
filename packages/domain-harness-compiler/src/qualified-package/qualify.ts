@@ -146,6 +146,12 @@ export function qualifyPackageClosure(submission: unknown): UnsignedQualificatio
     if (!Array.isArray(endpointsValue) || endpointsValue.length === 0) {
       fail('QUALIFY_ENDPOINT_INVALID', `package ${pkg.packageId} must declare a non-empty endpoints array`);
     }
+    for (const endpoint of endpointsValue) {
+      const entry = endpoint as { endpointId?: unknown; kind?: unknown };
+      if (typeof entry.endpointId !== 'string' || entry.endpointId.length === 0 || typeof entry.kind !== 'string' || entry.kind.length === 0) {
+        fail('QUALIFY_ENDPOINT_INVALID', `package ${pkg.packageId} declares a malformed endpoint entry (endpointId/kind must be non-empty strings)`);
+      }
+    }
     const endpointKinds = (endpointsValue as { kind: string }[]).map((endpoint) => endpoint.kind);
     if (new Set(endpointKinds).size !== endpointKinds.length) {
       fail('QUALIFY_ENDPOINT_INVALID', `package ${pkg.packageId} must declare unique endpoint kinds`);
@@ -183,24 +189,46 @@ export function qualifyPackageClosure(submission: unknown): UnsignedQualificatio
     }
   }
 
+  // Binding integrity (P1-BIND-02): every K/S/B role binding must target an
+  // EXISTING endpoint of a package of the CORRECT kind with the
+  // ABI-required endpoint kind — binding Kernel to a Business package or to
+  // a dangling endpointId is a static BUILD failure, not a T-B runtime
+  // discovery.
+  const packagesById = new Map(snapshot.packages.map((pkg) => [pkg.packageId, pkg]));
+  function requireRoleTarget(role: 'kernel' | 'standard-sdk' | 'business', packageId: string, endpointId: string): void {
+    const target = packagesById.get(packageId);
+    if (target === undefined) {
+      fail('QUALIFY_ROLE_BINDING_INVALID', `role ${role} binds unknown package ${packageId}`);
+    }
+    if (target.kind !== role) {
+      fail('QUALIFY_ROLE_BINDING_INVALID', `role ${role} binds package ${packageId} of kind ${target.kind}; the role requires a ${role} package`);
+    }
+    const endpoint = target.endpoints.find((candidate) => candidate.endpointId === endpointId);
+    if (endpoint === undefined) {
+      fail('QUALIFY_ROLE_BINDING_INVALID', `role ${role} binds endpoint ${endpointId} which package ${packageId} does not declare`);
+    }
+    const abi = V8_QUALIFIED_ABI[target.abiVersion];
+    if (abi !== undefined && !abi.requiredEndpointKinds.includes(endpoint.kind)) {
+      fail(
+        'QUALIFY_ROLE_BINDING_INVALID',
+        `role ${role} endpoint ${endpointId} has kind ${endpoint.kind}; ABI ${target.abiVersion} requires one of [${abi.requiredEndpointKinds.join(', ')}]`,
+      );
+    }
+  }
   for (const role of ['kernel', 'standard-sdk'] as const) {
     const bound = snapshot.bindings.filter((binding) => binding.role === role);
     const [only] = bound;
     if (bound.length !== 1 || only === undefined) {
       fail('QUALIFY_ROLE_BINDING_INVALID', `role ${role} must be bound to exactly one package (found ${bound.length})`);
     }
-    if (!seenPackageIds.has(only.packageId)) {
-      fail('QUALIFY_ROLE_BINDING_INVALID', `role ${role} binds unknown package ${only.packageId}`);
-    }
+    requireRoleTarget(role, only.packageId, only.endpointId);
   }
   const businessBound = snapshot.bindings.filter((binding) => binding.role === 'business');
   if (businessBound.length < 1) {
     fail('QUALIFY_ROLE_BINDING_INVALID', 'at least one business package must be selected (K/S/multiple-B closure)');
   }
   for (const bound of businessBound) {
-    if (!seenPackageIds.has(bound.packageId)) {
-      fail('QUALIFY_ROLE_BINDING_INVALID', `role business binds unknown package ${bound.packageId}`);
-    }
+    requireRoleTarget('business', bound.packageId, bound.endpointId);
   }
 
   // Provider uniqueness: an intent type must be provided by exactly one
@@ -227,13 +255,25 @@ export function qualifyPackageClosure(submission: unknown): UnsignedQualificatio
     if (typeof binding.intentType !== 'string' || binding.intentType.length === 0) {
       fail('QUALIFY_INTENT_BINDING_INVALID', 'intent bindings need a non-empty intentType');
     }
-    if (!seenPackageIds.has(binding.packageId)) {
+    const target = packagesById.get(binding.packageId);
+    if (target === undefined) {
       fail('QUALIFY_INTENT_BINDING_INVALID', `intent ${binding.intentType} binds unknown package ${binding.packageId}`);
     }
-    if (!intentProviders.has(binding.intentType)) {
+    // Provider correspondence (P1-BIND-02): the BOUND business package must
+    // itself advertise the intent type in INTENT_TYPES — not merely some
+    // other business package in the closure.
+    if (target.kind !== 'business' || (target.intentTypes ?? []).includes(binding.intentType) !== true) {
       fail(
-        'QUALIFY_INTENT_BINDING_MISSING',
-        `intent ${binding.intentType} is bound but its business package does not advertise it in INTENT_TYPES`,
+        'QUALIFY_INTENT_BINDING_INVALID',
+        `intent ${binding.intentType} is bound to package ${binding.packageId}, which does not advertise it in INTENT_TYPES`,
+      );
+    }
+    const endpoint = target.endpoints.find((candidate) => candidate.endpointId === binding.endpointId);
+    const abi = V8_QUALIFIED_ABI[target.abiVersion];
+    if (endpoint === undefined || (abi !== undefined && !abi.requiredEndpointKinds.includes(endpoint.kind))) {
+      fail(
+        'QUALIFY_INTENT_BINDING_INVALID',
+        `intent ${binding.intentType} binds endpoint ${binding.endpointId} which package ${binding.packageId} does not provide as a business endpoint`,
       );
     }
   }

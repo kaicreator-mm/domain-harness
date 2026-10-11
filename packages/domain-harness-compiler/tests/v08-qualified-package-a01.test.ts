@@ -15,7 +15,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { load, sha256Hex } from '@kaicreator/domain-harness/v8';
+import { computeSubjectDigest, load, QualifiedPackageError, sha256Hex } from '@kaicreator/domain-harness/v8';
+// The core load() trust gate (P1-AUTH-01 repair) is fail-closed: the
+// compiler tests exercise the BUILT core through the package subpath, so
+// the trusted issuer registry must be installed into the SAME module
+// instance (dist) via the internal protected channel — exactly what the
+// governance/Host bootstrap does before any qualified package executes.
+import { installTrustedIssuers } from '../../domain-harness/dist/public-v8/trust.js';
 import {
   analyzeModuleClosure,
   BuildError,
@@ -33,6 +39,8 @@ import {
 const ISSUER_ID = 'dac-issuer:test';
 const ISSUER_SECRET = 'issuer-secret-material';
 const TRUSTED_ISSUERS: ReadonlyMap<string, string> = new Map([[ISSUER_ID, ISSUER_SECRET]]);
+
+installTrustedIssuers({ issuers: TRUSTED_ISSUERS });
 
 function moduleSource(kind: 'kernel' | 'standard-sdk' | 'business', packageId: string, intentType?: string): string {
   const head = [
@@ -356,5 +364,101 @@ test('V08-ABI-A01-B12 closure analyzer proves self-contained static imports only
   assert.throws(
     () => analyzeModuleClosure({ entryPath: 'modules/entry.mjs', moduleSources: incomplete }),
     (error: unknown) => error instanceof ClosureError && error.code === 'IMPORT_UNRESOLVED',
+  );
+});
+
+test('V08-ABI-A01-B13 binding integrity at BUILD: wrong-kind/dangling/provider-mismatched bindings fail statically (P1-BIND-02)', () => {
+  const kernelId = 'kernel:demo@1.0.0';
+  const sdkId = 'std:demo@1.0.0';
+  const businessId = 'biz:demo@1.0.0';
+  const validTail: QualifiedBinding[] = [
+    { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+    { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+    { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'business-policy' },
+  ];
+  // Kernel role bound to the Standard SDK package (endpoint exists and is
+  // well-kinded FOR the SDK): the role-to-KIND correspondence now fails.
+  refuses(QualificationError, 'QUALIFY_ROLE_BINDING_INVALID', () =>
+    qualifyPackageClosure(submission({ bindingsOverride: [{ role: 'kernel', packageId: sdkId, endpointId: 'rule-interpreter' }, ...validTail] })),
+  );
+  // Kernel bound to the right package but an endpoint it never declares.
+  refuses(QualificationError, 'QUALIFY_ROLE_BINDING_INVALID', () =>
+    qualifyPackageClosure(submission({ bindingsOverride: [{ role: 'kernel', packageId: kernelId, endpointId: 'does-not-exist' }, ...validTail] })),
+  );
+  // Business role bound to the Kernel package.
+  refuses(QualificationError, 'QUALIFY_ROLE_BINDING_INVALID', () =>
+    qualifyPackageClosure(
+      submission({
+        bindingsOverride: [
+          { role: 'kernel', packageId: kernelId, endpointId: 'occurrence-runtime' },
+          { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+          { role: 'business', packageId: kernelId, endpointId: 'occurrence-runtime' },
+          { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'business-policy' },
+        ],
+      }),
+    ),
+  );
+  // Intent bound to a business package that does NOT advertise the intent
+  // (another package advertises it — the audited code accepted the wrong
+  // provider; the BOUND package must itself advertise the intent type).
+  const otherBusiness = moduleSource('business', 'biz:other@1.0.0', 'demo.other');
+  refuses(QualificationError, 'QUALIFY_INTENT_BINDING_INVALID', () =>
+    qualifyPackageClosure(
+      submission({
+        extraBusiness: [{ packageId: 'biz:other@1.0.0', source: otherBusiness, intentType: 'demo.other' }],
+        bindingsOverride: [
+          { role: 'kernel', packageId: kernelId, endpointId: 'occurrence-runtime' },
+          { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+          { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+          { role: 'business', packageId: 'biz:other@1.0.0', endpointId: 'business-policy' },
+          { role: 'intent', intentType: 'demo.request', packageId: 'biz:other@1.0.0', endpointId: 'business-policy' },
+        ],
+      }),
+    ),
+  );
+  // Malformed endpoint entry (empty endpointId) is a typed static failure.
+  const malformedEndpoint = {
+    ...submission(),
+    packages: submission().packages.map((pkg) =>
+      pkg.packageId === kernelId ? { ...pkg, endpoints: [{ endpointId: '', kind: 'occurrence-runtime' }] } : pkg,
+    ),
+  };
+  refuses(QualificationError, 'QUALIFY_ENDPOINT_INVALID', () => qualifyPackageClosure(malformedEndpoint));
+});
+
+test('V08-ABI-A01-B14 load-side re-check: a hand-minted root with a wrong-kind binding never executes', async () => {
+  // Even a root that BYPASSES the compiler (hand-assembled, digests all
+  // self-consistent, genuinely HMAC'd approval for the forged binding set)
+  // is refused at the core boundary when its kernel binding targets a
+  // wrong-kind package — binding integrity is re-checked at load, not only
+  // at BUILD.
+  const unsigned = qualifyPackageClosure(submission());
+  const approval = issueApprovalProof({ subjectDigest: unsigned.subjectDigest, issuerId: ISSUER_ID, issuerSecret: ISSUER_SECRET });
+  const sealed = buildQualifiedPackage({ unsigned, approval, trustedIssuers: TRUSTED_ISSUERS, moduleSources: moduleSourcesOf(submission()) });
+  const sdkId = 'std:demo@1.0.0';
+  const businessId = 'biz:demo@1.0.0';
+  const bindings: QualifiedBinding[] = [
+    { role: 'kernel', packageId: sdkId, endpointId: 'rule-interpreter' },
+    { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+    { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+    { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'business-policy' },
+  ];
+  const forgedDigest = computeSubjectDigest({
+    rootPackageId: sealed.rootPackageId,
+    packages: sealed.packages.map((pkg) => ({ packageId: pkg.packageId, moduleSha256: pkg.moduleSha256 })),
+    bindings,
+  });
+  const forgedApproval = issueApprovalProof({ subjectDigest: forgedDigest, issuerId: ISSUER_ID, issuerSecret: ISSUER_SECRET });
+  const forgedRoot = {
+    formatVersion: sealed.formatVersion,
+    rootPackageId: sealed.rootPackageId,
+    build: { ...sealed.build, closureDigest: forgedDigest },
+    approval: forgedApproval,
+    packages: sealed.packages,
+    bindings,
+  };
+  await assert.rejects(
+    () => load(forgedRoot),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'LOAD_ROLE_BINDING_INVALID',
   );
 });

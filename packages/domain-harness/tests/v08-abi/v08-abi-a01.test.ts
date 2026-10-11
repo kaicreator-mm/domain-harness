@@ -23,8 +23,21 @@
  *   - V08-ABI-A01-N6 ambiguous provider and failed activation: duplicate
  *                    intent bindings and modules missing required exports
  *                    fail typed at installation.
+ *   - V08-ABI-A01-N7 binding integrity (P1-BIND-02): roles bound to a
+ *                    wrong-kind package or a dangling endpointId, and
+ *                    intent bindings that dangle, fail closed statically
+ *                    BEFORE any import.
+ *
+ * P1-AUTH-01 repair premise: executable load is gated on the internal
+ * protected trust channel (trust.ts). This file performs the LEGITIMATE
+ * protected installation once at module scope — the issuer registry the
+ * governance/Host bootstrap would install — so the proofs minted here use
+ * a REAL HMAC secret (the old keyless 'hmac-sha256:'+sha256Hex fake is now
+ * refused; see v08-abi-a02-trust-atomic.test.ts for the fail-closed and
+ * forged-attestation vectors).
  */
 
+import { createHmac } from 'node:crypto';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -38,9 +51,15 @@ import {
   type QualifiedBinding,
   type SealedQualifiedPackageRoot,
 } from '../../src/public-v8/index.js';
+import { installTrustedIssuers } from '../../src/public-v8/trust.js';
 
 const ISSUER = 'dac-issuer:test';
+const ISSUER_SECRET = 'dac-issuer-secret:test-material';
 const ISSUED_AT = '2026-10-11T00:00:00.000Z';
+
+// Legitimate protected installation: exactly what the governance/Host
+// bootstrap performs before any qualified package may execute.
+installTrustedIssuers({ issuers: new Map([[ISSUER, ISSUER_SECRET]]) });
 
 function mintProof(subjectDigest: string, issuerId: string = ISSUER): ApprovalProof {
   const base = {
@@ -50,7 +69,10 @@ function mintProof(subjectDigest: string, issuerId: string = ISSUER): ApprovalPr
     issuedAt: ISSUED_AT,
   };
   const proofDigest = approvalBindingDigest(base as unknown as ApprovalProof);
-  return { ...base, proofDigest, issuerAttestation: 'hmac-sha256:' + sha256Hex(proofDigest) };
+  // Real issuer-side HMAC over the binding digest — a keyless hand-minted
+  // look-alike no longer passes the load trust gate.
+  const issuerAttestation = `hmac-sha256:${createHmac('sha256', ISSUER_SECRET).update(proofDigest, 'utf8').digest('hex')}`;
+  return { ...base, proofDigest, issuerAttestation };
 }
 
 function kernelModule(packageId: string): string {
@@ -333,4 +355,72 @@ test('V08-ABI-A01-N6 failed activation: unqualified module identity fails typed 
   // ABI kind disagreement between sealed descriptor and module self-declaration.
   const wrongAbi = kernelModule('kernel:demo@1.0.0').replace('v08-kernel-abi/1', 'v08-standard-sdk-abi/1');
   await refuse(buildRoot({ kernelSource: wrongAbi }), 'MODULE_IDENTITY_MISMATCH');
+});
+
+test('V08-ABI-A01-N7 binding integrity: wrong-kind/dangling bindings fail closed BEFORE any import (P1-BIND-02)', async () => {
+  const kernelId = 'kernel:demo@1.0.0';
+  const sdkId = 'std:demo@1.0.0';
+  const businessId = 'biz:demo@1.0.0';
+  // Kernel role bound to the BUSINESS package (its endpoint exists and is
+  // well-kinded FOR business): old code accepted this — the role-to-kind
+  // correspondence is now a static load failure.
+  await refuse(
+    buildRoot({
+      bindingsOverride: [
+        { role: 'kernel', packageId: businessId, endpointId: 'business-policy' },
+        { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+        { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+        { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'business-policy' },
+      ],
+    }),
+    'LOAD_ROLE_BINDING_INVALID',
+  );
+  // Kernel bound to the right package but an endpointId it never declares.
+  await refuse(
+    buildRoot({
+      bindingsOverride: [
+        { role: 'kernel', packageId: kernelId, endpointId: 'does-not-exist' },
+        { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+        { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+        { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'business-policy' },
+      ],
+    }),
+    'LOAD_ROLE_BINDING_INVALID',
+  );
+  // Business role bound to the Standard SDK package.
+  await refuse(
+    buildRoot({
+      bindingsOverride: [
+        { role: 'kernel', packageId: kernelId, endpointId: 'occurrence-runtime' },
+        { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+        { role: 'business', packageId: sdkId, endpointId: 'rule-interpreter' },
+        { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'business-policy' },
+      ],
+    }),
+    'LOAD_ROLE_BINDING_INVALID',
+  );
+  // Intent binding whose endpointId dangles.
+  await refuse(
+    buildRoot({
+      bindingsOverride: [
+        { role: 'kernel', packageId: kernelId, endpointId: 'occurrence-runtime' },
+        { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+        { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+        { role: 'intent', intentType: 'demo.request', packageId: businessId, endpointId: 'no-such-endpoint' },
+      ],
+    }),
+    'LOAD_INTENT_BINDING_INVALID',
+  );
+  // Intent provider bound to a non-business package.
+  await refuse(
+    buildRoot({
+      bindingsOverride: [
+        { role: 'kernel', packageId: kernelId, endpointId: 'occurrence-runtime' },
+        { role: 'standard-sdk', packageId: sdkId, endpointId: 'rule-interpreter' },
+        { role: 'business', packageId: businessId, endpointId: 'business-policy' },
+        { role: 'intent', intentType: 'demo.request', packageId: kernelId, endpointId: 'occurrence-runtime' },
+      ],
+    }),
+    'LOAD_INTENT_BINDING_INVALID',
+  );
 });

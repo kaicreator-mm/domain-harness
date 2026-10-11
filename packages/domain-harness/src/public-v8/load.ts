@@ -17,6 +17,7 @@
 
 import { assertQualifiedRoot, QualifiedPackageError, type SealedQualifiedPackageRoot } from './contracts.js';
 import { installQualifiedPackages, type InstalledQualifiedPackage } from './installer.js';
+import { verifyLoadApproval } from './trust.js';
 
 export interface LoadedQualifiedPackages {
   readonly formatVersion: string;
@@ -42,21 +43,28 @@ export interface LoadedQualifiedPackages {
 /**
  * Public one-argument loader. `packageRoot` must be a sealed qualified
  * package root produced by `@kaicreator/domain-harness-compiler` BUILD plus
- * an externally issued approval proof. This boundary verifies the sealed
- * shape, the producer trust prefix, the approval proof's BINDING to this
- * exact closure and every module's sealed bytes BEFORE import; cryptographic
- * issuer-attestation verification happens at the compiler attach boundary
- * (verifyApprovalProof with the governance issuer registry) — a hand-minted
- * structurally consistent root is therefore executable HERE until issuer
- * verification is wired into the protected Host channel in the successor
- * tasks (L2 U01), and that residual gap is a documented obligation, not a
- * hidden claim.
+ * an externally issued approval proof. The executable boundary is
+ * FAIL-CLOSED (P1-AUTH-01 repair): before ANY module import, the approval
+ * proof's HMAC-SHA256 issuer attestation must cryptographically verify
+ * against the trusted issuer registry installed in this process through the
+ * protected internal trust channel (trust.ts — governance/Host bootstrap
+ * only, never a public load() argument). In a process where no registry is
+ * installed, load() refuses with UNTRUSTED_ISSUER and executes NOTHING: a
+ * hand-minted structurally consistent root, even one whose digests all
+ * recompute, never becomes executable here. Binding integrity (role/kind/
+ * endpoint/provider correspondence) is likewise verified statically before
+ * import; whole-closure byte preflight precedes the first import
+ * (installer.ts).
  */
 export async function load(packageRoot: unknown): Promise<LoadedQualifiedPackages> {
   // Qualification runs on the canonical snapshot and installation consumes
   // the SAME snapshot — the original presentation is never read again after
   // this line (hostile getters cannot split qualification from install).
   const root = assertQualifiedRoot(packageRoot);
+  // Trust gate BEFORE any executable import: issuer attestation must
+  // cryptographically verify against the installed registry (fail-closed
+  // when the protected channel has not been established in this process).
+  verifyLoadApproval(root.approval);
   const installed = await installQualifiedPackages(root);
   const byPackageId = new Map<string, InstalledQualifiedPackage>(installed.map((entry) => [entry.descriptor.packageId, entry]));
   const loaded: LoadedQualifiedPackages = Object.freeze({
