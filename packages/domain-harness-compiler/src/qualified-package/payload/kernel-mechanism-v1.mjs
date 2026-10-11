@@ -1579,8 +1579,13 @@ function outcomeKey(record) {
 export class VolatileAdmissionEffectJournal {
   #records = new Map();
 
+  // [T-C, #966] Input/return alias isolation: every stored record and every
+  // returned record is a canonical deep snapshot, so caller-held objects can
+  // never contaminate committed state and exposed results can never mutate
+  // it (existing canonical utility — no alternate serializer).
   async getEffect(effectId) {
-    return this.#records.get(effectId) ?? null;
+    const existing = this.#records.get(effectId);
+    return existing === undefined ? null : snapshotJson(existing);
   }
 
   async beginEffect(record) {
@@ -1599,10 +1604,11 @@ export class VolatileAdmissionEffectJournal {
           `effect ${record.effectId} already exists with an incompatible identity`,
         );
       }
-      return { disposition: 'existing', record: existing };
+      return { disposition: 'existing', record: snapshotJson(existing) };
     }
-    this.#records.set(record.effectId, record);
-    return { disposition: 'created', record };
+    const stored = snapshotJson(record);
+    this.#records.set(record.effectId, stored);
+    return { disposition: 'created', record: snapshotJson(stored) };
   }
 
   async completeEffect(effectId, outcome) {
@@ -1626,7 +1632,7 @@ export class VolatileAdmissionEffectJournal {
         `cannot complete effect ${effectId} that was never begun`,
       );
     }
-    const completed = outcome.status === 'completed'
+    const completed = snapshotJson(outcome.status === 'completed'
       ? {
           ...existing,
           status: 'completed',
@@ -1638,7 +1644,7 @@ export class VolatileAdmissionEffectJournal {
           status: 'failed',
           error: outcome.error,
           completedAt: outcome.completedAt,
-        };
+        });
     if (existing.status !== 'started') {
       if (outcomeKey(existing) !== outcomeKey(completed)) {
         throw new CentralAdmissionError(
@@ -1646,15 +1652,17 @@ export class VolatileAdmissionEffectJournal {
           `effect ${effectId} is already settled with a conflicting outcome`,
         );
       }
-      return existing;
+      return snapshotJson(existing);
     }
     this.#records.set(effectId, completed);
-    return completed;
+    return snapshotJson(completed);
   }
 
   getRecords() {
-    return [...this.#records.values()].sort((left, right) =>
-      left.effectId < right.effectId ? -1 : left.effectId > right.effectId ? 1 : 0);
+    return [...this.#records.values()]
+      .map((record) => snapshotJson(record))
+      .sort((left, right) =>
+        left.effectId < right.effectId ? -1 : left.effectId > right.effectId ? 1 : 0);
   }
 }
 
@@ -1677,6 +1685,22 @@ function journalDocKey(effectId) {
   return `v08-kernel:effect-journal:${effectId}`;
 }
 
+/**
+ * [T-C, P1-L2-CAS-01] Typed rejection contract of the Host document port:
+ * a conditional write ({mustBeAbsent} | {mustMatchRevision}) that loses its
+ * compare-and-swap race rejects with an error carrying
+ * `code === 'HOST_CAS_CONFLICT'`. Any other rejection is a Host fault and is
+ * rethrown untouched (never silently retried, never fallen through).
+ */
+function isHostCasConflict(error) {
+  return typeof error === 'object' && error !== null && error.code === 'HOST_CAS_CONFLICT';
+}
+
+/** [T-C, #966] Canonical deep snapshot: isolated JSON data only (no aliasing). */
+function snapshotJson(value) {
+  return JSON.parse(canonicalJsonStringify(value));
+}
+
 export class KernelDurableEffectJournal {
   #docs;
   #moduleSha256;
@@ -1688,14 +1712,23 @@ export class KernelDurableEffectJournal {
     this.#counters = counters;
   }
 
+  /**
+   * [T-C, P1-L2-CAS-01] The Host read returns the FULL {value, revision}
+   * pair. The #994 source returned `doc.value` and dropped `doc.revision`,
+   * which made every subsequent terminal write pass
+   * `mustMatchRevision: undefined` — an unconditional write under the Host
+   * contract — so two competing trusted same-effect terminal completions
+   * could BOTH land and overwrite each other. The revision is now preserved
+   * end-to-end and every write below is a strongly conditional CAS.
+   */
   async #readEnvelope(effectId) {
     const doc = await this.#docs.get(journalDocKey(effectId));
-    return doc === null ? null : doc.value;
+    return doc === null ? null : { value: doc.value, revision: doc.revision };
   }
 
   async getEffect(effectId) {
     const envelope = await this.#readEnvelope(effectId);
-    return envelope === null ? null : envelope.record;
+    return envelope === null ? null : snapshotJson(envelope.value.record);
   }
 
   async beginEffect(record) {
@@ -1708,26 +1741,46 @@ export class KernelDurableEffectJournal {
     }
     const existing = await this.#readEnvelope(record.effectId);
     if (existing !== null) {
-      if (existing.kernelModuleSha256 !== this.#moduleSha256) {
+      if (existing.value.kernelModuleSha256 !== this.#moduleSha256) {
         throw new CentralAdmissionError(
           'ADMISSION_EFFECT_JOURNAL_CONFLICT',
-          `effect ${record.effectId} is pinned to kernel module ${existing.kernelModuleSha256} which is unavailable under the loaded kernel module ${this.#moduleSha256}; typed code unavailability — no silent cross-version replay`,
+          `effect ${record.effectId} is pinned to kernel module ${existing.value.kernelModuleSha256} which is unavailable under the loaded kernel module ${this.#moduleSha256}; typed code unavailability — no silent cross-version replay`,
         );
       }
-      if (!sameIdentity(existing.record, record)) {
+      if (!sameIdentity(existing.value.record, record)) {
         throw new CentralAdmissionError(
           'ADMISSION_EFFECT_JOURNAL_CONFLICT',
           `effect ${record.effectId} already exists with an incompatible identity`,
         );
       }
-      return { disposition: 'existing', record: existing.record };
+      return { disposition: 'existing', record: snapshotJson(existing.value.record) };
     }
     if (this.#counters !== undefined) this.#counters.journalBegins += 1;
-    await this.#docs.put(journalDocKey(record.effectId), {
-      kernelModuleSha256: this.#moduleSha256,
-      record,
-    }, { mustBeAbsent: true });
-    return { disposition: 'created', record };
+    try {
+      await this.#docs.put(journalDocKey(record.effectId), {
+        kernelModuleSha256: this.#moduleSha256,
+        record: snapshotJson(record),
+      }, { mustBeAbsent: true });
+    } catch (error) {
+      // [T-C] Lost the conditional create against a concurrent begin: re-read
+      // the authoritative envelope and settle honestly — same identity ⇒
+      // existing; anything else fails typed. Never fall through to a second
+      // unconditional write.
+      if (!isHostCasConflict(error)) throw error;
+      const winner = await this.#readEnvelope(record.effectId);
+      if (
+        winner !== null
+        && winner.value.kernelModuleSha256 === this.#moduleSha256
+        && sameIdentity(winner.value.record, record)
+      ) {
+        return { disposition: 'existing', record: snapshotJson(winner.value.record) };
+      }
+      throw new CentralAdmissionError(
+        'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+        `effect ${record.effectId} begin lost its conditional create race against an incompatible record`,
+      );
+    }
+    return { disposition: 'created', record: snapshotJson(record) };
   }
 
   async completeEffect(effectId, outcome) {
@@ -1749,16 +1802,18 @@ export class KernelDurableEffectJournal {
         `cannot complete effect ${effectId} that was never begun`,
       );
     }
-    if (envelope.kernelModuleSha256 !== this.#moduleSha256) {
+    if (envelope.value.kernelModuleSha256 !== this.#moduleSha256) {
       throw new CentralAdmissionError(
         'ADMISSION_EFFECT_JOURNAL_CONFLICT',
-        `effect ${effectId} is pinned to kernel module ${envelope.kernelModuleSha256} which is unavailable under the loaded kernel module ${this.#moduleSha256}; typed code unavailability — no silent cross-version replay`,
+        `effect ${effectId} is pinned to kernel module ${envelope.value.kernelModuleSha256} which is unavailable under the loaded kernel module ${this.#moduleSha256}; typed code unavailability — no silent cross-version replay`,
       );
     }
-    const existing = envelope.record;
-    const completed = outcome.status === 'completed'
+    const existing = envelope.value.record;
+    // [T-C, #966] The completed record is a fresh canonical snapshot; the
+    // caller's outcome object never aliases committed state.
+    const completed = snapshotJson(outcome.status === 'completed'
       ? { ...existing, status: 'completed', output: outcome.output, completedAt: outcome.completedAt }
-      : { ...existing, status: 'failed', error: outcome.error, completedAt: outcome.completedAt };
+      : { ...existing, status: 'failed', error: outcome.error, completedAt: outcome.completedAt });
     if (existing.status !== 'started') {
       if (outcomeKey(existing) !== outcomeKey(completed)) {
         throw new CentralAdmissionError(
@@ -1766,14 +1821,45 @@ export class KernelDurableEffectJournal {
           `effect ${effectId} is already settled with a conflicting outcome`,
         );
       }
-      return existing;
+      return snapshotJson(existing);
     }
     if (this.#counters !== undefined) this.#counters.journalCompletes += 1;
-    await this.#docs.put(journalDocKey(effectId), {
-      kernelModuleSha256: this.#moduleSha256,
-      record: completed,
-    }, { mustMatchRevision: envelope.revision });
-    return completed;
+    try {
+      // [T-C, P1-L2-CAS-01] STRONGLY CONDITIONAL terminal write: the CAS
+      // expectation is the exact revision read above. A concurrent terminal
+      // completion bumps the revision, so at most ONE of the competing
+      // completions can land — the terminal status is never overwritten.
+      await this.#docs.put(journalDocKey(effectId), {
+        kernelModuleSha256: this.#moduleSha256,
+        record: completed,
+      }, { mustMatchRevision: envelope.revision });
+    } catch (error) {
+      if (!isHostCasConflict(error)) throw error;
+      // Lost the terminal race. Re-read the authoritative record and settle
+      // honestly: the SAME authoritative terminal outcome is returned
+      // idempotently; a DIFFERENT outcome fails typed. There is NO
+      // unconditional fall-through on the terminal path.
+      const winner = await this.#readEnvelope(effectId);
+      if (winner !== null && winner.value.kernelModuleSha256 === this.#moduleSha256) {
+        const settled = winner.value.record;
+        if (settled.status !== 'started') {
+          if (outcomeKey(settled) !== outcomeKey(completed)) {
+            throw new CentralAdmissionError(
+              'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+              `effect ${effectId} is already settled with a conflicting outcome`,
+            );
+          }
+          return snapshotJson(settled);
+        }
+      }
+      throw new CentralAdmissionError(
+        'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+        `effect ${effectId} terminal completion lost its conditional CAS race; the authoritative record must be re-read before any further terminal claim`,
+      );
+    }
+    // [T-C, #966] The returned record is a snapshot DISTINCT from the stored
+    // one: a caller mutating the result can never reach committed state.
+    return snapshotJson(completed);
   }
 
   async getRecords() {
@@ -1781,7 +1867,7 @@ export class KernelDurableEffectJournal {
     const envelopes = await Promise.all(keys.map((key) => this.#docs.get(key)));
     return envelopes
       .filter((doc) => doc !== null)
-      .map((doc) => doc.value.record)
+      .map((doc) => snapshotJson(doc.value.record))
       .sort((left, right) =>
         left.effectId < right.effectId ? -1 : left.effectId > right.effectId ? 1 : 0);
   }
@@ -2176,6 +2262,19 @@ export function createOccurrenceRuntime(options) {
     },
   };
 
+  // [T-C, V08-ABI-C01-N7b] Observation is OPTIONAL and best-effort: a
+  // failing observer never mutates the authoritative occurrence (the
+  // receipt side-channel is not an authority path).
+  function safeObserve(receipt) {
+    if (observe === undefined) return;
+    try {
+      observe(receipt);
+    } catch {
+      // Observer failures are deliberately swallowed: the occurrence's
+      // admission/journal/state/terminal facts are already durable.
+    }
+  }
+
   async function openInstance(request) {
     const target = request.target;
     const snapshot = await engine.createInstance({
@@ -2219,7 +2318,7 @@ export function createOccurrenceRuntime(options) {
         occurrence: { messageId: request.messageId, workflowInstanceId: `${target.workflowId}:${target.instanceKey}` },
         attribution: attribution(),
       };
-      observe?.(receipt);
+      safeObserve(receipt);
       return receipt;
     }
 
@@ -2268,7 +2367,7 @@ export function createOccurrenceRuntime(options) {
           occurrence: { messageId: request.messageId, workflowInstanceId },
           attribution: attribution(),
         };
-        observe?.(receipt);
+        safeObserve(receipt);
         return receipt;
       }
 
@@ -2299,7 +2398,7 @@ export function createOccurrenceRuntime(options) {
         occurrence: { messageId: request.messageId, workflowInstanceId },
         attribution: attribution(),
       };
-      observe?.(receipt);
+      safeObserve(receipt);
       return receipt;
     });
   }

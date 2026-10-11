@@ -816,7 +816,7 @@ test('V08-ABI-C01-N8: poison dynamic binding declarations fail typed at wiring, 
 
 test('V08-ABI-C01-N9a: live post-wiring mutation of a WIRED dynamic declaration is IGNORED (snapshot authoritative)', async () => {
   const policy = businessPolicy();
-  const { runtime, host } = createRuntime({ policy });
+  const { runtime } = createRuntime({ policy });
   const intent = (policy.intentBindings.submitQuoteDecisionDynamic.definition as any).states[0].transitions[0].effectIntents[0] as any;
   intent.inputFrom.amount = { source: 'event', path: ['payload', 'amount'] };
   intent.inputFrom.requestId = { source: 'event', path: ['payload', 'hijacked'] };
