@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
   ABI_VERSION, ENDPOINTS, MODULE_ID, PACKAGE_KIND, STANDARD_KINDS,
-  StandardSdkError, interpret,
+  StandardSdkError, interpret, createHostBoundModelResolver,
 } from '../src/qualified-package/payload/standard-sdk-v1.mjs';
 import { qualifyPackageClosure } from '../src/qualified-package/qualify.js';
 
@@ -143,4 +143,56 @@ test('V08-ABI-D01-P4 current selected Kernel Rule contract ({ruleId,eventType,pa
   assert.equal(Object.hasOwn(r, 'freshModelCallCount'), false);
   refused('SDK_DECLARATION_INVALID', () => interpret({ eventType: 'QUOTE_DECIDED' }, { amount: 40 }));
   refused('SDK_KIND_UNSUPPORTED', () => interpret({ kind: 'unknown', id: 'declaration:unknown', ruleId: 'rule:disallowed' }, {}));
+});
+
+test('FR08-P-SD1 & V08-FR08-P: Model-free Rule path emits trusted observed zero only when Host ModelPort is bound', () => {
+  let calls = 0;
+  const trustedHostModelPort = Object.freeze({ invoke: async () => { calls++; return { decision: {}, event: {} }; } });
+  const bound = createHostBoundModelResolver(trustedHostModelPort);
+  const selected = bound.interpret(e('rule', { eventType: 'QUOTE_DECIDED' }), {});
+  assert.deepEqual(selected.modelCallEvidence, { status: 'measured', count: 0, scope: 'bound-model-port-invocations' });
+  assert.equal(calls, 0);
+  assert.deepEqual(interpret(e('rule', { eventType: 'QUOTE_DECIDED' }), {}).modelCallEvidence, { status: 'unsupported' });
+});
+
+test('FR08-P-SD2: trusted Host ModelPort actual invocation accounts exactly one call; unmeasured is explicit', async () => {
+  let calls = 0;
+  const port = { invoke: async ({ operation, input }: { operation: string, input: any }) => {
+    calls++;
+    assert.equal(operation, 'classify');
+    return { decision: { outcome: 'review', data: input }, event: { type: 'CLASSIFIED', payload: input } };
+  } };
+  const bound = createHostBoundModelResolver(port);
+  const plan = { id: 'decision:quote', kind: 'model-decision', modelOperation: 'classify' };
+  const result = await bound.invokeDecision(plan, { requestId: 'R1' }, { freshModelCallCount: 999 }) as any;
+  assert.equal(calls, 1);
+  assert.deepEqual(result.modelCallEvidence, { status: 'measured', count: 1, scope: 'bound-model-port-invocations' });
+  assert.deepEqual({ ...result.structuredDecision.decision.data }, { requestId: 'R1' });
+  assert.equal(Object.hasOwn(result, 'freshModelCallCount'), false);
+  const unmetered = createHostBoundModelResolver(port, { metering: 'unmeasured' });
+  const u = await unmetered.invokeDecision(plan, { requestId: 'R2' }) as any;
+  assert.deepEqual(u.modelCallEvidence, { status: 'unmeasured' });
+  assert.equal(calls, 2);
+});
+
+test('FR08-N-SD1: caller-claimed count and unsafe Host port never create measured evidence', () => {
+  const caller = { freshModelCallCount: 999, modelCalls: { status: 'measured', count: 999 } };
+  assert.deepEqual(interpret(e('rule', { eventType: 'TEST' }), {}, caller).modelCallEvidence, { status: 'unsupported' });
+  refused('SDK_MODEL_PORT_INVALID', () => createHostBoundModelResolver({ invoke: 123 }));
+  refused('SDK_MODEL_PORT_INVALID', () => createHostBoundModelResolver({ invoke: async () => ({}) }, { metering: 'fake' }));
+  let getterCalls = 0;
+  const evil = {};
+  Object.defineProperty(evil, 'invoke', { get() { getterCalls++; return () => null; }, enumerable: true });
+  refused('SDK_MODEL_PORT_INVALID', () => createHostBoundModelResolver(evil));
+  assert.equal(getterCalls, 0);
+});
+
+test('FR08-N-SD2: ModelPort failure, non-JSON, and malformed output fail closed without a synthetic count', async () => {
+  const plan = { id: 'decision:quote', kind: 'model-decision', modelOperation: 'classify' };
+  const broken = createHostBoundModelResolver({ invoke: async () => { throw new Error('provider fault'); } });
+  await assert.rejects(() => broken.invokeDecision(plan, {}), (error: any) => error.code === 'SDK_MODEL_PORT_FAILED');
+  const unsafe = createHostBoundModelResolver({ invoke: async () => ({ decision: {}, event: {}, extra: new Date() }) });
+  await assert.rejects(() => unsafe.invokeDecision(plan, {}), (error: any) => error.code === 'SDK_DATA_UNSAFE');
+  const malformed = createHostBoundModelResolver({ invoke: async () => ({ decision: {} }) });
+  await assert.rejects(() => malformed.invokeDecision(plan, {}), (error: any) => error.code === 'SDK_MODEL_OUTPUT_INVALID');
 });
