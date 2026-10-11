@@ -104,3 +104,27 @@ export type {
   SemanticDecisionPromotedReference,
   SemanticDecisionUnavailableDisposition,
 } from '@kaicreator/domain-harness/v2';
+
+// v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
+// external approval + sealed-root producer over the public core /v8 ABI.
+export {
+  analyzeModuleClosure,
+  assertDeclaredExports,
+  buildQualifiedPackage,
+  BuildError,
+  ClosureError,
+  issueApprovalProof,
+  qualifyPackageClosure,
+  qualifiedKey,
+  QualificationError,
+  verifyApprovalProof,
+  ApprovalError,
+} from './qualified-package/index.js';
+export type {
+  BuildQualifiedPackageOptions,
+  ModuleClosureReport,
+  QualifiedPackageSubmission,
+  QualificationSubmission,
+  TrustedIssuers,
+  UnsignedQualification,
+} from './qualified-package/index.js';

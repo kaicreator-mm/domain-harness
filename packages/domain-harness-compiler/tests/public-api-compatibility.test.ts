@@ -56,8 +56,25 @@ const LEGACY_RUNTIME_VALUES = [
 /** The one additive T008C compatibility commitment binding. */
 const T008C_COMPATIBILITY_VALUES = ['COMPILER_PUBLIC_API_VERSION'] as const;
 
-/** The complete T008C-promised runtime inventory (legacy + one additive marker). */
-const COMMITTED_RUNTIME_VALUES = [...LEGACY_RUNTIME_VALUES, ...T008C_COMPATIBILITY_VALUES];
+/** The additive T-A (#1000) qualified-package BUILD runtime bindings. */
+const TA_QUALIFIED_PACKAGE_VALUES = [
+  // functions (7)
+  'analyzeModuleClosure',
+  'assertDeclaredExports',
+  'buildQualifiedPackage',
+  'issueApprovalProof',
+  'qualifyPackageClosure',
+  'qualifiedKey',
+  'verifyApprovalProof',
+  // error classes (4)
+  'ApprovalError',
+  'BuildError',
+  'ClosureError',
+  'QualificationError',
+] as const;
+
+/** The complete T008C-promised runtime inventory (legacy + additive markers). */
+const COMMITTED_RUNTIME_VALUES = [...LEGACY_RUNTIME_VALUES, ...T008C_COMPATIBILITY_VALUES, ...TA_QUALIFIED_PACKAGE_VALUES];
 
 const COMMITTED_RUNTIME_SORTED = [...COMMITTED_RUNTIME_VALUES].sort((left, right) =>
   left < right ? -1 : left > right ? 1 : 0,
@@ -76,6 +93,13 @@ const FUNCTION_NAMES = new Set<string>([
   'emitTargetCompiledPackageModule',
   'translateV01ScriptInvokes',
   'bundleScriptTool',
+  'analyzeModuleClosure',
+  'assertDeclaredExports',
+  'buildQualifiedPackage',
+  'issueApprovalProof',
+  'qualifyPackageClosure',
+  'qualifiedKey',
+  'verifyApprovalProof',
 ]);
 const ERROR_CLASS_NAMES = new Set<string>([
   'SemanticDecisionCompileError',
@@ -83,6 +107,10 @@ const ERROR_CLASS_NAMES = new Set<string>([
   'BusinessSourceCompileError',
   'V01ScriptTranslationError',
   'ScriptCompileError',
+  'ApprovalError',
+  'BuildError',
+  'ClosureError',
+  'QualificationError',
 ]);
 
 /** The exactly-15 successor `/v7` runtime names owned by the core package. */

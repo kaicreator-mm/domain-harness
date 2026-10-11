@@ -309,6 +309,8 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
   // T001E added './v7'; T012-D1 bounded repair (gate #930, adjudication
   // #537@6052473158) added exactly one further additive key './v7/execution'
   // with types/import/require — no legacy target modified, none reordered.
+  // T-A (#1000) added exactly one further additive key './v8' (qualified
+  // package/component ABI subpath) under the same additive-only rule.
   assert.deepEqual(Object.keys(parsed.exports), [
     '.',
     './v2',
@@ -317,7 +319,13 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
     './v4',
     './v7',
     './v7/execution',
+    './v8',
   ]);
+  assert.deepEqual(parsed.exports['./v8'], {
+    types: './dist/public-v8/index.d.ts',
+    import: './dist/public-v8/index.js',
+    require: './dist/public-v8/index.js',
+  });
   // Pinned pre-change legacy targets (byte-identical, unmodified, unreordered).
   assert.deepEqual(parsed.exports['.'], {
     types: './dist/index.d.ts',

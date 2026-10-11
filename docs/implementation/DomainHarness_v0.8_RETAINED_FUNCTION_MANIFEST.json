@@ -1,0 +1,1006 @@
+{
+ "schema": "dh.v08.retained-function-manifest/1",
+ "task": "T-A (#1000)",
+ "generatedFrom": "docs/product/DomainHarness_v0.8_L1_PRODUCT_EVIDENCE.md @ e122a1239e03f2788eea0ad235e277d5fb4269de (v0.8)",
+ "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+ "entryCount": 44,
+ "stateRule": "Every row stays NOT_RUN / exactExecutionSHA=null until a real current-v0.8 positive AND negative executable test exists at an exact reviewed SHA (owner task updates it).",
+ "entries": [
+  {
+   "id": "FR01",
+   "title": "Workflow state / child / WAIT-RESUME",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`DELIVERED` · v0.1 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/engine/workfl",
+   "historicSourcePath": "packages/domain-harness/src/engine/workflow-instance-engine.ts",
+   "historicSourceBlob": "108299995ba1b4be2366becd500fc1cd24d57c44",
+   "historicTestPath": "packages/domain-harness/tests/instance/workflow-instance-engine.test.ts",
+   "historicTestBlob": "56e050923d4ed63966d3fa63afdf9bd556cdb5a8",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR01-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR01-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "FR02",
+   "title": "Portable expression, Rule and safe script",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`DELIVERED` · v0.1 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/expression/ex",
+   "historicSourcePath": "packages/domain-harness/src/expression/expression-runtime.ts",
+   "historicSourceBlob": "c37cf23d4987088df8218a124d5a29efdd758e7c",
+   "historicTestPath": "packages/domain-harness/tests/expression/portable-expression.test.ts",
+   "historicTestBlob": "c9cf11e3114ccf5f1174cf77d174032de15cf6c7",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR02-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR02-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR03",
+   "title": "Durable tool / Operation effect",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`DELIVERED` · v0.1/v0.2 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/executio",
+   "historicSourcePath": "packages/domain-harness/src/execution/tool-runner/durable-tool-runner.ts",
+   "historicSourceBlob": "395691cbaf8061d3c3fd28798fd99850c219285a",
+   "historicTestPath": "packages/domain-harness/tests/execution/durable-tool-runner.test.ts",
+   "historicTestBlob": "fe4775ecaa33582558d1ab3dd6102c0dfd71a427",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR03-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR03-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "FR04",
+   "title": "DomainMessage admission / ACK / dedup",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`DELIVERED` · v0.2 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/messaging/acc",
+   "historicSourcePath": "packages/domain-harness/src/messaging/acceptance/domain-message-acceptance.ts",
+   "historicSourceBlob": "d30296e994ce769423622fc8e15536b71112250b",
+   "historicTestPath": "packages/domain-harness/tests/messaging/acceptance/domain-message-acceptance.test.ts",
+   "historicTestBlob": "2b598c84dc95fd48dc5b95be62bfea060215d039",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR04-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR04-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "FR05",
+   "title": "Query / multi-source projection",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`DELIVERED` · v0.2 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/projection/pr",
+   "historicSourcePath": "packages/domain-harness/src/projection/projection-service.ts",
+   "historicSourceBlob": "52b3127da2e62d772a66abcb75a7f5c625a1ae9d",
+   "historicTestPath": "packages/domain-harness/tests/projection/query-projection.test.ts",
+   "historicTestBlob": "314c495baa618a5cb6258118b40edf4046196fd5",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR05-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR05-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR06",
+   "title": "Compiled root load / integrity",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "M",
+   "historicClassification": "`DELIVERED` · v0.1/v0.2 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/loader/l",
+   "historicSourcePath": "packages/domain-harness/src/loader/load-harness.ts",
+   "historicSourceBlob": "bb4781489180063005b6720c0ec695928c820d5e",
+   "historicTestPath": "packages/domain-harness/tests/loader-negative.test.ts",
+   "historicTestBlob": "575eb5f9caf35471943106d8ef6ac4f03c490fcf",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR06-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR06-N"
+   ],
+   "newImplementationPath": "packages/domain-harness/src/public-v8/ (contracts.ts, installer.ts, load.ts) + packages/domain-harness-compiler/src/qualified-package/",
+   "newTestPath": "packages/domain-harness/tests/v08-abi/v08-abi-a01.test.ts + packages/domain-harness-compiler/tests/v08-qualified-package-a01.test.ts",
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-B SDK Microkernel load/lifecycle"
+  },
+  {
+   "id": "FR07",
+   "title": "Bounded harness and child execution",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`DELIVERED` · v0.3 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/harness/harne",
+   "historicSourcePath": "packages/domain-harness/src/harness/harness-machine.ts",
+   "historicSourceBlob": "f2fe5d49138be550555e6b88863961778cb2ce0f",
+   "historicTestPath": "packages/domain-harness/tests/harness/business-harness-machine.test.ts",
+   "historicTestBlob": "0c5622b5206ec15622f3ad706c67a4545f6e418b",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR07-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR07-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR08",
+   "title": "Rule/cache/promotion/model resolver",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`DELIVERED` · v0.3 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/decision-reso",
+   "historicSourcePath": "packages/domain-harness/src/decision-resolver/resolver.ts",
+   "historicSourceBlob": "25e8a62181fa8ae21f7b30835849060603349115",
+   "historicTestPath": "packages/domain-harness/tests/decision-resolver/resolver.test.ts",
+   "historicTestBlob": "b8a73bf31de69d5de0d0a5a983ab589f3ca8b2a2",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR08-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR08-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR09",
+   "title": "Governed child-workflow selection",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`DELIVERED` · v0.3 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/promoted-chil",
+   "historicSourcePath": "packages/domain-harness/src/promoted-child/runtime.ts",
+   "historicSourceBlob": "e7e73afcb42454e7fd332616d57f3ff46dcded0d",
+   "historicTestPath": "packages/domain-harness/tests/promoted-child/runtime.test.ts",
+   "historicTestBlob": "5592752f3cc8b218e59a0010a2f3e4531400b746",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR09-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR09-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR10",
+   "title": "UX intent and DAC role-safe bridge",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "U",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED` · v0.4+ [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/sr",
+   "historicSourcePath": "packages/domain-harness/src/dac-bridge/adapters.ts",
+   "historicSourceBlob": "641a58d2f89efc69536ab00355393ac89462aacf",
+   "historicTestPath": "packages/domain-harness/tests/dac-bridge/dac-bridge.test.ts",
+   "historicTestBlob": "d77767d776b0304667f9435009ed928d6ec54660",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR10-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR10-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1004",
+   "futureOwnerNote": "T-E scoped UX transport"
+  },
+  {
+   "id": "FR11",
+   "title": "Typed compiled Domain Data",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED` · v0.3–v0.7 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harnes",
+   "historicSourcePath": "packages/domain-harness/src/projection/compiled-domain-data.ts",
+   "historicSourceBlob": "c052d0f34310efabb6e554cb360eadb3979665a8",
+   "historicTestPath": "packages/domain-harness/tests/projection/projection-domain-data.test.ts",
+   "historicTestBlob": "3c5d5fbb7f736711ea8b13b65c921f10f5006366",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR11-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR11-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "FR12",
+   "title": "No-fresh-LLM evidence-gated fast path",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED` · v0.3/v0.6 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harnes",
+   "historicSourcePath": "packages/domain-harness/src/runtime-evidence/use-gate.ts",
+   "historicSourceBlob": "701ecad5046ae335dd99c0aa2c246ca520694601",
+   "historicTestPath": "packages/domain-harness/tests/runtime-evidence/use-gate.test.ts",
+   "historicTestBlob": "425f386e0473bb89642c6c8412f1ef4a3877ca12",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR12-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR12-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR13",
+   "title": "Component / Kind / binding",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED` · v0.7 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src",
+   "historicSourcePath": "packages/domain-harness/src/contracts/component.ts",
+   "historicSourceBlob": "0e0113c5ab069aa74132f86b81735a97ed03a445",
+   "historicTestPath": "packages/domain-harness/tests/component/component-envelope.test.ts",
+   "historicTestBlob": "a2270a505c8810f46b275e336f381e0593b7ee28",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR13-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR13-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "FR14",
+   "title": "One Assembly effect / Journal authority",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`DELIVERED` · v0.7 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src/contracts/eff",
+   "historicSourcePath": "packages/domain-harness/src/contracts/effectful-invocation.ts",
+   "historicSourceBlob": "19c534593833790c2d45e14c32075d86c53e0cf8",
+   "historicTestPath": "packages/domain-harness/tests/effectful-invocation/effectful-invocation-recovery.test.ts",
+   "historicTestBlob": "490b39d4413f67d39933ee7b94359c2aa620c368",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR14-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR14-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "FR15",
+   "title": "Typed UX/Agent tool and resource bridge",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "U",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED` · v0.7 [src](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/src",
+   "historicSourcePath": "packages/domain-harness/src/adapters/ux-tool-request.ts",
+   "historicSourceBlob": "237c99952978200baf5eca8a4bbf75257f69607b",
+   "historicTestPath": "packages/domain-harness/tests/agent-tool-projection/agent-tool-projection.test.ts",
+   "historicTestBlob": "d402585f5021a8877cc97ddad130f6bf6548d074",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-FR15-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-FR15-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1004",
+   "futureOwnerNote": "T-E scoped UX transport"
+  },
+  {
+   "id": "HF16",
+   "title": "Poison message recovery and queue drain",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`INCLUDED_BY_FR04`",
+   "historicSourcePath": "packages/domain-harness/src/recovery-v2/poison-message-recovery.ts",
+   "historicSourceBlob": "92c6d3dbec4b21273c5e4fe3b7e3980d719af760",
+   "historicTestPath": "packages/domain-harness/tests/recovery-v2/poison-message-recovery.test.ts",
+   "historicTestBlob": "e91c8f76a5dc36b08b1ed3bd8c1374fe9787e48c",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF16-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF16-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF17",
+   "title": "Subscription reconnect / coalesce",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`INCLUDED_BY_FR05`",
+   "historicSourcePath": "packages/domain-harness/src/subscription/subscription-registry.ts",
+   "historicSourceBlob": "52177373a66bb17b3ebbc0ee5b10242be38c6aaa",
+   "historicTestPath": "packages/domain-harness/tests/subscription/subscription-registry.test.ts",
+   "historicTestBlob": "c658686fdbed27da4c10a73a75aa93ccb0dc726d",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF17-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF17-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "HF18",
+   "title": "Durable deadline and callback correlation",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`ADDITIONAL_DELIVERED_FUNCTION`",
+   "historicSourcePath": "packages/domain-harness/src/runtime/durable-control-coordinator.ts",
+   "historicSourceBlob": "8d341dcaf8878ab0b4efcb2aaedf98c63e38b3d6",
+   "historicTestPath": "packages/domain-harness/tests/runtime/durable-control-coordinator.test.ts",
+   "historicTestBlob": "a7bc24293ce869ee2c5476148d28b99ef0acb89f",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF18-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF18-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF19",
+   "title": "Atomic ProcessCommand terminal outcomes",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`ADDITIONAL_DELIVERED_FUNCTION`",
+   "historicSourcePath": "packages/domain-harness/src/runtime/process-command-integration.ts",
+   "historicSourceBlob": "d239d9aba4bc2fc43fa616f14ceff4db0e118802",
+   "historicTestPath": "packages/domain-harness/tests/process-command/durable-process-command.test.ts",
+   "historicTestBlob": "5a0214e57552432971a35d0cee8cc860af28929a",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF19-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF19-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF20",
+   "title": "Ordered observation cursor and restart",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`INCLUDED_BY_FR05`",
+   "historicSourcePath": "packages/domain-harness/src/observation/recording-store.ts",
+   "historicSourceBlob": "269907b13d115eaa5d2b1f6dc52a38227788eb67",
+   "historicTestPath": "packages/domain-harness/tests/observation/runtime-observation.test.ts",
+   "historicTestBlob": "4c08dfd851a46af6e2e4b84b342b7cddfa90fabb",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF20-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF20-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF21",
+   "title": "SIM versus PROD authority isolation",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`ADDITIONAL_DELIVERED_FUNCTION`",
+   "historicSourcePath": "packages/domain-harness/src/contracts/runtime-assembly.ts",
+   "historicSourceBlob": "e6dad8af62c27b367811f3813459189394d67b61",
+   "historicTestPath": "packages/domain-harness/tests/authority-class/authority-class.test.ts",
+   "historicTestBlob": "31b82a6fde9f4f3f499c55c2b3ec91a08e695d36",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF21-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF21-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF22",
+   "title": "Transitive provider capability closure",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`INCLUDED_BY_FR13`",
+   "historicSourcePath": "packages/domain-harness/src/contracts/capability-dependency-closure.ts",
+   "historicSourceBlob": "b355980437b11495b7f514f327832791667dbac2",
+   "historicTestPath": "packages/domain-harness/tests/capability-dependency-closure/capability-dependency-closure.test.ts",
+   "historicTestBlob": "0a5ac09cf0596c9d93e09faa985521927580f019",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF22-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF22-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "HF23",
+   "title": "Agent-safe Operation exposure projection",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "`INCLUDED_BY_FR15`",
+   "historicSourcePath": "packages/domain-harness/src/adapters/agent-tool-projection.ts",
+   "historicSourceBlob": "70932bed7f606a42a07daacec7447a77beb8c7ed",
+   "historicTestPath": "packages/domain-harness/tests/agent-tool-projection/agent-tool-projection.test.ts",
+   "historicTestBlob": "d402585f5021a8877cc97ddad130f6bf6548d074",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF23-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF23-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "HF24",
+   "title": "Deterministic business-source projection",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`INCLUDED_BY_FR11`",
+   "historicSourcePath": "packages/domain-harness/src/projection/compiled-business-source.ts",
+   "historicSourceBlob": "13948d5d50813a7c2bcaef9d32839039545b1542",
+   "historicTestPath": "packages/domain-harness/tests/projection/projection-business-source-schema.test.ts",
+   "historicTestBlob": "3cc3bb5bda97260c87bb0c5967e669eb18fdc265",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF24-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF24-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "HF25",
+   "title": "Typed App-contract code generation",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`INCLUDED_BY_FR11`",
+   "historicSourcePath": "packages/domain-harness/src/compiler/app-contracts.ts",
+   "historicSourceBlob": "72dabb9ac5430c3e3d3c4d27101953e2cf2b129f",
+   "historicTestPath": "packages/domain-harness/tests/app-contracts/generation.test.ts",
+   "historicTestBlob": "26640d7cc93cb519eebfce5d2ec01d20a2c2a86f",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF25-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF25-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "HF26",
+   "title": "Decision provenance / denial evidence capture",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`ADDITIONAL_DELIVERED_FUNCTION`",
+   "historicSourcePath": "packages/domain-harness/src/runtime-evidence/capture.ts",
+   "historicSourceBlob": "3c38f694dad0a373f25048f48dfda9496df2cc9e",
+   "historicTestPath": "packages/domain-harness/tests/runtime-evidence/capture.test.ts",
+   "historicTestBlob": "7d250186b63b280b3d544046570d0c01347874f2",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF26-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF26-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF27",
+   "title": "Per-instance serialized concurrent lane",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`INCLUDED_BY_FR01`",
+   "historicSourcePath": "packages/domain-harness/src/engine/per-instance-serialized-lane.ts",
+   "historicSourceBlob": "d5a94501648f547ef408870c16b0ce6297fc81b5",
+   "historicTestPath": "packages/domain-harness/tests/instance/workflow-instance-engine.test.ts",
+   "historicTestBlob": "56e050923d4ed63966d3fa63afdf9bd556cdb5a8",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF27-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF27-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF28",
+   "title": "Node / Expo portable packaged consumer",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "H",
+   "historicClassification": "`ADDITIONAL_DELIVERED_FUNCTION`",
+   "historicSourcePath": "packages/domain-harness/src/runtime/create-domain-runtime.ts",
+   "historicSourceBlob": "2edd182b15e714c841342f24b3491169de156337",
+   "historicTestPath": "packages/domain-harness-node/tests/cross-host/chm-cross-host.test.ts",
+   "historicTestBlob": "53b38d369e3882dcb0cf50ff7b0215fbdbb7f112",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF28-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF28-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1004",
+   "futureOwnerNote": "T-E qualified Node Host/physical storage"
+  },
+  {
+   "id": "HF29",
+   "title": "Allowed local / HTTP tool & script Host binding",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "H",
+   "historicClassification": "`INCLUDED_BY_FR03`",
+   "historicSourcePath": "packages/domain-harness/src/tool/host-local-contract/index.ts",
+   "historicSourceBlob": "df51b0a7395fea696694a4f57c5e5de1b43b6474",
+   "historicTestPath": "packages/domain-harness/tests/host-local-tool-binding.test.ts",
+   "historicTestBlob": "c60e56c93ab5c010fb41850eb4c11b8f508b0164",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF29-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF29-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1004",
+   "futureOwnerNote": "T-E qualified Node Host/physical storage"
+  },
+  {
+   "id": "HF30",
+   "title": "External DAC designation / delegation verifier",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`INCLUDED_BY_FR10`",
+   "historicSourcePath": "packages/domain-harness/src/dac-v0041/authority/verifier.ts",
+   "historicSourceBlob": "ff087a09c411324d139f2a34cb08ca6468004554",
+   "historicTestPath": "packages/domain-harness/tests/dac-v0041-authority/dac-v0041-authority-designation-chain.test.ts",
+   "historicTestBlob": "6418d96417cb3d7dbc8de07cbf73c223ba109dba",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF30-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF30-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "HF31",
+   "title": "Canonical record / accessor safety",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`INCLUDED_BY_FR13`",
+   "historicSourcePath": "packages/domain-harness/src/contracts/record-safety.ts",
+   "historicSourceBlob": "95424c894d6b012344a14adc180332b1fc7fe8ee",
+   "historicTestPath": "packages/domain-harness/tests/record-safety/descriptor-safety-matrix.test.ts",
+   "historicTestBlob": "7cfbb1a50574d6e2ac228ad9a5392f22ba016374",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF31-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF31-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "HF32",
+   "title": "Durable Workflow child-send result routing",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "K",
+   "historicClassification": "`INCLUDED_BY_FR04`",
+   "historicSourcePath": "packages/domain-harness/src/runtime/compiled-workflow-message-effects-v3.ts",
+   "historicSourceBlob": "36ab0b7a66a7bd6b41fcb585c797d9fa9bc8e323",
+   "historicTestPath": "packages/domain-harness/tests/runtime/compiled-workflow-message-effects-v3.test.ts",
+   "historicTestBlob": "4e934d19f0bf9fd07e7bece7964cc9924d52002f",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF32-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF32-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1002",
+   "futureOwnerNote": "T-C physical selected Kernel mechanisms"
+  },
+  {
+   "id": "HF33",
+   "title": "Same-occurrence resource currentness pin",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "H",
+   "historicClassification": "`INCLUDED_BY_FR15`",
+   "historicSourcePath": "packages/domain-harness/src/contracts/resource-resolution.ts",
+   "historicSourceBlob": "7a913eb4617bfe8033e70889180392336e2982db",
+   "historicTestPath": "packages/domain-harness/tests/resource-currentness/resource-currentness.test.ts",
+   "historicTestBlob": "78387745e309319dfb79b0f04f1752bb546e7be8",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF33-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF33-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1004",
+   "futureOwnerNote": "T-E qualified Node Host/physical storage"
+  },
+  {
+   "id": "HF34",
+   "title": "Definition graph snapshot/digest stability",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`INCLUDED_BY_FR13`",
+   "historicSourcePath": "packages/domain-harness/src/contracts/definition-graph.ts",
+   "historicSourceBlob": "a86ccd525540eb98f8cd4ad606b045f2606cf7f1",
+   "historicTestPath": "packages/domain-harness/tests/definition-graph/definition-graph-torn-snapshot.test.ts",
+   "historicTestBlob": "ee38a7fba794cce7ffc1a773c1aef859f62f9c07",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-HF34-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-HF34-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "NEW-FUNCTION-01",
+   "title": "DAC exact compatibility request↔validation↔result TWO-VIEW and contradictory-evidence precedence · [source two-view L495, precedence L839](https://github.com/kaicreator-mm/domain-harness/blob/86110c61",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED_PURE_VERIFIER`; under FR13/HF30 umbrella, **distinct slot**",
+   "historicSourcePath": "packages/domain-harness/src/dac-v0041/compatibility/verifier.ts",
+   "historicSourceBlob": "8a9636fd81fa224928305a0183a36cd8038d13ec",
+   "historicTestPath": "packages/domain-harness/tests/dac-v0041-compatibility/dac-v0041-compatibility-two-view.test.ts",
+   "historicTestBlob": "387690be93767a76a81455af6fbcc0c1653a818b",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-NF01-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-NF01-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "NEW-FUNCTION-02",
+   "title": "DAC ApplicationSelection→Manifest chosen subject/coverage + truthful material-refusal intake · [source](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/pa",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED_PURE_VERIFIER`; FR13/HF30 umbrella, distinct slot",
+   "historicSourcePath": "packages/domain-harness/src/dac-v0041/composition-intake/verifier.ts",
+   "historicSourceBlob": "0fbf6235bf55ff5ce37cf06585441df4686e07c7",
+   "historicTestPath": "packages/domain-harness/tests/dac-v0041-composition-intake/dac-v0041-composition-intake-selection.test.ts",
+   "historicTestBlob": "675c9ed23ee32248721c362e00d044eaa5a0dde7",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-NF02-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-NF02-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "NEW-FUNCTION-03",
+   "title": "DAC Runtime Binding fact verification, **Binding ≠ Activation/load** · [source](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/domain-harness/sr",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED_PURE_VERIFIER`; FR13/HF30 umbrella, distinct slot",
+   "historicSourcePath": "packages/domain-harness/src/dac-v0041/runtime/verifier.ts",
+   "historicSourceBlob": "7732fa9079b65c8ebb4ff782efeb5e593c4f1c62",
+   "historicTestPath": "packages/domain-harness/tests/dac-v0041-runtime/dac-v0041-runtime-binding.test.ts",
+   "historicTestBlob": "a62efdf604a7cccb83320625735794a7e8ab05ab",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-NF03-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-NF03-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "NEW-FUNCTION-04",
+   "title": "DAC Runtime Activation fact distinct from Binding, external issuer currentness + SoD · [source](https://github.com/kaicreator-mm/domain-harness/blob/86110c616b8cb18c730553e4cdab7ef555214521/packages/d",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "BUILD",
+   "historicClassification": "`DELIVERED_SCOPE_LIMITED_PURE_VERIFIER`; HF30 umbrella, distinct slot",
+   "historicSourcePath": "packages/domain-harness/src/dac-v0041/runtime/verifier.ts",
+   "historicSourceBlob": "7732fa9079b65c8ebb4ff782efeb5e593c4f1c62",
+   "historicTestPath": "packages/domain-harness/tests/dac-v0041-runtime/dac-v0041-runtime-activation.test.ts",
+   "historicTestBlob": "f091a3cd40d11b90fd14950eee1cdeaf9ef9f63c",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "V08-NF04-P"
+   ],
+   "proposedNegativeCases": [
+    "V08-NF04-N"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1000",
+   "futureOwnerNote": "T-A qualified BUILD/producer"
+  },
+  {
+   "id": "FR08-P-SD1",
+   "title": "FR08-P-SD1",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": null,
+   "historicSourcePath": "packages/domain-harness/src/decision-resolver/resolver.ts",
+   "historicSourceBlob": "25e8a62181fa8ae21f7b30835849060603349115",
+   "historicTestPath": "packages/domain-harness/tests/decision-resolver/resolver.test.ts",
+   "historicTestBlob": "b8a73bf31de69d5de0d0a5a983ab589f3ca8b2a2",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "FR08-P-SD1"
+   ],
+   "proposedNegativeCases": [],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR08-N-SD1",
+   "title": "FR08-N-SD1",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": null,
+   "historicSourcePath": "packages/domain-harness/src/decision-resolver/resolver.ts",
+   "historicSourceBlob": "25e8a62181fa8ae21f7b30835849060603349115",
+   "historicTestPath": "packages/domain-harness/tests/decision-resolver/resolver.test.ts",
+   "historicTestBlob": "b8a73bf31de69d5de0d0a5a983ab589f3ca8b2a2",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [],
+   "proposedNegativeCases": [
+    "FR08-N-SD1"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR08-P-SD2",
+   "title": "FR08-P-SD2",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": null,
+   "historicSourcePath": "packages/domain-harness/src/decision-resolver/resolver.ts",
+   "historicSourceBlob": "25e8a62181fa8ae21f7b30835849060603349115",
+   "historicTestPath": "packages/domain-harness/tests/decision-resolver/resolver.test.ts",
+   "historicTestBlob": "b8a73bf31de69d5de0d0a5a983ab589f3ca8b2a2",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [
+    "FR08-P-SD2"
+   ],
+   "proposedNegativeCases": [],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "FR08-N-SD2",
+   "title": "FR08-N-SD2",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": null,
+   "historicSourcePath": "packages/domain-harness/src/decision-resolver/resolver.ts",
+   "historicSourceBlob": "25e8a62181fa8ae21f7b30835849060603349115",
+   "historicTestPath": "packages/domain-harness/tests/decision-resolver/resolver.test.ts",
+   "historicTestBlob": "b8a73bf31de69d5de0d0a5a983ab589f3ca8b2a2",
+   "historicPinCommit": "86110c616b8cb18c730553e4cdab7ef555214521",
+   "proposedPositiveCases": [],
+   "proposedNegativeCases": [
+    "FR08-N-SD2"
+   ],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "NEW-FUNCTION-05",
+   "title": "T004 compiled SemanticDecision declaration → Runtime DecisionResolver binding. [v0.6 binding](https://github.com/kaicreator-mm/domain-harness/blob/7c367188d5c8cffa41bc22cd5269672a665c436f/packages/dom",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "**DELIVERED_V06_ABSENT_V07**; distinct from FR08 Rule/cache/promoted resolver sequence and already-added FR08 SD1/SD2 unavailable/event test slots",
+   "historicSourcePath": "packages/domain-harness/src/runtime/decision-resolver-binding.ts",
+   "historicSourceBlob": "98265242f11c809b71fd2268bd8297a740b785cf",
+   "historicTestPath": "packages/domain-harness/tests/v3-assembly/decision-resolver-integration.test.ts",
+   "historicTestBlob": "4bc854822f9d7a6178c70df29433c07c72553f9f",
+   "historicPinCommit": "7c367188d5c8cffa41bc22cd5269672a665c436f",
+   "proposedPositiveCases": [],
+   "proposedNegativeCases": [],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  },
+  {
+   "id": "NEW-FUNCTION-06",
+   "title": "T006 typed DecisionResolutionReceipt, DECISION_RECEIPT observation and durable append. [v0.6 receipt](https://github.com/kaicreator-mm/domain-harness/blob/7c367188d5c8cffa41bc22cd5269672a665c436f/pack",
+   "status": "NOT_RUN",
+   "exactExecutionSHA": null,
+   "frozenOwner": "S",
+   "historicClassification": "**DELIVERED_V06_ABSENT_V07**; not HF18 RuntimeControlReceipt or HF26 Runtime Evidence; neither extra Journal nor replay/mutation authority",
+   "historicSourcePath": "packages/domain-harness/src/observation/decision-receipt.ts",
+   "historicSourceBlob": "8bf42c18a440e973c8066e38107b46f15defed62",
+   "historicTestPath": "packages/domain-harness/tests/v3-assembly/decision-receipt.test.ts",
+   "historicTestBlob": "314c6122bf55e2f4657dc9523b4c0888d4cbe702",
+   "historicPinCommit": "7c367188d5c8cffa41bc22cd5269672a665c436f",
+   "proposedPositiveCases": [],
+   "proposedNegativeCases": [],
+   "newImplementationPath": null,
+   "newTestPath": null,
+   "futureOwnerTask": "#1003",
+   "futureOwnerNote": "T-D Standard SDK Package semantics"
+  }
+ ]
+}

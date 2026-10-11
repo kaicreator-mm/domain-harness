@@ -151,7 +151,14 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
     exports: Record<string, { types: string; import: string; require: string }>;
   };
   const subpaths = Object.keys(packageJson.exports).sort();
-    assert.deepEqual(subpaths, ['.', './v2', './v3', './v4', './v7', './v7/execution', './workflow']);
+  // T-A (#1000) added exactly one further additive key './v8' (qualified
+  // package/component ABI subpath) — no legacy target modified, none reordered.
+  assert.deepEqual(subpaths, ['.', './v2', './v3', './v4', './v7', './v7/execution', './v8', './workflow']);
+  assert.deepEqual(packageJson.exports['./v8'], {
+    types: './dist/public-v8/index.d.ts',
+    import: './dist/public-v8/index.js',
+    require: './dist/public-v8/index.js',
+  });
   assert.deepEqual(packageJson.exports['./v7/execution'], {
     types: './dist/public-v7/execution.d.ts',
     import: './dist/public-v7/execution.js',
