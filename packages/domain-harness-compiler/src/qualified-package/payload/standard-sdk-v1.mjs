@@ -226,3 +226,90 @@ export function interpret(declaration, rawInput, rawContext = {}) {
   }
   return { ...result, ...evidence(id) };
 }
+
+
+/**
+ * FR08 model measurement capability, scoped to the protected Host bootstrap.
+ *
+ * Binding authority is NOT established by this ordinary JS factory. Only the
+ * trusted Host, holding the module namespace behind qualified load(), may
+ * supply an actual ModelPort and expose the returned resolver to K. Neither
+ * a Business declaration nor interpret(..., context) can install one.
+ *
+ * A port invocation count is an observation of CALLS THROUGH THIS BOUND PORT
+ * for this resolution, not a derived number from model text, journal entries,
+ * user-provided context or historical fast-path assumptions. Without a
+ * Host-bound port, plain interpret() emits 'unsupported'.
+ *
+ * The factory never mutates Domain state or commits a tool/effect/journal.
+ */
+export function createHostBoundModelResolver(hostModelPort, options = {}) {
+  if (typeof hostModelPort !== 'object' || hostModelPort === null) {
+    fail('SDK_MODEL_PORT_INVALID', 'a protected Host ModelPort object is required');
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(hostModelPort, 'invoke');
+  if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+    fail('SDK_MODEL_PORT_INVALID', 'Host ModelPort.invoke must be a direct callable');
+  }
+  const invoke = descriptor.value.bind(hostModelPort);
+  const config = data(options);
+  const metered = config.metering === undefined || config.metering === 'measured';
+  if (config.metering !== undefined && config.metering !== 'measured' && config.metering !== 'unmeasured') {
+    fail('SDK_MODEL_PORT_INVALID', 'Host metering mode must be measured or unmeasured');
+  }
+
+  function observation(count) {
+    return metered
+      ? { status: 'measured', count, scope: 'bound-model-port-invocations' }
+      : { status: 'unmeasured' };
+  }
+
+  return Object.freeze({
+    /**
+     * Model-free success: zero actual calls THROUGH THIS PORT. This does
+     * not assert a global or cross-component LLM accounting total.
+     */
+    interpret(declaration, input, callerContext = {}) {
+      const resolved = interpret(declaration, input, callerContext);
+      return {
+        ...resolved,
+        modelCallEvidence: observation(0),
+      };
+    },
+    /**
+     * Fresh ModelPort invocation, with result captured as JSON. K alone can
+     * admit the returned proposed decision, enforce guards and write state.
+     */
+    async invokeDecision(declaration, input, callerContext = {}) {
+      const plan = record(data(declaration), 'model declaration');
+      const selectedInput = record(data(input), 'model input');
+      data(callerContext); // ignored for accounting; user-supplied meters cannot attest calls
+      if (plan.kind !== 'model-decision') {
+        fail('SDK_KIND_UNSUPPORTED', 'Host ModelPort invocation requires an explicit model-decision declaration');
+      }
+      const declarationId = ident(plan.id, 'model-decision.id');
+      const modelOperation = ident(plan.modelOperation, 'model-decision.modelOperation');
+      let output;
+      try {
+        output = await invoke({ operation: modelOperation, input: selectedInput });
+      } catch (_error) {
+        fail('SDK_MODEL_PORT_FAILED', 'trusted Host ModelPort invocation failed; no decision admitted');
+      }
+      const decision = data(output);
+      record(decision, 'model result');
+      if (!Object.hasOwn(decision, 'decision') || !Object.hasOwn(decision, 'event')) {
+        fail('SDK_MODEL_OUTPUT_INVALID', 'ModelPort output requires structured decision and event');
+      }
+      return {
+        kind: 'model-decision',
+        structuredDecision: decision,
+        provenance: { sdkModule: MODULE_ID, declarationId },
+        source: 'host-model-port',
+        llmAvoided: false,
+        modelCallEvidence: observation(1),
+        cacheDisposition: { read: 'disabled' },
+        telemetry: [],
+      };
+    },
+  });
+}
