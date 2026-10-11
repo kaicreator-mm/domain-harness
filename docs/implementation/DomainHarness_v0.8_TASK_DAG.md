@@ -120,3 +120,29 @@ RESEARCH_PR_AUTO_MERGE=NO
 CAS_PROOF=REQUIRES_IMPLEMENTATION_AND_REAL_TESTS
 RELEASE=NO
 ```
+
+
+## Materialized Issues and live dependency mirror — 2026-10-11
+
+All **seven** formal concern Issues were created from this frozen Task DAG, with executable issue-local L3 packs. Creating these Issues is *not* a Builder Claim or proof of execution.
+
+| Concern | GitHub issue | Initial admission | Explicit required predecessor(s) |
+| --- | --- | --- | --- |
+| T-A | [#1000](https://github.com/kaicreator-mm/domain-harness/issues/1000) | READY | reviewed L2 Freeze #999 |
+| T-B | [#1001](https://github.com/kaicreator-mm/domain-harness/issues/1001) | QUEUED | #1000 |
+| T-C | [#1002](https://github.com/kaicreator-mm/domain-harness/issues/1002) | QUEUED | #1000 |
+| T-D | [#1003](https://github.com/kaicreator-mm/domain-harness/issues/1003) | QUEUED | #1000 |
+| T-E | [#1004](https://github.com/kaicreator-mm/domain-harness/issues/1004) | QUEUED | #1000 |
+| T-F | [#1005](https://github.com/kaicreator-mm/domain-harness/issues/1005) | QUEUED | #1001, #1002, #1003, #1004 |
+| T-G | [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) | QUEUED | #1005 |
+
+**Live native Issue Dependencies registration: NOT YET VERIFIED / NOT CLAIMED.** The connected GitHub operations available to this Controller expose creation and body updates but **do not expose native dependency edge mutation**. Until 9 edges above are written through an authorized native GitHub API executor, use the explicit Issue bodies as a safe execution hold and do **not** incorrectly assert that Github's native dependency graph contains them. This issue-link mirror does not alter the frozen task scopes, Product/L2 conditions, or Review/Validation obligations. Assign that bounded mutation to a local GitHub API-capable actor, optionally concurrent with T-A build; never create duplicate Issues/PRs.
+
+```ini
+EVENT=V08_TASK_DAG_SEVEN_ISSUES_MATERIALIZED
+ISSUES=A1000;B1001;C1002;D1003;E1004;F1005;G1006
+NATIVE_EDGES=A->B;A->C;A->D;A->E;B->F;C->F;D->F;E->F;F->G
+NATIVE_ISSUE_DEPENDENCIES=UNVERIFIED_PENDING_API_ACTOR
+FIRST_READY=#1000
+TASK_DAG_ORIGINAL_FREEZE=aa9ca91a1a26b90b39ba131a21e7d5da9bbb78c0
+```
