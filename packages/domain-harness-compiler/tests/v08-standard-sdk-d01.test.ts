@@ -142,5 +142,5 @@ test('V08-ABI-D01-P4 current selected Kernel Rule contract ({ruleId,eventType,pa
   assert.deepEqual(r.modelCallEvidence, { status: 'unsupported' });
   assert.equal(Object.hasOwn(r, 'freshModelCallCount'), false);
   refused('SDK_DECLARATION_INVALID', () => interpret({ eventType: 'QUOTE_DECIDED' }, { amount: 40 }));
-  refused('SDK_KIND_UNSUPPORTED', () => interpret({ kind: 'unknown', ruleId: 'rule:disallowed' }, {}));
+  refused('SDK_KIND_UNSUPPORTED', () => interpret({ kind: 'unknown', id: 'declaration:unknown', ruleId: 'rule:disallowed' }, {}));
 });
