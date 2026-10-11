@@ -299,9 +299,11 @@ function tscBuildToStage(buildConfigPath: string, stageDistDirectory: string): v
 
 /**
  * Copy the pack-relevant skeleton of one package into its stage root. The
- * shipped `files` entries are exactly dist (+ README.md where declared);
- * no package defines prepack/postpack scripts or a LICENSE, so this is the
- * complete set npm pack would pick up from the live package root.
+ * shipped `files` entries are the declared package pack inventory.
+ * The compiler also carries a physically selected Standard SDK module
+ * source in src/qualified-package/payload/*.mjs; stageOnce copies those
+ * bytes separately so P2-01 sees byte-identical live and staged packs.
+ * No prepack/postpack scripts or a LICENSE are used in these fixtures.
  */
 function stagePackageSkeleton(packageRoot: string, stageRoot: string, readme: boolean): void {
   mkdirSync(stageRoot, { recursive: true });
@@ -362,6 +364,16 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
     // The compiler dist ships committed from git (#299) and no test rebuilds
     // it: stage a read-only copy of the live tree.
     cpSync(join(PACKAGE_ROOT, 'dist'), join(root, 'compiler', 'dist'), { recursive: true });
+    // V08-TD: the compiler now ships a sealed Standard SDK source module
+    // alongside dist. Copy the exact physical payload bytes into the private
+    // immutable staged package as well, otherwise the live-vs-stage P2-01
+    // equivalence guard correctly detects a PR-introduced live-only file.
+    // Missing source MUST fail closed rather than silently producing a
+    // qualified package that differs from the live npm pack.
+    const livePayload = join(PACKAGE_ROOT, 'src', 'qualified-package', 'payload');
+    const stagePayload = join(root, 'compiler', 'src', 'qualified-package', 'payload');
+    mkdirSync(dirname(stagePayload), { recursive: true });
+    cpSync(livePayload, stagePayload, { recursive: true });
 
     const coreTarball = packStage(join(root, 'core'), packsDirectory, 'domain-harness-0.2.0', 1);
     const compilerTarball = packStage(join(root, 'compiler'), packsDirectory, 'compiler', 1);
