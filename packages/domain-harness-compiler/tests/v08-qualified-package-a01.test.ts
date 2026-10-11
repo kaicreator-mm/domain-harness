@@ -216,6 +216,18 @@ test('V08-ABI-A01-N3 malicious transitive code: comment-obfuscated dynamic impor
   refuses(QualificationError, 'IMPORT_NOT_STATIC', () => qualifyPackageClosure(submission({ kernelSource: withRequire })));
   const withBareImport = `import { createHash } from 'node:crypto';\n${moduleSource('kernel', kernelId)}`;
   refuses(QualificationError, 'IMPORT_UNRESOLVED', () => qualifyPackageClosure(submission({ kernelSource: withBareImport })));
+  // Review P1-2: eval() and new Function() can synthesize dynamic imports at
+  // runtime — both constructors are refused by the AST scanner.
+  const withEval = moduleSource('kernel', kernelId).replace(
+    'export function createOccurrenceRuntime() { return {}; }',
+    "export function createOccurrenceRuntime() { const f = eval(\"return import('node:child_process')\"); return {}; }",
+  );
+  refuses(QualificationError, 'IMPORT_NOT_STATIC', () => qualifyPackageClosure(submission({ kernelSource: withEval })));
+  const withFunctionCtor = moduleSource('kernel', kernelId).replace(
+    'export function createOccurrenceRuntime() { return {}; }',
+    "export function createOccurrenceRuntime() { const f = new Function(\"return import('node:child_process')\"); return {}; }",
+  );
+  refuses(QualificationError, 'IMPORT_NOT_STATIC', () => qualifyPackageClosure(submission({ kernelSource: withFunctionCtor })));
 });
 
 test('V08-ABI-A01-B6 missing declared handler export is refused (AST, not a text match)', () => {

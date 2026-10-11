@@ -7,10 +7,13 @@
  * bytes against its sealed SHA-256 BEFORE the module is imported, then
  * instantiates the module physically from its exact sealed bytes via a
  * `data:` module import (the executing code enters the process ONLY through
- * this path) and checks the module's self-declared identity. A forged
- * producer, mutated bytes or a mismatched provider can therefore never
- * become executable (adapted from #994@b9ea4d1 load.mjs installer part and
- * #978@f87cfdf trusted-anchor install).
+ * this path) and checks the module's self-declared identity. Mutated bytes
+ * and a mismatched self-identity therefore never become executable; a
+ * forged producer is caught by the producer-prefix and approval-BINDING
+ * checks in contracts.ts, while cryptographic issuer-attestation
+ * verification stays at the compiler attach boundary until the successor
+ * Host-channel tasks own it (adapted from #994@b9ea4d1 load.mjs installer
+ * part and #978@f87cfdf trusted-anchor install).
  */
 import { QualifiedPackageError, V8_QUALIFIED_ABI, sha256Hex, } from './contracts.js';
 async function importModuleFromBytes(moduleSource) {

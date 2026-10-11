@@ -93,10 +93,20 @@ export function analyzeModuleClosure(input) {
     }
     function scanForDynamicImports(fromPath, statement) {
         const visit = (node) => {
+            const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
             if (ts.isCallExpression(node)
                 && (node.expression.kind === ts.SyntaxKind.ImportKeyword
                     || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) {
-                throw new ClosureError('IMPORT_NOT_STATIC', `module ${fromPath} contains a dynamic import()/require() expression (line ${node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1}); sealed qualified packages admit static imports only`);
+                throw new ClosureError('IMPORT_NOT_STATIC', `module ${fromPath} contains a dynamic import()/require() expression (line ${line}); sealed qualified packages admit static imports only`);
+            }
+            // eval(...) and new Function(...) can synthesize dynamic imports (and
+            // arbitrary code) at runtime; refuse the constructors themselves so
+            // "static imports only" has no AST-level escape hatch.
+            if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'eval') {
+                throw new ClosureError('IMPORT_NOT_STATIC', `module ${fromPath} calls eval() (line ${line}); sealed qualified packages admit statically analyzable code only`);
+            }
+            if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
+                throw new ClosureError('IMPORT_NOT_STATIC', `module ${fromPath} constructs new Function() (line ${line}); sealed qualified packages admit statically analyzable code only`);
             }
             ts.forEachChild(node, visit);
         };

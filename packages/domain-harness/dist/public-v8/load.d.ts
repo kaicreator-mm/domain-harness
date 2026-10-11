@@ -41,8 +41,15 @@ export interface LoadedQualifiedPackages {
 /**
  * Public one-argument loader. `packageRoot` must be a sealed qualified
  * package root produced by `@kaicreator/domain-harness-compiler` BUILD plus
- * an externally issued approval proof; every other input fails typed before
- * any executable import or effect.
+ * an externally issued approval proof. This boundary verifies the sealed
+ * shape, the producer trust prefix, the approval proof's BINDING to this
+ * exact closure and every module's sealed bytes BEFORE import; cryptographic
+ * issuer-attestation verification happens at the compiler attach boundary
+ * (verifyApprovalProof with the governance issuer registry) — a hand-minted
+ * structurally consistent root is therefore executable HERE until issuer
+ * verification is wired into the protected Host channel in the successor
+ * tasks (L2 U01), and that residual gap is a documented obligation, not a
+ * hidden claim.
  */
 export declare function load(packageRoot: unknown): Promise<LoadedQualifiedPackages>;
 //# sourceMappingURL=load.d.ts.map

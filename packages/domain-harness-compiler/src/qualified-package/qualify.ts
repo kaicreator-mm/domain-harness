@@ -154,8 +154,6 @@ export function qualifyPackageClosure(submission: unknown): UnsignedQualificatio
     // static and self-contained. (Byte identity is computed below from the
     // same presented bytes; the sealed root and the trusted installer
     // re-verify it independently.)
-    // Static AST checks: required exports really declared, closure really
-    // static and self-contained.
     try {
       assertDeclaredExports(pkg.modulePath, pkg.moduleSource, abi.requiredExports);
       analyzeModuleClosure({ entryPath: pkg.modulePath, moduleSources: new Map([[pkg.modulePath, pkg.moduleSource]]) });
