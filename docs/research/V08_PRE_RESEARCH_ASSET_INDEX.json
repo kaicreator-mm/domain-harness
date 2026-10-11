@@ -1,0 +1,442 @@
+{
+  "schema": "research-adoption-index/v0.1",
+  "status": "NON_NORMATIVE_PENDING_PRODUCT_FREEZE_AND_L2",
+  "generated_date": "2026-10-11",
+  "repository": "kaicreator-mm/domain-harness",
+  "base_main": "b5d851b568ffc7edec89ddbac0f706cf6301e8fe",
+  "normative_authorities": [
+    "https://github.com/kaicreator-mm/domain-harness/issues/942#issuecomment-6093650132",
+    "https://github.com/kaicreator-mm/domain-harness/issues/949#issuecomment-6105898109",
+    "https://github.com/kaicreator-mm/domain-harness/issues/953#issuecomment-6105904073"
+  ],
+  "ads_candidate_reference": "https://github.com/kaicreator-mm/ai-development-standard/pull/1055",
+  "rules": [
+    "Existing GitHub refs are immutable source evidence; reverify each source at L2 admission",
+    "Product Owner signature/Freeze/L2 implementation Task DAG not asserted",
+    "Each code entry is candidate for risk-scoped reuse, not pre-authorized code merge",
+    "No duplicate investigation if decision is already grounded; material P0/P1 exceptions only"
+  ],
+  "assets": [
+    {
+      "id": "R00_PRODUCT_AND_DESIGN_AUTHORITY",
+      "tier": "AUTHORITATIVE_DIRECTION_ONLY",
+      "issue": [
+        942,
+        949,
+        953,
+        990,
+        992
+      ],
+      "pr": [
+        989,
+        991
+      ],
+      "exact_head": "8189c8cfd2b297252dc020b7c7179a8d94ba257b",
+      "asset_type": [
+        "PRODUCT_SCOPE",
+        "ARCHITECTURE_DIRECTION",
+        "FUNCTION_REGISTER"
+      ],
+      "asset_paths": [
+        "docs/product/DomainHarness_v0.8_PRD_DRAFT.md",
+        "docs/product/DomainHarness_v0.8_L1_PRODUCT_EVIDENCE.md"
+      ],
+      "reuse": "CONSUME_AFTER_FINAL_OWNER_FREEZE",
+      "consumer": "Product owner -> L2 acceptance -> release functional coverage",
+      "guards": [
+        "Draft PR not frozen",
+        "No v0.1-v0.7 serialized/API compatibility",
+        "All delivered useful functionality IN",
+        "Latest PR991 may advance; resolve at L2 JIT"
+      ]
+    },
+    {
+      "id": "R01_BOOTSTRAP_SEED",
+      "tier": "PREDECESSOR_REFERENCE",
+      "issue": [
+        938
+      ],
+      "pr": [
+        940
+      ],
+      "exact_head": "beea9cdd29c51a046b8612871aa53be54b966e7c",
+      "asset_type": [
+        "CODE_REFERENCE",
+        "SMOKE_TEST",
+        "NEGATIVE"
+      ],
+      "asset_paths": [
+        "experiments/v08-package-first-bootstrap/bootstrap.mjs",
+        "experiments/v08-package-first-bootstrap/tests/spike.test.mjs"
+      ],
+      "reuse": "HARVEST_UNIQUE_FIRST_BOOTSTRAP_NEGATIVES",
+      "consumer": "BUILD/Host qualification negative vectors",
+      "guards": [
+        "Toy bootstrap not production kernel",
+        "Superseded structurally by R04/R07"
+      ]
+    },
+    {
+      "id": "R02_UNIFIED_COMPONENT",
+      "tier": "SELECTIVE_TEST_AND_SCHEMA_REFERENCE",
+      "issue": [
+        942
+      ],
+      "pr": [
+        944,
+        945
+      ],
+      "exact_head": "80d5ee81e676bdbce49b1c22d592eab892fb2154",
+      "asset_type": [
+        "CONTRACT_CANDIDATE",
+        "TEST",
+        "A_B_EVIDENCE"
+      ],
+      "asset_paths": [
+        "experiments/v08-unified-component-ab/unified.mjs",
+        "experiments/v08-unified-component-ab/tests/a-v07.test.mjs",
+        "experiments/v08-unified-component-ab/tests/b.test.mjs"
+      ],
+      "reuse": "ADAPT_KIND_AND_SCHEMA_TESTS_ONLY",
+      "consumer": "L2 Component/Kind binding -> Contract Task",
+      "guards": [
+        "A route is research comparator, not required historical ABI bridge",
+        "No second runtime"
+      ]
+    },
+    {
+      "id": "R03_SCHEMA_CONFORMANCE",
+      "tier": "SELECTIVE_CONTRACT_AND_NEGATIVE",
+      "issue": [
+        947
+      ],
+      "pr": [
+        948
+      ],
+      "exact_head": "f97610a904c7969836165b65ab53e575bd67d43b",
+      "asset_type": [
+        "SCHEMA_CANDIDATE",
+        "VALIDATOR_CANDIDATE",
+        "NEGATIVE_TEST"
+      ],
+      "asset_paths": [
+        "experiments/v08-spec-conformance-942-r1/schemas/component.schema.json",
+        "experiments/v08-spec-conformance-942-r1/schemas/package.schema.json",
+        "experiments/v08-spec-conformance-942-r1/schemas/operation.schema.json",
+        "experiments/v08-spec-conformance-942-r1/tests/conformance.test.mjs",
+        "experiments/v08-spec-conformance-942-r1/tests/known-gaps.test.mjs"
+      ],
+      "reuse": "ADAPT_AFTER_L2_SCHEMA_AUTHORITY_AND_P1_GAP_RECHECK",
+      "consumer": "BUILD Compiler/ABI contract",
+      "guards": [
+        "Known-gap green is NOT conformance PASS",
+        "Graph qualified-ID collision, dangerous JS descriptor/accessor negatives must be preserved"
+      ]
+    },
+    {
+      "id": "R04_ATTESTED_BINDING",
+      "tier": "SELECTIVE_SECURITY_NEGATIVE",
+      "issue": [
+        955
+      ],
+      "pr": [
+        961,
+        963
+      ],
+      "exact_head": "d9fd8b9220cdf67d0bf5bad2cd73dea5905020b2",
+      "asset_type": [
+        "TRUST_BINDING_REFERENCE",
+        "SECURITY_NEGATIVE"
+      ],
+      "asset_paths": [
+        "experiments/v08-gatea-b1-955-r2/bridge/attested-binding.mjs",
+        "experiments/v08-gatea-b1-955-r2/tests/b1.test.mjs"
+      ],
+      "reuse": "HARVEST_BYTE_HANDLER_PROVENANCE_TESTS",
+      "consumer": "BUILD/Host selected handler admission",
+      "guards": [
+        "Do not adopt test-only source as a second authority",
+        "Later D1/KPK governs actual selected physical runtime"
+      ]
+    },
+    {
+      "id": "R05_G0_GENESIS_TRUST",
+      "tier": "REUSE_APPROVED_MECHANISM_TESTS",
+      "issue": [
+        971
+      ],
+      "pr": [
+        974,
+        978
+      ],
+      "exact_head": "f87cfdfcf9fd252cc757c02e77d155afa5572303",
+      "asset_type": [
+        "HAND_AUTHORED_GENESIS",
+        "TRUST_ROOT_REFERENCE",
+        "TEST",
+        "BUILD_HOST_EVIDENCE"
+      ],
+      "asset_paths": [
+        "experiments/v08-genesis-seed-d1/host/bootstrap.mjs",
+        "experiments/v08-genesis-seed-d1/host/trust-roots.mjs",
+        "experiments/v08-genesis-seed-d1/tests/genesis.test.mjs",
+        "experiments/v08-genesis-seed-d1/packages/kernel/manifest.json"
+      ],
+      "reuse": "ADAPT_GENESIS_BYTE_SEAL_IMPORT_CLOSURE_G22_G26_NEGATIVES",
+      "consumer": "BUILD sealed package producer/Host install",
+      "guards": [
+        "Historical K0 exports link not K-owned State/Journal mechanism",
+        "Do not replace R07 physical K1 with old K0"
+      ]
+    },
+    {
+      "id": "R06_V07_NATIVE_AUTHORITY_BRIDGE",
+      "tier": "REFERENCE_ORACLE_NOT_RUNTIME",
+      "issue": [
+        960,
+        983,
+        984,
+        987
+      ],
+      "pr": [
+        969,
+        980,
+        985,
+        986,
+        988
+      ],
+      "exact_head": "cdf893d219cf066bec86142a663f3354b3b42dd3",
+      "asset_type": [
+        "TRUSTED_HOST_SEAM",
+        "T004_ORACLE",
+        "NEGATIVE_TEST"
+      ],
+      "asset_paths": [
+        "experiments/v08-b2-r4-integrated-host/tests/r4-integration.test.mjs",
+        "experiments/v08-b2-r4-integrated-host/authority/r4-ingress.mjs",
+        "experiments/v08-b2-r3-a1/authority/native-authority-host.mjs"
+      ],
+      "reuse": "ADAPT_ADMISSION_EFFECT_TRUST_NEGATIVES_AND_SOURCE_ORACLE",
+      "consumer": "Kernel/Host security and differential tests",
+      "guards": [
+        "K0->Host-private old v0.7 Runtime is NOT valid v0.8 K1 architecture",
+        "Never merge old Host runtime as second production authority"
+      ]
+    },
+    {
+      "id": "R07_KPK_SELECTED_KERNEL",
+      "tier": "PRIMARY_IMPLEMENTATION_HARVEST_CANDIDATE",
+      "issue": [
+        993
+      ],
+      "pr": [
+        994
+      ],
+      "exact_head": "b9ea4d1f42246c61d5382328788c50741cac8e43",
+      "asset_type": [
+        "MIGRATED_KERNEL_CODE",
+        "MINIMAL_LOADER",
+        "PRODUCER",
+        "HOST_ADAPTER",
+        "THREE_BUSINESS_FIXTURES",
+        "UX_REFERENCE",
+        "TEST",
+        "COMMITTED_EVIDENCE"
+      ],
+      "asset_paths": [
+        "experiments/v08-package-kernel-ownership-kpk01/MIGRATION_MAP.json",
+        "experiments/v08-package-kernel-ownership-kpk01/OWNERSHIP_MAP.md",
+        "experiments/v08-package-kernel-ownership-kpk01/src/producer/payload/kernel-mechanism-v1.mjs",
+        "experiments/v08-package-kernel-ownership-kpk01/src/microkernel/load.mjs",
+        "experiments/v08-package-kernel-ownership-kpk01/src/producer/build-package.mjs",
+        "experiments/v08-package-kernel-ownership-kpk01/src/producer/payload/sdk-standard.mjs",
+        "experiments/v08-package-kernel-ownership-kpk01/src/host/file-host.mjs",
+        "experiments/v08-package-kernel-ownership-kpk01/src/ux/ux-client.mjs",
+        "experiments/v08-package-kernel-ownership-kpk01/tests/kpk15-dynamic-effect-binding.test.mjs"
+      ],
+      "reuse": "SELECTIVE_PRODUCTION_ADAPTATION_NOT_WHOLE_PR_MERGE",
+      "consumer": "L2 selected Kernel + contract/core/effect/security Task PRs",
+      "guards": [
+        "Bounded experiment only; full implementation and release validation outstanding",
+        "In public facade raw query/journal/observe/kernelRuntime unauthorized read possible",
+        "Model call count hardcoded, needs actual measured or unsupported",
+        "Host-store hostile journal writer integrity not proven",
+        "Shared-openInstance concurrency P2 not proven",
+        "No production Forge/Simulator/Creator/DAC issuer implied"
+      ]
+    },
+    {
+      "id": "R08_APP_VALUE_AND_DYNAMIC_EFFECT",
+      "tier": "EVIDENCE_AND_TEST_DESIGN_SCRATCH_ONLY",
+      "issue": [
+        972
+      ],
+      "pr": [],
+      "exact_head": null,
+      "asset_type": [
+        "PRODUCT_VALUE_AB",
+        "REAL_TWO_BUSINESS_DOMAIN_NEGATIVE",
+        "DYNAMIC_EFFECT_REQUIREMENT"
+      ],
+      "asset_paths": [],
+      "reuse": "CONSUME_CANONICAL_TERMINAL_AND_KPK15_COMMITTED_TESTS",
+      "consumer": "Product retained-B direction, L2 effect Task, future App integration",
+      "guards": [
+        "Canonical #972 claim 6098111826 terminal 6098188937; 6098140056 supplementary noncanonical",
+        "A/B scratch artifacts not committed; do not claim code reusable",
+        "Old sealed B static Effect bug corrected experimentally on newer KPK15; current exact KPK head matters"
+      ]
+    },
+    {
+      "id": "R09_PF02_AUTH_READBACK_AND_MODEL_TRUTH",
+      "tier": "IMPLEMENTATION_GAP_EVIDENCE",
+      "issue": [
+        949,
+        953
+      ],
+      "pr": [],
+      "exact_head": null,
+      "asset_type": [
+        "THREAT_MODEL",
+        "SCRATCH_FALSIFIERS",
+        "ACCEPTANCE_PN"
+      ],
+      "asset_paths": [],
+      "reuse": "TAKE_INTO_L2_AND_IMPLEMENTATION_NEGATIVES",
+      "consumer": "Host principal issuer/verify + Kernel read gating + SDK truthful measurements",
+      "guards": [
+        "Unauthorized raw kernelRuntime/query/observe bypass, no useful observer capability loss",
+        "Host-verified principal on read and write; never caller.role as authority",
+        "No actual ModelPort counter in KPK; count unmeasured if not verified",
+        "Scratch proof C098 57/57 != committed patch"
+      ]
+    },
+    {
+      "id": "R10_PF03_OBSERVATION_AND_DURABILITY",
+      "tier": "PRODUCT_SCOPE_AND_RELEASE_GUARD",
+      "issue": [
+        949,
+        953
+      ],
+      "pr": [],
+      "exact_head": null,
+      "asset_type": [
+        "HISTORICAL_FUNCTION_RETENTION",
+        "FAULT_NEGATIVE",
+        "POLICY_DECISION"
+      ],
+      "asset_paths": [],
+      "reuse": "OPTIONAL_OBSERVATION_TYPED_ERRORS_AND_JOURNAL_SAFETY_IN;NEW_MANDATORY_KH_ATOMIC_RECEIPT_SCOPE_CHOICE",
+      "consumer": "Product owner -> L2/Release",
+      "guards": [
+        "Product decision recommendation not owner signoff",
+        "Cannot label per-key CAS multi-document atomicity",
+        "Do not remove useful historical durable observation/UNKNOWN/recovery",
+        "Any mandatory durable promise requires genuine Host+K atomic crash proof"
+      ]
+    },
+    {
+      "id": "R11_FUNCTIONAL_RETENTION_ORACLE",
+      "tier": "MUST_CONSUME_IN_RELEASE",
+      "issue": [
+        942,
+        949,
+        990
+      ],
+      "pr": [
+        991
+      ],
+      "exact_head": "86110c616b8cb18c730553e4cdab7ef555214521",
+      "asset_type": [
+        "SOURCE_TEST_MAP",
+        "FUNCTION_COVERAGE",
+        "NEGATIVE_TEST"
+      ],
+      "asset_paths": [
+        "packages/domain-harness/src/admission/admission.ts",
+        "packages/domain-harness/src/admission/effect-journal.ts",
+        "packages/domain-harness/src/workflow/predicate.ts",
+        "packages/domain-harness/src/engine/workflow-instance-engine.ts",
+        "packages/domain-harness/src/decision-resolver/resolver.ts"
+      ],
+      "reuse": "COVER_EXISTING_DELIVERED_FR_HF_NEW_FUNCTION_BEHAVIORS_USING_NEW_V08_ABI",
+      "consumer": "L2 coverage owner -> regression/Hidden/Closure",
+      "guards": [
+        "Do not enforce old API/ABI/digest or historical Journal migration",
+        "Historical v0.6+v0.7 useful features not implicitly removed",
+        "Proposed P/N tests are NOT executed v0.8 evidence"
+      ]
+    },
+    {
+      "id": "R12_CI_TEST_INFRA",
+      "tier": "MERGED_REUSE_NO_FURTHER_RESEARCH",
+      "issue": [
+        953
+      ],
+      "pr": [
+        996
+      ],
+      "exact_head": "1f59fa41ae6c8bfc2b6e3e7dd8dd45115d8a9956",
+      "asset_type": [
+        "MERGED_INFRA_CODE",
+        "FAULT_ORACLE"
+      ],
+      "asset_paths": [
+        "packages/domain-harness-compiler/tests/packed-fixture-stage.ts",
+        "packages/domain-harness-node/tests/successor-host/worker-oracle.ts",
+        "packages/domain-harness-node/tests/successor-host/n08-oracle-adversarial.test.ts"
+      ],
+      "reuse": "REUSE_MAIN_ALREADY_MERGED",
+      "consumer": "CI and staged packaged-consumer validation",
+      "guards": [
+        "#953 T022 residual in-test t016 concurrent core dist writer remains at main b5d851b",
+        "T022 forensic terminal #953@6105936070 TEST_INFRA_RACE; fix in bounded test-infra concern",
+        "CI green on one SHA not transfer to another"
+      ]
+    },
+    {
+      "id": "R13_ENGINEERING_DOGFOOD",
+      "tier": "PLANNED_POST_FREEZE_NOT_EXECUTED",
+      "issue": [
+        973
+      ],
+      "pr": [],
+      "exact_head": null,
+      "asset_type": [
+        "ACCEPTANCE_TASK_PACK"
+      ],
+      "asset_paths": [],
+      "reuse": "MATERIALIZE_AFTER_L2_AS_REAL_DOMAIN_APP_ON_SAME_KPK_COHORT",
+      "consumer": "Implementation Domain App / external release oracle",
+      "guards": [
+        "Do not count this as previously executed demo",
+        "No independent self-release approvals"
+      ]
+    },
+    {
+      "id": "R14_SUPERSEDED_PRODUCT_DRAFTS",
+      "tier": "HISTORICAL_ONLY",
+      "issue": [
+        950,
+        952,
+        968
+      ],
+      "pr": [
+        957,
+        967,
+        976
+      ],
+      "exact_head": "7d2fc7e9db8413c77b8416b1ee0346368537ecb0",
+      "asset_type": [
+        "PRODUCT_HISTORY"
+      ],
+      "asset_paths": [],
+      "reuse": "REFERENCE_HISTORICAL_FACTS_ONLY_PREFER_FINAL_PR991",
+      "consumer": "Traceability only",
+      "guards": [
+        "Old Product revision superseded by user Package-Kernel owner correction",
+        "No duplicate old Product PR merges"
+      ]
+    }
+  ]
+}
