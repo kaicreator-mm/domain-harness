@@ -1,0 +1,44 @@
+name: V08 #955 Gate-A B1 trusted composition (research only)
+on:
+  push:
+    branches:
+      - spike/v08-gatea-b1-trusted-binding-955-r1
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  b1-exact-source-ubuntu-node22:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact checked-out commit and tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'EVENT=%s\n' "$GITHUB_EVENT_NAME"
+          printf 'EXACT_SUBJECT=%s\n' "$(git rev-parse HEAD)"
+          printf 'EXACT_TREE=%s\n' "$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node -v
+          uname -a
+          test -f experiments/v08-gatea-b1-955/tests/b1.test.mjs
+      - name: B1 F2/F3/F1 actual fail-closed tests
+        run: node --test experiments/v08-gatea-b1-955/tests/b1.test.mjs
+      - name: Explicit non-approval
+        run: |
+          echo "B1_RESEARCH_ONLY=YES"
+          echo "K1_A1=OUT_OF_SCOPE"
+          echo "NATIVE_B_T002_T004=NOT_PROVEN"
+          echo "TECH_GATE_1=NOT_SELF_APPROVED"
+          echo "PRD_FREEZE=BLOCKED"
+          echo "MERGE=NO"

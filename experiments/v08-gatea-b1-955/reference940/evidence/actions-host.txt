@@ -1,0 +1,5 @@
+host=GitHub Actions ubuntu-latest (NOT project-designated Windows/ECF host)
+node=v22.23.3
+os=Linux
+arch=x86_64
+tested_input_sha=577d54b46d17289235ecc20cdb8452d424de5431

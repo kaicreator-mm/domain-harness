@@ -1,0 +1,32 @@
+{
+  "id": "support",
+  "version": "1.0.0",
+  "definitionId": "support.definition@1",
+  "dependencies": [
+    {
+      "id": "sdk",
+      "version": "0.0.1"
+    }
+  ],
+  "components": [
+    {
+      "id": "flag",
+      "kind": "tool",
+      "implementation": "support.flag.impl@1",
+      "provides": [
+        {
+          "id": "support.flag@1",
+          "operations": [
+            "read"
+          ]
+        }
+      ],
+      "requires": []
+    }
+  ],
+  "selections": {
+    "support.flag@1": "support@1.0.0/flag#support.flag.impl@1"
+  },
+  "module": "impl.mjs",
+  "moduleDigest": "a4689753d8ac182c20807e7f773174f823f8fec1"
+}
