@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  packTarballFrom,
+  stagePackedWorkspaces,
+} from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../..');
+const EXPO_PACKAGE_ROOT = join(REPO_ROOT, 'packages', 'domain-harness-expo');
 
 function run(command: string, args: readonly string[], cwd: string): string {
   return execFileSync(command, [...args], {
@@ -38,7 +43,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', () => {
+test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-t016-consumer-'));
   const packDirectory = join(root, 'packs');
   const consumerDirectory = join(root, 'consumer');
@@ -47,23 +52,44 @@ test('T-016 package consumer: packed core/node/expo expose the public v0.2 API t
     mkdirSync(packDirectory, { recursive: true });
     mkdirSync(consumerDirectory, { recursive: true });
 
-    runNpm(['run', 'build', '-w', '@kaicreator/domain-harness'], REPO_ROOT);
-    runNpm(['run', 'build', '-w', '@kaicreator/domain-harness-node'], REPO_ROOT);
-    runNpm(['run', 'build', '-w', '@kaicreator/domain-harness-expo'], REPO_ROOT);
+    // #953 (Controller 102): this file used to run
+    // `npm run build -w @kaicreator/domain-harness` (+ -node, + -expo) and
+    // `npm pack --workspace` IN-TEST — the last writer of the LIVE shared
+    // packages/domain-harness/dist inside the parallel `node --test` suite
+    // (the -node and -expo invocations each rebuilt core AGAIN through
+    // their prebuild hooks). While tsc truncate-rewrote dist, the t022
+    // spawned children linking that same dist could read a file inside the
+    // rewrite hole and exit 1 instead of the expected simulated 137 (#953
+    // T022 read-only forensic, verdict TEST_INFRA_RACE). Pack from the
+    // shared #996 immutable stage instead: core+node build into private
+    // staged outDirs (never the live dist, with the fail-closed live-dist
+    // freshness guard), and expo builds the same way through a direct
+    // `tsc -p --outDir` call — a workspace-script build is unusable here
+    // because expo's own prebuild hook rebuilds the live core dist.
+    const staged = await stagePackedWorkspaces({ includeNodePackage: true });
+    const coreTarball = staged.coreTarball;
+    const nodeTarball = staged.nodeTarball;
+    assert.ok(nodeTarball, 'staged node tarball packed');
 
-    for (const workspace of [
-      '@kaicreator/domain-harness',
-      '@kaicreator/domain-harness-node',
-      '@kaicreator/domain-harness-expo',
-    ]) {
-      runNpm(['pack', '--workspace', workspace, '--pack-destination', packDirectory], REPO_ROOT);
-    }
+    const expoStageRoot = join(root, 'expo-stage');
+    mkdirSync(expoStageRoot, { recursive: true });
+    cpSync(join(EXPO_PACKAGE_ROOT, 'package.json'), join(expoStageRoot, 'package.json'));
+    const tsc = join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
+    run(process.execPath, [
+      tsc,
+      '-p',
+      join(EXPO_PACKAGE_ROOT, 'tsconfig.build.json'),
+      '--outDir',
+      join(expoStageRoot, 'dist'),
+    ], REPO_ROOT);
+    const expoTarball = packTarballFrom(expoStageRoot, packDirectory, 'domain-harness-expo', 1);
 
-    const tarballs = readdirSync(packDirectory)
-      .filter((name) => name.endsWith('.tgz'))
-      .sort()
-      .map((name) => join(packDirectory, name));
-    assert.equal(tarballs.length, 3);
+    const tarballs = [coreTarball, nodeTarball, expoTarball];
+    assert.equal(
+      new Set(tarballs.map((tarball) => tarball.fileName)).size,
+      3,
+      'core/node/expo pack as three distinct tarballs',
+    );
 
     writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
       name: 'domain-harness-t016-clean-consumer',
@@ -78,7 +104,7 @@ test('T-016 package consumer: packed core/node/expo expose the public v0.2 API t
         '--no-audit',
         '--no-fund',
         '@types/node@^22.0.0',
-        ...tarballs,
+        ...tarballs.map((tarball) => tarball.path),
       ],
       consumerDirectory,
     );
@@ -137,7 +163,6 @@ void StaticPackageRegistry;
       include: ['index.ts'],
     }, null, 2));
 
-    const tsc = join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
     run(process.execPath, [tsc, '--project', 'tsconfig.json'], consumerDirectory);
   } finally {
     rmSync(root, { recursive: true, force: true });
