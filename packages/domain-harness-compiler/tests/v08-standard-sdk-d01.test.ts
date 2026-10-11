@@ -126,3 +126,21 @@ test('V08-ABI-D01-N4 no business/admission side effects or caller-injected opera
   assert.equal(Object.hasOwn(r, 'journal'), false);
   assert.equal(Object.hasOwn(r, 'runtime'), false);
 });
+
+test('V08-ABI-D01-P4 current selected Kernel Rule contract ({ruleId,eventType,payloadFromInput}) composes', () => {
+  // #994 KPK-15 passes a data-only Rule with ruleId rather than the
+  // five-Kind envelope. This MUST work on current v0.8 K/S shared ABI.
+  const selectedKernelRule = {
+    ruleId: 'rule:quote-decision-request',
+    eventType: 'QUOTE_DECIDED',
+    payloadFromInput: { amount: 'amount', requestId: 'requestId' },
+  };
+  const r = interpret(selectedKernelRule, { amount: 40, requestId: 'Q-40' }) as any;
+  assert.equal(r.kind, 'rule');
+  assert.equal(r.provenance.declarationId, 'rule:quote-decision-request');
+  assert.deepEqual({ ...r.structuredDecision.event.payload }, { amount: 40, requestId: 'Q-40' });
+  assert.deepEqual(r.modelCallEvidence, { status: 'unsupported' });
+  assert.equal(Object.hasOwn(r, 'freshModelCallCount'), false);
+  refused('SDK_DECLARATION_INVALID', () => interpret({ eventType: 'QUOTE_DECIDED' }, { amount: 40 }));
+  refused('SDK_KIND_UNSUPPORTED', () => interpret({ kind: 'unknown', ruleId: 'rule:disallowed' }, {}));
+});
