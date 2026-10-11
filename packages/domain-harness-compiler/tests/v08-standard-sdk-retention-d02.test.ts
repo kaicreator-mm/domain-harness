@@ -14,6 +14,9 @@ import {
   resolveRetainedDecision,
   projectRetainedAgentTools,
   makeRetainedDecisionReceipt,
+  selectRetainedPromotedChild,
+  coalesceRetainedObservations,
+  checkRetainedEvidenceApplicability,
 } from '../src/qualified-package/payload/standard-sdk-v1.mjs';
 
 function refuses(code: string, fn: () => unknown) {
@@ -100,4 +103,39 @@ test('V08-NF05-P/NF06-P bounded decision receipt proposal never performs durable
   assert.equal(result.authority, 'proposal-only');
   assert.equal(Object.hasOwn(result, 'journal'), false);
   refuses('SDK_DECISION_RECEIPT_INVALID', () => makeRetainedDecisionReceipt({ decisionId: 'dec:quote', turnId: 'turn:1', source: 'rule' }));
+});
+
+test('V08-FR09-P/N selected promoted child is exact, approved and durably pinned before K can run it', () => {
+  const exact = { artifactId: 'child:review', contentDigest: 'sha256:123' };
+  const approved = { ...exact, revoked: false, applicable: true, compatible: true };
+  const result = selectRetainedPromotedChild({ requested: exact, approved, pinCommitted: true });
+  assert.equal(result.authority, 'proposal-only');
+  assert.equal(result.operation, 'run-in-authoritative-kernel-only');
+  refuses('SDK_CHILD_IDENTITY_MISMATCH', () => selectRetainedPromotedChild({ requested: exact, approved: { ...approved, contentDigest: 'sha256:different' }, pinCommitted: true }));
+  refuses('SDK_CHILD_NOT_ELIGIBLE', () => selectRetainedPromotedChild({ requested: exact, approved: { ...approved, revoked: true }, pinCommitted: true }));
+  refuses('SDK_CHILD_PIN_REQUIRED', () => selectRetainedPromotedChild({ requested: exact, approved, pinCommitted: false }));
+});
+
+test('V08-HF17-P/N coalesces monotonic observation revisions, refuses inconsistent duplicates', () => {
+  const result = coalesceRetainedObservations([
+    { subscriptionId: 'sub:1', epoch: 1, revision: 'rev:1' },
+    { subscriptionId: 'sub:2', epoch: 1, revision: 'rev:2' },
+    { subscriptionId: 'sub:1', epoch: 2, revision: 'rev:3' },
+  ]);
+  assert.deepEqual(result.observations, [
+    { subscriptionId: 'sub:1', epoch: 2, revision: 'rev:3' },
+    { subscriptionId: 'sub:2', epoch: 1, revision: 'rev:2' },
+  ]);
+  assert.equal(result.authority, 'projection-only');
+  refuses('SDK_SUBSCRIPTION_STALE', () => coalesceRetainedObservations([{ subscriptionId: 'sub:1', epoch: 2, revision: 'rev:3' }, { subscriptionId: 'sub:1', epoch: 1, revision: 'rev:1' }]));
+  refuses('SDK_SUBSCRIPTION_AMBIGUOUS', () => coalesceRetainedObservations([{ subscriptionId: 'sub:1', epoch: 2, revision: 'rev:3' }, { subscriptionId: 'sub:1', epoch: 2, revision: 'rev:4' }]));
+});
+
+test('V08-FR12-P/N governed evaluation evidence is scope pinned and not runtime authority', () => {
+  const expected = { packageId: 'business:parts', baselineDigest: 'sha256:approved', durableAuditRequired: true };
+  const result = checkRetainedEvidenceApplicability({ packageId: 'business:parts', baselineDigest: 'sha256:approved', durableAudit: true }, expected);
+  assert.equal(result.eligibleForHostVerification, true);
+  assert.equal(result.authority, 'proposal-only');
+  refuses('SDK_EVIDENCE_SCOPE_MISMATCH', () => checkRetainedEvidenceApplicability({ packageId: 'business:other', baselineDigest: 'sha256:approved', durableAudit: true }, expected));
+  refuses('SDK_EVIDENCE_DURABILITY_REQUIRED', () => checkRetainedEvidenceApplicability({ packageId: 'business:parts', baselineDigest: 'sha256:approved', durableAudit: false }, expected));
 });
