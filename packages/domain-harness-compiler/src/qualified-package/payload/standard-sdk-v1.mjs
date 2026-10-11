@@ -465,3 +465,82 @@ export function makeRetainedDecisionReceipt(rawResolution) {
     durableAppend: 'required-by-kernel',
   };
 }
+
+/**
+ * FR09 source reuse: promoted-child/selection + runtime@86110c6
+ * blob e7e73afc...; qualified selection is a *candidate*, never an
+ * executable child or substituted package authority.
+ */
+export function selectRetainedPromotedChild(rawSelection) {
+  const choice = record(data(rawSelection), 'promoted child selection');
+  const requested = record(choice.requested, 'requested promoted artifact');
+  const approved = record(choice.approved, 'approved promoted artifact');
+  const artifactId = ident(requested.artifactId, 'requested.artifactId');
+  const contentDigest = ident(requested.contentDigest, 'requested.contentDigest');
+  if (approved.artifactId !== artifactId || approved.contentDigest !== contentDigest) {
+    fail('SDK_CHILD_IDENTITY_MISMATCH', 'promoted child does not match the approved exact artifact');
+  }
+  if (approved.revoked === true || approved.applicable !== true || approved.compatible !== true) {
+    fail('SDK_CHILD_NOT_ELIGIBLE', 'promoted child is revoked, incompatible or not applicable');
+  }
+  if (choice.pinCommitted !== true) {
+    fail('SDK_CHILD_PIN_REQUIRED', 'durable pin-before-execution must be established by Kernel');
+  }
+  return {
+    kind: 'promoted-child-candidate',
+    artifactId, contentDigest, authority: 'proposal-only',
+    operation: 'run-in-authoritative-kernel-only',
+  };
+}
+
+/**
+ * HF17: v0.7 SubscriptionRegistry @86110c6 blob 52177373...
+ * Deterministic coalescing of delivered revision observations, not Host
+ * registration, authorization, resubscription or event dispatch.
+ * Subscription currentness and credentials MUST be revalidated by H for
+ * every physical delivery.
+ */
+export function coalesceRetainedObservations(rawObservations) {
+  const observations = data(rawObservations);
+  if (!Array.isArray(observations) || observations.length > MAX_ITEMS) {
+    fail('SDK_SUBSCRIPTION_INVALID', 'observations must be a bounded data list');
+  }
+  const byId = new Map();
+  for (const event of observations) {
+    record(event, 'revision observation');
+    const subscriptionId = ident(event.subscriptionId, 'subscriptionId');
+    const revision = ident(event.revision, 'subscription revision');
+    const epoch = event.epoch;
+    if (!Number.isSafeInteger(epoch) || epoch < 0) {
+      fail('SDK_SUBSCRIPTION_INVALID', 'an observation must have a nonnegative monotonic epoch');
+    }
+    const previous = byId.get(subscriptionId);
+    if (previous && epoch < previous.epoch) {
+      fail('SDK_SUBSCRIPTION_STALE', 'a reordered older observation cannot replace a newer revision');
+    }
+    if (previous && epoch === previous.epoch && revision !== previous.revision) {
+      fail('SDK_SUBSCRIPTION_AMBIGUOUS', 'equal monotonic epochs with different revisions');
+    }
+    if (!previous || epoch > previous.epoch) byId.set(subscriptionId, { subscriptionId, revision, epoch });
+  }
+  return { kind: 'subscription-projection', observations: [...byId.values()], authority: 'projection-only' };
+}
+
+/**
+ * FR12 evidence applicability from use-gate.ts@86110c6
+ * blob 701ecad...; no credential minting. A claimed record is only a
+ * *semantic applicability candidate*, not a signed/durable audit proof.
+ */
+export function checkRetainedEvidenceApplicability(rawRecord, rawExpected) {
+  const receipt = record(data(rawRecord), 'evidence record');
+  const expected = record(data(rawExpected), 'evidence required provenance');
+  const packageId = ident(expected.packageId, 'expected packageId');
+  const baselineDigest = ident(expected.baselineDigest, 'expected baselineDigest');
+  if (receipt.packageId !== packageId || receipt.baselineDigest !== baselineDigest) {
+    fail('SDK_EVIDENCE_SCOPE_MISMATCH', 'evidence belongs to a different package or governance baseline');
+  }
+  if (expected.durableAuditRequired === true && receipt.durableAudit !== true) {
+    fail('SDK_EVIDENCE_DURABILITY_REQUIRED', 'governed evaluation requires durable audit evidence');
+  }
+  return { kind: 'evidence-applicability', eligibleForHostVerification: true, authority: 'proposal-only' };
+}
