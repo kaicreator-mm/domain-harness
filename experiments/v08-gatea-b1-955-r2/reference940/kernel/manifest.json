@@ -1,0 +1,61 @@
+{
+  "id": "kernel",
+  "version": "0.0.1",
+  "definitionId": "kernel.definition@1",
+  "dependencies": [],
+  "components": [
+    {
+      "id": "loader",
+      "kind": "semantic",
+      "implementation": "kernel.link.impl@1",
+      "provides": [
+        {
+          "id": "pkg.link@1",
+          "operations": [
+            "link",
+            "seal",
+            "stageKernel"
+          ]
+        }
+      ],
+      "requires": []
+    },
+    {
+      "id": "state",
+      "kind": "semantic",
+      "implementation": "kernel.state.impl@1",
+      "provides": [
+        {
+          "id": "state.commit@1",
+          "operations": [
+            "read",
+            "commit"
+          ]
+        }
+      ],
+      "requires": []
+    },
+    {
+      "id": "effect",
+      "kind": "tool",
+      "implementation": "kernel.effect.impl@1",
+      "provides": [
+        {
+          "id": "effect.record@1",
+          "operations": [
+            "record",
+            "list"
+          ]
+        }
+      ],
+      "requires": []
+    }
+  ],
+  "selections": {
+    "pkg.link@1": "kernel@0.0.1/loader#kernel.link.impl@1",
+    "state.commit@1": "kernel@0.0.1/state#kernel.state.impl@1",
+    "effect.record@1": "kernel@0.0.1/effect#kernel.effect.impl@1"
+  },
+  "module": "impl.mjs",
+  "moduleDigest": "52acc2f1f13cc181908aa2ae2e1a7e46fd3f71ee"
+}
