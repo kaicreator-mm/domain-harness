@@ -205,8 +205,16 @@ export function interpret(declaration, rawInput, rawContext = {}) {
   const definition = record(data(declaration), 'declaration');
   const input = record(data(rawInput), 'input');
   data(rawContext); // validated but ignored for all security/measurement claims
-  const kind = definition.kind;
-  const id = ident(definition.id, 'declaration.id');
+  // #994 selected Kernel's rule endpoint supplies {ruleId,eventType,
+  // payloadFromInput} with no generic {kind,id} wrapper. This is a
+  // current-v0.8 K/S composition contract, not legacy public API support.
+  // Do not guess a Kind from business input; the only permitted shorthand
+  // is an explicit ruleId on an otherwise data-only Rule declaration.
+  const shorthandRule = definition.kind === undefined
+    && Object.hasOwn(definition, 'ruleId')
+    && typeof definition.ruleId === 'string';
+  const kind = shorthandRule ? 'rule' : definition.kind;
+  const id = ident(shorthandRule ? definition.ruleId : definition.id, 'declaration.id');
   let result;
   switch (kind) {
     case 'schema': result = schema(definition, input); break;
