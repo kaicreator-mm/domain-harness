@@ -13,3 +13,5 @@ export { bundleScriptTool, ScriptCompileError, SCRIPT_EXECUTION_CAPABILITY, type
 export type { CapabilityId, JsonObject, JsonSchema, LoadedRawDomainPackage, LogicalToolBindingConfig, RawProjectionDefinition, RawProjectionDependency, RawSemanticDecisionDeclaration, RawToolDefinition, TargetHostProfile, ToolEffectSemantics, } from './raw/types.js';
 export type { CompiledPackageManifest } from './package/manifest.js';
 export type { CompiledSemanticDecisionDescriptor, SemanticDecisionCacheBypassReason, SemanticDecisionCachePolicy, SemanticDecisionContractVersion, SemanticDecisionPromotedReference, SemanticDecisionUnavailableDisposition, } from '@kaicreator/domain-harness/v2';
+export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';
+export type { BuildQualifiedPackageOptions, ModuleClosureReport, QualifiedPackageSubmission, QualificationSubmission, TrustedIssuers, UnsignedQualification, } from './qualified-package/index.js';

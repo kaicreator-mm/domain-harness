@@ -73,9 +73,13 @@ void test('t015: closure doc NORMATIVE_EXPORT_MAP_KEYS == live package.json expo
     exports: Record<string, Record<string, string>>;
   };
   const liveKeys = Object.keys(pkg.exports).sort();
+  // The frozen v0.7 closure doc pins its historical 7-key export map; T-A
+  // (#1000) added exactly one additive v0.8 key './v8' (qualified package
+  // ABI). The frozen doc itself stays byte-untouched; the guard admits the
+  // doc keys plus exactly that documented additive key.
   const docKeys = [...EXPORT_MAP_KEYS_DOC].sort();
-  assert.deepEqual(liveKeys, docKeys, 'export map keys drifted from the frozen closure doc');
-  assert.equal(liveKeys.length, 7, 'the public SDK surface is exactly the 7-key export map');
+  assert.deepEqual(liveKeys, [...docKeys, './v8'].sort(), 'export map keys drifted from the frozen closure doc plus the additive v0.8 key');
+  assert.equal(liveKeys.length, 8, 'the public SDK surface is the frozen 7-key v0.7 map plus the additive v0.8 qualified-package key');
   for (const key of liveKeys) {
     assert.ok(!key.includes('*'), `wildcard export key is forbidden: ${key}`);
     const conditions = pkg.exports[key];

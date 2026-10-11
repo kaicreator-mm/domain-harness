@@ -34,3 +34,6 @@ export { emitTargetCompiledPackageModule, } from './package/module-emitter.js';
 // The public compile path fails closed on untranslated script invokes.
 export { translateV01ScriptInvokes, V01ScriptTranslationError, } from './compat/v01-script/index.js';
 export { bundleScriptTool, ScriptCompileError, SCRIPT_EXECUTION_CAPABILITY, } from './script/script-bundle.js';
+// v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
+// external approval + sealed-root producer over the public core /v8 ABI.
+export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';
