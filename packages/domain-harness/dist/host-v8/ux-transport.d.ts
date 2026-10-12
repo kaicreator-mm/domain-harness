@@ -26,6 +26,7 @@
  *     constructor rejects injected hostPorts/verifier/installer options
  *     outright (B01-N8 Host face: no mutable installer injection).
  */
+import { type V8KernelPrincipalChannel } from '../public-v8/microkernel.js';
 import type { TrustedNodeHost } from './bootstrap.js';
 import type { HostEvent, HostSubscription } from './events.js';
 import { type HostCredential, type HostPrincipal } from './identity.js';
@@ -95,5 +96,53 @@ export declare function assertIntentScope(target: UxTarget, principal: HostPrinc
  * never the host object itself.
  */
 export declare function createHostUxTransport(host: TrustedNodeHost, credential: HostCredential): UxTransport;
+/** The protected tenant/app/workflow binding of one kernel UX transport. */
+export interface KernelUxScopeBinding {
+    readonly tenantId: string;
+    readonly appId: string;
+    readonly workflowId: string;
+}
+/** The authenticated send receipt: the Kernel outcome plus the H identity. */
+export interface UxKernelSendReceipt {
+    /** The authoritative Kernel receipt, verbatim and detached. */
+    readonly kernelReceipt: unknown;
+    /** The identity the Kernel actually evaluated — issuer-signed only. */
+    readonly authenticatedPrincipal: {
+        readonly issuerId: string;
+        readonly grantId: string;
+        readonly subject: string;
+        readonly tenantId: string;
+        readonly appId: string;
+        /** The single signed role this submission selected/carried. */
+        readonly role: string;
+    };
+    /** The caller-declared field, carried as untrusted user data. */
+    readonly declaredCaller: unknown;
+}
+export interface KernelUxTransport {
+    send(intent: unknown): Promise<UxKernelSendReceipt>;
+    query(request: unknown): Promise<unknown>;
+    subscribe(scope: unknown, listener: (receipt: unknown) => void): Promise<HostSubscription>;
+}
+interface KernelTransportDeps {
+    readonly authenticate: (credential: unknown) => Promise<HostPrincipal>;
+    readonly kernel: V8KernelPrincipalChannel;
+    readonly binding: KernelUxScopeBinding;
+}
+/**
+ * Create the typed kernel UX transport for one credential. The returned
+ * object is the complete UX-reachable surface: frozen, allowlisted,
+ * portless — exactly send/query/subscribe.
+ */
+export declare function createKernelUxTransport(deps: KernelTransportDeps, channel: {
+    readonly credential: HostCredential;
+}): KernelUxTransport;
+/**
+ * Wire the authenticated kernel UX transport: a trusted host, ONE loaded
+ * package facade scope, the protected tenant/app/workflow binding and one
+ * credential. The host context hands the RETURNED transport to the UX
+ * consumer — never the host object, the facade or the kernel channel.
+ */
+export declare function createHostKernelUxTransport(host: TrustedNodeHost, facade: unknown, binding: KernelUxScopeBinding, credential: HostCredential): KernelUxTransport;
 export {};
 //# sourceMappingURL=ux-transport.d.ts.map

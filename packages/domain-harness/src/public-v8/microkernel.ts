@@ -53,6 +53,72 @@ interface WiredKernelRuntime {
 }
 
 /**
+ * The H-authenticated caller record the selected Kernel receives on the
+ * authenticated UX route (I02, #1013). Every field is derived from the
+ * issuer-signed, per-operation-revalidated Host principal; a business
+ * payload can never contribute to it. The Kernel's business-owned role
+ * gate reads `role` — the only authority this record carries is the
+ * issuer-attested one.
+ */
+export interface KernelPrincipalCaller {
+  readonly kind: 'v08-host-principal/1';
+  readonly issuerId: string;
+  readonly grantId: string;
+  readonly subject: string;
+  readonly tenantId: string;
+  readonly appId: string;
+  readonly role: string;
+}
+
+/**
+ * The protected per-scope Kernel handle the authenticated Host UX transport
+ * consumes (I02, #1013). Deep-import only — deliberately NOT re-exported
+ * from the public `/v8` surface. It carries exactly the three verbs the UX
+ * route needs (submit / scoped instance read / receipt observation): no
+ * `openInstance` (protected Genesis, I03), no Journal, no mechanism
+ * counters, no Host ports.
+ */
+export interface V8KernelPrincipalChannel {
+  /** Submit one occurrence whose caller is the H-authenticated principal. */
+  submitAsPrincipal(intent: unknown, caller: KernelPrincipalCaller): Promise<unknown>;
+  /** Scoped instance read through the wired Kernel snapshot endpoint. */
+  snapshotForPrincipal(target: unknown): Promise<unknown>;
+  /** Observe Kernel receipts; returns the unsubscribe function. */
+  observeReceipts(observer: (receipt: unknown) => void): () => boolean;
+}
+
+/** Non-enumerable carrier key: the channel never appears on the facade keys. */
+const kernelPrincipalChannelKey = Symbol('v8.kernelPrincipalChannel');
+
+/**
+ * Protected accessor (I02, #1013): the kernel principal channel of ONE
+ * loaded facade scope. Host-context composition seam for the authenticated
+ * UX transport — a foreign object, or a scope that never went through
+ * `DomainHarness.load`, fails typed.
+ */
+export function kernelPrincipalChannel(facade: unknown): V8KernelPrincipalChannel {
+  if (
+    typeof facade !== 'object'
+    || facade === null
+    || !(kernelPrincipalChannelKey in facade)
+    || typeof (facade as Record<symbol, unknown>)[kernelPrincipalChannelKey] !== 'object'
+  ) {
+    throw new QualifiedPackageError(
+      'KERNEL_CHANNEL_ABSENT',
+      'the given object is not a DomainHarness.load facade scope; the protected kernel principal channel exists only on a live loaded scope',
+    );
+  }
+  const channel = (facade as Record<symbol, unknown>)[kernelPrincipalChannelKey];
+  if (channel === undefined || channel === null || typeof channel !== 'object') {
+    throw new QualifiedPackageError(
+      'KERNEL_CHANNEL_ABSENT',
+      'the given object is not a DomainHarness.load facade scope; the protected kernel principal channel exists only on a live loaded scope',
+    );
+  }
+  return channel as V8KernelPrincipalChannel;
+}
+
+/**
  * The generic mechanism-construction contract the loader wires (ported from
  * #994@b9ea4d1 load.mjs): the Kernel package's `createOccurrenceRuntime`
  * receives every resolved endpoint plus the protected Host ports. The
@@ -291,10 +357,14 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     });
   }
 
-  async function send(intent: unknown): Promise<unknown> {
-    assertOpen();
+  /**
+   * The single intent gate shared by the facade send and the authenticated
+   * principal submit: JSON-only, sealed-closure bound type, target shape,
+   * messageId. One implementation so the two routes can never drift.
+   */
+  function requireKernelIntent(intent: unknown): { intentType: string; target: unknown; messageId: string; input: unknown } {
     assertPlainJsonIntent(intent);
-    const record = intent as { intentType?: unknown; target?: unknown; messageId?: unknown };
+    const record = intent as { intentType?: unknown; target?: unknown; messageId?: unknown; input?: unknown };
     if (typeof record.intentType !== 'string' || record.intentType.length === 0) {
       throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
     }
@@ -308,7 +378,50 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     if (typeof record.messageId !== 'string' || record.messageId.length === 0) {
       throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
     }
+    return { intentType: record.intentType, target: record.target, messageId: record.messageId, input: record.input };
+  }
+
+  async function send(intent: unknown): Promise<unknown> {
+    assertOpen();
+    requireKernelIntent(intent);
     return kernelRuntime.submitOccurrence(intent);
+  }
+
+  /**
+   * I02 protected route: submit with the caller REPLACED by the
+   * H-authenticated principal record. The submit record is rebuilt from the
+   * validated fields ONLY — a declared payload `caller` (or any other
+   * payload field) never reaches the Kernel through this route.
+   */
+  async function submitAsPrincipal(intent: unknown, caller: KernelPrincipalCaller): Promise<unknown> {
+    assertOpen();
+    if (
+      typeof caller !== 'object'
+      || caller === null
+      || (caller as { kind?: unknown }).kind !== 'v08-host-principal/1'
+      || typeof (caller as { role?: unknown }).role !== 'string'
+      || (caller as { role: string }).role.length === 0
+    ) {
+      throw typedError('INTENT_MALFORMED', 'submitAsPrincipal requires an H-authenticated kernel principal caller record');
+    }
+    const validated = requireKernelIntent(intent);
+    const submission: Record<string, unknown> = {
+      intentType: validated.intentType,
+      target: validated.target,
+      messageId: validated.messageId,
+      caller,
+    };
+    if (validated.input !== undefined) {
+      submission.input = validated.input;
+    }
+    return kernelRuntime.submitOccurrence(submission);
+  }
+
+  /** Scoped instance read for the authenticated route (same gate as query). */
+  async function snapshotForPrincipal(target: unknown): Promise<unknown> {
+    assertOpen();
+    requireTarget(target);
+    return kernelRuntime.getSnapshot(target);
   }
 
   async function query(query: unknown): Promise<unknown> {
@@ -333,7 +446,8 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     }
   }
 
-  function subscribe(observer: (receipt: unknown) => void): () => boolean {
+  /** Register one receipt observer; shared by facade subscribe and the channel. */
+  function observeReceipts(observer: (receipt: unknown) => void): () => boolean {
     assertOpen();
     if (typeof observer !== 'function') {
       throw typedError('OBSERVER_INVALID', 'subscribe requires a listener function');
@@ -342,12 +456,33 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     return () => observers.delete(observer);
   }
 
+  function subscribe(observer: (receipt: unknown) => void): () => boolean {
+    assertOpen();
+    return observeReceipts(observer);
+  }
+
   function stop(): void {
     stopped = true;
     observers.clear();
   }
 
-  const facade: V8DomainFacade = Object.freeze({ send, query, subscribe, stop });
+  const kernelChannel: V8KernelPrincipalChannel = Object.freeze({
+    submitAsPrincipal,
+    snapshotForPrincipal,
+    observeReceipts,
+  });
+
+  // The protected principal channel rides on a non-enumerable symbol key:
+  // the facade's own key set stays exactly send/query/subscribe/stop and no
+  // privileged member is reachable by enumeration or `in` probing.
+  const facade: V8DomainFacade = { send, query, subscribe, stop };
+  Object.defineProperty(facade, kernelPrincipalChannelKey, {
+    value: kernelChannel,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  Object.freeze(facade);
   return facade;
 }
 

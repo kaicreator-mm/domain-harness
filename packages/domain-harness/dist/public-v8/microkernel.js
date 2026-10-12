@@ -31,6 +31,27 @@
 import { QualifiedPackageError } from './contracts.js';
 import { currentKernelHostPorts } from './kernel-host.js';
 import { load } from './load.js';
+/** Non-enumerable carrier key: the channel never appears on the facade keys. */
+const kernelPrincipalChannelKey = Symbol('v8.kernelPrincipalChannel');
+/**
+ * Protected accessor (I02, #1013): the kernel principal channel of ONE
+ * loaded facade scope. Host-context composition seam for the authenticated
+ * UX transport — a foreign object, or a scope that never went through
+ * `DomainHarness.load`, fails typed.
+ */
+export function kernelPrincipalChannel(facade) {
+    if (typeof facade !== 'object'
+        || facade === null
+        || !(kernelPrincipalChannelKey in facade)
+        || typeof facade[kernelPrincipalChannelKey] !== 'object') {
+        throw new QualifiedPackageError('KERNEL_CHANNEL_ABSENT', 'the given object is not a DomainHarness.load facade scope; the protected kernel principal channel exists only on a live loaded scope');
+    }
+    const channel = facade[kernelPrincipalChannelKey];
+    if (channel === undefined || channel === null || typeof channel !== 'object') {
+        throw new QualifiedPackageError('KERNEL_CHANNEL_ABSENT', 'the given object is not a DomainHarness.load facade scope; the protected kernel principal channel exists only on a live loaded scope');
+    }
+    return channel;
+}
 function typedError(code, message) {
     return new QualifiedPackageError(code, message);
 }
@@ -230,8 +251,12 @@ async function loadScopedFacade(packageRoot) {
             }))),
         });
     }
-    async function send(intent) {
-        assertOpen();
+    /**
+     * The single intent gate shared by the facade send and the authenticated
+     * principal submit: JSON-only, sealed-closure bound type, target shape,
+     * messageId. One implementation so the two routes can never drift.
+     */
+    function requireKernelIntent(intent) {
         assertPlainJsonIntent(intent);
         const record = intent;
         if (typeof record.intentType !== 'string' || record.intentType.length === 0) {
@@ -244,7 +269,45 @@ async function loadScopedFacade(packageRoot) {
         if (typeof record.messageId !== 'string' || record.messageId.length === 0) {
             throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
         }
+        return { intentType: record.intentType, target: record.target, messageId: record.messageId, input: record.input };
+    }
+    async function send(intent) {
+        assertOpen();
+        requireKernelIntent(intent);
         return kernelRuntime.submitOccurrence(intent);
+    }
+    /**
+     * I02 protected route: submit with the caller REPLACED by the
+     * H-authenticated principal record. The submit record is rebuilt from the
+     * validated fields ONLY — a declared payload `caller` (or any other
+     * payload field) never reaches the Kernel through this route.
+     */
+    async function submitAsPrincipal(intent, caller) {
+        assertOpen();
+        if (typeof caller !== 'object'
+            || caller === null
+            || caller.kind !== 'v08-host-principal/1'
+            || typeof caller.role !== 'string'
+            || caller.role.length === 0) {
+            throw typedError('INTENT_MALFORMED', 'submitAsPrincipal requires an H-authenticated kernel principal caller record');
+        }
+        const validated = requireKernelIntent(intent);
+        const submission = {
+            intentType: validated.intentType,
+            target: validated.target,
+            messageId: validated.messageId,
+            caller,
+        };
+        if (validated.input !== undefined) {
+            submission.input = validated.input;
+        }
+        return kernelRuntime.submitOccurrence(submission);
+    }
+    /** Scoped instance read for the authenticated route (same gate as query). */
+    async function snapshotForPrincipal(target) {
+        assertOpen();
+        requireTarget(target);
+        return kernelRuntime.getSnapshot(target);
     }
     async function query(query) {
         assertOpen();
@@ -267,7 +330,8 @@ async function loadScopedFacade(packageRoot) {
                 throw typedError('QUERY_KIND_UNKNOWN', `query kind ${String(record.kind)} is not a transport query`);
         }
     }
-    function subscribe(observer) {
+    /** Register one receipt observer; shared by facade subscribe and the channel. */
+    function observeReceipts(observer) {
         assertOpen();
         if (typeof observer !== 'function') {
             throw typedError('OBSERVER_INVALID', 'subscribe requires a listener function');
@@ -275,11 +339,30 @@ async function loadScopedFacade(packageRoot) {
         observers.add(observer);
         return () => observers.delete(observer);
     }
+    function subscribe(observer) {
+        assertOpen();
+        return observeReceipts(observer);
+    }
     function stop() {
         stopped = true;
         observers.clear();
     }
-    const facade = Object.freeze({ send, query, subscribe, stop });
+    const kernelChannel = Object.freeze({
+        submitAsPrincipal,
+        snapshotForPrincipal,
+        observeReceipts,
+    });
+    // The protected principal channel rides on a non-enumerable symbol key:
+    // the facade's own key set stays exactly send/query/subscribe/stop and no
+    // privileged member is reachable by enumeration or `in` probing.
+    const facade = { send, query, subscribe, stop };
+    Object.defineProperty(facade, kernelPrincipalChannelKey, {
+        value: kernelChannel,
+        enumerable: false,
+        writable: false,
+        configurable: false,
+    });
+    Object.freeze(facade);
     return facade;
 }
 /**
