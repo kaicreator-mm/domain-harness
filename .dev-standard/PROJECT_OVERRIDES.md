@@ -350,6 +350,15 @@ The final closure task must reconcile the exact v0.3 candidate against:
 
 `v0.3` merges to `main` only after release qualification/closure evidence is complete. (Satisfied: `v0.3` merged to `main` via PR #347.)
 
+## v0.8 Sealed Standard SDK implementation patterns
+
+Implementation guidance distilled from the FR02 execution (#1003, PR #1019, CI green; `.dev-standard` change is a governance-authority Independent Review trigger per Ownership below). These patterns govern how historic observables are ported into sealed qualified payloads; they do not amend frozen L1/L2 semantics.
+
+- **Reuse by bounded semantic subset, never by vendoring a library.** Sealed payload modules (zero imports, no dynamic code evaluation, no second runtime) must not embed a runtime library (e.g. JSONata) to retain historic behavior. Port the *observable semantics* as a bounded deterministic subset, and re-prove the sealed BUILD closure qualification on the actual changed module bytes inside the owning tests.
+- **Wall-clock guards become deterministic step budgets.** Where a sealed module must not read an ambient clock, convert time-based guardrails (timeouts) into fixed-rate deterministic operation budgets (e.g. FR02 `EXPRESSION_STEPS_PER_MS`). Same fail-closed denial class, replay-deterministic and testable without races.
+- **Logical time is declaration-injected.** Deterministic clock surfaces (`$now()`/`$millis()`-style) take their value from an explicit data-only declaration field; modules read no ambient clock. Non-portable inputs (cycles, accessors, `__proto__`) are refused by the sealed snapshot boundary before evaluation.
+- **Documentation duty for adaptations.** Each sealed-module adaptation that intentionally diverges from a pinned historic observable (code, message or mechanism) must be documented in the owning test file header so reviewers see the delta rather than discovering it by differential failure.
+
 ## Ownership / Sensitive Areas
 
 - `docs/product/**` and `docs/architecture/**` frozen compositions → reopen only through a documented architecture contradiction; never by implementation convenience
