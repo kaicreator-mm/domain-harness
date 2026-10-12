@@ -84,11 +84,7 @@ try {
       }
     }
     outcome.restart = restart;
-    await handle.host.close();
-    outcome.ok = true;
-    process.stdout.write(`JSON_RESULT: ${JSON.stringify(outcome)}\n`);
-    process.exit(0);
-  }
+  } else {
 
   // Public one-arg load in the SAME clean process proves the shared K/S
   // bytes load independently of the gateway registrations.
@@ -256,10 +252,14 @@ try {
 
   outcome.negatives = negatives;
 
+  } // end of the full-journey mode (register-only skips to the shared close)
+
   await handle.host.close();
   outcome.ok = true;
 } catch (error) {
   outcome.ok = false;
   outcome.error = String(error?.stack ?? error);
 }
+// Natural-exit write: no process.exit — a forced exit can truncate the
+// piped stdout line on Linux before the parent test reads it.
 process.stdout.write(`JSON_RESULT: ${JSON.stringify(outcome)}\n`);
