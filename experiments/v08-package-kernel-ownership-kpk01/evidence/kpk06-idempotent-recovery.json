@@ -1,0 +1,6 @@
+{
+  "falsifier": "KPK-06c",
+  "verdict": "PASS (v0.7 recovery matrix: idempotent re-execution is not a blind retry)",
+  "dispatches": 2,
+  "effectSemantics": "idempotent"
+}

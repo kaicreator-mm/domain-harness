@@ -1,0 +1,11 @@
+{
+  "falsifier": "KPK-15f",
+  "refusedKeys": [
+    "bad key!",
+    "x/effect/1",
+    "200-char run"
+  ],
+  "errorCode": "ADMISSION_EFFECT_IDEMPOTENCY_KEY_INVALID (before any journal write)",
+  "journalRows": 0,
+  "resourceCalls": 0
+}

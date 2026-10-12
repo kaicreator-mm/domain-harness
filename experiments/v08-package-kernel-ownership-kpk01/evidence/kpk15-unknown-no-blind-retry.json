@@ -1,0 +1,7 @@
+{
+  "falsifier": "KPK-15h",
+  "crashPoint": "journal completion write physically faulted after successful booking dispatch",
+  "dispatches": 1,
+  "journalRowStatus": "started",
+  "redriveErrorCode": "ADMISSION_EFFECT_AMBIGUOUS"
+}

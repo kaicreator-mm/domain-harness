@@ -1,0 +1,4 @@
+{
+  "falsifier": "KPK-15k",
+  "staticIntent": "unchanged v0.7 golden declared payload {reservation:\"quote\",amount:42} and key reserve:quote:1"
+}

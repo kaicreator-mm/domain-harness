@@ -1,0 +1,12 @@
+{
+  "falsifier": "KPK-03",
+  "rootPackageId": "app:order-approval@1.0.0",
+  "closureDigest": "329395fab7d15e2af91d5cf194e3e329976ce93f60ba9e7c83700f491ed61c5c",
+  "fixedIntentBindings": [
+    "submitQuoteDecision",
+    "submitQuoteDecisionStrict",
+    "submitQuoteDecisionDynamic"
+  ],
+  "digestOpsAtInstall": 3,
+  "unboundIntentTypedFailure": "INTENT_UNBOUND"
+}
