@@ -23,18 +23,42 @@
 import { QualifiedPackageError } from './contracts.js';
 
 /**
+ * The write-condition shape the physical Kernel document port accepts. The
+ * channel is condition-transparent: it forwards whatever the mechanism passed
+ * to the physical store, and a store that refuses unconditional writes stays
+ * the authority (a lost CAS expectation can never degrade into an
+ * unconditional write at this boundary).
+ */
+export interface V8KernelDocsPutConditions {
+  readonly mustBeAbsent?: true;
+  readonly mustMatchRevision?: number;
+}
+
+/**
  * The generic Host ports the wired Kernel mechanism may consume. Ports are
  * caller-shape-agnostic at the mechanism boundary; this channel only
  * verifies that every required member is a callable.
+ *
+ * #1013 (I01): the selected Kernel mechanism (`kernel-mechanism-v1.mjs`)
+ * additionally consumes journal `docs.list`, `hostPorts.resources` (real
+ * effect dispatch) and an optional trusted `clock`. These are OPTIONAL at
+ * this channel so pre-existing minimal memory fixtures stay valid installs;
+ * the trusted Host bootstrap installs the COMPLETE set.
  */
 export interface V8KernelHostPorts {
   readonly docs: {
     readonly get: (key: string) => unknown;
-    readonly put: (key: string, value: unknown) => unknown;
+    readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
+    /** Journal read-back (`list(prefix)`); optional for minimal fixtures. */
+    readonly list?: (prefix: string) => unknown;
   };
   readonly sha256: {
     readonly digestUtf8: (value: string) => string;
   };
+  /** Physical resource dispatch port handed to Business effect handlers. */
+  readonly resources?: object;
+  /** Trusted clock (ISO string); the mechanism defaults to wall clock when absent. */
+  readonly clock?: () => string;
 }
 
 let kernelHost: V8KernelHostPorts | undefined;
@@ -58,8 +82,8 @@ export function installKernelHostPorts(ports: unknown): void {
   if (typeof ports !== 'object' || ports === null) {
     throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'installKernelHostPorts requires a ports object {docs:{get,put}, sha256:{digestUtf8}}');
   }
-  const candidate = ports as { docs?: unknown; sha256?: unknown };
-  const docs = candidate.docs as { get?: unknown; put?: unknown } | undefined;
+  const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
+  const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown } | undefined;
   const sha256 = candidate.sha256 as { digestUtf8?: unknown } | undefined;
   if (
     typeof docs !== 'object'
@@ -72,14 +96,26 @@ export function installKernelHostPorts(ports: unknown): void {
   ) {
     throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put and sha256.digestUtf8 callables');
   }
+  if (docs.list !== undefined && !isCallable(docs.list)) {
+    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port docs.list must be a callable when provided');
+  }
+  if (candidate.resources !== undefined && (typeof candidate.resources !== 'object' || candidate.resources === null)) {
+    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port resources must be an object when provided');
+  }
+  if (candidate.clock !== undefined && !isCallable(candidate.clock)) {
+    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port clock must be a callable when provided');
+  }
   kernelHost = Object.freeze({
     docs: Object.freeze({
       get: docs.get as (key: string) => unknown,
-      put: docs.put as (key: string, value: unknown) => unknown,
+      put: docs.put as (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown,
+      ...(docs.list === undefined ? {} : { list: docs.list as (prefix: string) => unknown }),
     }),
     sha256: Object.freeze({
       digestUtf8: sha256.digestUtf8 as (value: string) => string,
     }),
+    ...(candidate.resources === undefined ? {} : { resources: candidate.resources }),
+    ...(candidate.clock === undefined ? {} : { clock: candidate.clock as () => string }),
   });
 }
 

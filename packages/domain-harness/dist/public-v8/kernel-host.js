@@ -48,14 +48,26 @@ export function installKernelHostPorts(ports) {
         || !isCallable(sha256.digestUtf8)) {
         throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put and sha256.digestUtf8 callables');
     }
+    if (docs.list !== undefined && !isCallable(docs.list)) {
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port docs.list must be a callable when provided');
+    }
+    if (candidate.resources !== undefined && (typeof candidate.resources !== 'object' || candidate.resources === null)) {
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port resources must be an object when provided');
+    }
+    if (candidate.clock !== undefined && !isCallable(candidate.clock)) {
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port clock must be a callable when provided');
+    }
     kernelHost = Object.freeze({
         docs: Object.freeze({
             get: docs.get,
             put: docs.put,
+            ...(docs.list === undefined ? {} : { list: docs.list }),
         }),
         sha256: Object.freeze({
             digestUtf8: sha256.digestUtf8,
         }),
+        ...(candidate.resources === undefined ? {} : { resources: candidate.resources }),
+        ...(candidate.clock === undefined ? {} : { clock: candidate.clock }),
     });
 }
 /** Diagnostics-only probe (tests/evidence); not a trust decision input. */

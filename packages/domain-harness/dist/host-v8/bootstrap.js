@@ -24,6 +24,9 @@
  * publish, no installer, no host ports — B01-N4/N6/N8).
  */
 import { installTrustedIssuers, isTrustChannelEstablished } from '../public-v8/trust.js';
+import { installKernelHostPorts } from '../public-v8/kernel-host.js';
+import { installHostModelPort } from '../public-v8/model-port.js';
+import { sha256Hex } from '../public-v8/contracts.js';
 import { probeTrueCasStore, InMemoryCasStore } from './cas.js';
 import { ResourceDispatcher } from './dispatcher.js';
 import { ScopedEventHub } from './events.js';
@@ -33,6 +36,21 @@ import { openSqliteCasStore, SqliteCasStore } from './sqlite-cas-store.js';
 function isSqliteStore(store) {
     return store instanceof SqliteCasStore;
 }
+/**
+ * The fixed Host service identity attached to Kernel effect dispatches
+ * (#1013, I01): Business effect handlers execute with Host-provisioned
+ * resources, not with the submitting user's identity — effects are
+ * kernel-owned and no principal material ever flows into them.
+ */
+const KERNEL_EFFECT_SERVICE_PRINCIPAL = Object.freeze({
+    issuerId: 'v8-host',
+    grantId: 'kernel-effect-service',
+    tenantId: 'v8-host',
+    appId: 'kernel-effects',
+    subject: 'v8-kernel-effect-service',
+    audience: 'v8-host',
+    roles: Object.freeze(['kernel-effect']),
+});
 /**
  * Protected Host bootstrap. Establishes the one-shot load trust channel
  * (trust.ts seam) and assembles the trusted Node Host over probed true-CAS
@@ -71,6 +89,39 @@ export async function bootstrapTrustedHost(input) {
     if (!isTrustChannelEstablished()) {
         throw new HostBoundaryError('HOST_BOOTSTRAP_INVALID', 'the load trust channel did not establish after protected installation');
     }
+    const resources = new ResourceDispatcher();
+    // ---- #1013 (I01): install the COMPLETE protected Kernel Host ports. ----
+    // The physically selected Kernel mechanism consumes exactly this bounded
+    // contract (kernel-mechanism-v1.mjs): true-CAS docs get/put/list over the
+    // SAME probed physical store (conditions forwarded verbatim — the store's
+    // refusal of unconditional writes stays authoritative), a trusted sha256
+    // digest, the physical resource dispatch port for Business effect
+    // handlers, and the trusted clock. One-shot like the load gate: a running
+    // process can never have its Kernel Host binding swapped mid-flight.
+    installKernelHostPorts({
+        docs: Object.freeze({
+            get: (key) => store.get(key),
+            put: (key, value, conditions) => store.put(key, value, conditions),
+            list: (prefix) => store.list(prefix),
+        }),
+        sha256: Object.freeze({
+            // Trusted digest (same construction as the compiler/verifier digest).
+            digestUtf8: (value) => sha256Hex(value),
+        }),
+        resources: Object.freeze({
+            // Business effect handlers call resources.call(key, operation, payload)
+            // with no principal argument; the effect dispatch attribution is the
+            // HOST service identity — the submitting principal never leaks into
+            // effect execution, and effect handlers can never mint authority.
+            call: (resourceKey, operation, payload) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
+        }),
+        clock: () => now().toISOString(),
+    });
+    // ---- #1013 (I04): optional trusted ModelPort through the protected
+    // one-shot channel; absent stays an honest model-free state. ----
+    if (input.modelPort !== undefined) {
+        installHostModelPort(input.modelPort);
+    }
     const verifier = new HostIdentityVerifier({
         issuers: input.issuers,
         audience: input.audience,
@@ -78,7 +129,6 @@ export async function bootstrapTrustedHost(input) {
         ...(input.maxCredentialAgeMs !== undefined ? { maxCredentialAgeMs: input.maxCredentialAgeMs } : {}),
         revocations: store,
     });
-    const resources = new ResourceDispatcher();
     const events = new ScopedEventHub({ authenticate: (credential) => verifier.authenticate(credential) });
     const host = Object.freeze({
         audience: input.audience,

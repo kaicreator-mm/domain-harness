@@ -54,6 +54,14 @@ export interface TrustedNodeHostInput {
     readonly storage?: TrustedHostStorageSpec | TrustedHostStorageInstance;
     /** Injectable clock (tests). */
     readonly now?: () => Date;
+    /**
+     * FR08 (#1013, I04): a deployment-provisioned trusted ModelPort. When
+     * present it is installed through the protected one-shot channel and the
+     * qualified Standard SDK's host-bound resolver marks only physically
+     * observed port invocations as `measured`. Omitted ⇒ model-free evidence
+     * stays honestly `unsupported`/`unmeasured`.
+     */
+    readonly modelPort?: unknown;
 }
 export interface TrustedNodeHost {
     readonly audience: string;

@@ -40,6 +40,68 @@ export interface V8DomainFacade {
     stop(): void;
 }
 /**
+ * The Host-verified principal the private gateway seam binds into Kernel
+ * requests (#1013, I02). Every field originates from an issuer-signed
+ * credential verified by the trusted Host — a caller-declared `caller.role`
+ * can never construct one of these.
+ */
+export interface V8GatewayPrincipal {
+    readonly subject: string;
+    readonly tenantId: string;
+    readonly appId: string;
+    readonly roles: readonly string[];
+}
+/**
+ * Private, Host-gateway-only Kernel operations on a loaded facade
+ * (#1013, I02/I03). NOT re-exported from the public `/v8` surface: the UX
+ * consumer never sees this object; the trusted Host kernel gateway
+ * (host-v8/kernel-gateway.ts) retrieves it right after the public one-arg
+ * `DomainHarness.load(package)` and binds an AUTHENTICATED principal to
+ * every Kernel request. There is no raw Kernel namespace, no raw Journal
+ * and no generic second Runtime on this seam.
+ */
+export interface V8FacadeKernelOps {
+    /** Identity of the loaded Business policy (routing/provisioning metadata). */
+    describePolicy(): {
+        readonly packageId: string;
+        readonly policyId: string;
+        readonly workflowKey: string;
+        readonly intentTypes: readonly string[];
+    };
+    /**
+     * Submit one occurrence as the H-authenticated principal. The caller
+     * record bound into the Kernel request is derived ONLY from the
+     * issuer-signed roles ∩ the sealed Business binding roles; intent data
+     * cannot carry a caller.
+     */
+    submitAs(principal: V8GatewayPrincipal, request: {
+        readonly intentType: string;
+        readonly messageId: string;
+        readonly instanceKey: string;
+        readonly input?: unknown;
+    }): Promise<unknown>;
+    /** Scoped instance read for the authenticated principal's app. */
+    queryInstance(instanceKey: string): Promise<unknown>;
+    /**
+     * Protected Genesis activation (#1013, I03): open the FIRST instance of
+     * the loaded Business package. The initial state/context are owned by the
+     * sealed Business policy — the request cannot choose initial authority or
+     * state, and no raw `openInstance` handle escapes.
+     */
+    provisionGenesis(request: {
+        readonly instanceKey: string;
+        readonly correlationId?: string;
+    }): Promise<unknown>;
+}
+/**
+ * Retrieve the private Kernel operations of a facade produced by
+ * `DomainHarness.load(package)` in THIS process (#1013, I02/I03). Returns
+ * `undefined` for anything that is not such a facade. Trusted Host gateway
+ * use only: the object binds H-authenticated principals to Kernel requests
+ * and exposes the protected Genesis path — it is never a public surface.
+ */
+export declare function getFacadeKernelOps(facade: object): V8FacadeKernelOps | undefined;
+/**
  * Public consumption brand (#994 heritage): `const facade =
  * await DomainHarness.load(package)`. The brand object is frozen and its
  * loader is the strictly one-argument scoped-facade loader above — the

@@ -30,6 +30,7 @@
  */
 import { QualifiedPackageError } from './contracts.js';
 import { currentKernelHostPorts } from './kernel-host.js';
+import { currentHostModelPort } from './model-port.js';
 import { load } from './load.js';
 function typedError(code, message) {
     return new QualifiedPackageError(code, message);
@@ -146,8 +147,27 @@ async function loadScopedFacade(packageRoot) {
         throw typedError('ENDPOINT_INVALID', `business package ${businessBinding.packageId} does not provide a callable business-policy endpoint`);
     }
     const createOccurrenceRuntime = kernelNamespace.createOccurrenceRuntime;
-    const interpret = sdkNamespace.interpret;
     const getPolicy = businessNamespace.getPolicy;
+    // ---- FR08 (#1013, I04): trusted ModelPort binding, protected channel ONLY.
+    // When this process bootstrapped a Host ModelPort and the qualified Standard
+    // SDK exposes the host-bound resolver factory, rule interpretation goes
+    // through that binding so model-call evidence can honestly report
+    // physically observed port invocations. Without an installed port the plain
+    // `interpret` stays wired and evidence remains `unsupported`/`unmeasured` —
+    // there is no synthetic measured zero and no caller-supplied port anywhere.
+    const modelPort = currentHostModelPort();
+    const resolverFactory = sdkNamespace.createHostBoundModelResolver;
+    const interpret = (modelPort !== undefined && typeof resolverFactory === 'function'
+        ? (() => {
+            const factory = resolverFactory;
+            try {
+                return factory(modelPort).interpret;
+            }
+            catch (error) {
+                throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver activation failed: ${String(error?.message ?? error)}`);
+            }
+        })()
+        : sdkNamespace.interpret);
     // Business policy resolution precedes kernel construction: a policy that
     // throws or returns a non-object fails typed with the mechanism still inert.
     let businessPolicy;
@@ -237,6 +257,12 @@ async function loadScopedFacade(packageRoot) {
         if (typeof record.intentType !== 'string' || record.intentType.length === 0) {
             throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
         }
+        if (record.caller !== undefined) {
+            // #1013 I02: a caller-declared `caller` is user data and can never
+            // carry authority. The public route refuses it outright; the only
+            // route that binds a caller is the Host gateway's authenticated seam.
+            throw typedError('INTENT_CALLER_FORBIDDEN', 'intent.caller is caller-declared data and can never carry authority; submit through the Host-authenticated kernel gateway which binds the verified principal');
+        }
         if (!intentIndex.has(record.intentType)) {
             throw typedError('INTENT_UNBOUND', `intent type ${record.intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
         }
@@ -279,8 +305,139 @@ async function loadScopedFacade(packageRoot) {
         stopped = true;
         observers.clear();
     }
+    // ---- #1013 private gateway seam (I02/I03), module-private WeakMap ----
+    // The UX consumer receives ONLY the frozen facade above; the trusted Host
+    // kernel gateway retrieves the ops below through getFacadeKernelOps()
+    // (never exported from the public /v8 index) to bind an H-authenticated
+    // principal to Kernel requests and to run the protected Genesis path.
+    const policyRecord = businessPolicy;
+    function resolveWorkflowKey() {
+        const definition = policyRecord.workflowDefinition;
+        const key = definition === null || typeof definition !== 'object' ? undefined : definition.workflowKey;
+        if (typeof key !== 'string' || key.length === 0 || key.includes(':')) {
+            throw typedError('POLICY_ADDRESSING_INVALID', `business package ${businessBinding.packageId} policy must declare a non-empty ':'-free workflowDefinition.workflowKey for gateway instance addressing`);
+        }
+        return key;
+    }
+    function resolveIntentRoles(intentType) {
+        const bindings = policyRecord.intentBindings;
+        if (bindings === null || typeof bindings !== 'object')
+            return undefined;
+        const binding = Object.prototype.hasOwnProperty.call(bindings, intentType) ? bindings[intentType] : undefined;
+        if (binding === null || typeof binding !== 'object')
+            return undefined;
+        return Array.isArray(binding.roles) ? binding.roles : undefined;
+    }
+    /**
+     * The ONLY caller derivation on this path: an issuer-signed principal role
+     * that the sealed Business binding itself admits. Mirrors the Kernel's own
+     * gate (deny when `binding.roles` is an array that excludes the caller) so
+     * the Host-side pick and the Kernel-side check can never disagree.
+     */
+    function requirePrincipalRole(principal, intentType) {
+        const roles = resolveIntentRoles(intentType);
+        if (roles === undefined)
+            return 'anonymous';
+        const granted = principal.roles.find((role) => roles.includes(role));
+        if (granted === undefined) {
+            throw typedError('PRINCIPAL_ROLE_NOT_BOUND', `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles [${roles.join(', ')}] required by intent ${intentType}`);
+        }
+        return granted;
+    }
+    function requireInstanceKey(instanceKey) {
+        if (typeof instanceKey !== 'string' || instanceKey.length === 0 || instanceKey.includes(':')) {
+            throw typedError('INSTANCE_KEY_INVALID', 'instanceKey must be a non-empty string without the workflow addressing delimiter \':\'');
+        }
+        return instanceKey;
+    }
+    function requirePrincipal(principal) {
+        if (typeof principal !== 'object'
+            || principal === null
+            || typeof principal.subject !== 'string'
+            || principal.subject.length === 0
+            || typeof principal.tenantId !== 'string'
+            || typeof principal.appId !== 'string'
+            || !Array.isArray(principal.roles)
+            || !principal.roles.every((role) => typeof role === 'string' && role.length > 0)) {
+            throw typedError('PRINCIPAL_INVALID', 'the gateway principal must carry the H-verified subject/tenant/app and issuer-signed roles');
+        }
+    }
+    const gatewayOps = {
+        describePolicy() {
+            assertOpen();
+            return Object.freeze({
+                packageId: typeof policyRecord.packageId === 'string' ? policyRecord.packageId : businessBinding.packageId,
+                policyId: typeof policyRecord.policyId === 'string' ? policyRecord.policyId : businessBinding.packageId,
+                workflowKey: resolveWorkflowKey(),
+                intentTypes: Object.freeze([...intentIndex.keys()]),
+            });
+        },
+        async submitAs(principal, request) {
+            assertOpen();
+            requirePrincipal(principal);
+            const { intentType, messageId, instanceKey } = request;
+            if (typeof intentType !== 'string' || intentType.length === 0) {
+                throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
+            }
+            if (typeof messageId !== 'string' || messageId.length === 0) {
+                throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
+            }
+            if (!intentIndex.has(intentType)) {
+                throw typedError('INTENT_UNBOUND', `intent type ${intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
+            }
+            const key = requireInstanceKey(instanceKey);
+            const role = requirePrincipalRole(principal, intentType);
+            // The Kernel request is CONSTRUCTED here — intent data never carries a
+            // caller; the verified principal is the only authority source.
+            const kernelRequest = {
+                intentType,
+                messageId,
+                input: request.input === undefined ? null : request.input,
+                target: { workflowId: resolveWorkflowKey(), instanceKey: key },
+                caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
+            };
+            assertPlainJsonIntent(kernelRequest);
+            return kernelRuntime.submitOccurrence(kernelRequest);
+        },
+        async queryInstance(instanceKey) {
+            assertOpen();
+            const key = requireInstanceKey(instanceKey);
+            return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: key });
+        },
+        async provisionGenesis(request) {
+            assertOpen();
+            const key = requireInstanceKey(request.instanceKey);
+            const runtimeWithOpener = kernelRuntime;
+            if (typeof runtimeWithOpener.openInstance !== 'function') {
+                throw typedError('GENESIS_ENDPOINT_INVALID', `kernel package ${kernelBinding.packageId} mechanism exposes no instance-open endpoint; protected Genesis provisioning is unavailable for this closure`);
+            }
+            // I03: the initial state/context are the sealed Business policy's own
+            // (the Kernel reads initialStateKey/initialContext from the policy) —
+            // this seam deliberately forwards NO caller-chosen initial context.
+            return runtimeWithOpener.openInstance({
+                target: { workflowId: resolveWorkflowKey(), instanceKey: key },
+                ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
+            });
+        },
+    };
     const facade = Object.freeze({ send, query, subscribe, stop });
+    facadeScopes.set(facade, Object.freeze(gatewayOps));
     return facade;
+}
+/**
+ * Module-private registry of the gateway ops bound to each facade this
+ * loader produced. Not exported from the public `/v8` index.
+ */
+const facadeScopes = new WeakMap();
+/**
+ * Retrieve the private Kernel operations of a facade produced by
+ * `DomainHarness.load(package)` in THIS process (#1013, I02/I03). Returns
+ * `undefined` for anything that is not such a facade. Trusted Host gateway
+ * use only: the object binds H-authenticated principals to Kernel requests
+ * and exposes the protected Genesis path — it is never a public surface.
+ */
+export function getFacadeKernelOps(facade) {
+    return facadeScopes.get(facade);
 }
 /**
  * Public consumption brand (#994 heritage): `const facade =

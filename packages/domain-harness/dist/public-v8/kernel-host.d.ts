@@ -20,18 +20,41 @@
  * implements journals/effects/state of its own.
  */
 /**
+ * The write-condition shape the physical Kernel document port accepts. The
+ * channel is condition-transparent: it forwards whatever the mechanism passed
+ * to the physical store, and a store that refuses unconditional writes stays
+ * the authority (a lost CAS expectation can never degrade into an
+ * unconditional write at this boundary).
+ */
+export interface V8KernelDocsPutConditions {
+    readonly mustBeAbsent?: true;
+    readonly mustMatchRevision?: number;
+}
+/**
  * The generic Host ports the wired Kernel mechanism may consume. Ports are
  * caller-shape-agnostic at the mechanism boundary; this channel only
  * verifies that every required member is a callable.
+ *
+ * #1013 (I01): the selected Kernel mechanism (`kernel-mechanism-v1.mjs`)
+ * additionally consumes journal `docs.list`, `hostPorts.resources` (real
+ * effect dispatch) and an optional trusted `clock`. These are OPTIONAL at
+ * this channel so pre-existing minimal memory fixtures stay valid installs;
+ * the trusted Host bootstrap installs the COMPLETE set.
  */
 export interface V8KernelHostPorts {
     readonly docs: {
         readonly get: (key: string) => unknown;
-        readonly put: (key: string, value: unknown) => unknown;
+        readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
+        /** Journal read-back (`list(prefix)`); optional for minimal fixtures. */
+        readonly list?: (prefix: string) => unknown;
     };
     readonly sha256: {
         readonly digestUtf8: (value: string) => string;
     };
+    /** Physical resource dispatch port handed to Business effect handlers. */
+    readonly resources?: object;
+    /** Trusted clock (ISO string); the mechanism defaults to wall clock when absent. */
+    readonly clock?: () => string;
 }
 /**
  * Install the kernel Host ports for this process. Internal protected
