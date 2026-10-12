@@ -277,6 +277,10 @@ export function b01Clone(root: SealedQualifiedPackageRoot): SealedQualifiedPacka
 
 // ---------------------------------------------------------------------------
 // Memory kernel Host (the protected channel's bootstrap input in tests).
+// [I01 #1013] The channel's ABI now requires the FULL bounded port set the
+// selected Kernel consumes (docs.get/put/list, sha256, clock, resources);
+// this fake keeps its intentionally loose memory semantics (unconditional
+// puts, revision 0) while satisfying the callable-shape contract.
 // ---------------------------------------------------------------------------
 
 export interface B01MemoryHost {
@@ -284,28 +288,42 @@ export interface B01MemoryHost {
   readonly docs: Map<string, unknown>;
   readonly puts: { key: string; value: unknown }[];
   readonly digestInputs: string[];
+  readonly resourceCalls: { resourceKey: string; operation: string; payload: unknown }[];
 }
+
+const B01_CLOCK_ISO = '2026-10-12T00:00:00.000Z';
 
 export function b01MemoryHost(): B01MemoryHost {
   const docs = new Map<string, unknown>();
   const puts: { key: string; value: unknown }[] = [];
   const digestInputs: string[] = [];
+  const resourceCalls: { resourceKey: string; operation: string; payload: unknown }[] = [];
   return {
     docs,
     puts,
     digestInputs,
+    resourceCalls,
     ports: {
       docs: {
-        get: (key: string) => docs.get(key),
+        get: async (key: string) => (docs.has(key) ? { value: docs.get(key), revision: 0 } : null),
         put: (key: string, value: unknown) => {
           docs.set(key, value);
           puts.push({ key, value });
+          return Promise.resolve({ revision: 0 });
         },
+        list: async (prefix: string) => [...docs.keys()].filter((key) => key.startsWith(prefix)),
       },
       sha256: {
         digestUtf8: (value: string) => {
           digestInputs.push(value);
           return createHash('sha256').update(value, 'utf8').digest('hex');
+        },
+      },
+      clock: () => B01_CLOCK_ISO,
+      resources: {
+        call: async (resourceKey: string, operation: string, payload: unknown) => {
+          resourceCalls.push({ resourceKey, operation, payload });
+          return null;
         },
       },
     },

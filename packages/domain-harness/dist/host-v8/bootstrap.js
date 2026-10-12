@@ -18,12 +18,32 @@
  *     currentness/revocation) over the SAME issuer registry material;
  *   - the generic resource dispatcher and the scoped event hub.
  *
+ * [#1013 I01] The bootstrap ALSO installs the protected kernel Host
+ * binding channel (public-v8/kernel-host.ts, one-shot) with the FULL
+ * bounded port set the selected Kernel mechanism consumes at runtime:
+ * the probed true-CAS docs port (get/put/list over THIS store — the same
+ * physical storage, adapted, never a second store), the node:crypto
+ * sha256 port, the trusted bootstrap clock, and the generic resource
+ * dispatcher behind a Host-owned dispatch principal. With this, the
+ * strictly one-argument `DomainHarness.load(package)` becomes executable
+ * in a real process; a process that never bootstrapped still fails closed
+ * with KERNEL_HOST_NOT_INSTALLED, and no public surface ever exposes the
+ * ports (no second load argument, no raw Host port export).
+ *
+ * Ordering: the kernel Host channel is installed BEFORE the one-shot load
+ * trust channel is consumed. If the kernel channel is already occupied
+ * (a hostile or stale manual installation), bootstrap refuses typed and
+ * the trust channel stays unconsumed — a failed bootstrap can never leave
+ * its freshly-established issuer trust bound to someone else's Host ports.
+ *
  * Issuer secrets live ONLY in closures (load gate + identity verifier).
  * The TrustedNodeHost object exposes no getter that can read them, and the
  * UX transport surface is a strict allowlist (no docs, no dispatcher, no
  * publish, no installer, no host ports — B01-N4/N6/N8).
  */
+import { createHash } from 'node:crypto';
 import { installTrustedIssuers, isTrustChannelEstablished } from '../public-v8/trust.js';
+import { installKernelHostPorts } from '../public-v8/kernel-host.js';
 import { probeTrueCasStore, InMemoryCasStore } from './cas.js';
 import { ResourceDispatcher } from './dispatcher.js';
 import { ScopedEventHub } from './events.js';
@@ -63,6 +83,40 @@ export async function bootstrapTrustedHost(input) {
     // C01-N7 at the physical boundary: prove the presented storage is a true
     // CAS store BEFORE any authority is allowed to rely on it.
     await probeTrueCasStore(store);
+    // ---- [#1013 I01] The protected kernel Host binding channel: install
+    // the FULL bounded port set over the probed physical storage, BEFORE the
+    // one-shot load trust channel is consumed (see module header). Every
+    // port adapts a Host-owned facility — nothing here is caller-supplied:
+    //   docs      — the same true-CAS store, shape-adapted 1:1 (get/put/list);
+    //   sha256    — node:crypto SHA-256 over UTF-8 (trusted Host crypto);
+    //   clock     — the bootstrap clock (injectable for tests, ISO-8601);
+    //   resources — the generic dispatcher behind the Host's own dispatch
+    //               principal (K/business effect handlers dispatch physical
+    //               resources as the Host, never as a caller).
+    const resources = new ResourceDispatcher();
+    const kernelDispatchPrincipal = Object.freeze({
+        issuerId: `host:${input.audience}`,
+        grantId: `host-kernel-dispatch:${input.audience}`,
+        tenantId: 'host',
+        appId: input.audience,
+        subject: `host-kernel:${input.audience}`,
+        audience: input.audience,
+        roles: Object.freeze(['host-kernel']),
+    });
+    installKernelHostPorts({
+        docs: {
+            get: (key) => store.get(key),
+            put: (key, value, conditions) => store.put(key, value, conditions),
+            list: (prefix) => store.list(prefix),
+        },
+        sha256: {
+            digestUtf8: (value) => createHash('sha256').update(value, 'utf8').digest('hex'),
+        },
+        clock: () => now().toISOString(),
+        resources: {
+            call: (resourceKey, operation, payload) => resources.call(resourceKey, operation, payload, { principal: kernelDispatchPrincipal }),
+        },
+    });
     // ---- The #1004 → trust.ts seam: install the protected load gate. ----
     installTrustedIssuers({
         issuers: input.issuers,
@@ -78,7 +132,6 @@ export async function bootstrapTrustedHost(input) {
         ...(input.maxCredentialAgeMs !== undefined ? { maxCredentialAgeMs: input.maxCredentialAgeMs } : {}),
         revocations: store,
     });
-    const resources = new ResourceDispatcher();
     const events = new ScopedEventHub({ authenticate: (credential) => verifier.authenticate(credential) });
     const host = Object.freeze({
         audience: input.audience,

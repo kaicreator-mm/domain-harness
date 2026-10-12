@@ -529,7 +529,11 @@ test('V08-ABI-B01-N8(post) the trust channel is one-shot per process', async () 
       }),
     (error: unknown) => {
       assert.ok(error instanceof QualifiedPackageError, `expected QualifiedPackageError, got ${String(error)}`);
-      assert.equal((error as QualifiedPackageError).code, 'TRUST_CHANNEL_ALREADY_ESTABLISHED');
+      // [#1013 I01] bootstrap installs the kernel Host channel BEFORE the
+      // load trust channel, so a second bootstrap is refused at the FIRST
+      // one-shot seam it meets — the kernel Host channel — and never
+      // touches (or re-establishes) issuer trust mid-flight.
+      assert.equal((error as QualifiedPackageError).code, 'KERNEL_HOST_ALREADY_INSTALLED');
       return true;
     },
   );

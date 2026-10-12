@@ -18,6 +18,24 @@
  *     currentness/revocation) over the SAME issuer registry material;
  *   - the generic resource dispatcher and the scoped event hub.
  *
+ * [#1013 I01] The bootstrap ALSO installs the protected kernel Host
+ * binding channel (public-v8/kernel-host.ts, one-shot) with the FULL
+ * bounded port set the selected Kernel mechanism consumes at runtime:
+ * the probed true-CAS docs port (get/put/list over THIS store — the same
+ * physical storage, adapted, never a second store), the node:crypto
+ * sha256 port, the trusted bootstrap clock, and the generic resource
+ * dispatcher behind a Host-owned dispatch principal. With this, the
+ * strictly one-argument `DomainHarness.load(package)` becomes executable
+ * in a real process; a process that never bootstrapped still fails closed
+ * with KERNEL_HOST_NOT_INSTALLED, and no public surface ever exposes the
+ * ports (no second load argument, no raw Host port export).
+ *
+ * Ordering: the kernel Host channel is installed BEFORE the one-shot load
+ * trust channel is consumed. If the kernel channel is already occupied
+ * (a hostile or stale manual installation), bootstrap refuses typed and
+ * the trust channel stays unconsumed — a failed bootstrap can never leave
+ * its freshly-established issuer trust bound to someone else's Host ports.
+ *
  * Issuer secrets live ONLY in closures (load gate + identity verifier).
  * The TrustedNodeHost object exposes no getter that can read them, and the
  * UX transport surface is a strict allowlist (no docs, no dispatcher, no
