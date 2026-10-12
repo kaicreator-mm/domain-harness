@@ -79,10 +79,11 @@ import {
 // Governance/Host bootstrap for THIS process (one-shot, exactly as in prod).
 const host = b01MemoryHost();
 installTrustedIssuers({ issuers: new Map([[B01_ISSUER, B01_ISSUER_SECRET]]) });
-installKernelHostPorts(host.ports);
 // #1013 R2: this host-context stand-in mints its own session capability for
-// the protected ops seam (bootstrapTrustedHost does this with a random one).
+// the protected ops seam AND the raw trusted-port getters (bootstrapTrustedHost
+// does this with one random value installed into every channel).
 const B01_GATEWAY_SESSION_CAP = 'b01-test-gateway-session-capability-0123456789abcdef0123456789abcdef';
+installKernelHostPorts(host.ports, B01_GATEWAY_SESSION_CAP);
 installGatewaySessionCap(B01_GATEWAY_SESSION_CAP);
 
 const TARGET = { workflowId: 'tb-flow', instanceKey: 'instance-1' };

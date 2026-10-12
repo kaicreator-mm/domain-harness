@@ -36,8 +36,10 @@ test('F-01: occupied Kernel Host channel refuses bootstrap BEFORE trust is consu
   assert.equal(isKernelHostInstalled(), false, 'fresh process: no kernel Host ports');
 
   // Occupy the protected kernel Host channel manually (the hostile/stale
-  // installation the falsifier models).
-  installKernelHostPorts(fullPorts());
+  // installation the falsifier models). The stale installer carries its own
+  // session capability — a hostile self-install only ever reaches its OWN
+  // objects (#1013 R2 @5494026032).
+  installKernelHostPorts(fullPorts(), 'stale-kernel-host-session-capability-0123456789abcdef0123456789abcdef');
   assert.equal(isKernelHostInstalled(), true, 'precondition: the channel is occupied');
 
   await assert.rejects(

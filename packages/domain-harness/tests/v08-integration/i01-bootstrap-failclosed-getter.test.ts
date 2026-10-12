@@ -84,7 +84,7 @@ test('F-01 R2: a flipping top-level modelPort getter refuses typed with zero res
   });
   assert.equal(isTrustChannelEstablished(), true);
   assert.equal(isKernelHostInstalled(), true);
-  assert.notEqual(currentHostModelPort(), undefined);
+  assert.notEqual(currentHostModelPort(handle.gatewaySessionCap), undefined);
   handle.host.resources.provision('ledger', () => ({ reserved: true }));
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
   await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });

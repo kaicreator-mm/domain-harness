@@ -45,15 +45,18 @@ test('I04: protected ModelPort channel — honest FR08 evidence and typed negati
   });
   handle.host.resources.provision('ledger', () => ({ reserved: true }));
   try {
-    // The channel holds EXACTLY the bootstrap-installed port.
-    const port = currentHostModelPort();
+    // The channel holds EXACTLY the bootstrap-installed port (readable only
+    // with the bootstrap session capability — #1013 R2 @5494026032).
+    const port = currentHostModelPort(handle.gatewaySessionCap);
     if (port === undefined) {
       throw new Error('bootstrap did not install the declared ModelPort');
     }
 
-    // Channel negatives: one-shot + shape.
+    // Channel negatives: one-shot + shape (the negative install carries a
+    // well-formed capability — the OCCUPANCY refusal must fire on the
+    // channel state, never on a missing capability).
     assert.throws(
-      () => installHostModelPort({ invoke: () => null }),
+      () => installHostModelPort({ invoke: () => null }, 'i04-negative-session-capability-0123456789abcdef0123456789abcd'),
       (error: unknown) => error instanceof QualifiedPackageError && error.code === 'MODEL_PORT_ALREADY_INSTALLED',
     );
 

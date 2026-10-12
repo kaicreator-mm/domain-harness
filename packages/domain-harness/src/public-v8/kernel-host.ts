@@ -66,8 +66,42 @@ export interface V8KernelHostPorts {
 
 let kernelHost: V8KernelHostPorts | undefined;
 
+/**
+ * #1013 R2 fresh review @5494026032 (NEW_P1_01): the same session-capability
+ * boundary the gateway ops seam already enforces (microkernel.ts, @6122817203).
+ * The packed npm distribution ships this module's compiled sibling next to the
+ * public entry, and stock Node resolves an absolute `file:` URL past any
+ * package-exports map — so "not re-exported" alone is NOT an enforceable
+ * boundary for `currentKernelHostPorts`. The installed ports are therefore
+ * stored TOGETHER with the bootstrap-minted unguessable session capability,
+ * and the getter refuses typed before the port object is ever returned unless
+ * the caller presents the exact capability. The capability value exists only
+ * in the trusted Host bootstrap's closure and the trusted Host kernel gateway.
+ */
+let kernelHostSessionCap: string | undefined;
+
 function isCallable(value: unknown): value is (...args: never[]) => unknown {
   return typeof value === 'function';
+}
+
+function isUnguessableSessionCap(cap: unknown): cap is string {
+  return typeof cap === 'string' && cap.length >= 32 && cap.length <= 256;
+}
+
+/**
+ * Constant-time equality for the session capability (fixed-length host
+ * random; pure JS on purpose — this module stays free of byte-decoding
+ * machinery by static proof).
+ */
+function sessionCapMatches(cap: unknown): boolean {
+  if (kernelHostSessionCap === undefined || typeof cap !== 'string' || cap.length !== kernelHostSessionCap.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let index = 0; index < cap.length; index += 1) {
+    diff |= cap.charCodeAt(index) ^ kernelHostSessionCap.charCodeAt(index);
+  }
+  return diff === 0;
 }
 
 /**
@@ -75,9 +109,11 @@ function isCallable(value: unknown): value is (...args: never[]) => unknown {
  * the one-shot channel (#1013 R1 F-01): occupancy and the COMPLETE port
  * shape are both checked here first, so the Host bootstrap can preflight
  * ALL one-shot channels (trust, kernel, ModelPort) before committing ANY.
- * Internal protected; not re-exported from the public `/v8` surface.
+ * The session capability is validated with the ports (the boundary can
+ * never exist without its key). Internal protected; not re-exported from
+ * the public `/v8` surface.
  */
-export function preflightKernelHostPorts(ports: unknown): void {
+export function preflightKernelHostPorts(ports: unknown, sessionCap: unknown): void {
   if (kernelHost !== undefined) {
     throw new QualifiedPackageError(
       'KERNEL_HOST_ALREADY_INSTALLED',
@@ -115,20 +151,27 @@ export function preflightKernelHostPorts(ports: unknown): void {
   if (!isCallable(candidate.clock)) {
     throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a clock callable returning an ISO timestamp (trusted Kernel timestamps; #1013 I01 complete-set contract)');
   }
+  if (!isUnguessableSessionCap(sessionCap)) {
+    throw new QualifiedPackageError(
+      'KERNEL_HOST_SESSION_CAP_INVALID',
+      'installKernelHostPorts requires the bootstrap-minted unguessable session capability string (32–256 chars) that gates currentKernelHostPorts (#1013 R2 @5494026032: raw ports can never be installed without their boundary)',
+    );
+  }
 }
 
 /**
- * Install the kernel Host ports for this process. Internal protected
- * bootstrap: one-shot (a second installation attempt fails typed, so a
- * running process can never have its Host storage swapped mid-flight).
+ * Install the kernel Host ports for this process together with the session
+ * capability that gates every read back. Internal protected bootstrap:
+ * one-shot (a second installation attempt fails typed, so a running process
+ * can never have its Host storage swapped mid-flight).
  *
  * The COMPLETE bounded port set is required: `docs.get/put/list`,
  * `sha256.digestUtf8`, `resources.call` and `clock`. A minimal
  * `{docs:{get,put}, sha256}` tuple is refused typed BEFORE anything is
  * installed — an incomplete production install can never exist.
  */
-export function installKernelHostPorts(ports: unknown): void {
-  preflightKernelHostPorts(ports);
+export function installKernelHostPorts(ports: unknown, sessionCap: unknown): void {
+  preflightKernelHostPorts(ports, sessionCap);
   const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
   const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown };
   const sha256 = candidate.sha256 as { digestUtf8?: unknown };
@@ -147,6 +190,8 @@ export function installKernelHostPorts(ports: unknown): void {
     }),
     clock: candidate.clock as () => string,
   });
+  // preflightKernelHostPorts already proved the capability is a string.
+  kernelHostSessionCap = sessionCap as string;
 }
 
 /** Diagnostics-only probe (tests/evidence); not a trust decision input. */
@@ -159,12 +204,27 @@ export function isKernelHostInstalled(): boolean {
  * through the protected bootstrap has NO Host binding, and the loader
  * refuses with KERNEL_HOST_NOT_INSTALLED instead of falling back to an
  * invented in-memory second runtime.
+ *
+ * #1013 R2 fresh review @5494026032 (NEW_P1_01): with ports installed, the
+ * caller must additionally present the EXACT session capability that was
+ * installed with them — a wrong or absent capability is refused typed
+ * (KERNEL_HOST_SESSION_DENIED) before the raw `{docs, resources}` object —
+ * uncredentialed physical CAS access and kernel-effect resource dispatch —
+ * can ever escape to a same-process deep importer. The capability never
+ * exists in this module's exports; only the trusted Host bootstrap closure
+ * and the loader's module-private channel hold it.
  */
-export function currentKernelHostPorts(): V8KernelHostPorts {
+export function currentKernelHostPorts(sessionCap?: unknown): V8KernelHostPorts {
   if (kernelHost === undefined) {
     throw new QualifiedPackageError(
       'KERNEL_HOST_NOT_INSTALLED',
       'no kernel Host ports are installed in this process (protected Host bootstrap not established); the loader fails closed and never invents a substitute effect runtime',
+    );
+  }
+  if (!sessionCapMatches(sessionCap)) {
+    throw new QualifiedPackageError(
+      'KERNEL_HOST_SESSION_DENIED',
+      'the installed kernel Host ports require the bootstrap session capability; structural module access carries no authority over the physical CAS store or kernel-effect resource dispatch (#1013 R2 @5494026032)',
     );
   }
   return kernelHost;

@@ -22,8 +22,11 @@ test('F-01: occupied ModelPort refuses bootstrap with zero trust/Kernel residue'
   assert.equal(currentHostModelPort(), undefined, 'fresh process: no ModelPort');
 
   // Occupy the protected ModelPort channel (a stale prior provisioning).
-  installHostModelPort({ invoke: async () => ({ decision: { outcome: 'stale' }, event: { type: 'STALE', payload: {} } }) });
-  assert.notEqual(currentHostModelPort(), undefined, 'precondition: the ModelPort channel is occupied');
+  // The stale installer carries its own session capability — a hostile
+  // self-install only ever reaches its OWN objects (#1013 R2 @5494026032).
+  const STALE_CAP = 'stale-model-port-session-capability-0123456789abcdef0123456789abcdef';
+  installHostModelPort({ invoke: async () => ({ decision: { outcome: 'stale' }, event: { type: 'STALE', payload: {} } }) }, STALE_CAP);
+  assert.notEqual(currentHostModelPort(STALE_CAP), undefined, 'precondition: the ModelPort channel is occupied');
 
   await assert.rejects(
     () => bootstrapTrustedHost({

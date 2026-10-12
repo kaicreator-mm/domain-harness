@@ -100,10 +100,12 @@ export interface TrustedHostHandle {
   readonly host: TrustedNodeHost;
   readonly store: CasDocumentStore;
   /**
-   * #1013 R2 (@6122817203): the unguessable gateway session capability this
-   * bootstrap installed. Hand it ONLY to the trusted Host kernel gateway
-   * (`createKernelGateway`); it is the sole key to the protected facade ops
-   * seam and must never cross into untrusted consumer code.
+   * #1013 R2 (@6122817203, fresh review @5494026032): the unguessable
+   * gateway session capability this bootstrap installed — with the gateway
+   * channel, the kernel Host ports and the ModelPort alike. Hand it ONLY to
+   * the trusted Host kernel gateway (`createKernelGateway`); it is the sole
+   * key to the protected facade ops seam AND to the raw trusted-port getters,
+   * and must never cross into untrusted consumer code.
    */
   readonly gatewaySessionCap: string;
 }
@@ -265,23 +267,29 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
   // data) and installed through the one-shot microkernel channel, so a
   // packed same-process consumer that deep-imports the shipped sibling
   // module can hold its functions but never this process's capability.
+  // #1013 R2 fresh review (@5494026032, NEW_P1_01/02): the SAME capability
+  // is installed WITH the kernel Host ports and the ModelPort — both raw
+  // port getters refuse typed without it, so uncredentialed deep imports of
+  // kernel-host.js / model-port.js hold functions but no physical CAS,
+  // kernel-effect dispatch or ModelPort authority either.
   const gatewaySessionCap = randomBytes(32).toString('hex');
   preflightTrustedIssuersInstall(trustInput);
-  preflightKernelHostPorts(kernelPorts);
+  preflightKernelHostPorts(kernelPorts, gatewaySessionCap);
   preflightGatewaySessionCap();
   if (modelPort !== undefined) {
-    preflightHostModelPort(modelPort);
+    preflightHostModelPort(modelPort, gatewaySessionCap);
   }
 
   // The #1004 → trust.ts seam: install the protected load gate, the kernel
   // Host ports (one-shot like the load gate: a running process can never
   // have its Host storage swapped mid-flight), and the optional trusted
-  // ModelPort (#1013 I04; absent stays an honest model-free state).
+  // ModelPort (#1013 I04; absent stays an honest model-free state). Every
+  // port-bearing channel carries the session capability installed beside it.
   installTrustedIssuers(trustInput);
-  installKernelHostPorts(kernelPorts);
+  installKernelHostPorts(kernelPorts, gatewaySessionCap);
   installGatewaySessionCap(gatewaySessionCap);
   if (modelPort !== undefined) {
-    installHostModelPort(modelPort);
+    installHostModelPort(modelPort, gatewaySessionCap);
   }
   if (!isTrustChannelEstablished()) {
     throw new HostBoundaryError('HOST_BOOTSTRAP_INVALID', 'the load trust channel did not establish after protected installation');

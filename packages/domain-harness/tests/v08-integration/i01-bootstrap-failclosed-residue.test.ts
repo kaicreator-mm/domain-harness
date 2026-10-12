@@ -60,7 +60,7 @@ test('F-01: malformed ModelPort refuses with zero residue; a subsequent trusted 
   });
   assert.equal(isTrustChannelEstablished(), true);
   assert.equal(isKernelHostInstalled(), true);
-  assert.notEqual(currentHostModelPort(), undefined);
+  assert.notEqual(currentHostModelPort(handle.gatewaySessionCap), undefined);
 
   // The real journey still works through the trusted channels.
   handle.host.resources.provision('ledger', () => ({ reserved: true }));

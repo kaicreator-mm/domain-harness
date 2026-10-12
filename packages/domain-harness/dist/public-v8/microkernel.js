@@ -111,8 +111,13 @@ async function loadScopedFacade(packageRoot) {
         throw typedError('LOAD_ARITY_INVALID', 'load accepts exactly one argument: the sealed qualified package root; there is no options overload and no caller-injectable Host port (P1-L2-ABI-02)');
     }
     // Kernel Host binding: protected internal channel ONLY (never a load
-    // argument). Fail-closed before anything else.
-    const hostPorts = currentKernelHostPorts();
+    // argument). Fail-closed before anything else. The read carries this
+    // module's gateway session capability (#1013 R2 @5494026032): the trusted
+    // bootstrap installs the SAME unguessable value into the gateway channel
+    // here and into the kernel Host ports channel, so the public one-arg load
+    // keeps working while an uncredentialed deep importer of kernel-host.js is
+    // refused at the getter before any port escapes.
+    const hostPorts = currentKernelHostPorts(gatewaySessionCap);
     // THE qualified load path — qualification, trust gate, whole-closure
     // preflight and every physical import happen here and nowhere else.
     const loaded = await load(packageRoot);
@@ -149,8 +154,12 @@ async function loadScopedFacade(packageRoot) {
     // invocations). Caller input/context never selects the path. Without an
     // installed port the plain `interpret` stays wired and evidence remains
     // `unsupported`/`unmeasured` — there is no synthetic measured zero and no
-    // caller-supplied port anywhere.
-    const modelPort = currentHostModelPort();
+    // caller-supplied port anywhere. The read carries this module's gateway
+    // session capability (#1013 R2 @5494026032): the same unguessable value
+    // the bootstrap installed with the port, so the trusted load path keeps
+    // working while an uncredentialed deep importer of model-port.js is
+    // refused at the getter before the frozen {invoke} object can be reached.
+    const modelPort = currentHostModelPort(gatewaySessionCap);
     const resolverFactory = sdkNamespace.createHostBoundModelResolver;
     const interpret = (modelPort !== undefined && typeof resolverFactory === 'function'
         ? (() => {

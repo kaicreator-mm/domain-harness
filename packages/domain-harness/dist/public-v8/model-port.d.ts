@@ -29,18 +29,30 @@ export interface V8HostModelPort {
  * one-shot channel (#1013 R1 F-01): occupancy and the direct-callable
  * shape both fail here first, so the Host bootstrap can preflight ALL
  * one-shot channels (trust, kernel, ModelPort) before committing ANY.
- * Internal protected; not re-exported from the public `/v8` surface.
+ * The session capability is validated with the port (the boundary can
+ * never exist without its key). Internal protected; not re-exported from
+ * the public `/v8` surface.
  */
-export declare function preflightHostModelPort(port: unknown): void;
+export declare function preflightHostModelPort(port: unknown, sessionCap: unknown): void;
 /**
- * Install the trusted Host ModelPort for this process. Internal protected
+ * Install the trusted Host ModelPort for this process together with the
+ * session capability that gates every read back. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed).
  */
-export declare function installHostModelPort(port: unknown): void;
+export declare function installHostModelPort(port: unknown, sessionCap: unknown): void;
 /**
  * The installed trusted ModelPort, or `undefined` when this process
  * bootstrapped without one. Absence is a legitimate honest state (FR08:
  * `unsupported`/`unmeasured`), never an error and never a fallback port.
+ *
+ * #1013 R2 fresh review @5494026032 (NEW_P1_02): with a port installed, the
+ * caller must present the EXACT session capability that was installed with
+ * it — a wrong or absent capability is refused typed
+ * (MODEL_PORT_SESSION_DENIED) before the frozen `{invoke}` object can be
+ * reached, so a same-process deep importer can never invoke the model
+ * outside the qualified S `model-decision` declaration selection and the
+ * truthful per-domain model-call evidence/accounting path. The capability
+ * never exists in this module's exports.
  */
-export declare function currentHostModelPort(): V8HostModelPort | undefined;
+export declare function currentHostModelPort(sessionCap?: unknown): V8HostModelPort | undefined;
 //# sourceMappingURL=model-port.d.ts.map
