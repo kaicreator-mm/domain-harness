@@ -372,7 +372,7 @@ test('V08-TF-D3-P01: full guarded lifecycle change-proposed→reviewed→validat
   assert.equal(final.packageId, engineering.MODULE_ID);
 });
 
-test('V08-TF-D3-P01b: a qualified release is terminal — no later occurrence is admitted and no second evidence append happens', async () => {
+test('V08-TF-D3-P01b: release-qualified is terminal — cross-stage intents reject typed and no second evidence append happens', async () => {
   const { runtime, host } = await openedEngineering();
   const { release } = await walkFullLifecycle(runtime);
   assert.equal(release.status, 'admitted');
@@ -382,9 +382,18 @@ test('V08-TF-D3-P01b: a qualified release is terminal — no later occurrence is
     ['recordValidation', validationInput(), 'validator'],
     ['qualifyRelease', releaseInput(), 'release-manager'],
   ] as const) {
-    const receipt = await submit(runtime, intentType, input, role);
-    assert.equal(receipt.status, 'denied');
-    assert.equal(receipt.denial.reason, 'no-candidate-transition');
+    if (intentType === 'qualifyRelease') {
+      // The final state is declared in this intent's own stage definition.
+      const receipt = await submit(runtime, intentType, input, role);
+      assert.equal(receipt.status, 'denied');
+      assert.equal(receipt.denial.reason, 'no-candidate-transition');
+    } else {
+      // Each sibling intent's sealed stage definition omits release-qualified.
+      await assert.rejects(
+        submit(runtime, intentType, input, role),
+        isTypedError('CentralAdmissionError', 'ADMISSION_UNKNOWN_STATE'),
+      );
+    }
   }
   assert.equal((await runtime.getJournalRecords()).length, 3);
   assert.equal(host.resources.callCount(), 3);
@@ -442,26 +451,29 @@ test('V08-TF-D3-N01: wrong-role callers are denied by the Business binding befor
   assert.equal(snapshot.stateRevision, 0);
 });
 
-test('V08-TF-D3-N01b: unqualified promotion — stage skipping has no candidate transition and D2 intents cannot drive a D3 instance', async () => {
+test('V08-TF-D3-N01b: unqualified promotion — out-of-stage intents reject typed and D2 intents cannot drive D3', async () => {
   const { runtime, host } = await openedEngineering();
 
-  // Validation before any review: the perfect validator payload still has
-  // no transition candidate from change-proposed.
-  const earlyValidation = await submit(runtime, 'recordValidation', validationInput(), 'validator');
-  assert.equal(earlyValidation.status, 'denied');
-  assert.equal(earlyValidation.denial.reason, 'no-candidate-transition');
+  // Each intent carries a sealed single-stage workflow definition. A submission
+  // from an undeclared sibling state fails typed before any effect or journal.
+  await assert.rejects(
+    submit(runtime, 'recordValidation', validationInput(), 'validator'),
+    isTypedError('CentralAdmissionError', 'ADMISSION_UNKNOWN_STATE'),
+  );
 
-  // Release before any review, by the legitimate release-manager role.
-  const earlyRelease = await submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager');
-  assert.equal(earlyRelease.status, 'denied');
-  assert.equal(earlyRelease.denial.reason, 'no-candidate-transition');
+  // Release before any review, even from the legitimate release-manager.
+  await assert.rejects(
+    submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager'),
+    isTypedError('CentralAdmissionError', 'ADMISSION_UNKNOWN_STATE'),
+  );
 
-  // A real review, then release straight from 'reviewed' (validation skipped).
+  // A real review, then release while validation is still skipped.
   const review = await submit(runtime, 'reviewChange', reviewInput(), 'reviewer');
   assert.equal(review.status, 'admitted');
-  const skippedValidation = await submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager');
-  assert.equal(skippedValidation.status, 'denied');
-  assert.equal(skippedValidation.denial.reason, 'no-candidate-transition');
+  await assert.rejects(
+    submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager'),
+    isTypedError('CentralAdmissionError', 'ADMISSION_UNKNOWN_STATE'),
+  );
 
   // D2 Approval intent types have no binding in the D3 business policy.
   await assert.rejects(
