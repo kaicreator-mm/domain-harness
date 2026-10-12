@@ -25,6 +25,14 @@ export interface V8HostModelPort {
     }) => unknown;
 }
 /**
+ * Validate a prospective ModelPort installation WITHOUT consuming the
+ * one-shot channel (#1013 R1 F-01): occupancy and the direct-callable
+ * shape both fail here first, so the Host bootstrap can preflight ALL
+ * one-shot channels (trust, kernel, ModelPort) before committing ANY.
+ * Internal protected; not re-exported from the public `/v8` surface.
+ */
+export declare function preflightHostModelPort(port: unknown): void;
+/**
  * Install the trusted Host ModelPort for this process. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed).
  */

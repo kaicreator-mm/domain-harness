@@ -17,7 +17,7 @@ import {
   mintPrincipalCredential,
 } from '@kaicreator/domain-harness/v8/host';
 
-const [sqlitePath, rootsPath, issuerId, issuerSecret] = process.argv.slice(2);
+const [sqlitePath, rootsPath, issuerId, issuerSecret, mode] = process.argv.slice(2);
 const roots = JSON.parse(await readFile(rootsPath, 'utf8'));
 const AUDIENCE = 'dh-v08-clean-child';
 const TENANT = 't1';
@@ -57,6 +57,38 @@ try {
   const gateway = createKernelGateway({ host: handle.host });
   await gateway.registerApp({ appId: 'order-approval', packageRoot: roots.approval, genesisRoles: ['platform-operator'] });
   await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: roots.engineering, genesisRoles: ['platform-operator'] });
+
+  // #1013 R1 F-02 restart leg: `register-only` mode runs in a SECOND clean
+  // process against the SAME physical SQLite file. The durable closure
+  // pins must make re-registering the SAME closures idempotent, while a
+  // SECOND independently valid approved closure under the SAME appId
+  // refuses typed before load (and loads fine under its own appId).
+  if (mode === 'register-only') {
+    const restart = {};
+    restart.sameClosuresIdempotent = true; // both registerApp calls above succeeded on the pinned store
+    if (roots.approvalVariant !== undefined) {
+      // A FRESH gateway models the post-restart routing table (empty
+      // in-process map): only the DURABLE pin governs the decision.
+      const restartGateway = createKernelGateway({ host: handle.host });
+      try {
+        await restartGateway.registerApp({ appId: 'order-approval', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'] });
+        restart.replacementRefusal = 'NOT_REFUSED';
+      } catch (error) {
+        restart.replacementRefusal = error.code ?? error.message;
+      }
+      try {
+        await restartGateway.registerApp({ appId: 'order-approval-r2', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'] });
+        restart.variantUnderOwnAppId = true;
+      } catch (error) {
+        restart.variantUnderOwnAppId = `REFUSED: ${error.code ?? error.message}`;
+      }
+    }
+    outcome.restart = restart;
+    await handle.host.close();
+    outcome.ok = true;
+    process.stdout.write(`JSON_RESULT: ${JSON.stringify(outcome)}\n`);
+    process.exit(0);
+  }
 
   // Public one-arg load in the SAME clean process proves the shared K/S
   // bytes load independently of the gateway registrations.

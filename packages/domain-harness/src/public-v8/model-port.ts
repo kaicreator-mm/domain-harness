@@ -38,10 +38,13 @@ function isDirectCallable(owner: object, key: string): boolean {
 }
 
 /**
- * Install the trusted Host ModelPort for this process. Internal protected
- * bootstrap: one-shot (a second installation attempt fails typed).
+ * Validate a prospective ModelPort installation WITHOUT consuming the
+ * one-shot channel (#1013 R1 F-01): occupancy and the direct-callable
+ * shape both fail here first, so the Host bootstrap can preflight ALL
+ * one-shot channels (trust, kernel, ModelPort) before committing ANY.
+ * Internal protected; not re-exported from the public `/v8` surface.
  */
-export function installHostModelPort(port: unknown): void {
+export function preflightHostModelPort(port: unknown): void {
   if (hostModelPort !== undefined) {
     throw new QualifiedPackageError(
       'MODEL_PORT_ALREADY_INSTALLED',
@@ -54,6 +57,14 @@ export function installHostModelPort(port: unknown): void {
       'installHostModelPort requires a port object with a direct callable invoke({operation, input}) data property',
     );
   }
+}
+
+/**
+ * Install the trusted Host ModelPort for this process. Internal protected
+ * bootstrap: one-shot (a second installation attempt fails typed).
+ */
+export function installHostModelPort(port: unknown): void {
+  preflightHostModelPort(port);
   hostModelPort = Object.freeze({ invoke: (port as V8HostModelPort).invoke.bind(port) });
 }
 

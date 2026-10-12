@@ -39,16 +39,19 @@ export const INTEG_ISSUER_SECRET = 'integration-issuer-secret:1013';
 export const FIXTURE_SHAS = {
   approval: 'b1169090676f7abe4ef04f34fc2d448b3662ce29f724fe23ed4ac5621812df5e',
   engineering: '2b403e4e0d460da454ffb2375983cb538b8b3e0f3c7af791db83d5b362932b37',
+  /** #1013-Builder-authored model-decision fixture (R1 F-03 physical path). */
+  model: '659ac04523c288225756dca0bc0e651179a4ea48f5e79c911d587e0afcfa15e7',
 } as const;
 
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
-export type AppKind = 'approval' | 'engineering';
+export type AppKind = 'approval' | 'engineering' | 'model';
 
 export const APP_IDS: Record<AppKind, string> = {
   approval: 'order-approval',
   engineering: 'domainharness-engineering',
+  model: 'model-quote',
 };
 
 export function sqliteTempPath(label: string): string {
@@ -61,10 +64,13 @@ export async function readModuleSources(kind: AppKind): Promise<{
   sdk: string;
   business: string;
 }> {
+  const businessFile = kind === 'approval'
+    ? 'business-approval'
+    : kind === 'engineering' ? 'business-engineering' : 'business-model-port';
   const [kernel, sdk, business] = await Promise.all([
     readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
     readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL(`${kind === 'approval' ? 'business-approval' : 'business-engineering'}.mjs`, fixtureDir), 'utf8'),
+    readFile(new URL(`${businessFile}.mjs`, fixtureDir), 'utf8'),
   ]);
   return { kernel, sdk, business };
 }
@@ -91,15 +97,27 @@ function firstEndpointId(endpoints: unknown): string {
  * Build one REAL sealed qualified root through the compiler BUILD path
  * (static qualification → external issuer approval → seal), exactly like
  * the F01 BUILD proof but for consumption by the integrated Host.
+ *
+ * `variantRootPackageId` (R1 F-02 falsifier) seals an INDEPENDENTLY VALID
+ * second closure from the same module bytes: a different rootPackageId
+ * yields a different subjectDigest → a different issuer approval → a
+ * different whole-closure digest. Both closures are qualified and
+ * issuer-approved on their own; only their identity differs.
  */
-export async function sealRealApp(kind: AppKind): Promise<SealedQualifiedPackageRoot> {
+export async function sealRealApp(kind: AppKind, variantRootPackageId?: string): Promise<SealedQualifiedPackageRoot> {
   // The sealed module payloads are plain ESM without type declarations; the
   // fixture bytes are SHA-pinned below, so the untyped namespace is safe.
-  const businessModule = kind === 'approval'
+  let businessModule: Record<string, unknown>;
+  if (kind === 'approval') {
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
-    ? await import('./fixtures/business-approval.mjs')
+    businessModule = await import('./fixtures/business-approval.mjs');
+  } else if (kind === 'engineering') {
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
-    : await import('./fixtures/business-engineering.mjs');
+    businessModule = await import('./fixtures/business-engineering.mjs');
+  } else {
+    // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
+    businessModule = await import('./fixtures/business-model-port.mjs');
+  }
   // @ts-expect-error selected kernel payload has no declaration file (.mjs)
   const kernelMeta = await import('../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs');
   // @ts-expect-error selected standard-sdk payload has no declaration file (.mjs)
@@ -113,7 +131,7 @@ export async function sealRealApp(kind: AppKind): Promise<SealedQualifiedPackage
   const businessEndpointId = firstEndpointId(businessModule.ENDPOINTS);
 
   const submission = {
-    rootPackageId: `app:v08:${APP_IDS[kind]}`,
+    rootPackageId: variantRootPackageId ?? `app:v08:${APP_IDS[kind]}`,
     packages: [
       {
         packageId: kernelId, kind: 'kernel' as const, abiVersion: kernelMeta.ABI_VERSION as string,

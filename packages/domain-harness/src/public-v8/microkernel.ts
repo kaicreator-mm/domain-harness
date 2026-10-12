@@ -142,7 +142,13 @@ interface WiredKernelRuntime {
 type KernelRuntimeFactory = (deps: {
   readonly moduleIdentity: { readonly packageId: string; readonly moduleSha256: string };
   readonly hostPorts: V8KernelHostPorts;
-  readonly sdkEndpoint: { readonly packageId: string; readonly interpret: (input: unknown) => unknown };
+  /**
+   * The rule-interpretation endpoint. Per the recorded ABI ruling
+   * (#1013@6118426531, R1 F-03) the Kernel awaits the returned value: a
+   * synchronous model-free resolution (plain value) and an async
+   * Host-bound model resolution (Promise) both flow through unchanged.
+   */
+  readonly sdkEndpoint: { readonly packageId: string; readonly interpret: (declaration: unknown, input: unknown, context: unknown) => unknown };
   readonly businessEndpoint: object;
   readonly observe: (receipt: unknown) => void;
 }) => unknown;
@@ -263,26 +269,53 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   const createOccurrenceRuntime = kernelNamespace.createOccurrenceRuntime as KernelRuntimeFactory;
   const getPolicy = businessNamespace.getPolicy as () => unknown;
 
-  // ---- FR08 (#1013, I04): trusted ModelPort binding, protected channel ONLY.
-  // When this process bootstrapped a Host ModelPort and the qualified Standard
-  // SDK exposes the host-bound resolver factory, rule interpretation goes
-  // through that binding so model-call evidence can honestly report
-  // physically observed port invocations. Without an installed port the plain
-  // `interpret` stays wired and evidence remains `unsupported`/`unmeasured` —
-  // there is no synthetic measured zero and no caller-supplied port anywhere.
+  // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
+  // ModelPort binding, protected channel ONLY. When this process bootstrapped
+  // a Host ModelPort and the qualified Standard SDK exposes the host-bound
+  // resolver factory, the endpoint handed to the Kernel is a COMPOSITE that
+  // dispatches ONLY on the SEALED business rule declaration: a
+  // `model-decision` rule routes through the resolver's real async
+  // port-invoking endpoint (`invokeDecision` — the Kernel awaits the result
+  // per the recorded ABI ruling), every other declared kind stays on the
+  // resolver's model-free wrapper (honest `measured(0)` scoped to bound-port
+  // invocations). Caller input/context never selects the path. Without an
+  // installed port the plain `interpret` stays wired and evidence remains
+  // `unsupported`/`unmeasured` — there is no synthetic measured zero and no
+  // caller-supplied port anywhere.
   const modelPort = currentHostModelPort();
   const resolverFactory = sdkNamespace.createHostBoundModelResolver;
   const interpret = (
     modelPort !== undefined && typeof resolverFactory === 'function'
       ? (() => {
-          const factory = resolverFactory as (port: unknown) => { interpret: (input: unknown) => unknown };
+          const factory = resolverFactory as (port: unknown) => {
+            interpret: (declaration: unknown, input: unknown, context: unknown) => unknown;
+            invokeDecision: (declaration: unknown, input: unknown, context: unknown) => unknown;
+          };
+          let bound: ReturnType<typeof factory>;
           try {
-            return factory(modelPort).interpret;
+            bound = factory(modelPort);
           } catch (error) {
             throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver activation failed: ${String((error as Error)?.message ?? error)}`);
           }
+          if (
+            typeof bound !== 'object'
+            || bound === null
+            || typeof bound.interpret !== 'function'
+            || typeof bound.invokeDecision !== 'function'
+          ) {
+            // R1 F-03 stale/failed-bind negative: a factory that does not
+            // expose the real port-invoking endpoint is not a usable
+            // production binding — refuse typed, never degrade silently.
+            throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver exposes no callable interpret/invokeDecision pair (stale or failed bind)`);
+          }
+          return (declaration: unknown, input: unknown, context: unknown): unknown => {
+            const kind = (declaration as { kind?: unknown } | null | undefined)?.kind;
+            return kind === 'model-decision'
+              ? bound.invokeDecision(declaration, input, context)
+              : bound.interpret(declaration, input, context);
+          };
         })()
-      : (sdkNamespace.interpret as (input: unknown) => unknown)
+      : (sdkNamespace.interpret as (declaration: unknown, input: unknown, context: unknown) => unknown)
   );
 
   // Business policy resolution precedes kernel construction: a policy that

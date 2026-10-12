@@ -62,6 +62,14 @@ export interface V8KernelHostPorts {
     readonly clock: () => string;
 }
 /**
+ * Validate a prospective kernel Host ports installation WITHOUT consuming
+ * the one-shot channel (#1013 R1 F-01): occupancy and the COMPLETE port
+ * shape are both checked here first, so the Host bootstrap can preflight
+ * ALL one-shot channels (trust, kernel, ModelPort) before committing ANY.
+ * Internal protected; not re-exported from the public `/v8` surface.
+ */
+export declare function preflightKernelHostPorts(ports: unknown): void;
+/**
  * Install the kernel Host ports for this process. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed, so a
  * running process can never have its Host storage swapped mid-flight).

@@ -23,6 +23,12 @@
  *     host-configured genesis role on the authenticated principal, and the
  *     initial state/context stay owned by the sealed Business policy — no
  *     raw `openInstance`, Kernel namespace or Journal handle ever escapes;
+ *   - app registration is DURABLY pinned (#1013 R1 F-02): the exact
+ *     installed closure identity (rootPackageId + whole-closure digest +
+ *     K/S/B module digests + host audience) is persisted in the physical
+ *     Host store under guarded CAS, so package replacement / stale roots
+ *     refuse across process restarts before their module bytes ever load,
+ *     and re-registering the SAME closure after a restart is idempotent;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
  *     delivery and silently stop when the grant is no longer valid.
  *

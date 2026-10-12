@@ -23,9 +23,9 @@
  * UX transport surface is a strict allowlist (no docs, no dispatcher, no
  * publish, no installer, no host ports — B01-N4/N6/N8).
  */
-import { installTrustedIssuers, isTrustChannelEstablished } from '../public-v8/trust.js';
-import { installKernelHostPorts } from '../public-v8/kernel-host.js';
-import { installHostModelPort } from '../public-v8/model-port.js';
+import { installTrustedIssuers, isTrustChannelEstablished, preflightTrustedIssuersInstall } from '../public-v8/trust.js';
+import { installKernelHostPorts, preflightKernelHostPorts } from '../public-v8/kernel-host.js';
+import { installHostModelPort, preflightHostModelPort } from '../public-v8/model-port.js';
 import { sha256Hex } from '../public-v8/contracts.js';
 import { probeTrueCasStore, InMemoryCasStore } from './cas.js';
 import { ResourceDispatcher } from './dispatcher.js';
@@ -54,9 +54,14 @@ const KERNEL_EFFECT_SERVICE_PRINCIPAL = Object.freeze({
 /**
  * Protected Host bootstrap. Establishes the one-shot load trust channel
  * (trust.ts seam) and assembles the trusted Node Host over probed true-CAS
- * physical storage. A second bootstrap in the same process fails typed with
- * TRUST_CHANNEL_ALREADY_ESTABLISHED (from the load gate) — a partially
- * bootstrapped process can never be re-trusted mid-flight.
+ * physical storage. Transactional across ALL one-shot channels (#1013 R1
+ * F-01): occupancy and shape of every channel are preflighted
+ * synchronously BEFORE any irreversible installation, and the installs
+ * commit in the same synchronous block (no async gap) — a bootstrap that
+ * refuses (occupied Kernel channel, malformed/occupied ModelPort,
+ * established trust channel, invalid input) leaves ZERO trust/Kernel/
+ * ModelPort residue, so a partially-bootstrapped process can never exist
+ * and a rejected attempt never blocks a subsequent trusted bootstrap.
  */
 export async function bootstrapTrustedHost(input) {
     if (typeof input.audience !== 'string' || input.audience.length === 0) {
@@ -81,24 +86,18 @@ export async function bootstrapTrustedHost(input) {
     // C01-N7 at the physical boundary: prove the presented storage is a true
     // CAS store BEFORE any authority is allowed to rely on it.
     await probeTrueCasStore(store);
-    // ---- The #1004 → trust.ts seam: install the protected load gate. ----
-    installTrustedIssuers({
-        issuers: input.issuers,
-        ...(input.maxProofAgeMs !== undefined ? { maxProofAgeMs: input.maxProofAgeMs } : {}),
-    });
-    if (!isTrustChannelEstablished()) {
-        throw new HostBoundaryError('HOST_BOOTSTRAP_INVALID', 'the load trust channel did not establish after protected installation');
-    }
+    // ---- Build EVERYTHING the host needs before any one-shot channel is
+    // touched (#1013 R1 F-01): a constructor or wiring failure below must
+    // leave the process exactly as un-bootstrapped as it started. ----
     const resources = new ResourceDispatcher();
-    // ---- #1013 (I01): install the COMPLETE protected Kernel Host ports. ----
-    // The physically selected Kernel mechanism consumes exactly this bounded
-    // contract (kernel-mechanism-v1.mjs): true-CAS docs get/put/list over the
-    // SAME probed physical store (conditions forwarded verbatim — the store's
-    // refusal of unconditional writes stays authoritative), a trusted sha256
-    // digest, the physical resource dispatch port for Business effect
-    // handlers, and the trusted clock. One-shot like the load gate: a running
-    // process can never have its Kernel Host binding swapped mid-flight.
-    installKernelHostPorts({
+    // #1013 (I01): the COMPLETE protected Kernel Host ports over the probed
+    // physical storage. The physically selected Kernel mechanism consumes
+    // exactly this bounded contract (kernel-mechanism-v1.mjs): true-CAS docs
+    // get/put/list over the SAME probed physical store (conditions forwarded
+    // verbatim — the store's refusal of unconditional writes stays
+    // authoritative), a trusted sha256 digest, the physical resource dispatch
+    // port for Business effect handlers, and the trusted clock.
+    const kernelPorts = {
         docs: Object.freeze({
             get: (key) => store.get(key),
             put: (key, value, conditions) => store.put(key, value, conditions),
@@ -116,12 +115,11 @@ export async function bootstrapTrustedHost(input) {
             call: (resourceKey, operation, payload) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
         }),
         clock: () => now().toISOString(),
-    });
-    // ---- #1013 (I04): optional trusted ModelPort through the protected
-    // one-shot channel; absent stays an honest model-free state. ----
-    if (input.modelPort !== undefined) {
-        installHostModelPort(input.modelPort);
-    }
+    };
+    const trustInput = {
+        issuers: input.issuers,
+        ...(input.maxProofAgeMs !== undefined ? { maxProofAgeMs: input.maxProofAgeMs } : {}),
+    };
     const verifier = new HostIdentityVerifier({
         issuers: input.issuers,
         audience: input.audience,
@@ -148,6 +146,31 @@ export async function bootstrapTrustedHost(input) {
                 await store.close();
         },
     });
+    // ---- Transactional one-shot commit (#1013 R1 F-01). PREFLIGHT every
+    // one-shot channel — occupancy AND port shape, plus the trust input —
+    // synchronously, then commit them in the SAME synchronous block with NO
+    // await between preflight and commit. A rejected bootstrap therefore
+    // consumes NOTHING: an occupied Kernel channel, a malformed or occupied
+    // ModelPort, an established trust channel or an invalid trust input all
+    // refuse typed with zero trust/Kernel/ModelPort residue (JS is
+    // single-threaded, so no other code can interleave the two blocks). ----
+    preflightTrustedIssuersInstall(trustInput);
+    preflightKernelHostPorts(kernelPorts);
+    if (input.modelPort !== undefined) {
+        preflightHostModelPort(input.modelPort);
+    }
+    // The #1004 → trust.ts seam: install the protected load gate, the kernel
+    // Host ports (one-shot like the load gate: a running process can never
+    // have its Kernel Host binding swapped mid-flight), and the optional
+    // trusted ModelPort (#1013 I04; absent stays an honest model-free state).
+    installTrustedIssuers(trustInput);
+    installKernelHostPorts(kernelPorts);
+    if (input.modelPort !== undefined) {
+        installHostModelPort(input.modelPort);
+    }
+    if (!isTrustChannelEstablished()) {
+        throw new HostBoundaryError('HOST_BOOTSTRAP_INVALID', 'the load trust channel did not establish after protected installation');
+    }
     return { host, store };
 }
 /**

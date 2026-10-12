@@ -89,9 +89,14 @@ export interface TrustedHostHandle {
 /**
  * Protected Host bootstrap. Establishes the one-shot load trust channel
  * (trust.ts seam) and assembles the trusted Node Host over probed true-CAS
- * physical storage. A second bootstrap in the same process fails typed with
- * TRUST_CHANNEL_ALREADY_ESTABLISHED (from the load gate) — a partially
- * bootstrapped process can never be re-trusted mid-flight.
+ * physical storage. Transactional across ALL one-shot channels (#1013 R1
+ * F-01): occupancy and shape of every channel are preflighted
+ * synchronously BEFORE any irreversible installation, and the installs
+ * commit in the same synchronous block (no async gap) — a bootstrap that
+ * refuses (occupied Kernel channel, malformed/occupied ModelPort,
+ * established trust channel, invalid input) leaves ZERO trust/Kernel/
+ * ModelPort residue, so a partially-bootstrapped process can never exist
+ * and a rejected attempt never blocks a subsequent trusted bootstrap.
  */
 export declare function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise<TrustedHostHandle>;
 /**

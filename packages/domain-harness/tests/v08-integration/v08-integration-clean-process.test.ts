@@ -35,6 +35,11 @@ interface ChildVerdict {
   negatives?: Record<string, string>;
   tenantIsolation?: Record<string, unknown>;
   publicFacadeClosed?: Record<string, string>;
+  restart?: {
+    sameClosuresIdempotent?: boolean;
+    replacementRefusal?: string;
+    variantUnderOwnAppId?: boolean | string;
+  };
 }
 
 function runChild(script: string, args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
@@ -92,6 +97,27 @@ test('I01–I04 clean-process journey: two REAL apps on one REAL SQLite Host', a
     assert.equal(verdict.publicFacadeClosed?.anonymousSend, 'FACADE_PUBLIC_ROUTE_CLOSED');
     assert.equal(verdict.publicFacadeClosed?.instanceQuery, 'FACADE_PUBLIC_ROUTE_CLOSED');
     assert.equal(verdict.publicFacadeClosed?.subscribe, 'FACADE_PUBLIC_ROUTE_CLOSED');
+
+    // #1013 R1 F-02 restart leg: a SECOND clean process on the SAME SQLite
+    // file re-registers the SAME closures (durable pins match → idempotent),
+    // a SECOND independently valid approved closure under the SAME appId
+    // refuses typed at the pin, and loads fine under its own appId.
+    const approvalVariant = await sealRealApp('approval', 'app:v08:order-approval-r2');
+    const roots2Path = join(dir, 'roots-restart.json');
+    await writeFile(roots2Path, JSON.stringify({ approval, engineering, approvalVariant }), 'utf8');
+    const restartRun = await runChild(
+      fileURLToPath(new URL('./clean-process-child.mjs', import.meta.url)),
+      [sqlitePath, roots2Path, INTEG_ISSUER, INTEG_ISSUER_SECRET, 'register-only'],
+    );
+    const restartLine = restartRun.stdout.split('\n').find((candidate) => candidate.startsWith('JSON_RESULT: '));
+    if (restartLine === undefined) {
+      assert.fail(`register-only child produced no verdict (code ${String(restartRun.code)})\nstdout:\n${restartRun.stdout}\nstderr:\n${restartRun.stderr}`);
+    }
+    const restartVerdict = JSON.parse(restartLine.slice('JSON_RESULT: '.length)) as ChildVerdict;
+    assert.equal(restartVerdict.ok, true, `register-only child failed: ${restartVerdict.error ?? 'unknown'}`);
+    assert.equal(restartVerdict.restart?.sameClosuresIdempotent, true);
+    assert.equal(restartVerdict.restart?.replacementRefusal, 'GATEWAY_APP_CLOSURE_MISMATCH');
+    assert.equal(restartVerdict.restart?.variantUnderOwnAppId, true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

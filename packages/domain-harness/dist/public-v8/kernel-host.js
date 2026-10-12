@@ -25,16 +25,13 @@ function isCallable(value) {
     return typeof value === 'function';
 }
 /**
- * Install the kernel Host ports for this process. Internal protected
- * bootstrap: one-shot (a second installation attempt fails typed, so a
- * running process can never have its Host storage swapped mid-flight).
- *
- * The COMPLETE bounded port set is required: `docs.get/put/list`,
- * `sha256.digestUtf8`, `resources.call` and `clock`. A minimal
- * `{docs:{get,put}, sha256}` tuple is refused typed BEFORE anything is
- * installed — an incomplete production install can never exist.
+ * Validate a prospective kernel Host ports installation WITHOUT consuming
+ * the one-shot channel (#1013 R1 F-01): occupancy and the COMPLETE port
+ * shape are both checked here first, so the Host bootstrap can preflight
+ * ALL one-shot channels (trust, kernel, ModelPort) before committing ANY.
+ * Internal protected; not re-exported from the public `/v8` surface.
  */
-export function installKernelHostPorts(ports) {
+export function preflightKernelHostPorts(ports) {
     if (kernelHost !== undefined) {
         throw new QualifiedPackageError('KERNEL_HOST_ALREADY_INSTALLED', 'kernel Host ports are already installed in this process; the protected kernel Host channel is one-shot');
     }
@@ -61,6 +58,23 @@ export function installKernelHostPorts(ports) {
     if (!isCallable(candidate.clock)) {
         throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a clock callable returning an ISO timestamp (trusted Kernel timestamps; #1013 I01 complete-set contract)');
     }
+}
+/**
+ * Install the kernel Host ports for this process. Internal protected
+ * bootstrap: one-shot (a second installation attempt fails typed, so a
+ * running process can never have its Host storage swapped mid-flight).
+ *
+ * The COMPLETE bounded port set is required: `docs.get/put/list`,
+ * `sha256.digestUtf8`, `resources.call` and `clock`. A minimal
+ * `{docs:{get,put}, sha256}` tuple is refused typed BEFORE anything is
+ * installed — an incomplete production install can never exist.
+ */
+export function installKernelHostPorts(ports) {
+    preflightKernelHostPorts(ports);
+    const candidate = ports;
+    const docs = candidate.docs;
+    const sha256 = candidate.sha256;
+    const resources = candidate.resources;
     kernelHost = Object.freeze({
         docs: Object.freeze({
             get: docs.get,

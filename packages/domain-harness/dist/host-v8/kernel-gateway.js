@@ -23,6 +23,12 @@
  *     host-configured genesis role on the authenticated principal, and the
  *     initial state/context stay owned by the sealed Business policy — no
  *     raw `openInstance`, Kernel namespace or Journal handle ever escapes;
+ *   - app registration is DURABLY pinned (#1013 R1 F-02): the exact
+ *     installed closure identity (rootPackageId + whole-closure digest +
+ *     K/S/B module digests + host audience) is persisted in the physical
+ *     Host store under guarded CAS, so package replacement / stale roots
+ *     refuse across process restarts before their module bytes ever load,
+ *     and re-registering the SAME closure after a restart is idempotent;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
  *     delivery and silently stop when the grant is no longer valid.
  *
@@ -31,8 +37,85 @@
  * selected Kernel package, T-C).
  */
 import { DomainHarness, getFacadeKernelOps } from '../public-v8/microkernel.js';
+import { canonicalSnapshot, sha256Hex } from '../public-v8/contracts.js';
 import { HostBoundaryError } from './errors.js';
 import { assertIntentScope } from './ux-transport.js';
+/**
+ * Durable CAS key under which a gateway registration pins the EXACT
+ * installed closure identity of an app (#1013 R1 F-02). Same namespace
+ * convention as the revocation records; never inside the Kernel journal
+ * prefix (`v08-kernel:…`).
+ */
+function appPinKey(appId) {
+    return `v8host:gateway:app-pin:${appId}`;
+}
+function readPackageShas(packages) {
+    if (!Array.isArray(packages))
+        return undefined;
+    const out = [];
+    for (const pkg of packages) {
+        if (typeof pkg !== 'object' || pkg === null)
+            return undefined;
+        const record = pkg;
+        if (typeof record.packageId !== 'string' || typeof record.kind !== 'string' || typeof record.moduleSha256 !== 'string')
+            return undefined;
+        out.push({ packageId: record.packageId, kind: record.kind, moduleSha256: record.moduleSha256 });
+    }
+    return out.sort((a, b) => (a.packageId < b.packageId ? -1 : a.packageId > b.packageId ? 1 : 0));
+}
+/**
+ * Best-effort descriptor-safe read of the identity a SUPPLIED root claims
+ * (canonicalSnapshot never invokes hostile getters). Returns `undefined`
+ * when the shape is unreadable — the qualified load remains the authority
+ * that refuses malformed roots typed; the pin check just runs earlier.
+ */
+function readClaimedClosureIdentity(packageRoot) {
+    let snapshot;
+    try {
+        snapshot = canonicalSnapshot(packageRoot);
+    }
+    catch {
+        return undefined;
+    }
+    if (typeof snapshot !== 'object' || snapshot === null)
+        return undefined;
+    const record = snapshot;
+    const build = record.build;
+    if (typeof record.rootPackageId !== 'string' || typeof build !== 'object' || build === null)
+        return undefined;
+    const closureDigest = build.closureDigest;
+    if (typeof closureDigest !== 'string')
+        return undefined;
+    const packages = readPackageShas(record.packages);
+    if (packages === undefined)
+        return undefined;
+    return { rootPackageId: record.rootPackageId, closureDigest, packages };
+}
+/** The same identity off the LOADED build trace (authoritative form). */
+function readInstalledClosureIdentity(trace) {
+    if (typeof trace !== 'object' || trace === null)
+        return undefined;
+    const record = trace;
+    if (typeof record.root !== 'object' || record.root === null)
+        return undefined;
+    const root = record.root;
+    if (typeof root.rootPackageId !== 'string' || typeof root.closureDigest !== 'string')
+        return undefined;
+    const packages = readPackageShas(record.packages);
+    if (packages === undefined)
+        return undefined;
+    return { rootPackageId: root.rootPackageId, closureDigest: root.closureDigest, packages };
+}
+function closurePin(appId, audience, identity) {
+    return sha256Hex(JSON.stringify({
+        pinVersion: 1,
+        appId,
+        audience,
+        rootPackageId: identity.rootPackageId,
+        closureDigest: identity.closureDigest,
+        packages: identity.packages,
+    }));
+}
 export function createKernelGateway(input) {
     if (typeof input !== 'object' || input === null || typeof input.host !== 'object' || input.host === null) {
         throw new HostBoundaryError('GATEWAY_MALFORMED', 'createKernelGateway requires the trusted host handle from bootstrapTrustedHost');
@@ -63,12 +146,68 @@ export function createKernelGateway(input) {
             if (apps.has(registration.appId)) {
                 throw new HostBoundaryError('GATEWAY_APP_ALREADY_REGISTERED', `app ${registration.appId} is already registered on this gateway`);
             }
+            // ---- #1013 R1 F-02: durable app-registration closure pin. The EXACT
+            // installed closure identity (appId + host audience + rootPackageId +
+            // whole-closure digest + per-package K/S/B module digests) is pinned in
+            // the PHYSICAL Host store under guarded CAS, so package
+            // replacement/stale roots refuse across process restarts — a second,
+            // independently valid signed closure for the same appId never gets to
+            // load (its module bytes never execute), and re-registering the SAME
+            // closure after a restart is idempotent. This all happens BEFORE any
+            // effect or Genesis can run through the app.
+            const pinKey = appPinKey(registration.appId);
+            const pinnedEntry = await host.docs.get(pinKey);
+            const pinned = pinnedEntry !== null && typeof pinnedEntry.value === 'object' && pinnedEntry.value !== null
+                ? pinnedEntry.value.closurePin
+                : undefined;
+            if (pinnedEntry !== null && pinned === undefined) {
+                throw new HostBoundaryError('GATEWAY_APP_PIN_INVALID', `app ${registration.appId} carries an unreadable registration pin in the physical Host store`);
+            }
+            if (pinned !== undefined) {
+                // Pre-load refusal: descriptor-safe claimed identity, no module bytes.
+                const claimed = readClaimedClosureIdentity(registration.packageRoot);
+                const claimedPin = claimed === undefined ? undefined : closurePin(registration.appId, host.audience, claimed);
+                if (claimedPin === undefined || claimedPin !== pinned) {
+                    throw new HostBoundaryError('GATEWAY_APP_CLOSURE_MISMATCH', `app ${registration.appId} is durably pinned to a different approved closure on this host (rootPackageId/closureDigest/K/S/B module digests differ); package replacement and stale roots refuse before load`);
+                }
+            }
             // The PUBLIC one-argument load — qualification, trust gate, whole-
             // closure byte preflight and physical import all happen inside.
             const facade = await DomainHarness.load(registration.packageRoot);
             const ops = getFacadeKernelOps(facade);
             if (ops === undefined) {
                 throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package did not produce a gateway-capable facade (protected ops seam missing)');
+            }
+            // Authoritative pin form: the LOADED build trace (the load's verified
+            // identity, not merely the supplied root's claim).
+            const installed = readInstalledClosureIdentity(await facade.query({ kind: 'build' }));
+            if (installed === undefined) {
+                throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package produced no readable build trace for the closure pin');
+            }
+            const installedPin = closurePin(registration.appId, host.audience, installed);
+            if (pinned !== undefined) {
+                if (installedPin !== pinned) {
+                    throw new HostBoundaryError('GATEWAY_APP_CLOSURE_MISMATCH', `app ${registration.appId} is durably pinned to a different approved closure on this host (the loaded closure identity differs from the pinned one)`);
+                }
+            }
+            else {
+                const record = Object.freeze({
+                    pinVersion: 1,
+                    appId: registration.appId,
+                    audience: host.audience,
+                    rootPackageId: installed.rootPackageId,
+                    closureDigest: installed.closureDigest,
+                    packages: Object.freeze(installed.packages.map((pkg) => Object.freeze({ ...pkg }))),
+                    closurePin: installedPin,
+                });
+                try {
+                    // Guarded CAS: a concurrent first registration of the same appId
+                    // can never be overwritten (mustBeAbsent).
+                    await host.docs.put(pinKey, record, { mustBeAbsent: true });
+                }
+                catch (error) {
+                    throw new HostBoundaryError('GATEWAY_APP_PIN_CONFLICT', `durably pinning app ${registration.appId} failed (concurrent or conflicting registration): ${String(error?.message ?? error)}`);
+                }
             }
             apps.set(registration.appId, Object.freeze({
                 appId: registration.appId,
