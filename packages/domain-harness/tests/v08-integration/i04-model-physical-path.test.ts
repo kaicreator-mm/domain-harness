@@ -90,6 +90,9 @@ test('F-03: REAL H→S→K model invocation — physically observed, measured, a
       throw new Error('the model-admitted turn left no effect-journal document');
     }
     const journalDoc = ((await handle.host.docs.get(journalKey))?.value as { record?: { status?: string; target?: { instanceKey?: string } } }).record;
+    if (journalDoc === undefined || journalDoc.target === undefined) {
+      throw new Error('the model-admitted effect-journal document is unreadable');
+    }
     assert.equal(journalDoc.status, 'completed');
     assert.equal(journalDoc.target.instanceKey, 't1:model-quote:quote-mp');
 
