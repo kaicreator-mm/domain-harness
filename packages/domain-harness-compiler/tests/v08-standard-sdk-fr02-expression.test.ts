@@ -244,3 +244,50 @@ test('V08-FR02-N3 malicious values, unsafe results and invalid declarations fail
   refused('SDK_DECLARATION_INVALID', () => evaluate('1', {}, { timeoutMs: 0 }));
   refused('SDK_DECLARATION_INVALID', () => evaluate('1', {}, { maxInputBytes: 10_000_000 }));
 });
+
+test('V08-FR02-N4 primitive/null results with outputSchema refuse typed, never a bare JS error', () => {
+  const required = { required: ['score'] };
+  const properties = { properties: { score: 'number' } };
+  // 'null' is a valid portable JSON expression result; without the leading
+  // primitive-vs-object check it reached Object.hasOwn(null, ...) and raised
+  // a raw TypeError instead of the recorded SDK refusal (review #5492338387
+  // P1-02). Scalars used to slip through a properties-only schema untouched.
+  refused('SDK_EXPRESSION_OUTPUT_INVALID', () => evaluate('null', {}, { outputSchema: required }));
+  refused('SDK_EXPRESSION_OUTPUT_INVALID', () => evaluate('null', {}, { outputSchema: properties }));
+  refused('SDK_EXPRESSION_OUTPUT_INVALID', () => evaluate('42', {}, { outputSchema: required }));
+  refused('SDK_EXPRESSION_OUTPUT_INVALID', () => evaluate('42', {}, { outputSchema: properties }));
+  refused('SDK_EXPRESSION_OUTPUT_INVALID', () => evaluate('"text"', {}, { outputSchema: required }));
+  refused('SDK_EXPRESSION_OUTPUT_INVALID', () => evaluate('true', {}, { outputSchema: properties }));
+  // Without a schema, primitive results remain plain portable JSON results.
+  assert.deepEqual(payloadOf(evaluate('null', {})), null);
+});
+
+test('V08-FR02-N5 deep expression recursion fails typed before any stack exhaustion', () => {
+  const nest = (open: string, close: string, count: number, inner = '1') =>
+    open.repeat(count) + inner + close.repeat(count);
+  // Review #5492338387 P1-01 repros: every source below is inside the
+  // 65,536-character bound, yet each used to drive the recursive-descent
+  // parser past the JS stack (raw RangeError) before the node budget or the
+  // timeout budget could run — including unknown-function argument nesting,
+  // which descends before the $name denial.
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate('-'.repeat(20000) + '1', {}));
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(nest('(', ')', 12000), {}));
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(nest('$sum(', ')', 8000), {}));
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(nest('{"a":', '}', 6000), {}));
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(nest('[', ']', 300), {}));
+  // The nesting bound is checked BEFORE descending: 256 levels parse and
+  // evaluate; the same shapes at 257 refuse typed.
+  assert.deepEqual(payloadOf(evaluate(nest('(', ')', 256), {})), 1);
+  assert.deepEqual(payloadOf(evaluate('-'.repeat(256) + '1', {})), 1);
+  let nestedExpected: Record<string, unknown> = 1;
+  for (let index = 0; index < 256; index += 1) nestedExpected = { a: nestedExpected };
+  assert.deepEqual(payloadOf(evaluate(nest('{"a":', '}', 256), {})), nestedExpected);
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(nest('(', ')', 257), {}));
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate('-'.repeat(257) + '1', {}));
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(nest('{"a":', '}', 257), {}));
+  // AST evaluation recursion is depth-bounded too: a left-leaning chain
+  // parses iteratively (nesting depth 1) so the parser bound alone cannot
+  // protect the evaluator's own recursion.
+  assert.deepEqual(payloadOf(evaluate(`${'1 + '.repeat(1000)}1`, {})), 1001);
+  refused('SDK_EXPRESSION_BOUNDS', () => evaluate(`${'1 + '.repeat(1100)}1`, {}));
+});

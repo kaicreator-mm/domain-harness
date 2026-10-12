@@ -29,6 +29,8 @@ const INVALID_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 // clock and replay stays byte-identical.
 const EXPRESSION_SOURCE_MAX_CHARS = 65_536;
 const EXPRESSION_NODE_BUDGET = 4_096;
+const EXPRESSION_PARSE_DEPTH_MAX = 256;
+const EXPRESSION_EVALUATE_DEPTH_MAX = 1_024;
 const EXPRESSION_MAX_BYTES = 4_194_304;
 const DEFAULT_EXPRESSION_MAX_BYTES = 1_048_576;
 const DEFAULT_EXPRESSION_TIMEOUT_MS = 2_000;
@@ -233,6 +235,9 @@ function operation(definition, input) {
  * - the v0.7 wall-clock timeoutMs becomes a deterministic fixed-rate step
  *   budget (EXPRESSION_STEPS_PER_MS steps per declared millisecond): the
  *   same fail-closed denial class with zero ambient time dependence;
+ * - parser nesting and AST evaluation recursion each carry an explicit
+ *   depth budget checked BEFORE descending, so a legal-length source can
+ *   never overflow the JS stack (typed SDK_EXPRESSION_BOUNDS instead);
  * - UTF-8 input/output byte limits and the plain-JSON result round-trip
  *   follow the v0.7 json-boundary semantics.
  */
@@ -289,6 +294,10 @@ function evaluateRulePayloadExpression(rawDeclaration, input) {
   return result;
 }
 
+function expressionValueKind(value) {
+  return value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+}
+
 function assertExpressionOutputSchema(rawSchema, result) {
   if (rawSchema === undefined) return;
   const schema = record(rawSchema, 'rule.payloadExpression.outputSchema');
@@ -297,6 +306,12 @@ function assertExpressionOutputSchema(rawSchema, result) {
     fail('SDK_DECLARATION_INVALID', 'outputSchema.required must be a bounded string list');
   }
   const properties = record(schema.properties ?? {}, 'outputSchema.properties');
+  // The schema describes object fields; primitive or null results must be
+  // refused typed before Object.hasOwn below can raise a bare TypeError.
+  const resultKind = expressionValueKind(result);
+  if (resultKind !== 'object' && resultKind !== 'array') {
+    fail('SDK_EXPRESSION_OUTPUT_INVALID', `expression result does not satisfy outputSchema (result is ${resultKind}, expected object)`);
+  }
   for (const name of required) {
     ident(name, 'outputSchema.required');
     if (!Object.hasOwn(result, name)) {
@@ -310,7 +325,7 @@ function assertExpressionOutputSchema(rawSchema, result) {
     }
     if (!Object.hasOwn(result, name)) continue;
     const value = result[name];
-    const actual = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+    const actual = expressionValueKind(value);
     if (actual !== expected) {
       fail('SDK_EXPRESSION_OUTPUT_INVALID', `expression result does not satisfy outputSchema (${name} is ${actual}, expected ${expected})`);
     }
@@ -319,7 +334,7 @@ function assertExpressionOutputSchema(rawSchema, result) {
 
 function evaluateExpressionSource(source, scope, logicalTime, timeoutMs) {
   const ast = createExpressionParser(source).parse();
-  const state = { steps: 0, budget: timeoutMs * EXPRESSION_STEPS_PER_MS, timeoutMs };
+  const state = { steps: 0, budget: timeoutMs * EXPRESSION_STEPS_PER_MS, timeoutMs, depth: 0 };
   const clock = { now: logicalTime, millis: Date.parse(logicalTime) };
   const result = evaluateExpressionNode(ast, scope, clock, state);
   if (result === MISSING) {
@@ -338,6 +353,7 @@ function expressionTick(state) {
 function createExpressionParser(source) {
   let pos = 0;
   let nodes = 0;
+  let depth = 0;
 
   function unsafe(message) {
     fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression ${message}`);
@@ -348,6 +364,16 @@ function createExpressionParser(source) {
       fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression exceeds bounded expression node budget (${EXPRESSION_NODE_BUDGET})`);
     }
     return fields;
+  }
+  // Every recursive-descent cycle passes through enterNesting() BEFORE
+  // descending, so a legal-length source can never exhaust the JS stack
+  // before the node/step budgets run. The counter is not restored on the
+  // failure path: fail() abandons this parser instance entirely.
+  function enterNesting() {
+    depth += 1;
+    if (depth > EXPRESSION_PARSE_DEPTH_MAX) {
+      fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression exceeds bounded expression nesting depth (${EXPRESSION_PARSE_DEPTH_MAX})`);
+    }
   }
   function skip() {
     while (
@@ -485,7 +511,12 @@ function createExpressionParser(source) {
     }
   }
   function parseUnary() {
-    if (eat('-')) return node({ type: 'neg', operand: parseUnary() });
+    if (eat('-')) {
+      enterNesting();
+      const operand = parseUnary();
+      depth -= 1;
+      return node({ type: 'neg', operand });
+    }
     return parsePostfix();
   }
   function parsePostfix() {
@@ -516,12 +547,15 @@ function createExpressionParser(source) {
     if (character === '' ) unsafe(`syntax error: unexpected end of expression`);
     if (character === '(') {
       pos += 1;
+      enterNesting();
       const inner = parseExpression();
+      depth -= 1;
       expect(')');
       return inner;
     }
     if (character === '{') {
       pos += 1;
+      enterNesting();
       const entries = [];
       if (peek() !== '}') {
         for (;;) {
@@ -540,16 +574,19 @@ function createExpressionParser(source) {
         }
       }
       expect('}');
+      depth -= 1;
       return node({ type: 'object', entries });
     }
     if (character === '[') {
       pos += 1;
+      enterNesting();
       const items = [];
       if (peek() !== ']') {
         items.push(parseExpression());
         while (eat(',')) items.push(parseExpression());
       }
       expect(']');
+      depth -= 1;
       return node({ type: 'array', items });
     }
     if (character === '"' || character === "'") {
@@ -566,12 +603,14 @@ function createExpressionParser(source) {
       skip();
       if (pos < source.length && source[pos] === '(') {
         pos += 1;
+        enterNesting();
         const args = [];
         if (peek() !== ')') {
           args.push(parseExpression());
           while (eat(',')) args.push(parseExpression());
         }
         expect(')');
+        depth -= 1;
         if (EXPRESSION_CLOCK_FUNCTIONS.has(name)) {
           if (args.length > 0) {
             fail('SDK_EXPRESSION_FORBIDDEN', `$${name}(...) arguments are not supported by the deterministic clock contract`);
@@ -641,6 +680,18 @@ function expressionBoolean(value, operator) {
 
 function evaluateExpressionNode(ast, scope, clock, state) {
   expressionTick(state);
+  state.depth += 1;
+  if (state.depth > EXPRESSION_EVALUATE_DEPTH_MAX) {
+    fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression exceeds bounded expression evaluation depth (${EXPRESSION_EVALUATE_DEPTH_MAX})`);
+  }
+  try {
+    return evaluateExpressionNodeInner(ast, scope, clock, state);
+  } finally {
+    state.depth -= 1;
+  }
+}
+
+function evaluateExpressionNodeInner(ast, scope, clock, state) {
   switch (ast.type) {
     case 'literal':
       return ast.value;
