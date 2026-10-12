@@ -112,6 +112,25 @@ const workflowDefinition = {
   ],
 };
 
+// The Kernel wires each intent binding's effect declarations against THAT
+// binding's own rule projection (wireAdmissionEffectBindings validates
+// `binding.definition ?? workflowDefinition` as one unit), so a multi-stage
+// shared workflow must hand every intent a definition in which only its OWN
+// transition carries the dynamic evidence binding — the same authoring
+// pattern as the Approval package's dynamic binding. The shared
+// workflowDefinition above stays the declared lifecycle contract; each
+// scoped clone keeps every state and guard so the state machine and denial
+// paths are identical.
+function scopedDefinition(transitionKey) {
+  const definition = structuredClone(workflowDefinition);
+  for (const state of definition.states) {
+    for (const transition of state.transitions ?? []) {
+      if (transition.transitionKey !== transitionKey) transition.effectIntents = [];
+    }
+  }
+  return definition;
+}
+
 export function getPolicy() {
   return {
     packageId: MODULE_ID,
@@ -140,14 +159,17 @@ export function getPolicy() {
       reviewChange: {
         trigger: { kind: 'event', eventType: 'CHANGE_REVIEWED' },
         ruleId: 'rule:review-change', roles: ['reviewer'],
+        definition: scopedDefinition('review'),
       },
       recordValidation: {
         trigger: { kind: 'event', eventType: 'VALIDATION_PASSED' },
         ruleId: 'rule:record-validation', roles: ['validator'],
+        definition: scopedDefinition('validate'),
       },
       qualifyRelease: {
         trigger: { kind: 'event', eventType: 'RELEASE_QUALIFIED' },
         ruleId: 'rule:qualify-release', roles: ['release-manager'],
+        definition: scopedDefinition('qualify'),
       },
     },
     effectBindings: {
