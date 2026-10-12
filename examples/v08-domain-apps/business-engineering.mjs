@@ -10,6 +10,25 @@
  * declared Rules, H owns physical resource dispatch/CAS/authenticated callers.
  * Evidence effects require an H-provisioned resource handler and are not
  * proof of a release until their durable Journal and state are observed.
+ *
+ * [#1013 interface adaptation, proven necessary by the fixed integration
+ * contract] Base bytes: PR #1012@9f6aaf4 examples/v08-domain-apps/
+ * business-engineering.mjs (sha256 d0f84aa6bde4e5a7be85f3f26b0c7b74eed9d70d
+ * cb7f655b5446ab677a02afd2). The selected Kernel's one-time dynamic
+ * effect-binding wiring validation (kernel-mechanism-v1.mjs
+ * wireAdmissionEffectBindings, [Controller 090 repair]) authorizes each
+ * intent's inputFrom/idempotencyKeyFrom fields ONLY against THAT intent's
+ * rule projection, and reads `binding.definition ?? workflowDefinition` —
+ * with the shared three-stage default definition the validate/qualify
+ * stages' evidence fields (validationId, testedSha, testsPassed,
+ * qualifiedSha, releaseApproved) are outside rule:review-change's
+ * projection and the mechanism activation fails typed
+ * (ACTIVATION_FAILED). The minimal contract-compatible adaptation — same
+ * states, transitions, guards, evidence semantics, roles and projections —
+ * is a per-intent single-stage `definition` (the same pattern the Approval
+ * package already uses for submitQuoteDecisionDynamic/Strict). The default
+ * workflowDefinition above is byte-unchanged. The T-F owner should apply
+ * this same adaptation to the examples source before T-F E2E.
  */
 export const MODULE_ID = 'business-domainharness-engineering@v08.1.0.0';
 export const PACKAGE_KIND = 'business';
@@ -112,6 +131,31 @@ const workflowDefinition = {
   ],
 };
 
+/**
+ * [#1013] Per-intent single-stage definition: each intent's dynamic evidence
+ * binding is validated (and executed) against its OWN stage only, keeping
+ * every inputFrom field inside that intent's rule-authorized projection.
+ * The transition/guard/effect semantics are identical to the default
+ * workflowDefinition above.
+ */
+function stageDefinition(stateKey) {
+  const stage = workflowDefinition.states.find((state) => state.stateKey === stateKey);
+  const target = workflowDefinition.states.find((state) => state.stateKey === stage.transitions[0].targetState);
+  return {
+    workflowKey: workflowDefinition.workflowKey,
+    initialState: workflowDefinition.initialState,
+    initialContext: workflowDefinition.initialContext,
+    guards: workflowDefinition.guards,
+    states: [
+      stage,
+      // The target state is reached WITHOUT its outgoing transition: a
+      // stage definition carries exactly one admissible transition, so no
+      // other stage's evidence fields enter this intent's authorization.
+      { stateKey: target.stateKey, ...(target.kind !== undefined ? { kind: target.kind } : {}) },
+    ],
+  };
+}
+
 export function getPolicy() {
   return {
     packageId: MODULE_ID,
@@ -140,14 +184,17 @@ export function getPolicy() {
       reviewChange: {
         trigger: { kind: 'event', eventType: 'CHANGE_REVIEWED' },
         ruleId: 'rule:review-change', roles: ['reviewer'],
+        definition: stageDefinition('change-proposed'),
       },
       recordValidation: {
         trigger: { kind: 'event', eventType: 'VALIDATION_PASSED' },
         ruleId: 'rule:record-validation', roles: ['validator'],
+        definition: stageDefinition('reviewed'),
       },
       qualifyRelease: {
         trigger: { kind: 'event', eventType: 'RELEASE_QUALIFIED' },
         ruleId: 'rule:qualify-release', roles: ['release-manager'],
+        definition: stageDefinition('validation-passed'),
       },
     },
     effectBindings: {
