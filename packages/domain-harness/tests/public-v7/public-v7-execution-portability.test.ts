@@ -26,7 +26,7 @@
  *    frozen journey with zero private imports (see `src/types.ts`).
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +58,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#930 packed package exposes ./v7/execution and the frozen T010 journey runs from packed public bytes', () => {
+test('#930 packed package exposes ./v7/execution and the frozen T010 journey runs from packed public bytes', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-public-v7-execution-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
@@ -666,6 +666,24 @@ import {
   type VerifiedToolImplementationBinding,
 } from '@kaicreator/domain-harness/v7/execution';
 import type {
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
   AdmissionDurableEffectJournal,
   AssemblyExecutionActivator,
   CentralAdmissionRequest,

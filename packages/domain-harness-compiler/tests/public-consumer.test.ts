@@ -21,7 +21,7 @@
  *   imports stay closed by the package `exports` map;
  * - the packed dist runtime inventory is exercised by direct evaluation.
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -62,7 +62,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('packed compiler exposes the stable root build API to a clean consumer', async () => {
+test('packed compiler exposes the stable root build API to a clean consumer', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-compiler-consumer-'));
   const consumerDirectory = join(root, 'consumer');
 
@@ -181,6 +181,24 @@ import type { ComponentEnvelope, Sha256Port } from '@kaicreator/domain-harness/v
 import { RAW_V07_TOOL_KIND } from '@kaicreator/domain-harness-compiler';
 // @ts-expect-error compiler deep imports stay closed by the package exports map
 import type { RawToolDefinition as RawToolDefinitionViaDeepPath } from '@kaicreator/domain-harness-compiler/dist/raw/types.js';
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
 
 type Expect<T extends true> = T;
 type Equal<A, B> =

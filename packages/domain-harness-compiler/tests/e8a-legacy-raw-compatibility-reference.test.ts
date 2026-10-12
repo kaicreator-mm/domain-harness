@@ -59,7 +59,7 @@
  * keys, UTF-8), not a reproduction of the manifest digest.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -567,7 +567,7 @@ async function frozen(): Promise<E8aFreeze> {
   return freezePromise;
 }
 
-test('E8a freeze preflight: exact identities captured before outcome inspection', async () => {
+test('E8a freeze preflight: exact identities captured before outcome inspection', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
 
   // Manifest freeze, verbatim.
@@ -620,7 +620,7 @@ test('E8a freeze preflight: exact identities captured before outcome inspection'
 // Matrix row 1: deterministic-raw-map
 // ---------------------------------------------------------------------------
 
-test('E8a deterministic-raw-map: same Raw + same rules => same graph semantic digest', async () => {
+test('E8a deterministic-raw-map: same Raw + same rules => same graph semantic digest', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const replay = mapRawV07AuthoringToComponentGraph(authoringInput());
 
@@ -632,7 +632,7 @@ test('E8a deterministic-raw-map: same Raw + same rules => same graph semantic di
   );
 });
 
-test('E8a deterministic-raw-map: Raw collection insertion-order permutation never changes the product', async () => {
+test('E8a deterministic-raw-map: Raw collection insertion-order permutation never changes the product', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   // Rebuild the same logical package with reversed Map insertion orders.
   const reversed = rawPackage();
@@ -654,7 +654,7 @@ test('E8a deterministic-raw-map: Raw collection insertion-order permutation neve
   );
 });
 
-test('E8a deterministic-raw-map: post-mapping Raw mutation cannot perturb the accepted product', async () => {
+test('E8a deterministic-raw-map: post-mapping Raw mutation cannot perturb the accepted product', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const digestBefore = await computeDefinitionGraphDigest(fx.mappingA.graph, sha256);
 
@@ -684,7 +684,7 @@ test('E8a deterministic-raw-map: post-mapping Raw mutation cannot perturb the ac
 // Matrix row 2: identity-correspondence
 // ---------------------------------------------------------------------------
 
-test('E8a identity-correspondence: exact historical identities bound to the canonical graph digest', async () => {
+test('E8a identity-correspondence: exact historical identities bound to the canonical graph digest', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const correspondence = fx.correspondence;
 
@@ -715,7 +715,7 @@ test('E8a identity-correspondence: exact historical identities bound to the cano
   );
 });
 
-test('E8a identity-correspondence: the artifact is immutable JSON evidence only — no executable material', async () => {
+test('E8a identity-correspondence: the artifact is immutable JSON evidence only — no executable material', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const correspondence = fx.correspondence;
 
@@ -761,7 +761,7 @@ function withProvenance(
   return { ...mapping, provenance: { ...mapping.provenance, components } };
 }
 
-test('E8a identity-correspondence: missing/extra/duplicate/ambiguous material fails typed, never guessed', async () => {
+test('E8a identity-correspondence: missing/extra/duplicate/ambiguous material fails typed, never guessed', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const mapping = fx.mappingA;
 
@@ -830,7 +830,7 @@ test('E8a identity-correspondence: missing/extra/duplicate/ambiguous material fa
   );
 });
 
-test('E8a identity-correspondence: the frozen artifact shares no live aliases with the accepted mapping', async () => {
+test('E8a identity-correspondence: the frozen artifact shares no live aliases with the accepted mapping', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const digestAtFreeze = fx.correspondenceDigest;
 
@@ -859,7 +859,7 @@ test('E8a identity-correspondence: the frozen artifact shares no live aliases wi
 // Matrix rows 6+7 (positive lanes): harness-config-map / promoted-subworkflow-map
 // ---------------------------------------------------------------------------
 
-test('E8a harness-config-map: historical harness-config maps to an ordinary Semantic Component on the exact compat Kind, verbatim', async () => {
+test('E8a harness-config-map: historical harness-config maps to an ordinary Semantic Component on the exact compat Kind, verbatim', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const harness = componentById(fx.mergedGraph.components, HARNESS_ID);
 
@@ -876,7 +876,7 @@ test('E8a harness-config-map: historical harness-config maps to an ordinary Sema
   assert.deepEqual(provenance.historicalIdentity, { ...HARNESS_IDENTITY });
 });
 
-test('E8a promoted-subworkflow-map: the single promoted-subworkflow maps to a Workflow Semantic Component + typed relation, exact envelope preserved', async () => {
+test('E8a promoted-subworkflow-map: the single promoted-subworkflow maps to a Workflow Semantic Component + typed relation, exact envelope preserved', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const promoted = componentById(fx.mergedGraph.components, PROMOTED_ID);
 
@@ -920,7 +920,7 @@ test('E8a promoted-subworkflow-map: the single promoted-subworkflow maps to a Wo
 // Matrix row 8: decision-source-order
 // ---------------------------------------------------------------------------
 
-test('E8a decision-source-order: declaration input permutation never changes canonical decision-source evidence', async () => {
+test('E8a decision-source-order: declaration input permutation never changes canonical decision-source evidence', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const ordered = mapHarnessConfigPromotedSubworkflowToComponentGraph(
     compatInput({
@@ -979,7 +979,7 @@ test('E8a decision-source-order: declaration input permutation never changes can
   ]);
 });
 
-test('E8a decision-source-order: config cannot mint authority — unknown sources, priority fields and conflicts fail typed', () => {
+test('E8a decision-source-order: config cannot mint authority — unknown sources, priority fields and conflicts fail typed', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
   // Unknown/inferred source names fail closed — no latest/default/first.
   for (const source of ['latest', 'default', 'first', 'registry-order', 'config-file', '']) {
     assert.throws(
@@ -1050,7 +1050,7 @@ test('E8a decision-source-order: config cannot mint authority — unknown source
 // Matrix row 9: ambiguous-unrepresentable-reject
 // ---------------------------------------------------------------------------
 
-test('E8a ambiguous-unrepresentable-reject: floating/range legacy identities and ambiguous historical semantics fail typed', () => {
+test('E8a ambiguous-unrepresentable-reject: floating/range legacy identities and ambiguous historical semantics fail typed', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
   // T008A: a floating capability selector is unrepresentable as an exact
   // identity — never rewritten, never closest-matched.
   assert.throws(
@@ -1243,7 +1243,7 @@ function typecheckConsumer(consumerDirectory: string): void {
   run(process.execPath, [tsc, '--project', 'tsconfig.json'], consumerDirectory);
 }
 
-test('E8a packed-consumer-root: legacy core/compiler public imports stay valid from the packed tarballs', async () => {
+test('E8a packed-consumer-root: legacy core/compiler public imports stay valid from the packed tarballs', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fxConsumer = await consumerFixture();
   const { consumerDirectory } = fxConsumer;
   try {
@@ -1332,7 +1332,7 @@ if (typeof core.createDomainRuntime !== 'function' || typeof core.StaticPackageR
   }
 }, { timeout: 600000 });
 
-test('E8a packed-consumer-v7: the successor /v7 surface is additive and nominally reachable from the same consumer', async () => {
+test('E8a packed-consumer-v7: the successor /v7 surface is additive and nominally reachable from the same consumer', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fxConsumer = await consumerFixture();
   const { consumerDirectory } = fxConsumer;
   try {
@@ -1352,6 +1352,24 @@ import {
   type UnderstoodKindDeclaration,
 } from '@kaicreator/domain-harness/v7';
 import { COMPILER_PUBLIC_API_VERSION } from '@kaicreator/domain-harness-compiler';
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
 
 const sha256: Sha256Port = {
   async digestUtf8(value: string): Promise<string> {
@@ -1400,7 +1418,7 @@ if (JSON.stringify(v7.COMPONENT_FAMILIES) !== '["semantic","tool"]') throw new E
   }
 }, { timeout: 600000 });
 
-test('E8a deep-import-reject: compat internals and package deep paths stay closed by the exports map', async () => {
+test('E8a deep-import-reject: compat internals and package deep paths stay closed by the exports map', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fxConsumer = await consumerFixture();
   const { consumerDirectory } = fxConsumer;
   try {
@@ -1447,7 +1465,7 @@ for (const key of ['admitComponent','computeDefinitionGraphDigest','validateTool
 // Matrix row 10: no-raw-runtime-bypass
 // ---------------------------------------------------------------------------
 
-test('E8a no-raw-runtime-bypass: Raw authoring and mapping JSON carry no runtime authority', async () => {
+test('E8a no-raw-runtime-bypass: Raw authoring and mapping JSON carry no runtime authority', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
 
   // The mapping result is plain JSON evidence: no functions, no handles, no
@@ -1482,7 +1500,7 @@ test('E8a no-raw-runtime-bypass: Raw authoring and mapping JSON carry no runtime
   validateDefinitionGraphEnvelope(fx.mergedGraph);
 });
 
-test('E8a no-raw-runtime-bypass: activation accepts only seal-minted assemblies — mapping JSON and Raw are rejected before any durable bind', async () => {
+test('E8a no-raw-runtime-bypass: activation accepts only seal-minted assemblies — mapping JSON and Raw are rejected before any durable bind', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
 
   // Public anti-forgery gate (reachable from the /v3 governance barrel): the
@@ -1552,7 +1570,7 @@ test('E8a no-raw-runtime-bypass: activation accepts only seal-minted assemblies 
   );
 });
 
-test('E8a no-raw-runtime-bypass: admission currentness — a mutated mapped component is not admitted under its historical identity', async () => {
+test('E8a no-raw-runtime-bypass: admission currentness — a mutated mapped component is not admitted under its historical identity', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fx = await frozen();
   const workflow = componentById(fx.mergedGraph.components, WORKFLOW_ID);
 
