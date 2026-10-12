@@ -133,7 +133,7 @@ test('I01-P: bootstrapTrustedHost installs the COMPLETE protected port set over 
     // produces a gateway-capable facade.
     const root = await sealRealApp('approval');
     const facade = await DomainHarness.load(root);
-    const ops = getFacadeKernelOps(facade);
+    const ops = getFacadeKernelOps(facade, handle.gatewaySessionCap);
     assert.notEqual(ops, undefined);
     assert.equal(ops!.describePolicy().workflowKey, 'order-quote');
     assert.equal(ops!.describePolicy().policyId, 'order-approval');

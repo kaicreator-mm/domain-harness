@@ -26,7 +26,7 @@ test('I03: protected Genesis activation — positive paths and typed negatives',
   });
   handle.host.resources.provision('ledger', () => ({ reserved: true }));
   handle.host.resources.provision('engineering-evidence', () => ({ recorded: true }));
-  const gateway = createKernelGateway({ host: handle.host });
+  const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
   await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
   await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: await sealRealApp('engineering'), genesisRoles: ['platform-operator'] });
 

@@ -191,11 +191,18 @@ function closurePin(appId: string, audience: string, identity: ClaimedClosureIde
   }));
 }
 
-export function createKernelGateway(input: { readonly host: TrustedNodeHost }): KernelGateway {
+export function createKernelGateway(input: { readonly host: TrustedNodeHost; readonly gatewaySessionCap: string }): KernelGateway {
   if (typeof input !== 'object' || input === null || typeof input.host !== 'object' || input.host === null) {
     throw new HostBoundaryError('GATEWAY_MALFORMED', 'createKernelGateway requires the trusted host handle from bootstrapTrustedHost');
   }
+  if (typeof input.gatewaySessionCap !== 'string' || input.gatewaySessionCap.length === 0) {
+    throw new HostBoundaryError(
+      'GATEWAY_MALFORMED',
+      'createKernelGateway requires the gateway session capability issued by bootstrapTrustedHost (handle.gatewaySessionCap); the protected facade ops seam is closed without it (#1013 R2 @6122817203)',
+    );
+  }
   const host = input.host;
+  const gatewaySessionCap = input.gatewaySessionCap;
   const apps = new Map<string, RegisteredApp>();
 
   async function authenticate(credential: unknown): Promise<HostPrincipal> {
@@ -258,7 +265,10 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost }): 
       // The PUBLIC one-argument load — qualification, trust gate, whole-
       // closure byte preflight and physical import all happen inside.
       const facade = await DomainHarness.load(registration.packageRoot);
-      const ops = getFacadeKernelOps(facade);
+      // #1013 R2 (@6122817203): the ops seam requires the bootstrap-issued
+      // gateway session capability — structural access to the sibling
+      // module or a forged principal carries no authority here.
+      const ops = getFacadeKernelOps(facade, gatewaySessionCap);
       if (ops === undefined) {
         throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package did not produce a gateway-capable facade (protected ops seam missing)');
       }

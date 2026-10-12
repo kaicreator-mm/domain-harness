@@ -44,7 +44,7 @@ test('Journal falsifier: same appId/instanceKey/messageId/idempotency text admit
     return { reserved: true };
   });
   try {
-    const gateway = createKernelGateway({ host: handle.host });
+    const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
 
     const tenant = (tenantId: string) => ({

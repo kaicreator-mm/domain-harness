@@ -48,8 +48,8 @@ async function setupHost() {
 }
 
 /** One fresh gateway per scenario on the shared trusted host. */
-async function attachGateway(host: Awaited<ReturnType<typeof setupHost>>['handle']['host']) {
-  const gateway = createKernelGateway({ host });
+async function attachGateway(handle: Awaited<ReturnType<typeof setupHost>>['handle']) {
+  const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
   await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
   await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: await sealRealApp('engineering'), genesisRoles: ['platform-operator'] });
   return gateway;
@@ -68,7 +68,7 @@ after(async () => {
 test('I02-P: authenticated UX send/query reach the selected K; roles come only from the signed credential', async () => {
   const { handle } = host;
   const { ledgerCalls, evidenceCalls } = host;
-  const gateway = await attachGateway(handle.host);
+  const gateway = await attachGateway(handle);
 
   const operatorC = mintCredential({ tenantId: TENANT, appId: 'order-approval', subject: 'op-1', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op-1' });
   const requesterC = mintCredential({ tenantId: TENANT, appId: 'order-approval', subject: 'req-1', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req-1' });
@@ -171,7 +171,7 @@ test('I02-P: authenticated UX send/query reach the selected K; roles come only f
 
 test('I02-N: forged role, self-declared caller, cross-tenant, UNKNOWN, raw-facade bypass fail closed', async () => {
   const { handle } = host;
-  const gateway = await attachGateway(handle.host);
+  const gateway = await attachGateway(handle);
 
   const operatorC = mintCredential({ tenantId: TENANT, appId: 'order-approval', subject: 'op-2', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op-2' });
   // A credential with NO business role — the caller DECLARES 'requester'.
@@ -263,7 +263,7 @@ test('I02-N: forged role, self-declared caller, cross-tenant, UNKNOWN, raw-facad
 
 test('I02-N7 (@6117218727 Candidate A): two VALID tenants reusing the same appId/instanceKey are physically isolated', async () => {
   const { handle } = host;
-  const gateway = await attachGateway(handle.host);
+  const gateway = await attachGateway(handle);
 
   // Two perfectly valid, issuer-signed principals of DIFFERENT tenants for
   // the SAME registered app — each addresses its OWN tenant-labeled target

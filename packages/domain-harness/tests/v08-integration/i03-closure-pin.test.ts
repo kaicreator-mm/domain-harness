@@ -39,7 +39,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
     const rootA = await sealRealApp('approval');
 
     // (1) First registration pins the closure identity durably.
-    const gateway1 = createKernelGateway({ host: handle.host });
+    const gateway1 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await gateway1.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'] });
     const pinEntry = await handle.host.docs.get('v8host:gateway:app-pin:order-approval');
     if (pinEntry === null) {
@@ -52,7 +52,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
     // (2) Restart idempotence: a FRESH gateway (empty in-process map = the
     // post-restart state) re-registers the SAME closure over the SAME
     // physical store — the pin matches, so this succeeds.
-    const gateway2 = createKernelGateway({ host: handle.host });
+    const gateway2 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await gateway2.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'] });
     assert.equal(gateway2.hasApp('order-approval'), true);
 
@@ -66,7 +66,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
       (rootB as { build: { closureDigest: string } }).build.closureDigest,
       'precondition: the two closures have distinct whole-closure digests',
     );
-    const gateway3 = createKernelGateway({ host: handle.host });
+    const gateway3 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await assert.rejects(
       () => gateway3.registerApp({ appId: 'order-approval', packageRoot: rootB, genesisRoles: ['platform-operator'] }),
       (error: unknown) => {
@@ -88,7 +88,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
       { ...pinValue, closurePin: '0'.repeat(64) },
       { mustMatchRevision: pinEntry.revision },
     );
-    const gateway4 = createKernelGateway({ host: handle.host });
+    const gateway4 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await assert.rejects(
       () => gateway4.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'] }),
       (error: unknown) => {

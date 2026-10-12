@@ -489,13 +489,83 @@ async function loadScopedFacade(packageRoot) {
  */
 const facadeScopes = new WeakMap();
 /**
+ * #1013 R2 repair (@6122817203): the gateway ops session capability channel.
+ * The packed npm distribution ships this module's compiled sibling next to
+ * the public entry, and stock Node resolves an absolute `file:` URL past any
+ * package-exports map — so "not re-exported" alone is NOT an enforceable
+ * boundary for an uncredentialed same-process consumer. The ops seam is
+ * therefore gated by a one-shot, host-generated unguessable session
+ * capability installed ONLY by `bootstrapTrustedHost` (which hands it to the
+ * trusted Host kernel gateway and to nobody else): without the exact
+ * capability, `getFacadeKernelOps` refuses typed before the WeakMap is ever
+ * consulted, and forging a `V8GatewayPrincipal` (structural check only) can
+ * never reach the Kernel. A deep import of this module yields functions, not
+ * authority. Mirrors the one-shot channel pattern of trust.ts/kernel-host.ts
+ * /model-port.ts: first installation wins, and a bootstrap whose session
+ * channel is already occupied refuses with zero residue.
+ */
+let gatewaySessionCap;
+/**
+ * Validate the gateway session channel WITHOUT consuming it (#1013 R2): the
+ * Host bootstrap preflights this channel alongside every other one-shot
+ * channel before committing any installation. Internal protected.
+ */
+export function preflightGatewaySessionCap() {
+    if (gatewaySessionCap !== undefined) {
+        throw typedError('GATEWAY_SESSION_ALREADY_INSTALLED', 'a gateway session capability is already installed in this process; the protected gateway ops seam is one-shot');
+    }
+}
+/**
+ * Install the gateway session capability for this process. Internal
+ * protected bootstrap (`bootstrapTrustedHost` only): one-shot, and the
+ * capability value must be an unguessable host-generated string so a
+ * consumer can never brute-force or guess its way past the seam.
+ */
+export function installGatewaySessionCap(cap) {
+    preflightGatewaySessionCap();
+    if (typeof cap !== 'string' || cap.length < 32 || cap.length > 256) {
+        throw typedError('GATEWAY_SESSION_INVALID', 'installGatewaySessionCap requires an unguessable host-generated session capability string (32–256 chars)');
+    }
+    gatewaySessionCap = cap;
+}
+/** Diagnostics-only probe (tests/evidence); not a trust decision input. */
+export function isGatewaySessionCapInstalled() {
+    return gatewaySessionCap !== undefined;
+}
+/**
+ * Constant-time equality for the session capability (fixed-length host
+ * random; pure JS on purpose — this module stays free of byte-decoding
+ * machinery by static proof).
+ */
+function sessionMatches(cap) {
+    if (gatewaySessionCap === undefined || typeof cap !== 'string' || cap.length !== gatewaySessionCap.length) {
+        return false;
+    }
+    let diff = 0;
+    for (let index = 0; index < cap.length; index += 1) {
+        diff |= cap.charCodeAt(index) ^ gatewaySessionCap.charCodeAt(index);
+    }
+    return diff === 0;
+}
+/**
  * Retrieve the private Kernel operations of a facade produced by
  * `DomainHarness.load(package)` in THIS process (#1013, I02/I03). Returns
  * `undefined` for anything that is not such a facade. Trusted Host gateway
- * use only: the object binds H-authenticated principals to Kernel requests
- * and exposes the protected Genesis path — it is never a public surface.
+ * use only: the caller must present the EXACT gateway session capability
+ * installed by `bootstrapTrustedHost` — a process without one fails closed
+ * (`GATEWAY_SESSION_NOT_INSTALLED`) and a wrong or absent capability is
+ * refused typed (`GATEWAY_SESSION_DENIED`) before any Kernel operation,
+ * observer or address is reachable. Deep-importing this module grants no
+ * authority: the capability never exists in this module's exports, only in
+ * the trusted Host bootstrap's closure.
  */
-export function getFacadeKernelOps(facade) {
+export function getFacadeKernelOps(facade, sessionCap) {
+    if (gatewaySessionCap === undefined) {
+        throw typedError('GATEWAY_SESSION_NOT_INSTALLED', 'no gateway session capability is installed in this process; the protected ops seam stays closed until the trusted Host bootstrap establishes one');
+    }
+    if (!sessionMatches(sessionCap)) {
+        throw typedError('GATEWAY_SESSION_DENIED', 'the protected facade ops seam requires the Host bootstrap gateway session capability; structural module access or a forged principal carries no authority (#1013 R2 @6122817203)');
+    }
     return facadeScopes.get(facade);
 }
 /**

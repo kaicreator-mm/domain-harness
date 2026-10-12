@@ -85,6 +85,13 @@ export interface TrustedNodeHost {
 export interface TrustedHostHandle {
     readonly host: TrustedNodeHost;
     readonly store: CasDocumentStore;
+    /**
+     * #1013 R2 (@6122817203): the unguessable gateway session capability this
+     * bootstrap installed. Hand it ONLY to the trusted Host kernel gateway
+     * (`createKernelGateway`); it is the sole key to the protected facade ops
+     * seam and must never cross into untrusted consumer code.
+     */
+    readonly gatewaySessionCap: string;
 }
 /**
  * Protected Host bootstrap. Establishes the one-shot load trust channel

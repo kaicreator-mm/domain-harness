@@ -54,7 +54,7 @@ try {
     return { recorded: true };
   });
 
-  const gateway = createKernelGateway({ host: handle.host });
+  const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
   await gateway.registerApp({ appId: 'order-approval', packageRoot: roots.approval, genesisRoles: ['platform-operator'] });
   await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: roots.engineering, genesisRoles: ['platform-operator'] });
 
@@ -69,7 +69,7 @@ try {
     if (roots.approvalVariant !== undefined) {
       // A FRESH gateway models the post-restart routing table (empty
       // in-process map): only the DURABLE pin governs the decision.
-      const restartGateway = createKernelGateway({ host: handle.host });
+      const restartGateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
       try {
         await restartGateway.registerApp({ appId: 'order-approval', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'] });
         restart.replacementRefusal = 'NOT_REFUSED';

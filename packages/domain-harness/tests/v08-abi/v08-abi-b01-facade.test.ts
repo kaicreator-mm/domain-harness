@@ -55,7 +55,7 @@ import * as v8Public from '../../src/public-v8/index.js';
 import { DomainHarness, QualifiedPackageError } from '../../src/public-v8/index.js';
 import { installTrustedIssuers } from '../../src/public-v8/trust.js';
 import { installKernelHostPorts } from '../../src/public-v8/kernel-host.js';
-import { getFacadeKernelOps, type V8FacadeKernelOps, type V8GatewayPrincipal } from '../../src/public-v8/microkernel.js';
+import { getFacadeKernelOps, installGatewaySessionCap, type V8FacadeKernelOps, type V8GatewayPrincipal } from '../../src/public-v8/microkernel.js';
 import {
   QualificationError,
   qualifyPackageClosure,
@@ -80,6 +80,10 @@ import {
 const host = b01MemoryHost();
 installTrustedIssuers({ issuers: new Map([[B01_ISSUER, B01_ISSUER_SECRET]]) });
 installKernelHostPorts(host.ports);
+// #1013 R2: this host-context stand-in mints its own session capability for
+// the protected ops seam (bootstrapTrustedHost does this with a random one).
+const B01_GATEWAY_SESSION_CAP = 'b01-test-gateway-session-capability-0123456789abcdef0123456789abcdef';
+installGatewaySessionCap(B01_GATEWAY_SESSION_CAP);
 
 const TARGET = { workflowId: 'tb-flow', instanceKey: 'instance-1' };
 
@@ -96,7 +100,7 @@ const TB_PRINCIPAL: V8GatewayPrincipal = Object.freeze({
 });
 
 function opsOf(facade: Awaited<ReturnType<typeof DomainHarness.load>>): V8FacadeKernelOps {
-  const ops = getFacadeKernelOps(facade);
+  const ops = getFacadeKernelOps(facade, B01_GATEWAY_SESSION_CAP);
   assert.ok(ops !== undefined, 'the loaded facade must carry the protected ops seam');
   return ops;
 }

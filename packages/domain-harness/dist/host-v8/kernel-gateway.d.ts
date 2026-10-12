@@ -89,6 +89,7 @@ export interface KernelGateway {
 }
 export declare function createKernelGateway(input: {
     readonly host: TrustedNodeHost;
+    readonly gatewaySessionCap: string;
 }): KernelGateway;
 /**
  * Bridge a Kernel receipt into the Host scoped event hub shape (host-context

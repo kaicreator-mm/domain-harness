@@ -116,13 +116,33 @@ export interface V8FacadeKernelOps {
     }): Promise<unknown>;
 }
 /**
+ * Validate the gateway session channel WITHOUT consuming it (#1013 R2): the
+ * Host bootstrap preflights this channel alongside every other one-shot
+ * channel before committing any installation. Internal protected.
+ */
+export declare function preflightGatewaySessionCap(): void;
+/**
+ * Install the gateway session capability for this process. Internal
+ * protected bootstrap (`bootstrapTrustedHost` only): one-shot, and the
+ * capability value must be an unguessable host-generated string so a
+ * consumer can never brute-force or guess its way past the seam.
+ */
+export declare function installGatewaySessionCap(cap: unknown): void;
+/** Diagnostics-only probe (tests/evidence); not a trust decision input. */
+export declare function isGatewaySessionCapInstalled(): boolean;
+/**
  * Retrieve the private Kernel operations of a facade produced by
  * `DomainHarness.load(package)` in THIS process (#1013, I02/I03). Returns
  * `undefined` for anything that is not such a facade. Trusted Host gateway
- * use only: the object binds H-authenticated principals to Kernel requests
- * and exposes the protected Genesis path — it is never a public surface.
+ * use only: the caller must present the EXACT gateway session capability
+ * installed by `bootstrapTrustedHost` — a process without one fails closed
+ * (`GATEWAY_SESSION_NOT_INSTALLED`) and a wrong or absent capability is
+ * refused typed (`GATEWAY_SESSION_DENIED`) before any Kernel operation,
+ * observer or address is reachable. Deep-importing this module grants no
+ * authority: the capability never exists in this module's exports, only in
+ * the trusted Host bootstrap's closure.
  */
-export declare function getFacadeKernelOps(facade: object): V8FacadeKernelOps | undefined;
+export declare function getFacadeKernelOps(facade: object, sessionCap?: unknown): V8FacadeKernelOps | undefined;
 /**
  * Public consumption brand (#994 heritage): `const facade =
  * await DomainHarness.load(package)`. The brand object is frozen and its

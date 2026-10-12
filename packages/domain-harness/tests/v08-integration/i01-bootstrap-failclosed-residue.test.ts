@@ -64,7 +64,7 @@ test('F-01: malformed ModelPort refuses with zero residue; a subsequent trusted 
 
   // The real journey still works through the trusted channels.
   handle.host.resources.provision('ledger', () => ({ reserved: true }));
-  const gateway = createKernelGateway({ host: handle.host });
+  const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
   await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
   const operatorC = mintCredential({ tenantId: 't1', appId: 'order-approval', subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
   const requesterC = mintCredential({ tenantId: 't1', appId: 'order-approval', subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
