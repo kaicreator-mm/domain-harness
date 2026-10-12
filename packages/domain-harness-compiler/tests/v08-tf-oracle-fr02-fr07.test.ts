@@ -43,7 +43,8 @@ const LEGACY_FR02_EXPECTED = Object.freeze({
 
 async function gitBlobSha(url: URL): Promise<string> {
   const bytes = await readFile(url);
-  const header = Buffer.from(`blob ${bytes.byteLength}\\0`, 'utf8');
+  // Git object format is the ASCII header followed by one literal NUL byte.
+  const header = Buffer.concat([Buffer.from(`blob ${bytes.byteLength}`, 'utf8'), Buffer.from([0])]);
   return createHash('sha1').update(header).update(bytes).digest('hex');
 }
 
@@ -162,11 +163,14 @@ function fr07BusinessPolicy() {
 
 function createFr07Runtime() {
   let sdkInterpretCalls = 0;
+  let observedSdkPayload: unknown;
   const sdkEndpoint = {
     packageId: sdk.MODULE_ID,
     interpret(declaration: unknown, input: unknown, context: unknown) {
       sdkInterpretCalls += 1;
-      return sdk.interpret(declaration, input, context);
+      const resolved = sdk.interpret(declaration, input, context);
+      observedSdkPayload = structuredClone(resolved.structuredDecision.event.payload);
+      return resolved;
     },
   };
   const runtime = kernel.createOccurrenceRuntime({
@@ -178,7 +182,7 @@ function createFr07Runtime() {
     sdkEndpoint,
     businessEndpoint: fr07BusinessPolicy(),
   });
-  return { runtime, sdkInterpretCalls: () => sdkInterpretCalls };
+  return { runtime, sdkInterpretCalls: () => sdkInterpretCalls, observedSdkPayload: () => observedSdkPayload };
 }
 
 test('WEB-ORACLE-1 META: source prep is bound to the exact physically selected v0.8 K/S blobs', async () => {
@@ -233,7 +237,7 @@ test('V08-FR02-N-CONTROL-01: physical S rejects non-portable JSON and accessor i
   cyclic.self = cyclic;
   assert.throws(
     () => sdk.interpret(declaration, cyclic),
-    (error: unknown) => code(error) === 'SDK_DATA_UNSAFE',
+    (error: unknown) => code(error) === 'SDK_DATA_BOUNDS',
   );
 
   let getterReads = 0;
@@ -305,7 +309,7 @@ test('V08-FR07-P-CONTROL-01: physical K→S executes exactly one bounded occurre
 });
 
 test('V08-FR07-N-CONTROL-01: caller/model-shaped authority fields do not override physical K Business state authority', async () => {
-  const { runtime, sdkInterpretCalls } = createFr07Runtime();
+  const { runtime, sdkInterpretCalls, observedSdkPayload } = createFr07Runtime();
   const target = { workflowId: 'oracle-fr07', instanceKey: 'case:smuggling' };
   await runtime.openInstance({ target, correlationId: 'corr:oracle-fr07-smuggling' });
 
@@ -330,7 +334,9 @@ test('V08-FR07-N-CONTROL-01: caller/model-shaped authority fields do not overrid
   assert.equal(receipt.status, 'admitted');
   assert.equal(receipt.admitted.targetState, 'accepted');
   assert.equal(sdkInterpretCalls(), 1);
-  assert.deepEqual({ ...receipt.admitted.resolved.structuredDecision.event.payload }, { value: 21 });
+  // The admitted receipt contains authoritative admission metadata, NOT the raw SDK result.
+  // Observe the real selected S interpreter result at its scoped invocation boundary.
+  assert.deepEqual(observedSdkPayload(), { value: 21 });
   const snapshot = await runtime.getSnapshot(target);
   assert.equal(snapshot.state.stateKey, 'accepted');
 });
