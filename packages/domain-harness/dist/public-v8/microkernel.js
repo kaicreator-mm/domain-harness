@@ -72,17 +72,6 @@ function assertPlainJsonIntent(intent) {
         }
     }
 }
-function requireTarget(target) {
-    const record = target;
-    if (typeof target !== 'object'
-        || target === null
-        || typeof record?.workflowId !== 'string'
-        || record.workflowId.length === 0
-        || typeof record?.instanceKey !== 'string'
-        || record.instanceKey.length === 0) {
-        throw typedError('TARGET_MALFORMED', 'target must be {workflowId, instanceKey} non-empty strings');
-    }
-}
 function requireRoleBinding(bindings, role) {
     const binding = bindings.find((candidate) => candidate.role === role);
     // Unreachable after assertQualifiedRoot (exactly-one K/S, >=1 B), but a
@@ -250,6 +239,21 @@ async function loadScopedFacade(packageRoot) {
             }))),
         });
     }
+    /**
+     * #1013 review repair (@6117218727 Candidate B): the PUBLIC facade verbs
+     * are CLOSED for authority-carrying routes. `send`, `instance` reads and
+     * receipt observation have no authentication channel at this surface —
+     * an unauthenticated in-process caller (including one holding a sealed
+     * root after a trusted Host bootstrap) must never mutate Kernel state,
+     * read instance data or observe receipts. Every such operation goes
+     * through the Host-authenticated kernel gateway seam
+     * (`getFacadeKernelOps`, trusted Host context only). The inert `build`
+     * trace stays public: it restates sealed-root metadata the caller
+     * already supplied and reads no Kernel state.
+     */
+    function refusePublicRoute(verb) {
+        return typedError('FACADE_PUBLIC_ROUTE_CLOSED', `the public facade ${verb} route is closed (#1013): mutations, instance reads and receipt observation require the Host-authenticated kernel gateway; DomainHarness.load stays the one-argument public entry`);
+    }
     async function send(intent) {
         assertOpen();
         assertPlainJsonIntent(intent);
@@ -263,14 +267,9 @@ async function loadScopedFacade(packageRoot) {
             // route that binds a caller is the Host gateway's authenticated seam.
             throw typedError('INTENT_CALLER_FORBIDDEN', 'intent.caller is caller-declared data and can never carry authority; submit through the Host-authenticated kernel gateway which binds the verified principal');
         }
-        if (!intentIndex.has(record.intentType)) {
-            throw typedError('INTENT_UNBOUND', `intent type ${record.intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
-        }
-        requireTarget(record.target);
-        if (typeof record.messageId !== 'string' || record.messageId.length === 0) {
-            throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
-        }
-        return kernelRuntime.submitOccurrence(intent);
+        // The no-caller variant would reach the Kernel as the implicit
+        // 'anonymous' caller — an unauthenticated mutation. Closed alike.
+        throw refusePublicRoute('send');
     }
     async function query(query) {
         assertOpen();
@@ -278,8 +277,8 @@ async function loadScopedFacade(packageRoot) {
         const record = query;
         switch (record.kind) {
             case 'instance':
-                requireTarget(record.target);
-                return kernelRuntime.getSnapshot(record.target);
+                // Unauthenticated instance reads are closed with the send route.
+                throw refusePublicRoute('query instance');
             case 'build':
                 return buildTrace();
             case 'journal':
@@ -298,8 +297,9 @@ async function loadScopedFacade(packageRoot) {
         if (typeof observer !== 'function') {
             throw typedError('OBSERVER_INVALID', 'subscribe requires a listener function');
         }
-        observers.add(observer);
-        return () => observers.delete(observer);
+        // Receipt observation without an authenticated principal would leak
+        // occurrence facts to any in-process holder of the facade. Closed.
+        throw refusePublicRoute('subscribe');
     }
     function stop() {
         stopped = true;
@@ -346,7 +346,7 @@ async function loadScopedFacade(packageRoot) {
     }
     function requireInstanceKey(instanceKey) {
         if (typeof instanceKey !== 'string' || instanceKey.length === 0 || instanceKey.includes(':')) {
-            throw typedError('INSTANCE_KEY_INVALID', 'instanceKey must be a non-empty string without the workflow addressing delimiter \':\'');
+            throw typedError('INSTANCE_KEY_INVALID', 'instanceKey must be a non-empty string without the addressing delimiter \':\'');
         }
         return instanceKey;
     }
@@ -356,11 +356,28 @@ async function loadScopedFacade(packageRoot) {
             || typeof principal.subject !== 'string'
             || principal.subject.length === 0
             || typeof principal.tenantId !== 'string'
+            || principal.tenantId.length === 0
+            || principal.tenantId.includes(':')
             || typeof principal.appId !== 'string'
+            || principal.appId.length === 0
+            || principal.appId.includes(':')
             || !Array.isArray(principal.roles)
             || !principal.roles.every((role) => typeof role === 'string' && role.length > 0)) {
-            throw typedError('PRINCIPAL_INVALID', 'the gateway principal must carry the H-verified subject/tenant/app and issuer-signed roles');
+            throw typedError('PRINCIPAL_INVALID', 'the gateway principal must carry the H-verified subject/tenant/app and issuer-signed roles (tenant/app without the \':\' delimiter)');
         }
+    }
+    /**
+     * The Host-derived, collision-free physical instance address: the
+     * authenticated principal's tenant/app qualify the caller-chosen key
+     * (#1013 @6117218727 Candidate A repair). All three components are
+     * ':'-free (credentials at identity shape check, registerApp at the
+     * gateway, requireInstanceKey here), so the join is unambiguous and two
+     * distinct tenants can never resolve to the same physical Kernel
+     * instance regardless of appId/instanceKey reuse. The namespace identity
+     * is derived ONLY from the VERIFIED principal — never caller-provided.
+     */
+    function qualifiedInstanceKey(principal, instanceKey) {
+        return `${principal.tenantId}:${principal.appId}:${instanceKey}`;
     }
     const gatewayOps = {
         describePolicy() {
@@ -388,24 +405,42 @@ async function loadScopedFacade(packageRoot) {
             const key = requireInstanceKey(instanceKey);
             const role = requirePrincipalRole(principal, intentType);
             // The Kernel request is CONSTRUCTED here — intent data never carries a
-            // caller; the verified principal is the only authority source.
+            // caller; the verified principal is the only authority source, and the
+            // physical instance address is the principal's tenant/app-qualified
+            // key (two tenants reusing the same appId/instanceKey are two distinct
+            // physical instances — never shared state, Journal or effects).
             const kernelRequest = {
                 intentType,
                 messageId,
                 input: request.input === undefined ? null : request.input,
-                target: { workflowId: resolveWorkflowKey(), instanceKey: key },
+                target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
                 caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
             };
             assertPlainJsonIntent(kernelRequest);
             return kernelRuntime.submitOccurrence(kernelRequest);
         },
-        async queryInstance(instanceKey) {
+        async queryInstance(principal, instanceKey) {
             assertOpen();
+            requirePrincipal(principal);
             const key = requireInstanceKey(instanceKey);
-            return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: key });
+            return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) });
         },
-        async provisionGenesis(request) {
+        workflowInstanceId(principal, instanceKey) {
+            requirePrincipal(principal);
+            const key = requireInstanceKey(instanceKey);
+            return `${resolveWorkflowKey()}:${qualifiedInstanceKey(principal, key)}`;
+        },
+        observeReceipts(observer) {
             assertOpen();
+            if (typeof observer !== 'function') {
+                throw typedError('OBSERVER_INVALID', 'a Kernel receipt observer must be a function');
+            }
+            observers.add(observer);
+            return () => observers.delete(observer);
+        },
+        async provisionGenesis(principal, request) {
+            assertOpen();
+            requirePrincipal(principal);
             const key = requireInstanceKey(request.instanceKey);
             const runtimeWithOpener = kernelRuntime;
             if (typeof runtimeWithOpener.openInstance !== 'function') {
@@ -413,9 +448,11 @@ async function loadScopedFacade(packageRoot) {
             }
             // I03: the initial state/context are the sealed Business policy's own
             // (the Kernel reads initialStateKey/initialContext from the policy) —
-            // this seam deliberately forwards NO caller-chosen initial context.
+            // this seam deliberately forwards NO caller-chosen initial context,
+            // and the instance address is the principal's tenant/app-qualified
+            // key (per-tenant Genesis by construction).
             return runtimeWithOpener.openInstance({
-                target: { workflowId: resolveWorkflowKey(), instanceKey: key },
+                target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
                 ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
             });
         },

@@ -214,8 +214,12 @@ test('I02-N: forged role, self-declared caller, cross-tenant, UNKNOWN, raw-facad
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'INTENT_UNBOUND',
   );
 
-  // 4. The public low-level facade REFUSES caller-carrying intents: the
-  //    direct route can never smuggle a self-declared role into K.
+  // 4. The public low-level facade is a CLOSED authority surface
+  //    (#1013@6117218727 Candidate B): an unprivileged in-process caller
+  //    holding the sealed root in a FULLY trusted-bootstrapped process can
+  //    neither smuggle a caller, mutate anonymously, read instance state
+  //    nor observe receipts. Every authority path is the authenticated
+  //    gateway seam.
   const root = await sealRealApp('approval');
   const facade = await DomainHarness.load(root);
   await assert.rejects(
@@ -225,6 +229,21 @@ test('I02-N: forged role, self-declared caller, cross-tenant, UNKNOWN, raw-facad
       caller: { role: 'requester' },
     }),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'INTENT_CALLER_FORBIDDEN',
+  );
+  await assert.rejects(
+    facade.send({
+      intentType: 'submitQuoteDecision', messageId: 'm-n4b', input: { amount: 30 },
+      target: { workflowId: 'order-quote', instanceKey: 'quote-n1' },
+    }),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'FACADE_PUBLIC_ROUTE_CLOSED',
+  );
+  await assert.rejects(
+    facade.query({ kind: 'instance', target: { workflowId: 'order-quote', instanceKey: 'quote-n1' } }),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'FACADE_PUBLIC_ROUTE_CLOSED',
+  );
+  assert.throws(
+    () => facade.subscribe(() => {}),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'FACADE_PUBLIC_ROUTE_CLOSED',
   );
 
   // 5. Gateway routing is app-bound: a credential whose (issuer-signed) app
@@ -239,5 +258,78 @@ test('I02-N: forged role, self-declared caller, cross-tenant, UNKNOWN, raw-facad
       input: { amount: 30 }, target: { tenantId: TENANT, appId: 'not-registered', instanceKey: 'x' },
     }) as Promise<unknown>,
     (error: unknown) => (error as { code?: string }).code === 'UX_KERNEL_APP_UNREGISTERED',
+  );
+});
+
+test('I02-N7 (@6117218727 Candidate A): two VALID tenants reusing the same appId/instanceKey are physically isolated', async () => {
+  const { handle } = host;
+  const gateway = await attachGateway(handle.host);
+
+  // Two perfectly valid, issuer-signed principals of DIFFERENT tenants for
+  // the SAME registered app — each addresses its OWN tenant-labeled target
+  // (this is the real attack shape; a forged cross-tenant TARGET is the
+  // weaker, different condition already covered above).
+  const opA = mintCredential({ tenantId: 't1', appId: 'order-approval', subject: 'op-a', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op-a' });
+  const reqA = mintCredential({ tenantId: 't1', appId: 'order-approval', subject: 'req-a', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req-a' });
+  const opB = mintCredential({ tenantId: 't2', appId: 'order-approval', subject: 'op-b', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op-b' });
+  const reqB = mintCredential({ tenantId: 't2', appId: 'order-approval', subject: 'req-b', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req-b' });
+  const SHARED_KEY = 'quote-shared';
+
+  // Tenant A: Genesis + an admitted transition (guard amount<=50 passes).
+  await gateway.activateGenesis(opA, { appId: 'order-approval', instanceKey: SHARED_KEY });
+  const aAdmitted = await gateway.send(reqA, {
+    intentType: 'submitQuoteDecisionDynamic', messageId: 'm-iso-a1',
+    input: { amount: 30, requestId: 'ISO-A1' },
+    target: { tenantId: 't1', appId: 'order-approval', instanceKey: SHARED_KEY },
+  }) as { status: string };
+  assert.equal(aAdmitted.status, 'admitted');
+
+  // Tenant B, BEFORE its own Genesis: its read of the SAME appId/instanceKey
+  // must see NOTHING of tenant A's instance (null — not A's state, effects
+  // or journal). This is the core cross-tenant readback falsifier.
+  const bBefore = await gateway.queryInstance(reqB, { tenantId: 't2', appId: 'order-approval', instanceKey: SHARED_KEY }) as unknown;
+  assert.equal(bBefore, null, "tenant B's qualified address resolves to a different physical instance — no read of tenant A state");
+
+  // Tenant A's view is intact and terminal-approved.
+  const aView = await gateway.queryInstance(reqA, { tenantId: 't1', appId: 'order-approval', instanceKey: SHARED_KEY }) as { state: { stateKey: string } };
+  assert.equal(aView.state.stateKey, 'approved');
+
+  // Tenant B: its OWN Genesis on the same key succeeds (its own namespace)
+  // and its instance evolves INDEPENDENTLY — a guard-denied submit (amount
+  // 75 > 50) leaves B's instance in 'review' while A's is 'approved'.
+  await gateway.activateGenesis(opB, { appId: 'order-approval', instanceKey: SHARED_KEY });
+  const bView = await gateway.queryInstance(reqB, { tenantId: 't2', appId: 'order-approval', instanceKey: SHARED_KEY }) as { state: { stateKey: string } };
+  assert.equal(bView.state.stateKey, 'review', 'tenant B drives its OWN physical instance (guard-denied, still in review)');
+  // Effect isolation: tenant A's admitted occurrence dispatched its ledger
+  // effect exactly once; tenant B's DENIED submit dispatched nothing.
+  const ledgerOf = (requestId: string) => host.ledgerCalls.filter((payload) => (payload as { requestId?: string }).requestId === requestId);
+  assert.equal(ledgerOf('ISO-A1').length, 1, "tenant A's effect dispatched exactly once");
+  const ledgerBeforeB = host.ledgerCalls.length;
+  const bDenied = await gateway.send(reqB, {
+    intentType: 'submitQuoteDecisionDynamic', messageId: 'm-iso-b1',
+    input: { amount: 75, requestId: 'ISO-B1' },
+    target: { tenantId: 't2', appId: 'order-approval', instanceKey: SHARED_KEY },
+  });
+  assert.equal((bDenied as { status: string }).status, 'denied');
+  assert.equal(host.ledgerCalls.length, ledgerBeforeB, "tenant B's denied submit dispatched no physical effect");
+
+  // Subscription isolation: tenant A's subscriber on the shared key never
+  // receives tenant B's occurrence receipts (the receipt filter address is
+  // the tenant/app-qualified workflowInstanceId).
+  const aReceipts: unknown[] = [];
+  await gateway.subscribe(reqA, { appId: 'order-approval', instanceKey: SHARED_KEY }, (receipt) => aReceipts.push(receipt));
+  await gateway.send(reqB, {
+    intentType: 'submitQuoteDecisionDynamic', messageId: 'm-iso-b2',
+    input: { amount: 20, requestId: 'ISO-B2' },
+    target: { tenantId: 't2', appId: 'order-approval', instanceKey: SHARED_KEY },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(aReceipts.length, 0, 'no cross-tenant receipt leakage through subscriptions');
+
+  // Duplicate-Genesis stays PER-TENANT: re-activating A's key as A refuses
+  // (its physical instance exists), while the namespaces never collided.
+  await assert.rejects(
+    gateway.activateGenesis(opA, { appId: 'order-approval', instanceKey: SHARED_KEY }) as Promise<unknown>,
+    (error: unknown) => (error as { code?: string }).code === 'HOST_KEY_EXISTS',
   );
 });

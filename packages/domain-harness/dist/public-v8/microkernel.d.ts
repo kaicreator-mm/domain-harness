@@ -59,6 +59,13 @@ export interface V8GatewayPrincipal {
  * `DomainHarness.load(package)` and binds an AUTHENTICATED principal to
  * every Kernel request. There is no raw Kernel namespace, no raw Journal
  * and no generic second Runtime on this seam.
+ *
+ * #1013 review repair (@6117218727 Candidate A): every physical Kernel
+ * instance address is QUALIFIED by the authenticated principal's
+ * tenant/app — `${tenantId}:${appId}:${instanceKey}` — so two distinct
+ * tenants addressing the same appId/instanceKey resolve to two DISTINCT
+ * physical Kernel instances (state, Journal, effects and receipts are
+ * namespace-isolated by construction, never by caller discipline).
  */
 export interface V8FacadeKernelOps {
     /** Identity of the loaded Business policy (routing/provisioning metadata). */
@@ -72,7 +79,8 @@ export interface V8FacadeKernelOps {
      * Submit one occurrence as the H-authenticated principal. The caller
      * record bound into the Kernel request is derived ONLY from the
      * issuer-signed roles ∩ the sealed Business binding roles; intent data
-     * cannot carry a caller.
+     * cannot carry a caller. The physical instance address is the
+     * tenant/app-qualified key of the authenticated principal.
      */
     submitAs(principal: V8GatewayPrincipal, request: {
         readonly intentType: string;
@@ -80,15 +88,29 @@ export interface V8FacadeKernelOps {
         readonly instanceKey: string;
         readonly input?: unknown;
     }): Promise<unknown>;
-    /** Scoped instance read for the authenticated principal's app. */
-    queryInstance(instanceKey: string): Promise<unknown>;
+    /** Scoped instance read for the authenticated principal's tenant/app. */
+    queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
+    /**
+     * The physical Kernel `workflowInstanceId` the tenant/app-qualified
+     * address resolves to (`${workflowKey}:${tenantId}:${appId}:${key}`) —
+     * the single source of the receipt-filter address shared by send,
+     * Genesis and subscriptions.
+     */
+    workflowInstanceId(principal: V8GatewayPrincipal, instanceKey: string): string;
+    /**
+     * Observe Kernel receipts for this scope (trusted gateway use; the
+     * public facade `subscribe` is closed — #1013 @6117218727 Candidate B).
+     * Returns the unsubscribe function.
+     */
+    observeReceipts(observer: (receipt: unknown) => void): () => boolean;
     /**
      * Protected Genesis activation (#1013, I03): open the FIRST instance of
-     * the loaded Business package. The initial state/context are owned by the
-     * sealed Business policy — the request cannot choose initial authority or
-     * state, and no raw `openInstance` handle escapes.
+     * the loaded Business package at the authenticated principal's
+     * tenant/app-qualified address. The initial state/context are owned by
+     * the sealed Business policy — the request cannot choose initial
+     * authority or state, and no raw `openInstance` handle escapes.
      */
-    provisionGenesis(request: {
+    provisionGenesis(principal: V8GatewayPrincipal, request: {
         readonly instanceKey: string;
         readonly correlationId?: string;
     }): Promise<unknown>;

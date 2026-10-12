@@ -28,46 +28,52 @@ function isCallable(value) {
  * Install the kernel Host ports for this process. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed, so a
  * running process can never have its Host storage swapped mid-flight).
+ *
+ * The COMPLETE bounded port set is required: `docs.get/put/list`,
+ * `sha256.digestUtf8`, `resources.call` and `clock`. A minimal
+ * `{docs:{get,put}, sha256}` tuple is refused typed BEFORE anything is
+ * installed — an incomplete production install can never exist.
  */
 export function installKernelHostPorts(ports) {
     if (kernelHost !== undefined) {
         throw new QualifiedPackageError('KERNEL_HOST_ALREADY_INSTALLED', 'kernel Host ports are already installed in this process; the protected kernel Host channel is one-shot');
     }
     if (typeof ports !== 'object' || ports === null) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'installKernelHostPorts requires a ports object {docs:{get,put}, sha256:{digestUtf8}}');
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'installKernelHostPorts requires the COMPLETE ports object {docs:{get,put,list}, sha256:{digestUtf8}, resources:{call}, clock} (#1013 I01: no partial install)');
     }
     const candidate = ports;
     const docs = candidate.docs;
     const sha256 = candidate.sha256;
+    const resources = candidate.resources;
     if (typeof docs !== 'object'
         || docs === null
         || !isCallable(docs.get)
         || !isCallable(docs.put)
+        || !isCallable(docs.list)
         || typeof sha256 !== 'object'
         || sha256 === null
         || !isCallable(sha256.digestUtf8)) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put and sha256.digestUtf8 callables');
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put, docs.list and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)');
     }
-    if (docs.list !== undefined && !isCallable(docs.list)) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port docs.list must be a callable when provided');
+    if (typeof resources !== 'object' || resources === null || !isCallable(resources.call)) {
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a resources.call callable (physical Business effect dispatch; #1013 I01 complete-set contract)');
     }
-    if (candidate.resources !== undefined && (typeof candidate.resources !== 'object' || candidate.resources === null)) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port resources must be an object when provided');
-    }
-    if (candidate.clock !== undefined && !isCallable(candidate.clock)) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port clock must be a callable when provided');
+    if (!isCallable(candidate.clock)) {
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a clock callable returning an ISO timestamp (trusted Kernel timestamps; #1013 I01 complete-set contract)');
     }
     kernelHost = Object.freeze({
         docs: Object.freeze({
             get: docs.get,
             put: docs.put,
-            ...(docs.list === undefined ? {} : { list: docs.list }),
+            list: docs.list,
         }),
         sha256: Object.freeze({
             digestUtf8: sha256.digestUtf8,
         }),
-        ...(candidate.resources === undefined ? {} : { resources: candidate.resources }),
-        ...(candidate.clock === undefined ? {} : { clock: candidate.clock }),
+        resources: Object.freeze({
+            call: resources.call,
+        }),
+        clock: candidate.clock,
     });
 }
 /** Diagnostics-only probe (tests/evidence); not a trust decision input. */

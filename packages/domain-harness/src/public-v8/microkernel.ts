@@ -68,6 +68,13 @@ export interface V8GatewayPrincipal {
  * `DomainHarness.load(package)` and binds an AUTHENTICATED principal to
  * every Kernel request. There is no raw Kernel namespace, no raw Journal
  * and no generic second Runtime on this seam.
+ *
+ * #1013 review repair (@6117218727 Candidate A): every physical Kernel
+ * instance address is QUALIFIED by the authenticated principal's
+ * tenant/app — `${tenantId}:${appId}:${instanceKey}` — so two distinct
+ * tenants addressing the same appId/instanceKey resolve to two DISTINCT
+ * physical Kernel instances (state, Journal, effects and receipts are
+ * namespace-isolated by construction, never by caller discipline).
  */
 export interface V8FacadeKernelOps {
   /** Identity of the loaded Business policy (routing/provisioning metadata). */
@@ -81,7 +88,8 @@ export interface V8FacadeKernelOps {
    * Submit one occurrence as the H-authenticated principal. The caller
    * record bound into the Kernel request is derived ONLY from the
    * issuer-signed roles ∩ the sealed Business binding roles; intent data
-   * cannot carry a caller.
+   * cannot carry a caller. The physical instance address is the
+   * tenant/app-qualified key of the authenticated principal.
    */
   submitAs(principal: V8GatewayPrincipal, request: {
     readonly intentType: string;
@@ -89,15 +97,29 @@ export interface V8FacadeKernelOps {
     readonly instanceKey: string;
     readonly input?: unknown;
   }): Promise<unknown>;
-  /** Scoped instance read for the authenticated principal's app. */
-  queryInstance(instanceKey: string): Promise<unknown>;
+  /** Scoped instance read for the authenticated principal's tenant/app. */
+  queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
+  /**
+   * The physical Kernel `workflowInstanceId` the tenant/app-qualified
+   * address resolves to (`${workflowKey}:${tenantId}:${appId}:${key}`) —
+   * the single source of the receipt-filter address shared by send,
+   * Genesis and subscriptions.
+   */
+  workflowInstanceId(principal: V8GatewayPrincipal, instanceKey: string): string;
+  /**
+   * Observe Kernel receipts for this scope (trusted gateway use; the
+   * public facade `subscribe` is closed — #1013 @6117218727 Candidate B).
+   * Returns the unsubscribe function.
+   */
+  observeReceipts(observer: (receipt: unknown) => void): () => boolean;
   /**
    * Protected Genesis activation (#1013, I03): open the FIRST instance of
-   * the loaded Business package. The initial state/context are owned by the
-   * sealed Business policy — the request cannot choose initial authority or
-   * state, and no raw `openInstance` handle escapes.
+   * the loaded Business package at the authenticated principal's
+   * tenant/app-qualified address. The initial state/context are owned by
+   * the sealed Business policy — the request cannot choose initial
+   * authority or state, and no raw `openInstance` handle escapes.
    */
-  provisionGenesis(request: {
+  provisionGenesis(principal: V8GatewayPrincipal, request: {
     readonly instanceKey: string;
     readonly correlationId?: string;
   }): Promise<unknown>;
@@ -163,20 +185,6 @@ function assertPlainJsonIntent(intent: unknown): void {
     for (const key of Object.keys(record)) {
       stack.push([`${path}.${key}`, record[key]]);
     }
-  }
-}
-
-function requireTarget(target: unknown): void {
-  const record = target as { workflowId?: unknown; instanceKey?: unknown } | null;
-  if (
-    typeof target !== 'object'
-    || target === null
-    || typeof record?.workflowId !== 'string'
-    || record.workflowId.length === 0
-    || typeof record?.instanceKey !== 'string'
-    || record.instanceKey.length === 0
-  ) {
-    throw typedError('TARGET_MALFORMED', 'target must be {workflowId, instanceKey} non-empty strings');
   }
 }
 
@@ -371,6 +379,25 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     });
   }
 
+  /**
+   * #1013 review repair (@6117218727 Candidate B): the PUBLIC facade verbs
+   * are CLOSED for authority-carrying routes. `send`, `instance` reads and
+   * receipt observation have no authentication channel at this surface —
+   * an unauthenticated in-process caller (including one holding a sealed
+   * root after a trusted Host bootstrap) must never mutate Kernel state,
+   * read instance data or observe receipts. Every such operation goes
+   * through the Host-authenticated kernel gateway seam
+   * (`getFacadeKernelOps`, trusted Host context only). The inert `build`
+   * trace stays public: it restates sealed-root metadata the caller
+   * already supplied and reads no Kernel state.
+   */
+  function refusePublicRoute(verb: string): QualifiedPackageError {
+    return typedError(
+      'FACADE_PUBLIC_ROUTE_CLOSED',
+      `the public facade ${verb} route is closed (#1013): mutations, instance reads and receipt observation require the Host-authenticated kernel gateway; DomainHarness.load stays the one-argument public entry`,
+    );
+  }
+
   async function send(intent: unknown): Promise<unknown> {
     assertOpen();
     assertPlainJsonIntent(intent);
@@ -387,17 +414,9 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
         'intent.caller is caller-declared data and can never carry authority; submit through the Host-authenticated kernel gateway which binds the verified principal',
       );
     }
-    if (!intentIndex.has(record.intentType)) {
-      throw typedError(
-        'INTENT_UNBOUND',
-        `intent type ${record.intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`,
-      );
-    }
-    requireTarget(record.target);
-    if (typeof record.messageId !== 'string' || record.messageId.length === 0) {
-      throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
-    }
-    return kernelRuntime.submitOccurrence(intent);
+    // The no-caller variant would reach the Kernel as the implicit
+    // 'anonymous' caller — an unauthenticated mutation. Closed alike.
+    throw refusePublicRoute('send');
   }
 
   async function query(query: unknown): Promise<unknown> {
@@ -406,8 +425,8 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     const record = query as { kind?: unknown; target?: unknown };
     switch (record.kind) {
       case 'instance':
-        requireTarget(record.target);
-        return kernelRuntime.getSnapshot(record.target);
+        // Unauthenticated instance reads are closed with the send route.
+        throw refusePublicRoute('query instance');
       case 'build':
         return buildTrace();
       case 'journal':
@@ -427,8 +446,9 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     if (typeof observer !== 'function') {
       throw typedError('OBSERVER_INVALID', 'subscribe requires a listener function');
     }
-    observers.add(observer);
-    return () => observers.delete(observer);
+    // Receipt observation without an authenticated principal would leak
+    // occurrence facts to any in-process holder of the facade. Closed.
+    throw refusePublicRoute('subscribe');
   }
 
   function stop(): void {
@@ -484,7 +504,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
 
   function requireInstanceKey(instanceKey: unknown): string {
     if (typeof instanceKey !== 'string' || instanceKey.length === 0 || instanceKey.includes(':')) {
-      throw typedError('INSTANCE_KEY_INVALID', 'instanceKey must be a non-empty string without the workflow addressing delimiter \':\'');
+      throw typedError('INSTANCE_KEY_INVALID', 'instanceKey must be a non-empty string without the addressing delimiter \':\'');
     }
     return instanceKey;
   }
@@ -496,12 +516,30 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       || typeof principal.subject !== 'string'
       || principal.subject.length === 0
       || typeof principal.tenantId !== 'string'
+      || principal.tenantId.length === 0
+      || principal.tenantId.includes(':')
       || typeof principal.appId !== 'string'
+      || principal.appId.length === 0
+      || principal.appId.includes(':')
       || !Array.isArray(principal.roles)
       || !principal.roles.every((role) => typeof role === 'string' && role.length > 0)
     ) {
-      throw typedError('PRINCIPAL_INVALID', 'the gateway principal must carry the H-verified subject/tenant/app and issuer-signed roles');
+      throw typedError('PRINCIPAL_INVALID', 'the gateway principal must carry the H-verified subject/tenant/app and issuer-signed roles (tenant/app without the \':\' delimiter)');
     }
+  }
+
+  /**
+   * The Host-derived, collision-free physical instance address: the
+   * authenticated principal's tenant/app qualify the caller-chosen key
+   * (#1013 @6117218727 Candidate A repair). All three components are
+   * ':'-free (credentials at identity shape check, registerApp at the
+   * gateway, requireInstanceKey here), so the join is unambiguous and two
+   * distinct tenants can never resolve to the same physical Kernel
+   * instance regardless of appId/instanceKey reuse. The namespace identity
+   * is derived ONLY from the VERIFIED principal — never caller-provided.
+   */
+  function qualifiedInstanceKey(principal: V8GatewayPrincipal, instanceKey: string): string {
+    return `${principal.tenantId}:${principal.appId}:${instanceKey}`;
   }
 
   const gatewayOps: V8FacadeKernelOps = {
@@ -535,24 +573,42 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       const key = requireInstanceKey(instanceKey);
       const role = requirePrincipalRole(principal, intentType);
       // The Kernel request is CONSTRUCTED here — intent data never carries a
-      // caller; the verified principal is the only authority source.
+      // caller; the verified principal is the only authority source, and the
+      // physical instance address is the principal's tenant/app-qualified
+      // key (two tenants reusing the same appId/instanceKey are two distinct
+      // physical instances — never shared state, Journal or effects).
       const kernelRequest = {
         intentType,
         messageId,
         input: request.input === undefined ? null : request.input,
-        target: { workflowId: resolveWorkflowKey(), instanceKey: key },
+        target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
         caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
       };
       assertPlainJsonIntent(kernelRequest);
       return kernelRuntime.submitOccurrence(kernelRequest);
     },
-    async queryInstance(instanceKey: string): Promise<unknown> {
+    async queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown> {
       assertOpen();
+      requirePrincipal(principal);
       const key = requireInstanceKey(instanceKey);
-      return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: key });
+      return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) });
     },
-    async provisionGenesis(request: { readonly instanceKey: string; readonly correlationId?: string }): Promise<unknown> {
+    workflowInstanceId(principal: V8GatewayPrincipal, instanceKey: string): string {
+      requirePrincipal(principal);
+      const key = requireInstanceKey(instanceKey);
+      return `${resolveWorkflowKey()}:${qualifiedInstanceKey(principal, key)}`;
+    },
+    observeReceipts(observer: (receipt: unknown) => void): () => boolean {
       assertOpen();
+      if (typeof observer !== 'function') {
+        throw typedError('OBSERVER_INVALID', 'a Kernel receipt observer must be a function');
+      }
+      observers.add(observer);
+      return () => observers.delete(observer);
+    },
+    async provisionGenesis(principal: V8GatewayPrincipal, request: { readonly instanceKey: string; readonly correlationId?: string }): Promise<unknown> {
+      assertOpen();
+      requirePrincipal(principal);
       const key = requireInstanceKey(request.instanceKey);
       const runtimeWithOpener = kernelRuntime as WiredKernelRuntime & { openInstance: (request: unknown) => unknown };
       if (typeof runtimeWithOpener.openInstance !== 'function') {
@@ -560,9 +616,11 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       }
       // I03: the initial state/context are the sealed Business policy's own
       // (the Kernel reads initialStateKey/initialContext from the policy) —
-      // this seam deliberately forwards NO caller-chosen initial context.
+      // this seam deliberately forwards NO caller-chosen initial context,
+      // and the instance address is the principal's tenant/app-qualified
+      // key (per-tenant Genesis by construction).
       return runtimeWithOpener.openInstance({
-        target: { workflowId: resolveWorkflowKey(), instanceKey: key },
+        target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
         ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
       });
     },

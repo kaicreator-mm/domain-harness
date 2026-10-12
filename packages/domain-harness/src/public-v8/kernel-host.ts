@@ -35,30 +35,33 @@ export interface V8KernelDocsPutConditions {
 }
 
 /**
- * The generic Host ports the wired Kernel mechanism may consume. Ports are
+ * The generic Host ports the wired Kernel mechanism consumes. Ports are
  * caller-shape-agnostic at the mechanism boundary; this channel only
  * verifies that every required member is a callable.
  *
- * #1013 (I01): the selected Kernel mechanism (`kernel-mechanism-v1.mjs`)
- * additionally consumes journal `docs.list`, `hostPorts.resources` (real
- * effect dispatch) and an optional trusted `clock`. These are OPTIONAL at
- * this channel so pre-existing minimal memory fixtures stay valid installs;
- * the trusted Host bootstrap installs the COMPLETE set.
+ * #1013 (I01, review repair @6117202798): the selected Kernel mechanism
+ * (`kernel-mechanism-v1.mjs`) consumes journal `docs.list`, physical
+ * `resources.call` for real Business effect dispatch and the trusted
+ * `clock`. The COMPLETE set is REQUIRED at installation — a partial tuple
+ * fails typed with KERNEL_HOST_INVALID and installs NOTHING, so a process
+ * can never carry a seemingly-installed production Kernel that would
+ * silently lack Journal/resource/clock capabilities (#1015 fail-closed
+ * contract; no test-only minimal installer exists).
  */
 export interface V8KernelHostPorts {
   readonly docs: {
     readonly get: (key: string) => unknown;
     readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
-    /** Journal read-back (`list(prefix)`); optional for minimal fixtures. */
-    readonly list?: (prefix: string) => unknown;
+    /** Journal read-back (`list(prefix)`). */
+    readonly list: (prefix: string) => unknown;
   };
   readonly sha256: {
     readonly digestUtf8: (value: string) => string;
   };
   /** Physical resource dispatch port handed to Business effect handlers. */
-  readonly resources?: object;
-  /** Trusted clock (ISO string); the mechanism defaults to wall clock when absent. */
-  readonly clock?: () => string;
+  readonly resources: { readonly call: (resourceKey: string, operation: string, payload: unknown) => unknown };
+  /** Trusted clock (ISO string) used for Kernel instance/journal timestamps. */
+  readonly clock: () => string;
 }
 
 let kernelHost: V8KernelHostPorts | undefined;
@@ -71,6 +74,11 @@ function isCallable(value: unknown): value is (...args: never[]) => unknown {
  * Install the kernel Host ports for this process. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed, so a
  * running process can never have its Host storage swapped mid-flight).
+ *
+ * The COMPLETE bounded port set is required: `docs.get/put/list`,
+ * `sha256.digestUtf8`, `resources.call` and `clock`. A minimal
+ * `{docs:{get,put}, sha256}` tuple is refused typed BEFORE anything is
+ * installed — an incomplete production install can never exist.
  */
 export function installKernelHostPorts(ports: unknown): void {
   if (kernelHost !== undefined) {
@@ -80,42 +88,49 @@ export function installKernelHostPorts(ports: unknown): void {
     );
   }
   if (typeof ports !== 'object' || ports === null) {
-    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'installKernelHostPorts requires a ports object {docs:{get,put}, sha256:{digestUtf8}}');
+    throw new QualifiedPackageError(
+      'KERNEL_HOST_INVALID',
+      'installKernelHostPorts requires the COMPLETE ports object {docs:{get,put,list}, sha256:{digestUtf8}, resources:{call}, clock} (#1013 I01: no partial install)',
+    );
   }
   const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
   const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown } | undefined;
   const sha256 = candidate.sha256 as { digestUtf8?: unknown } | undefined;
+  const resources = candidate.resources as { call?: unknown } | undefined;
   if (
     typeof docs !== 'object'
     || docs === null
     || !isCallable(docs.get)
     || !isCallable(docs.put)
+    || !isCallable(docs.list)
     || typeof sha256 !== 'object'
     || sha256 === null
     || !isCallable(sha256.digestUtf8)
   ) {
-    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put and sha256.digestUtf8 callables');
+    throw new QualifiedPackageError(
+      'KERNEL_HOST_INVALID',
+      'kernel Host ports must provide docs.get, docs.put, docs.list and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)',
+    );
   }
-  if (docs.list !== undefined && !isCallable(docs.list)) {
-    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port docs.list must be a callable when provided');
+  if (typeof resources !== 'object' || resources === null || !isCallable(resources.call)) {
+    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a resources.call callable (physical Business effect dispatch; #1013 I01 complete-set contract)');
   }
-  if (candidate.resources !== undefined && (typeof candidate.resources !== 'object' || candidate.resources === null)) {
-    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port resources must be an object when provided');
-  }
-  if (candidate.clock !== undefined && !isCallable(candidate.clock)) {
-    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host port clock must be a callable when provided');
+  if (!isCallable(candidate.clock)) {
+    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a clock callable returning an ISO timestamp (trusted Kernel timestamps; #1013 I01 complete-set contract)');
   }
   kernelHost = Object.freeze({
     docs: Object.freeze({
       get: docs.get as (key: string) => unknown,
       put: docs.put as (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown,
-      ...(docs.list === undefined ? {} : { list: docs.list as (prefix: string) => unknown }),
+      list: docs.list as (prefix: string) => unknown,
     }),
     sha256: Object.freeze({
       digestUtf8: sha256.digestUtf8 as (value: string) => string,
     }),
-    ...(candidate.resources === undefined ? {} : { resources: candidate.resources }),
-    ...(candidate.clock === undefined ? {} : { clock: candidate.clock as () => string }),
+    resources: Object.freeze({
+      call: resources.call as (resourceKey: string, operation: string, payload: unknown) => unknown,
+    }),
+    clock: candidate.clock as () => string,
   });
 }
 

@@ -31,35 +31,45 @@ export interface V8KernelDocsPutConditions {
     readonly mustMatchRevision?: number;
 }
 /**
- * The generic Host ports the wired Kernel mechanism may consume. Ports are
+ * The generic Host ports the wired Kernel mechanism consumes. Ports are
  * caller-shape-agnostic at the mechanism boundary; this channel only
  * verifies that every required member is a callable.
  *
- * #1013 (I01): the selected Kernel mechanism (`kernel-mechanism-v1.mjs`)
- * additionally consumes journal `docs.list`, `hostPorts.resources` (real
- * effect dispatch) and an optional trusted `clock`. These are OPTIONAL at
- * this channel so pre-existing minimal memory fixtures stay valid installs;
- * the trusted Host bootstrap installs the COMPLETE set.
+ * #1013 (I01, review repair @6117202798): the selected Kernel mechanism
+ * (`kernel-mechanism-v1.mjs`) consumes journal `docs.list`, physical
+ * `resources.call` for real Business effect dispatch and the trusted
+ * `clock`. The COMPLETE set is REQUIRED at installation — a partial tuple
+ * fails typed with KERNEL_HOST_INVALID and installs NOTHING, so a process
+ * can never carry a seemingly-installed production Kernel that would
+ * silently lack Journal/resource/clock capabilities (#1015 fail-closed
+ * contract; no test-only minimal installer exists).
  */
 export interface V8KernelHostPorts {
     readonly docs: {
         readonly get: (key: string) => unknown;
         readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
-        /** Journal read-back (`list(prefix)`); optional for minimal fixtures. */
-        readonly list?: (prefix: string) => unknown;
+        /** Journal read-back (`list(prefix)`). */
+        readonly list: (prefix: string) => unknown;
     };
     readonly sha256: {
         readonly digestUtf8: (value: string) => string;
     };
     /** Physical resource dispatch port handed to Business effect handlers. */
-    readonly resources?: object;
-    /** Trusted clock (ISO string); the mechanism defaults to wall clock when absent. */
-    readonly clock?: () => string;
+    readonly resources: {
+        readonly call: (resourceKey: string, operation: string, payload: unknown) => unknown;
+    };
+    /** Trusted clock (ISO string) used for Kernel instance/journal timestamps. */
+    readonly clock: () => string;
 }
 /**
  * Install the kernel Host ports for this process. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed, so a
  * running process can never have its Host storage swapped mid-flight).
+ *
+ * The COMPLETE bounded port set is required: `docs.get/put/list`,
+ * `sha256.digestUtf8`, `resources.call` and `clock`. A minimal
+ * `{docs:{get,put}, sha256}` tuple is refused typed BEFORE anything is
+ * installed — an incomplete production install can never exist.
  */
 export declare function installKernelHostPorts(ports: unknown): void;
 /** Diagnostics-only probe (tests/evidence); not a trust decision input. */

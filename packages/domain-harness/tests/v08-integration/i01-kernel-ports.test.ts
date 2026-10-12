@@ -24,23 +24,56 @@ import { bootstrapTrustedHost } from '../../src/host-v8/index.js';
 import { getFacadeKernelOps } from '../../src/public-v8/microkernel.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, sealRealApp, sqliteTempPath } from './helpers.js';
 
-test('I01-N: malformed port members are refused typed before bootstrap consumes the channel', () => {
-  const good = {
-    docs: { get: (key: string) => key, put: (_key: string, value: unknown) => value },
+test('I01-N: the COMPLETE port set is required — a partial tuple installs NOTHING', () => {
+  // The complete bounded set a trusted bootstrap installs.
+  const full = {
+    docs: { get: (key: string) => key, put: (_key: string, value: unknown) => value, list: (prefix: string) => [prefix] },
     sha256: { digestUtf8: (value: string) => value },
+    resources: { call: (_key: string, _op: string, payload: unknown) => payload },
+    clock: () => '2026-10-12T00:00:00.000Z',
   };
+  // Malformed members of an otherwise-complete tuple refuse typed.
   assert.throws(
-    () => installKernelHostPorts({ ...good, resources: 42 }),
+    () => installKernelHostPorts({ ...full, resources: 42 }),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
   );
   assert.throws(
-    () => installKernelHostPorts({ ...good, docs: { ...good.docs, list: 'not-a-function' } }),
+    () => installKernelHostPorts({ ...full, docs: { ...full.docs, list: 'not-a-function' } }),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
   );
   assert.throws(
-    () => installKernelHostPorts({ ...good, clock: 'not-a-function' }),
+    () => installKernelHostPorts({ ...full, clock: 'not-a-function' }),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
   );
+  // Members MISSING entirely (resources without a call, docs without list,
+  // tuple without clock) refuse typed — completeness is structural.
+  assert.throws(
+    () => installKernelHostPorts({ ...full, resources: {} }),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
+  );
+  assert.throws(
+    () => installKernelHostPorts({ ...full, docs: { get: full.docs.get, put: full.docs.put } }),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
+  );
+  const { clock: _omittedClock, ...withoutClock } = full;
+  assert.throws(
+    () => installKernelHostPorts(withoutClock),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
+  );
+
+  // THE #1013@6117202798 regression: the minimal legacy tuple
+  // {docs:{get,put}, sha256} — which the OPTIONAL-members channel formerly
+  // accepted — is refused typed, and the refusal leaves the one-shot
+  // channel UNCONSUMED: no seemingly-installed production Kernel can exist
+  // without the Journal/resource/clock capabilities the selected K consumes.
+  assert.throws(
+    () => installKernelHostPorts({
+      docs: { get: (key: string) => key, put: (_key: string, value: unknown) => value },
+      sha256: { digestUtf8: (value: string) => value },
+    }),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
+  );
+  assert.equal(isKernelHostInstalled(), false, 'a refused partial install consumes nothing — the process stays un-bootstrapped and fail-closed');
 });
 
 test('I01-P: bootstrapTrustedHost installs the COMPLETE protected port set over real SQLite and the one-arg load works', async () => {

@@ -164,6 +164,64 @@ try {
   } catch (error) {
     negatives.revokedCredential = error.code ?? error.message;
   }
+  // #1013@6117218727 Candidate A — two VALID tenants, SAME appId/instanceKey:
+  // physically isolated instances, effects and receipts over the REAL
+  // SQLite store in THIS clean process.
+  const iso = {};
+  const isoOpA = credential('order-approval', 'iso-op-a', ['platform-operator'], 'g-iso-op-a');
+  const isoReqA = credential('order-approval', 'iso-req-a', ['requester'], 'g-iso-req-a');
+  const isoOpB = mintPrincipalCredential({
+    issuerId, grantId: 'g-iso-op-b', tenantId: 't2', appId: 'order-approval', subject: 'iso-op-b', audience: AUDIENCE,
+    roles: ['platform-operator'], issuedAt: '2026-10-12T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+  }, issuerSecret);
+  const isoReqB = mintPrincipalCredential({
+    issuerId, grantId: 'g-iso-req-b', tenantId: 't2', appId: 'order-approval', subject: 'iso-req-b', audience: AUDIENCE,
+    roles: ['requester'], issuedAt: '2026-10-12T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+  }, issuerSecret);
+  const ISO_KEY = 'quote-iso';
+  await gateway.activateGenesis(isoOpA, { appId: 'order-approval', instanceKey: ISO_KEY });
+  const isoAdmitted = await gateway.send(isoReqA, {
+    intentType: 'submitQuoteDecisionDynamic', messageId: 'm-iso-a', input: { amount: 30, requestId: 'ISO-A1' },
+    target: { tenantId: 't1', appId: 'order-approval', instanceKey: ISO_KEY },
+  });
+  iso.aAdmitted = isoAdmitted.status === 'admitted';
+  iso.bReadsNothing = (await gateway.queryInstance(isoReqB, { tenantId: 't2', appId: 'order-approval', instanceKey: ISO_KEY })) === null;
+  await gateway.activateGenesis(isoOpB, { appId: 'order-approval', instanceKey: ISO_KEY });
+  const isoDenied = await gateway.send(isoReqB, {
+    intentType: 'submitQuoteDecisionDynamic', messageId: 'm-iso-b1', input: { amount: 75, requestId: 'ISO-B1' },
+    target: { tenantId: 't2', appId: 'order-approval', instanceKey: ISO_KEY },
+  });
+  iso.bOwnState = (await gateway.queryInstance(isoReqB, { tenantId: 't2', appId: 'order-approval', instanceKey: ISO_KEY })).state.stateKey;
+  iso.aStateIntact = (await gateway.queryInstance(isoReqA, { tenantId: 't1', appId: 'order-approval', instanceKey: ISO_KEY })).state.stateKey;
+  iso.bDenied = isoDenied.status === 'denied';
+  const isoReceipts = [];
+  await gateway.subscribe(isoReqA, { appId: 'order-approval', instanceKey: ISO_KEY }, (receipt) => isoReceipts.push(receipt));
+  await gateway.send(isoReqB, {
+    intentType: 'submitQuoteDecisionDynamic', messageId: 'm-iso-b2', input: { amount: 20, requestId: 'ISO-B2' },
+    target: { tenantId: 't2', appId: 'order-approval', instanceKey: ISO_KEY },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  iso.noCrossTenantReceipts = isoReceipts.length === 0;
+  iso.effectsIsolated = ledgerCalls.every((payload) => payload.requestId !== 'ISO-B1') && ledgerCalls.some((payload) => payload.requestId === 'ISO-A1');
+  outcome.tenantIsolation = iso;
+
+  // #1013@6117218727 Candidate B — the public facade authority routes are
+  // CLOSED in this fully-bootstrapped clean process.
+  const pub = {};
+  try {
+    await facade.send({ intentType: 'submitQuoteDecision', messageId: 'm-pub-1', input: { amount: 30 }, target: { workflowId: 'order-quote', instanceKey: 'quote-c1' } });
+    pub.anonymousSend = 'NOT_REFUSED';
+  } catch (error) { pub.anonymousSend = error.code ?? error.message; }
+  try {
+    await facade.query({ kind: 'instance', target: { workflowId: 'order-quote', instanceKey: 'quote-c1' } });
+    pub.instanceQuery = 'NOT_REFUSED';
+  } catch (error) { pub.instanceQuery = error.code ?? error.message; }
+  try {
+    facade.subscribe(() => {});
+    pub.subscribe = 'NOT_REFUSED';
+  } catch (error) { pub.subscribe = error.code ?? error.message; }
+  outcome.publicFacadeClosed = pub;
+
   outcome.negatives = negatives;
 
   await handle.host.close();

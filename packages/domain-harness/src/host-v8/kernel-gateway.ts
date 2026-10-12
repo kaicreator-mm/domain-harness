@@ -172,7 +172,11 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost }): 
       const principal = await authenticate(credential);
       assertIntentScope(target, principal);
       const app = requireApp(target.appId, principal);
-      return app.ops.queryInstance(target.instanceKey);
+      // The read resolves the tenant/app-qualified instance address of the
+      // AUTHENTICATED principal (#1013 @6117218727 Candidate A): a second
+      // tenant reusing the same appId/instanceKey reads only its own
+      // physical instance — never the first tenant's state.
+      return app.ops.queryInstance(principal, target.instanceKey);
     },
 
     async subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription> {
@@ -185,9 +189,14 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost }): 
         throw new HostBoundaryError('HOST_SCOPE_DENIED', `subscription scope app ${scope.appId} does not match the authenticated principal app ${principal.appId}`);
       }
       const app = requireApp(scope.appId, principal);
-      const workflowInstanceId = `${app.ops.describePolicy().workflowKey}:${scope.instanceKey}`;
+      // The receipt filter address is the SINGLE ops-derived qualified
+      // workflowInstanceId (workflowKey:tenant:app:instanceKey) — the same
+      // address Genesis/send/query resolve to, so a subscription can never
+      // observe another tenant's occurrences even when both tenants reuse
+      // the same appId/instanceKey.
+      const workflowInstanceId = app.ops.workflowInstanceId(principal, scope.instanceKey);
       let active = true;
-      const unsubscribeFacade = app.facade.subscribe((receipt: unknown) => {
+      const unsubscribeFacade = app.ops.observeReceipts((receipt: unknown) => {
         if (!active) return;
         const occurrence = (receipt as { occurrence?: { workflowInstanceId?: unknown } } | null)?.occurrence;
         if (occurrence?.workflowInstanceId !== workflowInstanceId) return;
@@ -229,7 +238,12 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost }): 
           `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the host-configured genesis roles [${app.genesisRoles.join(', ')}] for app ${app.appId}`,
         );
       }
-      return app.ops.provisionGenesis({
+      // Genesis opens the instance at the authenticated principal's
+      // tenant/app-qualified address: each tenant provisions (and later
+      // submits to) its OWN physical instance — duplicate/conflicting
+      // Genesis stays per-tenant, and no tenant can pre-empt another's
+      // namespace by choosing the same instanceKey.
+      return app.ops.provisionGenesis(principal, {
         instanceKey: request.instanceKey,
         ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
       });

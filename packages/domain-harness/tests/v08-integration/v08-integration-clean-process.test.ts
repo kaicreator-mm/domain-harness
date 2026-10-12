@@ -33,6 +33,8 @@ interface ChildVerdict {
   d3FinalState?: string;
   d3EvidenceCount?: number;
   negatives?: Record<string, string>;
+  tenantIsolation?: Record<string, unknown>;
+  publicFacadeClosed?: Record<string, string>;
 }
 
 function runChild(script: string, args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
@@ -79,6 +81,17 @@ test('I01–I04 clean-process journey: two REAL apps on one REAL SQLite Host', a
     assert.equal(verdict.negatives?.crossTenant, 'HOST_SCOPE_DENIED');
     assert.equal(verdict.negatives?.unknownIntent, 'INTENT_UNBOUND');
     assert.equal(verdict.negatives?.revokedCredential, 'HOST_CREDENTIAL_REVOKED');
+    // @6117218727 Candidate A/B verdicts (real SQLite clean process).
+    assert.equal(verdict.tenantIsolation?.aAdmitted, true);
+    assert.equal(verdict.tenantIsolation?.bReadsNothing, true, 'tenant B never read tenant A instance state');
+    assert.equal(verdict.tenantIsolation?.bDenied, true);
+    assert.equal(verdict.tenantIsolation?.bOwnState, 'review');
+    assert.equal(verdict.tenantIsolation?.aStateIntact, 'approved');
+    assert.equal(verdict.tenantIsolation?.noCrossTenantReceipts, true);
+    assert.equal(verdict.tenantIsolation?.effectsIsolated, true);
+    assert.equal(verdict.publicFacadeClosed?.anonymousSend, 'FACADE_PUBLIC_ROUTE_CLOSED');
+    assert.equal(verdict.publicFacadeClosed?.instanceQuery, 'FACADE_PUBLIC_ROUTE_CLOSED');
+    assert.equal(verdict.publicFacadeClosed?.subscribe, 'FACADE_PUBLIC_ROUTE_CLOSED');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
