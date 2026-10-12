@@ -40,6 +40,46 @@ export interface V8DomainFacade {
     stop(): void;
 }
 /**
+ * The H-authenticated caller record the selected Kernel receives on the
+ * authenticated UX route (I02, #1013). Every field is derived from the
+ * issuer-signed, per-operation-revalidated Host principal; a business
+ * payload can never contribute to it. The Kernel's business-owned role
+ * gate reads `role` — the only authority this record carries is the
+ * issuer-attested one.
+ */
+export interface KernelPrincipalCaller {
+    readonly kind: 'v08-host-principal/1';
+    readonly issuerId: string;
+    readonly grantId: string;
+    readonly subject: string;
+    readonly tenantId: string;
+    readonly appId: string;
+    readonly role: string;
+}
+/**
+ * The protected per-scope Kernel handle the authenticated Host UX transport
+ * consumes (I02, #1013). Deep-import only — deliberately NOT re-exported
+ * from the public `/v8` surface. It carries exactly the three verbs the UX
+ * route needs (submit / scoped instance read / receipt observation): no
+ * `openInstance` (protected Genesis, I03), no Journal, no mechanism
+ * counters, no Host ports.
+ */
+export interface V8KernelPrincipalChannel {
+    /** Submit one occurrence whose caller is the H-authenticated principal. */
+    submitAsPrincipal(intent: unknown, caller: KernelPrincipalCaller): Promise<unknown>;
+    /** Scoped instance read through the wired Kernel snapshot endpoint. */
+    snapshotForPrincipal(target: unknown): Promise<unknown>;
+    /** Observe Kernel receipts; returns the unsubscribe function. */
+    observeReceipts(observer: (receipt: unknown) => void): () => boolean;
+}
+/**
+ * Protected accessor (I02, #1013): the kernel principal channel of ONE
+ * loaded facade scope. Host-context composition seam for the authenticated
+ * UX transport — a foreign object, or a scope that never went through
+ * `DomainHarness.load`, fails typed.
+ */
+export declare function kernelPrincipalChannel(facade: unknown): V8KernelPrincipalChannel;
+/**
  * Public consumption brand (#994 heritage): `const facade =
  * await DomainHarness.load(package)`. The brand object is frozen and its
  * loader is the strictly one-argument scoped-facade loader above — the
