@@ -188,6 +188,19 @@ Required validation tuples, when applicable:
 
 One tuple PASS never implies another tuple PASS. Cross-build is not real platform execution unless the frozen project contract explicitly says otherwise.
 
+### Local gate discipline (Windows worktrees, v0.8-cycle operational facts)
+
+Empirically expensive lessons from the #1013/#1016 repair cycle; mechanical, project-specific:
+
+- **Package gate tail is `tsc -p tsconfig.test.json --noEmit`**: the `@kaicreator/domain-harness` test script runs `node --test` AND a final tsc. A green test run is NOT the package gate; local verification must include the tsc step (CI pipelines 1129/1130 failed exactly here with exit 2 while all 2998 tests passed).
+- **Registry-dependent packed-consumer journeys carry the N18 probe guard** (17 files as of #1016: core ×12 incl. `root-portability`/`application-manifest`/`composition-intake`/`control`/`dac-bridge`/`dac-refs`/`external-authority`/`observation`/`public-v7` ×3/`runtime-binding`, compiler ×3 `e8a`/`e8b`/`public-consumer`, node ×2 `t016`/`N18`): probe once (15 s, honors `NPM_REGISTRY`), skip as `NOT_RUN(NETWORK)` on egress-less hosts. Never remove a guard to "make it run" — an unguarded install hangs to the CI step timeout (killed pipelines 1129–1131). To execute them locally, set `NPM_REGISTRY=https://registry.npmmirror.com npm_config_registry=https://registry.npmmirror.com` (this build host has no npmjs egress; the mirror is reachable).
+- **better-sqlite3 is ABI-specific (not N-API-universal)**: ABI 127 = Node 22, 137 = Node 24. In pnpm-laid worktrees the binary lives at `node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build/Release/better_sqlite3.node`; a root-level `npm rebuild` follows the symlink and WIPES the store artifact. Switch per gate with prebuild-install inside that package dir: `<target-node> node_modules/.pnpm/prebuild-install@*/node_modules/prebuild-install/bin.js -r node -t <node-version>` (node-gyp source builds fail here — no VS toolchain; use the prebuild download).
+- **Multi-Node gates need PATH pinning + in-log version assertion**: npm run-script children resolve `node` from PATH, not from the npm launcher's node. Prefix the version dir in PATH and log `node -v` at the top of every gate run, or a "Node22 gate" silently runs on the default Node24 (observed: one full suite mislabeled + a 349-failure ABI cascade).
+- **Gate-command exit codes are evidence**: `npm test > log 2>&1; echo EXIT=$?` (or `${PIPESTATUS[0]}`); `| tail`/`| tee` terminators always report 0 and produced two rounds of false-green full-suite evidence in this cycle.
+- **`node --test` per-file process isolation is load-bearing**: the protected one-shot channels (load trust, kernel Host ports, ModelPort, gateway session capability) are process-global; every fail-closed negative that pre-occupies or residue-checks a channel lives in its OWN test file (one bootstrap per file maximum). Do not merge such negatives into a shared file.
+- **v08-integration fixtures re-seal from live compiler payload bytes per run**: changing K/S payload sources flows into fresh seals automatically (no pinned K/S sha to update); Business fixture bytes stay pinned via `FIXTURE_SHAS` in `tests/v08-integration/helpers.ts` — changing a Business fixture requires updating that pin in the same commit.
+- **CI (Woodpecker, repo id 18)**: step wall clock ≈ 28 min; logs are NOT retained after completion (logs API 404; live stream unavailable on the local backend). Diagnosis path: `WOODPECKER_TOKEN` + `GET /api/repos/18/pipelines/<n>` for step exit codes, `POST` the same path to restart; when logs are unavailable, cold-reproduce the CI chain in WSL (`npm ci` → `build` → `lint` → `typecheck` → `test`; WSL reaches npmmirror directly, not npmjs).
+
 ## CI Profile
 
 - CI profile: custom
