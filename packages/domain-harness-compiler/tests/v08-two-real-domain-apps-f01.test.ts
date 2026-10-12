@@ -27,7 +27,6 @@ const ISSUER = 'issuer:genesis-test';
 const SECRET = 'F01-local-external-issuer-proof-only-not-deployment-secret';
 
 type AppKind = 'approval' | 'engineering';
-type Submission = Parameters<typeof qualifyPackageClosure>[0] & Record<string, unknown>;
 
 async function unsignedApp(kind: AppKind) {
   const [kBytes, sBytes, bBytes] = await Promise.all([
