@@ -1,0 +1,37 @@
+From a42b64e0d4c3a2c3101ff88b3c85834cbd748939 Mon Sep 17 00:00:00 2001
+From: kaicreator-mm <bba287191@gmail.com>
+Date: Mon, 12 Oct 2026 10:36:26 +0800
+Subject: [PATCH] =?UTF-8?q?fix(v0.8=20T-F):=20drop=20unused=20Submission?=
+ =?UTF-8?q?=20type=20from=20F01=20=E2=80=94=20Woodpecker=201118=20root=20c?=
+ =?UTF-8?q?ause=20(#1005)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+npm run lint (which the .woodpecker/verify.yaml 'verify' step runs after
+build, BEFORE typecheck/test) fails on PR #1012@9f6aaf4 with
+@typescript-eslint/no-unused-vars: 'Submission' is defined but never
+used (v08-two-real-domain-apps-f01.test.ts:30) — eslint exit 1 gives the
+generic 'Pipeline failed' seen in ci/woodpecker/pr/verify pipeline 1118;
+the F01 tests never executed in CI. Locally F01 itself is green on Node
+24/Windows (6/6). One-line zero-behavior removal; owner may adopt or
+supersede on work/v08-tf-two-real-domain-apps.
+---
+ .../tests/v08-two-real-domain-apps-f01.test.ts                   | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/packages/domain-harness-compiler/tests/v08-two-real-domain-apps-f01.test.ts b/packages/domain-harness-compiler/tests/v08-two-real-domain-apps-f01.test.ts
+index fec9c6b..02c78cf 100644
+--- a/packages/domain-harness-compiler/tests/v08-two-real-domain-apps-f01.test.ts
++++ b/packages/domain-harness-compiler/tests/v08-two-real-domain-apps-f01.test.ts
+@@ -27,7 +27,6 @@ const ISSUER = 'issuer:genesis-test';
+ const SECRET = 'F01-local-external-issuer-proof-only-not-deployment-secret';
+ 
+ type AppKind = 'approval' | 'engineering';
+-type Submission = Parameters<typeof qualifyPackageClosure>[0] & Record<string, unknown>;
+ 
+ async function unsignedApp(kind: AppKind) {
+   const [kBytes, sBytes, bBytes] = await Promise.all([
+-- 
+2.55.0.windows.5
+
