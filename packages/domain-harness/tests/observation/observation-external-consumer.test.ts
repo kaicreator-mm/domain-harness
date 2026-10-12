@@ -13,6 +13,25 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
+
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
 function run(command: string, args: readonly string[], cwd: string): string {
@@ -44,25 +63,8 @@ function runNpm(args: readonly string[], cwd: string): string {
 // durable reads through the public readObservations API.
 const CONSUMER_PROGRAM = `
 import assert from 'node:assert/strict';
+
 import {
-
-/**
- * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
- * this file's packed-consumer journeys npm-install dependencies from the
- * registry; workers without egress must SKIP explicitly rather than hang
- * an install to the step timeout. Zero behavior change when reachable.
- */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? undefined
-  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
-
   computeCompiledPackageId,
   isRuntimeObservationStore,
   RUNTIME_OBSERVATION_CONTRACT_VERSION,

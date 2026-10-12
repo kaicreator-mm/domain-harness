@@ -33,8 +33,26 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
+
+const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 function run(command: string, args: readonly string[], cwd: string): string {
   return execFileSync(command, [...args], {
     cwd,
@@ -102,6 +120,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
+
 
 const require = createRequire(import.meta.url);
 const v7 = await import('@kaicreator/domain-harness/v7');
@@ -666,23 +685,6 @@ import {
   type VerifiedToolImplementationBinding,
 } from '@kaicreator/domain-harness/v7/execution';
 import type {
-
-/**
- * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
- * this file's packed-consumer journeys npm-install dependencies from the
- * registry; workers without egress must SKIP explicitly rather than hang
- * an install to the step timeout. Zero behavior change when reachable.
- */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? undefined
-  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
 
   AdmissionDurableEffectJournal,
   AssemblyExecutionActivator,

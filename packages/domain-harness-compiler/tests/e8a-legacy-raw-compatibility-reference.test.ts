@@ -67,6 +67,25 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { stagePackedWorkspaces } from './packed-fixture-stage.js';
+
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
 import {
   admitComponent,
   ComponentAdmissionError,
@@ -1352,25 +1371,6 @@ import {
   type UnderstoodKindDeclaration,
 } from '@kaicreator/domain-harness/v7';
 import { COMPILER_PUBLIC_API_VERSION } from '@kaicreator/domain-harness-compiler';
-
-/**
- * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
- * this file's packed-consumer journeys npm-install dependencies from the
- * registry; workers without egress must SKIP explicitly rather than hang
- * an install to the step timeout. Zero behavior change when reachable.
- */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
-
-const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
-  ? undefined
-  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
-
-
 const sha256: Sha256Port = {
   async digestUtf8(value: string): Promise<string> {
     const { createHash } = await import('node:crypto');
