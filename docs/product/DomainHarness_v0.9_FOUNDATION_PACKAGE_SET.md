@@ -37,6 +37,12 @@ Do not require a new npm workspace for each Domain Package merely for aesthetics
 
 **Model, Network, File, Script, Device** are optional and independently selected capabilities; adding them must not increase required Node Basic install closure unless Product specifically admits a real use case. Builtin Node modules and OS APIs are external implementation dependencies, **not** Domain Packages by themselves.
 
+### Fresh source baseline audit — do not confuse proposed Router with shipped v0.8 function
+
+On `v0.8@fd53e09826fe304e4f2f8e15fd291dd52c917e5a`, the selected physical `standard-sdk-v1.mjs` exports `STANDARD_KINDS = ['schema','rule','decision','workflow','operation']`, plus `interpret(...)` and resolver support, **but has no exported `WorkflowRouter` or `workflowRouter` symbol**. Therefore `WorkflowRouter inside Standard Basic` is a **v0.9 P0 target**, **NOT** proven delivered by v0.8's existing five-Kind interpreter. The old five-Kind `workflow` evaluation must remain supported and reusable.
+
+**Smallest Router contract to admit at L2:** given BUILD-selected Workflow/Rule/Decision semantics and authenticated Kernel-approved execution context, produce a bounded, deterministic **Workflow handler selection/dispatch** with typed no-candidate/ambiguous/denied failures. The selected Kernel still owns actual per-occurrence State, WAIT/RESUME, Effect/Journal and recovery. No separate generalized planner/agent/Workflow runtime and no automatic candidate promotion. Test two real Approval and Engineering selected Workflow graphs (positive) and wrong provider, ambiguous candidate, unauthorized admission, expired context (negative). If this adds zero demonstrated value beyond the existing `interpret('workflow')` and currently selected Kernel Workflow routing, permit an **explicit public alias/facade over existing logic** after L2 source proof; do not introduce a duplicate state machine just for the `WorkflowRouter` name.
+
 ### Workflow placement — settled scope proposal
 
 Workflow and WorkflowRouter **stay in `kaicreator.standard.basic` for v0.9**. Standard defines Workflow/Decision/Rule routing; the Kernel owns occurrence state, WAIT/RESUME commits, admission/Journal/Effect/replay. Business declares concrete workflows. A separate `standard.workflow` package may be considered **only later** for independently justified ABI lifecycle/reuse; not required by the v0.9 Product exit.
