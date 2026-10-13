@@ -20,9 +20,27 @@
 
 import { QualifiedPackageError } from './contracts.js';
 
+/**
+ * A request-scoped cancellation signal (#1003 FR07-KH2, B3) — structurally
+ * an `AbortSignal`. It is minted by the H-authenticated kernel gateway for
+ * ONE occurrence and only ever propagated as a signal: it carries no
+ * authority, and no public facade route can create or reach one.
+ */
+export interface V8CancellationSignal {
+  readonly aborted: boolean;
+  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
+}
+
 /** The Host-provisioned model port shape the selected SDK consumes. */
 export interface V8HostModelPort {
-  readonly invoke: (request: { readonly operation: string; readonly input: unknown }) => unknown;
+  /**
+   * `signal` is present when the turn belongs to a cancellable
+   * H-authenticated occurrence (#1003 FR07-KH2): a deployment port SHOULD
+   * abort the active model call when it fires; the Kernel latch discards a
+   * late result either way.
+   */
+  readonly invoke: (request: { readonly operation: string; readonly input: unknown; readonly signal?: V8CancellationSignal }) => unknown;
 }
 
 let hostModelPort: V8HostModelPort | undefined;

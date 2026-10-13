@@ -28,6 +28,7 @@
  * provider discovery or fallback; no runtime recompilation; no second
  * effect runtime (journals/effects exist only inside the wired Kernel).
  */
+import { type V8CancellationSignal } from './model-port.js';
 /** The scoped consumption facade returned by `DomainHarness.load(package)`. */
 export interface V8DomainFacade {
     /** Submit one occurrence intent through the wired Kernel mechanism. */
@@ -50,6 +51,15 @@ export interface V8GatewayPrincipal {
     readonly tenantId: string;
     readonly appId: string;
     readonly roles: readonly string[];
+}
+/**
+ * Protected, request-scoped occurrence control (#1003 FR07-KH2, B3). Only
+ * the H-authenticated kernel gateway constructs one (per `send`); it rides
+ * BESIDE the plain-JSON Kernel request — never inside intent data — and the
+ * selected Kernel owns the cancellation latch the signal drives.
+ */
+export interface V8OccurrenceControl {
+    readonly signal: V8CancellationSignal;
 }
 /**
  * Private, Host-gateway-only Kernel operations on a loaded facade
@@ -80,14 +90,15 @@ export interface V8FacadeKernelOps {
      * record bound into the Kernel request is derived ONLY from the
      * issuer-signed roles ∩ the sealed Business binding roles; intent data
      * cannot carry a caller. The physical instance address is the
-     * tenant/app-qualified key of the authenticated principal.
+     * tenant/app-qualified key of the authenticated principal. The optional
+     * `control` (#1003 FR07-KH2) is forwarded to the Kernel unchanged.
      */
     submitAs(principal: V8GatewayPrincipal, request: {
         readonly intentType: string;
         readonly messageId: string;
         readonly instanceKey: string;
         readonly input?: unknown;
-    }): Promise<unknown>;
+    }, control?: V8OccurrenceControl): Promise<unknown>;
     /** Scoped instance read for the authenticated principal's tenant/app. */
     queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
     /**

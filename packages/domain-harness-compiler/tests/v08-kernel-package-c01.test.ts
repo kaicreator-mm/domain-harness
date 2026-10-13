@@ -892,10 +892,14 @@ test('V08-ABI-C01-P1 (KPK04): authorized approval transition produces the exact 
   assert.equal(admitted.durableControlTurnId, TURN_ID);
   assert.equal(admitted.transitionKey, 'approve');
   assert.equal(admitted.targetState, 'approved');
+  // [#1003 FR07-KH2, review B2] The legacy numeric `freshModelCallCount`
+  // handoff is removed from the selected path: this fixture SDK supplies only
+  // that legacy number and no structured trusted evidence, so the admitted
+  // evidence is honestly `unsupported` (never a fabricated measurement).
   assert.deepEqual(admitted.resolver, {
     source: 'harness-machine',
     llmAvoided: false,
-    freshModelCallCount: 1,
+    modelCallEvidence: { status: 'unsupported' },
     cacheRead: 'disabled',
     telemetryEventCount: 0,
   });

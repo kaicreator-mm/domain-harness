@@ -30,7 +30,15 @@
  *     refuse across process restarts before their module bytes ever load,
  *     and re-registering the SAME closure after a restart is idempotent;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
- *     delivery and silently stop when the grant is no longer valid.
+ *     delivery and silently stop when the grant is no longer valid;
+ *   - cancellation (#1003 FR07-KH2, B3) is request-scoped and
+ *     H-authenticated: every `send` mints ONE AbortController whose signal
+ *     rides beside the Kernel request as the protected occurrence control;
+ *     `cancel` re-authenticates, applies the same tenant/app scope gate and
+ *     aborts only an in-flight occurrence the SAME principal subject
+ *     submitted. The signal carries no authority — the selected Kernel owns
+ *     the latch, and a cancel arriving after K closed it for admission
+ *     cannot split the authoritative occurrence.
  *
  * This module wires; it implements no Kernel policy, no Guard/Effect/
  * Journal semantics and no second runtime (those belong to the physically
@@ -126,6 +134,15 @@ export function createKernelGateway(input) {
     const host = input.host;
     const gatewaySessionCap = input.gatewaySessionCap;
     const apps = new Map();
+    /**
+     * In-flight cancellable occurrences, keyed by the authenticated
+     * tenant/app + instanceKey + messageId (#1003 FR07-KH2). Entries exist
+     * only while their `send` is running.
+     */
+    const inFlight = new Map();
+    function inFlightKey(principal, target, messageId) {
+        return JSON.stringify([principal.tenantId, principal.appId, target.instanceKey, messageId]);
+    }
     async function authenticate(credential) {
         return host.authenticate(credential);
     }
@@ -234,12 +251,51 @@ export function createKernelGateway(input) {
             const principal = await authenticate(credential);
             assertIntentScope(intent.target, principal);
             const app = requireApp(intent.target.appId, principal);
-            return app.ops.submitAs(principal, {
-                intentType: intent.intentType,
-                messageId: intent.messageId,
-                instanceKey: intent.target.instanceKey,
-                ...(intent.input === undefined ? {} : { input: intent.input }),
-            });
+            const key = inFlightKey(principal, intent.target, intent.messageId);
+            const entry = Object.freeze({ subject: principal.subject, controller: new AbortController() });
+            const entries = inFlight.get(key) ?? new Set();
+            entries.add(entry);
+            inFlight.set(key, entries);
+            try {
+                return await app.ops.submitAs(principal, {
+                    intentType: intent.intentType,
+                    messageId: intent.messageId,
+                    instanceKey: intent.target.instanceKey,
+                    ...(intent.input === undefined ? {} : { input: intent.input }),
+                }, { signal: entry.controller.signal });
+            }
+            finally {
+                entries.delete(entry);
+                if (entries.size === 0 && inFlight.get(key) === entries)
+                    inFlight.delete(key);
+            }
+        },
+        async cancel(credential, request) {
+            if (typeof request !== 'object'
+                || request === null
+                || typeof request.target !== 'object'
+                || request.target === null
+                || typeof request.target.instanceKey !== 'string'
+                || typeof request.messageId !== 'string'
+                || request.messageId.length === 0) {
+                throw new HostBoundaryError('HOST_CANCEL_MALFORMED', 'gateway cancel requires {target:{tenantId, appId, instanceKey}, messageId}');
+            }
+            // Re-authenticate and scope-gate exactly like send: a cancel is an
+            // authenticated Host command, never an unauthenticated facade route.
+            const principal = await authenticate(credential);
+            assertIntentScope(request.target, principal);
+            requireApp(request.target.appId, principal);
+            const entries = inFlight.get(inFlightKey(principal, request.target, request.messageId));
+            if (entries === undefined || entries.size === 0) {
+                return Object.freeze({ status: 'not-in-flight' });
+            }
+            const own = [...entries].filter((entry) => entry.subject === principal.subject);
+            if (own.length === 0) {
+                throw new HostBoundaryError('HOST_CANCEL_DENIED', `authenticated principal (subject ${principal.subject}) did not submit the in-flight occurrence it asks to cancel`);
+            }
+            for (const entry of own)
+                entry.controller.abort();
+            return Object.freeze({ status: 'cancel-requested' });
         },
         async queryInstance(credential, target) {
             const principal = await authenticate(credential);

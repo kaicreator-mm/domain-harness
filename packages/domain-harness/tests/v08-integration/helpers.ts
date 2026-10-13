@@ -41,17 +41,20 @@ export const FIXTURE_SHAS = {
   engineering: '2b403e4e0d460da454ffb2375983cb538b8b3e0f3c7af791db83d5b362932b37',
   /** #1013-Builder-authored model-decision fixture (R1 F-03 physical path). */
   model: '659ac04523c288225756dca0bc0e651179a4ea48f5e79c911d587e0afcfa15e7',
+  /** #1003 FR07-KH2-Builder-authored harness continuation fixture. */
+  continuation: 'f6f974a5537f39f1bf8b11882ed62e767e450a873ae359b98e78c4bfc73d3547',
 } as const;
 
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
-export type AppKind = 'approval' | 'engineering' | 'model';
+export type AppKind = 'approval' | 'engineering' | 'model' | 'continuation';
 
 export const APP_IDS: Record<AppKind, string> = {
   approval: 'order-approval',
   engineering: 'domainharness-engineering',
   model: 'model-quote',
+  continuation: 'continuation-quote',
 };
 
 export function sqliteTempPath(label: string): string {
@@ -66,7 +69,9 @@ export async function readModuleSources(kind: AppKind): Promise<{
 }> {
   const businessFile = kind === 'approval'
     ? 'business-approval'
-    : kind === 'engineering' ? 'business-engineering' : 'business-model-port';
+    : kind === 'engineering'
+      ? 'business-engineering'
+      : kind === 'model' ? 'business-model-port' : 'business-model-continuation';
   const [kernel, sdk, business] = await Promise.all([
     readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
     readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
@@ -114,9 +119,12 @@ export async function sealRealApp(kind: AppKind, variantRootPackageId?: string):
   } else if (kind === 'engineering') {
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
     businessModule = await import('./fixtures/business-engineering.mjs');
-  } else {
+  } else if (kind === 'model') {
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
     businessModule = await import('./fixtures/business-model-port.mjs');
+  } else {
+    // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
+    businessModule = await import('./fixtures/business-model-continuation.mjs');
   }
   // @ts-expect-error selected kernel payload has no declaration file (.mjs)
   const kernelMeta = await import('../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs');
