@@ -243,7 +243,11 @@ test('V08-FR07-S1-N1 non-canonical model outputs fail typed with no second model
     { kind: 'final', result: { decision: { outcome: 'model-proposed' }, event: wellFormedFinal.event } }, // decision missing data
     { kind: 'final', result: { decision: wellFormedFinal.decision, event: { ...wellFormedFinal.event, extra: true } } }, // event extra key
     { kind: 'final', result: { decision: { outcome: 5, data: {} }, event: wellFormedFinal.event } }, // non-string outcome
+    { kind: 'query', call: 42 }, // call not an object
+    { kind: 'final', result: [] }, // result not an object
     { kind: 7 }, // non-string kind
+    42, // model returned a bare scalar
+    'query', // model returned a bare string
   ];
   for (const output of malformed) {
     const port = spyPort([output]);

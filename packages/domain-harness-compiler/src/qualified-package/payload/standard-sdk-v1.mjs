@@ -185,6 +185,14 @@ function stepIdent(value, label) {
   return value;
 }
 
+/** Object check scoped to MODEL OUTPUT (never a declaration code). */
+function stepRecord(value, label) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    fail('SDK_MODEL_OUTPUT_INVALID', `model step ${label} must be an object`);
+  }
+  return value;
+}
+
 /**
  * Parse one data()-snapshotted model turn into a strict step envelope
  * candidate. Fail-closed typed on every non-canonical or authority-claiming
@@ -198,18 +206,18 @@ function parseStepEnvelope(snapshot) {
   }
   if (snapshot.kind === 'query') {
     exactKeys(snapshot, STEP_QUERY_KEYS, 'query envelope');
-    const call = record(snapshot.call, 'query call');
+    const call = stepRecord(snapshot.call, 'query call');
     exactKeys(call, STEP_CALL_KEYS, 'query call');
     return { stepKind: 'query', capabilityId: stepIdent(call.capabilityId, 'query call.capabilityId'), input: call.input };
   }
   if (snapshot.kind === 'final') {
     exactKeys(snapshot, STEP_FINAL_KEYS, 'final envelope');
-    const result = record(snapshot.result, 'final result');
+    const result = stepRecord(snapshot.result, 'final result');
     exactKeys(result, STEP_RESULT_KEYS, 'final result');
-    const decision = record(result.decision, 'final decision');
+    const decision = stepRecord(result.decision, 'final decision');
     exactKeys(decision, STEP_DECISION_KEYS, 'final decision');
     stepIdent(decision.outcome, 'final decision.outcome');
-    const event = record(result.event, 'final event');
+    const event = stepRecord(result.event, 'final event');
     exactKeys(event, STEP_EVENT_KEYS, 'final event');
     stepIdent(event.type, 'final event.type');
     return { stepKind: 'final', structuredDecision: { decision, event } };
@@ -1019,7 +1027,7 @@ export function createHostBoundModelResolver(hostModelPort, options = {}) {
         fail('SDK_MODEL_PORT_FAILED', 'trusted Host ModelPort invocation failed; no step envelope admitted');
       }
       const snapshot = data(output);
-      record(snapshot, 'model step output');
+      stepRecord(snapshot, 'model step output');
       const parsed = parseStepEnvelope(snapshot);
       const evidenceBase = {
         provenance: { sdkModule: MODULE_ID, declarationId },
