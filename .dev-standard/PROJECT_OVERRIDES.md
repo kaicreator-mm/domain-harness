@@ -123,6 +123,14 @@ Rules:
 - A Task MUST NOT silently downgrade a higher-authority `required` review rule.
 - Review is not a substitute for required Validation.
 
+### Security-review repair protocol (Builder side)
+
+Recorded from the #1013 R1/R2 security review rounds (PR #1016; fresh review #5494026032 / #1013@6129188323):
+
+- **Falsification-first**: when a review demands a reproduction, implement it as a COMMITTED test, run it RED on the exact reviewed HEAD (keep the marker log as evidence), repair, then GREEN. The committed test then doubles as the boundary's regression and documentation (reference: `tests/v08-integration/packed-raw-ports-session-negative.test.ts`; the RED run cost 13 seconds against the packed consumer and fully evidenced both new P1s).
+- **Class-surface inventory**: when a boundary pattern is accepted on one seam — or a bypass is demonstrated on one surface — the SAME repair must enumerate every sibling seam of the same class and guard each. Observed: after the R2 gateway-ops session capability (@6122817203), the fresh review immediately found the two uncapped raw getters in the same one-shot channel family (`currentKernelHostPorts` / `currentHostModelPort`) — reviewers frame findings as one class with N callable surfaces, so fixing only the named surface invites another round.
+- **No-L2-handoff argument obligation**: changing an internal protected channel's signature is NOT a frozen K/S authority/ABI change when four invariants hold — consumed port shapes unchanged, sole installer unchanged (`bootstrapTrustedHost`), public one-arg `DomainHarness.load` unchanged, K/S ownership unchanged — and the Builder's evidence MUST argue all four explicitly so the independent reviewer verifies the no-handoff claim instead of re-deriving it (the #1013 R2-repair PR comment carries exactly this argument).
+
 ## Validation Execution Profile
 
 Validation is deliberately split so expensive local environments are concentrated rather than repeated across every parallel feature PR.
