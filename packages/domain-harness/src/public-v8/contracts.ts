@@ -41,7 +41,14 @@ export const V8_QUALIFIED_ROOT_FORMAT = 'dhpkg/v8-qualified-root/1';
 export const V8_APPROVAL_PROOF_TYPE = 'v08-external-approval/1';
 export const V8_QUALIFIED_PRODUCER_PREFIX = 'qualified-producer:';
 
-export type QualifiedPackageKind = 'kernel' | 'standard-sdk' | 'business';
+/**
+ * Package kinds. The three closed K/S/B roles stay mandatory and exactly
+ * shaped; 'capability' (#1023 S02a) is the OPTIONAL extra capability-owned
+ * package kind admitted by BUILD alongside them — it occupies no closed
+ * role, shadows nothing, and executes only through its exact keyed
+ * endpoint/handler binding.
+ */
+export type QualifiedPackageKind = 'kernel' | 'standard-sdk' | 'business' | 'capability';
 
 export type QualifiedRole = 'kernel' | 'standard-sdk' | 'business';
 
@@ -54,9 +61,17 @@ export interface QualifiedEndpoint {
  * ABI knowledge the trusted installer needs to verify a module generically.
  * The executing mechanism itself stays inside the physically selected Kernel
  * package; the loader never re-implements it (#994 KPK-02 heritage).
+ *
+ * The 'v08-capability-abi/1' entry (#1023 S02a) is purely additive: the
+ * three closed-role entries keep their exact frozen shape. A capability
+ * package self-identifies like every other package and exposes ONE
+ * 'capability-endpoint' endpoint; its callable surface is the exact
+ * build-time handler map carried by its capability binding, verified
+ * against the physically installed namespace by the installer — never
+ * discovered at runtime.
  */
 export const V8_QUALIFIED_ABI: Readonly<
-  Record<string, { readonly kind: QualifiedPackageKind; readonly role: QualifiedRole; readonly requiredExports: readonly string[]; readonly requiredEndpointKinds: readonly string[] }>
+  Record<string, { readonly kind: QualifiedPackageKind; readonly role: QualifiedRole | 'capability'; readonly requiredExports: readonly string[]; readonly requiredEndpointKinds: readonly string[] }>
 > = Object.freeze({
   'v08-kernel-abi/1': {
     kind: 'kernel',
@@ -75,6 +90,12 @@ export const V8_QUALIFIED_ABI: Readonly<
     role: 'business',
     requiredExports: ['getPolicy', 'INTENT_TYPES', 'MODULE_ID', 'PACKAGE_KIND', 'ABI_VERSION', 'ENDPOINTS'],
     requiredEndpointKinds: ['business-policy'],
+  },
+  'v08-capability-abi/1': {
+    kind: 'capability',
+    role: 'capability',
+    requiredExports: ['MODULE_ID', 'PACKAGE_KIND', 'ABI_VERSION', 'ENDPOINTS'],
+    requiredEndpointKinds: ['capability-endpoint'],
   },
 });
 
@@ -118,7 +139,31 @@ export interface QualifiedIntentBinding {
   readonly endpointId: string;
 }
 
-export type QualifiedBinding = QualifiedRoleBinding | QualifiedIntentBinding;
+/** One build-time exact handler entry of a capability binding (#1023 S02a). */
+export interface QualifiedCapabilityHandlerBinding {
+  /** Callable operation identity inside this capability (unique per binding). */
+  readonly operationId: string;
+  /** Module export name the operation is statically bound to. */
+  readonly handler: string;
+}
+
+/**
+ * Optional extra capability-owned package binding (#1023 S02a): BUILD
+ * selects the package, assigns the unique capability identity, and pins the
+ * EXACT endpoint plus operation→handler map. No runtime discovery, no
+ * host-node catch-all: a capability package without exactly one such
+ * binding never becomes executable, and a capability can never occupy or
+ * shadow a closed K/S/B role.
+ */
+export interface QualifiedCapabilityBinding {
+  readonly role: 'capability';
+  readonly capabilityId: string;
+  readonly packageId: string;
+  readonly endpointId: string;
+  readonly handlers: readonly QualifiedCapabilityHandlerBinding[];
+}
+
+export type QualifiedBinding = QualifiedRoleBinding | QualifiedIntentBinding | QualifiedCapabilityBinding;
 
 export interface QualifiedBuildProvenance {
   readonly producerId: string;
@@ -227,9 +272,9 @@ export function approvalBindingDigest(proof: ApprovalProof): string {
 
 /**
  * Subject digest of a sealed closure: the exact package byte identities plus
- * the role/intent bindings. BUILD computes it at qualification time; load()
- * recomputes it from the presented root and refuses any divergence, so an
- * approval can never be replayed onto a different closure.
+ * the role/intent/capability bindings. BUILD computes it at qualification
+ * time; load() recomputes it from the presented root and refuses any
+ * divergence, so an approval can never be replayed onto a different closure.
  */
 export function computeSubjectDigest(input: {
   rootPackageId: string;
@@ -241,9 +286,24 @@ export function computeSubjectDigest(input: {
       domain: 'dh.v8.qualified-root.subject/1',
       rootPackageId: input.rootPackageId,
       packages: input.packages.map((pkg) => ({ packageId: pkg.packageId, moduleSha256: pkg.moduleSha256 })),
-      bindings: input.bindings.map((binding) => ({ ...binding })),
+      bindings: input.bindings.map((binding) => copyBindingForDigest(binding)),
     }),
   );
+}
+
+/**
+ * Plain-prototype copy of one binding for digest canonicalization. Bindings
+ * frequently arrive from `canonicalSnapshot` output, whose records are
+ * deliberately prototype-free; the historical shallow spread reproduced
+ * flat role/intent bindings as ordinary objects, and a capability binding
+ * adds one nested level (the handler map) that must be reproduced the same
+ * way or `canonicalJson` would refuse the snapshot-produced values.
+ */
+function copyBindingForDigest(binding: QualifiedBinding): QualifiedBinding {
+  if (binding.role === 'capability') {
+    return { ...binding, handlers: binding.handlers.map((handler) => ({ ...handler })) };
+  }
+  return { ...binding };
 }
 
 function isPlainStringRecord(value: unknown): value is Record<string, unknown> {
@@ -425,6 +485,95 @@ export function assertQualifiedRoot(root: unknown): SealedQualifiedPackageRoot {
       throw new QualifiedPackageError(
         'LOAD_INTENT_BINDING_INVALID',
         `intent ${binding.intentType} binds endpoint ${binding.endpointId} which package ${binding.packageId} does not provide as a business endpoint`,
+      );
+    }
+  }
+  // ---- Optional capability-owned packages (#1023 S02a) ----
+  // Every capability binding is an exact keyed declaration: unique
+  // capabilityId, one well-kinded capability-endpoint target, and a
+  // non-empty operation→handler map with unique operationIds. Every
+  // capability package in the closure must be bound by EXACTLY ONE such
+  // binding — an unbound (or multi-bound) extra package never becomes
+  // executable. These checks are static and run BEFORE the approval subject
+  // comparison and any executable import; handler EXPORT presence on the
+  // physically installed namespace is additionally verified by the
+  // installer (MODULE_HANDLER_MISSING).
+  const capabilityBindings = snapshot.bindings.filter(
+    (binding): binding is QualifiedCapabilityBinding => binding.role === 'capability',
+  );
+  const capabilityIds = new Set<string>();
+  for (const binding of capabilityBindings) {
+    if (typeof binding.capabilityId !== 'string' || binding.capabilityId.length === 0) {
+      throw new QualifiedPackageError('LOAD_CAPABILITY_BINDING_INVALID', 'capability bindings need a non-empty capabilityId');
+    }
+    if (capabilityIds.has(binding.capabilityId)) {
+      throw new QualifiedPackageError(
+        'LOAD_CAPABILITY_BINDING_INVALID',
+        `capabilityId ${binding.capabilityId} is bound more than once in this sealed closure; capability identities must stay injective`,
+      );
+    }
+    capabilityIds.add(binding.capabilityId);
+    const handlersValue: unknown = binding.handlers;
+    if (!Array.isArray(handlersValue) || handlersValue.length === 0) {
+      throw new QualifiedPackageError(
+        'LOAD_CAPABILITY_BINDING_INVALID',
+        `capability ${binding.capabilityId} must carry a non-empty exact operation→handler map`,
+      );
+    }
+    const operationIds = new Set<string>();
+    for (const handler of handlersValue) {
+      if (
+        !isPlainStringRecord(handler)
+        || typeof handler.operationId !== 'string'
+        || handler.operationId.length === 0
+        || typeof handler.handler !== 'string'
+        || handler.handler.length === 0
+      ) {
+        throw new QualifiedPackageError(
+          'LOAD_CAPABILITY_BINDING_INVALID',
+          `capability ${binding.capabilityId} declares a malformed handler entry (operationId/handler must be non-empty strings)`,
+        );
+      }
+      if (operationIds.has(handler.operationId)) {
+        throw new QualifiedPackageError(
+          'LOAD_CAPABILITY_BINDING_INVALID',
+          `capability ${binding.capabilityId} binds operation ${handler.operationId} more than once`,
+        );
+      }
+      operationIds.add(handler.operationId);
+    }
+    const target = packagesById.get(binding.packageId);
+    if (target === undefined) {
+      throw new QualifiedPackageError('LOAD_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} binds unknown package ${binding.packageId}`);
+    }
+    if (target.kind !== 'capability') {
+      throw new QualifiedPackageError(
+        'LOAD_CAPABILITY_BINDING_INVALID',
+        `capability ${binding.capabilityId} binds package ${binding.packageId} of kind ${target.kind}; a capability binding must target a capability package and can never shadow a closed role`,
+      );
+    }
+    const endpoint = target.endpoints.find((candidate) => candidate.endpointId === binding.endpointId);
+    if (endpoint === undefined) {
+      throw new QualifiedPackageError(
+        'LOAD_CAPABILITY_BINDING_INVALID',
+        `capability ${binding.capabilityId} binds endpoint ${binding.endpointId} which package ${binding.packageId} does not declare`,
+      );
+    }
+    const capabilityAbi = V8_QUALIFIED_ABI[target.abiVersion];
+    if (capabilityAbi !== undefined && !capabilityAbi.requiredEndpointKinds.includes(endpoint.kind)) {
+      throw new QualifiedPackageError(
+        'LOAD_CAPABILITY_BINDING_INVALID',
+        `capability ${binding.capabilityId} endpoint ${binding.endpointId} has kind ${endpoint.kind}; ABI ${target.abiVersion} requires one of [${capabilityAbi.requiredEndpointKinds.join(', ')}]`,
+      );
+    }
+  }
+  for (const pkg of snapshot.packages) {
+    if (pkg.kind !== 'capability') continue;
+    const bound = capabilityBindings.filter((binding) => binding.packageId === pkg.packageId);
+    if (bound.length !== 1) {
+      throw new QualifiedPackageError(
+        'LOAD_CAPABILITY_BINDING_INVALID',
+        `capability package ${pkg.packageId} is covered by ${bound.length} capability bindings (exactly one required); an unbound or multi-bound extra module can never become executable`,
       );
     }
   }

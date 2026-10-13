@@ -122,7 +122,16 @@ export function buildQualifiedPackage(options: BuildQualifiedPackageOptions): Se
     },
     approval,
     packages,
-    bindings: unsigned.bindings.map((binding) => ({ ...binding })),
+    // One-level-deep plain copies, mirroring the endpoint copies above:
+    // qualification bindings arrive from canonicalSnapshot output whose
+    // records are prototype-free, and a capability binding carries a nested
+    // handler map that must be reproduced as ordinary objects so the sealed
+    // root itself survives the load-side canonical snapshot.
+    bindings: unsigned.bindings.map((binding) =>
+      binding.role === 'capability'
+        ? { ...binding, handlers: binding.handlers.map((handler) => ({ ...handler })) }
+        : { ...binding },
+    ),
   } satisfies SealedQualifiedPackageRoot);
 }
 

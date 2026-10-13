@@ -24,6 +24,8 @@ export type {
   ApprovalProof,
   QualifiedBinding,
   QualifiedBuildProvenance,
+  QualifiedCapabilityBinding,
+  QualifiedCapabilityHandlerBinding,
   QualifiedEndpoint,
   QualifiedIntentBinding,
   QualifiedPackageDescriptor,

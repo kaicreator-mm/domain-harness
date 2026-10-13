@@ -27,6 +27,7 @@ import {
   computeSubjectDigest,
   sha256Hex,
   type QualifiedBinding,
+  type QualifiedCapabilityBinding,
   type QualifiedPackageKind,
 } from '@kaicreator/domain-harness/v8';
 import { analyzeModuleClosure, assertDeclaredExports, ClosureError } from './closure.js';
@@ -274,6 +275,85 @@ export function qualifyPackageClosure(submission: unknown): UnsignedQualificatio
       fail(
         'QUALIFY_INTENT_BINDING_INVALID',
         `intent ${binding.intentType} binds endpoint ${binding.endpointId} which package ${binding.packageId} does not provide as a business endpoint`,
+      );
+    }
+  }
+
+  // ---- Optional BUILD-selected capability packages (#1023 S02a) ----
+  // A capability package is admitted ONLY through an exact keyed
+  // capabilityId/packageId/endpointId binding with a non-empty, injective
+  // operation→handler map whose handler names are AST-verified declared
+  // exports of the sealed module bytes. Every submitted capability package
+  // must be covered by exactly one such binding — an unbound or multi-bound
+  // extra module can never become executable. No runtime discovery, no
+  // host-node catch-all: what BUILD binds here is the whole callable
+  // surface the installer will later verify on the physical namespace.
+  const capabilityBindings = snapshot.bindings.filter(
+    (binding): binding is QualifiedCapabilityBinding => binding.role === 'capability',
+  );
+  const capabilityIds = new Set<string>();
+  for (const binding of capabilityBindings) {
+    if (typeof binding.capabilityId !== 'string' || binding.capabilityId.length === 0) {
+      fail('QUALIFY_CAPABILITY_BINDING_INVALID', 'capability bindings need a non-empty capabilityId');
+    }
+    if (capabilityIds.has(binding.capabilityId)) {
+      fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capabilityId ${binding.capabilityId} is bound more than once; capability identities must stay injective`);
+    }
+    capabilityIds.add(binding.capabilityId);
+    const handlersValue: unknown = binding.handlers;
+    if (!Array.isArray(handlersValue) || handlersValue.length === 0) {
+      fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} must carry a non-empty exact operation→handler map`);
+    }
+    const operationIds = new Set<string>();
+    const handlerNames = new Set<string>();
+    for (const handler of handlersValue) {
+      const entry = handler as { operationId?: unknown; handler?: unknown };
+      if (typeof entry.operationId !== 'string' || entry.operationId.length === 0 || typeof entry.handler !== 'string' || entry.handler.length === 0) {
+        fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} declares a malformed handler entry (operationId/handler must be non-empty strings)`);
+      }
+      if (operationIds.has(entry.operationId)) {
+        fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} binds operation ${entry.operationId} more than once`);
+      }
+      operationIds.add(entry.operationId);
+      handlerNames.add(entry.handler);
+    }
+    const target = packagesById.get(binding.packageId);
+    if (target === undefined) {
+      fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} binds unknown package ${binding.packageId}`);
+    }
+    if (target.kind !== 'capability') {
+      fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} binds package ${binding.packageId} of kind ${target.kind}; a capability binding must target a capability package and can never shadow a closed role`);
+    }
+    const endpoint = target.endpoints.find((candidate) => candidate.endpointId === binding.endpointId);
+    if (endpoint === undefined) {
+      fail('QUALIFY_CAPABILITY_BINDING_INVALID', `capability ${binding.capabilityId} binds endpoint ${binding.endpointId} which package ${binding.packageId} does not declare`);
+    }
+    const capabilityAbi = V8_QUALIFIED_ABI[target.abiVersion];
+    if (capabilityAbi !== undefined && !capabilityAbi.requiredEndpointKinds.includes(endpoint.kind)) {
+      fail(
+        'QUALIFY_CAPABILITY_BINDING_INVALID',
+        `capability ${binding.capabilityId} endpoint ${binding.endpointId} has kind ${endpoint.kind}; ABI ${target.abiVersion} requires one of [${capabilityAbi.requiredEndpointKinds.join(', ')}]`,
+      );
+    }
+    // BUILD-time exact handler binding: every bound handler name must be a
+    // declared export of the sealed module bytes (AST-verified, not a text
+    // match — the installer re-verifies callability on the namespace).
+    try {
+      assertDeclaredExports(target.modulePath, target.moduleSource, [...handlerNames]);
+    } catch (error) {
+      if (error instanceof ClosureError) {
+        throw new QualificationError(error.code, error.message);
+      }
+      throw error;
+    }
+  }
+  for (const pkg of snapshot.packages) {
+    if (pkg.kind !== 'capability') continue;
+    const bound = capabilityBindings.filter((binding) => binding.packageId === pkg.packageId);
+    if (bound.length !== 1) {
+      fail(
+        'QUALIFY_CAPABILITY_UNBOUND',
+        `capability package ${pkg.packageId} is covered by ${bound.length} capability bindings (exactly one required); an unbound or multi-bound extra module can never become executable`,
       );
     }
   }
