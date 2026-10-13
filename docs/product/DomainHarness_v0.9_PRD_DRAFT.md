@@ -1,7 +1,7 @@
 # DomainHarness v0.9 — Production-Ready Node SDK PRD (Draft / Not Frozen)
 
 ```ini
-DOCUMENT_STATE=USER_DIRECTED_PRODUCT_TARGET_DRAFT
+DOCUMENT_STATE=CONCRETE_FOUNDATION_PROFILE_QUALIFICATION_AND_DAG_PROPOSALS_PENDING_REVIEW
 VERSION=v0.9
 PARENT_ISSUE=#1026
 BASELINE_REQUIRED=v0.8_RELEASE_QUALIFIED
@@ -71,16 +71,40 @@ RELEASE=NO
 
 **NOT v0.9 production gate by default** (requires separate L1 admission): N01 complete capability library, N02 Browser/Embedded/full Host reorganization, N03 (#1029) full Forge/Creator/Simulator/UX auto-generated App cross-project pipeline, N04 (#1030) QuickJS/Rust/Go/C second Microkernel, N05 (#1031) streaming/remote advanced calls. Arbitrary runtime Package hotloading and autonomous agent state/effect mutation additionally require explicit Product redesign; they are not implicit follow-ons.
 
-## 7. Pre-L1 unknowns that must be resolved, not endless research
+## 7. Four formerly unresolved Product choices — **bounded proposals now specified, NOT formally frozen**
 
-1. Actual accepted v0.8 Release SHA and installed Node package baseline, which remains v0.9 starting point.
-2. The smallest two independent, meaningful capability consumers and business workload; use existing D2/D3 where possible.
-3. Exact supported Node22/24 × Windows/Ubuntu × SQLite matrix and declared non-support, with a real test environment.
-4. SLO/acceptance metrics from measured real package workload and failure injection, not arbitrary invented performance targets.
-5. Official distribution channel (versioned signed tarballs/immutable exact Git pin vs npm), public ABI versioning policy **within v0.9 line**, developer support/incident response owner.
-6. Which optional N03–N05 candidates independently meet a separate Product return-on-cost threshold.
+The 2026-10-14 user direction explicitly selects a production-ready Node SDK. This PRD now references **three concrete independently reviewable decisions** so L1 can settle quickly, without further exploratory Demo work:
 
-Each answered through **bounded L1 evidence reuse**, no repeat #932/#938/#942 research demos. After L1 Product Freeze, prepare L2 owner/contract matrix, appropriately sized Task DAG, Tests→Contract→Implementation→Failure handling→Reference, disjoint PRs, real CI/Build Host and exact-SHA Version Closure. This draft confers no implementation approval.
+### D01. Official Foundation Package Set / distribution boundaries
+
+See [Foundation Package Set](./DomainHarness_v0.9_FOUNDATION_PACKAGE_SET.md). The supported baseline consists of:
+- SDK Microkernel public `@kaicreator/domain-harness/v9` (one-arg `DomainHarness.load(package)`);
+- independently identifiable `kaicreator.kernel.basic` (K State/Admission/Effect/Journal/UNKNOWN/Replay) and `kaicreator.standard.basic` (Schema/Rule/Decision/**Workflow+WorkflowRouter**/Operation);
+- selected Node capability implementations `kaicreator.capability.identity.node` (H-backed independent true caller identity) and `kaicreator.capability.storage.sqlite` (physical CAS/Storage under K authority);
+- producer-neutral official BUILD `@kaicreator/domain-harness-compiler` (not a Runtime Domain Package); and a `kaicreator.node.basic` **Profile** (immutable locked assembly list and tested target metadata, not a second Runtime Engine).
+
+The **names and illustrative manifest shape are candidate identifiers** until L2 ABI review, but the **separation of responsibilities and independently installable/versionable Package identities** are target P0. A separate npm artifact per Domain Package is *not mandatory* if each Package can be selected/verified/versioned/installed independently from a stable published release archive. Business Packages are per consumer; re-use D2/D3 real assets. Do not move full generic BUILD into Forge, require one separate Workflow Package, or create a catch-all `host-node` Domain Package.
+
+### D02. Node Basic Runtime Profile
+
+`node-basic` pins **exact** SDK ABI + one K and one S Package and independently qualified Identity/SQLite capability implementation versions/hashes. BUILD fixes all bindings and selected platform. H independently verifies actual installed bytes and DAC approval/currentness on **every fresh activation/restart before untrusted JS module import**, and binds current callers over protected H→K transport. The Profile **cannot** grant its own issuer approval or let Runtime search/select other packages.
+
+### D03. Supported Node environments and quantitative production test targets
+
+See [Node Production Qualification](./DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md).
+
+- Proposed **P0 production profile**: Ubuntu 24.04 LTS x86_64, Node 24.x, pinned native `better-sqlite3`/SQLite on local SSD. Reference host `4 vCPU/8 GiB/local SSD`. Real Build Host availability and native ABI **must** be confirmed, else bounded explicit Product amendment before Freeze; **nothing has yet been measured**.
+- Windows 11 x64 Node24 and Ubuntu 24.04 Node22 are **candidate secondary support profiles**, not a production support promise unless they independently qualify. v0.8's distinct mandatory host tests remain in v0.8 and cannot be waived by this choice.
+- Proposed benchmark thresholds for **local no-LLM, no-external-network**, real K/S/SQLite SDK under repeatable load: fresh-start p95 <=5 s (30 samples); 30-min 4 concurrent caller / >=10 operations per second / >=18k mixed valid operations, p95 <=500 ms and p99 <=2 s; >=99.9% valid success in fault-free conditions, 100% intentional invalid calls refused; RSS growth <=128 MiB post-warm-up with end RSS <=512 MiB; graceful idle stop <=10 s; 20 lifecycle loops, 5 forced crash windows, backup/restore and zero false durable ACK/duplicate effect. Seven separately tracked budgets **PERF-01–07** plus security/negative matrix.
+- **These are proposed numeric acceptance budgets, not measured performance or signed SLAs.** Independent Product L1 review must confirm host realism and permit a single bounded calibration against the exact accepted v0.8 baseline *before freezing*. Safety/immutability/currentness tests are non-negotiable regardless of performance target adaptation.
+
+### D04. Formal Product→L2→Task DAG execution order
+
+See [bounded Task DAG proposal](../implementation/DomainHarness_v0.9_TASK_DAG_PROPOSAL.md). **Reuse existing** #1027 N01-min Foundation → #1028 N02-min physical Node adapters; parallel post-ABI #1035 N07 public SDK consumers and #1032 N06 distribution/profile; #1036 N08 operations after actual physical artifact; #1037 N09 **independent release qualification after all relevant merges**. This describes proposed dependencies, **NOT** registered GitHub native dependency edges or admitted executable work.
+
+Product/L1 docs and independent review may proceed **while v0.8 work runs**. Source implementation and baseline adoption require actual v0.8 Release PASS/Tag; Product Freeze and L2 authority require their own exact-SHA gate, not this PRD author's signature. No new research Issue or a full 9-issue JIT implementation wave now. Other version candidates N03/N04/N05 and broad N01/N02 are optional unless separately Product-admitted.
+
+**Remaining *real* blockers (not new architectural research):** independent exact-head Product/L1 review of this PR; reference host profile availability; one bounded benchmark-budget calibration from measured v0.8 if needed; L2 ABI/authority Contract after accepted Product Freeze; final v0.8 release baseline pin. Do not claim these external evidence requirements satisfied by this documentation.
 
 ## 8. Progress / authority
 
@@ -88,6 +112,10 @@ Each answered through **bounded L1 evidence reuse**, no repeat #932/#938/#942 re
 PRODUCT_DIRECTION=NODE_SDK_PRODUCTION_READY_AFTER_V09
 USER_SCOPE_DIRECTION=YES
 PRD_DRAFT_CREATED=YES
+FOUNDATION_PACKAGE_SET_PROPOSED=YES
+NODE_BASIC_PROFILE_PROPOSED=YES
+QUANTITATIVE_QUALIFICATION_TARGETS_PROPOSED=YES
+SIX_CONCERN_DAG_PROPOSED_NOT_ADMITTED=YES
 INDEPENDENT_PRODUCT_L1_REVIEW=NOT_RUN
 PRODUCT_FREEZE=NO
 L2_EVIDENCE=NOT_RUN
