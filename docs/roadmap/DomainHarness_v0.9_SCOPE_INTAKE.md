@@ -70,12 +70,15 @@
 4. **v0.9 Task DAG/L3:** only after L2 evidence, create concern-sized build issues/PRs, distinct write sets, environment/CI readiness and meaningful cross-engine validation gates; reuse already tested code and oracles from v0.8.
 5. **Version closure:** real tests (incl. faults, authorization, no false ACK, clean package consumer, replay/currentness), independent source/security review, Full/Hidden/Critical Journeys/packaging and Release Qualification. `PR_PASS != RELEASE_PASS`.
 
-## 4. Explicitly unresolved Product choices
+## 4. D01–D04 Foundation / Profile / Support / Plan — now decision-ready proposals
 
-- N01/N02: minimum two real capability-sharing use cases, which runtime/platform environments are actually supported, whether browser/embedded is worthwhile now.
-- N03: whether cross-project E2E generation is part of **domain-harness v0.9 release** or a separately versioned integration campaign; who owns each release gate.
-- N04: ABI portability first vs actually executing same JS Package with one embedded QuickJS consumer, including Node API and native adapter costs.
-- N05: which advanced operations are justified; agent read-only prohibition and closed-world loading preserved unless Product revision.
-- N06: how to package and qualify only selected supported platforms; no accidental requirement for 4 runtimes and dual platform certification.
+User direction is fixed: **v0.9 must ship a production-qualifiable Node SDK**, not merely an abstract protocol. Current **candidate Product specification** (requires one independent exact-HEAD Product L1 review before normative Freeze):
 
-**Next action (on explicit v0.9 implementation kickoff only):** formalize this user-selected production-exit contract through L1/PRD and fresh Product Review, decide limited support profiles/metrics and optional expansions; then L2 and a minimal real-app-driven Task DAG. Do not reopen the existing v0.8 Design Chronicle to create v0.9 prerequisites.
+- **D01 Foundation Package Set:** [Product foundation contract](../product/DomainHarness_v0.9_FOUNDATION_PACKAGE_SET.md) — SDK Microkernel, independently addressable/versioned Kernel Basic, Standard Basic **including Workflow and WorkflowRouter**, Identity and SQLite Storage Capability Packages; BUILD Toolchain is not a Domain Package. `Runtime Profile` is only locked metadata, **not** a second Runtime/State/Journal owner.
+- **D02 Node Basic Profile:** same foundation document — Build-fixed exact versions, digests, K/S selected bytes, capability handlers and Node target; independent actual-artifact H assurance + per-start DAC currentness; no dynamic plugin/Host-domain package. Actual IDs/metadata spelling remains an **L2 ABI decision**, not a preexisting API.
+- **D03 Node support and budgets:** [Node production qualification](../product/DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) — proposed Ubuntu 24.04 x86_64 / Node24 / pinned native SQLite **P0**, Windows 11 Node24 and Ubuntu Node22 **candidate**; proposed concrete PERF-01..07 targets for startup, 30-min workload, p95/p99, reliability, memory, lifecycle, backup, security. **All targets NOT YET MEASURED.** One Product-approved calibration allowed from actual v0.8 baseline **before freeze**.
+- **D04 Formal process:** [small DAG proposal](../implementation/DomainHarness_v0.9_TASK_DAG_PROPOSAL.md) maps existing #1027/#1028/#1032/#1035/#1036/#1037 into Foundation → Node profile + public consumer + distribution → operations → independent v0.9 version qualification. **Proposed dependencies only, no formal GitHub DAG/claim or source authorization.** Exact L1 review and Product Freeze, then L2 and DAG; v0.8 Release PASS needed before new version source implementation.
+
+**Outstanding externally verifiable questions rather than open-ended architecture exploration:** actual v0.8 released baseline, accessible native Ubuntu24/Node24 Build Host, independent Product/L1 review and any one bounded threshold adjustment, then L2 exact ABI/security freeze. N03/N04/N05 and full capability/cross-platform ecosystem remain optional. Avoid new Demo/Research rounds.
+
+**Next action (after this docs-only PR's independent Product review):** formalize this user-selected production-exit contract through L1/PRD and fresh Product Review, decide limited support profiles/metrics and optional expansions; then L2 and a minimal real-app-driven Task DAG. Do not reopen the existing v0.8 Design Chronicle to create v0.9 prerequisites.
