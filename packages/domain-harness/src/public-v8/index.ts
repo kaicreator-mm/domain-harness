@@ -26,6 +26,7 @@ export type {
   QualifiedBuildProvenance,
   QualifiedCapabilityBinding,
   QualifiedCapabilityHandlerBinding,
+  QualifiedCleanupFailure,
   QualifiedEndpoint,
   QualifiedIntentBinding,
   QualifiedPackageDescriptor,
@@ -33,6 +34,7 @@ export type {
   QualifiedRole,
   QualifiedRoleBinding,
   SealedQualifiedPackageRoot,
+  V8PackageLifecycleContext,
 } from './contracts.js';
 export { load } from './load.js';
 export type { LoadedQualifiedPackages } from './load.js';

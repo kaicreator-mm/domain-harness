@@ -26,7 +26,10 @@
  * no v0.7 engine import or re-implementation — the physically selected
  * Kernel package owns the entire mechanism; no business special case; no
  * provider discovery or fallback; no runtime recompilation; no second
- * effect runtime (journals/effects exist only inside the wired Kernel).
+ * effect runtime (journals/effects exist only inside the wired Kernel);
+ * no init-script engine — the #1023 S03 lifecycle hooks are optional
+ * module exports of BUILD-sealed packages, called in the sealed
+ * BUILD-fixed packages order, and nothing more.
  */
 import { type V8CancellationSignal } from './model-port.js';
 /** The scoped consumption facade returned by `DomainHarness.load(package)`. */
