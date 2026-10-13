@@ -1646,14 +1646,21 @@ function wireAdmissionContextProjections(businessEndpoint) {
 
 /**
  * Resolve the admitted transition's context projection (admitCentralDecision
- * only: after admission, before any Journal/Effect). Returns `undefined` when
- * the transition declares none, `{conflict}` for a write-once violation, or
- * `{projection}` — the canonical fields to merge into the next context.
+ * only: after admission, before any Journal/Effect). The wiring-time frozen
+ * snapshot is the FIRST authority — a live `contextProjection` property
+ * deleted after wiring keeps the pinned projection; only a never-wired
+ * transition carrying live projection syntax refuses typed. Returns
+ * `undefined` when nothing was wired or declared, `{conflict}` for a
+ * write-once violation, or `{projection}` — the canonical fields to merge
+ * into the next context.
  */
 function resolveAdmissionContextProjection(transition, request, wiring) {
-  if (!hasOwn(transition, 'contextProjection')) return undefined;
+  // [#1005 D3-K R2 — review #5508191410 P1] The wiring snapshot outranks the
+  // live property: checking the live declaration first let a post-wiring
+  // `delete transition.contextProjection` bypass the frozen projection.
   const fields = wiring?.get(transition);
   if (fields === undefined) {
+    if (!hasOwn(transition, 'contextProjection')) return undefined;
     throw new CentralAdmissionError(
       'ADMISSION_CONTEXT_PROJECTION_UNVALIDATED',
       `transition ${String(transition.transitionKey)} carries context-projection syntax that was never validated at wiring; post-wiring injected declarations are refused`,

@@ -28,8 +28,9 @@
  *           committed changeId (K denies `context-projection-conflict`).
  *   D3-N5   wiring: hostile / unauthorized / reserved projection
  *           declarations fail typed at the trusted load boundary.
- *   D3-N6   post-wiring mutation is ignored; injected projection syntax on an
- *           unwired transition refuses typed.
+ *   D3-N6   post-wiring mutation is ignored; deleting the live property
+ *           after wiring keeps the frozen snapshot authoritative; injected
+ *           projection syntax on an unwired transition refuses typed.
  *   D3-R1   crash after effect before the state CAS → replay re-drives from
  *           the Journal (no second dispatch) and commits the lineage once.
  *   D3-R2   UNKNOWN (effect dispatched, terminal unknown) → retry is
@@ -420,7 +421,7 @@ test('D3-N5: hostile / unauthorized / reserved projection declarations fail type
   assert.doesNotThrow(() => runtime(policy({ projections: { review: { changeId: { source: 'decision', path: ['data', 'changeId'] } } } })));
 });
 
-test('D3-N6: post-wiring mutation is ignored; injected projection on an unwired transition refuses typed', async () => {
+test('D3-N6: post-wiring mutation and property deletion are ignored; injected projection on an unwired transition refuses typed', async () => {
   const businessPolicy = policy();
   const { rt, host } = await opened(businessPolicy);
   const reviewTransition = (businessPolicy.intentBindings.reviewChange.definition as any).states[0].transitions[0];
@@ -428,6 +429,20 @@ test('D3-N6: post-wiring mutation is ignored; injected projection on an unwired 
   reviewTransition.contextProjection.injected = proj('changeId');
   await submit(rt, 'reviewChange', 'm:review', REVIEW_A);
   assert.deepEqual((await committed(host)).context, { changeId: 'A', reviewedSha: 'sha-a' }, 'the wiring snapshot is authoritative');
+
+  // [#1005 D3-K R2 — review #5508191410 P1] A live property deleted after
+  // wiring must not bypass the wiring-time frozen projection: the pinned
+  // lineage still commits by the same state CAS.
+  const deleted = policy();
+  const wired = await opened(deleted);
+  const deletedTransition = (deleted.intentBindings.reviewChange.definition as any).states[0].transitions[0];
+  delete deletedTransition.contextProjection;
+  const deletedReceipt = await submit(wired.rt, 'reviewChange', 'm:review', REVIEW_A);
+  assert.equal(deletedReceipt.status, 'admitted');
+  assert.deepEqual(deletedReceipt.admitted.contextProjection, { changeId: 'A', reviewedSha: 'sha-a' }, 'the frozen snapshot is resolved despite the deleted live property');
+  assert.deepEqual(await committed(wired.host), { stateKey: 'reviewed', context: { changeId: 'A', reviewedSha: 'sha-a' }, revision: 1 }, 'the pinned changeId/reviewedSha lineage commits');
+  assert.equal(await journalCount(wired.host), 1);
+  assert.equal(wired.host.resourceCalls.length, 1);
 
   const unwired = policy({ projections: {} });
   const second = await opened(unwired);
