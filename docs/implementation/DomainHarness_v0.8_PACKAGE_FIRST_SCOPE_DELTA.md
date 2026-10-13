@@ -7,7 +7,7 @@
 
 | Formal DAG | GitHub | Current live Issue | Reuse; no unnecessary rewrite |
 | --- | --- | --- | --- |
-| T-A Package ABI & BUILD | [#1000](https://github.com/kaicreator-mm/domain-harness/issues/1000) | CLOSED | `packages/domain-harness-compiler/src/qualified-package/{build,qualify,approval,payload}/`; current qualified Package root |
+| T-A Package ABI & BUILD | [#1000](https://github.com/kaicreator-mm/domain-harness/issues/1000) | CLOSED | `packages/domain-harness-compiler/src/qualified-package/{build.ts,qualify.ts,approval.ts,payload/}`; current qualified Package root |
 | T-B Microkernel `load(package)` | [#1001](https://github.com/kaicreator-mm/domain-harness/issues/1001) | CLOSED | `packages/domain-harness/src/public-v8/{load,microkernel,contracts}.ts`; preserve one-arg API |
 | T-C Kernel authority / CAS | [#1002](https://github.com/kaicreator-mm/domain-harness/issues/1002) | CLOSED | `.../qualified-package/payload/kernel-mechanism-v1.mjs`; reuse current selected mechanism, Journal, recovery |
 | T-D Standard Kind functional retention | [#1003](https://github.com/kaicreator-mm/domain-harness/issues/1003) | OPEN | `.../qualified-package/payload/standard-sdk-v1.mjs`; FR02, model measurement, Decision/Workflow/Operation and oracles |
@@ -21,14 +21,31 @@ Formal Issue closure count 4/7 = 57% of Issues, **not** release completion. Curr
 
 | ID | Scope / falsifiable test | Existing assets | Owner and dependency |
 | --- | --- | --- | --- |
-| S01 | **Closed-world build/runtime responsibility map**: every current `trust/installer/Host` check explicitly classified BUILD/deployment, Package-init or runtime request policy. Do not silently remove frozen byte/issuer guarantees. | #1000 BUILDer, #1001 load, #1004 bootstrap, #1013 wiring | **#1023 L2 review first**; `PRODUCT_DECISION_REQUIRED` if frozen Product acceptance is not equivalent |
+| S01 | **Closed-world build/runtime responsibility map**: every current `trust/installer/Host` check individually classified BUILD, **independently verified immutable deployment/install**, Package-init, or runtime caller policy, with preserved pre-import frozen negative witness. No BUILD-only self-attestation substitutes for independently approved *actual installed bytes*; before any source migration, current `trust/installer` checks remain binding. | #1000 BUILDer, #1001 load, #1004 bootstrap, #1013 wiring | **#1023 L2 review first**; `PRODUCT_DECISION_REQUIRED` if frozen Product acceptance is not equivalent |
 | S02 | **Extensible Package/Capability load**: a non-K/S/B capability with fixed Handler executes without new Microkernel kind-specific branching. Prove pure Schema remains uncallable. Current hardcoded Kind list examined. | `public-v8/contracts.ts`, K/S module endpoints and existing qualified BUILD | #1023 single narrow ABI fix *only if existing seam inadequate*, independent review |
-| S03 | **Minimal Package lifecycle**: optional `init/dispose` or verified equivalent; deterministically ordered init, refusal of init failure, reverse cleanup; no generic init-script VM. | existing K/S construction and facade `stop()` | #1023; no duplicate Kernel instance engine |
-| S04 | **Unified callable Operation**: at least one pure and one effectful OperationCall over stable envelope/input/output/error/effect class; fixed BUILD-selected Handler; Kernel retains authoritative Effect/Journal. | #942 unified Component/optional Operations, selected S `operation`, K dispatcher, Approval App | #1023 contract and minimal integration; **coordinate ongoing T-D/T-F**, no write collisions |
-| S05 | **Capability-owned platform implementation evidence**: one actual Node implementation explicitly owned by its capability contract; preserve existing sqlite/CAS/UX behavior. Do **not** introduce general `host-node` package. | #1004 physical CAS and resources, #1002 K Journal | #1023 ownership mapping and small adapter only if needed |
+| S03 | **Minimal Package lifecycle**: optional `init/dispose` or verified equivalent; BUILD-bound capability-limited immutable ctx, deterministically ordered init, refusal of init failure, reverse best-effort cleanup, no exposure of partially initialized facade, idempotent disposal, typed cleanup failures. Top-level imported JS may already run, so claim no later Package init, NOT rollback of module evaluation. No generic init-script VM. | existing K/S construction and facade `stop()` | #1023; no duplicate Kernel instance engine |
+| S04 | **Unified callable Operation**: at least one pure and one effectful OperationCall over stable envelope/input/output/error/effect class; fixed BUILD-selected Handler and exposure policy. Any mutation or `effectClass != none` **must traverse independently authenticated caller → Business/Capability scope/exposure → K Admission → Journal/Effect/UNKNOWN**; direct LLM/app privileged Handler import denied with zero effect/journal. Kernel retains authoritative Effect/Journal. | #942 unified Component/optional Operations, selected S `operation`, K dispatcher, Approval App | #1023 contract and minimal integration; **coordinate ongoing T-D/T-F**, no write collisions |
+| S05 | **Capability-owned platform implementation evidence**: one actual Node implementation explicitly owned by its capability contract; preserve existing sqlite/CAS/UX behavior and independent environment/deployment verifier. Named Identity Capability verifies caller dynamically with H-provisioned secrets; instrumented ModelPort measurement is witnessed by actual port. Do **not** introduce general `host-node` Domain Package. | #1004 physical CAS and resources, #1002 K Journal | #1023 ownership mapping and small adapter only if needed |
 | S06 | **Real app and safety regression**: same exact K/S in Approval and Engineering, relevant existing FR/HF/NF, no second Host-owned Domain Runtime, real effects/UNKNOWN/replay, unauthenticated caller refusals and cross-tenant isolation. | #1005 + #1006 and their in-flight PRs | **existing owners #1005/#1006**, plus focused #1023 deltas; no new demo |
 
-**Conditional qualification:** S01's build/runtime trust redistribution conflicts with frozen L2 U01/U02; direct implementation of removing the trusted Host admission cannot proceed until a reviewed successor proves frozen Product observables or authorizes a bounded Product revision. This is the only cross-cutting architecture decision blocking #1023 completion, not a reason to stop unrelated #1003/#1005 work.
+**Conditional qualification:** S01's build/runtime trust redistribution conflicts with **frozen Product FR06/NF03/NF04**, not just L2 U01/U02. Preferred option A is a separately trusted pre-execution **immutable deploy/install verifier** tied to the actually executed artifact (no Package membership reapproval in Microkernel); the existing Host/load gate remains binding until an exact artifact equivalence witness exists. Otherwise option B requires an explicit bounded Product successor decision. No silent runtime gate deletion. This is the only cross-cutting architecture decision blocking #1023 completion, not a reason to stop unrelated #1003/#1005 work.
+
+
+## 2a. Independent reviewer R1 closure matrix — issue #1023
+
+| Finding | Required bounded documentary repair | Follow-on authority/tests |
+| --- | --- | --- |
+| P1-TRUST-01 | Option A **independently verified immutable deployment/install boundary before any module import**, binding actual artifact bytes+publisher+build subject; no BUILDer self-trust. Option B bounded Product decision if equivalence cannot be shown. | Frozen FR06-N / NF03-N / NF04-N stay binding, original loader gates stay until exact candidate passes |
+| P1-AUTHN-01 | Named **Identity Capability** verifies true issuer/tenant/app/instance/expiry/revocation each request; H environment provisions verifier keys and protected transport; K performs dynamic authorization. | PF02, FR10-N, FR15-N, read/write/subscribe denial |
+| P1-OWNER-H-01 | Source-linked accountable H role matrix FR06, NF03/NF04, HF28, HF29, HF33, NF06, FR08, PF02 and tests in [L2 successor §5](../architecture/DomainHarness_v0.8_L2_PACKAGE_FIRST_SUCCESSOR.md). Platform implementation owner does not erase independent assurance role. | Existing current Node/physical Host tests all retained; no claimed unsupported Expo parity |
+| P1-OPCALL-01 | Pure/read and effectful call envelopes distinguished; effectful and all mutation require authenticated scope, exposure and **K Admission → Journal/Effect/UNKNOWN**. | Unauthorized LLM/app direct tool: typed denial, zero effect/journal; no bypass |
+| P2-LIFECYCLE | Immutable capability-limited init ctx; top-level module evaluation caveat; reverse best-effort dispose + typed failure | Real ordered init/fail-cleanup assertions, no hidden side effects claim |
+| P2-MODEL | Model Capability's *actual* instrumented port reports measured usage under H-provisioned verified boundary | Otherwise `unmeasured|unsupported`, FR08 +/- |
+| P2-EXTENSIBILITY | Generic additional callable capability must neither replace single K nor create a second effect authority | BUILD selected role/endpoint/Handler, missing/forged/ambiguous denial |
+| P2-CHECK-MAP | Per-check stage/owner+negative matrix in L2 successor §5 | T-F/T-G actual tests after code, not docs-only PASS |
+| P3-CORRECTIONS | Do not duplicate NF05/06; distinguish frozen-content preserving appendix from byte-immutability; precise files `build.ts/qualify.ts/approval.ts` | Contract nomenclature checked against current actual ABI |
+
+**Nothing in this repair has yet run a native Build Host test.** The Product-equivalence option remains proposed until independent reviewer accepts it and real deployment tests prove it. Source changes require a separate JIT PR if still necessary.
 
 ## 3. v0.8 OPTIONAL, non-blocking
 
@@ -67,10 +84,10 @@ L2 correction:   #1023 L2 review + (if needed) one minimal ABI/lifecycle fix ---
 
 ## 6. Quick verification checklist (a T-G input, not new tests declared PASS)
 
-- [ ] L2/Product-equivalence decision on trust admission vs closed-world build recorded and reviewed
+- [ ] Independent immutable deployment/install proof for actual approved executable bytes and Product FR06/NF03/NF04 equiv, or explicit Product successor authorization; source-only review is not enough to claim real proof
 - [ ] Independent capability + OperationCall ABI composition under one real sealed root (including Schema-only negative)
 - [ ] Package init/dispose or evidenced lifecycle equivalent, positive + failed init reverse-cleanup cases
-- [ ] Platform-specific Node implementation selected by BUILD and owned by capability contract
+- [ ] Platform-specific Node implementation selected by BUILD, owned by capability contract; H assurance role plus named Identity/Model/Resource/Observation owners and their real negatives survive
 - [ ] Same K/S selected bytes and two meaningful Approval/Engineering B apps run
 - [ ] No runtime ad-hoc provider selection; no second Host State/Effect/Journal authority
 - [ ] Retained FR/HF/NF negatives, scoped caller restrictions, CAS/UNKNOWN/replay/fault and clean consumers checked against changed exact SHA
