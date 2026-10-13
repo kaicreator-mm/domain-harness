@@ -31,7 +31,7 @@
 
 import { QualifiedPackageError } from './contracts.js';
 import { currentKernelHostPorts, type V8KernelHostPorts } from './kernel-host.js';
-import { currentHostModelPort } from './model-port.js';
+import { currentHostModelPort, type V8CancellationSignal } from './model-port.js';
 import { load } from './load.js';
 import type { QualifiedIntentBinding, QualifiedRoleBinding, SealedQualifiedPackageRoot } from './contracts.js';
 
@@ -58,6 +58,16 @@ export interface V8GatewayPrincipal {
   readonly tenantId: string;
   readonly appId: string;
   readonly roles: readonly string[];
+}
+
+/**
+ * Protected, request-scoped occurrence control (#1003 FR07-KH2, B3). Only
+ * the H-authenticated kernel gateway constructs one (per `send`); it rides
+ * BESIDE the plain-JSON Kernel request — never inside intent data — and the
+ * selected Kernel owns the cancellation latch the signal drives.
+ */
+export interface V8OccurrenceControl {
+  readonly signal: V8CancellationSignal;
 }
 
 /**
@@ -89,14 +99,15 @@ export interface V8FacadeKernelOps {
    * record bound into the Kernel request is derived ONLY from the
    * issuer-signed roles ∩ the sealed Business binding roles; intent data
    * cannot carry a caller. The physical instance address is the
-   * tenant/app-qualified key of the authenticated principal.
+   * tenant/app-qualified key of the authenticated principal. The optional
+   * `control` (#1003 FR07-KH2) is forwarded to the Kernel unchanged.
    */
   submitAs(principal: V8GatewayPrincipal, request: {
     readonly intentType: string;
     readonly messageId: string;
     readonly instanceKey: string;
     readonly input?: unknown;
-  }): Promise<unknown>;
+  }, control?: V8OccurrenceControl): Promise<unknown>;
   /** Scoped instance read for the authenticated principal's tenant/app. */
   queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
   /**
@@ -127,7 +138,7 @@ export interface V8FacadeKernelOps {
 
 /** The shape of the wired Kernel mechanism the transport scope consumes. */
 interface WiredKernelRuntime {
-  submitOccurrence(intent: unknown): unknown;
+  submitOccurrence(intent: unknown, control?: V8OccurrenceControl): unknown;
   getSnapshot(target: unknown): unknown;
   /** Present on the selected Kernel mechanism (T-C); required only for Genesis. */
   openInstance?(request: unknown): unknown;
@@ -147,8 +158,15 @@ type KernelRuntimeFactory = (deps: {
    * (#1013@6118426531, R1 F-03) the Kernel awaits the returned value: a
    * synchronous model-free resolution (plain value) and an async
    * Host-bound model resolution (Promise) both flow through unchanged.
+   * `invokeStep` (#1003 FR07-KH2) is the S single-step surface the Kernel's
+   * bounded continuation drives; present only with a trusted ModelPort.
+   * Both accept the optional protected occurrence control as a 4th argument.
    */
-  readonly sdkEndpoint: { readonly packageId: string; readonly interpret: (declaration: unknown, input: unknown, context: unknown) => unknown };
+  readonly sdkEndpoint: {
+    readonly packageId: string;
+    readonly interpret: (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
+    readonly invokeStep?: (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
+  };
   readonly businessEndpoint: object;
   readonly observe: (receipt: unknown) => void;
 }) => unknown;
@@ -293,14 +311,17 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   // refused at the getter before the frozen {invoke} object can be reached.
   const modelPort = currentHostModelPort(gatewaySessionCap);
   const resolverFactory = sdkNamespace.createHostBoundModelResolver;
-  const interpret = (
+  type SdkEndpointFn = (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
+  const sdkEndpoint: { packageId: string; interpret: SdkEndpointFn; invokeStep?: SdkEndpointFn } = (
     modelPort !== undefined && typeof resolverFactory === 'function'
       ? (() => {
-          const factory = resolverFactory as (port: unknown) => {
+          interface BoundResolver {
             interpret: (declaration: unknown, input: unknown, context: unknown) => unknown;
             invokeDecision: (declaration: unknown, input: unknown, context: unknown) => unknown;
-          };
-          let bound: ReturnType<typeof factory>;
+            invokeStep?: (declaration: unknown, input: unknown, context: unknown) => unknown;
+          }
+          const factory = resolverFactory as (port: unknown) => BoundResolver;
+          let bound: BoundResolver;
           try {
             bound = factory(modelPort);
           } catch (error) {
@@ -317,14 +338,48 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
             // production binding — refuse typed, never degrade silently.
             throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver exposes no callable interpret/invokeDecision pair (stale or failed bind)`);
           }
-          return (declaration: unknown, input: unknown, context: unknown): unknown => {
+          /**
+           * #1003 FR07-KH2 (B3): the resolver for ONE model turn. Without a
+           * protected control it is the load-time binding. With one, the SAME
+           * qualified factory is bound to a request-scoped view of the SAME
+           * trusted port that adds only the cancellation signal to the
+           * physical invocation — the S step/decision code, its evidence
+           * minting and the port identity are unchanged; nothing else rides.
+           */
+          const resolverFor = (control: V8OccurrenceControl | undefined): BoundResolver => {
+            if (control === undefined) return bound;
+            const signal = control.signal;
+            const signalledPort = Object.freeze({
+              invoke: (request: { readonly operation: string; readonly input: unknown }): unknown =>
+                modelPort.invoke({ operation: request.operation, input: request.input, signal }),
+            });
+            try {
+              return factory(signalledPort);
+            } catch (error) {
+              throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver bind failed: ${String((error as Error)?.message ?? error)}`);
+            }
+          };
+          const interpretComposite: SdkEndpointFn = (declaration, input, context, control) => {
             const kind = (declaration as { kind?: unknown } | null | undefined)?.kind;
             return kind === 'model-decision'
-              ? bound.invokeDecision(declaration, input, context)
+              ? resolverFor(control).invokeDecision(declaration, input, context)
               : bound.interpret(declaration, input, context);
           };
+          if (typeof bound.invokeStep !== 'function') {
+            // An S package without the step surface still serves one-turn
+            // decisions; a harness rule then refuses typed inside K.
+            return { packageId: sdkBinding.packageId, interpret: interpretComposite };
+          }
+          const invokeStep: SdkEndpointFn = (declaration, input, context, control) => {
+            const resolver = resolverFor(control);
+            if (typeof resolver.invokeStep !== 'function') {
+              throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver exposes no invokeStep`);
+            }
+            return resolver.invokeStep(declaration, input, context);
+          };
+          return { packageId: sdkBinding.packageId, interpret: interpretComposite, invokeStep };
         })()
-      : (sdkNamespace.interpret as (declaration: unknown, input: unknown, context: unknown) => unknown)
+      : { packageId: sdkBinding.packageId, interpret: sdkNamespace.interpret as SdkEndpointFn }
   );
 
   // Business policy resolution precedes kernel construction: a policy that
@@ -359,7 +414,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     kernelCandidate = createOccurrenceRuntime({
       moduleIdentity,
       hostPorts,
-      sdkEndpoint: { packageId: sdkBinding.packageId, interpret },
+      sdkEndpoint: Object.freeze(sdkEndpoint),
       businessEndpoint: businessPolicy,
       observe: (receipt: unknown) => {
         for (const observer of observers) {
@@ -599,7 +654,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       readonly messageId: string;
       readonly instanceKey: string;
       readonly input?: unknown;
-    }): Promise<unknown> {
+    }, control?: V8OccurrenceControl): Promise<unknown> {
       assertOpen();
       requirePrincipal(principal);
       const { intentType, messageId, instanceKey } = request;
@@ -627,7 +682,11 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
         caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
       };
       assertPlainJsonIntent(kernelRequest);
-      return kernelRuntime.submitOccurrence(kernelRequest);
+      // #1003 FR07-KH2: the protected control stays OUT of the plain-JSON
+      // request; the Kernel validates it and owns the latch it drives.
+      return control === undefined
+        ? kernelRuntime.submitOccurrence(kernelRequest)
+        : kernelRuntime.submitOccurrence(kernelRequest, control);
     },
     async queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown> {
       assertOpen();

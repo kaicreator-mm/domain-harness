@@ -161,7 +161,7 @@ async function loadScopedFacade(packageRoot) {
     // refused at the getter before the frozen {invoke} object can be reached.
     const modelPort = currentHostModelPort(gatewaySessionCap);
     const resolverFactory = sdkNamespace.createHostBoundModelResolver;
-    const interpret = (modelPort !== undefined && typeof resolverFactory === 'function'
+    const sdkEndpoint = (modelPort !== undefined && typeof resolverFactory === 'function'
         ? (() => {
             const factory = resolverFactory;
             let bound;
@@ -180,14 +180,49 @@ async function loadScopedFacade(packageRoot) {
                 // production binding — refuse typed, never degrade silently.
                 throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver exposes no callable interpret/invokeDecision pair (stale or failed bind)`);
             }
-            return (declaration, input, context) => {
+            /**
+             * #1003 FR07-KH2 (B3): the resolver for ONE model turn. Without a
+             * protected control it is the load-time binding. With one, the SAME
+             * qualified factory is bound to a request-scoped view of the SAME
+             * trusted port that adds only the cancellation signal to the
+             * physical invocation — the S step/decision code, its evidence
+             * minting and the port identity are unchanged; nothing else rides.
+             */
+            const resolverFor = (control) => {
+                if (control === undefined)
+                    return bound;
+                const signal = control.signal;
+                const signalledPort = Object.freeze({
+                    invoke: (request) => modelPort.invoke({ operation: request.operation, input: request.input, signal }),
+                });
+                try {
+                    return factory(signalledPort);
+                }
+                catch (error) {
+                    throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver bind failed: ${String(error?.message ?? error)}`);
+                }
+            };
+            const interpretComposite = (declaration, input, context, control) => {
                 const kind = declaration?.kind;
                 return kind === 'model-decision'
-                    ? bound.invokeDecision(declaration, input, context)
+                    ? resolverFor(control).invokeDecision(declaration, input, context)
                     : bound.interpret(declaration, input, context);
             };
+            if (typeof bound.invokeStep !== 'function') {
+                // An S package without the step surface still serves one-turn
+                // decisions; a harness rule then refuses typed inside K.
+                return { packageId: sdkBinding.packageId, interpret: interpretComposite };
+            }
+            const invokeStep = (declaration, input, context, control) => {
+                const resolver = resolverFor(control);
+                if (typeof resolver.invokeStep !== 'function') {
+                    throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver exposes no invokeStep`);
+                }
+                return resolver.invokeStep(declaration, input, context);
+            };
+            return { packageId: sdkBinding.packageId, interpret: interpretComposite, invokeStep };
         })()
-        : sdkNamespace.interpret);
+        : { packageId: sdkBinding.packageId, interpret: sdkNamespace.interpret });
     // Business policy resolution precedes kernel construction: a policy that
     // throws or returns a non-object fails typed with the mechanism still inert.
     let businessPolicy;
@@ -218,7 +253,7 @@ async function loadScopedFacade(packageRoot) {
         kernelCandidate = createOccurrenceRuntime({
             moduleIdentity,
             hostPorts,
-            sdkEndpoint: { packageId: sdkBinding.packageId, interpret },
+            sdkEndpoint: Object.freeze(sdkEndpoint),
             businessEndpoint: businessPolicy,
             observe: (receipt) => {
                 for (const observer of observers) {
@@ -420,7 +455,7 @@ async function loadScopedFacade(packageRoot) {
                 intentTypes: Object.freeze([...intentIndex.keys()]),
             });
         },
-        async submitAs(principal, request) {
+        async submitAs(principal, request, control) {
             assertOpen();
             requirePrincipal(principal);
             const { intentType, messageId, instanceKey } = request;
@@ -448,7 +483,11 @@ async function loadScopedFacade(packageRoot) {
                 caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
             };
             assertPlainJsonIntent(kernelRequest);
-            return kernelRuntime.submitOccurrence(kernelRequest);
+            // #1003 FR07-KH2: the protected control stays OUT of the plain-JSON
+            // request; the Kernel validates it and owns the latch it drives.
+            return control === undefined
+                ? kernelRuntime.submitOccurrence(kernelRequest)
+                : kernelRuntime.submitOccurrence(kernelRequest, control);
         },
         async queryInstance(principal, instanceKey) {
             assertOpen();

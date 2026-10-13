@@ -30,7 +30,16 @@
  *     refuse across process restarts before their module bytes ever load,
  *     and re-registering the SAME closure after a restart is idempotent;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
- *     delivery and silently stop when the grant is no longer valid.
+ *     delivery and silently stop when the grant is no longer valid;
+ *   - cancellation (#1003 FR07-KH2, B3) is request-scoped and
+ *     H-authenticated: every `send` mints ONE AbortController whose signal
+ *     rides beside the Kernel request as the protected occurrence control;
+ *     `cancel` re-authenticates, applies the same tenant/app scope gate and
+ *     aborts only an in-flight occurrence the SAME principal subject
+ *     submitted (any other id, or another subject's, answers
+ *     `not-in-flight` alike). The signal carries no authority — the selected Kernel owns
+ *     the latch, and a cancel arriving after K closed it for admission
+ *     cannot split the authoritative occurrence.
  *
  * This module wires; it implements no Kernel policy, no Guard/Effect/
  * Journal semantics and no second runtime (those belong to the physically
@@ -69,6 +78,20 @@ export interface KernelReceiptScope {
 export interface KernelReceiptSubscription {
     unsubscribe(): void;
 }
+/** Request-scoped cancellation request (#1003 FR07-KH2). */
+export interface KernelGatewayCancelRequest {
+    readonly target: UxTarget;
+    readonly messageId: string;
+}
+/**
+ * `cancel-requested`: the in-flight occurrence's signal was raised — the
+ * `send` receipt stays the authoritative outcome (`terminated`/CANCELLED, or
+ * `admitted` when K had already closed its latch for admission).
+ * `not-in-flight`: nothing of this principal is running under that id.
+ */
+export interface KernelGatewayCancelResult {
+    readonly status: 'cancel-requested' | 'not-in-flight';
+}
 export interface KernelGateway {
     /** Host-context provisioning: load + bind one approved Domain App. */
     registerApp(input: KernelGatewayAppInput): Promise<void>;
@@ -76,6 +99,8 @@ export interface KernelGateway {
     hasApp(appId: string): boolean;
     /** Authenticated send through the REAL selected Kernel of the app. */
     send(credential: unknown, intent: KernelGatewaySendIntent): Promise<unknown>;
+    /** Authenticated, request-scoped cancellation of the principal's own in-flight send. */
+    cancel(credential: unknown, request: KernelGatewayCancelRequest): Promise<KernelGatewayCancelResult>;
     /** Authenticated scoped instance read (K getSnapshot). */
     queryInstance(credential: unknown, target: UxTarget): Promise<unknown>;
     /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
