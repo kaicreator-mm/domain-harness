@@ -46,8 +46,20 @@ export interface V8DomainFacade {
   query(query: unknown): Promise<unknown>;
   /** Observe receipts; returns the unsubscribe function. */
   subscribe(observer: (receipt: unknown) => void): () => boolean;
-  /** Stop the facade scope: observers cleared, further use fails typed. */
-  stop(): void;
+  /**
+   * Stop the facade scope. The scope is stopped for further use
+   * IMMEDIATELY (synchronous part); the returned promise settles when the
+   * reverse-order lifecycle teardown COMPLETES (#1023 S03, R1 P1-01: the
+   * stop contract is awaitable — every `dispose(context)` is awaited in
+   * reverse sealed order before the next one starts, a failing dispose
+   * never aborts the remaining teardown, and the aggregate typed error
+   * `LIFECYCLE_DISPOSE_FAILED` REJECTS the promise instead of being
+   * swallowed). Repeated stop is one-shot idempotent: the same cached
+   * outcome is reported and no teardown runs twice. Callers that ignore
+   * the returned promise leave a rejection unobserved — by design, the
+   * failure is never silenced.
+   */
+  stop(): Promise<void>;
 }
 
 /**
@@ -290,12 +302,13 @@ function requireRoleBinding(bindings: readonly SealedQualifiedPackageRoot['bindi
  * side effect. #1023 S03 adds the optional package lifecycle phase
  * (init ascending / dispose descending along the sealed BUILD-fixed
  * packages order) between import and wiring: an init failure blocks the
- * entire activation and reverse-disposes the initialized prefix; a
- * post-init wiring failure cleans up the same way with its own typed
- * error rethrown unchanged. Residual scope honestly documented (same JS
- * semantics as the installer): packages whose module top level already
- * evaluated during the qualified install cannot be un-evaluated; the
- * loader guarantees only that nothing of ITS OWN (facade, observers,
+ * entire activation and cleans up in reverse order starting from the
+ * failed package itself (best-effort, R1 P1-02); a post-init wiring
+ * failure cleans up the initialized packages the same way with its own
+ * typed error rethrown unchanged. Residual scope honestly documented
+ * (same JS semantics as the installer): packages whose module top level
+ * already evaluated during the qualified install cannot be un-evaluated;
+ * the loader guarantees only that nothing of ITS OWN (facade, observers,
  * mechanism construction, lifecycle participants) outlives a failed
  * activation.
  */
@@ -353,8 +366,10 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   // cleanup runs descending. A present-but-non-callable hook is refused by
   // the pre-scan BEFORE any lifecycle side effect; an init failure blocks
   // the whole activation (no policy resolution, no mechanism construction,
-  // no facade) and disposes the already-initialized prefix in reverse —
-  // the FAILED package itself is never disposed. The context is the frozen
+  // no facade) and cleans up along the reverse order starting with the
+  // FAILED package itself (R1 P1-02: its init may have partially allocated
+  // resources — a best-effort dispose runs first when the package exports
+  // one), then the already-initialized packages. The context is the frozen
   // data-only identity record (contracts.ts V8PackageLifecycleContext); it
   // never carries Host ports, gateway session material or any Kernel/Host
   // private capability, and there is no init-script engine — the hooks are
@@ -396,10 +411,23 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     try {
       await participant.init(participant.context);
     } catch (error) {
-      const cleanupFailures = await disposeInitialized(initialized);
+      // R1 P1-02: a failed init may hold PARTIALLY allocated resources —
+      // best-effort dispose the FAILING participant FIRST (its allocation
+      // is the most recent), then the already-initialized packages in
+      // reverse sealed order. Every cleanup failure is collected beside
+      // the primary LIFECYCLE_INIT_FAILED error without erasing it.
+      const cleanupFailures: QualifiedCleanupFailure[] = [];
+      if (participant.dispose !== undefined) {
+        try {
+          await participant.dispose(participant.context);
+        } catch (disposeError) {
+          cleanupFailures.push({ packageId: participant.packageId, message: errorMessage(disposeError) });
+        }
+      }
+      cleanupFailures.push(...await disposeInitialized(initialized));
       const failure = typedError(
         'LIFECYCLE_INIT_FAILED',
-        `package ${participant.packageId} lifecycle init failed: ${errorMessage(error)}; activation is blocked and the already-initialized packages were disposed in reverse sealed order`,
+        `package ${participant.packageId} lifecycle init failed: ${errorMessage(error)}; activation is blocked and lifecycle cleanup ran (the failed package best-effort first, then the initialized packages in reverse sealed order)`,
       );
       if (cleanupFailures.length > 0) failure.cleanupFailures = cleanupFailures;
       throw failure;
@@ -575,7 +603,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   );
 
   let stopped = false;
-  let disposed = false;
+  let stopDisposal: Promise<void> | undefined;
   function assertOpen(): void {
     if (stopped) {
       throw typedError('FACADE_STOPPED', 'this facade scope is stopped; load the package again for a fresh scope');
@@ -676,42 +704,28 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     throw refusePublicRoute('subscribe');
   }
 
-  function stop(): void {
+  function stop(): Promise<void> {
     stopped = true;
     observers.clear();
-    // #1023 S03: stopping the scope tears the package lifecycle down in
-    // REVERSE sealed (BUILD-fixed) order — the happy-path counterpart of the
-    // failure cleanup. The teardown is one-shot (a second stop changes
-    // nothing) and continues past a failing dispose so every remaining
-    // participant is still offered its cleanup; synchronous dispose
-    // failures are aggregated into one typed error. stop() is a
-    // synchronous boundary: an async dispose is STARTED here but its
-    // completion cannot be awaited at this call site (documented residual
-    // — the failure paths inside load() DO await async disposal fully).
-    if (disposed) return;
-    disposed = true;
-    const failures: QualifiedCleanupFailure[] = [];
-    for (const participant of [...initialized].reverse()) {
-      if (participant.dispose === undefined) continue;
-      try {
-        const result = participant.dispose(participant.context);
-        if (result !== null && typeof result === 'object' && typeof (result as { then?: unknown }).then === 'function') {
-          void (result as Promise<unknown>).catch(() => {
-            // Synchronous teardown cannot observe this rejection; the
-            // failure-path disposal inside load() is where async cleanup
-            // is fully coordinated and reported.
-          });
-        }
-      } catch (error) {
-        failures.push({ packageId: participant.packageId, message: errorMessage(error) });
+    // #1023 S03, R1 P1-01: stopping the scope tears the package lifecycle
+    // down along the reverse sealed (BUILD-fixed) order and the teardown is
+    // AWAITABLE — each dispose is fully awaited (sync or async) before the
+    // next participant starts, a failing dispose never aborts the remaining
+    // teardown, and the aggregate typed LIFECYCLE_DISPOSE_FAILED error
+    // REJECTS the returned promise (a rejection is never silenced: callers
+    // that ignore the promise leave it unobserved, which surfaces through
+    // the host's unhandled-rejection channel). The disposal is ONE-SHOT:
+    // the first stop caches the outcome promise and every repeated stop
+    // reports that same outcome without re-running anything.
+    stopDisposal ??= disposeInitialized(initialized).then((failures) => {
+      if (failures.length > 0) {
+        throw typedError(
+          'LIFECYCLE_DISPOSE_FAILED',
+          `facade stop lifecycle cleanup failed for ${failures.map((failure) => failure.packageId).join(', ')}: ${failures.map((failure) => failure.message).join('; ')}`,
+        );
       }
-    }
-    if (failures.length > 0) {
-      throw typedError(
-        'LIFECYCLE_DISPOSE_FAILED',
-        `facade stop lifecycle cleanup failed for ${failures.map((failure) => failure.packageId).join(', ')}: ${failures.map((failure) => failure.message).join('; ')}`,
-      );
-    }
+    });
+    return stopDisposal;
   }
 
   // ---- #1013 private gateway seam (I02/I03), module-private WeakMap ----

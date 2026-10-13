@@ -21,11 +21,11 @@
  *             package's init starts only after it settles); a second
  *             facade of the same root runs its own one-shot lifecycle.
  *   - S03-N1  an init failure on the LAST package blocks activation
- *             (no policy resolution, no mechanism construction, no facade)
- *             and disposes the already-initialized packages in reverse —
- *             the FAILED package itself is never disposed.
- *   - S03-N2  a mid-closure init failure leaves only the earlier
- *             initialized packages to clean up; later packages never run.
+ *             (no policy resolution, no mechanism construction, no facade);
+ *             the FAILED package is best-effort cleaned FIRST (R1 P1-02),
+ *             then the initialized prefix in reverse.
+ *   - S03-N2  a mid-closure init failure cleans the failed package first,
+ *             then the earlier initialized prefix; later packages never run.
  *   - S03-N3  a present-but-non-callable init/dispose export is refused
  *             by the pre-scan BEFORE any lifecycle side effect runs.
  *   - S03-N4  a dispose failure during failure cleanup is reported on the
@@ -35,9 +35,23 @@
  *             the pre-existing ACTIVATION_FAILED path) still cleans up
  *             every initialized package in reverse and keeps its own
  *             typed code.
- *   - S03-N6  a synchronous dispose failure at `stop()` throws typed
- *             LIFECYCLE_DISPOSE_FAILED after disposing every remaining
- *             participant; the facade is stopped either way.
+ *   - S03-N6  a synchronous dispose failure at stop REJECTS typed (the
+ *             stop contract is awaitable, R1 P1-01) after disposing every
+ *             remaining participant; repeated stop reports the same
+ *             outcome with zero re-run.
+ *   - S03-N9  a failed package WITHOUT a dispose export cleans only the
+ *             initialized prefix (best-effort is a no-op, not an error).
+ *   - S03-N10 a REAL partial allocation before an init failure is released
+ *             best-effort FIRST (R1 P1-02); the failed package's own
+ *             dispose failure rides beside the primary typed error.
+ *   - S03-P6a awaitable stop (R1 P1-01): async disposes with inverted
+ *             per-position delays settle STRICTLY sequentially in reverse
+ *             sealed order — a concurrent fire-and-forget teardown would
+ *             invert the completion order.
+ *   - S03-P6b an async dispose rejection at stop is OBSERVED (typed
+ *             rejection, never swallowed), teardown continues past it and
+ *             awaits every remaining disposer, and repeated stop is
+ *             idempotent (same outcome, zero re-run).
  *   - S03-N8  pin: the sealed packages order is committed by the approval
  *             subject digest — reordering the array to change the
  *             lifecycle order is refused by the existing replay gate.
@@ -111,6 +125,9 @@ export const S03_SENTINEL = '__v08S03LifecycleSentinel' as const;
 interface S03Registry {
   init: string[];
   dispose: string[];
+  disposeEnd: string[];
+  allocated: string[];
+  released: string[];
   initContexts: Record<string, unknown>;
   disposeContexts: Record<string, unknown>;
   mechanism: string[];
@@ -122,6 +139,9 @@ function freshRegistry(): S03Registry {
   return {
     init: [],
     dispose: [],
+    disposeEnd: [],
+    allocated: [],
+    released: [],
     initContexts: {},
     disposeContexts: {},
     mechanism: [],
@@ -144,27 +164,35 @@ function s03(): S03Registry {
   return fresh;
 }
 
-type HookVariant = 'ok' | 'throw' | 'asyncThrow' | 'nonCallable' | undefined;
+type HookVariant = 'ok' | 'throw' | 'allocateThrow' | 'asyncThrow' | 'asyncOk' | 'nonCallable' | undefined;
 
 /**
  * Optional lifecycle export lines for a sealed module. `ok` records the
  * call plus the received context; `throw` records the call and then fails
- * (the loader treats the hook as failed, not as never-called); `nonCallable`
- * exports a present-but-non-function value for the pre-scan vector.
+ * (the loader treats the hook as failed, not as never-called);
+ * `allocateThrow` simulates a REAL partial allocation before failing
+ * (records the allocation, releases are observed through dispose);
+ * `asyncThrow` fails only after a tick; `asyncOk` (dispose only) settles
+ * after `delayMs` so completion-order witnesses can distinguish an
+ * awaited reverse teardown from a concurrent fire-and-forget one;
+ * `nonCallable` exports a present-but-non-function value for the pre-scan
+ * vector. `dispose` records its START into `dispose` and its COMPLETION
+ * into `disposeEnd` (adjacent for sync variants, delayed for async ones).
  */
-function hookLines(packageId: string, init: HookVariant, dispose: HookVariant): string[] {
+function hookLines(packageId: string, init: HookVariant, dispose: HookVariant, disposeDelayMs = 0): string[] {
   const id = JSON.stringify(packageId);
   const lines: string[] = [];
   if (init === 'nonCallable') {
     lines.push('export const init = 42;');
   } else if (init !== undefined) {
-    const asyncPrefix = init === 'ok' ? '' : 'async ';
+    const asyncPrefix = init === 'ok' || init === 'throw' || init === 'allocateThrow' ? '' : 'async ';
     lines.push(
       `export ${asyncPrefix}function init(context) {`,
       `  const r = globalThis.${S03_SENTINEL};`,
       `  r.init.push(${id});`,
       `  r.initContexts[${id}] = context;`,
-      ...(init === 'throw' ? [`  throw new Error('s03-init-sabotage:' + ${id});`] : []),
+      ...(init === 'allocateThrow' ? [`  r.allocated.push(${id});`] : []),
+      ...(init === 'throw' || init === 'allocateThrow' ? [`  throw new Error('s03-init-sabotage:' + ${id});`] : []),
       ...(init === 'asyncThrow'
         ? [
             '  await new Promise((resolve) => setTimeout(resolve, 5));',
@@ -177,17 +205,21 @@ function hookLines(packageId: string, init: HookVariant, dispose: HookVariant): 
   if (dispose === 'nonCallable') {
     lines.push("export const dispose = 'not-a-function';");
   } else if (dispose !== undefined) {
-    const asyncPrefix = dispose === 'ok' || dispose === 'throw' ? '' : 'async ';
+    const isAsync = dispose === 'asyncOk' || dispose === 'asyncThrow';
+    const asyncPrefix = isAsync ? 'async ' : '';
     lines.push(
       `export ${asyncPrefix}function dispose(context) {`,
       `  const r = globalThis.${S03_SENTINEL};`,
       `  r.dispose.push(${id});`,
       `  r.disposeContexts[${id}] = context;`,
-      ...(dispose === 'throw' ? [`  throw new Error('s03-dispose-sabotage:' + ${id});`] : []),
-      ...(dispose === 'asyncThrow'
+      ...(dispose === 'ok' ? [`  r.released.push(${id});`, `  r.disposeEnd.push(${id});`] : []),
+      ...(dispose === 'throw' ? [`  r.disposeEnd.push(${id});`, `  throw new Error('s03-dispose-sabotage:' + ${id});`] : []),
+      ...(isAsync
         ? [
-            '  await new Promise((resolve) => setTimeout(resolve, 5));',
-            `  throw new Error('s03-dispose-async-sabotage:' + ${id});`,
+            `  await new Promise((resolve) => setTimeout(resolve, ${disposeDelayMs}));`,
+            ...(dispose === 'asyncOk'
+              ? [`  r.released.push(${id});`, `  r.disposeEnd.push(${id});`]
+              : [`  r.disposeEnd.push(${id});`, `  throw new Error('s03-dispose-async-sabotage:' + ${id});`]),
           ]
         : []),
       '}',
@@ -202,13 +234,13 @@ function hookLines(packageId: string, init: HookVariant, dispose: HookVariant): 
 // construction / policy resolution) the failure vectors assert stayed cold.
 // ---------------------------------------------------------------------------
 
-function s03Kernel(packageId: string, init?: HookVariant, dispose?: HookVariant): string {
+function s03Kernel(packageId: string, init?: HookVariant, dispose?: HookVariant, disposeDelayMs = 0): string {
   return [
     `export const MODULE_ID = ${JSON.stringify(packageId)};`,
     "export const PACKAGE_KIND = 'kernel';",
     "export const ABI_VERSION = 'v08-kernel-abi/1';",
     "export const ENDPOINTS = [{ endpointId: 'occurrence-runtime', kind: 'occurrence-runtime' }];",
-    ...hookLines(packageId, init, dispose),
+    ...hookLines(packageId, init, dispose, disposeDelayMs),
     'export function createOccurrenceRuntime(deps) {',
     `  globalThis.${S03_SENTINEL}.mechanism.push(${JSON.stringify(packageId)});`,
     '  let occurrences = 0;',
@@ -240,13 +272,13 @@ function s03Kernel(packageId: string, init?: HookVariant, dispose?: HookVariant)
   ].join('\n');
 }
 
-function s03Sdk(packageId: string, init?: HookVariant, dispose?: HookVariant): string {
+function s03Sdk(packageId: string, init?: HookVariant, dispose?: HookVariant, disposeDelayMs = 0): string {
   return [
     `export const MODULE_ID = ${JSON.stringify(packageId)};`,
     "export const PACKAGE_KIND = 'standard-sdk';",
     "export const ABI_VERSION = 'v08-standard-sdk-abi/1';",
     "export const ENDPOINTS = [{ endpointId: 'rule-interpreter', kind: 'rule-interpreter' }];",
-    ...hookLines(packageId, init, dispose),
+    ...hookLines(packageId, init, dispose, disposeDelayMs),
     'export function interpret(input) {',
     '  if (input !== null && typeof input === "object" && !Array.isArray(input)) {',
     '    return Object.assign({}, input);',
@@ -257,14 +289,14 @@ function s03Sdk(packageId: string, init?: HookVariant, dispose?: HookVariant): s
   ].join('\n');
 }
 
-function s03Business(packageId: string, intentType: string, init?: HookVariant, dispose?: HookVariant, failPolicy = false): string {
+function s03Business(packageId: string, intentType: string, init?: HookVariant, dispose?: HookVariant, failPolicy = false, disposeDelayMs = 0): string {
   return [
     `export const MODULE_ID = ${JSON.stringify(packageId)};`,
     "export const PACKAGE_KIND = 'business';",
     "export const ABI_VERSION = 'v08-business-abi/1';",
     "export const ENDPOINTS = [{ endpointId: 'business-policy', kind: 'business-policy' }];",
     `export const INTENT_TYPES = [${JSON.stringify(intentType)}];`,
-    ...hookLines(packageId, init, dispose),
+    ...hookLines(packageId, init, dispose, disposeDelayMs),
     'export function getPolicy() {',
     `  globalThis.${S03_SENTINEL}.policy.push(${JSON.stringify(packageId)});`,
     ...(failPolicy ? [`  throw new Error('s03-policy-sabotage');`] : []),
@@ -284,13 +316,13 @@ function s03Business(packageId: string, intentType: string, init?: HookVariant, 
   ].join('\n');
 }
 
-function s03Capability(packageId: string, init?: HookVariant, dispose?: HookVariant): string {
+function s03Capability(packageId: string, init?: HookVariant, dispose?: HookVariant, disposeDelayMs = 0): string {
   return [
     `export const MODULE_ID = ${JSON.stringify(packageId)};`,
     "export const PACKAGE_KIND = 'capability';",
     "export const ABI_VERSION = 'v08-capability-abi/1';",
     "export const ENDPOINTS = [{ endpointId: 'demo-capability', kind: 'capability-endpoint' }];",
-    ...hookLines(packageId, init, dispose),
+    ...hookLines(packageId, init, dispose, disposeDelayMs),
     'export function echoText(input) {',
     '  return { echoed: input === undefined ? null : input };',
     '}',
@@ -322,6 +354,8 @@ function mintProof(subjectDigest: string): ApprovalProof {
 interface MintLifecycle {
   readonly init?: HookVariant;
   readonly dispose?: HookVariant;
+  /** Settlement delay of an `asyncOk`/`asyncThrow` dispose (order witness). */
+  readonly disposeDelay?: number;
 }
 
 interface MintInput {
@@ -346,11 +380,11 @@ function mintRoot(input: MintInput): { root: SealedQualifiedPackageRoot } & Retu
   const ids = mintIds(input.tag);
   const intentType = `demo.s03-${input.tag}`;
   const capabilityWanted = input.capability !== false;
-  const kernelSource = s03Kernel(ids.kernelId, input.kernel?.init, input.kernel?.dispose);
-  const sdkSource = s03Sdk(ids.sdkId, input.sdk?.init, input.sdk?.dispose);
-  const businessSource = s03Business(ids.businessId, intentType, input.business?.init, input.business?.dispose, input.failPolicy === true);
+  const kernelSource = s03Kernel(ids.kernelId, input.kernel?.init, input.kernel?.dispose, input.kernel?.disposeDelay);
+  const sdkSource = s03Sdk(ids.sdkId, input.sdk?.init, input.sdk?.dispose, input.sdk?.disposeDelay);
+  const businessSource = s03Business(ids.businessId, intentType, input.business?.init, input.business?.dispose, input.failPolicy === true, input.business?.disposeDelay);
   const capabilitySource = capabilityWanted
-    ? s03Capability(ids.capabilityId, (input.capability as MintLifecycle | undefined)?.init, (input.capability as MintLifecycle | undefined)?.dispose)
+    ? s03Capability(ids.capabilityId, (input.capability as MintLifecycle | undefined)?.init, (input.capability as MintLifecycle | undefined)?.dispose, (input.capability as MintLifecycle | undefined)?.disposeDelay)
     : '';
   const packages = [
     {
@@ -557,13 +591,13 @@ test('V08-S03-P1 full participation: sealed-order init, unchanged K/S/B route, r
   })) as { status: string };
   assert.equal(receipt.status, 'admitted');
 
-  facade.stop();
+  await facade.stop();
   assert.deepEqual(registry.dispose, [ids.capabilityId, ids.businessId, ids.sdkId, ids.kernelId], 'stop disposes in reverse sealed order');
   // dispose received the SAME frozen context object as init.
   for (const packageId of [ids.kernelId, ids.sdkId, ids.businessId, ids.capabilityId]) {
     assert.equal(registry.disposeContexts[packageId], registry.initContexts[packageId], `dispose saw init's context for ${packageId}`);
   }
-  facade.stop(); // idempotent — no second lifecycle pass
+  await facade.stop(); // idempotent — no second lifecycle pass
   assert.equal(registry.dispose.length, 4, 'a second stop runs no further dispose');
 });
 
@@ -580,7 +614,7 @@ test('V08-S03-P2 participation is per package: dispose-only packages are cleaned
   assert.deepEqual(registry.init, [minted.kernelId, minted.capabilityId], 'only init-exporting packages init, still in sealed order');
   assert.equal(registry.initContexts[minted.sdkId], undefined, 'a dispose-only package is never init-ed');
   assert.equal(registry.initContexts[minted.businessId], undefined, 'a hook-less package is never init-ed');
-  facade.stop();
+  await facade.stop();
   assert.deepEqual(
     registry.dispose,
     [minted.capabilityId, minted.sdkId, minted.kernelId],
@@ -606,7 +640,7 @@ test('V08-S03-P3 regression: a closure without lifecycle exports keeps the histo
     input: { amount: 7 },
   })) as { status: string };
   assert.equal(receipt.status, 'admitted');
-  facade.stop();
+  await facade.stop();
   assert.deepEqual(registry.dispose, [], 'stop stays a pure scope teardown for hook-less closures');
 });
 
@@ -628,7 +662,7 @@ test('V08-S03-P4 an async init is awaited inside the sealed order; each facade s
     },
   );
   assert.deepEqual(registry.init, [minted.kernelId, minted.capabilityId], 'the async init was called in sealed order');
-  assert.deepEqual(registry.dispose, [minted.kernelId], 'the initialized kernel package was cleaned up in reverse');
+  assert.deepEqual(registry.dispose, [minted.capabilityId, minted.kernelId], 'the failed capability is best-effort disposed FIRST, then the initialized kernel in reverse');
   assert.deepEqual(registry.mechanism, [], 'activation stayed blocked');
 
   // The one-shot lifecycle is per facade scope: a fresh load of a healthy
@@ -642,8 +676,8 @@ test('V08-S03-P4 an async init is awaited inside the sealed order; each facade s
   assert.deepEqual(registry.init.filter((id) => id === minted2.kernelId || id === minted2.capabilityId), [minted2.kernelId, minted2.capabilityId]);
   const facadeB = await DomainHarness.load(minted2.root);
   assert.equal(registry.init.filter((id) => id === minted2.kernelId).length, 2, 'a second facade runs its own init pass (per-scope one-shot)');
-  facadeA.stop();
-  facadeB.stop();
+  await facadeA.stop();
+  await facadeB.stop();
   assert.deepEqual(
     registry.dispose.filter((id) => id === minted2.kernelId || id === minted2.capabilityId),
     [minted2.capabilityId, minted2.kernelId, minted2.capabilityId, minted2.kernelId],
@@ -651,7 +685,7 @@ test('V08-S03-P4 an async init is awaited inside the sealed order; each facade s
   );
 });
 
-test('V08-S03-N1 an init failure on the last package blocks activation and reverse-cleans the initialized prefix', async () => {
+test('V08-S03-N1 an init failure on the last package blocks activation; the FAILED package is best-effort cleaned FIRST, then the prefix in reverse (R1 P1-02)', async () => {
   const minted = mintRoot({
     tag: 'n1',
     kernel: { init: 'ok', dispose: 'ok' },
@@ -663,14 +697,18 @@ test('V08-S03-N1 an init failure on the last package blocks activation and rever
   assert.match(error.message, new RegExp(minted.capabilityId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   const registry = s03();
   assert.deepEqual(registry.init, [minted.kernelId, minted.sdkId, minted.businessId, minted.capabilityId], 'init ran in sealed order until the failure');
-  assert.deepEqual(registry.dispose, [minted.businessId, minted.sdkId, minted.kernelId], 'the initialized prefix is disposed in reverse');
-  assert.equal(registry.dispose.includes(minted.capabilityId), false, 'the FAILED package itself is never disposed');
+  assert.deepEqual(
+    registry.dispose,
+    [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId],
+    'the FAILED package is best-effort disposed FIRST (it may hold partial allocations), then the initialized prefix in reverse',
+  );
+  assert.deepEqual(registry.released, [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId], 'every dispose ran to completion');
   assert.deepEqual(registry.policy, [], 'business policy resolution never ran — activation is blocked');
   assert.deepEqual(registry.mechanism, [], 'kernel mechanism construction never ran — activation is blocked');
   assert.equal(error.cleanupFailures, undefined, 'no cleanup failures to report when every dispose succeeded');
 });
 
-test('V08-S03-N2 a mid-closure init failure cleans only the earlier initialized packages; later packages never run', async () => {
+test('V08-S03-N2 a mid-closure init failure cleans the FAILED package first, then the earlier initialized prefix; later packages never run', async () => {
   const minted = mintRoot({
     tag: 'n2',
     kernel: { init: 'ok', dispose: 'ok' },
@@ -681,7 +719,7 @@ test('V08-S03-N2 a mid-closure init failure cleans only the earlier initialized 
   await rejectsLoad('LIFECYCLE_INIT_FAILED', minted.root);
   const registry = s03();
   assert.deepEqual(registry.init, [minted.kernelId, minted.sdkId]);
-  assert.deepEqual(registry.dispose, [minted.kernelId], 'only the initialized prefix is disposed');
+  assert.deepEqual(registry.dispose, [minted.sdkId, minted.kernelId], 'failed sdk first (best-effort), then the initialized prefix in reverse');
   assert.equal(registry.init.includes(minted.businessId), false, 'later packages never init');
   assert.equal(registry.dispose.includes(minted.capabilityId), false, 'later packages never dispose');
   assert.deepEqual(registry.policy, [], 'activation blocked');
@@ -726,7 +764,7 @@ test('V08-S03-N4 a dispose failure during failure cleanup is reported without er
   assert.match(cleanupFailures[0].message, /s03-dispose/);
   const registry = s03();
   assert.deepEqual(registry.init, [minted.kernelId, minted.sdkId], 'init ran in sealed order until the sdk failure');
-  assert.deepEqual(registry.dispose, [minted.kernelId], 'only the initialized prefix (kernel) is disposed, in reverse');
+  assert.deepEqual(registry.dispose, [minted.sdkId, minted.kernelId], 'failed sdk disposed best-effort first, then the initialized prefix (kernel) in reverse');
 });
 
 test('V08-S03-N5 a post-init activation failure still reverse-cleans every initialized package and keeps its own typed code', async () => {
@@ -760,7 +798,7 @@ test('V08-S03-N5 a post-init activation failure still reverse-cleans every initi
   assert.equal(variantError.cleanupFailures[0].packageId, variant.kernelId);
 });
 
-test('V08-S03-N6 a synchronous dispose failure at stop throws typed after disposing every remaining participant', async () => {
+test('V08-S03-N6 a synchronous dispose failure at stop rejects typed after disposing every remaining participant (awaitable stop, R1 P1-01)', async () => {
   const minted = mintRoot({
     tag: 'n6',
     kernel: { init: 'ok', dispose: 'ok' },
@@ -771,20 +809,141 @@ test('V08-S03-N6 a synchronous dispose failure at stop throws typed after dispos
   const facade = await DomainHarness.load(minted.root);
   const registry = s03();
   assert.deepEqual(registry.dispose, [], 'nothing disposed while live');
-  assert.throws(() => facade.stop(), (error: unknown) => {
-    assert.ok(error instanceof QualifiedPackageError);
-    assert.equal((error as QualifiedPackageError).code, 'LIFECYCLE_DISPOSE_FAILED');
-    return true;
-  });
-  assert.deepEqual(registry.dispose, [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId], 'every participant still disposed in reverse order');
-  // The scope is stopped either way; a second stop is inert.
+  await assert.rejects(
+    () => facade.stop(),
+    (error: unknown) => {
+      assert.ok(error instanceof QualifiedPackageError);
+      assert.equal((error as QualifiedPackageError).code, 'LIFECYCLE_DISPOSE_FAILED');
+      return true;
+    },
+  );
+  assert.deepEqual(registry.disposeEnd, [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId], 'every participant still disposed in reverse order');
+  // The scope is stopped either way; a second stop reports the SAME outcome
+  // without running any further dispose (one-shot idempotent).
   await assert.rejects(() => facade.send({ intentType: 'demo.s03-n6' }), (error: unknown) => {
     assert.ok(error instanceof QualifiedPackageError);
     assert.equal((error as QualifiedPackageError).code, 'FACADE_STOPPED');
     return true;
   });
-  facade.stop();
-  assert.equal(registry.dispose.length, 4, 'the second stop runs no further dispose and no longer throws');
+  await assert.rejects(
+    () => facade.stop(),
+    (error: unknown) => {
+      assert.ok(error instanceof QualifiedPackageError);
+      assert.equal((error as QualifiedPackageError).code, 'LIFECYCLE_DISPOSE_FAILED');
+      return true;
+    },
+  );
+  assert.equal(registry.dispose.length, 4, 'the second stop runs no further dispose');
+});
+
+test('V08-S03-N9 a failed package WITHOUT a dispose export cleans only the initialized prefix (best-effort is a no-op)', async () => {
+  const minted = mintRoot({
+    tag: 'n9',
+    kernel: { init: 'ok', dispose: 'ok' },
+    sdk: { init: 'throw' }, // fails, exports no dispose
+    business: { init: 'ok', dispose: 'ok' },
+    capability: { init: 'ok', dispose: 'ok' },
+  });
+  await rejectsLoad('LIFECYCLE_INIT_FAILED', minted.root);
+  const registry = s03();
+  assert.deepEqual(registry.init, [minted.kernelId, minted.sdkId]);
+  assert.deepEqual(registry.dispose, [minted.kernelId], 'nothing to call on the failed package — only the prefix cleans up');
+});
+
+test('V08-S03-N10 a real partial allocation before init failure is released best-effort first; its own dispose failure is reported beside the primary (R1 P1-02)', async () => {
+  const minted = mintRoot({
+    tag: 'n10',
+    kernel: { init: 'ok', dispose: 'ok' },
+    sdk: { init: 'allocateThrow', dispose: 'ok' },
+    business: { init: 'ok', dispose: 'ok' },
+    capability: { init: 'ok', dispose: 'ok' },
+  });
+  const error = await rejectsLoad('LIFECYCLE_INIT_FAILED', minted.root);
+  assert.deepEqual(s03().allocated, [minted.sdkId], 'the sdk init really allocated before failing');
+  assert.deepEqual(
+    s03().released,
+    [minted.sdkId, minted.kernelId],
+    'the failed package\'s partial allocation is released FIRST, then the initialized prefix in reverse',
+  );
+  assert.equal(error.cleanupFailures, undefined, 'the successful best-effort release is not a cleanup failure');
+
+  // Dispose-failure variant: the failed package's OWN best-effort dispose
+  // rejects — the primary init failure survives, the release failure rides
+  // beside it as the FIRST cleanupFailures entry.
+  const variant = mintRoot({
+    tag: 'n10b',
+    kernel: { init: 'ok', dispose: 'ok' },
+    sdk: { init: 'allocateThrow', dispose: 'asyncThrow' },
+    business: { init: 'ok', dispose: 'ok' },
+    capability: { init: 'ok', dispose: 'ok' },
+  });
+  const variantError = await rejectsLoad('LIFECYCLE_INIT_FAILED', variant.root);
+  assert.match(variantError.message, /s03-init-sabotage/, 'the primary init failure message survives');
+  const cleanupFailures = variantError.cleanupFailures;
+  assert.ok(Array.isArray(cleanupFailures), 'cleanupFailures is attached');
+  assert.equal(cleanupFailures[0].packageId, variant.sdkId, 'the failed package\'s own dispose failure is reported first');
+  assert.match(cleanupFailures[0].message, /s03-dispose/);
+  assert.deepEqual(
+    s03().released.filter((id) => id === variant.kernelId || id === variant.sdkId),
+    [variant.kernelId],
+    'the prefix release still completed after the failed package\'s dispose rejected (the failed sdk released nothing — its dispose threw)',
+  );
+});
+
+test('V08-S03-P6a awaitable stop: async disposes settle strictly in reverse sealed order, not concurrently (R1 P1-01)', async () => {
+  // Inverted per-position delays: if stop() fire-and-forgot the disposers,
+  // the SHORT kernel delay (1ms) would complete before the LONG capability
+  // delay (15ms) — end order would invert. An awaited sequential teardown
+  // completes capability→business→sdk→kernel regardless of delays.
+  const minted = mintRoot({
+    tag: 'p6a',
+    kernel: { init: 'ok', dispose: 'asyncOk', disposeDelay: 1 },
+    sdk: { init: 'ok', dispose: 'asyncOk', disposeDelay: 6 },
+    business: { init: 'ok', dispose: 'asyncOk', disposeDelay: 10 },
+    capability: { init: 'ok', dispose: 'asyncOk', disposeDelay: 15 },
+  });
+  const facade = await DomainHarness.load(minted.root);
+  await facade.stop();
+  const registry = s03();
+  assert.deepEqual(registry.dispose, [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId], 'dispose STARTS in reverse sealed order');
+  assert.deepEqual(registry.disposeEnd, [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId], 'dispose COMPLETES strictly sequentially in reverse sealed order — each disposer awaited before the next starts');
+  assert.deepEqual(registry.released, [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId]);
+});
+
+test('V08-S03-P6b an async dispose rejection at stop is OBSERVED, cleanup continues past it, and a repeated stop reports the same outcome without re-running (R1 P1-01)', async () => {
+  const minted = mintRoot({
+    tag: 'p6b',
+    kernel: { init: 'ok', dispose: 'asyncOk', disposeDelay: 1 },
+    sdk: { init: 'ok', dispose: 'asyncOk', disposeDelay: 6 },
+    business: { init: 'ok', dispose: 'asyncThrow', disposeDelay: 10 }, // rejects mid-teardown
+    capability: { init: 'ok', dispose: 'asyncOk', disposeDelay: 15 },
+  });
+  const facade = await DomainHarness.load(minted.root);
+  await assert.rejects(
+    () => facade.stop(),
+    (error: unknown) => {
+      assert.ok(error instanceof QualifiedPackageError, `expected QualifiedPackageError, got ${String(error)}`);
+      assert.equal((error as QualifiedPackageError).code, 'LIFECYCLE_DISPOSE_FAILED');
+      assert.match((error as QualifiedPackageError).message, /s03-dispose-async-sabotage/, 'the async rejection is reported, never swallowed');
+      return true;
+    },
+  );
+  const registry = s03();
+  assert.deepEqual(
+    registry.disposeEnd,
+    [minted.capabilityId, minted.businessId, minted.sdkId, minted.kernelId],
+    'teardown continued past the async rejection and awaited every remaining disposer',
+  );
+  // Idempotent repeat: same outcome, zero re-run.
+  await assert.rejects(
+    () => facade.stop(),
+    (error: unknown) => {
+      assert.ok(error instanceof QualifiedPackageError);
+      assert.equal((error as QualifiedPackageError).code, 'LIFECYCLE_DISPOSE_FAILED');
+      return true;
+    },
+  );
+  assert.equal(registry.dispose.length, 4, 'no dispose ran a second time');
 });
 
 test('V08-S03-N8 pin: the sealed packages order is approval-committed — reordering to change the lifecycle order is refused', async () => {
