@@ -350,6 +350,15 @@ The final closure task must reconcile the exact v0.3 candidate against:
 
 `v0.3` merges to `main` only after release qualification/closure evidence is complete. (Satisfied: `v0.3` merged to `main` via PR #347.)
 
+## v0.8 Sealed Standard SDK implementation patterns
+
+Scope: implementation guidance for the **approved v0.8 no-import qualified Standard SDK payload contract**, derived from FR02 (#1003, PR #1019, independent R2 source review #5494487610 at `25fef6cc0fda212b4303d011aaebb3a57ca96c83`, CI #1140 PASS). These are not universal development rules, do not reopen frozen L1/L2 semantics, and do **not** declare selected H/K/S integration, historic full-runtime equivalence, or release qualification PASS. Changes to `.dev-standard/**` require fresh independent governance review.
+
+- **Reuse observable semantics within this sealed contract.** The approved v0.8 qualified payload requires zero imports, no dynamic code evaluation, and no second runtime; do not vendor a runtime library (e.g. JSONata) into the selected sealed module. Implement a bounded deterministic subset only where the Product/L2 owner has explicitly accepted the observable coverage and any omissions. Re-prove BUILD closure qualification on the exact changed module bytes; preserving a few example results does not prove the complete historic interface.
+- **Deterministic work budget is not a wall-clock timeout.** FR02 intentionally maps an accepted elapsed-time guard to `EXPRESSION_STEPS_PER_MS`, a counted evaluation-operation budget, so replay decisions need no ambient time source. This is a **documented, scope-limited semantic deviation**, not a general rule for converting timeouts. A step budget does not bound elapsed latency, CPU per operation, or memory. Independently bound source bytes, parse nesting, evaluator depth, inputs/outputs and allocations, with typed fail-closed errors; if the product requires a real deadline, enforce it at an authorized Host boundary and obtain explicit Product/L2 agreement. Do not claim equivalent timing semantics or deterministic replay of real elapsed time.
+- **Inject logical time for FR02 sealed expressions.** `$now()` and `$millis()` are derived from the declaration's explicit logical-time field, not a process clock. The SDK data-snapshot boundary rejects cycles, accessors, unsafe keys and non-portable numbers before evaluation. This does not require every other Domain Package or runtime to use declaration-injected clocks.
+- **Document and independently review adaptations.** For every accepted v0.7 observable whose code, denial type, mechanism, or behavior changes in v0.8, identify the historic pin, the exact changed behavior, the Product/L2 acceptance authority and executable positive/negative evidence in the owning test or decision record. An R2 PR review and green CI are source-level gates only; preserve downstream selected-path and release gates.
+
 ## Ownership / Sensitive Areas
 
 - `docs/product/**` and `docs/architecture/**` frozen compositions → reopen only through a documented architecture contradiction; never by implementation convenience

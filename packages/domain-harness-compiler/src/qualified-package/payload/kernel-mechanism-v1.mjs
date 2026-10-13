@@ -731,17 +731,26 @@ export function deriveDurableControlTurnId(target, source) {
   }
 }
 
-/** §21 handoff: resolver telemetry/LLM-avoidance evidence for the turn receipt. */
+/**
+ * §21 handoff: resolver telemetry/LLM-avoidance evidence for the turn receipt.
+ * [#1003 FR07-KH2, review B2] The legacy numeric `freshModelCallCount` is no
+ * longer read: only the structured trusted `modelCallEvidence` (normalized by
+ * admissionModelCallEvidence) and, for a K continuation, the K-built
+ * continuation evidence (turns, queries, K-attested dependencies) are carried.
+ */
 export function admissionResolverEvidence(resolved) {
   return {
     source: resolved.source,
     llmAvoided: resolved.llmAvoided,
-    freshModelCallCount: resolved.freshModelCallCount,
+    modelCallEvidence: admissionModelCallEvidence(resolved.modelCallEvidence),
     cacheRead: resolved.cacheDisposition.read,
     ...(resolved.cacheDisposition.write === undefined
       ? {}
       : { cacheWrite: resolved.cacheDisposition.write }),
     telemetryEventCount: resolved.telemetry.length,
+    ...(resolved.continuation === undefined
+      ? {}
+      : { continuation: JSON.parse(canonicalJsonStringify(resolved.continuation)) }),
   };
 }
 
@@ -2166,6 +2175,468 @@ export class KernelBaselineStore {
 }
 
 // ===========================================================================
+// [#1003 FR07-KH2 — kernel-owned NEW mechanism code, NOT a v0.7 migration]
+// Bounded model continuation, trusted model-call accounting and the
+// request-scoped cancellation latch.
+//
+// Contract: #1003@6122627750 (§4 K owns the loop) + review #1003@6130723310
+// B2/B3/B4. The v0.7 harness-machine.ts@86110c6 (blob f2fe5d49) SEMANTICS are
+// retained — query allowlist + explicit mutation denial, maxSteps guard,
+// query observation + dependency capture/dedupe, ordinary query failure as a
+// structured {ok:false,error} observation with bounded recovery, invalid
+// query output fail-closed, exact final validation, cooperative cancellation
+// — without its XState runtime and WITHOUT any Host/Business `execute()`
+// callback: the only query executor is the K-owned read below.
+//
+//   - A sealed `model-decision` rule carrying a data-only `harness` policy
+//     selects the continuation. The policy is validated ONCE at wiring
+//     (createOccurrenceRuntime — the trusted load boundary) and deep-frozen
+//     into a WeakMap keyed by the exact rule object; live mutation after
+//     wiring is ignored and an unwired harness rule refuses typed.
+//   - K owns every turn: before each S `invokeStep` call (recovery turns
+//     included) the K budget is checked against the sealed `maxSteps`,
+//     itself bounded by the immutable K ceiling MAX_FR07_STEPS. A query
+//     never resets the budget and there are no hidden retries.
+//   - A query envelope is a PROPOSAL: K authorizes the capability against
+//     the wired policy (unknown ⇒ UNKNOWN_CAPABILITY, mutation ⇒
+//     MUTATION_CAPABILITY_FORBIDDEN, both before any read) and executes the
+//     only read kind that exists — a projection of the K-attested instance
+//     context re-read through the Host document port at exactly the lane's
+//     stateRevision. Nothing on this path writes.
+//   - Model-call evidence: K accepts per-step evidence only in the exact
+//     trusted shape the Host-bound resolver mints (`measured` count 1 per
+//     physical turn, or `unmeasured`) and aggregates it; the legacy numeric
+//     `freshModelCallCount` is not read anywhere on the selected path.
+//   - Cancellation: a request-scoped signal from the H-authenticated gateway
+//     flips a K latch. K checks it before and after every awaited model turn
+//     and read and closes it immediately before central admission; once
+//     admission has begun a late cancel can no longer split the occurrence.
+//   - Only a final envelope (outcome/event allowlisted) reaches
+//     admitCentralDecision; every terminal before it leaves zero State,
+//     Journal and Effect.
+// ===========================================================================
+
+/** Immutable K-owned absolute ceiling on model turns per occurrence (B4). */
+export const MAX_FR07_STEPS = 8;
+
+const CONTINUATION_IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
+const CONTINUATION_MAX_CAPABILITIES = 32;
+const CONTINUATION_MAX_FIELDS = 32;
+const CONTINUATION_MAX_ALLOWED = 64;
+const CONTINUATION_HARNESS_KEYS = new Set(['maxSteps', 'capabilities', 'allowedOutcomes', 'allowedEvents']);
+const CONTINUATION_READ_KEYS = new Set(['mode', 'source', 'fields', 'outputSchema']);
+const CONTINUATION_SCHEMA_TYPES = new Set(['string', 'number', 'boolean', 'object', 'array', 'null']);
+const BOUND_PORT_EVIDENCE_SCOPE = 'bound-model-port-invocations';
+
+function invalidContinuation(message) {
+  throw new CentralAdmissionError('CONTINUATION_DECLARATION_INVALID', message);
+}
+
+function isJsonRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function jsonTypeOf(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function continuationIdentifier(value, label) {
+  if (typeof value !== 'string' || !CONTINUATION_IDENTIFIER.test(value)) {
+    invalidContinuation(`${label} must be a bounded identifier`);
+  }
+  return value;
+}
+
+function continuationIdentifierList(value, label) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > CONTINUATION_MAX_ALLOWED) {
+    invalidContinuation(`${label} must be a non-empty bounded identifier list`);
+  }
+  const seen = new Set();
+  for (const item of value) {
+    continuationIdentifier(item, label);
+    if (seen.has(item)) invalidContinuation(`${label} contains the duplicate ${item}`);
+    seen.add(item);
+  }
+  return [...value];
+}
+
+function snapshotReadDescriptor(descriptor, label) {
+  for (const key of Object.keys(descriptor)) {
+    if (!CONTINUATION_READ_KEYS.has(key)) invalidContinuation(`${label} carries the unsupported key ${key}`);
+  }
+  if (descriptor.source !== 'instance-context') {
+    invalidContinuation(`${label}.source must be 'instance-context' (the only K-owned read kind)`);
+  }
+  const fieldEntries = isJsonRecord(descriptor.fields) ? Object.entries(descriptor.fields) : [];
+  if (fieldEntries.length === 0 || fieldEntries.length > CONTINUATION_MAX_FIELDS) {
+    invalidContinuation(`${label}.fields must map 1..${CONTINUATION_MAX_FIELDS} output names to context keys`);
+  }
+  const fields = {};
+  for (const [outputName, contextKey] of fieldEntries) {
+    continuationIdentifier(outputName, `${label}.fields output name`);
+    fields[outputName] = continuationIdentifier(contextKey, `${label}.fields.${outputName}`);
+  }
+  const outputSchema = {};
+  if (hasOwn(descriptor, 'outputSchema')) {
+    if (!isJsonRecord(descriptor.outputSchema)) invalidContinuation(`${label}.outputSchema must be an object`);
+    for (const [outputName, type] of Object.entries(descriptor.outputSchema)) {
+      if (!hasOwn(fields, outputName)) invalidContinuation(`${label}.outputSchema names the undeclared field ${outputName}`);
+      if (!CONTINUATION_SCHEMA_TYPES.has(type)) invalidContinuation(`${label}.outputSchema.${outputName} has the unsupported type ${String(type)}`);
+      outputSchema[outputName] = type;
+    }
+  }
+  return { mode: 'read', source: 'instance-context', fields, outputSchema };
+}
+
+/**
+ * Validate and snapshot ONE harness policy (trusted wiring boundary). The
+ * budget is checked against the K ceiling before anything else, so a
+ * non-finite/non-integer/out-of-range value fails with its own typed code.
+ */
+function snapshotContinuationPolicy(rule, ruleId) {
+  const harness = rule.harness;
+  if (!isPlainObject(harness)) invalidContinuation(`rule ${ruleId}: harness must be a plain data object`);
+  const budget = Object.getOwnPropertyDescriptor(harness, 'maxSteps');
+  const maxSteps = budget !== undefined && hasOwn(budget, 'value') ? budget.value : undefined;
+  if (!Number.isSafeInteger(maxSteps) || maxSteps < 1 || maxSteps > MAX_FR07_STEPS) {
+    throw new CentralAdmissionError(
+      'CONTINUATION_MAX_STEPS_INVALID',
+      `rule ${ruleId}: harness.maxSteps must be an integer in 1..${MAX_FR07_STEPS} (the K-owned absolute ceiling MAX_FR07_STEPS)`,
+    );
+  }
+  let data;
+  try {
+    data = canonicalizeJson(harness);
+  } catch (error) {
+    invalidContinuation(`rule ${ruleId}: harness must be canonical JSON data (${error instanceof Error ? error.message : String(error)})`);
+  }
+  for (const key of Object.keys(data)) {
+    if (!CONTINUATION_HARNESS_KEYS.has(key)) invalidContinuation(`rule ${ruleId}: harness carries the unsupported key ${key}`);
+  }
+  const capabilityEntries = isJsonRecord(data.capabilities) ? Object.entries(data.capabilities) : [];
+  if (capabilityEntries.length === 0 || capabilityEntries.length > CONTINUATION_MAX_CAPABILITIES) {
+    invalidContinuation(`rule ${ruleId}: harness.capabilities must declare 1..${CONTINUATION_MAX_CAPABILITIES} capability descriptors`);
+  }
+  const capabilities = {};
+  for (const [capabilityId, descriptor] of capabilityEntries) {
+    const label = `rule ${ruleId}: capability ${capabilityId}`;
+    continuationIdentifier(capabilityId, `rule ${ruleId}: capability id`);
+    if (!isJsonRecord(descriptor)) invalidContinuation(`${label} must be a descriptor object`);
+    if (descriptor.mode === 'read') {
+      capabilities[capabilityId] = snapshotReadDescriptor(descriptor, label);
+    } else if (descriptor.mode === 'mutation') {
+      // Declared ONLY so K can deny it explicitly: no other field, no callable.
+      if (Object.keys(descriptor).length !== 1) invalidContinuation(`${label}: a mutation descriptor carries mode only`);
+      capabilities[capabilityId] = { mode: 'mutation' };
+    } else {
+      invalidContinuation(`${label}.mode must be 'read' or 'mutation'`);
+    }
+  }
+  if (typeof rule.id !== 'string' || typeof rule.modelOperation !== 'string') {
+    invalidContinuation(`rule ${ruleId}: a harness model-decision rule requires string id and modelOperation`);
+  }
+  const policy = {
+    // The ONLY declaration S ever receives for this rule (wiring snapshot).
+    declaration: { kind: 'model-decision', id: rule.id, modelOperation: rule.modelOperation },
+    maxSteps,
+    capabilities,
+    advertisedCapabilities: Object.keys(capabilities).filter((id) => capabilities[id].mode === 'read'),
+    allowedOutcomes: continuationIdentifierList(data.allowedOutcomes, `rule ${ruleId}: harness.allowedOutcomes`),
+    allowedEvents: continuationIdentifierList(data.allowedEvents, `rule ${ruleId}: harness.allowedEvents`),
+  };
+  deepFreezePreparedData(policy);
+  return policy;
+}
+
+/** Wire every harness rule of the Business policy (createOccurrenceRuntime only). */
+function wireContinuationPolicies(businessEndpoint) {
+  const registry = new WeakMap();
+  for (const [ruleId, rule] of Object.entries(businessEndpoint.rules ?? {})) {
+    if (!isJsonRecord(rule) || rule.kind !== 'model-decision' || !hasOwn(rule, 'harness')) continue;
+    registry.set(rule, snapshotContinuationPolicy(rule, ruleId));
+  }
+  return registry;
+}
+
+/**
+ * Trusted per-step evidence: exactly the shape the Host-bound resolver
+ * mints for ONE physically observed bound-port invocation. Anything else —
+ * a different count, extra fields, a model-free source — fails closed.
+ */
+function trustedStepEvidence(envelope) {
+  const evidence = envelope.modelCallEvidence;
+  if (envelope.source === 'host-model-port' && envelope.llmAvoided === false && isJsonRecord(evidence)) {
+    const keys = Object.keys(evidence).sort().join(',');
+    if (evidence.status === 'measured' && evidence.count === 1 && evidence.scope === BOUND_PORT_EVIDENCE_SCOPE && keys === 'count,scope,status') {
+      return 'measured';
+    }
+    if (evidence.status === 'unmeasured' && keys === 'status') {
+      return 'unmeasured';
+    }
+  }
+  throw new CentralAdmissionError(
+    'CONTINUATION_MODEL_EVIDENCE_INVALID',
+    'a continuation step did not carry the trusted single-invocation evidence of the Host-bound resolver; no decision is admitted',
+  );
+}
+
+/**
+ * K aggregate over completed turns. A discarded in-flight turn may have
+ * reached the physical port without returning evidence, so the aggregate
+ * can then no longer be an exact count: it degrades to `unmeasured`.
+ */
+function aggregateModelCallEvidence(stepEvidence, inFlightTurnDiscarded) {
+  if (inFlightTurnDiscarded || stepEvidence.length === 0 || stepEvidence.some((status) => status !== 'measured')) {
+    return { status: 'unmeasured' };
+  }
+  return { status: 'measured', count: stepEvidence.length, scope: BOUND_PORT_EVIDENCE_SCOPE };
+}
+
+/**
+ * Admission-side normalization of resolver model-call evidence (B2). Only a
+ * structured trusted shape is carried; absence is `unsupported`; a
+ * malformed structured claim fails closed.
+ */
+function admissionModelCallEvidence(evidence) {
+  if (evidence === undefined) return { status: 'unsupported' };
+  if (isJsonRecord(evidence)) {
+    const keys = Object.keys(evidence).sort().join(',');
+    if (evidence.status === 'measured' && Number.isSafeInteger(evidence.count) && evidence.count >= 0
+      && typeof evidence.scope === 'string' && keys === 'count,scope,status') {
+      return { status: 'measured', count: evidence.count, scope: evidence.scope };
+    }
+    if ((evidence.status === 'unmeasured' || evidence.status === 'unsupported') && keys === 'status') {
+      return { status: evidence.status };
+    }
+  }
+  throw new CentralAdmissionError(
+    'ADMISSION_MODEL_EVIDENCE_INVALID',
+    'resolver model-call evidence must be a structured measured/unmeasured/unsupported record; no decision is admitted',
+  );
+}
+
+/**
+ * Request-scoped cancellation latch (B3). The signal is H-owned (the
+ * authenticated gateway's AbortController); the latch state is K-owned:
+ * open → cancelled, or open → admitting (closed for good once admission
+ * starts). Without a control the latch never cancels.
+ */
+function createCancellationLatch(control) {
+  if (control === undefined) {
+    return { signal: undefined, get cancelled() { return false; }, closeForAdmission() { return true; }, dispose() {} };
+  }
+  const signal = isJsonRecord(control) ? control.signal : undefined;
+  if (
+    signal === null
+    || typeof signal !== 'object'
+    || typeof signal.aborted !== 'boolean'
+    || typeof signal.addEventListener !== 'function'
+    || typeof signal.removeEventListener !== 'function'
+  ) {
+    throw new CentralAdmissionError(
+      'OCCURRENCE_CONTROL_INVALID',
+      'an occurrence control must carry a request-scoped cancellation signal {aborted, addEventListener, removeEventListener}',
+    );
+  }
+  let state = signal.aborted ? 'cancelled' : 'open';
+  const onAbort = () => {
+    if (state === 'open') state = 'cancelled';
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
+  return {
+    signal,
+    get cancelled() {
+      if (state === 'open' && signal.aborted === true) state = 'cancelled';
+      return state === 'cancelled';
+    },
+    closeForAdmission() {
+      if (this.cancelled) return false;
+      state = 'admitting';
+      return true;
+    },
+    dispose() {
+      signal.removeEventListener('abort', onAbort);
+    },
+  };
+}
+
+/**
+ * The ONLY continuation query executor: a K-owned, read-only projection of
+ * the instance context, re-read through the Host document port and attested
+ * at exactly the lane's stateRevision. Ordinary failures (input not allowed
+ * by the descriptor, absent context key) become observations; read material
+ * that is not canonical, carries no version, or violates the sealed output
+ * contract is a terminal query-output failure.
+ */
+async function executeContinuationRead(descriptor, callInput, read) {
+  let selected = Object.keys(descriptor.fields);
+  let input;
+  try {
+    input = canonicalizeJson(callInput);
+  } catch {
+    return { ok: false, code: 'QUERY_INPUT_INVALID' };
+  }
+  if (!isJsonRecord(input) || Object.keys(input).some((key) => key !== 'fields')) {
+    return { ok: false, code: 'QUERY_INPUT_INVALID' };
+  }
+  if (hasOwn(input, 'fields')) {
+    const fields = input.fields;
+    if (!Array.isArray(fields) || fields.length === 0 || new Set(fields).size !== fields.length
+      || !fields.every((name) => typeof name === 'string' && hasOwn(descriptor.fields, name))) {
+      return { ok: false, code: 'QUERY_INPUT_INVALID' };
+    }
+    selected = [...fields];
+  }
+
+  const doc = await read.docs.get(instanceDocKey(read.target));
+  let material;
+  try {
+    material = canonicalizeJson(doc);
+  } catch {
+    return { invalid: 'read material is not canonical JSON (accessor, cycle or non-JSON value)' };
+  }
+  if (!isJsonRecord(material) || !isJsonRecord(material.value)) {
+    return { invalid: 'read material carries no instance document' };
+  }
+  const value = material.value;
+  if (!Number.isSafeInteger(material.revision) || !Number.isSafeInteger(value.stateRevision)) {
+    return { invalid: 'read material carries no instance version' };
+  }
+  if (!isJsonRecord(value.address) || !workflowAddressesEqual(value.address, read.target)) {
+    return { invalid: 'read material addresses a different workflow instance' };
+  }
+  if (material.revision !== value.stateRevision || value.stateRevision !== read.stateRevision) {
+    return { stale: true };
+  }
+  const context = isJsonRecord(value.state) ? value.state.context : undefined;
+  if (!isJsonRecord(context)) {
+    return { invalid: 'read material carries no instance context' };
+  }
+  const output = {};
+  for (const outputName of selected) {
+    const contextKey = descriptor.fields[outputName];
+    if (!hasOwn(context, contextKey)) return { ok: false, code: 'QUERY_SOURCE_MISSING' };
+    const item = context[contextKey];
+    if (hasOwn(descriptor.outputSchema, outputName) && jsonTypeOf(item) !== descriptor.outputSchema[outputName]) {
+      return { invalid: `read output ${outputName} violates its sealed output type ${descriptor.outputSchema[outputName]}` };
+    }
+    output[outputName] = item;
+  }
+  return { ok: true, output, stateRevision: value.stateRevision };
+}
+
+/**
+ * The K-owned bounded continuation loop (one occurrence, inside its lane).
+ * Returns either {resolved} for central admission or {terminal} — never
+ * writes State, Journal or Effect itself.
+ */
+async function runModelContinuation(run) {
+  const { policy, sdkEndpoint, latch, requestInput } = run;
+  const observations = [];
+  const dependencies = [];
+  const dependencyKeys = new Set();
+  const stepEvidence = [];
+  let steps = 0;
+  let queries = 0;
+  let inFlightTurnDiscarded = false;
+
+  const evidence = () => ({
+    source: 'host-model-port',
+    llmAvoided: false,
+    modelCallEvidence: aggregateModelCallEvidence(stepEvidence, inFlightTurnDiscarded),
+    continuation: {
+      maxSteps: policy.maxSteps,
+      steps,
+      queries,
+      dependencies: dependencies.map((dependency) => ({ ...dependency })),
+    },
+  });
+  const terminal = (code, extras = {}) => ({ terminal: { code, step: steps, ...extras }, evidence: evidence() });
+  const control = latch.signal === undefined ? undefined : { signal: latch.signal };
+
+  for (;;) {
+    if (latch.cancelled) return terminal('CANCELLED');
+    if (steps >= policy.maxSteps) return terminal('MAX_STEPS_EXHAUSTED');
+    steps += 1;
+    const modelInput = {
+      request: requestInput,
+      step: steps,
+      maxSteps: policy.maxSteps,
+      capabilities: [...policy.advertisedCapabilities],
+      observations: observations.map((observation) => canonicalizeJson(observation)),
+    };
+
+    let envelope;
+    try {
+      envelope = await sdkEndpoint.invokeStep(policy.declaration, modelInput, {}, control);
+    } catch (error) {
+      if (latch.cancelled) {
+        inFlightTurnDiscarded = true;
+        return terminal('CANCELLED', { inFlightTurnDiscarded: true });
+      }
+      throw error;
+    }
+    if (!isJsonRecord(envelope) || (envelope.kind !== 'query' && envelope.kind !== 'final')) {
+      throw new CentralAdmissionError('CONTINUATION_STEP_INVALID', 'the step surface returned no query/final envelope');
+    }
+    stepEvidence.push(trustedStepEvidence(envelope));
+    // Late result: a turn that completes after cancellation is discarded.
+    if (latch.cancelled) return terminal('CANCELLED', { lateResultDiscarded: true });
+
+    if (envelope.kind === 'final') {
+      const structuredDecision = envelope.structuredDecision;
+      const outcome = isJsonRecord(structuredDecision) && isJsonRecord(structuredDecision.decision) ? structuredDecision.decision.outcome : undefined;
+      const eventType = isJsonRecord(structuredDecision) && isJsonRecord(structuredDecision.event) ? structuredDecision.event.type : undefined;
+      if (!policy.allowedOutcomes.includes(outcome)) return terminal('FINAL_OUTCOME_NOT_ALLOWED');
+      if (!policy.allowedEvents.includes(eventType)) return terminal('FINAL_EVENT_NOT_ALLOWED');
+      return {
+        resolved: {
+          kind: 'model-continuation',
+          structuredDecision,
+          provenance: envelope.provenance,
+          cacheDisposition: { read: 'disabled' },
+          telemetry: [],
+          ...evidence(),
+        },
+      };
+    }
+
+    const call = envelope.call;
+    const capabilityId = isJsonRecord(call) ? call.capabilityId : undefined;
+    if (typeof capabilityId !== 'string') {
+      throw new CentralAdmissionError('CONTINUATION_STEP_INVALID', 'a query envelope carries no capabilityId');
+    }
+    const descriptor = hasOwn(policy.capabilities, capabilityId) ? policy.capabilities[capabilityId] : undefined;
+    if (descriptor === undefined) return terminal('UNKNOWN_CAPABILITY', { capabilityId });
+    if (descriptor.mode !== 'read') return terminal('MUTATION_CAPABILITY_FORBIDDEN', { capabilityId });
+
+    queries += 1;
+    const result = await executeContinuationRead(descriptor, call.input, run.read);
+    if (latch.cancelled) return terminal('CANCELLED', { lateReadDiscarded: true });
+    if (result.invalid !== undefined) return terminal('QUERY_OUTPUT_INVALID', { capabilityId });
+    if (result.stale === true) return terminal('QUERY_SOURCE_STALE', { capabilityId });
+    if (result.ok) {
+      observations.push({ step: steps, capabilityId, ok: true, output: result.output });
+      const dependency = {
+        capabilityId,
+        source: 'instance-context',
+        workflowInstanceId: run.read.workflowInstanceId,
+        stateRevision: result.stateRevision,
+      };
+      const key = canonicalJsonStringify(dependency);
+      if (!dependencyKeys.has(key)) {
+        dependencyKeys.add(key);
+        dependencies.push(dependency);
+      }
+    } else {
+      observations.push({ step: steps, capabilityId, ok: false, error: { code: result.code } });
+    }
+  }
+}
+
+// ===========================================================================
 // [KPK-01 experiment, kernel-owned] Occurrence runtime endpoint — the kernel
 // composition that the Microkernel wires from the sealed package endpoints.
 // The kernel decides WHEN/WHETHER admission, effects, journal commits and
@@ -2225,6 +2696,21 @@ export function createOccurrenceRuntime(options) {
   // BEFORE any instance can exist. The frozen snapshots registered here
   // are the only declaration source trusted at admission time.
   const effectBindings = wireAdmissionEffectBindings(businessEndpoint);
+  // [#1003 FR07-KH2] Same trusted boundary, same discipline: every harness
+  // rule is validated and frozen here, before any instance can exist.
+  const continuationPolicies = wireContinuationPolicies(businessEndpoint);
+
+  function continuationPolicyFor(rule) {
+    const wired = isJsonRecord(rule) ? continuationPolicies.get(rule) : undefined;
+    if (wired !== undefined) return wired;
+    if (isJsonRecord(rule) && rule.kind === 'model-decision' && hasOwn(rule, 'harness')) {
+      throw new CentralAdmissionError(
+        'CONTINUATION_DECLARATION_UNVALIDATED',
+        'a harness model-decision rule that was never wired at the trusted load boundary cannot run',
+      );
+    }
+    return undefined;
+  }
 
   async function bindGovernance(target) {
     const workflowInstanceId = `${target.workflowId}:${target.instanceKey}`;
@@ -2290,7 +2776,37 @@ export function createOccurrenceRuntime(options) {
     return snapshot;
   }
 
-  async function submitOccurrence(request) {
+  /**
+   * [#1003 FR07-KH2, B3] A continuation/cancellation terminal: the occurrence
+   * stopped BEFORE central admission, so no State, Journal or Effect exists.
+   */
+  function terminatedReceipt(request, workflowInstanceId, terminal, resolver) {
+    const receipt = {
+      status: 'terminated',
+      terminal,
+      ...(resolver === undefined ? {} : { resolver }),
+      occurrence: { messageId: request.messageId, workflowInstanceId },
+      attribution: attribution(),
+    };
+    safeObserve(receipt);
+    return receipt;
+  }
+
+  /**
+   * `control` is the optional protected, request-scoped occurrence control
+   * the H-authenticated gateway supplies (never intent data): currently its
+   * cancellation `signal` only. K owns the latch it drives.
+   */
+  async function submitOccurrence(request, control) {
+    const latch = createCancellationLatch(control);
+    try {
+      return await submitOccurrenceLatched(request, latch);
+    } finally {
+      latch.dispose();
+    }
+  }
+
+  async function submitOccurrenceLatched(request, latch) {
     counters.admissions += 1;
     const target = request.target;
     const binding = businessEndpoint.intentBindings[request.intentType];
@@ -2324,16 +2840,75 @@ export function createOccurrenceRuntime(options) {
 
     return engine.lane.run(target, async () => {
       const workflowInstanceId = `${target.workflowId}:${target.instanceKey}`;
+      // [#1003 FR07-KH2, B3] Cancelled while queued on the lane: nothing read.
+      if (latch.cancelled) {
+        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 0 });
+      }
       const snapshot = await engine.getInstance(target);
       if (snapshot === null) {
         throw new WorkflowInstanceNotFoundError(target);
+      }
+      // Cancelled during the lane-start read: no model turn may start.
+      if (latch.cancelled) {
+        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 0 });
       }
       const context = {
         ...snapshot.state.context,
         callerRole: caller.role,
       };
       const rule = businessEndpoint.rules[binding.ruleId];
-      const resolved = sdkEndpoint.interpret(rule, request.input, context);
+      const continuation = continuationPolicyFor(rule);
+      const control = latch.signal === undefined ? undefined : { signal: latch.signal };
+      let resolved;
+      if (continuation !== undefined) {
+        // [#1003 FR07-KH2] K-owned bounded model→query→observation→model
+        // continuation over the S single-step surface; only a final
+        // envelope proceeds to central admission below.
+        if (typeof sdkEndpoint.invokeStep !== 'function') {
+          throw new CentralAdmissionError(
+            'CONTINUATION_STEP_ENDPOINT_UNAVAILABLE',
+            'a harness model-decision rule requires the Host-bound Standard SDK step surface (invokeStep); none is wired',
+          );
+        }
+        const run = await runModelContinuation({
+          policy: continuation,
+          sdkEndpoint,
+          latch,
+          requestInput: request.input,
+          read: { docs, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
+        });
+        if (run.terminal !== undefined) {
+          return terminatedReceipt(request, workflowInstanceId, run.terminal, run.evidence);
+        }
+        resolved = run.resolved;
+      } else {
+        // [ABI ruling #1013@6118426531, R1 F-03] The endpoint contract is
+        // "synchronous value OR Promise thereof": `await` is transparent for
+        // every synchronous model-free Standard SDK endpoint (a non-Promise
+        // resolves to itself), and it is what lets a Host-bound model resolver
+        // route model-decision rules through its real async port-invoking
+        // endpoint. [#1003 FR07-KH2] The protected control rides along so a
+        // model-decision turn observes cancellation too.
+        try {
+          resolved = await sdkEndpoint.interpret(rule, request.input, context, control);
+        } catch (error) {
+          if (latch.cancelled) {
+            return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 1, inFlightTurnDiscarded: true }, { modelCallEvidence: { status: 'unmeasured' } });
+          }
+          throw error;
+        }
+      }
+
+      // [#1003 FR07-KH2, B3] The final-result → admission race: the latch is
+      // checked and CLOSED here, immediately before central admission. A
+      // cancel observed now discards the ready result; one arriving after
+      // this point can no longer split the authoritative occurrence.
+      if (!latch.closeForAdmission()) {
+        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', lateResultDiscarded: true }, {
+          modelCallEvidence: admissionModelCallEvidence(resolved?.modelCallEvidence),
+          ...(resolved?.continuation === undefined ? {} : { continuation: JSON.parse(canonicalJsonStringify(resolved.continuation)) }),
+        });
+      }
 
       const definition = binding.definition ?? businessEndpoint.workflowDefinition;
       const request_shape = {

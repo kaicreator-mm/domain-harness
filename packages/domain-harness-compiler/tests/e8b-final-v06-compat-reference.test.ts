@@ -62,7 +62,7 @@
  * keeps every reference assertion.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -70,6 +70,25 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { stagePackedWorkspaces } from './packed-fixture-stage.js';
+
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, '..');
@@ -263,7 +282,7 @@ function writeRawPackage(
   return root;
 }
 
-test('E8b packed-public-compat: the /v2 Semantic Decision + profile surface and the compiler root typecheck and run from the packed candidate tarballs', async () => {
+test('E8b packed-public-compat: the /v2 Semantic Decision + profile surface and the compiler root typecheck and run from the packed candidate tarballs', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fxConsumer = await consumerFixture();
   const { consumerDirectory } = fxConsumer;
   try {
@@ -345,7 +364,7 @@ if (typeof compiler.compileSemanticDecisions !== 'function') throw new Error('pa
   }
 }, { timeout: 600000 });
 
-test('E8b semantic-decision: the packed compiler compiles a final-v0.6-compatible SD-bearing package; manifest carries the exact contract identity; malformed/mutation-capability material fails closed', async () => {
+test('E8b semantic-decision: the packed compiler compiles a final-v0.6-compatible SD-bearing package; manifest carries the exact contract identity; malformed/mutation-capability material fails closed', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fxConsumer = await consumerFixture();
   const { consumerDirectory } = fxConsumer;
   try {
@@ -359,7 +378,6 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-
 const v2 = await import('@kaicreator/domain-harness/v2');
 const compiler = await import('@kaicreator/domain-harness-compiler');
 
@@ -487,7 +505,7 @@ console.log('E8B_SD_VECTOR', JSON.stringify({
   }
 }, { timeout: 600000 });
 
-test('E8b historical-identity-profile: baseline owner bytes are immutable (git-object identity) and the packed profile semantics remain exact/non-retroactive', async () => {
+test('E8b historical-identity-profile: baseline owner bytes are immutable (git-object identity) and the packed profile semantics remain exact/non-retroactive', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   // Byte identity between the frozen final-v0.6 baseline and the candidate:
   // each T000 owner file's git object at FINAL_V06_BASELINE must be the exact
   // object the candidate worktree hashes to — history is not rewritten under
@@ -541,7 +559,7 @@ if (v2.isSupportedCompiledArtifactProfile({ formatVersion: '0.4', runtimeContrac
   }
 }, { timeout: 600000 });
 
-test('E8b one-runtime-effect-authority: caller-constructed assembly JSON is rejected by the public activation brand gate before any durable bind', async () => {
+test('E8b one-runtime-effect-authority: caller-constructed assembly JSON is rejected by the public activation brand gate before any durable bind', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const fxConsumer = await consumerFixture();
   const { consumerDirectory } = fxConsumer;
   try {

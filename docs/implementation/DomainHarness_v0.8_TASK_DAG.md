@@ -146,3 +146,26 @@ NATIVE_ISSUE_DEPENDENCIES=UNVERIFIED_PENDING_API_ACTOR
 FIRST_READY=#1000
 TASK_DAG_ORIGINAL_FREEZE=aa9ca91a1a26b90b39ba131a21e7d5da9bbb78c0
 ```
+
+## 2026-10-13 bounded Package-first scope successor — REVIEW_REQUIRED
+
+> **Frozen-content-preserving successor appendix only: the historic DAG substance is retained but this file's bytes change by appending this section.** This is NOT a normative amendment to Product/L2 authority or permission to alter source. Read [L2 closed-world successor](../architecture/DomainHarness_v0.8_L2_PACKAGE_FIRST_SUCCESSOR.md), [scope and reuse/execution plan](./DomainHarness_v0.8_PACKAGE_FIRST_SCOPE_DELTA.md), and [single gap Issue #1023](https://github.com/kaicreator-mm/domain-harness/issues/1023). The successor becomes normative **only after** required independent Product/L2-equivalence review and the resulting authorized checkpoint. All preceding original Task DAG material remains preserved as historical planning evidence.
+
+- Original T-A #1000, T-B #1001, T-C #1002, T-E #1004 are **CLOSED** as of observed live GitHub 2026-10-13; preserve their K/S/BUILD/Node implementation, tests, and #1013/#1016 cross-component integration.
+- Original T-D #1003 and T-F #1005 are **OPEN, independently progressing**; do not reclaim write sets or duplicate current App/oracle PRs. T-G #1006 remains **OPEN**.
+- New **bounded #1023** is an architecture-ownership/lifecycle/callable-ABI delta, **not** a replacement T-A–T-G DAG or research round. Confirm frozen Product-equivalence of the user-directed closed-world runtime before changing before-import Host/issuer verification; preserve actual caller security/tenant isolation, durable CAS, UNKNOWN/Replay, all original FR/HF/NF and two real Apps.
+- **Proposed v0.8 P0 correction, subject to review and independent deploy/install Product-equivalence proof:** (1) exact static Package closure and BUILD/runtime owner mapping, (2) one general capability without Microkernel hardcoded K/S/B provider switch, (3) minimal Package optional init/dispose (or strict equivalent) with failure cleanup, (4) standard callable OperationCall over real pure/effectful cases and BUILD-bound handlers, (5) one capability-owned Node implementation witness, and (6) existing T-F/T-G integration/release checks.
+- **NOT v0.8 gates:** wholesale repo/package relocation, Forge mandatory producer, broad Host source split, complete Capability Package marketplace, dynamic package registry, QuickJS, native Rust/Go/C runtimes, multi-platform FFI, advanced Tool streaming/cancel. These are successor candidates.
+- **Release impact:** #1006 may continue non-conflicting preparation and validation, but final qualification must explicitly disposition #1023 and revalidate only **materially impacted** exact-SHA surfaces; do not declare Package-first successor L2 approved, implementation PASS, Hidden PASS or Release PASS from this note alone.
+
+```ini
+EVENT=V08_PACKAGE_FIRST_SCOPE_SUCCESSOR_PROPOSED
+AUTHORITATIVE_FROZEN_DAG=UNCHANGED_HISTORICAL_RECORD
+DESIGN_ISSUE=#942
+SCOPED_CHANGE=#1023
+REVIEW=REQUIRED_BEFORE_NORMATIVE_OR_IMPLEMENTATION_AUTHORITY_TRANSFER
+IN_FLIGHT_TASKS=#1003;#1005;#1006
+COMPLETED_FORMAL_TASKS=#1000;#1001;#1002;#1004
+PRODUCT_SCOPE=NO_UNREVIEWED_CHANGE
+RELEASE=NO
+```

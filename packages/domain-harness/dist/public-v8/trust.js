@@ -27,11 +27,13 @@ import { QualifiedPackageError } from './contracts.js';
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 let channel;
 /**
- * Install the trusted issuer registry for this process. Internal protected
- * bootstrap: one-shot (a second installation attempt fails typed, so a
- * partially-bootstrapped process cannot be re-trusted mid-flight).
+ * Validate a prospective trust-channel installation WITHOUT consuming the
+ * one-shot channel (#1013 R1 F-01): every refusal `installTrustedIssuers`
+ * would raise — occupancy and input shape — fails here first, so the Host
+ * bootstrap can preflight ALL one-shot channels before committing ANY.
+ * Internal protected; not re-exported from the public `/v8` surface.
  */
-export function installTrustedIssuers(input) {
+export function preflightTrustedIssuersInstall(input) {
     if (channel !== undefined) {
         throw new QualifiedPackageError('TRUST_CHANNEL_ALREADY_ESTABLISHED', 'a trusted issuer registry is already installed in this process; the protected load trust channel is one-shot');
     }
@@ -49,6 +51,14 @@ export function installTrustedIssuers(input) {
     if (input.maxProofAgeMs !== undefined && (!Number.isSafeInteger(input.maxProofAgeMs) || input.maxProofAgeMs <= 0)) {
         throw new QualifiedPackageError('TRUST_CHANNEL_INVALID', 'maxProofAgeMs must be a positive integer of milliseconds');
     }
+}
+/**
+ * Install the trusted issuer registry for this process. Internal protected
+ * bootstrap: one-shot (a second installation attempt fails typed, so a
+ * partially-bootstrapped process cannot be re-trusted mid-flight).
+ */
+export function installTrustedIssuers(input) {
+    preflightTrustedIssuersInstall(input);
     channel = Object.freeze({
         issuers: new Map(input.issuers),
         establishedAt: Date.now(),

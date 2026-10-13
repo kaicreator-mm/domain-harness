@@ -10,12 +10,14 @@
  * `./v2` entry remains untouched in both directions.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -37,6 +39,23 @@ const V7_RUNTIME_SORTED = [
   'validateDefinitionGraphEnvelope',
   'validateToolComponent',
 ].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
 
 function run(command: string, args: readonly string[], cwd: string): string {
   return execFileSync(command, [...args], {
@@ -61,7 +80,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#551 packed package exposes the additive ./v7 successor entry in a clean consumer', () => {
+test('#551 packed package exposes the additive ./v7 successor entry in a clean consumer', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-public-v7-portable-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
@@ -105,7 +124,6 @@ test('#551 packed package exposes the additive ./v7 successor entry in a clean c
     writeFileSync(join(consumer, 'index.mjs'), `
 import assert from 'node:assert/strict';
 import * as v7 from '@kaicreator/domain-harness/v7';
-
 // Exact runtime closure at dist level: exactly the 15 promised names.
 assert.deepEqual(Object.keys(v7).sort(), ${JSON.stringify(V7_RUNTIME_SORTED)});
 

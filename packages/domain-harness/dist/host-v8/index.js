@@ -20,4 +20,5 @@ export { ResourceDispatcher } from './dispatcher.js';
 export { ScopedEventHub } from './events.js';
 export { bootstrapTrustedHost, isHostTrustChannelEstablished, } from './bootstrap.js';
 export { assertIntentScope, createHostUxTransport, createUxTransport, uxDocumentNamespace, } from './ux-transport.js';
+export { createKernelGateway, kernelReceiptAsHostEvent, } from './kernel-gateway.js';
 //# sourceMappingURL=index.js.map

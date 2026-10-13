@@ -9,6 +9,15 @@
  * the negative counterpart (no registry at all) lives in
  * v08-abi-b01-untrusted.test.ts, which runs as its OWN process.
  *
+ * #1013 NOTE: after the #1013 integration repair the PUBLIC facade
+ * send/instance-query/subscribe routes are CLOSED (typed
+ * FACADE_PUBLIC_ROUTE_CLOSED — no unauthenticated mutation/read/observe);
+ * the submit/read/observe mechanics below run through the PROTECTED ops
+ * seam (getFacadeKernelOps + a host-context principal), exactly as the
+ * trusted Host kernel gateway drives it. The `build` trace stays public
+ * (inert sealed-root metadata). The one-argument public load itself is
+ * unchanged.
+ *
  * Test map (KPK ids are semantic ports of #994@b9ea4d1, re-based onto the
  * qualified package ABI; fixtures come through the REAL compiler BUILD path):
  *   - B01-P   physical selected-K import + full scoped round trip
@@ -46,6 +55,7 @@ import * as v8Public from '../../src/public-v8/index.js';
 import { DomainHarness, QualifiedPackageError } from '../../src/public-v8/index.js';
 import { installTrustedIssuers } from '../../src/public-v8/trust.js';
 import { installKernelHostPorts } from '../../src/public-v8/kernel-host.js';
+import { getFacadeKernelOps, installGatewaySessionCap, type V8FacadeKernelOps, type V8GatewayPrincipal } from '../../src/public-v8/microkernel.js';
 import {
   QualificationError,
   qualifyPackageClosure,
@@ -69,9 +79,43 @@ import {
 // Governance/Host bootstrap for THIS process (one-shot, exactly as in prod).
 const host = b01MemoryHost();
 installTrustedIssuers({ issuers: new Map([[B01_ISSUER, B01_ISSUER_SECRET]]) });
-installKernelHostPorts(host.ports);
+// #1013 R2: this host-context stand-in mints its own session capability for
+// the protected ops seam AND the raw trusted-port getters (bootstrapTrustedHost
+// does this with one random value installed into every channel).
+const B01_GATEWAY_SESSION_CAP = 'b01-test-gateway-session-capability-0123456789abcdef0123456789abcdef';
+installKernelHostPorts(host.ports, B01_GATEWAY_SESSION_CAP);
+installGatewaySessionCap(B01_GATEWAY_SESSION_CAP);
 
-const TARGET = { workflowId: 'tb-flow', instanceKey: 'instance:1' };
+const TARGET = { workflowId: 'tb-flow', instanceKey: 'instance-1' };
+
+// #1013 (@6117218727 Candidate B): the PUBLIC facade send/instance-query/
+// subscribe routes are CLOSED — mutations, instance reads and receipt
+// observation require the Host-authenticated gateway seam. These tests
+// drive the protected ops seam directly, exactly as the trusted Host
+// kernel gateway does (the in-process host-context stand-in).
+const TB_PRINCIPAL: V8GatewayPrincipal = Object.freeze({
+  subject: 'tb-fixture-host',
+  tenantId: 't-tb',
+  appId: 'a-tb',
+  roles: Object.freeze(['requester']),
+});
+
+function opsOf(facade: Awaited<ReturnType<typeof DomainHarness.load>>): V8FacadeKernelOps {
+  const ops = getFacadeKernelOps(facade, B01_GATEWAY_SESSION_CAP);
+  assert.ok(ops !== undefined, 'the loaded facade must carry the protected ops seam');
+  return ops;
+}
+
+/** The host-context submit path: the old intent shape mapped onto ops.submitAs. */
+async function kSend(facade: Awaited<ReturnType<typeof DomainHarness.load>>, intent: unknown): Promise<unknown> {
+  const record = intent as { intentType?: unknown; target?: { instanceKey?: unknown } | undefined; messageId?: unknown; input?: unknown };
+  return opsOf(facade).submitAs(TB_PRINCIPAL, {
+    intentType: record.intentType as string,
+    messageId: record.messageId as string,
+    instanceKey: record.target?.instanceKey as string,
+    ...(record.input === undefined ? {} : { input: record.input }),
+  });
+}
 
 interface ReceiptShape {
   status: string;
@@ -118,10 +162,10 @@ test('V08-ABI-B01-P the selected Kernel package is physically imported through t
   assert.deepEqual(Object.keys(facade).sort(), ['query', 'send', 'stop', 'subscribe']);
 
   const receipts: unknown[] = [];
-  const unsubscribe = facade.subscribe((receipt) => receipts.push(receipt));
+  const unsubscribe = opsOf(facade).observeReceipts((receipt) => receipts.push(receipt));
   const sealedKernel = root.packages.find((pkg) => pkg.packageId === closure.kernelId);
   assert.ok(sealedKernel !== undefined);
-  const receipt = asReceipt(await facade.send({ intentType: 'demo.p1', target: TARGET, messageId: 'msg:1', input: { amount: 42 } }));
+  const receipt = asReceipt(await kSend(facade, { intentType: 'demo.p1', target: TARGET, messageId: 'msg:1', input: { amount: 42 } }));
   assert.equal(receipt.status, 'admitted');
   assert.deepEqual(
     receipt.kernel,
@@ -139,7 +183,7 @@ test('V08-ABI-B01-P the selected Kernel package is physically imported through t
   // Observers see every receipt exactly once.
   assert.equal(receipts.length, 1);
 
-  const snapshot = (await facade.query({ kind: 'instance', target: TARGET })) as { occurrences: number; kernel: { packageId: string } };
+  const snapshot = (await opsOf(facade).queryInstance(TB_PRINCIPAL, TARGET.instanceKey)) as { occurrences: number; kernel: { packageId: string } };
   assert.equal(snapshot.occurrences, 1);
   assert.equal(snapshot.kernel.packageId, closure.kernelId);
   const trace = (await facade.query({ kind: 'build' })) as {
@@ -156,22 +200,22 @@ test('V08-ABI-B01-P the selected Kernel package is physically imported through t
 
   // Unsubscribing stops observation without stopping the scope.
   assert.equal(unsubscribe(), true);
-  await facade.send({ intentType: 'demo.p1', target: TARGET, messageId: 'msg:2', input: { amount: 42 } });
+  await kSend(facade, { intentType: 'demo.p1', target: TARGET, messageId: 'msg:2', input: { amount: 42 } });
   assert.equal(receipts.length, 1, 'an unsubscribed observer receives nothing more');
 });
 
 test('V08-ABI-B01-P2 transport gates fail typed at the scoped boundary', async () => {
   const closure = b01DefaultClosure('p2');
   const facade = await DomainHarness.load(b01Seal(closure.input));
-  await refuseFacade(facade.send({ intentType: 'demo.p2', target: TARGET, messageId: 'm', input: { evil: () => 1 } }), 'INTENT_NOT_JSON');
-  await refuseFacade(facade.send({ intentType: 'demo.p2', target: TARGET, messageId: 'm', input: { amount: Number.NaN } }), 'INTENT_NOT_JSON');
-  await refuseFacade(facade.send({ intentType: 'demo.p2', target: 'bogus', messageId: 'm', input: {} }), 'TARGET_MALFORMED');
-  await refuseFacade(facade.send({ intentType: 'demo.p2', target: TARGET, messageId: '', input: {} }), 'INTENT_MALFORMED');
-  await refuseFacade(facade.send({ intentType: 'demo.p2', target: TARGET, input: {} }), 'INTENT_MALFORMED');
-  await refuseFacade(facade.send({ intentType: 'demo.from-another-closure', target: TARGET, messageId: 'm', input: {} }), 'INTENT_UNBOUND');
+  await refuseFacade(kSend(facade, { intentType: 'demo.p2', target: TARGET, messageId: 'm', input: { evil: () => 1 } }), 'INTENT_NOT_JSON');
+  await refuseFacade(kSend(facade, { intentType: 'demo.p2', target: TARGET, messageId: 'm', input: { amount: Number.NaN } }), 'INTENT_NOT_JSON');
+  await refuseFacade(kSend(facade, { intentType: 'demo.p2', target: 'bogus', messageId: 'm', input: {} }), 'INSTANCE_KEY_INVALID');
+  await refuseFacade(kSend(facade, { intentType: 'demo.p2', target: TARGET, messageId: '', input: {} }), 'INTENT_MALFORMED');
+  await refuseFacade(kSend(facade, { intentType: 'demo.p2', target: TARGET, input: {} }), 'INTENT_MALFORMED');
+  await refuseFacade(kSend(facade, { intentType: 'demo.from-another-closure', target: TARGET, messageId: 'm', input: {} }), 'INTENT_UNBOUND');
   await refuseFacade(facade.query({ kind: 'warp' }), 'QUERY_KIND_UNKNOWN');
   assert.throws(
-    () => facade.subscribe('nope' as unknown as () => void),
+    () => opsOf(facade).observeReceipts('nope' as unknown as () => void),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'OBSERVER_INVALID',
   );
 });
@@ -241,14 +285,14 @@ test('V08-ABI-B01-KPK03 the fixed closure: frozen seal, zero provider discovery 
   // An intent OUTSIDE the sealed closure is typed-denied; the loader never
   // discovers another provider and never falls back.
   await refuseFacade(
-    facade.send({ intentType: 'demo.kpk03-unknown', target: TARGET, messageId: 'm', input: {} }),
+    kSend(facade, { intentType: 'demo.kpk03-unknown', target: TARGET, messageId: 'm', input: {} }),
     'INTENT_UNBOUND',
   );
   // A type bound by a DIFFERENT closure stays unbound here.
   const other = b01DefaultClosure('kpk03-other');
   b01Seal(other.input);
   await refuseFacade(
-    facade.send({ intentType: other.input.businessIntentType, target: TARGET, messageId: 'm', input: {} }),
+    kSend(facade, { intentType: other.input.businessIntentType, target: TARGET, messageId: 'm', input: {} }),
     'INTENT_UNBOUND',
   );
 });
@@ -281,23 +325,23 @@ test('V08-ABI-B01-KPK08 identical kernel+SDK bytes serve two business domains; p
 
   const facadeA = await DomainHarness.load(rootA);
   const facadeB = await DomainHarness.load(rootB);
-  const approved = asReceipt(await facadeA.send({ intentType: 'demo.approval', target: TARGET, messageId: 'ma1', input: { amount: 42 } }));
+  const approved = asReceipt(await kSend(facadeA, { intentType: 'demo.approval', target: TARGET, messageId: 'ma1', input: { amount: 42 } }));
   assert.equal(approved.status, 'admitted', 'approval cap admits 42');
-  const reserved = asReceipt(await facadeB.send({ intentType: 'demo.parts', target: TARGET, messageId: 'mb1', input: { amount: 5 } }));
+  const reserved = asReceipt(await kSend(facadeB, { intentType: 'demo.parts', target: TARGET, messageId: 'mb1', input: { amount: 5 } }));
   assert.equal(reserved.status, 'admitted', 'parts cap admits 5');
-  const denied = asReceipt(await facadeB.send({ intentType: 'demo.parts', target: TARGET, messageId: 'mb2', input: { amount: 42 } }));
+  const denied = asReceipt(await kSend(facadeB, { intentType: 'demo.parts', target: TARGET, messageId: 'mb2', input: { amount: 42 } }));
   assert.equal(denied.status, 'denied', 'parts cap denies 42 — same kernel code, different business behavior');
   assert.equal(approved.kernel.moduleSha256, reserved.kernel.moduleSha256, 'the SAME sealed kernel bytes execute in both domains');
 
   // Package switching: per-scope instance state never mixes.
-  const snapshotA = (await facadeA.query({ kind: 'instance', target: TARGET })) as { occurrences: number };
-  const snapshotB = (await facadeB.query({ kind: 'instance', target: TARGET })) as { occurrences: number };
+  const snapshotA = (await opsOf(facadeA).queryInstance(TB_PRINCIPAL, TARGET.instanceKey)) as { occurrences: number };
+  const snapshotB = (await opsOf(facadeB).queryInstance(TB_PRINCIPAL, TARGET.instanceKey)) as { occurrences: number };
   assert.equal(snapshotA.occurrences, 1);
   assert.equal(snapshotB.occurrences, 2);
   // Stopping scope A never touches scope B.
   facadeA.stop();
-  await refuseFacade(facadeA.send({ intentType: 'demo.approval', target: TARGET, messageId: 'ma2', input: { amount: 1 } }), 'FACADE_STOPPED');
-  const stillOpen = asReceipt(await facadeB.send({ intentType: 'demo.parts', target: TARGET, messageId: 'mb3', input: { amount: 1 } }));
+  await refuseFacade(kSend(facadeA, { intentType: 'demo.approval', target: TARGET, messageId: 'ma2', input: { amount: 1 } }), 'FACADE_STOPPED');
+  const stillOpen = asReceipt(await kSend(facadeB, { intentType: 'demo.parts', target: TARGET, messageId: 'mb3', input: { amount: 1 } }));
   assert.equal(stillOpen.status, 'admitted');
 });
 
@@ -308,12 +352,12 @@ test('V08-ABI-B01-KPK12 no whole-package rehash: install performs zero Host dige
   const facade = await DomainHarness.load(root);
   assert.equal(host.digestInputs.length - beforeLoad, 0, 'byte verification is internal to the qualified installer; the Host digest port is untouched at install');
   const beforeSends = host.digestInputs.length;
-  await facade.send({ intentType: 'demo.kpk12', target: TARGET, messageId: 'm1', input: { amount: 1 } });
-  await facade.send({ intentType: 'demo.kpk12', target: TARGET, messageId: 'm2', input: { amount: 2 } });
+  await kSend(facade, { intentType: 'demo.kpk12', target: TARGET, messageId: 'm1', input: { amount: 1 } });
+  await kSend(facade, { intentType: 'demo.kpk12', target: TARGET, messageId: 'm2', input: { amount: 2 } });
   assert.equal(host.digestInputs.length - beforeSends, 2, 'exactly the mechanism own per-occurrence governance digest — never a package rehash');
   const beforeQuery = host.digestInputs.length;
   await facade.query({ kind: 'build' });
-  await facade.query({ kind: 'instance', target: TARGET });
+  await opsOf(facade).queryInstance(TB_PRINCIPAL, TARGET.instanceKey);
   assert.equal(host.digestInputs.length - beforeQuery, 0, 'the query path performs zero digests');
   // Across this whole process no digest input was ever a sealed module source.
   for (const input of host.digestInputs) {
@@ -325,15 +369,15 @@ test('V08-ABI-B01-LIFE stop() is final and idempotent; the scope refuses further
   const closure = b01DefaultClosure('life');
   const facade = await DomainHarness.load(b01Seal(closure.input));
   const receipts: unknown[] = [];
-  facade.subscribe((receipt) => receipts.push(receipt));
-  await facade.send({ intentType: 'demo.life', target: TARGET, messageId: 'm1', input: { amount: 1 } });
+  opsOf(facade).observeReceipts((receipt) => receipts.push(receipt));
+  await kSend(facade, { intentType: 'demo.life', target: TARGET, messageId: 'm1', input: { amount: 1 } });
   assert.equal(receipts.length, 1);
   facade.stop();
   facade.stop(); // idempotent
-  await refuseFacade(facade.send({ intentType: 'demo.life', target: TARGET, messageId: 'm2', input: { amount: 1 } }), 'FACADE_STOPPED');
+  await refuseFacade(kSend(facade, { intentType: 'demo.life', target: TARGET, messageId: 'm2', input: { amount: 1 } }), 'FACADE_STOPPED');
   await refuseFacade(facade.query({ kind: 'build' }), 'FACADE_STOPPED');
   assert.throws(
-    () => facade.subscribe(() => {}),
+    () => opsOf(facade).observeReceipts(() => {}),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'FACADE_STOPPED',
   );
   assert.equal(receipts.length, 1, 'observers were cleared — no delivery after stop');
@@ -368,7 +412,7 @@ test('V08-ABI-B01-N1 fake second Host argument: strictly one-arg loader, injecti
   assert.equal(evilTouches, 0, 'the injected Host-shaped argument was never read, pre-import or otherwise');
   // The refused attempt left no state: the honest one-arg load works identically.
   const facade = await DomainHarness.load(root);
-  const receipt = asReceipt(await facade.send({ intentType: 'demo.n1', target: TARGET, messageId: 'm1', input: { amount: 3 } }));
+  const receipt = asReceipt(await kSend(facade, { intentType: 'demo.n1', target: TARGET, messageId: 'm1', input: { amount: 3 } }));
   assert.equal(receipt.status, 'admitted', 'the fake second argument produced no effect on the legitimate load');
   assert.equal(host.docs.get(`occ:${closure.kernelId}:1`) !== undefined, true, 'storage went through the protected channel, not the fake');
 });
@@ -420,6 +464,20 @@ test('V08-ABI-B01-N4 no raw Kernel accessor, no raw Journal, no Host ports on th
   await refuseFacade(facade.query({ kind: 'journal' }), 'QUERY_KIND_REFUSED');
   await refuseFacade(facade.query({ kind: 'mechanism' }), 'QUERY_KIND_REFUSED');
   await refuseFacade(facade.query({ kind: 'counters' }), 'QUERY_KIND_REFUSED');
+  // #1013 (@6117218727 Candidate B): the PUBLIC authority routes are CLOSED.
+  // A caller holding the facade in a trusted-bootstrapped process can
+  // neither mutate (anonymous send), read instance state nor observe
+  // receipts — every authority path goes through the Host-authenticated
+  // kernel gateway seam.
+  await refuseFacade(
+    facade.send({ intentType: 'demo.n4', target: TARGET, messageId: 'm-closed-1', input: {} }),
+    'FACADE_PUBLIC_ROUTE_CLOSED',
+  );
+  await refuseFacade(facade.query({ kind: 'instance', target: TARGET }), 'FACADE_PUBLIC_ROUTE_CLOSED');
+  assert.throws(
+    () => facade.subscribe(() => {}),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'FACADE_PUBLIC_ROUTE_CLOSED',
+  );
   // The public /v8 runtime surface is pinned exactly; the protected channels
   // (trust.ts, kernel-host.ts, installer.ts) are deep-imports only.
   const expected = [
@@ -532,7 +590,7 @@ test('V08-ABI-B01-N6 incomplete install leaves no side effect, and the loader st
   // closure still loads and admits.
   const ok = b01DefaultClosure('n6ok');
   const facade = await DomainHarness.load(b01Seal(ok.input));
-  const receipt = asReceipt(await facade.send({ intentType: 'demo.n6ok', target: TARGET, messageId: 'm1', input: { amount: 7 } }));
+  const receipt = asReceipt(await kSend(facade, { intentType: 'demo.n6ok', target: TARGET, messageId: 'm1', input: { amount: 7 } }));
   assert.equal(receipt.status, 'admitted');
 });
 
