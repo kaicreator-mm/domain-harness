@@ -123,6 +123,14 @@ Rules:
 - A Task MUST NOT silently downgrade a higher-authority `required` review rule.
 - Review is not a substitute for required Validation.
 
+### Security-review repair protocol (Builder side)
+
+Recorded from the #1013 R1/R2 security review rounds (PR #1016; fresh review #5494026032 / #1013@6129188323):
+
+- **Falsification-first**: when a review demands a reproduction, implement it as a COMMITTED test, run it RED on the exact reviewed HEAD (keep the marker log as evidence), repair, then GREEN. The committed test then doubles as the boundary's regression and documentation (reference: `tests/v08-integration/packed-raw-ports-session-negative.test.ts`; the RED run cost 13 seconds against the packed consumer and fully evidenced both new P1s).
+- **Class-surface inventory**: when a boundary pattern is accepted on one seam — or a bypass is demonstrated on one surface — the SAME repair must enumerate every sibling seam of the same class and guard each. Observed: after the R2 gateway-ops session capability (@6122817203), the fresh review immediately found the two uncapped raw getters in the same one-shot channel family (`currentKernelHostPorts` / `currentHostModelPort`) — reviewers frame findings as one class with N callable surfaces, so fixing only the named surface invites another round.
+- **No-L2-handoff argument obligation**: changing an internal protected channel's signature is NOT a frozen K/S authority/ABI change when four invariants hold — consumed port shapes unchanged, sole installer unchanged (`bootstrapTrustedHost`), public one-arg `DomainHarness.load` unchanged, K/S ownership unchanged — and the Builder's evidence MUST argue all four explicitly so the independent reviewer verifies the no-handoff claim instead of re-deriving it (the #1013 R2-repair PR comment carries exactly this argument).
+
 ## Validation Execution Profile
 
 Validation is deliberately split so expensive local environments are concentrated rather than repeated across every parallel feature PR.
@@ -138,6 +146,16 @@ Default for contract/core feature tasks:
 - exact-SHA review evidence.
 
 A feature task SHALL NOT claim host durability from mocks.
+
+### Local full-gate composition and timing facts (Windows Build Host)
+
+Recorded from the #1013 R2 repair session (PR #1016@115b71a): the core fix took ~35 minutes while three full local gate rounds took ~2h45m — almost all avoidable time lived in gate composition blind spots and gate-duration planning, not in the repair itself.
+
+- The `packages/domain-harness` `test` script is `build && build:legacy-test && node --import tsx --test "tests/**/*.test.ts" && tsc -p tsconfig.test.json --noEmit`; root `npm run typecheck` (tsconfig.json) covers `src` only, and single-file `node --import tsx --test <file>` bypasses the trailing test-directory typecheck. After changing any internal API signature, run `npx tsc -p tsconfig.test.json --noEmit` (seconds) BEFORE attempting a full gate round. Observed cost of skipping this precheck: 9 call-arity errors discovered only by a full 75-minute gate round.
+- With `NPM_REGISTRY` set (e.g. the npmmirror mirror), the packed-consumer journeys genuinely execute (without it they SKIP explicitly — a weaker gate): one full local gate round costs ~50–100 minutes, dominated by the N18 clean packed consumer (~25 min) and the e8a packed journey (~13–28 min; npm-cache warmth moves rounds toward the low end). Treat one full green round as an ~1h asset; every cheap-to-detect failure class (type errors, call arity, lint) must be blocked behind second-scale prechecks before a full round is spent.
+- A full-gate failure inside a packed journey with NO failing-test line and NO type/compile error (a silent phase) is environmental until proven otherwise: re-run that single test file standalone (e8a ~28 min) to split code vs environment; when it passes standalone, re-run the full gate. Do not edit code without that evidence. Do not launch other npm-install-heavy work (multi-version gates, separate packed journeys) while a full gate round is running — same-host contention slows every journey and amplifies transient network failures.
+- Long npm-chained gate runs buffer their logs through multiple pipes and flush in large chunks: a frozen pass-counter or unchanged `tail` is NOT evidence of a hang. Judge liveness by "did the last output line change" plus "are new child processes still spawning (process StartTime)"; install/network-bound children sitting near 0-CPU are normal. Intervene only when output AND process population are both static well beyond the phase's known duration.
+- Packed-consumer attack/falsification tests follow the established template — `npmRegistryReachable` probe, `npm pack` of core+node workspaces, clean-consumer `npm install`, an `attack.mjs` child driven by marker-line assertions, and trusted-side snapshots proving side-effect invariance. Reference implementations: `tests/v08-integration/packed-gateway-session-negative.test.ts` and `tests/v08-integration/packed-raw-ports-session-negative.test.ts`.
 
 ### Dedicated Node / Build Host validation wave
 
