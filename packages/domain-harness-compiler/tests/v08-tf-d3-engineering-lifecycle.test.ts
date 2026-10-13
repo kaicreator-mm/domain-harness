@@ -26,19 +26,36 @@
  *   D3-N01b  no stage-skipping promotion: from an earlier state no
  *            transition is a candidate; D2 Approval intent types cannot
  *            drive a D3 instance.
- *   D3-N02a  validation SHA exactness: testedSha must equal reviewedSha; a
- *            stale/failed/incomplete validation never moves the change and
- *            denial leaves durable state untouched (recovery still works).
- *   D3-N02b  release currentness: qualifiedSha must equal testedSha, and
- *            the release-manager attestation fields cannot be dropped.
+ *   D3-N02a  validation SHA exactness: testedSha must equal the COMMITTED
+ *            reviewedSha (context lineage); a stale/failed/incomplete
+ *            validation never moves the change and denial leaves durable
+ *            state untouched (recovery still works).
+ *   D3-N02b  release currentness: qualifiedSha must equal the COMMITTED
+ *            testedSha of the validated artifact, and the
+ *            release-manager attestation fields cannot be dropped.
  *   D3-N02c  revoked evidence violates the hard invariant and is denied
  *            BEFORE guard evaluation and any Journal/resource activity.
+ *   D3-N02d  CROSS-SOURCE lineage falsifiers (#1005@6127134676 P1): after
+ *            review(DH-1,HEAD) a fully SELF-CONSISTENT envelope for another
+ *            change (or another SHA pair) is denied against the durable
+ *            committed lineage with zero State/Journal/Effect residue —
+ *            under the pre-lineage within-event guards these exact
+ *            envelopes ADMITTED.
+ *   D3-N02e  the same falsification at release: after validation(DH-1,
+ *            VAL-1,HEAD) a release for another change / another
+ *            validationId / another SHA pair denies with zero residue; the
+ *            genuine same-source release still qualifies afterwards.
  *   D3-N03   the declared evidence effect fails closed without an
  *            authenticated physical Host resource port (typed Journal
  *            'failed', transition never commits, durably-failed retry is
  *            refused without a second dispatch).
  *   D3-N04   per-change stage evidence cannot be double-recorded
  *            (in-process replay containment through the state machine).
+ *   D3-N05   UNKNOWN release: a physical Host fault on the effect-journal
+ *            terminal write (after the evidence dispatched) leaves the
+ *            occurrence UNKNOWN — no state/lineage commit, typed
+ *            JOURNAL_CONFLICT; the un-faulted retry re-dispatches exactly
+ *            once (idempotent semantics) and commits the lineage.
  *   SHARED-P01  D2 Approval and D3 Engineering occurrences execute the
  *            EXACT same physical K/S modules (identical runtime
  *            attribution) and independently BUILDed roots pin byte-equal
@@ -51,12 +68,13 @@
  *
  * FIXTURE BOUNDARY (honest): the memory doc store, resource dispatcher and
  * clock below are TEST FIXTURES ONLY (same boundary as V08-ABI-C01). Real
- * clean-process Host bootstrap, durable SQLite/Journal evidence trails,
- * authenticated cross-tenant journeys and Host-principal revocation are
- * BLOCKED on integration Issue #1013 (I01–I04) and are deliberately NOT
- * claimed by this file. Per-occurrence evidence currentness here means the
- * policy's within-event SHA-equality guards; durable evidence-trail
- * currentness across restarts waits for #1013.
+ * clean-process Host bootstrap, durable SQLite/Journal evidence trails and
+ * authenticated cross-tenant journeys are NOT claimed by this file — they
+ * run in the domain-harness workspace v08-integration tests (I01–I04 and
+ * the T-F two-real-apps packed E2E). Evidence currentness in this file is
+ * REAL committed Kernel lineage (stage-declared contextProjection, Kernel
+ * PR #1034): every cross-stage guard reads the durable instance context
+ * through `context` operands, not the submitted envelope alone.
  */
 
 import { createHash } from 'node:crypto';
@@ -317,6 +335,19 @@ test('V08-TF-D3-P01: full guarded lifecycle change-proposed→reviewed→validat
   assert.equal(release.instance.lifecycle, 'completed');
   assert.equal(release.instance.stateRevision, 3);
   assert.equal(release.admitted.effects[0].idempotencyKey, 'engineering:release:DH-1');
+
+  // --- durable cross-stage lineage (Kernel #1034 contextProjection) ---
+  // Each admitted stage receipt carries the projection K resolved from THIS
+  // event, and the committed instance context accumulates the full lineage
+  // changeId → reviewedSha → validationId/testedSha → qualifiedSha through
+  // the same CAS writes that moved the state.
+  assert.deepEqual(review.admitted.contextProjection, { changeId: 'DH-1', reviewedSha: HEAD_SHA });
+  assert.deepEqual(validation.admitted.contextProjection, { changeId: 'DH-1', validationId: 'VAL-1', testedSha: HEAD_SHA });
+  assert.deepEqual(release.admitted.contextProjection, { qualifiedSha: HEAD_SHA });
+  const afterReview = await runtime.getSnapshot(ENG_TARGET);
+  assert.deepEqual((afterReview as any).state.context, {
+    changeId: 'DH-1', reviewedSha: HEAD_SHA, validationId: 'VAL-1', testedSha: HEAD_SHA, qualifiedSha: HEAD_SHA,
+  });
 
   // Every occurrence receipt attributes itself to the same physical kernel.
   for (const receipt of [review, validation, release]) {
@@ -583,6 +614,103 @@ test('V08-TF-D3-N02b: release currentness — qualifiedSha must equal testedSha 
 });
 
 // ===========================================================================
+// D3-N02d — CROSS-SOURCE lineage falsifiers (#1005@6127134676 P1).
+// A self-consistent envelope for a DIFFERENT change (or a different SHA
+// pair) previously ADMITTED because the guards compared the event only
+// with itself. Now the validation guard binds changeId/testedSha to the
+// lineage K committed at review, so every cross-source submission denies
+// with zero State/Journal/Effect residue.
+// ===========================================================================
+
+test('V08-TF-D3-N02d: cross-change validation — self-consistent envelopes for another change/SHA pair deny against committed lineage', async () => {
+  const { runtime, host } = await openedEngineering();
+  const review = await submit(runtime, 'reviewChange', reviewInput(), 'reviewer');
+  assert.equal(review.status, 'admitted');
+  assert.deepEqual((await runtime.getSnapshot(ENG_TARGET) as any).state.context, { changeId: 'DH-1', reviewedSha: HEAD_SHA });
+
+  // Attack 1 — a FULLY self-consistent envelope for a different change
+  // DH-2 (its own reviewedSha equals its own testedSha). This exact
+  // envelope was admitted by the pre-lineage within-event guard.
+  const crossChange = await submit(
+    runtime, 'recordValidation',
+    validationInput({ changeId: 'DH-2', reviewedSha: STALE_SHA, testedSha: STALE_SHA }),
+    'validator', ENG_TARGET, 'msg:d3:n02d-cross-change',
+  );
+  assert.equal(crossChange.status, 'denied');
+  assert.equal(crossChange.denial.reason, 'guard');
+  assert.equal(crossChange.denial.guardId, 'guard:validation-passed');
+  assert.equal(crossChange.denial.transitionKey, 'validate');
+
+  // Attack 2 — same changeId, but a forged different SHA pair (again
+  // internally consistent within the submitted envelope).
+  const crossSha = await submit(
+    runtime, 'recordValidation',
+    validationInput({ reviewedSha: STALE_SHA, testedSha: STALE_SHA }),
+    'validator', ENG_TARGET, 'msg:d3:n02d-cross-sha',
+  );
+  assert.equal(crossSha.status, 'denied');
+  assert.equal(crossSha.denial.reason, 'guard');
+  assert.equal(crossSha.denial.guardId, 'guard:validation-passed');
+
+  // Zero residue: no journal row, no effect dispatch, identical durable
+  // state AND lineage context at the same revision.
+  assert.equal((await runtime.getJournalRecords()).length, 1);
+  assert.equal(host.resources.callCount(), 1);
+  const snapshot = await runtime.getSnapshot(ENG_TARGET);
+  assert.equal(snapshot.state.stateKey, 'reviewed');
+  assert.equal(snapshot.stateRevision, 1);
+  assert.deepEqual((snapshot as any).state.context, { changeId: 'DH-1', reviewedSha: HEAD_SHA });
+
+  // The genuine same-source validation still proceeds afterwards.
+  const recovery = await submit(runtime, 'recordValidation', validationInput(), 'validator');
+  assert.equal(recovery.status, 'admitted');
+  assert.deepEqual(recovery.admitted.contextProjection, { changeId: 'DH-1', validationId: 'VAL-1', testedSha: HEAD_SHA });
+  assert.deepEqual((await runtime.getSnapshot(ENG_TARGET) as any).state.context, {
+    changeId: 'DH-1', reviewedSha: HEAD_SHA, validationId: 'VAL-1', testedSha: HEAD_SHA,
+  });
+});
+
+test('V08-TF-D3-N02e: cross-source release — another change/validationId/SHA pair denies; the genuine release qualifies afterwards', async () => {
+  const { runtime, host } = await openedEngineering();
+  await submit(runtime, 'reviewChange', reviewInput(), 'reviewer');
+  const validation = await submit(runtime, 'recordValidation', validationInput(), 'validator');
+  assert.equal(validation.status, 'admitted');
+  const committedLineage = { changeId: 'DH-1', reviewedSha: HEAD_SHA, validationId: 'VAL-1', testedSha: HEAD_SHA };
+
+  for (const [messageId, overrides] of [
+    // Another change's release — internally consistent, cross-source.
+    ['msg:d3:n02e-cross-change', { changeId: 'DH-2' }],
+    // A re-used envelope for a DIFFERENT validation run.
+    ['msg:d3:n02e-cross-validation', { validationId: 'VAL-2' }],
+    // A forged SHA pair different from the committed testedSha.
+    ['msg:d3:n02e-cross-sha', { testedSha: STALE_SHA, qualifiedSha: STALE_SHA }],
+  ] as const) {
+    const receipt = await submit(runtime, 'qualifyRelease', releaseInput(overrides), 'release-manager', ENG_TARGET, messageId);
+    assert.equal(receipt.status, 'denied', messageId);
+    assert.equal(receipt.denial.reason, 'guard', messageId);
+    assert.equal(receipt.denial.guardId, 'guard:release-qualified', messageId);
+    assert.equal(receipt.denial.transitionKey, 'qualify', messageId);
+  }
+
+  // Zero State/Journal/Effect residue across all three cross-source attempts.
+  assert.equal((await runtime.getJournalRecords()).length, 2);
+  assert.equal(host.resources.callCount(), 2);
+  const snapshot = await runtime.getSnapshot(ENG_TARGET);
+  assert.equal(snapshot.state.stateKey, 'validation-passed');
+  assert.equal(snapshot.stateRevision, 2);
+  assert.deepEqual((snapshot as any).state.context, committedLineage);
+
+  // The genuine same-source release qualifies and pins qualifiedSha.
+  const release = await submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager');
+  assert.equal(release.status, 'admitted');
+  assert.deepEqual(release.admitted.contextProjection, { qualifiedSha: HEAD_SHA });
+  const final = await runtime.getSnapshot(ENG_TARGET);
+  assert.equal(final.state.stateKey, 'release-qualified');
+  assert.equal(final.stateRevision, 3);
+  assert.deepEqual((final as any).state.context, { ...committedLineage, qualifiedSha: HEAD_SHA });
+});
+
+// ===========================================================================
 // D3-N02c — revoked evidence violates the hard invariant BEFORE guards and
 // any Journal/resource activity.
 // ===========================================================================
@@ -695,6 +823,82 @@ test('V08-TF-D3-N04: replaying an already-recorded stage occurrence appends no s
   assert.equal((await runtime.getJournalRecords()).length, 1);
   assert.equal(host.resources.callCount(), 1);
   assert.equal(host.resources.calls()[0].payload.idempotencyKey, 'engineering:review:DH-1');
+});
+
+// ===========================================================================
+// D3-N05 — UNKNOWN: a physical Host fault on the effect-journal TERMINAL
+// write (after the release evidence dispatched) leaves the occurrence
+// UNKNOWN. No state or lineage commit happens; the typed refusal is
+// JOURNAL_CONFLICT (ambiguous). Because the engineering evidence effect
+// is IDEMPOTENT, the un-faulted retry re-dispatches exactly once and then
+// commits — the K-level AMBIGUOUS-for-non-idempotent proof is Kernel
+// contract D3-R2 (#1034); here we prove the app-level discipline.
+// ===========================================================================
+
+test('V08-TF-D3-N05: UNKNOWN release — journal terminal fault commits nothing; idempotent retry re-dispatches once and then qualifies', async () => {
+  const { runtime, host } = await openedEngineering();
+  await submit(runtime, 'reviewChange', reviewInput(), 'reviewer');
+  await submit(runtime, 'recordValidation', validationInput(), 'validator');
+  const before = {
+    snapshot: await runtime.getSnapshot(ENG_TARGET),
+    journal: (await runtime.getJournalRecords()).length,
+    calls: host.resources.callCount(),
+  };
+  assert.equal(before.journal, 2);
+  assert.equal(before.calls, 2);
+
+  // Fault the SECOND journal write of THIS stage's evidence effect: the
+  // 'started' record commits, the evidence dispatches, the terminal
+  // 'completed' record faults — the occurrence ends UNKNOWN.
+  const originalPut = host.docs.put.bind(host.docs);
+  let journalPuts = 0;
+  host.docs.put = async (key: string, value: any, conditions?: Record<string, unknown>) => {
+    if (key.startsWith('v08-kernel:effect-journal:')) {
+      journalPuts += 1;
+      if (journalPuts === 2) {
+        throw Object.assign(new Error('host fault after release evidence dispatch'), { code: 'HOST_FAULT_INJECTED' });
+      }
+    }
+    return originalPut(key, value, conditions);
+  };
+  await assert.rejects(
+    submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager', ENG_TARGET, 'msg:d3:n05-release'),
+    (error: unknown) => {
+      const typed = error as { name?: string; code?: string; message?: string };
+      return typed?.name === 'CentralAdmissionError'
+        && typed?.code === 'ADMISSION_EFFECT_JOURNAL_CONFLICT'
+        && /ambiguous/.test(String(typed?.message));
+    },
+  );
+  host.docs.put = originalPut;
+
+  // The evidence dispatched exactly once so far; the state and lineage are
+  // NOT committed — the instance is still at validation-passed.
+  assert.equal(host.resources.callCount(), before.calls + 1);
+  const unknownSnapshot = await runtime.getSnapshot(ENG_TARGET);
+  assert.equal(unknownSnapshot.state.stateKey, 'validation-passed');
+  assert.equal(unknownSnapshot.stateRevision, (before.snapshot as any).stateRevision);
+  assert.deepEqual((unknownSnapshot as any).state.context, (before.snapshot as any).state.context);
+
+  // Un-faulted retry of the SAME message: idempotent semantics re-dispatch
+  // the evidence exactly once more, the terminal record commits, and the
+  // transition (with its qualifiedSha lineage) finally lands.
+  const retry = await submit(runtime, 'qualifyRelease', releaseInput(), 'release-manager', ENG_TARGET, 'msg:d3:n05-release');
+  assert.equal(retry.status, 'admitted');
+  assert.equal(retry.admitted.effects[0].disposition, 'executed');
+  assert.equal(host.resources.callCount(), before.calls + 2, 'exactly one re-dispatch under UNKNOWN recovery');
+
+  const records = await runtime.getJournalRecords();
+  assert.equal(records.length, 3, 'the started record was completed, not duplicated');
+  for (const record of records) {
+    assert.equal((record as any).status, 'completed');
+  }
+  const final = await runtime.getSnapshot(ENG_TARGET);
+  assert.equal(final.state.stateKey, 'release-qualified');
+  assert.equal(final.stateRevision, 3);
+  assert.deepEqual((final as any).state.context, {
+    changeId: 'DH-1', reviewedSha: HEAD_SHA, validationId: 'VAL-1', testedSha: HEAD_SHA, qualifiedSha: HEAD_SHA,
+  });
 });
 
 // ===========================================================================

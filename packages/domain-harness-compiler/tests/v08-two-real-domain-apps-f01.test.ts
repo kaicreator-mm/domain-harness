@@ -176,9 +176,33 @@ test('V08-TF-F01-D3-N: engineering role and exact SHA guards cannot be dropped f
   const release = policy.workflowDefinition.states[2].transitions[0];
   const guard = policy.workflowDefinition.guards.find((g: any) => g.guardId === release.guardId);
   assert.equal(guard.predicate.op, 'all');
+  // [#1005 D3 lineage] The release guard binds the attestation to the
+  // durably COMMITTED lineage (context operands), not to the submitted
+  // envelope itself: qualifiedSha must equal the committed testedSha.
   const exactSha = guard.predicate.predicates.find((p: any) =>
-    p.op === 'eq' && p.left?.path?.[1] === 'qualifiedSha' && p.right?.path?.[1] === 'testedSha');
-  assert.ok(exactSha, 'release requires qualified SHA to equal tested SHA, not an arbitrary caller flag');
+    p.op === 'eq' && p.left?.path?.[1] === 'qualifiedSha' && p.right?.source === 'context' && p.right?.path?.[0] === 'testedSha');
+  assert.ok(exactSha, 'release requires the qualified SHA to equal the COMMITTED testedSha lineage');
+  const sameValidation = guard.predicate.predicates.find((p: any) =>
+    p.op === 'eq' && p.left?.path?.[1] === 'validationId' && p.right?.source === 'context' && p.right?.path?.[0] === 'validationId');
+  assert.ok(sameValidation, 'release requires the very validationId K committed at the validation stage');
+  const validation = policy.workflowDefinition.states[1].transitions[0];
+  const validationGuard = policy.workflowDefinition.guards.find((g: any) => g.guardId === validation.guardId);
+  const testedIsReviewed = validationGuard.predicate.predicates.find((p: any) =>
+    p.op === 'eq' && p.left?.path?.[1] === 'testedSha' && p.right?.source === 'context' && p.right?.path?.[0] === 'reviewedSha');
+  assert.ok(testedIsReviewed, 'validation must test the exact SHA the review committed');
+  // Stage-declared contextProjection lineage (Kernel #1034 contract).
+  assert.deepEqual(policy.workflowDefinition.states[0].transitions[0].contextProjection, {
+    changeId: { source: 'event', path: ['payload', 'changeId'], type: 'string' },
+    reviewedSha: { source: 'event', path: ['payload', 'reviewedSha'], type: 'string' },
+  });
+  assert.deepEqual(policy.workflowDefinition.states[1].transitions[0].contextProjection, {
+    changeId: { source: 'event', path: ['payload', 'changeId'], type: 'string' },
+    validationId: { source: 'event', path: ['payload', 'validationId'], type: 'string' },
+    testedSha: { source: 'event', path: ['payload', 'testedSha'], type: 'string' },
+  });
+  assert.deepEqual(policy.workflowDefinition.states[2].transitions[0].contextProjection, {
+    qualifiedSha: { source: 'event', path: ['payload', 'qualifiedSha'], type: 'string' },
+  });
   assert.equal(policy.intentBindings.qualifyRelease.roles.includes('requester'), false);
   assert.equal(policy.intentBindings.qualifyRelease.roles.includes('release-manager'), true);
 });
