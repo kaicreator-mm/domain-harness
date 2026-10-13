@@ -187,7 +187,7 @@ export function installHostModelPort(port: unknown, sessionCap: unknown): void {
       'installHostModelPort requires the bootstrap-minted unguessable session capability string (32–256 chars) that gates currentHostModelPort (#1013 R2 @5494026032: a raw port can never be installed without its boundary)',
     );
   }
-  hostModelPort = Object.freeze({ invoke: Function.prototype.bind.call(invoke, port) });
+  hostModelPort = Object.freeze({ invoke: Function.prototype.bind.call(invoke, port) as V8HostModelPort['invoke'] });
   // isUnguessableSessionCap above already proved and narrowed the capability.
   hostModelPortSessionCap = sessionCap;
 }
