@@ -38,6 +38,20 @@ export declare function preflightHostModelPort(port: unknown, sessionCap: unknow
  * Install the trusted Host ModelPort for this process together with the
  * session capability that gates every read back. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed).
+ *
+ * #1013 R3 (@6138090328): when the bootstrap preflight staged a snapshot
+ * for THIS port object, the install consumes exactly that staged callable
+ * and performs NO read of the caller's object after the one-shot
+ * trust/kernel/session commits — preflight→install drift is neutralized by
+ * construction. Without a staged snapshot (direct installation), the
+ * callable is captured from its SINGLE descriptor read inside
+ * `validatedDirectInvoke` and THAT snapshotted function is what gets
+ * installed. Either way the get result is only ever compared, never
+ * installed; a Proxy whose descriptor trap is truthful but whose get trap
+ * drifts `invoke` refuses TYPED (MODEL_PORT_INVALID) at preflight — BEFORE
+ * any channel state mutates — so the pre-repair post-commit `.bind` crash
+ * (a half-bootstrapped process that defeated the R1 F-01 zero-residue
+ * property) cannot exist in either path.
  */
 export declare function installHostModelPort(port: unknown, sessionCap: unknown): void;
 /**

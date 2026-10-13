@@ -129,6 +129,43 @@ const { bootstrapTrustedHost, createKernelGateway, mintPrincipalCredential } =
 const ISSUER = 'issuer:dh-v08-integration';
 const SECRET = 'integration-issuer-secret:1013';
 const AUDIENCE = 'dh-v08-packed-raw-ports-negative';
+
+// ---- #1013 R3 (@6138090328) FIRST: nested-Proxy ModelPort descriptor/get
+// drift — the pre-repair shape crashed with a raw TypeError AFTER the
+// one-shot trust/kernel/session commits (half bootstrap). On the PACKED dist
+// in this clean consumer process it must now refuse TYPED BEFORE any channel
+// is consumed; the legitimate bootstrap below then succeeds in this SAME
+// process, proving the channels were never consumed.
+{
+  const { isHostTrustChannelEstablished } = await import('@kaicreator/domain-harness/v8/host');
+  const v8Entry0 = import.meta.resolve('@kaicreator/domain-harness/v8');
+  const khProbe = await import(new URL('./kernel-host.js', v8Entry0).href);
+  const mkProbe = await import(new URL('./microkernel.js', v8Entry0).href);
+  const realInvoke = async () => ({ decision: { outcome: 'x' }, event: { type: 'X', payload: {} } });
+  const inner = new Proxy({ invoke: realInvoke }, {
+    get(target, key, receiver) { return key === 'invoke' ? 42 : Reflect.get(target, key, receiver); },
+  });
+  const driftedPort = new Proxy(inner, {
+    getOwnPropertyDescriptor(target, key) { return Reflect.getOwnPropertyDescriptor(target, key); },
+    get(target, key, receiver) { return Reflect.get(target, key, receiver); },
+  });
+  let refusal = 'NOT_REFUSED';
+  try {
+    await bootstrapTrustedHost({
+      issuers: new Map([[ISSUER, SECRET]]),
+      audience: AUDIENCE,
+      modelPort: driftedPort,
+    });
+  } catch (error) {
+    refusal = error?.code ?? 'UNTYPED:' + String(error);
+  }
+  assert.equal(refusal, 'MODEL_PORT_INVALID', 'the drifted Proxy ModelPort refuses TYPED on the packed dist');
+  assert.equal(isHostTrustChannelEstablished(), false, 'R3: zero trust residue on the packed dist');
+  assert.equal(khProbe.isKernelHostInstalled(), false, 'R3: zero Kernel Host residue on the packed dist');
+  assert.equal(mkProbe.isGatewaySessionCapInstalled(), false, 'R3: zero gateway session residue on the packed dist');
+  console.log('R3_PROXY_DRIFT_REFUSED_TYPED_ZERO_RESIDUE');
+}
+
 const invocations = [];
 const ledgerCalls = [];
 const handle = await bootstrapTrustedHost({

@@ -31,14 +31,56 @@ let hostModelPort;
  * measurement path.
  */
 let hostModelPortSessionCap;
-function isDirectCallable(owner, key) {
+/**
+ * #1013 R3 (@6138090328): preflight-staged ModelPort snapshots. The
+ * bootstrap's transactional preflight validates the port and STAGES the
+ * exact validated callable here (keyed by the port object itself); the
+ * install then consumes the STAGED function and never re-reads the
+ * caller's object after the one-shot trust/kernel/session commits — a
+ * drifting Proxy cannot make the commit observe different material than
+ * the preflight validated. A staged entry from an aborted attempt is keyed
+ * to THAT port object, so a later install of a different object simply
+ * falls back to its own atomic fresh validation.
+ */
+const stagedInvokes = new WeakMap();
+/**
+ * Read and validate the direct callable `invoke` data property through its
+ * property descriptor EXACTLY ONCE (#1013 R3 @6138090328), and additionally
+ * require the descriptor/get REPRESENTATION TO AGREE. The value returned
+ * here is simultaneously the validation input and the material the caller
+ * of this helper may install; the get result is only compared, never
+ * installed — so a Proxy cannot make validation and installation observe
+ * different callables, and the pre-repair post-commit `.bind` crash (raw
+ * TypeError after trust/kernel/session were consumed) is closed by
+ * construction. A descriptor that truthfully reports a callable while the
+ * get trap drifts `invoke` (returns a non-function, a different function,
+ * or throws) is an unsafe proxy-style representation outside the
+ * direct-data-property contract and refuses typed; plain objects always
+ * agree.
+ */
+function validatedDirectInvoke(port) {
+    if (typeof port !== 'object' || port === null) {
+        return undefined;
+    }
     // The SDK refuses accessor/getter properties on this field; the channel
-    // enforces the same shape at installation so a hostile object cannot pass
-    // here and fail later inside sealed module bytes.
-    const descriptor = Object.getOwnPropertyDescriptor(owner, key);
-    return descriptor !== undefined
-        && Object.hasOwn(descriptor, 'value')
-        && typeof descriptor.value === 'function';
+    // enforces the same shape here so a hostile object cannot pass this check
+    // and fail later inside sealed module bytes.
+    const descriptor = Object.getOwnPropertyDescriptor(port, 'invoke');
+    if (descriptor === undefined || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+        return undefined;
+    }
+    let viaGet;
+    try {
+        viaGet = port.invoke;
+    }
+    catch {
+        // A get trap that throws is an unsafe representation, not a channel error.
+        return undefined;
+    }
+    if (viaGet !== descriptor.value) {
+        return undefined;
+    }
+    return descriptor.value;
 }
 function isUnguessableSessionCap(cap) {
     return typeof cap === 'string' && cap.length >= 32 && cap.length <= 256;
@@ -71,22 +113,51 @@ export function preflightHostModelPort(port, sessionCap) {
     if (hostModelPort !== undefined) {
         throw new QualifiedPackageError('MODEL_PORT_ALREADY_INSTALLED', 'a Host ModelPort is already installed in this process; the protected ModelPort channel is one-shot');
     }
-    if (typeof port !== 'object' || port === null || !isDirectCallable(port, 'invoke')) {
+    const invoke = validatedDirectInvoke(port);
+    if (invoke === undefined) {
         throw new QualifiedPackageError('MODEL_PORT_INVALID', 'installHostModelPort requires a port object with a direct callable invoke({operation, input}) data property');
     }
     if (!isUnguessableSessionCap(sessionCap)) {
         throw new QualifiedPackageError('MODEL_PORT_SESSION_CAP_INVALID', 'installHostModelPort requires the bootstrap-minted unguessable session capability string (32–256 chars) that gates currentHostModelPort (#1013 R2 @5494026032: a raw port can never be installed without its boundary)');
     }
+    // Stage the EXACT validated callable: the subsequent install consumes this
+    // snapshot and never re-reads the caller's object after the one-shot
+    // trust/kernel/session commits (#1013 R3 @6138090328).
+    stagedInvokes.set(port, invoke);
 }
 /**
  * Install the trusted Host ModelPort for this process together with the
  * session capability that gates every read back. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed).
+ *
+ * #1013 R3 (@6138090328): when the bootstrap preflight staged a snapshot
+ * for THIS port object, the install consumes exactly that staged callable
+ * and performs NO read of the caller's object after the one-shot
+ * trust/kernel/session commits — preflight→install drift is neutralized by
+ * construction. Without a staged snapshot (direct installation), the
+ * callable is captured from its SINGLE descriptor read inside
+ * `validatedDirectInvoke` and THAT snapshotted function is what gets
+ * installed. Either way the get result is only ever compared, never
+ * installed; a Proxy whose descriptor trap is truthful but whose get trap
+ * drifts `invoke` refuses TYPED (MODEL_PORT_INVALID) at preflight — BEFORE
+ * any channel state mutates — so the pre-repair post-commit `.bind` crash
+ * (a half-bootstrapped process that defeated the R1 F-01 zero-residue
+ * property) cannot exist in either path.
  */
 export function installHostModelPort(port, sessionCap) {
-    preflightHostModelPort(port, sessionCap);
-    hostModelPort = Object.freeze({ invoke: port.invoke.bind(port) });
-    // preflightHostModelPort already proved the capability is a string.
+    if (hostModelPort !== undefined) {
+        throw new QualifiedPackageError('MODEL_PORT_ALREADY_INSTALLED', 'a Host ModelPort is already installed in this process; the protected ModelPort channel is one-shot');
+    }
+    const staged = typeof port === 'object' && port !== null ? stagedInvokes.get(port) : undefined;
+    const invoke = staged ?? validatedDirectInvoke(port);
+    if (invoke === undefined) {
+        throw new QualifiedPackageError('MODEL_PORT_INVALID', 'installHostModelPort requires a port object with a direct callable invoke({operation, input}) data property');
+    }
+    if (!isUnguessableSessionCap(sessionCap)) {
+        throw new QualifiedPackageError('MODEL_PORT_SESSION_CAP_INVALID', 'installHostModelPort requires the bootstrap-minted unguessable session capability string (32–256 chars) that gates currentHostModelPort (#1013 R2 @5494026032: a raw port can never be installed without its boundary)');
+    }
+    hostModelPort = Object.freeze({ invoke: invoke.bind(port) });
+    // isUnguessableSessionCap above already proved and narrowed the capability.
     hostModelPortSessionCap = sessionCap;
 }
 /**
