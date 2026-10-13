@@ -65,6 +65,16 @@ the loaded K/S files and asserts these exact values, so a later K/S byte
 change (for example the #1005 D3 Kernel work) is **not silently inherited**:
 whichever change lands second must re-review and rebind this pin.
 
+```ini
+K_BLOB_PIN_COUPLED_WITH=PR1034_D3K
+```
+
+PR #1034 (#1005 D3-K) changes only `kernel-mechanism-v1.mjs`. Whichever of
+#1018 / #1034 merges second needs a one-line rebind of `V08_K_BLOB` in the L1
+oracle test after re-review; the pin is not weakened. Only the L1 META test is
+coupled: the L2 physical and L3 dist-consumer tests seal whatever K/S payload
+bytes are current (as the KH2 physical tests do) and carry no blob identity.
+
 ## 2. Oracle rule
 
 Historical expected behavior is the oracle. A changed public/API shape is not
@@ -168,6 +178,7 @@ THIS_BRANCH_PRODUCTION_FIX = NONE
 ```ini
 TODO_GAP_SENTINELS=0 (was 7)
 CURRENT_K_S_EXACT_BLOB_BINDING=905d291/efbd8e6 (v0.8@022e2b4)
+K_BLOB_PIN_COUPLED_WITH=PR1034_D3K
 L1_COMPILER_ORACLE=EXECUTED_LOCAL
 L2_SELECTED_PHYSICAL_SQLITE=EXECUTED_LOCAL
 L3_STOCK_NODE_DIST_CONSUMER=EXECUTED_LOCAL (workspace dist link; NPM_PACK_TARBALL=NOT_RUN)

@@ -51,6 +51,9 @@ const V08_S_BLOB_SOURCE_PREP = 'fa01e3cc70bc9a08bf14bd497dfb3fba79bd067f';
 const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // Current selected bytes this rebind is bound to (a later K/S byte change
 // must re-review and rebind; it is never silently inherited).
+// K_BLOB_PIN_COUPLED_WITH=PR1034_D3K: whichever of #1018 / #1034 merges
+// second rebinds V08_K_BLOB after re-review. Only this META pin is coupled;
+// the physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '022e2b4c699c2351ded77efca65a0c8b492d3aeb';
 const V08_S_BLOB = '905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a';
 const V08_K_BLOB = 'efbd8e60044a06ba0158e05ccea2919582c728b3';
