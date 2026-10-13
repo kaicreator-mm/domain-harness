@@ -2333,7 +2333,13 @@ export function createOccurrenceRuntime(options) {
         callerRole: caller.role,
       };
       const rule = businessEndpoint.rules[binding.ruleId];
-      const resolved = sdkEndpoint.interpret(rule, request.input, context);
+      // [ABI ruling #1013@6118426531, R1 F-03] The endpoint contract is
+      // "synchronous value OR Promise thereof": `await` is transparent for
+      // every synchronous model-free Standard SDK endpoint (a non-Promise
+      // resolves to itself), and it is what lets a Host-bound model resolver
+      // route model-decision rules through its real async port-invoking
+      // endpoint. No other K semantics change.
+      const resolved = await sdkEndpoint.interpret(rule, request.input, context);
 
       const definition = binding.definition ?? businessEndpoint.workflowDefinition;
       const request_shape = {

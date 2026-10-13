@@ -26,5 +26,7 @@ export type { EventScope, EventListener, HostEvent, HostSubscription } from './e
 export { bootstrapTrustedHost, isHostTrustChannelEstablished, } from './bootstrap.js';
 export type { TrustedHostHandle, TrustedHostStorageSpec, TrustedNodeHost, TrustedNodeHostInput } from './bootstrap.js';
 export { assertIntentScope, createHostUxTransport, createUxTransport, uxDocumentNamespace, } from './ux-transport.js';
-export type { UxDispatchReceipt, UxQueryKind, UxQueryRequest, UxTarget, UxTransport } from './ux-transport.js';
+export type { UxDispatchReceipt, UxKernelRoute, UxQueryKind, UxQueryRequest, UxTarget, UxTransport } from './ux-transport.js';
+export { createKernelGateway, kernelReceiptAsHostEvent, } from './kernel-gateway.js';
+export type { KernelGateway, KernelGatewayAppInput, KernelGatewaySendIntent, KernelReceiptScope, KernelReceiptSubscription, } from './kernel-gateway.js';
 //# sourceMappingURL=index.d.ts.map

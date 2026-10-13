@@ -30,6 +30,7 @@
  */
 import { QualifiedPackageError } from './contracts.js';
 import { currentKernelHostPorts } from './kernel-host.js';
+import { currentHostModelPort } from './model-port.js';
 import { load } from './load.js';
 function typedError(code, message) {
     return new QualifiedPackageError(code, message);
@@ -71,17 +72,6 @@ function assertPlainJsonIntent(intent) {
         }
     }
 }
-function requireTarget(target) {
-    const record = target;
-    if (typeof target !== 'object'
-        || target === null
-        || typeof record?.workflowId !== 'string'
-        || record.workflowId.length === 0
-        || typeof record?.instanceKey !== 'string'
-        || record.instanceKey.length === 0) {
-        throw typedError('TARGET_MALFORMED', 'target must be {workflowId, instanceKey} non-empty strings');
-    }
-}
 function requireRoleBinding(bindings, role) {
     const binding = bindings.find((candidate) => candidate.role === role);
     // Unreachable after assertQualifiedRoot (exactly-one K/S, >=1 B), but a
@@ -121,8 +111,13 @@ async function loadScopedFacade(packageRoot) {
         throw typedError('LOAD_ARITY_INVALID', 'load accepts exactly one argument: the sealed qualified package root; there is no options overload and no caller-injectable Host port (P1-L2-ABI-02)');
     }
     // Kernel Host binding: protected internal channel ONLY (never a load
-    // argument). Fail-closed before anything else.
-    const hostPorts = currentKernelHostPorts();
+    // argument). Fail-closed before anything else. The read carries this
+    // module's gateway session capability (#1013 R2 @5494026032): the trusted
+    // bootstrap installs the SAME unguessable value into the gateway channel
+    // here and into the kernel Host ports channel, so the public one-arg load
+    // keeps working while an uncredentialed deep importer of kernel-host.js is
+    // refused at the getter before any port escapes.
+    const hostPorts = currentKernelHostPorts(gatewaySessionCap);
     // THE qualified load path — qualification, trust gate, whole-closure
     // preflight and every physical import happen here and nowhere else.
     const loaded = await load(packageRoot);
@@ -146,8 +141,53 @@ async function loadScopedFacade(packageRoot) {
         throw typedError('ENDPOINT_INVALID', `business package ${businessBinding.packageId} does not provide a callable business-policy endpoint`);
     }
     const createOccurrenceRuntime = kernelNamespace.createOccurrenceRuntime;
-    const interpret = sdkNamespace.interpret;
     const getPolicy = businessNamespace.getPolicy;
+    // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
+    // ModelPort binding, protected channel ONLY. When this process bootstrapped
+    // a Host ModelPort and the qualified Standard SDK exposes the host-bound
+    // resolver factory, the endpoint handed to the Kernel is a COMPOSITE that
+    // dispatches ONLY on the SEALED business rule declaration: a
+    // `model-decision` rule routes through the resolver's real async
+    // port-invoking endpoint (`invokeDecision` — the Kernel awaits the result
+    // per the recorded ABI ruling), every other declared kind stays on the
+    // resolver's model-free wrapper (honest `measured(0)` scoped to bound-port
+    // invocations). Caller input/context never selects the path. Without an
+    // installed port the plain `interpret` stays wired and evidence remains
+    // `unsupported`/`unmeasured` — there is no synthetic measured zero and no
+    // caller-supplied port anywhere. The read carries this module's gateway
+    // session capability (#1013 R2 @5494026032): the same unguessable value
+    // the bootstrap installed with the port, so the trusted load path keeps
+    // working while an uncredentialed deep importer of model-port.js is
+    // refused at the getter before the frozen {invoke} object can be reached.
+    const modelPort = currentHostModelPort(gatewaySessionCap);
+    const resolverFactory = sdkNamespace.createHostBoundModelResolver;
+    const interpret = (modelPort !== undefined && typeof resolverFactory === 'function'
+        ? (() => {
+            const factory = resolverFactory;
+            let bound;
+            try {
+                bound = factory(modelPort);
+            }
+            catch (error) {
+                throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver activation failed: ${String(error?.message ?? error)}`);
+            }
+            if (typeof bound !== 'object'
+                || bound === null
+                || typeof bound.interpret !== 'function'
+                || typeof bound.invokeDecision !== 'function') {
+                // R1 F-03 stale/failed-bind negative: a factory that does not
+                // expose the real port-invoking endpoint is not a usable
+                // production binding — refuse typed, never degrade silently.
+                throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver exposes no callable interpret/invokeDecision pair (stale or failed bind)`);
+            }
+            return (declaration, input, context) => {
+                const kind = declaration?.kind;
+                return kind === 'model-decision'
+                    ? bound.invokeDecision(declaration, input, context)
+                    : bound.interpret(declaration, input, context);
+            };
+        })()
+        : sdkNamespace.interpret);
     // Business policy resolution precedes kernel construction: a policy that
     // throws or returns a non-object fails typed with the mechanism still inert.
     let businessPolicy;
@@ -230,6 +270,21 @@ async function loadScopedFacade(packageRoot) {
             }))),
         });
     }
+    /**
+     * #1013 review repair (@6117218727 Candidate B): the PUBLIC facade verbs
+     * are CLOSED for authority-carrying routes. `send`, `instance` reads and
+     * receipt observation have no authentication channel at this surface —
+     * an unauthenticated in-process caller (including one holding a sealed
+     * root after a trusted Host bootstrap) must never mutate Kernel state,
+     * read instance data or observe receipts. Every such operation goes
+     * through the Host-authenticated kernel gateway seam
+     * (`getFacadeKernelOps`, trusted Host context only). The inert `build`
+     * trace stays public: it restates sealed-root metadata the caller
+     * already supplied and reads no Kernel state.
+     */
+    function refusePublicRoute(verb) {
+        return typedError('FACADE_PUBLIC_ROUTE_CLOSED', `the public facade ${verb} route is closed (#1013): mutations, instance reads and receipt observation require the Host-authenticated kernel gateway; DomainHarness.load stays the one-argument public entry`);
+    }
     async function send(intent) {
         assertOpen();
         assertPlainJsonIntent(intent);
@@ -237,14 +292,15 @@ async function loadScopedFacade(packageRoot) {
         if (typeof record.intentType !== 'string' || record.intentType.length === 0) {
             throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
         }
-        if (!intentIndex.has(record.intentType)) {
-            throw typedError('INTENT_UNBOUND', `intent type ${record.intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
+        if (record.caller !== undefined) {
+            // #1013 I02: a caller-declared `caller` is user data and can never
+            // carry authority. The public route refuses it outright; the only
+            // route that binds a caller is the Host gateway's authenticated seam.
+            throw typedError('INTENT_CALLER_FORBIDDEN', 'intent.caller is caller-declared data and can never carry authority; submit through the Host-authenticated kernel gateway which binds the verified principal');
         }
-        requireTarget(record.target);
-        if (typeof record.messageId !== 'string' || record.messageId.length === 0) {
-            throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
-        }
-        return kernelRuntime.submitOccurrence(intent);
+        // The no-caller variant would reach the Kernel as the implicit
+        // 'anonymous' caller — an unauthenticated mutation. Closed alike.
+        throw refusePublicRoute('send');
     }
     async function query(query) {
         assertOpen();
@@ -252,8 +308,8 @@ async function loadScopedFacade(packageRoot) {
         const record = query;
         switch (record.kind) {
             case 'instance':
-                requireTarget(record.target);
-                return kernelRuntime.getSnapshot(record.target);
+                // Unauthenticated instance reads are closed with the send route.
+                throw refusePublicRoute('query instance');
             case 'build':
                 return buildTrace();
             case 'journal':
@@ -272,15 +328,254 @@ async function loadScopedFacade(packageRoot) {
         if (typeof observer !== 'function') {
             throw typedError('OBSERVER_INVALID', 'subscribe requires a listener function');
         }
-        observers.add(observer);
-        return () => observers.delete(observer);
+        // Receipt observation without an authenticated principal would leak
+        // occurrence facts to any in-process holder of the facade. Closed.
+        throw refusePublicRoute('subscribe');
     }
     function stop() {
         stopped = true;
         observers.clear();
     }
+    // ---- #1013 private gateway seam (I02/I03), module-private WeakMap ----
+    // The UX consumer receives ONLY the frozen facade above; the trusted Host
+    // kernel gateway retrieves the ops below through getFacadeKernelOps()
+    // (never exported from the public /v8 index) to bind an H-authenticated
+    // principal to Kernel requests and to run the protected Genesis path.
+    const policyRecord = businessPolicy;
+    function resolveWorkflowKey() {
+        const definition = policyRecord.workflowDefinition;
+        const key = definition === null || typeof definition !== 'object' ? undefined : definition.workflowKey;
+        if (typeof key !== 'string' || key.length === 0 || key.includes(':')) {
+            throw typedError('POLICY_ADDRESSING_INVALID', `business package ${businessBinding.packageId} policy must declare a non-empty ':'-free workflowDefinition.workflowKey for gateway instance addressing`);
+        }
+        return key;
+    }
+    function resolveIntentRoles(intentType) {
+        const bindings = policyRecord.intentBindings;
+        if (bindings === null || typeof bindings !== 'object')
+            return undefined;
+        const binding = Object.prototype.hasOwnProperty.call(bindings, intentType) ? bindings[intentType] : undefined;
+        if (binding === null || typeof binding !== 'object')
+            return undefined;
+        return Array.isArray(binding.roles) ? binding.roles : undefined;
+    }
+    /**
+     * The ONLY caller derivation on this path: an issuer-signed principal role
+     * that the sealed Business binding itself admits. Mirrors the Kernel's own
+     * gate (deny when `binding.roles` is an array that excludes the caller) so
+     * the Host-side pick and the Kernel-side check can never disagree.
+     */
+    function requirePrincipalRole(principal, intentType) {
+        const roles = resolveIntentRoles(intentType);
+        if (roles === undefined)
+            return 'anonymous';
+        const granted = principal.roles.find((role) => roles.includes(role));
+        if (granted === undefined) {
+            throw typedError('PRINCIPAL_ROLE_NOT_BOUND', `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles [${roles.join(', ')}] required by intent ${intentType}`);
+        }
+        return granted;
+    }
+    function requireInstanceKey(instanceKey) {
+        if (typeof instanceKey !== 'string' || instanceKey.length === 0 || instanceKey.includes(':')) {
+            throw typedError('INSTANCE_KEY_INVALID', 'instanceKey must be a non-empty string without the addressing delimiter \':\'');
+        }
+        return instanceKey;
+    }
+    function requirePrincipal(principal) {
+        if (typeof principal !== 'object'
+            || principal === null
+            || typeof principal.subject !== 'string'
+            || principal.subject.length === 0
+            || typeof principal.tenantId !== 'string'
+            || principal.tenantId.length === 0
+            || principal.tenantId.includes(':')
+            || typeof principal.appId !== 'string'
+            || principal.appId.length === 0
+            || principal.appId.includes(':')
+            || !Array.isArray(principal.roles)
+            || !principal.roles.every((role) => typeof role === 'string' && role.length > 0)) {
+            throw typedError('PRINCIPAL_INVALID', 'the gateway principal must carry the H-verified subject/tenant/app and issuer-signed roles (tenant/app without the \':\' delimiter)');
+        }
+    }
+    /**
+     * The Host-derived, collision-free physical instance address: the
+     * authenticated principal's tenant/app qualify the caller-chosen key
+     * (#1013 @6117218727 Candidate A repair). All three components are
+     * ':'-free (credentials at identity shape check, registerApp at the
+     * gateway, requireInstanceKey here), so the join is unambiguous and two
+     * distinct tenants can never resolve to the same physical Kernel
+     * instance regardless of appId/instanceKey reuse. The namespace identity
+     * is derived ONLY from the VERIFIED principal — never caller-provided.
+     */
+    function qualifiedInstanceKey(principal, instanceKey) {
+        return `${principal.tenantId}:${principal.appId}:${instanceKey}`;
+    }
+    const gatewayOps = {
+        describePolicy() {
+            assertOpen();
+            return Object.freeze({
+                packageId: typeof policyRecord.packageId === 'string' ? policyRecord.packageId : businessBinding.packageId,
+                policyId: typeof policyRecord.policyId === 'string' ? policyRecord.policyId : businessBinding.packageId,
+                workflowKey: resolveWorkflowKey(),
+                intentTypes: Object.freeze([...intentIndex.keys()]),
+            });
+        },
+        async submitAs(principal, request) {
+            assertOpen();
+            requirePrincipal(principal);
+            const { intentType, messageId, instanceKey } = request;
+            if (typeof intentType !== 'string' || intentType.length === 0) {
+                throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
+            }
+            if (typeof messageId !== 'string' || messageId.length === 0) {
+                throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
+            }
+            if (!intentIndex.has(intentType)) {
+                throw typedError('INTENT_UNBOUND', `intent type ${intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
+            }
+            const key = requireInstanceKey(instanceKey);
+            const role = requirePrincipalRole(principal, intentType);
+            // The Kernel request is CONSTRUCTED here — intent data never carries a
+            // caller; the verified principal is the only authority source, and the
+            // physical instance address is the principal's tenant/app-qualified
+            // key (two tenants reusing the same appId/instanceKey are two distinct
+            // physical instances — never shared state, Journal or effects).
+            const kernelRequest = {
+                intentType,
+                messageId,
+                input: request.input === undefined ? null : request.input,
+                target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+                caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
+            };
+            assertPlainJsonIntent(kernelRequest);
+            return kernelRuntime.submitOccurrence(kernelRequest);
+        },
+        async queryInstance(principal, instanceKey) {
+            assertOpen();
+            requirePrincipal(principal);
+            const key = requireInstanceKey(instanceKey);
+            return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) });
+        },
+        workflowInstanceId(principal, instanceKey) {
+            requirePrincipal(principal);
+            const key = requireInstanceKey(instanceKey);
+            return `${resolveWorkflowKey()}:${qualifiedInstanceKey(principal, key)}`;
+        },
+        observeReceipts(observer) {
+            assertOpen();
+            if (typeof observer !== 'function') {
+                throw typedError('OBSERVER_INVALID', 'a Kernel receipt observer must be a function');
+            }
+            observers.add(observer);
+            return () => observers.delete(observer);
+        },
+        async provisionGenesis(principal, request) {
+            assertOpen();
+            requirePrincipal(principal);
+            const key = requireInstanceKey(request.instanceKey);
+            const runtimeWithOpener = kernelRuntime;
+            if (typeof runtimeWithOpener.openInstance !== 'function') {
+                throw typedError('GENESIS_ENDPOINT_INVALID', `kernel package ${kernelBinding.packageId} mechanism exposes no instance-open endpoint; protected Genesis provisioning is unavailable for this closure`);
+            }
+            // I03: the initial state/context are the sealed Business policy's own
+            // (the Kernel reads initialStateKey/initialContext from the policy) —
+            // this seam deliberately forwards NO caller-chosen initial context,
+            // and the instance address is the principal's tenant/app-qualified
+            // key (per-tenant Genesis by construction).
+            return runtimeWithOpener.openInstance({
+                target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+                ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
+            });
+        },
+    };
     const facade = Object.freeze({ send, query, subscribe, stop });
+    facadeScopes.set(facade, Object.freeze(gatewayOps));
     return facade;
+}
+/**
+ * Module-private registry of the gateway ops bound to each facade this
+ * loader produced. Not exported from the public `/v8` index.
+ */
+const facadeScopes = new WeakMap();
+/**
+ * #1013 R2 repair (@6122817203): the gateway ops session capability channel.
+ * The packed npm distribution ships this module's compiled sibling next to
+ * the public entry, and stock Node resolves an absolute `file:` URL past any
+ * package-exports map — so "not re-exported" alone is NOT an enforceable
+ * boundary for an uncredentialed same-process consumer. The ops seam is
+ * therefore gated by a one-shot, host-generated unguessable session
+ * capability installed ONLY by `bootstrapTrustedHost` (which hands it to the
+ * trusted Host kernel gateway and to nobody else): without the exact
+ * capability, `getFacadeKernelOps` refuses typed before the WeakMap is ever
+ * consulted, and forging a `V8GatewayPrincipal` (structural check only) can
+ * never reach the Kernel. A deep import of this module yields functions, not
+ * authority. Mirrors the one-shot channel pattern of trust.ts/kernel-host.ts
+ * /model-port.ts: first installation wins, and a bootstrap whose session
+ * channel is already occupied refuses with zero residue.
+ */
+let gatewaySessionCap;
+/**
+ * Validate the gateway session channel WITHOUT consuming it (#1013 R2): the
+ * Host bootstrap preflights this channel alongside every other one-shot
+ * channel before committing any installation. Internal protected.
+ */
+export function preflightGatewaySessionCap() {
+    if (gatewaySessionCap !== undefined) {
+        throw typedError('GATEWAY_SESSION_ALREADY_INSTALLED', 'a gateway session capability is already installed in this process; the protected gateway ops seam is one-shot');
+    }
+}
+/**
+ * Install the gateway session capability for this process. Internal
+ * protected bootstrap (`bootstrapTrustedHost` only): one-shot, and the
+ * capability value must be an unguessable host-generated string so a
+ * consumer can never brute-force or guess its way past the seam.
+ */
+export function installGatewaySessionCap(cap) {
+    preflightGatewaySessionCap();
+    if (typeof cap !== 'string' || cap.length < 32 || cap.length > 256) {
+        throw typedError('GATEWAY_SESSION_INVALID', 'installGatewaySessionCap requires an unguessable host-generated session capability string (32–256 chars)');
+    }
+    gatewaySessionCap = cap;
+}
+/** Diagnostics-only probe (tests/evidence); not a trust decision input. */
+export function isGatewaySessionCapInstalled() {
+    return gatewaySessionCap !== undefined;
+}
+/**
+ * Constant-time equality for the session capability (fixed-length host
+ * random; pure JS on purpose — this module stays free of byte-decoding
+ * machinery by static proof).
+ */
+function sessionMatches(cap) {
+    if (gatewaySessionCap === undefined || typeof cap !== 'string' || cap.length !== gatewaySessionCap.length) {
+        return false;
+    }
+    let diff = 0;
+    for (let index = 0; index < cap.length; index += 1) {
+        diff |= cap.charCodeAt(index) ^ gatewaySessionCap.charCodeAt(index);
+    }
+    return diff === 0;
+}
+/**
+ * Retrieve the private Kernel operations of a facade produced by
+ * `DomainHarness.load(package)` in THIS process (#1013, I02/I03). Returns
+ * `undefined` for anything that is not such a facade. Trusted Host gateway
+ * use only: the caller must present the EXACT gateway session capability
+ * installed by `bootstrapTrustedHost` — a process without one fails closed
+ * (`GATEWAY_SESSION_NOT_INSTALLED`) and a wrong or absent capability is
+ * refused typed (`GATEWAY_SESSION_DENIED`) before any Kernel operation,
+ * observer or address is reachable. Deep-importing this module grants no
+ * authority: the capability never exists in this module's exports, only in
+ * the trusted Host bootstrap's closure.
+ */
+export function getFacadeKernelOps(facade, sessionCap) {
+    if (gatewaySessionCap === undefined) {
+        throw typedError('GATEWAY_SESSION_NOT_INSTALLED', 'no gateway session capability is installed in this process; the protected ops seam stays closed until the trusted Host bootstrap establishes one');
+    }
+    if (!sessionMatches(sessionCap)) {
+        throw typedError('GATEWAY_SESSION_DENIED', 'the protected facade ops seam requires the Host bootstrap gateway session capability; structural module access or a forged principal carries no authority (#1013 R2 @6122817203)');
+    }
+    return facadeScopes.get(facade);
 }
 /**
  * Public consumption brand (#994 heritage): `const facade =

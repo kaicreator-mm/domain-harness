@@ -18,12 +18,19 @@ import test from 'node:test';
 import { DomainHarness, QualifiedPackageError, load } from '../../src/public-v8/index.js';
 import { isTrustChannelEstablished } from '../../src/public-v8/trust.js';
 import { installKernelHostPorts, isKernelHostInstalled } from '../../src/public-v8/kernel-host.js';
+import { installGatewaySessionCap } from '../../src/public-v8/microkernel.js';
 import {
   b01DefaultClosure,
   b01MemoryHost,
   b01SentinelCount,
   b01Seal,
 } from './v08-tb-fixture.js';
+
+// The host-context stand-in's session capability: the loader path reads the
+// kernel Host ports with the SAME capability the stand-in installs into the
+// gateway channel (#1013 R2 @5494026032). The trust channel stays ABSENT —
+// that is the refusal this file proves.
+const B01_UNTRUSTED_SESSION_CAP = 'b01-untrusted-session-capability-0123456789abcdef0123456789abcd';
 
 async function refuseFacade(promise: Promise<unknown>, code: string): Promise<void> {
   await assert.rejects(
@@ -52,7 +59,8 @@ test('V08-ABI-B01-N7a without the protected Host bootstrap the loader fails clos
 
 test('V08-ABI-B01-N7b no trusted issuer registry: even a genuinely signed root is UNTRUSTED_ISSUER with zero execution (P1-AUTH-01 closure)', async () => {
   const host = b01MemoryHost();
-  installKernelHostPorts(host.ports); // Host bootstrap present; trust channel still ABSENT
+  installKernelHostPorts(host.ports, B01_UNTRUSTED_SESSION_CAP); // Host bootstrap present; trust channel still ABSENT
+  installGatewaySessionCap(B01_UNTRUSTED_SESSION_CAP);
   assert.equal(isTrustChannelEstablished(), false, 'no trusted issuer registry is installed in this process');
   const root = b01Seal(b01DefaultClosure('n7b').input); // genuinely HMAC-signed by the issuer side
   // The scoped facade loader refuses typed and executes nothing...

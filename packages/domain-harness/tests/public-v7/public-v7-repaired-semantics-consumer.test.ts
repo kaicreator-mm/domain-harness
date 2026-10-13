@@ -27,14 +27,33 @@
  * - legacy spot check from the same tarball: root and `./v2` stay unchanged.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+
+
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
 
 function run(command: string, args: readonly string[], cwd: string): string {
   return execFileSync(command, [...args], {
@@ -59,7 +78,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#570 packed consumer imports @kaicreator/domain-harness/v7 with repaired #555/#556 semantics', () => {
+test('#570 packed consumer imports @kaicreator/domain-harness/v7 with repaired #555/#556 semantics', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-public-v7-rebind-consumer-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
@@ -102,7 +121,6 @@ test('#570 packed consumer imports @kaicreator/domain-harness/v7 with repaired #
     writeFileSync(join(consumer, 'index.mjs'), `
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-
 const resolved = import.meta.resolve('@kaicreator/domain-harness/v7');
 assert.ok(
   resolved.includes('node_modules/@kaicreator/domain-harness/dist/public-v7/index.js'),

@@ -74,6 +74,15 @@ interface TransportDeps {
     } | null>;
     readonly subscribe: (credential: unknown, scope: unknown, listener: unknown) => Promise<HostSubscription>;
     readonly assertIntentScope: (target: UxTarget, principal: HostPrincipal) => void;
+    /**
+     * #1013 (I02) optional authenticated Kernel route: when the host attached
+     * a kernel gateway, domain intents and instance reads MUST go to the REAL
+     * selected Kernel of the authenticated app (never a generic resource
+     * fallback); the route re-authenticates the credential itself.
+     */
+    readonly sendToKernel?: (credential: unknown, intent: unknown) => Promise<unknown>;
+    readonly queryKernelInstance?: (credential: unknown, target: UxTarget) => Promise<unknown>;
+    readonly kernelHasApp?: (appId: string) => boolean;
 }
 /**
  * Create the typed UX transport for one credential. The returned object is
@@ -90,10 +99,25 @@ export interface UxTransport {
 /** The host-side scope gate shared by send and any instance-scoped verb. */
 export declare function assertIntentScope(target: UxTarget, principal: HostPrincipal): void;
 /**
+ * The kernel-gateway route a trusted host can attach to a UX transport
+ * (#1013, I02). Implementations MUST re-authenticate the credential
+ * themselves (the built-in gateway does); the transport never forwards any
+ * principal it derived — only the still-verified credential.
+ */
+export interface UxKernelRoute {
+    send(credential: unknown, intent: unknown): Promise<unknown>;
+    queryInstance(credential: unknown, target: UxTarget): Promise<unknown>;
+    hasApp(appId: string): boolean;
+}
+/**
  * Wire the typed UX transport to a trusted host for one credential. The
  * caller (host context) hands the RETURNED transport to the UX consumer —
- * never the host object itself.
+ * never the host object itself. With an attached kernel route, domain
+ * intents and instance reads go to the REAL selected Kernel; without one
+ * the transport keeps its generic-resource/doc behavior (fixtures).
  */
-export declare function createHostUxTransport(host: TrustedNodeHost, credential: HostCredential): UxTransport;
+export declare function createHostUxTransport(host: TrustedNodeHost, credential: HostCredential, options?: {
+    readonly kernel?: UxKernelRoute;
+}): UxTransport;
 export {};
 //# sourceMappingURL=ux-transport.d.ts.map

@@ -152,6 +152,7 @@ export function businessFixture(options: BusinessFixtureOptions): string {
     ...(options.failPolicy === true ? [] : [
       `  return {`,
       `    packageId: MODULE_ID,`,
+      `    workflowDefinition: { workflowKey: 'tb-flow' },`,
       `    decide(intent, interpreted) {`,
       `      const amount = Number(interpreted && interpreted.amount);`,
       `      if (!Number.isFinite(amount)) return { admit: false, reason: 'amount-required' };`,
@@ -280,6 +281,7 @@ export function b01Clone(root: SealedQualifiedPackageRoot): SealedQualifiedPacka
 // ---------------------------------------------------------------------------
 
 export interface B01MemoryHost {
+  /** The COMPLETE bounded port set (#1013 I01 complete-set contract). */
   readonly ports: V8KernelHostPorts;
   readonly docs: Map<string, unknown>;
   readonly puts: { key: string; value: unknown }[];
@@ -301,6 +303,7 @@ export function b01MemoryHost(): B01MemoryHost {
           docs.set(key, value);
           puts.push({ key, value });
         },
+        list: (prefix: string) => [...docs.keys()].filter((key) => key.startsWith(prefix)),
       },
       sha256: {
         digestUtf8: (value: string) => {
@@ -308,6 +311,15 @@ export function b01MemoryHost(): B01MemoryHost {
           return createHash('sha256').update(value, 'utf8').digest('hex');
         },
       },
+      // #1013 I01 complete-set contract: the channel now refuses a minimal
+      // get/put tuple, so the fixture memory host provides the full bounded
+      // port set a trusted bootstrap would install.
+      resources: {
+        call: () => {
+          throw new Error('b01 fixture kernel declares no physical effect resources');
+        },
+      },
+      clock: () => '2026-10-12T00:00:00.000Z',
     },
   };
 }

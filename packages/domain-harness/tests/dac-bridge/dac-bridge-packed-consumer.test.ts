@@ -4,12 +4,26 @@
 // the DAC UX<->Runtime correlation bridge surface using ONLY public package
 // imports — never src/ paths.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this journey installs the packed tarball's transitive dependencies from
+ * the npm registry. Workers without registry egress must SKIP explicitly
+ * rather than hang an npm install to the step timeout.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -181,7 +195,12 @@ function DAC_REFERENCE_BASELINE_COMMIT() {
 console.log('dac-bridge-consumer-ok');
 `;
 
-test('#308 packed package delivers the public DAC correlation bridge surface to a clean consumer', () => {
+test('#308 packed package delivers the public DAC correlation bridge surface to a clean consumer', (t) => {
+  if (!npmRegistryReachable()) {
+    t.skip('PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
+    return;
+  }
+
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-t308-consumer-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
