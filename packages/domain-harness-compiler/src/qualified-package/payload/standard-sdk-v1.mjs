@@ -8,6 +8,12 @@
  * This package only interprets five data-only Standard Kind declarations,
  * including the FR02 bounded portable Rule payloadExpression.
  *
+ * The host-bound resolver additionally exposes the FR07-S1 single-step
+ * query/final envelope surface (#1003 slice 1): an additive, currently
+ * UNSELECTED method — the Kernel does not call it until the FR07 K/H
+ * successor owns the bounded continuation loop, query authorization,
+ * maxSteps and cancellation.
+ *
  * No imports / eval / Function constructors / external side effects.
  */
 export const MODULE_ID = 'standard-sdk@v08.1.0.0';
@@ -140,6 +146,75 @@ function evidence(id) {
     cacheDisposition: { read: 'disabled' },
     telemetry: [],
   };
+}
+
+// FR07-S1 single-step envelope grammar, retained from the v0.7
+// harness-machine.ts@86110c6 blob f2fe5d49 exact-key parsers
+// (parseModelEnvelope / parseQueryCall / parseStructuredResult):
+//   {kind:'query', call:{capabilityId, input}}
+//   {kind:'final', result:{decision:{outcome,data}, event:{type,payload}}}
+// The model output may carry NOTHING else: state/transition/effect/journal/
+// governance authority belongs to K, and a model can never pre-claim call
+// provenance or measurement. Allowed outcomes/events/capabilities are NOT
+// validated here — that allowlist lives in the sealed Business policy and
+// is enforced by K in the FR07 K/H successor.
+const STEP_AUTHORITY_KEYS = Object.freeze([
+  'nextState', 'transition', 'mutation', 'effect', 'journal',
+  'promotion', 'activation', 'governanceBaseline', 'privateReasoning',
+  'modelCallEvidence', 'freshModelCallCount',
+]);
+const STEP_QUERY_KEYS = Object.freeze(['kind', 'call']);
+const STEP_CALL_KEYS = Object.freeze(['capabilityId', 'input']);
+const STEP_FINAL_KEYS = Object.freeze(['kind', 'result']);
+const STEP_RESULT_KEYS = Object.freeze(['decision', 'event']);
+const STEP_DECISION_KEYS = Object.freeze(['outcome', 'data']);
+const STEP_EVENT_KEYS = Object.freeze(['type', 'payload']);
+
+function exactKeys(value, keys, label) {
+  const actual = Object.keys(value);
+  if (actual.length !== keys.length || !keys.every((key) => Object.hasOwn(value, key))) {
+    fail('SDK_MODEL_OUTPUT_INVALID', `model step ${label} must carry exactly the keys [${keys.join(', ')}]`);
+  }
+}
+
+/** Bounded identifier check scoped to MODEL OUTPUT (never a declaration code). */
+function stepIdent(value, label) {
+  if (typeof value !== 'string' || !IDENTIFIER.test(value)) {
+    fail('SDK_MODEL_OUTPUT_INVALID', `model step ${label} must be a bounded identifier`);
+  }
+  return value;
+}
+
+/**
+ * Parse one data()-snapshotted model turn into a strict step envelope
+ * candidate. Fail-closed typed on every non-canonical or authority-claiming
+ * shape; the caller wraps the candidate with trusted per-step evidence.
+ */
+function parseStepEnvelope(snapshot) {
+  for (const key of STEP_AUTHORITY_KEYS) {
+    if (Object.hasOwn(snapshot, key)) {
+      fail('SDK_MODEL_AUTHORITY_REFUSED', `model step output may not carry the reserved authority/evidence key ${key}`);
+    }
+  }
+  if (snapshot.kind === 'query') {
+    exactKeys(snapshot, STEP_QUERY_KEYS, 'query envelope');
+    const call = record(snapshot.call, 'query call');
+    exactKeys(call, STEP_CALL_KEYS, 'query call');
+    return { stepKind: 'query', capabilityId: stepIdent(call.capabilityId, 'query call.capabilityId'), input: call.input };
+  }
+  if (snapshot.kind === 'final') {
+    exactKeys(snapshot, STEP_FINAL_KEYS, 'final envelope');
+    const result = record(snapshot.result, 'final result');
+    exactKeys(result, STEP_RESULT_KEYS, 'final result');
+    const decision = record(result.decision, 'final decision');
+    exactKeys(decision, STEP_DECISION_KEYS, 'final decision');
+    stepIdent(decision.outcome, 'final decision.outcome');
+    const event = record(result.event, 'final event');
+    exactKeys(event, STEP_EVENT_KEYS, 'final event');
+    stepIdent(event.type, 'final event.type');
+    return { stepKind: 'final', structuredDecision: { decision, event } };
+  }
+  fail('SDK_MODEL_OUTPUT_INVALID', `model step output kind must be 'query' or 'final'`);
 }
 
 function schema(definition, input) {
@@ -911,6 +986,56 @@ export function createHostBoundModelResolver(hostModelPort, options = {}) {
         cacheDisposition: { read: 'disabled' },
         telemetry: [],
       };
+    },
+    /**
+     * FR07-S1 single-step envelope surface (#1003 slice 1) — additive and
+     * currently UNSELECTED: the Kernel keeps calling interpret/invokeDecision
+     * only, until the FR07 K/H successor owns the bounded continuation loop.
+     *
+     * Runs exactly ONE physical ModelPort invocation and parses the model
+     * output into a strict data-only step envelope:
+     *   {kind:'query', call:{capabilityId,input}, modelCallEvidence,...}
+     *   {kind:'final', structuredDecision, modelCallEvidence,...}
+     * The query call is an inert PROPOSAL for K-owned authorization: S never
+     * executes it, never reads Host storage and never commits state/effect/
+     * journal. The evidence is this resolver's own observation of the single
+     * bound-port call; a model- or caller-supplied count can never reach it.
+     * No continuation, no maxSteps and no cancellation live here — those are
+     * K/H-owned in the FR07 successor per the #1003 admission.
+     */
+    async invokeStep(declaration, input, callerContext = {}) {
+      const plan = record(data(declaration), 'model declaration');
+      const selectedInput = record(data(input), 'model input');
+      data(callerContext); // ignored for accounting; user-supplied meters cannot attest calls
+      if (plan.kind !== 'model-decision') {
+        fail('SDK_KIND_UNSUPPORTED', 'Host ModelPort invocation requires an explicit model-decision declaration');
+      }
+      const declarationId = ident(plan.id, 'model-decision.id');
+      const modelOperation = ident(plan.modelOperation, 'model-decision.modelOperation');
+      let output;
+      try {
+        output = await invoke({ operation: modelOperation, input: selectedInput });
+      } catch (_error) {
+        fail('SDK_MODEL_PORT_FAILED', 'trusted Host ModelPort invocation failed; no step envelope admitted');
+      }
+      const snapshot = data(output);
+      record(snapshot, 'model step output');
+      const parsed = parseStepEnvelope(snapshot);
+      const evidenceBase = {
+        provenance: { sdkModule: MODULE_ID, declarationId },
+        source: 'host-model-port',
+        llmAvoided: false,
+        modelCallEvidence: observation(1),
+        cacheDisposition: { read: 'disabled' },
+        telemetry: [],
+      };
+      const envelope = parsed.stepKind === 'query'
+        ? { kind: 'query', call: { capabilityId: parsed.capabilityId, input: parsed.input }, ...evidenceBase }
+        : { kind: 'final', structuredDecision: parsed.structuredDecision, ...evidenceBase };
+      // v0.7 boundary (FR02 precedent): hand callers plain JSON, never the
+      // internal null-prototype constructions. The round-trip also proves
+      // the envelope is inert serializable data — no callable, no Host handle.
+      return JSON.parse(JSON.stringify(envelope));
     },
   });
 }
