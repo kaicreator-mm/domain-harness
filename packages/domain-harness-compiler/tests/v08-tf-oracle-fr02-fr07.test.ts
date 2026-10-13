@@ -1,10 +1,9 @@
 /**
  * WEB-ORACLE-1 — FR02 / FR07 historical usable-behavior differential.
  *
- * SOURCE_PREPARED_ONLY. This file intentionally distinguishes:
- *   1) executable control semantics present on the physically selected v0.8 K/S;
- *   2) historical FR02/FR07 semantics which remain GAP and are represented by
- *      test.todo sentinels rather than fabricated old-API compatibility.
+ * CURRENT_SELECTED_PATH_ORACLE. Seven historical FR02/FR07 GAP sentinels
+ * have been replaced with real executable selected K/S/Host P/N tests.
+ * Original v0.7 oracle source and test blob pins remain immutable.
  *
  * Historical authority (version/v0.7):
  *   commit 86110c616b8cb18c730553e4cdab7ef555214521
@@ -20,10 +19,10 @@
  *   kernel-mechanism-v1.mjs        f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555
  *
  * #1003 / PR #1018 selected-path rebind (dispatch #1003@6151642076):
- *   v0.8@022e2b4c699c2351ded77efca65a0c8b492d3aeb (includes FR02 #1019,
+ *   v0.8@8d7ef905275d4b270ff76206db935cbd6fc70fe0 (includes FR02 #1019,
  *   FR07-S1 #1022, FR07-KH2 #1025 at b9d0a14)
  *   standard-sdk-v1.mjs            905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a
- *   kernel-mechanism-v1.mjs        efbd8e60044a06ba0158e05ccea2919582c728b3
+ *   kernel-mechanism-v1.mjs        2dfec0c44c26d05635751dd13cd970906473d23d
  *
  * The seven former test.todo GAP sentinels are now REAL executable tests at
  * two levels:
@@ -51,12 +50,11 @@ const V08_S_BLOB_SOURCE_PREP = 'fa01e3cc70bc9a08bf14bd497dfb3fba79bd067f';
 const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // Current selected bytes this rebind is bound to (a later K/S byte change
 // must re-review and rebind; it is never silently inherited).
-// K_BLOB_PIN_COUPLED_WITH=PR1034_D3K: whichever of #1018 / #1034 merges
-// second rebinds V08_K_BLOB after re-review. Only this META pin is coupled;
-// the physical selected-path tests seal the current payload bytes.
-const V08_REBIND_BASE = '022e2b4c699c2351ded77efca65a0c8b492d3aeb';
+// K_BLOB_PIN_REBOUND_AFTER_PR1034_D3K: selected K current after merge.
+// The physical selected-path tests seal the current payload bytes.
+const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a';
-const V08_K_BLOB = 'efbd8e60044a06ba0158e05ccea2919582c728b3';
+const V08_K_BLOB = '2dfec0c44c26d05635751dd13cd970906473d23d';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
@@ -215,7 +213,7 @@ test('WEB-ORACLE-1 META: the rebind is bound to the exact physically selected v0
   assert.equal(V08_BASE, '557e8ba53f90309c9d370d32b77d2dff070b8a5b');
   assert.equal(V08_S_BLOB_SOURCE_PREP, 'fa01e3cc70bc9a08bf14bd497dfb3fba79bd067f');
   assert.equal(V08_K_BLOB_SOURCE_PREP, 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555');
-  assert.equal(V08_REBIND_BASE, '022e2b4c699c2351ded77efca65a0c8b492d3aeb');
+  assert.equal(V08_REBIND_BASE, '8d7ef905275d4b270ff76206db935cbd6fc70fe0');
   assert.equal(
     await gitBlobSha(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)),
     V08_S_BLOB,

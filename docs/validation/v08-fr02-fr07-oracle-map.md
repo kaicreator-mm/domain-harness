@@ -49,7 +49,7 @@ oracle test initial commit = 419bf664bbf9065c103abf7b181277c06bd4aa5f
 ### Current selected v0.8 subject of this rebind
 
 ```text
-v0.8 base = 022e2b4c699c2351ded77efca65a0c8b492d3aeb
+v0.8 base = 8d7ef905275d4b270ff76206db935cbd6fc70fe0
   includes FR02 S  (PR #1019, payloadExpression)
            FR07-S1 (PR #1022, invokeStep)
            FR07-KH2 (PR #1025, merge b9d0a14: K continuation + H gateway.cancel)
@@ -57,23 +57,24 @@ v0.8 base = 022e2b4c699c2351ded77efca65a0c8b492d3aeb
 S: packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs
    blob = 905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a
 K: packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
-   blob = efbd8e60044a06ba0158e05ccea2919582c728b3
+   blob = 2dfec0c44c26d05635751dd13cd970906473d23d
 ```
 
 The compiler oracle test (`WEB-ORACLE-1 META`) computes the Git blob SHA of
 the loaded K/S files and asserts these exact values, so a later K/S byte
 change (for example the #1005 D3 Kernel work) is **not silently inherited**:
-whichever change lands second must re-review and rebind this pin.
+the later PR #1034 D3-K merge requires this exact source-and-test rebind before PR admission.
 
 ```ini
-K_BLOB_PIN_COUPLED_WITH=PR1034_D3K
+K_BLOB_PIN_REBOUND_AFTER_PR1034_D3K=YES
 ```
 
-PR #1034 (#1005 D3-K) changes only `kernel-mechanism-v1.mjs`. Whichever of
-#1018 / #1034 merges second needs a one-line rebind of `V08_K_BLOB` in the L1
-oracle test after re-review; the pin is not weakened. Only the L1 META test is
-coupled: the L2 physical and L3 dist-consumer tests seal whatever K/S payload
-bytes are current (as the KH2 physical tests do) and carry no blob identity.
+PR #1034 (#1005 D3-K) has now merged into the selected Kernel. This successor
+rebinds `V08_K_BLOB` to that exact merged payload; the historical v0.7 pins
+are unchanged. L1 exact bytes are coupled; L2 physical and L3 dist-consumer
+tests seal whatever K/S payload bytes are current and carry no separate pin.
+Previous PR #1018 local Node22/24 evidence was measured on the pre-D3 tree;
+new exact-head CI must pass, and fresh native equivalence proof is not inferred.
 
 ## 2. Oracle rule
 
@@ -177,7 +178,7 @@ THIS_BRANCH_PRODUCTION_FIX = NONE
 
 ```ini
 TODO_GAP_SENTINELS=0 (was 7)
-CURRENT_K_S_EXACT_BLOB_BINDING=905d291/efbd8e6 (v0.8@022e2b4)
+CURRENT_K_S_EXACT_BLOB_BINDING=905d291/2dfec0c (v0.8@8d7ef90)
 K_BLOB_PIN_COUPLED_WITH=PR1034_D3K
 L1_COMPILER_ORACLE=EXECUTED_LOCAL
 L2_SELECTED_PHYSICAL_SQLITE=EXECUTED_LOCAL

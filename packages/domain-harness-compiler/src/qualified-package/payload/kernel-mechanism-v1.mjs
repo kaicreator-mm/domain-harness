@@ -922,6 +922,7 @@ function deny(reason, turnId, bindingDigest, resolver, extras = {}) {
       ...(extras.invariantId === undefined ? {} : { invariantId: extras.invariantId }),
       ...(extras.transitionKey === undefined ? {} : { transitionKey: extras.transitionKey }),
       ...(extras.guardId === undefined ? {} : { guardId: extras.guardId }),
+      ...(extras.contextField === undefined ? {} : { contextField: extras.contextField }),
       resolver,
     },
   };
@@ -1172,6 +1173,17 @@ export async function admitCentralDecision(request, ports) {
     ports.effectBindings,
   );
 
+  // [#1005 D3-K] Declarative state-context projection: resolved after
+  // authorized admission and before any journal write or effect dispatch;
+  // committed by the caller's state CAS together with the target state.
+  const context = resolveAdmissionContextProjection(selection.admitted, request, ports.contextProjections);
+  if (context?.conflict !== undefined) {
+    return deny('context-projection-conflict', turnId, pinned.bindingDigest, resolver, {
+      transitionKey: selection.admitted.transitionKey,
+      contextField: context.conflict.field,
+    });
+  }
+
   const effects = await executeEffectIntents(
     effectIntents,
     request,
@@ -1188,6 +1200,7 @@ export async function admitCentralDecision(request, ports) {
       targetState: selection.admitted.targetState,
       effects,
       resolver,
+      ...(context === undefined ? {} : { contextProjection: context.projection }),
     },
   };
 }
@@ -1516,6 +1529,176 @@ function resolveAdmissionEffectIntents(intents, request, wiring) {
       ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
     };
   });
+}
+
+// ===========================================================================
+// [#1005 D3-K — kernel-owned NEW mechanism code, NOT a v0.7 migration]
+// Declarative state-context projection (durable cross-stage lineage).
+//
+// Accepted minimal design: #1005@6130149429 (unlocked #1005@6151644929).
+// Before this, a committed transition rewrote `context: current.state.context`
+// unchanged, so no accepted stage could durably carry evidence (changeId,
+// reviewedSha, validationId, testedSha …) to the next stage, and a guard could
+// only compare an event with itself. A Business transition may now declare
+//
+//   contextProjection: { <contextField>: { source: 'event'|'decision',
+//                                          path, type? } }
+//
+// with exactly the effect-binding path discipline (event ['payload', key] /
+// decision ['data', key] inside THIS intent's rule-authorized projection, or
+// ['type'] / ['outcome']). All rules are enforced HERE:
+//   - validated ONCE at wiring and deep-frozen into a WeakMap keyed by the
+//     exact transition object; live mutation is ignored and projection syntax
+//     on an unwired transition refuses typed;
+//   - resolved inside admitCentralDecision AFTER schema / hard-invariant /
+//     guard admission and BEFORE any Journal write or Effect dispatch; a
+//     missing or mistyped value fails typed with zero Journal/Effect;
+//   - write-once lineage: a field already present in the committed context
+//     may only be re-projected with the identical value, otherwise the
+//     transition is denied ('context-projection-conflict') pre-effect;
+//   - committed into the next state context by the SAME state CAS write that
+//     moves the state (commitAcceptedTransitionInLane) — no second write, so a
+//     crash/UNKNOWN before the CAS commits neither state nor lineage, and a
+//     replay re-resolves the identical projection from the identical event.
+// `callerRole` (K-injected predicate context) is never a projection target.
+// ===========================================================================
+
+const CONTEXT_PROJECTION_TYPES = new Set(['string', 'number', 'boolean', 'object', 'array', 'null']);
+const CONTEXT_PROJECTION_RESERVED = new Set(['callerRole']);
+
+function invalidContextProjection(message) {
+  throw new CentralAdmissionError('ADMISSION_CONTEXT_PROJECTION_INVALID', message);
+}
+
+function contextValueType(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function snapshotContextProjection(transition, rule, intentType) {
+  const declared = transition.contextProjection;
+  const label = `intent ${intentType}, transition ${String(transition.transitionKey)}`;
+  if (!isPlainObject(declared) || Object.keys(declared).length === 0) {
+    invalidContextProjection(`${label}: contextProjection must be a non-empty object of field projections`);
+  }
+  const projection = rule?.payloadFromInput;
+  if (!isPlainObject(projection)) {
+    invalidContextProjection(`${label}: rule ${String(rule?.ruleId)} must declare payloadFromInput to authorize a context projection`);
+  }
+  const authorizedKeys = new Set(Object.keys(projection));
+  const fields = {};
+  for (const [field, spec] of Object.entries(declared)) {
+    if (!EFFECT_DESTINATION_NAME.test(field) || EFFECT_DESTINATION_FORBIDDEN.has(field) || CONTEXT_PROJECTION_RESERVED.has(field)) {
+      invalidContextProjection(`${label}: context field ${JSON.stringify(field)} must be a safe 1..64-character identifier and not a reserved Kernel context key`);
+    }
+    if (!isPlainObject(spec) || Object.keys(spec).some((key) => key !== 'source' && key !== 'path' && key !== 'type')) {
+      invalidContextProjection(`${label}: contextProjection.${field} may only declare source, path and type`);
+    }
+    if (spec.source !== 'event' && spec.source !== 'decision') {
+      invalidContextProjection(`${label}: contextProjection.${field}.source must be 'event' or 'decision'`);
+    }
+    const path = spec.path;
+    if (!Array.isArray(path) || path.length === 0 || path.length > 2 || path.some((segment) => typeof segment !== 'string' || segment.length === 0)) {
+      invalidContextProjection(`${label}: contextProjection.${field}.path must be one or two non-empty string segments`);
+    }
+    const allowed = spec.source === 'event'
+      ? (path.length === 1 && path[0] === 'type') || (path.length === 2 && path[0] === 'payload' && authorizedKeys.has(path[1]))
+      : (path.length === 1 && path[0] === 'outcome') || (path.length === 2 && path[0] === 'data' && authorizedKeys.has(path[1]));
+    if (!allowed) {
+      invalidContextProjection(`${label}: contextProjection.${field} ${spec.source} path [${path.join(', ')}] is outside the rule-authorized projection`);
+    }
+    if (spec.type !== undefined && !CONTEXT_PROJECTION_TYPES.has(spec.type)) {
+      invalidContextProjection(`${label}: contextProjection.${field}.type ${String(spec.type)} is not a JSON type`);
+    }
+    fields[field] = { source: spec.source, path: [...path], ...(spec.type === undefined ? {} : { type: spec.type }) };
+  }
+  deepFreezePreparedData(fields);
+  return fields;
+}
+
+/**
+ * Wiring-time validation of every context projection reachable from the
+ * Business policy (createOccurrenceRuntime only — the trusted load boundary).
+ */
+function wireAdmissionContextProjections(businessEndpoint) {
+  const registry = new WeakMap();
+  for (const [intentType, binding] of Object.entries(businessEndpoint.intentBindings ?? {})) {
+    const rule = (businessEndpoint.rules ?? {})[binding.ruleId];
+    const definition = binding.definition ?? businessEndpoint.workflowDefinition;
+    for (const state of definition?.states ?? []) {
+      for (const transition of state.transitions ?? []) {
+        if (!hasOwn(transition, 'contextProjection')) continue;
+        const snapshot = snapshotContextProjection(transition, rule, intentType);
+        const existing = registry.get(transition);
+        if (existing !== undefined) {
+          if (canonicalJsonStringify(existing) !== canonicalJsonStringify(snapshot)) {
+            invalidContextProjection(`intent ${intentType}: the same transition object is wired against conflicting rule authorizations`);
+          }
+        } else {
+          registry.set(transition, snapshot);
+        }
+      }
+    }
+  }
+  return registry;
+}
+
+/**
+ * Resolve the admitted transition's context projection (admitCentralDecision
+ * only: after admission, before any Journal/Effect). The wiring-time frozen
+ * snapshot is the FIRST authority — a live `contextProjection` property
+ * deleted after wiring keeps the pinned projection; only a never-wired
+ * transition carrying live projection syntax refuses typed. Returns
+ * `undefined` when nothing was wired or declared, `{conflict}` for a
+ * write-once violation, or `{projection}` — the canonical fields to merge
+ * into the next context.
+ */
+function resolveAdmissionContextProjection(transition, request, wiring) {
+  // [#1005 D3-K R2 — review #5508191410 P1] The wiring snapshot outranks the
+  // live property: checking the live declaration first let a post-wiring
+  // `delete transition.contextProjection` bypass the frozen projection.
+  const fields = wiring?.get(transition);
+  if (fields === undefined) {
+    if (!hasOwn(transition, 'contextProjection')) return undefined;
+    throw new CentralAdmissionError(
+      'ADMISSION_CONTEXT_PROJECTION_UNVALIDATED',
+      `transition ${String(transition.transitionKey)} carries context-projection syntax that was never validated at wiring; post-wiring injected declarations are refused`,
+    );
+  }
+  const decision = request.resolved?.structuredDecision?.decision;
+  const committed = request.context ?? {};
+  const projection = {};
+  for (const [field, spec] of Object.entries(fields)) {
+    const root = spec.source === 'event' ? request.event : decision;
+    const value = root === undefined || root === null ? BINDING_VALUE_MISSING : readBindingPath(root, spec.path);
+    if (value === BINDING_VALUE_MISSING) {
+      throw new CentralAdmissionError(
+        'ADMISSION_CONTEXT_PROJECTION_UNRESOLVED',
+        `context field ${field} (${spec.source} path ${spec.path.join('.')}) is not present on this occurrence; nothing is journaled or committed`,
+      );
+    }
+    let canonical;
+    try {
+      canonical = canonicalizeJson(value);
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'ADMISSION_CONTEXT_PROJECTION_UNRESOLVED',
+        `context field ${field} must be canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (spec.type !== undefined && contextValueType(value) !== spec.type) {
+      throw new CentralAdmissionError(
+        'ADMISSION_CONTEXT_PROJECTION_UNRESOLVED',
+        `context field ${field} must be of type ${spec.type}; nothing is journaled or committed`,
+      );
+    }
+    if (hasOwn(committed, field) && canonicalJsonStringify(committed[field]) !== canonicalJsonStringify(canonical)) {
+      return { conflict: { field } };
+    }
+    projection[field] = JSON.parse(JSON.stringify(canonical));
+  }
+  return { projection };
 }
 
 // ===========================================================================
@@ -2696,6 +2879,9 @@ export function createOccurrenceRuntime(options) {
   // BEFORE any instance can exist. The frozen snapshots registered here
   // are the only declaration source trusted at admission time.
   const effectBindings = wireAdmissionEffectBindings(businessEndpoint);
+  // [#1005 D3-K] Same trusted boundary: every declared state-context
+  // projection is validated and frozen before any instance can exist.
+  const contextProjections = wireAdmissionContextProjections(businessEndpoint);
   // [#1003 FR07-KH2] Same trusted boundary, same discipline: every harness
   // rule is validated and frozen here, before any instance can exist.
   const continuationPolicies = wireContinuationPolicies(businessEndpoint);
@@ -2932,6 +3118,7 @@ export function createOccurrenceRuntime(options) {
         effectJournal,
         effectTools,
         effectBindings,
+        contextProjections,
         trace: counters,
       });
 
@@ -2956,7 +3143,11 @@ export function createOccurrenceRuntime(options) {
         transition: (current) => ({
           nextState: {
             stateKey: outcome.admitted.targetState,
-            context: current.state.context,
+            // [#1005 D3-K] The admitted lineage projection is committed by
+            // THIS state CAS write, atomically with the target state.
+            context: outcome.admitted.contextProjection === undefined
+              ? current.state.context
+              : { ...current.state.context, ...outcome.admitted.contextProjection },
           },
           nextLifecycle,
           output: {
