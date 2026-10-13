@@ -6,12 +6,31 @@
 // SQLite reference-adapter suite (tests/store/t312-observation.test.ts in
 // @kaicreator/domain-harness-node).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+
+/**
+ * CI robustness (mirrors the successor-host N18 probe, #953 Controller 090):
+ * this file's packed-consumer journeys npm-install dependencies from the
+ * registry; workers without egress must SKIP explicitly rather than hang
+ * an install to the step timeout. Zero behavior change when reachable.
+ */
+function npmRegistryReachable(): boolean {
+  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
+    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
+  });
+  return probe.status === 0;
+}
+
+const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
+  ? undefined
+  : 'PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment';
+
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -44,6 +63,7 @@ function runNpm(args: readonly string[], cwd: string): string {
 // durable reads through the public readObservations API.
 const CONSUMER_PROGRAM = `
 import assert from 'node:assert/strict';
+
 import {
   computeCompiledPackageId,
   isRuntimeObservationStore,
@@ -228,7 +248,7 @@ await runtime.dispose();
 console.log('consumer-ok');
 `;
 
-test('#312 packed package delivers the public observation surface to a clean consumer', () => {
+test('#312 packed package delivers the public observation surface to a clean consumer', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-t312-consumer-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');

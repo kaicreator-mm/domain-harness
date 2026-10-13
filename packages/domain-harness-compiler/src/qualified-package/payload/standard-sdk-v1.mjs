@@ -5,7 +5,8 @@
  * closure. Adapted by file/contract from #994@b9ea4d1 sdk-standard.mjs; unlike
  * the experiment it never fabricates freshModelCallCount=1 for a model-free
  * evaluation. K owns admission, state, effect, journal, authorization and replay.
- * This package only interprets five data-only Standard Kind declarations.
+ * This package only interprets five data-only Standard Kind declarations,
+ * including the FR02 bounded portable Rule payloadExpression.
  *
  * No imports / eval / Function constructors / external side effects.
  */
@@ -22,6 +23,23 @@ const MAX_ITEMS = 1024;
 const MAX_CASES = 64;
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const INVALID_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+// FR02 portable-expression budgets. A declared timeoutMs converts to a
+// deterministic fixed-rate step budget, so evaluation never reads an ambient
+// clock and replay stays byte-identical.
+const EXPRESSION_SOURCE_MAX_CHARS = 65_536;
+const EXPRESSION_NODE_BUDGET = 4_096;
+const EXPRESSION_PARSE_DEPTH_MAX = 256;
+const EXPRESSION_EVALUATE_DEPTH_MAX = 1_024;
+const EXPRESSION_MAX_BYTES = 4_194_304;
+const DEFAULT_EXPRESSION_MAX_BYTES = 1_048_576;
+const DEFAULT_EXPRESSION_TIMEOUT_MS = 2_000;
+const MAX_EXPRESSION_TIMEOUT_MS = 60_000;
+const EXPRESSION_STEPS_PER_MS = 512;
+const EXPRESSION_FORBIDDEN_VARIABLES = new Set(['eval', 'random']);
+const EXPRESSION_CLOCK_FUNCTIONS = new Set(['now', 'millis']);
+const EXPRESSION_TYPES = new Set(['string', 'number', 'boolean', 'object', 'array', 'null']);
+const MISSING = Symbol('missing');
 
 export class StandardSdkError extends Error {
   constructor(code, message) {
@@ -149,7 +167,13 @@ function schema(definition, input) {
 
 function rule(definition, input) {
   const eventType = ident(definition.eventType, 'rule.eventType');
-  const payload = project(definition.payloadFromInput ?? {}, input, 'rule');
+  const hasPayloadExpression = Object.hasOwn(definition, 'payloadExpression');
+  if (hasPayloadExpression && Object.hasOwn(definition, 'payloadFromInput')) {
+    fail('SDK_DECLARATION_INVALID', 'rule must declare exactly one of payloadFromInput or payloadExpression');
+  }
+  const payload = hasPayloadExpression
+    ? evaluateRulePayloadExpression(definition.payloadExpression, input)
+    : project(definition.payloadFromInput ?? {}, input, 'rule');
   return {
     kind: 'rule',
     structuredDecision: {
@@ -194,6 +218,583 @@ function operation(definition, input) {
     // Data-only effect intent. NO Host calls and NO execution permission.
     proposal: { operationId, resourceKey, input: project(definition.inputFrom ?? {}, input, 'operation') },
   };
+}
+
+/**
+ * FR02 portable safe expression evaluation, retained from the v0.7
+ * expression-runtime.ts@c37cf23d / policy.ts / json-boundary.ts observables
+ * (historic pin 86110c6) and adapted to the sealed v0.8 Standard SDK:
+ *
+ * - JSONata is NOT embedded. A bounded deterministic grammar subset —
+ *   literals, field/index paths, object/array construction, arithmetic,
+ *   comparison, boolean and string-concat operators plus the deterministic
+ *   clock functions — is interpreted here, so the sealed payload keeps zero
+ *   imports, no dynamic code evaluation and no second runtime;
+ * - `$now()`/`$millis()` are injected from the declaration logicalTime; the
+ *   evaluator never reads an ambient clock or network;
+ * - the v0.7 wall-clock timeoutMs becomes a deterministic fixed-rate step
+ *   budget (EXPRESSION_STEPS_PER_MS steps per declared millisecond): the
+ *   same fail-closed denial class with zero ambient time dependence;
+ * - parser nesting and AST evaluation recursion each carry an explicit
+ *   depth budget checked BEFORE descending, so a legal-length source can
+ *   never overflow the JS stack (typed SDK_EXPRESSION_BOUNDS instead);
+ * - UTF-8 input/output byte limits and the plain-JSON result round-trip
+ *   follow the v0.7 json-boundary semantics.
+ */
+function utf8ByteLength(value) {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined) continue;
+    if (codePoint <= 0x7f) bytes += 1;
+    else if (codePoint <= 0x7ff) bytes += 2;
+    else if (codePoint <= 0xffff) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
+}
+
+function expressionOption(spec, field, fallback, maximum) {
+  const value = spec[field];
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > maximum) {
+    fail('SDK_DECLARATION_INVALID', `rule.payloadExpression.${field} must be an integer between 1 and ${maximum}`);
+  }
+  return value;
+}
+
+function evaluateRulePayloadExpression(rawDeclaration, input) {
+  const spec = record(rawDeclaration, 'rule.payloadExpression');
+  const source = spec.source;
+  if (typeof source !== 'string') {
+    fail('SDK_DECLARATION_INVALID', 'rule.payloadExpression.source must be an expression string');
+  }
+  if (source.length > EXPRESSION_SOURCE_MAX_CHARS) {
+    fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression source length exceeds ${EXPRESSION_SOURCE_MAX_CHARS} characters`);
+  }
+  const logicalTime = spec.logicalTime;
+  if (typeof logicalTime !== 'string' || !Number.isFinite(Date.parse(logicalTime))) {
+    fail('SDK_DECLARATION_INVALID', 'rule.payloadExpression.logicalTime must be a valid ISO timestamp');
+  }
+  const timeoutMs = expressionOption(spec, 'timeoutMs', DEFAULT_EXPRESSION_TIMEOUT_MS, MAX_EXPRESSION_TIMEOUT_MS);
+  const maxInputBytes = expressionOption(spec, 'maxInputBytes', DEFAULT_EXPRESSION_MAX_BYTES, EXPRESSION_MAX_BYTES);
+  const maxOutputBytes = expressionOption(spec, 'maxOutputBytes', DEFAULT_EXPRESSION_MAX_BYTES, EXPRESSION_MAX_BYTES);
+  if (utf8ByteLength(JSON.stringify(input)) > maxInputBytes) {
+    fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression input exceeds maxInputBytes (${maxInputBytes})`);
+  }
+  const evaluated = evaluateExpressionSource(source, input, logicalTime, timeoutMs);
+  const serialized = JSON.stringify(evaluated);
+  if (utf8ByteLength(serialized) > maxOutputBytes) {
+    fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression result exceeds maxOutputBytes (${maxOutputBytes})`);
+  }
+  // v0.7 boundary: hand callers plain JSON (JSON round-trip), never the
+  // evaluator's internal null-prototype constructions.
+  const result = JSON.parse(serialized);
+  assertExpressionOutputSchema(spec.outputSchema, result);
+  return result;
+}
+
+function expressionValueKind(value) {
+  return value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+}
+
+function assertExpressionOutputSchema(rawSchema, result) {
+  if (rawSchema === undefined) return;
+  const schema = record(rawSchema, 'rule.payloadExpression.outputSchema');
+  const required = schema.required ?? [];
+  if (!Array.isArray(required) || required.length > MAX_ITEMS) {
+    fail('SDK_DECLARATION_INVALID', 'outputSchema.required must be a bounded string list');
+  }
+  const properties = record(schema.properties ?? {}, 'outputSchema.properties');
+  // The schema describes object fields; primitive or null results must be
+  // refused typed before Object.hasOwn below can raise a bare TypeError.
+  const resultKind = expressionValueKind(result);
+  if (resultKind !== 'object' && resultKind !== 'array') {
+    fail('SDK_EXPRESSION_OUTPUT_INVALID', `expression result does not satisfy outputSchema (result is ${resultKind}, expected object)`);
+  }
+  for (const name of required) {
+    ident(name, 'outputSchema.required');
+    if (!Object.hasOwn(result, name)) {
+      fail('SDK_EXPRESSION_OUTPUT_INVALID', `expression result does not satisfy outputSchema (required ${name} is missing)`);
+    }
+  }
+  for (const [name, expected] of Object.entries(properties)) {
+    ident(name, 'outputSchema.properties key');
+    if (!EXPRESSION_TYPES.has(expected)) {
+      fail('SDK_DECLARATION_INVALID', `unsupported outputSchema type ${String(expected)}`);
+    }
+    if (!Object.hasOwn(result, name)) continue;
+    const value = result[name];
+    const actual = expressionValueKind(value);
+    if (actual !== expected) {
+      fail('SDK_EXPRESSION_OUTPUT_INVALID', `expression result does not satisfy outputSchema (${name} is ${actual}, expected ${expected})`);
+    }
+  }
+}
+
+function evaluateExpressionSource(source, scope, logicalTime, timeoutMs) {
+  const ast = createExpressionParser(source).parse();
+  const state = { steps: 0, budget: timeoutMs * EXPRESSION_STEPS_PER_MS, timeoutMs, depth: 0 };
+  const clock = { now: logicalTime, millis: Date.parse(logicalTime) };
+  const result = evaluateExpressionNode(ast, scope, clock, state);
+  if (result === MISSING) {
+    fail('SDK_EXPRESSION_UNSAFE', 'rule.payloadExpression result is not portable JSON (unresolved path)');
+  }
+  return result;
+}
+
+function expressionTick(state) {
+  state.steps += 1;
+  if (state.steps > state.budget) {
+    fail('SDK_EXPRESSION_TIMEOUT', `rule.payloadExpression evaluation exceeded its deterministic timeout budget (timeoutMs=${state.timeoutMs})`);
+  }
+}
+
+function createExpressionParser(source) {
+  let pos = 0;
+  let nodes = 0;
+  let depth = 0;
+
+  function unsafe(message) {
+    fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression ${message}`);
+  }
+  function node(fields) {
+    nodes += 1;
+    if (nodes > EXPRESSION_NODE_BUDGET) {
+      fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression exceeds bounded expression node budget (${EXPRESSION_NODE_BUDGET})`);
+    }
+    return fields;
+  }
+  // Every recursive-descent cycle passes through enterNesting() BEFORE
+  // descending, so a legal-length source can never exhaust the JS stack
+  // before the node/step budgets run. The counter is not restored on the
+  // failure path: fail() abandons this parser instance entirely.
+  function enterNesting() {
+    depth += 1;
+    if (depth > EXPRESSION_PARSE_DEPTH_MAX) {
+      fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression exceeds bounded expression nesting depth (${EXPRESSION_PARSE_DEPTH_MAX})`);
+    }
+  }
+  function skip() {
+    while (
+      pos < source.length
+      && (source[pos] === ' ' || source[pos] === '\t' || source[pos] === '\n' || source[pos] === '\r')
+    ) pos += 1;
+  }
+  function peek() {
+    skip();
+    return pos < source.length ? source[pos] : '';
+  }
+  function eat(character) {
+    if (peek() === character) {
+      pos += 1;
+      return true;
+    }
+    return false;
+  }
+  function expect(character) {
+    if (!eat(character)) unsafe(`syntax error: expected '${character}' at offset ${pos}`);
+  }
+  function identifierStart(character) {
+    return (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character === '_';
+  }
+  function identifierPart(character) {
+    return identifierStart(character) || (character >= '0' && character <= '9');
+  }
+  function readIdentifier() {
+    const start = pos;
+    while (pos < source.length && identifierPart(source[pos])) pos += 1;
+    return source.slice(start, pos);
+  }
+  function readKeyword(word) {
+    skip();
+    if (source.slice(pos, pos + word.length) !== word) return false;
+    const after = pos + word.length;
+    if (after < source.length && identifierPart(source[after])) return false;
+    pos = after;
+    return true;
+  }
+  function readString() {
+    const quote = source[pos];
+    pos += 1;
+    let value = '';
+    while (pos < source.length) {
+      const character = source[pos];
+      if (character === quote) {
+        pos += 1;
+        return value;
+      }
+      if (character === '\\') {
+        pos += 1;
+        if (pos >= source.length) unsafe('syntax error: unterminated escape');
+        const escape = source[pos];
+        if (escape === 'n') value += '\n';
+        else if (escape === 't') value += '\t';
+        else if (escape === 'r') value += '\r';
+        else if (escape === '"' || escape === "'" || escape === '\\' || escape === '/') value += escape;
+        else if (escape === 'u') {
+          const hex = source.slice(pos + 1, pos + 5);
+          if (!/^[0-9a-fA-F]{4}$/.test(hex)) unsafe('syntax error: invalid unicode escape');
+          value += String.fromCharCode(Number.parseInt(hex, 16));
+          pos += 4;
+        } else unsafe(`syntax error: invalid escape \\${escape}`);
+        pos += 1;
+        continue;
+      }
+      value += character;
+      pos += 1;
+    }
+    unsafe('syntax error: unterminated string');
+  }
+  function readNumber() {
+    const start = pos;
+    while (pos < source.length && source[pos] >= '0' && source[pos] <= '9') pos += 1;
+    if (pos < source.length && source[pos] === '.') {
+      pos += 1;
+      while (pos < source.length && source[pos] >= '0' && source[pos] <= '9') pos += 1;
+    }
+    if (pos < source.length && (source[pos] === 'e' || source[pos] === 'E')) {
+      pos += 1;
+      if (pos < source.length && (source[pos] === '+' || source[pos] === '-')) pos += 1;
+      while (pos < source.length && source[pos] >= '0' && source[pos] <= '9') pos += 1;
+    }
+    const text = source.slice(start, pos);
+    const value = Number(text);
+    if (text === '' || !Number.isFinite(value)) unsafe(`syntax error: invalid number at offset ${start}`);
+    return node({ type: 'literal', value });
+  }
+
+  function parseExpression() {
+    return parseOr();
+  }
+  function parseOr() {
+    let left = parseAnd();
+    while (readKeyword('or')) left = node({ type: 'binary', operator: 'or', left, right: parseAnd() });
+    return left;
+  }
+  function parseAnd() {
+    let left = parseComparison();
+    while (readKeyword('and')) left = node({ type: 'binary', operator: 'and', left, right: parseComparison() });
+    return left;
+  }
+  function parseComparison() {
+    const left = parseAdditive();
+    skip();
+    for (const operator of ['!=', '<=', '>=', '=', '<', '>']) {
+      if (source.slice(pos, pos + operator.length) === operator) {
+        pos += operator.length;
+        return node({ type: 'binary', operator, left, right: parseAdditive() });
+      }
+    }
+    return left;
+  }
+  function parseAdditive() {
+    let left = parseMultiplicative();
+    for (;;) {
+      skip();
+      const character = pos < source.length ? source[pos] : '';
+      if (character === '+' || character === '-' || character === '&') {
+        pos += 1;
+        left = node({ type: 'binary', operator: character, left, right: parseMultiplicative() });
+      } else return left;
+    }
+  }
+  function parseMultiplicative() {
+    let left = parseUnary();
+    for (;;) {
+      skip();
+      const character = pos < source.length ? source[pos] : '';
+      if (character === '*' || character === '/' || character === '%') {
+        pos += 1;
+        left = node({ type: 'binary', operator: character, left, right: parseUnary() });
+      } else return left;
+    }
+  }
+  function parseUnary() {
+    if (eat('-')) {
+      enterNesting();
+      const operand = parseUnary();
+      depth -= 1;
+      return node({ type: 'neg', operand });
+    }
+    return parsePostfix();
+  }
+  function parsePostfix() {
+    let base = parsePrimary();
+    for (;;) {
+      skip();
+      const character = pos < source.length ? source[pos] : '';
+      if (character === '.') {
+        pos += 1;
+        skip();
+        if (pos >= source.length || !identifierStart(source[pos])) unsafe(`syntax error: expected field name at offset ${pos}`);
+        base = node({ type: 'field', base, name: readIdentifier() });
+      } else if (character === '[') {
+        pos += 1;
+        const start = pos;
+        while (pos < source.length && source[pos] >= '0' && source[pos] <= '9') pos += 1;
+        const text = source.slice(start, pos);
+        if (text === '') unsafe(`syntax error: path index must be a nonnegative integer at offset ${start}`);
+        const index = Number(text);
+        expect(']');
+        base = node({ type: 'index', base, index });
+      } else return base;
+    }
+  }
+  function parsePrimary() {
+    skip();
+    const character = pos < source.length ? source[pos] : '';
+    if (character === '' ) unsafe(`syntax error: unexpected end of expression`);
+    if (character === '(') {
+      pos += 1;
+      enterNesting();
+      const inner = parseExpression();
+      depth -= 1;
+      expect(')');
+      return inner;
+    }
+    if (character === '{') {
+      pos += 1;
+      enterNesting();
+      const entries = [];
+      if (peek() !== '}') {
+        for (;;) {
+          skip();
+          const keyCharacter = peek();
+          let key;
+          if (keyCharacter === '"' || keyCharacter === "'") key = readString();
+          else if (identifierStart(keyCharacter)) key = readIdentifier();
+          else unsafe(`syntax error: invalid object key at offset ${pos}`);
+          if (INVALID_KEYS.has(key)) {
+            fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression object key ${JSON.stringify(key)} is forbidden`);
+          }
+          expect(':');
+          entries.push([key, parseExpression()]);
+          if (!eat(',')) break;
+        }
+      }
+      expect('}');
+      depth -= 1;
+      return node({ type: 'object', entries });
+    }
+    if (character === '[') {
+      pos += 1;
+      enterNesting();
+      const items = [];
+      if (peek() !== ']') {
+        items.push(parseExpression());
+        while (eat(',')) items.push(parseExpression());
+      }
+      expect(']');
+      depth -= 1;
+      return node({ type: 'array', items });
+    }
+    if (character === '"' || character === "'") {
+      return node({ type: 'literal', value: readString() });
+    }
+    if (character >= '0' && character <= '9') return readNumber();
+    if (character === '$') {
+      pos += 1;
+      const name = readIdentifier();
+      if (name === '') unsafe(`syntax error: expected a function name at offset ${pos}`);
+      if (EXPRESSION_FORBIDDEN_VARIABLES.has(name)) {
+        fail('SDK_EXPRESSION_FORBIDDEN', `$${name} is forbidden by DomainHarness`);
+      }
+      skip();
+      if (pos < source.length && source[pos] === '(') {
+        pos += 1;
+        enterNesting();
+        const args = [];
+        if (peek() !== ')') {
+          args.push(parseExpression());
+          while (eat(',')) args.push(parseExpression());
+        }
+        expect(')');
+        depth -= 1;
+        if (EXPRESSION_CLOCK_FUNCTIONS.has(name)) {
+          if (args.length > 0) {
+            fail('SDK_EXPRESSION_FORBIDDEN', `$${name}(...) arguments are not supported by the deterministic clock contract`);
+          }
+          return node({ type: 'clock', name });
+        }
+      }
+      fail('SDK_EXPRESSION_FORBIDDEN', `unknown or forbidden function or variable $${name}`);
+    }
+    if (identifierStart(character)) {
+      const name = readIdentifier();
+      if (name === 'true') return node({ type: 'literal', value: true });
+      if (name === 'false') return node({ type: 'literal', value: false });
+      if (name === 'null') return node({ type: 'literal', value: null });
+      return node({ type: 'root', name });
+    }
+    unsafe(`syntax error: unexpected character '${character}' at offset ${pos}`);
+  }
+
+  return {
+    parse() {
+      skip();
+      const ast = parseExpression();
+      skip();
+      if (pos !== source.length) unsafe(`syntax error: unexpected input at offset ${pos}`);
+      return ast;
+    },
+  };
+}
+
+function expressionJsonEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return a === b;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => expressionJsonEqual(item, b[index]));
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    return aKeys.length === bKeys.length
+      && aKeys.every((key) => Object.hasOwn(b, key) && expressionJsonEqual(a[key], b[key]));
+  }
+  return false;
+}
+
+function expressionNumber(value, operator) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression operator ${operator} requires finite number operands`);
+  }
+  return value;
+}
+
+function expressionString(value) {
+  if (typeof value !== 'string') {
+    fail('SDK_EXPRESSION_UNSAFE', 'rule.payloadExpression operator & requires two string operands');
+  }
+  return value;
+}
+
+function expressionBoolean(value, operator) {
+  if (typeof value !== 'boolean') {
+    fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression operator ${operator} requires boolean operands`);
+  }
+  return value;
+}
+
+function evaluateExpressionNode(ast, scope, clock, state) {
+  expressionTick(state);
+  state.depth += 1;
+  if (state.depth > EXPRESSION_EVALUATE_DEPTH_MAX) {
+    fail('SDK_EXPRESSION_BOUNDS', `rule.payloadExpression exceeds bounded expression evaluation depth (${EXPRESSION_EVALUATE_DEPTH_MAX})`);
+  }
+  try {
+    return evaluateExpressionNodeInner(ast, scope, clock, state);
+  } finally {
+    state.depth -= 1;
+  }
+}
+
+function evaluateExpressionNodeInner(ast, scope, clock, state) {
+  switch (ast.type) {
+    case 'literal':
+      return ast.value;
+    case 'clock':
+      return ast.name === 'now' ? clock.now : clock.millis;
+    case 'root':
+      return Object.hasOwn(scope, ast.name) ? scope[ast.name] : MISSING;
+    case 'field': {
+      const base = evaluateExpressionNode(ast.base, scope, clock, state);
+      if (base === MISSING) return MISSING;
+      if (base === null || typeof base !== 'object') return MISSING;
+      expressionTick(state);
+      return Object.hasOwn(base, ast.name) ? base[ast.name] : MISSING;
+    }
+    case 'index': {
+      const base = evaluateExpressionNode(ast.base, scope, clock, state);
+      if (base === MISSING) return MISSING;
+      if (!Array.isArray(base) || ast.index >= base.length) return MISSING;
+      expressionTick(state);
+      return base[ast.index];
+    }
+    case 'object': {
+      const result = Object.create(null);
+      for (const [key, valueAst] of ast.entries) {
+        const value = evaluateExpressionNode(valueAst, scope, clock, state);
+        if (value === MISSING) {
+          fail('SDK_EXPRESSION_UNSAFE', 'rule.payloadExpression result is not portable JSON (unresolved path)');
+        }
+        result[key] = value;
+      }
+      return result;
+    }
+    case 'array': {
+      const items = [];
+      for (const itemAst of ast.items) {
+        const value = evaluateExpressionNode(itemAst, scope, clock, state);
+        if (value === MISSING) {
+          fail('SDK_EXPRESSION_UNSAFE', 'rule.payloadExpression result is not portable JSON (unresolved path)');
+        }
+        items.push(value);
+      }
+      return items;
+    }
+    case 'neg': {
+      const operand = expressionNumber(evaluateExpressionNode(ast.operand, scope, clock, state), '-');
+      return -operand;
+    }
+    case 'binary':
+      return evaluateExpressionBinary(ast, scope, clock, state);
+    default:
+      fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression cannot evaluate node ${String(ast.type)}`);
+  }
+}
+
+function evaluateExpressionBinary(ast, scope, clock, state) {
+  const operator = ast.operator;
+  if (operator === '=' || operator === '!=') {
+    const left = evaluateExpressionNode(ast.left, scope, clock, state);
+    const right = evaluateExpressionNode(ast.right, scope, clock, state);
+    if (left === MISSING && right === MISSING) return operator === '=';
+    if (left === MISSING || right === MISSING) return operator !== '=';
+    const equal = expressionJsonEqual(left, right);
+    return operator === '=' ? equal : !equal;
+  }
+  const left = evaluateExpressionNode(ast.left, scope, clock, state);
+  const right = evaluateExpressionNode(ast.right, scope, clock, state);
+  switch (operator) {
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+    case '%': {
+      const a = expressionNumber(left, operator);
+      const b = expressionNumber(right, operator);
+      const result = operator === '+' ? a + b : operator === '-' ? a - b : operator === '*' ? a * b : operator === '/' ? a / b : a % b;
+      if (!Number.isFinite(result)) {
+        fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression operator ${operator} produced a non-finite number`);
+      }
+      return result;
+    }
+    case '&':
+      return `${expressionString(left)}${expressionString(right)}`;
+    case 'and':
+      return expressionBoolean(left, 'and') && expressionBoolean(right, 'and');
+    case 'or':
+      return expressionBoolean(left, 'or') || expressionBoolean(right, 'or');
+    case '<':
+    case '<=':
+    case '>':
+    case '>=': {
+      if (typeof left === 'number' && typeof right === 'number') {
+        const a = expressionNumber(left, operator);
+        const b = expressionNumber(right, operator);
+        return operator === '<' ? a < b : operator === '<=' ? a <= b : operator === '>' ? a > b : a >= b;
+      }
+      if (typeof left === 'string' && typeof right === 'string') {
+        return operator === '<' ? left < right : operator === '<=' ? left <= right : operator === '>' ? left > right : left >= right;
+      }
+      return fail('SDK_EXPRESSION_UNSAFE', 'rule.payloadExpression ordering comparison requires two numbers or two strings');
+    }
+    default:
+      fail('SDK_EXPRESSION_UNSAFE', `rule.payloadExpression unknown operator ${String(operator)}`);
+  }
 }
 
 /**

@@ -53,4 +53,16 @@ export {
   createUxTransport,
   uxDocumentNamespace,
 } from './ux-transport.js';
-export type { UxDispatchReceipt, UxQueryKind, UxQueryRequest, UxTarget, UxTransport } from './ux-transport.js';
+export type { UxDispatchReceipt, UxKernelRoute, UxQueryKind, UxQueryRequest, UxTarget, UxTransport } from './ux-transport.js';
+
+export {
+  createKernelGateway,
+  kernelReceiptAsHostEvent,
+} from './kernel-gateway.js';
+export type {
+  KernelGateway,
+  KernelGatewayAppInput,
+  KernelGatewaySendIntent,
+  KernelReceiptScope,
+  KernelReceiptSubscription,
+} from './kernel-gateway.js';

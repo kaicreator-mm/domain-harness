@@ -114,6 +114,35 @@ export function createUxTransport(deps, channel) {
             deps.assertIntentScope(target, principal);
             // `caller` is user data: echoed, never consulted for authorization.
             const declaredCaller = parsed.caller ?? null;
+            // #1013 (I02): with an attached kernel gateway, a domain intent MUST
+            // reach the REAL selected Kernel of the authenticated app. There is
+            // deliberately NO generic-resource fallback for intents in gateway
+            // mode: an app the gateway does not know refuses typed.
+            if (deps.sendToKernel !== undefined && deps.kernelHasApp !== undefined) {
+                if (!deps.kernelHasApp(principal.appId)) {
+                    throw new HostBoundaryError('UX_KERNEL_APP_UNREGISTERED', `no qualified Domain App closure is registered for the authenticated app ${principal.appId}; domain intents have no generic-resource fallback`);
+                }
+                const result = await deps.sendToKernel(channel.credential, {
+                    intentType,
+                    messageId,
+                    input: parsed.input ?? null,
+                    target,
+                });
+                return Object.freeze({
+                    status: 'dispatched',
+                    messageId,
+                    intentType,
+                    resourceKey: `kernel-intent:${principal.appId}:${intentType}`,
+                    result,
+                    authenticatedPrincipal: Object.freeze({
+                        subject: principal.subject,
+                        tenantId: principal.tenantId,
+                        appId: principal.appId,
+                        roles: Object.freeze([...principal.roles]),
+                    }),
+                    declaredCaller,
+                });
+            }
             const resourceKey = `intent:${intentType}`;
             const result = await deps.dispatch(resourceKey, intentType, { messageId, input: parsed.input ?? null, target, declaredCaller }, principal);
             return Object.freeze({
@@ -137,10 +166,28 @@ export function createUxTransport(deps, channel) {
             if (FORBIDDEN_QUERY_KINDS.has(kind)) {
                 throw new HostBoundaryError('UX_QUERY_KIND_FORBIDDEN', `query kind ${kind} is not representable on the UX surface; raw journal/kernel/store reads have no route`);
             }
-            if (kind !== 'doc') {
-                throw new HostBoundaryError('UX_QUERY_KIND_UNSUPPORTED', `query kind ${kind} is not supported by this host transport (supported: doc)`);
-            }
             const principal = await deps.authenticate(channel.credential);
+            // #1013 (I02): with an attached kernel gateway, `instance` is the
+            // authenticated scoped instance read through the REAL selected K.
+            if (kind === 'instance') {
+                if (deps.queryKernelInstance === undefined || deps.kernelHasApp === undefined) {
+                    throw new HostBoundaryError('UX_QUERY_KIND_UNSUPPORTED', 'query kind instance requires a host-attached kernel gateway (supported here: doc)');
+                }
+                const targetRecord = assertCanonicalSubRecord(parsed.target, 'UX_QUERY_MALFORMED', 'query target');
+                const target = {
+                    tenantId: requireString(targetRecord, 'tenantId', 'UX_QUERY_MALFORMED', 'query target'),
+                    appId: requireString(targetRecord, 'appId', 'UX_QUERY_MALFORMED', 'query target'),
+                    instanceKey: requireString(targetRecord, 'instanceKey', 'UX_QUERY_MALFORMED', 'query target'),
+                };
+                deps.assertIntentScope(target, principal);
+                if (!deps.kernelHasApp(principal.appId)) {
+                    throw new HostBoundaryError('UX_KERNEL_APP_UNREGISTERED', `no qualified Domain App closure is registered for the authenticated app ${principal.appId}; instance reads have no generic fallback`);
+                }
+                return deps.queryKernelInstance(channel.credential, target);
+            }
+            if (kind !== 'doc') {
+                throw new HostBoundaryError('UX_QUERY_KIND_UNSUPPORTED', `query kind ${kind} is not supported by this host transport (supported: doc${deps.queryKernelInstance !== undefined ? ', instance' : ''})`);
+            }
             const key = requireString(parsed, 'key', 'UX_QUERY_MALFORMED', 'query');
             const namespace = uxDocumentNamespace(principal.tenantId, principal.appId);
             // Namespace isolation invariant: the prefix check is only
@@ -180,15 +227,23 @@ export function assertIntentScope(target, principal) {
 /**
  * Wire the typed UX transport to a trusted host for one credential. The
  * caller (host context) hands the RETURNED transport to the UX consumer —
- * never the host object itself.
+ * never the host object itself. With an attached kernel route, domain
+ * intents and instance reads go to the REAL selected Kernel; without one
+ * the transport keeps its generic-resource/doc behavior (fixtures).
  */
-export function createHostUxTransport(host, credential) {
+export function createHostUxTransport(host, credential, options) {
+    const kernel = options?.kernel;
     return createUxTransport({
         authenticate: (credentialToCheck) => host.authenticate(credentialToCheck),
         dispatch: (resourceKey, operation, payload, principal) => host.resources.call(resourceKey, operation, payload, { principal }),
         readScopedDoc: (key) => host.docs.get(key),
         subscribe: (credentialToCheck, scope, listener) => host.events.subscribe(credentialToCheck, scope, listener),
         assertIntentScope,
+        ...(kernel === undefined ? {} : {
+            sendToKernel: (credentialToSubmit, intent) => kernel.send(credentialToSubmit, intent),
+            queryKernelInstance: (credentialToRead, target) => kernel.queryInstance(credentialToRead, target),
+            kernelHasApp: (appId) => kernel.hasApp(appId),
+        }),
     }, { credential });
 }
 //# sourceMappingURL=ux-transport.js.map

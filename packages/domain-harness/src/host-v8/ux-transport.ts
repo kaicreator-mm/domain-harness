@@ -90,6 +90,15 @@ interface TransportDeps {
   readonly readScopedDoc: (key: string) => Promise<{ value: unknown; revision: number } | null>;
   readonly subscribe: (credential: unknown, scope: unknown, listener: unknown) => Promise<HostSubscription>;
   readonly assertIntentScope: (target: UxTarget, principal: HostPrincipal) => void;
+  /**
+   * #1013 (I02) optional authenticated Kernel route: when the host attached
+   * a kernel gateway, domain intents and instance reads MUST go to the REAL
+   * selected Kernel of the authenticated app (never a generic resource
+   * fallback); the route re-authenticates the credential itself.
+   */
+  readonly sendToKernel?: (credential: unknown, intent: unknown) => Promise<unknown>;
+  readonly queryKernelInstance?: (credential: unknown, target: UxTarget) => Promise<unknown>;
+  readonly kernelHasApp?: (appId: string) => boolean;
 }
 
 const FORBIDDEN_QUERY_KINDS: ReadonlySet<string> = new Set([
@@ -168,6 +177,38 @@ export function createUxTransport(deps: TransportDeps, channel: { readonly crede
       deps.assertIntentScope(target, principal);
       // `caller` is user data: echoed, never consulted for authorization.
       const declaredCaller = parsed.caller ?? null;
+      // #1013 (I02): with an attached kernel gateway, a domain intent MUST
+      // reach the REAL selected Kernel of the authenticated app. There is
+      // deliberately NO generic-resource fallback for intents in gateway
+      // mode: an app the gateway does not know refuses typed.
+      if (deps.sendToKernel !== undefined && deps.kernelHasApp !== undefined) {
+        if (!deps.kernelHasApp(principal.appId)) {
+          throw new HostBoundaryError(
+            'UX_KERNEL_APP_UNREGISTERED',
+            `no qualified Domain App closure is registered for the authenticated app ${principal.appId}; domain intents have no generic-resource fallback`,
+          );
+        }
+        const result = await deps.sendToKernel(channel.credential, {
+          intentType,
+          messageId,
+          input: parsed.input ?? null,
+          target,
+        });
+        return Object.freeze({
+          status: 'dispatched',
+          messageId,
+          intentType,
+          resourceKey: `kernel-intent:${principal.appId}:${intentType}`,
+          result,
+          authenticatedPrincipal: Object.freeze({
+            subject: principal.subject,
+            tenantId: principal.tenantId,
+            appId: principal.appId,
+            roles: Object.freeze([...principal.roles]),
+          }),
+          declaredCaller,
+        });
+      }
       const resourceKey = `intent:${intentType}`;
       const result = await deps.dispatch(
         resourceKey,
@@ -197,10 +238,31 @@ export function createUxTransport(deps: TransportDeps, channel: { readonly crede
       if (FORBIDDEN_QUERY_KINDS.has(kind)) {
         throw new HostBoundaryError('UX_QUERY_KIND_FORBIDDEN', `query kind ${kind} is not representable on the UX surface; raw journal/kernel/store reads have no route`);
       }
-      if (kind !== 'doc') {
-        throw new HostBoundaryError('UX_QUERY_KIND_UNSUPPORTED', `query kind ${kind} is not supported by this host transport (supported: doc)`);
-      }
       const principal = await deps.authenticate(channel.credential);
+      // #1013 (I02): with an attached kernel gateway, `instance` is the
+      // authenticated scoped instance read through the REAL selected K.
+      if (kind === 'instance') {
+        if (deps.queryKernelInstance === undefined || deps.kernelHasApp === undefined) {
+          throw new HostBoundaryError('UX_QUERY_KIND_UNSUPPORTED', 'query kind instance requires a host-attached kernel gateway (supported here: doc)');
+        }
+        const targetRecord = assertCanonicalSubRecord(parsed.target, 'UX_QUERY_MALFORMED', 'query target');
+        const target: UxTarget = {
+          tenantId: requireString(targetRecord, 'tenantId', 'UX_QUERY_MALFORMED', 'query target'),
+          appId: requireString(targetRecord, 'appId', 'UX_QUERY_MALFORMED', 'query target'),
+          instanceKey: requireString(targetRecord, 'instanceKey', 'UX_QUERY_MALFORMED', 'query target'),
+        };
+        deps.assertIntentScope(target, principal);
+        if (!deps.kernelHasApp(principal.appId)) {
+          throw new HostBoundaryError(
+            'UX_KERNEL_APP_UNREGISTERED',
+            `no qualified Domain App closure is registered for the authenticated app ${principal.appId}; instance reads have no generic fallback`,
+          );
+        }
+        return deps.queryKernelInstance(channel.credential, target);
+      }
+      if (kind !== 'doc') {
+        throw new HostBoundaryError('UX_QUERY_KIND_UNSUPPORTED', `query kind ${kind} is not supported by this host transport (supported: doc${deps.queryKernelInstance !== undefined ? ', instance' : ''})`);
+      }
       const key = requireString(parsed, 'key', 'UX_QUERY_MALFORMED', 'query');
       const namespace = uxDocumentNamespace(principal.tenantId, principal.appId);
       // Namespace isolation invariant: the prefix check is only
@@ -256,11 +318,26 @@ export function assertIntentScope(target: UxTarget, principal: HostPrincipal): v
 }
 
 /**
+ * The kernel-gateway route a trusted host can attach to a UX transport
+ * (#1013, I02). Implementations MUST re-authenticate the credential
+ * themselves (the built-in gateway does); the transport never forwards any
+ * principal it derived — only the still-verified credential.
+ */
+export interface UxKernelRoute {
+  send(credential: unknown, intent: unknown): Promise<unknown>;
+  queryInstance(credential: unknown, target: UxTarget): Promise<unknown>;
+  hasApp(appId: string): boolean;
+}
+
+/**
  * Wire the typed UX transport to a trusted host for one credential. The
  * caller (host context) hands the RETURNED transport to the UX consumer —
- * never the host object itself.
+ * never the host object itself. With an attached kernel route, domain
+ * intents and instance reads go to the REAL selected Kernel; without one
+ * the transport keeps its generic-resource/doc behavior (fixtures).
  */
-export function createHostUxTransport(host: TrustedNodeHost, credential: HostCredential): UxTransport {
+export function createHostUxTransport(host: TrustedNodeHost, credential: HostCredential, options?: { readonly kernel?: UxKernelRoute }): UxTransport {
+  const kernel = options?.kernel;
   return createUxTransport(
     {
       authenticate: (credentialToCheck) => host.authenticate(credentialToCheck),
@@ -268,6 +345,11 @@ export function createHostUxTransport(host: TrustedNodeHost, credential: HostCre
       readScopedDoc: (key) => host.docs.get(key),
       subscribe: (credentialToCheck, scope, listener) => host.events.subscribe(credentialToCheck, scope, listener),
       assertIntentScope,
+      ...(kernel === undefined ? {} : {
+        sendToKernel: (credentialToSubmit: unknown, intent: unknown) => kernel.send(credentialToSubmit, intent),
+        queryKernelInstance: (credentialToRead: unknown, target: UxTarget) => kernel.queryInstance(credentialToRead, target),
+        kernelHasApp: (appId: string) => kernel.hasApp(appId),
+      }),
     },
     { credential },
   );

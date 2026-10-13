@@ -33,6 +33,14 @@ export interface InstallTrustedIssuersInput {
     readonly maxProofAgeMs?: number;
 }
 /**
+ * Validate a prospective trust-channel installation WITHOUT consuming the
+ * one-shot channel (#1013 R1 F-01): every refusal `installTrustedIssuers`
+ * would raise — occupancy and input shape — fails here first, so the Host
+ * bootstrap can preflight ALL one-shot channels before committing ANY.
+ * Internal protected; not re-exported from the public `/v8` surface.
+ */
+export declare function preflightTrustedIssuersInstall(input: InstallTrustedIssuersInput): void;
+/**
  * Install the trusted issuer registry for this process. Internal protected
  * bootstrap: one-shot (a second installation attempt fails typed, so a
  * partially-bootstrapped process cannot be re-trusted mid-flight).
