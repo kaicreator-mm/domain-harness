@@ -33,6 +33,7 @@ import {
   QualifiedPackageError,
   V8_QUALIFIED_ABI,
   sha256Hex,
+  type QualifiedCapabilityBinding,
   type QualifiedPackageDescriptor,
   type SealedQualifiedPackageRoot,
 } from './contracts.js';
@@ -143,6 +144,26 @@ export async function installQualifiedPackages(root: SealedQualifiedPackageRoot)
           'ENDPOINT_MISSING',
           `package ${descriptor.packageId}: sealed endpoint kind ${kind} is not provided by the module`,
         );
+      }
+    }
+    // Capability handler correspondence (#1023 S02a): every operation→handler
+    // entry the sealed root binds for this capability package must resolve
+    // to a genuinely callable export of the physically installed namespace —
+    // presence elsewhere in the closure is not enough, and a bound name that
+    // is missing or non-callable fails typed before any handler can run.
+    if (descriptor.kind === 'capability') {
+      const capabilityBindings = root.bindings.filter(
+        (binding): binding is QualifiedCapabilityBinding => binding.role === 'capability' && binding.packageId === descriptor.packageId,
+      );
+      for (const binding of capabilityBindings) {
+        for (const bound of binding.handlers) {
+          if (typeof bound.handler !== 'string' || bound.handler.length === 0 || typeof namespace[bound.handler] !== 'function') {
+            throw new QualifiedPackageError(
+              'MODULE_HANDLER_MISSING',
+              `package ${descriptor.packageId}: capability ${binding.capabilityId} binds handler ${String(bound.handler)} for operation ${String(bound.operationId)}, which the module does not export as a function`,
+            );
+          }
+        }
       }
     }
     installed.push({ descriptor, namespace });

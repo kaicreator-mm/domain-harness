@@ -31,7 +31,14 @@ export declare class QualifiedPackageError extends Error {
 export declare const V8_QUALIFIED_ROOT_FORMAT = "dhpkg/v8-qualified-root/1";
 export declare const V8_APPROVAL_PROOF_TYPE = "v08-external-approval/1";
 export declare const V8_QUALIFIED_PRODUCER_PREFIX = "qualified-producer:";
-export type QualifiedPackageKind = 'kernel' | 'standard-sdk' | 'business';
+/**
+ * Package kinds. The three closed K/S/B roles stay mandatory and exactly
+ * shaped; 'capability' (#1023 S02a) is the OPTIONAL extra capability-owned
+ * package kind admitted by BUILD alongside them — it occupies no closed
+ * role, shadows nothing, and executes only through its exact keyed
+ * endpoint/handler binding.
+ */
+export type QualifiedPackageKind = 'kernel' | 'standard-sdk' | 'business' | 'capability';
 export type QualifiedRole = 'kernel' | 'standard-sdk' | 'business';
 export interface QualifiedEndpoint {
     readonly endpointId: string;
@@ -41,10 +48,18 @@ export interface QualifiedEndpoint {
  * ABI knowledge the trusted installer needs to verify a module generically.
  * The executing mechanism itself stays inside the physically selected Kernel
  * package; the loader never re-implements it (#994 KPK-02 heritage).
+ *
+ * The 'v08-capability-abi/1' entry (#1023 S02a) is purely additive: the
+ * three closed-role entries keep their exact frozen shape. A capability
+ * package self-identifies like every other package and exposes ONE
+ * 'capability-endpoint' endpoint; its callable surface is the exact
+ * build-time handler map carried by its capability binding, verified
+ * against the physically installed namespace by the installer — never
+ * discovered at runtime.
  */
 export declare const V8_QUALIFIED_ABI: Readonly<Record<string, {
     readonly kind: QualifiedPackageKind;
-    readonly role: QualifiedRole;
+    readonly role: QualifiedRole | 'capability';
     readonly requiredExports: readonly string[];
     readonly requiredEndpointKinds: readonly string[];
 }>>;
@@ -84,7 +99,29 @@ export interface QualifiedIntentBinding {
     readonly packageId: string;
     readonly endpointId: string;
 }
-export type QualifiedBinding = QualifiedRoleBinding | QualifiedIntentBinding;
+/** One build-time exact handler entry of a capability binding (#1023 S02a). */
+export interface QualifiedCapabilityHandlerBinding {
+    /** Callable operation identity inside this capability (unique per binding). */
+    readonly operationId: string;
+    /** Module export name the operation is statically bound to. */
+    readonly handler: string;
+}
+/**
+ * Optional extra capability-owned package binding (#1023 S02a): BUILD
+ * selects the package, assigns the unique capability identity, and pins the
+ * EXACT endpoint plus operation→handler map. No runtime discovery, no
+ * host-node catch-all: a capability package without exactly one such
+ * binding never becomes executable, and a capability can never occupy or
+ * shadow a closed K/S/B role.
+ */
+export interface QualifiedCapabilityBinding {
+    readonly role: 'capability';
+    readonly capabilityId: string;
+    readonly packageId: string;
+    readonly endpointId: string;
+    readonly handlers: readonly QualifiedCapabilityHandlerBinding[];
+}
+export type QualifiedBinding = QualifiedRoleBinding | QualifiedIntentBinding | QualifiedCapabilityBinding;
 export interface QualifiedBuildProvenance {
     readonly producerId: string;
     readonly builtAt: string;
@@ -116,9 +153,9 @@ export declare function canonicalJson(value: unknown): string;
 export declare function approvalBindingDigest(proof: ApprovalProof): string;
 /**
  * Subject digest of a sealed closure: the exact package byte identities plus
- * the role/intent bindings. BUILD computes it at qualification time; load()
- * recomputes it from the presented root and refuses any divergence, so an
- * approval can never be replayed onto a different closure.
+ * the role/intent/capability bindings. BUILD computes it at qualification
+ * time; load() recomputes it from the presented root and refuses any
+ * divergence, so an approval can never be replayed onto a different closure.
  */
 export declare function computeSubjectDigest(input: {
     rootPackageId: string;
