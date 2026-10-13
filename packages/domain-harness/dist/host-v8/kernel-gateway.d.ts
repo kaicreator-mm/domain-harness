@@ -36,7 +36,8 @@
  *     rides beside the Kernel request as the protected occurrence control;
  *     `cancel` re-authenticates, applies the same tenant/app scope gate and
  *     aborts only an in-flight occurrence the SAME principal subject
- *     submitted. The signal carries no authority — the selected Kernel owns
+ *     submitted (any other id, or another subject's, answers
+ *     `not-in-flight` alike). The signal carries no authority — the selected Kernel owns
  *     the latch, and a cancel arriving after K closed it for admission
  *     cannot split the authoritative occurrence.
  *

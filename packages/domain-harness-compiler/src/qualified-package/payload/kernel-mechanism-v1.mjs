@@ -2848,6 +2848,10 @@ export function createOccurrenceRuntime(options) {
       if (snapshot === null) {
         throw new WorkflowInstanceNotFoundError(target);
       }
+      // Cancelled during the lane-start read: no model turn may start.
+      if (latch.cancelled) {
+        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 0 });
+      }
       const context = {
         ...snapshot.state.context,
         callerRole: caller.role,

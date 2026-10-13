@@ -128,6 +128,7 @@ interface Invocation {
 type Script = (turn: Record<string, any>, signal: AbortSignal | undefined, record: Invocation) => unknown;
 
 const scripts = new Map<string, Script>();
+let adviseHook: ((reply: unknown, signal: AbortSignal | undefined, record: Invocation) => unknown) | undefined;
 const invocations: Invocation[] = [];
 
 function finalQuote(amount: number, requestId: string, outcome = 'approve-quote', type = 'QUOTE_DECIDED'): unknown {
@@ -155,11 +156,13 @@ const modelPort = {
     };
     invocations.push(record);
     if (request.operation === 'quote.advise') {
-      // I04 one-turn model-decision app (unchanged #1013 fixture).
-      return {
+      // I04 one-turn model-decision app (unchanged #1013 fixture); an
+      // optional per-test hook may hold the turn to exercise cancellation.
+      const reply = {
         decision: { outcome: 'model-proposed' },
         event: { type: 'MODEL_QUOTE_DECIDED', payload: { amount: 30, requestId: 'MP-1' } },
       };
+      return adviseHook === undefined ? reply : adviseHook(reply, request.signal, record);
     }
     const scenario = String(input.request?.scenario);
     const script = scripts.get(scenario);
@@ -441,6 +444,8 @@ test('FR07-N4: cancel during an active model turn ⇒ the physical port observes
   assert.equal(receipt.terminal.code, 'CANCELLED');
   assert.equal(invocationsFor('n4').length, 1);
   assert.equal(invocationsFor('n4')[0]?.observedAbort, true, 'the physical model invocation observed the cancellation');
+  assert.equal(receipt.terminal.inFlightTurnDiscarded, true);
+  assert.deepEqual(receipt.resolver.modelCallEvidence, { status: 'unmeasured' }, 'a discarded in-flight turn can never yield an exact (under)count');
   await assertNoAuthorityResidue(key, ledgerBefore);
   assert.deepEqual(await gateway.cancel(requesterC, { target: target(key), messageId: 'm-n4' }), { status: 'not-in-flight' });
 });
@@ -463,6 +468,8 @@ test('FR07-N4: a late final that ignores the signal is discarded by the K latch'
   const receipt = await pending;
   assert.equal(receipt.status, 'terminated');
   assert.equal(receipt.terminal.code, 'CANCELLED');
+  assert.equal(receipt.terminal.lateResultDiscarded, true, 'the completed late turn is discarded by the in-loop latch check');
+  assert.deepEqual(receipt.resolver.modelCallEvidence, MEASURED(1), 'the late turn physically happened and is truthfully counted');
   await assertNoAuthorityResidue(key, ledgerBefore);
 });
 
@@ -483,17 +490,19 @@ test('FR07-N5: cancel during the K read ⇒ late read discarded; model turn #2 n
   assert.equal(receipt.status, 'terminated');
   assert.equal(receipt.terminal.code, 'CANCELLED');
   assert.equal(invocationsFor('n5').length, 1, 'model turn #2 = 0');
+  assert.equal(receipt.terminal.lateReadDiscarded, true);
   await assertNoAuthorityResidue(key, ledgerBefore);
 });
 
-test('FR07-N4b: cancel after the final model result is ready but before admission ⇒ CANCELLED, zero admission', async () => {
+test('FR07-N4b: a cancel landing as the ready final is delivered ⇒ discarded by the latch before admission; zero admission', async () => {
   const key = 'n4b';
   await genesis(key);
   const cancelResults: unknown[] = [];
   scripts.set('n4b', async () => {
     // The model's final result is READY; the authenticated cancel completes
-    // before that result is delivered to K, so K resumes with a valid final
-    // envelope and must stop at the pre-admission latch.
+    // before that result is delivered to K. On the continuation path the
+    // first latch check after the turn (in-loop, step 1) discards it; the
+    // closeForAdmission branch itself is pinned by the I04 test below.
     const ready = finalQuote(30, 'N4B');
     cancelResults.push(await gateway.cancel(requesterC, { target: target(key), messageId: 'm-n4b' }));
     return ready;
@@ -504,6 +513,7 @@ test('FR07-N4b: cancel after the final model result is ready but before admissio
   assert.equal(receipt.status, 'terminated');
   assert.equal(receipt.terminal.code, 'CANCELLED');
   assert.deepEqual(cancelResults, [{ status: 'cancel-requested' }]);
+  assert.deepEqual(receipt.terminal, { code: 'CANCELLED', step: 1, lateResultDiscarded: true });
   assert.equal(invocationsFor('n4b').length, 1);
   assert.equal(store.readsOf(pinDocKey(key)) - pinReadsBefore, 0, 'central admission never started (no governance pin read)');
   await assertNoAuthorityResidue(key, ledgerBefore);
@@ -541,10 +551,11 @@ test('B3: cancellation is H-authenticated and scoped to the submitting principal
   });
   const pending = send(key, 'n4-authz');
   await entered.promise;
-  await assert.rejects(
-    gateway.cancel(otherRequesterC, { target: target(key), messageId: 'm-n4-authz' }),
-    (error: { code?: string }) => error.code === 'HOST_CANCEL_DENIED',
-  );
+  // Another subject of the same tenant/app gets the SAME answer for another
+  // principal's in-flight id as for an absent one: no cancel authority and
+  // no in-flight existence/timing oracle.
+  assert.deepEqual(await gateway.cancel(otherRequesterC, { target: target(key), messageId: 'm-n4-authz' }), { status: 'not-in-flight' });
+  assert.deepEqual(await gateway.cancel(otherRequesterC, { target: target(key), messageId: 'm-absent' }), { status: 'not-in-flight' });
   await assert.rejects(
     gateway.cancel(otherTenantC, { target: target(key), messageId: 'm-n4-authz' }),
     (error: { code?: string }) => typeof error.code === 'string' && error.code.startsWith('HOST_'),
@@ -555,6 +566,61 @@ test('B3: cancellation is H-authenticated and scoped to the submitting principal
   release.resolve();
   const receipt = await pending;
   assert.equal(receipt.status, 'admitted', 'no refused cancel attempt affected the occurrence');
+});
+
+test('B3 I04: a one-turn model result that ignores the signal is discarded at the pre-admission latch (closeForAdmission)', async () => {
+  const key = 'i04-late';
+  await gateway.activateGenesis(modelOperatorC, { appId: MODEL_APP, instanceKey: key });
+  const entered = deferred();
+  const release = deferred();
+  adviseHook = async (reply) => {
+    entered.resolve();
+    await release.promise;
+    return reply;
+  };
+  try {
+    const ledgerBefore = ledgerCalls.length;
+    const pending = gateway.send(modelRequesterC, {
+      intentType: 'submitModelQuoteDecision', messageId: 'm-i04-late', input: { amount: 30, requestId: 'MP-L' }, target: target(key, MODEL_APP),
+    }) as Promise<Record<string, any>>;
+    await entered.promise;
+    assert.deepEqual(await gateway.cancel(modelRequesterC, { target: target(key, MODEL_APP), messageId: 'm-i04-late' }), { status: 'cancel-requested' });
+    release.resolve();
+    const receipt = await pending;
+    assert.equal(receipt.status, 'terminated');
+    assert.deepEqual(receipt.terminal, { code: 'CANCELLED', lateResultDiscarded: true }, 'the closeForAdmission branch (no step field)');
+    assert.deepEqual(receipt.resolver.modelCallEvidence, MEASURED(1));
+    const snapshot = await gateway.queryInstance(modelRequesterC, target(key, MODEL_APP)) as { state: { stateKey: string } };
+    assert.equal(snapshot.state.stateKey, 'review');
+    assert.equal(ledgerCalls.length, ledgerBefore);
+    let journal = 0;
+    for (const docKey of await handle.host.docs.list(JOURNAL_PREFIX)) {
+      const record = ((await handle.host.docs.get(docKey))?.value as { record?: { target?: { instanceKey?: string } } }).record;
+      if (record?.target?.instanceKey === `${TENANT}:${MODEL_APP}:${key}`) journal += 1;
+    }
+    assert.equal(journal, 0);
+  } finally {
+    adviseHook = undefined;
+  }
+});
+
+test('B3 I04: a cancel K observes after the lane-start read prevents the physical model call', async () => {
+  const key = 'i04-early';
+  await gateway.activateGenesis(modelOperatorC, { appId: MODEL_APP, instanceKey: key });
+  const reached = deferred();
+  const release = deferred();
+  store.arm({ key: `v08-kernel:wf-instance:${MODEL_APP}:${TENANT}:${MODEL_APP}:${key}`, onRead: 1, barrier: { reached: reached.resolve, release: release.promise } });
+  const before = invocations.filter((entry) => entry.operation === 'quote.advise').length;
+  const pending = gateway.send(modelRequesterC, {
+    intentType: 'submitModelQuoteDecision', messageId: 'm-i04-early', input: { amount: 30, requestId: 'MP-E' }, target: target(key, MODEL_APP),
+  }) as Promise<Record<string, any>>;
+  await reached.promise;
+  await gateway.cancel(modelRequesterC, { target: target(key, MODEL_APP), messageId: 'm-i04-early' });
+  release.resolve();
+  const receipt = await pending;
+  assert.equal(receipt.status, 'terminated');
+  assert.deepEqual(receipt.terminal, { code: 'CANCELLED', step: 0 });
+  assert.equal(invocations.filter((entry) => entry.operation === 'quote.advise').length - before, 0, 'no physical model call after an observed cancel');
 });
 
 // ---------------------------------------------------------------------------

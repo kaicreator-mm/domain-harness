@@ -36,7 +36,8 @@
  *     rides beside the Kernel request as the protected occurrence control;
  *     `cancel` re-authenticates, applies the same tenant/app scope gate and
  *     aborts only an in-flight occurrence the SAME principal subject
- *     submitted. The signal carries no authority — the selected Kernel owns
+ *     submitted (any other id, or another subject's, answers
+ *     `not-in-flight` alike). The signal carries no authority — the selected Kernel owns
  *     the latch, and a cancel arriving after K closed it for admission
  *     cannot split the authoritative occurrence.
  *
@@ -398,16 +399,14 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       const principal = await authenticate(credential);
       assertIntentScope(request.target, principal);
       requireApp(request.target.appId, principal);
+      // Only the principal's OWN in-flight entries are visible: another
+      // subject's occurrence under the same id answers exactly like an
+      // absent one, so cancel is neither an authority nor an in-flight
+      // existence/timing oracle across subjects.
       const entries = inFlight.get(inFlightKey(principal, request.target, request.messageId));
-      if (entries === undefined || entries.size === 0) {
-        return Object.freeze({ status: 'not-in-flight' });
-      }
-      const own = [...entries].filter((entry) => entry.subject === principal.subject);
+      const own = entries === undefined ? [] : [...entries].filter((entry) => entry.subject === principal.subject);
       if (own.length === 0) {
-        throw new HostBoundaryError(
-          'HOST_CANCEL_DENIED',
-          `authenticated principal (subject ${principal.subject}) did not submit the in-flight occurrence it asks to cancel`,
-        );
+        return Object.freeze({ status: 'not-in-flight' });
       }
       for (const entry of own) entry.controller.abort();
       return Object.freeze({ status: 'cancel-requested' });
