@@ -29,16 +29,15 @@ export const INTEG_ISSUER_SECRET = 'integration-issuer-secret:1013';
  * SHA-256 of the adopted Business fixture bytes.
  *
  * - approval: the EXACT PR #1012@9f6aaf4 authored bytes.
- * - engineering: PR #1012@9f6aaf4 bytes + the minimal #1013-proven
- *   interface adaptation (per-intent single-stage `definition`s) that the
- *   selected Kernel's dynamic effect-binding wiring validation requires;
- *   the fixture header documents the base sha and the exact reason. The
- *   T-F owner must apply the same adaptation to the examples source before
- *   T-F E2E can run on unadapted bytes.
+ * - engineering: the exact PR #1012 successor bytes (per-intent single-stage
+ *   `definition`s [#1013 adaptation] + the stage-declared `contextProjection`
+ *   lineage with `context`-operand guards [#1005 D3, after Kernel #1034]);
+ *   byte-identical to examples/v08-domain-apps/business-engineering.mjs —
+ *   one canonical D3 policy, no test-only substitute.
  */
 export const FIXTURE_SHAS = {
   approval: 'b1169090676f7abe4ef04f34fc2d448b3662ce29f724fe23ed4ac5621812df5e',
-  engineering: '2b403e4e0d460da454ffb2375983cb538b8b3e0f3c7af791db83d5b362932b37',
+  engineering: 'c2b61d24d2fe729e2a254b7efd63d4695cecf5027caddc7182873f7b89597cad',
   /** #1013-Builder-authored model-decision fixture (R1 F-03 physical path). */
   model: '659ac04523c288225756dca0bc0e651179a4ea48f5e79c911d587e0afcfa15e7',
   /** #1003 FR07-KH2-Builder-authored harness continuation fixture. */
