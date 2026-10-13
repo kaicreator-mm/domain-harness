@@ -156,7 +156,7 @@ export function installHostModelPort(port, sessionCap) {
     if (!isUnguessableSessionCap(sessionCap)) {
         throw new QualifiedPackageError('MODEL_PORT_SESSION_CAP_INVALID', 'installHostModelPort requires the bootstrap-minted unguessable session capability string (32–256 chars) that gates currentHostModelPort (#1013 R2 @5494026032: a raw port can never be installed without its boundary)');
     }
-    hostModelPort = Object.freeze({ invoke: invoke.bind(port) });
+    hostModelPort = Object.freeze({ invoke: Function.prototype.bind.call(invoke, port) });
     // isUnguessableSessionCap above already proved and narrowed the capability.
     hostModelPortSessionCap = sessionCap;
 }
