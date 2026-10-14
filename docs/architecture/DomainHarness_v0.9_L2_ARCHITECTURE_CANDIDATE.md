@@ -4,7 +4,7 @@
 DOCUMENT_STATUS=DRAFT_L2_NOT_FROZEN
 PARENT=#1026
 PRODUCT_SCOPE=R2_F01_F10_FROZEN_PR1048_MAIN_a51a0c57f1c66d602120e6538b4db24072a2e747
-V08_OBSERVED_SOURCE=3d1b50bc7cea6af29c847755de9b425aa8e3b4a3_UNQUALIFIED
+V08_OBSERVED_SOURCE=9ea7f6f12a51c78dec747a823db6ade620a2fa6c_UNQUALIFIED
 REUSE_SOURCE_MAP=PR1046_DRAFT_PREPARATORY
 INDEPENDENT_ADVERSARIAL_L2_REVIEW=NOT_RUN
 FORMAL_IMPLEMENTATION_DAG=NOT_ADMITTED
@@ -16,7 +16,7 @@ V09_RELEASE=HOLD
 
 The normative Product input is R2 F01–F10 accepted by the merged [Product scope checkpoint PR #1048](https://github.com/kaicreator-mm/domain-harness/pull/1048), after the substantive adversarial terminal [#1026@6169545765](https://github.com/kaicreator-mm/domain-harness/issues/1026#issuecomment-6169545765), P0=0/P1=0/P2=2 routed. The historic PRD/roadmap's Node/OS-only P0 statements are superseded by the JS Core successor. Distinct-GitHub-account reviewer approval is **not attested**; do not forge it.
 
-Source reuse starts from **observed, not released** `v0.8@3d1b50bc7cea6af29c847755de9b425aa8e3b4a3`, with exact byte evidence in #1046. #1003/#1005/#1023/#1006 and v0.8 release remain their own required gate. This L2 may be reviewed before v0.8 releases, but implementation cannot start or inherit a fictitious release PASS; re-pin final v0.8 tag and artifact digests at implementation admission.
+Source reuse now observes **not yet released** `v0.8@9ea7f6f12a51c78dec747a823db6ade620a2fa6c` after #1047 S01 merge; prior exact pre-S01 byte evidence is preserved in #1046. Source facts are not a qualified v0.8 release claim. #1003/#1005/#1023/#1006 and v0.8 release remain their own required gate. This L2 may be reviewed before v0.8 releases, but implementation cannot start or inherit a fictitious release PASS; re-pin final v0.8 tag and artifact digests at implementation admission.
 
 ## 2. Selected composition / authorities
 
@@ -144,7 +144,7 @@ Unconditional DAG owners #1027 → #1032/#1035 → #1036 → #1037 with exact te
 
 **Module-evaluation caveat:** Approved Package JS may itself have arbitrary top-level side effects; there is no JS module evaluation rollback. The invariant is *no unauthorized module-source graph may be evaluated and no unapproved K-mediated physical Effect occurs*. Static imports and permitted dynamic imports from approved Packages must resolve within the BUILD-pinned closure **or** within explicitly allowed platform/Host builtins pinned by the supported runtime profile. Transitive third-party executable dependencies must be pinned/verified; host engine builtins are qualified by the named runtime/profile rather than hashed as Package source bytes. Any unbound package import, network-loaded code or non-approved module substitution is refused at the selected H resolver boundary. Top-level side-effect containment beyond approved code requires additional isolation and is not silently guaranteed by digest checks.
 
-**Currentness caveat:** v0.8 observed baseline's `trust.ts` checks HMAC and optional proof age, *not general revocation*. Pending v0.8 [#1023 S01 PR #1047](https://github.com/kaicreator-mm/domain-harness/pull/1047) proposes durable protected installed references and per-activation issuer/proof revocations; its observed PR HEAD `3efdae990c097c1b014f86f029a1ba2514a79638` was **open/CI pending** when this draft was written. It is a **candidate reuse asset, NOT accepted source**. Re-adopt its exact final merged/released artifact if and only if verified under v0.8 #1006. Do not independently rewrite another install/currentness mechanism in v0.9.
+**Currentness caveat:** v0.8 observed baseline's `trust.ts` checks HMAC and optional proof age, *not general revocation*. v0.8 [#1023 S01 PR #1047](https://github.com/kaicreator-mm/domain-harness/pull/1047) is now **MERGED** to `v0.8@9ea7f6f12a51c78dec747a823db6ade620a2fa6c`: durable protected installed references and per-activation issuer/proof revocation are **accepted branch source reuse candidates**, still **NOT release-qualified**. Re-pin the exact final released source/artifact only after #1006 Release Qualification; do not duplicate S01 mechanics in v0.9. Do not independently rewrite another install/currentness mechanism in v0.9.
 
 ### Exact logical H/K/C interaction and failure ownership
 
@@ -174,9 +174,28 @@ These are **proposed portable categories** and required semantic invariants, not
 `L2_ARCH_REVIEW_POLICY=required` for protected approval/module-evaluation and K authority boundary; a separate review **session/operator context** must use exact HEAD, even if the GitHub transport account happens to be the same. This author-side reconciliation is **not** independent evidence.
 
 - **R1 JS engine floor:** ES2022 + ESM + async + versioned Host ABI is the proposed bounded floor, with first selected real JS engine to be named and tested by #1037. Do not claim cross-engine support before proof. Lack of chosen concrete engine profile is **validation-admission BLOCKED** and must be concretely named before the selected release tests; it need not imply an OS matrix.
-- **R2 cryptographic/loader ABI:** select protected H-approved content-addressed module graph with explicit allowed profile-builtins and canonical UTF-8 subject-digest byte vectors. This is a **bounded design assumption** with #1032 owner; proof of artifact byte identity + effective revocation before any unapproved import is **release-blocking**, not waivable. Adopt #1047 only after v0.8 accepts/releases it.
+- **R2 cryptographic/loader ABI:** select protected H-approved content-addressed module graph with explicit allowed profile-builtins and canonical UTF-8 subject-digest byte vectors. This is a **bounded design assumption** with #1032 owner; proof of artifact byte identity + effective revocation before any unapproved import is **release-blocking**, not waivable. #1047 is merged on the v0.8 branch; adopt its bounded source seam in design now but do not treat it as release-qualified until #1006 passes.
 - **R3 WorkflowRouter and public error ABI:** bounded Router is Standard-only; the final exact API name/error taxonomy is a **#1027 contract-first Task** followed by #1035 public binding, not permission for a second implementation. ABI-breaking changes require explicit frozen L2 successor.
 - **R4 review credential:** ADS `standards/CHATGPT_WEB_ROLE.md` permits same GitHub transport identity **when independent Reviewer session_ref/operator_id is distinct from Builder/author**. The author may not invent an independent context. Record exact review provenance at L2 Freeze.
 - **R5 inherited release source:** v0.8 #1006 OPEN; do **not** start v0.9 implementation. Re-pin final v0.8 release baseline and accepted S01 before Task implementation dispatch.
 
 **R2 author-side gate:** `L2_DESIGN_R2=READY_FOR_FRESH_REVIEW_ONLY`; `INDEPENDENT_REVIEW=NOT_RUN`; `L2_FREEZE=NO`; `IMPLEMENTATION=NO`; `V09_RELEASE=HOLD`.
+
+## 9. Post-v0.8-S01 source successor / CI-bypass controller record
+
+The user's `SKIP_CI_AND_CONTINUE` direction **removes the routine PR-phase CI wait for this v0.9 planning progression**. It is not a claim that CI passed or an authorization to waive actual security, Full/Hidden/selected-runtime/clean-consumer/release checks. Existing repository branch protection still applies. The exact documented review and release gate remain separately enforced.
+
+Updated physical readback at **v0.8@9ea7f6f12a51c78dec747a823db6ade620a2fa6c**, after PR #1047 merged:
+- `public-v8/deploy.ts` = `20b853ab16fa9be187bc239e786e6b46cd97e4dc` (new protected content-addressed deployment/currentness);
+- `public-v8/load.ts` = `22eda49b3298f916ef4d8f37856d60afc6f77d2f`;
+- `public-v8/installer.ts` = `c2ce1f36d295d44180232c187c71ef6c80f04345`;
+- `host-v8/bootstrap.ts` = `e3183b143a61b65ac9933e50e7da0da56ef5d6f6`;
+- `host-v8/kernel-gateway.ts` = `4c26fc49cc618f99a98c576f47fa8494982a18b6`;
+- unchanged `contracts.ts` = `cb20695e772862bb2b56569cc5f958b94d3efc5e`, `trust.ts` = `635f833e2b9ef586984b421d12c679e37c9c4bf9`;
+- selected K/S payloads unchanged: `2dfec0c44c26d05635751dd13cd970906473d23d` / `905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a`.
+
+**Decision:** adopt the *architecture and tested-source intent* of protected installed handle + durable revocation in v0.9 JS/TS Core, where selected H provides the same actual security properties. Do **not** port Node SQLite physical storage into every JS Core implementation. A non-Node selected H must furnish an equivalent protected content-addressed immutable-module resolver and current approval oracle, or be marked `NOT_QUALIFIED`. Selected H's protected registry cannot be manufactured by calling public `load(package)`.
+
+**A source-map freshness exception, not an authority gap:** #1046's already-merged pre-S01 evidence remains an immutable historical observation and is **not retroactively rewritten**; the above successor pins and eventual v0.8 released exact baseline govern future reuse. All actual source implementation still waits for v0.8 Release Qualification, v0.9 L2 Freeze and admitted Task DAG.
+
+**Review path:** author has made design choices and must obtain a truly independent, fresh review session at exact HEAD before claiming L2 PASS; this record does not impersonate a separate reviewer. Release QUALIFICATION remains mandatory even if PR-level CI is deliberately skipped.
