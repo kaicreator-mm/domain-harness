@@ -1,7 +1,7 @@
 # DomainHarness v0.9 — Production-Ready Node SDK PRD (Draft / Not Frozen)
 
 ```ini
-DOCUMENT_STATE=CONCRETE_FOUNDATION_PROFILE_QUALIFICATION_AND_DAG_PROPOSALS_PENDING_REVIEW
+DOCUMENT_STATE=CONTENT_REVIEW_PASS_P2_CLOSURE_PROPOSED_L1_NOT_FROZEN
 VERSION=v0.9
 PARENT_ISSUE=#1026
 BASELINE_REQUIRED=v0.8_RELEASE_QUALIFIED
@@ -105,7 +105,7 @@ See [bounded Task DAG proposal](../implementation/DomainHarness_v0.9_TASK_DAG_PR
 
 Product/L1 docs and independent review may proceed **while v0.8 work runs**. Source implementation and baseline adoption require actual v0.8 Release PASS/Tag; Product Freeze and L2 authority require their own exact-SHA gate, not this PRD author's signature. No new research Issue or a full 9-issue JIT implementation wave now. Other version candidates N03/N04/N05 and broad N01/N02 are optional unless separately Product-admitted.
 
-**Remaining *real* blockers (not new architectural research):** independent exact-head Product/L1 review of this PR; reference host profile availability; one bounded benchmark-budget calibration from measured v0.8 if needed; L2 ABI/authority Contract after accepted Product Freeze; final v0.8 release baseline pin. Do not claim these external evidence requirements satisfied by this documentation.
+**Remaining *real* blockers (not new architectural research):** exact v0.8 released baseline; primary native production Host qualification (**the FZ-01 WSL2 Ubuntu26 probe is DEV_PREVALIDATION_ONLY**); one bounded performance-budget calibration on genuine accepted baseline; a separately reviewed **formal Product/L1 Freeze**; then L2 ABI/authority Contract and formal Task DAG. The reviewed #1033 Product **proposal** is already merged; do not demand a duplicate proposal review or claim actual production Test PASS from docs.
 
 ## 7a. Post-proposal review status and pending evidence
 
