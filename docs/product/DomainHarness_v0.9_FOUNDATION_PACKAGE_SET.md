@@ -1,4 +1,4 @@
-# DomainHarness v0.9 — Foundation Package Set and Node Basic Profile (Product Contract Proposal)
+# DomainHarness v0.9 — JS Core Foundation Package Set and optional Node Basic Profile (Product Contract Proposal)
 
 ```ini
 STATUS=PROPOSED_PRODUCT_CONTRACT_PENDING_INDEPENDENT_L1_REVIEW
@@ -8,6 +8,12 @@ IMPLEMENTATION=NOT_AUTHORIZED
 V08_CLAIMS=UNCHANGED
 RELEASE=NOT_QUALIFIED
 ```
+
+## Controlling JS/TS Core scope successor (2026-10-14)
+
+User-confirmed current Core requirements: JavaScript module execution after TypeScript authoring/build, not a specific OS, Node version or SQLite. **The mandatory Foundation Core** is SDK Microkernel, selected executable Kernel+Standard Domain Packages, producer-neutral BUILD and the contract for **selected** Business/Capability Packages with independent H trust. `Identity.node`, `Storage.sqlite` and `Node Basic Profile` below are **REFERENCE/SELECTED implementations only**, **not mandatory for every DomainHarness SDK consumer**. These concrete packages retain their own real validation obligations **if shipped/promised**, including native SQLite durability, but must not drive a Windows/Linux/WSL2 P0 matrix for the Core.
+
+See [JS runtime successor](./DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md). Actual v0.8 Core imports `node:crypto` and uses `Buffer`/`data:` imports; L2 must prove portability seams **without removing current security checks**. Do not misstate all-JS-engine portability already achieved. **Where historic Node-only P0 statements below conflict, this user successor controls** until formal refreshed Product Freeze.
 
 ## 1. Decision — core is a **small official package set**, not a second Runtime
 
