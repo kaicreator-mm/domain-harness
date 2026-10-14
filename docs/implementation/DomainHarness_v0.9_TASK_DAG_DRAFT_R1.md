@@ -4,7 +4,7 @@
 STATUS=PLANNING_DRAFT_NOT_FORMAL_DAG
 OWNER=#1026
 PRODUCT_SCOPE=R2_F01_F10_FROZEN_PR1048
-ARCH_CANDIDATE=PR1049@0c014989c3394f1a440b3afa8a443dc31a570328
+ARCH_CANDIDATE=PR1049@097dead07cc60cbad060cb12ab318f540c0a1eb8
 L2_FREEZE=NOT_YET
 V08_RELEASE_BASELINE=NOT_QUALIFIED_#1006_OPEN
 TASK_ISSUES=EXISTING_#1027_#1028_#1032_#1035_#1036_#1037
@@ -75,7 +75,7 @@ The core selection of an **actual durable/identity Capability** remains obligato
 
 **Next owner action:** obtain independent exact-HEAD L2 review for #1049; freeze only after zero unresolved P0/P1 and disposition of material UNKNOWNs. Adopt this file as *formal* Task DAG only by a separate explicit controller freeze/approval checkpoint after re-reading latest L2 and v0.8 release pins. At that point check live Issue claim/PR occupancy; do not duplicate work claimed by another agent.
 
-**Author-side L2 A11 handoff:** v0.9 #1032 must close v0.8 S01's raw-approved-root transitional fallback: only a previously H-installed immutable current artifact may be passed to v0.9 public `load(package)`. #1035 types/documentation and #1037 adversarial test must reject direct raw Root execution. Reference L2 candidate PR #1049@`0c014989c3394f1a440b3afa8a443dc31a570328`. No v0.8 source change implied.
+**Author-side L2 A11 handoff:** v0.9 #1032 must close v0.8 S01's raw-approved-root transitional fallback: only a previously H-installed immutable current artifact may be passed to v0.9 public `load(package)`. #1035 types/documentation and #1037 adversarial test must reject direct raw Root execution. Reference L2 candidate PR #1049@`097dead07cc60cbad060cb12ab318f540c0a1eb8`. No v0.8 source change implied.
 
 ## 5. R3 exact architecture reviewer findings mapped into existing implementation owners
 
@@ -83,11 +83,11 @@ Frozen Product still sets universal **JS/TS Core**, NOT universal Node or OS mat
 
 **#1032 P0 contract+integration slices:** Build outputs one bundled, per-Package self-contained ESM module and sealed graph/digest; selected H AST checks exactly the executed preflight SHA-confirmed bytes (no static/dynamic/import.meta/require/eval external import escape), Node24 activation fresh module-cache identity, installed-only opaque reference lookup, separate governance-only inert install, trusted H registry/approval/currentness, caller scope/effect permit registry. No public approval callback, verifier injection, plain object or v0.8 raw Root fallback. H registry logical storage owner is **#1032** and physical Node24/SQLite true-CAS adapter **#1028**. H has no K business Journal.
 
-**#1027 P0 contract-only first:** Canonical Standard-owned pure Router result union \`selected|missing|ambiguous|denied\`, deterministic explicit ambiguous ties, no state/Journal/Effect; K alone owns admission, transitions, Journal, replay and UNKNOWN, physically selected C invokes physical operation only via authorized K path. K validates scoped H-internal one-shot permit provenance and closure binding, not a caller-shape object. Reuse v0.8 Standard semantics.
+**#1027 P0 contract-only first:** Canonical Standard-owned pure Router result union `selected|missing|ambiguous|denied`, deterministic explicit ambiguous ties, no state/Journal/Effect; K alone owns admission, transitions, Journal, replay and UNKNOWN, physically selected C invokes physical operation only via authorized K path. K validates scoped H-internal one-shot permit provenance and closure binding, not a caller-shape object. Reuse v0.8 Standard semantics.
 
-**#1035 P0 consumer/types:** Expose single-argument \`load(installedReference:string)\` and \`send/query/subscribe/stop\`, stable public \`PACKAGE_NOT_AUTHORIZED\` generic fail family, no raw \`getModuleNamespace\`, H or router implementation leak. An independent clean-installed consumer exercises typed contract, forged/root/object rejection.
+**#1035 P0 consumer/types:** Expose single-argument `load(installedReference:string)` and `send/query/subscribe/stop`, stable public `PACKAGE_NOT_AUTHORIZED` generic fail family, no raw `getModuleNamespace`, H or router implementation leak. An independent clean-installed consumer exercises typed contract, forged/root/object rejection.
 
-**#1036 P0 lifecycle/security integration:** Protected H-to-K per-operation principal provenance and one-shot effect permit, same protected CAS ordering vs revocation, scope/tenant/audience/app/revision/expiry binding; per-delivery sensitive subscription recheck; \`stop\` owner authorization; honest already-started IO ACK/UNKNOWN; K owns replay and Journal; no retroactive undo.
+**#1036 P0 lifecycle/security integration:** Protected H-to-K per-operation principal provenance and one-shot effect permit, same protected CAS ordering vs revocation, scope/tenant/audience/app/revision/expiry binding; per-delivery sensitive subscription recheck; `stop` owner authorization; honest already-started IO ACK/UNKNOWN; K owns replay and Journal; no retroactive undo.
 
 **#1037 P0 selected executable assurance:** For the actual Node24 reference, test static file/bare/relative imports, both dynamic literal/computed imports, export-from/import.meta/eval, transitive unbundled source, post-approval byte mutation, module-cache cross-activation/tenant reuse, invalid AST, source/Host bootstrap outage, raw-root and forged object/string, cross-audience copied installed ref, concurrent revoke-vs-activate/effect permit, different-App stop, stale stream after scope revoke, expired token, CAS/UNKNOWN/replay, two real Apps and fully external clean consumer. Verify canonical SHA UTF-8 vectors D04, selected-H real SQLite durable currentness. Hidden Validation independently on frozen exact packaged artifact. A pass on targeted tests is never Full/Hidden Release PASS.
 
