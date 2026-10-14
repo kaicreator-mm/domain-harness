@@ -94,6 +94,23 @@ export interface KernelGatewayCancelRequest {
 }
 
 /**
+ * #1023 S04 — one authenticated BUILD-fixed OperationCall through the
+ * gateway. Pure operations carry only the capability/operation identity
+ * and plain-JSON input; effectful operations additionally carry the
+ * occurrence address components exactly like an authenticated send.
+ */
+export interface KernelGatewayOperationCall {
+  readonly appId: string;
+  readonly capabilityId: string;
+  readonly operationId: string;
+  readonly input?: unknown;
+  /** Effectful operations only: the occurrence instance address component. */
+  readonly instanceKey?: string;
+  /** Effectful operations only: the occurrence dedup/replay identity. */
+  readonly messageId?: string;
+}
+
+/**
  * `cancel-requested`: the in-flight occurrence's signal was raised — the
  * `send` receipt stays the authoritative outcome (`terminated`/CANCELLED, or
  * `admitted` when K had already closed its latch for admission).
@@ -110,6 +127,14 @@ export interface KernelGateway {
   hasApp(appId: string): boolean;
   /** Authenticated send through the REAL selected Kernel of the app. */
   send(credential: unknown, intent: KernelGatewaySendIntent): Promise<unknown>;
+  /**
+   * #1023 S04: authenticated BUILD-fixed OperationCall. Every call
+   * re-authenticates the credential and scope-gates the authenticated
+   * principal's app exactly like send; pure operations dispatch the exact
+   * sealed handler, effectful operations traverse the same unbypassable
+   * Business admission + Kernel occurrence path as send.
+   */
+  invokeOperation(credential: unknown, request: KernelGatewayOperationCall): Promise<unknown>;
   /** Authenticated, request-scoped cancellation of the principal's own in-flight send. */
   cancel(credential: unknown, request: KernelGatewayCancelRequest): Promise<KernelGatewayCancelResult>;
   /** Authenticated scoped instance read (K getSnapshot). */
@@ -344,6 +369,27 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
           );
         }
       }
+      // ---- #1023 S04: provision the BUILD-selected capability resource
+      // adapters derived from the sealed OperationCall ABI. The adapters
+      // are the ONLY physical route to the capability-owned effectful
+      // handlers, and they are reachable exclusively through the selected
+      // Kernel's effect dispatch (hostPorts.resources carries the Host
+      // service principal — never a caller identity). A resource key is
+      // physical-Host-global: a second registration claiming the same key
+      // refuses typed here, before the app becomes routable.
+      for (const adapter of ops.operationResourceAdapters()) {
+        const operations = adapter.operations;
+        host.resources.provision(adapter.resourceKey, (operation, payload) => {
+          const handler = operations.get(operation);
+          if (handler === undefined) {
+            throw new HostBoundaryError(
+              'HOST_RESOURCE_OPERATION_UNKNOWN',
+              `resource ${adapter.resourceKey} has no BUILD-selected handler for operation ${operation}`,
+            );
+          }
+          return handler(payload);
+        });
+      }
       apps.set(registration.appId, Object.freeze({
         appId: registration.appId,
         facade,
@@ -375,6 +421,54 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
           messageId: intent.messageId,
           instanceKey: intent.target.instanceKey,
           ...(intent.input === undefined ? {} : { input: intent.input }),
+        }, { signal: entry.controller.signal });
+      } finally {
+        entries.delete(entry);
+        if (entries.size === 0 && inFlight.get(key) === entries) inFlight.delete(key);
+      }
+    },
+
+    async invokeOperation(credential: unknown, request: KernelGatewayOperationCall): Promise<unknown> {
+      if (
+        typeof request !== 'object'
+        || request === null
+        || typeof request.appId !== 'string'
+        || request.appId.length === 0
+        || typeof request.capabilityId !== 'string'
+        || request.capabilityId.length === 0
+        || typeof request.operationId !== 'string'
+        || request.operationId.length === 0
+      ) {
+        throw new HostBoundaryError('HOST_OPERATION_MALFORMED', 'gateway invokeOperation requires {appId, capabilityId, operationId} with non-empty strings');
+      }
+      // Re-authenticate exactly like send: every OperationCall presents a
+      // current credential — issuer, audience, tenant/app, roles, revocation
+      // and currentness are all re-verified, nothing is cached.
+      const principal = await authenticate(credential);
+      // The appId is asserted against the AUTHENTICATED principal's app —
+      // cross-app/cross-tenant routing is refused before any dispatch.
+      const app = requireApp(request.appId, principal);
+      const call = {
+        capabilityId: request.capabilityId,
+        operationId: request.operationId,
+        ...(request.input === undefined ? {} : { input: request.input }),
+      };
+      // An effectful call addressing an occurrence gets the same
+      // request-scoped cancellation as send (#1003 FR07-KH2); a pure call
+      // carries no occurrence address and therefore no in-flight entry.
+      if (request.instanceKey === undefined || request.messageId === undefined) {
+        return app.ops.invokeOperation(principal, call);
+      }
+      const key = inFlightKey(principal, { tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, request.messageId);
+      const entry = Object.freeze({ subject: principal.subject, controller: new AbortController() });
+      const entries = inFlight.get(key) ?? new Set();
+      entries.add(entry);
+      inFlight.set(key, entries);
+      try {
+        return await app.ops.invokeOperation(principal, {
+          ...call,
+          instanceKey: request.instanceKey,
+          messageId: request.messageId,
         }, { signal: entry.controller.signal });
       } finally {
         entries.delete(entry);

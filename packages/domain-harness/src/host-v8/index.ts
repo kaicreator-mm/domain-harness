@@ -64,6 +64,7 @@ export type {
   KernelGatewayAppInput,
   KernelGatewayCancelRequest,
   KernelGatewayCancelResult,
+  KernelGatewayOperationCall,
   KernelGatewaySendIntent,
   KernelReceiptScope,
   KernelReceiptSubscription,

@@ -29,7 +29,13 @@
  * effect runtime (journals/effects exist only inside the wired Kernel);
  * no init-script engine — the #1023 S03 lifecycle hooks are optional
  * module exports of BUILD-sealed packages, called in the sealed
- * BUILD-fixed packages order, and nothing more.
+ * BUILD-fixed packages order, and nothing more. The #1023 S04 callable
+ * OperationCall surface adds NO second Runtime either: pure operations
+ * dispatch the exact BUILD-bound sealed handler with plain-JSON data only,
+ * effectful operations are ordinary authenticated Kernel occurrences
+ * (Business admission → Journal → Effect), and the capability-owned
+ * physical handlers run only behind the Kernel's effect dispatch as
+ * Host-provisioned resource adapters.
  */
 import { type V8CancellationSignal } from './model-port.js';
 /** The scoped consumption facade returned by `DomainHarness.load(package)`. */
@@ -75,6 +81,33 @@ export interface V8GatewayPrincipal {
  */
 export interface V8OccurrenceControl {
     readonly signal: V8CancellationSignal;
+}
+/**
+ * #1023 S04 — one BUILD-fixed callable OperationCall envelope. The
+ * capability/operation identity and the plain-JSON input are the ONLY
+ * caller-controlled content; an effectful operation additionally carries
+ * the occurrence address components (instanceKey/messageId) exactly like an
+ * authenticated send. No caller-declared role, principal, verifiedPrincipal
+ * or Host port can ride this envelope.
+ */
+export interface V8OperationCall {
+    readonly capabilityId: string;
+    readonly operationId: string;
+    readonly input?: unknown;
+    /** Effectful operations only: the occurrence instance address component. */
+    readonly instanceKey?: string;
+    /** Effectful operations only: the occurrence dedup/replay identity. */
+    readonly messageId?: string;
+}
+/**
+ * #1023 S04 — one trusted-Host physical resource adapter derived from the
+ * sealed capability OperationCall ABI: the BUILD-selected capability
+ * handlers for one Host resource key, reachable ONLY through the selected
+ * Kernel's effect dispatch (`hostPorts.resources`), never from a call.
+ */
+export interface V8OperationResourceAdapter {
+    readonly resourceKey: string;
+    readonly operations: ReadonlyMap<string, (payload: unknown) => unknown>;
 }
 /**
  * Private, Host-gateway-only Kernel operations on a loaded facade
@@ -140,6 +173,26 @@ export interface V8FacadeKernelOps {
         readonly instanceKey: string;
         readonly correlationId?: string;
     }): Promise<unknown>;
+    /**
+     * #1023 S04: BUILD-fixed OperationCall dispatch on the protected gateway
+     * seam. The exact handler comes from the sealed S02a capability binding
+     * matched against the sealed module `OPERATIONS` ABI — no runtime
+     * discovery. A pure (`effectClass 'none'`) operation runs the exact
+     * handler with the plain-JSON input ONLY (no Host/Kernel port is in
+     * scope, no State/Journal/Effect is touched) behind the Business-governed
+     * visibility gate. An effectful operation NEVER touches the handler
+     * directly: the call traverses the sealed Business intent's role gate and
+     * the selected Kernel's submitOccurrence (Admission → Journal → Effect);
+     * the capability-owned physical handler runs only behind the Kernel's
+     * effect dispatch as the Host-provisioned resource adapter.
+     */
+    invokeOperation(principal: V8GatewayPrincipal, call: V8OperationCall, control?: V8OccurrenceControl): Promise<unknown>;
+    /**
+     * #1023 S04: the BUILD-selected physical resource adapters derived from
+     * the sealed capability OperationCall ABI — trusted Host wiring input for
+     * `registerApp` provisioning ONLY. Never caller-visible.
+     */
+    operationResourceAdapters(): readonly V8OperationResourceAdapter[];
 }
 /**
  * Validate the gateway session channel WITHOUT consuming it (#1013 R2): the
