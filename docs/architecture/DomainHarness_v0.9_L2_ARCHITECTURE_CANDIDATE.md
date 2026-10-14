@@ -91,3 +91,47 @@ Conformance set L2-01–L2-06 (reusing existing v0.8 P/N/FR/Hidden where applica
 - L2-R5: **v0.8 qualified baseline absent:** source adoption and actual v0.8 #1006 release evidence must be re-pinned at implementation admission; no source implementation authority until then.
 
 **Review protocol:** one genuinely fresh bounded adversarial L2 architecture review on the exact candidate HEAD after L2-R1–R4 are addressed. Report P0/P1/P2 with real readback and counterexamples. No repetitive review rounds for unchanged findings. A source-author self-check is not a distinct-account independent review. Upon L2 PASS, freeze separate exact-source checkpoint, then convert the six existing owner Issues into a right-sized formal Implementation DAG with conditional #1028. No autonomous formal v0.9 implementation or release is claimed by this candidate.
+
+## 7. R1 bounded proposed ABI resolution (for independent challenge, NOT yet frozen)
+
+### L2-R1: engine envelope and installation ABI
+
+**Proposed minimum compile target:** ES2022 + ESM + Promise/async + typed-array/UTF-8 semantics (the latter may be supplied by the selected protected H), a deterministic serialized data contract, and an explicitly declared **selected Host installation ABI revision**. The SDK Core may not require Node globals (`Buffer`, `process`, `node:crypto`, native SQLite) directly. A selected engine lacking compatible ESM evaluation or one required H ABI reports `UNSUPPORTED_RUNTIME_ABI` / `UNSUPPORTED_HOST_ABI` **before executing user Packages**. ES2022 is a proposed floor to validate against actual K/S source, not yet a tested all-engine support claim.
+
+**Protected internal boundary (logical methods, NOT public `load` options):**
+
+```ts
+// Internal H-owned installation seam; runtime names are proposals, not exports.
+interface ProtectedInstalledClosure {
+  readonly subjectDigest: string;
+  readonly runtimeAbi: string;
+  readonly selectedPackages: readonly VerifiedModuleHandle[];
+}
+interface ProtectedHostAssurance {
+  verifyCurrentApprovalAndInstall(root: unknown): Promise<ProtectedInstalledClosure>;
+  authenticateAndRecheckCaller(input: unknown, purpose: 'send' | 'query' | 'subscribe'): Promise<AuthorizedPrincipal>;
+}
+interface VerifiedModuleHandle {
+  readonly packageId: string;
+  readonly abiVersion: string;
+  readonly moduleSha256: string;
+  // Opaque to public caller: selected H already proved physical source bytes.
+  readonly opaqueInternalHandle: unknown;
+}
+```
+
+This is an **internal conceptual SPI**, not an assertion that mutable JS objects/TS interfaces convey cryptographic provenance. Only trusted H bootstrap can instantiate/bind it, with protected provenance outside arbitrary Business/UX inputs. `DomainHarness.load(package)` remains exactly one public argument. A forged object implementing this interface must convey **no** authority. H must validate the actual transitive ESM module graph, resolving imports from an approved read-only byte map; dynamic external/specifier fetch or ad hoc `data:` import of caller-provided modules is denied unless itself a specifically approved selected loader. H's physical crypto + byte loader are selected implementations, not exposed as a user-changeable Provider.
+
+### L2-R2: frozen digest domain and currentness decision
+
+Adopt **versioned subject separation** rather than reusing v0.8 subject bytes as v0.9 silently. Proposed `dh.v9.qualified-root.subject/1` subject commits: format/version, rootPackageId, exact **ordered** selected package IDs/kinds/ABI/module byte SHA-256, declared transitive import/source dependency digests, exact role/intent/capability operation→handler mapping, selected JS/Host ABI profile revision, and BUILD provenance subject. Use a specified canonical JSON encoding (plain data descriptors only, sorted own string keys, ordered arrays, no accessors/prototype/unsafe keys/NaN/-0) and UTF-8 SHA-256 lowercase hex; **derive this from the observed `computeSubjectDigest` / `canonicalSnapshot` behavior, do not hand-roll a duplicate canonicalizer in K**. This is a proposed *delta*, requiring byte vectors and negative collision/alias tests before Freeze.
+
+Retain protected independent cryptographic issuer authentication at least as strong as v0.8's internal HMAC-SHA256 attestation; a bare SHA/JSON `approved=true` flag is not authority. Add protected currentness/revocation lookup **per activation/restart**, not an optional max-age-only proxy. Recheck H caller/tenant authorization on every sensitive read/query/subscribe/operation boundary. The existing v0.8 trust channel's `maxProofAgeMs` is optional and *does not by itself establish externally revoked approval*, so v0.9 must not falsely count that as revocation proof. Any inability to reach the configured approval/currentness authority fails closed according to an L2-defined typed policy; no silent authority fallback.
+
+### L2-R3: bounded public semantics
+
+Selected `Standard Basic` retains v0.8 `schema/rule/decision/workflow/operation` evaluation. A v0.9 WorkflowRouter call **returns an immutable candidate/selection or typed missing/ambiguous/denied result** based on BUILD-selected operations + K-authenticated context. It does *not* itself advance state or record an Effect/Journal; those remain selected Kernel operations. Reuse a public alias to existing Standard/K selection if executable evidence proves equivalent. Public v0.9 SDK exposes one stable typed `load(package)` + authenticated scoped `send/query/subscribe/stop` facade, typed standard failure codes and explicit supported/unsupported selected runtime/capability; no public `H.verify` or `getModuleNamespace` bypass surface.
+
+### L2-R4: acceptance scope and implementation DAG
+
+Unconditional DAG owners #1027 → #1032/#1035 → #1036 → #1037 with exact tests and independent security/release. #1028 becomes a dependency **only when** a Node/SQLite reference adapter is chosen for that release artifact; if not selected, the chosen *actual* physical durable/identity capability and its qualified owner must replace that proof, not disappear. N03/N04/N05 optional. A single L2 exact-HEAD adversarial review tests R1–R4; review the source-author claim but never misrepresent same-account GitHub activity as a distinct-account credential. Final v0.8 release pin is a separate implementation-admission prerequisite.
