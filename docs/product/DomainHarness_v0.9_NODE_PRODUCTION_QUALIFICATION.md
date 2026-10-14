@@ -26,6 +26,12 @@ TEST_PASS=NOT_CLAIMED
 
 **Preflight and freeze hold:** if the real Build Host is not Ubuntu 24.04 x64 or a qualified equivalent is not available, the P0 profile remains **unqualified**; choose a real accessible supported host **through a bounded explicit Product L1 amendment and fresh evidence before freeze**, not by silently claiming Ubuntu 24.04 testing. Node versions are major-line selectors; exact patch, compiler flags, native ABI, SQLite mode and kernel/filesystem facts are pinned in validation records at candidate qualification.
 
+### FZ-01 observed development profile — **not an accepted production tier**
+
+The read-only October 14 [FZ-01 Build Host receipt on #1026](https://github.com/kaicreator-mm/domain-harness/issues/1026) describes an **available WSL2 Ubuntu 26.04.1 x86_64 guest** (Microsoft WSL kernel) with Node `24.21.0`, already installed native `better-sqlite3 12.11.1` (bundled SQLite `3.53.2`), 8 allocated vCPU / ~16 GiB guest RAM and ext4 guest volume backed by a local NVMe SSD. Real file-backed WAL checkpoint and clean addon load were observed. It mismatches the proposed **native Ubuntu 24.04** P0 distribution/kernel/host class and is **DEV_PREVALIDATION_ONLY**, never Ubuntu24/native Production QUALIFIED. Current v0.9 pinned selected driver build and any PERF-01–07 execution remain **NOT_VERIFIED / NOT_RUN**.
+
+**L1 ruling recommended:** keep the native Ubuntu24 P0 target pending one **different native host** qualification, use existing WSL2 only for non-authoritative build/ABI/test feasibility. Changing the P0 OS or permitting a production WSL2 profile would require its own bounded explicit L1 amendment with independently qualified actual security/durability/ops profile; merely running Node native modules in a guest is insufficient. Do not repeat FZ-01 on the same unchanged WSL2 guest.
+
 ## 2. Deterministic benchmark specification and initial proposed numeric targets
 
 These are **target thresholds, NOT observed measurements**. Their purpose is to make v0.9 release testable. A single **bounded Product/L1 calibration** may revise the numeric targets based on the exact released v0.8 baseline **before** v0.9 Product Freeze; changes thereafter require an independently reviewed Product amendment, not a post-failure silent threshold increase.
