@@ -305,6 +305,77 @@ test('NF05-N (K submit): a post-wiring injected semantic-decision rule never run
   );
 });
 
+test('NF05-N (K submit, R1 P1): an in-place mutation of a wired rule object never changes what runs', async () => {
+  const ports = unitPorts();
+  // A FRESH digest-correct declaration wired through the trusted boundary
+  // (the module-level `wiredRule` stays untouched for the other cases).
+  const rule = withDigest(compiledDeclaration({ id: 'rule:sd-mutated' }));
+  const received: unknown[] = [];
+  // A private definition with ONE authorized effect on the approve
+  // transition, so the journal below carries exactly the ONE record the
+  // approved meaning authorizes (and none from the mutation).
+  const policy = {
+    ...semanticPolicy({ 'rule:sd-mutated': rule }),
+    workflowDefinition: {
+      ...UNIT_DEFINITION,
+      states: [
+        {
+          stateKey: 'review',
+          transitions: [{
+            transitionKey: 'approve',
+            trigger: { kind: 'event', eventType: 'SD_QUOTE_DECIDED' },
+            targetState: 'approved',
+            effectIntents: [{
+              effectType: 'effect:reserve',
+              input: { reservation: 'sd-mutated' },
+              idempotencyKey: 'reserve:sd-mutated:1',
+            }],
+          }],
+        },
+        { stateKey: 'approved', kind: 'final' },
+      ],
+    },
+    effectBindings: {
+      'effect:reserve': { semantics: 'non-idempotent', handler: async () => ({ reserved: true }) },
+    },
+  };
+  const rt = kernel.createOccurrenceRuntime({
+    moduleIdentity: { packageId: kernel.MODULE_ID, moduleSha256: sha256Hex(KERNEL_SOURCE) },
+    hostPorts: ports,
+    sdkEndpoint: {
+      packageId: 'standard-sdk@v08.1.0.0',
+      interpret: (d: unknown, i: unknown, c: unknown) => { received.push(d); return sdk.interpret(d, i, c); },
+    },
+    businessEndpoint: policy,
+  });
+  const target = { workflowId: 'sd-unit', instanceKey: 'u:3' };
+  await rt.openInstance({ target });
+
+  // AFTER wiring, the still-mutable original object is mutated IN PLACE —
+  // same object identity, both values flipped inside the pre-approved
+  // allowlists (the exact R1 P1 scenario). The WeakMap identity check
+  // alone cannot see this mutation.
+  const disposition = rule.disposition as Record<string, unknown>;
+  disposition.outcome = 'reject';
+  disposition.eventType = 'SD_QUOTE_REJECTED';
+  assert.equal(rule.disposition.outcome, 'reject');
+
+  const receipt = await rt.submitOccurrence({ intentType: 'rule:sd-mutated', messageId: 'm1', input: INPUT, target });
+  // The load-time verified FROZEN declaration is what S received and what
+  // ran: the approved meaning (approve / SD_QUOTE_DECIDED) is admitted.
+  assert.equal(receipt.status, 'admitted');
+  assert.equal(received.length, 1);
+  assert.equal(Object.isFrozen(received[0]), true, 'S must receive the deep-frozen verified snapshot, not the mutable original');
+  const seen = received[0] as { disposition?: { outcome?: string; eventType?: string } };
+  assert.equal(seen.disposition?.outcome, 'approve');
+  assert.equal(seen.disposition?.eventType, 'SD_QUOTE_DECIDED');
+  const snapshot = await rt.getSnapshot(target);
+  assert.equal(snapshot?.state?.stateKey, 'approved');
+  // Exactly the ONE authorized journal record of the approved transition —
+  // the mutation produced no additional or unauthorized record.
+  assert.equal(await ports.docs.list('v08-kernel:effect-journal:').then((keys: string[]) => keys.length), 1);
+});
+
 test('FR08-N-SD1 (K submit): declared unavailability terminates typed with zero admission activity', async () => {
   const ports = unitPorts();
   const rt = kernel.createOccurrenceRuntime({

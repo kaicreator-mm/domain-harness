@@ -3238,14 +3238,23 @@ export function createOccurrenceRuntime(options) {
       // [#1003 FR08 SD1/SD2 + NF05] A compiled semantic-decision rule that
       // was never digest-verified/frozen at this trusted load boundary can
       // never run — no silent unbound fallback for post-wiring injected or
-      // swapped declarations.
-      if (isJsonRecord(rule) && rule.kind === 'semantic-decision' && !semanticDecisionRules.has(rule)) {
+      // swapped declarations. The registry is keyed by object identity, so
+      // `get` (not a re-read of the mutable `kind`) is what binds a rule
+      // wired as semantic even if its shape was mutated after wiring.
+      const wiredSemanticDecision = isJsonRecord(rule) ? semanticDecisionRules.get(rule) : undefined;
+      if (wiredSemanticDecision === undefined && isJsonRecord(rule) && rule.kind === 'semantic-decision') {
         throw new CentralAdmissionError(
           'SEMANTIC_DECISION_UNVALIDATED',
           `semantic-decision rule ${String(binding.ruleId)} was never validated at the trusted load boundary; post-wiring injected declarations are refused`,
         );
       }
-      const continuation = continuationPolicyFor(rule);
+      // [#1051 R1 P1] S interprets ONLY the load-time verified frozen
+      // declaration. The original rule object stays ordinary mutable policy
+      // surface; an in-place mutation after wiring must not change what
+      // executes — the approved meaning at load time is the meaning that
+      // runs.
+      const declaration = wiredSemanticDecision === undefined ? rule : wiredSemanticDecision.declaration;
+      const continuation = continuationPolicyFor(declaration);
       const control = latch.signal === undefined ? undefined : { signal: latch.signal };
       let resolved;
       if (continuation !== undefined) {
@@ -3278,7 +3287,7 @@ export function createOccurrenceRuntime(options) {
         // endpoint. [#1003 FR07-KH2] The protected control rides along so a
         // model-decision turn observes cancellation too.
         try {
-          resolved = await sdkEndpoint.interpret(rule, request.input, context, control);
+          resolved = await sdkEndpoint.interpret(declaration, request.input, context, control);
         } catch (error) {
           if (latch.cancelled) {
             return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 1, inFlightTurnDiscarded: true }, { modelCallEvidence: { status: 'unmeasured' } });
