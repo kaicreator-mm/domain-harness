@@ -237,6 +237,7 @@ export function getPolicy() {
     effectBindings: {
       'effect:record-engineering-evidence': {
         semantics: 'idempotent',
+        resource: { key: 'engineering-evidence', operation: 'append' },
         handler: async ({ input, effectId, idempotencyKey, resources }) => {
           if (!resources || typeof resources.call !== 'function') {
             throw new Error('engineering evidence effect requires authenticated physical Host resource port');

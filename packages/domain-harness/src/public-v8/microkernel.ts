@@ -29,7 +29,13 @@
  * effect runtime (journals/effects exist only inside the wired Kernel);
  * no init-script engine — the #1023 S03 lifecycle hooks are optional
  * module exports of BUILD-sealed packages, called in the sealed
- * BUILD-fixed packages order, and nothing more.
+ * BUILD-fixed packages order, and nothing more. The #1023 S04 callable
+ * OperationCall surface adds NO second Runtime either: pure operations
+ * dispatch the exact BUILD-bound sealed handler with plain-JSON data only,
+ * effectful operations are ordinary authenticated Kernel occurrences
+ * (Business admission → Journal → Effect), and the capability-owned
+ * physical handlers run only behind the Kernel's effect dispatch as
+ * Host-provisioned resource adapters.
  */
 
 import { QualifiedPackageError, type QualifiedCleanupFailure, type QualifiedPackageKind, type V8PackageLifecycleContext } from './contracts.js';
@@ -83,6 +89,35 @@ export interface V8GatewayPrincipal {
  */
 export interface V8OccurrenceControl {
   readonly signal: V8CancellationSignal;
+}
+
+/**
+ * #1023 S04 — one BUILD-fixed callable OperationCall envelope. The
+ * capability/operation identity and the plain-JSON input are the ONLY
+ * caller-controlled content; an effectful operation additionally carries
+ * the occurrence address components (instanceKey/messageId) exactly like an
+ * authenticated send. No caller-declared role, principal, verifiedPrincipal
+ * or Host port can ride this envelope.
+ */
+export interface V8OperationCall {
+  readonly capabilityId: string;
+  readonly operationId: string;
+  readonly input?: unknown;
+  /** Effectful operations only: the occurrence instance address component. */
+  readonly instanceKey?: string;
+  /** Effectful operations only: the occurrence dedup/replay identity. */
+  readonly messageId?: string;
+}
+
+/**
+ * #1023 S04 — one trusted-Host physical resource adapter derived from the
+ * sealed capability OperationCall ABI: the BUILD-selected capability
+ * handlers for one Host resource key, reachable ONLY through the selected
+ * Kernel's effect dispatch (`hostPorts.resources`), never from a call.
+ */
+export interface V8OperationResourceAdapter {
+  readonly resourceKey: string;
+  readonly operations: ReadonlyMap<string, (payload: unknown) => unknown>;
 }
 
 /**
@@ -149,6 +184,26 @@ export interface V8FacadeKernelOps {
     readonly instanceKey: string;
     readonly correlationId?: string;
   }): Promise<unknown>;
+  /**
+   * #1023 S04: BUILD-fixed OperationCall dispatch on the protected gateway
+   * seam. The exact handler comes from the sealed S02a capability binding
+   * matched against the sealed module `OPERATIONS` ABI — no runtime
+   * discovery. A pure (`effectClass 'none'`) operation runs the exact
+   * handler with the plain-JSON input ONLY (no Host/Kernel port is in
+   * scope, no State/Journal/Effect is touched) behind the Business-governed
+   * visibility gate. An effectful operation NEVER touches the handler
+   * directly: the call traverses the sealed Business intent's role gate and
+   * the selected Kernel's submitOccurrence (Admission → Journal → Effect);
+   * the capability-owned physical handler runs only behind the Kernel's
+   * effect dispatch as the Host-provisioned resource adapter.
+   */
+  invokeOperation(principal: V8GatewayPrincipal, call: V8OperationCall, control?: V8OccurrenceControl): Promise<unknown>;
+  /**
+   * #1023 S04: the BUILD-selected physical resource adapters derived from
+   * the sealed capability OperationCall ABI — trusted Host wiring input for
+   * `registerApp` provisioning ONLY. Never caller-visible.
+   */
+  operationResourceAdapters(): readonly V8OperationResourceAdapter[];
 }
 
 /** The shape of the wired Kernel mechanism the transport scope consumes. */
@@ -230,6 +285,388 @@ async function disposeInitialized(initialized: readonly LifecycleParticipant[]):
     }
   }
   return failures;
+}
+
+// ---- #1023 S04: BUILD-fixed callable OperationCall ----
+
+/** The pre-existing effect-class declaration family (L2 successor §4). */
+type V8OperationEffectClass = 'none' | 'idempotent' | 'non-idempotent';
+
+/** One wired callable operation: the sealed ABI entry plus the exact BUILD-bound handler. */
+interface WiredOperation {
+  readonly effectClass: V8OperationEffectClass;
+  readonly handler: (input: unknown) => unknown;
+  /** Pure: the sealed Business intent whose issuer-bound role set governs visibility. */
+  readonly visibilityIntentType?: string;
+  /** Effectful: the sealed Business intent that owns admission (roles/guard/invariant/effects). */
+  readonly intentType?: string;
+  /** Effectful: the Host physical resource route behind the Kernel's effect dispatch. */
+  readonly resource?: { readonly key: string; readonly operation: string };
+}
+
+interface WiredCapability {
+  readonly packageId: string;
+  readonly endpointId: string;
+  readonly operations: Map<string, WiredOperation>;
+}
+
+const OPERATION_EFFECT_CLASSES: readonly V8OperationEffectClass[] = ['none', 'idempotent', 'non-idempotent'];
+
+function isOperationEffectClass(value: unknown): value is V8OperationEffectClass {
+  return typeof value === 'string' && (OPERATION_EFFECT_CLASSES as readonly string[]).includes(value);
+}
+
+// ---- #1023 S04 R1 P1-02: Operation↔Effect binding interlock ----
+
+/**
+ * Read the AUTHORITATIVE physical-route semantics of one effect binding off
+ * the sealed Business policy — the same policy object the selected Kernel
+ * dispatches effects on. An effect binding that declares no Host route is
+ * unverifiable at wiring: `undefined`.
+ */
+function readEffectBindingRoute(effectBinding: unknown): { semantics: unknown; resource?: { key: string; operation: string } } | undefined {
+  if (!isPlainRecordValue(effectBinding)) return undefined;
+  const resource = effectBinding.resource;
+  if (resource === undefined) return { semantics: effectBinding.semantics };
+  if (!isPlainRecordValue(resource) || typeof resource.key !== 'string' || typeof resource.operation !== 'string') return undefined;
+  return { semantics: effectBinding.semantics, resource: { key: resource.key, operation: resource.operation } };
+}
+
+/**
+ * The wiring-time Operation→Effect interlock (#1023 S04 R1 P1-02). The
+ * sealed capability ABI's CLAIMS are checked against the sealed Business
+ * policy's own declarations — the exact data the selected Kernel's effect
+ * dispatch reads — so a callable effectful operation can never declare a
+ * route, an effect class or an intent the Business policy contradicts:
+ *
+ *   - the policy must actually BIND the claimed admission intent;
+ *   - the intent binding's trigger-matching transitions must dispatch at
+ *     least one Business effect intent (a no-effect intent would return a
+ *     K receipt with no capability handler ever running);
+ *   - every dispatched effect binding must DECLARE its Host physical route
+ *     `{key, operation}` and it must EQUAL the ABI's claimed route;
+ *   - the effect binding's `semantics` must EQUAL the ABI's declared
+ *     `effectClass` (no false idempotency/retry-safety declaration);
+ *   - the union of dispatched routes must be EXACTLY the one claimed route
+ *     (one callable effectful operation = one physical route).
+ *
+ * This is a declarative, K-compatible link (sealed policy data, no
+ * speculative runtime handler introspection): a Business handler that lied
+ * about its route dispatches into the injective adapter map and fails
+ * closed typed (HOST_RESOURCE_OPERATION_UNKNOWN) at runtime.
+ */
+function assertOperationEffectBinding(input: {
+  readonly capabilityId: string;
+  readonly operationId: string;
+  readonly intentType: string;
+  readonly resource: { readonly key: string; readonly operation: string };
+  readonly effectClass: V8OperationEffectClass;
+  readonly businessPolicy: Record<string, unknown>;
+}): void {
+  const { capabilityId, operationId, intentType, resource, effectClass, businessPolicy } = input;
+  const where = `capability ${capabilityId} operation ${operationId}`;
+  const intentBindings = businessPolicy.intentBindings;
+  const binding = isPlainRecordValue(intentBindings) && Object.prototype.hasOwnProperty.call(intentBindings, intentType)
+    ? intentBindings[intentType]
+    : undefined;
+  if (!isPlainRecordValue(binding)) {
+    throw typedError(
+      'OPERATION_BINDING_MISMATCH',
+      `${where} claims admission intent ${intentType}, but the sealed Business policy binds no such intent; the Operation→Effect link is unverifiable`,
+    );
+  }
+  const trigger = binding.trigger;
+  const eventType = isPlainRecordValue(trigger) ? trigger.eventType : undefined;
+  if (typeof eventType !== 'string' || eventType.length === 0) {
+    throw typedError(
+      'OPERATION_BINDING_MISMATCH',
+      `${where} claims admission intent ${intentType}, whose sealed Business binding declares no usable event trigger; the Operation→Effect link is unverifiable`,
+    );
+  }
+  const definition = isPlainRecordValue(binding.definition) ? binding.definition : businessPolicy.workflowDefinition;
+  if (!isPlainRecordValue(definition) || !Array.isArray(definition.states)) {
+    throw typedError(
+      'OPERATION_BINDING_MISMATCH',
+      `${where} claims admission intent ${intentType}, whose sealed Business definition is unreadable; the Operation→Effect link is unverifiable`,
+    );
+  }
+  // Collect every effect intent the intent's trigger can dispatch, across ALL
+  // states of its definition — the guard/state branch is a runtime decision,
+  // so the wiring link must cover every declared branch or refuse.
+  const effectTypes = new Set<string>();
+  for (const state of definition.states) {
+    if (!isPlainRecordValue(state) || !Array.isArray(state.transitions)) continue;
+    for (const transition of state.transitions) {
+      if (!isPlainRecordValue(transition)) continue;
+      const transitionTrigger = transition.trigger;
+      if (!isPlainRecordValue(transitionTrigger) || transitionTrigger.eventType !== eventType) continue;
+      // #1023 S04 R2 (@5514296714): EVERY trigger-matching transition the
+      // selected Kernel could admit must dispatch the promised effect - a
+      // same-event branch WITHOUT effects (the real approval policy's guarded
+      // approve plus fallback reject) could otherwise be admitted with an
+      // 'admitted' receipt while the promised capability handler never runs.
+      // Guarded DENIALS stay valid: a denied occurrence never reaches effect
+      // dispatch and is not affected here.
+      const intents = Array.isArray(transition.effectIntents) ? transition.effectIntents : [];
+      if (intents.length === 0) {
+        const transitionKey = typeof transition.transitionKey === 'string' ? transition.transitionKey : '(unnamed)';
+        throw typedError(
+          'OPERATION_BINDING_MISMATCH',
+          `${where} claims admission intent ${intentType}, but its transition ${transitionKey} for event ${eventType} dispatches no Business effect - the Kernel could admit this branch and the OperationCall would report success without the promised capability handler (mixed effectful/effectless same-event branches refuse)`,
+        );
+      }
+      for (const effectIntent of intents) {
+        if (isPlainRecordValue(effectIntent) && typeof effectIntent.effectType === 'string') {
+          effectTypes.add(effectIntent.effectType);
+        }
+      }
+    }
+  }
+  if (effectTypes.size === 0) {
+    throw typedError(
+      'OPERATION_BINDING_MISMATCH',
+      `${where} claims admission intent ${intentType}, but none of its transitions dispatches a Business effect — a callable effectful operation cannot bind a no-effect intent (its K receipt would run no capability handler)`,
+    );
+  }
+  const effectBindings = businessPolicy.effectBindings;
+  const routes = new Set<string>();
+  for (const effectType of effectTypes) {
+    const route = isPlainRecordValue(effectBindings) && Object.prototype.hasOwnProperty.call(effectBindings, effectType)
+      ? readEffectBindingRoute(effectBindings[effectType])
+      : undefined;
+    if (route === undefined || route.resource === undefined) {
+      throw typedError(
+        'OPERATION_BINDING_MISMATCH',
+        `${where} resolves Business effect ${effectType}, which declares no Host physical route {key, operation}; the Operation→Effect link is unverifiable`,
+      );
+    }
+    if (route.semantics !== effectClass) {
+      throw typedError(
+        'OPERATION_BINDING_MISMATCH',
+        `${where} declares effectClass ${effectClass}, but Business effect ${effectType} declares semantics ${String(route.semantics)} — a false idempotency/retry-safety declaration refuses`,
+      );
+    }
+    if (route.resource.key !== resource.key || route.resource.operation !== resource.operation) {
+      throw typedError(
+        'OPERATION_BINDING_MISMATCH',
+        `${where} claims the Host physical route ${resource.key}.${resource.operation}, but Business effect ${effectType} dispatches ${route.resource.key}.${route.resource.operation}`,
+      );
+    }
+    routes.add(`${route.resource.key} ${route.resource.operation}`);
+  }
+  if (routes.size !== 1) {
+    throw typedError(
+      'OPERATION_BINDING_MISMATCH',
+      `${where} claims one Host physical route, but its admission intent dispatches ${routes.size} distinct Business routes`,
+    );
+  }
+}
+
+const OPERATION_JSON_MAX_DEPTH = 64;
+
+function isPlainRecordValue(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Descriptor-safe bounded JSON validation for OperationCall payloads: plain
+ * JSON data only (finite numbers, plain arrays/objects), hostile ACCESSORS
+ * refused WITHOUT invocation, depth-capped so a cyclic presentation cannot
+ * exhaust the stack. Unlike assertPlainJsonIntent (the transport-intent
+ * walker), this reads every slot through its property descriptor — an
+ * OperationCall is a NEW externally shaped surface, so its input AND the
+ * handler's output both pass this gate typed.
+ */
+function assertOperationJsonData(value: unknown, path: string, code: string, depth = 0): void {
+  if (depth > OPERATION_JSON_MAX_DEPTH) {
+    throw typedError(code, `${path} exceeds the maximum OperationCall JSON depth (${OPERATION_JSON_MAX_DEPTH})`);
+  }
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw typedError(code, `${path} contains a non-finite number`);
+    }
+    return;
+  }
+  if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'bigint' || typeof value === 'undefined') {
+    throw typedError(code, `${path} carries a non-JSON ${typeof value}; OperationCall payloads are data only`);
+  }
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+      throw typedError(code, `${path} is not a plain array`);
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value) as Record<string, PropertyDescriptor | undefined>;
+    const lengthDescriptor = descriptors.length;
+    if (
+      lengthDescriptor === undefined
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+    ) {
+      throw typedError(code, `${path}.length descriptor is not the intrinsic array length`);
+    }
+    const length = lengthDescriptor.value as number;
+    if (Reflect.ownKeys(descriptors).length !== length + 1) {
+      throw typedError(code, `${path} has non-index own keys`);
+    }
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = descriptors[String(index)];
+      if (descriptor === undefined || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        throw typedError(code, `${path}[${index}] is not an own enumerable data slot (accessors are refused)`);
+      }
+      assertOperationJsonData(descriptor.value, `${path}[${index}]`, code, depth + 1);
+    }
+    return;
+  }
+  if (typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) {
+    throw typedError(code, `${path} must be a plain JSON object`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value) as Record<string, PropertyDescriptor | undefined>;
+  for (const key of Object.keys(value)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw typedError(code, `${path}.${key} is a dangerous own key`);
+    }
+    const descriptor = descriptors[key];
+    if (descriptor === undefined || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw typedError(code, `${path}.${key} is not an own enumerable data slot (accessors are refused)`);
+    }
+    assertOperationJsonData(descriptor.value, `${path}.${key}`, code, depth + 1);
+  }
+  if (Reflect.ownKeys(descriptors).length !== Object.keys(value).length) {
+    throw typedError(code, `${path} has non-enumerable own keys`);
+  }
+}
+
+/**
+ * Wire the callable operation surface of every sealed S02a capability
+ * binding at THIS trusted activation boundary (#1023 S04): the module's
+ * optional `OPERATIONS` ABI table is validated against the BUILD capability
+ * binding's exact operation→handler map (the installer already proved every
+ * bound handler is a callable export), every referenced visibility/admission
+ * intent must be sealed in THIS closure, and every effectful entry must
+ * carry its Host physical resource route. A malformed, unbound, duplicate
+ * or contradictory ABI fails typed BEFORE any facade escapes — a capability
+ * package without an `OPERATIONS` export keeps the S02a-only behavior (its
+ * handlers stay installed but not callable). No runtime discovery exists:
+ * what BUILD sealed here is the entire callable surface.
+ */
+function wireCapabilityOperations(input: {
+  readonly bindings: readonly SealedQualifiedPackageRoot['bindings'][number][];
+  readonly getModuleNamespace: (packageId: string) => Record<string, unknown>;
+  readonly sealedIntentTypes: ReadonlySet<string>;
+  readonly businessPolicy: Record<string, unknown>;
+}): { capabilities: Map<string, WiredCapability>; adapters: Map<string, Map<string, (payload: unknown) => unknown>> } {
+  const capabilities = new Map<string, WiredCapability>();
+  const adapters = new Map<string, Map<string, (payload: unknown) => unknown>>();
+  for (const binding of input.bindings) {
+    if (binding.role !== 'capability') continue;
+    const namespace = input.getModuleNamespace(binding.packageId);
+    const operations = new Map<string, WiredOperation>();
+    const abiTable: unknown = namespace.OPERATIONS;
+    if (abiTable === undefined) {
+      capabilities.set(binding.capabilityId, { packageId: binding.packageId, endpointId: binding.endpointId, operations });
+      continue;
+    }
+    if (!Array.isArray(abiTable) || abiTable.length === 0) {
+      throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} exports an OPERATIONS ABI that is not a non-empty array`);
+    }
+    for (const entry of abiTable) {
+      if (!isPlainRecordValue(entry)) {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} OPERATIONS entries must be plain records`);
+      }
+      const operationId = entry.operationId;
+      if (typeof operationId !== 'string' || operationId.length === 0) {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} declares an OPERATIONS entry without a non-empty operationId`);
+      }
+      if (operations.has(operationId)) {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} declares operation ${operationId} more than once in its OPERATIONS ABI`);
+      }
+      const effectClass = entry.effectClass;
+      if (!isOperationEffectClass(effectClass)) {
+        throw typedError(
+          'OPERATION_ABI_INVALID',
+          `capability ${binding.capabilityId} operation ${operationId} declares effectClass ${String(effectClass)}; the declaration family is none | idempotent | non-idempotent`,
+        );
+      }
+      const boundHandler = binding.handlers.find((candidate) => candidate.operationId === operationId);
+      if (boundHandler === undefined) {
+        throw typedError(
+          'OPERATION_ABI_INVALID',
+          `capability ${binding.capabilityId} OPERATIONS entry ${operationId} has no exact BUILD handler binding; the callable surface is BUILD-fixed`,
+        );
+      }
+      const handlerExport = namespace[boundHandler.handler];
+      // The installer already refused non-callable bound exports
+      // (MODULE_HANDLER_MISSING); this is the same invariant re-anchored at
+      // the dispatch wiring.
+      if (typeof handlerExport !== 'function') {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} operation ${operationId} handler ${boundHandler.handler} is not callable on the installed namespace`);
+      }
+      const handler = handlerExport as (input: unknown) => unknown;
+      if (effectClass === 'none') {
+        const visibility = entry.visibility;
+        if (!isPlainRecordValue(visibility) || typeof visibility.intentType !== 'string' || visibility.intentType.length === 0) {
+          throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} pure operation ${operationId} must declare visibility.intentType (Business-governed role set)`);
+        }
+        if (!input.sealedIntentTypes.has(visibility.intentType)) {
+          throw typedError(
+            'OPERATION_ABI_INVALID',
+            `capability ${binding.capabilityId} pure operation ${operationId} visibility references intent ${visibility.intentType} which is not bound in this sealed closure`,
+          );
+        }
+        if (entry.intentType !== undefined || entry.resource !== undefined) {
+          throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} pure operation ${operationId} cannot declare an admission intent or a physical resource route`);
+        }
+        operations.set(operationId, { effectClass, handler, visibilityIntentType: visibility.intentType });
+        continue;
+      }
+      const intentType = entry.intentType;
+      if (typeof intentType !== 'string' || intentType.length === 0) {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} must declare the sealed Business intentType that owns its admission`);
+      }
+      if (!input.sealedIntentTypes.has(intentType)) {
+        throw typedError(
+          'OPERATION_ABI_INVALID',
+          `capability ${binding.capabilityId} effectful operation ${operationId} references intent ${intentType} which is not bound in this sealed closure; every effect traverses the sealed Business admission`,
+        );
+      }
+      if (entry.visibility !== undefined) {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} visibility is the intent's own role gate; an extra visibility declaration is contradictory`);
+      }
+      const resource = entry.resource;
+      if (
+        !isPlainRecordValue(resource)
+        || typeof resource.key !== 'string' || resource.key.length === 0
+        || typeof resource.operation !== 'string' || resource.operation.length === 0
+      ) {
+        throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} must declare resource {key, operation} for the Host physical route`);
+      }
+      // #1023 S04 R1 P1-02: the ABI's claims must match the AUTHORITATIVE
+      // sealed Business policy declarations the selected Kernel's effect
+      // dispatch reads - wrong route, wrong effect class, no-effect intent
+      // or an unbound intent refuses typed HERE, before any facade escapes.
+      assertOperationEffectBinding({
+        capabilityId: binding.capabilityId,
+        operationId,
+        intentType,
+        resource: { key: resource.key, operation: resource.operation },
+        effectClass,
+        businessPolicy: input.businessPolicy,
+      });
+      const resourceOperations = adapters.get(resource.key) ?? new Map<string, (payload: unknown) => unknown>();
+      if (resourceOperations.has(resource.operation)) {
+        throw typedError(
+          'OPERATION_ABI_INVALID',
+          `resource ${resource.key}.${resource.operation} is claimed by more than one capability operation; Host physical routes are injective`,
+        );
+      }
+      resourceOperations.set(resource.operation, handler);
+      adapters.set(resource.key, resourceOperations);
+      operations.set(operationId, { effectClass, handler, intentType, resource: { key: resource.key, operation: resource.operation } });
+    }
+    capabilities.set(binding.capabilityId, { packageId: binding.packageId, endpointId: binding.endpointId, operations });
+  }
+  return { capabilities, adapters };
 }
 
 /**
@@ -436,8 +873,18 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   }
 
   const observers = new Set<(receipt: unknown) => void>();
+  // The sealed intent index IS the fixed closure: send() performs no
+  // provider discovery and never falls back (KPK-03 heritage). Built before
+  // the activation try so the #1023 S04 capability OperationCall wiring can
+  // validate every ABI-referenced intent against the SAME sealed set.
+  const intentIndex = new Map(
+    bindings
+      .filter((binding): binding is QualifiedIntentBinding => binding.role === 'intent')
+      .map((binding) => [binding.intentType, binding]),
+  );
   let businessPolicy: object;
   let kernelRuntime: WiredKernelRuntime;
+  let wiredOperations: { capabilities: Map<string, WiredCapability>; adapters: Map<string, Map<string, (payload: unknown) => unknown>> };
   try {
     // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
     // ModelPort binding, protected channel ONLY. When this process bootstrapped
@@ -582,6 +1029,19 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       throw typedError('KERNEL_RUNTIME_INVALID', `kernel package ${kernelBinding.packageId} did not activate a mechanism with submitOccurrence/getSnapshot`);
     }
     kernelRuntime = kernelCandidate as WiredKernelRuntime;
+
+    // ---- #1023 S04: BUILD-fixed callable OperationCall wiring ----
+    // The sealed S02a capability bindings plus each capability module's
+    // optional sealed OPERATIONS ABI become the dispatch table (and the
+    // trusted-Host physical resource adapters) — validated HERE, at the
+    // same trusted boundary, so a malformed ABI leaves no facade (the S03
+    // reverse cleanup above applies to any initialized packages).
+    wiredOperations = wireCapabilityOperations({
+      bindings,
+      getModuleNamespace: (packageId: string) => loaded.getModuleNamespace(packageId),
+      sealedIntentTypes: new Set(intentIndex.keys()),
+      businessPolicy: businessPolicy as Record<string, unknown>,
+    });
   } catch (error) {
     // #1023 S03: a post-init activation failure leaves NO partial active
     // residue either — every already-initialized package is disposed in
@@ -594,13 +1054,14 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     throw error;
   }
 
-  // The sealed intent index IS the fixed closure: send() performs no
-  // provider discovery and never falls back (KPK-03 heritage).
-  const intentIndex = new Map(
-    bindings
-      .filter((binding): binding is QualifiedIntentBinding => binding.role === 'intent')
-      .map((binding) => [binding.intentType, binding]),
+  // The frozen trusted-Host adapter view (#1023 S04): one entry per sealed
+  // resource key, each operation map frozen at this trusted boundary.
+  const resourceAdapters: readonly V8OperationResourceAdapter[] = Object.freeze(
+    [...wiredOperations.adapters.entries()].map(([resourceKey, operations]) =>
+      Object.freeze({ resourceKey, operations: new Map(operations) }),
+    ),
   );
+  const capabilityOperations = wiredOperations.capabilities;
 
   let stopped = false;
   let stopDisposal: Promise<void> | undefined;
@@ -814,6 +1275,49 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     return `${principal.tenantId}:${principal.appId}:${instanceKey}`;
   }
 
+  /**
+   * The single authenticated Kernel-occurrence request construction
+   * (#1013 I02, shared verbatim by submitAs and the #1023 S04 effectful
+   * OperationCall): intent shape check, sealed-intent binding check, the
+   * principal's tenant/app-qualified instance address and the caller
+   * derived ONLY from the issuer-signed roles ∩ the sealed Business binding
+   * roles. `send` and an effectful OperationCall can never diverge — they
+   * are the same unbypassable route.
+   */
+  function buildKernelOccurrenceRequest(principal: V8GatewayPrincipal, request: {
+    readonly intentType: string;
+    readonly messageId: string;
+    readonly instanceKey: string;
+    readonly input?: unknown;
+  }): Record<string, unknown> {
+    const { intentType, messageId, instanceKey } = request;
+    if (typeof intentType !== 'string' || intentType.length === 0) {
+      throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
+    }
+    if (typeof messageId !== 'string' || messageId.length === 0) {
+      throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
+    }
+    if (!intentIndex.has(intentType)) {
+      throw typedError('INTENT_UNBOUND', `intent type ${intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
+    }
+    const key = requireInstanceKey(instanceKey);
+    const role = requirePrincipalRole(principal, intentType);
+    // The Kernel request is CONSTRUCTED here — intent data never carries a
+    // caller; the verified principal is the only authority source, and the
+    // physical instance address is the principal's tenant/app-qualified
+    // key (two tenants reusing the same appId/instanceKey are two distinct
+    // physical instances — never shared state, Journal or effects).
+    const kernelRequest = {
+      intentType,
+      messageId,
+      input: request.input === undefined ? null : request.input,
+      target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+      caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
+    };
+    assertPlainJsonIntent(kernelRequest);
+    return kernelRequest;
+  }
+
   const gatewayOps: V8FacadeKernelOps = {
     describePolicy(): { packageId: string; policyId: string; workflowKey: string; intentTypes: readonly string[] } {
       assertOpen();
@@ -832,31 +1336,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     }, control?: V8OccurrenceControl): Promise<unknown> {
       assertOpen();
       requirePrincipal(principal);
-      const { intentType, messageId, instanceKey } = request;
-      if (typeof intentType !== 'string' || intentType.length === 0) {
-        throw typedError('INTENT_MALFORMED', 'intent.intentType must be a non-empty string');
-      }
-      if (typeof messageId !== 'string' || messageId.length === 0) {
-        throw typedError('INTENT_MALFORMED', 'intent.messageId must be a non-empty string');
-      }
-      if (!intentIndex.has(intentType)) {
-        throw typedError('INTENT_UNBOUND', `intent type ${intentType} is not bound in this sealed package closure; no provider discovery or fallback exists at runtime`);
-      }
-      const key = requireInstanceKey(instanceKey);
-      const role = requirePrincipalRole(principal, intentType);
-      // The Kernel request is CONSTRUCTED here — intent data never carries a
-      // caller; the verified principal is the only authority source, and the
-      // physical instance address is the principal's tenant/app-qualified
-      // key (two tenants reusing the same appId/instanceKey are two distinct
-      // physical instances — never shared state, Journal or effects).
-      const kernelRequest = {
-        intentType,
-        messageId,
-        input: request.input === undefined ? null : request.input,
-        target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
-        caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
-      };
-      assertPlainJsonIntent(kernelRequest);
+      const kernelRequest = buildKernelOccurrenceRequest(principal, request);
       // #1003 FR07-KH2: the protected control stays OUT of the plain-JSON
       // request; the Kernel validates it and owns the latch it drives.
       return control === undefined
@@ -899,6 +1379,80 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
         target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
         ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
       });
+    },
+    async invokeOperation(principal: V8GatewayPrincipal, call: V8OperationCall, control?: V8OccurrenceControl): Promise<unknown> {
+      assertOpen();
+      requirePrincipal(principal);
+      if (typeof call !== 'object' || call === null) {
+        throw typedError('OPERATION_CALL_MALFORMED', 'an OperationCall must be a plain record {capabilityId, operationId, input?}');
+      }
+      const callRecord = call as unknown as Record<string, unknown>;
+      if (typeof callRecord.capabilityId !== 'string' || callRecord.capabilityId.length === 0) {
+        throw typedError('OPERATION_CALL_MALFORMED', 'OperationCall.capabilityId must be a non-empty string');
+      }
+      if (typeof callRecord.operationId !== 'string' || callRecord.operationId.length === 0) {
+        throw typedError('OPERATION_CALL_MALFORMED', 'OperationCall.operationId must be a non-empty string');
+      }
+      const capability = capabilityOperations.get(callRecord.capabilityId);
+      if (capability === undefined) {
+        throw typedError(
+          'OPERATION_CAPABILITY_UNKNOWN',
+          `capability ${callRecord.capabilityId} is not bound in this sealed package closure; the callable surface is BUILD-fixed with no runtime discovery`,
+        );
+      }
+      const operation = capability.operations.get(callRecord.operationId);
+      if (operation === undefined) {
+        throw typedError(
+          'OPERATION_UNKNOWN',
+          `operation ${callRecord.operationId} is not declared callable on capability ${callRecord.capabilityId} in this sealed closure`,
+        );
+      }
+      if (operation.effectClass === 'none') {
+        // PURE dispatch: the ONLY inputs are the plain-JSON OperationCall
+        // data. No Host/Kernel port, no State/Journal/Effect contact, and
+        // no occurrence address may ride (one surface, one meaning).
+        if (callRecord.instanceKey !== undefined || callRecord.messageId !== undefined) {
+          throw typedError('OPERATION_CALL_MALFORMED', 'a pure OperationCall carries no occurrence address (instanceKey/messageId)');
+        }
+        const visibilityIntent = operation.visibilityIntentType as string;
+        // B-governed visibility: the issuer-signed principal must hold a
+        // role the SEALED Business intent binding admits — the same gate as
+        // an authenticated send, decided by the same sealed policy data.
+        requirePrincipalRole(principal, visibilityIntent);
+        const input = callRecord.input === undefined ? null : callRecord.input;
+        assertOperationJsonData(input, '$operationCall.input', 'OPERATION_INPUT_INVALID');
+        let output: unknown;
+        try {
+          output = await operation.handler(input);
+        } catch (error) {
+          throw typedError('OPERATION_HANDLER_FAILED', `operation ${callRecord.operationId} handler failed: ${errorMessage(error)}`);
+        }
+        assertOperationJsonData(output, '$operationCall.output', 'OPERATION_OUTPUT_INVALID');
+        return output;
+      }
+      // EFFECTFUL dispatch: the capability handler is NEVER executed here.
+      // The call is an authenticated Kernel occurrence like send — the
+      // sealed Business intent owns the role/guard/invariant and the effect
+      // declaration, and the physical handler runs only behind the
+      // Kernel's effect dispatch (Admission → Journal → Effect) as the
+      // Host-provisioned resource adapter. This branch constructs the SAME
+      // request submitAs builds — there is no alternate K/S composition.
+      if (typeof callRecord.messageId !== 'string' || callRecord.messageId.length === 0 || typeof callRecord.instanceKey !== 'string' || callRecord.instanceKey.length === 0) {
+        throw typedError('OPERATION_CALL_MALFORMED', 'an effectful OperationCall must carry the occurrence address (instanceKey and messageId) exactly like an authenticated send');
+      }
+      const kernelRequest = buildKernelOccurrenceRequest(principal, {
+        intentType: operation.intentType as string,
+        messageId: callRecord.messageId,
+        instanceKey: callRecord.instanceKey,
+        input: callRecord.input,
+      });
+      return control === undefined
+        ? kernelRuntime.submitOccurrence(kernelRequest)
+        : kernelRuntime.submitOccurrence(kernelRequest, control);
+    },
+    operationResourceAdapters(): readonly V8OperationResourceAdapter[] {
+      assertOpen();
+      return resourceAdapters;
     },
   };
 

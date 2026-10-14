@@ -204,6 +204,7 @@ export function getPolicy() {
     effectBindings: {
       'effect:reserve': {
         semantics: 'non-idempotent',
+        resource: { key: 'ledger', operation: 'reserve' },
         handler: async ({ input, effectId, resources }) => {
           if (resources === undefined) {
             throw new Error('effect:reserve requires the Host resource port');

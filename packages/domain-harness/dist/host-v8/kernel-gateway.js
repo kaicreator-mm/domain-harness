@@ -28,7 +28,12 @@
  *     K/S/B module digests + host audience) is persisted in the physical
  *     Host store under guarded CAS, so package replacement / stale roots
  *     refuse across process restarts before their module bytes ever load,
- *     and re-registering the SAME closure after a restart is idempotent;
+ *     and re-registering the SAME closure after a restart is idempotent.
+ *     The registration is ATOMIC (#1023 S04 R1 P1-01): the capability
+ *     resource adapters install as one all-or-nothing batch BEFORE the
+ *     durable pin commit, and ANY post-load failure rolls the batch back,
+ *     awaits the facade's S03 lifecycle teardown and leaves no pin, no
+ *     partial adapter and no live facade behind;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
  *     delivery and silently stop when the grant is no longer valid;
  *   - cancellation (#1003 FR07-KH2, B3) is request-scoped and
@@ -46,7 +51,7 @@
  * selected Kernel package, T-C).
  */
 import { DomainHarness, getFacadeKernelOps } from '../public-v8/microkernel.js';
-import { canonicalSnapshot, sha256Hex } from '../public-v8/contracts.js';
+import { QualifiedPackageError, canonicalSnapshot, sha256Hex } from '../public-v8/contracts.js';
 import { HostBoundaryError } from './errors.js';
 import { assertIntentScope } from './ux-transport.js';
 /**
@@ -195,44 +200,122 @@ export function createKernelGateway(input) {
             }
             // The PUBLIC one-argument load — qualification, trust gate, whole-
             // closure byte preflight and physical import all happen inside.
+            // #1023 S04 R1 P1-01: from this S03-activating load on, the
+            // registration is ALL-OR-NOTHING — any failure below rolls back every
+            // resource adapter THIS call installed (bounded reversible batch) and
+            // AWAITS the facade's reverse-order lifecycle teardown, so no durable
+            // pin, no partial adapter install and no live facade can survive a
+            // refused registration.
             const facade = await DomainHarness.load(registration.packageRoot);
-            // #1013 R2 (@6122817203): the ops seam requires the bootstrap-issued
-            // gateway session capability — structural access to the sibling
-            // module or a forged principal carries no authority here.
-            const ops = getFacadeKernelOps(facade, gatewaySessionCap);
-            if (ops === undefined) {
-                throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package did not produce a gateway-capable facade (protected ops seam missing)');
-            }
-            // Authoritative pin form: the LOADED build trace (the load's verified
-            // identity, not merely the supplied root's claim).
-            const installed = readInstalledClosureIdentity(await facade.query({ kind: 'build' }));
-            if (installed === undefined) {
-                throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package produced no readable build trace for the closure pin');
-            }
-            const installedPin = closurePin(registration.appId, host.audience, installed);
-            if (pinned !== undefined) {
-                if (installedPin !== pinned) {
+            const installedKeys = [];
+            let ops;
+            try {
+                // #1013 R2 (@6122817203): the ops seam requires the bootstrap-issued
+                // gateway session capability — structural access to the sibling
+                // module or a forged principal carries no authority here.
+                ops = getFacadeKernelOps(facade, gatewaySessionCap);
+                if (ops === undefined) {
+                    throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package did not produce a gateway-capable facade (protected ops seam missing)');
+                }
+                // Authoritative pin form: the LOADED build trace (the load's verified
+                // identity, not merely the supplied root's claim).
+                const installed = readInstalledClosureIdentity(await facade.query({ kind: 'build' }));
+                if (installed === undefined) {
+                    throw new HostBoundaryError('GATEWAY_FACADE_INVALID', 'the loaded package produced no readable build trace for the closure pin');
+                }
+                const installedPin = closurePin(registration.appId, host.audience, installed);
+                if (pinned !== undefined && installedPin !== pinned) {
                     throw new HostBoundaryError('GATEWAY_APP_CLOSURE_MISMATCH', `app ${registration.appId} is durably pinned to a different approved closure on this host (the loaded closure identity differs from the pinned one)`);
                 }
+                // ---- #1023 S04: provision the BUILD-selected capability resource
+                // adapters derived from the sealed OperationCall ABI. The adapters
+                // are the ONLY physical route to the capability-owned effectful
+                // handlers, and they are reachable exclusively through the selected
+                // Kernel's effect dispatch (hostPorts.resources carries the Host
+                // service principal — never a caller identity). A resource key is
+                // physical-Host-global, so the install is an ALL-OR-NOTHING batch
+                // (R1 P1-01): the dispatcher preflights every key — collision on
+                // this Host and duplication inside the batch — and commits every
+                // handler in one synchronous block, BEFORE the durable pin below. A
+                // second registration claiming any taken key therefore refuses with
+                // ZERO partial install.
+                const adapters = ops.operationResourceAdapters();
+                host.resources.provisionAll(adapters.map((adapter) => ({
+                    resourceKey: adapter.resourceKey,
+                    handler: (operation, payload) => {
+                        const handler = adapter.operations.get(operation);
+                        if (handler === undefined) {
+                            throw new HostBoundaryError('HOST_RESOURCE_OPERATION_UNKNOWN', `resource ${adapter.resourceKey} has no BUILD-selected handler for operation ${operation}`);
+                        }
+                        return handler(payload);
+                    },
+                })));
+                installedKeys.push(...adapters.map((adapter) => adapter.resourceKey));
+                // ---- Durable pin commit LAST (#1013 R1 F-02 / S04 R1 P1-01): the
+                // guarded CAS is the FINAL durable step of the registration — nothing
+                // after it can fail, so a refused registration can never leave a pin
+                // behind, and a pin conflict rolls the adapter batch back above. A
+                // concurrent first registration of the same appId can never be
+                // overwritten (mustBeAbsent); on losing that race the re-read
+                // distinguishes the IDENTICAL closure (concurrent idempotent
+                // registration — the adapters this call installed stay live, matching
+                // the restart idempotency contract) from a conflicting closure
+                // (rollback + typed conflict).
+                if (pinned === undefined) {
+                    const record = Object.freeze({
+                        pinVersion: 1,
+                        appId: registration.appId,
+                        audience: host.audience,
+                        rootPackageId: installed.rootPackageId,
+                        closureDigest: installed.closureDigest,
+                        packages: Object.freeze(installed.packages.map((pkg) => Object.freeze({ ...pkg }))),
+                        closurePin: installedPin,
+                    });
+                    try {
+                        await host.docs.put(pinKey, record, { mustBeAbsent: true });
+                    }
+                    catch (error) {
+                        const concurrentEntry = await host.docs.get(pinKey);
+                        const concurrentPin = concurrentEntry !== null && typeof concurrentEntry.value === 'object' && concurrentEntry.value !== null
+                            ? concurrentEntry.value.closurePin
+                            : undefined;
+                        if (concurrentPin !== installedPin) {
+                            throw new HostBoundaryError('GATEWAY_APP_PIN_CONFLICT', `durably pinning app ${registration.appId} failed (concurrent or conflicting registration): ${String(error?.message ?? error)}`);
+                        }
+                        // The identical closure won the concurrent CAS — idempotent.
+                    }
+                }
             }
-            else {
-                const record = Object.freeze({
-                    pinVersion: 1,
-                    appId: registration.appId,
-                    audience: host.audience,
-                    rootPackageId: installed.rootPackageId,
-                    closureDigest: installed.closureDigest,
-                    packages: Object.freeze(installed.packages.map((pkg) => Object.freeze({ ...pkg }))),
-                    closurePin: installedPin,
-                });
+            catch (error) {
+                // ---- Bounded rollback (#1023 S04 R1 P1-01): remove every adapter
+                // THIS call installed, then AWAIT the facade's reverse-order S03
+                // teardown. The primary typed error is never erased; rollback and
+                // teardown failures ride BESIDE it on the thrown error.
+                const rollbackFailures = [];
+                for (const key of installedKeys) {
+                    try {
+                        host.resources.unprovision(key);
+                    }
+                    catch (rollbackError) {
+                        rollbackFailures.push(`unprovision ${key}: ${String(rollbackError?.message ?? rollbackError)}`);
+                    }
+                }
                 try {
-                    // Guarded CAS: a concurrent first registration of the same appId
-                    // can never be overwritten (mustBeAbsent).
-                    await host.docs.put(pinKey, record, { mustBeAbsent: true });
+                    await facade.stop();
                 }
-                catch (error) {
-                    throw new HostBoundaryError('GATEWAY_APP_PIN_CONFLICT', `durably pinning app ${registration.appId} failed (concurrent or conflicting registration): ${String(error?.message ?? error)}`);
+                catch (teardownError) {
+                    rollbackFailures.push(`lifecycle teardown: ${String(teardownError?.message ?? teardownError)}`);
                 }
+                if (rollbackFailures.length > 0 && error instanceof HostBoundaryError) {
+                    throw new HostBoundaryError(error.code, `${error.message} (post-failure rollback also reported: ${rollbackFailures.join('; ')})`);
+                }
+                if (rollbackFailures.length > 0 && error instanceof QualifiedPackageError) {
+                    error.cleanupFailures = [
+                        ...(error.cleanupFailures ?? []),
+                        ...rollbackFailures.map((message) => ({ packageId: `gateway:registerApp:${registration.appId}`, message })),
+                    ];
+                }
+                throw error;
             }
             apps.set(registration.appId, Object.freeze({
                 appId: registration.appId,
@@ -263,6 +346,53 @@ export function createKernelGateway(input) {
                     messageId: intent.messageId,
                     instanceKey: intent.target.instanceKey,
                     ...(intent.input === undefined ? {} : { input: intent.input }),
+                }, { signal: entry.controller.signal });
+            }
+            finally {
+                entries.delete(entry);
+                if (entries.size === 0 && inFlight.get(key) === entries)
+                    inFlight.delete(key);
+            }
+        },
+        async invokeOperation(credential, request) {
+            if (typeof request !== 'object'
+                || request === null
+                || typeof request.appId !== 'string'
+                || request.appId.length === 0
+                || typeof request.capabilityId !== 'string'
+                || request.capabilityId.length === 0
+                || typeof request.operationId !== 'string'
+                || request.operationId.length === 0) {
+                throw new HostBoundaryError('HOST_OPERATION_MALFORMED', 'gateway invokeOperation requires {appId, capabilityId, operationId} with non-empty strings');
+            }
+            // Re-authenticate exactly like send: every OperationCall presents a
+            // current credential — issuer, audience, tenant/app, roles, revocation
+            // and currentness are all re-verified, nothing is cached.
+            const principal = await authenticate(credential);
+            // The appId is asserted against the AUTHENTICATED principal's app —
+            // cross-app/cross-tenant routing is refused before any dispatch.
+            const app = requireApp(request.appId, principal);
+            const call = {
+                capabilityId: request.capabilityId,
+                operationId: request.operationId,
+                ...(request.input === undefined ? {} : { input: request.input }),
+            };
+            // An effectful call addressing an occurrence gets the same
+            // request-scoped cancellation as send (#1003 FR07-KH2); a pure call
+            // carries no occurrence address and therefore no in-flight entry.
+            if (request.instanceKey === undefined || request.messageId === undefined) {
+                return app.ops.invokeOperation(principal, call);
+            }
+            const key = inFlightKey(principal, { tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, request.messageId);
+            const entry = Object.freeze({ subject: principal.subject, controller: new AbortController() });
+            const entries = inFlight.get(key) ?? new Set();
+            entries.add(entry);
+            inFlight.set(key, entries);
+            try {
+                return await app.ops.invokeOperation(principal, {
+                    ...call,
+                    instanceKey: request.instanceKey,
+                    messageId: request.messageId,
                 }, { signal: entry.controller.signal });
             }
             finally {

@@ -28,7 +28,12 @@
  *     K/S/B module digests + host audience) is persisted in the physical
  *     Host store under guarded CAS, so package replacement / stale roots
  *     refuse across process restarts before their module bytes ever load,
- *     and re-registering the SAME closure after a restart is idempotent;
+ *     and re-registering the SAME closure after a restart is idempotent.
+ *     The registration is ATOMIC (#1023 S04 R1 P1-01): the capability
+ *     resource adapters install as one all-or-nothing batch BEFORE the
+ *     durable pin commit, and ANY post-load failure rolls the batch back,
+ *     awaits the facade's S03 lifecycle teardown and leaves no pin, no
+ *     partial adapter and no live facade behind;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
  *     delivery and silently stop when the grant is no longer valid;
  *   - cancellation (#1003 FR07-KH2, B3) is request-scoped and
@@ -84,6 +89,22 @@ export interface KernelGatewayCancelRequest {
     readonly messageId: string;
 }
 /**
+ * #1023 S04 — one authenticated BUILD-fixed OperationCall through the
+ * gateway. Pure operations carry only the capability/operation identity
+ * and plain-JSON input; effectful operations additionally carry the
+ * occurrence address components exactly like an authenticated send.
+ */
+export interface KernelGatewayOperationCall {
+    readonly appId: string;
+    readonly capabilityId: string;
+    readonly operationId: string;
+    readonly input?: unknown;
+    /** Effectful operations only: the occurrence instance address component. */
+    readonly instanceKey?: string;
+    /** Effectful operations only: the occurrence dedup/replay identity. */
+    readonly messageId?: string;
+}
+/**
  * `cancel-requested`: the in-flight occurrence's signal was raised — the
  * `send` receipt stays the authoritative outcome (`terminated`/CANCELLED, or
  * `admitted` when K had already closed its latch for admission).
@@ -99,6 +120,14 @@ export interface KernelGateway {
     hasApp(appId: string): boolean;
     /** Authenticated send through the REAL selected Kernel of the app. */
     send(credential: unknown, intent: KernelGatewaySendIntent): Promise<unknown>;
+    /**
+     * #1023 S04: authenticated BUILD-fixed OperationCall. Every call
+     * re-authenticates the credential and scope-gates the authenticated
+     * principal's app exactly like send; pure operations dispatch the exact
+     * sealed handler, effectful operations traverse the same unbypassable
+     * Business admission + Kernel occurrence path as send.
+     */
+    invokeOperation(credential: unknown, request: KernelGatewayOperationCall): Promise<unknown>;
     /** Authenticated, request-scoped cancellation of the principal's own in-flight send. */
     cancel(credential: unknown, request: KernelGatewayCancelRequest): Promise<KernelGatewayCancelResult>;
     /** Authenticated scoped instance read (K getSnapshot). */
