@@ -90,37 +90,15 @@ Conformance set L2-01–L2-06 (reusing existing v0.8 P/N/FR/Hidden where applica
 - L2-R4: conditional Node/SQLite task DAG dependency and the distinct-account approval policy check under the pinned ADS.
 - L2-R5: **v0.8 qualified baseline absent:** source adoption and actual v0.8 #1006 release evidence must be re-pinned at implementation admission; no source implementation authority until then.
 
-**Review protocol:** one genuinely fresh bounded adversarial L2 architecture review on the exact candidate HEAD after L2-R1–R4 are addressed. Report P0/P1/P2 with real readback and counterexamples. No repetitive review rounds for unchanged findings. A source-author self-check is not a distinct-account independent review. Upon L2 PASS, freeze separate exact-source checkpoint, then convert the six existing owner Issues into a right-sized formal Implementation DAG with conditional #1028. No autonomous formal v0.9 implementation or release is claimed by this candidate.
+**Review protocol:** one genuine independent *delta* L2 review on the exact R3 candidate HEAD after the two R1 reviews identified material P1 findings. Report P0/P1/P2 with real readback and counterexamples. No repetitive review rounds for unchanged findings. A source-author self-check is not a genuinely independent review context; ADS permits a shared GitHub transport account when reviewer `operator_id/session_ref` is distinct. Upon L2 PASS, freeze separate exact-source checkpoint, then convert the six existing owner Issues into a right-sized formal Implementation DAG with conditional #1028. No autonomous formal v0.9 implementation or release is claimed by this candidate.
 
-## 7. R1 bounded proposed ABI resolution (for independent challenge, NOT yet frozen)
+## 7. R1 historical design sketch (superseded where §11 R3 fixes ABI)
 
 ### L2-R1: engine envelope and installation ABI
 
 **Proposed minimum compile target:** ES2022 + ESM + Promise/async + typed-array/UTF-8 semantics (the latter may be supplied by the selected protected H), a deterministic serialized data contract, and an explicitly declared **selected Host installation ABI revision**. The SDK Core may not require Node globals (`Buffer`, `process`, `node:crypto`, native SQLite) directly. A selected engine lacking compatible ESM evaluation or one required H ABI reports `UNSUPPORTED_RUNTIME_ABI` / `UNSUPPORTED_HOST_ABI` **before executing user Packages**. ES2022 is a proposed floor to validate against actual K/S source, not yet a tested all-engine support claim.
 
-**Protected internal boundary (logical methods, NOT public `load` options):**
-
-```ts
-// Internal H-owned installation seam; runtime names are proposals, not exports.
-interface ProtectedInstalledClosure {
-  readonly subjectDigest: string;
-  readonly runtimeAbi: string;
-  readonly selectedPackages: readonly VerifiedModuleHandle[];
-}
-interface ProtectedHostAssurance {
-  verifyCurrentApprovalAndInstall(root: unknown): Promise<ProtectedInstalledClosure>;
-  authenticateAndRecheckCaller(input: unknown, purpose: 'send' | 'query' | 'subscribe'): Promise<AuthorizedPrincipal>;
-}
-interface VerifiedModuleHandle {
-  readonly packageId: string;
-  readonly abiVersion: string;
-  readonly moduleSha256: string;
-  // Opaque to public caller: selected H already proved physical source bytes.
-  readonly opaqueInternalHandle: unknown;
-}
-```
-
-This is an **internal conceptual SPI**, not an assertion that mutable JS objects/TS interfaces convey cryptographic provenance. Only trusted H bootstrap can instantiate/bind it, with protected provenance outside arbitrary Business/UX inputs. `DomainHarness.load(package)` remains exactly one public argument. A forged object implementing this interface must convey **no** authority. H must validate the actual transitive ESM module graph, resolving imports from an approved read-only byte map; dynamic external/specifier fetch or ad hoc `data:` import of caller-provided modules is denied unless itself a specifically approved selected loader. H's physical crypto + byte loader are selected implementations, not exposed as a user-changeable Provider.
+**R3 selected internal split (authoritative D02/D03):** trusted *governance-only* `install(sealedRoot, approval, audience)` qualifies and durably publishes an inert Package artifact; protected H `activate(installedRef:string)` validates stored opaque reference/currentness and loads only qualified bundled bytes; public `DomainHarness.load(package)` forwards **exactly one installed-reference string** into protected H, never accepts raw Root/object/caller-provided verifier. H grants private per-operation caller credentials for `send|query|subscribe|deliver|stop` and one-shot physical Effect permits after current principal **and Package** approval checks. K consumes H-authenticated context and retains all Admission, State, Journal, Effect and UNKNOWN decisions. Methods/types here are boundary semantics, not separately instantiable user-supplied JavaScript interfaces. The complete protection/commit race rules are in **§11 D01–D03**; the earlier combined `verifyCurrentApprovalAndInstall(root)` and `purpose='send|query|subscribe'` prototype were explicitly **rejected** by independent R1 findings.
 
 ### L2-R2: frozen digest domain and currentness decision
 
@@ -173,7 +151,7 @@ These are **proposed portable categories** and required semantic invariants, not
 
 `L2_ARCH_REVIEW_POLICY=required` for protected approval/module-evaluation and K authority boundary; a separate review **session/operator context** must use exact HEAD, even if the GitHub transport account happens to be the same. This author-side reconciliation is **not** independent evidence.
 
-- **R1 JS engine floor:** ES2022 + ESM + async + versioned Host ABI is the proposed bounded floor, with first selected real JS engine to be named and tested by #1037. Do not claim cross-engine support before proof. Lack of chosen concrete engine profile is **validation-admission BLOCKED** and must be concretely named before the selected release tests; it need not imply an OS matrix.
+- **R1 JS engine floor:** ES2022 + ESM + async + versioned Host ABI is the proposed bounded floor, with Node24 ESM + protected selected H/SQLite now named for the first reference cohort in §11 D01 and to be tested by #1037. Do not claim cross-engine support before proof. Lack of chosen concrete engine profile is **validation-admission BLOCKED** and must be concretely named before the selected release tests; it need not imply an OS matrix.
 - **R2 cryptographic/loader ABI:** select protected H-approved content-addressed module graph with explicit allowed profile-builtins and canonical UTF-8 subject-digest byte vectors. This is a **bounded design assumption** with #1032 owner; proof of artifact byte identity + effective revocation before any unapproved import is **release-blocking**, not waivable. #1047 is merged on the v0.8 branch; adopt its bounded source seam in design now but do not treat it as release-qualified until #1006 passes.
 - **R3 WorkflowRouter and public error ABI:** bounded Router is Standard-only; the final exact API name/error taxonomy is a **#1027 contract-first Task** followed by #1035 public binding, not permission for a second implementation. ABI-breaking changes require explicit frozen L2 successor.
 - **R4 review credential:** ADS `standards/CHATGPT_WEB_ROLE.md` permits same GitHub transport identity **when independent Reviewer session_ref/operator_id is distinct from Builder/author**. The author may not invent an independent context. Record exact review provenance at L2 Freeze.
