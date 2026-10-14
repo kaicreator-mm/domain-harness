@@ -400,8 +400,22 @@ function assertOperationEffectBinding(input: {
       if (!isPlainRecordValue(transition)) continue;
       const transitionTrigger = transition.trigger;
       if (!isPlainRecordValue(transitionTrigger) || transitionTrigger.eventType !== eventType) continue;
-      if (!Array.isArray(transition.effectIntents)) continue;
-      for (const effectIntent of transition.effectIntents) {
+      // #1023 S04 R2 (@5514296714): EVERY trigger-matching transition the
+      // selected Kernel could admit must dispatch the promised effect - a
+      // same-event branch WITHOUT effects (the real approval policy's guarded
+      // approve plus fallback reject) could otherwise be admitted with an
+      // 'admitted' receipt while the promised capability handler never runs.
+      // Guarded DENIALS stay valid: a denied occurrence never reaches effect
+      // dispatch and is not affected here.
+      const intents = Array.isArray(transition.effectIntents) ? transition.effectIntents : [];
+      if (intents.length === 0) {
+        const transitionKey = typeof transition.transitionKey === 'string' ? transition.transitionKey : '(unnamed)';
+        throw typedError(
+          'OPERATION_BINDING_MISMATCH',
+          `${where} claims admission intent ${intentType}, but its transition ${transitionKey} for event ${eventType} dispatches no Business effect - the Kernel could admit this branch and the OperationCall would report success without the promised capability handler (mixed effectful/effectless same-event branches refuse)`,
+        );
+      }
+      for (const effectIntent of intents) {
         if (isPlainRecordValue(effectIntent) && typeof effectIntent.effectType === 'string') {
           effectTypes.add(effectIntent.effectType);
         }

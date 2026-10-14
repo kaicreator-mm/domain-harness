@@ -526,16 +526,19 @@ function businessPatchOnce(source: string, anchor: string, replacement: string, 
 }
 
 /**
- * S04-W3 (#1023 S04 R1 P1-02): the wiring-time Operation→Effect binding
- * interlock. A sealed effectful OPERATIONS entry must match the AUTHORITATIVE
+ * S04-W3 (#1023 S04 R1 P1-02 + R2 @5514296714): the wiring-time Operation→Effect
+ * binding interlock. A sealed effectful OPERATIONS entry must match the AUTHORITATIVE
  * sealed Business policy data the selected Kernel dispatches on — the intent
  * binding's transitions must dispatch Business effect(s), each effect binding
  * must DECLARE its Host physical route {key, operation} equal to the ABI's
  * claim, and its `semantics` must equal the declared `effectClass`. A wrong
  * route, a false idempotency declaration, an effect-less intent, or an intent
  * the policy does not bind refuses typed at load, BEFORE any
- * activation/dispatch — no K-receipt-without-capability-handler and no false
- * retry-safety declaration can survive wiring.
+ * activation/dispatch. R2 adds the MIXED-branch rule: EVERY trigger-matching
+ * transition the Kernel could admit must dispatch the promised effect — the
+ * real submitQuoteDecision's guarded approve (effect:reserve) plus fallback
+ * reject (no effect) must refuse, because an admitted reject branch would
+ * return an 'admitted' receipt with zero capability handler runs.
  */
 test('S04-W3: Operation↔Effect binding interlock refuses mismatched declarations at load, before any activation/dispatch', async () => {
   const businessSource = await readFile(new URL('business-approval.mjs', examplesDir), 'utf8');
@@ -670,6 +673,73 @@ export function getPolicy() {`,
         '',
         'strict binding removal',
       ),
+    },
+    {
+      name: 'mixed effectful/effectless same-event branches (the REAL submitQuoteDecision approve+reject)',
+      capabilityModuleSource: await capabilityVariant((literal) => literal.replace(
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteDecisionDynamic',",
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteDecision',",
+      )),
+      messageIncludes: 'reject',
+    },
+    {
+      name: 'second same-event transition dispatching a DIFFERENT physical route',
+      businessModuleSource: (() => {
+        let source = businessPatchOnce(
+          businessSource,
+          `                idempotencyKeyFrom: { template: 'reserve:quote:{requestId}' },
+              },
+            ],
+          },
+        ],`,
+          `                idempotencyKeyFrom: { template: 'reserve:quote:{requestId}' },
+              },
+            ],
+          },
+          {
+            transitionKey: 'approve-alt-route',
+            trigger: { kind: 'event', eventType: 'QUOTE_DECIDED' },
+            targetState: 'approved',
+            guardId: 'guard:amount-ok',
+            effectIntents: [
+              {
+                effectType: 'effect:reserve-alt',
+                inputFrom: {
+                  amount: { source: 'event', path: ['payload', 'amount'] },
+                  requestId: { source: 'event', path: ['payload', 'requestId'] },
+                },
+                idempotencyKeyFrom: { template: 'reserve-alt:quote:{requestId}' },
+              },
+            ],
+          },
+        ],`,
+          'second same-event transition',
+        );
+        source = businessPatchOnce(
+          source,
+          `          return resources.call('ledger', 'reserve', { ...input, effectId });
+        },
+      },
+    },`,
+          `          return resources.call('ledger', 'reserve', { ...input, effectId });
+        },
+      },
+      'effect:reserve-alt': {
+        semantics: 'non-idempotent',
+        resource: { key: 'ledger', operation: 'reserveAlt' },
+        handler: async ({ input, effectId, resources }) => {
+          if (resources === undefined) {
+            throw new Error('effect:reserve-alt requires the Host resource port');
+          }
+          return resources.call('ledger', 'reserveAlt', { ...input, effectId });
+        },
+      },
+    },`,
+          'alternate-route effect binding',
+        );
+        return source;
+      })(),
+      messageIncludes: 'reserveAlt',
     },
   ];
   for (const variant of variants) {
