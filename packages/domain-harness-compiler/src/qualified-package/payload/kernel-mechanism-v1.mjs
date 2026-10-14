@@ -2269,6 +2269,87 @@ function pinDocKey(workflowInstanceId) {
   return `v08-kernel:governance-pin:${workflowInstanceId}`;
 }
 
+// ===========================================================================
+// [#1003 NF06] K-owned decision-receipt records (OBSERVATIONAL_OPTIONAL).
+// One durable data-only record per EXACT durable control turn, created
+// through the Host true-CAS port (mustBeAbsent — create-or-conflict, never
+// an unconditional write). The record NEVER carries admission authority:
+// the admitted State, Effect journal and instance CAS remain the only
+// authority; a lost/failed/conflicting record is reported as a separate
+// typed observation outcome and can never rewrite the business truth.
+// ===========================================================================
+
+function decisionReceiptDocKey(turnId) {
+  return `v08-kernel:decision-receipt:${turnId}`;
+}
+
+/**
+ * Receipt identity for idempotent-replay adjudication: the kernel module
+ * bytes, the turn's occurrence identity and the redacted projected record —
+ * everything EXCEPT the volatile recordedAt timestamp, so a crash-restart
+ * replay of the same admitted turn recognizes its own record instead of
+ * conflicting.
+ */
+function decisionReceiptIdentity(envelope) {
+  const record = isJsonRecord(envelope) && isJsonRecord(envelope.record) ? envelope.record : {};
+  const { recordedAt: _recordedAt, ...identity } = record;
+  return canonicalJsonStringify({ kernelModuleSha256: envelope.kernelModuleSha256, record: identity });
+}
+
+const RECEIPT_DURABILITY_MODES = new Set(['observational-optional', 'durable-mandatory']);
+
+/**
+ * [#1003 NF06] Trusted load-boundary wiring of every intent-declared
+ * `receiptPolicy`: shape-validated and frozen HERE, before any instance can
+ * exist (same discipline as the effect/continuation/semantic wiring). A
+ * malformed policy fails the load typed; a valid one is the ONLY receipt
+ * authority the submit lane trusts at occurrence time.
+ */
+function wireDecisionReceiptPolicies(businessEndpoint) {
+  const policies = new Map();
+  const bindings = businessEndpoint.intentBindings ?? {};
+  for (const [intentType, binding] of Object.entries(bindings)) {
+    if (!isJsonRecord(binding) || !hasOwn(binding, 'receiptPolicy')) continue;
+    const rawPolicy = binding.receiptPolicy;
+    if (!isJsonRecord(rawPolicy)) {
+      throw new CentralAdmissionError(
+        'BUSINESS_RECEIPT_POLICY_INVALID',
+        `intent ${intentType} declares a receiptPolicy that is not an object`,
+      );
+    }
+    const durability = rawPolicy.durability;
+    if (typeof durability !== 'string' || !RECEIPT_DURABILITY_MODES.has(durability)) {
+      throw new CentralAdmissionError(
+        'BUSINESS_RECEIPT_POLICY_INVALID',
+        `intent ${intentType} declares receiptPolicy.durability ${JSON.stringify(durability)}; exactly 'observational-optional' or 'durable-mandatory' is accepted`,
+      );
+    }
+    let readerRoles;
+    if (rawPolicy.readerRoles !== undefined) {
+      if (!Array.isArray(rawPolicy.readerRoles)
+        || rawPolicy.readerRoles.length === 0
+        || rawPolicy.readerRoles.length > 64
+        || !rawPolicy.readerRoles.every((role) => typeof role === 'string' && role.length > 0)) {
+        throw new CentralAdmissionError(
+          'BUSINESS_RECEIPT_POLICY_INVALID',
+          `intent ${intentType} declares receiptPolicy.readerRoles that is not a bounded non-empty list of roles`,
+        );
+      }
+      readerRoles = [...new Set(rawPolicy.readerRoles)];
+    } else if (durability === 'observational-optional') {
+      throw new CentralAdmissionError(
+        'BUSINESS_RECEIPT_POLICY_INVALID',
+        `intent ${intentType} declares an observational-optional receiptPolicy without readerRoles; a readable observation must declare who may read it`,
+      );
+    }
+    policies.set(intentType, Object.freeze({
+      durability,
+      ...(readerRoles === undefined ? {} : { readerRoles: Object.freeze(readerRoles) }),
+    }));
+  }
+  return policies;
+}
+
 export class KernelGovernancePinStore {
   #docs;
   #sha256;
@@ -3049,6 +3130,7 @@ export function createOccurrenceRuntime(options) {
     engineCommits: 0,
     instanceCreates: 0,
     instanceReads: 0,
+    decisionReceiptAppends: 0,
   };
 
   const docs = hostPorts.docs;
@@ -3077,6 +3159,9 @@ export function createOccurrenceRuntime(options) {
   // shape validated ONCE here; a stale/substituted/malformed declaration
   // fails the load typed before any instance can exist.
   const semanticDecisionRules = wireSemanticDecisionRules(businessEndpoint, sha256);
+  // [#1003 NF06] Same trusted boundary: every intent-declared receiptPolicy
+  // is shape-validated and frozen here, before any instance can exist.
+  const decisionReceiptPolicies = wireDecisionReceiptPolicies(businessEndpoint);
 
   function continuationPolicyFor(rule) {
     const wired = isJsonRecord(rule) ? continuationPolicies.get(rule) : undefined;
@@ -3102,6 +3187,193 @@ export function createOccurrenceRuntime(options) {
     await baselines.putBody(body);
     await pinStore.bindPin({ workflowInstanceId, governanceBaseline: identity });
     return body;
+  }
+
+  /**
+   * [#1003 NF06 OBSERVATIONAL_OPTIONAL] The K-owned authoritative append of
+   * ONE data-only decision receipt at the exact durable control turn key,
+   * invoked strictly AFTER the admitted business commit. K alone decides
+   * when/why a record may exist; S supplies only the redacted data-only
+   * projection of the verified outcome; the generic Host CAS create is the
+   * only persistence. Every failure is a SEPARATE typed observation outcome:
+   * nothing here may throw out of the occurrence, rewrite the admitted
+   * truth, or claim 'recorded' without a physically accepted create. A
+   * create that loses to an existing record re-reads it INSIDE this
+   * boundary: the re-read and the identity comparison are themselves
+   * bounded — a Host read failure during the replay check is a typed
+   * not_recorded observation, never a business failure [#1055 R1 P1-02];
+   * the SAME turn's own identity (turn + declaration + projected record,
+   * minus the volatile recordedAt) is an idempotent replay; anything else is
+   * a typed conflict that never overwrites the stored record. The envelope
+   * freezes the recording intent's reader scope, so every read authorizes
+   * against THIS record's own scope — never the union of all policies'
+   * roles [#1055 R1 P1-01].
+   */
+  async function appendObservationalDecisionReceipt({ request, target, workflowInstanceId, binding, declaration, resolved }) {
+    const receiptPolicy = decisionReceiptPolicies.get(request.intentType);
+    if (receiptPolicy === undefined || receiptPolicy.durability !== 'observational-optional') {
+      return undefined;
+    }
+    if (typeof sdkEndpoint?.projectDecisionReceipt !== 'function') {
+      return {
+        status: 'not_recorded',
+        error: { code: 'SDK_DECISION_RECEIPT_PROJECTION_UNAVAILABLE', message: 'the selected Standard SDK exposes no decision-receipt projection endpoint' },
+      };
+    }
+    const turnId = deriveDurableControlTurnId(target, { kind: 'message', sourceMessageId: request.messageId });
+    const declarationIdentity = isJsonRecord(declaration)
+      ? {
+        ruleId: typeof declaration.id === 'string' ? declaration.id : binding.ruleId,
+        ...(typeof declaration.declarationDigest === 'string' ? { declarationDigest: declaration.declarationDigest } : {}),
+      }
+      : { ruleId: binding.ruleId };
+    let projected;
+    try {
+      projected = await sdkEndpoint.projectDecisionReceipt({
+        turnId,
+        workflowInstanceId,
+        declaration: declarationIdentity,
+        resolved,
+        durability: 'observational-optional',
+      });
+    } catch (error) {
+      return {
+        status: 'not_recorded',
+        error: {
+          code: typeof error?.code === 'string' ? error.code : 'DECISION_RECEIPT_PROJECTION_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+    const envelope = {
+      kernelModuleSha256: moduleIdentity.moduleSha256,
+      // [#1055 R1 P1-01] The per-record frozen read scope: the readerRoles of
+      // THE intent that records THIS receipt, snapshotted at append time.
+      // getDecisionReceipt authorizes against this scope alone — a reader
+      // declared by a different intent's policy never gains authority over
+      // this record, and the key alone confers no read authority.
+      readerRoles: snapshotJson(receiptPolicy.readerRoles ?? []),
+      record: snapshotJson({
+        projected,
+        occurrence: { messageId: request.messageId, workflowInstanceId },
+        attribution: attribution(),
+        recordedAt: clock(),
+      }),
+    };
+    counters.decisionReceiptAppends += 1;
+    const key = decisionReceiptDocKey(turnId);
+    try {
+      await docs.put(key, envelope, { mustBeAbsent: true });
+      return { status: 'recorded', receiptKey: key, durability: 'observational-optional' };
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
+        // [#1055 R1 P1-02] The re-read and the identity comparison live
+        // INSIDE the optional observation boundary: a Host read failure,
+        // an unreadable winner or a canonicalization exception during the
+        // replay check is a separate typed not_recorded outcome — it can
+        // never fail the already-committed business ACK.
+        try {
+          const winner = await docs.get(key);
+          if (winner !== null && isJsonRecord(winner.value) && decisionReceiptIdentity(winner.value) === decisionReceiptIdentity(envelope)) {
+            return { status: 'recorded', receiptKey: key, durability: 'observational-optional', idempotentReplay: true };
+          }
+          return {
+            status: 'not_recorded',
+            error: { code: 'DECISION_RECEIPT_CONFLICT', message: `a different record already occupies the decision-receipt key ${key}; the conflicting record is never overwritten` },
+          };
+        } catch (replayError) {
+          return {
+            status: 'not_recorded',
+            error: {
+              code: typeof replayError?.code === 'string' ? replayError.code : 'DECISION_RECEIPT_REPLAY_CHECK_FAILED',
+              message: replayError instanceof Error ? replayError.message : String(replayError),
+            },
+          };
+        }
+      }
+      return {
+        status: 'not_recorded',
+        error: {
+          code: typeof error?.code === 'string' ? error.code : 'DECISION_RECEIPT_APPEND_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+  }
+
+  /**
+   * [#1003 NF06] Authorized read of ONE persisted decision receipt through
+   * the same K authority that appended it. THE authorization decision is the
+   * record's OWN frozen reader scope — the readerRoles of the intent that
+   * recorded THIS receipt, snapshotted into the envelope at append time
+   * [#1055 R1 P1-01]: a role declared by a DIFFERENT intent's receiptPolicy
+   * (even one wired in the same closure) confers no authority over this
+   * record, so a reader of an unprivileged intent can never read a more
+   * sensitive intent's committed receipt. A coarse pre-filter (the caller
+   * must hold a role declared by SOME wired receiptPolicy) refuses obvious
+   * non-readers before the store is touched, but it is only a NECESSARY
+   * condition — never sufficient. A record pinned to different Kernel
+   * module bytes refuses typed (no silent cross-version replay), and an
+   * absent record stays an honest null — it is never an error and never a
+   * claim.
+   */
+  async function getDecisionReceipt(request) {
+    if (!isJsonRecord(request)) {
+      throw new CentralAdmissionError('DECISION_RECEIPT_READ_INVALID', 'a decision-receipt read must be a record {target, messageId, caller}');
+    }
+    const target = request.target;
+    const messageId = request.messageId;
+    if (!isJsonRecord(target) || typeof target.workflowId !== 'string' || typeof target.instanceKey !== 'string') {
+      throw new CentralAdmissionError('DECISION_RECEIPT_READ_INVALID', 'a decision-receipt read requires a workflow target {workflowId, instanceKey}');
+    }
+    if (typeof messageId !== 'string' || messageId.length === 0) {
+      throw new CentralAdmissionError('DECISION_RECEIPT_READ_INVALID', 'a decision-receipt read requires a non-empty messageId');
+    }
+    const caller = isJsonRecord(request.caller) ? request.caller : { role: 'anonymous' };
+    const callerRoles = Array.isArray(caller.roles) && caller.roles.every((role) => typeof role === 'string')
+      ? caller.roles
+      : typeof caller.role === 'string' ? [caller.role] : [];
+    // Coarse pre-filter only (necessary, never sufficient): refuse callers
+    // holding no declared receipt-reader role at all before the store is
+    // touched. The AUTHORITATIVE gate is the per-record frozen scope below.
+    const declaredAnywhere = new Set();
+    for (const policy of decisionReceiptPolicies.values()) {
+      for (const role of policy.readerRoles ?? []) declaredAnywhere.add(role);
+    }
+    if (declaredAnywhere.size === 0 || !callerRoles.some((role) => declaredAnywhere.has(role))) {
+      throw new CentralAdmissionError(
+        'DECISION_RECEIPT_READ_UNAUTHORIZED',
+        'the authenticated caller holds none of the Business-declared decision-receipt reader roles; the record is not readable',
+      );
+    }
+    const turnId = deriveDurableControlTurnId(target, { kind: 'message', sourceMessageId: messageId });
+    const doc = await docs.get(decisionReceiptDocKey(turnId));
+    if (doc === null) return null;
+    const envelope = doc.value;
+    if (!isJsonRecord(envelope) || envelope.kernelModuleSha256 !== moduleIdentity.moduleSha256) {
+      throw new CentralAdmissionError(
+        'DECISION_RECEIPT_KERNEL_MISMATCH',
+        `the decision receipt of turn ${turnId} is pinned to different kernel module bytes; typed code unavailability — no silent cross-version replay`,
+      );
+    }
+    // [#1055 R1 P1-01] The authoritative per-record gate, checked BEFORE any
+    // record byte is released: the caller must hold one of the readerRoles
+    // frozen into THIS envelope by the intent that recorded it. A record
+    // carrying no valid frozen scope is not readable by anyone (fail closed).
+    const recordScope = envelope.readerRoles;
+    if (!Array.isArray(recordScope) || recordScope.length === 0 || !recordScope.every((role) => typeof role === 'string' && role.length > 0)) {
+      throw new CentralAdmissionError(
+        'DECISION_RECEIPT_READ_UNAUTHORIZED',
+        `the decision receipt of turn ${turnId} carries no frozen reader scope; it is not readable by any caller`,
+      );
+    }
+    if (!callerRoles.some((role) => recordScope.includes(role))) {
+      throw new CentralAdmissionError(
+        'DECISION_RECEIPT_READ_UNAUTHORIZED',
+        `the authenticated caller holds none of the reader roles the recording intent froze for the decision receipt of turn ${turnId}; the record is not readable`,
+      );
+    }
+    return snapshotJson(envelope.record);
   }
 
   const effectTools = {
@@ -3209,6 +3481,39 @@ export function createOccurrenceRuntime(options) {
       const receipt = {
         status: 'denied',
         denial,
+        occurrence: { messageId: request.messageId, workflowInstanceId: `${target.workflowId}:${target.instanceKey}` },
+        attribution: attribution(),
+      };
+      safeObserve(receipt);
+      return receipt;
+    }
+
+    // [#1003 NF06 DURABLE_MANDATORY] Feasibility gate: the frozen v0.8 Host
+    // storage contract is a true-CAS SINGLE-document store with NO
+    // cross-document atomic batch or coordinated recovery protocol, so the
+    // state-CAS + receipt-append of one occurrence CANNOT be proven atomic
+    // or crash-recoverable (the physical negative of this slice witnesses
+    // the receipt append failing after the admitted business commit). A
+    // separately declared mandatory receipt policy is therefore refused
+    // typed BEFORE admission — zero Guard/Journal/Effect/State mutation, no
+    // silent fallback to the optional best-effort mode — and reported for
+    // product adjudication instead of faking a durability the Host does not
+    // supply.
+    const wiredReceiptPolicy = decisionReceiptPolicies.get(request.intentType);
+    if (wiredReceiptPolicy !== undefined && wiredReceiptPolicy.durability === 'durable-mandatory') {
+      const receipt = {
+        status: 'denied',
+        denial: {
+          reason: 'decision-receipt-mandatory-unsupported',
+          deniedBy: businessEndpoint.packageId,
+          intentType: request.intentType,
+          decisionReceipt: {
+            policy: 'durable-mandatory',
+            supported: false,
+            productDecision: 'PRODUCT_DECISION_REQUIRED',
+            detail: 'the v0.8 Host true-CAS document store cannot coordinate an atomic or crash-recoverable state+receipt commit; the mandatory receipt mode is refused before admission rather than silently degraded',
+          },
+        },
         occurrence: { messageId: request.messageId, workflowInstanceId: `${target.workflowId}:${target.instanceKey}` },
         attribution: attribution(),
       };
@@ -3379,12 +3684,28 @@ export function createOccurrenceRuntime(options) {
         }),
       });
 
+      // [#1003 NF06 OBSERVATIONAL_OPTIONAL] AFTER the admitted business
+      // commit (the authoritative state CAS is already durable), the
+      // K-owned decision receipt is appended as a SEPARATE best-effort
+      // observation. Its typed outcome rides the occurrence receipt as an
+      // independent field: the admitted business truth above is never
+      // rewritten, rolled back or failed by this append.
+      const decisionReceipt = await appendObservationalDecisionReceipt({
+        request,
+        target,
+        workflowInstanceId,
+        binding,
+        declaration,
+        resolved,
+      });
+
       const receipt = {
         status: 'admitted',
         admitted: outcome.admitted,
         instance: committed,
         occurrence: { messageId: request.messageId, workflowInstanceId },
         attribution: attribution(),
+        ...(decisionReceipt === undefined ? {} : { decisionReceipt }),
       };
       safeObserve(receipt);
       return receipt;
@@ -3434,6 +3755,7 @@ export function createOccurrenceRuntime(options) {
     openInstance,
     submitOccurrence,
     getSnapshot,
+    getDecisionReceipt,
     getJournalRecords: () => effectJournal.getRecords(),
     getMechanismIdentity,
     businessPackageId: businessEndpoint.packageId,

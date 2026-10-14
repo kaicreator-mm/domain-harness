@@ -455,6 +455,17 @@ export function createKernelGateway(input) {
             // physical instance — never the first tenant's state.
             return app.ops.queryInstance(principal, target.instanceKey);
         },
+        async queryDecisionReceipt(credential, request) {
+            const principal = await authenticate(credential);
+            assertIntentScope(request, principal);
+            const app = requireApp(request.appId, principal);
+            // [#1003 NF06] Same authenticated-read discipline as queryInstance:
+            // the tenant/app-qualified address of the AUTHENTICATED principal plus
+            // the exact message turn. The Kernel alone owns the Business-declared
+            // reader-role gate and the record bytes; an unauthenticated or
+            // out-of-scope read never reaches the physical store.
+            return app.ops.queryDecisionReceipt(principal, { instanceKey: request.instanceKey, messageId: request.messageId });
+        },
         async subscribe(credential, scope, listener) {
             if (typeof listener !== 'function') {
                 throw new HostBoundaryError('HOST_SUBSCRIPTION_MALFORMED', 'a Kernel receipt subscription requires a listener function');

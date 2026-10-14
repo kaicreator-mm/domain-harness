@@ -132,6 +132,14 @@ export interface KernelGateway {
     cancel(credential: unknown, request: KernelGatewayCancelRequest): Promise<KernelGatewayCancelResult>;
     /** Authenticated scoped instance read (K getSnapshot). */
     queryInstance(credential: unknown, target: UxTarget): Promise<unknown>;
+    /**
+     * [#1003 NF06] Authenticated scoped decision-receipt read: ONE persisted
+     * record of the exact message turn, through the same K authority that
+     * appended it (Business-declared reader roles gate the Kernel side).
+     */
+    queryDecisionReceipt(credential: unknown, request: UxTarget & {
+        readonly messageId: string;
+    }): Promise<unknown>;
     /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
     subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription>;
     /** Protected Genesis activation (host-configured role authority). */

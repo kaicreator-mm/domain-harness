@@ -122,6 +122,14 @@ function ident(value, label) {
   return value;
 }
 
+/** K-derived opaque addresses (URL-encoded turn/workflow ids): bounded text, not identifier-shaped. */
+function boundedText(value, label) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 256) {
+    fail('SDK_DECISION_RECEIPT_RECORD_INVALID', `${label} must be bounded non-empty text`);
+  }
+  return value;
+}
+
 function project(fields, input, label) {
   const map = record(fields, `${label} projection`);
   const result = Object.create(null);
@@ -1357,6 +1365,74 @@ export function makeRetainedDecisionReceipt(rawResolution) {
     decision: resolution.decision,
     authority: 'proposal-only',
     durableAppend: 'required-by-kernel',
+  };
+}
+
+/**
+ * #1003 NF06 OBSERVATIONAL_OPTIONAL — bounded, redacted, DATA-ONLY decision
+ * receipt projection. The Kernel hands in ONLY material it has already
+ * verified (the derived durable turn identity, the approved declaration
+ * identity, the resolved structured decision) plus the declaring receipt
+ * policy; this projection reduces it to an allowlist — decision outcome and
+ * event TYPE only. Raw input payloads, credentials and any model text can
+ * never enter the record: they are not on the allowlist even when present
+ * in the verified material. S owns no durable append: the returned record
+ * is inert data the Kernel alone may persist through the Host CAS port.
+ */
+export function projectDecisionReceiptRecord(rawVerified) {
+  const verified = record(data(rawVerified), 'verified decision material');
+  // The durable turn id / workflow instance id are K-derived opaque
+  // addresses (URL-encoded components), not declaration identifiers: they
+  // are validated as bounded non-empty text, never identifier-shaped.
+  const turnId = boundedText(verified.turnId, 'turnId');
+  const workflowInstanceId = boundedText(verified.workflowInstanceId, 'workflowInstanceId');
+  const declaration = record(verified.declaration, 'declaration identity');
+  const ruleId = ident(declaration.ruleId, 'declaration.ruleId');
+  const declarationDigest = declaration.declarationDigest === undefined
+    ? undefined
+    : boundedText(declaration.declarationDigest, 'declaration.declarationDigest');
+  const durability = verified.durability;
+  if (durability !== 'observational-optional') {
+    fail('SDK_DECISION_RECEIPT_RECORD_INVALID', 'a data-only decision receipt projects the observational-optional durability only; durable-mandatory coordination is Kernel/Host authority, never an S claim');
+  }
+  const resolved = record(verified.resolved, 'verified resolution');
+  const source = ident(resolved.source, 'resolution source');
+  const structured = record(resolved.structuredDecision, 'resolved structured decision');
+  const decision = record(structured.decision, 'resolved decision');
+  const outcome = ident(decision.outcome, 'resolved decision outcome');
+  const event = record(structured.event, 'resolved event');
+  const eventType = ident(event.type, 'resolved event type');
+  if (typeof resolved.llmAvoided !== 'boolean') {
+    fail('SDK_DECISION_RECEIPT_RECORD_INVALID', 'the verified resolution must carry a boolean llmAvoided truth');
+  }
+  let modelCallEvidence;
+  if (resolved.modelCallEvidence === undefined) {
+    modelCallEvidence = { status: 'unsupported' };
+  } else {
+    const evidence = record(resolved.modelCallEvidence, 'model call evidence');
+    const keys = Object.keys(evidence).sort().join(',');
+    if (evidence.status === 'measured' && Number.isSafeInteger(evidence.count) && evidence.count >= 0
+      && typeof evidence.scope === 'string' && keys === 'count,scope,status') {
+      modelCallEvidence = { status: 'measured', count: evidence.count, scope: evidence.scope };
+    } else if ((evidence.status === 'unmeasured' || evidence.status === 'unsupported') && keys === 'status') {
+      modelCallEvidence = { status: evidence.status };
+    } else {
+      fail('SDK_DECISION_RECEIPT_RECORD_INVALID', 'model call evidence must be the structured measured/unmeasured/unsupported record');
+    }
+  }
+  return {
+    kind: 'decision-receipt-record',
+    eventType: 'DECISION_RECEIPT',
+    turnId,
+    workflowInstanceId,
+    declaration: declarationDigest === undefined ? { ruleId } : { ruleId, declarationDigest },
+    decision: { outcome },
+    event: { type: eventType },
+    source,
+    llmAvoided: resolved.llmAvoided,
+    modelCallEvidence,
+    durability,
+    authority: 'data-only',
   };
 }
 

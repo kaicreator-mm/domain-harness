@@ -37,6 +37,14 @@ export declare class SqliteCasStore implements CasDocumentStore {
     failNextPutMatching(keySubstring: string, { skip }?: {
         skip?: number | undefined;
     }): void;
+    /**
+     * Physical READ fault injection (#1055 R1 P1-02 vector), same contract as
+     * cas.ts: the next matching `get` fails typed, proving read-side Host
+     * failures on the physical path.
+     */
+    failNextGetMatching(keySubstring: string, { skip }?: {
+        skip?: number | undefined;
+    }): void;
     get(key: string): Promise<CasGetResult | null>;
     put(key: string, value: unknown, conditions: CasPutConditions): Promise<{
         revision: number;

@@ -45,7 +45,12 @@ export const FIXTURE_SHAS = {
   /** #1003 FR07-KH2-Builder-authored harness continuation fixture. */
   continuation: 'f6f974a5537f39f1bf8b11882ed62e767e450a873ae359b98e78c4bfc73d3547',
   /** #1003 FR08 SD1/SD2 + NF05-Builder-authored semantic-decision fixtures. */
-  semantic: 'e5aece1345ebb9f31a64e2b815e998957a94641863d46ae5277bc72390374365',
+  // #1003 NF06: re-pinned for the two added receipt-policy intents
+  // (submitSdReceiptQuote / submitSdMandatoryQuote — same approved rule
+  // declaration and digests; the receipt policy is intent-level governance).
+  // #1055 R1 P1-01: re-pinned for the third receipt-policy intent
+  // submitSdRestrictedQuote (disjoint reader scope; same declaration).
+  semantic: '76e065c3063b755b822d7fa9f3b1a6fc17cca542a51c82328954a75354fb9efb',
   semanticBad: 'fff7743a36c61682d923aa1272ff517036993e56e538c77c105c2ed9a04f8446',
 } as const;
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);

@@ -67,6 +67,14 @@ export declare class InMemoryCasStore implements CasDocumentStore {
     failNextPutMatching(keySubstring: string, { skip }?: {
         skip?: number | undefined;
     }): void;
+    /**
+     * Physical READ fault injection (#1055 R1 P1-02 vector): the next matching
+     * `get` fails typed, so a read-side Host failure (connection closed, I/O
+     * error) is provable on the physical path — symmetric with the write fault.
+     */
+    failNextGetMatching(keySubstring: string, { skip }?: {
+        skip?: number | undefined;
+    }): void;
     get(key: string): Promise<CasGetResult | null>;
     put(key: string, value: unknown, conditions: CasPutConditions): Promise<{
         revision: number;

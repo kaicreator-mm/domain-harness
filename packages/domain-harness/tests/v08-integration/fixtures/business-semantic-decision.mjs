@@ -47,6 +47,9 @@ export const INTENT_TYPES = [
   'submitSdUnavailable',
   'submitSdPostViolation',
   'submitSdPromotionMissing',
+  'submitSdReceiptQuote',
+  'submitSdRestrictedQuote',
+  'submitSdMandatoryQuote',
 ];
 /** Effect types this policy declares handlers for. */
 export const EFFECT_TYPES = ['effect:reserve'];
@@ -306,6 +309,51 @@ export function getPolicy() {
         ruleId: 'rule:sd-promotion-missing',
         roles: ['requester'],
         definition: sdQuoteDefinition(),
+      },
+      // [#1003 NF06] The two receipt-policy declarations, both bound to the
+      // EXACT already-approved deterministic declaration (identical
+      // declarationDigest — the receipt policy is intent-level governance,
+      // never a second declaration authority):
+      //   - observational-optional: the admitted turn appends one best-effort
+      //     data-only DECISION_RECEIPT record; requester/observer may read it.
+      //   - durable-mandatory: v0.8 has no K/H state+receipt atomic
+      //     coordination, so this intent is expected to be refused typed
+      //     BEFORE admission (the physical negative of the NF06 slice).
+      submitSdReceiptQuote: {
+        trigger: { kind: 'event', eventType: 'SD_QUOTE_DECIDED' },
+        ruleId: 'rule:sd-fixed-quote',
+        roles: ['requester'],
+        definition: sdQuoteDefinition(),
+        receiptPolicy: {
+          durability: 'observational-optional',
+          readerRoles: ['requester', 'observer'],
+        },
+      },
+      // [#1055 R1 P1-01] A second observational-optional intent whose reader
+      // scope is DISJOINT from submitSdReceiptQuote's ['requester',
+      // 'observer']: a reader valid for one intent's receipts must not become
+      // a reader of the other intent's receipts (the per-record scope
+      // negative). Same approved declaration and digest — only the
+      // intent-level receipt governance differs.
+      submitSdRestrictedQuote: {
+        trigger: { kind: 'event', eventType: 'SD_QUOTE_DECIDED' },
+        ruleId: 'rule:sd-fixed-quote',
+        roles: ['requester'],
+        definition: sdQuoteDefinition(),
+        receiptPolicy: {
+          durability: 'observational-optional',
+          readerRoles: ['restricted-reader'],
+        },
+      },
+      submitSdMandatoryQuote: {
+        trigger: { kind: 'event', eventType: 'SD_QUOTE_DECIDED' },
+        ruleId: 'rule:sd-fixed-quote',
+        roles: ['requester'],
+        definition: sdQuoteDefinition(),
+        receiptPolicy: {
+          durability: 'durable-mandatory',
+          readerRoles: ['requester'],
+        },
       },
     },
     effectBindings: {
