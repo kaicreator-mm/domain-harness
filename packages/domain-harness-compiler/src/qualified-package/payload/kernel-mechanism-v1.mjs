@@ -2543,6 +2543,193 @@ function wireContinuationPolicies(businessEndpoint) {
   return registry;
 }
 
+// ===========================================================================
+// [#1003 FR08 SD1/SD2 + NF05] Trusted-boundary validation of every
+// semantic-decision rule of the Business policy — the SELECTED-Kernel half
+// of the BUILD→Standard declaration approval binding. BUILD compiles the
+// SemanticDecision descriptor and pins its canonical content identity
+// (declarationDigest); this wiring verifies that digest through the Host
+// sha256 port (SYNCHRONOUSLY — the physical bootstrap port returns the hex
+// digest directly) so ONLY the exact compiled declaration can run: a stale
+// or substituted descriptor fails the load typed before any instance can
+// exist. The shape is validated once here, the validated declaration is
+// deep-frozen, and a semantic-decision rule that was never wired is refused
+// at submit (no silent unbound fallback). The Kernel gains no new
+// authority: Guard/Admission/Effect/Journal stay exactly where they were;
+// the Standard SDK interpreter remains the only declaration semantics.
+// ===========================================================================
+const SEMANTIC_RULE_KEYS = new Set([
+  'kind', 'id', 'decisionId', 'declarationDigest', 'inputSelection', 'resultSchema',
+  'allowedOutcomes', 'allowedEventTypes', 'queryCapabilityIds', 'dependencyMaterial',
+  'cachePolicy', 'promotedReference', 'policy', 'disposition', 'unavailable',
+]);
+const SEMANTIC_DISPOSITION_KEYS = new Set(['mode', 'outcome', 'eventType', 'outcomeFrom', 'eventTypeFrom', 'payloadFromInput']);
+const SEMANTIC_SCHEMA_TYPES = new Set(['string', 'number', 'boolean', 'object', 'array', 'null']);
+const SEMANTIC_MAX_LIST = 64;
+const SEMANTIC_MAX_FIELDS = 32;
+const SEMANTIC_IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
+
+function invalidSemanticRule(message) {
+  throw new CentralAdmissionError('SEMANTIC_DECISION_INVALID', message);
+}
+
+function semanticIdentifier(value, label) {
+  if (typeof value !== 'string' || !SEMANTIC_IDENTIFIER.test(value)) {
+    invalidSemanticRule(`${label} must be a bounded identifier`);
+  }
+  return value;
+}
+
+function semanticIdentifierList(value, label) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > SEMANTIC_MAX_LIST) {
+    invalidSemanticRule(`${label} must be a non-empty bounded identifier list`);
+  }
+  const seen = new Set();
+  for (const item of value) {
+    semanticIdentifier(item, label);
+    if (seen.has(item)) invalidSemanticRule(`${label} contains the duplicate ${item}`);
+    seen.add(item);
+  }
+  return [...value];
+}
+
+/** Validate ONE compiled semantic-decision rule and freeze its snapshot. */
+function snapshotSemanticDecisionRule(rule, ruleId, sha256) {
+  let data;
+  try {
+    data = canonicalizeJson(rule);
+  } catch (error) {
+    invalidSemanticRule(`rule ${ruleId}: the declaration must be canonical JSON data (${error instanceof Error ? error.message : String(error)})`);
+  }
+  for (const key of Object.keys(data)) {
+    if (!SEMANTIC_RULE_KEYS.has(key)) invalidSemanticRule(`rule ${ruleId}: the declaration carries the unsupported key ${key}`);
+  }
+  const id = semanticIdentifier(data.id, `rule ${ruleId}: id`);
+  if (data.decisionId !== undefined && data.decisionId !== id) {
+    invalidSemanticRule(`rule ${ruleId}: decisionId does not match the declaration id`);
+  }
+  // BUILD approval binding: the pinned canonical content identity must
+  // verify against the declaration actually present in this policy.
+  const digest = data.declarationDigest;
+  if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) {
+    invalidSemanticRule(`rule ${ruleId}: a compiled semantic-decision rule must carry its 64-hex declarationDigest`);
+  }
+  const { declarationDigest: _pinned, ...body } = data;
+  let computed;
+  try {
+    computed = sha256.digestUtf8(canonicalJsonStringify(body));
+  } catch (error) {
+    invalidSemanticRule(`rule ${ruleId}: the Host sha256 port refused the declaration digest material (${error instanceof Error ? error.message : String(error)})`);
+  }
+  if (typeof computed !== 'string' || computed.length === 0) {
+    invalidSemanticRule(`rule ${ruleId}: the Host sha256 port must return the declarationDigest synchronously (an async digest cannot gate the synchronous trusted load boundary)`);
+  }
+  if (computed !== digest) {
+    invalidSemanticRule(`rule ${ruleId}: declarationDigest does not match the declaration body (stale or substituted descriptor)`);
+  }
+  const allowedOutcomes = semanticIdentifierList(data.allowedOutcomes, `rule ${ruleId}: allowedOutcomes`);
+  const allowedEventTypes = semanticIdentifierList(data.allowedEventTypes, `rule ${ruleId}: allowedEventTypes`);
+  if (data.queryCapabilityIds !== undefined) {
+    // A decision with no query capabilities is legal; the read-only
+    // VERIFICATION of each listed capability belongs to BUILD.
+    if (!Array.isArray(data.queryCapabilityIds) || data.queryCapabilityIds.length > SEMANTIC_MAX_LIST) {
+      invalidSemanticRule(`rule ${ruleId}: queryCapabilityIds must be a bounded identifier list`);
+    }
+    const seenCapabilities = new Set();
+    for (const capabilityId of data.queryCapabilityIds) {
+      semanticIdentifier(capabilityId, `rule ${ruleId}: queryCapabilityIds`);
+      if (seenCapabilities.has(capabilityId)) invalidSemanticRule(`rule ${ruleId}: queryCapabilityIds contains the duplicate ${capabilityId}`);
+      seenCapabilities.add(capabilityId);
+    }
+  }
+  // Exact input selection: 1..N declared projection fields.
+  const selectionEntries = isJsonRecord(data.inputSelection) ? Object.entries(data.inputSelection) : [];
+  if (selectionEntries.length === 0 || selectionEntries.length > SEMANTIC_MAX_FIELDS) {
+    invalidSemanticRule(`rule ${ruleId}: inputSelection must map 1..${SEMANTIC_MAX_FIELDS} output names to input keys`);
+  }
+  const selectedKeys = new Set();
+  for (const [outputName, sourceKey] of selectionEntries) {
+    semanticIdentifier(outputName, `rule ${ruleId}: inputSelection output name`);
+    semanticIdentifier(sourceKey, `rule ${ruleId}: inputSelection.${outputName}`);
+    selectedKeys.add(outputName);
+  }
+  if (data.resultSchema !== undefined) {
+    if (!isJsonRecord(data.resultSchema)) invalidSemanticRule(`rule ${ruleId}: resultSchema must be an object`);
+    const required = data.resultSchema.required ?? [];
+    if (!Array.isArray(required) || required.length > 1024) {
+      invalidSemanticRule(`rule ${ruleId}: resultSchema.required must be a bounded string list`);
+    }
+    for (const name of required) semanticIdentifier(name, `rule ${ruleId}: resultSchema.required`);
+    const properties = isJsonRecord(data.resultSchema.properties) ? data.resultSchema.properties : {};
+    for (const [name, type] of Object.entries(properties)) {
+      semanticIdentifier(name, `rule ${ruleId}: resultSchema.properties key`);
+      if (!SEMANTIC_SCHEMA_TYPES.has(type)) {
+        invalidSemanticRule(`rule ${ruleId}: resultSchema.properties.${name} has the unsupported type ${String(type)}`);
+      }
+    }
+  }
+  if (!isJsonRecord(data.policy) || !Number.isSafeInteger(data.policy.maxSteps) || data.policy.maxSteps < 1) {
+    invalidSemanticRule(`rule ${ruleId}: policy.maxSteps must be a positive integer`);
+  }
+  if (data.promotedReference !== undefined) {
+    if (!isJsonRecord(data.promotedReference)) invalidSemanticRule(`rule ${ruleId}: promotedReference must be an object`);
+    semanticIdentifier(data.promotedReference.artifactId, `rule ${ruleId}: promotedReference.artifactId`);
+    semanticIdentifier(data.promotedReference.contentDigest, `rule ${ruleId}: promotedReference.contentDigest`);
+    if (data.promotedReference.required !== undefined && typeof data.promotedReference.required !== 'boolean') {
+      invalidSemanticRule(`rule ${ruleId}: promotedReference.required must be a boolean`);
+    }
+  }
+  if (data.unavailable !== undefined) {
+    if (!isJsonRecord(data.unavailable) || data.unavailable.disposition !== 'semantic-unavailable'
+      || typeof data.unavailable.reason !== 'string' || data.unavailable.reason.length === 0
+      || data.unavailable.reason.length > 256) {
+      invalidSemanticRule(`rule ${ruleId}: unavailable must declare disposition 'semantic-unavailable' with a bounded non-empty reason`);
+    }
+  } else {
+    if (!isJsonRecord(data.disposition)) invalidSemanticRule(`rule ${ruleId}: disposition must be an object`);
+    for (const key of Object.keys(data.disposition)) {
+      if (!SEMANTIC_DISPOSITION_KEYS.has(key)) invalidSemanticRule(`rule ${ruleId}: disposition carries the unsupported key ${key}`);
+    }
+    const projection = isJsonRecord(data.disposition.payloadFromInput) ? data.disposition.payloadFromInput : {};
+    if (Object.keys(projection).length > SEMANTIC_MAX_FIELDS) {
+      invalidSemanticRule(`rule ${ruleId}: disposition.payloadFromInput is unbounded`);
+    }
+    for (const [field, sourceKey] of Object.entries(projection)) {
+      semanticIdentifier(field, `rule ${ruleId}: disposition.payloadFromInput field`);
+      semanticIdentifier(sourceKey, `rule ${ruleId}: disposition.payloadFromInput.${field}`);
+      if (!selectedKeys.has(sourceKey)) {
+        invalidSemanticRule(`rule ${ruleId}: disposition.payloadFromInput.${field} addresses ${String(sourceKey)} outside the declared inputSelection`);
+      }
+    }
+    if (data.disposition.mode === 'deterministic') {
+      if (!allowedOutcomes.includes(semanticIdentifier(data.disposition.outcome, `rule ${ruleId}: disposition.outcome`))) {
+        invalidSemanticRule(`rule ${ruleId}: disposition.outcome is not a declared allowed outcome`);
+      }
+      if (!allowedEventTypes.includes(semanticIdentifier(data.disposition.eventType, `rule ${ruleId}: disposition.eventType`))) {
+        invalidSemanticRule(`rule ${ruleId}: disposition.eventType is not a declared allowed event type`);
+      }
+    } else if (data.disposition.mode === 'route') {
+      semanticIdentifier(data.disposition.outcomeFrom, `rule ${ruleId}: disposition.outcomeFrom`);
+      semanticIdentifier(data.disposition.eventTypeFrom, `rule ${ruleId}: disposition.eventTypeFrom`);
+    } else {
+      invalidSemanticRule(`rule ${ruleId}: disposition.mode must be 'deterministic' or 'route'`);
+    }
+  }
+  const snapshot = { declaration: data };
+  deepFreezePreparedData(snapshot);
+  return snapshot;
+}
+
+/** Wire every compiled semantic-decision rule (createOccurrenceRuntime only). */
+function wireSemanticDecisionRules(businessEndpoint, sha256) {
+  const registry = new WeakMap();
+  for (const [ruleId, rule] of Object.entries(businessEndpoint.rules ?? {})) {
+    if (!isJsonRecord(rule) || rule.kind !== 'semantic-decision') continue;
+    registry.set(rule, snapshotSemanticDecisionRule(rule, ruleId, sha256));
+  }
+  return registry;
+}
+
 /**
  * Trusted per-step evidence: exactly the shape the Host-bound resolver
  * mints for ONE physically observed bound-port invocation. Anything else —
@@ -2885,6 +3072,11 @@ export function createOccurrenceRuntime(options) {
   // [#1003 FR07-KH2] Same trusted boundary, same discipline: every harness
   // rule is validated and frozen here, before any instance can exist.
   const continuationPolicies = wireContinuationPolicies(businessEndpoint);
+  // [#1003 FR08 SD1/SD2 + NF05] Same trusted boundary: every compiled
+  // semantic-decision rule has its pinned declarationDigest verified and its
+  // shape validated ONCE here; a stale/substituted/malformed declaration
+  // fails the load typed before any instance can exist.
+  const semanticDecisionRules = wireSemanticDecisionRules(businessEndpoint, sha256);
 
   function continuationPolicyFor(rule) {
     const wired = isJsonRecord(rule) ? continuationPolicies.get(rule) : undefined;
@@ -3043,7 +3235,26 @@ export function createOccurrenceRuntime(options) {
         callerRole: caller.role,
       };
       const rule = businessEndpoint.rules[binding.ruleId];
-      const continuation = continuationPolicyFor(rule);
+      // [#1003 FR08 SD1/SD2 + NF05] A compiled semantic-decision rule that
+      // was never digest-verified/frozen at this trusted load boundary can
+      // never run — no silent unbound fallback for post-wiring injected or
+      // swapped declarations. The registry is keyed by object identity, so
+      // `get` (not a re-read of the mutable `kind`) is what binds a rule
+      // wired as semantic even if its shape was mutated after wiring.
+      const wiredSemanticDecision = isJsonRecord(rule) ? semanticDecisionRules.get(rule) : undefined;
+      if (wiredSemanticDecision === undefined && isJsonRecord(rule) && rule.kind === 'semantic-decision') {
+        throw new CentralAdmissionError(
+          'SEMANTIC_DECISION_UNVALIDATED',
+          `semantic-decision rule ${String(binding.ruleId)} was never validated at the trusted load boundary; post-wiring injected declarations are refused`,
+        );
+      }
+      // [#1051 R1 P1] S interprets ONLY the load-time verified frozen
+      // declaration. The original rule object stays ordinary mutable policy
+      // surface; an in-place mutation after wiring must not change what
+      // executes — the approved meaning at load time is the meaning that
+      // runs.
+      const declaration = wiredSemanticDecision === undefined ? rule : wiredSemanticDecision.declaration;
+      const continuation = continuationPolicyFor(declaration);
       const control = latch.signal === undefined ? undefined : { signal: latch.signal };
       let resolved;
       if (continuation !== undefined) {
@@ -3076,13 +3287,24 @@ export function createOccurrenceRuntime(options) {
         // endpoint. [#1003 FR07-KH2] The protected control rides along so a
         // model-decision turn observes cancellation too.
         try {
-          resolved = await sdkEndpoint.interpret(rule, request.input, context, control);
+          resolved = await sdkEndpoint.interpret(declaration, request.input, context, control);
         } catch (error) {
           if (latch.cancelled) {
             return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 1, inFlightTurnDiscarded: true }, { modelCallEvidence: { status: 'unmeasured' } });
           }
           throw error;
         }
+      }
+
+      // [#1003 FR08 SD1] Declared semantic-unavailability: a typed
+      // zero-effect terminal BEFORE central admission — no Guard/Admission
+      // runs, no Journal record and no Effect dispatch exist, and the
+      // ModelPort was never invoked (the declaration route is model-free).
+      if (isJsonRecord(resolved) && resolved.semanticStatus === 'unavailable') {
+        const declarationId = isJsonRecord(resolved.provenance) && typeof resolved.provenance.declarationId === 'string'
+          ? { declarationId: resolved.provenance.declarationId }
+          : {};
+        return terminatedReceipt(request, workflowInstanceId, { code: 'SEMANTIC_UNAVAILABLE', ...declarationId }, admissionResolverEvidence(resolved));
       }
 
       // [#1003 FR07-KH2, B3] The final-result → admission race: the latch is

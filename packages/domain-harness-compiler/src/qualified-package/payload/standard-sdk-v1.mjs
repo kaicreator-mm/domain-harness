@@ -303,6 +303,165 @@ function operation(definition, input) {
   };
 }
 
+// FR08 SD1/SD2 + NF05 (#1003): the compiled SemanticDecision declaration
+// interpreter. BUILD compiles/validates/pins the descriptor
+// (compileSemanticDecisions — declarationDigest over the canonical body);
+// the selected Kernel verifies that digest once at its trusted load boundary
+// and alone owns Guard/Admission/Effect/Journal; this interpreter only turns
+// the data-only declaration into ONE proposed structured decision. It never
+// calls a ModelPort (the declaration route is model-free by construction)
+// and never executes or authorizes anything.
+const SEMANTIC_MAX_LIST = 64;
+const SEMANTIC_MAX_FIELDS = 32;
+const SEMANTIC_RESULT_TYPES = new Set(['string', 'number', 'boolean', 'object', 'array', 'null']);
+const SEMANTIC_REASON_MAX_CHARS = 256;
+
+function identList(value, label) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > SEMANTIC_MAX_LIST) {
+    fail('SDK_SEMANTIC_DECISION_INVALID', `${label} must be a non-empty bounded identifier list`);
+  }
+  const seen = new Set();
+  for (const item of value) {
+    ident(item, label);
+    if (seen.has(item)) fail('SDK_SEMANTIC_DECISION_INVALID', `${label} contains the duplicate ${item}`);
+    seen.add(item);
+  }
+  return [...value];
+}
+
+/**
+ * NF05 declared resultSchema check on the resolver RESULT payload
+ * (decision.data — same scoping precedent as the FR02 payloadExpression
+ * outputSchema). Violations are typed refusals AFTER resolution and BEFORE
+ * any Kernel admission can consume the proposal.
+ */
+function assertSemanticResultSchema(rawSchema, payload) {
+  if (rawSchema === undefined) return;
+  const spec = record(rawSchema, 'semantic-decision.resultSchema');
+  const required = spec.required ?? [];
+  if (!Array.isArray(required) || required.length > MAX_ITEMS) {
+    fail('SDK_SEMANTIC_DECISION_INVALID', 'resultSchema.required must be a bounded string list');
+  }
+  const properties = record(spec.properties ?? {}, 'resultSchema.properties');
+  for (const name of required) {
+    ident(name, 'resultSchema.required');
+    if (!Object.hasOwn(payload, name)) {
+      fail('SDK_SEMANTIC_RESULT_INVALID', `semantic decision result violates resultSchema (required ${name} is missing)`);
+    }
+  }
+  for (const [name, expected] of Object.entries(properties)) {
+    ident(name, 'resultSchema.properties key');
+    if (!SEMANTIC_RESULT_TYPES.has(expected)) {
+      fail('SDK_SEMANTIC_DECISION_INVALID', `unsupported resultSchema type ${String(expected)}`);
+    }
+    if (!Object.hasOwn(payload, name)) continue;
+    const actual = expressionValueKind(payload[name]);
+    if (actual !== expected) {
+      fail('SDK_SEMANTIC_RESULT_INVALID', `semantic decision result violates resultSchema (${name} is ${actual}, expected ${expected})`);
+    }
+  }
+}
+
+function semanticDecision(definition, input, rawContext) {
+  const allowedOutcomes = identList(definition.allowedOutcomes, 'semantic-decision.allowedOutcomes');
+  const allowedEventTypes = identList(definition.allowedEventTypes, 'semantic-decision.allowedEventTypes');
+  if (definition.queryCapabilityIds !== undefined) {
+    // Read-only capability VERIFICATION belongs to BUILD (compiled Tools,
+    // effect 'none'); here the list is only shape-bounded inert data, and a
+    // decision with no query capabilities is legal (bounded, may be empty).
+    if (!Array.isArray(definition.queryCapabilityIds) || definition.queryCapabilityIds.length > SEMANTIC_MAX_LIST) {
+      fail('SDK_SEMANTIC_DECISION_INVALID', 'semantic-decision.queryCapabilityIds must be a bounded identifier list');
+    }
+    const seen = new Set();
+    for (const capabilityId of definition.queryCapabilityIds) {
+      ident(capabilityId, 'semantic-decision.queryCapabilityIds');
+      if (seen.has(capabilityId)) fail('SDK_SEMANTIC_DECISION_INVALID', `semantic-decision.queryCapabilityIds contains the duplicate ${capabilityId}`);
+      seen.add(capabilityId);
+    }
+  }
+  // SD1: a declared semantic-unavailability is a typed zero-effect state of
+  // its own — NOT an error and NOT a decision. The Kernel turns it into a
+  // typed terminal before central admission; no ModelPort and no effect can
+  // exist on this path.
+  if (definition.unavailable !== undefined) {
+    const unavailable = record(definition.unavailable, 'semantic-decision.unavailable');
+    if (unavailable.disposition !== 'semantic-unavailable') {
+      fail('SDK_SEMANTIC_DECISION_INVALID', "unavailable.disposition must be 'semantic-unavailable'");
+    }
+    if (typeof unavailable.reason !== 'string' || unavailable.reason.length === 0
+      || unavailable.reason.length > SEMANTIC_REASON_MAX_CHARS) {
+      fail('SDK_SEMANTIC_DECISION_INVALID', 'unavailable.reason must be a bounded non-empty string');
+    }
+    return {
+      kind: 'semantic-decision',
+      semanticStatus: 'unavailable',
+      unavailable: { disposition: unavailable.disposition, reason: unavailable.reason },
+    };
+  }
+  const context = record(data(rawContext), 'semantic-decision context');
+  // NF05: a declared required promoted reference must be SUPPLIED through
+  // the trusted Kernel context with the exact pinned content identity.
+  if (definition.promotedReference !== undefined) {
+    const reference = record(definition.promotedReference, 'semantic-decision.promotedReference');
+    const artifactId = ident(reference.artifactId, 'promotedReference.artifactId');
+    const contentDigest = ident(reference.contentDigest, 'promotedReference.contentDigest');
+    if (reference.required === true) {
+      const suppliedMap = context.promotedReferences === undefined ? {} : context.promotedReferences;
+      const supplied = record(suppliedMap, 'context.promotedReferences')[artifactId];
+      if (!Object.hasOwn(record(suppliedMap, 'context.promotedReferences'), artifactId)
+        || supplied?.artifactId !== artifactId || supplied?.contentDigest !== contentDigest) {
+        fail('SDK_SEMANTIC_PROMOTION_UNRESOLVED', `the required promoted reference ${artifactId} is not supplied or does not match the pinned content digest`);
+      }
+    }
+  }
+  // NF05: exact input selection — the decision may read ONLY the declared
+  // projection of the occurrence input.
+  const selection = record(definition.inputSelection ?? {}, 'semantic-decision.inputSelection');
+  if (Object.keys(selection).length === 0 || Object.keys(selection).length > SEMANTIC_MAX_FIELDS) {
+    fail('SDK_SEMANTIC_DECISION_INVALID', `semantic-decision.inputSelection must map 1..${SEMANTIC_MAX_FIELDS} fields`);
+  }
+  const selectedInput = project(selection, input, 'semantic-decision');
+  // SD2: the declared disposition is the ONLY source of the proposed event
+  // type/outcome, and both must stay inside the declared allowlists.
+  const disposition = record(definition.disposition, 'semantic-decision.disposition');
+  let outcome;
+  let eventType;
+  if (disposition.mode === 'deterministic') {
+    outcome = ident(disposition.outcome, 'disposition.outcome');
+    eventType = ident(disposition.eventType, 'disposition.eventType');
+  } else if (disposition.mode === 'route') {
+    outcome = selectedInput[ident(disposition.outcomeFrom, 'disposition.outcomeFrom')];
+    eventType = selectedInput[ident(disposition.eventTypeFrom, 'disposition.eventTypeFrom')];
+    if (typeof outcome !== 'string' || !IDENTIFIER.test(outcome)) {
+      fail('SDK_SEMANTIC_DECISION_INVALID', 'the routed outcome must be a bounded identifier');
+    }
+    if (typeof eventType !== 'string' || !IDENTIFIER.test(eventType)) {
+      fail('SDK_SEMANTIC_DECISION_INVALID', 'the routed event type must be a bounded identifier');
+    }
+  } else {
+    fail('SDK_SEMANTIC_DECISION_INVALID', "disposition.mode must be 'deterministic' or 'route'");
+  }
+  if (!allowedOutcomes.includes(outcome)) {
+    fail('SDK_SEMANTIC_OUTCOME_UNDECLARED', `outcome ${outcome} is not a declared allowed outcome`);
+  }
+  if (!allowedEventTypes.includes(eventType)) {
+    fail('SDK_SEMANTIC_EVENT_UNDECLARED', `event type ${eventType} is not a declared allowed event type`);
+  }
+  const payload = project(disposition.payloadFromInput ?? {}, selectedInput, 'semantic-decision disposition');
+  assertSemanticResultSchema(definition.resultSchema, payload);
+  return {
+    kind: 'semantic-decision',
+    structuredDecision: {
+      decision: { outcome, data: payload },
+      event: { type: eventType, payload },
+    },
+    // FR08 SD1 declaration-level truth: this declared route contains ZERO
+    // fresh-model steps by construction. It is NOT an operational port
+    // attestation — that stays exclusively in modelCallEvidence.
+    freshModelCallCount: 0,
+  };
+}
+
 /**
  * FR02 portable safe expression evaluation, retained from the v0.7
  * expression-runtime.ts@c37cf23d / policy.ts / json-boundary.ts observables
@@ -906,6 +1065,7 @@ export function interpret(declaration, rawInput, rawContext = {}) {
     case 'decision': result = decision(definition, input); break;
     case 'workflow': result = workflow(definition, input); break;
     case 'operation': result = operation(definition, input); break;
+    case 'semantic-decision': result = semanticDecision(definition, input, rawContext); break;
     default: fail('SDK_KIND_UNSUPPORTED', `unsupported Standard Kind ${String(kind)}`);
   }
   return { ...result, ...evidence(id) };
