@@ -48,7 +48,9 @@ export const FIXTURE_SHAS = {
   // #1003 NF06: re-pinned for the two added receipt-policy intents
   // (submitSdReceiptQuote / submitSdMandatoryQuote — same approved rule
   // declaration and digests; the receipt policy is intent-level governance).
-  semantic: 'a687a43735f6f440961c84106448e87e370887f68a997993f7303068606355dd',
+  // #1055 R1 P1-01: re-pinned for the third receipt-policy intent
+  // submitSdRestrictedQuote (disjoint reader scope; same declaration).
+  semantic: '76e065c3063b755b822d7fa9f3b1a6fc17cca542a51c82328954a75354fb9efb',
   semanticBad: 'fff7743a36c61682d923aa1272ff517036993e56e538c77c105c2ed9a04f8446',
 } as const;
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);

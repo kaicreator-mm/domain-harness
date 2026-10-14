@@ -69,10 +69,13 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // S/K_BLOB_PIN_REBOUND_AFTER_NF06_RECEIPT: #1003 NF06 — additive
 // decision-receipt projection (S) and K-owned observational append /
 // mandatory pre-admission refusal / authorized read (K).
+// K_BLOB_PIN_REBOUND_AFTER_1055_R1: #1055 R1 P1-01/P1-02 repair — per-record
+// frozen reader scope on the receipt read + HOST_KEY_EXISTS re-read bounded
+// inside the optional observation boundary (S bytes unchanged).
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = 'ba609647dbfccbf958537ff2e5c9eef0205dcc85';
+const V08_K_BLOB = '9f5cdd7de267846f413ea6316c1aa85bace1e550';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

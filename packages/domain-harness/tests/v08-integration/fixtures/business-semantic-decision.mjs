@@ -48,6 +48,7 @@ export const INTENT_TYPES = [
   'submitSdPostViolation',
   'submitSdPromotionMissing',
   'submitSdReceiptQuote',
+  'submitSdRestrictedQuote',
   'submitSdMandatoryQuote',
 ];
 /** Effect types this policy declares handlers for. */
@@ -326,6 +327,22 @@ export function getPolicy() {
         receiptPolicy: {
           durability: 'observational-optional',
           readerRoles: ['requester', 'observer'],
+        },
+      },
+      // [#1055 R1 P1-01] A second observational-optional intent whose reader
+      // scope is DISJOINT from submitSdReceiptQuote's ['requester',
+      // 'observer']: a reader valid for one intent's receipts must not become
+      // a reader of the other intent's receipts (the per-record scope
+      // negative). Same approved declaration and digest — only the
+      // intent-level receipt governance differs.
+      submitSdRestrictedQuote: {
+        trigger: { kind: 'event', eventType: 'SD_QUOTE_DECIDED' },
+        ruleId: 'rule:sd-fixed-quote',
+        roles: ['requester'],
+        definition: sdQuoteDefinition(),
+        receiptPolicy: {
+          durability: 'observational-optional',
+          readerRoles: ['restricted-reader'],
         },
       },
       submitSdMandatoryQuote: {

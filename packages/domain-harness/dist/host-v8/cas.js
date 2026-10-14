@@ -64,11 +64,21 @@ function cloneJson(value) {
 export class InMemoryCasStore {
     #docs = new Map();
     #fault = null;
+    #getFault = null;
     /** Physical fault injection (KPK-06 vector port): typed Host-side I/O failure. */
     failNextPutMatching(keySubstring, { skip = 0 } = {}) {
         this.#fault = { keySubstring, remainingSkips: skip };
     }
+    /**
+     * Physical READ fault injection (#1055 R1 P1-02 vector): the next matching
+     * `get` fails typed, so a read-side Host failure (connection closed, I/O
+     * error) is provable on the physical path — symmetric with the write fault.
+     */
+    failNextGetMatching(keySubstring, { skip = 0 } = {}) {
+        this.#getFault = { keySubstring, remainingSkips: skip };
+    }
     async get(key) {
+        this.#maybeFaultRead(key);
         const doc = this.#docs.get(key);
         if (doc === undefined)
             return null;
@@ -136,6 +146,18 @@ export class InMemoryCasStore {
         }
         this.#fault = null;
         throw new HostBoundaryError('HOST_FAULT_INJECTED', `host storage physically faulted during write of ${key}`);
+    }
+    #maybeFaultRead(key) {
+        if (this.#getFault === null)
+            return;
+        if (!key.includes(this.#getFault.keySubstring))
+            return;
+        if (this.#getFault.remainingSkips > 0) {
+            this.#getFault.remainingSkips -= 1;
+            return;
+        }
+        this.#getFault = null;
+        throw new HostBoundaryError('HOST_FAULT_INJECTED', `host storage physically faulted during read of ${key}`);
     }
 }
 /**

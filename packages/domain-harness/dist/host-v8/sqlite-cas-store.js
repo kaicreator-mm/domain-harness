@@ -34,6 +34,7 @@ export class SqliteCasStore {
     #update;
     #delete;
     #fault = null;
+    #getFault = null;
     #closed = false;
     constructor(db) {
         this.#db = db;
@@ -47,7 +48,16 @@ export class SqliteCasStore {
     failNextPutMatching(keySubstring, { skip = 0 } = {}) {
         this.#fault = { keySubstring, remainingSkips: skip };
     }
+    /**
+     * Physical READ fault injection (#1055 R1 P1-02 vector), same contract as
+     * cas.ts: the next matching `get` fails typed, proving read-side Host
+     * failures on the physical path.
+     */
+    failNextGetMatching(keySubstring, { skip = 0 } = {}) {
+        this.#getFault = { keySubstring, remainingSkips: skip };
+    }
     async get(key) {
+        this.#maybeFaultRead(key);
         const row = this.#select.get(key);
         if (row === undefined)
             return null;
@@ -145,6 +155,18 @@ export class SqliteCasStore {
         }
         this.#fault = null;
         throw new HostBoundaryError('HOST_FAULT_INJECTED', `host storage physically faulted during write of ${key}`);
+    }
+    #maybeFaultRead(key) {
+        if (this.#getFault === null)
+            return;
+        if (!key.includes(this.#getFault.keySubstring))
+            return;
+        if (this.#getFault.remainingSkips > 0) {
+            this.#getFault.remainingSkips -= 1;
+            return;
+        }
+        this.#getFault = null;
+        throw new HostBoundaryError('HOST_FAULT_INJECTED', `host storage physically faulted during read of ${key}`);
     }
 }
 /**

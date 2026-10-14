@@ -15,6 +15,15 @@
  * commit are separate typed observation outcomes that never rewrite the
  * business truth. A spawned child process reopens the same SQLite file and
  * reads the record through the authenticated gateway (physical restart).
+ *
+ * #1055 R1 repair negatives (two P1 root causes, same fixture):
+ *   - CROSS-INTENT: the read authorization is the record's OWN frozen
+ *     reader scope (the intent that recorded it), never the union of all
+ *     policies' roles — a reader of intent A is refused typed on intent B's
+ *     committed receipt, while B's own reader is admitted.
+ *   - REPLAY-READ-FAULT: a HOST_KEY_EXISTS re-read that itself fails
+ *     physically stays a separate not_recorded observation; the already
+ *     committed State/Journal/Effect ACK is never failed by it.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,6 +48,10 @@ let gateway: ReturnType<typeof createKernelGateway>;
 let operator: ReturnType<typeof mintCredential>;
 let requester: ReturnType<typeof mintCredential>;
 let outsider: ReturnType<typeof mintCredential>;
+/** [#1055 R1 P1-01] Holds ONLY the disjoint restricted intent's reader role. */
+let restrictedReader: ReturnType<typeof mintCredential>;
+/** [#1055 R1 P1-01] Holds ONLY the open intent's secondary reader role. */
+let observerReader: ReturnType<typeof mintCredential>;
 let hostClosed = false;
 let storagePath: string;
 /** The ONE sealed closure of this process — the restart leg re-registers the EXACT same root (durable pin idempotence). */
@@ -70,6 +83,8 @@ test.before(async () => {
   operator = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
   requester = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
   outsider = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'out', roles: ['no-access'], audience: AUDIENCE, grantId: 'g-out' });
+  restrictedReader = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'restricted', roles: ['restricted-reader'], audience: AUDIENCE, grantId: 'g-restricted' });
+  observerReader = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'obs', roles: ['observer'], audience: AUDIENCE, grantId: 'g-obs' });
 });
 
 test.after(async () => {
@@ -178,6 +193,54 @@ test('NF06-N: an unauthorized observer read refuses typed before any record byte
   );
 });
 
+test('NF06-N-CROSS-INTENT: a reader role of one intent cannot read another intent\'s committed receipt — the authorization is the record\'s own frozen scope, never the union', async () => {
+  // A restricted-intent turn on the SAME tenant/app family appends its own
+  // receipt under a DISJOINT reader scope (['restricted-reader'] vs
+  // ['requester', 'observer']).
+  const instanceKey = await activatedInstance('sd-xint-1');
+  const receipt = await sendIntent({
+    intentType: 'submitSdRestrictedQuote',
+    messageId: 'm-xint',
+    input: { amount: 30, requestId: 'SD-XINT' },
+    instanceKey,
+  }) as { status: string; decisionReceipt?: { status?: string; receiptKey?: string } };
+
+  assert.equal(receipt.status, 'admitted');
+  assert.equal(receipt.decisionReceipt?.status, 'recorded', 'the restricted intent is a normal observational-optional turn');
+  assert.equal(receipt.decisionReceipt?.receiptKey, receiptKeyOf('sd-xint-1', 'm-xint'));
+
+  // RED target [#1055 R1 P1-01]: 'requester' IS a declared receipt reader of
+  // submitSdReceiptQuote, so a global union gate admits it — but it holds
+  // none of THIS record's frozen scope and MUST be refused typed.
+  await assert.rejects(
+    () => gateway.queryDecisionReceipt(requester, { tenantId: 't1', appId: 'sd-quote', instanceKey, messageId: 'm-xint' }),
+    (error: unknown) => (error as { code?: string })?.code === 'DECISION_RECEIPT_READ_UNAUTHORIZED',
+    'a reader of intent A must not read intent B\'s committed receipt even though its role is in the all-policies union',
+  );
+  // Same for a pure 'observer' reader of the open intent.
+  await assert.rejects(
+    () => gateway.queryDecisionReceipt(observerReader, { tenantId: 't1', appId: 'sd-quote', instanceKey, messageId: 'm-xint' }),
+    (error: unknown) => (error as { code?: string })?.code === 'DECISION_RECEIPT_READ_UNAUTHORIZED',
+  );
+
+  // The legitimate control: the record's OWN declared reader is admitted and
+  // sees the same redacted data-only record.
+  const record = await gateway.queryDecisionReceipt(restrictedReader, { tenantId: 't1', appId: 'sd-quote', instanceKey, messageId: 'm-xint' }) as {
+    projected?: { kind?: string; decision?: { outcome?: string } };
+    occurrence?: { messageId?: string };
+  };
+  assert.equal(record?.projected?.kind, 'decision-receipt-record');
+  assert.equal(record?.projected?.decision?.outcome, 'approve');
+  assert.equal(record?.occurrence?.messageId, 'm-xint');
+
+  // Disjoint in the reverse direction too: the restricted reader cannot read
+  // the open intent's committed record (m-rc-1 from the P test above).
+  await assert.rejects(
+    () => gateway.queryDecisionReceipt(restrictedReader, { tenantId: 't1', appId: 'sd-quote', instanceKey: 'sd-rc-1', messageId: 'm-rc-1' }),
+    (error: unknown) => (error as { code?: string })?.code === 'DECISION_RECEIPT_READ_UNAUTHORIZED',
+  );
+});
+
 test('NF06-N: a conflicting record occupying the turn key refuses typed, is never overwritten, and the business truth still advances', async () => {
   const instanceKey = await activatedInstance('sd-conf-1');
   const key = receiptKeyOf('sd-conf-1', 'm-conf');
@@ -204,6 +267,46 @@ test('NF06-N: a conflicting record occupying the turn key refuses typed, is neve
   assert.equal(await journalRecordsFor(instanceKey), 1);
   assert.equal(ledgerCalls.length - ledgerBefore, 1);
   // The conflicting record was NOT overwritten by the append attempt.
+  const stored = (await handle.host.docs.get(key)) as { value?: { kernelModuleSha256?: string } };
+  assert.equal(stored?.value?.kernelModuleSha256, 'pinned-to-a-different-kernel-module');
+});
+
+test('NF06-N-REPLAY-READ-FAULT: a HOST_KEY_EXISTS re-read failure after the admitted business commit stays a separate not_recorded observation — never a business ACK failure', async () => {
+  const instanceKey = await activatedInstance('sd-rf-1');
+  const key = receiptKeyOf('sd-rf-1', 'm-rf');
+  // Pre-occupy the exact turn key with a DIFFERENT-identity record, so the
+  // append's true-CAS create refuses HOST_KEY_EXISTS and the code path must
+  // re-read the winner — exactly like the conflict test above.
+  await handle.host.docs.put(key, {
+    kernelModuleSha256: 'pinned-to-a-different-kernel-module',
+    record: { projected: { kind: 'decision-receipt-record', turnId: 'turn:sd-quote:t1:sd-quote:sd-rf-1:message:m-rf' } },
+  }, { mustBeAbsent: true });
+  // RED target [#1055 R1 P1-02]: the re-read itself fails physically — a
+  // typed Host read fault on the decision-receipt namespace. The observation
+  // boundary must absorb it; the admitted business ACK must survive.
+  (handle.store as SqliteCasStore).failNextGetMatching('decision-receipt');
+  const ledgerBefore = ledgerCalls.length;
+
+  const receipt = await sendIntent({
+    intentType: 'submitSdReceiptQuote',
+    messageId: 'm-rf',
+    input: { amount: 30, requestId: 'SD-RF' },
+    instanceKey,
+  }) as { status: string; admitted?: unknown; decisionReceipt?: { status?: string; error?: { code?: string; message?: string } } };
+
+  assert.equal(receipt.status, 'admitted', 'the business ACK is never failed by an observation re-read error');
+  assert.ok(receipt.admitted !== undefined, 'the admitted business outcome is still fully reported');
+  assert.deepEqual(
+    receipt.decisionReceipt,
+    { status: 'not_recorded', error: { code: 'HOST_FAULT_INJECTED', message: (receipt.decisionReceipt?.error?.message as string) } },
+    'the separate observation outcome reports the actual re-read fault without any recorded claim',
+  );
+  // Business truth is durable regardless: state, journal, effect — each once.
+  assert.equal(await stateOf(instanceKey), 'approved');
+  assert.equal(await journalRecordsFor(instanceKey), 1);
+  assert.equal(ledgerCalls.length - ledgerBefore, 1);
+  // The one-shot read fault is consumed; the occupied record still stands
+  // (never overwritten by the append attempt).
   const stored = (await handle.host.docs.get(key)) as { value?: { kernelModuleSha256?: string } };
   assert.equal(stored?.value?.kernelModuleSha256, 'pinned-to-a-different-kernel-module');
 });

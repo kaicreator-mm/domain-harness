@@ -3198,10 +3198,16 @@ export function createOccurrenceRuntime(options) {
    * only persistence. Every failure is a SEPARATE typed observation outcome:
    * nothing here may throw out of the occurrence, rewrite the admitted
    * truth, or claim 'recorded' without a physically accepted create. A
-   * create that loses to an existing record re-reads it: the SAME turn's
-   * own identity (turn + declaration + projected record, minus the volatile
-   * recordedAt) is an idempotent replay; anything else is a typed conflict
-   * that never overwrites the stored record.
+   * create that loses to an existing record re-reads it INSIDE this
+   * boundary: the re-read and the identity comparison are themselves
+   * bounded — a Host read failure during the replay check is a typed
+   * not_recorded observation, never a business failure [#1055 R1 P1-02];
+   * the SAME turn's own identity (turn + declaration + projected record,
+   * minus the volatile recordedAt) is an idempotent replay; anything else is
+   * a typed conflict that never overwrites the stored record. The envelope
+   * freezes the recording intent's reader scope, so every read authorizes
+   * against THIS record's own scope — never the union of all policies'
+   * roles [#1055 R1 P1-01].
    */
   async function appendObservationalDecisionReceipt({ request, target, workflowInstanceId, binding, declaration, resolved }) {
     const receiptPolicy = decisionReceiptPolicies.get(request.intentType);
@@ -3241,6 +3247,12 @@ export function createOccurrenceRuntime(options) {
     }
     const envelope = {
       kernelModuleSha256: moduleIdentity.moduleSha256,
+      // [#1055 R1 P1-01] The per-record frozen read scope: the readerRoles of
+      // THE intent that records THIS receipt, snapshotted at append time.
+      // getDecisionReceipt authorizes against this scope alone — a reader
+      // declared by a different intent's policy never gains authority over
+      // this record, and the key alone confers no read authority.
+      readerRoles: snapshotJson(receiptPolicy.readerRoles ?? []),
       record: snapshotJson({
         projected,
         occurrence: { messageId: request.messageId, workflowInstanceId },
@@ -3255,14 +3267,29 @@ export function createOccurrenceRuntime(options) {
       return { status: 'recorded', receiptKey: key, durability: 'observational-optional' };
     } catch (error) {
       if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
-        const winner = await docs.get(key);
-        if (winner !== null && isJsonRecord(winner.value) && decisionReceiptIdentity(winner.value) === decisionReceiptIdentity(envelope)) {
-          return { status: 'recorded', receiptKey: key, durability: 'observational-optional', idempotentReplay: true };
+        // [#1055 R1 P1-02] The re-read and the identity comparison live
+        // INSIDE the optional observation boundary: a Host read failure,
+        // an unreadable winner or a canonicalization exception during the
+        // replay check is a separate typed not_recorded outcome — it can
+        // never fail the already-committed business ACK.
+        try {
+          const winner = await docs.get(key);
+          if (winner !== null && isJsonRecord(winner.value) && decisionReceiptIdentity(winner.value) === decisionReceiptIdentity(envelope)) {
+            return { status: 'recorded', receiptKey: key, durability: 'observational-optional', idempotentReplay: true };
+          }
+          return {
+            status: 'not_recorded',
+            error: { code: 'DECISION_RECEIPT_CONFLICT', message: `a different record already occupies the decision-receipt key ${key}; the conflicting record is never overwritten` },
+          };
+        } catch (replayError) {
+          return {
+            status: 'not_recorded',
+            error: {
+              code: typeof replayError?.code === 'string' ? replayError.code : 'DECISION_RECEIPT_REPLAY_CHECK_FAILED',
+              message: replayError instanceof Error ? replayError.message : String(replayError),
+            },
+          };
         }
-        return {
-          status: 'not_recorded',
-          error: { code: 'DECISION_RECEIPT_CONFLICT', message: `a different record already occupies the decision-receipt key ${key}; the conflicting record is never overwritten` },
-        };
       }
       return {
         status: 'not_recorded',
@@ -3276,12 +3303,19 @@ export function createOccurrenceRuntime(options) {
 
   /**
    * [#1003 NF06] Authorized read of ONE persisted decision receipt through
-   * the same K authority that appended it. The reader gate is the union of
-   * the readerRoles every wired receiptPolicy declares — an authenticated
-   * caller holding none of them is refused typed BEFORE any record byte is
-   * returned. A record pinned to different Kernel module bytes refuses
-   * typed (no silent cross-version replay), and an absent record stays an
-   * honest null — it is never an error and never a claim.
+   * the same K authority that appended it. THE authorization decision is the
+   * record's OWN frozen reader scope — the readerRoles of the intent that
+   * recorded THIS receipt, snapshotted into the envelope at append time
+   * [#1055 R1 P1-01]: a role declared by a DIFFERENT intent's receiptPolicy
+   * (even one wired in the same closure) confers no authority over this
+   * record, so a reader of an unprivileged intent can never read a more
+   * sensitive intent's committed receipt. A coarse pre-filter (the caller
+   * must hold a role declared by SOME wired receiptPolicy) refuses obvious
+   * non-readers before the store is touched, but it is only a NECESSARY
+   * condition — never sufficient. A record pinned to different Kernel
+   * module bytes refuses typed (no silent cross-version replay), and an
+   * absent record stays an honest null — it is never an error and never a
+   * claim.
    */
   async function getDecisionReceipt(request) {
     if (!isJsonRecord(request)) {
@@ -3299,11 +3333,14 @@ export function createOccurrenceRuntime(options) {
     const callerRoles = Array.isArray(caller.roles) && caller.roles.every((role) => typeof role === 'string')
       ? caller.roles
       : typeof caller.role === 'string' ? [caller.role] : [];
-    const allowed = new Set();
+    // Coarse pre-filter only (necessary, never sufficient): refuse callers
+    // holding no declared receipt-reader role at all before the store is
+    // touched. The AUTHORITATIVE gate is the per-record frozen scope below.
+    const declaredAnywhere = new Set();
     for (const policy of decisionReceiptPolicies.values()) {
-      for (const role of policy.readerRoles ?? []) allowed.add(role);
+      for (const role of policy.readerRoles ?? []) declaredAnywhere.add(role);
     }
-    if (allowed.size === 0 || !callerRoles.some((role) => allowed.has(role))) {
+    if (declaredAnywhere.size === 0 || !callerRoles.some((role) => declaredAnywhere.has(role))) {
       throw new CentralAdmissionError(
         'DECISION_RECEIPT_READ_UNAUTHORIZED',
         'the authenticated caller holds none of the Business-declared decision-receipt reader roles; the record is not readable',
@@ -3317,6 +3354,23 @@ export function createOccurrenceRuntime(options) {
       throw new CentralAdmissionError(
         'DECISION_RECEIPT_KERNEL_MISMATCH',
         `the decision receipt of turn ${turnId} is pinned to different kernel module bytes; typed code unavailability — no silent cross-version replay`,
+      );
+    }
+    // [#1055 R1 P1-01] The authoritative per-record gate, checked BEFORE any
+    // record byte is released: the caller must hold one of the readerRoles
+    // frozen into THIS envelope by the intent that recorded it. A record
+    // carrying no valid frozen scope is not readable by anyone (fail closed).
+    const recordScope = envelope.readerRoles;
+    if (!Array.isArray(recordScope) || recordScope.length === 0 || !recordScope.every((role) => typeof role === 'string' && role.length > 0)) {
+      throw new CentralAdmissionError(
+        'DECISION_RECEIPT_READ_UNAUTHORIZED',
+        `the decision receipt of turn ${turnId} carries no frozen reader scope; it is not readable by any caller`,
+      );
+    }
+    if (!callerRoles.some((role) => recordScope.includes(role))) {
+      throw new CentralAdmissionError(
+        'DECISION_RECEIPT_READ_UNAUTHORIZED',
+        `the authenticated caller holds none of the reader roles the recording intent froze for the decision receipt of turn ${turnId}; the record is not readable`,
       );
     }
     return snapshotJson(envelope.record);

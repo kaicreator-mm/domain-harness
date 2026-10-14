@@ -107,13 +107,24 @@ function cloneJson(value: unknown): unknown {
 export class InMemoryCasStore implements CasDocumentStore {
   readonly #docs = new Map<string, { value: unknown; revision: number }>();
   #fault: { keySubstring: string; remainingSkips: number } | null = null;
+  #getFault: { keySubstring: string; remainingSkips: number } | null = null;
 
   /** Physical fault injection (KPK-06 vector port): typed Host-side I/O failure. */
   failNextPutMatching(keySubstring: string, { skip = 0 } = {}): void {
     this.#fault = { keySubstring, remainingSkips: skip };
   }
 
+  /**
+   * Physical READ fault injection (#1055 R1 P1-02 vector): the next matching
+   * `get` fails typed, so a read-side Host failure (connection closed, I/O
+   * error) is provable on the physical path — symmetric with the write fault.
+   */
+  failNextGetMatching(keySubstring: string, { skip = 0 } = {}): void {
+    this.#getFault = { keySubstring, remainingSkips: skip };
+  }
+
   async get(key: string): Promise<CasGetResult | null> {
+    this.#maybeFaultRead(key);
     const doc = this.#docs.get(key);
     if (doc === undefined) return null;
     return { value: cloneJson(doc.value), revision: doc.revision };
@@ -188,6 +199,17 @@ export class InMemoryCasStore implements CasDocumentStore {
     }
     this.#fault = null;
     throw new HostBoundaryError('HOST_FAULT_INJECTED', `host storage physically faulted during write of ${key}`);
+  }
+
+  #maybeFaultRead(key: string): void {
+    if (this.#getFault === null) return;
+    if (!key.includes(this.#getFault.keySubstring)) return;
+    if (this.#getFault.remainingSkips > 0) {
+      this.#getFault.remainingSkips -= 1;
+      return;
+    }
+    this.#getFault = null;
+    throw new HostBoundaryError('HOST_FAULT_INJECTED', `host storage physically faulted during read of ${key}`);
   }
 }
 
