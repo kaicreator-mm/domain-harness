@@ -30,16 +30,16 @@ v0.8 original frozen Node/OS evidence remains in v0.8; no waiver. Until successo
 
 ## 2. Corrected gate separation — platform-neutral SDK Product direction
 
-**User Product decision 2026-10-14:** no mandatory Ubuntu 24.04, dedicated host, nonvirtualized hardware or special procurement. SDK P0 target is **Node 24 + real, pinned SQLite + independently qualified supported deployment profile**. Windows/Linux are target families and WSL2/VM/container are legitimate deployment/test classes when explicitly qualified. Read [Node Production Qualification](./DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) controlling successor.
+**User Product decision 2026-10-14:** no mandatory Ubuntu 24.04, dedicated host, nonvirtualized hardware or special procurement. SDK Core P0 target is **JS/TS authoring and a proven selected JavaScript executable environment**, plus secure K/S/B and selected Capability contracts. OS/Node/SQLite details apply only to a chosen adapter, not a universal Core acceptance matrix. Read [Node Production Qualification](./DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) controlling successor.
 
 | ID | Required evidence or decision | When required | Current disposition |
 | --- | --- | --- | --- |
 | **FZ-01 / FZ-01N** | WSL2 Ubuntu26/Node24/SQLite already verified; other native host unavailable; **no repeat search** | Planning environment inventory; not formal L1 Freeze gate | `RECEIPTED; NOT_BLOCKING_PRODUCT_FREEZE` |
 | **FZ-02** | Actual PERF-01..07 and realistic selected-target budgets on exact installed candidate; numeric targets approved at L1, changes via a reviewed bounded Product amendment | Candidate native/supported-profile Release Qualification, **not pre-L1 measurement prerequisite** | `NOT_RUN; RELEASE_GATE` |
 | **FZ-03** | v0.8 #1023/#1003/#1006 released and exact SHA/tag qualified for inheritance | Before v0.9 formal implementation starts and before v0.9 Release PASS | `V08_RELEASE_NOT_YET_QUALIFIED; IMPL_GATE` |
-| **FZ-04** | Freeze architecture/scope: Foundation, WorkflowRouter, public ABI boundaries, Node24+SQLite platform-neutral supported-profile policy, frozen acceptance thresholds, optional deferrals and owners | **Product/L1 Freeze gate now** | `READY_FOR_BOUNDED_REVIEW` |
+| **FZ-04** | Freeze architecture/scope: JS/TS minimal ESM/runtime/Host ABI, Foundation, WorkflowRouter, public ABI boundaries, selected capability constraints and real-core acceptance, optional deferrals and owners | **Product/L1 Freeze gate now** | `READY_FOR_BOUNDED_REVIEW` |
 | **FZ-05** | Fresh review of exact revised Product contract and decision record; no unresolved Product/security P0/P1, valid authority/independence record | **Product/L1 Freeze gate now** | `NOT_RUN` |
-| **FZ-06** | Actual claimed Windows/Linux/WSL2/VM/Container target-specific SQLite native ABI/storage/persistence/restart/security, clean consumer and Full/Hidden/CJ/SLO | Version qualification for **each** claimed profile | `NOT_RUN; RELEASE_GATE` |
+| **FZ-06** | Selected/adverstised runtime + Capability-specific APIs, durable storage/persistence/restart/security, clean consumer and Full/Hidden/CJ; Node/SQLite native ABI only for that optional offering | Version qualification for **each** claimed profile | `NOT_RUN; RELEASE_GATE` |
 
 **Schedule simplification:** Product/L1 Freeze and **non-executable** L2 architecture evidence can be advanced now, without a second Ubuntu host or measured v0.8 release performance. L2 must mark v0.8 borrowed SHAs **PROVISIONAL**, not a released fact. Formal v0.9 implementation starts **only after** accepted v0.8 Release PASS and v0.9 Product/L2/DAG. A green CI check is not OS-native or release-qualification evidence.
 
