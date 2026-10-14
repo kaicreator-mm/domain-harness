@@ -200,11 +200,13 @@ export async function bootstrapTrustedHost(input) {
     preflightTrustedIssuersInstall(trustInput);
     preflightKernelHostPorts(kernelPorts, gatewaySessionCap);
     preflightGatewaySessionCap();
-    // #1023 S01: the trusted deployment authority joins the SAME transaction
-    // — the probed physical store is its only capability, so a bootstrapped
-    // Host always owns immutable content-addressed installs and durable
-    // approval/issuer currentness over that store.
-    preflightDeploymentAuthorityInstall({ store });
+    // #1023 S01 (+R1 #5519609071): the trusted deployment authority joins the
+    // SAME transaction — the probed physical store is its storage, the Host
+    // audience binds every installed reference (P1-02), and the SAME
+    // bootstrap-minted session capability gates every mutating governance
+    // command (P1-01: install/revoke/withdraw refuse uncredentialed deep
+    // imports exactly like the kernel-host/model-port getters, #1013 R2).
+    preflightDeploymentAuthorityInstall({ store, audience, governanceCap: gatewaySessionCap });
     if (modelPort !== undefined) {
         preflightHostModelPort(modelPort, gatewaySessionCap);
     }
@@ -216,7 +218,7 @@ export async function bootstrapTrustedHost(input) {
     installTrustedIssuers(trustInput);
     installKernelHostPorts(kernelPorts, gatewaySessionCap);
     installGatewaySessionCap(gatewaySessionCap);
-    installDeploymentAuthority({ store });
+    installDeploymentAuthority({ store, audience, governanceCap: gatewaySessionCap });
     if (modelPort !== undefined) {
         installHostModelPort(modelPort, gatewaySessionCap);
     }

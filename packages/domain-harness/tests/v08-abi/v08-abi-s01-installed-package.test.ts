@@ -85,7 +85,9 @@ import {
 const ISSUER = 'dac-issuer:s01';
 const ISSUER_SECRET = 'dac-issuer-secret:s01-material';
 const ISSUER_TWO = 'dac-issuer:s01-second';
+const ISSUER_THREE = 'dac-issuer:s01-third';
 const ISSUER_TWO_SECRET = 'dac-issuer-secret:s01-second-material';
+const ISSUER_THREE_SECRET = 'dac-issuer-secret:s01-third-material';
 const AUDIENCE = 'dh-v08-s01';
 const TENANT = 't-s01';
 
@@ -111,6 +113,7 @@ before(async () => {
     issuers: new Map([
       [ISSUER, ISSUER_SECRET],
       [ISSUER_TWO, ISSUER_TWO_SECRET],
+      [ISSUER_THREE, ISSUER_THREE_SECRET],
       // The integration issuer seals the REAL Approval app bytes (P1).
       [INTEG_ISSUER, INTEG_ISSUER_SECRET],
     ]),
@@ -181,7 +184,7 @@ test('S01-P1 one REAL Approval app artifact activates through the installed refe
   // S01-N1 vectors below on sentinel-instrumented closures.
   await assertFixtureBytes('approval');
   const root = await sealRealApp('approval');
-  const handle = await deployInstallPackage(root);
+  const handle = await deployInstallPackage(root, shared.handle.gatewaySessionCap);
   p1Handle = handle;
   assert.match(handle, HANDLE_SHAPE, 'install mints an opaque content-scoped installed reference');
   const loaded = await load(handle);
@@ -254,7 +257,7 @@ test('S01-N1 an install record without its artifact (interrupted publish) refuse
 
 test('S01-N1 tampered installed artifact bytes are refused by the content address before any import', async () => {
   const b = sealed('s01n1tamper');
-  const handle = await deployInstallPackage(b.root);
+  const handle = await deployInstallPackage(b.root, shared.handle.gatewaySessionCap);
   assert.equal((await load(handle)).rootPackageId, b.root.rootPackageId, 'the untampered artifact activates first');
   const record = await readInstallRecord(handle);
   const artifactEntry = await shared.handle.host.docs.get(deployArtifactKey(record.artifactDigest));
@@ -279,7 +282,7 @@ test('S01-N1 a pre-occupied artifact address (CAS collision) refuses the install
   // the content address with hostile bytes.
   const digest = sha256Hex(canonicalJson(b01Clone(c.root)));
   await shared.handle.host.docs.put(deployArtifactKey(digest), { artifactBytes: 'hostile-pre-occupied' }, { mustBeAbsent: true });
-  await refuse(deployInstallPackage(c.root), 'INSTALL_ARTIFACT_CONFLICT');
+  await refuse(deployInstallPackage(c.root, shared.handle.gatewaySessionCap), 'INSTALL_ARTIFACT_CONFLICT');
   assertNeverExecuted(c);
 });
 
@@ -289,16 +292,16 @@ test('S01-N1 a pre-occupied artifact address (CAS collision) refuses the install
 
 test('S01-N2 a revoked previously installed approval refuses BOTH reference and legacy activation (byte identity is not current authorization)', async () => {
   const d = sealed('s01n2rev');
-  const handle = await deployInstallPackage(d.root);
+  const handle = await deployInstallPackage(d.root, shared.handle.gatewaySessionCap);
   assert.equal((await load(handle)).rootPackageId, d.root.rootPackageId, 'installation-current activation succeeds first');
-  await revokeDeployedApproval({ handle, reason: 'governance-withdrawal' });
+  await revokeDeployedApproval({ handle, governanceCap: shared.handle.gatewaySessionCap, reason: 'governance-withdrawal' });
   await refuse(load(handle), 'APPROVAL_REVOKED');
   // The legacy approved-root presentation of the SAME approval is equally
   // refused: every fresh load checks deployment currentness.
   await refuse(load(b01Clone(d.root)), 'APPROVAL_REVOKED');
   // Typed double-revoke (durable store record is write-once).
   await assert.rejects(
-    () => revokeDeployedApproval({ handle }),
+    () => revokeDeployedApproval({ handle, governanceCap: shared.handle.gatewaySessionCap }),
     (error: unknown) => {
       assert.ok(error instanceof QualifiedPackageError);
       assert.equal((error as QualifiedPackageError).code, 'APPROVAL_ALREADY_REVOKED');
@@ -309,23 +312,23 @@ test('S01-N2 a revoked previously installed approval refuses BOTH reference and 
 
 test('S01-N2 revocation BEFORE the first activation never executes a single package byte', async () => {
   const e = sealed('s01n2pre');
-  const handle = await deployInstallPackage(e.root);
-  await revokeDeployedApproval({ handle });
+  const handle = await deployInstallPackage(e.root, shared.handle.gatewaySessionCap);
+  await revokeDeployedApproval({ handle, governanceCap: shared.handle.gatewaySessionCap });
   await refuse(load(handle), 'APPROVAL_REVOKED');
   assertNeverExecuted(e);
 });
 
 test('S01-N2 issuer withdrawal refuses only the withdrawn issuer\'s artifacts; the other issuer keeps activating', async () => {
   const f = sealed('s01n2wd', ISSUER_TWO, ISSUER_TWO_SECRET);
-  const handle = await deployInstallPackage(f.root);
+  const handle = await deployInstallPackage(f.root, shared.handle.gatewaySessionCap);
   assert.equal((await load(handle)).rootPackageId, f.root.rootPackageId);
-  await withdrawDeploymentIssuer({ issuerId: ISSUER_TWO });
+  await withdrawDeploymentIssuer({ issuerId: ISSUER_TWO, governanceCap: shared.handle.gatewaySessionCap });
   await refuse(load(handle), 'ISSUER_WITHDRAWN');
   // The FIRST issuer's closure (installed in S01-P1) still activates.
   assert.ok(p1Handle !== undefined, 'S01-P1 must have run first (node:test runs top-level tests in order)');
   assert.equal((await load(p1Handle)).rootPackageId, 'app:v08:order-approval');
   await assert.rejects(
-    () => withdrawDeploymentIssuer({ issuerId: ISSUER_TWO }),
+    () => withdrawDeploymentIssuer({ issuerId: ISSUER_TWO, governanceCap: shared.handle.gatewaySessionCap }),
     (error: unknown) => {
       assert.ok(error instanceof QualifiedPackageError);
       assert.equal((error as QualifiedPackageError).code, 'ISSUER_ALREADY_WITHDRAWN');
@@ -335,12 +338,52 @@ test('S01-N2 issuer withdrawal refuses only the withdrawn issuer\'s artifacts; t
 });
 
 // ---------------------------------------------------------------------------
+// S01-R1 (review #5519609071) — the two P1 repairs, one RED→GREEN negative
+// per root class plus its legitimate control.
+// ---------------------------------------------------------------------------
+
+test('S01-R1-P1-01 deployment governance mutators refuse an uncredentialed deep importer (install/revoke/withdraw, wrong or absent capability)', async () => {
+  // The #1013 uncredentialed-deep-import class, now covering the deployment
+  // authority: same process, trusted channel established, but NO Host
+  // governance capability — every mutating command refuses typed and leaves
+  // ZERO durable residue.
+  const artifactsBefore = (await shared.handle.host.docs.list('v8deploy:artifact:')).length;
+  const j = sealed('s01r1p101');
+  await refuse(deployInstallPackage(j.root, 'forged-governance-capability-x'), 'DEPLOY_GOVERNANCE_DENIED');
+  await refuse(deployInstallPackage(j.root, undefined as unknown as string), 'DEPLOY_GOVERNANCE_DENIED');
+  assert.equal(
+    (await shared.handle.host.docs.list('v8deploy:artifact:')).length,
+    artifactsBefore,
+    'the refused unauthorized install published no artifact',
+  );
+  assertNeverExecuted(j);
+  // Malicious withdrawal/re revocation of the LIVE issuer and reference:
+  // typed refuse, and the real approved apps of that issuer STILL activate.
+  assert.ok(p1Handle !== undefined, 'S01-P1 must have run first');
+  await refuse(
+    withdrawDeploymentIssuer({ issuerId: ISSUER, governanceCap: 'forged-governance-capability-x' }),
+    'DEPLOY_GOVERNANCE_DENIED',
+  );
+  await refuse(withdrawDeploymentIssuer({ issuerId: ISSUER } as Parameters<typeof withdrawDeploymentIssuer>[0]), 'DEPLOY_GOVERNANCE_DENIED');
+  await refuse(revokeDeployedApproval({ handle: p1Handle, governanceCap: 'forged-governance-capability-x' }), 'DEPLOY_GOVERNANCE_DENIED');
+  assert.equal((await load(p1Handle)).rootPackageId, 'app:v08:order-approval', 'the refused governance mutations changed nothing — the live installed app still activates');
+  // Legitimate control: the SAME commands with the bootstrap-issued
+  // governance capability still work (authorized withdrawal below; the
+  // authorized install/revoke controls are the pre-existing vectors).
+  const ctl = sealed('s01r1p101ctl', ISSUER_THREE, ISSUER_THREE_SECRET);
+  const ctlHandle = await deployInstallPackage(ctl.root, shared.handle.gatewaySessionCap);
+  assert.equal((await load(ctlHandle)).rootPackageId, ctl.root.rootPackageId);
+  await withdrawDeploymentIssuer({ issuerId: ISSUER_THREE, governanceCap: shared.handle.gatewaySessionCap });
+  await refuse(load(ctlHandle), 'ISSUER_WITHDRAWN');
+});
+
+// ---------------------------------------------------------------------------
 // S01-N3 — cross-app substitution and immutable single-artifact publishing.
 // ---------------------------------------------------------------------------
 
 test('S01-N3 a different closure under a pinned appId is refused before load and its bytes never execute', async () => {
   const g = sealed('s01n3x');
-  const handleG = await deployInstallPackage(g.root);
+  const handleG = await deployInstallPackage(g.root, shared.handle.gatewaySessionCap);
   const gateway = createKernelGateway({ host: shared.handle.host, gatewaySessionCap: shared.handle.gatewaySessionCap });
   // s01-order-alpha is durably pinned to the S01-P1 closure by the previous test.
   await assert.rejects(
@@ -358,8 +401,8 @@ test('S01-N3 a different closure under a pinned appId is refused before load and
 
 test('S01-N3 reinstalling the SAME sealed root publishes ONE immutable artifact and never advances its revision', async () => {
   const h = sealed('s01n3idem');
-  const first = await deployInstallPackage(h.root);
-  const second = await deployInstallPackage(h.root);
+  const first = await deployInstallPackage(h.root, shared.handle.gatewaySessionCap);
+  const second = await deployInstallPackage(h.root, shared.handle.gatewaySessionCap);
   assert.notEqual(first, second, 'each install mints its own opaque reference');
   const recordA = await readInstallRecord(first);
   const recordB = await readInstallRecord(second);
@@ -437,11 +480,32 @@ test('S01-N2-restart approval revocation and reference opacity survive process r
   const fresh = await runChild('load', sqlite, handle);
   assert.ok(fresh.ok, `activation in a restarted process succeeds while installation-current: ${JSON.stringify(fresh)}`);
 
+  // S01-R1-P1-02: the installed reference is BOUND to the trusted Host
+  // audience — the SAME SQLite store bootstrapped under a DIFFERENT audience
+  // refuses the handle typed, before any import (cross-audience replay).
+  const foreignAudience = await runChild('cross-audience-load', sqlite, handle);
+  assert.equal(foreignAudience.ok, false);
+  assert.equal(foreignAudience.code, 'INSTALL_AUDIENCE_MISMATCH', `different-audience same-store boot refuses: ${JSON.stringify(foreignAudience)}`);
+  // Legitimate control: under the ORIGINAL audience the SAME handle still
+  // activates on the SAME store (restart reuse is the intended path).
+  const sameAudience = await runChild('load', sqlite, handle);
+  assert.ok(sameAudience.ok, `same-audience reload stays valid after the cross-audience refusal: ${JSON.stringify(sameAudience)}`);
+
   await runChild('revoke', sqlite, handle);
 
   const refused = await runChild('load', sqlite, handle);
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'APPROVAL_REVOKED', `post-restart activation refuses pre-import: ${JSON.stringify(refused)}`);
+
+  // S01-R1-P1-01 restart leg: an AUTHORIZED withdrawal (governance
+  // capability presented) stays durable across a process restart.
+  const withdrawSqlite = join(shared.dir, 'withdraw.sqlite');
+  const wDeployed = await runChild('deploy', withdrawSqlite, 's01wdraw');
+  assert.ok(wDeployed.ok && typeof wDeployed.handle === 'string', `withdraw deploy leg ok: ${JSON.stringify(wDeployed)}`);
+  await runChild('withdraw', withdrawSqlite, wDeployed.handle as string);
+  const wRefused = await runChild('load', withdrawSqlite, wDeployed.handle as string);
+  assert.equal(wRefused.ok, false);
+  assert.equal(wRefused.code, 'ISSUER_WITHDRAWN', `authorized withdrawal refuses activations after restart: ${JSON.stringify(wRefused)}`);
 
   // The opaque reference never resolves outside its own deployment store.
   const foreign = await runChild('load', join(shared.dir, 'other-store.sqlite'), handle);
