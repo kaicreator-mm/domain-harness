@@ -4,7 +4,7 @@
 STATUS=PLANNING_DRAFT_NOT_FORMAL_DAG
 OWNER=#1026
 PRODUCT_SCOPE=R2_F01_F10_FROZEN_PR1048
-ARCH_CANDIDATE=PR1049@097dead07cc60cbad060cb12ab318f540c0a1eb8
+ARCH_CANDIDATE=PR1049@f5e393e199654d1fddcf6730cece30f9875860fa
 L2_FREEZE=NOT_YET
 V08_RELEASE_BASELINE=NOT_QUALIFIED_#1006_OPEN
 TASK_ISSUES=EXISTING_#1027_#1028_#1032_#1035_#1036_#1037
@@ -75,7 +75,7 @@ The core selection of an **actual durable/identity Capability** remains obligato
 
 **Next owner action:** obtain independent exact-HEAD L2 review for #1049; freeze only after zero unresolved P0/P1 and disposition of material UNKNOWNs. Adopt this file as *formal* Task DAG only by a separate explicit controller freeze/approval checkpoint after re-reading latest L2 and v0.8 release pins. At that point check live Issue claim/PR occupancy; do not duplicate work claimed by another agent.
 
-**Author-side L2 A11 handoff:** v0.9 #1032 must close v0.8 S01's raw-approved-root transitional fallback: only a previously H-installed immutable current artifact may be passed to v0.9 public `load(package)`. #1035 types/documentation and #1037 adversarial test must reject direct raw Root execution. Reference L2 candidate PR #1049@`097dead07cc60cbad060cb12ab318f540c0a1eb8`. No v0.8 source change implied.
+**Author-side L2 A11 handoff:** v0.9 #1032 must close v0.8 S01's raw-approved-root transitional fallback: only a previously H-installed immutable current artifact may be passed to v0.9 public `load(package)`. #1035 types/documentation and #1037 adversarial test must reject direct raw Root execution. Reference L2 candidate PR #1049@`f5e393e199654d1fddcf6730cece30f9875860fa`. No v0.8 source change implied.
 
 ## 5. R3 exact architecture reviewer findings mapped into existing implementation owners
 
