@@ -1,6 +1,6 @@
 # v0.8 Retained 44 — current selected-source evidence intake (NON-NORMATIVE)
 
-> T-G #1006 Web-only evidence-index baseline `v0.8@306c3900c558b39ee822e87e339079b426cf6817`. This file is a **source-assertion map**, NOT executed candidate validation. The frozen `docs/implementation/DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json` remains unchanged: **44/44 NOT_RUN, 0/44 exactExecutionSHA**. Evidence must not be promoted from another SHA or a proposal/legacy test. NF06 has a separate active local Builder; no concurrent writes to K/S/Host. **RELEASE=HOLD**.
+> T-G #1006 Web-only evidence-index successor `v0.8@a1cffa2561e81bc3a146ee49e96303f5483bd633`. This file is a **source-assertion map**, NOT executed candidate validation. The frozen `docs/implementation/DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json` remains unchanged: **44/44 NOT_RUN, 0/44 exactExecutionSHA**. Evidence must not be promoted from another SHA or a proposal/legacy test. NF06 PR #1055 has **MERGED** at `a1cffa2561e81bc3a146ee49e96303f5483bd633` after independently reviewed bounded repairs. Its existing selected-path P/N test **source** may be indexed here, but final exact-candidate execution remains NOT_RUN. **RELEASE=HOLD**.
 
 ## Cost-controlled final-candidate rule
 
@@ -9,7 +9,7 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 ## Test-path key
 
 - `C` = `packages/domain-harness-compiler/tests/`; `I` = `packages/domain-harness/tests/v08-integration/`; `A` = `packages/domain-harness/tests/`; `H` = `packages/domain-harness/tests/v08-host/`.
-- Table witnesses are **candidate files**. Several are complementary and do not alone prove the full frozen row. `SELECTED_PN_PRESENT` means exact current selected-path tests exist, **not** version PASS. `PHYSICAL_PARTIAL` means current real K/H assertions cover only part of the row. `SOURCE_TEST_ONLY` means BUILD/unit sources exist but physical acceptance isn't independently matched. `PROPOSAL_ONLY` and `LEGACY_WITNESS_ONLY` cannot satisfy selected-runtime P/N. `NO_EXACT_V08_PN_MAPPED` means a missing selected witness must be triaged; it does NOT establish missing production functionality. `ACTIVE_LOCAL_OWNER` is reserved for NF06.
+- Table witnesses are **candidate files**. Several are complementary and do not alone prove the full frozen row. `SELECTED_PN_PRESENT` means exact current selected-path tests exist, **not** version PASS. `PHYSICAL_PARTIAL` means current real K/H assertions cover only part of the row. `SOURCE_TEST_ONLY` means BUILD/unit sources exist but physical acceptance isn't independently matched. `PROPOSAL_ONLY` and `LEGACY_WITNESS_ONLY` cannot satisfy selected-runtime P/N. `NO_EXACT_V08_PN_MAPPED` means a missing selected witness must be triaged; it does NOT establish missing production functionality. `ACTIVE_LOCAL_OWNER` would mean an implementation still in progress; after PR #1055 merged no current row uses this classification. This is an index classification, not a Release PASS.
 
 ## All frozen entries — 44 unique rows
 
@@ -58,21 +58,21 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 | `FR08-P-SD2` | S | SELECTED_PN_PRESENT | C v08-standard-sdk-fr08-sd; I fr08-sd-nf05-physical; declared event through K central admission; final rerun owed |
 | `FR08-N-SD2` | S | SELECTED_PN_PRESENT | C v08-standard-sdk-fr08-sd; I fr08-sd-nf05-physical; undeclared event denied with 0 effect; final rerun owed |
 | `NEW-FUNCTION-05` | S | SELECTED_PN_PRESENT | C v08-standard-sdk-fr08-sd; I fr08-sd-nf05-physical; digest-bound PRE/POST, promoted-negative and mutation regression; final rerun owed |
-| `NEW-FUNCTION-06` | S | ACTIVE_LOCAL_OWNER | C v08-standard-sdk-retention-d02 (proposal only); NF06 Builder running; do not duplicate; true SQLite optional receipt + mandatory policy unproven |
+| `NEW-FUNCTION-06` | S | SELECTED_PN_PRESENT | v0.8 PR #1055 merged `a1cffa2561e81bc3a146ee49e96303f5483bd633`; selected K receipt + optional authorized durable append/read + fail-closed mandatory **pre-admission refusal**, Node24 true-SQLite/restart targeted P/N specifically in `I nf06-decision-receipt-physical` and `C v08-standard-sdk-nf06-receipt`; other FR08-SD source tests remain separate supporting evidence; see #1006@6176494805 for exact positive/negative witness classification. Product-approved new mandatory K/H atomic positive OUT (#949@6106607603), not an unfulfilled NF06 acceptance. Final candidate full + row assertion mapping still NOT_RUN. |
 
 ## Current source-map counts (NOT completion counts)
 
-- `ACTIVE_LOCAL_OWNER`: 1
+- `ACTIVE_LOCAL_OWNER`: 0
 - `LEGACY_WITNESS_ONLY`: 5
 - `NO_EXACT_V08_PN_MAPPED`: 3
 - `PHYSICAL_PARTIAL`: 15
 - `PROPOSAL_ONLY`: 6
-- `SELECTED_PN_PRESENT`: 7
+- `SELECTED_PN_PRESENT`: 8
 - `SOURCE_TEST_ONLY`: 7
 
-## Priority validation queues (do not alter NF06 Builder write set)
+## Priority validation queues (preserve selected K/S/Host source ownership)
 
-1. **NF06 active**: preserve one owner and wait for its PR. Existing S helper returns `authority:'proposal-only'` with `durableAppend:'required-by-kernel'`: never call that durability. Mandatory policy requires genuine atomic/recovery evidence or PRODUCT_DECISION_REQUIRED; do not expand K/H in a second branch.
+1. **NF06 source selected, not release-qualified**: PR #1055 merged after independent source-review repairs (R2 PASS). Optional receipt append/read, post-commit-failure containment, authorized visibility, true SQLite restart, and mandatory typed **zero-effect refusal** have selected-path P/N sources; separately approved new mandatory atomic K/H positive is OUT of v0.8 (#949@6106607603). No parallel implementation needed for NF06 solely because this stale ledger formerly said `ACTIVE_LOCAL_OWNER`; do not report an actual final candidate PASS before one #1006 run.
 2. **Selected S semantic gaps**: FR05 full revision pin and FR08 resolver Rule/cache/promoted path, FR09 governed child execution, FR12 fast-path evidence, HF17/HF23 observer/agent exposure. Proposal-only tests may be used as reusable subtests, not a final P/N replacement.
 3. **Distinct high-risk K rows**: HF18 (deadline/callback), HF20 (ordered cursor), HF32 (durable child-send); verify actual selected source/test against frozen observables BEFORE creating any extra test. HF16/HF19/HF21 were only partially witnessed by K C01 and tenant isolation, not the entire retained behavior.
 4. **BUILD and DAC bridge**: historical DAC 01–04 sources/tests remain in the repo; selected BUILD binding and actual approval currentness need new candidate-appropriate provenance. Avoid porting old APIs before checking what the frozen Product truly requires.
@@ -80,4 +80,4 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 
 ## Ownership and gate
 
-Web may refine this index while source SHA is fixed, or review NF06 PR once owner finishes. The NF06 Builder alone owns active K/S/Host changes. Final #1006 evidence-only PR may update the frozen 44 statuses only after real exact-SHA P/N and independent validation. CI deferral applies to intermediate PR full runs, **not** final v0.8 candidate qualification.
+Web may refine this source index on a pinned branch and use the now-merged NF06 PR #1055. Do not introduce a second source writer or mutate K/S/Host from this documentation-only classification update. Final #1006 evidence-only PR may update the frozen 44 statuses only after real exact-SHA P/N and independent validation. CI deferral applies to intermediate PR full runs, **not** final v0.8 candidate qualification.
