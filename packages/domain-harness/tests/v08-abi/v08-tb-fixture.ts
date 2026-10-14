@@ -318,6 +318,11 @@ export function b01MemoryHost(): B01MemoryHost {
         call: () => {
           throw new Error('b01 fixture kernel declares no physical effect resources');
         },
+        // #1023 S05 R1 P1-01: the scoped-physical dispatch member joins the
+        // COMPLETE set; the fixture kernel owns no scoped resources either.
+        callScoped: () => {
+          throw new Error('b01 fixture kernel declares no physical effect resources');
+        },
       },
       clock: () => '2026-10-12T00:00:00.000Z',
     },

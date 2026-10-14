@@ -414,7 +414,14 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
     // ---- S04-N7: physical resource fault → typed failed occurrence; the
     // capability handler never ran; retry refuses; the failure is durable ----
     await harness.gateway.activateGenesis(harness.credential(['platform-operator'], 's04-op'), { appId: APP, instanceKey: 'q-s04-fault' });
-    harness.handle.host.resources.failNextCall('ledger');
+    // #1023 S05: the adapter lives under the app-scoped PHYSICAL key — take
+    // it from the accounting of the app's own earlier dispatches.
+    const ledgerPhysicalKey = harness.handle.host.resources.calls().find((record) => record.resourceKey.includes('ledger'))?.resourceKey;
+    assert.ok(
+      ledgerPhysicalKey !== undefined && ledgerPhysicalKey.endsWith('\u0000ledger'),
+      `the ledger dispatches are accounted under the app-scoped physical key (got ${JSON.stringify(ledgerPhysicalKey)})`,
+    );
+    harness.handle.host.resources.failNextCall(ledgerPhysicalKey);
     const failed = await callCode(() => invoke(harness, requester, {
       operationId: 'quote.reserve', input: { amount: 10, requestId: 'S04-F1' }, instanceKey: 'q-s04-fault', messageId: 'm-s04-f1',
     }));
@@ -432,28 +439,69 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
     const faultOutput = failedRecord?.output;
     assert.equal(faultOutput, undefined, 'the faulted dispatch produced no capability output');
 
-    // ---- S04-W2: the capability resource adapter was provisioned from the
-    // sealed ABI at registerApp (P2's durable output proves it physically
-    // ran); a SECOND app registration declaring the same resource key must
-    // refuse — the capability-owned adapter is provisioned once per physical
-    // Host, derived from the BUILD-selected binding. The refusal is ATOMIC
-    // (#1023 S04 R1 P1-01): no durable pin, no partial adapter and no live
-    // second app may survive it. ----
-    await assert.rejects(
-      () => harness.gateway.registerApp({ appId: 'order-approval-2', packageRoot: sealed.root, genesisRoles: ['platform-operator'] }),
-      (error: unknown) => {
-        const code = String((error as { code?: unknown })?.code ?? '');
-        assert.ok(code.startsWith('HOST_'), `expected typed HOST_* refusal, got ${code}`);
-        return true;
-      },
-    );
-    assert.equal(
+    // ---- S04-W2 (#1023 S05 contract): the capability resource adapter was
+    // provisioned from the sealed ABI at registerApp (P2's durable output
+    // proves it physically ran). Under S05 the adapter installs under an
+    // INJECTIVE per-activation physical key, so a SECOND app registration —
+    // even one binding the SAME logical `ledger.reserve` route — no longer
+    // refuses: both deployments coexist on the one physical Host, each
+    // executing exactly its own BUILD-selected handler. ----
+    const dispatchAtW2 = harness.dispatchCount();
+    const keyCountAtW2 = harness.handle.host.resources.resourceKeys().length;
+    await harness.gateway.registerApp({ appId: 'order-approval-2', packageRoot: sealed.root, genesisRoles: ['platform-operator'] });
+    assert.equal(harness.gateway.hasApp('order-approval-2'), true, 'the second deployment registers on the same Host');
+    assert.notEqual(
       await harness.handle.host.docs.get('v8host:gateway:app-pin:order-approval-2'),
       null,
-      'a refused second registration must leave NO durable pin residue (R1 P1-01)',
+      'the second deployment durably pins its own closure registration',
     );
-    assert.equal(harness.gateway.hasApp('order-approval-2'), false);
-    assert.equal(harness.dispatchCount(), dispatchAtN6 + 1, 'the refused second registration dispatches nothing');
+    assert.equal(
+      harness.handle.host.resources.resourceKeys().length,
+      keyCountAtW2 + 1,
+      'the second deployment retained its OWN scoped physical adapter (injective identity)',
+    );
+    const requester2 = mintPrincipalCredential({
+      issuerId: INTEG_ISSUER, grantId: 'g-s04-w2-requester', tenantId: TENANT, appId: 'order-approval-2', subject: 's04-user-2', audience: AUDIENCE,
+      roles: ['requester'], issuedAt: '2026-10-14T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+    }, INTEG_ISSUER_SECRET) as unknown as string;
+    const operator2 = mintPrincipalCredential({
+      issuerId: INTEG_ISSUER, grantId: 'g-s04-w2-op', tenantId: TENANT, appId: 'order-approval-2', subject: 's04-op-2', audience: AUDIENCE,
+      roles: ['platform-operator'], issuedAt: '2026-10-14T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+    }, INTEG_ISSUER_SECRET) as unknown as string;
+    await harness.gateway.activateGenesis(operator2, { appId: 'order-approval-2', instanceKey: 'q-s04-w2' });
+    const w2 = (await harness.gateway.invokeOperation(requester2, {
+      appId: 'order-approval-2', capabilityId: CAPABILITY_ID,
+      operationId: 'quote.reserve', input: { amount: 12, requestId: 'S04-W2' }, instanceKey: 'q-s04-w2', messageId: 'm-s04-w2',
+    })) as Record<string, any>;
+    assert.equal(w2.status, 'admitted', 'the second deployment runs its own effectful operation end-to-end');
+    const w2Journal = (await harness.journalRecords()).find((record) => (record.output as Record<string, unknown> | undefined)?.requestId === 'S04-W2');
+    assert.equal(w2Journal?.status, 'completed');
+    assert.deepEqual(w2Journal?.output, {
+      reserved: true,
+      ledgerEntryId: `ledger:${w2Journal?.effectId}`,
+      reservedAmount: 12,
+      requestId: 'S04-W2',
+    }, "the second deployment's durable output IS its own capability handler's");
+    // The FIRST deployment keeps its own handler and namespace: a fresh
+    // effect there runs through the ORIGINAL app-scoped key only.
+    await harness.gateway.activateGenesis(harness.credential(['platform-operator'], 's04-op'), { appId: APP, instanceKey: 'q-s04-w2-first' });
+    const firstAfter = (await invoke(harness, requester, {
+      operationId: 'quote.reserve', input: { amount: 12, requestId: 'S04-W2-FIRST' }, instanceKey: 'q-s04-w2-first', messageId: 'm-s04-w2-first',
+    })) as Record<string, any>;
+    assert.equal(firstAfter.status, 'admitted');
+    const firstJournal = (await harness.journalRecords()).find((record) => (record.output as Record<string, unknown> | undefined)?.requestId === 'S04-W2-FIRST');
+    assert.equal(firstJournal?.status, 'completed');
+    assert.deepEqual(firstJournal?.output, {
+      reserved: true,
+      ledgerEntryId: `ledger:${firstJournal?.effectId}`,
+      reservedAmount: 12,
+      requestId: 'S04-W2-FIRST',
+    }, "the first deployment still executes its own handler after the second registered");
+    const w2Keys = harness.handle.host.resources.calls()
+      .filter((record) => record.resourceKey.endsWith('\u0000ledger'))
+      .map((record) => record.resourceKey);
+    assert.equal(new Set(w2Keys).size, 2, `the two deployments dispatched on two DISTINCT physical keys (got ${JSON.stringify([...new Set(w2Keys)])})`);
+    assert.equal(harness.dispatchCount(), dispatchAtW2 + 2, 'exactly the two legit dispatches happened');
   } finally {
     await harness.handle.host.close();
     await rm(harness.dir, { recursive: true, force: true });

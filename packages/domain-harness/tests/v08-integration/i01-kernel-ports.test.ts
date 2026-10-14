@@ -33,7 +33,7 @@ test('I01-N: the COMPLETE port set is required — a partial tuple installs NOTH
   const full = {
     docs: { get: (key: string) => key, put: (_key: string, value: unknown) => value, list: (prefix: string) => [prefix] },
     sha256: { digestUtf8: (value: string) => value },
-    resources: { call: (_key: string, _op: string, payload: unknown) => payload },
+    resources: { call: (_key: string, _op: string, payload: unknown) => payload, callScoped: (_scopeId: string, _key: string, _op: string, payload: unknown) => payload },
     clock: () => '2026-10-12T00:00:00.000Z',
   };
   // Malformed members of an otherwise-complete tuple refuse typed.
@@ -53,6 +53,12 @@ test('I01-N: the COMPLETE port set is required — a partial tuple installs NOTH
   // tuple without clock) refuse typed — completeness is structural.
   assert.throws(
     () => installKernelHostPorts({ ...full, resources: {} }, NEGATIVE_CAP),
+    (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
+  );
+  // #1023 S05 R1 P1-01: the scoped-physical dispatch member is part of the
+  // COMPLETE set — a resources port without callScoped installs NOTHING.
+  assert.throws(
+    () => installKernelHostPorts({ ...full, resources: { call: full.resources.call } }, NEGATIVE_CAP),
     (error: unknown) => error instanceof QualifiedPackageError && error.code === 'KERNEL_HOST_INVALID',
   );
   assert.throws(
@@ -96,6 +102,7 @@ test('I01-P: bootstrapTrustedHost installs the COMPLETE protected port set over 
     assert.equal(typeof ports.docs.put, 'function');
     assert.equal(typeof ports.docs.list, 'function');
     assert.equal(typeof (ports.resources as Record<string, unknown>).call, 'function');
+    assert.equal(typeof (ports.resources as Record<string, unknown>).callScoped, 'function');
     assert.equal(typeof ports.clock, 'function');
 
     // Trusted digest port is the compiler/verifier digest construction.

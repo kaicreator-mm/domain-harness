@@ -27,7 +27,7 @@ function fullPorts(): Record<string, unknown> {
     },
     sha256: { digestUtf8: () => 'ab'.repeat(32) },
     clock: () => '2026-10-12T00:00:00.000Z',
-    resources: { call: async () => null },
+    resources: { call: async () => null, callScoped: async () => null },
   };
 }
 

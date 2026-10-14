@@ -85,8 +85,11 @@ export function preflightKernelHostPorts(ports, sessionCap) {
         || !isCallable(sha256.digestUtf8)) {
         throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put, docs.list and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)');
     }
-    if (typeof resources !== 'object' || resources === null || !isCallable(resources.call)) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a resources.call callable (physical Business effect dispatch; #1013 I01 complete-set contract)');
+    if (typeof resources !== 'object'
+        || resources === null
+        || !isCallable(resources.call)
+        || !isCallable(resources.callScoped)) {
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide resources.call and resources.callScoped callables (physical Business effect dispatch plus the #1023 S05 R1 scoped-physical route; #1013 I01 complete-set contract)');
     }
     if (!isCallable(candidate.clock)) {
         throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a clock callable returning an ISO timestamp (trusted Kernel timestamps; #1013 I01 complete-set contract)');
@@ -123,6 +126,7 @@ export function installKernelHostPorts(ports, sessionCap) {
         }),
         resources: Object.freeze({
             call: resources.call,
+            callScoped: resources.callScoped,
         }),
         clock: candidate.clock,
     });

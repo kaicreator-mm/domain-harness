@@ -11,6 +11,20 @@
  *
  * Every dispatch carries the AUTHENTICATED principal (verified credential),
  * so a resource can never mistake caller-declared user data for identity.
+ *
+ * #1023 S05 — the dispatcher's map keys are PHYSICAL keys. Deployment-owned
+ * handlers install under their bare logical key (this module's historical
+ * shape); capability-owned adapters install under the INJECTIVE composed
+ * `<scopeId>\u0000<logicalKey>` entries the trusted kernel gateway provisions,
+ * where the scope is minted per activation by the trusted loader. Two
+ * independently approved closures binding the same logical route therefore
+ * retain two distinct entries and can never cross-route. The scoped-physical
+ * namespace is RESERVED against raw `call` dispatch (#1023 S05 R1 P1-01):
+ * naming a composed key by its exact string — from a Business effect handler
+ * whose declared route says otherwise, from an adapter-less closure's raw
+ * port, or from any other raw-port caller — refuses typed, because the only
+ * route into a scoped entry is the trusted per-activation `callScoped`
+ * wiring that composes the caller deployment's OWN loader-minted scope.
  */
 
 import type { HostPrincipal } from './identity.js';
@@ -23,6 +37,19 @@ export interface DispatchContext {
 
 export type ResourceHandler = (operation: string, payload: unknown, context: DispatchContext) => unknown;
 
+/**
+ * #1023 S05 R1 P1-01: the delimiter of the scoped-physical namespace. Every
+ * capability-owned adapter the trusted kernel gateway provisions is retained
+ * under `<scopeId>\u0000<logicalKey>`; the namespace is RESERVED against raw
+ * `call` dispatch — no Business effect handler (scoped or adapter-less
+ * closure alike) and no other raw-port caller can reach another deployment's
+ * scoped entry by naming its exact string. The ONLY route into a scoped
+ * entry is `callScoped`, composed with the caller deployment's OWN
+ * loader-minted scope by the trusted per-activation port wiring (never
+ * forwarded to the Kernel mechanism or any package).
+ */
+const SCOPED_RESOURCE_DELIMITER = '\u0000';
+
 export interface ResourceCallRecord {
   readonly resourceKey: string;
   readonly operation: string;
@@ -34,6 +61,19 @@ export class ResourceDispatcher {
   readonly #handlers = new Map<string, ResourceHandler>();
   readonly #calls: { record: ResourceCallRecord; resourceKey: string; operation: string }[] = [];
   #failNextResource: string | null = null;
+
+  /**
+   * Host-context retention probe (#1023 S05): the sorted PHYSICAL keys every
+   * currently provisioned handler is retained under — the observable
+   * registry behind "the Host registers and retains each deployment's
+   * unique physical identity". Keys here are the composed
+   * `<scopeId>\0<logicalKey>` entries the trusted gateway provisions
+   * (capability-owned adapters) plus any deployment-owned bare keys.
+   * Read-only diagnostics; never installs, never routes.
+   */
+  resourceKeys(): readonly string[] {
+    return [...this.#handlers.keys()].sort();
+  }
 
   /** Host-context provisioning (deployment configuration, not caller surface). */
   provision(resourceKey: string, handler: ResourceHandler): void {
@@ -127,6 +167,54 @@ export class ResourceDispatcher {
     if (typeof resourceKey !== 'string' || resourceKey.length === 0 || typeof operation !== 'string' || operation.length === 0) {
       throw new HostBoundaryError('HOST_RESOURCE_MALFORMED', 'resource dispatch requires non-empty resourceKey and operation strings');
     }
+    // #1023 S05 R1 P1-01: the scoped-physical namespace is reserved. A key
+    // containing the delimiter is another (or this) deployment's capability
+    // entry; a Business effect handler whose DECLARED route is one thing can
+    // still name a different physical key in its EXECUTABLE (a declaration is
+    // not proof of what the code calls), so the physical boundary itself must
+    // fail closed: naming the reserved namespace through the raw port refuses
+    // typed, and the refusal is accounted like any physically observed one.
+    if (resourceKey.includes(SCOPED_RESOURCE_DELIMITER)) {
+      this.#calls.push({
+        record: {
+          resourceKey,
+          operation,
+          principalSubject: context.principal.subject,
+          principalRoles: [...context.principal.roles],
+        },
+        resourceKey,
+        operation,
+      });
+      throw new HostBoundaryError(
+        'HOST_RESOURCE_NAMESPACE_RESERVED',
+        `HOST_RESOURCE_NAMESPACE_RESERVED: resource keys containing the scoped-physical delimiter are reserved for the trusted per-activation capability port; dispatching a scoped physical key by name through the raw Host resource port is refused`,
+      );
+    }
+    return this.#dispatch(resourceKey, operation, payload, context);
+  }
+
+  /**
+   * #1023 S05 R1 P1-01: the privileged scoped dispatch. Composes the given
+   * deployment scope with the logical key and dispatches the retained
+   * capability entry — the ONLY route into the reserved namespace. This
+   * method exists on the physical Host boundary for the trusted bootstrap
+   * port wiring; the loader's per-activation resources view calls it with
+   * the scope it minted itself, and that view never forwards the member to
+   * the Kernel mechanism, the Business packages or any caller (the raw ports
+   * are additionally session-capability-gated in kernel-host.ts).
+   */
+  async callScoped(scopeId: string, resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown> {
+    if (typeof scopeId !== 'string' || scopeId.length === 0 || scopeId.includes(SCOPED_RESOURCE_DELIMITER)) {
+      throw new HostBoundaryError('HOST_RESOURCE_MALFORMED', 'scoped resource dispatch requires a non-empty scopeId without the scoped-physical delimiter');
+    }
+    if (typeof resourceKey !== 'string' || resourceKey.length === 0 || typeof operation !== 'string' || operation.length === 0) {
+      throw new HostBoundaryError('HOST_RESOURCE_MALFORMED', 'resource dispatch requires non-empty resourceKey and operation strings');
+    }
+    return this.#dispatch(`${scopeId}${SCOPED_RESOURCE_DELIMITER}${resourceKey}`, operation, payload, context);
+  }
+
+  /** The shared physical dispatch core: accounting, fault injection, handler. */
+  async #dispatch(resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown> {
     const handler = this.#handlers.get(resourceKey);
     if (handler === undefined) {
       // Accounting happens BEFORE any refusal: an unprovisioned dispatch is

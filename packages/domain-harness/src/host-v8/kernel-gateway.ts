@@ -361,21 +361,27 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
             `app ${registration.appId} is durably pinned to a different approved closure on this host (the loaded closure identity differs from the pinned one)`,
           );
         }
-        // ---- #1023 S04: provision the BUILD-selected capability resource
-        // adapters derived from the sealed OperationCall ABI. The adapters
-        // are the ONLY physical route to the capability-owned effectful
-        // handlers, and they are reachable exclusively through the selected
-        // Kernel's effect dispatch (hostPorts.resources carries the Host
-        // service principal — never a caller identity). A resource key is
-        // physical-Host-global, so the install is an ALL-OR-NOTHING batch
-        // (R1 P1-01): the dispatcher preflights every key — collision on
-        // this Host and duplication inside the batch — and commits every
+        // ---- #1023 S04/S05: provision the BUILD-selected capability
+        // resource adapters derived from the sealed OperationCall ABI. The
+        // adapters are the ONLY physical route to the capability-owned
+        // effectful handlers, and they are reachable exclusively through the
+        // selected Kernel's effect dispatch (hostPorts.resources carries the
+        // Host service principal — never a caller identity). #1023 S05: each
+        // adapter carries its activation's INJECTIVE physical deployment
+        // identity, so the gateway installs it under the composed key
+        // `<scopeId>\0<logicalKey>` — two independently approved closures
+        // binding the SAME logical route install two distinct entries and
+        // can never cross-route (the S04 Host-global logical-key collision
+        // is gone by construction). The install is still an ALL-OR-NOTHING
+        // batch (R1 P1-01): the dispatcher preflights every key — collision
+        // on this Host and duplication inside the batch — and commits every
         // handler in one synchronous block, BEFORE the durable pin below. A
-        // second registration claiming any taken key therefore refuses with
-        // ZERO partial install.
+        // batch collision is now reachable only through a same-scope reuse
+        // (structurally impossible: the scope is minted fresh per load);
+        // the post-batch pin CAS race remains the guarded failure path.
         const adapters = ops.operationResourceAdapters();
         host.resources.provisionAll(adapters.map((adapter) => ({
-          resourceKey: adapter.resourceKey,
+          resourceKey: adapter.physicalResourceKey,
           handler: (operation: string, payload: unknown): unknown => {
             const handler = adapter.operations.get(operation);
             if (handler === undefined) {
@@ -387,7 +393,7 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
             return handler(payload);
           },
         })));
-        installedKeys.push(...adapters.map((adapter) => adapter.resourceKey));
+        installedKeys.push(...adapters.map((adapter) => adapter.physicalResourceKey));
         // ---- Durable pin commit LAST (#1013 R1 F-02 / S04 R1 P1-01): the
         // guarded CAS is the FINAL durable step of the registration — nothing
         // after it can fail, so a refused registration can never leave a pin

@@ -38,7 +38,7 @@
  * Host-provisioned resource adapters.
  */
 
-import { QualifiedPackageError, type QualifiedCleanupFailure, type QualifiedPackageKind, type V8PackageLifecycleContext } from './contracts.js';
+import { QualifiedPackageError, sha256Hex, type QualifiedCleanupFailure, type QualifiedPackageKind, type V8PackageLifecycleContext } from './contracts.js';
 import { currentKernelHostPorts, type V8KernelHostPorts } from './kernel-host.js';
 import { currentHostModelPort, type V8CancellationSignal } from './model-port.js';
 import { load } from './load.js';
@@ -116,7 +116,16 @@ export interface V8OperationCall {
  * Kernel's effect dispatch (`hostPorts.resources`), never from a call.
  */
 export interface V8OperationResourceAdapter {
+  /** The LOGICAL sealed route key (the Business policy's own declaration). */
   readonly resourceKey: string;
+  /**
+   * #1023 S05: this activation's injective physical deployment identity,
+   * minted by the trusted loader from load-verified closure bytes — never
+   * from caller payload, never ambient mutable routing state.
+   */
+  readonly scopeId: string;
+  /** The dispatcher map key: `${scopeId}\u0000${resourceKey}`. */
+  readonly physicalResourceKey: string;
   readonly operations: ReadonlyMap<string, (payload: unknown) => unknown>;
 }
 
@@ -222,7 +231,7 @@ interface WiredKernelRuntime {
  */
 type KernelRuntimeFactory = (deps: {
   readonly moduleIdentity: { readonly packageId: string; readonly moduleSha256: string };
-  readonly hostPorts: V8KernelHostPorts;
+  readonly hostPorts: V8KernelMechanismHostPorts;
   /**
    * The rule-interpretation endpoint. Per the recorded ABI ruling
    * (#1013@6118426531, R1 F-03) the Kernel awaits the returned value: a
@@ -241,12 +250,65 @@ type KernelRuntimeFactory = (deps: {
   readonly observe: (receipt: unknown) => void;
 }) => unknown;
 
+/**
+ * The Host-port view the wired Kernel mechanism consumes: the raw protected
+ * ports MINUS the #1023 S05 R1 privileged `callScoped` member. The mechanism
+ * (and through it every Business package and effect handler) can only ever
+ * see the plain `resources.call`, which refuses the reserved scoped-physical
+ * namespace at the dispatcher — a scope can never be presented to a package.
+ */
+type V8KernelMechanismHostPorts = Omit<V8KernelHostPorts, 'resources'> & {
+  readonly resources: { readonly call: V8KernelHostPorts['resources']['call'] };
+};
+
 function typedError(code: string, message: string): QualifiedPackageError {
   return new QualifiedPackageError(code, message);
 }
 
 function errorMessage(error: unknown): string {
   return String((error as Error | undefined)?.message ?? error);
+}
+
+// ---- #1023 S05: per-activation physical resource deployment identity ----
+
+/**
+ * Process-monotonic activation ordinal. Read exactly once per qualified load
+ * to mint that activation's scope; it is never ambient routing state — no
+ * "current app" variable exists anywhere on this path, so interleaved async
+ * activations can never observe each other's identity.
+ */
+let resourceActivationCounter = 0;
+
+/**
+ * Compose the PHYSICAL dispatcher key of one logical route under one
+ * activation scope. The scope is NUL-free hex, so the composition is
+ * injective in (scope, logicalKey) — two deployments can never resolve onto
+ * each other's entries. #1023 S05 R1 P1-01: a caller or Business effect
+ * handler naming a FORGED composed string is stopped by the dispatcher's
+ * reserved-namespace guard, not by this composition — the raw `call` refuses
+ * any key containing the delimiter typed, and the only route into the
+ * reserved namespace is the privileged `callScoped` member the trusted
+ * loader's per-activation view calls with the scope it minted itself.
+ */
+function physicalResourceKey(scopeId: string, resourceKey: string): string {
+  return `${scopeId}\u0000${resourceKey}`;
+}
+
+/**
+ * Mint one activation's scope: sha256 over the load-VERIFIED closure
+ * identity (root package id + whole-closure digest) plus the activation
+ * ordinal. Deterministic and auditable (a physical key in the dispatcher's
+ * accounting recomputes to the exact closure activation that produced it),
+ * unforgeable by collision, and minted exclusively inside the trusted
+ * loader — a caller can neither choose it nor observe it before dispatch.
+ */
+function mintResourceScopeId(rootPackageId: string, closureDigest: string): string {
+  return sha256Hex(JSON.stringify({
+    resourceScopeVersion: 1,
+    rootPackageId,
+    closureDigest,
+    activation: (resourceActivationCounter += 1),
+  }));
 }
 
 // ---- #1023 S03: optional package lifecycle (init/dispose hooks) ----
@@ -769,6 +831,10 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   // preflight and every physical import happen here and nowhere else.
   const loaded = await load(packageRoot);
 
+  // #1023 S05: this activation's physical resource deployment identity —
+  // consumed by the claim-gated scoped resources view built below.
+  const resourceScopeId = mintResourceScopeId(loaded.rootPackageId, loaded.build.closureDigest);
+
   const bindings = loaded.bindings;
   const kernelBinding = requireRoleBinding(bindings, 'kernel');
   const sdkBinding = requireRoleBinding(bindings, 'standard-sdk');
@@ -998,13 +1064,77 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       moduleSha256: kernelProvenance.moduleSha256,
     };
 
+    // ---- #1023 S04: BUILD-fixed callable OperationCall wiring ----
+    // The sealed S02a capability bindings plus each capability module's
+    // optional sealed OPERATIONS ABI become the dispatch table (and the
+    // trusted-Host physical resource adapters) — validated HERE, at the
+    // same trusted boundary and BEFORE the kernel mechanism is constructed,
+    // so a malformed ABI leaves no facade and no mechanism side effect (the
+    // S03 reverse cleanup above applies to any initialized packages).
+    wiredOperations = wireCapabilityOperations({
+      bindings,
+      getModuleNamespace: (packageId: string) => loaded.getModuleNamespace(packageId),
+      sealedIntentTypes: new Set(intentIndex.keys()),
+      businessPolicy: businessPolicy as Record<string, unknown>,
+    });
+
+    // ---- #1023 S05: capability-owned physical Node adapter identity. Every
+    // LOGICAL resource key THIS closure claims through its sealed effectful
+    // OPERATIONS ABI is dispatched through THIS activation's injective
+    // physical scope — `<scopeId>\u0000<logicalKey>` — so the capability-
+    // owned handlers the trusted Host gateway provisions can never be
+    // crossed, shadowed or shared between two deployments binding the same
+    // logical route. UNCLAIMED keys keep the historical deployment-owned
+    // bare-key routing verbatim (the D2/D3 Apps and mixed closures consume
+    // those unchanged). The claim set is sealed BUILD data and the scope is
+    // loader-minted wiring: the Kernel mechanism, the Business effect
+    // handlers and every caller keep seeing the plain
+    // `resources.call(logicalKey, operation, payload)` port shape — the
+    // claimed route keeps its OWN scoped adapter (BUILD binding precedence).
+    //
+    // #1023 S05 R1 P1-01 — the reserved scoped-physical namespace: the raw
+    // `resources.call` REFUSES any key containing the scope delimiter at the
+    // physical Host dispatcher, so a Business effect handler — scoped or
+    // adapter-less alike — cannot reach ANOTHER deployment's scoped entry by
+    // naming its exact string, even when its executable lies about its
+    // declared route (a signed package's declaration is not proof of what
+    // its code calls; the unclaimed fallback above lands on that guard and
+    // the occurrence fails typed). The claimed branch dispatches through the
+    // privileged `callScoped` member, which exists only on the raw
+    // session-capability-gated ports this trusted loader reads; the runtime
+    // view forwards ONLY the plain `call`, so no Kernel mechanism, Business
+    // package or caller can ever present a scope. ----
+    const claimedResourceKeys = wiredOperations.adapters;
+    // #1023 S05 R2 P1: the mechanism-facing view is ALWAYS a fresh frozen
+    // RUNTIME-narrowed object — including the adapter-less branch. A TS type
+    // cannot strip runtime members: forwarding the raw `hostPorts` would
+    // hand the unchanged Kernel (and through `resources: hostPorts.resources`
+    // every Business effect handler) the privileged `callScoped` member,
+    // letting a signed but buggy or input-parametrized adapter-less Business
+    // present a foreign scope and bypass the reserved-namespace guard. The
+    // zero-claim branch keeps the plain bare-key `call` semantics verbatim
+    // (the bare function reference carries no sibling member).
+    const runtimeHostPorts: V8KernelMechanismHostPorts = Object.freeze({
+      docs: hostPorts.docs,
+      sha256: hostPorts.sha256,
+      resources: Object.freeze({
+        call: claimedResourceKeys.size === 0
+          ? hostPorts.resources.call
+          : (resourceKey: string, operation: string, payload: unknown) =>
+            claimedResourceKeys.has(resourceKey)
+              ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload)
+              : hostPorts.resources.call(resourceKey, operation, payload),
+      }),
+      clock: hostPorts.clock,
+    });
+
     // ---- Kernel mechanism construction (LAST; kernel-owned side effects
     // exist only from this point on, and only behind the verified gate). ----
     let kernelCandidate: unknown;
     try {
       kernelCandidate = createOccurrenceRuntime({
         moduleIdentity,
-        hostPorts,
+        hostPorts: runtimeHostPorts,
         sdkEndpoint: Object.freeze(sdkEndpoint),
         businessEndpoint: businessPolicy,
         observe: (receipt: unknown) => {
@@ -1029,19 +1159,6 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       throw typedError('KERNEL_RUNTIME_INVALID', `kernel package ${kernelBinding.packageId} did not activate a mechanism with submitOccurrence/getSnapshot`);
     }
     kernelRuntime = kernelCandidate as WiredKernelRuntime;
-
-    // ---- #1023 S04: BUILD-fixed callable OperationCall wiring ----
-    // The sealed S02a capability bindings plus each capability module's
-    // optional sealed OPERATIONS ABI become the dispatch table (and the
-    // trusted-Host physical resource adapters) — validated HERE, at the
-    // same trusted boundary, so a malformed ABI leaves no facade (the S03
-    // reverse cleanup above applies to any initialized packages).
-    wiredOperations = wireCapabilityOperations({
-      bindings,
-      getModuleNamespace: (packageId: string) => loaded.getModuleNamespace(packageId),
-      sealedIntentTypes: new Set(intentIndex.keys()),
-      businessPolicy: businessPolicy as Record<string, unknown>,
-    });
   } catch (error) {
     // #1023 S03: a post-init activation failure leaves NO partial active
     // residue either — every already-initialized package is disposed in
@@ -1054,11 +1171,17 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     throw error;
   }
 
-  // The frozen trusted-Host adapter view (#1023 S04): one entry per sealed
-  // resource key, each operation map frozen at this trusted boundary.
+  // The frozen trusted-Host adapter view (#1023 S04/S05): one entry per
+  // sealed LOGICAL resource key, each carrying the activation's injective
+  // physical identity, each operation map frozen at this trusted boundary.
   const resourceAdapters: readonly V8OperationResourceAdapter[] = Object.freeze(
     [...wiredOperations.adapters.entries()].map(([resourceKey, operations]) =>
-      Object.freeze({ resourceKey, operations: new Map(operations) }),
+      Object.freeze({
+        resourceKey,
+        scopeId: resourceScopeId,
+        physicalResourceKey: physicalResourceKey(resourceScopeId, resourceKey),
+        operations: new Map(operations),
+      }),
     ),
   );
   const capabilityOperations = wiredOperations.capabilities;

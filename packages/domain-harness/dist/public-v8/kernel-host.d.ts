@@ -54,9 +54,17 @@ export interface V8KernelHostPorts {
     readonly sha256: {
         readonly digestUtf8: (value: string) => string;
     };
-    /** Physical resource dispatch port handed to Business effect handlers. */
+    /**
+     * Physical resource dispatch port handed to Business effect handlers.
+     * #1023 S05 R1 P1-01: `call` refuses the reserved scoped-physical
+     * namespace at the dispatcher; `callScoped` is the ONLY route into it and
+     * exists for the trusted loader's per-activation resources view alone —
+     * the view the loader hands the Kernel mechanism never forwards it, so no
+     * package or caller can present a scope.
+     */
     readonly resources: {
         readonly call: (resourceKey: string, operation: string, payload: unknown) => unknown;
+        readonly callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown) => unknown;
     };
     /** Trusted clock (ISO string) used for Kernel instance/journal timestamps. */
     readonly clock: () => string;
