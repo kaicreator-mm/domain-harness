@@ -106,7 +106,16 @@ export interface V8OperationCall {
  * Kernel's effect dispatch (`hostPorts.resources`), never from a call.
  */
 export interface V8OperationResourceAdapter {
+    /** The LOGICAL sealed route key (the Business policy's own declaration). */
     readonly resourceKey: string;
+    /**
+     * #1023 S05: this activation's injective physical deployment identity,
+     * minted by the trusted loader from load-verified closure bytes — never
+     * from caller payload, never ambient mutable routing state.
+     */
+    readonly scopeId: string;
+    /** The dispatcher map key: `${scopeId}\u0000${resourceKey}`. */
+    readonly physicalResourceKey: string;
     readonly operations: ReadonlyMap<string, (payload: unknown) => unknown>;
 }
 /**

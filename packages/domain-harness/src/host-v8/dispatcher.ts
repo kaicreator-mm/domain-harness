@@ -11,6 +11,17 @@
  *
  * Every dispatch carries the AUTHENTICATED principal (verified credential),
  * so a resource can never mistake caller-declared user data for identity.
+ *
+ * #1023 S05 — the dispatcher's map keys are PHYSICAL keys. Deployment-owned
+ * handlers install under their bare logical key (this module's historical
+ * shape); capability-owned adapters install under the INJECTIVE composed
+ * `<scopeId>\0<logicalKey>` entries the trusted kernel gateway provisions,
+ * where the scope is minted per activation by the trusted loader. Two
+ * independently approved closures binding the same logical route therefore
+ * retain two distinct entries and can never cross-route, and a caller
+ * forging a composed string as its logical key only reaches its own
+ * deployment's scope-prefixed unknown (the identity never comes from the
+ * call itself).
  */
 
 import type { HostPrincipal } from './identity.js';
@@ -34,6 +45,19 @@ export class ResourceDispatcher {
   readonly #handlers = new Map<string, ResourceHandler>();
   readonly #calls: { record: ResourceCallRecord; resourceKey: string; operation: string }[] = [];
   #failNextResource: string | null = null;
+
+  /**
+   * Host-context retention probe (#1023 S05): the sorted PHYSICAL keys every
+   * currently provisioned handler is retained under — the observable
+   * registry behind "the Host registers and retains each deployment's
+   * unique physical identity". Keys here are the composed
+   * `<scopeId>\0<logicalKey>` entries the trusted gateway provisions
+   * (capability-owned adapters) plus any deployment-owned bare keys.
+   * Read-only diagnostics; never installs, never routes.
+   */
+  resourceKeys(): readonly string[] {
+    return [...this.#handlers.keys()].sort();
+  }
 
   /** Host-context provisioning (deployment configuration, not caller surface). */
   provision(resourceKey: string, handler: ResourceHandler): void {

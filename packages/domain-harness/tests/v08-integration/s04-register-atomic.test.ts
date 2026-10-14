@@ -1,35 +1,40 @@
 /**
- * #1023 S04 R1 P1-01 — registerApp atomicity (RED-first repair).
+ * #1023 S04 R1 P1-01 — registerApp atomicity (RED-first repair), re-adjudicated
+ * for the S05 capability-owned adapter identity.
  * ===========================================================================
  *
  * The R1 review (#5513676627) proved `registerApp` non-atomic: the durable
  * app pin committed BEFORE the capability resource adapters were provisioned,
- * the provisioning loop was non-reversible, and ANY post-load failure left
+ * the provisioning loop was non-irreversible, and ANY post-load failure left
  * (a) a durable pin for an app that never registered, (b) partially installed
  * physical adapters that poison every retry on the same Host, and (c) a
  * loaded facade whose S03 lifecycle was never torn down.
  *
- * These vectors pin the repaired contract over REAL SQLite (one trusted host
- * bootstrap per process — the trust channel is one-shot — with per-vector
- * appIds and resource keys so every vector owns an isolated slice of the
- * shared physical Host):
+ * S05 (#1023) changed the collision landscape: capability-owned adapters now
+ * install under INJECTIVE per-activation physical keys
+ * (`<scopeId>\0<logicalKey>`), so two independently approved closures binding
+ * the same LOGICAL route can no longer collide on one Host at all — the S04
+ * "second app refuses" and "manual pre-provisioning owns the route"
+ * collision classes are gone BY CONSTRUCTION. What MUST stay proven:
  *
- *   RA-A  a pre-provisioned resource collision refuses the registration
- *         BEFORE the durable pin and before ANY adapter install: no pin
- *         record, no leaked adapter (the manual provisioning stays THE
- *         handler), no live app, the S03 dispose ran after the load, and a
- *         retry on the SAME host+gateway SUCCEEDES once the conflicting
- *         provisioning is removed.
- *   RA-B  a closure with TWO physical routes whose SECOND key collides
- *         refuses with ZERO partial install — the first route never leaks —
- *         no pin, dispose ran; after the conflict is removed the retry
- *         installs BOTH routes and each effectful operation runs end-to-end
- *         through the selected Kernel (journal output IS the capability
- *         handler's).
+ *   RA-A  the one remaining post-adapter failure — the durable pin CAS race
+ *         between two registrations of the SAME appId with DIFFERENT
+ *         closures — refuses typed (GATEWAY_APP_PIN_CONFLICT) with ZERO
+ *         residue: the loser's scoped adapters are rolled back, its facade
+ *         S03 dispose runs, the winner keeps working end-to-end, and the
+ *         losing closure registers cleanly under a fresh appId afterwards.
+ *         The race is driven DETERMINISTICALLY: the losing registration
+ *         pends inside a test-gated S03 lifecycle init, strictly between its
+ *         pre-load pin read (no pin) and its adapter/pin commit.
+ *   RA-B  dual-app coexistence on the SHARED Host: two closures binding the
+ *         SAME logical ledger/audit routes register BOTH, and each app's
+ *         effectful operations run end-to-end through the selected Kernel
+ *         with THEIR OWN capability handler's durable output.
  *   RA-C  the dispatcher's host-context rollback surface: `provisionAll` is
  *         all-or-nothing (existing-key collision AND in-batch duplicate
  *         install nothing), `has` probes without installing, `unprovision`
- *         round-trips typed.
+ *         round-trips typed, and `resourceKeys` observes exactly the
+ *         retained physical set.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -62,29 +67,24 @@ const TENANT = 't-s04ra';
 /** Process-global lifecycle probe the sealed capability bytes write to. */
 const PROBE_KEY = '__v08S04RegisterAtomicProbe';
 
-interface Probe {
-  init: number;
+/** The RA-A race gate + probe (deterministic pin-CAS race driver). */
+const RACE_GATE_KEY = '__v08S04RegisterAtomicRaceGate';
+const RACE_PROBE_KEY = '__v08S04RegisterAtomicRaceProbe';
+
+interface RaceProbe {
+  initEntered: number;
   dispose: number;
 }
 
-// Created HERE (never replaced): the sealed module captures this exact object
-// at import time via `globalThis[PROBE_KEY] ??= {...}`, so resets must mutate
-// in place or the increments would land on a stale reference.
-(globalThis as Record<string, unknown>)[PROBE_KEY] = { init: 0, dispose: 0 };
-
-function probe(): Probe {
-  return (globalThis as Record<string, unknown>)[PROBE_KEY] as Probe;
-}
-
-function resetProbe(): void {
-  probe().init = 0;
-  probe().dispose = 0;
+function raceProbe(): RaceProbe {
+  return (globalThis as Record<string, unknown>)[RACE_PROBE_KEY] as RaceProbe;
 }
 
 // ---------------------------------------------------------------------------
 // ONE trusted host bootstrap per process (the load trust channel is one-shot).
-// Every vector owns a distinct appId and distinct physical resource keys, so
-// the shared real-SQLite Host stays collision-free across vectors.
+// Every vector owns a distinct appId, so the shared real-SQLite Host stays
+// collision-free across vectors (S05 makes logical resource keys safe to
+// SHARE — see RA-B, which deliberately reuses the same logical keys).
 // ---------------------------------------------------------------------------
 
 interface SharedHost {
@@ -116,14 +116,6 @@ function patchOnce(source: string, anchor: string, replacement: string, label: s
   return source.replace(anchor, replacement);
 }
 
-/** One vector's shape: distinct appId + distinct physical resource keys. */
-interface VectorShape {
-  readonly appId: string;
-  readonly ledgerKey: string;
-  readonly auditKey: string;
-  readonly capabilityId: string;
-}
-
 /**
  * The REAL approval Business bytes extended to the two-route S04 shape: the
  * existing `effect:reserve` (ledger.reserve, non-idempotent, now DECLARING its
@@ -131,10 +123,9 @@ interface VectorShape {
  * `effect:audit` (audit.append, idempotent) behind a new sealed intent
  * `submitQuoteAudit` — the audit transition mirrors the proven dynamic-binding
  * declaration form (inputFrom/idempotencyKeyFrom over rule-authorized
- * payload projections). The physical resource keys are vector-scoped so the
- * shared Host isolates the vectors.
+ * payload projections).
  */
-async function twoRouteBusinessSource(shape: VectorShape): Promise<string> {
+async function twoRouteBusinessSource(ledgerKey: string, auditKey: string): Promise<string> {
   let source = await readFile(new URL('business-approval.mjs', examplesDir), 'utf8');
   source = patchOnce(
     source,
@@ -215,7 +206,7 @@ export function getPolicy() {`,
         handler:`,
     `      'effect:reserve': {
         semantics: 'non-idempotent',
-        resource: { key: '${shape.ledgerKey}', operation: 'reserve' },
+        resource: { key: '${ledgerKey}', operation: 'reserve' },
         handler:`,
     'reserve route declaration',
   );
@@ -225,17 +216,17 @@ export function getPolicy() {`,
         },
       },
     },`,
-    `          return resources.call('${shape.ledgerKey}', 'reserve', { ...input, effectId });
+    `          return resources.call('${ledgerKey}', 'reserve', { ...input, effectId });
         },
       },
       'effect:audit': {
         semantics: 'idempotent',
-        resource: { key: '${shape.auditKey}', operation: 'append' },
+        resource: { key: '${auditKey}', operation: 'append' },
         handler: async ({ input, effectId, idempotencyKey, resources }) => {
           if (resources === undefined) {
             throw new Error('effect:audit requires the Host resource port');
           }
-          return resources.call('${shape.auditKey}', 'append', { ...input, effectId, idempotencyKey });
+          return resources.call('${auditKey}', 'append', { ...input, effectId, idempotencyKey });
         },
       },
     },`,
@@ -247,17 +238,48 @@ export function getPolicy() {`,
 /**
  * The atomicity-probe capability package: the two-route sealed OPERATIONS ABI
  * (one pure + reserve/audit effectful) with S03 lifecycle exports that write
- * the process-global probe, so a registration failure's teardown is observable.
+ * the process-global probe, so a registration failure's teardown is
+ * observable. `marker` distinguishes independently authored implementations
+ * of the SAME logical routes (RA-B dual-app); `gated` parks the S03 init on
+ * the RA-A race gate so the durable pin CAS race is driven deterministically.
  */
-function atomicCapabilitySource(shape: VectorShape): string {
+function atomicCapabilitySource(options: {
+  readonly ledgerKey: string;
+  readonly auditKey: string;
+  readonly moduleTag: string;
+  readonly marker?: string;
+  readonly gated?: boolean;
+}): string {
+  const { ledgerKey, auditKey, moduleTag, marker = 'BASE', gated = false } = options;
+  const lifecycle = gated
+    ? `const RACE_PROBE = (globalThis.${RACE_PROBE_KEY} ??= { initEntered: 0, dispose: 0 });
+
+export async function init() {
+  RACE_PROBE.initEntered += 1;
+  await globalThis.${RACE_GATE_KEY}.promise;
+}
+
+export async function dispose() {
+  RACE_PROBE.dispose += 1;
+}`
+    : `const PROBE = (globalThis.${PROBE_KEY} ??= { init: 0, dispose: 0 });
+
+export async function init() {
+  PROBE.init += 1;
+}
+
+export async function dispose() {
+  PROBE.dispose += 1;
+}`;
   return `/**
- * Atomicity-probe capability package (#1023 S04 R1 P1-01 test fixture).
+ * Atomicity-probe capability package (#1023 S04 R1 P1-01 / S05 test fixture,
+ * implementation tag ${marker}).
  */
-export const MODULE_ID = 'capability-register-atomic@v08.1.0.0';
+export const MODULE_ID = 'capability-register-atomic-${moduleTag}@v08.1.0.0';
 export const PACKAGE_KIND = 'capability';
 export const ABI_VERSION = 'v08-capability-abi/1';
 export const ENDPOINTS = [
-  { endpointId: 'capability:register-atomic', kind: 'capability-endpoint' },
+  { endpointId: 'capability:register-atomic-${moduleTag}', kind: 'capability-endpoint' },
 ];
 
 export const OPERATIONS = [
@@ -270,25 +292,17 @@ export const OPERATIONS = [
     operationId: 'quote.reserve',
     effectClass: 'non-idempotent',
     intentType: 'submitQuoteDecisionDynamic',
-    resource: { key: '${shape.ledgerKey}', operation: 'reserve' },
+    resource: { key: '${ledgerKey}', operation: 'reserve' },
   },
   {
     operationId: 'quote.audit',
     effectClass: 'idempotent',
     intentType: 'submitQuoteAudit',
-    resource: { key: '${shape.auditKey}', operation: 'append' },
+    resource: { key: '${auditKey}', operation: 'append' },
   },
 ];
 
-const PROBE = (globalThis.${PROBE_KEY} ??= { init: 0, dispose: 0 });
-
-export async function init() {
-  PROBE.init += 1;
-}
-
-export async function dispose() {
-  PROBE.dispose += 1;
-}
+${lifecycle}
 
 const SERVICE_MULTIPLIER = Object.freeze({ standard: 1, expedited: 1.25 });
 
@@ -304,7 +318,7 @@ export function previewTotal(input) {
   }
   const serviceLevel = multiplier === undefined ? 'standard' : record.serviceLevel;
   const subtotal = Math.round(amount * 100 * (multiplier ?? 1)) / 100;
-  return { ok: true, serviceLevel, subtotal, total: subtotal };
+  return { ok: true, implementation: '${marker}', serviceLevel, subtotal, total: subtotal };
 }
 
 export function reserveLedger(payload) {
@@ -314,7 +328,8 @@ export function reserveLedger(payload) {
   const record = payload === null || typeof payload !== 'object' ? {} : payload;
   return {
     reserved: true,
-    ledgerEntryId: \`ledger:\${String(record.effectId ?? 'unknown')}\`,
+    implementation: '${marker}',
+    ledgerEntryId: \`ledger-\${'${marker}'.toLowerCase()}:\${String(record.effectId ?? 'unknown')}\`,
     reservedAmount: Number(record.amount) || 0,
     requestId: record.requestId === undefined ? null : record.requestId,
   };
@@ -327,20 +342,27 @@ export function appendAudit(payload) {
   const record = payload === null || typeof payload !== 'object' ? {} : payload;
   return {
     appended: true,
-    auditEntryId: \`audit:\${String(record.effectId ?? 'unknown')}\`,
+    implementation: '${marker}',
+    auditEntryId: \`audit-\${'${marker}'.toLowerCase()}:\${String(record.effectId ?? 'unknown')}\`,
     requestId: record.requestId === undefined ? null : record.requestId,
   };
 }
 `;
 }
 
-async function sealAtomicClosure(shape: VectorShape, rootId: string): Promise<SealedQualifiedPackageRoot> {
+async function sealAtomicClosure(options: {
+  readonly ledgerKey: string;
+  readonly auditKey: string;
+  readonly capabilityId: string;
+  readonly capabilityText: string;
+  readonly rootId: string;
+}): Promise<SealedQualifiedPackageRoot> {
+  const { ledgerKey, auditKey, capabilityId, capabilityText, rootId } = options;
   const [kernelSource, sdkSource, businessText] = await Promise.all([
     readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
     readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
-    twoRouteBusinessSource(shape),
+    twoRouteBusinessSource(ledgerKey, auditKey),
   ]);
-  const capabilityText = atomicCapabilitySource(shape);
   const kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`) as Record<string, any>;
   const sdk = await import(`data:text/javascript;base64,${Buffer.from(sdkSource, 'utf8').toString('base64')}`) as Record<string, any>;
   const business = await import(`data:text/javascript;base64,${Buffer.from(businessText, 'utf8').toString('base64')}`) as Record<string, any>;
@@ -363,7 +385,7 @@ async function sealAtomicClosure(shape: VectorShape, rootId: string): Promise<Se
       })),
       {
         role: 'capability' as const,
-        capabilityId: shape.capabilityId,
+        capabilityId,
         packageId: capability.MODULE_ID as string,
         endpointId: capability.ENDPOINTS[0].endpointId,
         handlers: [
@@ -392,20 +414,21 @@ async function sealAtomicClosure(shape: VectorShape, rootId: string): Promise<Se
 
 interface Harness {
   readonly gateway: KernelGateway;
-  readonly shape: VectorShape;
+  readonly appId: string;
+  readonly capabilityId: string;
   readonly credential: string;
   readonly operatorCredential: string;
   invoke(operationId: string, request: { input?: unknown; instanceKey?: string; messageId?: string }): Promise<unknown>;
   journalRecords(): Promise<{ effectId: string; status: string; output?: unknown }[]>;
 }
 
-function makeHarness(shape: VectorShape): Harness {
+function makeHarness(appId: string, capabilityId: string): Harness {
   const gateway = createKernelGateway({ host: shared.handle.host, gatewaySessionCap: shared.handle.gatewaySessionCap });
   const credential = mintPrincipalCredential({
     issuerId: INTEG_ISSUER,
-    grantId: `g-${shape.appId}-requester`,
+    grantId: `g-${appId}-requester`,
     tenantId: TENANT,
-    appId: shape.appId,
+    appId,
     subject: 's04ra-user',
     audience: AUDIENCE,
     roles: ['requester'],
@@ -414,9 +437,9 @@ function makeHarness(shape: VectorShape): Harness {
   }, INTEG_ISSUER_SECRET) as unknown as string;
   const operatorCredential = mintPrincipalCredential({
     issuerId: INTEG_ISSUER,
-    grantId: `g-${shape.appId}-op`,
+    grantId: `g-${appId}-op`,
     tenantId: TENANT,
-    appId: shape.appId,
+    appId,
     subject: 's04ra-op',
     audience: AUDIENCE,
     roles: ['platform-operator'],
@@ -425,11 +448,12 @@ function makeHarness(shape: VectorShape): Harness {
   }, INTEG_ISSUER_SECRET) as unknown as string;
   return {
     gateway,
-    shape,
+    appId,
+    capabilityId,
     credential,
     operatorCredential,
     invoke(operationId, request) {
-      const call: Record<string, unknown> = { appId: shape.appId, capabilityId: shape.capabilityId, operationId };
+      const call: Record<string, unknown> = { appId, capabilityId, operationId };
       for (const [key, value] of Object.entries(request)) {
         if (value !== undefined) call[key] = value;
       }
@@ -466,7 +490,7 @@ const HOST_CONTEXT_PRINCIPAL = Object.freeze({
 });
 
 async function register(harness: Harness, root: SealedQualifiedPackageRoot): Promise<void> {
-  await harness.gateway.registerApp({ appId: harness.shape.appId, packageRoot: root, genesisRoles: ['platform-operator'] });
+  await harness.gateway.registerApp({ appId: harness.appId, packageRoot: root, genesisRoles: ['platform-operator'] });
 }
 
 async function refusalCode(run: () => Promise<unknown>): Promise<{ code: string; message: string }> {
@@ -478,135 +502,147 @@ async function refusalCode(run: () => Promise<unknown>): Promise<{ code: string;
   }
 }
 
-test('RA-A: a pre-provisioned resource collision refuses registerApp with zero residue and a working same-host retry', { timeout: 240_000 }, async () => {
-  const shape: VectorShape = { appId: 'order-approval-ra-a', ledgerKey: 'ledger-ra-a', auditKey: 'audit-ra-a', capabilityId: 'cap:register-atomic-a' };
-  const root = await sealAtomicClosure(shape, 'app:v08:s04:ra-a');
-  const harness = makeHarness(shape);
-  const pinKey = `v8host:gateway:app-pin:${shape.appId}`;
+test('RA-A: the durable-pin CAS race refuses the losing registration with zero residue; the winner and a clean retry both work', { timeout: 240_000 }, async () => {
+  const ledgerKey = 'ledger-ra-a';
+  const auditKey = 'audit-ra-a';
+  const appId = 'order-approval-ra-a';
+  const pinKey = `v8host:gateway:app-pin:${appId}`;
+  let releaseGate: () => void = () => {};
+  (globalThis as Record<string, unknown>)[RACE_GATE_KEY] = { promise: new Promise<void>((resolve) => { releaseGate = resolve; }) };
   try {
-    // Deployment-style manual provisioning owns the ledger route before registration.
-    shared.handle.host.resources.provision(shape.ledgerKey, () => ({ manual: true }));
-
-    resetProbe();
-    const refusal = await refusalCode(() => register(harness, root));
-    assert.equal(refusal.code, 'HOST_RESOURCE_PROVISIONED', `collision refuses typed (got ${refusal.code}: ${refusal.message})`);
-    assert.ok(refusal.message.includes(shape.ledgerKey), 'the refusal names the conflicting resource key');
-
-    // ---- zero residue ----
-    assert.equal(await shared.handle.host.docs.get(pinKey), null, 'NO durable pin may exist for a refused registration');
-    assert.equal(harness.gateway.hasApp(shape.appId), false, 'no live app registration survives the refusal');
-    assert.equal(shared.handle.host.resources.has(shape.auditKey), false, 'the OTHER physical route is never (partially) installed');
-    // The manual provisioning stays THE handler — nothing overwrote it.
-    const manual = await shared.handle.host.resources.call(shape.ledgerKey, 'reserve', { probe: 1 }, { principal: HOST_CONTEXT_PRINCIPAL });
-    assert.deepEqual(manual, { manual: true }, 'the pre-existing provisioning keeps its own handler');
-
-    // ---- S03 lifecycle teardown after the failed load ----
-    assert.ok(probe().init >= 1, 'the sealed capability init ran during the load');
-    assert.ok(probe().dispose >= 1, 'the facade lifecycle dispose MUST run after the refused registration');
-
-    // ---- conflict removed → retry on the SAME host+gateway succeeds ----
-    shared.handle.host.resources.unprovision(shape.ledgerKey);
-    const initBefore = probe().init;
-    await register(harness, root);
-    assert.equal(harness.gateway.hasApp(shape.appId), true);
-    assert.ok(probe().init > initBefore, 'the retry loads a fresh facade (init ran again)');
-    const pinEntry = await shared.handle.host.docs.get(pinKey);
-    assert.ok(typeof (pinEntry?.value as { closurePin?: unknown } | null)?.closurePin === 'string', 'the successful retry durably pins the closure');
-
-    // ---- the retried app is fully live: pure + effectful end-to-end ----
-    await harness.gateway.activateGenesis(harness.operatorCredential, { appId: shape.appId, instanceKey: 'q-ra' });
-    const pure = await harness.invoke('quote.preview-total', { input: { amount: 30, serviceLevel: 'expedited' } });
-    assert.deepEqual(pure, { ok: true, serviceLevel: 'expedited', subtotal: 37.5, total: 37.5 });
-    const journalBefore = (await harness.journalRecords()).length;
-    const reserve = await harness.invoke('quote.reserve', { input: { amount: 30, requestId: 'RA-A-1' }, instanceKey: 'q-ra', messageId: 'm-ra-a-1' }) as Record<string, any>;
-    assert.equal(reserve.status, 'admitted');
-    const journal = await harness.journalRecords();
-    assert.equal(journal.length, journalBefore + 1);
-    const record = journal[journal.length - 1];
-    assert.equal(record?.status, 'completed');
-    assert.deepEqual(record?.output, {
-      reserved: true,
-      ledgerEntryId: `ledger:${record?.effectId}`,
-      reservedAmount: 30,
-      requestId: 'RA-A-1',
-    }, "the retried registration's adapter IS the capability handler");
-  } finally {
-    // Leave the shared Host clean for the next vector (guarded so a pre-repair
-    // RED run still surfaces its primary assertion failure, not a cleanup TypeError).
-    const resources = shared.handle.host.resources as { unprovision?: (key: string) => void; has?: (key: string) => boolean };
-    for (const key of [shape.ledgerKey, shape.auditKey]) {
-      if (typeof resources.unprovision === 'function' && resources.has?.(key) === true) resources.unprovision(key);
-    }
-  }
-});
-
-test('RA-B: a SECOND-route collision refuses with ZERO partial install; retry installs both routes end-to-end', { timeout: 240_000 }, async () => {
-  const shape: VectorShape = { appId: 'order-approval-ra-b', ledgerKey: 'ledger-ra-b', auditKey: 'audit-ra-b', capabilityId: 'cap:register-atomic-b' };
-  const root = await sealAtomicClosure(shape, 'app:v08:s04:ra-b');
-  const harness = makeHarness(shape);
-  const pinKey = `v8host:gateway:app-pin:${shape.appId}`;
-  try {
-    // The SECOND adapter's key is taken; under the old non-atomic order the
-    // FIRST adapter leaked installed before the refusal.
-    shared.handle.host.resources.provision(shape.auditKey, () => ({ manualAudit: true }));
-
-    resetProbe();
-    const refusal = await refusalCode(() => register(harness, root));
-    assert.equal(refusal.code, 'HOST_RESOURCE_PROVISIONED', `second-route collision refuses typed (got ${refusal.code}: ${refusal.message})`);
-    assert.ok(refusal.message.includes(shape.auditKey), 'the refusal names the conflicting resource key');
-
-    assert.equal(shared.handle.host.resources.has(shape.ledgerKey), false, 'NO partial install: the first route must not leak when a later key collides');
-    assert.equal(await shared.handle.host.docs.get(pinKey), null, 'no durable pin for the refused registration');
-    assert.equal(harness.gateway.hasApp(shape.appId), false);
-    assert.ok(probe().dispose >= 1, 'the facade lifecycle dispose ran after the refused registration');
-
-    // ---- conflict removed → retry succeeds; BOTH physical routes live ----
-    shared.handle.host.resources.unprovision(shape.auditKey);
-    await register(harness, root);
-    assert.equal(harness.gateway.hasApp(shape.appId), true);
-    assert.equal(shared.handle.host.resources.has(shape.ledgerKey), true, 'the capability-owned ledger adapter is installed');
-    assert.equal(shared.handle.host.resources.has(shape.auditKey), true, 'the capability-owned audit adapter is installed');
-
-    await harness.gateway.activateGenesis(harness.operatorCredential, { appId: shape.appId, instanceKey: 'q-ra-b' });
-    // A SEPARATE instance for the audit occurrence: the reserve transition
-    // above moved q-ra-b to its final state, and the audit intent's own
-    // definition starts from 'review'.
-    await harness.gateway.activateGenesis(harness.operatorCredential, { appId: shape.appId, instanceKey: 'q-ra-b-audit' });
-    const journalBefore = (await harness.journalRecords()).length;
-    const reserve = await harness.invoke('quote.reserve', { input: { amount: 10, requestId: 'RA-B-R' }, instanceKey: 'q-ra-b', messageId: 'm-ra-b-r' }) as Record<string, any>;
-    assert.equal(reserve.status, 'admitted', 'the reserve route runs end-to-end after the retry');
-    const audit = await harness.invoke('quote.audit', { input: { amount: 10, requestId: 'RA-B-A' }, instanceKey: 'q-ra-b-audit', messageId: 'm-ra-b-a' }) as Record<string, any>;
-    assert.equal(
-      audit.status,
-      'admitted',
-      `the audit route runs end-to-end after the retry (receipt: ${JSON.stringify(audit)})`,
-    );
-    const journal = await harness.journalRecords();
-    assert.equal(journal.length, journalBefore + 2, 'both durable effects journaled');
-    const auditRecord = journal.find((record) => {
-      const output = record.output as Record<string, unknown> | undefined;
-      return output !== undefined && output.appended === true;
+    // Two DIFFERENT closures racing for the SAME appId: the gated one parks
+    // inside its S03 init (after reading "no pin", before its adapter batch
+    // and pin commit), the fast one wins the durable pin meanwhile.
+    const gatedRoot = await sealAtomicClosure({
+      ledgerKey, auditKey, capabilityId: 'cap:register-atomic-race',
+      capabilityText: atomicCapabilitySource({ ledgerKey, auditKey, moduleTag: 'race-gated', marker: 'GATED', gated: true }),
+      rootId: 'app:v08:s04:ra-a-gated',
     });
-    assert.ok(auditRecord !== undefined, `the audit effect completed (journal: ${JSON.stringify(journal.map((record) => record.status))})`);
-    assert.equal(auditRecord.status, 'completed');
-    assert.deepEqual(auditRecord.output, {
-      appended: true,
-      auditEntryId: `audit:${auditRecord.effectId}`,
-      requestId: 'RA-B-A',
-    }, 'the audit adapter output IS the capability handler result');
+    const fastRoot = await sealAtomicClosure({
+      ledgerKey, auditKey, capabilityId: 'cap:register-atomic-race',
+      capabilityText: atomicCapabilitySource({ ledgerKey, auditKey, moduleTag: 'race-fast', marker: 'FAST' }),
+      rootId: 'app:v08:s04:ra-a-fast',
+    });
+    const gatewayLoser = makeHarness(appId, 'cap:register-atomic-race');
+    const gatewayWinner = makeHarness(appId, 'cap:register-atomic-race');
+    const keyBaseline = shared.handle.host.resources.resourceKeys().length;
+
+    const pending = gatewayLoser.gateway.registerApp({ appId, packageRoot: gatedRoot, genesisRoles: ['platform-operator'] });
+    const deadline = Date.now() + 30_000;
+    while (raceProbe().initEntered === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(raceProbe().initEntered, 1, 'the gated closure reached its lifecycle init');
+
+    await gatewayWinner.gateway.registerApp({ appId, packageRoot: fastRoot, genesisRoles: ['platform-operator'] });
+    assert.equal(gatewayWinner.gateway.hasApp(appId), true);
+    assert.equal(shared.handle.host.resources.resourceKeys().length, keyBaseline + 2, 'exactly the winner\'s two scoped adapters exist so far');
+
+    releaseGate();
+    const loser = await refusalCode(() => pending);
+    assert.equal(loser.code, 'GATEWAY_APP_PIN_CONFLICT', `the losing closure refuses typed on the durable pin CAS (got ${loser.code}: ${loser.message})`);
+    assert.equal(gatewayLoser.gateway.hasApp(appId), false, 'the losing gateway holds no live app');
+    assert.equal(shared.handle.host.resources.resourceKeys().length, keyBaseline + 2, 'the loser\'s scoped adapters were rolled back (zero handler leak)');
+    assert.ok(raceProbe().dispose >= 1, 'the losing facade\'s S03 dispose ran during the rollback');
+    const winnerPin = await shared.handle.host.docs.get(pinKey);
+    assert.ok(typeof (winnerPin?.value as { closurePin?: unknown } | null)?.closurePin === 'string', 'the WINNER\'s durable pin survives the loser\'s rollback untouched');
+
+    // ---- the winner is fully live end-to-end (both physical routes) ----
+    await gatewayWinner.gateway.activateGenesis(gatewayWinner.operatorCredential, { appId, instanceKey: 'q-ra-a' });
+    await gatewayWinner.gateway.activateGenesis(gatewayWinner.operatorCredential, { appId, instanceKey: 'q-ra-a-audit' });
+    const journalBefore = (await gatewayWinner.journalRecords()).length;
+    const reserve = await gatewayWinner.invoke('quote.reserve', { input: { amount: 30, requestId: 'RA-A-1' }, instanceKey: 'q-ra-a', messageId: 'm-ra-a-1' }) as Record<string, any>;
+    assert.equal(reserve.status, 'admitted');
+    const audit = await gatewayWinner.invoke('quote.audit', { input: { amount: 30, requestId: 'RA-A-2' }, instanceKey: 'q-ra-a-audit', messageId: 'm-ra-a-2' }) as Record<string, any>;
+    assert.equal(audit.status, 'admitted');
+    const journal = await gatewayWinner.journalRecords();
+    assert.equal(journal.length, journalBefore + 2, 'both durable effects journaled');
+    const reserveRecord = journal.find((record) => (record.output as Record<string, unknown> | undefined)?.requestId === 'RA-A-1');
+    const auditRecord = journal.find((record) => (record.output as Record<string, unknown> | undefined)?.requestId === 'RA-A-2');
+    assert.equal(reserveRecord?.status, 'completed');
+    assert.equal((reserveRecord?.output as Record<string, unknown> | undefined)?.implementation, 'FAST', "the winner's reserve output IS its own capability handler's");
+    assert.equal(auditRecord?.status, 'completed');
+    assert.equal((auditRecord?.output as Record<string, unknown> | undefined)?.implementation, 'FAST', "the winner's audit output IS its own capability handler's");
+
+    // ---- the losing closure is not poisoned: it registers cleanly under a
+    // fresh appId on the SAME host (the already-released gate resolves
+    // immediately, so its lifecycle completes normally this time) ----
+    const dispatchBefore = shared.handle.host.resources.callCount();
+    const retryHarness = makeHarness('order-approval-ra-a-retry', 'cap:register-atomic-race');
+    await retryHarness.gateway.registerApp({ appId: 'order-approval-ra-a-retry', packageRoot: gatedRoot, genesisRoles: ['platform-operator'] });
+    assert.equal(retryHarness.gateway.hasApp('order-approval-ra-a-retry'), true);
+    assert.ok(raceProbe().initEntered >= 2, 'the retry re-activated the gated package lifecycle');
+    assert.equal(shared.handle.host.resources.callCount(), dispatchBefore, 'the clean retry dispatched nothing');
   } finally {
-    const resources = shared.handle.host.resources as { unprovision?: (key: string) => void; has?: (key: string) => boolean };
-    for (const key of [shape.ledgerKey, shape.auditKey]) {
-      if (typeof resources.unprovision === 'function' && resources.has?.(key) === true) resources.unprovision(key);
+    releaseGate();
+  }
+});
+
+test('RA-B: two closures binding the SAME logical routes coexist on one Host, each running its own capability handlers end-to-end', { timeout: 240_000 }, async () => {
+  // BOTH shapes deliberately share the SAME logical ledger/audit keys: under
+  // S05 the adapters install under injective per-activation physical keys,
+  // so the second registration no longer refuses — the S04 collision class
+  // this vector used to pin is gone by construction, and what must stay
+  // proven is that each app executes ITS OWN handler on BOTH routes.
+  const ledgerKey = 'ledger-ra-b';
+  const auditKey = 'audit-ra-b';
+  const rootOne = await sealAtomicClosure({
+    ledgerKey, auditKey, capabilityId: 'cap:register-atomic-b1',
+    capabilityText: atomicCapabilitySource({ ledgerKey, auditKey, moduleTag: 'ra-b1', marker: 'ONE' }),
+    rootId: 'app:v08:s04:ra-b1',
+  });
+  const rootTwo = await sealAtomicClosure({
+    ledgerKey, auditKey, capabilityId: 'cap:register-atomic-b2',
+    capabilityText: atomicCapabilitySource({ ledgerKey, auditKey, moduleTag: 'ra-b2', marker: 'TWO' }),
+    rootId: 'app:v08:s04:ra-b2',
+  });
+  const one = makeHarness('order-approval-ra-b1', 'cap:register-atomic-b1');
+  const two = makeHarness('order-approval-ra-b2', 'cap:register-atomic-b2');
+  try {
+    await register(one, rootOne);
+    await register(two, rootTwo);
+    assert.equal(one.gateway.hasApp('order-approval-ra-b1'), true);
+    assert.equal(two.gateway.hasApp('order-approval-ra-b2'), true);
+    // Four DISTINCT physical keys — two logical routes × two deployments.
+    const scoped = shared.handle.host.resources.resourceKeys().filter((key) => key.endsWith(`\u0000${ledgerKey}`) || key.endsWith(`\u0000${auditKey}`));
+    assert.equal(scoped.length, 4, `two deployments × two logical routes = four physical keys (got ${JSON.stringify(scoped)})`);
+    assert.equal(new Set(scoped).size, 4, 'every physical key is distinct (injective identity)');
+
+    await one.gateway.activateGenesis(one.operatorCredential, { appId: one.appId, instanceKey: 'q-ra-b1' });
+    await one.gateway.activateGenesis(one.operatorCredential, { appId: one.appId, instanceKey: 'q-ra-b1-audit' });
+    await two.gateway.activateGenesis(two.operatorCredential, { appId: two.appId, instanceKey: 'q-ra-b2' });
+    await two.gateway.activateGenesis(two.operatorCredential, { appId: two.appId, instanceKey: 'q-ra-b2-audit' });
+
+    const baseline = new Set((await one.journalRecords()).map((record) => record.effectId));
+    const reserveOne = await one.invoke('quote.reserve', { input: { amount: 10, requestId: 'RA-B-1-R' }, instanceKey: 'q-ra-b1', messageId: 'm-ra-b1-r' }) as Record<string, any>;
+    const auditOne = await one.invoke('quote.audit', { input: { amount: 10, requestId: 'RA-B-1-A' }, instanceKey: 'q-ra-b1-audit', messageId: 'm-ra-b1-a' }) as Record<string, any>;
+    const reserveTwo = await two.invoke('quote.reserve', { input: { amount: 10, requestId: 'RA-B-2-R' }, instanceKey: 'q-ra-b2', messageId: 'm-ra-b2-r' }) as Record<string, any>;
+    const auditTwo = await two.invoke('quote.audit', { input: { amount: 10, requestId: 'RA-B-2-A' }, instanceKey: 'q-ra-b2-audit', messageId: 'm-ra-b2-a' }) as Record<string, any>;
+    for (const receipt of [reserveOne, auditOne, reserveTwo, auditTwo]) {
+      assert.equal(receipt.status, 'admitted');
+    }
+    const journal = (await one.journalRecords()).filter((record) => !baseline.has(record.effectId));
+    assert.equal(journal.length, 4, 'all four durable effects journaled');
+    const byRequest = (requestId: string) => journal.find((record) => (record.output as Record<string, unknown> | undefined)?.requestId === requestId);
+    assert.equal((byRequest('RA-B-1-R')?.output as Record<string, unknown> | undefined)?.implementation, 'ONE');
+    assert.equal((byRequest('RA-B-1-A')?.output as Record<string, unknown> | undefined)?.implementation, 'ONE');
+    assert.equal((byRequest('RA-B-2-R')?.output as Record<string, unknown> | undefined)?.implementation, 'TWO');
+    assert.equal((byRequest('RA-B-2-A')?.output as Record<string, unknown> | undefined)?.implementation, 'TWO', 'each app\'s durable outputs are ITS OWN handler\'s on BOTH routes');
+  } finally {
+    // Leave the shared Host clean for the next vector.
+    const resources = shared.handle.host.resources as { unprovision?: (key: string) => void; resourceKeys?: () => readonly string[] };
+    for (const key of resources.resourceKeys?.() ?? []) {
+      if (key.includes('\u0000')) resources.unprovision?.(key);
     }
   }
 });
 
-test('RA-C: dispatcher rollback surface — provisionAll is all-or-nothing, has/unprovision round-trip typed', async () => {
+test('RA-C: dispatcher rollback surface — provisionAll is all-or-nothing, has/unprovision round-trip typed, resourceKeys observes retention', async () => {
   const resources = shared.handle.host.resources;
   resources.provision('k-existing', () => ({ which: 'manual' }));
   assert.equal(resources.has('k-existing'), true);
   assert.equal(resources.has('k-free'), false);
+  assert.deepEqual([...resources.resourceKeys()], ['k-existing'], 'resourceKeys observes exactly the retained physical set');
 
   const handler = (): unknown => ({ which: 'batch' });
   // Existing-key collision installs NOTHING from the batch.
@@ -619,6 +655,7 @@ test('RA-C: dispatcher rollback surface — provisionAll is all-or-nothing, has/
     'a colliding batch refuses typed',
   );
   assert.equal(resources.has('k-free'), false, 'the colliding batch installed nothing');
+  assert.deepEqual([...resources.resourceKeys()], ['k-existing'], 'the refused batch left the retained set untouched');
 
   // In-batch duplicate installs NOTHING either.
   assert.throws(
@@ -638,6 +675,7 @@ test('RA-C: dispatcher rollback surface — provisionAll is all-or-nothing, has/
   ]);
   assert.equal(resources.has('k-one'), true);
   assert.equal(resources.has('k-two'), true);
+  assert.deepEqual([...resources.resourceKeys()].sort(), ['k-existing', 'k-one', 'k-two']);
   resources.unprovision('k-one');
   assert.equal(resources.has('k-one'), false);
   assert.throws(
@@ -650,4 +688,5 @@ test('RA-C: dispatcher rollback surface — provisionAll is all-or-nothing, has/
   assert.deepEqual(manual, { which: 'manual' });
   resources.unprovision('k-existing');
   resources.unprovision('k-two');
+  assert.deepEqual([...resources.resourceKeys()], [], 'the dispatcher retains nothing after the round-trip');
 });
