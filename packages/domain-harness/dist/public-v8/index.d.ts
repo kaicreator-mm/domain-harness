@@ -7,7 +7,7 @@
  * binding.
  */
 export { QualifiedPackageError, V8_QUALIFIED_ABI, V8_QUALIFIED_ROOT_FORMAT, V8_APPROVAL_PROOF_TYPE, V8_QUALIFIED_PRODUCER_PREFIX, approvalBindingDigest, canonicalJson, canonicalSnapshot, computeSubjectDigest, isApprovalProofShape, sha256Hex, } from './contracts.js';
-export type { ApprovalProof, QualifiedBinding, QualifiedBuildProvenance, QualifiedCapabilityBinding, QualifiedCapabilityHandlerBinding, QualifiedEndpoint, QualifiedIntentBinding, QualifiedPackageDescriptor, QualifiedPackageKind, QualifiedRole, QualifiedRoleBinding, SealedQualifiedPackageRoot, } from './contracts.js';
+export type { ApprovalProof, QualifiedBinding, QualifiedBuildProvenance, QualifiedCapabilityBinding, QualifiedCapabilityHandlerBinding, QualifiedCleanupFailure, QualifiedEndpoint, QualifiedIntentBinding, QualifiedPackageDescriptor, QualifiedPackageKind, QualifiedRole, QualifiedRoleBinding, SealedQualifiedPackageRoot, V8PackageLifecycleContext, } from './contracts.js';
 export { load } from './load.js';
 export type { LoadedQualifiedPackages } from './load.js';
 export { DomainHarness } from './microkernel.js';

@@ -26,7 +26,38 @@
 /** Typed error taxonomy for the public v8 qualified-package ABI. */
 export declare class QualifiedPackageError extends Error {
     readonly code: string;
+    /**
+     * #1023 S03: when the package-lifecycle failure path ran a reverse-order
+     * cleanup and one or more `dispose(context)` hooks FAILED, the typed
+     * primary error carries the per-package failures here — the primary
+     * code/message is never erased or replaced by a cleanup failure.
+     */
+    cleanupFailures?: readonly QualifiedCleanupFailure[];
     constructor(code: string, message: string);
+}
+/**
+ * One package's failed `dispose(context)` during an S03 failure-path
+ * cleanup (or a facade `stop()` teardown): the package identity plus the
+ * dispose failure message. Reported without erasing the primary failure.
+ */
+export interface QualifiedCleanupFailure {
+    readonly packageId: string;
+    readonly message: string;
+}
+/**
+ * #1023 S03 — the data-only lifecycle context handed to a package's
+ * optional `init(context)` / `dispose(context)` exports. It carries exactly
+ * the sealed identity of the package and its closure: frozen, plain-JSON,
+ * and NEVER any Kernel/Host private capability (no Host ports, no gateway
+ * session material, no Kernel namespace, no callables). The same frozen
+ * object is passed to that package's init and its dispose.
+ */
+export interface V8PackageLifecycleContext {
+    readonly packageId: string;
+    readonly kind: QualifiedPackageKind;
+    readonly abiVersion: string;
+    readonly rootPackageId: string;
+    readonly closureDigest: string;
 }
 export declare const V8_QUALIFIED_ROOT_FORMAT = "dhpkg/v8-qualified-root/1";
 export declare const V8_APPROVAL_PROOF_TYPE = "v08-external-approval/1";
@@ -133,6 +164,15 @@ export interface SealedQualifiedPackageRoot {
     readonly rootPackageId: string;
     readonly build: QualifiedBuildProvenance;
     readonly approval: ApprovalProof;
+    /**
+     * The sealed packages array, in the producer's BUILD submission order.
+     * #1023 S03: this order IS the BUILD-fixed dependency order of the
+     * optional package lifecycle — `init(context)` runs ascending, cleanup
+     * `dispose(context)` runs descending — and it is committed inside the
+     * approval subject digest (computeSubjectDigest digests the ordered
+     * packages array), so a reordered presentation of the same approval is
+     * refused by the existing replay gate.
+     */
     readonly packages: readonly QualifiedPackageDescriptor[];
     readonly bindings: readonly QualifiedBinding[];
 }

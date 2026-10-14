@@ -26,10 +26,13 @@
  * no v0.7 engine import or re-implementation — the physically selected
  * Kernel package owns the entire mechanism; no business special case; no
  * provider discovery or fallback; no runtime recompilation; no second
- * effect runtime (journals/effects exist only inside the wired Kernel).
+ * effect runtime (journals/effects exist only inside the wired Kernel);
+ * no init-script engine — the #1023 S03 lifecycle hooks are optional
+ * module exports of BUILD-sealed packages, called in the sealed
+ * BUILD-fixed packages order, and nothing more.
  */
 
-import { QualifiedPackageError } from './contracts.js';
+import { QualifiedPackageError, type QualifiedCleanupFailure, type QualifiedPackageKind, type V8PackageLifecycleContext } from './contracts.js';
 import { currentKernelHostPorts, type V8KernelHostPorts } from './kernel-host.js';
 import { currentHostModelPort, type V8CancellationSignal } from './model-port.js';
 import { load } from './load.js';
@@ -43,8 +46,20 @@ export interface V8DomainFacade {
   query(query: unknown): Promise<unknown>;
   /** Observe receipts; returns the unsubscribe function. */
   subscribe(observer: (receipt: unknown) => void): () => boolean;
-  /** Stop the facade scope: observers cleared, further use fails typed. */
-  stop(): void;
+  /**
+   * Stop the facade scope. The scope is stopped for further use
+   * IMMEDIATELY (synchronous part); the returned promise settles when the
+   * reverse-order lifecycle teardown COMPLETES (#1023 S03, R1 P1-01: the
+   * stop contract is awaitable — every `dispose(context)` is awaited in
+   * reverse sealed order before the next one starts, a failing dispose
+   * never aborts the remaining teardown, and the aggregate typed error
+   * `LIFECYCLE_DISPOSE_FAILED` REJECTS the promise instead of being
+   * swallowed). Repeated stop is one-shot idempotent: the same cached
+   * outcome is reported and no teardown runs twice. Callers that ignore
+   * the returned promise leave a rejection unobserved — by design, the
+   * failure is never silenced.
+   */
+  stop(): Promise<void>;
 }
 
 /**
@@ -175,6 +190,48 @@ function typedError(code: string, message: string): QualifiedPackageError {
   return new QualifiedPackageError(code, message);
 }
 
+function errorMessage(error: unknown): string {
+  return String((error as Error | undefined)?.message ?? error);
+}
+
+// ---- #1023 S03: optional package lifecycle (init/dispose hooks) ----
+
+/** The optional lifecycle export shape every sealed package MAY expose. */
+type LifecycleHook = (context: V8PackageLifecycleContext) => unknown;
+
+/**
+ * One closure package that participates in the S03 lifecycle: it exports
+ * `init` and/or `dispose` (participation is per package; a hook-less
+ * package is never touched). `context` is the frozen data-only identity
+ * record shared by that package's init and dispose.
+ */
+interface LifecycleParticipant {
+  readonly packageId: string;
+  readonly context: V8PackageLifecycleContext;
+  readonly init: LifecycleHook | undefined;
+  readonly dispose: LifecycleHook | undefined;
+}
+
+/**
+ * Reverse-order cleanup of already-initialized packages along the sealed
+ * (BUILD-fixed) dependency order. Every participant is offered its
+ * `dispose` even when an earlier dispose failed; failures are COLLECTED,
+ * never thrown, so the caller can report them beside the primary failure
+ * without erasing it.
+ */
+async function disposeInitialized(initialized: readonly LifecycleParticipant[]): Promise<QualifiedCleanupFailure[]> {
+  const failures: QualifiedCleanupFailure[] = [];
+  for (const participant of [...initialized].reverse()) {
+    if (participant.dispose === undefined) continue;
+    try {
+      await participant.dispose(participant.context);
+    } catch (error) {
+      failures.push({ packageId: participant.packageId, message: errorMessage(error) });
+    }
+  }
+  return failures;
+}
+
 /**
  * Structurally validate ONE generic intent (ported from #994@b9ea4d1
  * contracts.mjs): JSON-only, no functions/symbols/handles — intents are
@@ -242,11 +299,18 @@ function requireRoleBinding(bindings: readonly SealedQualifiedPackageRoot['bindi
  * residue: endpoint type checks and business policy resolution run BEFORE
  * the kernel mechanism is constructed; on any failure no facade escapes,
  * no observer is registered and the kernel mechanism has produced no
- * side effect. Residual scope honestly documented (same JS semantics as
- * the installer): packages whose module top level already evaluated during
- * the qualified install cannot be un-evaluated; the loader guarantees only
- * that nothing of ITS OWN (facade, observers, mechanism construction)
- * outlives a failed activation.
+ * side effect. #1023 S03 adds the optional package lifecycle phase
+ * (init ascending / dispose descending along the sealed BUILD-fixed
+ * packages order) between import and wiring: an init failure blocks the
+ * entire activation and cleans up in reverse order starting from the
+ * failed package itself (best-effort, R1 P1-02); a post-init wiring
+ * failure cleans up the initialized packages the same way with its own
+ * typed error rethrown unchanged. Residual scope honestly documented
+ * (same JS semantics as the installer): packages whose module top level
+ * already evaluated during the qualified install cannot be un-evaluated;
+ * the loader guarantees only that nothing of ITS OWN (facade, observers,
+ * mechanism construction, lifecycle participants) outlives a failed
+ * activation.
  */
 async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   if (arguments.length !== 1) {
@@ -292,152 +356,243 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   const createOccurrenceRuntime = kernelNamespace.createOccurrenceRuntime as KernelRuntimeFactory;
   const getPolicy = businessNamespace.getPolicy as () => unknown;
 
-  // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
-  // ModelPort binding, protected channel ONLY. When this process bootstrapped
-  // a Host ModelPort and the qualified Standard SDK exposes the host-bound
-  // resolver factory, the endpoint handed to the Kernel is a COMPOSITE that
-  // dispatches ONLY on the SEALED business rule declaration: a
-  // `model-decision` rule routes through the resolver's real async
-  // port-invoking endpoint (`invokeDecision` — the Kernel awaits the result
-  // per the recorded ABI ruling), every other declared kind stays on the
-  // resolver's model-free wrapper (honest `measured(0)` scoped to bound-port
-  // invocations). Caller input/context never selects the path. Without an
-  // installed port the plain `interpret` stays wired and evidence remains
-  // `unsupported`/`unmeasured` — there is no synthetic measured zero and no
-  // caller-supplied port anywhere. The read carries this module's gateway
-  // session capability (#1013 R2 @5494026032): the same unguessable value
-  // the bootstrap installed with the port, so the trusted load path keeps
-  // working while an uncredentialed deep importer of model-port.js is
-  // refused at the getter before the frozen {invoke} object can be reached.
-  const modelPort = currentHostModelPort(gatewaySessionCap);
-  const resolverFactory = sdkNamespace.createHostBoundModelResolver;
-  type SdkEndpointFn = (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
-  const sdkEndpoint: { packageId: string; interpret: SdkEndpointFn; invokeStep?: SdkEndpointFn } = (
-    modelPort !== undefined && typeof resolverFactory === 'function'
-      ? (() => {
-          interface BoundResolver {
-            interpret: (declaration: unknown, input: unknown, context: unknown) => unknown;
-            invokeDecision: (declaration: unknown, input: unknown, context: unknown) => unknown;
-            invokeStep?: (declaration: unknown, input: unknown, context: unknown) => unknown;
-          }
-          const factory = resolverFactory as (port: unknown) => BoundResolver;
-          let bound: BoundResolver;
-          try {
-            bound = factory(modelPort);
-          } catch (error) {
-            throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver activation failed: ${String((error as Error)?.message ?? error)}`);
-          }
-          if (
-            typeof bound !== 'object'
-            || bound === null
-            || typeof bound.interpret !== 'function'
-            || typeof bound.invokeDecision !== 'function'
-          ) {
-            // R1 F-03 stale/failed-bind negative: a factory that does not
-            // expose the real port-invoking endpoint is not a usable
-            // production binding — refuse typed, never degrade silently.
-            throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver exposes no callable interpret/invokeDecision pair (stale or failed bind)`);
-          }
-          /**
-           * #1003 FR07-KH2 (B3): the resolver for ONE model turn. Without a
-           * protected control it is the load-time binding. With one, the SAME
-           * qualified factory is bound to a request-scoped view of the SAME
-           * trusted port that adds only the cancellation signal to the
-           * physical invocation — the S step/decision code, its evidence
-           * minting and the port identity are unchanged; nothing else rides.
-           */
-          const resolverFor = (control: V8OccurrenceControl | undefined): BoundResolver => {
-            if (control === undefined) return bound;
-            const signal = control.signal;
-            const signalledPort = Object.freeze({
-              invoke: (request: { readonly operation: string; readonly input: unknown }): unknown =>
-                modelPort.invoke({ operation: request.operation, input: request.input, signal }),
-            });
-            try {
-              return factory(signalledPort);
-            } catch (error) {
-              throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver bind failed: ${String((error as Error)?.message ?? error)}`);
-            }
-          };
-          const interpretComposite: SdkEndpointFn = (declaration, input, context, control) => {
-            const kind = (declaration as { kind?: unknown } | null | undefined)?.kind;
-            return kind === 'model-decision'
-              ? resolverFor(control).invokeDecision(declaration, input, context)
-              : bound.interpret(declaration, input, context);
-          };
-          if (typeof bound.invokeStep !== 'function') {
-            // An S package without the step surface still serves one-turn
-            // decisions; a harness rule then refuses typed inside K.
-            return { packageId: sdkBinding.packageId, interpret: interpretComposite };
-          }
-          const invokeStep: SdkEndpointFn = (declaration, input, context, control) => {
-            const resolver = resolverFor(control);
-            if (typeof resolver.invokeStep !== 'function') {
-              throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver exposes no invokeStep`);
-            }
-            return resolver.invokeStep(declaration, input, context);
-          };
-          return { packageId: sdkBinding.packageId, interpret: interpretComposite, invokeStep };
-        })()
-      : { packageId: sdkBinding.packageId, interpret: sdkNamespace.interpret as SdkEndpointFn }
-  );
-
-  // Business policy resolution precedes kernel construction: a policy that
-  // throws or returns a non-object fails typed with the mechanism still inert.
-  let businessPolicy: object;
-  try {
-    businessPolicy = getPolicy() as object;
-  } catch (error) {
-    throw typedError('ACTIVATION_FAILED', `business package ${businessBinding.packageId} policy activation failed: ${String((error as Error)?.message ?? error)}`);
+  // ---- #1023 S03: optional package lifecycle (init/dispose) ----
+  // Module import stays the existing trusted preflight above (load() →
+  // installer); ACTIVATION side effects are this phase. Every package of
+  // the actually selected closure (K/S/B plus any BUILD-admitted capability
+  // package) MAY export `init(context)` / `dispose(context)`; the sealed
+  // root's packages array order — BUILD-fixed and committed inside the
+  // approval subject digest — IS the dependency order: init runs ascending,
+  // cleanup runs descending. A present-but-non-callable hook is refused by
+  // the pre-scan BEFORE any lifecycle side effect; an init failure blocks
+  // the whole activation (no policy resolution, no mechanism construction,
+  // no facade) and cleans up along the reverse order starting with the
+  // FAILED package itself (R1 P1-02: its init may have partially allocated
+  // resources — a best-effort dispose runs first when the package exports
+  // one), then the already-initialized packages. The context is the frozen
+  // data-only identity record (contracts.ts V8PackageLifecycleContext); it
+  // never carries Host ports, gateway session material or any Kernel/Host
+  // private capability, and there is no init-script engine — the hooks are
+  // exports of BUILD-sealed module bytes, nothing else.
+  const participants: LifecycleParticipant[] = [];
+  for (const pkg of loaded.installedPackages) {
+    const namespace = loaded.getModuleNamespace(pkg.packageId);
+    const initHook = namespace.init;
+    const disposeHook = namespace.dispose;
+    if (initHook === undefined && disposeHook === undefined) continue;
+    if ((initHook !== undefined && typeof initHook !== 'function') || (disposeHook !== undefined && typeof disposeHook !== 'function')) {
+      const which = initHook !== undefined && typeof initHook !== 'function' ? 'init' : 'dispose';
+      throw typedError(
+        'LIFECYCLE_HOOK_INVALID',
+        `package ${pkg.packageId} exports a ${which} hook that is not a function; lifecycle hooks must be callable module exports`,
+      );
+    }
+    participants.push({
+      packageId: pkg.packageId,
+      context: Object.freeze({
+        packageId: pkg.packageId,
+        kind: pkg.kind as QualifiedPackageKind,
+        abiVersion: pkg.abiVersion,
+        rootPackageId: loaded.rootPackageId,
+        closureDigest: loaded.build.closureDigest,
+      }),
+      init: initHook as LifecycleHook | undefined,
+      dispose: disposeHook as LifecycleHook | undefined,
+    });
   }
-  if (businessPolicy === null || typeof businessPolicy !== 'object') {
-    throw typedError('ACTIVATION_FAILED', `business package ${businessBinding.packageId} policy activation did not resolve to an object`);
+  const initialized: LifecycleParticipant[] = [];
+  for (const participant of participants) {
+    if (participant.init === undefined) {
+      // A dispose-only participant is vacuously initialized: it never
+      // receives init, but its cleanup runs in the reverse sealed order.
+      initialized.push(participant);
+      continue;
+    }
+    try {
+      await participant.init(participant.context);
+    } catch (error) {
+      // R1 P1-02: a failed init may hold PARTIALLY allocated resources —
+      // best-effort dispose the FAILING participant FIRST (its allocation
+      // is the most recent), then the already-initialized packages in
+      // reverse sealed order. Every cleanup failure is collected beside
+      // the primary LIFECYCLE_INIT_FAILED error without erasing it.
+      const cleanupFailures: QualifiedCleanupFailure[] = [];
+      if (participant.dispose !== undefined) {
+        try {
+          await participant.dispose(participant.context);
+        } catch (disposeError) {
+          cleanupFailures.push({ packageId: participant.packageId, message: errorMessage(disposeError) });
+        }
+      }
+      cleanupFailures.push(...await disposeInitialized(initialized));
+      const failure = typedError(
+        'LIFECYCLE_INIT_FAILED',
+        `package ${participant.packageId} lifecycle init failed: ${errorMessage(error)}; activation is blocked and lifecycle cleanup ran (the failed package best-effort first, then the initialized packages in reverse sealed order)`,
+      );
+      if (cleanupFailures.length > 0) failure.cleanupFailures = cleanupFailures;
+      throw failure;
+    }
+    initialized.push(participant);
   }
-
-  const kernelProvenance = loaded.installedPackages.find((pkg) => pkg.packageId === kernelBinding.packageId);
-  // Unreachable after the qualified install (every bound package is
-  // installed), but the mechanism identity is never silently empty.
-  if (kernelProvenance === undefined) {
-    throw typedError('LOAD_ROLE_BINDING_INVALID', `kernel package ${kernelBinding.packageId} is bound but not installed in this closure`);
-  }
-  const moduleIdentity = {
-    packageId: kernelBinding.packageId,
-    moduleSha256: kernelProvenance.moduleSha256,
-  };
 
   const observers = new Set<(receipt: unknown) => void>();
-
-  // ---- Kernel mechanism construction (LAST; kernel-owned side effects
-  // exist only from this point on, and only behind the verified gate). ----
-  let kernelCandidate: unknown;
+  let businessPolicy: object;
+  let kernelRuntime: WiredKernelRuntime;
   try {
-    kernelCandidate = createOccurrenceRuntime({
-      moduleIdentity,
-      hostPorts,
-      sdkEndpoint: Object.freeze(sdkEndpoint),
-      businessEndpoint: businessPolicy,
-      observe: (receipt: unknown) => {
-        for (const observer of observers) {
-          try {
-            observer(receipt);
-          } catch {
-            // An observer failure never mutates the authoritative occurrence.
+    // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
+    // ModelPort binding, protected channel ONLY. When this process bootstrapped
+    // a Host ModelPort and the qualified Standard SDK exposes the host-bound
+    // resolver factory, the endpoint handed to the Kernel is a COMPOSITE that
+    // dispatches ONLY on the SEALED business rule declaration: a
+    // `model-decision` rule routes through the resolver's real async
+    // port-invoking endpoint (`invokeDecision` — the Kernel awaits the result
+    // per the recorded ABI ruling), every other declared kind stays on the
+    // resolver's model-free wrapper (honest `measured(0)` scoped to bound-port
+    // invocations). Caller input/context never selects the path. Without an
+    // installed port the plain `interpret` stays wired and evidence remains
+    // `unsupported`/`unmeasured` — there is no synthetic measured zero and no
+    // caller-supplied port anywhere. The read carries this module's gateway
+    // session capability (#1013 R2 @5494026032): the same unguessable value
+    // the bootstrap installed with the port, so the trusted load path keeps
+    // working while an uncredentialed deep importer of model-port.js is
+    // refused at the getter before the frozen {invoke} object can be reached.
+    const modelPort = currentHostModelPort(gatewaySessionCap);
+    const resolverFactory = sdkNamespace.createHostBoundModelResolver;
+    type SdkEndpointFn = (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
+    const sdkEndpoint: { packageId: string; interpret: SdkEndpointFn; invokeStep?: SdkEndpointFn } = (
+      modelPort !== undefined && typeof resolverFactory === 'function'
+        ? (() => {
+            interface BoundResolver {
+              interpret: (declaration: unknown, input: unknown, context: unknown) => unknown;
+              invokeDecision: (declaration: unknown, input: unknown, context: unknown) => unknown;
+              invokeStep?: (declaration: unknown, input: unknown, context: unknown) => unknown;
+            }
+            const factory = resolverFactory as (port: unknown) => BoundResolver;
+            let bound: BoundResolver;
+            try {
+              bound = factory(modelPort);
+            } catch (error) {
+              throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver activation failed: ${String((error as Error)?.message ?? error)}`);
+            }
+            if (
+              typeof bound !== 'object'
+              || bound === null
+              || typeof bound.interpret !== 'function'
+              || typeof bound.invokeDecision !== 'function'
+            ) {
+              // R1 F-03 stale/failed-bind negative: a factory that does not
+              // expose the real port-invoking endpoint is not a usable
+              // production binding — refuse typed, never degrade silently.
+              throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} host-bound model resolver exposes no callable interpret/invokeDecision pair (stale or failed bind)`);
+            }
+            /**
+             * #1003 FR07-KH2 (B3): the resolver for ONE model turn. Without a
+             * protected control it is the load-time binding. With one, the SAME
+             * qualified factory is bound to a request-scoped view of the SAME
+             * trusted port that adds only the cancellation signal to the
+             * physical invocation — the S step/decision code, its evidence
+             * minting and the port identity are unchanged; nothing else rides.
+             */
+            const resolverFor = (control: V8OccurrenceControl | undefined): BoundResolver => {
+              if (control === undefined) return bound;
+              const signal = control.signal;
+              const signalledPort = Object.freeze({
+                invoke: (request: { readonly operation: string; readonly input: unknown }): unknown =>
+                  modelPort.invoke({ operation: request.operation, input: request.input, signal }),
+              });
+              try {
+                return factory(signalledPort);
+              } catch (error) {
+                throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver bind failed: ${String((error as Error)?.message ?? error)}`);
+              }
+            };
+            const interpretComposite: SdkEndpointFn = (declaration, input, context, control) => {
+              const kind = (declaration as { kind?: unknown } | null | undefined)?.kind;
+              return kind === 'model-decision'
+                ? resolverFor(control).invokeDecision(declaration, input, context)
+                : bound.interpret(declaration, input, context);
+            };
+            if (typeof bound.invokeStep !== 'function') {
+              // An S package without the step surface still serves one-turn
+              // decisions; a harness rule then refuses typed inside K.
+              return { packageId: sdkBinding.packageId, interpret: interpretComposite };
+            }
+            const invokeStep: SdkEndpointFn = (declaration, input, context, control) => {
+              const resolver = resolverFor(control);
+              if (typeof resolver.invokeStep !== 'function') {
+                throw typedError('ACTIVATION_FAILED', `standard-sdk package ${sdkBinding.packageId} request-scoped model resolver exposes no invokeStep`);
+              }
+              return resolver.invokeStep(declaration, input, context);
+            };
+            return { packageId: sdkBinding.packageId, interpret: interpretComposite, invokeStep };
+          })()
+        : { packageId: sdkBinding.packageId, interpret: sdkNamespace.interpret as SdkEndpointFn }
+    );
+
+    // Business policy resolution precedes kernel construction: a policy that
+    // throws or returns a non-object fails typed with the mechanism still inert.
+    try {
+      businessPolicy = getPolicy() as object;
+    } catch (error) {
+      throw typedError('ACTIVATION_FAILED', `business package ${businessBinding.packageId} policy activation failed: ${String((error as Error)?.message ?? error)}`);
+    }
+    if (businessPolicy === null || typeof businessPolicy !== 'object') {
+      throw typedError('ACTIVATION_FAILED', `business package ${businessBinding.packageId} policy activation did not resolve to an object`);
+    }
+
+    const kernelProvenance = loaded.installedPackages.find((pkg) => pkg.packageId === kernelBinding.packageId);
+    // Unreachable after the qualified install (every bound package is
+    // installed), but the mechanism identity is never silently empty.
+    if (kernelProvenance === undefined) {
+      throw typedError('LOAD_ROLE_BINDING_INVALID', `kernel package ${kernelBinding.packageId} is bound but not installed in this closure`);
+    }
+    const moduleIdentity = {
+      packageId: kernelBinding.packageId,
+      moduleSha256: kernelProvenance.moduleSha256,
+    };
+
+    // ---- Kernel mechanism construction (LAST; kernel-owned side effects
+    // exist only from this point on, and only behind the verified gate). ----
+    let kernelCandidate: unknown;
+    try {
+      kernelCandidate = createOccurrenceRuntime({
+        moduleIdentity,
+        hostPorts,
+        sdkEndpoint: Object.freeze(sdkEndpoint),
+        businessEndpoint: businessPolicy,
+        observe: (receipt: unknown) => {
+          for (const observer of observers) {
+            try {
+              observer(receipt);
+            } catch {
+              // An observer failure never mutates the authoritative occurrence.
+            }
           }
-        }
-      },
-    });
+        },
+      });
+    } catch (error) {
+      throw typedError('ACTIVATION_FAILED', `kernel package ${kernelBinding.packageId} mechanism activation failed: ${String((error as Error)?.message ?? error)}`);
+    }
+    if (
+      typeof kernelCandidate !== 'object'
+      || kernelCandidate === null
+      || typeof (kernelCandidate as WiredKernelRuntime).submitOccurrence !== 'function'
+      || typeof (kernelCandidate as WiredKernelRuntime).getSnapshot !== 'function'
+    ) {
+      throw typedError('KERNEL_RUNTIME_INVALID', `kernel package ${kernelBinding.packageId} did not activate a mechanism with submitOccurrence/getSnapshot`);
+    }
+    kernelRuntime = kernelCandidate as WiredKernelRuntime;
   } catch (error) {
-    throw typedError('ACTIVATION_FAILED', `kernel package ${kernelBinding.packageId} mechanism activation failed: ${String((error as Error)?.message ?? error)}`);
+    // #1023 S03: a post-init activation failure leaves NO partial active
+    // residue either — every already-initialized package is disposed in
+    // reverse sealed order, the primary typed error is rethrown unchanged,
+    // and dispose failures ride beside it without erasing it.
+    const cleanupFailures = await disposeInitialized(initialized);
+    if (cleanupFailures.length > 0 && error instanceof QualifiedPackageError) {
+      error.cleanupFailures = cleanupFailures;
+    }
+    throw error;
   }
-  if (
-    typeof kernelCandidate !== 'object'
-    || kernelCandidate === null
-    || typeof (kernelCandidate as WiredKernelRuntime).submitOccurrence !== 'function'
-    || typeof (kernelCandidate as WiredKernelRuntime).getSnapshot !== 'function'
-  ) {
-    throw typedError('KERNEL_RUNTIME_INVALID', `kernel package ${kernelBinding.packageId} did not activate a mechanism with submitOccurrence/getSnapshot`);
-  }
-  const kernelRuntime = kernelCandidate as WiredKernelRuntime;
 
   // The sealed intent index IS the fixed closure: send() performs no
   // provider discovery and never falls back (KPK-03 heritage).
@@ -448,6 +603,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   );
 
   let stopped = false;
+  let stopDisposal: Promise<void> | undefined;
   function assertOpen(): void {
     if (stopped) {
       throw typedError('FACADE_STOPPED', 'this facade scope is stopped; load the package again for a fresh scope');
@@ -548,9 +704,28 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     throw refusePublicRoute('subscribe');
   }
 
-  function stop(): void {
+  function stop(): Promise<void> {
     stopped = true;
     observers.clear();
+    // #1023 S03, R1 P1-01: stopping the scope tears the package lifecycle
+    // down along the reverse sealed (BUILD-fixed) order and the teardown is
+    // AWAITABLE — each dispose is fully awaited (sync or async) before the
+    // next participant starts, a failing dispose never aborts the remaining
+    // teardown, and the aggregate typed LIFECYCLE_DISPOSE_FAILED error
+    // REJECTS the returned promise (a rejection is never silenced: callers
+    // that ignore the promise leave it unobserved, which surfaces through
+    // the host's unhandled-rejection channel). The disposal is ONE-SHOT:
+    // the first stop caches the outcome promise and every repeated stop
+    // reports that same outcome without re-running anything.
+    stopDisposal ??= disposeInitialized(initialized).then((failures) => {
+      if (failures.length > 0) {
+        throw typedError(
+          'LIFECYCLE_DISPOSE_FAILED',
+          `facade stop lifecycle cleanup failed for ${failures.map((failure) => failure.packageId).join(', ')}: ${failures.map((failure) => failure.message).join('; ')}`,
+        );
+      }
+    });
+    return stopDisposal;
   }
 
   // ---- #1013 private gateway seam (I02/I03), module-private WeakMap ----

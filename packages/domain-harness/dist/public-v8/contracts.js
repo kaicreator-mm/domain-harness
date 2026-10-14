@@ -27,6 +27,13 @@ import { createHash } from 'node:crypto';
 /** Typed error taxonomy for the public v8 qualified-package ABI. */
 export class QualifiedPackageError extends Error {
     code;
+    /**
+     * #1023 S03: when the package-lifecycle failure path ran a reverse-order
+     * cleanup and one or more `dispose(context)` hooks FAILED, the typed
+     * primary error carries the per-package failures here — the primary
+     * code/message is never erased or replaced by a cleanup failure.
+     */
+    cleanupFailures;
     constructor(code, message) {
         super(message);
         this.name = 'QualifiedPackageError';

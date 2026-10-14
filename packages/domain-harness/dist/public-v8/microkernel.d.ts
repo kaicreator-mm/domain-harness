@@ -26,7 +26,10 @@
  * no v0.7 engine import or re-implementation — the physically selected
  * Kernel package owns the entire mechanism; no business special case; no
  * provider discovery or fallback; no runtime recompilation; no second
- * effect runtime (journals/effects exist only inside the wired Kernel).
+ * effect runtime (journals/effects exist only inside the wired Kernel);
+ * no init-script engine — the #1023 S03 lifecycle hooks are optional
+ * module exports of BUILD-sealed packages, called in the sealed
+ * BUILD-fixed packages order, and nothing more.
  */
 import { type V8CancellationSignal } from './model-port.js';
 /** The scoped consumption facade returned by `DomainHarness.load(package)`. */
@@ -37,8 +40,20 @@ export interface V8DomainFacade {
     query(query: unknown): Promise<unknown>;
     /** Observe receipts; returns the unsubscribe function. */
     subscribe(observer: (receipt: unknown) => void): () => boolean;
-    /** Stop the facade scope: observers cleared, further use fails typed. */
-    stop(): void;
+    /**
+     * Stop the facade scope. The scope is stopped for further use
+     * IMMEDIATELY (synchronous part); the returned promise settles when the
+     * reverse-order lifecycle teardown COMPLETES (#1023 S03, R1 P1-01: the
+     * stop contract is awaitable — every `dispose(context)` is awaited in
+     * reverse sealed order before the next one starts, a failing dispose
+     * never aborts the remaining teardown, and the aggregate typed error
+     * `LIFECYCLE_DISPOSE_FAILED` REJECTS the promise instead of being
+     * swallowed). Repeated stop is one-shot idempotent: the same cached
+     * outcome is reported and no teardown runs twice. Callers that ignore
+     * the returned promise leave a rejection unobserved — by design, the
+     * failure is never silenced.
+     */
+    stop(): Promise<void>;
 }
 /**
  * The Host-verified principal the private gateway seam binds into Kernel
