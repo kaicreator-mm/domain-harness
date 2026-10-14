@@ -24,6 +24,12 @@
  *   standard-sdk-v1.mjs            905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a
  *   kernel-mechanism-v1.mjs        2dfec0c44c26d05635751dd13cd970906473d23d
  *
+ * #1003 FR08 SD1/SD2 + NF05 rebind (both payloads carry the additive
+ * semantic-decision interpreter / trusted-boundary wiring; every FR02/FR07
+ * oracle row is re-run unchanged over the new bytes by this file):
+ *   standard-sdk-v1.mjs            58b14aa080331998cf2e26e8be22507fde8bf0a4
+ *   kernel-mechanism-v1.mjs        de1620eb6ba1c5dc5e07ae10a55e8b19ae7500ad
+ *
  * The seven former test.todo GAP sentinels are now REAL executable tests at
  * two levels:
  *   1) here, an in-memory K→S differential over the exact selected payload
@@ -51,10 +57,13 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // Current selected bytes this rebind is bound to (a later K/S byte change
 // must re-review and rebind; it is never silently inherited).
 // K_BLOB_PIN_REBOUND_AFTER_PR1034_D3K: selected K current after merge.
+// S/K_BLOB_PIN_REBOUND_AFTER_FR08_SD_NF05: #1003 FR08 SD1/SD2 + NF05 —
+// additive semantic-decision interpreter (S) and trusted-boundary
+// digest wiring (K); all FR02/FR07 oracle rows re-run unchanged below.
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
-const V08_S_BLOB = '905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a';
-const V08_K_BLOB = '2dfec0c44c26d05635751dd13cd970906473d23d';
+const V08_S_BLOB = '58b14aa080331998cf2e26e8be22507fde8bf0a4';
+const V08_K_BLOB = 'de1620eb6ba1c5dc5e07ae10a55e8b19ae7500ad';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
