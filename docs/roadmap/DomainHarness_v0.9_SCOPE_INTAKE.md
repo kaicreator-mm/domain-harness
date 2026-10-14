@@ -3,6 +3,12 @@
 > **STATUS = USER_APPROVED_PRODUCTION_EXIT_TARGET / L1_NOT_FROZEN / L2_NOT_FROZEN / NOT_TASK_DAG / NO_IMPLEMENTATION / NO_RELEASE_PASS.** Scope is a Product **target**, not an independently accepted freeze or an executable work authorization.
 > This is the roadmap index for [v0.9 Register #1026](https://github.com/kaicreator-mm/domain-harness/issues/1026) and six **candidate** intake issues. It is **not** an executable DAG or approved mandatory release scope. Created after the 2026-10-13 user architecture discussion and a bounded [v0.8 Package-first scope ledger](https://github.com/kaicreator-mm/domain-harness/blob/docs/v08-package-first-closed-world-scope-20261013/docs/implementation/DomainHarness_v0.8_PACKAGE_FIRST_SCOPE_DELTA.md). No changes to v0.8 PRD, L1/L2 Freeze, Task DAG, source or release gates.
 
+## 0. Latest v0.9 Product priority — JS/TS execution only (2026-10-14)
+
+The user further corrected the prior [#1043](https://github.com/kaicreator-mm/domain-harness/pull/1043) OS-neutral **Node24+SQLite** plan: **DomainHarness SDK Core needs an explicitly specified JavaScript execution and TypeScript authoring/build contract**, not any required Windows/Linux/WSL2 acceptance, Node24 version or SQLite physical driver. These checks belong to **selected Capability/Host implementations** only when shipped/promised. See [controlling JS runtime successor](../product/DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md).
+
+Product/Freeze candidate #1044 has been superseded by this material Core-scope correction and requires exact-new-head Product review. Existing v0.8 Windows/Ubuntu Node22/24 validation remains untouched. No blanket all-JS-engine support is claimed before actual verification.
+
 ## 0a. Controlling supported-platform correction (user Product decision 2026-10-14)
 
 The user explicitly removed the proposal's **Ubuntu24-only / bare-metal Build Host precondition**. The v0.9 Product remains a **Node24 + selected native SQLite SDK**, intended for Windows and Linux consumers; WSL2/VM/container are valid test/deployment classes **under their own declared and tested support profiles**. See [Product PRD](../product/DomainHarness_v0.9_PRD_DRAFT.md), [Node qualification](../product/DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) and [L1 ledger](../product/DomainHarness_v0.9_L1_FREEZE_READINESS.md) for the normative candidate scope.

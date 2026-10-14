@@ -7,7 +7,7 @@ PREDECESSOR_MAIN_MERGE=db8b0e0c57b89fa893fbceafeed3ce111e7a2e6e
 PREDECESSOR_REVIEW=PASS_L1_PROPOSAL_P0_0_P1_0_P2_3
 PRODUCT_FREEZE=NOT_GRANTED
 AUTHORITATIVE_V08_RELEASE_BASELINE=NOT_YET_AVAILABLE
-PRODUCT_PLATFORM_POLICY=NODE24_SQLITE_NO_FIXED_UBUNTU_OR_BARE_METAL
+PRODUCT_PLATFORM_POLICY=JS_TS_CORE_NO_OS_OR_NODE_NATIVE_MATRIX
 FZ01_PREFLIGHT=RECEIVED_NONQUALIFYING_WSL2_UBUNTU26_NODE24_SQLITE
 L2_AUTHORITY=NOT_GRANTED
 V09_IMPL=NOT_STARTED
@@ -15,25 +15,31 @@ V09_IMPL=NOT_STARTED
 
 ## 1. Completed planning gates / disposition
 
-- **Production product direction:** accepted: v0.9 ships production-ready supported Node SDK as Foundation Package Set + selected K/S + Identity/SQLite capability implementations + BUILD and external consumer, not a technology-demo version.
+- **Production product direction:** corrected: v0.9 ships production-ready JS/TS-authorable, JS-executed SDK Core + selected K/S/Capability packages + BUILD and real external consumer; Node+SQLite are optional/reference integrations, not a technology-demo version.
 - **Product proposal source:** reviewed five-document PR #1033 exact `10aa58b2625b67219d735ad79338e6902165df27` has `PASS_L1_PROPOSAL` from fresh content reviewer and Woodpecker SUCCESS; merged docs-only to main at `db8b0e0c57b89fa893fbceafeed3ce111e7a2e6e`. A review by the same GitHub account as author does **not** count as a distinct-account `APPROVE`; no Product Freeze automatically follows.
 - **P2-01 ownership:** proposal now fixes Standard Basic **WorkflowRouter semantic owner = #1027**; #1035 owns only public consumer API/docs; #1028 Node physical capability/H assurance; split write sets JIT if source work exceeds one concern. Existing `interpret('workflow')` is a reusable implementation, not proof of a dedicated Router public export.
 - **P2-02 performance denominator:** proposal now requires at least 18,000 **eligible successful completions** across an actual 1,800-second four-caller run, explicit submitted/eligible/success/expected-conflict/unexpected-failure/timeout/late counts, 99.9% eligible fault-free correctness and documented tail inclusion. Any false ACK/security error is unconditional Release HOLD regardless of percentile.
 - **P2-03 stale review pin:** PR #1033 metadata corrected to its reviewed exact SHA before merge.
 - **No Code/Task DAG auto-admission:** #1027/#1028/#1032/#1035/#1036/#1037 remain the six P0 candidate owner Issues. N03/N04/N05 and broad platform/capability/ecosystem deferred by default.
 
+## Latest JS/TS Core Product successor — overrides all earlier Node/OS P0 assumptions
+
+[JS runtime contract](./DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md) supersedes this ledger's previous references to mandatory `Node 24 + SQLite`, Windows/Linux target families, reference-host performance and Core-facing `FZ-01` inventory. **Product/L1 Freeze requires no OS, Node version, SQLite or host inventory**; freeze the minimum JS module/async execution/typed Host Capability contract, secure closed-world loader and falsifiable real App validation instead. Actual JS runner and physical selected providers receive their **own** release qualification only if selected or advertised. FZ-01/01N are retained as historical evidence but have no gating value for Core L1.
+
+v0.8 original frozen Node/OS evidence remains in v0.8; no waiver. Until successor review, `PRODUCT_FREEZE=NO`, no runtime/portability PASS, and candidate #1044 must be superseded.
+
 ## 2. Corrected gate separation — platform-neutral SDK Product direction
 
-**User Product decision 2026-10-14:** no mandatory Ubuntu 24.04, dedicated host, nonvirtualized hardware or special procurement. SDK P0 target is **Node 24 + real, pinned SQLite + independently qualified supported deployment profile**. Windows/Linux are target families and WSL2/VM/container are legitimate deployment/test classes when explicitly qualified. Read [Node Production Qualification](./DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) controlling successor.
+**User Product decision 2026-10-14:** no mandatory Ubuntu 24.04, dedicated host, nonvirtualized hardware or special procurement. SDK Core P0 target is **JS/TS authoring and a proven selected JavaScript executable environment**, plus secure K/S/B and selected Capability contracts. OS/Node/SQLite details apply only to a chosen adapter, not a universal Core acceptance matrix. Read [Node Production Qualification](./DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) controlling successor.
 
 | ID | Required evidence or decision | When required | Current disposition |
 | --- | --- | --- | --- |
 | **FZ-01 / FZ-01N** | WSL2 Ubuntu26/Node24/SQLite already verified; other native host unavailable; **no repeat search** | Planning environment inventory; not formal L1 Freeze gate | `RECEIPTED; NOT_BLOCKING_PRODUCT_FREEZE` |
 | **FZ-02** | Actual PERF-01..07 and realistic selected-target budgets on exact installed candidate; numeric targets approved at L1, changes via a reviewed bounded Product amendment | Candidate native/supported-profile Release Qualification, **not pre-L1 measurement prerequisite** | `NOT_RUN; RELEASE_GATE` |
 | **FZ-03** | v0.8 #1023/#1003/#1006 released and exact SHA/tag qualified for inheritance | Before v0.9 formal implementation starts and before v0.9 Release PASS | `V08_RELEASE_NOT_YET_QUALIFIED; IMPL_GATE` |
-| **FZ-04** | Freeze architecture/scope: Foundation, WorkflowRouter, public ABI boundaries, Node24+SQLite platform-neutral supported-profile policy, frozen acceptance thresholds, optional deferrals and owners | **Product/L1 Freeze gate now** | `READY_FOR_BOUNDED_REVIEW` |
+| **FZ-04** | Freeze architecture/scope: JS/TS minimal ESM/runtime/Host ABI, Foundation, WorkflowRouter, public ABI boundaries, selected capability constraints and real-core acceptance, optional deferrals and owners | **Product/L1 Freeze gate now** | `READY_FOR_BOUNDED_REVIEW` |
 | **FZ-05** | Fresh review of exact revised Product contract and decision record; no unresolved Product/security P0/P1, valid authority/independence record | **Product/L1 Freeze gate now** | `NOT_RUN` |
-| **FZ-06** | Actual claimed Windows/Linux/WSL2/VM/Container target-specific SQLite native ABI/storage/persistence/restart/security, clean consumer and Full/Hidden/CJ/SLO | Version qualification for **each** claimed profile | `NOT_RUN; RELEASE_GATE` |
+| **FZ-06** | Selected/adverstised runtime + Capability-specific APIs, durable storage/persistence/restart/security, clean consumer and Full/Hidden/CJ; Node/SQLite native ABI only for that optional offering | Version qualification for **each** claimed profile | `NOT_RUN; RELEASE_GATE` |
 
 **Schedule simplification:** Product/L1 Freeze and **non-executable** L2 architecture evidence can be advanced now, without a second Ubuntu host or measured v0.8 release performance. L2 must mark v0.8 borrowed SHAs **PROVISIONAL**, not a released fact. Formal v0.9 implementation starts **only after** accepted v0.8 Release PASS and v0.9 Product/L2/DAG. A green CI check is not OS-native or release-qualification evidence.
 

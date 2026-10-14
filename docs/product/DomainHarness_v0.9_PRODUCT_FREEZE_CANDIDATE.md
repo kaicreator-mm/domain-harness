@@ -1,7 +1,7 @@
 # DomainHarness v0.9 — Product/L1 Freeze Candidate and Decision Register
 
 ```ini
-DOCUMENT_STATUS=CANDIDATE_AWAITING_FRESH_INDEPENDENT_L1_REVIEW
+DOCUMENT_STATUS=SUPERSEDED_BY_USER_JS_TS_SCOPE_CORRECTION_DO_NOT_FREEZE
 VERSION=v0.9
 PARENT_ISSUE=#1026
 BASE_MAIN=47d929b57ff187dfc0747622d92041abd921ef65
@@ -13,6 +13,12 @@ V09_IMPLEMENTATION=NOT_AUTHORIZED
 V09_RELEASE_QUALIFICATION=NOT_RUN
 V08_RELEASE_PASS=NOT_ATTESTED
 ```
+
+## Superseded — do not use this old exact-SHA freeze subject
+
+**User Product successor (2026-10-14):** DomainHarness Core accepts an actual JS execution contract (TS authoring/build), **not a Windows/Linux/WSL2 platform matrix or mandatory Node24/native SQLite**, which are selected adapter concerns only. F01/F02/F06 below were written for an older Node SDK proposal. This **historic Product candidate #1044 must not receive PASS_L1_REVIEW or PRODUCT_FREEZE_PASS at its old exact SHA**. Its original blob pins no longer describe the revised PRD. Review the [JS Core successor](./DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md) and a fresh R2 freeze candidate with *new exact blob SHAs* instead.
+
+`HISTORICAL_CANDIDATE_VALID=NO; PRODUCT_FREEZE=NO; R2_REVIEW_REQUIRED=YES`.
 
 ## 1. Normative candidate snapshot to approve or reject (no author self-freeze)
 
