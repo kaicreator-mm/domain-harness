@@ -199,3 +199,17 @@ Updated physical readback at **v0.8@9ea7f6f12a51c78dec747a823db6ade620a2fa6c**, 
 **A source-map freshness exception, not an authority gap:** #1046's already-merged pre-S01 evidence remains an immutable historical observation and is **not retroactively rewritten**; the above successor pins and eventual v0.8 released exact baseline govern future reuse. All actual source implementation still waits for v0.8 Release Qualification, v0.9 L2 Freeze and admitted Task DAG.
 
 **Review path:** author has made design choices and must obtain a truly independent, fresh review session at exact HEAD before claiming L2 PASS; this record does not impersonate a separate reviewer. Release QUALIFICATION remains mandatory even if PR-level CI is deliberately skipped.
+
+## 10. Installed-only v0.9 load boundary — closing the inherited S01 compatibility seam
+
+On merged v0.8 S01 `public-v8/load.ts@22eda49b3298f916ef4d8f37856d60afc6f77d2f`, `load(package)` recognizes an installed handle but **also allows a legacy approved raw sealed-root presentation** after the HMAC/currentness gates. That transitional path is not itself evidence that the v0.9 *new* installed-only Product goal is satisfied. Pre-v1.0 old asset compatibility is explicitly not mandatory.
+
+**v0.9 architecture decision A11:** public `DomainHarness.load(package)` accepts **only a protected-H-bound identity of a previously installed, independently approved immutable selected closure** (an opaque reference/verified immutable package object backed by H protected state). Merely presenting a valid-looking or even previously HMAC-approved raw Root does **not** authorize direct source/module evaluation if it was not installed as that current selected artifact. Raw BUILD roots are supplied to trusted *deployment installation*, not public execution. Exact JS argument representation stays a contract decision under #1035 and must be bound through the selected H assurance; a JavaScript object with same shape and property names is not proof of installation.
+
+- The v0.8 raw-approved-root fallback must be **removed or inaccessible from v0.9 public load** (while preserving v0.8's own already-accepted behavior). No v0.9 legacy compatibility obligation can silently weaken Product F03/F05.
+- Tampered/stale/cross-audience installed reference, raw uninstalled root, changed module graph or revoked issuer -> typed `PACKAGE_NOT_INSTALLED_OR_AUTHORIZED` class **before any unauthorized import or Effect**.
+- The internal selected H installation code may take an inert raw sealed closure to *qualify and publish* content-addressed approved bytes. It may not execute them during this publishing step. `load(package)` activates only the H-resolved current installed closure, with all static preflight before evaluating the first approved module.
+- A source-code refactor that removes `node:crypto` or `data:` imports must not reintroduce public Host verifier injection. Alternate JS engines need a real selected H crypto/byte-loading backend and fail closed otherwise.
+- **Validation owner:** #1032 tests installed-handle only plus forged raw-root and S01-legacy-raw bypass negatives; #1035 tests public typed API surface; #1037 independently tests zero unauthorized import/Effect and per-restart currentness.
+
+This is a Product-aligned **target v0.9 architectural correction**, not a newly claimed v0.8 P1 defect, retroactive v0.8 regression or a v0.9 implementation PASS.
