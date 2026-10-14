@@ -17,13 +17,13 @@ See [JS runtime successor](./DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md
 
 ## 1. Decision — core is a **small official package set**, not a second Runtime
 
-**Scope to Product-freeze for v0.9:** ship a separately identifiable, reproducible **Foundation Package Set** containing the minimal Microkernel SDK, physically executable Kernel Basic and Standard Basic Domain Packages, two Node capability implementations (Identity, SQLite Storage), and producer-neutral qualified BUILD tooling. A **Node Basic Runtime Profile** pins the set. The Profile is metadata/selection/deployment policy, **NOT** another Domain Package and **NEVER** a State/Effect/Journal engine.
+**Scope to Product-freeze for v0.9:** ship a separately identifiable, reproducible **Foundation Package Set** containing the minimal Microkernel SDK, physically executable Kernel Basic and Standard Basic Domain Packages, the **selected Capability Package contract**, and producer-neutral qualified BUILD tooling. An optional **Node Basic reference Profile** may pin a Node Identity/SQLite cohort when selected. The Profile is metadata/selection/deployment policy, **NOT** another Domain Package and **NEVER** a State/Effect/Journal engine.
 
 This separates three identities which must not be conflated:
 
 1. **SDK/distribution artifacts** (npm-compatible tarball/immutable release archive; installation/developer-facing version).
 2. **Domain Packages** (BUILD-selected executable unit, each independently versioned and hashed, even if several are delivered in one physical release archive).
-3. **App Assembly/Runtime Profile** (a locked composition of Package versions, Node target, ABI/Handler/Capability binding, independent installation/activation evidence; not an executable module or a trust authority in itself).
+3. **App Assembly/Runtime Profile** (a locked composition of Package versions, selected JS runtime target, ABI/Handler/Capability binding, independent installation/activation evidence; not an executable module or a trust authority in itself).
 
 Do not require a new npm workspace for each Domain Package merely for aesthetics. **Independently addressable and installable Package artifacts** are P0; separate npm packages per Domain Package are an implementation choice. A consumer must not need a compiler source-path or private test fixture.
 
@@ -34,10 +34,10 @@ Do not require a new npm workspace for each Domain Package merely for aesthetics
 | `@kaicreator/domain-harness` (public `/v9`) | Microkernel SDK artifact | `load(package)`, fixed connection, lifecycle, public typed façade, host-gateway contract; no domain State/Effect/Journal or active provider discovery | **P0**; reuse current workspace implementation, add unambiguous v0.9 public consumption surface |
 | `kaicreator.kernel.basic` | Official **Kernel Domain Package** | one selected State/Transition/Guard/Admission/Effect/Journal/UNKNOWN/Replay authority; adapter to selected physical ports | **P0**; package v0.8 physically executed selected Kernel code with no rewritten second engine |
 | `kaicreator.standard.basic` | Official **Standard Domain Package** | Schema, Rule, Decision, Workflow (including WorkflowRouter), Operation semantics and authorized resolver; no State/Journal engine | **P0**; first implementation reuse v0.8 Standard module; internal modules may be separate but one public Package for now |
-| `kaicreator.capability.identity.node` | Capability Domain Package (Node target) | credential-verification implementation/Handler, interface, init/dispose, scoped output. **H still owns independent caller provenance and protected trust provision** | **P0** physical selected implementation; do not allow package to mint its own issuer/verified facts |
-| `kaicreator.capability.storage.sqlite` | Capability Domain Package (Node target) | SQLite DB access + atomic CAS primitives, resource lifecycle and physical error mapping; **K retains policy and Journal/Effect admission** | **P0** physical selected implementation; reuse v0.8 real SQLite storage and security tests |
+| `kaicreator.capability.identity.node` | Capability Domain Package (Node target) | credential-verification implementation/Handler, interface, init/dispose, scoped output. **H still owns independent caller provenance and protected trust provision** | **REFERENCE/CONDITIONAL**, selected implementation only; do not allow package to mint its own issuer/verified facts |
+| `kaicreator.capability.storage.sqlite` | Capability Domain Package (Node target) | SQLite DB access + atomic CAS primitives, resource lifecycle and physical error mapping; **K retains policy and Journal/Effect admission** | **REFERENCE/CONDITIONAL** if Node/SQLite adapter distributed; reuse v0.8 SQLite security tests |
 | `@kaicreator/domain-harness-compiler` | Independent BUILD **toolchain**, **not** a Runtime Domain Package | qualified Package selection, K/S/B/Capability closure and Handler binding, pinned profile packing and subject digest; external DAC approval remains independent | **P0**; existing compiler reusable, Forge is the authoring/Business Package generator outside Harness |
-| `kaicreator.node.basic` | **Runtime Profile** (lock/manifest, not runnable handler) | exact K/S/Identity/Storage versions and digests, ABI version, deployment target, consumer SDK version, protected approval reference | **P0** distribution convenience; never instantiate a second Runtime or authorize itself |
+| `kaicreator.node.basic` | **Runtime Profile** (lock/manifest, not runnable handler) | exact K/S/Identity/Storage versions and digests, ABI version, deployment target, consumer SDK version, protected approval reference | **OPTIONAL** distribution convenience; never instantiate a second Runtime or authorize itself |
 
 **Business Packages:** Approval and Engineering are **distinct consumer/demo/conformance packages** and are not bundled as mandatory SDK business logic. At least one actual external app can author its own B package via the public BUILD interface.
 
@@ -96,13 +96,13 @@ A shipped profile must use **actual tested hashes** and independent DAC/deploy s
 
 **P1.** Package A Approval and Package B Engineering from the **existing real v0.8 assets** build and execute with **identical** foundation Kernel+Standard digests; both consume the same actual Identity/Storage capability implementations. A third-party consumer assembles its own B source from the documented API and uses independently installed official artifacts, not a test fixture. No third bespoke demo is needed: a minimal consumer exercise using the existing two Apps is enough.
 
-**P2.** Actual logged `load(package)` instantiates one closed Foundation cohort with optional package lifecycle, authenticated UX query/send/subscribe and pure/effectful OperationCalls through fixed selected Handlers; real SQLite restart/replay/UNKNOWN and scoped results have executable P/N evidence.
+**P2.** Actual logged `load(package)` instantiates one closed Foundation cohort with optional package lifecycle, authenticated UX query/send/subscribe and pure/effectful OperationCalls through fixed selected Handlers; real **selected Storage Capability** restart/replay/UNKNOWN and scoped results have executable P/N evidence (SQLite when the reference adapter is chosen).
 
 **N1.** Unsupported target, missing/duplicate/ambiguous provider, cross-version ABI mismatch, forged `packageId`, unsigned or replaced installed module, expired/revoked DAC designation **after installation**, forged prelinked handle, wrong K, shadowing Identity, unauthorized caller/agent mutation: typed refusal before unauthorized import/State/Effect/Journal.
 
 **N2.** An independent clean consumer cannot deep-import secrets/Host handles to bypass caller authentication; provenance and H assurance are external to Identity implementation and BUILD self-signing; rejected caller leaves zero unauthorized effects.
 
-**N3.** Missing native SQLite driver, read-only storage, CAS conflict, corrupt schema, aborted init, repeated stop and crash windows preserve Kernel authority and typed error/UNKNOWN with no false durable ACK.
+**N3.** Missing selected Storage Capability (or native SQLite driver if that adapter is chosen), read-only storage, CAS conflict, corrupt schema, aborted init, repeated stop and crash windows preserve Kernel authority and typed error/UNKNOWN with no false durable ACK.
 
 ## 6. Existing assets and scope control
 
