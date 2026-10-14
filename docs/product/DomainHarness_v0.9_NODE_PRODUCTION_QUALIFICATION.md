@@ -1,7 +1,7 @@
-# DomainHarness v0.9 — Node Production Support and Qualification Budget (Product/L1 Proposal)
+# DomainHarness v0.9 — Selected Node/SQLite Reference Adapter Qualification (Not Core P0)
 
 ```ini
-STATUS=PROPOSED_L1_QUALIFICATION_CRITERIA_NOT_MEASURED
+STATUS=REFERENCE_ADAPTER_TARGETS_NOT_CORE_JS_TS_ACCEPTANCE
 VERSION=v0.9
 OWNER=#1036 (N08), #1037 (N09)
 SOURCE=#1026
@@ -11,32 +11,19 @@ PRODUCT_FREEZE=NO
 TEST_PASS=NOT_CLAIMED
 ```
 
-## 1. Platform-neutral Node SDK support and release qualification (user Product decision, 2026-10-14)
+## 1. Applicability — selected Node + SQLite adapter ONLY
 
-**Product requirement:** DomainHarness v0.9 is a portable Node.js SDK, **not an Ubuntu-specific or bare-metal-specific product**. The baseline technology is **Node.js 24.x + selected, ABI-compatible real SQLite + immutable K/S/Capability Domain Packages**. Windows and Linux are first-class target **platform families**; WSL2, VM, container, and cloud are valid environments when their exact support/observability/storage contract is declared and verified. Node22 is optional **for v0.9 only**; previously frozen v0.8 Node22/24 Windows/Ubuntu tests remain binding in v0.8.
+**Controlling 2026-10-14 Product direction:** DomainHarness **Core** requires a defined **JavaScript/TypeScript execution and Package ABI**, not a Windows/Linux/WSL2, Node24 or SQLite matrix. See [JS runtime contract successor](./DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md). This document is a **bounded OPTIONAL/REFERENCE benchmark plan for an official Node+SQLite selected Capability configuration**, **not** the v0.9 Core Product Freeze acceptance matrix. When that adapter is actually distributed as production supported, its real API/native-driver/Storage/Host lifecycle and security tests are mandatory for **that profile only**. If not shipped/advertised, it cannot hold Core Product Freeze/Release.
 
-| Profile class | Platform examples, not predetermined PASS | Qualification and publication rules |
-| --- | --- | --- |
-| **TARGET: Windows** | Windows 11 / supported Windows Server, Node 24, pinned native SQLite binding | **SUPPORTED only after** actual Windows-native clean consumer + file SQLite WAL/CAS/restart/backup/security/Full/CJ evidence at exact v0.9 artifact. Otherwise `NOT_QUALIFIED` |
-| **TARGET: Linux** | Ubuntu 24/26, other specified Linux distro, bare metal, VM, cloud VM, or container, Node 24 | **SUPPORTED only after** actual Linux target OS/kernel/container storage/Node/SQLite binding, clean consumer, crash/recovery/currentness and release evidence. **No mandatory Ubuntu version or physical bare-metal host** |
-| **CANDIDATE: WSL2** | Ubuntu 26.04.1 under Windows WSL2, Node 24, ext4-on-VHD-backed filesystem | May run build/tests and bounded qualification; **WSL2-specific production support only if** exact WSL2 profile (guest kernel, backing volume and shutdown/restart semantics) passes the *same applicable* P0 safety, recovery and operational gates. WSL2 PASS never implies native Linux server PASS |
-| **OPTIONAL** | Node 22, macOS, ARM, embedded, QuickJS, Browser/Expo and other runtimes | Not v0.9 default production promise; any additional supported target needs separately selected profile and native evidence |
+Core must execute in **at least one actual selected JS runtime** with a pinned SDK/ESM/Host capability environment and real K/S/B plus selected qualified Capability implementations; support on other interpreters and platforms is never implied. L2 must separately define Core's minimal ESM/async/crypto/import/runtime expectations, because existing v0.8 sources use `node:crypto`, Node `Buffer` and `data:` module import and **cannot yet substantiate arbitrary JS portability**. Preserve H currentness/independent byte acceptance when abstracting these.
 
-**Product versus release distinction:** Product/L1 Freeze selects the **capability envelope and intended platform families**, not fictitious OS test results. It **does not require** locating or provisioning a specific Ubuntu or physical native server, running PERF-01–07, or finishing v0.8's release before L1 decisions are recorded. L2 may use an explicitly **provisional** v0.8 SHA/source map for planning, but implementation cannot inherit a *qualified baseline* until v0.8 Release PASS. At **v0.9 Release Qualification**, publish **only profiles actually proven** on their exact installed SDK/artifact/native binding. At least **one explicitly supported, operationally deployable Node 24 + SQLite profile** must pass clean install, full P/N, critical journeys, durability, fault recovery, security and measured performance; otherwise `V09_RELEASE_HOLD`. Windows/Linux *as a dual-platform support claim* requires both independently qualified. A WSL-only release must be explicitly scoped as such and must not claim generic production Linux or Windows support.
-
-**Environment neutrality is not evidence waiver.** Actual selected filesystem (including WSL2 VHD mount and Windows file sharing, Docker bind mounts or container volumes), locking, flush/durability, WAL behavior, OS credential/ACL behavior, process crash/restart, hardware/VM persistence assumptions and native driver ABI must each be tested under the declared supported profile. Avoid unsupported transitive native-driver/ABI reuse. Native testing means executing native compiled SQLite module in **the actual chosen target environment**, not requiring dedicated bare metal.
-
-### FZ-01 / FZ-01N real environment evidence — reused without unnecessary blockers
-
-October 14 [FZ-01 receipt](https://github.com/kaicreator-mm/domain-harness/issues/1026) showed **WSL2 Ubuntu 26.04.1 x64**, Node `24.21.0` ABI 137, native `better-sqlite3 12.11.1` with SQLite `3.53.2`, local guest-ext4-backed WAL, 8 vCPU and ~16 GiB memory. This is useful **verified local compatibility/prevalidation evidence**. It is **not** itself an exact-v0.9 clean-consumer/Full/Hidden/critical-journey, crash recovery or measured PERF qualification. However, it is no longer excluded *solely because it is WSL2 or Ubuntu 26*. Reuse this existing host for new relevant v0.9 work after proper authorization; no repeat FZ-01 inventory needed.
-
-FZ-01N reported no accessible different non-WSL2 Ubuntu host; that fact is retained, but **`NATIVE_HOST_UNAVAILABLE` is no longer a Product/L1 Freeze blocker or automatic v0.9 release blocker**. Actual target profile qualification remains a release gate. Windows-native evidence can be captured on the existing workstation once release artifacts exist; Linux VM/container/CI environments may be used when their actual host/kernel/volume capabilities are established. No need to create a new server just to satisfy a historical OS pin.
+Actual local FZ-01 WSL2 Ubuntu26 + Node24 + SQLite WAL preflight remains historic **Node adapter evidence**, not a Core Product requirement, a cross-platform support claim or a v0.9 Release PASS. FZ-01N's unavailable native Ubuntu Host is not a blocker and must not be rechecked. Any OS/driver-specific qualification attaches only to the selected corresponding reference Capability Package and promised deployment support.
 
 ## 2. Deterministic benchmark specification and initial proposed numeric targets
 
-These are **target thresholds, NOT observed measurements**. Their purpose is to make v0.9 release testable. Numeric budget targets can be **Product-frozen before a Build Host is provisioned** as explicit acceptance criteria; real measurements and any feasibility calibration must be recorded **before the relevant v0.9 Release Qualification**, and changing a Product-frozen threshold requires a narrow independent Product amendment (never a post-failure silent relaxation). Compare against v0.8 evidence if available; no requirement to wait for v0.8 release solely to state v0.9 measurable goals.
+These are **reference-adapter target thresholds, NOT observed measurements**. They DO NOT apply to Core or a non-SQLite selected storage implementation. They are used only if a Node/SQLite profile is shipped/qualified. Numeric budget targets can be **Product-frozen before a Build Host is provisioned** as explicit acceptance criteria; real measurements and any feasibility calibration must be recorded **before the relevant v0.9 Release Qualification**, and changing a Product-frozen threshold requires a narrow independent Product amendment (never a post-failure silent relaxation). Compare against v0.8 evidence if available; no requirement to wait for v0.8 release solely to state v0.9 measurable goals.
 
-**Reference bench:** a **documented and reproducible supported Node24+SQLite deployment profile** (Windows/Linux/WSL2/VM/Container as applicable) with recorded CPU allocation, RAM, filesystem, storage, native SQLite version/ABI and environment isolation. `4 vCPU / 8 GiB / local SSD` remains a **recommended comparability class, not a release gate or required host purchase**; disclose actual capacity and do not compare unlike hardware as equivalent. Pin this profile before performance qualification. Workload is local SDK **without external network I/O or optional LLM**, using two real Business Packages and the same selected K/S/Identity/Storage.
+**Optional Node/SQLite reference bench:** a **documented and reproducible selected Node+SQLite deployment profile** (Windows/Linux/WSL2/VM/Container as applicable) with recorded CPU allocation, RAM, filesystem, storage, native SQLite version/ABI and environment isolation. `4 vCPU / 8 GiB / local SSD` remains a **recommended comparability class, not a release gate or required host purchase**; disclose actual capacity and do not compare unlike hardware as equivalent. Pin this profile before performance qualification. Workload is local SDK **without external network I/O or optional LLM**, using two real Business Packages and the same selected K/S/Identity/Storage.
 
 | Budget ID | Exact workload/measurement | Proposed v0.9 P0 budget |
 | --- | --- | --- |
@@ -67,7 +54,7 @@ The reference run **must** write a machine-generated, per-attempt receipt and su
 
 **Workload scoring guard:** classify **expected, correctly typed CAS contention/conflict**, explicit `UNKNOWN` after an injected crash and deliberate denials as **valid semantic outcomes**, not service availability failures. Benchmark the 99.9% success rate against **eligible non-conflicting, fault-free authorized operations** only; publish concurrent contention attempts/conflict rate separately with asserted zero unauthorized effects and no blind retry. Report all **unexpected** failures/timeouts in latency/availability results, and count accepted-but-lost durable outcomes as Release HOLD regardless of percentage. Avoid a benchmark that accidentally rewards skipping CAS admission.
 
-**Interpretation:** a latency target is meaningful only with actual measured distributions and reproducible fixtures. Document timeouts, exclusions and sample counts; record failures rather than filtering them out of percentiles. Invalid requests are not included in the authorized-op availability numerator but must pass separately. **No SLO claim** for arbitrary WAN calls, real LLM inference or privileged OS disruption. Any unsupported profile must be clearly labelled NOT_QUALIFIED.
+**Interpretation:** a latency target is meaningful only with actual measured distributions and reproducible fixtures. Document timeouts, exclusions and sample counts; record failures rather than filtering them out of percentiles. Invalid requests are not included in the authorized-op availability numerator but must pass separately. **No Core-wide SLO claim** for arbitrary WAN calls, real LLM inference or privileged OS disruption. Any unsupported profile must be clearly labelled NOT_QUALIFIED.
 
 ## 3. Reliability, security and observability matrix
 
@@ -100,4 +87,4 @@ remaining_P0_P1 / waiver_scope / release_decision / tag
 
 - v0.8 #1004 real Node Host, #1002 K CAS, #1005 two real Apps provide **source and test reuse**, but their historical CI/Node22/24 PASS is **not** v0.9 exact-candidate qualification.
 - #1036 N08 owns production operations, measured stability and runbooks; #1037 N09 independently validates; #1032 N06 owns pinned artifact distribution; #1028 N02 owns real physical Node+Storage/Identity realization.
-- This is a **decision-ready L1 proposal**. `SUPPORTED_PROFILE=NONE_RELEASE_QUALIFIED`; `PERFORMANCE_TARGETS=PROPOSED_NOT_MEASURED`; `PRODUCT_FREEZE=NO`; `V09_RELEASE=HOLD`.
+- This is a **selected-reference implementation proposal only**, not Core P0. `SUPPORTED_PROFILE=NONE_RELEASE_QUALIFIED`; `PERFORMANCE_TARGETS=PROPOSED_NOT_MEASURED`; `PRODUCT_FREEZE=NO`; `V09_RELEASE=HOLD`.
