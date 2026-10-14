@@ -3,6 +3,12 @@
 > **STATUS = USER_APPROVED_PRODUCTION_EXIT_TARGET / L1_NOT_FROZEN / L2_NOT_FROZEN / NOT_TASK_DAG / NO_IMPLEMENTATION / NO_RELEASE_PASS.** Scope is a Product **target**, not an independently accepted freeze or an executable work authorization.
 > This is the roadmap index for [v0.9 Register #1026](https://github.com/kaicreator-mm/domain-harness/issues/1026) and six **candidate** intake issues. It is **not** an executable DAG or approved mandatory release scope. Created after the 2026-10-13 user architecture discussion and a bounded [v0.8 Package-first scope ledger](https://github.com/kaicreator-mm/domain-harness/blob/docs/v08-package-first-closed-world-scope-20261013/docs/implementation/DomainHarness_v0.8_PACKAGE_FIRST_SCOPE_DELTA.md). No changes to v0.8 PRD, L1/L2 Freeze, Task DAG, source or release gates.
 
+## 0a. Controlling supported-platform correction (user Product decision 2026-10-14)
+
+The user explicitly removed the proposal's **Ubuntu24-only / bare-metal Build Host precondition**. The v0.9 Product remains a **Node24 + selected native SQLite SDK**, intended for Windows and Linux consumers; WSL2/VM/container are valid test/deployment classes **under their own declared and tested support profiles**. See [Product PRD](../product/DomainHarness_v0.9_PRD_DRAFT.md), [Node qualification](../product/DomainHarness_v0.9_NODE_PRODUCTION_QUALIFICATION.md) and [L1 ledger](../product/DomainHarness_v0.9_L1_FREEZE_READINESS.md) for the normative candidate scope.
+
+**Product/L1 Freeze and provisional L2 work do not need an additional Ubuntu/native host or measured performance before writing testable contracts**. Exact v0.9 Release support claims **do** require measured per-target native SQLite, fault/recovery, clean consumer, security, Full/Hidden/CJ; do not equate existing WSL2 preflight to general production Linux/Windows. An absent extra Ubuntu machine is no longer an automatic version blocker. No v0.8 test obligation is relaxed.
+
 ## 1. The v0.8→v0.9 boundary
 
 **v0.8 retains mandatory closure** under [#1023](https://github.com/kaicreator-mm/domain-harness/issues/1023) and existing formal T-A–T-G ([#1000–#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006)): minimally extensible closed-world BUILD/Package ABI, minimal lifecycle and unified safe OperationCall, actual Node physical baseline, selected K/S, two Approval/Engineering Domain Apps, FR/HF/NF preservation, full/hidden/critical-journey/release tests.
