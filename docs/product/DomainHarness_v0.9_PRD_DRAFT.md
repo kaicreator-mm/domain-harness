@@ -68,18 +68,18 @@ RELEASE=NO
 
 ## 6. Mandatory vs optional future candidates
 
-**P0 Product target:** N01 **minimum only** (#1027), N02 **Node minimum only** (#1028), N06 (#1032), N07 (#1035), N08 (#1036), N09 (#1037).
+**P0 Product target:** N01 Core minimum (#1027), N06 Core distribution (#1032), N07 JS/TS API (#1035), N08 Core operability (#1036), N09 Release/security (#1037). N02 Node/SQLite reference adapter (#1028) is **conditional only if selected/shipped as a declared production capability**.
 
 **NOT v0.9 production gate by default** (requires separate L1 admission): N01 complete capability library, N02 Browser/Embedded/full Host reorganization, N03 (#1029) full Forge/Creator/Simulator/UX auto-generated App cross-project pipeline, N04 (#1030) QuickJS/Rust/Go/C second Microkernel, N05 (#1031) streaming/remote advanced calls. Arbitrary runtime Package hotloading and autonomous agent state/effect mutation additionally require explicit Product redesign; they are not implicit follow-ons.
 
 ## 7. Four formerly unresolved Product choices — **bounded proposals now specified, NOT formally frozen**
 
-The 2026-10-14 user direction explicitly selects a production-ready Node SDK. This PRD now references **three concrete independently reviewable decisions** so L1 can settle quickly, without further exploratory Demo work:
+The latest 2026-10-14 user direction explicitly selects a production-ready JS/TS SDK Core and separates Node adapter qualification from Core. This PRD now references **three concrete independently reviewable decisions** so L1 can settle quickly, without further exploratory Demo work:
 
 ### D01. Official Foundation Package Set / distribution boundaries
 
 See [Foundation Package Set](./DomainHarness_v0.9_FOUNDATION_PACKAGE_SET.md) **subject to** [JS/TS Core successor](./DomainHarness_v0.9_JS_RUNTIME_CONTRACT_SUCCESSOR.md); Node Identity/SQLite are reference implementations, not universal Core mandatory packages. The supported baseline consists of:
-- SDK Microkernel public `@kaicreator/domain-harness/v9` (one-arg `DomainHarness.load(package)`);
+- SDK Microkernel public `@kaicreator/domain-harness/v9` (one-arg `DomainHarness.load(package)`), with a separately defined JS runtime module/Host-port ABI;
 - independently identifiable `kaicreator.kernel.basic` (K State/Admission/Effect/Journal/UNKNOWN/Replay) and `kaicreator.standard.basic` (Schema/Rule/Decision/**Workflow+WorkflowRouter**/Operation);
 - selected Node capability implementations `kaicreator.capability.identity.node` (H-backed independent true caller identity) and `kaicreator.capability.storage.sqlite` (physical CAS/Storage under K authority);
 - producer-neutral official BUILD `@kaicreator/domain-harness-compiler` (not a Runtime Domain Package); and a `kaicreator.node.basic` **Profile** (immutable locked assembly list and tested target metadata, not a second Runtime Engine).
