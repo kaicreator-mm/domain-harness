@@ -58,8 +58,18 @@ export interface V8KernelHostPorts {
   readonly sha256: {
     readonly digestUtf8: (value: string) => string;
   };
-  /** Physical resource dispatch port handed to Business effect handlers. */
-  readonly resources: { readonly call: (resourceKey: string, operation: string, payload: unknown) => unknown };
+  /**
+   * Physical resource dispatch port handed to Business effect handlers.
+   * #1023 S05 R1 P1-01: `call` refuses the reserved scoped-physical
+   * namespace at the dispatcher; `callScoped` is the ONLY route into it and
+   * exists for the trusted loader's per-activation resources view alone —
+   * the view the loader hands the Kernel mechanism never forwards it, so no
+   * package or caller can present a scope.
+   */
+  readonly resources: {
+    readonly call: (resourceKey: string, operation: string, payload: unknown) => unknown;
+    readonly callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown) => unknown;
+  };
   /** Trusted clock (ISO string) used for Kernel instance/journal timestamps. */
   readonly clock: () => string;
 }
@@ -129,7 +139,7 @@ export function preflightKernelHostPorts(ports: unknown, sessionCap: unknown): v
   const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
   const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown } | undefined;
   const sha256 = candidate.sha256 as { digestUtf8?: unknown } | undefined;
-  const resources = candidate.resources as { call?: unknown } | undefined;
+  const resources = candidate.resources as { call?: unknown; callScoped?: unknown } | undefined;
   if (
     typeof docs !== 'object'
     || docs === null
@@ -145,8 +155,16 @@ export function preflightKernelHostPorts(ports: unknown, sessionCap: unknown): v
       'kernel Host ports must provide docs.get, docs.put, docs.list and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)',
     );
   }
-  if (typeof resources !== 'object' || resources === null || !isCallable(resources.call)) {
-    throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a resources.call callable (physical Business effect dispatch; #1013 I01 complete-set contract)');
+  if (
+    typeof resources !== 'object'
+    || resources === null
+    || !isCallable(resources.call)
+    || !isCallable(resources.callScoped)
+  ) {
+    throw new QualifiedPackageError(
+      'KERNEL_HOST_INVALID',
+      'kernel Host ports must provide resources.call and resources.callScoped callables (physical Business effect dispatch plus the #1023 S05 R1 scoped-physical route; #1013 I01 complete-set contract)',
+    );
   }
   if (!isCallable(candidate.clock)) {
     throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide a clock callable returning an ISO timestamp (trusted Kernel timestamps; #1013 I01 complete-set contract)');
@@ -175,7 +193,7 @@ export function installKernelHostPorts(ports: unknown, sessionCap: unknown): voi
   const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
   const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown };
   const sha256 = candidate.sha256 as { digestUtf8?: unknown };
-  const resources = candidate.resources as { call?: unknown };
+  const resources = candidate.resources as { call?: unknown; callScoped?: unknown };
   kernelHost = Object.freeze({
     docs: Object.freeze({
       get: docs.get as (key: string) => unknown,
@@ -187,6 +205,7 @@ export function installKernelHostPorts(ports: unknown, sessionCap: unknown): voi
     }),
     resources: Object.freeze({
       call: resources.call as (resourceKey: string, operation: string, payload: unknown) => unknown,
+      callScoped: resources.callScoped as (scopeId: string, resourceKey: string, operation: string, payload: unknown) => unknown,
     }),
     clock: candidate.clock as () => string,
   });

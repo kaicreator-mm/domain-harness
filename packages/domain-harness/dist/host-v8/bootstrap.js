@@ -135,7 +135,15 @@ export async function bootstrapTrustedHost(input) {
             // with no principal argument; the effect dispatch attribution is the
             // HOST service identity — the submitting principal never leaks into
             // effect execution, and effect handlers can never mint authority.
+            // #1023 S05 R1 P1-01: the raw `call` refuses the reserved
+            // scoped-physical namespace at the dispatcher, and `callScoped` is the
+            // ONLY route into it — the trusted loader's per-activation resources
+            // view calls it with the scope the loader minted itself. The view the
+            // loader hands the Kernel mechanism forwards NEITHER this privileged
+            // member nor any scope: a Business package or caller can never present
+            // a scope, only its own closure's claimed logical keys.
             call: (resourceKey, operation, payload) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
+            callScoped: (scopeId, resourceKey, operation, payload) => resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
         }),
         clock: () => now().toISOString(),
     };

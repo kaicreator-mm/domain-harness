@@ -225,6 +225,49 @@ export function reserveLedger(payload) {
 `;
 }
 
+/**
+ * #1023 S05 R1 P1-01 counterexample fixture: the REAL approval Business
+ * bytes with the `effect:reserve` handler INPUT-PARAMETRIZED — the effect
+ * input's `resourceKey` (absent ⇒ the declared `ledger`) selects the key the
+ * executable actually dispatches on, while every DECLARATION (rule
+ * projection, effect route, sealed OPERATIONS ABI) still claims exactly
+ * `ledger.reserve`. A signed/BUILD-approved package's declaration is not
+ * proof of what its executable calls: the Host resource boundary must fail
+ * closed when such a handler names another deployment's scoped physical key.
+ */
+async function resourceKeyParamBusinessSource(): Promise<string> {
+  let source = await readFile(new URL('business-approval.mjs', examplesDir), 'utf8');
+  const patchOnce = (anchor: string, replacement: string, label: string): void => {
+    const count = source.split(anchor).length - 1;
+    assert.equal(count, 1, `business fixture anchor for ${label} must occur exactly once`);
+    source = source.replace(anchor, replacement);
+  };
+  patchOnce(
+    "    'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },",
+    "    'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId', resourceKey: 'resourceKey' } },",
+    'rule projection',
+  );
+  patchOnce(
+    `                inputFrom: {
+                  amount: { source: 'event', path: ['payload', 'amount'] },
+                  requestId: { source: 'event', path: ['payload', 'requestId'] },
+                },`,
+    `                inputFrom: {
+                  amount: { source: 'event', path: ['payload', 'amount'] },
+                  requestId: { source: 'event', path: ['payload', 'requestId'] },
+                  resourceKey: { source: 'event', path: ['payload', 'resourceKey'] },
+                },`,
+    'effect input projection',
+  );
+  patchOnce(
+    `          return resources.call('ledger', 'reserve', { ...input, effectId });`,
+    `          const routeKey = typeof input.resourceKey === 'string' && input.resourceKey.length > 0 ? input.resourceKey : 'ledger';
+          return resources.call(routeKey, 'reserve', { ...input, effectId });`,
+    'parametrized reserve handler',
+  );
+  return source;
+}
+
 interface SealedApp {
   readonly root: SealedQualifiedPackageRoot;
   readonly rootPath: string;
@@ -241,11 +284,11 @@ async function importModuleSource(source: string): Promise<Record<string, any>> 
  * variant; only the capability implementation bytes differ. The sealed root
  * is also written to a JSON file the S05-C1 clean child reuses.
  */
-async function sealApp(rootId: string, capabilityText: string, dir: string): Promise<SealedApp> {
+async function sealApp(rootId: string, capabilityText: string, dir: string, options: { businessModuleSource?: string } = {}): Promise<SealedApp> {
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
     readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
     readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('business-approval.mjs', examplesDir), 'utf8'),
+    options.businessModuleSource === undefined ? readFile(new URL('business-approval.mjs', examplesDir), 'utf8') : Promise.resolve(options.businessModuleSource),
   ]);
   const kernel = await importModuleSource(kernelSource);
   const sdk = await importModuleSource(sdkSource);
@@ -687,6 +730,131 @@ test('S05-R1: the pin-CAS race rolls the losing registration back with zero resi
   }
 });
 
+test('S05-N2 (R1 P1-01): an undeclared resource key cannot reach another deployment\'s scoped physical handler — the raw dispatcher namespace is reserved', { timeout: 240_000 }, async () => {
+  const ATTACK = 'order-approval-n2-attack';
+  const TARGET = 'order-approval-n2-target';
+  const LEGACY = 'order-approval-n2-legacy';
+  // The ATTACK closure: the input-parametrized Business (declarations still
+  // claim ledger.reserve) + the canonical A capability. The TARGET closure:
+  // the unmodified Business + the independently authored B capability, owning
+  // the SAME logical ledger.reserve on the SAME Host.
+  const parametrizedBusiness = await resourceKeyParamBusinessSource();
+  const attackApp = await sealApp('app:v08:s05:n2-attack', await capabilitySourceA(), shared.dir, { businessModuleSource: parametrizedBusiness });
+  const targetApp = await sealApp('app:v08:s05:n2-target', capabilitySourceB(), shared.dir);
+  // The adapter-less escape closure: the SAME parametrized Business with NO
+  // capability package — its runtime receives the RAW Host ports, exactly
+  // like the D2/D3 real Apps.
+  const legacyRoot = await sealPlainApp('app:v08:s05:n2-legacy', parametrizedBusiness);
+
+  await shared.gateway.registerApp({ appId: ATTACK, packageRoot: attackApp.root, genesisRoles: ['platform-operator'] });
+  await shared.gateway.registerApp({ appId: TARGET, packageRoot: targetApp.root, genesisRoles: ['platform-operator'] });
+  await shared.gateway.registerApp({ appId: LEGACY, packageRoot: legacyRoot, genesisRoles: ['platform-operator'] });
+  const attackCred = credential(ATTACK, ['requester'], 's05-n2-attack');
+  const attackOp = credential(ATTACK, ['platform-operator'], 's05-n2-attack');
+  const targetCred = credential(TARGET, ['requester'], 's05-n2-target');
+  const targetOp = credential(TARGET, ['platform-operator'], 's05-n2-target');
+  const legacyCred = credential(LEGACY, ['requester'], 's05-n2-legacy');
+  const legacyOp = credential(LEGACY, ['platform-operator'], 's05-n2-legacy');
+
+  // Identify the TARGET deployment's physical key deterministically: run one
+  // legitimate effect on TARGET first; its accounting record IS that key.
+  await shared.gateway.activateGenesis(targetOp, { appId: TARGET, instanceKey: 'q-n2-target' });
+  const legit = (await invoke(TARGET, targetCred, {
+    operationId: 'quote.reserve', input: { amount: 10, requestId: 'S05-N2-LEGIT' }, instanceKey: 'q-n2-target', messageId: 'm-s05-n2-legit',
+  })) as Record<string, any>;
+  assert.equal(legit.status, 'admitted');
+  const keyTarget = shared.handle.host.resources.calls()[shared.handle.host.resources.calls().length - 1]?.resourceKey;
+  assert.ok(keyTarget !== undefined && keyTarget.endsWith('\u0000ledger'), `the target's physical key is the last accounted dispatch (got ${JSON.stringify(keyTarget)})`);
+
+  // ---- 1) the SCOPED-APP escape (the review's exact counterexample): the
+  // ATTACK app's authorized effectful call carries the TARGET's physical key
+  // in its input; the parametrized handler dispatches on it. The scoped
+  // claim-gated view takes the UNCLAIMED fallback branch — the raw Host
+  // dispatcher must refuse the reserved namespace typed, the effect fails,
+  // and the TARGET's handler output never lands in the ATTACK's journal. ----
+  await shared.gateway.activateGenesis(attackOp, { appId: ATTACK, instanceKey: 'q-n2-attack' });
+  let baseline = (await journalRecords()).map((record) => record.effectId);
+  const escape = await callCode(() => invoke(ATTACK, attackCred, {
+    operationId: 'quote.reserve',
+    input: { amount: 10, requestId: 'S05-N2-ESCAPE', resourceKey: keyTarget },
+    instanceKey: 'q-n2-attack',
+    messageId: 'm-s05-n2-escape',
+  }));
+  assert.equal(escape.code, 'ADMISSION_EFFECT_FAILED', `the cross-scope raw-key dispatch fails the occurrence typed (got ${escape.code}: ${escape.message})`);
+  assert.ok((escape.message ?? '').includes('HOST_RESOURCE_NAMESPACE_RESERVED'), `the refusal names the reserved-namespace guard (got: ${escape.message})`);
+  let fresh = await newJournalRecords(baseline);
+  assert.equal(fresh.length, 1, 'exactly one (failed) durable effect record for the escape attempt');
+  assert.equal(fresh[0]?.status, 'failed', 'the escape effect is durably recorded as FAILED');
+  assert.equal(fresh[0]?.output, undefined, "the TARGET handler's output never landed in the ATTACK app's journal");
+
+  // ---- 2) legitimate claimed routing on the SAME ATTACK closure still
+  // works: with the declared key the call is K-admitted and the ATTACK's OWN
+  // capability handler output is journaled. ----
+  await shared.gateway.activateGenesis(attackOp, { appId: ATTACK, instanceKey: 'q-n2-attack-ok' });
+  baseline = (await journalRecords()).map((record) => record.effectId);
+  const legitAttack = (await invoke(ATTACK, attackCred, {
+    operationId: 'quote.reserve', input: { amount: 10, requestId: 'S05-N2-OK', resourceKey: 'ledger' }, instanceKey: 'q-n2-attack-ok', messageId: 'm-s05-n2-ok',
+  })) as Record<string, any>;
+  assert.equal(legitAttack.status, 'admitted');
+  fresh = await newJournalRecords(baseline);
+  assert.equal(fresh.length, 1);
+  assert.equal(fresh[0]?.status, 'completed');
+  assert.ok(isHandlerOutput(fresh[0]?.output, 'A'), `the declared-key call still runs the ATTACK's OWN handler (got ${JSON.stringify(fresh[0]?.output)})`);
+
+  // ---- 3) the ADAPTER-LESS escape: the parametrized Business WITHOUT any
+  // capability package receives the RAW Host ports; naming the TARGET's
+  // physical key through an authenticated send must fail the effect typed at
+  // the same reserved boundary — while its LEGITIMATE bare-key fallback (the
+  // deployment-owned `ledger` route, the S05-P3 compatibility case) keeps
+  // working on the SAME Host. ----
+  shared.handle.host.resources.provision('ledger', (_operation: string, payload: unknown) => {
+    const record = payload as Record<string, unknown> | null | undefined;
+    return { reserved: true, handler: 'DEPLOYMENT', ledgerEntryId: `deploy:${String(record?.effectId ?? 'unknown')}`, reservedAmount: Number(record?.amount) || 0, requestId: record?.requestId ?? null };
+  });
+  try {
+    await shared.gateway.activateGenesis(legacyOp, { appId: LEGACY, instanceKey: 'q-n2-legacy-escape' });
+    baseline = (await journalRecords()).map((record) => record.effectId);
+    const legacyEscape = await callCode(() => shared.gateway.send(legacyCred, {
+      intentType: 'submitQuoteDecisionDynamic',
+      messageId: 'm-s05-n2-legacy-escape',
+      input: { amount: 10, requestId: 'S05-N2-LEGACY-ESCAPE', resourceKey: keyTarget },
+      target: { tenantId: TENANT, appId: LEGACY, instanceKey: 'q-n2-legacy-escape' },
+    }));
+    assert.equal(legacyEscape.code, 'ADMISSION_EFFECT_FAILED', `the adapter-less raw-port escape fails typed (got ${legacyEscape.code}: ${legacyEscape.message})`);
+    assert.ok((legacyEscape.message ?? '').includes('HOST_RESOURCE_NAMESPACE_RESERVED'), `the refusal names the reserved-namespace guard (got: ${legacyEscape.message})`);
+    fresh = await newJournalRecords(baseline);
+    assert.equal(fresh.length, 1);
+    assert.equal(fresh[0]?.status, 'failed');
+    assert.equal(fresh[0]?.output, undefined, 'the TARGET handler never ran for the adapter-less escape either');
+
+    // The legitimate deployment-owned bare route survives the guard.
+    await shared.gateway.activateGenesis(legacyOp, { appId: LEGACY, instanceKey: 'q-n2-legacy-ok' });
+    baseline = (await journalRecords()).map((record) => record.effectId);
+    const legacyOk = (await shared.gateway.send(legacyCred, {
+      intentType: 'submitQuoteDecisionDynamic',
+      messageId: 'm-s05-n2-legacy-ok',
+      input: { amount: 10, requestId: 'S05-N2-LEGACY-OK', resourceKey: 'ledger' },
+      target: { tenantId: TENANT, appId: LEGACY, instanceKey: 'q-n2-legacy-ok' },
+    })) as Record<string, any>;
+    assert.equal(legacyOk.status, 'admitted', 'the adapter-less app still consumes the deployment-owned bare route');
+    fresh = await newJournalRecords(baseline);
+    const legacyOkRecord = fresh.find((record) => (record.output as Record<string, unknown> | undefined)?.handler === 'DEPLOYMENT');
+    assert.ok(legacyOkRecord !== undefined && legacyOkRecord.status === 'completed', 'the bare deployment handler completed');
+  } finally {
+    shared.handle.host.resources.unprovision('ledger');
+  }
+
+  // ---- 4) the guard is uniform at the physical Host boundary: even a
+  // direct host-context raw dispatch naming the reserved namespace refuses
+  // typed (scoped entries are reachable ONLY through the trusted
+  // per-activation scoped port). ----
+  await assert.rejects(
+    () => shared.handle.host.resources.call(keyTarget, 'reserve', { probe: 1 }, { principal: { issuerId: 'test', grantId: 'g', tenantId: TENANT, appId: 'probe', subject: 'probe', audience: AUDIENCE, roles: ['probe'] } }),
+    (error: unknown) => String((error as { code?: unknown })?.code ?? '') === 'HOST_RESOURCE_NAMESPACE_RESERVED',
+    'a raw dispatcher call naming a scoped physical key refuses typed',
+  );
+});
+
 test('S05-C1: restart on the same durable store + clean stock-Node packed consumer keeps both own handlers', { timeout: 240_000 }, async () => {
   const credA = credential(APP_A, ['requester'], 's05-user-a');
   const credB = credential(APP_B, ['requester'], 's05-user-b');
@@ -727,6 +895,44 @@ test('S05-C1: restart on the same durable store + clean stock-Node packed consum
   assert.ok(isHandlerOutput(child.journalOutputB, 'B'), `restarted app B still runs its own handler (got ${JSON.stringify(child.journalOutputB)})`);
   assert.equal(child.forgedClosure, 'GATEWAY_APP_CLOSURE_MISMATCH', 'the restarted store refuses the cross-closure replacement for a pinned appId');
 });
+
+/** Seal an ADAPTER-LESS (S02a-era, no capability package) closure. */
+async function sealPlainApp(rootId: string, businessModuleSource?: string): Promise<SealedQualifiedPackageRoot> {
+  const [kernelSource, sdkSource, businessSource] = await Promise.all([
+    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    businessModuleSource === undefined ? readFile(new URL('business-approval.mjs', examplesDir), 'utf8') : Promise.resolve(businessModuleSource),
+  ]);
+  const kernelNs = await importModuleSource(kernelSource);
+  const sdkNs = await importModuleSource(sdkSource);
+  const businessNs = await importModuleSource(businessSource);
+  const packages = [
+    { packageId: kernelNs.MODULE_ID as string, kind: 'kernel' as const, abiVersion: kernelNs.ABI_VERSION as string, modulePath: 'modules/kernel.mjs', moduleSource: kernelSource, endpoints: kernelNs.ENDPOINTS },
+    { packageId: sdkNs.MODULE_ID as string, kind: 'standard-sdk' as const, abiVersion: sdkNs.ABI_VERSION as string, modulePath: 'modules/standard.mjs', moduleSource: sdkSource, endpoints: sdkNs.ENDPOINTS },
+    { packageId: businessNs.MODULE_ID as string, kind: 'business' as const, abiVersion: businessNs.ABI_VERSION as string, modulePath: 'modules/business.mjs', moduleSource: businessSource, endpoints: businessNs.ENDPOINTS, intentTypes: businessNs.INTENT_TYPES },
+  ];
+  const submission: QualificationSubmission = {
+    rootPackageId: rootId,
+    packages,
+    bindings: [
+      { role: 'kernel', packageId: kernelNs.MODULE_ID, endpointId: kernelNs.ENDPOINTS[0].endpointId },
+      { role: 'standard-sdk', packageId: sdkNs.MODULE_ID, endpointId: sdkNs.ENDPOINTS[0].endpointId },
+      { role: 'business', packageId: businessNs.MODULE_ID, endpointId: businessNs.ENDPOINTS[0].endpointId },
+      ...(businessNs.INTENT_TYPES as string[]).map((intentType) => ({
+        role: 'intent' as const, intentType, packageId: businessNs.MODULE_ID as string, endpointId: businessNs.ENDPOINTS[0].endpointId,
+      })),
+    ],
+  };
+  const unsigned = qualifyPackageClosure(submission);
+  const approval = issueApprovalProof({ subjectDigest: unsigned.subjectDigest, issuerId: INTEG_ISSUER, issuerSecret: INTEG_ISSUER_SECRET, issuedAt: '2026-10-14T00:00:00.000Z' });
+  return buildQualifiedPackage({
+    unsigned,
+    approval,
+    trustedIssuers: new Map([[INTEG_ISSUER, INTEG_ISSUER_SECRET]]),
+    moduleSources: new Map(packages.map((pkg) => [pkg.modulePath, pkg.moduleSource])),
+    baseCommit: 'v0.8-s05',
+  }) as SealedQualifiedPackageRoot;
+}
 
 function runCleanChild(args: string[]): Promise<Record<string, any>> {
   const script = fileURLToPath(new URL('./s05-clean-process-child.mjs', import.meta.url));

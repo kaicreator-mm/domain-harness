@@ -293,7 +293,7 @@ try {
   kernelHostModule.installKernelHostPorts({
     docs: { get: async () => null, put: async () => ({ revision: 0 }), list: async () => [] },
     sha256: { digestUtf8: (value) => value },
-    resources: { call: async () => null },
+    resources: { call: async () => null, callScoped: async () => null },
     clock: () => '2026-10-12T00:00:00.000Z',
   }, 'attacker-late-capability-0123456789abcdef0123456789abcdef');
   assert.fail('a late kernel Host ports install must refuse');

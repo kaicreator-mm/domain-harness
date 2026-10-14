@@ -58,11 +58,13 @@ let resourceActivationCounter = 0;
 /**
  * Compose the PHYSICAL dispatcher key of one logical route under one
  * activation scope. The scope is NUL-free hex, so the composition is
- * injective in (scope, logicalKey): two deployments — or a caller forging a
- * cross-scope key string inside an OperationCall input or a Business effect
- * route — can never resolve onto another deployment's physical entry (a
- * forged composed string is itself just an unclaimed logical key that gets
- * this activation's own scope prefixed).
+ * injective in (scope, logicalKey) — two deployments can never resolve onto
+ * each other's entries. #1023 S05 R1 P1-01: a caller or Business effect
+ * handler naming a FORGED composed string is stopped by the dispatcher's
+ * reserved-namespace guard, not by this composition — the raw `call` refuses
+ * any key containing the delimiter typed, and the only route into the
+ * reserved namespace is the privileged `callScoped` member the trusted
+ * loader's per-activation view calls with the scope it minted itself.
  */
 function physicalResourceKey(scopeId, resourceKey) {
     return `${scopeId}\u0000${resourceKey}`;
@@ -736,9 +738,20 @@ async function loadScopedFacade(packageRoot) {
         // loader-minted wiring: the Kernel mechanism, the Business effect
         // handlers and every caller keep seeing the plain
         // `resources.call(logicalKey, operation, payload)` port shape — the
-        // identity never derives from caller payload, a global current-app
-        // variable or provider discovery, and the raw unscoped ports never
-        // reach the mechanism. ----
+        // claimed route keeps its OWN scoped adapter (BUILD binding precedence).
+        //
+        // #1023 S05 R1 P1-01 — the reserved scoped-physical namespace: the raw
+        // `resources.call` REFUSES any key containing the scope delimiter at the
+        // physical Host dispatcher, so a Business effect handler — scoped or
+        // adapter-less alike — cannot reach ANOTHER deployment's scoped entry by
+        // naming its exact string, even when its executable lies about its
+        // declared route (a signed package's declaration is not proof of what
+        // its code calls; the unclaimed fallback above lands on that guard and
+        // the occurrence fails typed). The claimed branch dispatches through the
+        // privileged `callScoped` member, which exists only on the raw
+        // session-capability-gated ports this trusted loader reads; the runtime
+        // view forwards ONLY the plain `call`, so no Kernel mechanism, Business
+        // package or caller can ever present a scope. ----
         const claimedResourceKeys = wiredOperations.adapters;
         const runtimeHostPorts = claimedResourceKeys.size === 0
             ? hostPorts
@@ -747,7 +760,7 @@ async function loadScopedFacade(packageRoot) {
                 sha256: hostPorts.sha256,
                 resources: Object.freeze({
                     call: (resourceKey, operation, payload) => claimedResourceKeys.has(resourceKey)
-                        ? hostPorts.resources.call(physicalResourceKey(resourceScopeId, resourceKey), operation, payload)
+                        ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload)
                         : hostPorts.resources.call(resourceKey, operation, payload),
                 }),
                 clock: hostPorts.clock,
