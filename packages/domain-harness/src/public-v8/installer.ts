@@ -49,13 +49,13 @@ async function importModuleFromBytes(moduleSource: string): Promise<Record<strin
 }
 
 /**
- * Install every sealed package of an already statically qualified,
- * trust-verified root. Phase 1 preflights the WHOLE closure before the
- * first import; phase 2 activates sequentially with runtime identity and
- * endpoint-correspondence checks per module.
+ * Phase 1 as a reusable INERT whole-closure preflight (#1023 S01: the
+ * trusted deployment install verifies the sealed byte/ABI/endpoint links
+ * exactly like this preflight — with NO import). Hashes every package's
+ * bytes against its pinned SHA-256 and validates ABI declarations and
+ * endpoint shapes for the ENTIRE closure before the FIRST import.
  */
-export async function installQualifiedPackages(root: SealedQualifiedPackageRoot): Promise<readonly InstalledQualifiedPackage[]> {
-  // ---- Phase 1: whole-closure inert preflight (no import in this loop) ----
+export function preflightSealedClosureBytes(root: SealedQualifiedPackageRoot): void {
   for (const descriptor of root.packages) {
     const digest = sha256Hex(descriptor.moduleSource);
     if (digest !== descriptor.moduleSha256) {
@@ -77,6 +77,17 @@ export async function installQualifiedPackages(root: SealedQualifiedPackageRoot)
       }
     }
   }
+}
+
+/**
+ * Install every sealed package of an already statically qualified,
+ * trust-verified root. Phase 1 preflights the WHOLE closure before the
+ * first import; phase 2 activates sequentially with runtime identity and
+ * endpoint-correspondence checks per module.
+ */
+export async function installQualifiedPackages(root: SealedQualifiedPackageRoot): Promise<readonly InstalledQualifiedPackage[]> {
+  // ---- Phase 1: whole-closure inert preflight (no import in this loop) ----
+  preflightSealedClosureBytes(root);
 
   // ---- Phase 2: sequential activation (evaluation begins here) ----
   const installed: InstalledQualifiedPackage[] = [];

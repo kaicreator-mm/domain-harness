@@ -25,6 +25,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { installTrustedIssuers, isTrustChannelEstablished, preflightTrustedIssuersInstall } from '../public-v8/trust.js';
+import { installDeploymentAuthority, preflightDeploymentAuthorityInstall } from '../public-v8/deploy.js';
 import { installKernelHostPorts, preflightKernelHostPorts } from '../public-v8/kernel-host.js';
 import { installHostModelPort, preflightHostModelPort } from '../public-v8/model-port.js';
 import { installGatewaySessionCap, preflightGatewaySessionCap } from '../public-v8/microkernel.js';
@@ -199,6 +200,11 @@ export async function bootstrapTrustedHost(input) {
     preflightTrustedIssuersInstall(trustInput);
     preflightKernelHostPorts(kernelPorts, gatewaySessionCap);
     preflightGatewaySessionCap();
+    // #1023 S01: the trusted deployment authority joins the SAME transaction
+    // — the probed physical store is its only capability, so a bootstrapped
+    // Host always owns immutable content-addressed installs and durable
+    // approval/issuer currentness over that store.
+    preflightDeploymentAuthorityInstall({ store });
     if (modelPort !== undefined) {
         preflightHostModelPort(modelPort, gatewaySessionCap);
     }
@@ -210,6 +216,7 @@ export async function bootstrapTrustedHost(input) {
     installTrustedIssuers(trustInput);
     installKernelHostPorts(kernelPorts, gatewaySessionCap);
     installGatewaySessionCap(gatewaySessionCap);
+    installDeploymentAuthority({ store });
     if (modelPort !== undefined) {
         installHostModelPort(modelPort, gatewaySessionCap);
     }

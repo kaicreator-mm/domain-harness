@@ -34,6 +34,14 @@ export interface InstalledQualifiedPackage {
     readonly namespace: Record<string, unknown>;
 }
 /**
+ * Phase 1 as a reusable INERT whole-closure preflight (#1023 S01: the
+ * trusted deployment install verifies the sealed byte/ABI/endpoint links
+ * exactly like this preflight — with NO import). Hashes every package's
+ * bytes against its pinned SHA-256 and validates ABI declarations and
+ * endpoint shapes for the ENTIRE closure before the FIRST import.
+ */
+export declare function preflightSealedClosureBytes(root: SealedQualifiedPackageRoot): void;
+/**
  * Install every sealed package of an already statically qualified,
  * trust-verified root. Phase 1 preflights the WHOLE closure before the
  * first import; phase 2 activates sequentially with runtime identity and

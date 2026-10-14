@@ -17,6 +17,7 @@
 import { assertQualifiedRoot, QualifiedPackageError } from './contracts.js';
 import { installQualifiedPackages } from './installer.js';
 import { verifyLoadApproval } from './trust.js';
+import { isInstalledHandleShape, resolveInstalledPackageRoot, verifyDeploymentCurrentness } from './deploy.js';
 /**
  * Public one-argument loader. `packageRoot` must be a sealed qualified
  * package root produced by `@kaicreator/domain-harness-compiler` BUILD plus
@@ -34,14 +35,28 @@ import { verifyLoadApproval } from './trust.js';
  * (installer.ts).
  */
 export async function load(packageRoot) {
+    // #1023 S01: an opaque trusted-deployment installed reference resolves to
+    // its content-addressed immutable artifact FIRST (fail-closed typed when
+    // forged, foreign to this store, corrupted, or byte-mutated — never a
+    // fallback to another artifact); every other presentation is the legacy
+    // approved-root path, which keeps ALL its existing guards until a bounded
+    // reviewed cutover. Both presentations then flow through the SAME
+    // qualification/trust/install pipeline below.
+    const subject = isInstalledHandleShape(packageRoot) ? await resolveInstalledPackageRoot(packageRoot) : packageRoot;
     // Qualification runs on the canonical snapshot and installation consumes
     // the SAME snapshot — the original presentation is never read again after
     // this line (hostile getters cannot split qualification from install).
-    const root = assertQualifiedRoot(packageRoot);
+    const root = assertQualifiedRoot(subject);
     // Trust gate BEFORE any executable import: issuer attestation must
     // cryptographically verify against the installed registry (fail-closed
     // when the protected channel has not been established in this process).
     verifyLoadApproval(root.approval);
+    // #1023 S01 activation currentness: approved byte identity is not current
+    // authorization — EVERY fresh load re-checks the trusted deployment
+    // authority's revocation/withdrawal records BEFORE any package source
+    // execution (no-op in a process without the deployment channel; the trust
+    // gate above still applies there).
+    await verifyDeploymentCurrentness(root.approval);
     const installed = await installQualifiedPackages(root);
     const byPackageId = new Map(installed.map((entry) => [entry.descriptor.packageId, entry]));
     const loaded = Object.freeze({

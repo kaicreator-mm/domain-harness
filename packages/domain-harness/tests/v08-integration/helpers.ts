@@ -36,7 +36,9 @@ export const INTEG_ISSUER_SECRET = 'integration-issuer-secret:1013';
  *   one canonical D3 policy, no test-only substitute.
  */
 export const FIXTURE_SHAS = {
-  approval: 'b1169090676f7abe4ef04f34fc2d448b3662ce29f724fe23ed4ac5621812df5e',
+  // #1023 S01: re-pinned to the S04-era bytes (3c79a4b touched the fixture
+  // without updating this pin; the pin had no callers, so the drift was silent).
+  approval: 'fd494e6e91234d983727715cd379635d9951de65b99e240e56923fd21947a7d8',
   engineering: 'c2b61d24d2fe729e2a254b7efd63d4695cecf5027caddc7182873f7b89597cad',
   /** #1013-Builder-authored model-decision fixture (R1 F-03 physical path). */
   model: '659ac04523c288225756dca0bc0e651179a4ea48f5e79c911d587e0afcfa15e7',

@@ -37,7 +37,7 @@
  *           sealed ABI; a second capability app cannot re-provision it
  *   S04-C1  clean stock-Node packed-consumer child (dist imports only)
  */
-import test from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -155,6 +155,21 @@ async function capabilityVariant(patch: (operationsLiteral: string) => string): 
   return source.slice(0, start) + patch(source.slice(start, end + 2)) + source.slice(end + 2);
 }
 
+/**
+ * #1023 S01: the shared-test host now stays OPEN until file teardown — every
+ * fresh load (including the S04-W1/W3 wiring-refusal loads below) performs a
+ * durable deployment-currentness read against the trusted store, so closing
+ * it mid-file would turn those pinned typed refusals into store errors.
+ */
+let sharedHarness: Harness | undefined;
+
+after(async () => {
+  if (sharedHarness !== undefined) {
+    await sharedHarness.handle.host.close();
+    await rm(sharedHarness.dir, { recursive: true, force: true });
+  }
+});
+
 interface Harness {
   readonly handle: TrustedHostHandle;
   readonly gateway: KernelGateway;
@@ -244,6 +259,7 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
   assert.equal(sealed.sdkSha, sha256Hex(await readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8')));
 
   const harness = await bootstrapHarness(sealed.root);
+  sharedHarness = harness;
   try {
     const requester = harness.credential(['requester']);
     // Genesis so the effectful occurrence has a physical instance.
@@ -503,8 +519,7 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
     assert.equal(new Set(w2Keys).size, 2, `the two deployments dispatched on two DISTINCT physical keys (got ${JSON.stringify([...new Set(w2Keys)])})`);
     assert.equal(harness.dispatchCount(), dispatchAtW2 + 2, 'exactly the two legit dispatches happened');
   } finally {
-    await harness.handle.host.close();
-    await rm(harness.dir, { recursive: true, force: true });
+    // #1023 S01: close+rm moved to the file-level after() — see sharedHarness.
   }
 });
 

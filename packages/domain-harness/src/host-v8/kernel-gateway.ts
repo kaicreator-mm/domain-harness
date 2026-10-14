@@ -53,6 +53,7 @@
 
 import { DomainHarness, getFacadeKernelOps, type V8DomainFacade, type V8FacadeKernelOps } from '../public-v8/microkernel.js';
 import { QualifiedPackageError, canonicalSnapshot, sha256Hex } from '../public-v8/contracts.js';
+import { isInstalledHandleShape, resolveInstalledPackageRoot } from '../public-v8/deploy.js';
 import { HostBoundaryError } from './errors.js';
 import type { TrustedNodeHost } from './bootstrap.js';
 import { assertIntentScope, type UxTarget } from './ux-transport.js';
@@ -320,7 +321,16 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       }
       if (pinned !== undefined) {
         // Pre-load refusal: descriptor-safe claimed identity, no module bytes.
-        const claimed = readClaimedClosureIdentity(registration.packageRoot);
+        // #1023 S01: an installed reference resolves through the trusted
+        // deployment seam FIRST (its artifact root IS the claimed identity),
+        // so a restart re-registration of the SAME closure under its opaque
+        // reference stays idempotent instead of being refused as an
+        // unreadable claim; a DIFFERENT closure's reference still mismatches
+        // the pin. Resolution failures propagate typed and fail closed.
+        const claimedSource = isInstalledHandleShape(registration.packageRoot)
+          ? await resolveInstalledPackageRoot(registration.packageRoot)
+          : registration.packageRoot;
+        const claimed = readClaimedClosureIdentity(claimedSource);
         const claimedPin = claimed === undefined ? undefined : closurePin(registration.appId, host.audience, claimed);
         if (claimedPin === undefined || claimedPin !== pinned) {
           throw new HostBoundaryError(
