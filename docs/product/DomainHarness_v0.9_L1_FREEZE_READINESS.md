@@ -7,6 +7,7 @@ PREDECESSOR_MAIN_MERGE=db8b0e0c57b89fa893fbceafeed3ce111e7a2e6e
 PREDECESSOR_REVIEW=PASS_L1_PROPOSAL_P0_0_P1_0_P2_3
 PRODUCT_FREEZE=NOT_GRANTED
 AUTHORITATIVE_V08_RELEASE_BASELINE=NOT_YET_AVAILABLE
+FZ01_PREFLIGHT=RECEIVED_NONQUALIFYING_WSL2_UBUNTU26_NODE24_SQLITE
 L2_AUTHORITY=NOT_GRANTED
 V09_IMPL=NOT_STARTED
 ```
@@ -24,13 +25,27 @@ V09_IMPL=NOT_STARTED
 
 | ID | Required fact (not new research) | Responsible source | Gate state |
 | --- | --- | --- | --- |
-| FZ-01 | Available physical production-reference Host with OS/arch/CPU/RAM/storage, Node version, native SQLite/driver ABI and supported CI location, or one explicit bounded alternative-profile choice | **Local Build Host preflight** | `NEEDS_REAL_HOST_EVIDENCE` |
+| FZ-01 | Real Host preflight received: WSL2 Ubuntu 26.04.1 x86_64/Node24/SQLite loads, but proposed Ubuntu24 native physical profile mismatches. Native production Host remains unverified. | [#1026 FZ-01 receipt](https://github.com/kaicreator-mm/domain-harness/issues/1026) | `DEV_REFERENCE_VERIFIED; P0_PRODUCTION_HOST_NOT_VERIFIED` |
 | FZ-02 | Single **calibration** of proposed PERF-01–07 numeric budgets against **released** v0.8's real K/S/SQLite/dual-App workloads; if a v0.8 candidate exists but not released, explicitly label readings **NON_AUTHORITATIVE_EARLY_PROBE**, not release evidence | Local native environment only **after baseline qualified** (a non-authoritative early probe may be used to validate feasibility) | `NOT_RUN` |
 | FZ-03 | v0.8 Released exact SHA/tree/tag, completion of original T-D/#1003, T-G/#1006 and bounded #1023, with physical K/S/Node/Approval/Engineering positive/negative tests and independent Release Qualification | v0.8 program controller | `BLOCKED_ON_V08_RELEASE` |
 | FZ-04 | Product Scope: record exact supported primary profile, immutable distribution strategy, concrete public SDK target, P0/optional deferrals, quantitative budget and correct semantic owners after FZ-01/02 | #1026 Product Controller | `PROPOSED_NOT_FROZEN` |
 | FZ-05 | One bounded fresh Product/L1 exact-SHA review of resulting candidate Freeze, no unwaived Product P0/P1 and explicit `PRODUCT_FREEZE_PASS` | reviewer independent of writing agent | `NOT_RUN` |
 
-**Efficiency:** FZ-01 environment-only probe can be done **now** without touching any v0.8 source. FZ-02 full truthful performance baseline should bind the **released** v0.8 exact SHA; do not fabricate results from PR #1033 docs CI. FZ-03 is tracked by v0.8, **not** a reason to launch v0.9 implementation early. Product Freeze may use independently justified measured calibration or explicit support-scope amendments, never an arbitrary threshold change after failed tests.
+**Efficiency:** FZ-01 environment-only probe **already completed** on a WSL2 host, without touching any v0.8 source. Do not repeat the same preflight on that unchanged WSL2 host. FZ-02 full truthful performance baseline should bind the **released** v0.8 exact SHA; do not fabricate results from PR #1033 docs CI. FZ-03 is tracked by v0.8, **not** a reason to launch v0.9 implementation early. Product Freeze may use independently justified measured calibration or explicit support-scope amendments, never an arbitrary threshold change after failed tests.
+
+## 2a. FZ-01 disposition: real readback and bounded supported-profile ruling
+
+Actual October 14 FZ-01 receipt on [#1026](https://github.com/kaicreator-mm/domain-harness/issues/1026) establishes **a development/prevalidation host**, not the P0 native-production reference: `Ubuntu 26.04.1 LTS x86_64`, `microsoft-standard-WSL2` kernel, 8 allocated vCPU, 15.6 GiB visible RAM, ext4 guest volume on NVMe SSD, Node `24.21.0` (ABI 137), `better-sqlite3 12.11.1` loading native bundled SQLite `3.53.2` and real throwaway file WAL operations. It also recorded Node 22 ABI 127 loads only under the matching Node major; ABI crossloads fail as expected.
+
+**Bounded Product recommendation, not a frozen change:**
+
+- Classify this actual WSL2 Ubuntu26 environment as **DEV_PREVALIDATION_ONLY** for local SDK compile/tests, selected-ABI early exercises, source evidence, and possibly explicitly labelled **NON_AUTHORITATIVE_EARLY_PERF_PROBE**. Its correctness evidence may inform a native profile, but it **cannot itself qualify** the original Ubuntu24 native-production profile, native crash/persistence power-loss assumptions or PERF-01–07 as a P0 release PASS.
+- **Retain the proposed v0.9 P0 Ubuntu 24.04 x86_64 Node24/native SQLite physical host profile** until Product/L1 explicitly selects a reachable equally substantiated native Linux host/profile. Do **not** relabel WSL2 Ubuntu26 as Ubuntu24/native, and do not silently add WSL2 to the promised production support matrix.
+- If an independent real native Ubuntu Build Host is available, perform **one targeted production-host FZ-01 delta** (OS/kernel/host type/native driver/SQLite/SSD) there, not another all-29-addon WSL probe. Its physical OS may be 24.04 or another LTS; an alternate distro requires a **bounded L1 amendment before freeze**. Woodpecker runner host native-ness requires its own evidence, not inference from green CI.
+- If no native Host is available, set `P0_NATIVE_PROFILE_HOST=BLOCKED_ON_ENVIRONMENT` and **do not freeze an unprovable SLO/release qualifier**. Continue only docs/L2 evidence preparation, no false production claim. The user can provide alternate real Host access when needed.
+- The actual v0.9 pinned native driver and supported Profile artifact can only be qualified after v0.8 Release PASS and v0.9 artifact selection; FZ-01's already-installed Node24 module is **not** a v0.9 released package. PERF-01..07 have not run.
+
+**Gate status:** `FZ01_WSL_DEV_PROBE=PASS_FACTS`, `FZ01_NATIVE_PRODUCTION_PROFILE=NOT_VERIFIED`, `PRODUCT_L1_AMENDMENT=NOT_REQUIRED_IF_UBUNTU24_NATIVE_HOST_IS_FOUND`, `V09_PRODUCTION_READY=NO`.
 
 ## 3. Minimum local-only environment preflight (read-only)
 
