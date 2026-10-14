@@ -3,16 +3,16 @@
 ```ini
 STATUS=SOURCE_MAPPED_L2_PREPARATION_NOT_NORMATIVE
 PARENT=#1026
-PRODUCT_SUCCESSOR_PR=#1045_PENDING
-PRODUCT_FREEZE=NO
+PRODUCT_SUCCESSOR_PR=#1045_MERGED
+PRODUCT_FREEZE=JS_TS_SCOPE_CHECKPOINT_PR1048_MERGED
 L2_FREEZE=NO
 IMPLEMENTATION_TASK_DAG=NOT_ADMITTED
 NEW_SOURCE_IMPLEMENTATION=NO
-V08_SOURCE_BASE=3c79a4bf1cd761c61c91079e7b0b5fb2e2914ae2_PROVISIONAL
+V08_SOURCE_BASE=3d1b50bc7cea6af29c847755de9b425aa8e3b4a3_UNQUALIFIED
 SCOPE=ONLY_JS_CORE_HOST_CRYPTO_MODULE_BOUNDARY
 ```
 
-## 1. L2 driver and source readback — the only material JS portability delta
+## 1. L2 driver and source readback — a material JS portability delta
 
 Product direction (2026-10-14) is an independently distributable **JS/TS SDK Core** whose Packages are selected executable JavaScript modules. TypeScript is a build/typecheck authoring format, **not** a runtime dependency. Windows/Linux/WSL2/Node24/SQLite are **not universal Core gates**. Each explicitly selected/admitted Capability implementation may have its own runtime/OS/native requirements, but they must not leak into Microkernel/Kernel/Standard portable API.
 
@@ -79,4 +79,12 @@ Current Node reference Host may be used as a source oracle; L2 must **not** add 
 
 **Owner mapping (existing issues, not a formal new DAG):** N01 #1027 K/S/Package/Standard Workflow semantics; N06 #1032 BUILD/distribution/protected installed modules; N07 #1035 public JS/TS entry; N09 #1037 independent security/release; N02 #1028 only a selected Node/SQLite reference implementation if shipped; N08 #1036 Core operation/lifecycle and chosen reference capability ops. Reuse frozen v0.8 material. One PR per concern.
 
-`PRODUCT_FREEZE=NO; L2_FREEZE=NO; FORMAL_DAG=NO; SOURCE_BUILD_TESTS=NOT_RUN; RELEASE=HOLD`.
+`PRODUCT_FREEZE=JS_TS_SCOPE_FROZEN; L2_FREEZE=NO; FORMAL_DAG=NO; SOURCE_BUILD_TESTS=NOT_RUN; RELEASE=HOLD`.
+
+## 5. Refreshed immutable-source evidence / bounded L2 review handoff (2026-10-14)
+
+- Frozen **scope only**: Product R2 F01–F10, #1026@6169545765 substantive adversarial review P0=0/P1=0/P2=2, checkpoint PR #1048 merged in main at `a51a0c57f1c66d602120e6538b4db24072a2e747`. Distinct-GitHub-account reviewer approval NOT_ATTESTED; L2/DAG/source implementation are NOT authorized by that merge.
+- Actual **unqualified** v0.8 source branch observed: `3d1b50bc7cea6af29c847755de9b425aa8e3b4a3`. Exact file blob source pins: contracts `cb20695e772862bb2b56569cc5f958b94d3efc5e`; trust `635f833e2b9ef586984b421d12c679e37c9c4bf9`; installer `aaa43f31b6e93ad0c5986bc5286da2730cec6387`; load `ad40b63fa59fb64b6cb36e6277a7767b1b2523f8`; microkernel `1061dcbb18795a0b6c0f0ef96a8f345503e3dd6b`; kernel-host `b342ea68185d4189e65c77845762fab566d884e0`; Host bootstrap `da41cbca676e5aa8be8adbef86dbba9107d7fbcf`; Node identity `ef5603647e56ec837ef8dcc5680a4df334e141d4`; SQLite CAS `ebdb7aa1c6144a5c08fd104b5bdf099cd129668c`; K payload `2dfec0c44c26d05635751dd13cd970906473d23d`; S payload `905d29183efb94bafd3bd2cb2d5a8dfbcf9e4b2a`; SDK package manifest `0a9d31ad1679810f5ead09ab1b953ed0cdd3ce77`.
+- **Exact implementation limitation:** v0.8 installer performs whole-closure inert bytes/ABI preflight **before** first import, then sequential JS module evaluation + export identity checks. It cannot guarantee rollback of top-level side effects from already evaluated modules when a later import fails. Formal L2 must preserve preimport trust and explicitly handle partial activation; do not claim impossible JS module transactionality.
+- **Owner and risk separation:** #1027 K/S, standard WorkflowRouter, Capability/Handler semantics; #1032 BUILD, signed sealed artifact and protected import; #1035 public TS/ESM API; #1036 lifecycle/typed failures/ops; #1037 security, two real apps, independent Full/Hidden/CJ and external consumer; #1028 Node/SQLite native failure/CAS only **if** shipped/advertised. Legacy proposed DAG edge making #1028 universally mandatory remains NOT_ADMITTED; Product review P2-02 is resolved in the eventual formal DAG, not by inheriting the old diagram.
+- **Bounded next gate:** complete a formal L2 contract for selected JS ESM/async/runtime Host ABI, H independent approval-currentness, module-graph byte identity, K-only Journal/effects/UNKNOWN, package lifecycle, typed public exports, optional selected adapter. Then perform **one** exact-head independent adversarial L2 review. Replace unqualified v0.8 source refs with the actual released baseline after #1006 PASS. No new demo wave and no release claims from this documentation PR.
