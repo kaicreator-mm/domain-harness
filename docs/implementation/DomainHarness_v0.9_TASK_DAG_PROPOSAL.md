@@ -51,15 +51,15 @@ Potential parallelism after **bounded ABI Contract**: #1028 Node physical capabi
 
 | Stage / reuse | Responsible existing Issue | Minimal evidence | Code ownership boundary |
 | --- | --- | --- | --- |
-| P0 Read/reuse/accept v0.8 | #1026 (program) | actual v0.8 released code/Test SHA, known issues, define Node24+SQLite Windows/Linux target-profile qualification policy without a fixed Ubuntu/native-host dependency | **No code**, no new demo |
-| P1 Foundation Contract + Standard workflow routing semantics | [N01 #1027](https://github.com/kaicreator-mm/domain-harness/issues/1027) | one K, one S with WorkflowRouter, 2 capability packages, owner-only manifest ABI, 2 distinct real consumers | Package contracts/metadata, no K algorithm rewrite |
-| P2 Node capability | [N02 #1028](https://github.com/kaicreator-mm/domain-harness/issues/1028) | identity H-verified, storage SQLite actual CAS and resources across 2 apps; no unqualified Node/OS claims | capability-owned Node adapter and tests; H assurance retained |
+| P0 Read/reuse/accept v0.8 | #1026 (program) | actual v0.8 released code/Test SHA, known issues, define minimum JS module/ESM+async+Host capability contract and selected runtime qualification plan without OS matrix | **No code**, no new demo |
+| P1 Foundation Contract + Standard workflow routing semantics | [N01 #1027](https://github.com/kaicreator-mm/domain-harness/issues/1027) | one K, one S with WorkflowRouter, selected capability contracts, owner-only manifest ABI, 2 distinct real consumers | Package contracts/metadata, no K algorithm rewrite |
+| P2 Selected Node adapter (conditional) | [N02 #1028](https://github.com/kaicreator-mm/domain-harness/issues/1028) | identity H-verified, storage SQLite actual CAS and resources across 2 apps; no unqualified Node/OS claims | capability-owned Node adapter and tests; H assurance retained |
 | P3 Official distribution | [N06 #1032](https://github.com/kaicreator-mm/domain-harness/issues/1032) | reproducible versioned SDK/BUILD/K/S/Identity/Storage, locked Profile, package hashes, external clean install | pack scripts/manifests, not runtime policy |
 | P4 Public consumer UX | [N07 #1035](https://github.com/kaicreator-mm/domain-harness/issues/1035) | typed documented API, no private imports, correct authenticated client + standard Workflow semantics | public SDK facade/docs/examples, not Host trust bypass |
 | P5 Operations | [N08 #1036](https://github.com/kaicreator-mm/domain-harness/issues/1036) | measured exact Node24 supported-profile failure/start/recovery/resource/backup and redacted diagnostics | ops instrumentation/runbooks, no duplicate Journal |
 | P6 Release / independent adversarial | [N09 #1037](https://github.com/kaicreator-mm/domain-harness/issues/1037) | exact candidate full/hidden/CJ/security/native/consumer review, tags/baseline | evidence/validation; source regressions routed to owning concern |
 
-**Mandatory Product targets**: N01-min/N02-min/N06/N07/N08/N09. Optional: N01 broad capability market, N02 Browser/Embedded/full Host refactor, [N03 #1029](https://github.com/kaicreator-mm/domain-harness/issues/1029) external app generation ecosystem, [N04 #1030](https://github.com/kaicreator-mm/domain-harness/issues/1030) QuickJS/multilanguage, [N05 #1031](https://github.com/kaicreator-mm/domain-harness/issues/1031) streaming/remote. These cannot be silently promoted into version critical path.
+**Mandatory SDK Core Product targets**: N01-min/N06/N07/N08/N09. N02-min Node Identity/SQLite is **conditional when shipped as a production-qualified reference adapter**, not universal Core P0. Optional: N01 broad capability market, N02 Browser/Embedded/full Host refactor, [N03 #1029](https://github.com/kaicreator-mm/domain-harness/issues/1029) external app generation ecosystem, [N04 #1030](https://github.com/kaicreator-mm/domain-harness/issues/1030) QuickJS/multilanguage, [N05 #1031](https://github.com/kaicreator-mm/domain-harness/issues/1031) streaming/remote. These cannot be silently promoted into version critical path.
 
 ## 3. Gates, defects, ownership, and risk-based planning
 
@@ -73,7 +73,7 @@ Potential parallelism after **bounded ABI Contract**: #1028 Node physical capabi
 
 ## 4. Minimum review agenda and admission outputs
 
-1. Review Product objective and required Foundation Package Set: SDK, K, S (Workflow inside), Identity, Storage, BUILD, Node Profile; externally generated Business Package is not mandatory for v0.9 SDK readiness.
+1. Review Core Product objective and required Foundation Package Set: JS/TS SDK, K, S (Workflow inside), **selected** Capability Contract and BUILD (Node Identity/SQLite/Profile conditional); externally generated Business Package is not mandatory for v0.9 SDK readiness.
 2. Validate Node Production Qualification doc: Core JS/TS executable contract, actual K/S/B and secure selected Host bindings are **PRODUCT ACCEPTANCE CRITERIA**; Node/SQLite reference PERF-01–07 are optional selected-adapter tests, not already measured pass results; do not require a special Ubuntu/native host for Product Freeze. Confirm actual qualification environments before **Release**, adjust criteria only by reviewed Product change control.
 3. Confirm `v0.8 RELEASE_HOLD` if inherited requirements not passed. The v0.9 plan may review early but cannot use unqualified v0.8 source as an accepted released foundation.
 4. Independent reviewer posts one terminal with exact PR HEAD, frozen Product owner/security invariants, any necessary P1 corrections, explicitly `PASS_L1_REVIEW` or `NEEDS_REVISION` and whether a follow-up Product Freeze checkpoint is authorized. **The document author cannot self-certify independent review**.
