@@ -26,6 +26,12 @@ TEST_PASS=NOT_CLAIMED
 
 **Preflight and freeze hold:** if the real Build Host is not Ubuntu 24.04 x64 or a qualified equivalent is not available, the P0 profile remains **unqualified**; choose a real accessible supported host **through a bounded explicit Product L1 amendment and fresh evidence before freeze**, not by silently claiming Ubuntu 24.04 testing. Node versions are major-line selectors; exact patch, compiler flags, native ABI, SQLite mode and kernel/filesystem facts are pinned in validation records at candidate qualification.
 
+### FZ-01 observed development profile — **not an accepted production tier**
+
+The read-only October 14 [FZ-01 Build Host receipt on #1026](https://github.com/kaicreator-mm/domain-harness/issues/1026) describes an **available WSL2 Ubuntu 26.04.1 x86_64 guest** (Microsoft WSL kernel) with Node `24.21.0`, already installed native `better-sqlite3 12.11.1` (bundled SQLite `3.53.2`), 8 allocated vCPU / ~16 GiB guest RAM and ext4 guest volume backed by a local NVMe SSD. Real file-backed WAL checkpoint and clean addon load were observed. It mismatches the proposed **native Ubuntu 24.04** P0 distribution/kernel/host class and is **DEV_PREVALIDATION_ONLY**, never Ubuntu24/native Production QUALIFIED. Current v0.9 pinned selected driver build and any PERF-01–07 execution remain **NOT_VERIFIED / NOT_RUN**.
+
+**L1 ruling recommended:** keep the native Ubuntu24 P0 target pending one **different native host** qualification, use existing WSL2 only for non-authoritative build/ABI/test feasibility. Changing the P0 OS or permitting a production WSL2 profile would require its own bounded explicit L1 amendment with independently qualified actual security/durability/ops profile; merely running Node native modules in a guest is insufficient. Do not repeat FZ-01 on the same unchanged WSL2 guest.
+
 ## 2. Deterministic benchmark specification and initial proposed numeric targets
 
 These are **target thresholds, NOT observed measurements**. Their purpose is to make v0.9 release testable. A single **bounded Product/L1 calibration** may revise the numeric targets based on the exact released v0.8 baseline **before** v0.9 Product Freeze; changes thereafter require an independently reviewed Product amendment, not a post-failure silent threshold increase.
@@ -41,6 +47,23 @@ These are **target thresholds, NOT observed measurements**. Their purpose is to 
 | **PERF-05 Lifecycle/Recovery** | 20 start→authenticated use→graceful stop cycles; 5 forced process terminations across durable Journal/Effect windows, then fresh process restart with trusted artifact | Graceful stop **<=10 s** when no external operation is pending; recovered process starts under PERF-01; all committed outcomes replay once, externally ambiguous outcomes remain truthful **UNKNOWN** until resolved (do not demand fabricated automatic success) |
 | **PERF-06 Backup/restore** | Real SQLite checkpoint/backup + restore on isolated process using documented runbook; verify selected Package/ABI/instance/Journal identity and startup-currentness again | Exact valid business state + Journal continuity after restore; corruption/mismatched artifact causes typed refusal/diagnosis, never silent replay into wrong Assembly |
 | **PERF-07 Security/ops visibility** | Independent evaluator injects revoked credentials, wrong app/tenant, missing capability, invalid Handler/root, failed init, disk failure, stale observer and partial import; inspect logs/metrics/traces | 0 unauthorized effects, 0 leaked token/key/secret, 0 untruthful success, typed recovery/denial classification and end-to-end correlation; clear unsupported/failure status |
+
+### PERF-02/03 denominator and inclusion contract — P2-02 closure
+
+The reference run **must** write a machine-generated, per-attempt receipt and summary with the following disjoint counts and timestamps:
+
+| Metric | Definition | How it is used |
+| --- | --- | --- |
+| `submitted_total` | All invocation attempts, including deliberate invalid/contending calls; retries have unique attempt IDs | Report only; **never** by itself qualifies throughput |
+| `eligible_submitted` | Distinct authorized, valid, non-conflicting calls sent during the 30-min fault-free window; no deliberate denial, no injected crash or intentionally contended write | Availability denominator; minimum **18,000** attempts with four caller sessions |
+| `eligible_success` | Eligible calls completed by the deadline with correct typed business receipt and **durable** outcome where applicable | Throughput numerator; must be **>=18,000 successful completions / 1,800 s (10.0/s)** and `eligible_success / eligible_submitted >= 0.999` |
+| `eligible_unexpected_failure` | Unauthorized silent acceptance, unexpected error, untyped terminal, lost durable ACK, timed-out eligible call or incorrect result | Included in availability denominator; false ACK and security failure **always Release HOLD** independent of percent |
+| `expected_negative` | Correctly denied unauthorized/invalid caller and deliberately forced contention/UNKNOWN cases | **Separate** positive-negative suite, never inflates eligible success or throughput |
+| `warmup` | 200 seed operations (before the fixed 30-min clock) | Excluded from throughput/availability/latency qualification sample |
+
+**Latency:** sample `eligible_submitted` from actual admission/submission monotonic timestamp to terminal receipt; report p50/p95/p99 for `eligible_success`, with all `eligible_unexpected_failure`, timeouts and incomplete calls **separately counted and not silently dropped**. In addition, report p99 *tail-inclusive* bound with non-successful eligible attempts classified at `+Infinity` (or right-censored with count displayed), so a run cannot meet a percentile by filtering worst attempts. The p95<=500ms / p99<=2,000ms targets apply to **eligible successful terminal calls**, **only if** the overall availability and tail inclusion gates also pass. Retried attempts count as separate requests only if the client explicitly submitted them; they never count as more than one successful durable business effect.
+
+**Throughput:** `eligible_success / observed_run_duration_seconds >=10.0`; observed duration must be **at least 1,800 seconds**, not merely a simulator's nominal time. Publish submitted, eligible, successful, expected-negative, contention, unexpected-failure, timeout, retry and completion counts separately. Reject partial-duration/missing-raw-receipt summaries. Counts and percentile code are part of the **independent N09 validator** and must be tested with synthetic denominator counterexamples before a Release PASS.
 
 **Workload scoring guard:** classify **expected, correctly typed CAS contention/conflict**, explicit `UNKNOWN` after an injected crash and deliberate denials as **valid semantic outcomes**, not service availability failures. Benchmark the 99.9% success rate against **eligible non-conflicting, fault-free authorized operations** only; publish concurrent contention attempts/conflict rate separately with asserted zero unauthorized effects and no blind retry. Report all **unexpected** failures/timeouts in latency/availability results, and count accepted-but-lost durable outcomes as Release HOLD regardless of percentage. Avoid a benchmark that accidentally rewards skipping CAS admission.
 

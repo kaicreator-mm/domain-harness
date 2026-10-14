@@ -37,12 +37,20 @@ flowchart TD
   F --> G
 ```
 
+### Exact ownership of Standard WorkflowRouter — P2-01 closure
+
+**Design/contract owner: N01 #1027**, because WorkflowRouter is a **Standard Domain Package semantic feature**, not a public Microkernel runtime or a physical H adapter. Source target: selected `standard-sdk-v1.mjs` successor **only when** a fresh L2 source map proves the current five-Kind `interpret('workflow')` plus existing Kernel routing cannot already satisfy the needed bounded route selection. Minimum: deterministic selected-Workflow handler/step routing, typed ambiguous/missing/forbidden responses and *two existing Approval/Engineering users*. Explicitly **not** a second occurrence State/WAIT/Journal implementation. A zero-new-code thin public binding to proven existing Standard+Kernel logic is preferred when sufficient.
+
+**Consumer-facing API/docs owner: N07 #1035**, which may export/document the WorkflowRouter operation *after* #1027 supplies a frozen semantic contract; N07 must not independently implement a second Router. **Physical Node implementation and H/SQLite owner: N02 #1028**, which must not edit the Standard Router file or Kernel mechanics. N06 #1032 only packages the approved artifacts/profile and must not amend their semantics.
+
+**JIT size/write-set rule:** In the later **formal Task DAG** (not this proposal), if #1027's Capability/Package metadata concern and Standard Router need overlapping large source work, split its implementation into bounded **N01-Contract** and **N01-Router** child task packs with disjoint source write sets and a single controlling #1027 owner; do **not** spawn two concurrent builders on `standard-sdk-v1.mjs`. Pin the actual current v0.8 release SHA/physical K/S payload first. This explicitly assigns the contested Standard semantic owner without creating an issue or implementation claim now.
+
 Potential parallelism after **bounded ABI Contract**: #1028 Node physical capability work and #1035 public consumer docs/API work can proceed **only in separate write sets**; #1032 packaging must consume pinned ABI and avoid changing their in-flight public exports. #1036 after physical lifecycle/packaging. #1037 runs **only after merged exact candidate**; test design/hidden pack preparation may be concurrent without fake validation. No fully locked dependencies or claims until Task DAG freeze.
 
 | Stage / reuse | Responsible existing Issue | Minimal evidence | Code ownership boundary |
 | --- | --- | --- | --- |
 | P0 Read/reuse/accept v0.8 | #1026 (program) | actual v0.8 released code/Test SHA, known issues, select real Node24 Ubuntu 24.04 qualification environment | **No code**, no new demo |
-| P1 Foundation Contract | [N01 #1027](https://github.com/kaicreator-mm/domain-harness/issues/1027) | one K, one S with WorkflowRouter, 2 capability packages, owner-only manifest ABI, 2 distinct real consumers | Package contracts/metadata, no K algorithm rewrite |
+| P1 Foundation Contract + Standard workflow routing semantics | [N01 #1027](https://github.com/kaicreator-mm/domain-harness/issues/1027) | one K, one S with WorkflowRouter, 2 capability packages, owner-only manifest ABI, 2 distinct real consumers | Package contracts/metadata, no K algorithm rewrite |
 | P2 Node capability | [N02 #1028](https://github.com/kaicreator-mm/domain-harness/issues/1028) | identity H-verified, storage SQLite actual CAS and resources across 2 apps; no unqualified Node/OS claims | capability-owned Node adapter and tests; H assurance retained |
 | P3 Official distribution | [N06 #1032](https://github.com/kaicreator-mm/domain-harness/issues/1032) | reproducible versioned SDK/BUILD/K/S/Identity/Storage, locked Profile, package hashes, external clean install | pack scripts/manifests, not runtime policy |
 | P4 Public consumer UX | [N07 #1035](https://github.com/kaicreator-mm/domain-harness/issues/1035) | typed documented API, no private imports, correct authenticated client + standard Workflow semantics | public SDK facade/docs/examples, not Host trust bypass |

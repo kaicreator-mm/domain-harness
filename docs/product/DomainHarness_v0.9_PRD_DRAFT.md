@@ -1,11 +1,12 @@
 # DomainHarness v0.9 — Production-Ready Node SDK PRD (Draft / Not Frozen)
 
 ```ini
-DOCUMENT_STATE=CONCRETE_FOUNDATION_PROFILE_QUALIFICATION_AND_DAG_PROPOSALS_PENDING_REVIEW
+DOCUMENT_STATE=CONTENT_REVIEW_PASS_P2_CLOSURE_PROPOSED_L1_NOT_FROZEN
 VERSION=v0.9
 PARENT_ISSUE=#1026
 BASELINE_REQUIRED=v0.8_RELEASE_QUALIFIED
-L1_REVIEW=NOT_YET_RUN
+L1_PROPOSAL_CONTENT_REVIEW=PASS_AT_1033_10aa58b_P2_3
+INDEPENDENT_DISTINCT_ACCOUNT_APPROVAL=NOT_CLAIMED
 PRODUCT_FREEZE=NO
 L2=NOT_ADMITTED
 TASK_DAG=NOT_ADMITTED
@@ -104,7 +105,13 @@ See [bounded Task DAG proposal](../implementation/DomainHarness_v0.9_TASK_DAG_PR
 
 Product/L1 docs and independent review may proceed **while v0.8 work runs**. Source implementation and baseline adoption require actual v0.8 Release PASS/Tag; Product Freeze and L2 authority require their own exact-SHA gate, not this PRD author's signature. No new research Issue or a full 9-issue JIT implementation wave now. Other version candidates N03/N04/N05 and broad N01/N02 are optional unless separately Product-admitted.
 
-**Remaining *real* blockers (not new architectural research):** independent exact-head Product/L1 review of this PR; reference host profile availability; one bounded benchmark-budget calibration from measured v0.8 if needed; L2 ABI/authority Contract after accepted Product Freeze; final v0.8 release baseline pin. Do not claim these external evidence requirements satisfied by this documentation.
+**Remaining *real* blockers (not new architectural research):** exact v0.8 released baseline; primary native production Host qualification (**the FZ-01 WSL2 Ubuntu26 probe is DEV_PREVALIDATION_ONLY**); one bounded performance-budget calibration on genuine accepted baseline; a separately reviewed **formal Product/L1 Freeze**; then L2 ABI/authority Contract and formal Task DAG. The reviewed #1033 Product **proposal** is already merged; do not demand a duplicate proposal review or claim actual production Test PASS from docs.
+
+## 7a. Post-proposal review status and pending evidence
+
+- PR #1033 `10aa58b2625b67219d735ad79338e6902165df27` docs CI SUCCESS and fresh content `PASS_L1_PROPOSAL` (P0/P1=0; P2=3), merged to main at `db8b0e0c57b89fa893fbceafeed3ce111e7a2e6e`. This is **NOT Product Freeze** and not independent distinct-account approval.
+- Proposal P2-01 WorkflowRouter Standard semantic vs public API work ownership and P2-02 benchmark denominator rules are resolved in a bounded successor; P2-03 outdated-head PR metadata was corrected before merge.
+- Actual productive Product Freeze requires [one-time L1 Freeze Readiness and Host preflight](./DomainHarness_v0.9_L1_FREEZE_READINESS.md), v0.8 released SHA, exact numeric performance budget feasibility, and a subsequent authorized fresh review. All are `NOT_PROVEN` now.
 
 ## 8. Progress / authority
 
@@ -116,7 +123,8 @@ FOUNDATION_PACKAGE_SET_PROPOSED=YES
 NODE_BASIC_PROFILE_PROPOSED=YES
 QUANTITATIVE_QUALIFICATION_TARGETS_PROPOSED=YES
 SIX_CONCERN_DAG_PROPOSED_NOT_ADMITTED=YES
-INDEPENDENT_PRODUCT_L1_REVIEW=NOT_RUN
+PRODUCT_L1_PROPOSAL_CONTENT_REVIEW=PASS_P2_3_AT_PR1033
+PRODUCT_L1_FREEZE_REVIEW=NOT_RUN
 PRODUCT_FREEZE=NO
 L2_EVIDENCE=NOT_RUN
 TASK_DAG=NOT_CREATED
