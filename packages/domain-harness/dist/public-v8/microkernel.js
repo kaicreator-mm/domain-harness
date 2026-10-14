@@ -72,6 +72,111 @@ const OPERATION_EFFECT_CLASSES = ['none', 'idempotent', 'non-idempotent'];
 function isOperationEffectClass(value) {
     return typeof value === 'string' && OPERATION_EFFECT_CLASSES.includes(value);
 }
+// ---- #1023 S04 R1 P1-02: Operation↔Effect binding interlock ----
+/**
+ * Read the AUTHORITATIVE physical-route semantics of one effect binding off
+ * the sealed Business policy — the same policy object the selected Kernel
+ * dispatches effects on. An effect binding that declares no Host route is
+ * unverifiable at wiring: `undefined`.
+ */
+function readEffectBindingRoute(effectBinding) {
+    if (!isPlainRecordValue(effectBinding))
+        return undefined;
+    const resource = effectBinding.resource;
+    if (resource === undefined)
+        return { semantics: effectBinding.semantics };
+    if (!isPlainRecordValue(resource) || typeof resource.key !== 'string' || typeof resource.operation !== 'string')
+        return undefined;
+    return { semantics: effectBinding.semantics, resource: { key: resource.key, operation: resource.operation } };
+}
+/**
+ * The wiring-time Operation→Effect interlock (#1023 S04 R1 P1-02). The
+ * sealed capability ABI's CLAIMS are checked against the sealed Business
+ * policy's own declarations — the exact data the selected Kernel's effect
+ * dispatch reads — so a callable effectful operation can never declare a
+ * route, an effect class or an intent the Business policy contradicts:
+ *
+ *   - the policy must actually BIND the claimed admission intent;
+ *   - the intent binding's trigger-matching transitions must dispatch at
+ *     least one Business effect intent (a no-effect intent would return a
+ *     K receipt with no capability handler ever running);
+ *   - every dispatched effect binding must DECLARE its Host physical route
+ *     `{key, operation}` and it must EQUAL the ABI's claimed route;
+ *   - the effect binding's `semantics` must EQUAL the ABI's declared
+ *     `effectClass` (no false idempotency/retry-safety declaration);
+ *   - the union of dispatched routes must be EXACTLY the one claimed route
+ *     (one callable effectful operation = one physical route).
+ *
+ * This is a declarative, K-compatible link (sealed policy data, no
+ * speculative runtime handler introspection): a Business handler that lied
+ * about its route dispatches into the injective adapter map and fails
+ * closed typed (HOST_RESOURCE_OPERATION_UNKNOWN) at runtime.
+ */
+function assertOperationEffectBinding(input) {
+    const { capabilityId, operationId, intentType, resource, effectClass, businessPolicy } = input;
+    const where = `capability ${capabilityId} operation ${operationId}`;
+    const intentBindings = businessPolicy.intentBindings;
+    const binding = isPlainRecordValue(intentBindings) && Object.prototype.hasOwnProperty.call(intentBindings, intentType)
+        ? intentBindings[intentType]
+        : undefined;
+    if (!isPlainRecordValue(binding)) {
+        throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims admission intent ${intentType}, but the sealed Business policy binds no such intent; the Operation→Effect link is unverifiable`);
+    }
+    const trigger = binding.trigger;
+    const eventType = isPlainRecordValue(trigger) ? trigger.eventType : undefined;
+    if (typeof eventType !== 'string' || eventType.length === 0) {
+        throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims admission intent ${intentType}, whose sealed Business binding declares no usable event trigger; the Operation→Effect link is unverifiable`);
+    }
+    const definition = isPlainRecordValue(binding.definition) ? binding.definition : businessPolicy.workflowDefinition;
+    if (!isPlainRecordValue(definition) || !Array.isArray(definition.states)) {
+        throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims admission intent ${intentType}, whose sealed Business definition is unreadable; the Operation→Effect link is unverifiable`);
+    }
+    // Collect every effect intent the intent's trigger can dispatch, across ALL
+    // states of its definition — the guard/state branch is a runtime decision,
+    // so the wiring link must cover every declared branch or refuse.
+    const effectTypes = new Set();
+    for (const state of definition.states) {
+        if (!isPlainRecordValue(state) || !Array.isArray(state.transitions))
+            continue;
+        for (const transition of state.transitions) {
+            if (!isPlainRecordValue(transition))
+                continue;
+            const transitionTrigger = transition.trigger;
+            if (!isPlainRecordValue(transitionTrigger) || transitionTrigger.eventType !== eventType)
+                continue;
+            if (!Array.isArray(transition.effectIntents))
+                continue;
+            for (const effectIntent of transition.effectIntents) {
+                if (isPlainRecordValue(effectIntent) && typeof effectIntent.effectType === 'string') {
+                    effectTypes.add(effectIntent.effectType);
+                }
+            }
+        }
+    }
+    if (effectTypes.size === 0) {
+        throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims admission intent ${intentType}, but none of its transitions dispatches a Business effect — a callable effectful operation cannot bind a no-effect intent (its K receipt would run no capability handler)`);
+    }
+    const effectBindings = businessPolicy.effectBindings;
+    const routes = new Set();
+    for (const effectType of effectTypes) {
+        const route = isPlainRecordValue(effectBindings) && Object.prototype.hasOwnProperty.call(effectBindings, effectType)
+            ? readEffectBindingRoute(effectBindings[effectType])
+            : undefined;
+        if (route === undefined || route.resource === undefined) {
+            throw typedError('OPERATION_BINDING_MISMATCH', `${where} resolves Business effect ${effectType}, which declares no Host physical route {key, operation}; the Operation→Effect link is unverifiable`);
+        }
+        if (route.semantics !== effectClass) {
+            throw typedError('OPERATION_BINDING_MISMATCH', `${where} declares effectClass ${effectClass}, but Business effect ${effectType} declares semantics ${String(route.semantics)} — a false idempotency/retry-safety declaration refuses`);
+        }
+        if (route.resource.key !== resource.key || route.resource.operation !== resource.operation) {
+            throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims the Host physical route ${resource.key}.${resource.operation}, but Business effect ${effectType} dispatches ${route.resource.key}.${route.resource.operation}`);
+        }
+        routes.add(`${route.resource.key} ${route.resource.operation}`);
+    }
+    if (routes.size !== 1) {
+        throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims one Host physical route, but its admission intent dispatches ${routes.size} distinct Business routes`);
+    }
+}
 const OPERATION_JSON_MAX_DEPTH = 64;
 function isPlainRecordValue(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -229,6 +334,18 @@ function wireCapabilityOperations(input) {
                 || typeof resource.operation !== 'string' || resource.operation.length === 0) {
                 throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} must declare resource {key, operation} for the Host physical route`);
             }
+            // #1023 S04 R1 P1-02: the ABI's claims must match the AUTHORITATIVE
+            // sealed Business policy declarations the selected Kernel's effect
+            // dispatch reads - wrong route, wrong effect class, no-effect intent
+            // or an unbound intent refuses typed HERE, before any facade escapes.
+            assertOperationEffectBinding({
+                capabilityId: binding.capabilityId,
+                operationId,
+                intentType,
+                resource: { key: resource.key, operation: resource.operation },
+                effectClass,
+                businessPolicy: input.businessPolicy,
+            });
             const resourceOperations = adapters.get(resource.key) ?? new Map();
             if (resourceOperations.has(resource.operation)) {
                 throw typedError('OPERATION_ABI_INVALID', `resource ${resource.key}.${resource.operation} is claimed by more than one capability operation; Host physical routes are injective`);
@@ -586,6 +703,7 @@ async function loadScopedFacade(packageRoot) {
             bindings,
             getModuleNamespace: (packageId) => loaded.getModuleNamespace(packageId),
             sealedIntentTypes: new Set(intentIndex.keys()),
+            businessPolicy: businessPolicy,
         });
     }
     catch (error) {

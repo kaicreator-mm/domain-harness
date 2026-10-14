@@ -85,7 +85,7 @@ async function capabilitySource(): Promise<string> {
  * selected K/S payload bytes) plus the capability package, through the REAL
  * compiler BUILD path. Returns the sealed root and the identity digests.
  */
-async function sealS04Closure(options: { capabilityModuleSource?: string } = {}): Promise<{
+async function sealS04Closure(options: { capabilityModuleSource?: string; businessModuleSource?: string } = {}): Promise<{
   root: SealedQualifiedPackageRoot;
   kernelSha: string;
   sdkSha: string;
@@ -93,7 +93,7 @@ async function sealS04Closure(options: { capabilityModuleSource?: string } = {})
   const [kernelSource, sdkSource, businessSource, capabilityText] = await Promise.all([
     readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
     readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('business-approval.mjs', examplesDir), 'utf8'),
+    options.businessModuleSource === undefined ? readFile(new URL('business-approval.mjs', examplesDir), 'utf8') : Promise.resolve(options.businessModuleSource),
     options.capabilityModuleSource === undefined ? capabilitySource() : Promise.resolve(options.capabilityModuleSource),
   ]);
   const kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`) as Record<string, any>;
@@ -107,7 +107,7 @@ async function sealS04Closure(options: { capabilityModuleSource?: string } = {})
     { packageId: capability.MODULE_ID as string, kind: 'capability' as const, abiVersion: capability.ABI_VERSION as string, modulePath: 'modules/capability.mjs', moduleSource: capabilityText, endpoints: capability.ENDPOINTS },
   ];
   const submission: QualificationSubmission = {
-    rootPackageId: `app:v08:s04:${options.capabilityModuleSource === undefined ? 'main' : 'variant'}`,
+    rootPackageId: `app:v08:s04:${options.capabilityModuleSource === undefined && options.businessModuleSource === undefined ? 'main' : 'variant'}`,
     packages,
     bindings: [
       { role: 'kernel', packageId: kernel.MODULE_ID, endpointId: kernel.ENDPOINTS[0].endpointId },
@@ -436,7 +436,9 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
     // sealed ABI at registerApp (P2's durable output proves it physically
     // ran); a SECOND app registration declaring the same resource key must
     // refuse — the capability-owned adapter is provisioned once per physical
-    // Host, derived from the BUILD-selected binding. ----
+    // Host, derived from the BUILD-selected binding. The refusal is ATOMIC
+    // (#1023 S04 R1 P1-01): no durable pin, no partial adapter and no live
+    // second app may survive it. ----
     await assert.rejects(
       () => harness.gateway.registerApp({ appId: 'order-approval-2', packageRoot: sealed.root, genesisRoles: ['platform-operator'] }),
       (error: unknown) => {
@@ -445,6 +447,13 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
         return true;
       },
     );
+    assert.equal(
+      await harness.handle.host.docs.get('v8host:gateway:app-pin:order-approval-2'),
+      null,
+      'a refused second registration must leave NO durable pin residue (R1 P1-01)',
+    );
+    assert.equal(harness.gateway.hasApp('order-approval-2'), false);
+    assert.equal(harness.dispatchCount(), dispatchAtN6 + 1, 'the refused second registration dispatches nothing');
   } finally {
     await harness.handle.host.close();
     await rm(harness.dir, { recursive: true, force: true });
@@ -507,6 +516,183 @@ test('S04-W1: wiring-time OperationCall ABI validation refuses bad OPERATIONS va
   const facade = await DomainHarness.load(plain.root);
   assert.deepEqual(Object.keys(facade).sort(), ['query', 'send', 'stop', 'subscribe']);
   await facade.stop();
+});
+
+/** Patch anchor discipline for the business fixtures: exactly one occurrence. */
+function businessPatchOnce(source: string, anchor: string, replacement: string, label: string): string {
+  const count = source.split(anchor).length - 1;
+  assert.equal(count, 1, `business fixture anchor for ${label} must occur exactly once`);
+  return source.replace(anchor, replacement);
+}
+
+/**
+ * S04-W3 (#1023 S04 R1 P1-02): the wiring-time Operation→Effect binding
+ * interlock. A sealed effectful OPERATIONS entry must match the AUTHORITATIVE
+ * sealed Business policy data the selected Kernel dispatches on — the intent
+ * binding's transitions must dispatch Business effect(s), each effect binding
+ * must DECLARE its Host physical route {key, operation} equal to the ABI's
+ * claim, and its `semantics` must equal the declared `effectClass`. A wrong
+ * route, a false idempotency declaration, an effect-less intent, or an intent
+ * the policy does not bind refuses typed at load, BEFORE any
+ * activation/dispatch — no K-receipt-without-capability-handler and no false
+ * retry-safety declaration can survive wiring.
+ */
+test('S04-W3: Operation↔Effect binding interlock refuses mismatched declarations at load, before any activation/dispatch', async () => {
+  const businessSource = await readFile(new URL('business-approval.mjs', examplesDir), 'utf8');
+  const variants: readonly { name: string; capabilityModuleSource?: string; businessModuleSource?: string; messageIncludes?: string }[] = [
+    {
+      name: 'altered Host resource key (ABI claims a route the Business effect does not dispatch)',
+      capabilityModuleSource: await capabilityVariant((literal) => literal.replace(
+        "resource: { key: 'ledger', operation: 'reserve' },",
+        "resource: { key: 'not-ledger', operation: 'reserve' },",
+      )),
+      messageIncludes: 'not-ledger',
+    },
+    {
+      name: 'altered Host resource operation',
+      capabilityModuleSource: await capabilityVariant((literal) => literal.replace(
+        "resource: { key: 'ledger', operation: 'reserve' },",
+        "resource: { key: 'ledger', operation: 'not-reserve' },",
+      )),
+      messageIncludes: 'not-reserve',
+    },
+    {
+      name: 'false idempotency declaration (ABI idempotent, Business semantics non-idempotent)',
+      capabilityModuleSource: await capabilityVariant((literal) => literal.replace(
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteDecisionDynamic',",
+        "effectClass: 'idempotent',\n    intentType: 'submitQuoteDecisionDynamic',",
+      )),
+      messageIncludes: 'idempotent',
+    },
+    {
+      name: 'Business effect semantics tampered (Business idempotent, ABI non-idempotent)',
+      businessModuleSource: businessPatchOnce(
+        businessSource,
+        "        semantics: 'non-idempotent',\n        resource: { key: 'ledger', operation: 'reserve' },",
+        "        semantics: 'idempotent',\n        resource: { key: 'ledger', operation: 'reserve' },",
+        'effect semantics',
+      ),
+    },
+    {
+      name: 'Business effect binding declares no Host physical route',
+      businessModuleSource: businessPatchOnce(
+        businessSource,
+        "        semantics: 'non-idempotent',\n        resource: { key: 'ledger', operation: 'reserve' },\n        handler:",
+        "        semantics: 'non-idempotent',\n        handler:",
+        'effect route declaration',
+      ),
+    },
+    {
+      name: 'no-effect intent (sealed intent whose transitions dispatch no Business effect)',
+      capabilityModuleSource: await capabilityVariant((literal) => literal.replace(
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteDecisionDynamic',",
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteNote',",
+      )),
+      businessModuleSource: (() => {
+        let source = businessPatchOnce(
+          businessSource,
+          "export const INTENT_TYPES = ['submitQuoteDecision', 'submitQuoteDecisionStrict', 'submitQuoteDecisionDynamic'];",
+          "export const INTENT_TYPES = ['submitQuoteDecision', 'submitQuoteDecisionStrict', 'submitQuoteDecisionDynamic', 'submitQuoteNote'];",
+          'note INTENT_TYPES',
+        );
+        source = businessPatchOnce(
+          source,
+          'export function getPolicy() {',
+          `function makeNoteDefinition() {
+  return {
+    workflowKey: 'order-quote',
+    initialState: 'review',
+    initialContext: {},
+    states: [
+      {
+        stateKey: 'review',
+        transitions: [
+          { transitionKey: 'note', trigger: { kind: 'event', eventType: 'QUOTE_NOTED' }, targetState: 'approved' },
+        ],
+      },
+      { stateKey: 'approved', kind: 'final' },
+    ],
+  };
+}
+
+export function getPolicy() {`,
+          'note definition',
+        );
+        source = businessPatchOnce(
+          source,
+          "    'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },",
+          `    'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },
+    'rule:quote-note': { ruleId: 'rule:quote-note', eventType: 'QUOTE_NOTED', payloadFromInput: { noteId: 'noteId' } },`,
+          'note rule',
+        );
+        source = businessPatchOnce(
+          source,
+          `      submitQuoteDecisionDynamic: {
+        trigger: { kind: 'event', eventType: 'QUOTE_DECIDED' },
+        ruleId: 'rule:quote-decision-request',
+        roles: ['requester'],
+        definition: makeDynamicDefinition(),
+      },
+    },`,
+          `      submitQuoteDecisionDynamic: {
+        trigger: { kind: 'event', eventType: 'QUOTE_DECIDED' },
+        ruleId: 'rule:quote-decision-request',
+        roles: ['requester'],
+        definition: makeDynamicDefinition(),
+      },
+      submitQuoteNote: {
+        trigger: { kind: 'event', eventType: 'QUOTE_NOTED' },
+        ruleId: 'rule:quote-note',
+        roles: ['requester'],
+        definition: makeNoteDefinition(),
+      },
+    },`,
+          'note intent binding',
+        );
+        return source;
+      })(),
+    },
+    {
+      name: 'intent the sealed Business policy does not bind',
+      capabilityModuleSource: await capabilityVariant((literal) => literal.replace(
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteDecisionDynamic',",
+        "effectClass: 'non-idempotent',\n    intentType: 'submitQuoteDecisionStrict',",
+      )),
+      businessModuleSource: businessPatchOnce(
+        businessSource,
+        `      submitQuoteDecisionStrict: {
+        trigger: { kind: 'event', eventType: 'QUOTE_DECIDED' },
+        ruleId: 'rule:quote-decision',
+        roles: ['requester'],
+        definition: makeDefinition({ omitReject: true }),
+      },
+`,
+        '',
+        'strict binding removal',
+      ),
+    },
+  ];
+  for (const variant of variants) {
+    const sealed = await sealS04Closure({
+      ...(variant.capabilityModuleSource === undefined ? {} : { capabilityModuleSource: variant.capabilityModuleSource }),
+      ...(variant.businessModuleSource === undefined ? {} : { businessModuleSource: variant.businessModuleSource }),
+    });
+    await assert.rejects(
+      () => DomainHarness.load(sealed.root),
+      (error: unknown) => {
+        assert.ok(error instanceof QualifiedPackageError, `${variant.name}: expected QualifiedPackageError, got ${String(error)}`);
+        assert.equal((error as QualifiedPackageError).code, 'OPERATION_BINDING_MISMATCH', variant.name);
+        if (variant.messageIncludes !== undefined) {
+          assert.ok(
+            (error as Error).message.includes(variant.messageIncludes),
+            `${variant.name}: refusal message should mention ${variant.messageIncludes} (got: ${(error as Error).message})`,
+          );
+        }
+        return true;
+      },
+      variant.name,
+    );
+  }
 });
 
 test('S04-C1: clean stock-Node packed consumer drives the OperationCall surface through the dist subpaths only', { timeout: 120_000 }, async () => {

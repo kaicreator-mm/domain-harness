@@ -28,7 +28,12 @@
  *     K/S/B module digests + host audience) is persisted in the physical
  *     Host store under guarded CAS, so package replacement / stale roots
  *     refuse across process restarts before their module bytes ever load,
- *     and re-registering the SAME closure after a restart is idempotent;
+ *     and re-registering the SAME closure after a restart is idempotent.
+ *     The registration is ATOMIC (#1023 S04 R1 P1-01): the capability
+ *     resource adapters install as one all-or-nothing batch BEFORE the
+ *     durable pin commit, and ANY post-load failure rolls the batch back,
+ *     awaits the facade's S03 lifecycle teardown and leaves no pin, no
+ *     partial adapter and no live facade behind;
  *   - K-receipt subscriptions re-authenticate the credential on EVERY
  *     delivery and silently stop when the grant is no longer valid;
  *   - cancellation (#1003 FR07-KH2, B3) is request-scoped and

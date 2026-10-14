@@ -51,7 +51,12 @@ export const ENDPOINTS = [
  * type whose issuer-bound role set governs who may call the operation; the
  * effectful `resource` names the Host physical resource route the Kernel's
  * effect dispatch (never the caller) reaches this package's handler
- * through.
+ * through. At wiring the effectful claims are CROSS-VALIDATED against the
+ * sealed Business policy's own effect-binding declarations (#1023 S04 R1
+ * P1-02): the admission intent must dispatch the claimed effect, the effect
+ * binding's declared route {key, operation} must equal this claim, and its
+ * `semantics` must equal the declared `effectClass` — a wrong route, a
+ * false idempotency declaration or a no-effect intent refuses at load.
  */
 export const OPERATIONS = [
   {
