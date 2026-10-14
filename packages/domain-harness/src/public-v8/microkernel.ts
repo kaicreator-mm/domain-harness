@@ -1105,19 +1105,28 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     // view forwards ONLY the plain `call`, so no Kernel mechanism, Business
     // package or caller can ever present a scope. ----
     const claimedResourceKeys = wiredOperations.adapters;
-    const runtimeHostPorts: V8KernelMechanismHostPorts = claimedResourceKeys.size === 0
-      ? hostPorts
-      : Object.freeze({
-        docs: hostPorts.docs,
-        sha256: hostPorts.sha256,
-        resources: Object.freeze({
-          call: (resourceKey: string, operation: string, payload: unknown) =>
+    // #1023 S05 R2 P1: the mechanism-facing view is ALWAYS a fresh frozen
+    // RUNTIME-narrowed object — including the adapter-less branch. A TS type
+    // cannot strip runtime members: forwarding the raw `hostPorts` would
+    // hand the unchanged Kernel (and through `resources: hostPorts.resources`
+    // every Business effect handler) the privileged `callScoped` member,
+    // letting a signed but buggy or input-parametrized adapter-less Business
+    // present a foreign scope and bypass the reserved-namespace guard. The
+    // zero-claim branch keeps the plain bare-key `call` semantics verbatim
+    // (the bare function reference carries no sibling member).
+    const runtimeHostPorts: V8KernelMechanismHostPorts = Object.freeze({
+      docs: hostPorts.docs,
+      sha256: hostPorts.sha256,
+      resources: Object.freeze({
+        call: claimedResourceKeys.size === 0
+          ? hostPorts.resources.call
+          : (resourceKey: string, operation: string, payload: unknown) =>
             claimedResourceKeys.has(resourceKey)
               ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload)
               : hostPorts.resources.call(resourceKey, operation, payload),
-        }),
-        clock: hostPorts.clock,
-      });
+      }),
+      clock: hostPorts.clock,
+    });
 
     // ---- Kernel mechanism construction (LAST; kernel-owned side effects
     // exist only from this point on, and only behind the verified gate). ----

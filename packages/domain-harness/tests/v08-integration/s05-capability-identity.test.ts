@@ -268,6 +268,40 @@ async function resourceKeyParamBusinessSource(): Promise<string> {
   return source;
 }
 
+/**
+ * #1023 S05 R2 P1 counterexample fixture: an ADAPTER-less Business whose
+ * effect handler first checks whether the privileged `callScoped` member is
+ * runtime-reachable on the resources port it received. On a leaking build it
+ * USES the privilege with a foreign scope observed from accounting (no
+ * secret needed) and returns the stolen cross-deployment handler output; on
+ * a confined build the member is structurally absent and the handler falls
+ * back to the legitimate deployment-owned bare `ledger` route.
+ */
+async function leakProbeBusinessSource(): Promise<string> {
+  let source = await readFile(new URL('business-approval.mjs', examplesDir), 'utf8');
+  const patchOnce = (anchor: string, replacement: string, label: string): void => {
+    const count = source.split(anchor).length - 1;
+    assert.equal(count, 1, `business fixture anchor for ${label} must occur exactly once`);
+    source = source.replace(anchor, replacement);
+  };
+  patchOnce(
+    "    'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },",
+    "    'rule:quote-decision-request': { ruleId: 'rule:quote-decision-request', eventType: 'QUOTE_DECIDED', payloadFromInput: { amount: 'amount', requestId: 'requestId', foreignScope: 'foreignScope' } },",
+    'rule projection',
+  );
+  patchOnce(
+    "                inputFrom: {\n                  amount: { source: 'event', path: ['payload', 'amount'] },\n                  requestId: { source: 'event', path: ['payload', 'requestId'] },\n                },",
+    "                inputFrom: {\n                  amount: { source: 'event', path: ['payload', 'amount'] },\n                  requestId: { source: 'event', path: ['payload', 'requestId'] },\n                  foreignScope: { source: 'event', path: ['payload', 'foreignScope'] },\n                },",
+    'effect input projection',
+  );
+  patchOnce(
+    "          return resources.call('ledger', 'reserve', { ...input, effectId });",
+    "          if (Object.hasOwn(resources, 'callScoped')) {\n            const stolen = await resources.callScoped(String(input.foreignScope), 'ledger', 'reserve', { amount: 1, effectId, requestId: 'S05-R2-LEAK' });\n            return { leaked: true, stolen };\n          }\n          return resources.call('ledger', 'reserve', { ...input, effectId });",
+    'leak-probe reserve handler',
+  );
+  return source;
+}
+
 interface SealedApp {
   readonly root: SealedQualifiedPackageRoot;
   readonly rootPath: string;
@@ -853,6 +887,82 @@ test('S05-N2 (R1 P1-01): an undeclared resource key cannot reach another deploym
     (error: unknown) => String((error as { code?: unknown })?.code ?? '') === 'HOST_RESOURCE_NAMESPACE_RESERVED',
     'a raw dispatcher call naming a scoped physical key refuses typed',
   );
+});
+
+test('S05-N3 (R2 P1): the privileged callScoped member is runtime-absent from every port a Business effect handler sees', { timeout: 240_000 }, async () => {
+  const TARGET = 'order-approval-n3-target';
+  const PROBE = 'order-approval-n3-probe';
+  const SCOPED = 'order-approval-n3-scoped';
+  // A TARGET deployment whose physical scope an attacker can observe from
+  // accounting (no secret: the R1 review already established resource-string
+  // secrecy is never an authorization boundary).
+  const targetApp = await sealApp('app:v08:s05:n3-target', capabilitySourceB(), shared.dir);
+  await shared.gateway.registerApp({ appId: TARGET, packageRoot: targetApp.root, genesisRoles: ['platform-operator'] });
+  const targetOp = credential(TARGET, ['platform-operator'], 's05-n3-target');
+  const targetCred = credential(TARGET, ['requester'], 's05-n3-target');
+  await shared.gateway.activateGenesis(targetOp, { appId: TARGET, instanceKey: 'q-n3-target' });
+  const legitTarget = (await invoke(TARGET, targetCred, {
+    operationId: 'quote.reserve', input: { amount: 10, requestId: 'S05-N3-LEGIT' }, instanceKey: 'q-n3-target', messageId: 'm-s05-n3-legit',
+  })) as Record<string, any>;
+  assert.equal(legitTarget.status, 'admitted');
+  const keyTarget = shared.handle.host.resources.calls()[shared.handle.host.resources.calls().length - 1]?.resourceKey;
+  assert.ok(keyTarget !== undefined && keyTarget.endsWith('\u0000ledger'));
+  const foreignScope = keyTarget.split('\u0000')[0];
+
+  // The ADAPTER-LESS leak probe: its Business effect handler checks
+  // Object.hasOwn(resources, 'callScoped') at runtime and, when present,
+  // uses it with the foreign scope. The deployment bare `ledger` route is
+  // provisioned so the CONFINED behavior is the legitimate bare dispatch.
+  shared.handle.host.resources.provision('ledger', (_operation: string, payload: unknown) => {
+    const record = payload as Record<string, unknown> | null | undefined;
+    return { reserved: true, handler: 'DEPLOYMENT', ledgerEntryId: `deploy:${String(record?.effectId ?? 'unknown')}`, reservedAmount: Number(record?.amount) || 0, requestId: record?.requestId ?? null };
+  });
+  try {
+    const probeRoot = await sealPlainApp('app:v08:s05:n3-probe', await leakProbeBusinessSource());
+    await shared.gateway.registerApp({ appId: PROBE, packageRoot: probeRoot, genesisRoles: ['platform-operator'] });
+    const probeCred = credential(PROBE, ['requester'], 's05-n3-probe');
+    const probeOp = credential(PROBE, ['platform-operator'], 's05-n3-probe');
+    await shared.gateway.activateGenesis(probeOp, { appId: PROBE, instanceKey: 'q-n3-probe' });
+    let baseline = (await journalRecords()).map((record) => record.effectId);
+    const probe = (await shared.gateway.send(probeCred, {
+      intentType: 'submitQuoteDecisionDynamic',
+      messageId: 'm-s05-n3-probe',
+      input: { amount: 10, requestId: 'S05-N3-PROBE', foreignScope },
+      target: { tenantId: TENANT, appId: PROBE, instanceKey: 'q-n3-probe' },
+    })) as Record<string, any>;
+    assert.equal(probe.status, 'admitted', 'the confined probe effect completes through the legitimate bare route');
+    let fresh = await newJournalRecords(baseline);
+    assert.equal(fresh.length, 1, 'exactly one durable effect record for the probe occurrence');
+    const probeRecord = fresh[0];
+    assert.equal(probeRecord?.status, 'completed', 'the probe effect is durably completed');
+    const probeOutput = probeRecord.output as Record<string, unknown> | undefined;
+    assert.equal(probeOutput?.leaked, undefined, 'the privileged member was NOT runtime-reachable from the Business effect handler');
+    assert.equal(probeOutput?.handler, 'DEPLOYMENT', 'the confined fallback consumed the deployment-owned bare route');
+    assert.notEqual((probeOutput?.ledgerEntryId as string | undefined)?.startsWith('ledger-b:'), true, "the TARGET deployment's handler never ran for the probe");
+    // No dispatch on the TARGET's physical key beyond its own legitimate one.
+    assert.equal(dispatchesOn(keyTarget), 1, 'the probe dispatched nothing on the TARGET physical key');
+
+    // The capability-scoped app on the same Host keeps its own handler and
+    // its Business sees the same runtime-narrowed port shape (the scoped
+    // branch already built a fresh view; its claimed route stays functional).
+    const scopedApp = await sealApp('app:v08:s05:n3-scoped', await capabilitySourceA(), shared.dir);
+    await shared.gateway.registerApp({ appId: SCOPED, packageRoot: scopedApp.root, genesisRoles: ['platform-operator'] });
+    const scopedCred = credential(SCOPED, ['requester'], 's05-n3-scoped');
+    const scopedOp = credential(SCOPED, ['platform-operator'], 's05-n3-scoped');
+    await shared.gateway.activateGenesis(scopedOp, { appId: SCOPED, instanceKey: 'q-n3-scoped' });
+    baseline = (await journalRecords()).map((record) => record.effectId);
+    const scoped = (await invoke(SCOPED, scopedCred, {
+      operationId: 'quote.reserve', input: { amount: 10, requestId: 'S05-N3-SCOPED' }, instanceKey: 'q-n3-scoped', messageId: 'm-s05-n3-scoped',
+    })) as Record<string, any>;
+    assert.equal(scoped.status, 'admitted');
+    fresh = await newJournalRecords(baseline);
+    const scopedRecord = fresh.find((record) => (record.output as Record<string, unknown> | undefined)?.requestId === 'S05-N3-SCOPED');
+    assert.ok(scopedRecord !== undefined && scopedRecord.status === 'completed');
+    assert.ok(isHandlerOutput(scopedRecord.output, 'A'), 'the capability-scoped app still executes its OWN handler');
+    assert.equal((scopedRecord.output as Record<string, unknown> | undefined)?.handler, undefined, 'the scoped app never consumed the bare deployment route');
+  } finally {
+    shared.handle.host.resources.unprovision('ledger');
+  }
 });
 
 test('S05-C1: restart on the same durable store + clean stock-Node packed consumer keeps both own handlers', { timeout: 240_000 }, async () => {
