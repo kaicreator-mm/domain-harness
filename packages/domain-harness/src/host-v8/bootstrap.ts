@@ -26,6 +26,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { installTrustedIssuers, isTrustChannelEstablished, preflightTrustedIssuersInstall } from '../public-v8/trust.js';
+import { installDeploymentAuthority, preflightDeploymentAuthorityInstall } from '../public-v8/deploy.js';
 import { installKernelHostPorts, preflightKernelHostPorts } from '../public-v8/kernel-host.js';
 import { installHostModelPort, preflightHostModelPort } from '../public-v8/model-port.js';
 import { installGatewaySessionCap, preflightGatewaySessionCap } from '../public-v8/microkernel.js';
@@ -285,6 +286,13 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
   preflightTrustedIssuersInstall(trustInput);
   preflightKernelHostPorts(kernelPorts, gatewaySessionCap);
   preflightGatewaySessionCap();
+  // #1023 S01 (+R1 #5519609071): the trusted deployment authority joins the
+  // SAME transaction — the probed physical store is its storage, the Host
+  // audience binds every installed reference (P1-02), and the SAME
+  // bootstrap-minted session capability gates every mutating governance
+  // command (P1-01: install/revoke/withdraw refuse uncredentialed deep
+  // imports exactly like the kernel-host/model-port getters, #1013 R2).
+  preflightDeploymentAuthorityInstall({ store, audience, governanceCap: gatewaySessionCap });
   if (modelPort !== undefined) {
     preflightHostModelPort(modelPort, gatewaySessionCap);
   }
@@ -297,6 +305,7 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
   installTrustedIssuers(trustInput);
   installKernelHostPorts(kernelPorts, gatewaySessionCap);
   installGatewaySessionCap(gatewaySessionCap);
+  installDeploymentAuthority({ store, audience, governanceCap: gatewaySessionCap });
   if (modelPort !== undefined) {
     installHostModelPort(modelPort, gatewaySessionCap);
   }
