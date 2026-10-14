@@ -16,12 +16,12 @@ V09_RELEASE=HOLD
 
 | Product artifact | Git blob SHA |
 | --- | --- |
-| PRD | `ad471474fca6cfb01c9ec67bc89089d87cf62aec` |
-| Foundation | `5607f41cb032542b549f16cfe688377ca982726e` |
+| PRD | `3f1753d6090769de5e7c48156de24386a224e886` |
+| Foundation | `9dc58386a52307c92f0facd0d12f86d9a63887d0` |
 | Reference Node benchmark | `8081c6f00cca22ae40de0b82c8f0aca434444c6e` |
-| L1 readiness | `afb89f140835f244ca2e7ac42d506158d0dac584` |
+| L1 readiness | `7563b3ca199a38183977d6d04e79f401b9a6ec40` |
 | Roadmap | `88cc0af8de672dc60cff792137d23e5d8aeaa4eb` |
-| Proposed DAG (informative) | `8daf2662a11a8d5848b189f724c140200b1be326` |
+| Proposed DAG (informative) | `b1d26f2881602ba5a0dd956854aa1b04b3831ccd` |
 | **Controlling JS Core successor** | `ef0c785b173a4aa15913f138a3c4cf6ff8be0d08` |
 
 Paths are the existing v0.9 product/roadmap/implementation files plus new product JS successor. A revised blob or HEAD requires fresh review; R1 candidate #1044 must **not** be independently frozen as though its old Node/OS assumptions remain authoritative.
