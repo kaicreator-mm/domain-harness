@@ -170,6 +170,18 @@ export interface V8FacadeKernelOps {
   /** Scoped instance read for the authenticated principal's tenant/app. */
   queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
   /**
+   * [#1003 NF06] Authorized read of ONE persisted decision receipt: the
+   * authenticated principal's tenant/app-qualified instance plus the exact
+   * message (durable control turn). The Kernel owns the reader-role gate
+   * (the Business receiptPolicy readerRoles) and the record bytes; this
+   * seam forwards only the verified principal — never caller-chosen
+   * authority.
+   */
+  queryDecisionReceipt(principal: V8GatewayPrincipal, request: {
+    readonly instanceKey: string;
+    readonly messageId: string;
+  }): Promise<unknown>;
+  /**
    * The physical Kernel `workflowInstanceId` the tenant/app-qualified
    * address resolves to (`${workflowKey}:${tenantId}:${appId}:${key}`) —
    * the single source of the receipt-filter address shared by send,
@@ -221,6 +233,8 @@ interface WiredKernelRuntime {
   getSnapshot(target: unknown): unknown;
   /** Present on the selected Kernel mechanism (T-C); required only for Genesis. */
   openInstance?(request: unknown): unknown;
+  /** [#1003 NF06] Present on the selected Kernel mechanism; the authorized read of one persisted decision receipt. */
+  getDecisionReceipt?(request: unknown): unknown;
 }
 
 /**
@@ -245,6 +259,8 @@ type KernelRuntimeFactory = (deps: {
     readonly packageId: string;
     readonly interpret: (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
     readonly invokeStep?: (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
+    /** [#1003 NF06] The S bounded redacted data-only decision-receipt projection; optional ABI member. */
+    readonly projectDecisionReceipt?: (verified: unknown) => unknown;
   };
   readonly businessEndpoint: object;
   readonly observe: (receipt: unknown) => void;
@@ -1037,9 +1053,22 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
               }
               return resolver.invokeStep(declaration, input, context);
             };
-            return { packageId: sdkBinding.packageId, interpret: interpretComposite, invokeStep };
+            return {
+              packageId: sdkBinding.packageId,
+              interpret: interpretComposite,
+              invokeStep,
+              ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
+                ? { projectDecisionReceipt: (verified: unknown) => (sdkNamespace.projectDecisionReceiptRecord as (v: unknown) => unknown)(verified) }
+                : {}),
+            };
           })()
-        : { packageId: sdkBinding.packageId, interpret: sdkNamespace.interpret as SdkEndpointFn }
+        : {
+          packageId: sdkBinding.packageId,
+          interpret: sdkNamespace.interpret as SdkEndpointFn,
+          ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
+            ? { projectDecisionReceipt: (verified: unknown) => (sdkNamespace.projectDecisionReceiptRecord as (v: unknown) => unknown)(verified) }
+            : {}),
+        }
     );
 
     // Business policy resolution precedes kernel construction: a policy that
@@ -1471,6 +1500,29 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       requirePrincipal(principal);
       const key = requireInstanceKey(instanceKey);
       return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) });
+    },
+    async queryDecisionReceipt(principal: V8GatewayPrincipal, request: {
+      readonly instanceKey: string;
+      readonly messageId: string;
+    }): Promise<unknown> {
+      assertOpen();
+      requirePrincipal(principal);
+      const key = requireInstanceKey(request.instanceKey);
+      if (typeof request.messageId !== 'string' || request.messageId.length === 0) {
+        throw typedError('INTENT_MALFORMED', 'a decision-receipt read requires a non-empty messageId');
+      }
+      const runtimeWithReceiptRead = kernelRuntime as WiredKernelRuntime & { getDecisionReceipt: (request: unknown) => unknown };
+      if (typeof runtimeWithReceiptRead.getDecisionReceipt !== 'function') {
+        throw typedError('DECISION_RECEIPT_ENDPOINT_INVALID', `kernel package ${kernelBinding.packageId} mechanism exposes no decision-receipt read endpoint`);
+      }
+      // Same authority discipline as buildKernelOccurrenceRequest: the
+      // address and the caller are derived ONLY from the verified
+      // principal — intent data never chooses them here either.
+      return runtimeWithReceiptRead.getDecisionReceipt({
+        target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+        messageId: request.messageId,
+        caller: { subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId, roles: [...principal.roles] },
+      });
     },
     workflowInstanceId(principal: V8GatewayPrincipal, instanceKey: string): string {
       requirePrincipal(principal);

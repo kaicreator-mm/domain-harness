@@ -689,9 +689,22 @@ async function loadScopedFacade(packageRoot) {
                     }
                     return resolver.invokeStep(declaration, input, context);
                 };
-                return { packageId: sdkBinding.packageId, interpret: interpretComposite, invokeStep };
+                return {
+                    packageId: sdkBinding.packageId,
+                    interpret: interpretComposite,
+                    invokeStep,
+                    ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
+                        ? { projectDecisionReceipt: (verified) => sdkNamespace.projectDecisionReceiptRecord(verified) }
+                        : {}),
+                };
             })()
-            : { packageId: sdkBinding.packageId, interpret: sdkNamespace.interpret });
+            : {
+                packageId: sdkBinding.packageId,
+                interpret: sdkNamespace.interpret,
+                ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
+                    ? { projectDecisionReceipt: (verified) => sdkNamespace.projectDecisionReceiptRecord(verified) }
+                    : {}),
+            });
         // Business policy resolution precedes kernel construction: a policy that
         // throws or returns a non-object fails typed with the mechanism still inert.
         try {
@@ -1069,6 +1082,26 @@ async function loadScopedFacade(packageRoot) {
             requirePrincipal(principal);
             const key = requireInstanceKey(instanceKey);
             return kernelRuntime.getSnapshot({ workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) });
+        },
+        async queryDecisionReceipt(principal, request) {
+            assertOpen();
+            requirePrincipal(principal);
+            const key = requireInstanceKey(request.instanceKey);
+            if (typeof request.messageId !== 'string' || request.messageId.length === 0) {
+                throw typedError('INTENT_MALFORMED', 'a decision-receipt read requires a non-empty messageId');
+            }
+            const runtimeWithReceiptRead = kernelRuntime;
+            if (typeof runtimeWithReceiptRead.getDecisionReceipt !== 'function') {
+                throw typedError('DECISION_RECEIPT_ENDPOINT_INVALID', `kernel package ${kernelBinding.packageId} mechanism exposes no decision-receipt read endpoint`);
+            }
+            // Same authority discipline as buildKernelOccurrenceRequest: the
+            // address and the caller are derived ONLY from the verified
+            // principal — intent data never chooses them here either.
+            return runtimeWithReceiptRead.getDecisionReceipt({
+                target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+                messageId: request.messageId,
+                caller: { subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId, roles: [...principal.roles] },
+            });
         },
         workflowInstanceId(principal, instanceKey) {
             requirePrincipal(principal);

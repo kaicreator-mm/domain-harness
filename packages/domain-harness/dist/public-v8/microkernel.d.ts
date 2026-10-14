@@ -159,6 +159,18 @@ export interface V8FacadeKernelOps {
     /** Scoped instance read for the authenticated principal's tenant/app. */
     queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
     /**
+     * [#1003 NF06] Authorized read of ONE persisted decision receipt: the
+     * authenticated principal's tenant/app-qualified instance plus the exact
+     * message (durable control turn). The Kernel owns the reader-role gate
+     * (the Business receiptPolicy readerRoles) and the record bytes; this
+     * seam forwards only the verified principal — never caller-chosen
+     * authority.
+     */
+    queryDecisionReceipt(principal: V8GatewayPrincipal, request: {
+        readonly instanceKey: string;
+        readonly messageId: string;
+    }): Promise<unknown>;
+    /**
      * The physical Kernel `workflowInstanceId` the tenant/app-qualified
      * address resolves to (`${workflowKey}:${tenantId}:${appId}:${key}`) —
      * the single source of the receipt-filter address shared by send,

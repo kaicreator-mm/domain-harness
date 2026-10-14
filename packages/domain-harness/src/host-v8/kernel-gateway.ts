@@ -145,6 +145,12 @@ export interface KernelGateway {
   cancel(credential: unknown, request: KernelGatewayCancelRequest): Promise<KernelGatewayCancelResult>;
   /** Authenticated scoped instance read (K getSnapshot). */
   queryInstance(credential: unknown, target: UxTarget): Promise<unknown>;
+  /**
+   * [#1003 NF06] Authenticated scoped decision-receipt read: ONE persisted
+   * record of the exact message turn, through the same K authority that
+   * appended it (Business-declared reader roles gate the Kernel side).
+   */
+  queryDecisionReceipt(credential: unknown, request: UxTarget & { readonly messageId: string }): Promise<unknown>;
   /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
   subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription>;
   /** Protected Genesis activation (host-configured role authority). */
@@ -594,6 +600,18 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       // tenant reusing the same appId/instanceKey reads only its own
       // physical instance — never the first tenant's state.
       return app.ops.queryInstance(principal, target.instanceKey);
+    },
+
+    async queryDecisionReceipt(credential: unknown, request: UxTarget & { readonly messageId: string }): Promise<unknown> {
+      const principal = await authenticate(credential);
+      assertIntentScope(request, principal);
+      const app = requireApp(request.appId, principal);
+      // [#1003 NF06] Same authenticated-read discipline as queryInstance:
+      // the tenant/app-qualified address of the AUTHENTICATED principal plus
+      // the exact message turn. The Kernel alone owns the Business-declared
+      // reader-role gate and the record bytes; an unauthenticated or
+      // out-of-scope read never reaches the physical store.
+      return app.ops.queryDecisionReceipt(principal, { instanceKey: request.instanceKey, messageId: request.messageId });
     },
 
     async subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription> {

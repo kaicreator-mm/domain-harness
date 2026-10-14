@@ -30,6 +30,12 @@
  *   standard-sdk-v1.mjs            58b14aa080331998cf2e26e8be22507fde8bf0a4
  *   kernel-mechanism-v1.mjs        de1620eb6ba1c5dc5e07ae10a55e8b19ae7500ad
  *
+ * #1003 NF06 rebind (additive decision-receipt projection in S + K-owned
+ * observational append / mandatory pre-admission refusal / authorized read;
+ * all FR02/FR07 oracle rows re-run unchanged below):
+ *   standard-sdk-v1.mjs            06c7988992478fb0614bf6e4d106f3ec6f7f8c44
+ *   kernel-mechanism-v1.mjs        ba609647dbfccbf958537ff2e5c9eef0205dcc85
+ *
  * The seven former test.todo GAP sentinels are now REAL executable tests at
  * two levels:
  *   1) here, an in-memory K→S differential over the exact selected payload
@@ -60,10 +66,13 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // S/K_BLOB_PIN_REBOUND_AFTER_FR08_SD_NF05: #1003 FR08 SD1/SD2 + NF05 —
 // additive semantic-decision interpreter (S) and trusted-boundary
 // digest wiring (K); all FR02/FR07 oracle rows re-run unchanged below.
+// S/K_BLOB_PIN_REBOUND_AFTER_NF06_RECEIPT: #1003 NF06 — additive
+// decision-receipt projection (S) and K-owned observational append /
+// mandatory pre-admission refusal / authorized read (K).
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
-const V08_S_BLOB = '58b14aa080331998cf2e26e8be22507fde8bf0a4';
-const V08_K_BLOB = 'de1620eb6ba1c5dc5e07ae10a55e8b19ae7500ad';
+const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
+const V08_K_BLOB = 'ba609647dbfccbf958537ff2e5c9eef0205dcc85';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
