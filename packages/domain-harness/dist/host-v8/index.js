@@ -21,4 +21,8 @@ export { ScopedEventHub } from './events.js';
 export { bootstrapTrustedHost, isHostTrustChannelEstablished, } from './bootstrap.js';
 export { assertIntentScope, createHostUxTransport, createUxTransport, uxDocumentNamespace, } from './ux-transport.js';
 export { createKernelGateway, kernelReceiptAsHostEvent, } from './kernel-gateway.js';
+// [#1062 HF18/HF32] Host-side durable control coordination (external work:
+// deadline + callback correlation; the Kernel keeps sole State/Journal/
+// Effect/turn-identity authority).
+export { ChildInvocationCoordinator, DurableControlError, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf } from './durable-controls.js';
 //# sourceMappingURL=index.js.map

@@ -1086,7 +1086,9 @@ async function loadScopedFacade(packageRoot) {
      * principal's tenant/app-qualified instance address and the caller
      * derived ONLY from the issuer-signed roles ∩ the sealed Business binding
      * roles. `send` and an effectful OperationCall can never diverge — they
-     * are the same unbypassable route.
+     * are the same unbypassable route. [#1062] An optional `turnSource`
+     * (trusted-Host-derived durable control source) rides along verbatim;
+     * the public send path never supplies one.
      */
     function buildKernelOccurrenceRequest(principal, request) {
         const { intentType, messageId, instanceKey } = request;
@@ -1112,6 +1114,7 @@ async function loadScopedFacade(packageRoot) {
             input: request.input === undefined ? null : request.input,
             target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
             caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
+            ...(request.turnSource === undefined ? {} : { turnSource: request.turnSource }),
         };
         assertPlainJsonIntent(kernelRequest);
         return kernelRequest;
@@ -1135,6 +1138,11 @@ async function loadScopedFacade(packageRoot) {
             return control === undefined
                 ? kernelRuntime.submitOccurrence(kernelRequest)
                 : kernelRuntime.submitOccurrence(kernelRequest, control);
+        },
+        roleAdmitted(principal, intentType) {
+            assertOpen();
+            requirePrincipal(principal);
+            return roleAdmittedByIntent(principal, intentType);
         },
         async queryInstance(principal, instanceKey) {
             assertOpen();

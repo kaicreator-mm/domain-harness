@@ -160,13 +160,31 @@ export interface V8FacadeKernelOps {
    * cannot carry a caller. The physical instance address is the
    * tenant/app-qualified key of the authenticated principal. The optional
    * `control` (#1003 FR07-KH2) is forwarded to the Kernel unchanged.
+   *
+   * [#1062 shared durable-control seam] The optional `turnSource` is a
+   * TRUSTED-HOST-ONLY field: it is constructed by the Host gateway from a
+   * durably settled control record (timer/callback/child-terminal), never
+   * from caller data — the public `send` verb has no such field and this
+   * ops seam is capability-guarded (getFacadeKernelOps). The Kernel
+   * validates the shape strictly and derives the deterministic turn id.
    */
   submitAs(principal: V8GatewayPrincipal, request: {
     readonly intentType: string;
     readonly messageId: string;
     readonly instanceKey: string;
     readonly input?: unknown;
+    readonly turnSource?: unknown;
   }, control?: V8OccurrenceControl): Promise<unknown>;
+  /**
+   * [#1066 R1 P1-A] Non-throwing Business-role admission probe of the
+   * EXACT pick `submitAs`'s internal role gate makes (an intent without a
+   * bound role set admits every authenticated principal, exactly like the
+   * submit-time gate's 'anonymous'). The trusted Host gateway uses it to
+   * enforce intent authority BEFORE any durable-control settlement CAS —
+   * never as a substitute for the submit-time gate, which stays
+   * authoritative for every actual Kernel submission.
+   */
+  roleAdmitted(principal: V8GatewayPrincipal, intentType: string): boolean;
   /** Scoped instance read for the authenticated principal's tenant/app. */
   queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
   /**
@@ -1581,13 +1599,16 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
    * principal's tenant/app-qualified instance address and the caller
    * derived ONLY from the issuer-signed roles ∩ the sealed Business binding
    * roles. `send` and an effectful OperationCall can never diverge — they
-   * are the same unbypassable route.
+   * are the same unbypassable route. [#1062] An optional `turnSource`
+   * (trusted-Host-derived durable control source) rides along verbatim;
+   * the public send path never supplies one.
    */
   function buildKernelOccurrenceRequest(principal: V8GatewayPrincipal, request: {
     readonly intentType: string;
     readonly messageId: string;
     readonly instanceKey: string;
     readonly input?: unknown;
+    readonly turnSource?: unknown;
   }): Record<string, unknown> {
     const { intentType, messageId, instanceKey } = request;
     if (typeof intentType !== 'string' || intentType.length === 0) {
@@ -1612,6 +1633,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       input: request.input === undefined ? null : request.input,
       target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
       caller: { role, subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId },
+      ...(request.turnSource === undefined ? {} : { turnSource: request.turnSource }),
     };
     assertPlainJsonIntent(kernelRequest);
     return kernelRequest;
@@ -1632,6 +1654,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       readonly messageId: string;
       readonly instanceKey: string;
       readonly input?: unknown;
+      readonly turnSource?: unknown;
     }, control?: V8OccurrenceControl): Promise<unknown> {
       assertOpen();
       requirePrincipal(principal);
@@ -1641,6 +1664,11 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       return control === undefined
         ? kernelRuntime.submitOccurrence(kernelRequest)
         : kernelRuntime.submitOccurrence(kernelRequest, control);
+    },
+    roleAdmitted(principal: V8GatewayPrincipal, intentType: string): boolean {
+      assertOpen();
+      requirePrincipal(principal);
+      return roleAdmittedByIntent(principal, intentType);
     },
     async queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown> {
       assertOpen();

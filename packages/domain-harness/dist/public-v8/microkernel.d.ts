@@ -149,13 +149,31 @@ export interface V8FacadeKernelOps {
      * cannot carry a caller. The physical instance address is the
      * tenant/app-qualified key of the authenticated principal. The optional
      * `control` (#1003 FR07-KH2) is forwarded to the Kernel unchanged.
+     *
+     * [#1062 shared durable-control seam] The optional `turnSource` is a
+     * TRUSTED-HOST-ONLY field: it is constructed by the Host gateway from a
+     * durably settled control record (timer/callback/child-terminal), never
+     * from caller data — the public `send` verb has no such field and this
+     * ops seam is capability-guarded (getFacadeKernelOps). The Kernel
+     * validates the shape strictly and derives the deterministic turn id.
      */
     submitAs(principal: V8GatewayPrincipal, request: {
         readonly intentType: string;
         readonly messageId: string;
         readonly instanceKey: string;
         readonly input?: unknown;
+        readonly turnSource?: unknown;
     }, control?: V8OccurrenceControl): Promise<unknown>;
+    /**
+     * [#1066 R1 P1-A] Non-throwing Business-role admission probe of the
+     * EXACT pick `submitAs`'s internal role gate makes (an intent without a
+     * bound role set admits every authenticated principal, exactly like the
+     * submit-time gate's 'anonymous'). The trusted Host gateway uses it to
+     * enforce intent authority BEFORE any durable-control settlement CAS —
+     * never as a substitute for the submit-time gate, which stays
+     * authoritative for every actual Kernel submission.
+     */
+    roleAdmitted(principal: V8GatewayPrincipal, intentType: string): boolean;
     /** Scoped instance read for the authenticated principal's tenant/app. */
     queryInstance(principal: V8GatewayPrincipal, instanceKey: string): Promise<unknown>;
     /**

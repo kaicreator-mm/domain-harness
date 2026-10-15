@@ -55,6 +55,7 @@ import { QualifiedPackageError, canonicalSnapshot, sha256Hex } from '../public-v
 import { isInstalledHandleShape, resolveInstalledPackageRoot } from '../public-v8/deploy.js';
 import { HostBoundaryError } from './errors.js';
 import { assertIntentScope } from './ux-transport.js';
+import { ChildInvocationCoordinator, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf, } from './durable-controls.js';
 /**
  * Durable CAS key under which a gateway registration pins the EXACT
  * installed closure identity of an app (#1013 R1 F-02). Same namespace
@@ -142,6 +143,18 @@ export function createKernelGateway(input) {
     const gatewaySessionCap = input.gatewaySessionCap;
     const apps = new Map();
     /**
+     * [#1062] The Host-side durable external-work coordinator over the SAME
+     * probed physical store the Kernel consumes (Host namespace records; the
+     * Kernel keeps sole authority over State/Journal/Effect/turn identity).
+     */
+    const externalWork = new ExternalWorkCoordinator(host.docs);
+    /**
+     * [#1062 HF32] The Host-side durable child-invocation coordinator over
+     * the same probed physical store (all-or-durable-rejection semantics
+     * adapted from the frozen v0.7 compiled-workflow message effects).
+     */
+    const childInvocations = new ChildInvocationCoordinator(host.docs);
+    /**
      * In-flight cancellable occurrences, keyed by the authenticated
      * tenant/app + instanceKey + messageId (#1003 FR07-KH2). Entries exist
      * only while their `send` is running.
@@ -192,6 +205,56 @@ export function createKernelGateway(input) {
         }
         return retained;
     }
+    /**
+     * [#1062] The single route EVERY durable-control turn submission takes:
+     * the SAME authenticated ops seam as `send` — principal-derived caller,
+     * sealed Business role gate, deterministic messageId — plus the
+     * trusted-Host turnSource projected from the durable record. There is no
+     * raw kernel submission and no caller-supplied source anywhere.
+     */
+    function submitControlTurn(app, principal, instanceKey, intentType, messageId, turnSourceInput, turnInput) {
+        return app.ops.submitAs(principal, {
+            intentType,
+            messageId,
+            instanceKey,
+            ...(turnInput === undefined ? {} : { input: turnInput }),
+            turnSource: turnSourceInput,
+        });
+    }
+    function requireControlRole(app, principal) {
+        if (!app.controlRoles.some((role) => principal.roles.includes(role))) {
+            throw new HostBoundaryError('HOST_CONTROL_ROLE_DENIED', `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the host-configured control roles [${app.controlRoles.join(', ')}] for app ${app.appId}`);
+        }
+    }
+    /**
+     * [#1066 R1 P1-A] Pre-CAS Business-intent authority for durable-control
+     * settlements: the SAME role predicate protected `submitAs` enforces
+     * (the sealed Business intent binding roles ∩ the issuer-signed
+     * principal roles), checked BEFORE any durable record is settled. An
+     * unauthorized principal can neither persist a terminal/callback payload
+     * nor leave one behind for a privileged recovery to execute under its
+     * own authority; legitimate requester deliveries (the roles the sealed
+     * binding itself admits, including role-less intents) are unaffected —
+     * this is NOT a blanket platform-operator requirement.
+     */
+    function requireIntentRole(app, principal, intentType) {
+        if (!app.ops.roleAdmitted(principal, intentType)) {
+            throw new HostBoundaryError('HOST_CONTROL_ROLE_DENIED', `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles required by intent ${intentType} of app ${app.appId}; the durable settlement is refused before any mutation`);
+        }
+    }
+    function requireDurableStorage() {
+        if (host.storageMode !== 'physical') {
+            throw new HostBoundaryError('HOST_DURABLE_CONTROLS_UNAVAILABLE', 'this host was bootstrapped without durable physical storage; durable external-work registrations are refused before any mutation');
+        }
+    }
+    function requireBoundIntents(app, intentTypes) {
+        const bound = new Set(app.ops.describePolicy().intentTypes);
+        for (const intentType of intentTypes) {
+            if (!bound.has(intentType)) {
+                throw new HostBoundaryError('GATEWAY_INTENT_UNBOUND', `intent type ${intentType} is not bound in the sealed closure of app ${app.appId}; a durable control registration may only route to sealed Business intents`);
+            }
+        }
+    }
     const gateway = {
         async registerApp(registration) {
             if (typeof registration.appId !== 'string' || registration.appId.length === 0 || registration.appId.includes(':')) {
@@ -200,6 +263,13 @@ export function createKernelGateway(input) {
             if (!Array.isArray(registration.genesisRoles) || registration.genesisRoles.length === 0
                 || !registration.genesisRoles.every((role) => typeof role === 'string' && role.length > 0)) {
                 throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp requires a non-empty genesisRoles array of host governance roles');
+            }
+            // [#1062] Optional durable-control governance roles; the genesis roles
+            // are the default authority for registrations/deadlines/recovery.
+            if (registration.controlRoles !== undefined
+                && (!Array.isArray(registration.controlRoles) || registration.controlRoles.length === 0
+                    || !registration.controlRoles.every((role) => typeof role === 'string' && role.length > 0))) {
+                throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp controlRoles, when present, must be a non-empty array of host governance roles');
             }
             if (apps.has(registration.appId)) {
                 throw new HostBoundaryError('GATEWAY_APP_ALREADY_REGISTERED', `app ${registration.appId} is already registered on this gateway`);
@@ -369,6 +439,7 @@ export function createKernelGateway(input) {
                 ops,
                 // the guard above narrowed the declared readonly string[]; restore it
                 genesisRoles: Object.freeze([...registration.genesisRoles]),
+                controlRoles: Object.freeze([...(registration.controlRoles ?? registration.genesisRoles)]),
             }));
         },
         hasApp(appId) {
@@ -798,6 +869,294 @@ export function createKernelGateway(input) {
                 instanceKey: request.instanceKey,
                 ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
             });
+        },
+        async registerExternalWork(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+                || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+                || typeof request.deadlineTimerId !== 'string' || request.deadlineTimerId.length === 0
+                || typeof request.dueAt !== 'string'
+                || typeof request.callbackIntentType !== 'string' || request.callbackIntentType.length === 0
+                || typeof request.timeoutIntentType !== 'string' || request.timeoutIntentType.length === 0) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'registerExternalWork requires {appId, instanceKey, externalCorrelationId, deadlineTimerId, dueAt, callbackIntentType, timeoutIntentType} with non-empty strings');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            requireControlRole(app, principal);
+            // The unsupported-durable-Host refusal lands BEFORE any record or
+            // mutation exists (the frozen HF18 negative).
+            requireDurableStorage();
+            requireBoundIntents(app, [request.callbackIntentType, request.timeoutIntentType]);
+            const registered = await externalWork.register({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                instanceKey: request.instanceKey,
+                externalCorrelationId: request.externalCorrelationId,
+                deadlineTimerId: request.deadlineTimerId,
+                dueAt: request.dueAt,
+                callbackIntentType: request.callbackIntentType,
+                timeoutIntentType: request.timeoutIntentType,
+                registeredAt: new Date().toISOString(),
+            });
+            return Object.freeze({ status: 'registered', disposition: registered.disposition, record: registered.record });
+        },
+        async acceptExternalCallback(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+                || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+                || typeof request.callbackOrdinal !== 'number' || !Number.isSafeInteger(request.callbackOrdinal) || request.callbackOrdinal <= 0) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'acceptExternalCallback requires {appId, instanceKey, externalCorrelationId, callbackOrdinal} with a positive safe integer ordinal');
+            }
+            if (request.payload !== undefined) {
+                try {
+                    canonicalSnapshot(request.payload);
+                }
+                catch {
+                    throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'acceptExternalCallback payload must be plain JSON');
+                }
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            requireDurableStorage();
+            // [#1066 R1 P1-A] Pre-CAS Business-intent authority. The settlement
+            // intent is decided deterministically from the SAME receivedAt the
+            // settlement will use (a late callback converts to the timeout turn
+            // exactly like settleCallback itself decides), so the role checked
+            // here can never diverge from the intent the settled turn submits.
+            // A record that is not 'waiting' can no longer settle anything (the
+            // only persisting CAS transition is waiting→settled), so its typed
+            // duplicate/late outcomes need no authority — they mutate nothing.
+            const receivedAt = new Date().toISOString();
+            const current = await externalWork.read(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId);
+            if (current.status === 'waiting') {
+                requireIntentRole(app, principal, Date.parse(receivedAt) >= Date.parse(current.dueAt) ? current.timeoutIntentType : current.callbackIntentType);
+            }
+            const outcome = await externalWork.settleCallback({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                instanceKey: request.instanceKey,
+                externalCorrelationId: request.externalCorrelationId,
+                callbackOrdinal: request.callbackOrdinal,
+                payload: request.payload === undefined ? null : request.payload,
+                receivedAt,
+            });
+            if (outcome.disposition !== 'accepted') {
+                // Typed duplicate/late/ignored outcome: ZERO Kernel activity.
+                return Object.freeze({ status: outcome.disposition, record: outcome.record });
+            }
+            const isCallback = outcome.turnSource.kind === 'callback';
+            const receipt = await submitControlTurn(app, principal, request.instanceKey, isCallback ? outcome.record.callbackIntentType : outcome.record.timeoutIntentType, outcome.messageId, kernelTurnSourceOf(outcome.turnSource), 
+            // The Standard SDK rule interpreter requires an OBJECT input; a
+            // payload-less control turn carries an empty object, never null.
+            isCallback ? (outcome.turnSource.payload ?? {}) : {});
+            await externalWork.markSubmitted(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId, outcome.messageId, new Date().toISOString());
+            return Object.freeze({ status: 'accepted', receipt, record: outcome.record });
+        },
+        async fireDeadline(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+                || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+                || typeof request.timerId !== 'string' || request.timerId.length === 0
+                || typeof request.fireOrdinal !== 'number' || !Number.isSafeInteger(request.fireOrdinal)) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'fireDeadline requires {appId, instanceKey, externalCorrelationId, timerId, fireOrdinal}');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            requireControlRole(app, principal);
+            requireDurableStorage();
+            // [#1066 R1 P1-A] Same pre-CAS Business-intent authority as the
+            // callback settlement: the deadline timer turn submits the sealed
+            // timeout intent, and the firing principal must be one that intent
+            // itself admits — before the settlement CAS persists the turn. A
+            // record that is not 'waiting' can no longer settle anything, so its
+            // typed duplicate outcomes need no authority.
+            const deadlineRecord = await externalWork.read(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId);
+            if (deadlineRecord.status === 'waiting') {
+                requireIntentRole(app, principal, deadlineRecord.timeoutIntentType);
+            }
+            const outcome = await externalWork.settleDeadline({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                instanceKey: request.instanceKey,
+                externalCorrelationId: request.externalCorrelationId,
+                timerId: request.timerId,
+                fireOrdinal: request.fireOrdinal,
+                firedAt: new Date().toISOString(),
+            });
+            if (outcome.disposition !== 'accepted') {
+                return Object.freeze({ status: outcome.disposition, record: outcome.record });
+            }
+            const receipt = await submitControlTurn(app, principal, request.instanceKey, outcome.record.timeoutIntentType, outcome.messageId, kernelTurnSourceOf(outcome.turnSource), {});
+            await externalWork.markSubmitted(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId, outcome.messageId, new Date().toISOString());
+            return Object.freeze({ status: 'accepted', receipt, record: outcome.record });
+        },
+        async queryExternalWork(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+                || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'queryExternalWork requires {appId, instanceKey, externalCorrelationId} with non-empty strings');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+            requireApp(request.appId, principal);
+            return externalWork.read(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId);
+        },
+        async recoverDurableControls(credential, request) {
+            if (typeof request !== 'object' || request === null || typeof request.appId !== 'string' || request.appId.length === 0) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'recoverDurableControls requires a non-empty appId');
+            }
+            const principal = await authenticate(credential);
+            const app = requireApp(request.appId, principal);
+            requireControlRole(app, principal);
+            requireDurableStorage();
+            const result = await externalWork.recoverDueAndSettled({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                now: new Date().toISOString(),
+                fireDue: async (correlation) => {
+                    const isCallback = correlation.turnSource.kind === 'callback';
+                    await submitControlTurn(app, principal, correlation.record.instanceKey, isCallback ? correlation.record.callbackIntentType : correlation.record.timeoutIntentType, correlation.messageId, kernelTurnSourceOf(correlation.turnSource), isCallback ? (correlation.turnSource.payload ?? {}) : {});
+                },
+            });
+            return Object.freeze({ status: 'recovered', ...result });
+        },
+        async sendChildMessage(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.parentInstanceKey !== 'string' || request.parentInstanceKey.length === 0
+                || typeof request.childInstanceKey !== 'string' || request.childInstanceKey.length === 0
+                || typeof request.childIntentType !== 'string' || request.childIntentType.length === 0
+                || typeof request.doneIntentType !== 'string' || request.doneIntentType.length === 0
+                || typeof request.errorIntentType !== 'string' || request.errorIntentType.length === 0
+                || (request.invocationOrdinal !== undefined
+                    && (typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0))) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'sendChildMessage requires {appId, parentInstanceKey, childInstanceKey, childIntentType, doneIntentType, errorIntentType} with non-empty strings and an optional positive ordinal');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            requireDurableStorage();
+            requireBoundIntents(app, [request.childIntentType, request.doneIntentType, request.errorIntentType]);
+            // [#1066 R1 P1-A] Child-intent authority BEFORE the durable ordinal
+            // is allocated — a principal the sealed child intent does not admit
+            // allocates nothing durable (the settlement-before-authorization
+            // root is closed at allocation too).
+            requireIntentRole(app, principal, request.childIntentType);
+            const opened = await childInvocations.open({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                parentInstanceKey: request.parentInstanceKey,
+                childInstanceKey: request.childInstanceKey,
+                ...(request.invocationOrdinal === undefined ? {} : { invocationOrdinal: request.invocationOrdinal }),
+                childIntentType: request.childIntentType,
+                doneIntentType: request.doneIntentType,
+                errorIntentType: request.errorIntentType,
+                openedAt: new Date().toISOString(),
+            });
+            const record = opened.record;
+            const childTurnSource = {
+                kind: 'callback',
+                externalCorrelationId: childInvocationCorrelationId(record.parentInstanceKey, record.childInstanceKey, record.invocationOrdinal),
+                callbackOrdinal: 1,
+            };
+            let childReceipt;
+            try {
+                childReceipt = await submitControlTurn(app, principal, record.childInstanceKey, record.childIntentType, record.childTurnMessageId, childTurnSource, request.input === undefined ? {} : request.input);
+            }
+            catch (error) {
+                // Permanent typed submission refusals settle the invocation
+                // durably BEFORE any route selection — a rejected invocation is
+                // never retried; everything else is transient (the record stays
+                // pending for a bounded re-send by the caller).
+                const code = error?.code;
+                const name = error?.name;
+                const permanent = code === 'PRINCIPAL_ROLE_NOT_BOUND' || code === 'INTENT_UNBOUND' || code === 'INTENT_MALFORMED' || code === 'INTENT_NOT_JSON' || name === 'WorkflowInstanceNotFoundError';
+                if (!permanent)
+                    throw error;
+                const rejection = { code: code ?? 'WORKFLOW_INSTANCE_NOT_FOUND', message: error?.message };
+                const settled = await childInvocations.settleSend({
+                    appId: request.appId, tenantId: principal.tenantId, record,
+                    outcome: 'rejected', rejection, settledAt: new Date().toISOString(),
+                });
+                return Object.freeze({ status: 'rejected_routed', invocation: settled, rejection });
+            }
+            const receipt = childReceipt;
+            if (receipt.status === 'admitted') {
+                const settled = await childInvocations.settleSend({
+                    appId: request.appId, tenantId: principal.tenantId, record,
+                    outcome: 'accepted', settledAt: new Date().toISOString(),
+                });
+                return Object.freeze({ status: 'accepted', invocation: settled, receipt: childReceipt });
+            }
+            // A Kernel denied/terminated receipt is permanent business truth.
+            const rejection = receipt.status === 'denied'
+                ? { code: 'CHILD_TURN_DENIED', kernelDenial: receipt.denial }
+                : { code: 'CHILD_TURN_TERMINATED', terminal: receipt.terminal };
+            const settled = await childInvocations.settleSend({
+                appId: request.appId, tenantId: principal.tenantId, record,
+                outcome: 'rejected', rejection, settledAt: new Date().toISOString(),
+            });
+            return Object.freeze({ status: 'rejected_routed', invocation: settled, rejection });
+        },
+        async deliverChildTerminal(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.parentInstanceKey !== 'string' || request.parentInstanceKey.length === 0
+                || typeof request.childInstanceKey !== 'string' || request.childInstanceKey.length === 0
+                || typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0
+                || (request.terminalKind !== 'done' && request.terminalKind !== 'error')) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'deliverChildTerminal requires {appId, parentInstanceKey, childInstanceKey, invocationOrdinal, terminalKind:done|error}');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            requireDurableStorage();
+            // [#1066 R1 P1-A] Parent-intent authority BEFORE the terminal
+            // settlement CAS: only an 'accepted' invocation can settle (every
+            // other status refuses typed with zero mutation), and the settling
+            // principal must be one the sealed done/error intent itself admits —
+            // an unauthorized caller can no longer durably poison the terminal.
+            const addressed = await childInvocations.peek(request.appId, principal.tenantId, request.parentInstanceKey, request.childInstanceKey, request.invocationOrdinal);
+            if (addressed !== null && addressed.status === 'accepted') {
+                requireIntentRole(app, principal, request.terminalKind === 'done' ? addressed.doneIntentType : addressed.errorIntentType);
+            }
+            const outcome = await childInvocations.settleTerminal({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                parentInstanceKey: request.parentInstanceKey,
+                childInstanceKey: request.childInstanceKey,
+                invocationOrdinal: request.invocationOrdinal,
+                terminalKind: request.terminalKind,
+                ...(request.input === undefined ? {} : { terminalInput: request.input }),
+                settledAt: new Date().toISOString(),
+            });
+            if (outcome.disposition !== 'accepted') {
+                // A duplicate terminal: typed outcome, ZERO Kernel activity.
+                return Object.freeze({ status: 'already-terminal', invocation: outcome.record });
+            }
+            const receipt = await submitControlTurn(app, principal, request.parentInstanceKey, request.terminalKind === 'done' ? outcome.plan.record.doneIntentType : outcome.plan.record.errorIntentType, outcome.plan.parentTurnMessageId, outcome.plan.parentTurnSource, request.input === undefined ? {} : request.input);
+            await childInvocations.markSubmitted(outcome.record, outcome.plan.parentTurnMessageId, new Date().toISOString());
+            return Object.freeze({ status: 'accepted', invocation: outcome.record, receipt });
+        },
+        async queryChildInvocation(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.parentInstanceKey !== 'string' || request.parentInstanceKey.length === 0
+                || typeof request.childInstanceKey !== 'string' || request.childInstanceKey.length === 0
+                || typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'queryChildInvocation requires {appId, parentInstanceKey, childInstanceKey, invocationOrdinal}');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
+            requireApp(request.appId, principal);
+            return childInvocations.peek(request.appId, principal.tenantId, request.parentInstanceKey, request.childInstanceKey, request.invocationOrdinal);
         },
     };
     return Object.freeze(gateway);

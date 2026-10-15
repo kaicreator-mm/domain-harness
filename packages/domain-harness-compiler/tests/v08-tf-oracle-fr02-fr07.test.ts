@@ -79,10 +79,21 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // exported); all FR02/FR07 oracle rows re-run unchanged below.
 // K_BLOB_PIN_REBOUND_AFTER_1057_R2_FASTFIX: source-only gate repair: WeakMap actual count
 // and postcommit cache reread exception isolation; see #1057 review #5527917178.
+// K_BLOB_PIN_REBOUND_AFTER_1062_TURN_SEAM: #1062 shared non-message durable
+// control turn seam — strictTurnSource + occurrenceTurnOf at every turn-id
+// derivation site + K-owned turn dispositions (S bytes unchanged); all
+// FR02/FR07 oracle rows re-run unchanged below.
+// K_BLOB_PIN_REBOUND_AFTER_1066_R1_P1B: #1066 R1 P1-B — bounded same-CAS
+// non-message turn admission history inside the instance state CAS +
+// history-replay of a lost turn disposition (S bytes unchanged); all
+// FR02/FR07 oracle rows re-run unchanged below.
+// K_BLOB_PIN_REBOUND_AFTER_1066_R2_EVICTION: fail closed BEFORE evicting
+// a same-CAS control-turn identity whose optional disposition is absent;
+// only an independently durable matching disposition makes eviction safe.
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = 'ff6df872f2078ba7fb9bb178cae8b70ec8196f6f';
+const V08_K_BLOB = 'b6ab05d123d9233243ec4ada1416f88eb7ad16e7';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

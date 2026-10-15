@@ -68,6 +68,13 @@ export interface KernelGatewayAppInput {
      * for this app. Host governance configuration — never caller data.
      */
     readonly genesisRoles: readonly string[];
+    /**
+     * [#1062] Roles allowed to run the protected durable-control governance
+     * verbs (external-work registration, deadline firing, recovery). Defaults
+     * to genesisRoles when omitted. Host governance configuration — never
+     * caller data.
+     */
+    readonly controlRoles?: readonly string[];
 }
 export interface KernelGatewaySendIntent {
     readonly intentType: string;
@@ -240,6 +247,111 @@ export interface KernelGateway {
         readonly appId: string;
         readonly instanceKey: string;
         readonly correlationId?: string;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF18] Protected durable external-work registration: ONE
+     * deadline+callback correlation bound to the principal's tenant/app
+     * instance, with the SEALED Business intents the settled turn will
+     * submit. Requires a host-configured control role and DURABLE physical
+     * storage — a non-durable host refuses typed BEFORE any mutation.
+     */
+    registerExternalWork(credential: unknown, request: {
+        readonly appId: string;
+        readonly instanceKey: string;
+        readonly externalCorrelationId: string;
+        readonly deadlineTimerId: string;
+        readonly dueAt: string;
+        readonly callbackIntentType: string;
+        readonly timeoutIntentType: string;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF18] ONE authenticated external callback delivery. The durable
+     * CAS state machine admits exactly ONE winning delivery; its deterministic
+     * callback turn source is submitted through the SAME authenticated Kernel
+     * seam as send. Duplicates/late/misbound deliveries answer typed outcomes
+     * with ZERO Kernel activity.
+     */
+    acceptExternalCallback(credential: unknown, request: {
+        readonly appId: string;
+        readonly instanceKey: string;
+        readonly externalCorrelationId: string;
+        readonly callbackOrdinal: number;
+        readonly payload?: unknown;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF18] ONE authenticated deadline fire (host scheduler / operator
+     * driven). Early fires and foreign timers refuse typed; the one-shot
+     * winner submits the timer turn through the authenticated Kernel seam.
+     */
+    fireDeadline(credential: unknown, request: {
+        readonly appId: string;
+        readonly instanceKey: string;
+        readonly externalCorrelationId: string;
+        readonly timerId: string;
+        readonly fireOrdinal: number;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF18] Authenticated read of ONE durable external-work record
+     * (the persisted correlation/deadline truth; survives restarts).
+     */
+    queryExternalWork(credential: unknown, request: {
+        readonly appId: string;
+        readonly instanceKey: string;
+        readonly externalCorrelationId: string;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF18] Caller-driven recovery (control role; NOT a scheduler):
+     * fires the due waiting deadlines and re-submits every settled record
+     * whose Kernel turn submission may have been lost. The stable turn
+     * identity makes every heal an idempotent Kernel replay.
+     */
+    recoverDurableControls(credential: unknown, request: {
+        readonly appId: string;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF32] ONE authenticated durable child-send: the invocation
+     * record is created pending, the child message turn submits through the
+     * SAME authenticated Kernel seam as send (riding the shared non-message
+     * turn source for deterministic replay), and the outcome settles
+     * durably — `accepted`, or `rejected_routed` with the PERMANENT
+     * rejection committed BEFORE any route selection (a rejected invocation
+     * is never retried; an infrastructure failure leaves it pending for a
+     * bounded re-send).
+     */
+    sendChildMessage(credential: unknown, request: {
+        readonly appId: string;
+        readonly parentInstanceKey: string;
+        readonly childInstanceKey: string;
+        readonly childIntentType: string;
+        readonly doneIntentType: string;
+        readonly errorIntentType: string;
+        readonly input?: unknown;
+        readonly invocationOrdinal?: number;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF32] ONE authenticated correlated child terminal. The durable
+     * CAS state machine routes the terminal to its parent EXACTLY once (the
+     * winning child-terminal turn source submits through the authenticated
+     * Kernel seam); duplicate terminals, foreign targets and terminals on
+     * non-accepted invocations refuse typed with ZERO Kernel activity.
+     */
+    deliverChildTerminal(credential: unknown, request: {
+        readonly appId: string;
+        readonly parentInstanceKey: string;
+        readonly childInstanceKey: string;
+        readonly invocationOrdinal: number;
+        readonly terminalKind: 'done' | 'error';
+        readonly input?: unknown;
+    }): Promise<unknown>;
+    /**
+     * [#1062 HF32] Authenticated read of ONE durable child-invocation record
+     * (the persisted accepted/rejected/terminal truth).
+     */
+    queryChildInvocation(credential: unknown, request: {
+        readonly appId: string;
+        readonly parentInstanceKey: string;
+        readonly childInstanceKey: string;
+        readonly invocationOrdinal: number;
     }): Promise<unknown>;
 }
 export declare function createKernelGateway(input: {

@@ -45,7 +45,7 @@ export {
   bootstrapTrustedHost,
   isHostTrustChannelEstablished,
 } from './bootstrap.js';
-export type { TrustedHostHandle, TrustedHostStorageSpec, TrustedNodeHost, TrustedNodeHostInput } from './bootstrap.js';
+export type { TrustedHostHandle, TrustedHostStorageSpec, TrustedHostStorageInstance, TrustedNodeHost, TrustedNodeHostInput } from './bootstrap.js';
 
 export {
   assertIntentScope,
@@ -76,3 +76,16 @@ export type {
   KernelReceiptScope,
   KernelReceiptSubscription,
 } from './kernel-gateway.js';
+
+// [#1062 HF18/HF32] Host-side durable control coordination (external work:
+// deadline + callback correlation; the Kernel keeps sole State/Journal/
+// Effect/turn-identity authority).
+export { ChildInvocationCoordinator, DurableControlError, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf } from './durable-controls.js';
+export type {
+  ChildInvocationRecord,
+  ChildInvocationTurnPlan,
+  DurableControlErrorCode,
+  ExternalWorkRecord,
+  ExternalWorkTurnSource,
+  RegisterExternalWorkInput,
+} from './durable-controls.js';

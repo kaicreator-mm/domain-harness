@@ -70,6 +70,13 @@ export interface TrustedNodeHost {
      * surface — the transport never hands this object to a caller.
      */
     readonly docs: CasDocumentStore;
+    /**
+     * [#1062] Whether `docs` is backed by durable physical storage ('memory'
+     * when the host was bootstrapped without a storage spec). Durable
+     * control records (HF18 deadlines/callbacks, HF32 child invocations)
+     * MUST refuse before mutation on a non-durable host.
+     */
+    readonly storageMode: 'memory' | 'physical';
     /** Host-context generic resource dispatcher (provisioning + accounting). */
     readonly resources: ResourceDispatcher;
     /** Host-context scoped event hub (publish; subscriptions go through the transport). */
