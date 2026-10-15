@@ -48,7 +48,7 @@ predecessor SHA is provenance only.
 | FR08-N-SD2 | S | CANDIDATE-PN-PASS | same (undeclared event denied, 0 effect) | — |
 | NEW-FUNCTION-05 | S | CANDIDATE-PN-PASS | same NF05 digest-bound PRE/POST + promoted-negative + mutation regression | — |
 | NEW-FUNCTION-06 | S | CANDIDATE-PN-PASS | `nf06-decision-receipt-physical` (14 NF06 lines at candidate: append/read, fail-closed mandatory pre-admission refusal, true SQLite restart) | — |
-| FR06 | K | CANDIDATE-PARTIAL | compiler `v08-qualified-package-a01`; `v08-abi-a01`; `s01-installed-package` (13 lines) | FR06 wording reconciliation |
+| FR06 | M | CANDIDATE-PN-PASS | **R2 Web source↔executed-assertion crosswalk**: compiler `v08-qualified-package-a01` B1 positive qualified closure → approved sealed root → `load(root)`; B2/B3/B4 negative subject/issuer/TOCTOU drift; core `v08-abi-a01` approved load positive and N1–N7 fail-closed prior to import; actual installed-byte/currentness N in `v08-abi-s01-installed-package`. Full run executed compiler 374/374 + core 3145/3145 at `b151320`. Pre-v1 API/ABI parity OUT by Product Freeze. | — |
 | FR10 | U | CANDIDATE-PARTIAL | `i02-auth-ux-kernel` role/tenant denial | full DAC UX role-safe bridge mapping |
 | FR14 | K | CANDIDATE-PARTIAL | compiler C01; `T-F E2E` single K journal/authority | whole-FR14 P/N mapping |
 | FR15 | U | CANDIDATE-PARTIAL | `i02-auth-ux-kernel`; `s04-operation-call` | agent/resource exposure completion |
@@ -62,10 +62,10 @@ predecessor SHA is provenance only.
 | HF33 | H | CANDIDATE-PARTIAL | `i03-closure-pin`; `s05-capability-identity` (5/5 incl. #1067 dispatch-derived key fix) | same-occurrence resource currentness |
 | FR11 | BUILD | SOURCE-LEVEL-EXECUTED | compiler `domain-data-section` / `domain-data-schema-contract` green | compiled typed Domain Data exact v0.8 consumer P/N |
 | FR13 | BUILD | SOURCE-LEVEL-EXECUTED | compiler `v08-qualified-package-a01`, `v08-capability-package-s02a` binding/Kind checks | full row split proof |
-| HF22 | BUILD | SOURCE-LEVEL-EXECUTED | compiler transitive closure AST/ABI checks | exact row proof review |
+| HF22 | BUILD | CANDIDATE-PN-PASS | **R2 Web source↔executed-assertion crosswalk**: compiler `v08-qualified-package-a01` B12 permitted sealed relative transitive import P / missing sibling typed N + A01-N3 dynamic/unsealed import negative; `v08-capability-package-s02a` B1/B4 physical `load(root)` with sealed capability closure positive and N1–N7 undeclared/forged/duplicate/wrong-kind/role-shadow/dynamic import refusals. Executed in the candidate compiler 374/374; selected core load integration from the same suite, not old-ABI parity. | — |
 | HF24 | BUILD | SOURCE-LEVEL-EXECUTED | compiler `business-source-section` BUILD projection | exact current P/N signoff |
 | HF25 | BUILD | SOURCE-LEVEL-EXECUTED | compiler typed codegen sources | consumer P/N |
-| HF31 | BUILD | SOURCE-LEVEL-EXECUTED | compiler + ABI hostile-getter/canonical-record negatives | exact row proof |
+| HF31 | BUILD | CANDIDATE-PN-PASS | **R2 Web source↔executed-assertion crosswalk**: compiler `v08-qualified-package-a01` B1 canonical accepted submission → real `load(root)` P, B8 hostile accessor N with getter count exactly 0, B9 own `__proto__` N; core `v08-abi-a01` positive sealed load plus N4 hostile accessor/prototype rejection before module load. Both candidate suites ran green (374 compiler + 3145 core). | — |
 | HF34 | BUILD | SOURCE-LEVEL-EXECUTED | compiler canonical digest/refusal checks | definition-graph exact P/N |
 | HF30 | BUILD | LEGACY-EXECUTED / SELECTED-NOT-RUN | `dac-v0041-runtime-activation` historic | selected BUILD integrated proof |
 | NEW-FUNCTION-01 | BUILD | LEGACY-EXECUTED / SELECTED-NOT-RUN | `dac-v0041-compatibility` historic | selected BUILD bridge |
@@ -75,25 +75,24 @@ predecessor SHA is provenance only.
 
 ## Counts (candidate scope)
 
-- `CANDIDATE-PN-PASS`: 17 rows — exactly the source map's SELECTED_PN_PRESENT set
+- `CANDIDATE-PN-PASS`: 20 rows — the original 17 selected-P/N rows
   (FR02, FR05, FR07, FR08, FR09, FR12, HF17, HF18, HF20, HF23, HF32, FR08-P/N-SD1,
-  FR08-P/N-SD2, NEW-FUNCTION-05, NEW-FUNCTION-06), each of whose selected tests ran
-  green at the exact candidate in the pinned full run, with the four intake gap roots
-  (the #1057 ×2, #1061, #1066 negatives owed inside FR08/HF23/HF18) closed by the
-  targeted gap batch this round.
-- `CANDIDATE-PARTIAL`: 15 rows (executed subset green; listed remainders NOT_RUN).
-- `SOURCE-LEVEL-EXECUTED`: 7 rows (compiler suite green at candidate; physical/consumer
+  FR08-P/N-SD2, NEW-FUNCTION-05, NEW-FUNCTION-06) PLUS the R2 executed-test crosswalk
+  FR06, HF22, HF31. All were asserted by test suites already green on the exact candidate;
+  original four gap roots were closed by the same-candidate 6/6 targeted batch.
+- `CANDIDATE-PARTIAL`: 14 rows (executed subset green; listed remainders NOT_RUN).
+- `SOURCE-LEVEL-EXECUTED`: 5 rows (compiler suite green at candidate; physical/consumer
   acceptance NOT_RUN).
 - `LEGACY-EXECUTED / SELECTED-NOT-RUN`: 5 rows.
-- Aggregate: 17 + 15 + 7 + 5 = 44 rows with candidate-scope dispositions; 27 rows still
-  carry NOT_RUN material (15 partial remainders + 7 physical acceptances + 5 selected
+- Aggregate: 20 + 14 + 5 + 5 = 44 rows with candidate-scope dispositions; 24 rows still
+  carry NOT_RUN material (14 partial remainders + 5 physical acceptances + 5 selected
   bridges). The by-row table above is the authority.
 
-## Outstanding for Release (HOLD — unchanged)
+## Outstanding for Release (HOLD — R2 evidence crosswalk)
 
 1. **Hidden Validation — COMPLETE/PASS**, **34/34 executed** on the exact frozen candidate, 0 public findings, runner exit 0. See the updated `tg1006-hidden-prepack-attestation.md` and public-safe [#1006@6194609734](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6194609734); private PREPACK rev5 and real execution are archived in private merged PRs #60/#61. The prior same-login/Owner identity blocker was intentionally removed by user decision; execution identity is trusted self-declaration.
-2. The **27 material NOT_RUN retained-function obligations** enumerated per row above remain open: 15 partially executed rows, 7 source-level only and 5 legacy-only. A 34/34 Hidden aggregate PASS does not by itself prove the frozen P/N acceptance for all 44 individual historical functions.
-3. Release Qualification remains **HOLD pending exact P/N coverage/rescope for those 27 rows and a subsequent release decision**; source-evidence PR #1069 was bounded-reviewed/merged, with exact executable-byte-equivalent Woodpecker pass already recorded. A GitHub-account Owner distinctness gate is not required.
+2. The **24 material NOT_RUN retained-function obligations** enumerated per row above remain open: 14 partially executed rows, 5 source-level only and 5 legacy-only. A 34/34 Hidden aggregate PASS does not by itself prove the frozen P/N acceptance for all 44 individual historical functions.
+3. Release Qualification remains **HOLD pending exact P/N coverage/rescope for those 24 rows and a subsequent release decision**; source-evidence PR #1069 was bounded-reviewed/merged, with exact executable-byte-equivalent Woodpecker pass already recorded. A GitHub-account Owner distinctness gate is not required.
 
 ## Exact-SHA CI appendix
 
@@ -116,4 +115,8 @@ npm run lint && npm run typecheck && npm test` chain with its built-in
 
 ## 2026-10-15 Hidden PASS successor appendix (non-destructive)
 
-Private `DH08-FP-53-01` revision 1 was minted using exact live candidate freeze/review read-backs and executed 34/34 scenarios with aggregate PASS on `b151320ee6835755ba043e2602c085c180c9c849` (tree `a8135b2a217edff395da0a4f31dd7955d3b3db5a`). The full private archive lives at `kaicreator-mm/hidden-validation` PR #61 merged `923100ad06159621d5be42c1c1e377161cfcf34d`; only the public-safe result was posted at `domain-harness#1006@6194609734`. **All 44 row statuses and the historical record of the one full public run remain unchanged.** No extra suite was run to append this documentary update. Release remains HOLD on the 27 specific P/N remnants, pending a bounded candidate-evidence crosswalk or actual missing targeted tests.
+Private `DH08-FP-53-01` revision 1 was minted using exact live candidate freeze/review read-backs and executed 34/34 scenarios with aggregate PASS on `b151320ee6835755ba043e2602c085c180c9c849` (tree `a8135b2a217edff395da0a4f31dd7955d3b3db5a`). The full private archive lives at `kaicreator-mm/hidden-validation` PR #61 merged `923100ad06159621d5be42c1c1e377161cfcf34d`; only the public-safe result was posted at `domain-harness#1006@6194609734`. **At the time of that Hidden-only appendix, the 44 row classifications were unchanged; the later R2 source crosswalk below upgrades three rows using old executed test evidence. The historical public run record remains unchanged.** No extra suite was run to append this documentary update. Release remains HOLD on the 24 specific P/N remnants, pending a bounded candidate-evidence crosswalk or actual missing targeted tests.
+
+## R2 reuse-first source-to-executed crosswalk — FR06/HF22/HF31 (no new native run)
+
+The exact frozen-candidate test sources, independently read again by Web, make three former `NOT_RUN` *mapping* gaps demonstrably covered by **already executed** P/N assertions in the single original full run: `FR06` qualified root compile/approved load/forged or drifted root rejection; `HF22` sealed transitive provider and capability closure acceptance with missing/unsafe transitive or shadowed binding refusal; `HF31` accepted canonical records with hostile getter/prototype refusal before import and explicit zero getter invocation. Positive and negative test IDs are recorded per row above. Compiler `374/374` and core `3145/3145` ran on the exact candidate `b151320ee6835755ba043e2602c085c180c9c849` (see `tg1006-final-candidate-execution.md`). This is **candidate evidence reuse**, not a claim that Web reran Node/SQLite; no new test or full regression was started. The frozen manifest itself was not modified. Counts: **20 P/N PASS / 14 partial / 5 source-level / 5 legacy-only = 44**, leaving **24 material P/N gaps**.
