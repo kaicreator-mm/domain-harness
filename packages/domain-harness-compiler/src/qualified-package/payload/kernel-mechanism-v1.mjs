@@ -3028,11 +3028,14 @@ function snapshotDecisionSourceRule(rule, ruleId, businessEndpoint, sha256) {
 /** Wire every decision-source rule of the Business policy (createOccurrenceRuntime only). */
 function wireDecisionSourceRules(businessEndpoint, sha256) {
   const registry = new WeakMap();
+  let count = 0;
   for (const [ruleId, rule] of Object.entries(businessEndpoint.rules ?? {})) {
     if (!isJsonRecord(rule) || rule.kind !== 'decision-source') continue;
     registry.set(rule, snapshotDecisionSourceRule(rule, ruleId, businessEndpoint, sha256));
+    count += 1;
   }
-  return registry;
+  // WeakMap has no .size: carry a bounded explicit count for fail-fast load gates.
+  return { registry, count };
 }
 
 /**
@@ -3394,8 +3397,8 @@ export function createOccurrenceRuntime(options) {
   // here before any instance can exist. The retained S decision-source
   // semantics must be exposed by the selected Standard SDK for any wired
   // rule — no silent degradation to a different engine.
-  const decisionSourceRules = wireDecisionSourceRules(businessEndpoint, sha256);
-  if (decisionSourceRules.size > 0 && (
+  const { registry: decisionSourceRules, count: decisionSourceRuleCount } = wireDecisionSourceRules(businessEndpoint, sha256);
+  if (decisionSourceRuleCount > 0 && (
     typeof sdkEndpoint?.resolveDecisionSource !== 'function'
     || typeof sdkEndpoint?.selectPromotedChild !== 'function'
     || typeof sdkEndpoint?.checkEvidenceApplicability !== 'function'
@@ -3423,7 +3426,7 @@ export function createOccurrenceRuntime(options) {
     && DECISION_SOURCE_IDENTIFIER.test(businessEndpoint.policyId)
     ? businessEndpoint.policyId
     : undefined;
-  if (decisionSourceRules.size > 0 && decisionScopePackage === undefined) {
+  if (decisionSourceRuleCount > 0 && decisionScopePackage === undefined) {
     throw new CentralAdmissionError(
       'DECISION_SOURCE_INVALID',
       'a Business policy that declares decision-source rules must carry a bounded-identifier policyId for the retained evidence-applicability scope',
@@ -3465,7 +3468,15 @@ export function createOccurrenceRuntime(options) {
         // lost the create race — fall through to the CAS re-read
       }
     }
-    const current = await docs.get(key);
+    // Cache maintenance happens after the authoritative business commit.
+    // A failed re-read must NEVER reject an already admitted business ACK.
+    let current;
+    try {
+      current = await docs.get(key);
+    } catch {
+      counters.decisionCacheWriteFailures += 1;
+      return;
+    }
     if (!isJsonRecord(current)) {
       counters.decisionCacheWriteFailures += 1;
       return;
