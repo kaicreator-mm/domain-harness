@@ -604,4 +604,169 @@ export class ChildInvocationCoordinator {
         // idempotently at the Kernel.
     }
 }
+export function poisonRecoveryDocKey(appId, tenantId, instanceKey, poisonMessageId) {
+    return `v8host:poison-recovery:${appId}:${tenantId}:${instanceKey}:${poisonMessageId}`;
+}
+/** The durable recovery action identity embedded in the Kernel turn source. */
+export function poisonRecoveryActionId(poisonMessageId) {
+    return `pr:${poisonMessageId}`;
+}
+export function poisonRecoveryTurnMessageId(poisonMessageId) {
+    return `ctrl:recovery:${poisonMessageId}:1`;
+}
+function decodePoisonRecovery(envelope, key) {
+    const raw = asRecord(envelope, `poison-recovery record ${key}`);
+    if (raw.pinVersion !== 1 || raw.kind !== 'poison-recovery') {
+        throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} is not a poison-recovery record`);
+    }
+    const record = raw;
+    requireComponent(record.appId, 'appId');
+    requireComponent(record.tenantId, 'tenantId');
+    requireComponent(record.instanceKey, 'instanceKey');
+    requireComponent(record.poisonMessageId, 'poisonMessageId');
+    requireComponent(record.recoveryIntentType, 'recoveryIntentType');
+    requireNonEmptyText(record.reason, 'reason');
+    if (typeof record.authorizedBy !== 'object' || record.authorizedBy === null || typeof record.authorizedBy.subject !== 'string') {
+        throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries no authorizing principal`);
+    }
+    requireInstant(record.authorizedAt, 'authorizedAt');
+    if (record.status !== 'authorized' && record.status !== 'delivered') {
+        throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries an unknown status`);
+    }
+    requireInstant(record.createdAt, 'createdAt');
+    requireInstant(record.updatedAt, 'updatedAt');
+    if (record.status === 'authorized' && record.deliveredSource !== undefined) {
+        throw new DurableControlError('POISON_RECOVERY_INVALID', `authorized record ${key} must not carry a deliveredSource`);
+    }
+    if (record.status === 'delivered' && (record.deliveredSource === undefined || record.deliveredSource.resumeOrdinal !== 1)) {
+        throw new DurableControlError('POISON_RECOVERY_INVALID', `delivered record ${key} must carry its one-shot terminal source`);
+    }
+    return record;
+}
+export class PoisonRecoveryCoordinator {
+    docs;
+    constructor(docs) {
+        this.docs = docs;
+    }
+    async load(key) {
+        const envelope = await this.docs.get(key);
+        if (envelope === null) {
+            throw new DurableControlError('POISON_RECOVERY_UNKNOWN', `no durable poison-recovery action exists for ${key}; an unauthorized recovery never reaches the Kernel`);
+        }
+        return { record: decodePoisonRecovery(envelope.value, key), revision: envelope.revision };
+    }
+    /**
+     * Durably authorize ONE corrective recovery action for an exact poisoned
+     * message. Single creation (mustBeAbsent); the same material re-authorizes
+     * idempotently ('existing'), different material for the same poison is a
+     * typed identity conflict.
+     */
+    async authorize(input) {
+        requireComponent(input.poisonMessageId, 'poisonMessageId');
+        requireComponent(input.recoveryIntentType, 'recoveryIntentType');
+        requireNonEmptyText(input.reason, 'reason');
+        requireInstant(input.authorizedAt, 'authorizedAt');
+        const key = poisonRecoveryDocKey(input.appId, input.tenantId, input.instanceKey, input.poisonMessageId);
+        const record = {
+            pinVersion: 1,
+            kind: 'poison-recovery',
+            appId: input.appId,
+            tenantId: input.tenantId,
+            instanceKey: input.instanceKey,
+            poisonMessageId: input.poisonMessageId,
+            recoveryIntentType: input.recoveryIntentType,
+            recoveryInput: input.recoveryInput,
+            reason: input.reason,
+            authorizedBy: input.authorizedBy,
+            authorizedAt: input.authorizedAt,
+            status: 'authorized',
+            createdAt: input.authorizedAt,
+            updatedAt: input.authorizedAt,
+        };
+        try {
+            await this.docs.put(key, record, { mustBeAbsent: true });
+            return { record, disposition: 'created' };
+        }
+        catch {
+            const { record: current } = await this.load(key);
+            const exact = current.recoveryIntentType === record.recoveryIntentType
+                && canonicalJsonStringify(current.recoveryInput ?? null) === canonicalJsonStringify(record.recoveryInput ?? null);
+            if (!exact) {
+                throw new DurableControlError('POISON_RECOVERY_IDENTITY_CONFLICT', `poisoned message ${input.poisonMessageId} is already bound to different corrective material; one poison admits exactly one authorized recovery action`);
+            }
+            return { record: current, disposition: 'existing' };
+        }
+    }
+    /**
+     * Read ONE durable recovery action (the persisted authorization truth;
+     * survives restarts). Authenticated Host-context read for the delivery
+     * verb's pre-CAS Business-intent authority check.
+     */
+    async read(appId, tenantId, instanceKey, poisonMessageId) {
+        requireComponent(poisonMessageId, 'poisonMessageId');
+        const { record } = await this.load(poisonRecoveryDocKey(appId, tenantId, instanceKey, poisonMessageId));
+        return record;
+    }
+    /**
+     * Deliver the authorized corrective turn exactly once. The CAS winner
+     * (authorized→delivered) hands its deterministic recovery turn source to
+     * the Kernel submission seam; every later redelivery — duplicate or after
+     * restart — returns the STORED terminal source so the Kernel turn
+     * disposition replays it idempotently (zero doubled State/Effect).
+     */
+    async deliver(input) {
+        requireComponent(input.poisonMessageId, 'poisonMessageId');
+        requireInstant(input.deliveredAt, 'deliveredAt');
+        const key = poisonRecoveryDocKey(input.appId, input.tenantId, input.instanceKey, input.poisonMessageId);
+        const source = {
+            kind: 'recovery',
+            durableRecoveryActionId: poisonRecoveryActionId(input.poisonMessageId),
+            resumeOrdinal: 1,
+        };
+        const messageId = poisonRecoveryTurnMessageId(input.poisonMessageId);
+        for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+            const { record: current, revision } = await this.load(key);
+            if (current.status === 'delivered') {
+                return { disposition: 'duplicate', record: current, turnSource: current.deliveredSource ?? source, messageId };
+            }
+            const next = {
+                ...current,
+                status: 'delivered',
+                updatedAt: input.deliveredAt,
+                deliveredSource: source,
+            };
+            if (await this.cas(key, next, revision)) {
+                return { disposition: 'accepted', record: next, turnSource: source, messageId };
+            }
+        }
+        throw new DurableControlError('DURABLE_CONTROL_CONTENTION', `could not deliver poison recovery ${key} after bounded retries`);
+    }
+    /** The heal marker (see ExternalWorkCoordinator.markSubmitted). */
+    async markSubmitted(appId, tenantId, instanceKey, poisonMessageId, messageId, submittedAt) {
+        const key = poisonRecoveryDocKey(appId, tenantId, instanceKey, poisonMessageId);
+        for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+            const { record: current, revision } = await this.load(key);
+            if (current.submittedTurn !== undefined && current.submittedTurn.messageId === messageId)
+                return;
+            const next = { ...current, submittedTurn: { messageId, submittedAt }, updatedAt: submittedAt };
+            if (await this.cas(key, next, revision))
+                return;
+        }
+        // The marker is a heal optimization, never an authority — losing the
+        // bounded race only means a later redelivery replays the SAME turn id
+        // idempotently at the Kernel.
+    }
+    async cas(key, next, expectedRevision) {
+        try {
+            await this.docs.put(key, next, { mustMatchRevision: expectedRevision });
+            return true;
+        }
+        catch (error) {
+            if (typeof error === 'object' && error !== null && error.code === 'HOST_CAS_CONFLICT') {
+                return false;
+            }
+            throw error;
+        }
+    }
+}
 //# sourceMappingURL=durable-controls.js.map

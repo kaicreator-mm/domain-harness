@@ -32,7 +32,7 @@
  * correlation/timer ids validated HERE typed).
  */
 import type { CasDocumentStore } from './cas.js';
-export type DurableControlErrorCode = 'DURABLE_CONTROL_INVALID' | 'DURABLE_CONTROL_UNAVAILABLE' | 'EXTERNAL_WORK_IDENTITY_CONFLICT' | 'UNKNOWN_EXTERNAL_CORRELATION' | 'DEADLINE_TIMER_MISMATCH' | 'DEADLINE_NOT_DUE' | 'CALLBACK_IDENTITY_CONFLICT' | 'CHILD_INVOCATION_UNKNOWN' | 'CHILD_INVOCATION_NOT_ACCEPTED' | 'CHILD_INVOCATION_ALREADY_TERMINAL' | 'CHILD_INVOCATION_SETTLED' | 'CHILD_INVOCATION_REJECTED' | 'DURABLE_CONTROL_CONTENTION';
+export type DurableControlErrorCode = 'DURABLE_CONTROL_INVALID' | 'DURABLE_CONTROL_UNAVAILABLE' | 'EXTERNAL_WORK_IDENTITY_CONFLICT' | 'UNKNOWN_EXTERNAL_CORRELATION' | 'DEADLINE_TIMER_MISMATCH' | 'DEADLINE_NOT_DUE' | 'CALLBACK_IDENTITY_CONFLICT' | 'CHILD_INVOCATION_UNKNOWN' | 'CHILD_INVOCATION_NOT_ACCEPTED' | 'CHILD_INVOCATION_ALREADY_TERMINAL' | 'CHILD_INVOCATION_SETTLED' | 'CHILD_INVOCATION_REJECTED' | 'POISON_RECOVERY_INVALID' | 'POISON_RECOVERY_IDENTITY_CONFLICT' | 'POISON_RECOVERY_UNKNOWN' | 'DURABLE_CONTROL_CONTENTION';
 export declare class DurableControlError extends Error {
     readonly code: DurableControlErrorCode;
     constructor(code: DurableControlErrorCode, message: string);
@@ -288,5 +288,104 @@ export declare class ChildInvocationCoordinator {
     }>;
     /** The heal marker (see ExternalWorkCoordinator.markSubmitted). */
     markSubmitted(record: ChildInvocationRecord, messageId: string, submittedAt: string): Promise<void>;
+}
+export type PoisonRecoveryTurnSource = {
+    readonly kind: 'recovery';
+    readonly durableRecoveryActionId: string;
+    readonly resumeOrdinal: number;
+};
+export interface PoisonRecoveryRecord {
+    readonly pinVersion: 1;
+    readonly kind: 'poison-recovery';
+    readonly appId: string;
+    readonly tenantId: string;
+    readonly instanceKey: string;
+    readonly poisonMessageId: string;
+    /** The sealed Business intent the corrective turn submits (bound here). */
+    readonly recoveryIntentType: string;
+    /** Corrective occurrence input (RECORD truth only; never in the turnSource). */
+    readonly recoveryInput: unknown;
+    readonly reason: string;
+    readonly authorizedBy: {
+        readonly subject: string;
+        readonly roles: readonly string[];
+    };
+    readonly authorizedAt: string;
+    readonly status: 'authorized' | 'delivered';
+    readonly createdAt: string;
+    readonly updatedAt: string;
+    readonly deliveredSource?: PoisonRecoveryTurnSource;
+    /** Heal marker written AFTER a successful Kernel submission. */
+    readonly submittedTurn?: {
+        readonly messageId: string;
+        readonly submittedAt: string;
+    };
+}
+export interface AuthorizePoisonRecoveryInput {
+    readonly appId: string;
+    readonly tenantId: string;
+    readonly instanceKey: string;
+    readonly poisonMessageId: string;
+    readonly recoveryIntentType: string;
+    readonly recoveryInput: unknown;
+    readonly reason: string;
+    readonly authorizedBy: {
+        readonly subject: string;
+        readonly roles: readonly string[];
+    };
+    readonly authorizedAt: string;
+}
+export type DeliverPoisonRecoveryOutcome = {
+    readonly disposition: 'accepted';
+    readonly record: PoisonRecoveryRecord;
+    readonly turnSource: PoisonRecoveryTurnSource;
+    readonly messageId: string;
+} | {
+    readonly disposition: 'duplicate';
+    readonly record: PoisonRecoveryRecord;
+    readonly turnSource: PoisonRecoveryTurnSource;
+    readonly messageId: string;
+};
+export declare function poisonRecoveryDocKey(appId: string, tenantId: string, instanceKey: string, poisonMessageId: string): string;
+/** The durable recovery action identity embedded in the Kernel turn source. */
+export declare function poisonRecoveryActionId(poisonMessageId: string): string;
+export declare function poisonRecoveryTurnMessageId(poisonMessageId: string): string;
+export declare class PoisonRecoveryCoordinator {
+    private readonly docs;
+    constructor(docs: CasDocumentStore);
+    private load;
+    /**
+     * Durably authorize ONE corrective recovery action for an exact poisoned
+     * message. Single creation (mustBeAbsent); the same material re-authorizes
+     * idempotently ('existing'), different material for the same poison is a
+     * typed identity conflict.
+     */
+    authorize(input: AuthorizePoisonRecoveryInput): Promise<{
+        record: PoisonRecoveryRecord;
+        disposition: 'created' | 'existing';
+    }>;
+    /**
+     * Read ONE durable recovery action (the persisted authorization truth;
+     * survives restarts). Authenticated Host-context read for the delivery
+     * verb's pre-CAS Business-intent authority check.
+     */
+    read(appId: string, tenantId: string, instanceKey: string, poisonMessageId: string): Promise<PoisonRecoveryRecord>;
+    /**
+     * Deliver the authorized corrective turn exactly once. The CAS winner
+     * (authorized→delivered) hands its deterministic recovery turn source to
+     * the Kernel submission seam; every later redelivery — duplicate or after
+     * restart — returns the STORED terminal source so the Kernel turn
+     * disposition replays it idempotently (zero doubled State/Effect).
+     */
+    deliver(input: {
+        readonly appId: string;
+        readonly tenantId: string;
+        readonly instanceKey: string;
+        readonly poisonMessageId: string;
+        readonly deliveredAt: string;
+    }): Promise<DeliverPoisonRecoveryOutcome>;
+    /** The heal marker (see ExternalWorkCoordinator.markSubmitted). */
+    markSubmitted(appId: string, tenantId: string, instanceKey: string, poisonMessageId: string, messageId: string, submittedAt: string): Promise<void>;
+    private cas;
 }
 //# sourceMappingURL=durable-controls.d.ts.map

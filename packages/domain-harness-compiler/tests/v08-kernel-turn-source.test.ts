@@ -11,9 +11,12 @@
  *     message source at EVERY in-payload turn-id derivation site; the ids
  *     are deterministic and source-distinct (timer/callback/child-terminal);
  *   - strictTurnSource: exact shape — extra fields, missing fields,
- *     non-positive ordinals, bad terminalKind, kind 'message'/'recovery'/
- *     unknown all fail typed ADMISSION_INVALID_TURN_SOURCE BEFORE any
- *     State/Journal/Effect activity;
+ *     non-positive ordinals, bad terminalKind, kind 'message'/unknown all
+ *     fail typed ADMISSION_INVALID_TURN_SOURCE BEFORE any
+ *     State/Journal/Effect activity. [#1006 HF16] a WELL-FORMED recovery
+ *     source is shape-admitted at this seam (the Host coordinator's durable
+ *     CAS-authorized recovery-action record is the authorization
+ *     credential; malformed recovery shapes still refuse typed here);
  *   - turn disposition: a replay of the SAME non-message source replays the
  *     stored receipt (idempotentReplay, zero new state revision, zero new
  *     effect execution); the SAME source under a DIFFERENT intentType
@@ -306,7 +309,12 @@ test('turn-source N: malformed turn sources refuse typed before any mutation', a
     { kind: 'timer', timerId: 't', fireOrdinal: -1 },
     { kind: 'child-terminal', parentActorId: 'p', childActorId: 'c', invocationOrdinal: 1, terminalKind: 'crash' },
     { kind: 'message', sourceMessageId: 'm' },
-    { kind: 'recovery', durableRecoveryActionId: 'r', resumeOrdinal: 1 },
+    // [#1006 HF16] malformed recovery shapes still refuse typed; the
+    // well-formed source is shape-admitted (its Host-side authorization is
+    // the durable CAS record, asserted in the physical recovery suite).
+    { kind: 'recovery', durableRecoveryActionId: 'r' },
+    { kind: 'recovery', durableRecoveryActionId: 'r', resumeOrdinal: 0 },
+    { kind: 'recovery', durableRecoveryActionId: 'r', resumeOrdinal: 1, extra: true },
     { kind: 'quantum' },
     'not-a-record',
   ];

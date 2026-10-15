@@ -55,7 +55,7 @@ import { QualifiedPackageError, canonicalSnapshot, sha256Hex } from '../public-v
 import { isInstalledHandleShape, resolveInstalledPackageRoot } from '../public-v8/deploy.js';
 import { HostBoundaryError } from './errors.js';
 import { assertIntentScope } from './ux-transport.js';
-import { ChildInvocationCoordinator, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf, } from './durable-controls.js';
+import { ChildInvocationCoordinator, ExternalWorkCoordinator, PoisonRecoveryCoordinator, childInvocationCorrelationId, kernelTurnSourceOf, poisonRecoveryActionId, } from './durable-controls.js';
 /**
  * Durable CAS key under which a gateway registration pins the EXACT
  * installed closure identity of an app (#1013 R1 F-02). Same namespace
@@ -154,6 +154,13 @@ export function createKernelGateway(input) {
      * adapted from the frozen v0.7 compiled-workflow message effects).
      */
     const childInvocations = new ChildInvocationCoordinator(host.docs);
+    /**
+     * [#1006 HF16] The Host-side durable poison-recovery coordinator over the
+     * same probed physical store: ONE CAS-authorized corrective action per
+     * poisoned message, delivered once through the SAME authenticated Kernel
+     * seam as every durable control turn.
+     */
+    const poisonRecovery = new PoisonRecoveryCoordinator(host.docs);
     /**
      * In-flight cancellable occurrences, keyed by the authenticated
      * tenant/app + instanceKey + messageId (#1003 FR07-KH2). Entries exist
@@ -1041,6 +1048,75 @@ export function createKernelGateway(input) {
                 },
             });
             return Object.freeze({ status: 'recovered', ...result });
+        },
+        async authorizePoisonRecovery(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+                || typeof request.poisonMessageId !== 'string' || request.poisonMessageId.length === 0
+                || typeof request.intentType !== 'string' || request.intentType.length === 0
+                || typeof request.reason !== 'string' || request.reason.length === 0
+                || typeof request.input !== 'object' || request.input === null || Array.isArray(request.input)) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'authorizePoisonRecovery requires {appId, instanceKey, poisonMessageId, intentType, reason} non-empty strings and a JSON-record input');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            // The authorization itself is a privileged control act; the corrective
+            // turn's Business-intent authority is enforced at DELIVERY (the same
+            // split registerExternalWork/acceptExternalCallback use).
+            requireControlRole(app, principal);
+            requireDurableStorage();
+            requireBoundIntents(app, [request.intentType]);
+            const granted = await poisonRecovery.authorize({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                instanceKey: request.instanceKey,
+                poisonMessageId: request.poisonMessageId,
+                recoveryIntentType: request.intentType,
+                recoveryInput: request.input,
+                reason: request.reason,
+                authorizedBy: { subject: principal.subject, roles: [...principal.roles] },
+                authorizedAt: new Date().toISOString(),
+            });
+            return Object.freeze({
+                status: 'authorized',
+                disposition: granted.disposition,
+                actionId: poisonRecoveryActionId(request.poisonMessageId),
+                record: granted.record,
+            });
+        },
+        async deliverPoisonRecovery(credential, request) {
+            if (typeof request !== 'object' || request === null
+                || typeof request.appId !== 'string' || request.appId.length === 0
+                || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+                || typeof request.poisonMessageId !== 'string' || request.poisonMessageId.length === 0) {
+                throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'deliverPoisonRecovery requires {appId, instanceKey, poisonMessageId} with non-empty strings');
+            }
+            const principal = await authenticate(credential);
+            assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+            const app = requireApp(request.appId, principal);
+            requireDurableStorage();
+            // [#1066 R1 P1-A discipline] The delivery SUBMITS the bound intent, so
+            // the Business-bound role authority is checked BEFORE any durable
+            // record settles — an unauthorized principal can neither deliver the
+            // corrective turn nor consume the one-shot settlement.
+            const current = await poisonRecovery.read(request.appId, principal.tenantId, request.instanceKey, request.poisonMessageId);
+            requireIntentRole(app, principal, current.recoveryIntentType);
+            const outcome = await poisonRecovery.deliver({
+                appId: request.appId,
+                tenantId: principal.tenantId,
+                instanceKey: request.instanceKey,
+                poisonMessageId: request.poisonMessageId,
+                deliveredAt: new Date().toISOString(),
+            });
+            const receipt = await submitControlTurn(app, principal, request.instanceKey, outcome.record.recoveryIntentType, outcome.messageId, {
+                kind: 'recovery',
+                durableRecoveryActionId: outcome.turnSource.durableRecoveryActionId,
+                resumeOrdinal: outcome.turnSource.resumeOrdinal,
+            }, outcome.record.recoveryInput);
+            await poisonRecovery.markSubmitted(request.appId, principal.tenantId, request.instanceKey, request.poisonMessageId, outcome.messageId, new Date().toISOString());
+            return Object.freeze({ status: outcome.disposition === 'accepted' ? 'accepted' : 'duplicate', disposition: outcome.disposition, receipt, record: outcome.record });
         },
         async sendChildMessage(credential, request) {
             if (typeof request !== 'object' || request === null
