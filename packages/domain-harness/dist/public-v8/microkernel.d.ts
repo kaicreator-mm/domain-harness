@@ -189,6 +189,19 @@ export interface V8FacadeKernelOps {
         readonly messageId: string;
     }): Promise<unknown>;
     /**
+     * [#1063 HF20] Authorized read of the ordered durable mutation-observation
+     * window riding the principal's tenant/app-qualified instance document:
+     * the Kernel alone validates the opaque cursor against the current
+     * committed window (stream-bound, never beyond the watermark) and owns
+     * the record/page bytes; this seam forwards only the verified principal —
+     * never caller-chosen authority, exactly like the NF06 receipt read.
+     */
+    queryMutationObservations(principal: V8GatewayPrincipal, request: {
+        readonly instanceKey: string;
+        readonly afterCursor?: string;
+        readonly limit?: number;
+    }): Promise<unknown>;
+    /**
      * The physical Kernel `workflowInstanceId` the tenant/app-qualified
      * address resolves to (`${workflowKey}:${tenantId}:${appId}:${key}`) —
      * the single source of the receipt-filter address shared by send,

@@ -21,6 +21,9 @@ export { ScopedEventHub } from './events.js';
 export { bootstrapTrustedHost, isHostTrustChannelEstablished, } from './bootstrap.js';
 export { assertIntentScope, createHostUxTransport, createUxTransport, uxDocumentNamespace, } from './ux-transport.js';
 export { createKernelGateway, kernelReceiptAsHostEvent, } from './kernel-gateway.js';
+// [#1063 HF20] ordered durable mutation-observation contract (the Kernel
+// payload twin of these semantics lives in the sealed kernel bytes).
+export { HF20_MUTATION_OBSERVATION_CONTRACT_VERSION, HF20_MUTATION_OBSERVATION_KINDS, HF20_MUTATION_OBSERVATION_RETENTION_LIMIT, HF20_OBSERVATION_READ_LIMIT_DEFAULT, HF20_OBSERVATION_READ_LIMIT_MAX, HF20_OBSERVATION_READ_LIMIT_MIN, Hf20ObservationError, appendHf20MutationObservation, decodeHf20Cursor, encodeHf20Cursor, isHf20MutationObservationWindow, newHf20ObservationWindow, projectHf20ObservationPage, } from './hf20-mutation-observation.js';
 // [#1062 HF18/HF32] Host-side durable control coordination (external work:
 // deadline + callback correlation; the Kernel keeps sole State/Journal/
 // Effect/turn-identity authority).

@@ -567,6 +567,21 @@ export function createKernelGateway(input) {
             // out-of-scope read never reaches the physical store.
             return app.ops.queryDecisionReceipt(principal, { instanceKey: request.instanceKey, messageId: request.messageId });
         },
+        async queryMutationObservations(credential, request) {
+            const principal = await authenticate(credential);
+            assertIntentScope(request, principal);
+            const app = requireApp(request.appId, principal);
+            // [#1063 HF20] The protected observation read is control-role gated
+            // (the same host governance configuration every protected control
+            // verb uses): an ordinary authenticated reader — one who may send and
+            // queryInstance — is NOT a mutation-observation reader.
+            requireControlRole(app, principal);
+            return app.ops.queryMutationObservations(principal, {
+                instanceKey: request.instanceKey,
+                ...(request.afterCursor === undefined ? {} : { afterCursor: request.afterCursor }),
+                ...(request.limit === undefined ? {} : { limit: request.limit }),
+            });
+        },
         async subscribe(credential, scope, listener) {
             if (typeof listener !== 'function') {
                 throw new HostBoundaryError('HOST_SUBSCRIPTION_MALFORMED', 'a Kernel receipt subscription requires a listener function');

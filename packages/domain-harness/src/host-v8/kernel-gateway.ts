@@ -235,6 +235,19 @@ export interface KernelGateway {
    * appended it (Business-declared reader roles gate the Kernel side).
    */
   queryDecisionReceipt(credential: unknown, request: UxTarget & { readonly messageId: string }): Promise<unknown>;
+  /**
+   * [#1063 HF20] Authenticated scoped mutation-observation read: the ordered
+   * committed-mutation window riding the principal's tenant/app-qualified
+   * instance document, through the same K authority that commits it (opaque
+   * K-validated cursor; restart-resumable on the same physical storage).
+   * Requires a host-configured control role — an ordinary authenticated
+   * reader (one who may send and queryInstance) is NOT a mutation-
+   * observation reader.
+   */
+  queryMutationObservations(credential: unknown, request: UxTarget & {
+    readonly afterCursor?: string;
+    readonly limit?: number;
+  }): Promise<unknown>;
   /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
   subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription>;
   /**
@@ -954,6 +967,25 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       // reader-role gate and the record bytes; an unauthenticated or
       // out-of-scope read never reaches the physical store.
       return app.ops.queryDecisionReceipt(principal, { instanceKey: request.instanceKey, messageId: request.messageId });
+    },
+
+    async queryMutationObservations(credential: unknown, request: UxTarget & {
+      readonly afterCursor?: string;
+      readonly limit?: number;
+    }): Promise<unknown> {
+      const principal = await authenticate(credential);
+      assertIntentScope(request, principal);
+      const app = requireApp(request.appId, principal);
+      // [#1063 HF20] The protected observation read is control-role gated
+      // (the same host governance configuration every protected control
+      // verb uses): an ordinary authenticated reader — one who may send and
+      // queryInstance — is NOT a mutation-observation reader.
+      requireControlRole(app, principal);
+      return app.ops.queryMutationObservations(principal, {
+        instanceKey: request.instanceKey,
+        ...(request.afterCursor === undefined ? {} : { afterCursor: request.afterCursor }),
+        ...(request.limit === undefined ? {} : { limit: request.limit }),
+      });
     },
 
     async subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription> {

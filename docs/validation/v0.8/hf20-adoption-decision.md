@@ -4,17 +4,21 @@
 ISSUE=1063
 PARENT=1006
 SEAM=B
-BASE=v0.8@6ca9fb625dbbc0c5f1fda88011420aaae30c5db7
-STATE=DECISION_AND_CONTRACT_FROZEN__K_WIRING_DEFERRED_TO_SEAM_A_MERGE
-NATIVE_PN=NOT_RUN (deferred until #1062 merges; see plan)
-RELEASE=HOLD (unchanged; 44/44 status rows stay NOT_RUN)
+BASE=v0.8@c9b6de229c593b7f0a00658ff7aa4b885ec5e397
+STATE=WIRED__SELECTED_PN_EXECUTED (§5 executed after the #1062/#1066 seam-A merge)
+NATIVE_PN=11/11 PASS, 0 SKIP (hf20-mutation-observation.test.ts, Node24 + real SQLite)
+RELEASE=HOLD (unchanged; 44/44 status rows stay NOT_RUN until the #1006 final gate)
 ```
 
 This document freezes the **source adoption decision**, the **minimal K/H
 contract** reference and the **independent test design** for the HF20
-corrective child. No `kernel-mechanism-v1.mjs` byte was touched: #1062 is
-the sole active K source owner; everything here is separate-module
-preparation plus this evidence, per #1006@6185543865.
+corrective child. The K/H wiring hooks of §5 have now been EXECUTED on
+`v0.8@c9b6de2` (the #1062/#1066 seam-A K owner merged and released the
+shared K file per #1063@6188137089): the same-envelope window, the
+protected read verb, the restart witness (two fresh processes over one
+physical SQLite file — the trust channel is one-shot per process, the
+NF06 spawned-reader discipline) and the read-scope redaction are in the
+selected K bytes and the trusted gateway.
 
 ## 1. What HF20 is — and is not
 
@@ -117,33 +121,37 @@ cannot be partially stored).
 - `isHf20MutationObservationWindow` — fail-closed structural guard
   (contiguity, kinds, revision math) used before any projection.
 
-## 5. Deferred K/H adaptation points (execute ONLY after #1062 merges)
+## 5. K/H adaptation points (EXECUTED on `v0.8@c9b6de2`)
 
-The exact small hooks this decision prepares (rebase onto seam-A's merged
-K first; keep each edit minimal):
+The exact small hooks this decision prepared, now executed after the
+seam-A merge (each edit minimal; #1062's turn admission/history/eviction
+guard and #1067's S05 fix preserved verbatim):
 
-1. `kernel-mechanism-v1.mjs`
-   - `PersistentWorkflowInstanceRepository.create`: seed the window in the
-     created snapshot (`mutationObservations` field) and append the
-     `INSTANCE_OPENED` record.
-   - `commitAcceptedTransitionInLane`: run the reducer inside the
-     transition and include the next window in the CAS-written document.
-   - Return-object addition: `readMutationObservations(target,
-     {afterCursor?, limit?})` — decode/validate cursor against the
-     qualified stream, read the snapshot doc, `projectHf20ObservationPage`.
-   - `counters.mutationObservationReads`; expose the reader in
-     `getMechanismIdentity().mechanismFunctions` for differential pinning
-     (house pattern).
+1. `kernel-mechanism-v1.mjs` (K payload — internal semantic twin of the
+   §4 contract, no import; cursor codec implemented in pure JS so the
+   sealed bytes keep their no-Node-global portability, wire-identical to
+   the Host contract's base64url):
+   - `PersistentWorkflowInstanceRepository.create`: seeds the window with
+     the `INSTANCE_OPENED` record in the SAME mustBeAbsent put.
+   - `commitAcceptedTransitionInLane`: the pure reducer appends the
+     `MUTATION_COMMITTED` record inside the SAME single-key CAS value.
+   - `readMutationObservations(target-derived request)`: cursor decode +
+     validation against the qualified stream, window read, page
+     projection; `counters.mutationObservationReads`; exposed in
+     `getMechanismIdentity().mechanismFunctions`.
+   - `outwardInstanceSnapshot`: queryInstance/getSnapshot, the Genesis
+     response, occurrence receipts and turn-disposition receipts receive
+     the OUTWARD projection — `mutationObservations` and
+     `admittedControlTurns` stay internal next-CAS/replay truth.
 2. `public-v8/microkernel.ts` `gatewayOps`: `queryMutationObservations(
    principal, {instanceKey, afterCursor?, limit?})` → K read at the
    principal-qualified address.
 3. `host-v8/kernel-gateway.ts`: authenticated verb
-   `queryMutationObservations(credential, request)` — authenticate →
-   `assertIntentScope`-style scope gate → `requireApp` → ops call
-   (the `queryDecisionReceipt` discipline verbatim).
-4. Wire the module export through `host-v8/index.ts` (this barrel line is
-   intentionally left for the wiring PR to avoid a same-file collision with
-   seam A's Host integration).
+   `queryMutationObservations(credential, UxTarget & {afterCursor?,
+   limit?})` — authenticate → `assertIntentScope` → `requireApp` →
+   `requireControlRole` (an ordinary authenticated reader is NOT an HF20
+   reader) → ops call.
+4. `host-v8/index.ts`: contract module exported through the barrel.
 
 ## 6. Independent test design (file:
 `packages/domain-harness/tests/v08-integration/hf20-mutation-observation.test.ts`)

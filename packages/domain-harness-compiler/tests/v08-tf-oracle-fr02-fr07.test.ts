@@ -90,10 +90,15 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // K_BLOB_PIN_REBOUND_AFTER_1066_R2_EVICTION: fail closed BEFORE evicting
 // a same-CAS control-turn identity whose optional disposition is absent;
 // only an independently durable matching disposition makes eviction safe.
+// K_BLOB_PIN_REBOUND_AFTER_1063_HF20: #1063 HF20 — same-CAS ordered durable
+// mutation-observation window (INSTANCE_OPENED at create, MUTATION_COMMITTED
+// inside every state CAS) + K-validated opaque cursor read + outward
+// instance snapshot redaction of the K-only carrier fields (S bytes
+// unchanged); all FR02/FR07 oracle rows re-run unchanged below.
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = 'b6ab05d123d9233243ec4ada1416f88eb7ad16e7';
+const V08_K_BLOB = '88c75748046188fc5247d07f81f5e53f6dc94c3c';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

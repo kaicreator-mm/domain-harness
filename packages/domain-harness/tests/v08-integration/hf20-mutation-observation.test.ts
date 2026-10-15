@@ -1,49 +1,53 @@
 /**
  * #1063 HF20 — ordered durable mutation observation: contract witness +
- * physical carrier witness + staged P/N seam driver (seam-B preparation).
+ * physical carrier witness + selected physical P/N + read-scope boundary.
  * ===========================================================================
  *
- * THREE deliberately separate parts (`docs/validation/v0.8/
+ * FOUR deliberately separate parts (`docs/validation/v0.8/
  * hf20-adoption-decision.md`):
  *
- *   Part A — CONTRACT UNIT (runs now): the pure cursor codec, append
- *   reducer and page projection of the frozen HF20 contract module
- *   (`src/host-v8/hf20-mutation-observation.ts`): contiguous sequences,
- *   eviction → RETENTION_TRUNCATED gap, fail-closed window guard,
- *   stream-bound opaque cursors, beyond-watermark refusal.
+ *   Part A — CONTRACT UNIT: the pure cursor codec, append reducer and page
+ *   projection of the frozen HF20 contract module (`src/host-v8/
+ *   hf20-mutation-observation.ts`): contiguous sequences, eviction →
+ *   RETENTION_TRUNCATED gap, fail-closed window guard, stream-bound opaque
+ *   cursors, beyond-watermark refusal.
  *
- *   Part B — PHYSICAL CARRIER WITNESS (runs now, real SQLite):
+ *   Part B — PHYSICAL CARRIER WITNESS (real SQLite):
  *   B1 drives `SqliteCasStore` DIRECTLY with a state+window document to
  *   witness the same-envelope atomicity the adoption decision rides: ONE
  *   CAS put carries revision+state+window together, a stale-CAS loser
  *   leaves no record, and a fault-injected put leaves the whole row at its
  *   previous revision (no partial window can exist).
  *   B2 drives the REAL selected closure (`DomainHarness.load` → trusted
- *   host → gateway) and witnesses the carrier invariants on today's K:
- *   the physical instance row keeps `revision === snapshot.stateRevision`
- *   across repeated admitted turns, tenant/app isolation is physical row
- *   key separation, and a faulted instance-doc put rejects the send with
- *   the row entirely unchanged. (Today's row carries NO window yet — the
- *   K hook lands with the seam-A merge; this asserts the foundation it
- *   will ride, and honestly states the absence.)
+ *   host → gateway) and witnesses the wired carrier: the physical instance
+ *   row carries the window from create (INSTANCE_OPENED at revision 0),
+ *   keeps `revision === snapshot.stateRevision` across admitted turns with
+ *   exactly one appended record per committed revision, tenant/app
+ *   isolation is physical row key separation, and a faulted instance-doc
+ *   put rejects the send with the row — window included — unchanged.
  *
- *   Part C — HF20-P/HF20-N SEAM DRIVER (STAGED): the full positive flow
+ *   Part C — HF20-P/HF20-N SELECTED PHYSICAL P/N (the #1062 seam-A K
+ *   owner has merged; the K hook is wired): the full positive flow
  *   (ordered records → host close → reopen same physical SQLite → resume
  *   from cursor after a post-restart committed turn) and negatives
- *   (forged/stale/cross-tenant cursor, replay synthesis, uncommitted
- *   mutation, Effect-Journal distinctness) activate ONLY when a gateway
- *   exposes `queryMutationObservations` (checked AT RUN TIME through
- *   `t.skip`, because the wiring is a property of the loaded closure, not
- *   of this file). Until the #1062 seam-A K owner merges and the small K
- *   hook is wired, every Part C test reports a typed SKIP naming the
- *   deferral — never a fake green, never a silent pass-through. This is
- *   test PREPARATION under #1006@6185543865: no kernel-mechanism-v1.mjs
- *   byte is touched here, and Part C owns its complete host lifecycle on
- *   its own physical SQLite file.
+ *   (forged/cross-tenant cursor, replay synthesis, uncommitted mutation,
+ *   Effect-Journal distinctness). The gateway verb's absence is a FAILING
+ *   required case — never a SKIP, never a fake green.
+ *
+ *   Part D — READ-SCOPE BOUNDARY (#1063@6188137089): the ordinary
+ *   authenticated reader (may send and queryInstance) is NOT an HF20
+ *   reader; the authorized control-role read works; and queryInstance,
+ *   FR05 projection, the initial Genesis response and the occurrence
+ *   receipt.instance never expose the K-only carrier fields
+ *   (`mutationObservations`, `admittedControlTurns`).
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildQualifiedPackage,
@@ -401,37 +405,52 @@ function sendOn(targetGateway: KernelGateway, messageId: string, principal: Host
 
 test('HF20 carrier B2: the physical instance row IS the atomicity foundation HF20 rides', async () => {
   assert.ok(handle.store instanceof SqliteCasStore, 'the trusted host storage is the physical SQLite CAS store');
-  await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: INSTANCE_KEY });
+  const genesisSnapshot = (await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: INSTANCE_KEY })) as Record<string, unknown>;
+  // [#1063 read scope] The initial Genesis response is the OUTWARD
+  // projection — the K-only carrier fields never leave the Kernel.
+  assert.equal('mutationObservations' in genesisSnapshot, false);
+  assert.equal('admittedControlTurns' in genesisSnapshot, false);
   const docKeyList = await handle.store.list('v08-kernel:wf-instance:');
   assert.ok(docKeyList.includes(INSTANCE_DOC_KEY), `physical instance row ${INSTANCE_DOC_KEY} exists`);
   let row = await handle.store.get(INSTANCE_DOC_KEY);
   assert.ok(row !== null);
-  let snapshot = (await gateway.queryInstance(requester, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as { stateRevision: number };
+  let snapshot = (await gateway.queryInstance(requester, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as Record<string, unknown> & { stateRevision: number };
   // The carrier invariant: physical doc revision === K-attested stateRevision.
   assert.equal(row.revision, 0);
   assert.equal(snapshot.stateRevision, 0);
   assert.equal((row.value as { stateRevision: number }).stateRevision, 0);
-  // Honest pre-wiring statement: today's committed document carries NO
-  // observation window yet — it arrives with the deferred K hook (#1062).
-  assert.equal('mutationObservations' in (row.value as object), false);
-  // Every admitted turn advances the ONE row by exactly one revision.
+  // Post-wiring carrier: the created row carries the SAME-envelope window
+  // the K create seeded (INSTANCE_OPENED at revision 0) — one row, one
+  // counter, one transaction; the outward queryInstance read projects the
+  // committed truth WITHOUT the carrier fields.
+  const createdWindow = (row.value as { mutationObservations: unknown }).mutationObservations;
+  assert.equal(isHf20MutationObservationWindow(createdWindow), true);
+  assert.equal((createdWindow as { mutationSequence: number }).mutationSequence, 1);
+  assert.equal('mutationObservations' in snapshot, false);
+  assert.equal('admittedControlTurns' in snapshot, false);
+  // Every admitted turn advances the ONE row by exactly one revision and
+  // appends exactly ONE observation record into the SAME row value.
   for (let turn = 1; turn <= 3; turn += 1) {
-    const receipt = (await sendOn(gateway, `hf20-carrier-${turn}`)) as { status: string };
+    const receipt = (await sendOn(gateway, `hf20-carrier-${turn}`)) as { status: string; instance: Record<string, unknown> };
     assert.equal(receipt.status, 'admitted');
+    assert.equal('mutationObservations' in receipt.instance, false);
+    assert.equal('admittedControlTurns' in receipt.instance, false);
     row = await handle.store.get(INSTANCE_DOC_KEY);
     assert.ok(row !== null);
-    snapshot = (await gateway.queryInstance(requester, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as { stateRevision: number };
+    snapshot = (await gateway.queryInstance(requester, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as Record<string, unknown> & { stateRevision: number };
     assert.equal(row.revision, turn);
     assert.equal(snapshot.stateRevision, turn);
+    assert.equal((row.value as { mutationObservations: { mutationSequence: number } }).mutationObservations.mutationSequence, turn + 1);
   }
   // Tenant/app isolation is PHYSICAL: a second tenant's instance is a
-  // distinct row and never shares this stream's carrier.
+  // distinct row with its own seeded window, never this stream's carrier.
   await gateway.activateGenesis(t2Operator, { appId: APP_ID, instanceKey: INSTANCE_KEY });
   const keys = await handle.store.list('v08-kernel:wf-instance:');
   assert.ok(keys.includes(T2_INSTANCE_DOC_KEY));
   const t2Row = await handle.store.get(T2_INSTANCE_DOC_KEY);
   assert.ok(t2Row !== null);
   assert.equal(t2Row.revision, 0);
+  assert.equal(isHf20MutationObservationWindow((t2Row.value as { mutationObservations: unknown }).mutationObservations), true);
   // A physically faulted instance-doc write rejects the whole turn and
   // leaves revision, state and any observation truth entirely unchanged.
   (handle.store as SqliteCasStore).failNextPutMatching('v08-kernel:wf-instance:');
@@ -443,20 +462,22 @@ test('HF20 carrier B2: the physical instance row IS the atomicity foundation HF2
   assert.ok(row !== null);
   assert.equal(row.revision, 3);
   assert.equal((row.value as { stateRevision: number }).stateRevision, 3);
+  assert.equal((row.value as { mutationObservations: { mutationSequence: number } }).mutationObservations.mutationSequence, 4);
 });
 
 // ===========================================================================
-// Part C — HF20-P/HF20-N seam driver (STAGED until the K hook lands)
+// Part C — HF20-P/HF20-N selected physical P/N (the seam-A K owner has
+// merged; the wiring is IN scope — its absence is a FAILING required case)
 // ===========================================================================
 
 /**
- * The staged seam: the protected gateway read verb the deferred wiring
- * (adoption decision §5) installs. Feature-detected AT RUN TIME (inside
- * the test body through `t.skip`) because the wiring is a property of the
- * loaded closure bytes, not of this file's module shape.
+ * The protected gateway read verb the wiring (adoption decision §5)
+ * installs. Its absence is a REQUIRED failure now that the #1062 seam-A K
+ * owner has merged and the K hook is wired — never a SKIP, never a green.
  */
 interface Hf20GatewaySeam {
   queryMutationObservations(credential: unknown, request: {
+    readonly tenantId: string;
     readonly appId: string;
     readonly instanceKey: string;
     readonly afterCursor?: string;
@@ -464,40 +485,60 @@ interface Hf20GatewaySeam {
   }): Promise<unknown>;
 }
 
-function hf20SeamOf(targetGateway: KernelGateway): Hf20GatewaySeam | undefined {
+function hf20SeamOf(targetGateway: KernelGateway): Hf20GatewaySeam {
   const candidate = (targetGateway as unknown as Partial<Hf20GatewaySeam>).queryMutationObservations;
-  return typeof candidate === 'function' ? (targetGateway as unknown as Hf20GatewaySeam) : undefined;
+  assert.ok(
+    typeof candidate === 'function',
+    'required HF20 wiring: the gateway verb queryMutationObservations must exist (adoption decision §5; #1062 seam-A merged)',
+  );
+  return targetGateway as unknown as Hf20GatewaySeam;
 }
 
-const HF20_WIRING_PENDING = 'HF20 seam driver staged: gateway verb queryMutationObservations is not wired yet (K hook deferred until #1062 seam-A merges; see docs/validation/v0.8/hf20-adoption-decision.md §5) — NOT RUN, no green claimed';
-
-test('HF20-P: ordered committed-mutation records + restart resume from opaque K-validated cursor', async (t) => {
-  const seam = hf20SeamOf(gateway);
-  if (seam === undefined) {
-    t.skip(HF20_WIRING_PENDING);
-    return;
-  }
-  // This driver owns its complete lifecycle on its own physical SQLite.
-  const dbPath = sqliteTempPath('hf20-pn-driver');
-  const first = await bootstrapTrustedHost({
-    issuers: new Map([[INTEG_ISSUER, INTEG_ISSUER_SECRET]]),
-    audience: AUDIENCE,
-    storage: { path: dbPath },
+/**
+ * Runs one phase of the two-process RESTART driver over the SAME physical
+ * SQLite file (the protected load trust channel is one-shot per process —
+ * the NF06 spawned-reader discipline).
+ */
+async function runHf20DriverPhase(rootFile: string, dbPath: string, phase: 'open' | 'resume', afterCursor?: string): Promise<Record<string, unknown>> {
+  const child = spawn(process.execPath, [
+    '--import', 'tsx',
+    fileURLToPath(new URL('./hf20-restart-driver.ts', import.meta.url)),
+    rootFile,
+    dbPath,
+    phase,
+    ...(afterCursor === undefined ? [] : [afterCursor]),
+  ], { cwd: process.cwd(), env: process.env });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
+  child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
+  const exitCode = await new Promise<number>((resolve) => {
+    child.on('close', (code: number | null) => resolve(code ?? -1));
   });
-  const firstGateway = createKernelGateway({ host: first.host, gatewaySessionCap: first.gatewaySessionCap });
-  await firstGateway.registerApp({ appId: APP_ID, packageRoot: sealedRoot, genesisRoles: ['platform-operator'] });
-  await firstGateway.activateGenesis(operator, { appId: APP_ID, instanceKey: INSTANCE_KEY });
-  for (let turn = 1; turn <= 2; turn += 1) {
-    const receipt = (await sendOn(firstGateway, `hf20-p-${turn}`)) as { status: string };
-    assert.equal(receipt.status, 'admitted');
-  }
-  const firstSeam = hf20SeamOf(firstGateway) as Hf20GatewaySeam;
-  const page = (await firstSeam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
-    records: { sequence: number; kind: string }[];
-    nextCursor?: string;
-    highWatermark: number;
+  assert.equal(exitCode, 0, `the hf20 restart driver (${phase}) must succeed (stderr: ${stderr.slice(0, 400)})`);
+  const line = stdout.split(/\r?\n/).find((candidate) => candidate.startsWith('HF20_PHASE_RESULT '));
+  assert.ok(line !== undefined, `the hf20 restart driver (${phase}) printed its result line (stdout: ${stdout.slice(0, 400)})`);
+  return JSON.parse(line.slice('HF20_PHASE_RESULT '.length)) as Record<string, unknown>;
+}
+
+test('HF20-P: ordered committed-mutation records + restart resume from opaque K-validated cursor', async () => {
+  hf20SeamOf(gateway);
+  // This driver owns its complete lifecycle on its own physical SQLite,
+  // across TWO fresh processes (open → physical close → resume).
+  const rootFile = join(tmpdir(), `dh1063-hf20-root-${process.pid}.json`);
+  await writeFile(rootFile, JSON.stringify(sealedRoot), 'utf8');
+  const dbPath = sqliteTempPath('hf20-pn-driver');
+
+  const opened = (await runHf20DriverPhase(rootFile, dbPath, 'open')) as {
+    page: {
+      records: { sequence: number; kind: string; stateRevisionAfter: number }[];
+      nextCursor?: string;
+      highWatermark: number;
+    };
   };
-  // Ordered, committed-mutation-only records with exact instance scope.
+  const page = opened.page;
+  // Ordered, committed-mutation-only records with exact instance scope:
+  // INSTANCE_OPENED@0 then one MUTATION_COMMITTED per admitted revision.
   const sequences = page.records.map((record) => record.sequence);
   for (let index = 1; index < sequences.length; index += 1) {
     const previous = sequences.at(index - 1);
@@ -505,53 +546,41 @@ test('HF20-P: ordered committed-mutation records + restart resume from opaque K-
     assert.ok(previous !== undefined && current !== undefined);
     assert.equal(current, previous + 1);
   }
-  assert.ok(page.records.every((record) => record.kind === 'INSTANCE_OPENED' || record.kind === 'MUTATION_COMMITTED'));
+  assert.deepEqual(page.records.map((record) => record.kind), ['INSTANCE_OPENED', 'MUTATION_COMMITTED', 'MUTATION_COMMITTED']);
+  assert.deepEqual(page.records.map((record) => record.stateRevisionAfter), [0, 1, 2]);
   assert.ok(page.nextCursor !== undefined);
   const cursor = page.nextCursor as string;
   const watermarkBeforeRestart = page.highWatermark;
-  // Restart: close the host, reopen the SAME physical SQLite file.
-  await first.host.close();
-  const reopened = await bootstrapTrustedHost({
-    issuers: new Map([[INTEG_ISSUER, INTEG_ISSUER_SECRET]]),
-    audience: AUDIENCE,
-    storage: { path: dbPath },
-  });
-  try {
-    const reopenedGateway = createKernelGateway({ host: reopened.host, gatewaySessionCap: reopened.gatewaySessionCap });
-    await reopenedGateway.registerApp({ appId: APP_ID, packageRoot: sealedRoot, genesisRoles: ['platform-operator'] });
-    const reopenedSeam = hf20SeamOf(reopenedGateway) as Hf20GatewaySeam;
-    // Resume first: the cursor still reads exactly-after its sequence.
-    const resumedBeforeNew = (await reopenedSeam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY, afterCursor: cursor })) as {
-      records: { sequence: number }[];
-      highWatermark: number;
-    };
-    assert.equal(resumedBeforeNew.highWatermark, watermarkBeforeRestart);
-    // One more committed turn AFTER the restart becomes visible from the
-    // SAME cursor — the durable resume witness.
-    const receipt = (await sendOn(reopenedGateway, 'hf20-p-post-restart')) as { status: string };
-    assert.equal(receipt.status, 'admitted');
-    const resumed = (await reopenedSeam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY, afterCursor: cursor })) as {
+  assert.equal(watermarkBeforeRestart, 3);
+
+  // Restart: a FRESH process reopens the SAME physical SQLite file,
+  // resumes from the cursor, commits one more turn and resumes again.
+  const resumedResult = (await runHf20DriverPhase(rootFile, dbPath, 'resume', cursor)) as {
+    beforeWatermark: number;
+    beforeRecords: number;
+    page: {
       records: { sequence: number; stateRevisionAfter: number }[];
       highWatermark: number;
     };
-    assert.ok(resumed.records.length >= 1);
-    assert.ok(resumed.records.every((record) => record.sequence > watermarkBeforeRestart));
-    assert.equal(resumed.highWatermark, watermarkBeforeRestart + 1);
-    const lastResumed = resumed.records.at(-1);
-    assert.ok(lastResumed !== undefined);
-    assert.equal(lastResumed.stateRevisionAfter, watermarkBeforeRestart);
-  } finally {
-    await reopened.host.close();
-  }
+  };
+  // Resume first: the cursor still reads exactly-after its sequence, with
+  // the pre-restart watermark intact.
+  assert.equal(resumedResult.beforeWatermark, watermarkBeforeRestart);
+  assert.equal(resumedResult.beforeRecords, 0);
+  // One more committed turn AFTER the restart becomes visible from the
+  // SAME cursor — the durable resume witness.
+  const resumed = resumedResult.page;
+  assert.ok(resumed.records.length >= 1);
+  assert.ok(resumed.records.every((record) => record.sequence > watermarkBeforeRestart));
+  assert.equal(resumed.highWatermark, watermarkBeforeRestart + 1);
+  const lastResumed = resumed.records.at(-1);
+  assert.ok(lastResumed !== undefined);
+  assert.equal(lastResumed.stateRevisionAfter, watermarkBeforeRestart);
 });
 
-test('HF20-N: forged/stale/cross-tenant cursors, replay synthesis and uncommitted mutations yield no observation', async (t) => {
+test('HF20-N: forged/stale/cross-tenant cursors, replay synthesis and uncommitted mutations yield no observation', async () => {
   const seam = hf20SeamOf(gateway);
-  if (seam === undefined) {
-    t.skip(HF20_WIRING_PENDING);
-    return;
-  }
-  const page = (await seam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
+  const page = (await seam.queryMutationObservations(operator, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
     records: { kind?: unknown }[];
     highWatermark: number;
   };
@@ -562,16 +591,18 @@ test('HF20-N: forged/stale/cross-tenant cursors, replay synthesis and uncommitte
     return Buffer.from(JSON.stringify(payload)).toString('base64url');
   })();
   await assert.rejects(
-    seam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY, afterCursor: forged }),
+    seam.queryMutationObservations(operator, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY, afterCursor: forged }),
     (error: unknown) => /CURSOR_/.test(String((error as { code?: string }).code ?? '')),
   );
   // A cursor minted for ANOTHER tenant's stream is substitution: refused.
   await assert.rejects(
-    seam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY, afterCursor: encodeHf20Cursor(`x:t2:${APP_ID}:${INSTANCE_KEY}`, 0) }),
+    seam.queryMutationObservations(operator, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY, afterCursor: encodeHf20Cursor(`x:t2:${APP_ID}:${INSTANCE_KEY}`, 0) }),
     (error: unknown) => (error as { code?: string }).code === 'CURSOR_STREAM_MISMATCH',
   );
+  // A stale-but-legal cursor of THIS exact stream (behind the watermark)
+  // stays a resume point — the restart-resume witness is HF20-P above.
   // Replaying the same read synthesizes nothing: identical page, no growth.
-  const replay = (await seam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
+  const replay = (await seam.queryMutationObservations(operator, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
     records: unknown[];
     highWatermark: number;
   };
@@ -583,7 +614,7 @@ test('HF20-N: forged/stale/cross-tenant cursors, replay synthesis and uncommitte
     sendOn(gateway, 'hf20-n-faulted'),
     (error: unknown) => (error as { code?: string }).code === 'HOST_FAULT_INJECTED',
   );
-  const afterFault = (await seam.queryMutationObservations(requester, { appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
+  const afterFault = (await seam.queryMutationObservations(operator, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
     records: { kind?: unknown }[];
     highWatermark: number;
   };
@@ -591,4 +622,55 @@ test('HF20-N: forged/stale/cross-tenant cursors, replay synthesis and uncommitte
   // Effect Journal distinctness: no journal-shaped record ever enters the
   // mutation-observation stream (kinds are the two mutation families only).
   assert.ok(afterFault.records.every((record) => record.kind === 'INSTANCE_OPENED' || record.kind === 'MUTATION_COMMITTED'));
+});
+
+// ===========================================================================
+// Part D — read-scope boundary (the one material boundary #1063@6188137089)
+// ===========================================================================
+
+test('HF20 read scope: the ordinary authenticated reader is refused; no outward surface carries the K-only carrier fields', async () => {
+  const seam = hf20SeamOf(gateway);
+  // ONE small negative: the ordinary authenticated reader — a principal
+  // that MAY send and queryInstance — is NOT an HF20 reader.
+  await assert.rejects(
+    seam.queryMutationObservations(requester, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY }),
+    (error: unknown) => (error as { code?: string }).code === 'HOST_CONTROL_ROLE_DENIED',
+  );
+  // The authorized specialized query still works.
+  const authorized = (await seam.queryMutationObservations(operator, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as {
+    records: unknown[];
+    highWatermark: number;
+  };
+  assert.ok(authorized.records.length >= 1);
+  // The physical row carries the K-only carrier (HF20 window; the #1066
+  // same-CAS admittedControlTurns history rides the same row on control-
+  // turn flows); nothing outward does — the outward projection strips BOTH.
+  const row = await handle.store.get(INSTANCE_DOC_KEY);
+  assert.ok(row !== null);
+  assert.equal('mutationObservations' in (row.value as object), true);
+  // queryInstance projects the outward snapshot only.
+  const snapshot = (await gateway.queryInstance(requester, { tenantId: TENANT, appId: APP_ID, instanceKey: INSTANCE_KEY })) as Record<string, unknown>;
+  assert.equal('mutationObservations' in snapshot, false);
+  assert.equal('admittedControlTurns' in snapshot, false);
+  // The occurrence receipt carries the same outward instance projection.
+  const receipt = (await sendOn(gateway, 'hf20-scope-witness')) as { status: string; instance: Record<string, unknown> };
+  assert.equal(receipt.status, 'admitted');
+  assert.equal('mutationObservations' in receipt.instance, false);
+  assert.equal('admittedControlTurns' in receipt.instance, false);
+  // FR05: the projection source is the SAME redacted K read — no carrier
+  // field can leak through the retained projection either.
+  const projection = (await gateway.queryProjection(requester, {
+    appId: APP_ID,
+    projectionId: 'proj:hf20-leak-witness',
+    dependencies: [{ name: 'src', instanceKey: INSTANCE_KEY, expectedRevision: 'rev-4' }],
+    fields: { source: 'src' },
+  })) as { candidate: Record<string, Record<string, unknown>> };
+  const projectedSource = projection.candidate.source;
+  assert.ok(projectedSource !== undefined);
+  assert.equal('mutationObservations' in projectedSource, false);
+  assert.equal('admittedControlTurns' in projectedSource, false);
+  // The initial Genesis response is the outward projection too.
+  const genesis = (await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: 'hf20-scope-genesis' })) as Record<string, unknown>;
+  assert.equal('mutationObservations' in genesis, false);
+  assert.equal('admittedControlTurns' in genesis, false);
 });
