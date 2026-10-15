@@ -191,7 +191,7 @@ export interface KernelGatewayLatestObserver {
 export interface KernelGatewayAgentToolQueryResult {
   readonly kind: 'agent-tool-query';
   readonly appId: string;
-  readonly tools: readonly { readonly operationId: string; readonly effectClass: 'none'; readonly authority: string }[];
+  readonly tools: readonly { readonly capabilityId: string; readonly operationId: string; readonly effectClass: 'none'; readonly authority: string }[];
   readonly projectionAuthority: string;
 }
 
@@ -980,31 +980,47 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       const app = requireApp(request.appId, principal);
       const retained = requireRetainedProjection(app);
       const surface = app.ops.describeOperationSurface(principal);
-      // The S projection runs over the FULL BUILD-sealed descriptor list
-      // (it keeps exactly agent-exposed pure operations and refuses an
-      // agent-marked effectful entry — unreachable after the wiring, the
-      // seal is still the belt-and-braces authority here).
-      const projection = retained.projectAgentTools(surface.map((descriptor) => ({
-        operationId: descriptor.operationId,
-        agentExposed: descriptor.agentExposed,
-        effectClass: descriptor.effectClass,
-      }))) as { tools?: { operationId?: unknown; effectClass?: unknown; authority?: unknown }[]; authority?: unknown };
-      // Business-governed visibility: discovery lists only what THIS
-      // authenticated principal could actually call through the protected
-      // OperationCall route (the same role pick, probed without throwing).
-      const admitted = new Set(surface.filter((descriptor) => descriptor.principalAdmitted).map((descriptor) => descriptor.operationId));
-      const tools = (projection.tools ?? [])
-        .filter((tool) => admitted.has(tool.operationId as string))
-        .map((tool) => Object.freeze({
-          operationId: tool.operationId as string,
-          effectClass: 'none' as const,
-          authority: typeof tool.authority === 'string' ? tool.authority : 'projection-only',
-        }));
+      // OperationCall binds the COMPOSITE (capabilityId, operationId), so
+      // project each BUILD-sealed capability independently: unrelated
+      // capability packages may legitimately reuse the same operationId.
+      // The sealed S projection remains the sole read-only eligibility
+      // interpreter and still refuses duplicates WITHIN one capability.
+      const byCapability = new Map<string, typeof surface[number][]>();
+      for (const descriptor of surface) {
+        const group = byCapability.get(descriptor.capabilityId) ?? [];
+        group.push(descriptor);
+        byCapability.set(descriptor.capabilityId, group);
+      }
+      const tools: Array<KernelGatewayAgentToolQueryResult['tools'][number]> = [];
+      let projectionAuthority = 'projection-only';
+      for (const [capabilityId, descriptors] of byCapability) {
+        const projection = retained.projectAgentTools(descriptors.map((descriptor) => ({
+          operationId: descriptor.operationId,
+          agentExposed: descriptor.agentExposed,
+          effectClass: descriptor.effectClass,
+        }))) as { tools?: { operationId?: unknown; effectClass?: unknown; authority?: unknown }[]; authority?: unknown };
+        if (typeof projection.authority === 'string') projectionAuthority = projection.authority;
+        // Apply the same Business-bound role pick inside THIS capability.
+        // An identical operationId admitted on another capability grants
+        // no visibility or calling authority here.
+        const admitted = new Set(
+          descriptors.filter((descriptor) => descriptor.principalAdmitted).map((descriptor) => descriptor.operationId),
+        );
+        for (const tool of projection.tools ?? []) {
+          if (!admitted.has(tool.operationId as string)) continue;
+          tools.push(Object.freeze({
+            capabilityId,
+            operationId: tool.operationId as string,
+            effectClass: 'none' as const,
+            authority: typeof tool.authority === 'string' ? tool.authority : 'projection-only',
+          }));
+        }
+      }
       return Object.freeze({
         kind: 'agent-tool-query',
         appId: request.appId,
         tools: Object.freeze(tools),
-        projectionAuthority: typeof projection.authority === 'string' ? projection.authority : 'projection-only',
+        projectionAuthority,
       });
     },
 
