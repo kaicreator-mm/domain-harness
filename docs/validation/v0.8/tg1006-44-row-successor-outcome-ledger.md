@@ -100,4 +100,19 @@ predecessor SHA is provenance only.
 
 ## Exact-SHA CI appendix
 
-(pipeline result appended after the evidence PR's pull_request Woodpecker run settles)
+PR #1069 (base `v0.8`), head `62a7660f35860632d29a1cc0e8bfffd150326b66` = frozen
+candidate `b151320ee…` + the 8 evidence files of this round only (4 test/fixture +
+4 docs; zero production `src` change). The `pull_request`-triggered Woodpecker
+pipeline — `ci/woodpecker/pr/verify` — ran the full `npm ci && npm run build &&
+npm run lint && npm run typecheck && npm test` chain with its built-in
+`git rev-parse HEAD = $CI_COMMIT_SHA` exact-commit check:
+
+- Pipeline: `https://ci.kaicreator.com/repos/18/pipeline/1272/1`
+- Event: `pull_request` (push allowlist main/v0.2/v0.3/v0.4 does not include v0.8 —
+  no push CI is claimed)
+- Result: **pass — "Pipeline was successful"** (settled 2026-10-15T11:15:20Z UTC
+  after ~33 min)
+- Scope note: this is CI PASS at the evidence-PR head, whose production code paths are
+  byte-identical to the frozen candidate (diff limited to tests + docs as recorded in
+  the execution record). It is candidate-scope CI evidence, NOT a Release PASS.
+
