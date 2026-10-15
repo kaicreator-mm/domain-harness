@@ -61,10 +61,17 @@ export {
 } from './kernel-gateway.js';
 export type {
   KernelGateway,
+  KernelGatewayAgentToolQueryResult,
   KernelGatewayAppInput,
   KernelGatewayCancelRequest,
   KernelGatewayCancelResult,
+  KernelGatewayLatestObserver,
+  KernelGatewayLatestObserverScope,
+  KernelGatewayLatestObserverStatus,
+  KernelGatewayLatestObserverUpdate,
   KernelGatewayOperationCall,
+  KernelGatewayProjectionDependency,
+  KernelGatewayProjectionRequest,
   KernelGatewaySendIntent,
   KernelReceiptScope,
   KernelReceiptSubscription,
