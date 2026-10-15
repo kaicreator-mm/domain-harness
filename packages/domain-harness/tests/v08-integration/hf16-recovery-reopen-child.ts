@@ -43,7 +43,7 @@ const journalRowsBefore = await journalCount();
 const again = await gateway.authorizePoisonRecovery(operator, {
   appId: APP_ID, instanceKey: 'q-rec', poisonMessageId: 'm-poison-1',
   intentType: 'submitQuoteDecisionDynamic', input: { amount: 30, requestId: 'RECOVER-1' }, reason: 'ledger-restored',
-});
+}) as { disposition: string };
 
 // Redelivery after restart: typed duplicate + idempotent Kernel replay.
 const redelivered = await gateway.deliverPoisonRecovery(requester, {

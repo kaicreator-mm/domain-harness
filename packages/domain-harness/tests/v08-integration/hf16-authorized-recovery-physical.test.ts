@@ -72,12 +72,14 @@ const requester = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 're
 const target = (instanceKey: string) => ({ tenantId: TENANT, appId: APP_ID, instanceKey });
 const send = (messageId: string, input: Record<string, unknown>, instanceKey: string) =>
   gateway.send(requester, { intentType: 'submitQuoteDecisionDynamic', messageId, input, target: target(instanceKey) });
-const authorize = (credential: unknown, poisonMessageId: string, input: Record<string, unknown>, reason = 'ledger-restored') =>
+type RecoveryAuthorization = { status: string; disposition: string; actionId: string };
+type RecoveryDelivery = { status: string; disposition?: string; receipt?: { status: string; admitted?: { durableControlTurnId: string } } };
+const authorize = (credential: unknown, poisonMessageId: string, input: Record<string, unknown>, reason = 'ledger-restored'): Promise<RecoveryAuthorization> =>
   gateway.authorizePoisonRecovery(credential, {
     appId: APP_ID, instanceKey: 'q-rec', poisonMessageId, intentType: 'submitQuoteDecisionDynamic', input, reason,
-  });
-const deliver = (credential: unknown, poisonMessageId: string, instanceKey = 'q-rec') =>
-  gateway.deliverPoisonRecovery(credential, { appId: APP_ID, instanceKey, poisonMessageId });
+  }) as Promise<RecoveryAuthorization>;
+const deliver = (credential: unknown, poisonMessageId: string, instanceKey = 'q-rec'): Promise<RecoveryDelivery> =>
+  gateway.deliverPoisonRecovery(credential, { appId: APP_ID, instanceKey, poisonMessageId }) as Promise<RecoveryDelivery>;
 
 async function journalRows(): Promise<Array<Record<string, unknown>>> {
   const keys = await handle.host.docs.list(JOURNAL_PREFIX);
@@ -160,7 +162,7 @@ test('HF16-P authorized recovery: durable action, corrective turn, drain continu
   // the state, the re-send resolves to a typed domain outcome (denial or
   // effect-failure) — never an admission — with zero new activity.
   const rowsAfterRecovery = (await journalRows()).length;
-  let poisonOutcome: { code?: string; status?: string };
+  let poisonOutcome: { code?: string | undefined; status?: string | undefined };
   try {
     poisonOutcome = await send('m-poison-1', { amount: 30, requestId: 'POISON-1' }, 'q-rec') as { status: string };
   } catch (error) {
