@@ -1,6 +1,6 @@
 # v0.8 Retained 44 — current selected-source evidence intake (NON-NORMATIVE)
 
-> T-G #1006 Web-only evidence-index successor `v0.8@a1cffa2561e81bc3a146ee49e96303f5483bd633`. This file is a **source-assertion map**, NOT executed candidate validation. The frozen `docs/implementation/DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json` remains unchanged: **44/44 NOT_RUN, 0/44 exactExecutionSHA**. Evidence must not be promoted from another SHA or a proposal/legacy test. NF06 PR #1055 has **MERGED** at `a1cffa2561e81bc3a146ee49e96303f5483bd633` after independently reviewed bounded repairs. Its existing selected-path P/N test **source** may be indexed here, but final exact-candidate execution remains NOT_RUN. **RELEASE=HOLD**.
+> T-G #1006 Web-only evidence-index successor `v0.8@1c8b4942d93011370efcc9235bb5862883ecf8fb` (after PRs #1055, #1057, #1061). This file is a **source-assertion map**, NOT executed candidate validation. The frozen `docs/implementation/DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json` remains unchanged: **44/44 NOT_RUN, 0/44 exactExecutionSHA**. Evidence must not be promoted from another SHA or a proposal/legacy test. NF06 PR #1055, decision-source PR #1057, and retained-read PR #1061 have **MERGED**. Their selected-path P/N test **sources** may be indexed here, but final candidate execution remains NOT_RUN. HF18/HF20/HF32 have separately confirmed missing selected runtime paths; corrective Issues #1062/#1063 own the only K implementation follow-up. **RELEASE=HOLD**.
 
 ## Cost-controlled final-candidate rule
 
@@ -9,7 +9,7 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 ## Test-path key
 
 - `C` = `packages/domain-harness-compiler/tests/`; `I` = `packages/domain-harness/tests/v08-integration/`; `A` = `packages/domain-harness/tests/`; `H` = `packages/domain-harness/tests/v08-host/`.
-- Table witnesses are **candidate files**. Several are complementary and do not alone prove the full frozen row. `SELECTED_PN_PRESENT` means exact current selected-path tests exist, **not** version PASS. `PHYSICAL_PARTIAL` means current real K/H assertions cover only part of the row. `SOURCE_TEST_ONLY` means BUILD/unit sources exist but physical acceptance isn't independently matched. `PROPOSAL_ONLY` and `LEGACY_WITNESS_ONLY` cannot satisfy selected-runtime P/N. `NO_EXACT_V08_PN_MAPPED` means a missing selected witness must be triaged; it does NOT establish missing production functionality. `ACTIVE_LOCAL_OWNER` would mean an implementation still in progress; after PR #1055 merged no current row uses this classification. This is an index classification, not a Release PASS.
+- Table witnesses are **candidate files**. Several are complementary and do not alone prove the full frozen row. `SELECTED_PN_PRESENT` means exact current selected-path tests exist, **not** version PASS. `PHYSICAL_PARTIAL` means current real K/H assertions cover only part of the row. `SOURCE_TEST_ONLY` means BUILD/unit sources exist but physical acceptance isn't independently matched. `PROPOSAL_ONLY` and `LEGACY_WITNESS_ONLY` cannot satisfy selected-runtime P/N. `NO_EXACT_V08_PN_MAPPED` means selected witness absence; for **HF18/HF20/HF32 only**, #1006@6185453827 additionally establishes `MATERIAL_IMPLEMENTATION_GAP` by selected K/H source reachability (SOURCE_ONLY, not a native failing test). `ACTIVE_LOCAL_OWNER` would mean an implementation still in progress; after PR #1055 merged no current row uses this classification. This is an index classification, not a Release PASS.
 
 ## All frozen entries — 44 unique rows
 
@@ -19,25 +19,25 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 | `FR02` | S | SELECTED_PN_PRESENT | C WEB-ORACLE-1; I v08-tf-fr02-fr07-selected-physical; FR02-F01/F02/F03; final SHA rerun owed |
 | `FR03` | K | PHYSICAL_PARTIAL | C v08-kernel-package-c01; I s04-operation-call; tool effect replay/UNKNOWN covered; full FR03 mapping owed |
 | `FR04` | K | PHYSICAL_PARTIAL | C C01; I i02-auth-ux-kernel, journal-tenant-isolation; DomainMessage ACK/dedup full matrix not isolated |
-| `FR05` | S | PROPOSAL_ONLY | C v08-standard-sdk-retention-d02; source-revision projection only; no selected H/K multi-source truth |
+| `FR05` | S | SELECTED_PN_PRESENT | PR #1061: H `queryProjection` + sealed S `projectRetainedRead` over principal-scoped K snapshots; `I fr05-hf17-hf23-selected-physical` two-source rev-pinned positive, stale/cross-tenant negative (owner Node24 SQLite 10/10 aggregate at PR predecessor; patched HEAD full re-execution NOT_RUN) |
 | `FR06` | M | PHYSICAL_PARTIAL | C v08-qualified-package-a01; A v08-abi-a01, s01-installed-package; approved load/byte negatives exist; reconcile FR06 wording |
 | `FR07` | S | SELECTED_PN_PRESENT | C WEB-ORACLE-1; I v08-tf-fr02-fr07-selected-physical; FR07 F01/F02/F03/F04; final SHA rerun owed |
-| `FR08` | S | PROPOSAL_ONLY | C v08-standard-sdk-retention-d02; I fr08-sd-nf05-physical; SD1/SD2 are separately mapped; full rule/cache/promotion source resolution not proved |
-| `FR09` | S | PROPOSAL_ONLY | C v08-standard-sdk-retention-d02; selection proposal not physically approved child execution |
+| `FR08` | S | SELECTED_PN_PRESENT | PR #1057: selected K `resolveDecisionSourceTurn` → S `resolveRetainedDecision`; `I fr08-fr09-fr12-decision-source-physical` covers Rule/exact-cache/pinned child/fallback ordering and stale/revoked (owner SQLite 5/5 pre-fastfix; final SHA not executed). Source-only WeakMap-count and postcommit cache read-fault patches need TWO candidate negatives |
+| `FR09` | S | SELECTED_PN_PRESENT | PR #1057: K pinned promoted-child approval/candidate digest and S `selectRetainedPromotedChild`, real selected Node24 SQLite pin/revocation N; full child-actor routing is separately HF32 and NOT proven by this row |
 | `FR10` | U | PHYSICAL_PARTIAL | I i02-auth-ux-kernel; role/tenant intent denial physical; full DAC UX role-safe bridge mapping owed |
 | `FR11` | BUILD | SOURCE_TEST_ONLY | C domain-data-section, domain-data-schema-contract; compiled typed Domain Data exact v0.8 consumer P/N unverified |
-| `FR12` | S | PROPOSAL_ONLY | C v08-standard-sdk-retention-d02; S evidence proposal only; selected fast path/authority not mapped |
+| `FR12` | S | SELECTED_PN_PRESENT | PR #1057 selected current-revision exact-cache and S `checkRetainedEvidenceApplicability`; `I fr08-fr09-fr12-decision-source-physical` no-fresh-model currentness N, plus #1051 SD1/SD2 zero-ModelPort; re-run exact final candidate only |
 | `FR13` | BUILD | SOURCE_TEST_ONLY | C v08-qualified-package-a01, v08-capability-package-s02a; BUILD binding/Kind checks; full row split needed |
 | `FR14` | K | PHYSICAL_PARTIAL | C v08-kernel-package-c01; I tf-two-real-apps-packed-e2e; single K journal/authority physical, whole FR14 P/N mapping pending |
 | `FR15` | U | PHYSICAL_PARTIAL | I i02-auth-ux-kernel, s04-operation-call; typed UX/protected operation partial; agent/resource exposure not fully covered |
 | `HF16` | K | PHYSICAL_PARTIAL | C v08-kernel-package-c01; crash/ambiguous journal selected; poison queue drain missing witness |
-| `HF17` | S | PROPOSAL_ONLY | C v08-standard-sdk-retention-d02; revision coalescing proposal; no reconnect cursor physical |
-| `HF18` | K | NO_EXACT_V08_PN_MAPPED | historical manifest paths only; durable deadline/callback correlation selected P/N not found |
+| `HF17` | S | SELECTED_PN_PRESENT | PR #1061 H `observeLatest` + S `coalesceRetainedObservations`; `I fr05-hf17-hf23-selected-physical` Query latest → NEW NON-DURABLE session, coalesced live, revoked/no-session N. Historic HF17 DOES NOT require durable cursor; HF20 independent |
+| `HF18` | K | NO_EXACT_V08_PN_MAPPED | **MATERIAL_IMPLEMENTATION_GAP** confirmed SOURCE_ONLY #1006@6185453827; K derives timer/callback turn IDs but selected K/H has no delivery/deadline correlation path; corrective #1062. No physical P/N yet |
 | `HF19` | K | PHYSICAL_PARTIAL | C v08-kernel-package-c01; I journal-tenant-isolation; CAS/effect terminal partial; atomic ProcessCommand terminal proof unresolved |
-| `HF20` | K | NO_EXACT_V08_PN_MAPPED | historical manifest paths only; ordered observation cursor/restart selected P/N not found |
+| `HF20` | K | NO_EXACT_V08_PN_MAPPED | **MATERIAL_IMPLEMENTATION_GAP** confirmed SOURCE_ONLY #1006@6185453827; HF17 live observer is non-durable, no selected ordered mutation-record/cursor reopen carrier; corrective #1063. No physical P/N yet |
 | `HF21` | K | PHYSICAL_PARTIAL | I i02-auth-ux-kernel; tenant separation is not SIM/PROD authority isolation |
 | `HF22` | BUILD | SOURCE_TEST_ONLY | C v08-qualified-package-a01; transitive closure AST/ABI checks; exact row proof needs review |
-| `HF23` | S | PROPOSAL_ONLY | C v08-standard-sdk-retention-d02; read-only agent-operation list proposal; no selected access observer |
+| `HF23` | S | SELECTED_PN_PRESENT | PR #1061 H `queryAgentTools` over BUILD-sealed pure marking/role gate and S `projectRetainedAgentTools`; selected SQLite approved/hidden/effectful/revoked N, R2 composite `(capabilityId, operationId)` source fixed with exact dist. Two-capability SAME operationId real negative still owed ONCE on final candidate |
 | `HF24` | BUILD | SOURCE_TEST_ONLY | C business-source-section; BUILD projection source tests; exact current P/N not signed off |
 | `HF25` | BUILD | SOURCE_TEST_ONLY | C v08-qualified-package-a01, business-source-section; typed code generation source evidence; consumer P/N pending |
 | `HF26` | K | PHYSICAL_PARTIAL | C v08-kernel-package-c01; I i02-auth-ux-kernel; denial receipt exists; complete provenance/evidence per row pending |
@@ -46,7 +46,7 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 | `HF29` | H | PHYSICAL_PARTIAL | C host-local-tool-binding; I s04-operation-call; allowed local/HTTP/script Host permissions exact matrix not mapped |
 | `HF30` | BUILD | LEGACY_WITNESS_ONLY | A dac-v0041-runtime-activation; C v08-qualified-package-a01; DAC designation/delegation historic tests, not selected BUILD integrated proof |
 | `HF31` | BUILD | SOURCE_TEST_ONLY | C v08-qualified-package-a01; A v08-abi-a01; hostile getters/canonical records negative tests present |
-| `HF32` | K | NO_EXACT_V08_PN_MAPPED | historical manifest paths only; durable child-send result routing selected P/N not found |
+| `HF32` | K | NO_EXACT_V08_PN_MAPPED | **MATERIAL_IMPLEMENTATION_GAP** confirmed SOURCE_ONLY #1006@6185453827; FR09 promoted package pin is NOT child actor/send-result routing; corrective #1062. No physical P/N yet |
 | `HF33` | H | PHYSICAL_PARTIAL | I i03-closure-pin, s05-capability-identity; Host closure/adapter pin isn't same-occurrence resource currentness |
 | `HF34` | BUILD | SOURCE_TEST_ONLY | C v08-qualified-package-a01; canonical digest/refusal source checks; definition graph exact P/N pending |
 | `NEW-FUNCTION-01` | BUILD | LEGACY_WITNESS_ONLY | A dac-v0041-compatibility/*; historic exact two-view verification only; selected BUILD bridge unproven |
@@ -66,18 +66,18 @@ One immutable final candidate → one full CI run and one focused Node22/24 + re
 - `LEGACY_WITNESS_ONLY`: 5
 - `NO_EXACT_V08_PN_MAPPED`: 3
 - `PHYSICAL_PARTIAL`: 15
-- `PROPOSAL_ONLY`: 6
-- `SELECTED_PN_PRESENT`: 8
+- `PROPOSAL_ONLY`: 0
+- `SELECTED_PN_PRESENT`: 14
 - `SOURCE_TEST_ONLY`: 7
 
 ## Priority validation queues (preserve selected K/S/Host source ownership)
 
 1. **NF06 source selected, not release-qualified**: PR #1055 merged after independent source-review repairs (R2 PASS). Optional receipt append/read, post-commit-failure containment, authorized visibility, true SQLite restart, and mandatory typed **zero-effect refusal** have selected-path P/N sources; separately approved new mandatory atomic K/H positive is OUT of v0.8 (#949@6106607603). No parallel implementation needed for NF06 solely because this stale ledger formerly said `ACTIVE_LOCAL_OWNER`; do not report an actual final candidate PASS before one #1006 run.
-2. **Selected S semantic gaps**: FR05 full revision pin and FR08 resolver Rule/cache/promoted path, FR09 governed child execution, FR12 fast-path evidence, HF17/HF23 observer/agent exposure. Proposal-only tests may be used as reusable subtests, not a final P/N replacement.
-3. **Distinct high-risk K rows**: HF18 (deadline/callback), HF20 (ordered cursor), HF32 (durable child-send); verify actual selected source/test against frozen observables BEFORE creating any extra test. HF16/HF19/HF21 were only partially witnessed by K C01 and tenant isolation, not the entire retained behavior.
+2. **Selected S seams now merged, NOT current candidate test PASS:** PR #1057 (FR08 general/FR09/FR12) and PR #1061 (FR05/HF17/HF23) add selected K/H/S wiring and local SQLite source-witness tests. Reuse real P/N source candidates, do not run six additional full suites. Final candidate specifically owes #1057 WeakMap load-denial and postcommit cache re-read ACK fault negatives, and #1061 HF23 two-capability same-operation identity/role control.
+3. **Confirmed selected K gaps (NOT native TEST_FAIL):** HF18 + HF32 share corrective K-turn Issue #1062; HF20 mutation-record/cursor Issue #1063 is independent. Both are T-G corrective children, not two new formal DAG gates; Release HOLD until implementation and exact selected physical P/N. HF16/HF19/HF21 are still only partly source-mapped, no claim of full functional PASS.
 4. **BUILD and DAC bridge**: historical DAC 01–04 sources/tests remain in the repo; selected BUILD binding and actual approval currentness need new candidate-appropriate provenance. Avoid porting old APIs before checking what the frozen Product truly requires.
 5. **Deferred CI reconciliation**: #1051 Woodpecker #1236 FAILURE remains pending root-cause; inspect/reproduce once on final immutable tree, and classify any real failure before Release Qualification.
 
 ## Ownership and gate
 
-Web may refine this source index on a pinned branch and use the now-merged NF06 PR #1055. Do not introduce a second source writer or mutate K/S/Host from this documentation-only classification update. Final #1006 evidence-only PR may update the frozen 44 statuses only after real exact-SHA P/N and independent validation. CI deferral applies to intermediate PR full runs, **not** final v0.8 candidate qualification.
+Web may refine this NON-NORMATIVE source index on a pinned branch after the three merged PRs and source-only preflight. Do not introduce a second source writer or mutate K/S/Host from this documentation-only classification update. Final #1006 evidence-only PR may update the frozen 44 statuses only after real exact-SHA P/N and independent validation. CI deferral applies to intermediate PR full runs, **not** final v0.8 candidate qualification.
