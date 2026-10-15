@@ -630,6 +630,15 @@ async function loadScopedFacade(packageRoot) {
         // refused at the getter before the frozen {invoke} object can be reached.
         const modelPort = currentHostModelPort(gatewaySessionCap);
         const resolverFactory = sdkNamespace.createHostBoundModelResolver;
+        const retainedDecisionSource = typeof sdkNamespace.resolveRetainedDecision === 'function'
+            && typeof sdkNamespace.selectRetainedPromotedChild === 'function'
+            && typeof sdkNamespace.checkRetainedEvidenceApplicability === 'function'
+            ? {
+                resolveDecisionSource: (selection) => sdkNamespace.resolveRetainedDecision(selection),
+                selectPromotedChild: (selection) => sdkNamespace.selectRetainedPromotedChild(selection),
+                checkEvidenceApplicability: (record, expected) => sdkNamespace.checkRetainedEvidenceApplicability(record, expected),
+            }
+            : {};
         const sdkEndpoint = (modelPort !== undefined && typeof resolverFactory === 'function'
             ? (() => {
                 const factory = resolverFactory;
@@ -680,7 +689,7 @@ async function loadScopedFacade(packageRoot) {
                 if (typeof bound.invokeStep !== 'function') {
                     // An S package without the step surface still serves one-turn
                     // decisions; a harness rule then refuses typed inside K.
-                    return { packageId: sdkBinding.packageId, interpret: interpretComposite };
+                    return { packageId: sdkBinding.packageId, interpret: interpretComposite, ...retainedDecisionSource };
                 }
                 const invokeStep = (declaration, input, context, control) => {
                     const resolver = resolverFor(control);
@@ -693,6 +702,7 @@ async function loadScopedFacade(packageRoot) {
                     packageId: sdkBinding.packageId,
                     interpret: interpretComposite,
                     invokeStep,
+                    ...retainedDecisionSource,
                     ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
                         ? { projectDecisionReceipt: (verified) => sdkNamespace.projectDecisionReceiptRecord(verified) }
                         : {}),
@@ -701,6 +711,7 @@ async function loadScopedFacade(packageRoot) {
             : {
                 packageId: sdkBinding.packageId,
                 interpret: sdkNamespace.interpret,
+                ...retainedDecisionSource,
                 ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
                     ? { projectDecisionReceipt: (verified) => sdkNamespace.projectDecisionReceiptRecord(verified) }
                     : {}),

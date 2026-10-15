@@ -52,11 +52,14 @@ export const FIXTURE_SHAS = {
   // submitSdRestrictedQuote (disjoint reader scope; same declaration).
   semantic: '76e065c3063b755b822d7fa9f3b1a6fc17cca542a51c82328954a75354fb9efb',
   semanticBad: 'fff7743a36c61682d923aa1272ff517036993e56e538c77c105c2ed9a04f8446',
+  /** #1003 FR08 general + FR09 + FR12-Builder-authored decision-source fixtures. */
+  decisionSource: '18c3e07b9525f68a7776061a43dbd0ae9d99934c644c09546d48b9b533b75733',
+  decisionSourceBad: '576a4f7c2fb8319d84625b5c0488d1d5c0ecb57988bee58e960cf28eeba78cdb',
 } as const;
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
-export type AppKind = 'approval' | 'engineering' | 'model' | 'continuation' | 'semantic' | 'semanticBad';
+export type AppKind = 'approval' | 'engineering' | 'model' | 'continuation' | 'semantic' | 'semanticBad' | 'decisionSource' | 'decisionSourceBad';
 
 export const APP_IDS: Record<AppKind, string> = {
   approval: 'order-approval',
@@ -65,6 +68,8 @@ export const APP_IDS: Record<AppKind, string> = {
   continuation: 'continuation-quote',
   semantic: 'sd-quote',
   semanticBad: 'sd-quote-bad',
+  decisionSource: 'ds2-quote',
+  decisionSourceBad: 'ds2-quote-bad',
 };
 
 export function sqliteTempPath(label: string): string {
@@ -85,7 +90,11 @@ export async function readModuleSources(kind: AppKind): Promise<{
         ? 'business-model-port'
         : kind === 'continuation'
           ? 'business-model-continuation'
-          : kind === 'semantic' ? 'business-semantic-decision' : 'business-semantic-decision-bad';
+          : kind === 'semantic'
+            ? 'business-semantic-decision'
+            : kind === 'semanticBad'
+              ? 'business-semantic-decision-bad'
+              : kind === 'decisionSource' ? 'business-decision-source' : 'business-decision-source-bad';
   const [kernel, sdk, business] = await Promise.all([
     readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
     readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
@@ -142,9 +151,15 @@ export async function sealRealApp(kind: AppKind, variantRootPackageId?: string):
   } else if (kind === 'semantic') {
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
     businessModule = await import('./fixtures/business-semantic-decision.mjs');
-  } else {
+  } else if (kind === 'semanticBad') {
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
     businessModule = await import('./fixtures/business-semantic-decision-bad.mjs');
+  } else if (kind === 'decisionSource') {
+    // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
+    businessModule = await import('./fixtures/business-decision-source.mjs');
+  } else {
+    // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
+    businessModule = await import('./fixtures/business-decision-source-bad.mjs');
   }
   // @ts-expect-error selected kernel payload has no declaration file (.mjs)
   const kernelMeta = await import('../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs');

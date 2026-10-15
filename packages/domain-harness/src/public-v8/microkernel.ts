@@ -261,6 +261,17 @@ type KernelRuntimeFactory = (deps: {
     readonly invokeStep?: (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
     /** [#1003 NF06] The S bounded redacted data-only decision-receipt projection; optional ABI member. */
     readonly projectDecisionReceipt?: (verified: unknown) => unknown;
+    /**
+     * [#1003 FR08 general + FR09 + FR12] The retained S decision-source
+     * semantics; optional ABI members. S remains the ONLY ordering,
+     * currentness and eligibility authority — the selected Kernel supplies
+     * the qualified observations and owns every durable record. A Standard
+     * SDK without them cannot serve a Business policy that declares
+     * decision-source rules (the Kernel refuses the load typed).
+     */
+    readonly resolveDecisionSource?: (selection: unknown) => unknown;
+    readonly selectPromotedChild?: (selection: unknown) => unknown;
+    readonly checkEvidenceApplicability?: (record: unknown, expected: unknown) => unknown;
   };
   readonly businessEndpoint: object;
   readonly observe: (receipt: unknown) => void;
@@ -988,7 +999,31 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     const modelPort = currentHostModelPort(gatewaySessionCap);
     const resolverFactory = sdkNamespace.createHostBoundModelResolver;
     type SdkEndpointFn = (declaration: unknown, input: unknown, context: unknown, control?: V8OccurrenceControl) => unknown;
-    const sdkEndpoint: { packageId: string; interpret: SdkEndpointFn; invokeStep?: SdkEndpointFn } = (
+    /**
+     * [#1003 FR08 general + FR09 + FR12] The retained S decision-source
+     * endpoints (resolveRetainedDecision / selectRetainedPromotedChild /
+     * checkRetainedEvidenceApplicability) surfaced on the protected
+     * sdkEndpoint handed to the selected Kernel — additive optional ABI
+     * members exactly like the NF06 decision-receipt projection. All
+     * three must be exposed together or none is wired; the Kernel refuses
+     * a decision-source-declaring Business policy when they are absent.
+     */
+    interface RetainedDecisionSourceEndpoints {
+      readonly resolveDecisionSource: (selection: unknown) => unknown;
+      readonly selectPromotedChild: (selection: unknown) => unknown;
+      readonly checkEvidenceApplicability: (record: unknown, expected: unknown) => unknown;
+    }
+    const retainedDecisionSource: Partial<RetainedDecisionSourceEndpoints> =
+      typeof sdkNamespace.resolveRetainedDecision === 'function'
+      && typeof sdkNamespace.selectRetainedPromotedChild === 'function'
+      && typeof sdkNamespace.checkRetainedEvidenceApplicability === 'function'
+        ? {
+          resolveDecisionSource: (selection: unknown) => (sdkNamespace.resolveRetainedDecision as (v: unknown) => unknown)(selection),
+          selectPromotedChild: (selection: unknown) => (sdkNamespace.selectRetainedPromotedChild as (v: unknown) => unknown)(selection),
+          checkEvidenceApplicability: (record: unknown, expected: unknown) => (sdkNamespace.checkRetainedEvidenceApplicability as (a: unknown, b: unknown) => unknown)(record, expected),
+        }
+        : {};
+    const sdkEndpoint: { packageId: string; interpret: SdkEndpointFn; invokeStep?: SdkEndpointFn } & Partial<RetainedDecisionSourceEndpoints> = (
       modelPort !== undefined && typeof resolverFactory === 'function'
         ? (() => {
             interface BoundResolver {
@@ -1044,7 +1079,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
             if (typeof bound.invokeStep !== 'function') {
               // An S package without the step surface still serves one-turn
               // decisions; a harness rule then refuses typed inside K.
-              return { packageId: sdkBinding.packageId, interpret: interpretComposite };
+              return { packageId: sdkBinding.packageId, interpret: interpretComposite, ...retainedDecisionSource };
             }
             const invokeStep: SdkEndpointFn = (declaration, input, context, control) => {
               const resolver = resolverFor(control);
@@ -1057,6 +1092,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
               packageId: sdkBinding.packageId,
               interpret: interpretComposite,
               invokeStep,
+              ...retainedDecisionSource,
               ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
                 ? { projectDecisionReceipt: (verified: unknown) => (sdkNamespace.projectDecisionReceiptRecord as (v: unknown) => unknown)(verified) }
                 : {}),
@@ -1065,6 +1101,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
         : {
           packageId: sdkBinding.packageId,
           interpret: sdkNamespace.interpret as SdkEndpointFn,
+          ...retainedDecisionSource,
           ...(typeof sdkNamespace.projectDecisionReceiptRecord === 'function'
             ? { projectDecisionReceipt: (verified: unknown) => (sdkNamespace.projectDecisionReceiptRecord as (v: unknown) => unknown)(verified) }
             : {}),
