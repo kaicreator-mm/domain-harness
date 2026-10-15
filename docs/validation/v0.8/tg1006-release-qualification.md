@@ -1,6 +1,6 @@
-# DomainHarness v0.8 — T-G Release Qualification R5 (selected physical falsifiers and real missing features)
+# DomainHarness v0.8 — T-G Release Qualification R6 (HF16 selected success, successor production candidate still HOLD)
 
-**Decision (2026-10-16): `RELEASE_HOLD_RETAINED_FUNCTION_PN_GAPS`.** This is a concrete evidence-based qualification, not a newly requested full test campaign, a tag authorization or a claim that all 44 retained functions passed. T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) stays OPEN (**formal DAG 6/7**).
+**Decision (2026-10-16): `RELEASE_HOLD_RETAINED_FUNCTION_PN_GAPS` (R6 successor source: HF16 resolved, new production candidate not yet independently requalified).** This is a concrete evidence-based qualification, not a newly requested full test campaign, a tag authorization or a claim that all 44 retained functions passed. T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) stays OPEN (**formal DAG 6/7**).
 
 ## 1. Exact candidate and verified gates
 
@@ -14,6 +14,9 @@
 | Exact-equivalent PR CI | Woodpecker `ci/woodpecker/pr/verify` **PASS** at evidence PR #1069 commit `62a7660f...` ([pipeline 1272](https://ci.kaicreator.com/repos/18/pipeline/1272/1)); no production source delta against the candidate. PR #1069 independently bounded-reviewed, then merged to `v0.8` at `3c48d816...`. Do not claim exact frozen SHA itself had a separate CI run. |
 | Hidden Validation | **34/34 PRIVATE scenario executions PASS**, 0 public findings, runner EXIT=0, reviewed private PREPACK rev5 `DH08-PP-53-01` and FINAL `DH08-FP-53-01` rev1, candidate/tree/adapter/artifact SHA256 pinned, public [#1006@6194609734](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6194609734). Full non-sensitive attestation: [Hidden evidence](tg1006-hidden-prepack-attestation.md). Private PR #60 merged `f9ec2dcc`; result archive PR #61 merged `923100ad`. |
 | Development execution identity | User-authorized `SELF_DECLARED_UNVERIFIED`: **no Owner identity or GitHub-login distinctness checks**. Product caller/tenant/role authorization still applies. This is not a proof of executor identity independence. |
+
+
+**R6 SOURCE SUCCESSOR (no frozen-candidate evidence mutation):** HF16 code PR [#1079](https://github.com/kaicreator-mm/domain-harness/pull/1079) merged at `0b53d95883c7af216ef9417db3ad646470a1a219`. Exact R2 HEAD `616bcf23...` source review #5539677584 PASS_BOUND_DELTA, real selected Node24/SQLite 5/5 focused plus 145/145 impacted tests, original poisoned effect never re-executes, authorized one-shot corrected turn, typed unverified/fabricated/foreign poison denial before durable CAS, duplicate/restart zero double-effect; R1 full remote CI #1285 SUCCESS, R2 #1286 was still PENDING at merge and is **NOT CLAIMED PASS**. Frozen old candidate full 3,786 and private Hidden 34/34 are evidence for **old product bytes**, not automatic release qualification for this successor source. This source update changes K/Host; final Release Qualification must pin source SHA, recheck affected safety and final unified acceptance, reusing unchanged evidence where justified. R6 44-row *proof coverage* now **32 P/N / 8 partial / 3 source-only / 1 legacy-only**, **12 material gaps**: FR01, HF21, HF29, FR11, HF24/25/30/34 and NF01–04. Separate Draft PR #1083 pure-DAC packaged export is unbuilt/unverified, not counted.
 
 ## 2. Release-blocking evidence gap — frozen useful functions IN
 
@@ -30,17 +33,17 @@ The approved [Product](../../product/DomainHarness_v0.8_PRODUCT_FREEZE.md) and [
 
 | Current retained-function outcome | Rows | Meaning |
 |---|---:|---|
-| `CANDIDATE-PN-PASS` | **31** | Exact current-candidate P AND N observable genuinely executed. |
-| `CANDIDATE-PARTIAL` | **9** | Relevant candidate tests passed but required individual P/N behavior remains partially unproven. |
+| `CANDIDATE-PN-PASS` | **32** | Exact current-candidate P AND N observable genuinely executed. |
+| `CANDIDATE-PARTIAL` | **8** | Relevant candidate tests passed but required individual P/N behavior remains partially unproven. |
 | `SOURCE-LEVEL-EXECUTED` | **3** | Compiler BUILD/unit source ran; independent consumer/physical scope is missing. |
 | `LEGACY-EXECUTED / SELECTED-NOT-RUN` | **1** | Historical tests ran, but selected v0.8 BUILD/DAC bridge behavior is not verified. |
-| **Total** | **44** | **13** entries still have unproven material acceptance, not failures. |
+| **Total** | **44** | **12** entries still have unproven material acceptance, not failures. |
 
 The 34/34 Hidden PASS is orthogonal: it proves the independently composed blind scenarios ran against the exact candidate, but **does not automatically establish each of 44 specified individual P/N acceptance rows**; private oracle/fixture mappings cannot be published to backfill the public ledger by guesswork.
 
 ### Bounded closure workstreams — not 13 new campaigns
 
-1. **Kernel/authority 3**: FR01, HF16, HF21. FR04/HF19/HF26/HF27 have now been exercised via real selected Kernel physical P/N on PR #1075, FR03/FR14 already crosswalked; FR01 child-depth, HF16 authorized recovery and HF21 simulation/class effect gates are actual feature gaps. Review *actual executed* Kernel/Host/real-SQLite T-F/KPK/HF18/HF20/UNKNOWN test assertions against each row's frozen P/N requirement. Only truly uncovered fault roots warrant a new selected fixture.
+1. **Kernel/authority 2**: FR01, HF21. HF16 R6 selected source P/N merged PR #1079. FR04/HF19/HF26/HF27 have now been exercised via real selected Kernel physical P/N on PR #1075, FR03/FR14 already crosswalked; FR01 child-depth, HF16 authorized recovery and HF21 simulation/class effect gates are actual feature gaps. Review *actual executed* Kernel/Host/real-SQLite T-F/KPK/HF18/HF20/UNKNOWN test assertions against each row's frozen P/N requirement. Only truly uncovered fault roots warrant a new selected fixture.
 2. **Host/UX 1**: HF29. HF33 selected pinned physical resource P/N is now evidenced in #1075; FR10/FR15 authenticated UX and agent read-only bridge P/N plus HF28 qualified Node packed consumer P/N were earlier crosswalked. Expo remains conditional/outside current required Host without explicit approval. Match actual packed D2/D3 and Host/UX/role/resource tests to the row's acceptance. Do not require non-approved Expo/Hermes full parity or a Windows/Linux/WSL2 platform matrix solely from historical API claims; explicitly distinguish mandatory current Node Host behavior from out-of-scope legacy compatibility.
 3. **BUILD, ABI and DAC bridge 9**: FR11, HF24, HF25, HF30, HF34, NEW-FUNCTION-01–04. FR13 selected Kind P/N is now evidenced by old executed candidate tests; FR11 and NF01–04 have additional R3 tests but remain PARTIAL for missing selected-runtime/production bridge proof. FR06/HF22/HF31 are now supported by same-candidate compiled+actual loaded positive and negative evidence already executed; see the R2 row crosswalk in the successor ledger. Reconcile existing 374 compiler tests, clean packed consumer and exact selected BUILD/DomainData/DAC runtime tests with functional P/N. Old ABI byte parity is OUT, but accepted useful functionality remains IN.
 
@@ -49,7 +52,7 @@ The 34/34 Hidden PASS is orthogonal: it proves the independently composed blind 
 ## 3. Release disposition and non-waiver
 
 ```ini
-EVENT=DH08_TG_RELEASE_QUALIFICATION_R5
+EVENT=DH08_TG_RELEASE_QUALIFICATION_R6_PROVISIONAL
 SOURCE_OF_TRUTH=LIVE_GITHUB
 CANDIDATE_SHA=b151320ee6835755ba043e2602c085c180c9c849
 CANDIDATE_TREE=a8135b2a217edff395da0a4f31dd7955d3b3db5a
@@ -63,14 +66,16 @@ HIDDEN=34_OF_34_PASS
 HIDDEN_PUBLIC_FINDINGS=0
 PRIVATE_EVIDENCE=HIDDEN_VALIDATION_PR60_PR61_MERGED
 CI=PASS_EXECUTABLE_EQUIVALENT_PR1069_62a7660
-RETAINED_44=31_PN_PASS_9_PARTIAL_3_SOURCE_ONLY_1_LEGACY_ONLY
-MATERIAL_PN_GAPS=13
+RETAINED_44=32_PN_PASS_8_PARTIAL_3_SOURCE_ONLY_1_LEGACY_ONLY
+MATERIAL_PN_GAPS=12
 PRODUCTION_COMPAT_PRE_V1=OUT
 OWNER_GITHUB_LOGIN_GATE=NONE
 RELEASE_QUALIFIED=NO
 TAG=NO
+SUCCESSOR_MERGE=0b53d95883c7af216ef9417db3ad646470a1a219
+HF16_R2_CI_AT_MERGE=PENDING_NOT_PASS
 ISSUE_1006=OPEN
-NEXT=FIX_OR_PRODUCT_DISPOSE_FR01_HF16_HF21_HF29_AND_PROVE_BUILD_DAC_NINE
+NEXT=FIX_OR_PRODUCT_DISPOSE_FR01_HF21_HF29_AND_PROVE_BUILD_DAC_NINE_NEW_CANDIDATE_VALIDATION
 ```
 
 This is a **HOLD on unproven acceptance, not a product test failure**. No security/CAS/false-ACK defect is waived. Re-evaluate after only the material unproven tests are matched or executed; a legitimate Product rescope of a historically *compatibility-only* item requires an explicit recorded decision rather than implicit status promotion. A subsequent qualification must name the exact source and actual test receipts.
