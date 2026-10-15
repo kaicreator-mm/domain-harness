@@ -504,8 +504,11 @@ test('S05-P1/P2/N1/P3: dual-app same-logical-key physical handler isolation on o
   for (const key of scoped) {
     assert.ok(key.endsWith('\u0000ledger'), `physical key ${JSON.stringify(key)} composes the logical ledger route`);
   }
-  const keyA = scoped[0]!;
-  const keyB = scoped[1]!;
+  // ResourceDispatcher.resourceKeys() is LEXICOGRAPHICALLY sorted by
+  // opaque deployment scope, not by app registration order. Assign the
+  // observed A/B physical keys only after A's first actual dispatch.
+  let keyA = scoped[0]!;
+  let keyB = scoped[1]!;
 
   await shared.gateway.activateGenesis(opA, { appId: APP_A, instanceKey: 'q-a' });
   await shared.gateway.activateGenesis(opB, { appId: APP_B, instanceKey: 'q-b' });
@@ -520,6 +523,13 @@ test('S05-P1/P2/N1/P3: dual-app same-logical-key physical handler isolation on o
   assert.equal(fresh.length, 1, 'exactly one new durable effect for app A');
   assert.equal(fresh[0]?.status, 'completed');
   assert.ok(isHandlerOutput(fresh[0]?.output, 'A'), `app A's durable effect output is ITS OWN handler's (got ${JSON.stringify(fresh[0]?.output)})`);
+  // Identity discovery from the FIRST physical dispatch, never from the
+  // sorted list position (which is arbitrary across distinct scope digests).
+  const actualAKey = scoped.find((key) => dispatchesOn(key) === 1);
+  assert.ok(actualAKey !== undefined, 'one and only one physical handler saw app A dispatch');
+  keyA = actualAKey;
+  keyB = scoped.find((key) => key !== keyA)!;
+  assert.equal(dispatchesOn(keyB), 0, 'B physical handler was NOT touched by the A dispatch');
   assert.equal(dispatchesOn(keyA), 1, 'app A dispatched exactly once on its own physical key');
 
   // Effectful call on B → B's OWN handler; A's key untouched.
