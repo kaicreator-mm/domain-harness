@@ -366,10 +366,11 @@ test('HF23-P discovery returns exactly the agent-approved pure operation for an 
   );
   const tool = result.tools.find((entry) => entry.operationId === 'agent.order-summary');
   assert.ok(tool !== undefined);
+  assert.equal(tool.capabilityId, CAPABILITY_ID, 'discovery must return the exact BUILD-bound capability identity');
   assert.equal(tool.effectClass, 'none');
   assert.equal(tool.authority, 'projection-only');
   // Discovery is inert: no handler, no route, no admission material rides a tool.
-  assert.deepEqual(Object.keys(tool).sort(), ['authority', 'effectClass', 'operationId']);
+  assert.deepEqual(Object.keys(tool).sort(), ['authority', 'capabilityId', 'effectClass', 'operationId']);
 });
 
 test('HF23-N hidden pure operation and effectful operation never enter the surface; wrong role sees nothing', async () => {
