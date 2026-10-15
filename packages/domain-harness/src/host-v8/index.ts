@@ -76,3 +76,14 @@ export type {
   KernelReceiptScope,
   KernelReceiptSubscription,
 } from './kernel-gateway.js';
+
+// [#1062 HF18/HF32] Host-side durable control coordination (external work:
+// deadline + callback correlation; the Kernel keeps sole State/Journal/
+// Effect/turn-identity authority).
+export { DurableControlError, ExternalWorkCoordinator, kernelTurnSourceOf } from './durable-controls.js';
+export type {
+  DurableControlErrorCode,
+  ExternalWorkRecord,
+  ExternalWorkTurnSource,
+  RegisterExternalWorkInput,
+} from './durable-controls.js';

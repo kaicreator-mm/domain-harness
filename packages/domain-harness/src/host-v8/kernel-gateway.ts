@@ -59,6 +59,12 @@ import type { TrustedNodeHost } from './bootstrap.js';
 import { assertIntentScope, type UxTarget } from './ux-transport.js';
 import type { HostEvent } from './events.js';
 import type { HostCredential, HostPrincipal } from './identity.js';
+import {
+  ExternalWorkCoordinator,
+  kernelTurnSourceOf,
+  type ExternalWorkRecord,
+  type ExternalWorkTurnSource,
+} from './durable-controls.js';
 
 /** One registered qualified Domain App closure bound to a host appId. */
 export interface KernelGatewayAppInput {
@@ -74,6 +80,13 @@ export interface KernelGatewayAppInput {
    * for this app. Host governance configuration — never caller data.
    */
   readonly genesisRoles: readonly string[];
+  /**
+   * [#1062] Roles allowed to run the protected durable-control governance
+   * verbs (external-work registration, deadline firing, recovery). Defaults
+   * to genesisRoles when omitted. Host governance configuration — never
+   * caller data.
+   */
+  readonly controlRoles?: readonly string[];
 }
 
 export interface KernelGatewaySendIntent {
@@ -252,6 +265,64 @@ export interface KernelGateway {
     readonly instanceKey: string;
     readonly correlationId?: string;
   }): Promise<unknown>;
+  /**
+   * [#1062 HF18] Protected durable external-work registration: ONE
+   * deadline+callback correlation bound to the principal's tenant/app
+   * instance, with the SEALED Business intents the settled turn will
+   * submit. Requires a host-configured control role and DURABLE physical
+   * storage — a non-durable host refuses typed BEFORE any mutation.
+   */
+  registerExternalWork(credential: unknown, request: {
+    readonly appId: string;
+    readonly instanceKey: string;
+    readonly externalCorrelationId: string;
+    readonly deadlineTimerId: string;
+    readonly dueAt: string;
+    readonly callbackIntentType: string;
+    readonly timeoutIntentType: string;
+  }): Promise<unknown>;
+  /**
+   * [#1062 HF18] ONE authenticated external callback delivery. The durable
+   * CAS state machine admits exactly ONE winning delivery; its deterministic
+   * callback turn source is submitted through the SAME authenticated Kernel
+   * seam as send. Duplicates/late/misbound deliveries answer typed outcomes
+   * with ZERO Kernel activity.
+   */
+  acceptExternalCallback(credential: unknown, request: {
+    readonly appId: string;
+    readonly instanceKey: string;
+    readonly externalCorrelationId: string;
+    readonly callbackOrdinal: number;
+    readonly payload?: unknown;
+  }): Promise<unknown>;
+  /**
+   * [#1062 HF18] ONE authenticated deadline fire (host scheduler / operator
+   * driven). Early fires and foreign timers refuse typed; the one-shot
+   * winner submits the timer turn through the authenticated Kernel seam.
+   */
+  fireDeadline(credential: unknown, request: {
+    readonly appId: string;
+    readonly instanceKey: string;
+    readonly externalCorrelationId: string;
+    readonly timerId: string;
+    readonly fireOrdinal: number;
+  }): Promise<unknown>;
+  /**
+   * [#1062 HF18] Authenticated read of ONE durable external-work record
+   * (the persisted correlation/deadline truth; survives restarts).
+   */
+  queryExternalWork(credential: unknown, request: {
+    readonly appId: string;
+    readonly instanceKey: string;
+    readonly externalCorrelationId: string;
+  }): Promise<unknown>;
+  /**
+   * [#1062 HF18] Caller-driven recovery (control role; NOT a scheduler):
+   * fires the due waiting deadlines and re-submits every settled record
+   * whose Kernel turn submission may have been lost. The stable turn
+   * identity makes every heal an idempotent Kernel replay.
+   */
+  recoverDurableControls(credential: unknown, request: { readonly appId: string }): Promise<unknown>;
 }
 
 interface RegisteredApp {
@@ -259,6 +330,7 @@ interface RegisteredApp {
   readonly facade: V8DomainFacade;
   readonly ops: V8FacadeKernelOps;
   readonly genesisRoles: readonly string[];
+  readonly controlRoles: readonly string[];
 }
 
 /** The durable app-registration pin record (physical Host store). */
@@ -362,6 +434,12 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
   const gatewaySessionCap = input.gatewaySessionCap;
   const apps = new Map<string, RegisteredApp>();
   /**
+   * [#1062] The Host-side durable external-work coordinator over the SAME
+   * probed physical store the Kernel consumes (Host namespace records; the
+   * Kernel keeps sole authority over State/Journal/Effect/turn identity).
+   */
+  const externalWork = new ExternalWorkCoordinator(host.docs);
+  /**
    * In-flight cancellable occurrences, keyed by the authenticated
    * tenant/app + instanceKey + messageId (#1003 FR07-KH2). Entries exist
    * only while their `send` is running.
@@ -424,6 +502,61 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
     return retained;
   }
 
+  /**
+   * [#1062] The single route EVERY durable-control turn submission takes:
+   * the SAME authenticated ops seam as `send` — principal-derived caller,
+   * sealed Business role gate, deterministic messageId — plus the
+   * trusted-Host turnSource projected from the durable record. There is no
+   * raw kernel submission and no caller-supplied source anywhere.
+   */
+  function submitControlTurn(
+    app: RegisteredApp,
+    principal: HostPrincipal,
+    instanceKey: string,
+    intentType: string,
+    messageId: string,
+    turnSourceInput: unknown,
+    turnInput: unknown,
+  ): Promise<unknown> {
+    return app.ops.submitAs(principal, {
+      intentType,
+      messageId,
+      instanceKey,
+      ...(turnInput === undefined ? {} : { input: turnInput }),
+      turnSource: turnSourceInput,
+    });
+  }
+
+  function requireControlRole(app: RegisteredApp, principal: HostPrincipal): void {
+    if (!app.controlRoles.some((role) => principal.roles.includes(role))) {
+      throw new HostBoundaryError(
+        'HOST_CONTROL_ROLE_DENIED',
+        `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the host-configured control roles [${app.controlRoles.join(', ')}] for app ${app.appId}`,
+      );
+    }
+  }
+
+  function requireDurableStorage(): void {
+    if (host.storageMode !== 'physical') {
+      throw new HostBoundaryError(
+        'HOST_DURABLE_CONTROLS_UNAVAILABLE',
+        'this host was bootstrapped without durable physical storage; durable external-work registrations are refused before any mutation',
+      );
+    }
+  }
+
+  function requireBoundIntents(app: RegisteredApp, intentTypes: readonly string[]): void {
+    const bound = new Set(app.ops.describePolicy().intentTypes);
+    for (const intentType of intentTypes) {
+      if (!bound.has(intentType)) {
+        throw new HostBoundaryError(
+          'GATEWAY_INTENT_UNBOUND',
+          `intent type ${intentType} is not bound in the sealed closure of app ${app.appId}; a durable control registration may only route to sealed Business intents`,
+        );
+      }
+    }
+  }
+
   const gateway: KernelGateway = {
     async registerApp(registration: KernelGatewayAppInput): Promise<void> {
       if (typeof registration.appId !== 'string' || registration.appId.length === 0 || registration.appId.includes(':')) {
@@ -432,6 +565,13 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       if (!Array.isArray(registration.genesisRoles) || registration.genesisRoles.length === 0
         || !registration.genesisRoles.every((role) => typeof role === 'string' && role.length > 0)) {
         throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp requires a non-empty genesisRoles array of host governance roles');
+      }
+      // [#1062] Optional durable-control governance roles; the genesis roles
+      // are the default authority for registrations/deadlines/recovery.
+      if (registration.controlRoles !== undefined
+        && (!Array.isArray(registration.controlRoles) || registration.controlRoles.length === 0
+          || !registration.controlRoles.every((role) => typeof role === 'string' && role.length > 0))) {
+        throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp controlRoles, when present, must be a non-empty array of host governance roles');
       }
       if (apps.has(registration.appId)) {
         throw new HostBoundaryError('GATEWAY_APP_ALREADY_REGISTERED', `app ${registration.appId} is already registered on this gateway`);
@@ -609,6 +749,7 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         ops,
         // the guard above narrowed the declared readonly string[]; restore it
         genesisRoles: Object.freeze([...(registration.genesisRoles as readonly string[])]),
+        controlRoles: Object.freeze([...(registration.controlRoles ?? registration.genesisRoles as readonly string[])]),
       }));
     },
 
@@ -1050,6 +1191,199 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         instanceKey: request.instanceKey,
         ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
       });
+    },
+
+    async registerExternalWork(credential: unknown, request: {
+      readonly appId: string;
+      readonly instanceKey: string;
+      readonly externalCorrelationId: string;
+      readonly deadlineTimerId: string;
+      readonly dueAt: string;
+      readonly callbackIntentType: string;
+      readonly timeoutIntentType: string;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+        || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+        || typeof request.deadlineTimerId !== 'string' || request.deadlineTimerId.length === 0
+        || typeof request.dueAt !== 'string'
+        || typeof request.callbackIntentType !== 'string' || request.callbackIntentType.length === 0
+        || typeof request.timeoutIntentType !== 'string' || request.timeoutIntentType.length === 0
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'registerExternalWork requires {appId, instanceKey, externalCorrelationId, deadlineTimerId, dueAt, callbackIntentType, timeoutIntentType} with non-empty strings');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      requireControlRole(app, principal);
+      // The unsupported-durable-Host refusal lands BEFORE any record or
+      // mutation exists (the frozen HF18 negative).
+      requireDurableStorage();
+      requireBoundIntents(app, [request.callbackIntentType, request.timeoutIntentType]);
+      const registered = await externalWork.register({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        instanceKey: request.instanceKey,
+        externalCorrelationId: request.externalCorrelationId,
+        deadlineTimerId: request.deadlineTimerId,
+        dueAt: request.dueAt,
+        callbackIntentType: request.callbackIntentType,
+        timeoutIntentType: request.timeoutIntentType,
+        registeredAt: new Date().toISOString(),
+      });
+      return Object.freeze({ status: 'registered', disposition: registered.disposition, record: registered.record });
+    },
+
+    async acceptExternalCallback(credential: unknown, request: {
+      readonly appId: string;
+      readonly instanceKey: string;
+      readonly externalCorrelationId: string;
+      readonly callbackOrdinal: number;
+      readonly payload?: unknown;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+        || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+        || typeof request.callbackOrdinal !== 'number' || !Number.isSafeInteger(request.callbackOrdinal) || request.callbackOrdinal <= 0
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'acceptExternalCallback requires {appId, instanceKey, externalCorrelationId, callbackOrdinal} with a positive safe integer ordinal');
+      }
+      if (request.payload !== undefined) {
+        try {
+          canonicalSnapshot(request.payload);
+        } catch {
+          throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'acceptExternalCallback payload must be plain JSON');
+        }
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      requireDurableStorage();
+      const outcome = await externalWork.settleCallback({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        instanceKey: request.instanceKey,
+        externalCorrelationId: request.externalCorrelationId,
+        callbackOrdinal: request.callbackOrdinal,
+        payload: request.payload === undefined ? null : request.payload,
+        receivedAt: new Date().toISOString(),
+      });
+      if (outcome.disposition !== 'accepted') {
+        // Typed duplicate/late/ignored outcome: ZERO Kernel activity.
+        return Object.freeze({ status: outcome.disposition, record: outcome.record });
+      }
+      const isCallback = outcome.turnSource.kind === 'callback';
+      const receipt = await submitControlTurn(
+        app,
+        principal,
+        request.instanceKey,
+        isCallback ? outcome.record.callbackIntentType : outcome.record.timeoutIntentType,
+        outcome.messageId,
+        kernelTurnSourceOf(outcome.turnSource),
+        // The Standard SDK rule interpreter requires an OBJECT input; a
+        // payload-less control turn carries an empty object, never null.
+        isCallback ? (outcome.turnSource.payload ?? {}) : {},
+      );
+      await externalWork.markSubmitted(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId, outcome.messageId, new Date().toISOString());
+      return Object.freeze({ status: 'accepted', receipt, record: outcome.record });
+    },
+
+    async fireDeadline(credential: unknown, request: {
+      readonly appId: string;
+      readonly instanceKey: string;
+      readonly externalCorrelationId: string;
+      readonly timerId: string;
+      readonly fireOrdinal: number;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+        || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+        || typeof request.timerId !== 'string' || request.timerId.length === 0
+        || typeof request.fireOrdinal !== 'number' || !Number.isSafeInteger(request.fireOrdinal)
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'fireDeadline requires {appId, instanceKey, externalCorrelationId, timerId, fireOrdinal}');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      requireControlRole(app, principal);
+      requireDurableStorage();
+      const outcome = await externalWork.settleDeadline({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        instanceKey: request.instanceKey,
+        externalCorrelationId: request.externalCorrelationId,
+        timerId: request.timerId,
+        fireOrdinal: request.fireOrdinal,
+        firedAt: new Date().toISOString(),
+      });
+      if (outcome.disposition !== 'accepted') {
+        return Object.freeze({ status: outcome.disposition, record: outcome.record });
+      }
+      const receipt = await submitControlTurn(
+        app,
+        principal,
+        request.instanceKey,
+        outcome.record.timeoutIntentType,
+        outcome.messageId,
+        kernelTurnSourceOf(outcome.turnSource),
+        {},
+      );
+      await externalWork.markSubmitted(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId, outcome.messageId, new Date().toISOString());
+      return Object.freeze({ status: 'accepted', receipt, record: outcome.record });
+    },
+
+    async queryExternalWork(credential: unknown, request: {
+      readonly appId: string;
+      readonly instanceKey: string;
+      readonly externalCorrelationId: string;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+        || typeof request.externalCorrelationId !== 'string' || request.externalCorrelationId.length === 0
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'queryExternalWork requires {appId, instanceKey, externalCorrelationId} with non-empty strings');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+      requireApp(request.appId, principal);
+      return externalWork.read(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId);
+    },
+
+    async recoverDurableControls(credential: unknown, request: { readonly appId: string }): Promise<unknown> {
+      if (typeof request !== 'object' || request === null || typeof request.appId !== 'string' || request.appId.length === 0) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'recoverDurableControls requires a non-empty appId');
+      }
+      const principal = await authenticate(credential);
+      const app = requireApp(request.appId, principal);
+      requireControlRole(app, principal);
+      requireDurableStorage();
+      const result = await externalWork.recoverDueAndSettled({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        now: new Date().toISOString(),
+        fireDue: async (correlation: { record: ExternalWorkRecord; turnSource: ExternalWorkTurnSource; messageId: string }): Promise<void> => {
+          const isCallback = correlation.turnSource.kind === 'callback';
+          await submitControlTurn(
+            app,
+            principal,
+            correlation.record.instanceKey,
+            isCallback ? correlation.record.callbackIntentType : correlation.record.timeoutIntentType,
+            correlation.messageId,
+            kernelTurnSourceOf(correlation.turnSource),
+            isCallback ? (correlation.turnSource.payload ?? {}) : {},
+          );
+        },
+      });
+      return Object.freeze({ status: 'recovered', ...result });
     },
   };
   return Object.freeze(gateway);
