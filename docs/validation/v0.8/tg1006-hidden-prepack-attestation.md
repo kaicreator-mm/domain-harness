@@ -1,63 +1,50 @@
-# v0.8 T-G #1006 — Hidden Validation attestation (non-sensitive; execution NOT_RUN)
+# v0.8 T-G #1006 — Hidden Validation public-safe attestation (EXECUTED PASS)
 
-> Public-safe record required by `#1006@6189172826`: "private vectors remain in
-> permitted private repo, only non-secret attestation publicly". No private scenario,
-> fixture value, assertion mapping, checksum-of-private-input or result detail from the
-> private pack appears here. Hidden Builder self-run was NOT used and does not count.
+> **Updated successor evidence** to the earlier v0.8 T-G attestation that reported Hidden NOT_RUN. That earlier outcome was correct **at its time**, but is now superseded by the real private execution on 2026-10-15. Private vectors, assertion/fixture mappings and raw results remain exclusively in `kaicreator-mm/hidden-validation`. **Hidden PASS is not Release PASS.**
 
-## State at the closing of this T-G round
+## Actual immutable candidate and FINAL identity
 
-- An independently authored private Hidden PRE-PACK for v0.8 exists in the permitted
-  private repository `kaicreator-mm/hidden-validation` at branch
-  `task/domain-harness-v0.8-hidden-prepack-53` (worktree `hv-i53-zcode`), pack id
-  `DH08-PP-53-01`, revision 3 (HEAD `367e2c0`), authored under the T-G public dispatch
-  `#1006@6118662082` and tracker `hidden-validation#53`.
-- Authoring independence: the pack was authored by an identity other than the v0.8
-  feature Builders (PRs #1055/#1057/#1061/#1065/#1066/#1067/#1068) and other than this
-  T-G acceptance executor; it went through two formal independent review rounds that
-  returned CHANGES_REQUESTED (P0/P1 findings) and a third-round terminal:
-  **independent private pre-pack review terminal PASS at `hidden-validation#55@6128051800`
-  (revision 3, P1-04 repair verified on the mint success path)**.
-- Coverage surface (public-safe counts only): 34 scenarios across 23 coverage
-  dimensions derived from the frozen v0.8 L2 architecture; includes the retained
-  function surface (44-row families plus the six new functions), clean package
-  consumer, dual real Apps on one sealed K/S cohort, typed UNKNOWN, installer-verified
-  code bytes, and the v0.7 functional oracle differential.
-- Integrity self-check executed by THIS round (control path only, not execution):
-  `prepack-selfcheck.mjs` → PASS on Node `v24.21.0` AND Node `v22.23.3`
-  (`authorityIntegrity: PASS`, closed file set PASS, anti-copy vs v0.7 PASS, leak-check
-  controls PASS, schema contradiction guards PASS, sandbox mint success-path control
-  PASS with 6 read-back negatives rejected). The self-check's sandbox mint is
-  `readbackMode='recorded-fixtures'` and is structurally execution-ineligible.
+| Evidence | Verified value |
+|---|---|
+| Frozen production candidate | `b151320ee6835755ba043e2602c085c180c9c849` |
+| Candidate tree | `a8135b2a217edff395da0a4f31dd7955d3b3db5a` |
+| Candidate freeze act | [#1006@6192013655](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6192013655) |
+| Private PREPACK | `DH08-PP-53-01`, revision **5**, checksum `sha256:61a6190faa6553f098e0f1c0da42bfccc12cea8c5f37549d1851832a74019fd9` |
+| PREPACK reviewed historical HEAD | `hidden-validation` PR #60 @ `0302641306f1f1080980d11c6ff3aef31c8744e9` |
+| Actual private review terminal | [hidden-validation#55@6193003094](https://github.com/kaicreator-mm/hidden-validation/issues/55#issuecomment-6193003094) — scoped PASS |
+| FINAL identity | `DH08-FP-53-01`, revision **1**, checksum `sha256:fdacf1bb43508ed01744c2d397e468cecc93a7c10e46261de8307ef0df518287` |
+| Candidate surface + artifact manifest | Four exact-candidate npm workspace tarballs, SHA256 bound; surface manifest digest `sha256:4d312ae47d22f3216a514b19e918e8c5e8a6ceb88d00579b7d09ec19cc589f23` |
+| Adapter identity | `dh08-candidate-adapter-b151320-r2`, digest `sha256:66abd33509d605212e6d652913e125752911388f4fc5eabe155b584fa0fcbf8e` |
+| Private execution and archive | [hidden-validation#53@6194603473](https://github.com/kaicreator-mm/hidden-validation/issues/53#issuecomment-6194603473); private PR #61 merged `923100ad06159621d5be42c1c1e377161cfcf34d` |
+| Public-safe terminal | [#1006@6194609734](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6194609734) |
 
-## Why execution is NOT_RUN (structural, not waived)
+## Execution outcome
 
-The pack's own finalization contract (`runner/finalize-pack.mjs`, reviewed PASS) mints
-a FINAL pack only when BOTH online gates hold:
+- A **single real** `hidden-runner.mjs` run, after a live-readback FINAL mint, executed **34/34** private scenarios against the exact frozen production candidate and real packed artifacts.
+- Aggregate **PASS**; **34 unique PASS rows**, **0 failed rows**, **0 public findings**; runner **exit 0**. Private schema + public-safe schema validation, checksummed binding, candidate cleanliness before/after, artifact/adapter digests and public leak check passed per private execution record.
+- The private `result.private.json` was independently inspected at the archived private evidence branch with 34 unique PASS rows and the exact same candidate SHA/tree and FINAL checksum as `manifest.final.json`. The separate Web review confirmed that the real candidate adapter contains 34 specific scenario driver functions and an unimplemented-scenario **fail-closed** path. This document does **not** disclose any private scenario contents.
+- Node 22/24 PREPACK self-check PASS and prior independent private pack review evidence are retained from their exact commits; those checks are **not** confused with the actual product Hidden run.
 
-1. a `TG_CANDIDATE_FREEZE` act comment on `domain-harness#1006` naming the exact
-   candidate SHA/tree, posted by an actor distinct from pack owner and executor —
-   **no such act exists on #1006 at closing** (the intake comment
-   `#1006@6189172826` is `DH08_TG_REUSE_FIRST_FINAL_CANDIDATE_ACTIVATION`, not a
-   `TG_CANDIDATE_FREEZE` act, and this executor may not mint one for itself);
-2. pack owner and executor as **distinct GitHub login identities** — every actor in
-   this environment (including the review terminal, the intake authority and this
-   executor) posts under the single `kaicreator-mm` login, so the distinctness gate
-   cannot be satisfied by any legitimate pairing available here.
+## Identity policy, limitations, release boundary
 
-Faking either gate (self-posted freeze act, sandbox-recorded read-backs) is explicitly
-refused by the reviewed runner (`HV08_PACK_RECEIPT_READBACK_NOT_LIVE`) and would not
-count as independent. Hidden Validation therefore stays **NOT_RUN** at candidate
-`b151320ee6835755ba043e2602c085c180c9c849`; no Hidden PASS/FAIL is claimed in either
-direction.
+The user removed all mandatory development-workflow Owner identity and GitHub-login comparison gates. The FINAL pack is **ownerless** and records a single self-declared `executorIdentity={actorId,role,sessionId}` under `SELF_DECLARED_UNVERIFIED`. Declarations are accepted as declared. The result demonstrates executing candidate behavior and sealed evidence, **not** independently verified actor identity. No business/tenant/runtime authorization checks were removed.
 
-## What unblocks it (for the successor round)
+No second 3,786-test full regression or repeated Hidden campaign was triggered for identity/documentation changes; the candidate's earlier full run and 6/6 targeted fault batch remain separately recorded in `tg1006-final-candidate-execution.md`.
 
-1. The T-G authority (an actor that is neither pack owner nor executor) posts the
-   `TG_CANDIDATE_FREEZE` act on #1006 for the frozen candidate SHA/tree.
-2. A distinct executor identity (separate GitHub login) is designated by the pack owner
-   to run `finalize-pack.mjs` (online gh gates) and then the offline
-   `runner/hidden-runner.mjs` against the exact candidate checkout, followed by the
-   leak-check before any public posting.
-3. If the candidate moves (any source change), the pack binds to the new SHA/tree via
-   the same gates; prior mints do not transfer.
+**T-G Release Qualification is still pending:** the frozen 44-row successor retained-function ledger currently has **17 exact-candidate P/N PASS, 15 partial, 7 source-level and 5 legacy-only** rows. Hence **27 rows retain material NOT_RUN acceptance**, until their frozen observables are separately matched to *actually executed* current-candidate tests or genuinely executed Hidden evidence under the private blindness boundary. Never infer full retained-function acceptance from aggregate Hidden PASS.
+
+```ini
+EVENT=DH08_TG_HIDDEN_PUBLIC_SAFE_RESULT
+CANDIDATE_SHA=b151320ee6835755ba043e2602c085c180c9c849
+CANDIDATE_TREE=a8135b2a217edff395da0a4f31dd7955d3b3db5a
+FINAL_PACK_ID=DH08-FP-53-01
+FINAL_PACK_REVISION=1
+HIDDEN=PASS
+SCENARIOS_EXECUTED=34_OF_34
+HIDDEN_PUBLIC_FINDINGS=0
+IDENTITY_POLICY=SELF_DECLARED_UNVERIFIED
+PRIVATE_EVIDENCE=hidden-validation_PR61_MERGED_923100ad
+RETAINED_44_MATERIAL_GAPS=27
+T_G=OPEN
+RELEASE=HOLD
+```
