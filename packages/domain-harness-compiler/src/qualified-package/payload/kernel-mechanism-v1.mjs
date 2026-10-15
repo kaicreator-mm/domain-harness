@@ -2811,6 +2811,233 @@ function wireSemanticDecisionRules(businessEndpoint, sha256) {
   return registry;
 }
 
+// ===========================================================================
+// [#1003 FR08 general + FR09 + FR12] Trusted-boundary validation of
+// decision-source rules — the Kernel half of the retained resolver
+// composition, lawfully reduced to the frozen v0.8 S contract
+// (standard-sdk-v1.mjs resolveRetainedDecision / selectRetainedPromotedChild
+// / checkRetainedEvidenceApplicability): "K passes current qualified
+// observations; the Standard SDK emits only a selected candidate".
+//
+// The Business package compiles a decision-source declaration whose legs
+// mirror the retained v0.7 ordering Rule -> Exact Cache -> Promoted ->
+// Harness; this wiring verifies the pinned canonical declarationDigest and
+// freezes the validated legs EXACTLY like the semantic-decision wiring, so
+// only the exact compiled declaration can run. The Kernel gains NO new
+// admission authority: the S selection is the only ordering/currentness/
+// eligibility authority, the selected candidate flows through the UNCHANGED
+// central admission (schema → hard invariant → guard → transition →
+// journal → effect), and every durable record (exact-cache entry,
+// promoted-child pin) lives in the generic Host document store through the
+// same ports the journal/pins/baselines already use. No second runtime, no
+// v0.7 resolver port, no caller-injected store.
+// ===========================================================================
+const DECISION_SOURCE_RULE_KEYS = new Set([
+  'kind', 'id', 'decisionId', 'declarationDigest', 'payloadFromInput', 'rule', 'cache', 'promoted', 'harness',
+]);
+const DECISION_SOURCE_IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
+const DECISION_SOURCE_DIGEST = /^[0-9a-f]{64}$/;
+const DECISION_SOURCE_MAX_DEPS = 8;
+const DECISION_SOURCE_MAX_PROJECTION = 16;
+const DECISION_CACHE_PREFIX = 'v08-kernel:decision-cache:';
+const PROMOTED_PIN_PREFIX = 'v08-kernel:promoted-pin:';
+
+function invalidDecisionSource(message) {
+  throw new CentralAdmissionError('DECISION_SOURCE_INVALID', message);
+}
+
+function decisionSourceIdentifier(value, label) {
+  if (typeof value !== 'string' || !DECISION_SOURCE_IDENTIFIER.test(value)) {
+    invalidDecisionSource(`${label} must be a bounded identifier`);
+  }
+  return value;
+}
+
+function snapshotDecisionSourcePredicate(value, label) {
+  if (!isJsonRecord(value)) invalidDecisionSource(`${label} must be a DomainPredicate object`);
+  try {
+    assertDomainPredicateShape(value, label, invalidDecisionSource);
+    return prepareDomainPredicate(value);
+  } catch (error) {
+    if (error instanceof CentralAdmissionError) throw error;
+    invalidDecisionSource(`${label} is not a preparable DomainPredicate: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Validate ONE compiled decision-source rule and freeze its snapshot.
+ * Shape follows the semantic-decision discipline: exact key set, pinned
+ * canonical declarationDigest, deep-frozen legs. The promoted leg's
+ * requested identity must match the sealed approved artifact EXACTLY at
+ * this boundary (a BUILD inconsistency fails the load); eligibility
+ * (revoked / applicable / compatible) is deliberately NOT decided here —
+ * that is the retained S runtime authority.
+ */
+function snapshotDecisionSourceRule(rule, ruleId, businessEndpoint, sha256) {
+  const data = rule;
+  for (const key of Object.keys(data)) {
+    if (!DECISION_SOURCE_RULE_KEYS.has(key)) {
+      invalidDecisionSource(`rule ${ruleId}: unknown decision-source field ${JSON.stringify(key)}`);
+    }
+  }
+  if (data.id !== ruleId) invalidDecisionSource(`rule ${ruleId}: decision-source id must equal the policy rule key`);
+  decisionSourceIdentifier(data.id, `rule ${ruleId}: id`);
+  const decisionId = decisionSourceIdentifier(data.decisionId, `rule ${ruleId}: decisionId`);
+  if (typeof data.declarationDigest !== 'string' || !DECISION_SOURCE_DIGEST.test(data.declarationDigest)) {
+    invalidDecisionSource(`rule ${ruleId}: a compiled decision-source rule must carry its 64-hex declarationDigest`);
+  }
+  const { declarationDigest: _pinned, ...body } = data;
+  let digest;
+  try {
+    digest = sha256.digestUtf8(canonicalJsonStringify(body));
+  } catch (error) {
+    invalidDecisionSource(`rule ${ruleId}: the Host sha256 port must return the declarationDigest synchronously (${error instanceof Error ? error.message : String(error)})`);
+  }
+  if (digest !== data.declarationDigest) {
+    invalidDecisionSource(`rule ${ruleId}: declarationDigest does not match the declaration body (stale or substituted descriptor)`);
+  }
+
+  // The bounded input-projection authorization (the exact context-projection
+  // discipline: rule-level payloadFromInput). Doubles as the rule leg's
+  // candidate payload source when a rule leg is declared.
+  let payloadFromInput;
+  if (data.payloadFromInput !== undefined) {
+    if (!isJsonRecord(data.payloadFromInput) || Object.keys(data.payloadFromInput).length === 0
+      || Object.keys(data.payloadFromInput).length > DECISION_SOURCE_MAX_PROJECTION) {
+      invalidDecisionSource(`rule ${ruleId}: payloadFromInput must be a non-empty bounded key map`);
+    }
+    payloadFromInput = {};
+    for (const [payloadKey, inputKey] of Object.entries(data.payloadFromInput)) {
+      decisionSourceIdentifier(payloadKey, `rule ${ruleId}: payloadFromInput key`);
+      decisionSourceIdentifier(inputKey, `rule ${ruleId}: payloadFromInput.${payloadKey}`);
+      payloadFromInput[payloadKey] = inputKey;
+    }
+  }
+
+  // Deterministic rule leg: predicate gate + declared outcome/eventType; the
+  // candidate payload is projected from the occurrence input through the
+  // authorized map. A mapped input key that is absent makes the leg MISS
+  // (the deterministic rule declines to decide this input) — never a
+  // half-projected candidate.
+  let ruleLeg;
+  if (data.rule !== undefined) {
+    if (!isJsonRecord(data.rule)) invalidDecisionSource(`rule ${ruleId}: rule leg must be an object`);
+    for (const key of Object.keys(data.rule)) {
+      if (key !== 'when' && key !== 'outcome' && key !== 'eventType') {
+        invalidDecisionSource(`rule ${ruleId}: rule leg may only declare when, outcome and eventType`);
+      }
+    }
+    if (payloadFromInput === undefined) {
+      invalidDecisionSource(`rule ${ruleId}: a rule leg requires the rule-level payloadFromInput projection`);
+    }
+    const when = snapshotDecisionSourcePredicate(data.rule.when, `rule ${ruleId}: rule.when`);
+    const outcome = decisionSourceIdentifier(data.rule.outcome, `rule ${ruleId}: rule.outcome`);
+    const eventType = decisionSourceIdentifier(data.rule.eventType, `rule ${ruleId}: rule.eventType`);
+    ruleLeg = { when, outcome, eventType };
+  }
+
+  // Exact-cache leg: the declared dependency fields whose CURRENT context
+  // values pin the cache key; a lookup under changed dependency material is
+  // a miss by construction and the stale entry is never served.
+  let cacheDeps;
+  if (data.cache !== undefined) {
+    if (!isJsonRecord(data.cache)) invalidDecisionSource(`rule ${ruleId}: cache leg must be an object`);
+    for (const key of Object.keys(data.cache)) {
+      if (key !== 'dependencies') invalidDecisionSource(`rule ${ruleId}: cache leg may only declare dependencies`);
+    }
+    const dependencies = data.cache.dependencies;
+    if (!Array.isArray(dependencies) || dependencies.length === 0 || dependencies.length > DECISION_SOURCE_MAX_DEPS) {
+      invalidDecisionSource(`rule ${ruleId}: cache.dependencies must be a non-empty bounded list of context fields`);
+    }
+    const seen = new Set();
+    cacheDeps = [];
+    for (const field of dependencies) {
+      decisionSourceIdentifier(field, `rule ${ruleId}: cache dependency field`);
+      if (seen.has(field)) invalidDecisionSource(`rule ${ruleId}: duplicate cache dependency field ${field}`);
+      seen.add(field);
+      cacheDeps.push(field);
+    }
+  }
+
+  // Governed promoted-child leg (FR09): requested identity must match the
+  // sealed approved artifact exactly; durable pin-before-execution is
+  // established at turn time by THIS kernel; eligibility stays with S.
+  let promoted;
+  if (data.promoted !== undefined) {
+    if (!isJsonRecord(data.promoted)) invalidDecisionSource(`rule ${ruleId}: promoted leg must be an object`);
+    for (const key of Object.keys(data.promoted)) {
+      if (key !== 'artifactId' && key !== 'contentDigest' && key !== 'when') {
+        invalidDecisionSource(`rule ${ruleId}: promoted leg may only declare artifactId, contentDigest and when`);
+      }
+    }
+    const artifactId = decisionSourceIdentifier(data.promoted.artifactId, `rule ${ruleId}: promoted.artifactId`);
+    const contentDigest = decisionSourceIdentifier(data.promoted.contentDigest, `rule ${ruleId}: promoted.contentDigest`);
+    const approved = isJsonRecord(businessEndpoint.promotedArtifacts)
+      ? businessEndpoint.promotedArtifacts[artifactId]
+      : undefined;
+    if (!isJsonRecord(approved) || approved.artifactId !== artifactId || approved.contentDigest !== contentDigest) {
+      invalidDecisionSource(
+        `rule ${ruleId}: the promoted reference does not match the sealed approved artifact ${artifactId} (BUILD identity inconsistency)`,
+      );
+    }
+    const candidate = approved.candidate;
+    if (!isJsonRecord(candidate) || !isJsonRecord(candidate.decision) || !isJsonRecord(candidate.event)
+      || typeof candidate.decision.outcome !== 'string' || typeof candidate.event.type !== 'string') {
+      invalidDecisionSource(`rule ${ruleId}: approved artifact ${artifactId} carries no structured decision candidate`);
+    }
+    try {
+      canonicalizeJson(candidate);
+    } catch (error) {
+      invalidDecisionSource(`rule ${ruleId}: approved artifact ${artifactId} candidate is not canonical JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const when = snapshotDecisionSourcePredicate(data.promoted.when, `rule ${ruleId}: promoted.when`);
+    promoted = { artifactId, contentDigest, when, candidate: snapshotJson(candidate) };
+  }
+
+  // Bounded harness fallback leg: ONE trusted ModelPort turn through the
+  // sealed composite model-decision surface, reached only when every
+  // earlier leg missed.
+  let harness;
+  if (data.harness !== undefined) {
+    if (!isJsonRecord(data.harness)) invalidDecisionSource(`rule ${ruleId}: harness leg must be an object`);
+    for (const key of Object.keys(data.harness)) {
+      if (key !== 'modelOperation') invalidDecisionSource(`rule ${ruleId}: harness leg may only declare modelOperation`);
+    }
+    const modelOperation = decisionSourceIdentifier(data.harness.modelOperation, `rule ${ruleId}: harness.modelOperation`);
+    harness = { modelOperation };
+  }
+
+  if (ruleLeg === undefined && promoted === undefined && harness === undefined) {
+    invalidDecisionSource(`rule ${ruleId}: a decision-source rule must declare at least one resolver leg (rule/promoted/harness)`);
+  }
+
+  const snapshot = {
+    id: data.id,
+    decisionId,
+    payloadFromInput,
+    ruleLeg,
+    cacheDeps,
+    promoted,
+    harness,
+    declaration: snapshotJson(body),
+  };
+  deepFreezePreparedData(snapshot);
+  return snapshot;
+}
+
+/** Wire every decision-source rule of the Business policy (createOccurrenceRuntime only). */
+function wireDecisionSourceRules(businessEndpoint, sha256) {
+  const registry = new WeakMap();
+  let count = 0;
+  for (const [ruleId, rule] of Object.entries(businessEndpoint.rules ?? {})) {
+    if (!isJsonRecord(rule) || rule.kind !== 'decision-source') continue;
+    registry.set(rule, snapshotDecisionSourceRule(rule, ruleId, businessEndpoint, sha256));
+    count += 1;
+  }
+  // WeakMap has no .size: carry a bounded explicit count for fail-fast load gates.
+  return { registry, count };
+}
+
 /**
  * Trusted per-step evidence: exactly the shape the Host-bound resolver
  * mints for ONE physically observed bound-port invocation. Anything else —
@@ -3131,6 +3358,9 @@ export function createOccurrenceRuntime(options) {
     instanceCreates: 0,
     instanceReads: 0,
     decisionReceiptAppends: 0,
+    decisionCacheWrites: 0,
+    decisionCacheWriteFailures: 0,
+    promotedPins: 0,
   };
 
   const docs = hostPorts.docs;
@@ -3162,6 +3392,378 @@ export function createOccurrenceRuntime(options) {
   // [#1003 NF06] Same trusted boundary: every intent-declared receiptPolicy
   // is shape-validated and frozen here, before any instance can exist.
   const decisionReceiptPolicies = wireDecisionReceiptPolicies(businessEndpoint);
+  // [#1003 FR08 general + FR09 + FR12] Same trusted boundary: every
+  // decision-source rule is digest-verified, shape-validated and frozen
+  // here before any instance can exist. The retained S decision-source
+  // semantics must be exposed by the selected Standard SDK for any wired
+  // rule — no silent degradation to a different engine.
+  const { registry: decisionSourceRules, count: decisionSourceRuleCount } = wireDecisionSourceRules(businessEndpoint, sha256);
+  if (decisionSourceRuleCount > 0 && (
+    typeof sdkEndpoint?.resolveDecisionSource !== 'function'
+    || typeof sdkEndpoint?.selectPromotedChild !== 'function'
+    || typeof sdkEndpoint?.checkEvidenceApplicability !== 'function'
+  )) {
+    throw new CentralAdmissionError(
+      'DECISION_SOURCE_SDK_ENDPOINT_UNAVAILABLE',
+      'the Business policy declares decision-source rules but the selected Standard SDK exposes no retained decision-source endpoints (resolveRetainedDecision / selectRetainedPromotedChild / checkRetainedEvidenceApplicability)',
+    );
+  }
+  // [#1003 FR12] The per-policy decision-scope identity exact-cache records
+  // are pinned to: the exact Business package + policy + governance
+  // semantics, through the SAME synchronous Host sha256 port as the wiring
+  // digests. The retained S evidence-applicability helper validates its
+  // package/baseline fields with the bounded-identifier grammar, so the
+  // scope is encoded identifier-safely (policyId + a letter-prefixed
+  // digest); a policy whose policyId is not identifier-shaped cannot
+  // declare cacheable decision-source rules. A cached record from any
+  // other scope is never applicable.
+  const decisionScopeDigest = `decision-scope-v1:${sha256.digestUtf8(canonicalJsonStringify({
+    packageId: businessEndpoint.packageId,
+    policyId: businessEndpoint.policyId,
+    governanceSemantics: businessEndpoint.governanceSemantics ?? null,
+  }))}`;
+  const decisionScopePackage = typeof businessEndpoint.policyId === 'string'
+    && DECISION_SOURCE_IDENTIFIER.test(businessEndpoint.policyId)
+    ? businessEndpoint.policyId
+    : undefined;
+  if (decisionSourceRuleCount > 0 && decisionScopePackage === undefined) {
+    throw new CentralAdmissionError(
+      'DECISION_SOURCE_INVALID',
+      'a Business policy that declares decision-source rules must carry a bounded-identifier policyId for the retained evidence-applicability scope',
+    );
+  }
+
+  /**
+   * [#1003 FR08 general] Persist ONE exact-cache record through the Host
+   * true-CAS port — the physical store has no unconditional writes, so the
+   * write is exactly one of create (mustBeAbsent) or CAS
+   * (mustMatchRevision at the just-read revision), like every other
+   * Kernel-owned durable record. The key is content-addressed by the
+   * instance + decision + canonical input + dependency material, so an
+   * overwrite can only carry newer admitted truth for the exact same
+   * lookup; any lost race is a bounded observation (the cache is an
+   * optimization over the durable admission, never an authority).
+   */
+  async function writeDecisionCacheRecord(key, record) {
+    let envelope;
+    try {
+      envelope = await docs.get(key);
+    } catch {
+      envelope = undefined;
+    }
+    const existing = isJsonRecord(envelope) ? envelope : undefined;
+    if (
+      existing !== undefined
+      && isJsonRecord(existing.value)
+      && existing.value.writtenAtTurn === record.writtenAtTurn
+    ) {
+      return; // idempotent same-turn replay of the exact admitted record
+    }
+    if (existing === undefined) {
+      try {
+        await docs.put(key, record, { mustBeAbsent: true });
+        counters.decisionCacheWrites += 1;
+        return;
+      } catch {
+        // lost the create race — fall through to the CAS re-read
+      }
+    }
+    // Cache maintenance happens after the authoritative business commit.
+    // A failed re-read must NEVER reject an already admitted business ACK.
+    let current;
+    try {
+      current = await docs.get(key);
+    } catch {
+      counters.decisionCacheWriteFailures += 1;
+      return;
+    }
+    if (!isJsonRecord(current)) {
+      counters.decisionCacheWriteFailures += 1;
+      return;
+    }
+    try {
+      await docs.put(key, record, { mustMatchRevision: current.revision });
+      counters.decisionCacheWrites += 1;
+    } catch {
+      counters.decisionCacheWriteFailures += 1;
+    }
+  }
+
+  /**
+   * [#1003 FR09] Durable pin-before-execution in the generic Host document
+   * store (create-if-absent CAS). Re-pinning the EXACT approved artifact is
+   * idempotent; a different digest under the same pin slot refuses typed —
+   * the approved child can never drift.
+   */
+  async function commitDecisionSourcePin(pinKey, pinRecord) {
+    try {
+      await docs.put(pinKey, pinRecord, { mustBeAbsent: true });
+      counters.promotedPins += 1;
+      return;
+    } catch {
+      const envelope = await docs.get(pinKey);
+      const existing = isJsonRecord(envelope) ? envelope.value : undefined;
+      if (isJsonRecord(existing) && existing.artifactId === pinRecord.artifactId
+        && existing.contentDigest === pinRecord.contentDigest) {
+        return;
+      }
+      throw new CentralAdmissionError(
+        'DECISION_SOURCE_PIN_CONFLICT',
+        `the promoted-child pin ${pinKey} is already committed for a different artifact digest; the approved child cannot drift`,
+      );
+    }
+  }
+
+  /**
+   * [#1003 FR08 general + FR09 + FR12] The K-owned decision-source
+   * composition for ONE turn (inside its lane, before central admission).
+   *
+   * The legs are assembled lazily in the retained frozen order so an
+   * earlier match never consults a later source: the deterministic rule
+   * leg first, then the exact-cache leg (FR08 currentness: the lookup key
+   * pins the current dependency material; FR12 applicability: the retained
+   * S evidence check plus promoted-producer invalidation gate every hit),
+   * then the governed promoted leg (FR09: sealed approval identity, S
+   * eligibility, durable K pin before the candidate proceeds). S's
+   * resolveRetainedDecision is the ONLY ordering authority. Only when every
+   * declared cheap leg missed does the bounded harness fallback run —
+   * exactly ONE trusted ModelPort turn through the sealed composite
+   * model-decision surface with its honest measured(1) evidence.
+   *
+   * Returns {resolved, pendingWrite} for the UNCHANGED central admission,
+   * or {terminal, evidence} for a typed zero-effect stop. The exact-cache
+   * write is deferred: it happens only after the authoritative state
+   * commit, so a candidate denied by any admission gate is never cached.
+   */
+  async function resolveDecisionSourceTurn({ wired, request, context, control, target, workflowInstanceId, latch }) {
+    const turnId = deriveDurableControlTurnId(target, { kind: 'message', sourceMessageId: request.messageId });
+    let canonicalInput;
+    try {
+      canonicalInput = canonicalizeJson(request.input ?? {});
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'DECISION_SOURCE_INPUT_INVALID',
+        `decision-source input must be canonical JSON: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (!isJsonRecord(canonicalInput)) {
+      throw new CentralAdmissionError('DECISION_SOURCE_INPUT_INVALID', 'decision-source input must be a JSON object');
+    }
+    const predicateInput = () => prepareDomainPredicateEvaluationInput({
+      context,
+      event: { type: 'decision-source-input', payload: canonicalInput },
+    });
+
+    // ---- current dependency material (exact-cache currentness) ----
+    let dependencies;
+    let cacheKey;
+    if (wired.cacheDeps !== undefined) {
+      dependencies = {};
+      for (const field of wired.cacheDeps) {
+        const value = context[field];
+        if (value !== undefined && (typeof value !== 'string' || value.length === 0)) {
+          throw new CentralAdmissionError(
+            'DECISION_SOURCE_DEPENDENCY_INVALID',
+            `decision ${wired.decisionId} dependency field ${field} is not a bounded revision string`,
+          );
+        }
+        dependencies[field] = value === undefined ? '' : value;
+      }
+      cacheKey = `${DECISION_CACHE_PREFIX}${workflowInstanceId}:${wired.decisionId}`
+        + `:${sha256.digestUtf8(canonicalJsonStringify(canonicalInput))}`
+        + `:${sha256.digestUtf8(canonicalJsonStringify(dependencies))}`;
+    }
+
+    const observations = {};
+    const legMissed = (name) => observations[name] === undefined || observations[name].status === 'miss';
+    let cacheRead = 'disabled';
+    let promotedArtifact;
+    let harnessEnvelope;
+
+    // ---- deterministic rule leg ----
+    if (wired.ruleLeg !== undefined) {
+      let projectable = true;
+      const payload = {};
+      for (const [payloadKey, inputKey] of Object.entries(wired.payloadFromInput)) {
+        if (!hasOwn(canonicalInput, inputKey)) {
+          projectable = false;
+          break;
+        }
+        payload[payloadKey] = canonicalInput[inputKey];
+      }
+      if (projectable && evaluateDomainPredicate(wired.ruleLeg.when, predicateInput())) {
+        observations.rule = {
+          status: 'match',
+          candidate: {
+            decision: { outcome: wired.ruleLeg.outcome },
+            event: { type: wired.ruleLeg.eventType, payload },
+          },
+        };
+      } else {
+        observations.rule = { status: 'miss' };
+      }
+    }
+
+    // ---- exact-cache leg (FR08 currentness + FR12 applicability) ----
+    if (wired.cacheDeps !== undefined && legMissed('rule')) {
+      cacheRead = 'miss';
+      let record;
+      try {
+        const envelope = await docs.get(cacheKey);
+        record = isJsonRecord(envelope) ? envelope.value : undefined;
+      } catch {
+        record = undefined;
+      }
+      if (isJsonRecord(record) && isJsonRecord(record.candidate) && isJsonRecord(record.provenance)) {
+        let applicable = true;
+        try {
+          sdkEndpoint.checkEvidenceApplicability(
+            { packageId: record.provenance.packageId, baselineDigest: record.provenance.baselineDigest },
+            { packageId: decisionScopePackage, baselineDigest: decisionScopeDigest },
+          );
+        } catch {
+          applicable = false;
+        }
+        // Producer invalidation: a cached decision produced by a promoted
+        // artifact is only current while that exact artifact is still the
+        // sealed approval and not revoked — a retired producer can never
+        // replay its old result through the cache.
+        if (applicable && isJsonRecord(record.producedBy) && record.producedBy.kind === 'promoted-artifact') {
+          const approved = isJsonRecord(businessEndpoint.promotedArtifacts)
+            ? businessEndpoint.promotedArtifacts[record.producedBy.artifactId]
+            : undefined;
+          if (!isJsonRecord(approved) || approved.contentDigest !== record.producedBy.contentDigest
+            || approved.revoked === true) {
+            applicable = false;
+          }
+        }
+        if (applicable) {
+          observations['exact-cache'] = { status: 'match', exactCurrent: true, candidate: record.candidate };
+          cacheRead = 'hit';
+        }
+      }
+    }
+
+    // ---- governed promoted-child leg (FR09) ----
+    if (wired.promoted !== undefined && legMissed('rule') && legMissed('exact-cache')) {
+      if (evaluateDomainPredicate(wired.promoted.when, predicateInput())) {
+        const approved = businessEndpoint.promotedArtifacts[wired.promoted.artifactId];
+        const approvedView = {
+          artifactId: approved.artifactId,
+          contentDigest: approved.contentDigest,
+          ...(approved.revoked !== undefined ? { revoked: approved.revoked } : {}),
+          ...(approved.applicable !== undefined ? { applicable: approved.applicable } : {}),
+          ...(approved.compatible !== undefined ? { compatible: approved.compatible } : {}),
+        };
+        const requested = { artifactId: wired.promoted.artifactId, contentDigest: wired.promoted.contentDigest };
+        let child;
+        try {
+          child = sdkEndpoint.selectPromotedChild({ requested, approved: approvedView, pinCommitted: false });
+        } catch (error) {
+          if (!(isJsonRecord(error) && error.code === 'SDK_CHILD_PIN_REQUIRED')) throw error;
+        }
+        if (child === undefined) {
+          const pinKey = `${PROMOTED_PIN_PREFIX}${workflowInstanceId}:${wired.decisionId}`;
+          await commitDecisionSourcePin(pinKey, {
+            artifactId: requested.artifactId,
+            contentDigest: requested.contentDigest,
+            pinnedAtTurn: turnId,
+            pinnedAt: clock(),
+          });
+          sdkEndpoint.selectPromotedChild({ requested, approved: approvedView, pinCommitted: true });
+        }
+        observations['promoted-subworkflow'] = {
+          status: 'match',
+          artifactCurrent: true,
+          candidate: wired.promoted.candidate,
+        };
+        promotedArtifact = { kind: 'promoted-artifact', artifactId: requested.artifactId, contentDigest: requested.contentDigest };
+      } else {
+        observations['promoted-subworkflow'] = { status: 'miss' };
+      }
+    }
+
+    // ---- S selection over the declared frozen ordering ----
+    let selected;
+    try {
+      selected = sdkEndpoint.resolveDecisionSource({ decisionId: wired.decisionId, observations });
+    } catch (error) {
+      if (!(wired.harness !== undefined && isJsonRecord(error) && error.code === 'SDK_DECISION_HARNESS_UNCONFIGURED')) {
+        throw error;
+      }
+      selected = undefined;
+    }
+
+    // ---- bounded harness fallback: exactly ONE trusted ModelPort turn ----
+    if (selected === undefined) {
+      const declaration = { kind: 'model-decision', id: `${wired.id}:harness`, modelOperation: wired.harness.modelOperation };
+      try {
+        harnessEnvelope = await sdkEndpoint.interpret(declaration, canonicalInput, context, control);
+      } catch (error) {
+        if (latch.cancelled) {
+          return {
+            terminal: { code: 'CANCELLED', step: 1, inFlightTurnDiscarded: true },
+            evidence: { modelCallEvidence: { status: 'unmeasured' } },
+          };
+        }
+        throw error;
+      }
+      if (!isJsonRecord(harnessEnvelope) || !isJsonRecord(harnessEnvelope.structuredDecision)) {
+        throw new CentralAdmissionError(
+          'DECISION_SOURCE_MODEL_EVIDENCE_INVALID',
+          'the harness fallback envelope carries no structured decision; no decision is admitted',
+        );
+      }
+      try {
+        trustedStepEvidence(harnessEnvelope);
+      } catch (error) {
+        throw new CentralAdmissionError(
+          'DECISION_SOURCE_MODEL_EVIDENCE_INVALID',
+          `the harness fallback did not carry the trusted single-invocation evidence of the Host-bound resolver: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      selected = sdkEndpoint.resolveDecisionSource({
+        decisionId: wired.decisionId,
+        observations: {
+          ...observations,
+          'harness-machine': { status: 'match', candidate: harnessEnvelope.structuredDecision },
+        },
+      });
+    }
+
+    const source = selected.selectedSource;
+    const resolved = {
+      structuredDecision: selected.candidate,
+      source,
+      llmAvoided: source !== 'harness-machine',
+      modelCallEvidence: source === 'harness-machine'
+        ? harnessEnvelope.modelCallEvidence
+        : { status: 'measured', count: 0, scope: BOUND_PORT_EVIDENCE_SCOPE },
+      cacheDisposition: { read: cacheRead },
+      telemetry: [],
+    };
+    // A cache-hit turn writes NOTHING back: the row already carries the
+    // original admitted producer record (its source lineage and producedBy
+    // identity are the durable ordering truth — relabeling them
+    // 'exact-cache' would erase the producer).
+    const pendingWrite = wired.cacheDeps === undefined || source === 'exact-cache' ? undefined : {
+      key: cacheKey,
+      record: {
+        version: 1,
+        decisionId: wired.decisionId,
+        source,
+        candidate: selected.candidate,
+        provenance: {
+          packageId: decisionScopePackage,
+          baselineDigest: decisionScopeDigest,
+          dependencies,
+        },
+        ...(promotedArtifact !== undefined && source === 'promoted-subworkflow' ? { producedBy: promotedArtifact } : {}),
+        writtenAtTurn: turnId,
+      },
+    };
+    return { resolved, pendingWrite };
+  }
 
   function continuationPolicyFor(rule) {
     const wired = isJsonRecord(rule) ? continuationPolicies.get(rule) : undefined;
@@ -3553,6 +4155,16 @@ export function createOccurrenceRuntime(options) {
           `semantic-decision rule ${String(binding.ruleId)} was never validated at the trusted load boundary; post-wiring injected declarations are refused`,
         );
       }
+      // [#1003 FR08 general + FR09 + FR12] A decision-source rule that was
+      // never digest-verified/frozen at this trusted load boundary can
+      // never run — same discipline as the semantic-decision wiring.
+      const wiredDecisionSource = isJsonRecord(rule) ? decisionSourceRules.get(rule) : undefined;
+      if (wiredDecisionSource === undefined && isJsonRecord(rule) && rule.kind === 'decision-source') {
+        throw new CentralAdmissionError(
+          'DECISION_SOURCE_UNVALIDATED',
+          `decision-source rule ${String(binding.ruleId)} was never validated at the trusted load boundary; post-wiring injected declarations are refused`,
+        );
+      }
       // [#1051 R1 P1] S interprets ONLY the load-time verified frozen
       // declaration. The original rule object stays ordinary mutable policy
       // surface; an in-place mutation after wiring must not change what
@@ -3562,7 +4174,27 @@ export function createOccurrenceRuntime(options) {
       const continuation = continuationPolicyFor(declaration);
       const control = latch.signal === undefined ? undefined : { signal: latch.signal };
       let resolved;
-      if (continuation !== undefined) {
+      let decisionSourcePendingWrite;
+      if (wiredDecisionSource !== undefined) {
+        // [#1003 FR08 general + FR09 + FR12] The K-owned retained resolver
+        // composition: S selects, K supplies the qualified observations, and
+        // the selected candidate proceeds through the UNCHANGED central
+        // admission below — there is no separate admission path.
+        const decisionSource = await resolveDecisionSourceTurn({
+          wired: wiredDecisionSource,
+          request,
+          context,
+          control,
+          target,
+          workflowInstanceId,
+          latch,
+        });
+        if (decisionSource.terminal !== undefined) {
+          return terminatedReceipt(request, workflowInstanceId, decisionSource.terminal, decisionSource.evidence);
+        }
+        resolved = decisionSource.resolved;
+        decisionSourcePendingWrite = decisionSource.pendingWrite;
+      } else if (continuation !== undefined) {
         // [#1003 FR07-KH2] K-owned bounded model→query→observation→model
         // continuation over the S single-step surface; only a final
         // envelope proceeds to central admission below.
@@ -3683,6 +4315,17 @@ export function createOccurrenceRuntime(options) {
           },
         }),
       });
+
+      // [#1003 FR08 general] The exact-cache write happens only AFTER the
+      // authoritative state commit: a candidate denied by any admission
+      // gate is never cached, and a write failure after the committed
+      // truth is a bounded observation that never fails the ACK.
+      if (decisionSourcePendingWrite !== undefined) {
+        await writeDecisionCacheRecord(decisionSourcePendingWrite.key, {
+          ...decisionSourcePendingWrite.record,
+          writtenAt: clock(),
+        });
+      }
 
       // [#1003 NF06 OBSERVATIONAL_OPTIONAL] AFTER the admitted business
       // commit (the authoritative state CAS is already durable), the
