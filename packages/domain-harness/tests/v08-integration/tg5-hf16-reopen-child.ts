@@ -38,7 +38,7 @@ const send = (messageId: string, input: Record<string, unknown>, instanceKey: st
 
 const stateBefore = await gateway.queryInstance(requester, target('q-poison')) as { stateRevision: number; state: { stateKey: string } };
 let retryCode: string | undefined;
-let retryMessage = '';
+let retryMessage: string;
 let retryStatus: string | undefined;
 try {
   const receipt = await send('m-poison-1', { amount: 30, requestId: 'POISON-1' }, 'q-poison') as { status: string; denial?: { reason: string } };
