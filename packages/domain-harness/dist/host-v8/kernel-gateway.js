@@ -55,6 +55,8 @@ import { QualifiedPackageError, canonicalSnapshot, sha256Hex } from '../public-v
 import { isInstalledHandleShape, resolveInstalledPackageRoot } from '../public-v8/deploy.js';
 import { HostBoundaryError } from './errors.js';
 import { assertIntentScope } from './ux-transport.js';
+import { SchemaValidator } from '../execution/schema-validator.js';
+import { dispatchHostToolCall, validateHostToolCallAdapters } from './tool-call-port.js';
 import { ChildInvocationCoordinator, ExternalWorkCoordinator, PoisonRecoveryCoordinator, childInvocationCorrelationId, kernelTurnSourceOf, poisonRecoveryActionId, } from './durable-controls.js';
 /**
  * Durable CAS key under which a gateway registration pins the EXACT
@@ -149,6 +151,12 @@ export function createKernelGateway(input) {
     const host = input.host;
     const gatewaySessionCap = input.gatewaySessionCap;
     const apps = new Map();
+    /**
+     * [#1006 HF29] The one exact-schema validator every Tool Call dispatch
+     * uses (same Ajv-2020 machinery as the frozen tool contracts; cached
+     * compiled schemas per sealed descriptor object).
+     */
+    const toolCallValidator = new SchemaValidator();
     /**
      * [#1062] The Host-side durable external-work coordinator over the SAME
      * probed physical store the Kernel consumes (Host namespace records; the
@@ -315,6 +323,13 @@ export function createKernelGateway(input) {
                 && (!Array.isArray(registration.controlRoles) || registration.controlRoles.length === 0
                     || !registration.controlRoles.every((role) => typeof role === 'string' && role.length > 0))) {
                 throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp controlRoles, when present, must be a non-empty array of host governance roles');
+            }
+            // [#1006 HF29] Shape-gate the explicitly provided Tool Call adapters
+            // (Host governance input). Agreement with the SEALED bindings —
+            // transport kind, capability and bound digest — is enforced per call
+            // at dispatch; unsealed adapters simply never run.
+            if (registration.toolCallAdapters !== undefined) {
+                validateHostToolCallAdapters(registration.toolCallAdapters);
             }
             if (apps.has(registration.appId)) {
                 throw new HostBoundaryError('GATEWAY_APP_ALREADY_REGISTERED', `app ${registration.appId} is already registered on this gateway`);
@@ -485,6 +500,7 @@ export function createKernelGateway(input) {
                 // the guard above narrowed the declared readonly string[]; restore it
                 genesisRoles: Object.freeze([...registration.genesisRoles]),
                 controlRoles: Object.freeze([...(registration.controlRoles ?? registration.genesisRoles)]),
+                toolCallAdapters: Object.freeze({ ...(registration.toolCallAdapters ?? {}) }),
             }));
         },
         hasApp(appId) {
@@ -908,6 +924,38 @@ export function createKernelGateway(input) {
                 appId: request.appId,
                 tools: Object.freeze(tools),
                 projectionAuthority,
+            });
+        },
+        async executeToolCall(credential, request) {
+            if (typeof request !== 'object'
+                || request === null
+                || typeof request.appId !== 'string'
+                || request.appId.length === 0
+                || typeof request.toolId !== 'string'
+                || request.toolId.length === 0) {
+                throw new HostBoundaryError('HOST_TOOL_CALL_MALFORMED', 'gateway executeToolCall requires {appId, toolId} with non-empty strings');
+            }
+            // Re-authenticate exactly like send/invokeOperation: issuer, audience,
+            // tenant/app, roles, revocation and currentness are all re-verified.
+            const principal = await authenticate(credential);
+            const app = requireApp(request.appId, principal);
+            // Closed-world lookup: only a SEALED Tool Call binding of THIS
+            // registered closure can ever dispatch (no runtime discovery).
+            const sealed = app.ops.sealedToolBindings().find((binding) => binding.toolId === request.toolId);
+            if (sealed === undefined) {
+                throw new HostBoundaryError('HOST_TOOL_UNKNOWN', `tool ${request.toolId} is not a sealed Tool Call binding of app ${app.appId}'s closure; the executable tool surface is BUILD-fixed with no runtime discovery`);
+            }
+            // Business-governed execution authority: the SAME issuer-signed role
+            // pick an authenticated send against the sealed visibility intent
+            // makes — a caller-declared role never reaches the dispatch.
+            if (!app.ops.roleAdmitted(principal, sealed.visibilityIntentType)) {
+                throw new HostBoundaryError('HOST_TOOL_ROLE_DENIED', `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles required by the visibility intent of tool ${sealed.toolId}`);
+            }
+            return dispatchHostToolCall({
+                sealed,
+                adapters: app.toolCallAdapters,
+                validator: toolCallValidator,
+                toolInput: request.input,
             });
         },
         async activateGenesis(credential, request) {

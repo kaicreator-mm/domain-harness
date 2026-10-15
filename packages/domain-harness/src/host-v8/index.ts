@@ -73,9 +73,23 @@ export type {
   KernelGatewayProjectionDependency,
   KernelGatewayProjectionRequest,
   KernelGatewaySendIntent,
+  KernelGatewayToolCallRequest,
   KernelReceiptScope,
   KernelReceiptSubscription,
 } from './kernel-gateway.js';
+
+// [#1006 HF29] Host-owned approved Tool Call dispatch port: the explicitly
+// provided Host adapters (local / injected HTTP transports) and the frozen
+// approved transport family every sealed Tool Call binding checks against.
+export {
+  HOST_TOOL_CALL_APPROVED_TRANSPORTS,
+  HOST_TOOL_CALL_MAX_OUTPUT_BYTES,
+  HOST_TOOL_CALL_TRANSPORT_LOCAL,
+  HOST_TOOL_CALL_TRANSPORT_REMOTE_HTTP_JSON,
+  dispatchHostToolCall,
+  validateHostToolCallAdapters,
+} from './tool-call-port.js';
+export type { HostToolCallAdapter, HostToolCallAdapters } from './tool-call-port.js';
 
 // [#1063 HF20] ordered durable mutation-observation contract (the Kernel
 // payload twin of these semantics lives in the sealed kernel bytes).

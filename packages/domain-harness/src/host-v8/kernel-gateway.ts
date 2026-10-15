@@ -51,7 +51,7 @@
  * selected Kernel package, T-C).
  */
 
-import { DomainHarness, getFacadeKernelOps, type V8DomainFacade, type V8FacadeKernelOps } from '../public-v8/microkernel.js';
+import { DomainHarness, getFacadeKernelOps, type V8DomainFacade, type V8FacadeKernelOps, type V8SealedToolBinding } from '../public-v8/microkernel.js';
 import { QualifiedPackageError, canonicalSnapshot, sha256Hex } from '../public-v8/contracts.js';
 import { isInstalledHandleShape, resolveInstalledPackageRoot } from '../public-v8/deploy.js';
 import { HostBoundaryError } from './errors.js';
@@ -59,6 +59,8 @@ import type { TrustedNodeHost } from './bootstrap.js';
 import { assertIntentScope, type UxTarget } from './ux-transport.js';
 import type { HostEvent } from './events.js';
 import type { HostCredential, HostPrincipal } from './identity.js';
+import { SchemaValidator } from '../execution/schema-validator.js';
+import { dispatchHostToolCall, validateHostToolCallAdapters, type HostToolCallAdapters } from './tool-call-port.js';
 import {
   ChildInvocationCoordinator,
   ExternalWorkCoordinator,
@@ -91,6 +93,15 @@ export interface KernelGatewayAppInput {
    * caller data.
    */
   readonly controlRoles?: readonly string[];
+  /**
+   * [#1006 HF29] The explicitly provided Host adapters for this app's
+   * SEALED Tool Call bindings (local / injected HTTP transports), keyed by
+   * the sealed bindingId. Host governance configuration — never caller
+   * data: no default adapter exists, and a Tool Call whose binding has no
+   * adapter here refuses typed before any effect. Concrete tool
+   * implementations live ONLY here — the microkernel never receives one.
+   */
+  readonly toolCallAdapters?: HostToolCallAdapters;
 }
 
 export interface KernelGatewaySendIntent {
@@ -131,6 +142,20 @@ export interface KernelGatewayOperationCall {
   readonly instanceKey?: string;
   /** Effectful operations only: the occurrence dedup/replay identity. */
   readonly messageId?: string;
+}
+
+/**
+ * #1006 R5 HF29 — one authenticated approved Tool Call through the
+ * Host-owned dispatch port. The tool must be a SEALED Tool Call binding of
+ * the registered closure (local/HTTP JSON transport, bound digest, exact
+ * schemas); the concrete implementation is the explicitly provided Host
+ * adapter whose digest matches the sealed binding. Pure JSON data only —
+ * no occurrence address rides a Tool Call.
+ */
+export interface KernelGatewayToolCallRequest {
+  readonly appId: string;
+  readonly toolId: string;
+  readonly input?: unknown;
 }
 
 /**
@@ -276,6 +301,20 @@ export interface KernelGateway {
    * central occurrence path (`send` / effectful OperationCall).
    */
   queryAgentTools(credential: unknown, request: { readonly appId: string }): Promise<KernelGatewayAgentToolQueryResult>;
+  /**
+   * [#1006 HF29] One authenticated approved Tool Call through the Host-owned
+   * dispatch port: the tool must be a sealed binding of the app's closure,
+   * the authenticated principal must hold a role the sealed Business
+   * visibility intent admits, every sealed required capability must be
+   * provided by this Host, and the explicitly provided adapter must match
+   * the sealed transport kind and BOUND DIGEST with exact input/output JSON
+   * Schemas — every refusal fires typed BEFORE the adapter (and any
+   * effect) runs. Effectful tool bindings and transports outside the frozen
+   * approved family (script is NOT in the selected v0.8 approved target
+   * profile) refuse typed; there is no default network, no module import
+   * and no fallback transport.
+   */
+  executeToolCall(credential: unknown, request: KernelGatewayToolCallRequest): Promise<unknown>;
   /** Protected Genesis activation (host-configured role authority). */
   activateGenesis(credential: unknown, request: {
     readonly appId: string;
@@ -422,6 +461,8 @@ interface RegisteredApp {
   readonly ops: V8FacadeKernelOps;
   readonly genesisRoles: readonly string[];
   readonly controlRoles: readonly string[];
+  /** [#1006 HF29] The explicitly provided Tool Call adapters (Host governance). */
+  readonly toolCallAdapters: HostToolCallAdapters;
 }
 
 /** The durable app-registration pin record (physical Host store). */
@@ -532,6 +573,12 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
   const host = input.host;
   const gatewaySessionCap = input.gatewaySessionCap;
   const apps = new Map<string, RegisteredApp>();
+  /**
+   * [#1006 HF29] The one exact-schema validator every Tool Call dispatch
+   * uses (same Ajv-2020 machinery as the frozen tool contracts; cached
+   * compiled schemas per sealed descriptor object).
+   */
+  const toolCallValidator = new SchemaValidator();
   /**
    * [#1062] The Host-side durable external-work coordinator over the SAME
    * probed physical store the Kernel consumes (Host namespace records; the
@@ -744,6 +791,13 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
           || !registration.controlRoles.every((role) => typeof role === 'string' && role.length > 0))) {
         throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp controlRoles, when present, must be a non-empty array of host governance roles');
       }
+      // [#1006 HF29] Shape-gate the explicitly provided Tool Call adapters
+      // (Host governance input). Agreement with the SEALED bindings —
+      // transport kind, capability and bound digest — is enforced per call
+      // at dispatch; unsealed adapters simply never run.
+      if (registration.toolCallAdapters !== undefined) {
+        validateHostToolCallAdapters(registration.toolCallAdapters);
+      }
       if (apps.has(registration.appId)) {
         throw new HostBoundaryError('GATEWAY_APP_ALREADY_REGISTERED', `app ${registration.appId} is already registered on this gateway`);
       }
@@ -921,6 +975,7 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         // the guard above narrowed the declared readonly string[]; restore it
         genesisRoles: Object.freeze([...(registration.genesisRoles as readonly string[])]),
         controlRoles: Object.freeze([...(registration.controlRoles ?? registration.genesisRoles as readonly string[])]),
+        toolCallAdapters: Object.freeze({ ...(registration.toolCallAdapters ?? {}) }),
       }));
     },
 
@@ -1352,6 +1407,48 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         appId: request.appId,
         tools: Object.freeze(tools),
         projectionAuthority,
+      });
+    },
+
+    async executeToolCall(credential: unknown, request: KernelGatewayToolCallRequest): Promise<unknown> {
+      if (
+        typeof request !== 'object'
+        || request === null
+        || typeof request.appId !== 'string'
+        || request.appId.length === 0
+        || typeof request.toolId !== 'string'
+        || request.toolId.length === 0
+      ) {
+        throw new HostBoundaryError('HOST_TOOL_CALL_MALFORMED', 'gateway executeToolCall requires {appId, toolId} with non-empty strings');
+      }
+      // Re-authenticate exactly like send/invokeOperation: issuer, audience,
+      // tenant/app, roles, revocation and currentness are all re-verified.
+      const principal = await authenticate(credential);
+      const app = requireApp(request.appId, principal);
+      // Closed-world lookup: only a SEALED Tool Call binding of THIS
+      // registered closure can ever dispatch (no runtime discovery).
+      const sealed: V8SealedToolBinding | undefined
+        = app.ops.sealedToolBindings().find((binding) => binding.toolId === request.toolId);
+      if (sealed === undefined) {
+        throw new HostBoundaryError(
+          'HOST_TOOL_UNKNOWN',
+          `tool ${request.toolId} is not a sealed Tool Call binding of app ${app.appId}'s closure; the executable tool surface is BUILD-fixed with no runtime discovery`,
+        );
+      }
+      // Business-governed execution authority: the SAME issuer-signed role
+      // pick an authenticated send against the sealed visibility intent
+      // makes — a caller-declared role never reaches the dispatch.
+      if (!app.ops.roleAdmitted(principal, sealed.visibilityIntentType)) {
+        throw new HostBoundaryError(
+          'HOST_TOOL_ROLE_DENIED',
+          `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles required by the visibility intent of tool ${sealed.toolId}`,
+        );
+      }
+      return dispatchHostToolCall({
+        sealed,
+        adapters: app.toolCallAdapters,
+        validator: toolCallValidator,
+        toolInput: request.input,
       });
     },
 

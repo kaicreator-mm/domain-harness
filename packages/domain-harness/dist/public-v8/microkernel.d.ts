@@ -37,6 +37,7 @@
  * physical handlers run only behind the Kernel's effect dispatch as
  * Host-provisioned resource adapters.
  */
+import type { JsonSchema } from '../contracts/json.js';
 import { type V8CancellationSignal } from './model-port.js';
 /** The scoped consumption facade returned by `DomainHarness.load(package)`. */
 export interface V8DomainFacade {
@@ -254,6 +255,15 @@ export interface V8FacadeKernelOps {
      */
     describeOperationSurface(principal: V8GatewayPrincipal): readonly V8OperationSurfaceDescriptor[];
     /**
+     * #1006 HF29: the BUILD-sealed Tool Call bindings of this closure — the
+     * approved local/HTTP JSON binding table every authenticated Tool Call
+     * dispatch checks against. Inert sealed metadata only (binding identity,
+     * bound digest, exact schemas, Business-governed visibility): no handler
+     * ever rides a descriptor — the concrete implementation stays an
+     * explicitly provided Host adapter the trusted gateway matches by digest.
+     */
+    sealedToolBindings(): readonly V8SealedToolBinding[];
+    /**
      * #1003 FR05/HF17/HF23: the retained Standard-SDK query/observer/agent
      * projections surfaced for the trusted gateway exactly like the FR08
      * retained decision-source endpoints — additive optional ABI members,
@@ -292,6 +302,33 @@ export interface V8OperationSurfaceDescriptor {
     readonly admissionIntentType?: string;
     /** Whether the authenticated principal holds the Business-bound role. */
     readonly principalAdmitted: boolean;
+}
+/**
+ * #1006 R5 HF29 — one BUILD-sealed Tool Call binding descriptor. The sealed
+ * capability `TOOLS` ABI table entry behind the Host-owned dispatch port:
+ * inert approval metadata (binding identity + bound digest + exact JSON
+ * Schemas + the Business intent whose bound role set governs execution).
+ * No implementation rides the descriptor — the Host registers the concrete
+ * adapter and the dispatch refuses everything but the exact bound digest.
+ */
+export interface V8SealedToolBinding {
+    readonly capabilityId: string;
+    readonly toolId: string;
+    readonly effectClass: V8OperationEffectClass;
+    /** The sealed transport kind (frozen family: host-local / remote-http-json). */
+    readonly bindingKind: string;
+    /** The sealed binding identity the Host adapter registers under. */
+    readonly bindingId: string;
+    /** The bound artifact digest a Host adapter must match exactly. */
+    readonly bindingDigest: string;
+    /** The host capabilities this tool declared it requires. */
+    readonly requiredCapabilities: readonly string[];
+    /** Exact input JSON Schema (absent = any JSON input). */
+    readonly inputSchema?: JsonSchema;
+    /** Exact output JSON Schema. */
+    readonly outputSchema: JsonSchema;
+    /** The sealed Business intent whose issuer-bound role set authorizes a call. */
+    readonly visibilityIntentType: string;
 }
 /**
  * Validate the gateway session channel WITHOUT consuming it (#1013 R2): the
