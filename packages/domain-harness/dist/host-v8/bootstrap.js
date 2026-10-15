@@ -163,6 +163,7 @@ export async function bootstrapTrustedHost(input) {
     const host = Object.freeze({
         audience,
         docs: store,
+        storageMode: storage === undefined ? 'memory' : 'physical',
         resources,
         events,
         authenticate: (credential) => verifier.authenticate(credential),

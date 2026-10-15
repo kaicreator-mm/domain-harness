@@ -24,7 +24,6 @@ import {
   bootstrapTrustedHost,
   createKernelGateway,
   openSqliteCasStore,
-  type SqliteCasStore,
   type TrustedHostStorageInstance,
 } from '../../src/host-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential } from './helpers.js';
@@ -88,10 +87,8 @@ if (mode === 'memory') {
   }
 } else if (mode === 'setup' || mode === 'unknown') {
   let storage: { path: string } | TrustedHostStorageInstance = { path: dbPath as string };
-  let inner: SqliteCasStore | null = null;
   if (mode === 'unknown') {
-    inner = await openSqliteCasStore({ path: dbPath as string });
-    const store = inner;
+    const store = await openSqliteCasStore({ path: dbPath as string });
     let armed = true;
     storage = {
       store: {

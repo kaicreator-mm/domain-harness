@@ -72,7 +72,6 @@ let gateway: KernelGateway;
 let operator: HostCredential;
 let requester: HostCredential;
 let outsider: HostCredential;
-let mainClosed = false;
 const ledgerCalls: { operation: string; payload: Record<string, unknown> }[] = [];
 
 function component(value: string): string {
@@ -148,7 +147,7 @@ before(async () => {
 });
 
 after(async () => {
-  if (handle !== undefined && !mainClosed) {
+  if (handle !== undefined) {
     await handle.host.close();
   }
 });

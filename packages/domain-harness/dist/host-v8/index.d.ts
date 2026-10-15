@@ -24,9 +24,11 @@ export type { DispatchContext, ResourceCallRecord, ResourceHandler } from './dis
 export { ScopedEventHub } from './events.js';
 export type { EventScope, EventListener, HostEvent, HostSubscription } from './events.js';
 export { bootstrapTrustedHost, isHostTrustChannelEstablished, } from './bootstrap.js';
-export type { TrustedHostHandle, TrustedHostStorageSpec, TrustedNodeHost, TrustedNodeHostInput } from './bootstrap.js';
+export type { TrustedHostHandle, TrustedHostStorageSpec, TrustedHostStorageInstance, TrustedNodeHost, TrustedNodeHostInput } from './bootstrap.js';
 export { assertIntentScope, createHostUxTransport, createUxTransport, uxDocumentNamespace, } from './ux-transport.js';
 export type { UxDispatchReceipt, UxKernelRoute, UxQueryKind, UxQueryRequest, UxTarget, UxTransport } from './ux-transport.js';
 export { createKernelGateway, kernelReceiptAsHostEvent, } from './kernel-gateway.js';
 export type { KernelGateway, KernelGatewayAgentToolQueryResult, KernelGatewayAppInput, KernelGatewayCancelRequest, KernelGatewayCancelResult, KernelGatewayLatestObserver, KernelGatewayLatestObserverScope, KernelGatewayLatestObserverStatus, KernelGatewayLatestObserverUpdate, KernelGatewayOperationCall, KernelGatewayProjectionDependency, KernelGatewayProjectionRequest, KernelGatewaySendIntent, KernelReceiptScope, KernelReceiptSubscription, } from './kernel-gateway.js';
+export { ChildInvocationCoordinator, DurableControlError, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf } from './durable-controls.js';
+export type { ChildInvocationRecord, ChildInvocationTurnPlan, DurableControlErrorCode, ExternalWorkRecord, ExternalWorkTurnSource, RegisterExternalWorkInput, } from './durable-controls.js';
 //# sourceMappingURL=index.d.ts.map

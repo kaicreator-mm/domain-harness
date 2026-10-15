@@ -81,7 +81,11 @@ export function kernelTurnSourceOf(source: ExternalWorkTurnSource): Record<strin
   if (source.kind === 'callback') {
     return { kind: 'callback', externalCorrelationId: source.externalCorrelationId, callbackOrdinal: source.callbackOrdinal ?? 1 };
   }
-  return { kind: 'timer', timerId: source.timerId as string, fireOrdinal: source.fireOrdinal ?? 1 };
+  return {
+    kind: 'timer',
+    ...(source.timerId === undefined ? {} : { timerId: source.timerId }),
+    ...(source.fireOrdinal === undefined ? {} : { fireOrdinal: source.fireOrdinal }),
+  };
 }
 
 /** The durable record stored at the correlation key (plain JSON). */
