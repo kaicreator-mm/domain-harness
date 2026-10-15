@@ -65,7 +65,7 @@ All above are planning **owner defaults**, not substitutes for real GitHub Work 
 | A missing Scaffold demands rebuilding the already frozen DAG | Mature-project v0.9 legitimately has a frozen Task DAG with no preimplementation scaffold source | **DENY** retroactive new requirement; mature project `REUSE_EXISTING_STRUCTURES` |
 | The Node24 reference automatically entails OS matrix/QuickJS acceptance | Product/L2 deliberately limits the first selected runtime while JS/TS Core remains portable by ABI | **DENY** universal OS/engine scope inflation |
 
-**Outcome:** one concrete source-reuse/collision-prevention map, **not** a new normative v4.12 implementation or a second DAG. `EXISTING_SOURCE_PATHS_READ_BACK=4`, `PENDING_SOURCE_PATHS_CHECKED=5`, `NATIVE_DEPENDENCIES=11/11`, `ACTUAL_WELCOME_CLAIMS=0`, `ACTUAL_V09_CODE=0`, `CHECKER_CODE_RUN=NO`. The 5 pending paths include a single example test path; they are not an implementation quota.
+**Outcome:** one concrete source-reuse/collision-prevention map, **not** a new normative v4.12 implementation or a second DAG. `EXISTING_SOURCE_PATHS_READ_BACK=4`, `PENDING_SOURCE_PATHS_CHECKED=5`, `NATIVE_DEPENDENCIES=11/11`, `ACCEPTED_SOURCE_CLAIMS=NOT_ESTABLISHED_BY_THIS_SHADOW_AUDIT`, `ACTUAL_V09_CODE=0`, `CHECKER_CODE_RUN=NO`. The 5 pending paths include a single example test path; they are not an implementation quota.
 
 ## 4. Trigger for change-impact re-evaluation
 
