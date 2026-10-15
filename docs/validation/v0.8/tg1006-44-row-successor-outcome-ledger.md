@@ -91,12 +91,9 @@ predecessor SHA is provenance only.
 
 ## Outstanding for Release (HOLD — unchanged)
 
-1. Hidden Validation execution (see `tg1006-hidden-prepack-attestation.md` — finalization
-   structurally blocked pending a distinct-actor candidate-freeze act and distinct
-   owner/executor identities; NOT_RUN).
-2. The NOT_RUN material enumerated per row above.
-3. Independent review of THIS evidence PR + real release-owner decision. T-G stays 6/7
-   pending those.
+1. **Hidden Validation — COMPLETE/PASS**, **34/34 executed** on the exact frozen candidate, 0 public findings, runner exit 0. See the updated `tg1006-hidden-prepack-attestation.md` and public-safe [#1006@6194609734](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6194609734); private PREPACK rev5 and real execution are archived in private merged PRs #60/#61. The prior same-login/Owner identity blocker was intentionally removed by user decision; execution identity is trusted self-declaration.
+2. The **27 material NOT_RUN retained-function obligations** enumerated per row above remain open: 15 partially executed rows, 7 source-level only and 5 legacy-only. A 34/34 Hidden aggregate PASS does not by itself prove the frozen P/N acceptance for all 44 individual historical functions.
+3. Release Qualification remains **HOLD pending exact P/N coverage/rescope for those 27 rows and a subsequent release decision**; source-evidence PR #1069 was bounded-reviewed/merged, with exact executable-byte-equivalent Woodpecker pass already recorded. A GitHub-account Owner distinctness gate is not required.
 
 ## Exact-SHA CI appendix
 
@@ -116,3 +113,7 @@ npm run lint && npm run typecheck && npm test` chain with its built-in
   byte-identical to the frozen candidate (diff limited to tests + docs as recorded in
   the execution record). It is candidate-scope CI evidence, NOT a Release PASS.
 
+
+## 2026-10-15 Hidden PASS successor appendix (non-destructive)
+
+Private `DH08-FP-53-01` revision 1 was minted using exact live candidate freeze/review read-backs and executed 34/34 scenarios with aggregate PASS on `b151320ee6835755ba043e2602c085c180c9c849` (tree `a8135b2a217edff395da0a4f31dd7955d3b3db5a`). The full private archive lives at `kaicreator-mm/hidden-validation` PR #61 merged `923100ad06159621d5be42c1c1e377161cfcf34d`; only the public-safe result was posted at `domain-harness#1006@6194609734`. **All 44 row statuses and the historical record of the one full public run remain unchanged.** No extra suite was run to append this documentary update. Release remains HOLD on the 27 specific P/N remnants, pending a bounded candidate-evidence crosswalk or actual missing targeted tests.
