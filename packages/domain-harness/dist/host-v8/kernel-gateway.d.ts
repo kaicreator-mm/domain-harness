@@ -173,6 +173,7 @@ export interface KernelGatewayAgentToolQueryResult {
     readonly kind: 'agent-tool-query';
     readonly appId: string;
     readonly tools: readonly {
+        readonly capabilityId: string;
         readonly operationId: string;
         readonly effectClass: 'none';
         readonly authority: string;
