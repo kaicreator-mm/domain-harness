@@ -77,10 +77,12 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // lazy leg assembly + exact-cache/promoted-pin durable records; S bytes
 // unchanged — the retained S decision-source semantics were already
 // exported); all FR02/FR07 oracle rows re-run unchanged below.
+// K_BLOB_PIN_REBOUND_AFTER_1057_R2_FASTFIX: source-only gate repair: WeakMap actual count
+// and postcommit cache reread exception isolation; see #1057 review #5527917178.
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = 'd470b707470814312fde7b7c24ff232722d3f182';
+const V08_K_BLOB = 'ff6df872f2078ba7fb9bb178cae8b70ec8196f6f';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
