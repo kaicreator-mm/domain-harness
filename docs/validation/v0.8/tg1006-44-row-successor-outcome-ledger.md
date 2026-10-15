@@ -75,12 +75,11 @@ predecessor SHA is provenance only.
 
 ## Counts (candidate scope)
 
-- `CANDIDATE-PN-PASS`: 20 rows — exactly the source map's SELECTED_PN_PRESENT set
+- `CANDIDATE-PN-PASS`: 20 rows — the original 17 selected-P/N rows
   (FR02, FR05, FR07, FR08, FR09, FR12, HF17, HF18, HF20, HF23, HF32, FR08-P/N-SD1,
-  FR08-P/N-SD2, NEW-FUNCTION-05, NEW-FUNCTION-06), each of whose selected tests ran
-  green at the exact candidate in the pinned full run, with the four intake gap roots
-  (the #1057 ×2, #1061, #1066 negatives owed inside FR08/HF23/HF18) closed by the
-  targeted gap batch this round.
+  FR08-P/N-SD2, NEW-FUNCTION-05, NEW-FUNCTION-06) PLUS the R2 executed-test crosswalk
+  FR06, HF22, HF31. All were asserted by test suites already green on the exact candidate;
+  original four gap roots were closed by the same-candidate 6/6 targeted batch.
 - `CANDIDATE-PARTIAL`: 14 rows (executed subset green; listed remainders NOT_RUN).
 - `SOURCE-LEVEL-EXECUTED`: 5 rows (compiler suite green at candidate; physical/consumer
   acceptance NOT_RUN).
@@ -89,11 +88,11 @@ predecessor SHA is provenance only.
   carry NOT_RUN material (14 partial remainders + 5 physical acceptances + 5 selected
   bridges). The by-row table above is the authority.
 
-## Outstanding for Release (HOLD — unchanged)
+## Outstanding for Release (HOLD — R2 evidence crosswalk)
 
 1. **Hidden Validation — COMPLETE/PASS**, **34/34 executed** on the exact frozen candidate, 0 public findings, runner exit 0. See the updated `tg1006-hidden-prepack-attestation.md` and public-safe [#1006@6194609734](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6194609734); private PREPACK rev5 and real execution are archived in private merged PRs #60/#61. The prior same-login/Owner identity blocker was intentionally removed by user decision; execution identity is trusted self-declaration.
 2. The **24 material NOT_RUN retained-function obligations** enumerated per row above remain open: 14 partially executed rows, 5 source-level only and 5 legacy-only. A 34/34 Hidden aggregate PASS does not by itself prove the frozen P/N acceptance for all 44 individual historical functions.
-3. Release Qualification remains **HOLD pending exact P/N coverage/rescope for those 27 rows and a subsequent release decision**; source-evidence PR #1069 was bounded-reviewed/merged, with exact executable-byte-equivalent Woodpecker pass already recorded. A GitHub-account Owner distinctness gate is not required.
+3. Release Qualification remains **HOLD pending exact P/N coverage/rescope for those 24 rows and a subsequent release decision**; source-evidence PR #1069 was bounded-reviewed/merged, with exact executable-byte-equivalent Woodpecker pass already recorded. A GitHub-account Owner distinctness gate is not required.
 
 ## Exact-SHA CI appendix
 
@@ -116,7 +115,7 @@ npm run lint && npm run typecheck && npm test` chain with its built-in
 
 ## 2026-10-15 Hidden PASS successor appendix (non-destructive)
 
-Private `DH08-FP-53-01` revision 1 was minted using exact live candidate freeze/review read-backs and executed 34/34 scenarios with aggregate PASS on `b151320ee6835755ba043e2602c085c180c9c849` (tree `a8135b2a217edff395da0a4f31dd7955d3b3db5a`). The full private archive lives at `kaicreator-mm/hidden-validation` PR #61 merged `923100ad06159621d5be42c1c1e377161cfcf34d`; only the public-safe result was posted at `domain-harness#1006@6194609734`. **All 44 row statuses and the historical record of the one full public run remain unchanged.** No extra suite was run to append this documentary update. Release remains HOLD on the 24 specific P/N remnants, pending a bounded candidate-evidence crosswalk or actual missing targeted tests.
+Private `DH08-FP-53-01` revision 1 was minted using exact live candidate freeze/review read-backs and executed 34/34 scenarios with aggregate PASS on `b151320ee6835755ba043e2602c085c180c9c849` (tree `a8135b2a217edff395da0a4f31dd7955d3b3db5a`). The full private archive lives at `kaicreator-mm/hidden-validation` PR #61 merged `923100ad06159621d5be42c1c1e377161cfcf34d`; only the public-safe result was posted at `domain-harness#1006@6194609734`. **At the time of that Hidden-only appendix, the 44 row classifications were unchanged; the later R2 source crosswalk below upgrades three rows using old executed test evidence. The historical public run record remains unchanged.** No extra suite was run to append this documentary update. Release remains HOLD on the 24 specific P/N remnants, pending a bounded candidate-evidence crosswalk or actual missing targeted tests.
 
 ## R2 reuse-first source-to-executed crosswalk — FR06/HF22/HF31 (no new native run)
 
