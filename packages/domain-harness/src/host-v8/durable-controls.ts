@@ -838,9 +838,17 @@ export class ChildInvocationCoordinator {
 //
 // The credential binds the exact corrective material (sealed Business
 // intentType + JSON input) at AUTHORIZATION time; the input lives in the
-// RECORD only and is never part of the Kernel turnSource. Re-authorization
-// of the same material resolves to the same record ('existing'); DIFFERENT
-// material for the same poisoned message is a typed identity conflict, so
+// RECORD only and is never part of the Kernel turnSource. [#1066 R1
+// P1-HF16-01] The credential ALSO pins the durable poison evidence — the
+// FAILED effect row of the selected Kernel that proved the named message
+// actually poisoned the exact app/tenant/instance — supplied by the trusted
+// gateway seam after its fail-closed verification; a nonexistent,
+// successful or foreign poison never creates a record at all. The evidence
+// is a pinned reference only: the Kernel stays sole authority over Journal
+// semantics, and the pinned effectId is never re-executed by anything.
+// Re-authorization of the same material resolves to the same record
+// ('existing'); DIFFERENT material for the same poisoned message is a typed
+// identity conflict, so
 // one poison admits exactly one authorized corrective action. Duplicate or
 // restart redelivery returns the STORED terminal source — the deterministic
 // recovery turn id makes every re-submission an idempotent Kernel turn
@@ -872,6 +880,13 @@ export interface PoisonRecoveryRecord {
   readonly reason: string;
   readonly authorizedBy: { readonly subject: string; readonly roles: readonly string[] };
   readonly authorizedAt: string;
+  /**
+   * [#1079 R1 P1-HF16-01] Pinned poison proof: the durable FAILED effect row
+   * of the selected Kernel that authorized this credential. Supplied by the
+   * trusted gateway seam (the coordinator owns no Kernel-journal read
+   * authority); a record cannot exist without verified evidence.
+   */
+  readonly poisonEvidence: { readonly effectId: string; readonly verifiedAt: string };
   readonly status: 'authorized' | 'delivered';
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -890,6 +905,12 @@ export interface AuthorizePoisonRecoveryInput {
   readonly reason: string;
   readonly authorizedBy: { readonly subject: string; readonly roles: readonly string[] };
   readonly authorizedAt: string;
+  /**
+   * [#1079 R1 P1-HF16-01] REQUIRED proof that the named message durably
+   * poisoned the exact app/tenant/instance: the FAILED effect row the
+   * trusted gateway seam verified before creating the credential.
+   */
+  readonly poisonEvidence: { readonly effectId: string; readonly verifiedAt: string };
 }
 
 export type DeliverPoisonRecoveryOutcome =
@@ -925,6 +946,11 @@ function decodePoisonRecovery(envelope: unknown, key: string): PoisonRecoveryRec
     throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries no authorizing principal`);
   }
   requireInstant(record.authorizedAt, 'authorizedAt');
+  if (typeof record.poisonEvidence !== 'object' || record.poisonEvidence === null
+    || typeof record.poisonEvidence.effectId !== 'string' || record.poisonEvidence.effectId.length === 0) {
+    throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries no pinned poison evidence (the verified FAILED effectId)`);
+  }
+  requireInstant(record.poisonEvidence.verifiedAt, 'poisonEvidence.verifiedAt');
   if (record.status !== 'authorized' && record.status !== 'delivered') {
     throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries an unknown status`);
   }
@@ -955,15 +981,25 @@ export class PoisonRecoveryCoordinator {
 
   /**
    * Durably authorize ONE corrective recovery action for an exact poisoned
-   * message. Single creation (mustBeAbsent); the same material re-authorizes
-   * idempotently ('existing'), different material for the same poison is a
-   * typed identity conflict.
+   * message. [#1079 R1 P1-HF16-01] The caller MUST supply the pinned poison
+   * evidence — the durable FAILED effect row of the selected Kernel for the
+   * exact app/tenant/instance/message — so a credential can never exist for
+   * a nonexistent, successful or foreign poison (the trusted gateway seam
+   * verifies the evidence BEFORE calling here; the evidence shape is
+   * re-validated fail-closed). Single creation (mustBeAbsent); the same
+   * material re-authorizes idempotently ('existing'), different material for
+   * the same poison is a typed identity conflict.
    */
   async authorize(input: AuthorizePoisonRecoveryInput): Promise<{ record: PoisonRecoveryRecord; disposition: 'created' | 'existing' }> {
     requireComponent(input.poisonMessageId, 'poisonMessageId');
     requireComponent(input.recoveryIntentType, 'recoveryIntentType');
     requireNonEmptyText(input.reason, 'reason');
     requireInstant(input.authorizedAt, 'authorizedAt');
+    if (typeof input.poisonEvidence !== 'object' || input.poisonEvidence === null
+      || typeof input.poisonEvidence.effectId !== 'string' || input.poisonEvidence.effectId.length === 0) {
+      invalid('poisonEvidence must pin the verified FAILED effectId of the named poisoned message');
+    }
+    requireInstant(input.poisonEvidence.verifiedAt, 'poisonEvidence.verifiedAt');
     const key = poisonRecoveryDocKey(input.appId, input.tenantId, input.instanceKey, input.poisonMessageId);
     const record: PoisonRecoveryRecord = {
       pinVersion: 1,
@@ -977,6 +1013,7 @@ export class PoisonRecoveryCoordinator {
       reason: input.reason,
       authorizedBy: input.authorizedBy,
       authorizedAt: input.authorizedAt,
+      poisonEvidence: input.poisonEvidence,
       status: 'authorized',
       createdAt: input.authorizedAt,
       updatedAt: input.authorizedAt,

@@ -24,6 +24,12 @@
  *       refusal with zero Kernel activity; a non-control principal cannot
  *       authorize; the authorizing control principal without the Business
  *       intent role cannot deliver (separation of duties);
+ *     - [#1079 R1 P1-HF16-01] the authorization itself is bound to PROOF of
+ *       a real poison: a nonexistent message, a non-failed (successful)
+ *       message and a foreign-instance poison all refuse typed with ZERO
+ *       recovery records and ZERO effects (the durable FAILED effect row of
+ *       the exact app/tenant/instance/message is the only admissible
+ *       subject, pinned into the Host CAS record);
  *     - the ORIGINAL poisoned message still refuses re-execution after the
  *       recovery (no illicit double effect);
  *     - duplicate delivery is an idempotent Kernel replay: ZERO new journal
@@ -197,6 +203,61 @@ test('HF16-N duplicate recovery and identity conflicts never double-execute', { 
   assert.match(redelivered.receipt?.admitted?.durableControlTurnId ?? '', /recovery:pr%3Am-poison-1:1$/);
   assert.equal((await journalRows()).length, rowsBefore, 'zero new journal rows on duplicate delivery');
   assert.equal(countDispatches('RECOVER-1'), dispatchBefore, 'zero new physical dispatches on duplicate delivery');
+});
+
+test('HF16-N fail-closed poison precondition: nonexistent / non-failed / foreign-instance poisons authorize nothing', { timeout: 240_000 }, async () => {
+  // A FRESH instance whose business message SUCCEEDS — the exact shape of a
+  // syntactically valid but non-failed (non-poisoned) message.
+  await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: 'q-clean' });
+  const clean = await send('m-clean-1', { amount: 30, requestId: 'CLEAN-1' }, 'q-clean') as { status: string };
+  assert.equal(clean.status, 'admitted', 'the clean message completed (not a poison)');
+
+  const rowsBefore = (await journalRows()).length;
+  const recoveryDocsBefore = (await handle.host.docs.list(RECOVERY_DOC_PREFIX)).length;
+  const unverified = (error: unknown) => (error as { code?: string }).code === 'HOST_POISON_UNVERIFIED';
+
+  // ---- N: a message that never poisoned anything (invented id) refuses.
+  await assert.rejects(
+    () => authorize(operator, 'm-never-poisoned', { amount: 30, requestId: 'RECOVER-X' }),
+    unverified,
+  );
+  // ---- N: a real message that SUCCEEDED (never failed) refuses.
+  await assert.rejects(
+    () => gateway.authorizePoisonRecovery(operator, {
+      appId: APP_ID, instanceKey: 'q-clean', poisonMessageId: 'm-clean-1',
+      intentType: 'submitQuoteDecisionDynamic', input: { amount: 30, requestId: 'RECOVER-X' }, reason: 'ledger-restored',
+    }),
+    unverified,
+  );
+  // ---- N: the GENUINE poison of q-rec addressed at ANOTHER instance
+  // refuses — the failed effect row lives under q-rec's exact identity.
+  await assert.rejects(
+    () => gateway.authorizePoisonRecovery(operator, {
+      appId: APP_ID, instanceKey: 'q-clean', poisonMessageId: 'm-poison-1',
+      intentType: 'submitQuoteDecisionDynamic', input: { amount: 30, requestId: 'RECOVER-X' }, reason: 'ledger-restored',
+    }),
+    unverified,
+  );
+
+  // ---- zero recovery records, zero effects, zero dispatches: every refused
+  // authorization left NOTHING durable and called NO Kernel effect path.
+  assert.equal((await handle.host.docs.list(RECOVERY_DOC_PREFIX)).length, recoveryDocsBefore, 'the refused authorizations persisted no recovery credential');
+  assert.equal((await journalRows()).length, rowsBefore, 'the refused authorizations wrote no journal row');
+  assert.equal(countDispatches('RECOVER-X'), 0, 'nothing was ever dispatched for the refused material');
+  assert.equal(countDispatches('CLEAN-1'), 1, 'the clean message dispatched exactly its own single effect');
+
+  // ---- N: the never-authorized poison has no credential, so delivery
+  // refuses typed exactly like any forged recovery.
+  await assert.rejects(
+    () => deliver(requester, 'm-never-poisoned'),
+    (error: unknown) => (error as { code?: string }).code === 'POISON_RECOVERY_UNKNOWN',
+  );
+
+  // ---- P (unchanged): the GENUINE poison of q-rec still authorizes on the
+  // exact poisoned instance — same durable action, evidence pinned.
+  const pinned = await authorize(operator, 'm-poison-1', { amount: 30, requestId: 'RECOVER-1' });
+  assert.equal(pinned.disposition, 'existing', 'the genuine poison resolves to the SAME durable action');
+  assert.equal((await handle.host.docs.list(RECOVERY_DOC_PREFIX)).length, recoveryDocsBefore, 'no new credential for the genuine poison either');
 });
 
 test('HF16-P restart: a genuine fresh process reopens the store with identical recovery identity and zero double effects', { timeout: 300_000 }, async () => {

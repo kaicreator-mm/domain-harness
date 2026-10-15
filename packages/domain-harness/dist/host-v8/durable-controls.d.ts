@@ -311,6 +311,16 @@ export interface PoisonRecoveryRecord {
         readonly roles: readonly string[];
     };
     readonly authorizedAt: string;
+    /**
+     * [#1079 R1 P1-HF16-01] Pinned poison proof: the durable FAILED effect row
+     * of the selected Kernel that authorized this credential. Supplied by the
+     * trusted gateway seam (the coordinator owns no Kernel-journal read
+     * authority); a record cannot exist without verified evidence.
+     */
+    readonly poisonEvidence: {
+        readonly effectId: string;
+        readonly verifiedAt: string;
+    };
     readonly status: 'authorized' | 'delivered';
     readonly createdAt: string;
     readonly updatedAt: string;
@@ -334,6 +344,15 @@ export interface AuthorizePoisonRecoveryInput {
         readonly roles: readonly string[];
     };
     readonly authorizedAt: string;
+    /**
+     * [#1079 R1 P1-HF16-01] REQUIRED proof that the named message durably
+     * poisoned the exact app/tenant/instance: the FAILED effect row the
+     * trusted gateway seam verified before creating the credential.
+     */
+    readonly poisonEvidence: {
+        readonly effectId: string;
+        readonly verifiedAt: string;
+    };
 }
 export type DeliverPoisonRecoveryOutcome = {
     readonly disposition: 'accepted';
@@ -356,9 +375,14 @@ export declare class PoisonRecoveryCoordinator {
     private load;
     /**
      * Durably authorize ONE corrective recovery action for an exact poisoned
-     * message. Single creation (mustBeAbsent); the same material re-authorizes
-     * idempotently ('existing'), different material for the same poison is a
-     * typed identity conflict.
+     * message. [#1079 R1 P1-HF16-01] The caller MUST supply the pinned poison
+     * evidence — the durable FAILED effect row of the selected Kernel for the
+     * exact app/tenant/instance/message — so a credential can never exist for
+     * a nonexistent, successful or foreign poison (the trusted gateway seam
+     * verifies the evidence BEFORE calling here; the evidence shape is
+     * re-validated fail-closed). Single creation (mustBeAbsent); the same
+     * material re-authorizes idempotently ('existing'), different material for
+     * the same poison is a typed identity conflict.
      */
     authorize(input: AuthorizePoisonRecoveryInput): Promise<{
         record: PoisonRecoveryRecord;

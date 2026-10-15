@@ -630,6 +630,11 @@ function decodePoisonRecovery(envelope, key) {
         throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries no authorizing principal`);
     }
     requireInstant(record.authorizedAt, 'authorizedAt');
+    if (typeof record.poisonEvidence !== 'object' || record.poisonEvidence === null
+        || typeof record.poisonEvidence.effectId !== 'string' || record.poisonEvidence.effectId.length === 0) {
+        throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries no pinned poison evidence (the verified FAILED effectId)`);
+    }
+    requireInstant(record.poisonEvidence.verifiedAt, 'poisonEvidence.verifiedAt');
     if (record.status !== 'authorized' && record.status !== 'delivered') {
         throw new DurableControlError('POISON_RECOVERY_INVALID', `record ${key} carries an unknown status`);
     }
@@ -657,15 +662,25 @@ export class PoisonRecoveryCoordinator {
     }
     /**
      * Durably authorize ONE corrective recovery action for an exact poisoned
-     * message. Single creation (mustBeAbsent); the same material re-authorizes
-     * idempotently ('existing'), different material for the same poison is a
-     * typed identity conflict.
+     * message. [#1079 R1 P1-HF16-01] The caller MUST supply the pinned poison
+     * evidence — the durable FAILED effect row of the selected Kernel for the
+     * exact app/tenant/instance/message — so a credential can never exist for
+     * a nonexistent, successful or foreign poison (the trusted gateway seam
+     * verifies the evidence BEFORE calling here; the evidence shape is
+     * re-validated fail-closed). Single creation (mustBeAbsent); the same
+     * material re-authorizes idempotently ('existing'), different material for
+     * the same poison is a typed identity conflict.
      */
     async authorize(input) {
         requireComponent(input.poisonMessageId, 'poisonMessageId');
         requireComponent(input.recoveryIntentType, 'recoveryIntentType');
         requireNonEmptyText(input.reason, 'reason');
         requireInstant(input.authorizedAt, 'authorizedAt');
+        if (typeof input.poisonEvidence !== 'object' || input.poisonEvidence === null
+            || typeof input.poisonEvidence.effectId !== 'string' || input.poisonEvidence.effectId.length === 0) {
+            invalid('poisonEvidence must pin the verified FAILED effectId of the named poisoned message');
+        }
+        requireInstant(input.poisonEvidence.verifiedAt, 'poisonEvidence.verifiedAt');
         const key = poisonRecoveryDocKey(input.appId, input.tenantId, input.instanceKey, input.poisonMessageId);
         const record = {
             pinVersion: 1,
@@ -679,6 +694,7 @@ export class PoisonRecoveryCoordinator {
             reason: input.reason,
             authorizedBy: input.authorizedBy,
             authorizedAt: input.authorizedAt,
+            poisonEvidence: input.poisonEvidence,
             status: 'authorized',
             createdAt: input.authorizedAt,
             updatedAt: input.authorizedAt,
