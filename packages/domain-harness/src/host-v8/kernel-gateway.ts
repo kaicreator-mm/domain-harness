@@ -60,7 +60,9 @@ import { assertIntentScope, type UxTarget } from './ux-transport.js';
 import type { HostEvent } from './events.js';
 import type { HostCredential, HostPrincipal } from './identity.js';
 import {
+  ChildInvocationCoordinator,
   ExternalWorkCoordinator,
+  childInvocationCorrelationId,
   kernelTurnSourceOf,
   type ExternalWorkRecord,
   type ExternalWorkTurnSource,
@@ -323,6 +325,51 @@ export interface KernelGateway {
    * identity makes every heal an idempotent Kernel replay.
    */
   recoverDurableControls(credential: unknown, request: { readonly appId: string }): Promise<unknown>;
+  /**
+   * [#1062 HF32] ONE authenticated durable child-send: the invocation
+   * record is created pending, the child message turn submits through the
+   * SAME authenticated Kernel seam as send (riding the shared non-message
+   * turn source for deterministic replay), and the outcome settles
+   * durably — `accepted`, or `rejected_routed` with the PERMANENT
+   * rejection committed BEFORE any route selection (a rejected invocation
+   * is never retried; an infrastructure failure leaves it pending for a
+   * bounded re-send).
+   */
+  sendChildMessage(credential: unknown, request: {
+    readonly appId: string;
+    readonly parentInstanceKey: string;
+    readonly childInstanceKey: string;
+    readonly childIntentType: string;
+    readonly doneIntentType: string;
+    readonly errorIntentType: string;
+    readonly input?: unknown;
+    readonly invocationOrdinal?: number;
+  }): Promise<unknown>;
+  /**
+   * [#1062 HF32] ONE authenticated correlated child terminal. The durable
+   * CAS state machine routes the terminal to its parent EXACTLY once (the
+   * winning child-terminal turn source submits through the authenticated
+   * Kernel seam); duplicate terminals, foreign targets and terminals on
+   * non-accepted invocations refuse typed with ZERO Kernel activity.
+   */
+  deliverChildTerminal(credential: unknown, request: {
+    readonly appId: string;
+    readonly parentInstanceKey: string;
+    readonly childInstanceKey: string;
+    readonly invocationOrdinal: number;
+    readonly terminalKind: 'done' | 'error';
+    readonly input?: unknown;
+  }): Promise<unknown>;
+  /**
+   * [#1062 HF32] Authenticated read of ONE durable child-invocation record
+   * (the persisted accepted/rejected/terminal truth).
+   */
+  queryChildInvocation(credential: unknown, request: {
+    readonly appId: string;
+    readonly parentInstanceKey: string;
+    readonly childInstanceKey: string;
+    readonly invocationOrdinal: number;
+  }): Promise<unknown>;
 }
 
 interface RegisteredApp {
@@ -439,6 +486,12 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
    * Kernel keeps sole authority over State/Journal/Effect/turn identity).
    */
   const externalWork = new ExternalWorkCoordinator(host.docs);
+  /**
+   * [#1062 HF32] The Host-side durable child-invocation coordinator over
+   * the same probed physical store (all-or-durable-rejection semantics
+   * adapted from the frozen v0.7 compiled-workflow message effects).
+   */
+  const childInvocations = new ChildInvocationCoordinator(host.docs);
   /**
    * In-flight cancellable occurrences, keyed by the authenticated
    * tenant/app + instanceKey + messageId (#1003 FR07-KH2). Entries exist
@@ -1384,6 +1437,167 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         },
       });
       return Object.freeze({ status: 'recovered', ...result });
+    },
+
+    async sendChildMessage(credential: unknown, request: {
+      readonly appId: string;
+      readonly parentInstanceKey: string;
+      readonly childInstanceKey: string;
+      readonly childIntentType: string;
+      readonly doneIntentType: string;
+      readonly errorIntentType: string;
+      readonly input?: unknown;
+      readonly invocationOrdinal?: number;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.parentInstanceKey !== 'string' || request.parentInstanceKey.length === 0
+        || typeof request.childInstanceKey !== 'string' || request.childInstanceKey.length === 0
+        || typeof request.childIntentType !== 'string' || request.childIntentType.length === 0
+        || typeof request.doneIntentType !== 'string' || request.doneIntentType.length === 0
+        || typeof request.errorIntentType !== 'string' || request.errorIntentType.length === 0
+        || (request.invocationOrdinal !== undefined
+          && (typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0))
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'sendChildMessage requires {appId, parentInstanceKey, childInstanceKey, childIntentType, doneIntentType, errorIntentType} with non-empty strings and an optional positive ordinal');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      requireDurableStorage();
+      requireBoundIntents(app, [request.childIntentType, request.doneIntentType, request.errorIntentType]);
+      const opened = await childInvocations.open({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        parentInstanceKey: request.parentInstanceKey,
+        childInstanceKey: request.childInstanceKey,
+        ...(request.invocationOrdinal === undefined ? {} : { invocationOrdinal: request.invocationOrdinal }),
+        childIntentType: request.childIntentType,
+        doneIntentType: request.doneIntentType,
+        errorIntentType: request.errorIntentType,
+        openedAt: new Date().toISOString(),
+      });
+      const record = opened.record;
+      const childTurnSource = {
+        kind: 'callback' as const,
+        externalCorrelationId: childInvocationCorrelationId(record.parentInstanceKey, record.childInstanceKey, record.invocationOrdinal),
+        callbackOrdinal: 1,
+      };
+      let childReceipt: unknown;
+      try {
+        childReceipt = await submitControlTurn(
+          app,
+          principal,
+          record.childInstanceKey,
+          record.childIntentType,
+          record.childTurnMessageId,
+          childTurnSource,
+          request.input === undefined ? {} : request.input,
+        );
+      } catch (error) {
+        // Permanent typed submission refusals settle the invocation
+        // durably BEFORE any route selection — a rejected invocation is
+        // never retried; everything else is transient (the record stays
+        // pending for a bounded re-send by the caller).
+        const code = (error as { code?: string })?.code;
+        const name = (error as { name?: string })?.name;
+        const permanent = code === 'PRINCIPAL_ROLE_NOT_BOUND' || code === 'INTENT_UNBOUND' || code === 'INTENT_MALFORMED' || code === 'INTENT_NOT_JSON' || name === 'WorkflowInstanceNotFoundError';
+        if (!permanent) throw error;
+        const rejection = { code: code ?? 'WORKFLOW_INSTANCE_NOT_FOUND', message: (error as Error)?.message };
+        const settled = await childInvocations.settleSend({
+          appId: request.appId, tenantId: principal.tenantId, record,
+          outcome: 'rejected', rejection, settledAt: new Date().toISOString(),
+        });
+        return Object.freeze({ status: 'rejected_routed', invocation: settled, rejection });
+      }
+      const receipt = childReceipt as { status: string; denial?: { reason?: string }; terminal?: { code?: string } };
+      if (receipt.status === 'admitted') {
+        const settled = await childInvocations.settleSend({
+          appId: request.appId, tenantId: principal.tenantId, record,
+          outcome: 'accepted', settledAt: new Date().toISOString(),
+        });
+        return Object.freeze({ status: 'accepted', invocation: settled, receipt: childReceipt });
+      }
+      // A Kernel denied/terminated receipt is permanent business truth.
+      const rejection = receipt.status === 'denied'
+        ? { code: 'CHILD_TURN_DENIED', kernelDenial: receipt.denial }
+        : { code: 'CHILD_TURN_TERMINATED', terminal: receipt.terminal };
+      const settled = await childInvocations.settleSend({
+        appId: request.appId, tenantId: principal.tenantId, record,
+        outcome: 'rejected', rejection, settledAt: new Date().toISOString(),
+      });
+      return Object.freeze({ status: 'rejected_routed', invocation: settled, rejection });
+    },
+
+    async deliverChildTerminal(credential: unknown, request: {
+      readonly appId: string;
+      readonly parentInstanceKey: string;
+      readonly childInstanceKey: string;
+      readonly invocationOrdinal: number;
+      readonly terminalKind: 'done' | 'error';
+      readonly input?: unknown;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.parentInstanceKey !== 'string' || request.parentInstanceKey.length === 0
+        || typeof request.childInstanceKey !== 'string' || request.childInstanceKey.length === 0
+        || typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0
+        || (request.terminalKind !== 'done' && request.terminalKind !== 'error')
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'deliverChildTerminal requires {appId, parentInstanceKey, childInstanceKey, invocationOrdinal, terminalKind:done|error}');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      requireDurableStorage();
+      const outcome = await childInvocations.settleTerminal({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        parentInstanceKey: request.parentInstanceKey,
+        childInstanceKey: request.childInstanceKey,
+        invocationOrdinal: request.invocationOrdinal,
+        terminalKind: request.terminalKind,
+        ...(request.input === undefined ? {} : { terminalInput: request.input }),
+        settledAt: new Date().toISOString(),
+      });
+      if (outcome.disposition !== 'accepted') {
+        // A duplicate terminal: typed outcome, ZERO Kernel activity.
+        return Object.freeze({ status: 'already-terminal', invocation: outcome.record });
+      }
+      const receipt = await submitControlTurn(
+        app,
+        principal,
+        request.parentInstanceKey,
+        request.terminalKind === 'done' ? outcome.plan.record.doneIntentType : outcome.plan.record.errorIntentType,
+        outcome.plan.parentTurnMessageId,
+        outcome.plan.parentTurnSource,
+        request.input === undefined ? {} : request.input,
+      );
+      await childInvocations.markSubmitted(outcome.record, outcome.plan.parentTurnMessageId, new Date().toISOString());
+      return Object.freeze({ status: 'accepted', invocation: outcome.record, receipt });
+    },
+
+    async queryChildInvocation(credential: unknown, request: {
+      readonly appId: string;
+      readonly parentInstanceKey: string;
+      readonly childInstanceKey: string;
+      readonly invocationOrdinal: number;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.parentInstanceKey !== 'string' || request.parentInstanceKey.length === 0
+        || typeof request.childInstanceKey !== 'string' || request.childInstanceKey.length === 0
+        || typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'queryChildInvocation requires {appId, parentInstanceKey, childInstanceKey, invocationOrdinal}');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
+      requireApp(request.appId, principal);
+      return childInvocations.peek(request.appId, principal.tenantId, request.parentInstanceKey, request.childInstanceKey, request.invocationOrdinal);
     },
   };
   return Object.freeze(gateway);

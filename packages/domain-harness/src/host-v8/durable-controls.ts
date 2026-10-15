@@ -43,6 +43,11 @@ export type DurableControlErrorCode =
   | 'DEADLINE_TIMER_MISMATCH'
   | 'DEADLINE_NOT_DUE'
   | 'CALLBACK_IDENTITY_CONFLICT'
+  | 'CHILD_INVOCATION_UNKNOWN'
+  | 'CHILD_INVOCATION_NOT_ACCEPTED'
+  | 'CHILD_INVOCATION_ALREADY_TERMINAL'
+  | 'CHILD_INVOCATION_SETTLED'
+  | 'CHILD_INVOCATION_REJECTED'
   | 'DURABLE_CONTROL_CONTENTION';
 
 export class DurableControlError extends Error {
@@ -127,6 +132,14 @@ function invalid(message: string): never {
 function requireComponent(value: unknown, name: string): string {
   if (typeof value !== 'string' || value.length === 0 || value.includes(':')) {
     invalid(`${name} must be a non-empty ':'-free string`);
+  }
+  return value;
+}
+
+/** Non-empty string without the ':'-free constraint (message ids carry the delimited correlation). */
+function requireNonEmptyText(value: unknown, name: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    invalid(`${name} must be a non-empty string`);
   }
   return value;
 }
@@ -475,5 +488,331 @@ export class ExternalWorkCoordinator {
       }
       throw error;
     }
+  }
+}
+
+// ===========================================================================
+// [#1062 HF32] Host-side durable child-invocation coordination, adapted
+// from the frozen v0.7 reference `src/runtime/
+// compiled-workflow-message-effects-v3.ts` (blob 36ab0b7a…) all-or-durable-
+// rejection semantics: a PERMANENT rejection is durably committed BEFORE
+// any route selection (rejected_routed), and a settled invocation is never
+// silently retried — the v0.8 route selection is the authenticated caller
+// acting on the returned truth.
+//
+// State machine per child invocation (single document, single CAS
+// authority — no cross-document atomicity claimed):
+//
+//   pending ──CAS──► accepted ──CAS──► done | error   (the child-terminal
+//                    │                              routing settles once)
+//                    └──CAS──► rejected             (permanent; never
+//                                                   transient, never retried)
+//
+// The CHILD message turn rides the SAME non-message seam (a callback
+// turnSource bound to the invocation correlation, callbackOrdinal 1), so
+// an UNKNOWN-window retry of a pending invocation replays idempotently at
+// the Kernel turn disposition. The correlated child terminal routes to its
+// parent exactly once through the child-terminal turnSource.
+//
+// Record keys (Host namespace):
+//   v8host:durable-control:child:{appId}:{tenantId}:{parentInstanceKey}:
+//   {childInstanceKey}:{invocationOrdinal}
+// ===========================================================================
+
+export interface ChildInvocationRecord {
+  readonly pinVersion: 1;
+  readonly kind: 'child-invocation';
+  readonly appId: string;
+  readonly tenantId: string;
+  readonly parentInstanceKey: string;
+  readonly childInstanceKey: string;
+  readonly invocationOrdinal: number;
+  readonly childIntentType: string;
+  readonly doneIntentType: string;
+  readonly errorIntentType: string;
+  readonly status: 'pending' | 'accepted' | 'rejected' | 'done' | 'error';
+  readonly childTurnMessageId: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly rejection?: { readonly code: string; readonly message?: string };
+  readonly terminal?: { readonly terminalKind: 'done' | 'error'; readonly input?: unknown; readonly settledAt: string };
+  readonly submittedTurn?: { readonly messageId: string; readonly submittedAt: string };
+}
+
+export interface ChildInvocationTurnPlan {
+  readonly record: ChildInvocationRecord;
+  readonly childTurnSource: Record<string, unknown>;
+  readonly childTurnMessageId: string;
+  readonly parentTurnSource: { kind: 'child-terminal'; parentActorId: string; childActorId: string; invocationOrdinal: number; terminalKind: 'done' | 'error' };
+  readonly parentTurnMessageId: string;
+}
+
+export function childInvocationDocKey(appId: string, tenantId: string, parentInstanceKey: string, childInstanceKey: string, invocationOrdinal: number): string {
+  return `v8host:durable-control:child:${appId}:${tenantId}:${parentInstanceKey}:${childInstanceKey}:${String(invocationOrdinal)}`;
+}
+
+export function childInvocationCorrelationId(parentInstanceKey: string, childInstanceKey: string, invocationOrdinal: number): string {
+  return `child:${parentInstanceKey}:${childInstanceKey}:${String(invocationOrdinal)}`;
+}
+
+function decodeChildInvocation(envelope: unknown, key: string): ChildInvocationRecord {
+  const raw = asRecord(envelope, `child-invocation record ${key}`);
+  if (raw.pinVersion !== 1 || raw.kind !== 'child-invocation') {
+    throw new DurableControlError('DURABLE_CONTROL_INVALID', `record ${key} is not a child-invocation record`);
+  }
+  const record = raw as unknown as ChildInvocationRecord;
+  requireComponent(record.appId, 'appId');
+  requireComponent(record.tenantId, 'tenantId');
+  requireComponent(record.parentInstanceKey, 'parentInstanceKey');
+  requireComponent(record.childInstanceKey, 'childInstanceKey');
+  requirePositiveOrdinal(record.invocationOrdinal, 'invocationOrdinal');
+  requireComponent(record.childIntentType, 'childIntentType');
+  requireComponent(record.doneIntentType, 'doneIntentType');
+  requireComponent(record.errorIntentType, 'errorIntentType');
+  if (!['pending', 'accepted', 'rejected', 'done', 'error'].includes(record.status)) {
+    throw new DurableControlError('DURABLE_CONTROL_INVALID', `record ${key} carries an unknown status`);
+  }
+  requireNonEmptyText(record.childTurnMessageId, 'childTurnMessageId');
+  requireInstant(record.createdAt, 'createdAt');
+  requireInstant(record.updatedAt, 'updatedAt');
+  if (record.status === 'pending' && (record.rejection !== undefined || record.terminal !== undefined)) {
+    throw new DurableControlError('DURABLE_CONTROL_INVALID', `pending record ${key} must not carry a rejection or terminal`);
+  }
+  return record;
+}
+
+function rejectedRefusal(ordinal: number, record: ChildInvocationRecord): never {
+  throw new DurableControlError(
+    'CHILD_INVOCATION_REJECTED',
+    `child invocation ${String(ordinal)} was PERMANENTLY rejected (${record.rejection?.code ?? 'unknown'}); a rejected invocation is never retried`,
+  );
+}
+
+export class ChildInvocationCoordinator {
+  constructor(private readonly docs: CasDocumentStore) {}
+
+  private async load(key: string): Promise<{ record: ChildInvocationRecord; revision: number }> {
+    const envelope = await this.docs.get(key);
+    if (envelope === null) {
+      throw new DurableControlError('CHILD_INVOCATION_UNKNOWN', `child invocation ${key} is not durably registered on this host`);
+    }
+    return { record: decodeChildInvocation(envelope.value, key), revision: envelope.revision };
+  }
+
+  async peek(appId: string, tenantId: string, parentInstanceKey: string, childInstanceKey: string, invocationOrdinal: number): Promise<ChildInvocationRecord | null> {
+    const key = childInvocationDocKey(appId, tenantId, parentInstanceKey, childInstanceKey, invocationOrdinal);
+    const envelope = await this.docs.get(key);
+    if (envelope === null) return null;
+    return decodeChildInvocation(envelope.value, key);
+  }
+
+  /**
+   * Allocate (or re-address) ONE invocation record. Without an explicit
+   * ordinal the next free ordinal of the (parent, child) pair is claimed
+   * under create-if-absent CAS; an explicit ordinal re-addresses a known
+   * invocation (bounded UNKNOWN-window retry while pending, typed refusal
+   * once settled — a rejected invocation is NEVER retried).
+   */
+  async open(input: {
+    readonly appId: string;
+    readonly tenantId: string;
+    readonly parentInstanceKey: string;
+    readonly childInstanceKey: string;
+    readonly invocationOrdinal?: number;
+    readonly childIntentType: string;
+    readonly doneIntentType: string;
+    readonly errorIntentType: string;
+    readonly openedAt: string;
+  }): Promise<{ record: ChildInvocationRecord; disposition: 'created' | 'pending-retry' }> {
+    requireComponent(input.parentInstanceKey, 'parentInstanceKey');
+    requireComponent(input.childInstanceKey, 'childInstanceKey');
+    requireComponent(input.childIntentType, 'childIntentType');
+    requireComponent(input.doneIntentType, 'doneIntentType');
+    requireComponent(input.errorIntentType, 'errorIntentType');
+    requireInstant(input.openedAt, 'openedAt');
+    if (input.invocationOrdinal !== undefined) {
+      requirePositiveOrdinal(input.invocationOrdinal, 'invocationOrdinal');
+      const current = await this.peek(input.appId, input.tenantId, input.parentInstanceKey, input.childInstanceKey, input.invocationOrdinal);
+      if (current !== null) return this.adjudicateExisting(current);
+    } else {
+      const prefix = `v8host:durable-control:child:${input.appId}:${input.tenantId}:${input.parentInstanceKey}:${input.childInstanceKey}:`;
+      const existing = await this.docs.list(prefix);
+      let ordinal = existing.length + 1;
+      for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+        const record = this.pendingRecord(input, ordinal);
+        try {
+          await this.docs.put(childInvocationDocKey(input.appId, input.tenantId, input.parentInstanceKey, input.childInstanceKey, ordinal), record, { mustBeAbsent: true });
+          return { record, disposition: 'created' };
+        } catch (error) {
+          if ((error as { code?: string })?.code !== 'HOST_KEY_EXISTS') throw error;
+          ordinal += 1;
+        }
+      }
+      throw new DurableControlError('DURABLE_CONTROL_CONTENTION', 'could not allocate a child invocation ordinal after bounded retries');
+    }
+    // Explicit ordinal, record absent: create it at exactly that ordinal.
+    const record = this.pendingRecord(input, input.invocationOrdinal);
+    try {
+      await this.docs.put(childInvocationDocKey(input.appId, input.tenantId, input.parentInstanceKey, input.childInstanceKey, input.invocationOrdinal), record, { mustBeAbsent: true });
+      return { record, disposition: 'created' };
+    } catch {
+      const current = await this.peek(input.appId, input.tenantId, input.parentInstanceKey, input.childInstanceKey, input.invocationOrdinal);
+      if (current === null) throw new DurableControlError('CHILD_INVOCATION_UNKNOWN', 'child invocation disappeared while being addressed');
+      return this.adjudicateExisting(current);
+    }
+  }
+
+  private adjudicateExisting(current: ChildInvocationRecord): { record: ChildInvocationRecord; disposition: 'created' | 'pending-retry' } {
+    if (current.status === 'rejected') rejectedRefusal(current.invocationOrdinal, current);
+    if (current.status !== 'pending') {
+      throw new DurableControlError(
+        'CHILD_INVOCATION_SETTLED',
+        `child invocation ${String(current.invocationOrdinal)} is already settled (${current.status}); a settled invocation is never re-sent`,
+      );
+    }
+    return { record: current, disposition: 'pending-retry' };
+  }
+
+  private pendingRecord(input: { appId: string; tenantId: string; parentInstanceKey: string; childInstanceKey: string; childIntentType: string; doneIntentType: string; errorIntentType: string; openedAt: string }, ordinal: number): ChildInvocationRecord {
+    const correlationId = childInvocationCorrelationId(input.parentInstanceKey, input.childInstanceKey, ordinal);
+    return {
+      pinVersion: 1,
+      kind: 'child-invocation',
+      appId: input.appId,
+      tenantId: input.tenantId,
+      parentInstanceKey: input.parentInstanceKey,
+      childInstanceKey: input.childInstanceKey,
+      invocationOrdinal: ordinal,
+      childIntentType: input.childIntentType,
+      doneIntentType: input.doneIntentType,
+      errorIntentType: input.errorIntentType,
+      status: 'pending',
+      childTurnMessageId: `child-msg:${correlationId}`,
+      createdAt: input.openedAt,
+      updatedAt: input.openedAt,
+    };
+  }
+
+  /**
+   * Settle the child-send outcome: `accepted` (the child message turn was
+   * admitted) or `rejected` (a PERMANENT typed refusal, durably committed
+   * BEFORE any route selection — the caller routes on the returned truth).
+   */
+  async settleSend(input: {
+    readonly appId: string;
+    readonly tenantId: string;
+    readonly record: ChildInvocationRecord;
+    readonly outcome: 'accepted' | 'rejected';
+    readonly rejection?: { readonly code: string; readonly message?: string };
+    readonly settledAt: string;
+  }): Promise<ChildInvocationRecord> {
+    requireInstant(input.settledAt, 'settledAt');
+    const key = childInvocationDocKey(input.appId, input.tenantId, input.record.parentInstanceKey, input.record.childInstanceKey, input.record.invocationOrdinal);
+    for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+      const { record: current, revision } = await this.load(key);
+      if (current.status !== 'pending') {
+        if (current.status === input.outcome) return current; // idempotent same-outcome replay
+        throw new DurableControlError('CHILD_INVOCATION_SETTLED', `child invocation ${String(current.invocationOrdinal)} is already settled (${current.status})`);
+      }
+      const next: ChildInvocationRecord = {
+        ...current,
+        status: input.outcome,
+        ...(input.outcome === 'rejected' && input.rejection !== undefined ? { rejection: input.rejection } : {}),
+        updatedAt: input.settledAt,
+      };
+      try {
+        await this.docs.put(key, next, { mustMatchRevision: revision });
+        return next;
+      } catch (error) {
+        if ((error as { code?: string })?.code !== 'HOST_CAS_CONFLICT') throw error;
+      }
+    }
+    throw new DurableControlError('DURABLE_CONTROL_CONTENTION', `could not settle child invocation ${key} after bounded retries`);
+  }
+
+  /**
+   * Settle ONE correlated child terminal (done | error). Exactly ONE CAS
+   * winner receives the deterministic parent child-terminal turn source;
+   * duplicates and terminals on non-accepted invocations refuse typed with
+   * ZERO Kernel activity.
+   */
+  async settleTerminal(input: {
+    readonly appId: string;
+    readonly tenantId: string;
+    readonly parentInstanceKey: string;
+    readonly childInstanceKey: string;
+    readonly invocationOrdinal: number;
+    readonly terminalKind: 'done' | 'error';
+    readonly terminalInput?: unknown;
+    readonly settledAt: string;
+  }): Promise<{ disposition: 'accepted'; plan: ChildInvocationTurnPlan; record: ChildInvocationRecord } | { disposition: 'already-terminal'; record: ChildInvocationRecord }> {
+    if (input.terminalKind !== 'done' && input.terminalKind !== 'error') {
+      invalid('terminalKind must be done or error');
+    }
+    requireInstant(input.settledAt, 'settledAt');
+    const key = childInvocationDocKey(input.appId, input.tenantId, input.parentInstanceKey, input.childInstanceKey, input.invocationOrdinal);
+    for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+      const { record: current, revision } = await this.load(key);
+      if (current.status === 'done' || current.status === 'error') {
+        return { disposition: 'already-terminal', record: current };
+      }
+      if (current.status !== 'accepted') {
+        throw new DurableControlError(
+          'CHILD_INVOCATION_NOT_ACCEPTED',
+          `child invocation ${String(current.invocationOrdinal)} is ${current.status}; only an accepted child invocation may receive a terminal`,
+        );
+      }
+      const terminal = { terminalKind: input.terminalKind, ...(input.terminalInput === undefined ? {} : { input: input.terminalInput }), settledAt: input.settledAt };
+      const next: ChildInvocationRecord = {
+        ...current,
+        status: input.terminalKind,
+        terminal,
+        updatedAt: input.settledAt,
+      };
+      try {
+        await this.docs.put(key, next, { mustMatchRevision: revision });
+      } catch (error) {
+        if ((error as { code?: string })?.code !== 'HOST_CAS_CONFLICT') throw error;
+        continue;
+      }
+      const correlationId = childInvocationCorrelationId(current.parentInstanceKey, current.childInstanceKey, current.invocationOrdinal);
+      return {
+        disposition: 'accepted',
+        record: next,
+        plan: {
+          record: next,
+          childTurnSource: { kind: 'callback', externalCorrelationId: correlationId, callbackOrdinal: 1 },
+          childTurnMessageId: current.childTurnMessageId,
+          parentTurnSource: {
+            kind: 'child-terminal',
+            parentActorId: current.parentInstanceKey,
+            childActorId: current.childInstanceKey,
+            invocationOrdinal: current.invocationOrdinal,
+            terminalKind: input.terminalKind,
+          },
+          parentTurnMessageId: `ctrl:child-terminal:${correlationId}:${input.terminalKind}`,
+        },
+      };
+    }
+    throw new DurableControlError('DURABLE_CONTROL_CONTENTION', `could not settle child invocation ${key} after bounded retries`);
+  }
+
+  /** The heal marker (see ExternalWorkCoordinator.markSubmitted). */
+  async markSubmitted(record: ChildInvocationRecord, messageId: string, submittedAt: string): Promise<void> {
+    const key = childInvocationDocKey(record.appId, record.tenantId, record.parentInstanceKey, record.childInstanceKey, record.invocationOrdinal);
+    for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+      const { record: current, revision } = await this.load(key);
+      if (current.submittedTurn !== undefined && current.submittedTurn.messageId === messageId) return;
+      const next: ChildInvocationRecord = { ...current, submittedTurn: { messageId, submittedAt }, updatedAt: submittedAt };
+      try {
+        await this.docs.put(key, next, { mustMatchRevision: revision });
+        return;
+      } catch (error) {
+        if ((error as { code?: string })?.code !== 'HOST_CAS_CONFLICT') throw error;
+      }
+    }
+    // The marker is a heal optimization, never an authority — losing the
+    // bounded race only means a later recovery replays the SAME turn id
+    // idempotently at the Kernel.
   }
 }

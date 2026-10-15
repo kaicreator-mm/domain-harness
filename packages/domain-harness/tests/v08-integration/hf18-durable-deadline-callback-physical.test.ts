@@ -192,7 +192,7 @@ async function runChild(mode: string, args: string[]): Promise<Record<string, un
     '--import', 'tsx',
     fileURLToPath(new URL('./hf18-child-hosts.ts', import.meta.url)),
     mode, ...args,
-  ], { cwd: process.cwd(), env: process.environ ?? process.env });
+  ], { cwd: process.cwd(), env: process.env });
   let stdout = '';
   let stderr = '';
   child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
