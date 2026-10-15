@@ -1,4 +1,4 @@
-# DomainHarness v0.8 — T-G Release Qualification R3 (scope/selected-path reconciliation)
+# DomainHarness v0.8 — T-G Release Qualification R4 (zero-rerun selected K/UX/Host proof)
 
 **Decision (2026-10-16): `RELEASE_HOLD_RETAINED_FUNCTION_PN_GAPS`.** This is a concrete evidence-based qualification, not a newly requested full test campaign, a tag authorization or a claim that all 44 retained functions passed. T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) stays OPEN (**formal DAG 6/7**).
 
@@ -22,22 +22,24 @@
 
 **R3 audit, not a blanket 9-row promotion.** T-G R3 locally ran 8/8 targeted tests at unchanged production candidate bytes (3 test files, Node24, real SQLite for FR11, no full-suite/Hidden rerun), then merged via [PR #1072](https://github.com/kaicreator-mm/domain-harness/pull/1072) at `3fa73f2a`. Exact source review found some witnesses use old/successor runtime modules rather than selected v0.8 K/S/B, and NF01–04 current compiler-to-DAC inputs are *assembled in test code*, not a shipped production bridge. These are useful positive/negative tests, not proof of current selected-runtime integration. Existing exact candidate v0.8 BUILD+Kind tests **do** close FR13 via source-only witness mapping (D01 P/N and A01/S02A approved closure+role/type P/N), giving **21** full P/N PASS. The remaining **23** rows stay visible, with richer PARTIAL witness coverage; see revised ledger.
 
+**R4 actual-current-selected-runtime crosswalk:** five more rows, FR03/FR14/FR10/FR15/HF28, each have genuinely previously executed P/N asserts within the **already completed frozen-candidate full run**, including selected K CAS/Journal/UNKNOWN and receipt, authenticated typed Host UX, bounded S agent tool read and the Node npm-packed dual-App consumer. Exact test IDs and negative behaviors are given per row in the successor ledger; no new runtime/Hidden execution. HF28's historical Expo/Hermes claim is **conditional** under frozen Product L1 on explicitly approved v0.8 Host support; Node is the only required physical Host shown here, and stored Hermes evidence cannot stand in for a live target. No extra Windows/Linux/WSL2 or Expo matrix introduced. New total: **26 P/N PASS / 14 PARTIAL / 3 SOURCE-ONLY / 1 LEGACY-ONLY; 18 material acceptance gaps**. This R4 supersedes only prior numerical counts while retaining historical R1/R2/R3 evidence.
+
 The approved [Product](../../product/DomainHarness_v0.8_PRODUCT_FREEZE.md) and [L2 Freeze](../../architecture/DomainHarness_v0.8_L2_FREEZE.md) explicitly require retained **useful functional behavior**, not historical pre-v1 API/ABI/asset compatibility. The immutable 44-row retained-function manifest is audit lineage, while the authorized [candidate-scope successor ledger](tg1006-44-row-successor-outcome-ledger.md) records what was **actually asserted** in executed candidate tests.
 
 | Current retained-function outcome | Rows | Meaning |
 |---|---:|---|
-| `CANDIDATE-PN-PASS` | **21** | Exact current-candidate P AND N observable genuinely executed. |
-| `CANDIDATE-PARTIAL` | **19** | Relevant candidate tests passed but required individual P/N behavior remains partially unproven. |
+| `CANDIDATE-PN-PASS` | **26** | Exact current-candidate P AND N observable genuinely executed. |
+| `CANDIDATE-PARTIAL` | **14** | Relevant candidate tests passed but required individual P/N behavior remains partially unproven. |
 | `SOURCE-LEVEL-EXECUTED` | **3** | Compiler BUILD/unit source ran; independent consumer/physical scope is missing. |
 | `LEGACY-EXECUTED / SELECTED-NOT-RUN` | **1** | Historical tests ran, but selected v0.8 BUILD/DAC bridge behavior is not verified. |
-| **Total** | **44** | **23** entries still have unproven material acceptance, not failures. |
+| **Total** | **44** | **18** entries still have unproven material acceptance, not failures. |
 
 The 34/34 Hidden PASS is orthogonal: it proves the independently composed blind scenarios ran against the exact candidate, but **does not automatically establish each of 44 specified individual P/N acceptance rows**; private oracle/fixture mappings cannot be published to backfill the public ledger by guesswork.
 
-### Bounded closure workstreams — not 23 new campaigns
+### Bounded closure workstreams — not 18 new campaigns
 
-1. **Kernel/authority 9**: FR01, FR03, FR04, FR14, HF16, HF19, HF21, HF26, HF27. Review *actual executed* Kernel/Host/real-SQLite T-F/KPK/HF18/HF20/UNKNOWN test assertions against each row's frozen P/N requirement. Only truly uncovered fault roots warrant a new selected fixture.
-2. **Host/UX 5**: FR10, FR15, HF28, HF29, HF33. Match actual packed D2/D3 and Host/UX/role/resource tests to the row's acceptance. Do not require non-approved Expo/Hermes full parity or a Windows/Linux/WSL2 platform matrix solely from historical API claims; explicitly distinguish mandatory current Node Host behavior from out-of-scope legacy compatibility.
+1. **Kernel/authority 7**: FR01, FR04, HF16, HF19, HF21, HF26, HF27. FR03 and FR14 have now been crosswalked to the already-executed selected Kernel effect/journal/UNKNOWN P/N and physical S04/T-F witnesses. Review *actual executed* Kernel/Host/real-SQLite T-F/KPK/HF18/HF20/UNKNOWN test assertions against each row's frozen P/N requirement. Only truly uncovered fault roots warrant a new selected fixture.
+2. **Host/UX 2**: HF29, HF33. FR10/FR15 authenticated UX and agent read-only bridge P/N plus HF28 qualified Node packed consumer P/N are now crosswalked to actual previously executed tests. Expo remains conditional/outside current required Host without explicit approval. Match actual packed D2/D3 and Host/UX/role/resource tests to the row's acceptance. Do not require non-approved Expo/Hermes full parity or a Windows/Linux/WSL2 platform matrix solely from historical API claims; explicitly distinguish mandatory current Node Host behavior from out-of-scope legacy compatibility.
 3. **BUILD, ABI and DAC bridge 9**: FR11, HF24, HF25, HF30, HF34, NEW-FUNCTION-01–04. FR13 selected Kind P/N is now evidenced by old executed candidate tests; FR11 and NF01–04 have additional R3 tests but remain PARTIAL for missing selected-runtime/production bridge proof. FR06/HF22/HF31 are now supported by same-candidate compiled+actual loaded positive and negative evidence already executed; see the R2 row crosswalk in the successor ledger. Reconcile existing 374 compiler tests, clean packed consumer and exact selected BUILD/DomainData/DAC runtime tests with functional P/N. Old ABI byte parity is OUT, but accepted useful functionality remains IN.
 
 **Process:** (a) source-only Web crosswalk over frozen row text → executed assertion/test ID and candidate exact SHA; (b) reuse original executed logs and private Hidden PASS (only public-safe aggregated claims), (c) identify a deduplicated **minimal** truly absent acceptance set, (d) dispatch targeted native tests ONLY for those, (e) update the successor ledger after actual proof; retain all unresolved rows honestly. A code change, if one is really needed, is a separate issue/PR with narrowly scoped diff verification. **Do not** rerun full 3,786 tests or repeat the 34 private Hidden scenarios because this documentation is amended.
@@ -45,7 +47,7 @@ The 34/34 Hidden PASS is orthogonal: it proves the independently composed blind 
 ## 3. Release disposition and non-waiver
 
 ```ini
-EVENT=DH08_TG_RELEASE_QUALIFICATION_R3
+EVENT=DH08_TG_RELEASE_QUALIFICATION_R4
 SOURCE_OF_TRUTH=LIVE_GITHUB
 CANDIDATE_SHA=b151320ee6835755ba043e2602c085c180c9c849
 CANDIDATE_TREE=a8135b2a217edff395da0a4f31dd7955d3b3db5a
@@ -58,14 +60,14 @@ HIDDEN=34_OF_34_PASS
 HIDDEN_PUBLIC_FINDINGS=0
 PRIVATE_EVIDENCE=HIDDEN_VALIDATION_PR60_PR61_MERGED
 CI=PASS_EXECUTABLE_EQUIVALENT_PR1069_62a7660
-RETAINED_44=21_PN_PASS_19_PARTIAL_3_SOURCE_ONLY_1_LEGACY_ONLY
-MATERIAL_PN_GAPS=23
+RETAINED_44=26_PN_PASS_14_PARTIAL_3_SOURCE_ONLY_1_LEGACY_ONLY
+MATERIAL_PN_GAPS=18
 PRODUCTION_COMPAT_PRE_V1=OUT
 OWNER_GITHUB_LOGIN_GATE=NONE
 RELEASE_QUALIFIED=NO
 TAG=NO
 ISSUE_1006=OPEN
-NEXT=SELECTED_V08_PATH_PROOF_FOR_REMAINING_23_NO_FULL_RERUN
+NEXT=SELECTED_V08_PATH_PROOF_FOR_REMAINING_18_NO_FULL_RERUN
 ```
 
 This is a **HOLD on unproven acceptance, not a product test failure**. No security/CAS/false-ACK defect is waived. Re-evaluate after only the material unproven tests are matched or executed; a legitimate Product rescope of a historically *compatibility-only* item requires an explicit recorded decision rather than implicit status promotion. A subsequent qualification must name the exact source and actual test receipts.
