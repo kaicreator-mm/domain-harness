@@ -2395,10 +2395,11 @@ function turnDispositionDocKey(turnId) {
  * [#1066 R1 P1-B] The bounded same-CAS admission history bound: the last
  * 16 non-message turn admissions ride inside the instance document. The
  * history is the crash-window backstop for a LOST turn-disposition record
- * (written best-effort after the state CAS); with more than 16 intervening
- * non-message turns AND a lost disposition record the dedup falls back to
- * the pre-existing behavior — never a silent correctness claim beyond the
- * bound.
+ * (written best-effort after the state CAS). Before evicting the oldest of
+ * 16 entries K must verify its independent disposition exists with the
+ * exact identity; otherwise new control turns FAIL CLOSED until the old
+ * source is recovered and its missing disposition healed. Thus a delayed
+ * recovery cannot silently pass beyond the bounded crash backstop.
  */
 const MAX_ADMITTED_CONTROL_TURN_HISTORY = 16;
 
@@ -4420,6 +4421,28 @@ export function createOccurrenceRuntime(options) {
         );
         if (historyReplayed !== undefined) {
           return historyReplayed;
+        }
+        // [#1066 R2] The 16-entry SAME-CAS crash backstop may evict an
+        // older turn ONLY if its independent durable disposition exists.
+        // Otherwise a delayed Host recovery could re-admit the evicted
+        // turn. Refuse a NEW turn before any admission/effect until the
+        // older missing disposition is healed by replaying its source.
+        const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
+        if (history.length >= MAX_ADMITTED_CONTROL_TURN_HISTORY) {
+          const oldest = history[0];
+          if (!isJsonRecord(oldest) || typeof oldest.turnId !== 'string' || typeof oldest.identity !== 'string') {
+            throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_INVALID', 'cannot evict an invalid committed control-turn admission');
+          }
+          let disposition;
+          try {
+            disposition = await docs.get(turnDispositionDocKey(oldest.turnId));
+          } catch {
+            throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'cannot verify the oldest admitted control turn disposition; fail closed before eviction');
+          }
+          if (disposition === null || !isJsonRecord(disposition.value)
+            || disposition.value.identity !== oldest.identity) {
+            throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'oldest committed control turn has no matching durable disposition; recover it before admitting another turn');
+          }
         }
       }
       const context = {
