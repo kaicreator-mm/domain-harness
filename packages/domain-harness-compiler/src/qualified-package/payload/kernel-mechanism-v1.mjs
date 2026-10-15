@@ -2168,6 +2168,304 @@ export class PerInstanceSerializedLane {
 }
 
 // ===========================================================================
+// [#1063 HF20] ordered durable mutation observation — the Kernel-internal
+// contract twin of `src/host-v8/hf20-mutation-observation.ts` (semantic
+// twin only: the payload is self-contained sealed bytes and imports
+// nothing). The observation window rides the SAME instance document the
+// authoritative state CAS writes (create seeds INSTANCE_OPENED; every
+// commitAcceptedTransitionInLane appends MUTATION_COMMITTED inside the same
+// single-key CAS value), so a record can never exist without its committed
+// stateRevision and vice versa — one physical row, one counter, one
+// transaction. Ordering authority is `sequence` alone; eviction of the
+// retained tail is the explicit RETENTION_TRUNCATED gap; cursors are
+// stream-bound opaque tokens re-validated against the CURRENT window.
+// ===========================================================================
+
+const HF20_MUTATION_OBSERVATION_CONTRACT_VERSION = 'hf20-mutation-observation/1';
+const HF20_MUTATION_OBSERVATION_RETENTION_LIMIT = 64;
+const HF20_MUTATION_OBSERVATION_KINDS = ['INSTANCE_OPENED', 'MUTATION_COMMITTED'];
+
+function isHf20SafeNonNegativeInteger(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isHf20MutationObservationWindow(value) {
+  if (!isJsonRecord(value)) return false;
+  if (value.contractVersion !== HF20_MUTATION_OBSERVATION_CONTRACT_VERSION) return false;
+  if (!isHf20SafeNonNegativeInteger(value.mutationSequence)) return false;
+  if (!Array.isArray(value.records)) return false;
+  if (value.records.length > HF20_MUTATION_OBSERVATION_RETENTION_LIMIT) return false;
+  if (value.records.length > value.mutationSequence) return false;
+  const expectedFirst = value.mutationSequence - value.records.length + 1;
+  for (let index = 0; index < value.records.length; index += 1) {
+    const record = value.records[index];
+    if (!isJsonRecord(record)) return false;
+    if (!('sequence' in record) || !('kind' in record) || !('stateRevisionAfter' in record) || !('committedAt' in record)) {
+      return false;
+    }
+    if (!isHf20SafeNonNegativeInteger(record.sequence) || record.sequence !== expectedFirst + index) return false;
+    if (typeof record.kind !== 'string' || !HF20_MUTATION_OBSERVATION_KINDS.includes(record.kind)) return false;
+    if (!isHf20SafeNonNegativeInteger(record.stateRevisionAfter)) return false;
+    if (record.stateRevisionBefore !== undefined && !isHf20SafeNonNegativeInteger(record.stateRevisionBefore)) return false;
+    if (record.sourceMessageId !== undefined && (typeof record.sourceMessageId !== 'string' || record.sourceMessageId.length === 0)) return false;
+    if (typeof record.committedAt !== 'string' || record.committedAt.length === 0) return false;
+    if (record.kind === 'INSTANCE_OPENED' && record.stateRevisionAfter !== 0) return false;
+    if (record.kind === 'MUTATION_COMMITTED' && record.stateRevisionBefore !== record.stateRevisionAfter - 1) return false;
+  }
+  return true;
+}
+
+function newHf20ObservationWindow() {
+  return {
+    contractVersion: HF20_MUTATION_OBSERVATION_CONTRACT_VERSION,
+    mutationSequence: 0,
+    records: [],
+  };
+}
+
+/**
+ * The PURE append reducer the commit path runs INSIDE its CAS write value.
+ * There is deliberately no separate append entry point: an observation
+ * record that did not ride the authoritative commit would be exactly the
+ * best-effort second-document shape HF20 forbids.
+ */
+function appendHf20MutationObservation(window, intent, committedAt) {
+  if (!isHf20MutationObservationWindow(window)) {
+    throw new CentralAdmissionError(
+      'WINDOW_INVALID',
+      'the stored mutation-observation window is structurally invalid; the commit fails closed',
+    );
+  }
+  if (!HF20_MUTATION_OBSERVATION_KINDS.includes(intent.kind)) {
+    throw new CentralAdmissionError('WINDOW_INVALID', `unknown mutation observation kind ${String(intent.kind)}`);
+  }
+  if (!isHf20SafeNonNegativeInteger(intent.stateRevisionAfter)) {
+    throw new CentralAdmissionError('WINDOW_INVALID', 'stateRevisionAfter must be a safe non-negative integer');
+  }
+  if (typeof committedAt !== 'string' || committedAt.length === 0) {
+    throw new CentralAdmissionError('WINDOW_INVALID', 'committedAt must be a non-empty string');
+  }
+  const record = {
+    sequence: window.mutationSequence + 1,
+    kind: intent.kind,
+    stateRevisionAfter: intent.stateRevisionAfter,
+    ...(intent.stateRevisionBefore === undefined ? {} : { stateRevisionBefore: intent.stateRevisionBefore }),
+    ...(intent.sourceMessageId === undefined ? {} : { sourceMessageId: intent.sourceMessageId }),
+    committedAt,
+  };
+  if (record.kind === 'INSTANCE_OPENED' && record.stateRevisionAfter !== 0) {
+    throw new CentralAdmissionError('WINDOW_INVALID', 'INSTANCE_OPENED must commit at stateRevisionAfter 0');
+  }
+  if (record.kind === 'MUTATION_COMMITTED' && record.stateRevisionBefore !== record.stateRevisionAfter - 1) {
+    throw new CentralAdmissionError('WINDOW_INVALID', 'MUTATION_COMMITTED must advance the document revision by exactly one');
+  }
+  return {
+    window: {
+      contractVersion: HF20_MUTATION_OBSERVATION_CONTRACT_VERSION,
+      mutationSequence: record.sequence,
+      records: [...window.records, record].slice(-HF20_MUTATION_OBSERVATION_RETENTION_LIMIT),
+    },
+    record,
+  };
+}
+
+// Opaque cursor codec — base64url over UTF-8 JSON {v,s,a}, implemented with
+// no Node/global dependency (the payload keeps its sealed-bytes portability;
+// the encoding is wire-identical to any standard base64url implementation).
+const HF20_CURSOR_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+function utf8EncodeHf20(text) {
+  const bytes = [];
+  for (let index = 0; index < text.length; index += 1) {
+    let code = text.charCodeAt(index);
+    if (code < 0x80) {
+      bytes.push(code);
+    } else if (code < 0x800) {
+      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+    } else if (code >= 0xd800 && code <= 0xdbff && index + 1 < text.length
+      && text.charCodeAt(index + 1) >= 0xdc00 && text.charCodeAt(index + 1) <= 0xdfff) {
+      code = 0x10000 + ((code - 0xd800) << 10) + (text.charCodeAt(index + 1) - 0xdc00);
+      index += 1;
+      bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    } else {
+      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    }
+  }
+  return bytes;
+}
+
+function utf8DecodeHf20(bytes) {
+  let text = '';
+  for (let index = 0; index < bytes.length;) {
+    const lead = bytes[index];
+    index += 1;
+    let code;
+    if (lead < 0x80) {
+      code = lead;
+    } else if (lead >= 0xc0 && lead < 0xe0) {
+      code = ((lead & 0x1f) << 6) | (bytes[index] & 0x3f);
+      index += 1;
+    } else if (lead >= 0xe0 && lead < 0xf0) {
+      code = ((lead & 0x0f) << 12) | ((bytes[index] & 0x3f) << 6) | (bytes[index + 1] & 0x3f);
+      index += 2;
+    } else {
+      code = ((lead & 0x07) << 18) | ((bytes[index] & 0x3f) << 12) | ((bytes[index + 1] & 0x3f) << 6) | (bytes[index + 2] & 0x3f);
+      index += 3;
+    }
+    if (code > 0xffff) {
+      code -= 0x10000;
+      text += String.fromCharCode(0xd800 + (code >> 10), 0xdc00 + (code & 0x3ff));
+    } else {
+      text += String.fromCharCode(code);
+    }
+  }
+  return text;
+}
+
+function base64UrlEncodeHf20(text) {
+  const bytes = utf8EncodeHf20(text);
+  let encoded = '';
+  for (let index = 0; index < bytes.length; index += 3) {
+    const b0 = bytes[index];
+    const b1 = index + 1 < bytes.length ? bytes[index + 1] : undefined;
+    const b2 = index + 2 < bytes.length ? bytes[index + 2] : undefined;
+    encoded += HF20_CURSOR_ALPHABET[b0 >> 2];
+    encoded += HF20_CURSOR_ALPHABET[((b0 & 0x03) << 4) | ((b1 ?? 0) >> 4)];
+    if (b1 === undefined) break;
+    encoded += HF20_CURSOR_ALPHABET[((b1 & 0x0f) << 2) | ((b2 ?? 0) >> 6)];
+    if (b2 === undefined) break;
+    encoded += HF20_CURSOR_ALPHABET[b2 & 0x3f];
+  }
+  return encoded;
+}
+
+function base64UrlDecodeHf20(encoded) {
+  let bitBuffer = 0;
+  let bitCount = 0;
+  const bytes = [];
+  for (const character of encoded) {
+    const value = HF20_CURSOR_ALPHABET.indexOf(character);
+    if (value < 0) {
+      throw new CentralAdmissionError('CURSOR_MALFORMED', `the cursor token carries a non-base64url character`);
+    }
+    bitBuffer = (bitBuffer * 64) + value;
+    bitCount += 6;
+    if (bitCount >= 8) {
+      bitCount -= 8;
+      bytes.push(Math.floor(bitBuffer / (2 ** bitCount)) & 0xff);
+      bitBuffer %= (2 ** bitCount);
+    }
+  }
+  return bytes;
+}
+
+function encodeHf20Cursor(stream, after) {
+  if (typeof stream !== 'string' || stream.length === 0) {
+    throw new CentralAdmissionError('CURSOR_MALFORMED', 'a cursor requires a non-empty stream identity');
+  }
+  if (!isHf20SafeNonNegativeInteger(after)) {
+    throw new CentralAdmissionError('CURSOR_MALFORMED', 'a cursor requires a safe non-negative exclusive-after sequence');
+  }
+  return base64UrlEncodeHf20(JSON.stringify({ v: 1, s: stream, a: after }));
+}
+
+function decodeHf20Cursor(cursor) {
+  if (typeof cursor !== 'string' || cursor.length === 0) {
+    throw new CentralAdmissionError('CURSOR_MALFORMED', 'a cursor token must be a non-empty string');
+  }
+  let payload;
+  try {
+    payload = JSON.parse(utf8DecodeHf20(base64UrlDecodeHf20(cursor)));
+  } catch (error) {
+    if (error instanceof CentralAdmissionError) throw error;
+    throw new CentralAdmissionError('CURSOR_MALFORMED', 'the cursor token is not decodable base64url JSON');
+  }
+  if (!isJsonRecord(payload) || payload.v !== 1 || typeof payload.s !== 'string' || payload.s.length === 0
+    || !isHf20SafeNonNegativeInteger(payload.a)) {
+    throw new CentralAdmissionError('CURSOR_MALFORMED', 'the cursor token does not carry the {v,s,a} contract shape');
+  }
+  return { stream: payload.s, after: payload.a };
+}
+
+function clampHf20ReadLimit(limit) {
+  if (limit === undefined) return 100;
+  if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 1) {
+    throw new CentralAdmissionError('READ_LIMIT_INVALID', 'the read limit must be an integer ≥ 1');
+  }
+  return Math.min(limit, 1000);
+}
+
+function projectHf20ObservationPage(window, request) {
+  if (!isHf20MutationObservationWindow(window)) {
+    throw new CentralAdmissionError('WINDOW_INVALID', 'the stored mutation-observation window is structurally invalid; fail closed');
+  }
+  if (typeof request.stream !== 'string' || request.stream.length === 0) {
+    throw new CentralAdmissionError('CURSOR_STREAM_MISMATCH', 'a read requires the exact stream identity being read');
+  }
+  const limit = clampHf20ReadLimit(request.limit);
+  let after = 0;
+  if (request.afterCursor !== undefined) {
+    const decoded = decodeHf20Cursor(request.afterCursor);
+    if (decoded.stream !== request.stream) {
+      throw new CentralAdmissionError(
+        'CURSOR_STREAM_MISMATCH',
+        `the cursor was minted for stream ${decoded.stream}, not ${request.stream}; substitution fails closed`,
+      );
+    }
+    if (decoded.after > window.mutationSequence) {
+      throw new CentralAdmissionError(
+        'CURSOR_BEYOND_WATERMARK',
+        `the cursor claims sequence ${String(decoded.after)} but the stream's committed watermark is ${String(window.mutationSequence)}; no such progress was ever committed`,
+      );
+    }
+    after = decoded.after;
+  }
+  const highWatermark = window.mutationSequence;
+  const retained = window.records;
+  const earliestAvailable = retained.length > 0 ? retained[0].sequence : undefined;
+  const truncated = after < highWatermark
+    && earliestAvailable !== undefined
+    && after < earliestAvailable - 1;
+  const records = retained.filter((record) => record.sequence > after).slice(0, limit);
+  const lastRecord = records.length > 0 ? records[records.length - 1] : undefined;
+  return {
+    records,
+    ...(lastRecord !== undefined ? { nextCursor: encodeHf20Cursor(request.stream, lastRecord.sequence) } : {}),
+    highWatermark,
+    ...(truncated
+      ? {
+        gap: {
+          kind: 'RETENTION_TRUNCATED',
+          requestedAfter: after,
+          ...(earliestAvailable === undefined ? {} : { earliestAvailable }),
+          highWatermark,
+        },
+      }
+      : {}),
+  };
+}
+
+/**
+ * [#1063 HF20 read-scope boundary] The outward projection of one instance
+ * snapshot: the K-only carrier fields (`mutationObservations` — HF20;
+ * `admittedControlTurns` — #1066 same-CAS turn admission history) stay
+ * INTERNAL next-CAS/replay truth and never leave the Kernel through
+ * queryInstance/FR05/Genesis/receipt surfaces; the protected
+ * mutation-observation read verb is the ONLY authorized reader of the
+ * observation window, and the turn history has no outward reader at all.
+ */
+function outwardInstanceSnapshot(snapshot) {
+  if (!isJsonRecord(snapshot)) return snapshot;
+  if (!('mutationObservations' in snapshot) && !('admittedControlTurns' in snapshot)) return snapshot;
+  const outward = {};
+  for (const key of Object.keys(snapshot)) {
+    if (key === 'mutationObservations' || key === 'admittedControlTurns') continue;
+    outward[key] = snapshot[key];
+  }
+  return outward;
+}
+
+// ===========================================================================
 // v0.7 migrated: instance/persistent-workflow-instance.ts +
 // engine/workflow-instance-engine.ts
 // [KPK-01 adaptation] the v0.7 RuntimeStore port is replaced by the generic
@@ -2204,6 +2502,14 @@ export class PersistentWorkflowInstanceRepository {
 
   async create(request) {
     const timestamp = this.#now();
+    // [#1063 HF20] The observation window rides the created instance
+    // document from byte zero: INSTANCE_OPENED commits at stateRevision 0
+    // in the SAME mustBeAbsent put that creates the row.
+    const opened = appendHf20MutationObservation(
+      newHf20ObservationWindow(),
+      { kind: 'INSTANCE_OPENED', stateRevisionAfter: 0 },
+      timestamp,
+    );
     const snapshot = {
       address: { ...request.address },
       correlationId: request.correlationId,
@@ -2211,6 +2517,7 @@ export class PersistentWorkflowInstanceRepository {
       lifecycle: request.lifecycle ?? 'active',
       stateRevision: 0,
       state: request.initialState,
+      mutationObservations: opened.window,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -2303,6 +2610,23 @@ export class WorkflowInstanceEngine {
           },
         ].slice(-MAX_ADMITTED_CONTROL_TURN_HISTORY);
 
+    // [#1063 HF20] The MUTATION_COMMITTED observation record is computed by
+    // the pure reducer INSIDE this same transition body and rides the SAME
+    // single-key CAS value below — one physical row write makes the record
+    // and the new stateRevision durable together or not at all. A losing
+    // writer takes HOST_CAS_CONFLICT from the put BEFORE any durable effect,
+    // so a lost/uncommitted turn never yields an observation.
+    const mutationObservations = appendHf20MutationObservation(
+      current.mutationObservations,
+      {
+        kind: 'MUTATION_COMMITTED',
+        stateRevisionBefore: current.stateRevision,
+        stateRevisionAfter: current.stateRevision + 1,
+        sourceMessageId: request.messageId,
+      },
+      updatedAt,
+    ).window;
+
     await this.#docs.put(instanceDocKey(request.target), {
       address: current.address,
       correlationId: current.correlationId,
@@ -2315,6 +2639,7 @@ export class WorkflowInstanceEngine {
       lastMessageId: request.messageId,
       createdAt: current.createdAt,
       updatedAt,
+      mutationObservations,
       ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
     }, { mustMatchRevision: current.stateRevision });
 
@@ -3489,6 +3814,7 @@ export function createOccurrenceRuntime(options) {
     decisionReceiptAppends: 0,
     decisionCacheWrites: 0,
     decisionCacheWriteFailures: 0,
+    mutationObservationReads: 0,
     promotedPins: 0,
     turnDispositions: 0,
     turnAdmissionReplays: 0,
@@ -4144,7 +4470,7 @@ export function createOccurrenceRuntime(options) {
       status: 'admitted',
       idempotentReplay: true,
       turnAdmission: { turnId, admittedAtStateRevision: admission.stateRevision },
-      instance: snapshot,
+      instance: outwardInstanceSnapshot(snapshot),
       occurrence: { messageId: request.messageId, workflowInstanceId },
       attribution: attribution(),
     };
@@ -4278,7 +4604,10 @@ export function createOccurrenceRuntime(options) {
       },
     });
     await bindGovernance(target);
-    return snapshot;
+    // [#1063 HF20] Genesis answers with the OUTWARD snapshot: the seeded
+    // observation window is internal carrier truth, readable only through
+    // the protected mutation-observation read.
+    return outwardInstanceSnapshot(snapshot);
   }
 
   /**
@@ -4660,10 +4989,10 @@ export function createOccurrenceRuntime(options) {
         resolved,
       });
 
-      // [#1062 shared seam] The turn disposition is created AFTER the
-      // authoritative state CAS (best-effort, never fails the committed
-      // ACK, never claims cross-document atomicity — see the block comment
-      // at turnDispositionDocKey).
+      // [#1063 HF20] The committed instance projection that leaves the
+      // Kernel is the OUTWARD snapshot: the observation window and the
+      // control-turn admission history stay internal carrier/replay truth.
+      const outwardCommitted = outwardInstanceSnapshot(committed);
       let turnDisposition;
       if (controlTurnId !== undefined) {
         turnDisposition = await writeTurnDisposition(
@@ -4674,7 +5003,7 @@ export function createOccurrenceRuntime(options) {
           {
             status: 'admitted',
             admitted: outcome.admitted,
-            instance: committed,
+            instance: outwardCommitted,
             occurrence: { messageId: request.messageId, workflowInstanceId },
             attribution: attribution(),
           },
@@ -4684,7 +5013,7 @@ export function createOccurrenceRuntime(options) {
       const receipt = {
         status: 'admitted',
         admitted: outcome.admitted,
-        instance: committed,
+        instance: outwardCommitted,
         occurrence: { messageId: request.messageId, workflowInstanceId },
         attribution: attribution(),
         ...(decisionReceipt === undefined ? {} : { decisionReceipt }),
@@ -4709,7 +5038,43 @@ export function createOccurrenceRuntime(options) {
 
   async function getSnapshot(target) {
     counters.instanceReads += 1;
-    return engine.getInstance(target);
+    // [#1063 HF20] The outward snapshot redacts the K-only carrier fields;
+    // the raw document stays the internal next-CAS/replay truth.
+    return outwardInstanceSnapshot(await engine.getInstance(target));
+  }
+
+  /**
+   * [#1063 HF20] Authorized read of the ordered durable mutation-observation
+   * window riding the instance document. The Kernel alone validates the
+   * opaque cursor against the CURRENT committed window (malformed /
+   * substituted stream / beyond-watermark all fail closed typed) and owns
+   * the page bytes; an absent instance answers null exactly like
+   * getSnapshot — the read is neither an existence oracle nor a leak.
+   */
+  async function readMutationObservations(request) {
+    counters.mutationObservationReads += 1;
+    if (!isJsonRecord(request)) {
+      throw new CentralAdmissionError('MUTATION_OBSERVATION_READ_INVALID', 'a mutation-observation read must be a record {target, afterCursor?, limit?}');
+    }
+    const target = request.target;
+    if (!isJsonRecord(target) || typeof target.workflowId !== 'string' || target.workflowId.length === 0
+      || typeof target.instanceKey !== 'string' || target.instanceKey.length === 0) {
+      throw new CentralAdmissionError('MUTATION_OBSERVATION_READ_INVALID', 'a mutation-observation read requires a workflow target {workflowId, instanceKey}');
+    }
+    if (request.afterCursor !== undefined && (typeof request.afterCursor !== 'string' || request.afterCursor.length === 0)) {
+      throw new CentralAdmissionError('MUTATION_OBSERVATION_READ_INVALID', 'afterCursor, when present, must be a non-empty string');
+    }
+    const raw = await engine.getInstance(target);
+    if (raw === null) return null;
+    if (!isHf20MutationObservationWindow(raw.mutationObservations)) {
+      throw new CentralAdmissionError('WINDOW_INVALID', 'the instance carries no valid mutation-observation window; the read fails closed');
+    }
+    const stream = `${target.workflowId}:${target.instanceKey}`;
+    return projectHf20ObservationPage(raw.mutationObservations, {
+      stream,
+      ...(request.afterCursor === undefined ? {} : { afterCursor: request.afterCursor }),
+      ...(request.limit === undefined ? {} : { limit: request.limit }),
+    });
   }
 
   function getMechanismIdentity() {
@@ -4726,6 +5091,7 @@ export function createOccurrenceRuntime(options) {
         VolatileAdmissionEffectJournal: VolatileAdmissionEffectJournal.toString(),
         WorkflowInstanceEngine: WorkflowInstanceEngine.toString(),
         deriveDurableControlTurnId: deriveDurableControlTurnId.toString(),
+        readMutationObservations: readMutationObservations.toString(),
       },
     };
   }
@@ -4738,6 +5104,7 @@ export function createOccurrenceRuntime(options) {
     openInstance,
     submitOccurrence,
     getSnapshot,
+    readMutationObservations,
     getDecisionReceipt,
     getJournalRecords: () => effectJournal.getRecords(),
     getMechanismIdentity,

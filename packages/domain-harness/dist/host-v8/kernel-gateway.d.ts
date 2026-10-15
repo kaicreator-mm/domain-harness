@@ -214,6 +214,19 @@ export interface KernelGateway {
     queryDecisionReceipt(credential: unknown, request: UxTarget & {
         readonly messageId: string;
     }): Promise<unknown>;
+    /**
+     * [#1063 HF20] Authenticated scoped mutation-observation read: the ordered
+     * committed-mutation window riding the principal's tenant/app-qualified
+     * instance document, through the same K authority that commits it (opaque
+     * K-validated cursor; restart-resumable on the same physical storage).
+     * Requires a host-configured control role — an ordinary authenticated
+     * reader (one who may send and queryInstance) is NOT a mutation-
+     * observation reader.
+     */
+    queryMutationObservations(credential: unknown, request: UxTarget & {
+        readonly afterCursor?: string;
+        readonly limit?: number;
+    }): Promise<unknown>;
     /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
     subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription>;
     /**

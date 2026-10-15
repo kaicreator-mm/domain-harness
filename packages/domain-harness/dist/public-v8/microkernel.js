@@ -1170,6 +1170,28 @@ async function loadScopedFacade(packageRoot) {
                 caller: { subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId, roles: [...principal.roles] },
             });
         },
+        async queryMutationObservations(principal, request) {
+            assertOpen();
+            requirePrincipal(principal);
+            const key = requireInstanceKey(request.instanceKey);
+            if (request.afterCursor !== undefined && (typeof request.afterCursor !== 'string' || request.afterCursor.length === 0)) {
+                throw typedError('INTENT_MALFORMED', 'a mutation-observation read cursor, when present, must be a non-empty string');
+            }
+            if (request.limit !== undefined && (typeof request.limit !== 'number' || !Number.isSafeInteger(request.limit) || request.limit < 1)) {
+                throw typedError('INTENT_MALFORMED', 'a mutation-observation read limit, when present, must be a positive safe integer');
+            }
+            const runtimeWithObservationRead = kernelRuntime;
+            if (typeof runtimeWithObservationRead.readMutationObservations !== 'function') {
+                throw typedError('MUTATION_OBSERVATION_ENDPOINT_INVALID', `kernel package ${kernelBinding.packageId} mechanism exposes no mutation-observation read endpoint`);
+            }
+            // Same authority discipline as queryDecisionReceipt: the stream
+            // address is derived ONLY from the verified principal.
+            return runtimeWithObservationRead.readMutationObservations({
+                target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+                ...(request.afterCursor === undefined ? {} : { afterCursor: request.afterCursor }),
+                ...(request.limit === undefined ? {} : { limit: request.limit }),
+            });
+        },
         workflowInstanceId(principal, instanceKey) {
             requirePrincipal(principal);
             const key = requireInstanceKey(instanceKey);

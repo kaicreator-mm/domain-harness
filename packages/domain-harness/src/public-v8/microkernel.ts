@@ -200,6 +200,19 @@ export interface V8FacadeKernelOps {
     readonly messageId: string;
   }): Promise<unknown>;
   /**
+   * [#1063 HF20] Authorized read of the ordered durable mutation-observation
+   * window riding the principal's tenant/app-qualified instance document:
+   * the Kernel alone validates the opaque cursor against the current
+   * committed window (stream-bound, never beyond the watermark) and owns
+   * the record/page bytes; this seam forwards only the verified principal —
+   * never caller-chosen authority, exactly like the NF06 receipt read.
+   */
+  queryMutationObservations(principal: V8GatewayPrincipal, request: {
+    readonly instanceKey: string;
+    readonly afterCursor?: string;
+    readonly limit?: number;
+  }): Promise<unknown>;
+  /**
    * The physical Kernel `workflowInstanceId` the tenant/app-qualified
    * address resolves to (`${workflowKey}:${tenantId}:${appId}:${key}`) —
    * the single source of the receipt-filter address shared by send,
@@ -277,6 +290,8 @@ interface WiredKernelRuntime {
   openInstance?(request: unknown): unknown;
   /** [#1003 NF06] Present on the selected Kernel mechanism; the authorized read of one persisted decision receipt. */
   getDecisionReceipt?(request: unknown): unknown;
+  /** [#1063 HF20] Present on the selected Kernel mechanism; the K-validated ordered mutation-observation read. */
+  readMutationObservations?(request: unknown): unknown;
 }
 
 /**
@@ -1697,6 +1712,32 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
         target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
         messageId: request.messageId,
         caller: { subject: principal.subject, tenantId: principal.tenantId, appId: principal.appId, roles: [...principal.roles] },
+      });
+    },
+    async queryMutationObservations(principal: V8GatewayPrincipal, request: {
+      readonly instanceKey: string;
+      readonly afterCursor?: string;
+      readonly limit?: number;
+    }): Promise<unknown> {
+      assertOpen();
+      requirePrincipal(principal);
+      const key = requireInstanceKey(request.instanceKey);
+      if (request.afterCursor !== undefined && (typeof request.afterCursor !== 'string' || request.afterCursor.length === 0)) {
+        throw typedError('INTENT_MALFORMED', 'a mutation-observation read cursor, when present, must be a non-empty string');
+      }
+      if (request.limit !== undefined && (typeof request.limit !== 'number' || !Number.isSafeInteger(request.limit) || request.limit < 1)) {
+        throw typedError('INTENT_MALFORMED', 'a mutation-observation read limit, when present, must be a positive safe integer');
+      }
+      const runtimeWithObservationRead = kernelRuntime as WiredKernelRuntime & { readMutationObservations: (request: unknown) => unknown };
+      if (typeof runtimeWithObservationRead.readMutationObservations !== 'function') {
+        throw typedError('MUTATION_OBSERVATION_ENDPOINT_INVALID', `kernel package ${kernelBinding.packageId} mechanism exposes no mutation-observation read endpoint`);
+      }
+      // Same authority discipline as queryDecisionReceipt: the stream
+      // address is derived ONLY from the verified principal.
+      return runtimeWithObservationRead.readMutationObservations({
+        target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
+        ...(request.afterCursor === undefined ? {} : { afterCursor: request.afterCursor }),
+        ...(request.limit === undefined ? {} : { limit: request.limit }),
       });
     },
     workflowInstanceId(principal: V8GatewayPrincipal, instanceKey: string): string {
