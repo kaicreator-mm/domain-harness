@@ -87,10 +87,13 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // non-message turn admission history inside the instance state CAS +
 // history-replay of a lost turn disposition (S bytes unchanged); all
 // FR02/FR07 oracle rows re-run unchanged below.
+// K_BLOB_PIN_REBOUND_AFTER_1066_R2_EVICTION: fail closed BEFORE evicting
+// a same-CAS control-turn identity whose optional disposition is absent;
+// only an independently durable matching disposition makes eviction safe.
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = '9ad22c3eb1fdf783887d056d730faa69fd3907c3';
+const V08_K_BLOB = 'b6ab05d123d9233243ec4ada1416f88eb7ad16e7';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
