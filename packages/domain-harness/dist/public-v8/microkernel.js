@@ -1139,6 +1139,11 @@ async function loadScopedFacade(packageRoot) {
                 ? kernelRuntime.submitOccurrence(kernelRequest)
                 : kernelRuntime.submitOccurrence(kernelRequest, control);
         },
+        roleAdmitted(principal, intentType) {
+            assertOpen();
+            requirePrincipal(principal);
+            return roleAdmittedByIntent(principal, intentType);
+        },
         async queryInstance(principal, instanceKey) {
             assertOpen();
             requirePrincipal(principal);

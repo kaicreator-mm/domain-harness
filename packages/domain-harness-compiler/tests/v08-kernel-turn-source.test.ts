@@ -373,14 +373,26 @@ test('turn-source N: honest UNKNOWN window — failed disposition create never d
   const revision = first.instance.stateRevision;
   assert.equal(ports.resourceCalls.length, 1);
 
-  // The healed replay finds no disposition (the UNKNOWN window): admission
-  // re-runs, but the TERMINAL state yields no candidate transition — the
-  // state can never double-commit and no second effect is dispatched.
+  // [#1066 R1 P1-B] The healed replay finds no disposition record (the
+  // UNKNOWN window) but the SAME-CAS admission history INSIDE the committed
+  // instance document answers the once-only guarantee at the protocol
+  // level: the re-submitted turn is recognized as already admitted with
+  // ZERO new State/Journal/Effect activity — never again left to the
+  // business state machine's refusal to mask the window.
   const replay = await rt.submitOccurrence(callbackRequest('submitResume', CALLBACK_SOURCE, 'ctrl:callback:corr-1:1'));
-  assert.equal(replay.status, 'denied');
-  assert.equal(replay.denial.reason, 'no-candidate-transition');
+  assert.equal(replay.status, 'admitted', 'the replay is answered from the committed admission history');
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(replay.turnAdmission.turnId, expectedTurnId(CALLBACK_SOURCE));
   const after = await rt.getSnapshot(TARGET);
   assert.equal(after.stateRevision, revision, 'terminal state is not doubled');
   assert.equal(after.state.stateKey, 'resumed');
   assert.equal(ports.resourceCalls.length, 1, 'no duplicate effect execution');
+
+  // The replay heals the lost disposition observation: a THIRD delivery
+  // now replays from the healed record itself.
+  const third = await rt.submitOccurrence(callbackRequest('submitResume', CALLBACK_SOURCE, 'ctrl:callback:corr-1:1'));
+  assert.equal(third.status, 'admitted');
+  assert.equal(third.idempotentReplay, true);
+  assert.equal((await rt.getSnapshot(TARGET)).stateRevision, revision, 'still not doubled');
+  assert.equal(ports.resourceCalls.length, 1, 'still no duplicate effect execution');
 });

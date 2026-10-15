@@ -83,10 +83,14 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // control turn seam — strictTurnSource + occurrenceTurnOf at every turn-id
 // derivation site + K-owned turn dispositions (S bytes unchanged); all
 // FR02/FR07 oracle rows re-run unchanged below.
+// K_BLOB_PIN_REBOUND_AFTER_1066_R1_P1B: #1066 R1 P1-B — bounded same-CAS
+// non-message turn admission history inside the instance state CAS +
+// history-replay of a lost turn disposition (S bytes unchanged); all
+// FR02/FR07 oracle rows re-run unchanged below.
 // The physical selected-path tests seal the current payload bytes.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = 'f1ee9028aba653fb2cbb2252fada4097a80bc19b';
+const V08_K_BLOB = '9ad22c3eb1fdf783887d056d730faa69fd3907c3';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

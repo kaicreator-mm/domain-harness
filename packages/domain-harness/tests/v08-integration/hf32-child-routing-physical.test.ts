@@ -23,10 +23,14 @@
  * addressing; the child terminal routes to its parent exactly once with
  * durable accepted/rejected/terminal truth.
  *
- * N legs: a PERMANENT rejection (sealed Business role gate) commits
- * durably BEFORE route selection (rejected_routed) and the rejected
- * invocation is NEVER retried (typed refusal, never transient); duplicate
- * child terminals and target substitutions cannot double any effect.
+ * N legs: a PERMANENT rejection commits durably BEFORE route selection
+ * (rejected_routed) and the rejected invocation is NEVER retried (typed
+ * refusal, never transient); duplicate child terminals and target
+ * substitutions cannot double any effect. [#1066 R1 P1-A] a principal
+ * without the child-intent Business role is refused BEFORE any durable
+ * allocation, and an unauthorized outsider can neither poison a child
+ * terminal nor allocate an invocation — the authorized terminal still
+ * routes exactly once.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -61,6 +65,7 @@ let handle: TrustedHostHandle;
 let gateway: KernelGateway;
 let operator: HostCredential;
 let requester: HostCredential;
+let outsider: HostCredential;
 const ledgerCalls: { operation: string; payload: Record<string, unknown> }[] = [];
 
 function component(value: string): string {
@@ -137,6 +142,7 @@ before(async () => {
   await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'] });
   operator = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
   requester = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
+  outsider = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 'out', roles: ['observer-only'], audience: AUDIENCE, grantId: 'g-out' });
 });
 
 after(async () => {
@@ -170,8 +176,8 @@ async function assertRefused(promise: Promise<unknown>, code: string): Promise<v
   });
 }
 
-function sendChild(parentKey: string, childKey: string, childIntentType: string, input?: unknown, invocationOrdinal?: number): Promise<unknown> {
-  return gateway.sendChildMessage(requester, {
+function sendChildAs(credential: HostCredential, parentKey: string, childKey: string, childIntentType: string, input?: unknown, invocationOrdinal?: number): Promise<unknown> {
+  return gateway.sendChildMessage(credential, {
     appId: APP_ID,
     parentInstanceKey: parentKey,
     childInstanceKey: childKey,
@@ -183,8 +189,12 @@ function sendChild(parentKey: string, childKey: string, childIntentType: string,
   });
 }
 
-function deliverTerminal(parentKey: string, childKey: string, ordinal: number, terminalKind: 'done' | 'error', input?: unknown): Promise<unknown> {
-  return gateway.deliverChildTerminal(requester, {
+function sendChild(parentKey: string, childKey: string, childIntentType: string, input?: unknown, invocationOrdinal?: number): Promise<unknown> {
+  return sendChildAs(requester, parentKey, childKey, childIntentType, input, invocationOrdinal);
+}
+
+function deliverTerminalAs(credential: HostCredential, parentKey: string, childKey: string, ordinal: number, terminalKind: 'done' | 'error', input?: unknown): Promise<unknown> {
+  return gateway.deliverChildTerminal(credential, {
     appId: APP_ID,
     parentInstanceKey: parentKey,
     childInstanceKey: childKey,
@@ -192,6 +202,10 @@ function deliverTerminal(parentKey: string, childKey: string, ordinal: number, t
     terminalKind,
     ...(input === undefined ? {} : { input }),
   });
+}
+
+function deliverTerminal(parentKey: string, childKey: string, ordinal: number, terminalKind: 'done' | 'error', input?: unknown): Promise<unknown> {
+  return deliverTerminalAs(requester, parentKey, childKey, ordinal, terminalKind, input);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,39 +302,90 @@ test('HF32-N re-sending a settled invocation refuses typed (never re-opened)', a
 // is NEVER misclassified as transient / retried
 // ---------------------------------------------------------------------------
 
-test('HF32-N a permanent child rejection (sealed role gate) settles durably rejected_routed and is never retried', async () => {
+test('HF32-N [#1066 R1 P1-A] a principal without the child-intent Business role is refused BEFORE any durable allocation; the durable-rejection truth stays for submission-time refusals', async () => {
   await startWaiting('hf32-p3', 'm-p3-start');
   await activate('hf32-p3c');
   const ledgerBefore = ledgerCalls.length;
 
   // runChildTaskRestricted admits ONLY role child-worker — the requester's
-  // submission is PERMANENTLY refused at the sealed Business gate.
-  const rejected = await sendChild('hf32-p3', 'hf32-p3c', 'runChildTaskRestricted', { amount: 5 }) as {
+  // send is refused at the Host boundary BEFORE the invocation record is
+  // allocated (the settlement-before-authorization root is closed: an
+  // unauthorized principal allocates nothing durable).
+  await assertRefused(sendChild('hf32-p3', 'hf32-p3c', 'runChildTaskRestricted', { amount: 5 }), 'HOST_CONTROL_ROLE_DENIED');
+  const allocated = await gateway.queryChildInvocation(requester, {
+    appId: APP_ID, parentInstanceKey: 'hf32-p3', childInstanceKey: 'hf32-p3c', invocationOrdinal: 1,
+  }) as unknown;
+  assert.equal(allocated, null, 'no durable invocation record was allocated for the unauthorized send');
+  assert.equal((await stateOf('hf32-p3c')).stateKey, 'review', 'the child state was never touched');
+  assert.equal(ledgerCalls.length, ledgerBefore, 'zero effects for the refused send');
+
+  // The PERMANENT durable-rejection truth (all-or-durable-rejection) still
+  // commits for a submission-time refusal that cannot be predicted at the
+  // Host boundary: the child instance does not exist.
+  const rejected = await sendChild('hf32-p3', 'hf32-nochild', 'runChildTask', { amount: 5 }) as {
     status: string;
     invocation: { status: string; rejection?: { code?: string } };
     rejection: { code: string };
   };
   assert.equal(rejected.status, 'rejected_routed');
   assert.equal(rejected.invocation.status, 'rejected');
-  assert.equal(rejected.rejection.code, 'PRINCIPAL_ROLE_NOT_BOUND');
-  const child = await stateOf('hf32-p3c');
-  assert.equal(child.stateKey, 'review', 'the child state was never touched');
-  assert.equal(ledgerCalls.length, ledgerBefore, 'zero effects for the rejected send');
-
-  // The durable rejection truth is persisted BEFORE any route selection.
+  assert.equal(rejected.rejection.code, 'WORKFLOW_INSTANCE_NOT_FOUND');
   const record = await gateway.queryChildInvocation(requester, {
-    appId: APP_ID, parentInstanceKey: 'hf32-p3', childInstanceKey: 'hf32-p3c', invocationOrdinal: 1,
+    appId: APP_ID, parentInstanceKey: 'hf32-p3', childInstanceKey: 'hf32-nochild', invocationOrdinal: 1,
   }) as { status: string; rejection?: { code?: string } };
   assert.equal(record.status, 'rejected');
-  assert.equal(record.rejection?.code, 'PRINCIPAL_ROLE_NOT_BOUND');
+  assert.equal(record.rejection?.code, 'WORKFLOW_INSTANCE_NOT_FOUND');
 
   // The rejected invocation is NEVER retried: a typed refusal, never a
   // transient re-send loop.
-  await assertRefused(sendChild('hf32-p3', 'hf32-p3c', 'runChildTaskRestricted', { amount: 5 }, 1), 'CHILD_INVOCATION_REJECTED');
+  await assertRefused(sendChild('hf32-p3', 'hf32-nochild', 'runChildTask', { amount: 5 }, 1), 'CHILD_INVOCATION_REJECTED');
   assert.equal(ledgerCalls.length, ledgerBefore, 'still zero effects');
   assert.equal((await stateOf('hf32-p3c')).stateKey, 'review');
 
   // A terminal on the rejected invocation refuses typed as well.
-  await assertRefused(deliverTerminal('hf32-p3', 'hf32-p3c', 1, 'done', { amount: 7 }), 'CHILD_INVOCATION_NOT_ACCEPTED');
+  await assertRefused(deliverTerminal('hf32-p3', 'hf32-nochild', 1, 'done', { amount: 7 }), 'CHILD_INVOCATION_NOT_ACCEPTED');
   assert.equal(ledgerCalls.length, ledgerBefore);
+});
+
+test('HF32-N [#1066 R1 P1-A] an unauthorized outsider cannot poison a child terminal or allocate a child invocation; the authorized terminal still routes exactly once', async () => {
+  await startWaiting('hf32-p5', 'm-p5-start');
+  await activate('hf32-p5c');
+  const sent = await sendChild('hf32-p5', 'hf32-p5c', 'runChildTask', { amount: 5 }) as { status: string };
+  assert.equal(sent.status, 'accepted');
+  const before = await stateOf('hf32-p5');
+  const ledgerBefore = ledgerCalls.length;
+
+  // The outsider terminal delivery is refused BEFORE the settlement CAS —
+  // the invocation is not poisoned and no outsider input is durably stored.
+  await assertRefused(deliverTerminalAs(outsider, 'hf32-p5', 'hf32-p5c', 1, 'done', { amount: 999, evil: true }), 'HOST_CONTROL_ROLE_DENIED');
+  const notPoisoned = await gateway.queryChildInvocation(requester, {
+    appId: APP_ID, parentInstanceKey: 'hf32-p5', childInstanceKey: 'hf32-p5c', invocationOrdinal: 1,
+  }) as { status: string; terminal?: unknown };
+  assert.equal(notPoisoned.status, 'accepted', 'the invocation is still accepted — no outsider terminal was committed');
+  assert.equal(notPoisoned.terminal, undefined, 'no outsider terminal input was durably stored');
+  assert.equal((await stateOf('hf32-p5')).stateRevision, before.stateRevision, 'the refused terminal moved no state');
+  assert.equal(ledgerCalls.length, ledgerBefore, 'the refused terminal dispatched no effect');
+
+  // The authorized terminal still routes to the parent exactly once — the
+  // pre-CAS gate did not break the legitimate routing path.
+  const terminal = await deliverTerminal('hf32-p5', 'hf32-p5c', 1, 'done', { amount: 7 }) as {
+    status: string;
+    receipt: { admitted: { durableControlTurnId: string }; instance: { state: { stateKey: string } } };
+  };
+  assert.equal(terminal.status, 'accepted');
+  assert.equal(terminal.receipt.admitted.durableControlTurnId, expectedTerminalTurnId('hf32-p5', 'hf32-p5c', 1, 'done'));
+  assert.equal(terminal.receipt.instance.state.stateKey, 'childOk', 'the parent routed the authorized done terminal');
+  assert.equal(ledgerCalls.length - ledgerBefore, 1, 'exactly one parent effect');
+
+  // The outsider child SEND is refused BEFORE the durable ordinal is
+  // allocated — an unauthorized principal cannot even create the record a
+  // later privileged caller would act on.
+  await startWaiting('hf32-p6', 'm-p6-start');
+  await activate('hf32-p6c');
+  await assertRefused(sendChildAs(outsider, 'hf32-p6', 'hf32-p6c', 'runChildTask', { amount: 5 }), 'HOST_CONTROL_ROLE_DENIED');
+  const allocated = await gateway.queryChildInvocation(requester, {
+    appId: APP_ID, parentInstanceKey: 'hf32-p6', childInstanceKey: 'hf32-p6c', invocationOrdinal: 1,
+  }) as unknown;
+  assert.equal(allocated, null, 'no durable invocation record was allocated for the outsider send');
+  assert.equal(ledgerCalls.length - ledgerBefore, 1, 'still exactly one effect — only the authorized terminal ran');
 });

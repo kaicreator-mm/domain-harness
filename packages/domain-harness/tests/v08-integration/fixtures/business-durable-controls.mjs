@@ -8,6 +8,11 @@
  *   HF18 — external work on instance 'waiting':
  *     resumeFromCallback  (callback turn)  waiting → resumed   (+reserve)
  *     timeOutOnDeadline   (timer turn)     waiting → timedOut  (+reserve)
+ *     pingFromCallback    (callback turn)  waiting → progressing →
+ *                            progressing (LEGAL SELF-LOOP) — drives the
+ *                            [#1066 R1 P1-B] crash-window negative where a
+ *                            re-submitted turn is business-legal and only
+ *                            the protocol-level turn identity can refuse it
  *   HF32 — child invocation:
  *     runChildTask        (child message)  review  → taskDone  (+reserve)
  *     runChildTaskRestricted (role-gated: ONLY child-worker may run it —
@@ -34,6 +39,7 @@ export const INTENT_TYPES = [
   'submitStart',
   'resumeFromCallback',
   'timeOutOnDeadline',
+  'pingFromCallback',
   'runChildTask',
   'runChildTaskRestricted',
   'onChildDone',
@@ -115,6 +121,30 @@ function makeDefinition({ dynamicResume } = { dynamicResume: false }) {
             guardId: 'guard:always',
             effectIntents: [],
           },
+          {
+            // [#1066 R1 P1-B] The LEGAL SELF-LOOP entry: the same callback
+            // trigger that begins progress also re-admits from 'progressing'
+            // — the crash-replay duplicate a protocol-level turn identity
+            // must refuse, where business-state refusals ('resumed' is
+            // final) would only mask it.
+            transitionKey: 'begin-progress',
+            trigger: { kind: 'event', eventType: 'CALLBACK_PROGRESS' },
+            targetState: 'progressing',
+            guardId: 'guard:always',
+            effectIntents: [{ effectType: 'effect:reserve', input: { reservation: 'progress' }, idempotencyKey: 'reserve:progress:1' }],
+          },
+        ],
+      },
+      {
+        stateKey: 'progressing',
+        transitions: [
+          {
+            transitionKey: 'progress-again',
+            trigger: { kind: 'event', eventType: 'CALLBACK_PROGRESS' },
+            targetState: 'progressing',
+            guardId: 'guard:always',
+            effectIntents: [{ effectType: 'effect:reserve', input: { reservation: 'progress' }, idempotencyKey: 'reserve:progress:1' }],
+          },
         ],
       },
       { stateKey: 'resumed', kind: 'final' },
@@ -154,6 +184,7 @@ export function getPolicy() {
       'rule:start': { ruleId: 'rule:start', eventType: 'WORK_STARTED', payloadFromInput: { amount: 'amount' } },
       'rule:resume': { ruleId: 'rule:resume', eventType: 'CALLBACK_RESUMED', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },
       'rule:timeout': { ruleId: 'rule:timeout', eventType: 'DEADLINE_TIMED_OUT' },
+      'rule:progress': { ruleId: 'rule:progress', eventType: 'CALLBACK_PROGRESS', payloadFromInput: { amount: 'amount', requestId: 'requestId' } },
       'rule:child-task': { ruleId: 'rule:child-task', eventType: 'CHILD_TASK', payloadFromInput: { amount: 'amount' } },
       'rule:child-done': { ruleId: 'rule:child-done', eventType: 'CHILD_DONE', payloadFromInput: { amount: 'amount' } },
       'rule:child-error': { ruleId: 'rule:child-error', eventType: 'CHILD_ERROR', payloadFromInput: { reason: 'reason' } },
@@ -162,6 +193,7 @@ export function getPolicy() {
       submitStart: { trigger: { kind: 'event', eventType: 'WORK_STARTED' }, ruleId: 'rule:start', roles: ['requester'] },
       resumeFromCallback: { trigger: { kind: 'event', eventType: 'CALLBACK_RESUMED' }, ruleId: 'rule:resume', roles: ['requester'], definition: resumeDefinition },
       timeOutOnDeadline: { trigger: { kind: 'event', eventType: 'DEADLINE_TIMED_OUT' }, ruleId: 'rule:timeout', roles: ['requester'] },
+      pingFromCallback: { trigger: { kind: 'event', eventType: 'CALLBACK_PROGRESS' }, ruleId: 'rule:progress', roles: ['requester'] },
       runChildTask: { trigger: { kind: 'event', eventType: 'CHILD_TASK' }, ruleId: 'rule:child-task', roles: ['requester'] },
       runChildTaskRestricted: { trigger: { kind: 'event', eventType: 'CHILD_TASK' }, ruleId: 'rule:child-task', roles: ['child-worker'] },
       onChildDone: { trigger: { kind: 'event', eventType: 'CHILD_DONE' }, ruleId: 'rule:child-done', roles: ['requester'] },

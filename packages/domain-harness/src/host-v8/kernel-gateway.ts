@@ -589,6 +589,26 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
     }
   }
 
+  /**
+   * [#1066 R1 P1-A] Pre-CAS Business-intent authority for durable-control
+   * settlements: the SAME role predicate protected `submitAs` enforces
+   * (the sealed Business intent binding roles ∩ the issuer-signed
+   * principal roles), checked BEFORE any durable record is settled. An
+   * unauthorized principal can neither persist a terminal/callback payload
+   * nor leave one behind for a privileged recovery to execute under its
+   * own authority; legitimate requester deliveries (the roles the sealed
+   * binding itself admits, including role-less intents) are unaffected —
+   * this is NOT a blanket platform-operator requirement.
+   */
+  function requireIntentRole(app: RegisteredApp, principal: HostPrincipal, intentType: string): void {
+    if (!app.ops.roleAdmitted(principal, intentType)) {
+      throw new HostBoundaryError(
+        'HOST_CONTROL_ROLE_DENIED',
+        `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles required by intent ${intentType} of app ${app.appId}; the durable settlement is refused before any mutation`,
+      );
+    }
+  }
+
   function requireDurableStorage(): void {
     if (host.storageMode !== 'physical') {
       throw new HostBoundaryError(
@@ -1316,6 +1336,23 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
       const app = requireApp(request.appId, principal);
       requireDurableStorage();
+      // [#1066 R1 P1-A] Pre-CAS Business-intent authority. The settlement
+      // intent is decided deterministically from the SAME receivedAt the
+      // settlement will use (a late callback converts to the timeout turn
+      // exactly like settleCallback itself decides), so the role checked
+      // here can never diverge from the intent the settled turn submits.
+      // A record that is not 'waiting' can no longer settle anything (the
+      // only persisting CAS transition is waiting→settled), so its typed
+      // duplicate/late outcomes need no authority — they mutate nothing.
+      const receivedAt = new Date().toISOString();
+      const current = await externalWork.read(request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId);
+      if (current.status === 'waiting') {
+        requireIntentRole(
+          app,
+          principal,
+          Date.parse(receivedAt) >= Date.parse(current.dueAt) ? current.timeoutIntentType : current.callbackIntentType,
+        );
+      }
       const outcome = await externalWork.settleCallback({
         appId: request.appId,
         tenantId: principal.tenantId,
@@ -1323,7 +1360,7 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         externalCorrelationId: request.externalCorrelationId,
         callbackOrdinal: request.callbackOrdinal,
         payload: request.payload === undefined ? null : request.payload,
-        receivedAt: new Date().toISOString(),
+        receivedAt,
       });
       if (outcome.disposition !== 'accepted') {
         // Typed duplicate/late/ignored outcome: ZERO Kernel activity.
@@ -1367,6 +1404,18 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       const app = requireApp(request.appId, principal);
       requireControlRole(app, principal);
       requireDurableStorage();
+      // [#1066 R1 P1-A] Same pre-CAS Business-intent authority as the
+      // callback settlement: the deadline timer turn submits the sealed
+      // timeout intent, and the firing principal must be one that intent
+      // itself admits — before the settlement CAS persists the turn. A
+      // record that is not 'waiting' can no longer settle anything, so its
+      // typed duplicate outcomes need no authority.
+      const deadlineRecord = await externalWork.read(
+        request.appId, principal.tenantId, request.instanceKey, request.externalCorrelationId,
+      );
+      if (deadlineRecord.status === 'waiting') {
+        requireIntentRole(app, principal, deadlineRecord.timeoutIntentType);
+      }
       const outcome = await externalWork.settleDeadline({
         appId: request.appId,
         tenantId: principal.tenantId,
@@ -1467,6 +1516,11 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       const app = requireApp(request.appId, principal);
       requireDurableStorage();
       requireBoundIntents(app, [request.childIntentType, request.doneIntentType, request.errorIntentType]);
+      // [#1066 R1 P1-A] Child-intent authority BEFORE the durable ordinal
+      // is allocated — a principal the sealed child intent does not admit
+      // allocates nothing durable (the settlement-before-authorization
+      // root is closed at allocation too).
+      requireIntentRole(app, principal, request.childIntentType);
       const opened = await childInvocations.open({
         appId: request.appId,
         tenantId: principal.tenantId,
@@ -1552,6 +1606,17 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
       const app = requireApp(request.appId, principal);
       requireDurableStorage();
+      // [#1066 R1 P1-A] Parent-intent authority BEFORE the terminal
+      // settlement CAS: only an 'accepted' invocation can settle (every
+      // other status refuses typed with zero mutation), and the settling
+      // principal must be one the sealed done/error intent itself admits —
+      // an unauthorized caller can no longer durably poison the terminal.
+      const addressed = await childInvocations.peek(
+        request.appId, principal.tenantId, request.parentInstanceKey, request.childInstanceKey, request.invocationOrdinal,
+      );
+      if (addressed !== null && addressed.status === 'accepted') {
+        requireIntentRole(app, principal, request.terminalKind === 'done' ? addressed.doneIntentType : addressed.errorIntentType);
+      }
       const outcome = await childInvocations.settleTerminal({
         appId: request.appId,
         tenantId: principal.tenantId,

@@ -312,7 +312,7 @@ test('HF18-N a misbound target (wrong instance) answers typed UNKNOWN_EXTERNAL_C
   assert.equal(ledgerCalls.length, ledgerBefore);
 });
 
-test('HF18-N an unprivileged principal cannot register work and its delivery is denied with zero effect; recovery heals exactly once', async () => {
+test('HF18-N [#1066 R1 P1-A] an unauthorized outsider cannot settle/poison a callback and privileged recovery never executes its payload; the legitimate requester still works', async () => {
   await startWaiting('hf18-e', 'm-start-e');
   await assertRefused(gateway.registerExternalWork(outsider, {
     appId: APP_ID, instanceKey: 'hf18-e',
@@ -322,27 +322,45 @@ test('HF18-N an unprivileged principal cannot register work and its delivery is 
   }), 'HOST_CONTROL_ROLE_DENIED');
   await registerWork('hf18-e', 'corr-e', 'timer-e', new Date(Date.now() + 60 * 60 * 1000).toISOString());
   const ledgerBefore = ledgerCalls.length;
-  // The record SETTLES (single CAS winner) but the Kernel turn is denied at
-  // the sealed Business role gate — zero state/effect activity.
+
+  // The outsider delivery is refused at the Host boundary BEFORE the
+  // settlement CAS — the sealed Business intent role gate now runs
+  // pre-persistence, so NOTHING of the outsider's is durably stored.
   await assertRefused(gateway.acceptExternalCallback(outsider, {
     appId: APP_ID, instanceKey: 'hf18-e', externalCorrelationId: 'corr-e',
     callbackOrdinal: 1, payload: { amount: 6, requestId: 'r-e-1' },
-  }), 'PRINCIPAL_ROLE_NOT_BOUND');
-  assert.equal(ledgerCalls.length, ledgerBefore, 'zero effects for the denied delivery');
-  assert.equal((await stateOf('hf18-e')).stateKey, 'waiting', 'the denied delivery moved no state');
+  }), 'HOST_CONTROL_ROLE_DENIED');
+  const notPoisoned = await gateway.queryExternalWork(requester, {
+    appId: APP_ID, instanceKey: 'hf18-e', externalCorrelationId: 'corr-e',
+  }) as { status: string; terminalSource?: unknown };
+  assert.equal(notPoisoned.status, 'waiting', 'the outsider delivery settled nothing — the correlation is not poisoned');
+  assert.equal(notPoisoned.terminalSource, undefined, 'no outsider payload was durably stored');
+  assert.equal((await stateOf('hf18-e')).stateKey, 'waiting', 'the refused delivery moved no state');
+  assert.equal(ledgerCalls.length, ledgerBefore, 'zero effects for the refused delivery');
 
-  // Recovery heal: an authorized control principal re-submits the STORED
-  // terminal source — the turn runs EXACTLY once, and a second recovery
-  // pass re-submits nothing (idempotent, zero doubled effect).
-  const healed = await gateway.recoverDurableControls(operator, { appId: APP_ID }) as { status: string; fired: number; healed: number };
-  assert.equal(healed.status, 'recovered');
-  assert.ok(healed.healed >= 1, `at least the settled-unsubmitted correlation was healed (got ${String(healed.healed)})`);
-  assert.equal((await stateOf('hf18-e')).stateKey, 'resumed', 'the healed turn committed the terminal state');
-  const ledgerAfterHeal = ledgerCalls.length;
-  assert.equal(ledgerAfterHeal - ledgerBefore, 1, 'exactly one effect across delivery + heal');
+  // Privileged recovery cannot launder the outsider payload: with nothing
+  // settled by an unauthorized principal, recovery finds nothing to execute.
+  const recovered = await gateway.recoverDurableControls(operator, { appId: APP_ID }) as { status: string; healed: number };
+  assert.equal(recovered.status, 'recovered');
+  assert.equal(recovered.healed, 0, 'no settled-unsubmitted correlation exists for recovery to heal');
+  assert.equal(ledgerCalls.length, ledgerBefore, 'recovery executed zero effects — no outsider payload');
+  assert.equal((await stateOf('hf18-e')).stateKey, 'waiting', 'recovery moved no state');
+
+  // The legitimately authorized requester still delivers the bound callback
+  // (the pre-CAS gate must not degrade into a blanket operator requirement).
+  const outcome = await gateway.acceptExternalCallback(requester, {
+    appId: APP_ID, instanceKey: 'hf18-e', externalCorrelationId: 'corr-e',
+    callbackOrdinal: 1, payload: { amount: 6, requestId: 'r-e-1' },
+  }) as { status: string; receipt: { status: string } };
+  assert.equal(outcome.status, 'accepted');
+  assert.equal(outcome.receipt.status, 'admitted');
+  assert.equal(ledgerCalls.length - ledgerBefore, 1, 'exactly one effect for the legitimate delivery');
+  assert.equal((await stateOf('hf18-e')).stateKey, 'resumed');
+
+  // A later recovery pass re-submits nothing (the heal marker stands).
   const again = await gateway.recoverDurableControls(operator, { appId: APP_ID }) as { healed: number };
   assert.equal(again.healed, 0, 'the submittedTurn marker prevents re-submission');
-  assert.equal(ledgerCalls.length, ledgerAfterHeal, 'no doubled effect from the second recovery');
+  assert.equal(ledgerCalls.length - ledgerBefore, 1, 'no doubled effect from the later recovery');
 });
 
 // ---------------------------------------------------------------------------
@@ -373,6 +391,44 @@ test('HF18-N SQLite crash-window injection: failed turn-disposition create repor
   assert.equal(result.stateAfterRecovery, 'resumed');
   assert.equal(result.revisionAfterDuplicate, result.revision, 'the terminal state was not doubled');
   assert.equal(result.ledgerCalls, 1, 'no duplicate effect anywhere');
+});
+
+// ---------------------------------------------------------------------------
+// [#1066 R1 P1-B] The REAL crash boundary: the authoritative state CAS (and
+// its same-CAS turn-admission history) committed, but BOTH the independent
+// K turn-disposition record AND the Host submittedTurn marker are absent —
+// exactly the window a process death between the state commit and the
+// post-commit observations leaves behind. Durable Host recovery re-submits
+// the SAME non-message turn; the Kernel must recognize its own committed
+// admission and answer ONE State / ONE Journal / ONE Effect — never a
+// second state revision, never a duplicated logical admission.
+// ---------------------------------------------------------------------------
+
+test('HF18-N [#1066 R1 P1-B] crash window with disposition AND marker absent: recovery replays the SAME turn with exactly ONE State/Journal/Effect', async () => {
+  const dbPath = sqliteTempPath('hf18crash');
+  const result = await runChild('crash', [rootFile, dbPath, 'hf18-z', 'corr-z', '4', 'r-z-1']);
+  // The crash boundary itself: the turn was authoritatively admitted, the
+  // marker write failed honestly, and both post-commit observations are
+  // physically absent from the SQLite store before recovery runs. The
+  // correlation binds pingFromCallback — a LEGAL SELF-LOOP from
+  // 'progressing' — so a protocol-level gap cannot hide behind a
+  // business-state refusal.
+  assert.equal(result.deliveryErrorCode, 'HOST_STORE_INJECTED_FAILURE', 'the marker write failed honestly (the injected crash boundary)');
+  assert.equal(result.state, 'progressing', 'the authoritative state CAS committed');
+  assert.equal(result.dispositionRecordedBeforeRecovery, false, 'the K turn-disposition record is absent (crash window)');
+  assert.equal(result.markerBeforeRecovery, false, 'the Host submittedTurn marker is absent too');
+  assert.equal(result.journalRecordsBeforeRecovery, 1, 'exactly ONE effect-journal record for the turn');
+  assert.equal(result.ledgerCalls, 1, 'the effect executed exactly once');
+  // Recovery re-submits the settled-unsubmitted turn — and NOTHING doubles.
+  assert.ok(typeof result.recoveryHealed === 'number' && result.recoveryHealed >= 1, `the recovery re-submitted the settled-unsubmitted turn (got ${String(result.recoveryHealed)})`);
+  assert.equal(result.stateAfterRecovery, 'progressing', 'the state stays the same truth');
+  assert.equal(result.revisionAfterRecovery, result.revision, 'NO second state revision — the re-submitted turn was recognized as already admitted');
+  assert.equal(result.journalRecordsAfterRecovery, 1, 'still exactly ONE effect-journal record');
+  assert.equal(result.ledgerAfterRecovery, 1, 'still exactly ONE effect execution');
+  assert.equal(result.dispositionHealedByRecovery, true, 'the lost disposition observation was healed by the replay');
+  assert.equal(result.markerAfterRecovery, true, 'the heal marker was written after the replay');
+  assert.equal(result.secondRecoveryHealed, 0, 'a second recovery pass heals nothing');
+  assert.equal(result.ledgerAfterSecondRecovery, 1, 'still exactly ONE effect execution after the second pass');
 });
 
 test('HF18-P-RESTART a fresh process reopens the physical store and delivers the bound callback exactly once', async () => {
