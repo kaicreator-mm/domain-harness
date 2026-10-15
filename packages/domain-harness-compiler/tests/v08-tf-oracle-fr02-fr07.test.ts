@@ -100,7 +100,7 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // source (strictTurnSource admits kind:'recovery'); S bytes unchanged.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = '9d2ea465b23f01404703ae52b403cb5cc9755d19';
+const V08_K_BLOB = 'e9b35fa11ee74fd2b8e97c2b68584e49bc070629';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

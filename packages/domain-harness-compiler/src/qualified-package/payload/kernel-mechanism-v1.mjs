@@ -1263,6 +1263,24 @@ export async function admitCentralDecision(request, ports) {
     });
   }
 
+  // [#1006 HF21] Production Effect/Journal authority gate: an admitted turn
+  // that would mint durable production effects requires the occurrence's
+  // exact PRODUCTION runtime authority class. A SIMULATION pin refuses typed
+  // HERE — after authorized transition admission, BEFORE any journal write or
+  // effect dispatch — leaving zero physical Effect. The gate is consumed from
+  // the governance port (the ONE pin authority); a port that cannot express
+  // production effect authority fails closed, never open.
+  if (effectIntents.length > 0) {
+    const requireProductionEffectAuthority = ports.governance?.requireProductionEffectAuthority;
+    if (typeof requireProductionEffectAuthority !== 'function') {
+      throw new CentralAdmissionError(
+        'AUTHORITY_CLASS_FORBIDDEN',
+        'the governance port carries no production effect authority gate; an effect-bearing admission fails closed',
+      );
+    }
+    await requireProductionEffectAuthority.call(ports.governance, request.workflowInstanceId);
+  }
+
   const effects = await executeEffectIntents(
     effectIntents,
     request,
@@ -2695,6 +2713,42 @@ function pinDocKey(workflowInstanceId) {
 }
 
 // ===========================================================================
+// [#1006 HF21] Selected K SIM/PROD effect authority separation. The runtime
+// authority class is an EXPLICIT activation-plane fact bound at instance
+// Genesis (the v0.7 T002D #655/#688 semantic reference ported to the selected
+// physical K/S/B path): the SAME sealed closure may back PRODUCTION and
+// SIMULATION instances, no Definition/policy identity ever implies a class,
+// and the class is woven into the ONE existing KernelGovernancePinStore
+// bindingDigest — never a second pin/currentness plane, never a parallel
+// authority registry, never a GitHub execution-identity check. A SIMULATION
+// pin can never mint authoritative production Effect/Journal; a forged or
+// substituted class fails typed before any production Effect/Journal; the
+// class persists across CAS/restart/replay because the pin doc is the same
+// physical durable record. Pins activated without a class keep the exact
+// legacy (pre-HF21) digest material — the historical classless compatibility
+// boundary — and can never be newly minted, upgraded or downgraded through
+// this seam (bind-once conflict discipline below).
+// ===========================================================================
+
+const PRODUCTION_AUTHORITY_CLASS = 'PRODUCTION';
+const SIMULATION_AUTHORITY_CLASS = 'SIMULATION';
+
+/**
+ * [#1006 HF21] The class is exactly `PRODUCTION` or `SIMULATION` — never a
+ * floating selector, alias, derived/implicit value or a third class. Anything
+ * else fails typed AUTHORITY_CLASS_FORBIDDEN before any durable pin write.
+ */
+export function requireRuntimeAuthorityClass(value, field) {
+  if (value !== PRODUCTION_AUTHORITY_CLASS && value !== SIMULATION_AUTHORITY_CLASS) {
+    throw new GovernanceExecutionBindingError(
+      'AUTHORITY_CLASS_FORBIDDEN',
+      `${field} must be exactly 'PRODUCTION' or 'SIMULATION'; ${JSON.stringify(value)} is forbidden`,
+    );
+  }
+  return value;
+}
+
+// ===========================================================================
 // [#1003 NF06] K-owned decision-receipt records (OBSERVATIONAL_OPTIONAL).
 // One durable data-only record per EXACT durable control turn, created
 // through the Host true-CAS port (mustBeAbsent — create-or-conflict, never
@@ -2828,17 +2882,38 @@ export class KernelGovernancePinStore {
     this.#moduleSha256 = moduleSha256;
   }
 
-  async bindPin({ workflowInstanceId, governanceBaseline }) {
-    assertGovernanceBaselineIdentity(governanceBaseline);
-    const bindingDigest = await computeCanonicalJsonDigest(
+  /**
+   * [#1006 HF21] The ONE binding-digest material: the exact pre-HF21 tuple,
+   * plus the runtime authority class IFF the activation supplied one. A
+   * classless activation keeps the byte-identical legacy material; a
+   * class-bearing activation can never be re-forged into another class (or
+   * stripped to classless) without changing this digest.
+   */
+  async #computeBindingDigest(workflowInstanceId, governanceBaseline, authorityClass) {
+    return computeCanonicalJsonDigest(
       {
         workflowInstanceId,
         governanceBaseline: governanceBaselineKey(governanceBaseline),
         kernelModuleSha256: this.#moduleSha256,
+        ...(authorityClass === undefined ? {} : { authorityClass }),
       },
       this.#sha256,
     );
-    const pin = { workflowInstanceId, governanceBaseline, bindingDigest, kernelModuleSha256: this.#moduleSha256 };
+  }
+
+  async bindPin({ workflowInstanceId, governanceBaseline, authorityClass }) {
+    assertGovernanceBaselineIdentity(governanceBaseline);
+    if (authorityClass !== undefined) {
+      requireRuntimeAuthorityClass(authorityClass, 'authorityClass');
+    }
+    const bindingDigest = await this.#computeBindingDigest(workflowInstanceId, governanceBaseline, authorityClass);
+    const pin = {
+      workflowInstanceId,
+      governanceBaseline,
+      bindingDigest,
+      kernelModuleSha256: this.#moduleSha256,
+      ...(authorityClass === undefined ? {} : { authorityClass }),
+    };
     const existing = await this.#docs.get(pinDocKey(workflowInstanceId));
     if (existing !== null) {
       if (canonicalJsonStringify(existing.value) !== canonicalJsonStringify(pin)) {
@@ -2866,6 +2941,47 @@ export class KernelGovernancePinStore {
       throw new GovernanceExecutionBindingError(
         'GOVERNANCE_EXECUTION_PIN_CONFLICT',
         `workflow instance ${workflowInstanceId} is pinned to kernel module ${pin.kernelModuleSha256} which is unavailable under the loaded kernel module ${this.#moduleSha256}; typed code unavailability — no silent cross-version replay`,
+      );
+    }
+    // [#1006 HF21] Re-prove the stored authority tuple: the bindingDigest is
+    // recomputed from the stored fields (class included when present) and any
+    // divergence — a re-forged/substituted/stripped authority class above all
+    // — refuses typed here, BEFORE any admission that could mint production
+    // Effect/Journal. Durable store data is untrusted authority material.
+    if (pin.authorityClass !== undefined) {
+      requireRuntimeAuthorityClass(pin.authorityClass, 'pin.authorityClass');
+    }
+    const expectedDigest = await this.#computeBindingDigest(
+      pin.workflowInstanceId,
+      pin.governanceBaseline,
+      pin.authorityClass,
+    );
+    if (pin.bindingDigest !== expectedDigest) {
+      throw new GovernanceExecutionBindingError(
+        'AUTHORITY_CLASS_MISMATCH',
+        `workflow instance ${workflowInstanceId} carries a GovernanceExecutionPin whose bindingDigest does not match its stored authority tuple; re-forged execution authority refuses typed`,
+      );
+    }
+    return pin;
+  }
+
+  /**
+   * [#1006 HF21] The production Effect/Journal authority gate (the selected-K
+   * port of the v0.7 T002D `requireProductionEffectAuthority` semantic). A
+   * SIMULATION-class occurrence can observe and execute simulation semantics,
+   * but can NEVER mint an authoritative production Effect, Journal record or
+   * publication — the typed refusal happens before any journal write or
+   * effect dispatch. Historical classless pins (pre-HF21 activations) stay on
+   * the documented compatibility boundary and are NOT silently up- or
+   * downgraded here; they can never be re-bound with a class (bind-once
+   * conflict) and remain a reported product-disposition gap, not an authority.
+   */
+  async requireProductionEffectAuthority(workflowInstanceId) {
+    const pin = await this.requirePinnedExecution(workflowInstanceId);
+    if (pin.authorityClass === SIMULATION_AUTHORITY_CLASS) {
+      throw new GovernanceExecutionBindingError(
+        'AUTHORITY_CLASS_MISMATCH',
+        `workflow instance ${workflowInstanceId} is activated under the SIMULATION runtime authority class; a simulation occurrence can never mint authoritative production Effect, Journal or publication`,
       );
     }
     return pin;
@@ -4248,7 +4364,7 @@ export function createOccurrenceRuntime(options) {
     return undefined;
   }
 
-  async function bindGovernance(target) {
+  async function bindGovernance(target, authorityClass) {
     const workflowInstanceId = `${target.workflowId}:${target.instanceKey}`;
     const identity = await computeGovernanceBaselineIdentity({
       domainId: businessEndpoint.domainId,
@@ -4258,7 +4374,9 @@ export function createOccurrenceRuntime(options) {
     }, sha256);
     const body = { identity, semantics: businessEndpoint.governanceSemantics };
     await baselines.putBody(body);
-    await pinStore.bindPin({ workflowInstanceId, governanceBaseline: identity });
+    // [#1006 HF21] The activation-plane runtime authority class rides the ONE
+    // existing pin (woven into bindingDigest; validated exact by the store).
+    await pinStore.bindPin({ workflowInstanceId, governanceBaseline: identity, ...(authorityClass === undefined ? {} : { authorityClass }) });
     return body;
   }
 
@@ -4607,6 +4725,10 @@ export function createOccurrenceRuntime(options) {
 
   async function openInstance(request) {
     const target = request.target;
+    // [#1006 HF21] The authority class reaches the activation boundary ONLY
+    // through the trusted Host genesis seam (provisionGenesis); it is exact-
+    // validated by the pin store before any durable write.
+    const authorityClass = request?.authorityClass;
     const snapshot = await engine.createInstance({
       address: target,
       correlationId: request.correlationId ?? `corr:${target.instanceKey}`,
@@ -4616,7 +4738,7 @@ export function createOccurrenceRuntime(options) {
         context: { ...businessEndpoint.initialContext, ...(request.initialContext ?? {}) },
       },
     });
-    await bindGovernance(target);
+    await bindGovernance(target, authorityClass);
     // [#1063 HF20] Genesis answers with the OUTWARD snapshot: the seeded
     // observation window is internal carrier truth, readable only through
     // the protected mutation-observation read.
@@ -4656,6 +4778,16 @@ export function createOccurrenceRuntime(options) {
   async function submitOccurrenceLatched(request, latch) {
     counters.admissions += 1;
     const target = request.target;
+    // [#1006 HF21] The runtime authority class is activation-plane material
+    // (Genesis pin); a caller-presented class on ANY submit plane — message,
+    // OperationCall or control — is an injected authority claim and refuses
+    // typed here, before any read, admission, Journal or Effect activity.
+    if (hasOwn(request, 'authorityClass')) {
+      throw new CentralAdmissionError(
+        'AUTHORITY_CLASS_FORBIDDEN',
+        'a caller may never present or override the runtime authority class; it is activation-plane material bound once at instance Genesis and woven into the durable GovernanceExecutionPin',
+      );
+    }
     const binding = businessEndpoint.intentBindings[request.intentType];
     if (binding === undefined) {
       throw new CentralAdmissionError(

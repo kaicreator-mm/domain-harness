@@ -224,6 +224,12 @@ export interface V8FacadeKernelOps {
     provisionGenesis(principal: V8GatewayPrincipal, request: {
         readonly instanceKey: string;
         readonly correlationId?: string;
+        /**
+         * [#1006 HF21] The registered closure runtime authority class forwarded
+         * by the trusted gateway (never genesis-caller data); the Kernel weaves
+         * it into the durable GovernanceExecutionPin bindingDigest.
+         */
+        readonly authorityClass?: 'PRODUCTION' | 'SIMULATION';
     }): Promise<unknown>;
     /**
      * #1023 S04: BUILD-fixed OperationCall dispatch on the protected gateway

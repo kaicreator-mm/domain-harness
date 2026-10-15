@@ -1218,9 +1218,13 @@ async function loadScopedFacade(packageRoot) {
             // this seam deliberately forwards NO caller-chosen initial context,
             // and the instance address is the principal's tenant/app-qualified
             // key (per-tenant Genesis by construction).
+            // [#1006 HF21] The runtime authority class is the REGISTERED closure
+            // class forwarded by the trusted gateway (never genesis-caller data);
+            // the Kernel exact-validates and weaves it into the instance pin.
             return runtimeWithOpener.openInstance({
                 target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
                 ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
+                ...(request.authorityClass === undefined ? {} : { authorityClass: request.authorityClass }),
             });
         },
         async invokeOperation(principal, call, control) {
