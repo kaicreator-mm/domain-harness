@@ -735,6 +735,10 @@ const NON_MESSAGE_TURN_SOURCE_FIELDS = {
   timer: ['timerId', 'fireOrdinal'],
   callback: ['externalCorrelationId', 'callbackOrdinal'],
   'child-terminal': ['parentActorId', 'childActorId', 'invocationOrdinal', 'terminalKind'],
+  // [#1006 HF16 authorized poison recovery] The trusted Host seam supplies
+  // the recovery source ONLY from its durable CAS-authorized recovery-action
+  // record; the public send path never constructs one.
+  recovery: ['durableRecoveryActionId', 'resumeOrdinal'],
 };
 
 /**
@@ -746,16 +750,25 @@ const NON_MESSAGE_TURN_SOURCE_FIELDS = {
  * the turn id (`deriveDurableControlTurnId` runs on a probe target), so a
  * turnSource accepted here is byte-deterministically replayable and can never
  * smuggle foreign material into the turn identity.
+ *
+ * [#1006 HF16] `recovery` is admitted here as the corrective poison-recovery
+ * turn source: the Host coordinator's durable CAS-authorized recovery-action
+ * record is the authorization credential, and the derived deterministic turn
+ * id gives duplicate/restart redeliveries the same turn-disposition
+ * idempotence every other durable control turn enjoys. The Kernel's own
+ * fail-closed poison policy is unchanged: a durably failed effect row is
+ * never re-executed by ANY turn (the corrective turn runs its own effects
+ * under its own identity).
  */
 export function strictTurnSource(source) {
   if (!isJsonRecord(source)) {
     throw new CentralAdmissionError('ADMISSION_INVALID_TURN_SOURCE', 'turnSource must be a JSON record');
   }
   const kind = source.kind;
-  if (kind === 'message' || kind === 'recovery') {
+  if (kind === 'message') {
     throw new CentralAdmissionError(
       'ADMISSION_INVALID_TURN_SOURCE',
-      `a turnSource of kind ${String(kind)} is not accepted at this seam: message turns derive from messageId and no recovery source is wired`,
+      'a turnSource of kind message is not accepted at this seam: message turns derive from messageId',
     );
   }
   const fields = NON_MESSAGE_TURN_SOURCE_FIELDS[kind];

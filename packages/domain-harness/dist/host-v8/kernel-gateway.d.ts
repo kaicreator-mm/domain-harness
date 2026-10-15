@@ -322,6 +322,35 @@ export interface KernelGateway {
         readonly appId: string;
     }): Promise<unknown>;
     /**
+     * [#1006 HF16] Protected durable POISON-RECOVERY authorization: a
+     * host-configured control role durably authorizes ONE corrective recovery
+     * action for an exact poisoned message of the principal's tenant/app
+     * instance, binding the sealed Business intent and corrective input the
+     * recovery turn will submit. Durable physical storage required; the same
+     * material re-authorizes idempotently, different material for the same
+     * poison is a typed identity conflict.
+     */
+    authorizePoisonRecovery(credential: unknown, request: {
+        readonly appId: string;
+        readonly instanceKey: string;
+        readonly poisonMessageId: string;
+        readonly intentType: string;
+        readonly input: Record<string, unknown>;
+        readonly reason: string;
+    }): Promise<unknown>;
+    /**
+     * [#1006 HF16] ONE authenticated poison-recovery delivery. Only a
+     * principal admitted to the bound Business intent may deliver (the
+     * settlement submits a real turn); the durable CAS state machine admits
+     * exactly ONE winning delivery and every redelivery is an idempotent
+     * Kernel turn-disposition replay with zero doubled State/Effect.
+     */
+    deliverPoisonRecovery(credential: unknown, request: {
+        readonly appId: string;
+        readonly instanceKey: string;
+        readonly poisonMessageId: string;
+    }): Promise<unknown>;
+    /**
      * [#1062 HF32] ONE authenticated durable child-send: the invocation
      * record is created pending, the child message turn submits through the
      * SAME authenticated Kernel seam as send (riding the shared non-message

@@ -62,8 +62,10 @@ import type { HostCredential, HostPrincipal } from './identity.js';
 import {
   ChildInvocationCoordinator,
   ExternalWorkCoordinator,
+  PoisonRecoveryCoordinator,
   childInvocationCorrelationId,
   kernelTurnSourceOf,
+  poisonRecoveryActionId,
   type ExternalWorkRecord,
   type ExternalWorkTurnSource,
 } from './durable-controls.js';
@@ -339,6 +341,35 @@ export interface KernelGateway {
    */
   recoverDurableControls(credential: unknown, request: { readonly appId: string }): Promise<unknown>;
   /**
+   * [#1006 HF16] Protected durable POISON-RECOVERY authorization: a
+   * host-configured control role durably authorizes ONE corrective recovery
+   * action for an exact poisoned message of the principal's tenant/app
+   * instance, binding the sealed Business intent and corrective input the
+   * recovery turn will submit. Durable physical storage required; the same
+   * material re-authorizes idempotently, different material for the same
+   * poison is a typed identity conflict.
+   */
+  authorizePoisonRecovery(credential: unknown, request: {
+    readonly appId: string;
+    readonly instanceKey: string;
+    readonly poisonMessageId: string;
+    readonly intentType: string;
+    readonly input: Record<string, unknown>;
+    readonly reason: string;
+  }): Promise<unknown>;
+  /**
+   * [#1006 HF16] ONE authenticated poison-recovery delivery. Only a
+   * principal admitted to the bound Business intent may deliver (the
+   * settlement submits a real turn); the durable CAS state machine admits
+   * exactly ONE winning delivery and every redelivery is an idempotent
+   * Kernel turn-disposition replay with zero doubled State/Effect.
+   */
+  deliverPoisonRecovery(credential: unknown, request: {
+    readonly appId: string;
+    readonly instanceKey: string;
+    readonly poisonMessageId: string;
+  }): Promise<unknown>;
+  /**
    * [#1062 HF32] ONE authenticated durable child-send: the invocation
    * record is created pending, the child message turn submits through the
    * SAME authenticated Kernel seam as send (riding the shared non-message
@@ -413,6 +444,14 @@ interface AppClosurePinRecord {
 function appPinKey(appId: string): string {
   return `v8host:gateway:app-pin:${appId}`;
 }
+
+/**
+ * [#1079 R1 P1-HF16-01] The selected Kernel's physical effect-journal
+ * namespace — read-only probe target of the poison-recovery authorization
+ * precondition (`requireDurablePoisonEvidence`); the Kernel stays sole
+ * authority over Journal semantics and this boundary never writes there.
+ */
+const KERNEL_EFFECT_JOURNAL_PREFIX = 'v08-kernel:effect-journal:';
 
 /** The descriptor-safe closure identity read off a sealed root BEFORE load. */
 interface ClaimedClosureIdentity {
@@ -505,6 +544,13 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
    * adapted from the frozen v0.7 compiled-workflow message effects).
    */
   const childInvocations = new ChildInvocationCoordinator(host.docs);
+  /**
+   * [#1006 HF16] The Host-side durable poison-recovery coordinator over the
+   * same probed physical store: ONE CAS-authorized corrective action per
+   * poisoned message, delivered once through the SAME authenticated Kernel
+   * seam as every durable control turn.
+   */
+  const poisonRecovery = new PoisonRecoveryCoordinator(host.docs);
   /**
    * In-flight cancellable occurrences, keyed by the authenticated
    * tenant/app + instanceKey + messageId (#1003 FR07-KH2). Entries exist
@@ -629,6 +675,45 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         'this host was bootstrapped without durable physical storage; durable external-work registrations are refused before any mutation',
       );
     }
+  }
+
+  /**
+   * [#1079 R1 P1-HF16-01] Fail-closed poison precondition: PROVE that the
+   * named message actually poisoned THIS exact authenticated
+   * app/tenant/instance before any recovery credential is created. The
+   * proof is read-only over the SAME physical store: the selected Kernel's
+   * deterministic business-message turn identity
+   * (`turn:<workflowKey>:<tenant:app:instance>:message:<messageId>` — the
+   * exact derivation of `deriveDurableControlTurnId` over the principal's
+   * qualified instance address) addresses the durable effect-journal rows of
+   * that one message, and at least one row must carry `status === 'failed'`.
+   * A nonexistent, successful or foreign-instance poison has no FAILED row
+   * under that exact address and refuses typed with ZERO recovery record and
+   * ZERO Kernel activity. The Kernel stays sole authority over Journal
+   * semantics — nothing is written here, and the pinned evidence (the FAILED
+   * effectId) rides inside the Host CAS record as a stable source
+   * reference; the pinned row itself is never re-executed by anything.
+   */
+  async function requireDurablePoisonEvidence(
+    app: RegisteredApp,
+    principal: HostPrincipal,
+    request: { readonly instanceKey: string; readonly poisonMessageId: string },
+  ): Promise<{ readonly effectId: string; readonly verifiedAt: string }> {
+    const workflowKey = app.ops.describePolicy().workflowKey;
+    const turnId = `turn:${encodeURIComponent(workflowKey)}:${encodeURIComponent(`${principal.tenantId}:${app.appId}:${request.instanceKey}`)}:message:${encodeURIComponent(request.poisonMessageId)}`;
+    const exactPrefix = `${KERNEL_EFFECT_JOURNAL_PREFIX}${turnId}/effect/`;
+    const keys = (await host.docs.list(KERNEL_EFFECT_JOURNAL_PREFIX)).filter((key) => key.startsWith(exactPrefix));
+    for (const key of keys) {
+      const envelope = await host.docs.get(key);
+      const record = (envelope?.value as { record?: { readonly effectId?: unknown; readonly status?: unknown } } | null)?.record;
+      if (typeof record?.effectId === 'string' && record.effectId.length > 0 && record.status === 'failed') {
+        return { effectId: record.effectId, verifiedAt: new Date().toISOString() };
+      }
+    }
+    throw new HostBoundaryError(
+      'HOST_POISON_UNVERIFIED',
+      `message ${request.poisonMessageId} has no durable FAILED effect under the selected Kernel for the authenticated app/tenant/instance ${request.instanceKey}; a recovery authorization is bound to a real poison and refuses typed (nonexistent, successful and foreign-instance poisons never create a credential)`,
+    );
   }
 
   function requireBoundIntents(app: RegisteredApp, intentTypes: readonly string[]): void {
@@ -1518,6 +1603,119 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         },
       });
       return Object.freeze({ status: 'recovered', ...result });
+    },
+
+    async authorizePoisonRecovery(credential: unknown, request: {
+      readonly appId: string;
+      readonly instanceKey: string;
+      readonly poisonMessageId: string;
+      readonly intentType: string;
+      readonly input: Record<string, unknown>;
+      readonly reason: string;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+        || typeof request.poisonMessageId !== 'string' || request.poisonMessageId.length === 0
+        || typeof request.intentType !== 'string' || request.intentType.length === 0
+        || typeof request.reason !== 'string' || request.reason.length === 0
+        || typeof request.input !== 'object' || request.input === null || Array.isArray(request.input)
+      ) {
+        throw new HostBoundaryError(
+          'HOST_CONTROL_MALFORMED',
+          'authorizePoisonRecovery requires {appId, instanceKey, poisonMessageId, intentType, reason} non-empty strings and a JSON-record input',
+        );
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      // The authorization itself is a privileged control act; the corrective
+      // turn's Business-intent authority is enforced at DELIVERY (the same
+      // split registerExternalWork/acceptExternalCallback use).
+      requireControlRole(app, principal);
+      requireDurableStorage();
+      requireBoundIntents(app, [request.intentType]);
+      // [#1079 R1 P1-HF16-01] Fail-closed poison precondition BEFORE any
+      // credential is created: the named message must have a durable FAILED
+      // effect under the selected Kernel at the exact authenticated
+      // app/tenant/instance address. A nonexistent, successful or
+      // foreign-instance poison refuses typed with zero recovery record and
+      // zero Kernel activity; the verified FAILED effectId is pinned into
+      // the Host CAS record as the stable poison source reference.
+      const poisonEvidence = await requireDurablePoisonEvidence(app, principal, request);
+      const granted = await poisonRecovery.authorize({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        instanceKey: request.instanceKey,
+        poisonMessageId: request.poisonMessageId,
+        recoveryIntentType: request.intentType,
+        recoveryInput: request.input,
+        reason: request.reason,
+        authorizedBy: { subject: principal.subject, roles: [...principal.roles] },
+        authorizedAt: new Date().toISOString(),
+        poisonEvidence,
+      });
+      return Object.freeze({
+        status: 'authorized',
+        disposition: granted.disposition,
+        actionId: poisonRecoveryActionId(request.poisonMessageId),
+        record: granted.record,
+      });
+    },
+
+    async deliverPoisonRecovery(credential: unknown, request: {
+      readonly appId: string;
+      readonly instanceKey: string;
+      readonly poisonMessageId: string;
+    }): Promise<unknown> {
+      if (
+        typeof request !== 'object' || request === null
+        || typeof request.appId !== 'string' || request.appId.length === 0
+        || typeof request.instanceKey !== 'string' || request.instanceKey.length === 0
+        || typeof request.poisonMessageId !== 'string' || request.poisonMessageId.length === 0
+      ) {
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'deliverPoisonRecovery requires {appId, instanceKey, poisonMessageId} with non-empty strings');
+      }
+      const principal = await authenticate(credential);
+      assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.instanceKey }, principal);
+      const app = requireApp(request.appId, principal);
+      requireDurableStorage();
+      // [#1066 R1 P1-A discipline] The delivery SUBMITS the bound intent, so
+      // the Business-bound role authority is checked BEFORE any durable
+      // record settles — an unauthorized principal can neither deliver the
+      // corrective turn nor consume the one-shot settlement.
+      const current = await poisonRecovery.read(request.appId, principal.tenantId, request.instanceKey, request.poisonMessageId);
+      requireIntentRole(app, principal, current.recoveryIntentType);
+      const outcome = await poisonRecovery.deliver({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        instanceKey: request.instanceKey,
+        poisonMessageId: request.poisonMessageId,
+        deliveredAt: new Date().toISOString(),
+      });
+      const receipt = await submitControlTurn(
+        app,
+        principal,
+        request.instanceKey,
+        outcome.record.recoveryIntentType,
+        outcome.messageId,
+        {
+          kind: 'recovery',
+          durableRecoveryActionId: outcome.turnSource.durableRecoveryActionId,
+          resumeOrdinal: outcome.turnSource.resumeOrdinal,
+        },
+        outcome.record.recoveryInput,
+      );
+      await poisonRecovery.markSubmitted(
+        request.appId,
+        principal.tenantId,
+        request.instanceKey,
+        request.poisonMessageId,
+        outcome.messageId,
+        new Date().toISOString(),
+      );
+      return Object.freeze({ status: outcome.disposition === 'accepted' ? 'accepted' : 'duplicate', disposition: outcome.disposition, receipt, record: outcome.record });
     },
 
     async sendChildMessage(credential: unknown, request: {
