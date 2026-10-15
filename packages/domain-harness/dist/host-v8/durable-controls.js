@@ -363,6 +363,48 @@ export class ExternalWorkCoordinator {
         }
     }
 }
+// ===========================================================================
+// [#1062 HF32] Host-side durable child-invocation coordination, adapted
+// from the frozen v0.7 reference `src/runtime/
+// compiled-workflow-message-effects-v3.ts` (blob 36ab0b7a…) all-or-durable-
+// rejection semantics: a PERMANENT rejection is durably committed BEFORE
+// any route selection (rejected_routed), and a settled invocation is never
+// silently retried — the v0.8 route selection is the authenticated caller
+// acting on the returned truth.
+//
+// State machine per child invocation (single document, single CAS
+// authority — no cross-document atomicity claimed):
+//
+//   pending ──CAS──► accepted ──CAS──► done | error   (the child-terminal
+//                    │                              routing settles once)
+//                    └──CAS──► rejected             (permanent; never
+//                                                   transient, never retried)
+//
+// The CHILD message turn rides the SAME non-message seam (a callback
+// turnSource bound to the invocation correlation, callbackOrdinal 1), so
+// an UNKNOWN-window retry of a pending invocation replays idempotently at
+// the Kernel turn disposition. The correlated child terminal routes to its
+// parent exactly once through the child-terminal turnSource.
+//
+// [#1080 FR01] Every invocation record stamps its durable LINEAGE DEPTH
+// (a lineage root's edge = 1); a new edge's depth is derived from the
+// parent's own incoming records — durable truth, never caller arithmetic —
+// and the declared provenance pointer is cross-checked against it. Beyond
+// the frozen maximum the send refuses typed BEFORE allocation (see
+// MAX_CHILD_LINEAGE_DEPTH below).
+//
+// Record keys (Host namespace):
+//   v8host:durable-control:child:{appId}:{tenantId}:{parentInstanceKey}:
+//   {childInstanceKey}:{invocationOrdinal}
+// ===========================================================================
+// [#1080 FR01] Selected Host-declared bound on durable child-invocation
+// lineage depth. Identity provenance: the smallest EXISTING frozen
+// child-depth limit — DEFAULT_MAX_CHILD_WORKFLOW_DEPTH = 32
+// (src/runner/run-coordinator.ts, "Internal v0.1 defensive bound", pinned
+// by tests/child-workflow.test.ts) — reused by value, not a newly invented
+// scheduler constant. Edge depths 1..32 are the admitted range (a lineage
+// root's first edge is depth 1); depth 33 (max+1) refuses typed.
+const MAX_CHILD_LINEAGE_DEPTH = 32;
 export function childInvocationDocKey(appId, tenantId, parentInstanceKey, childInstanceKey, invocationOrdinal) {
     return `v8host:durable-control:child:${appId}:${tenantId}:${parentInstanceKey}:${childInstanceKey}:${String(invocationOrdinal)}`;
 }
@@ -380,6 +422,12 @@ function decodeChildInvocation(envelope, key) {
     requireComponent(record.parentInstanceKey, 'parentInstanceKey');
     requireComponent(record.childInstanceKey, 'childInstanceKey');
     requirePositiveOrdinal(record.invocationOrdinal, 'invocationOrdinal');
+    // [#1080 FR01] Fail closed on a tampered record: creation refuses any
+    // depth beyond the accepted maximum, so a stored overflowed or missing
+    // depth is corruption, never accepted truth.
+    if (requirePositiveOrdinal(record.lineageDepth, 'lineageDepth') > MAX_CHILD_LINEAGE_DEPTH) {
+        throw new DurableControlError('DURABLE_CONTROL_INVALID', `record ${key} carries a lineage depth beyond the accepted maximum (${String(MAX_CHILD_LINEAGE_DEPTH)})`);
+    }
     requireComponent(record.childIntentType, 'childIntentType');
     requireComponent(record.doneIntentType, 'doneIntentType');
     requireComponent(record.errorIntentType, 'errorIntentType');
@@ -426,6 +474,12 @@ export class ChildInvocationCoordinator {
     async open(input) {
         requireComponent(input.parentInstanceKey, 'parentInstanceKey');
         requireComponent(input.childInstanceKey, 'childInstanceKey');
+        // [#1080 FR01] The stamped depth is re-validated here (defense in
+        // depth): the gateway derives it through deriveLineageDepth, and a
+        // depth beyond the accepted maximum never reaches a durable record.
+        if (requirePositiveOrdinal(input.lineageDepth, 'lineageDepth') > MAX_CHILD_LINEAGE_DEPTH) {
+            throw new DurableControlError('DURABLE_CONTROL_INVALID', `lineage depth ${String(input.lineageDepth)} exceeds the accepted maximum (${String(MAX_CHILD_LINEAGE_DEPTH)})`);
+        }
         requireComponent(input.childIntentType, 'childIntentType');
         requireComponent(input.doneIntentType, 'doneIntentType');
         requireComponent(input.errorIntentType, 'errorIntentType');
@@ -467,6 +521,61 @@ export class ChildInvocationCoordinator {
             return this.adjudicateExisting(current);
         }
     }
+    /**
+     * [#1080 FR01] Derive the lineage depth a NEW outgoing edge of
+     * `parentInstanceKey` would carry — from DURABLE truth only (the
+     * parent's own incoming invocation records), never caller arithmetic —
+     * and fail-closed adjudicate the caller's declared provenance pointer
+     * against that truth BEFORE any durable allocation:
+     *
+     *   missing    a non-root parent (it HAS incoming invocation records)
+     *              declares no provenance — a deep parent cannot root-claim
+     *   forged     a declared pointer that resolves to no incoming record of
+     *              THIS parent (tampered ordinal / foreign pair), or a root
+     *              parent declaring provenance it cannot have
+     *   overflowed  the derived edge depth would exceed the frozen maximum
+     *
+     * Every edge of a deep tree is itself a durable record allocated through
+     * this seam, so the incoming-record scan captures the WHOLE lineage —
+     * the bound cannot be bypassed by re-addressing or cross-pair sends.
+     */
+    async deriveLineageDepth(input) {
+        requireComponent(input.parentInstanceKey, 'parentInstanceKey');
+        if (input.declared !== undefined) {
+            requireComponent(input.declared.viaParentInstanceKey, 'viaParentInstanceKey');
+            requirePositiveOrdinal(input.declared.invocationOrdinal, 'invocationOrdinal');
+        }
+        const prefix = `v8host:durable-control:child:${input.appId}:${input.tenantId}:`;
+        let parentDepth = 0;
+        for (const key of await this.docs.list(prefix)) {
+            const parts = key.split(':');
+            // v8host:durable-control:child:{appId}:{tenantId}:{parent}:{child}:{ordinal}
+            if (parts.length !== 8 || parts[6] !== input.parentInstanceKey)
+                continue;
+            const incoming = await this.load(key);
+            if (incoming.record.lineageDepth > parentDepth)
+                parentDepth = incoming.record.lineageDepth;
+        }
+        if (parentDepth === 0) {
+            if (input.declared !== undefined) {
+                throw new DurableControlError('CHILD_LINEAGE_FORGERY', `instance ${input.parentInstanceKey} has no durable incoming child invocation; the declared lineage provenance is forged`);
+            }
+        }
+        else if (input.declared === undefined) {
+            throw new DurableControlError('CHILD_LINEAGE_REQUIRED', `instance ${input.parentInstanceKey} is a durable child (incoming lineage depth ${String(parentDepth)}); a deeper send must declare its provenance invocation`);
+        }
+        else {
+            const resolves = await this.peek(input.appId, input.tenantId, input.declared.viaParentInstanceKey, input.parentInstanceKey, input.declared.invocationOrdinal);
+            if (resolves === null) {
+                throw new DurableControlError('CHILD_LINEAGE_FORGERY', `declared lineage provenance (via ${input.declared.viaParentInstanceKey}, ordinal ${String(input.declared.invocationOrdinal)}) is not a durable incoming invocation of ${input.parentInstanceKey} (tampered or foreign)`);
+            }
+        }
+        const edgeDepth = parentDepth + 1;
+        if (edgeDepth > MAX_CHILD_LINEAGE_DEPTH) {
+            throw new DurableControlError('CHILD_DEPTH_EXCEEDED', `child lineage depth ${String(edgeDepth)} would exceed the accepted maximum ${String(MAX_CHILD_LINEAGE_DEPTH)}; the send is refused before any durable allocation`);
+        }
+        return edgeDepth;
+    }
     adjudicateExisting(current) {
         if (current.status === 'rejected')
             rejectedRefusal(current.invocationOrdinal, current);
@@ -485,6 +594,7 @@ export class ChildInvocationCoordinator {
             parentInstanceKey: input.parentInstanceKey,
             childInstanceKey: input.childInstanceKey,
             invocationOrdinal: ordinal,
+            lineageDepth: input.lineageDepth,
             childIntentType: input.childIntentType,
             doneIntentType: input.doneIntentType,
             errorIntentType: input.errorIntentType,

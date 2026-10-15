@@ -369,6 +369,16 @@ export interface KernelGateway {
         readonly errorIntentType: string;
         readonly input?: unknown;
         readonly invocationOrdinal?: number;
+        /**
+         * [#1080 FR01] The parent instance's OWN incoming invocation — its
+         * durable lineage provenance. Required once the parent is itself a
+         * durable child (the Host cross-checks the pointer against durable
+         * truth); a lineage root declares nothing.
+         */
+        readonly parentLineage?: {
+            readonly viaParentInstanceKey: string;
+            readonly invocationOrdinal: number;
+        };
     }): Promise<unknown>;
     /**
      * [#1062 HF32] ONE authenticated correlated child terminal. The durable
