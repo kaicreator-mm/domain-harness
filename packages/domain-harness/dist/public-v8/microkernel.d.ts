@@ -214,6 +214,53 @@ export interface V8FacadeKernelOps {
      * `registerApp` provisioning ONLY. Never caller-visible.
      */
     operationResourceAdapters(): readonly V8OperationResourceAdapter[];
+    /**
+     * #1003 HF23: the BUILD-sealed inert operation descriptors, computed for
+     * the AUTHENTICATED principal. Discovery metadata only — no handler, no
+     * physical resource route, no admission authority; the `agentExposed`
+     * marking is sealed BUILD data and `principalAdmitted` mirrors the same
+     * Business-bound role pick an actual OperationCall would take.
+     */
+    describeOperationSurface(principal: V8GatewayPrincipal): readonly V8OperationSurfaceDescriptor[];
+    /**
+     * #1003 FR05/HF17/HF23: the retained Standard-SDK query/observer/agent
+     * projections surfaced for the trusted gateway exactly like the FR08
+     * retained decision-source endpoints — additive optional ABI members,
+     * wired all-or-none only when the sealed Standard SDK exports all three.
+     * Pure inert S projections: H authentication and the Kernel's own reads
+     * stay the authority; nothing here mints a revision or admits a call.
+     */
+    readonly retainedProjection?: {
+        /** FR05: deterministic multi-source projection over exact K-attested revision selectors. */
+        readonly projectRead: (declaration: unknown, snapshots: unknown) => unknown;
+        /** HF17: monotonic-epoch coalescing of delivered revision observations. */
+        readonly coalesceObservations: (observations: unknown) => unknown;
+        /** HF23: read-only agent tool surface over BUILD-sealed descriptors. */
+        readonly projectAgentTools: (operations: unknown) => unknown;
+    };
+}
+/** The pre-existing effect-class declaration family (L2 successor §4). */
+type V8OperationEffectClass = 'none' | 'idempotent' | 'non-idempotent';
+/**
+ * #1003 HF23 — one BUILD-sealed operation descriptor for an authenticated
+ * principal: inert discovery metadata only. No handler, no physical
+ * resource route and no admission authority ever rides a descriptor; the
+ * `agentExposed` marking is the sealed BUILD approval, and
+ * `principalAdmitted` mirrors the same Business-bound role pick a call
+ * would take (requirePrincipalRole) without throwing.
+ */
+export interface V8OperationSurfaceDescriptor {
+    readonly capabilityId: string;
+    readonly operationId: string;
+    readonly effectClass: V8OperationEffectClass;
+    /** Pure operations only: the sealed BUILD `agent` approval marking. */
+    readonly agentExposed: boolean;
+    /** Pure: the sealed Business intent whose bound role set governs visibility. */
+    readonly visibilityIntentType?: string;
+    /** Effectful: the sealed Business intent that owns central admission. */
+    readonly admissionIntentType?: string;
+    /** Whether the authenticated principal holds the Business-bound role. */
+    readonly principalAdmitted: boolean;
 }
 /**
  * Validate the gateway session channel WITHOUT consuming it (#1013 R2): the
@@ -253,4 +300,5 @@ export declare function getFacadeKernelOps(facade: object, sessionCap?: unknown)
 export declare const DomainHarness: Readonly<{
     readonly load: (packageRoot: unknown) => Promise<V8DomainFacade>;
 }>;
+export {};
 //# sourceMappingURL=microkernel.d.ts.map

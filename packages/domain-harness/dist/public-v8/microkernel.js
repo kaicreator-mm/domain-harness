@@ -219,7 +219,7 @@ function assertOperationEffectBinding(input) {
         if (route.resource.key !== resource.key || route.resource.operation !== resource.operation) {
             throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims the Host physical route ${resource.key}.${resource.operation}, but Business effect ${effectType} dispatches ${route.resource.key}.${route.resource.operation}`);
         }
-        routes.add(`${route.resource.key} ${route.resource.operation}`);
+        routes.add(`${route.resource.key}\u0000${route.resource.operation}`);
     }
     if (routes.size !== 1) {
         throw typedError('OPERATION_BINDING_MISMATCH', `${where} claims one Host physical route, but its admission intent dispatches ${routes.size} distinct Business routes`);
@@ -363,12 +363,30 @@ function wireCapabilityOperations(input) {
                 if (entry.intentType !== undefined || entry.resource !== undefined) {
                     throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} pure operation ${operationId} cannot declare an admission intent or a physical resource route`);
                 }
-                operations.set(operationId, { effectClass, handler, visibilityIntentType: visibility.intentType });
+                // #1003 HF23: the optional agent exposure marking is the exact
+                // boolean `true` or absent — anything else is a malformed seal.
+                if (entry.agent !== undefined && entry.agent !== true) {
+                    throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} pure operation ${operationId} declares an agent exposure marking that is not the exact boolean true`);
+                }
+                operations.set(operationId, {
+                    effectClass,
+                    handler,
+                    visibilityIntentType: visibility.intentType,
+                    ...(entry.agent === true ? { agent: true } : {}),
+                });
                 continue;
             }
             const intentType = entry.intentType;
             if (typeof intentType !== 'string' || intentType.length === 0) {
                 throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} must declare the sealed Business intentType that owns its admission`);
+            }
+            // #1003 HF23: an effectful operation can never carry the agent
+            // exposure marking — the agent surface is read-only BY SEAL, and a
+            // mutation reaches the Kernel only through the central occurrence
+            // admission the intent below owns. The refusal fires at wiring,
+            // BEFORE any facade escapes.
+            if (entry.agent === true) {
+                throw typedError('OPERATION_AGENT_MUTATION_REFUSED', `capability ${binding.capabilityId} effectful operation ${operationId} cannot carry the agent exposure marking; the agent surface is read-only and effectful admission belongs to the sealed central occurrence path only`);
             }
             if (!input.sealedIntentTypes.has(intentType)) {
                 throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} references intent ${intentType} which is not bound in this sealed closure; every effect traverses the sealed Business admission`);
@@ -851,6 +869,24 @@ async function loadScopedFacade(packageRoot) {
         operations: new Map(operations),
     })));
     const capabilityOperations = wiredOperations.capabilities;
+    /**
+     * [#1003 FR05/HF17/HF23] The retained S query/observer/agent projections
+     * (projectRetainedRead / coalesceRetainedObservations /
+     * projectRetainedAgentTools) surfaced on the protected gateway ops —
+     * additive optional ABI members exactly like the FR08 retained
+     * decision-source endpoints; all three wire together or none does. The
+     * projections are the SEALED SDK's own code (the same module the Kernel
+     * validated at load), never a Host re-implementation.
+     */
+    const retainedProjection = typeof sdkNamespace.projectRetainedRead === 'function'
+        && typeof sdkNamespace.coalesceRetainedObservations === 'function'
+        && typeof sdkNamespace.projectRetainedAgentTools === 'function'
+        ? Object.freeze({
+            projectRead: (declaration, snapshots) => sdkNamespace.projectRetainedRead(declaration, snapshots),
+            coalesceObservations: (observations) => sdkNamespace.coalesceRetainedObservations(observations),
+            projectAgentTools: (operations) => sdkNamespace.projectRetainedAgentTools(operations),
+        })
+        : undefined;
     let stopped = false;
     let stopDisposal;
     function assertOpen() {
@@ -995,6 +1031,18 @@ async function loadScopedFacade(packageRoot) {
             throw typedError('PRINCIPAL_ROLE_NOT_BOUND', `authenticated principal (subject ${principal.subject}, roles [${principal.roles.join(', ')}]) holds none of the Business-bound roles [${roles.join(', ')}] required by intent ${intentType}`);
         }
         return granted;
+    }
+    /**
+     * #1003 HF23: the non-throwing visibility probe of the SAME pick
+     * requirePrincipalRole makes (an intent without a bound role set admits
+     * everyone, exactly like the call gate's 'anonymous'); discovery hides
+     * what the authenticated principal could not call.
+     */
+    function roleAdmittedByIntent(principal, intentType) {
+        const roles = resolveIntentRoles(intentType);
+        if (roles === undefined)
+            return true;
+        return principal.roles.some((role) => roles.includes(role));
     }
     function requireInstanceKey(instanceKey) {
         if (typeof instanceKey !== 'string' || instanceKey.length === 0 || instanceKey.includes(':')) {
@@ -1214,6 +1262,28 @@ async function loadScopedFacade(packageRoot) {
             assertOpen();
             return resourceAdapters;
         },
+        describeOperationSurface(principal) {
+            assertOpen();
+            requirePrincipal(principal);
+            const out = [];
+            for (const [capabilityId, capability] of capabilityOperations) {
+                for (const [operationId, operation] of capability.operations) {
+                    const pure = operation.effectClass === 'none';
+                    const governingIntent = pure ? operation.visibilityIntentType : operation.intentType;
+                    out.push(Object.freeze({
+                        capabilityId,
+                        operationId,
+                        effectClass: operation.effectClass,
+                        agentExposed: operation.agent === true,
+                        ...(pure && operation.visibilityIntentType !== undefined ? { visibilityIntentType: operation.visibilityIntentType } : {}),
+                        ...(!pure && operation.intentType !== undefined ? { admissionIntentType: operation.intentType } : {}),
+                        principalAdmitted: governingIntent === undefined ? true : roleAdmittedByIntent(principal, governingIntent),
+                    }));
+                }
+            }
+            return Object.freeze(out);
+        },
+        ...(retainedProjection === undefined ? {} : { retainedProjection }),
     };
     const facade = Object.freeze({ send, query, subscribe, stop });
     facadeScopes.set(facade, Object.freeze(gatewayOps));

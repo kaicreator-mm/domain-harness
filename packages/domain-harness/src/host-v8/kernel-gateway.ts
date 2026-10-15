@@ -126,6 +126,75 @@ export interface KernelGatewayCancelResult {
   readonly status: 'cancel-requested' | 'not-in-flight';
 }
 
+/**
+ * #1003 FR05 — one credentialed multi-source projection read. Every
+ * dependency source is read through the SAME authenticated K read as
+ * `queryInstance` (each at the caller principal's tenant/app-qualified
+ * address), pinned to the exact K-attested `stateRevision` the caller
+ * projected (`rev-<n>`), and handed to the sealed Standard SDK's retained
+ * `projectRetainedRead` — a deterministic, fail-closed projection proposal.
+ */
+export interface KernelGatewayProjectionDependency {
+  /** Projection-local source name (unique, ':'-free). */
+  readonly name: string;
+  /** The instance address component, qualified by the authenticated principal. */
+  readonly instanceKey: string;
+  /** The pinned K-attested revision the projection requires (`rev-<n>`). */
+  readonly expectedRevision: string;
+}
+
+export interface KernelGatewayProjectionRequest {
+  readonly appId: string;
+  readonly projectionId: string;
+  readonly dependencies: readonly KernelGatewayProjectionDependency[];
+  /** Output name → declared source name (the S projection field map). */
+  readonly fields: Readonly<Record<string, string>>;
+}
+
+/**
+ * #1003 HF17 — one live non-durable latest observer. The reconnect contract
+ * is exactly `Query latest → create a NEW non-durable subscription session`:
+ * no durable cursor, no offset replay, no journal-backed resume and no
+ * subscription state in any store. Receipts that land while no session
+ * exists are gone by contract (HF20 durability is a separate K-retention
+ * row). Every delivery re-authenticates the credential; a revoked grant or
+ * a persistently failing listener stops the session fail-closed.
+ */
+export interface KernelGatewayLatestObserverScope {
+  readonly appId: string;
+  readonly instanceKey: string;
+}
+
+/** One coalesced live update: the newest K-attested revision observed. */
+export interface KernelGatewayLatestObserverUpdate {
+  readonly revision: string;
+  readonly snapshot: unknown;
+}
+
+export type KernelGatewayLatestObserverStatus = 'live' | 'credential-stopped' | 'listener-failed' | 'read-failed' | 'closed';
+
+export interface KernelGatewayLatestObserver {
+  /** The Query-latest snapshot the session opened at (null before Genesis). */
+  readonly latest: unknown;
+  status(): KernelGatewayLatestObserverStatus;
+  unsubscribe(): void;
+}
+
+/**
+ * #1003 HF23 — the result of one credentialed agent tool-surface read:
+ * exactly the BUILD `agent`-approved PURE operations this principal's
+ * Business-bound roles may call. Inert discovery metadata only — no
+ * handler, no route and no mutation authority; effectful operations never
+ * enter the surface (the seal refuses the marking), and a discovered tool
+ * stays callable only through the S04 protected OperationCall route.
+ */
+export interface KernelGatewayAgentToolQueryResult {
+  readonly kind: 'agent-tool-query';
+  readonly appId: string;
+  readonly tools: readonly { readonly capabilityId: string; readonly operationId: string; readonly effectClass: 'none'; readonly authority: string }[];
+  readonly projectionAuthority: string;
+}
+
 export interface KernelGateway {
   /** Host-context provisioning: load + bind one approved Domain App. */
   registerApp(input: KernelGatewayAppInput): Promise<void>;
@@ -153,6 +222,30 @@ export interface KernelGateway {
   queryDecisionReceipt(credential: unknown, request: UxTarget & { readonly messageId: string }): Promise<unknown>;
   /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
   subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription>;
+  /**
+   * [#1003 FR05] Authenticated multi-source projection read: every source
+   * resolves through the authenticated principal's qualified K read, the
+   * exact K-attested revisions are pinned by the caller, and the sealed
+   * Standard SDK's retained `projectRetainedRead` yields the inert
+   * projection candidate (fail-closed on any stale/missing source).
+   */
+  queryProjection(credential: unknown, request: KernelGatewayProjectionRequest): Promise<unknown>;
+  /**
+   * [#1003 HF17] Authenticated latest-then-subscribe observer: ONE Query
+   * latest opens the session, then a NEW non-durable subscription delivers
+   * coalesced live revision updates (the sealed SDK's retained
+   * `coalesceRetainedObservations` collapses same-subject observations to
+   * the newest). Non-durable by contract; every delivery re-authenticates.
+   */
+  observeLatest(credential: HostCredential, scope: KernelGatewayLatestObserverScope, listener: (update: KernelGatewayLatestObserverUpdate) => void): Promise<KernelGatewayLatestObserver>;
+  /**
+   * [#1003 HF23] Authenticated agent tool-surface discovery: exactly the
+   * BUILD `agent`-approved PURE operations the principal's Business-bound
+   * roles may call, projected by the sealed SDK's retained
+   * `projectAgentTools`. Discovery grants nothing — mutations stay on the
+   * central occurrence path (`send` / effectful OperationCall).
+   */
+  queryAgentTools(credential: unknown, request: { readonly appId: string }): Promise<KernelGatewayAgentToolQueryResult>;
   /** Protected Genesis activation (host-configured role authority). */
   activateGenesis(credential: unknown, request: {
     readonly appId: string;
@@ -294,6 +387,41 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       );
     }
     return app;
+  }
+
+  /**
+   * The K-attested revision selector of one source snapshot: the selected
+   * Kernel's own monotonic `stateRevision` (`rev-<n>`). Anything the loaded
+   * mechanism did not attest fails closed — the gateway never mints a
+   * revision from unverified data.
+   */
+  function snapshotRevisionOf(snapshot: unknown): string {
+    if (typeof snapshot !== 'object' || snapshot === null) {
+      throw new HostBoundaryError('HOST_PROJECTION_SOURCE_UNKNOWN', 'a projection source resolved to no Kernel instance at the authenticated address');
+    }
+    const revision = (snapshot as { stateRevision?: unknown }).stateRevision;
+    if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) {
+      throw new HostBoundaryError('HOST_PROJECTION_SOURCE_UNKNOWN', 'a projection source carries no K-attested stateRevision; fail closed');
+    }
+    return `rev-${revision}`;
+  }
+
+  /**
+   * The retained S query/observer/agent projections of an app's SEALED
+   * Standard SDK (surfaced at load exactly like the FR08 retained
+   * decision-source endpoints). A sealed SDK that does not export them
+   * refuses the query/observer/agent verbs typed — no Host-side
+   * re-implementation ever substitutes for the sealed projection bytes.
+   */
+  function requireRetainedProjection(app: RegisteredApp): NonNullable<V8FacadeKernelOps['retainedProjection']> {
+    const retained = app.ops.retainedProjection;
+    if (retained === undefined) {
+      throw new HostBoundaryError(
+        'HOST_PROJECTION_SDK_UNAVAILABLE',
+        `the sealed Standard SDK of app ${app.appId} exposes no retained query/observer/agent projection endpoints (projectRetainedRead / coalesceRetainedObservations / projectRetainedAgentTools)`,
+      );
+    }
+    return retained;
   }
 
   const gateway: KernelGateway = {
@@ -654,6 +782,246 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
           unsubscribeFacade();
         },
       };
+    },
+
+    async queryProjection(credential: unknown, request: KernelGatewayProjectionRequest): Promise<unknown> {
+      if (
+        typeof request !== 'object'
+        || request === null
+        || typeof request.appId !== 'string'
+        || request.appId.length === 0
+        || typeof request.projectionId !== 'string'
+        || request.projectionId.length === 0
+        || !Array.isArray(request.dependencies)
+        || request.dependencies.length === 0
+        || request.dependencies.length > 8
+        || typeof request.fields !== 'object'
+        || request.fields === null
+        || Array.isArray(request.fields)
+      ) {
+        throw new HostBoundaryError('HOST_PROJECTION_MALFORMED', 'queryProjection requires {appId, projectionId, 1–8 dependencies, fields} with a plain fields record');
+      }
+      const names = new Set<string>();
+      // Re-assert the element type after the Array.isArray shape gate (the
+      // predicate narrows the readonly array's elements to `any` for
+      // type-aware lint); each field is re-validated below regardless.
+      const dependencies = request.dependencies as readonly KernelGatewayProjectionDependency[];
+      for (const dependency of dependencies) {
+        if (
+          typeof dependency !== 'object'
+          || dependency === null
+          || typeof dependency.name !== 'string'
+          || dependency.name.length === 0
+          || dependency.name.includes(':')
+          || typeof dependency.instanceKey !== 'string'
+          || dependency.instanceKey.length === 0
+          || typeof dependency.expectedRevision !== 'string'
+          || dependency.expectedRevision.length === 0
+        ) {
+          throw new HostBoundaryError('HOST_PROJECTION_MALFORMED', 'each projection dependency requires non-empty name/instanceKey/expectedRevision strings');
+        }
+        if (names.has(dependency.name)) {
+          throw new HostBoundaryError('HOST_PROJECTION_MALFORMED', `ambiguous duplicate projection source ${dependency.name}`);
+        }
+        names.add(dependency.name);
+      }
+      const principal = await authenticate(credential);
+      const app = requireApp(request.appId, principal);
+      const retained = requireRetainedProjection(app);
+      // Every source resolves through the SAME authenticated principal-
+      // qualified K read as queryInstance — a second tenant reusing the same
+      // appId/instanceKey can only ever project its own physical instance.
+      const snapshots: Record<string, { revision: string; value: unknown }> = {};
+      for (const dependency of dependencies) {
+        const snapshot = await app.ops.queryInstance(principal, dependency.instanceKey);
+        snapshots[dependency.name] = { revision: snapshotRevisionOf(snapshot), value: snapshot };
+      }
+      // The retained S projection owns the deterministic fail-closed
+      // semantics (SDK_PROJECTION_STALE / SDK_PROJECTION_MISSING …); its
+      // typed refusal propagates to the caller unchanged.
+      return retained.projectRead(
+        {
+          projectionId: request.projectionId,
+          dependencies: dependencies.map((dependency) => ({ name: dependency.name, expectedRevision: dependency.expectedRevision })),
+          fields: { ...request.fields },
+        },
+        snapshots,
+      );
+    },
+
+    async observeLatest(credential: HostCredential, scope: KernelGatewayLatestObserverScope, listener: (update: KernelGatewayLatestObserverUpdate) => void): Promise<KernelGatewayLatestObserver> {
+      if (typeof listener !== 'function') {
+        throw new HostBoundaryError('HOST_SUBSCRIPTION_MALFORMED', 'a latest observer requires a listener function');
+      }
+      if (typeof scope !== 'object' || scope === null || typeof scope.appId !== 'string' || typeof scope.instanceKey !== 'string' || scope.instanceKey.length === 0) {
+        throw new HostBoundaryError('HOST_SUBSCRIPTION_MALFORMED', 'a latest observer requires {appId, instanceKey}');
+      }
+      const principal = await authenticate(credential);
+      if (scope.appId !== principal.appId) {
+        throw new HostBoundaryError('HOST_SCOPE_DENIED', `observer scope app ${scope.appId} does not match the authenticated principal app ${principal.appId}`);
+      }
+      const app = requireApp(scope.appId, principal);
+      const retained = requireRetainedProjection(app);
+      const workflowInstanceId = app.ops.workflowInstanceId(principal, scope.instanceKey);
+      // ---- The HF17 reconnect contract, and nothing more: ONE Query
+      // latest opens the session, then a NEW non-durable subscription. No
+      // cursor, no offset, no replay — occurrences landing between the
+      // query and this subscription (or while unsubscribed) are gone by
+      // contract; the next session's Query latest observes their effect.
+      const latest = await app.ops.queryInstance(principal, scope.instanceKey);
+      let observerStatus: KernelGatewayLatestObserverStatus = 'live';
+      // Per-session serialized flush lane: epoch/observation/delivery order
+      // can never interleave, and the coalescing input stays bounded.
+      let lane: Promise<void> = Promise.resolve();
+      let epoch = 0;
+      let coalesced: { subscriptionId: string; revision: string; epoch: number } | undefined;
+      let lastDeliveredRevision: string | undefined;
+
+      function stopWith(next: KernelGatewayLatestObserverStatus): void {
+        observerStatus = next;
+        try {
+          unsubscribeFacade();
+        } catch {
+          // A facade teardown failure never resurrects a stopped session.
+        }
+      }
+
+      const unsubscribeFacade = app.ops.observeReceipts((receipt: unknown) => {
+        if (observerStatus !== 'live') return;
+        const occurrence = (receipt as { occurrence?: { workflowInstanceId?: unknown } } | null)?.occurrence;
+        if (occurrence?.workflowInstanceId !== workflowInstanceId) return;
+        lane = lane.then(async () => {
+          if (observerStatus !== 'live') return;
+          try {
+            // Currentness/revocation lease: the grant is re-verified on
+            // EVERY delivery; an invalidated subscriber stops receiving.
+            await authenticate(credential);
+          } catch {
+            stopWith('credential-stopped');
+            return;
+          }
+          // G23 flush semantics: re-read the LATEST revision at flush with
+          // a bounded observer-read retry; a persistently failing read
+          // stops the session fail-closed (no unbounded retry loop).
+          let snapshot: unknown;
+          try {
+            let attempt = 0;
+            for (; ; attempt += 1) {
+              try {
+                snapshot = await app.ops.queryInstance(principal, scope.instanceKey);
+                break;
+              } catch (error) {
+                if (attempt >= 2) throw error;
+              }
+            }
+          } catch {
+            stopWith('read-failed');
+            return;
+          }
+          if (observerStatus !== 'live' || snapshot === null || typeof snapshot !== 'object') return;
+          const revision = snapshotRevisionOf(snapshot);
+          epoch += 1;
+          // Incremental coalescing through the sealed S projection: the
+          // session's accumulated latest plus the new observation collapse
+          // to the newest monotonic epoch (same-subject duplicates die
+          // here), keeping the S input bounded for the session's lifetime.
+          let newest: { subscriptionId: string; revision: string; epoch: number } | undefined;
+          try {
+            const projected = retained.coalesceObservations(
+              coalesced === undefined ? [{ subscriptionId: workflowInstanceId, revision, epoch }] : [coalesced, { subscriptionId: workflowInstanceId, revision, epoch }],
+            ) as { observations?: { subscriptionId?: unknown; revision?: unknown; epoch?: unknown }[] };
+            newest = projected.observations?.find((observation) => observation.subscriptionId === workflowInstanceId) as { subscriptionId: string; revision: string; epoch: number } | undefined;
+          } catch {
+            // A coalescing refusal is a projection-staleness signal (e.g. a
+            // reordered epoch); the session stops fail-closed.
+            stopWith('read-failed');
+            return;
+          }
+          if (newest === undefined) {
+            stopWith('read-failed');
+            return;
+          }
+          coalesced = newest;
+          if (newest.revision === lastDeliveredRevision) return; // coalesced away
+          // Bounded listener retry (G23): one immediate retry, then the
+          // session stops — a failing consumer never loops the Host.
+          let delivered = false;
+          for (let attempt = 0; !delivered; attempt += 1) {
+            try {
+              listener({ revision: newest.revision, snapshot });
+              delivered = true;
+            } catch {
+              if (attempt >= 1) {
+                stopWith('listener-failed');
+                return;
+              }
+            }
+          }
+          lastDeliveredRevision = newest.revision;
+        }).catch(() => {
+          // The lane never rejects: every failure path stops the session.
+        });
+      });
+
+      return Object.freeze({
+        latest,
+        status: (): KernelGatewayLatestObserverStatus => observerStatus,
+        unsubscribe: (): void => {
+          if (observerStatus === 'live') stopWith('closed');
+        },
+      });
+    },
+
+    async queryAgentTools(credential: unknown, request: { readonly appId: string }): Promise<KernelGatewayAgentToolQueryResult> {
+      if (typeof request !== 'object' || request === null || typeof request.appId !== 'string' || request.appId.length === 0) {
+        throw new HostBoundaryError('HOST_AGENT_TOOLS_MALFORMED', 'queryAgentTools requires a non-empty appId');
+      }
+      const principal = await authenticate(credential);
+      const app = requireApp(request.appId, principal);
+      const retained = requireRetainedProjection(app);
+      const surface = app.ops.describeOperationSurface(principal);
+      // OperationCall binds the COMPOSITE (capabilityId, operationId), so
+      // project each BUILD-sealed capability independently: unrelated
+      // capability packages may legitimately reuse the same operationId.
+      // The sealed S projection remains the sole read-only eligibility
+      // interpreter and still refuses duplicates WITHIN one capability.
+      const byCapability = new Map<string, typeof surface[number][]>();
+      for (const descriptor of surface) {
+        const group = byCapability.get(descriptor.capabilityId) ?? [];
+        group.push(descriptor);
+        byCapability.set(descriptor.capabilityId, group);
+      }
+      const tools: Array<KernelGatewayAgentToolQueryResult['tools'][number]> = [];
+      let projectionAuthority = 'projection-only';
+      for (const [capabilityId, descriptors] of byCapability) {
+        const projection = retained.projectAgentTools(descriptors.map((descriptor) => ({
+          operationId: descriptor.operationId,
+          agentExposed: descriptor.agentExposed,
+          effectClass: descriptor.effectClass,
+        }))) as { tools?: { operationId?: unknown; effectClass?: unknown; authority?: unknown }[]; authority?: unknown };
+        if (typeof projection.authority === 'string') projectionAuthority = projection.authority;
+        // Apply the same Business-bound role pick inside THIS capability.
+        // An identical operationId admitted on another capability grants
+        // no visibility or calling authority here.
+        const admitted = new Set(
+          descriptors.filter((descriptor) => descriptor.principalAdmitted).map((descriptor) => descriptor.operationId),
+        );
+        for (const tool of projection.tools ?? []) {
+          if (!admitted.has(tool.operationId as string)) continue;
+          tools.push(Object.freeze({
+            capabilityId,
+            operationId: tool.operationId as string,
+            effectClass: 'none' as const,
+            authority: typeof tool.authority === 'string' ? tool.authority : 'projection-only',
+          }));
+        }
+      }
+      return Object.freeze({
+        kind: 'agent-tool-query',
+        appId: request.appId,
+        tools: Object.freeze(tools),
+        projectionAuthority,
+      });
     },
 
     async activateGenesis(credential: unknown, request: {

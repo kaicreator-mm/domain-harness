@@ -113,6 +113,73 @@ export interface KernelGatewayOperationCall {
 export interface KernelGatewayCancelResult {
     readonly status: 'cancel-requested' | 'not-in-flight';
 }
+/**
+ * #1003 FR05 — one credentialed multi-source projection read. Every
+ * dependency source is read through the SAME authenticated K read as
+ * `queryInstance` (each at the caller principal's tenant/app-qualified
+ * address), pinned to the exact K-attested `stateRevision` the caller
+ * projected (`rev-<n>`), and handed to the sealed Standard SDK's retained
+ * `projectRetainedRead` — a deterministic, fail-closed projection proposal.
+ */
+export interface KernelGatewayProjectionDependency {
+    /** Projection-local source name (unique, ':'-free). */
+    readonly name: string;
+    /** The instance address component, qualified by the authenticated principal. */
+    readonly instanceKey: string;
+    /** The pinned K-attested revision the projection requires (`rev-<n>`). */
+    readonly expectedRevision: string;
+}
+export interface KernelGatewayProjectionRequest {
+    readonly appId: string;
+    readonly projectionId: string;
+    readonly dependencies: readonly KernelGatewayProjectionDependency[];
+    /** Output name → declared source name (the S projection field map). */
+    readonly fields: Readonly<Record<string, string>>;
+}
+/**
+ * #1003 HF17 — one live non-durable latest observer. The reconnect contract
+ * is exactly `Query latest → create a NEW non-durable subscription session`:
+ * no durable cursor, no offset replay, no journal-backed resume and no
+ * subscription state in any store. Receipts that land while no session
+ * exists are gone by contract (HF20 durability is a separate K-retention
+ * row). Every delivery re-authenticates the credential; a revoked grant or
+ * a persistently failing listener stops the session fail-closed.
+ */
+export interface KernelGatewayLatestObserverScope {
+    readonly appId: string;
+    readonly instanceKey: string;
+}
+/** One coalesced live update: the newest K-attested revision observed. */
+export interface KernelGatewayLatestObserverUpdate {
+    readonly revision: string;
+    readonly snapshot: unknown;
+}
+export type KernelGatewayLatestObserverStatus = 'live' | 'credential-stopped' | 'listener-failed' | 'read-failed' | 'closed';
+export interface KernelGatewayLatestObserver {
+    /** The Query-latest snapshot the session opened at (null before Genesis). */
+    readonly latest: unknown;
+    status(): KernelGatewayLatestObserverStatus;
+    unsubscribe(): void;
+}
+/**
+ * #1003 HF23 — the result of one credentialed agent tool-surface read:
+ * exactly the BUILD `agent`-approved PURE operations this principal's
+ * Business-bound roles may call. Inert discovery metadata only — no
+ * handler, no route and no mutation authority; effectful operations never
+ * enter the surface (the seal refuses the marking), and a discovered tool
+ * stays callable only through the S04 protected OperationCall route.
+ */
+export interface KernelGatewayAgentToolQueryResult {
+    readonly kind: 'agent-tool-query';
+    readonly appId: string;
+    readonly tools: readonly {
+        readonly capabilityId: string;
+        readonly operationId: string;
+        readonly effectClass: 'none';
+        readonly authority: string;
+    }[];
+    readonly projectionAuthority: string;
+}
 export interface KernelGateway {
     /** Host-context provisioning: load + bind one approved Domain App. */
     registerApp(input: KernelGatewayAppInput): Promise<void>;
@@ -142,6 +209,32 @@ export interface KernelGateway {
     }): Promise<unknown>;
     /** Authenticated subscribe to Kernel receipts; revalidated per delivery. */
     subscribe(credential: HostCredential, scope: KernelReceiptScope, listener: (receipt: unknown) => void): Promise<KernelReceiptSubscription>;
+    /**
+     * [#1003 FR05] Authenticated multi-source projection read: every source
+     * resolves through the authenticated principal's qualified K read, the
+     * exact K-attested revisions are pinned by the caller, and the sealed
+     * Standard SDK's retained `projectRetainedRead` yields the inert
+     * projection candidate (fail-closed on any stale/missing source).
+     */
+    queryProjection(credential: unknown, request: KernelGatewayProjectionRequest): Promise<unknown>;
+    /**
+     * [#1003 HF17] Authenticated latest-then-subscribe observer: ONE Query
+     * latest opens the session, then a NEW non-durable subscription delivers
+     * coalesced live revision updates (the sealed SDK's retained
+     * `coalesceRetainedObservations` collapses same-subject observations to
+     * the newest). Non-durable by contract; every delivery re-authenticates.
+     */
+    observeLatest(credential: HostCredential, scope: KernelGatewayLatestObserverScope, listener: (update: KernelGatewayLatestObserverUpdate) => void): Promise<KernelGatewayLatestObserver>;
+    /**
+     * [#1003 HF23] Authenticated agent tool-surface discovery: exactly the
+     * BUILD `agent`-approved PURE operations the principal's Business-bound
+     * roles may call, projected by the sealed SDK's retained
+     * `projectAgentTools`. Discovery grants nothing — mutations stay on the
+     * central occurrence path (`send` / effectful OperationCall).
+     */
+    queryAgentTools(credential: unknown, request: {
+        readonly appId: string;
+    }): Promise<KernelGatewayAgentToolQueryResult>;
     /** Protected Genesis activation (host-configured role authority). */
     activateGenesis(credential: unknown, request: {
         readonly appId: string;

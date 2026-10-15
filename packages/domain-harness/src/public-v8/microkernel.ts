@@ -225,6 +225,30 @@ export interface V8FacadeKernelOps {
    * `registerApp` provisioning ONLY. Never caller-visible.
    */
   operationResourceAdapters(): readonly V8OperationResourceAdapter[];
+  /**
+   * #1003 HF23: the BUILD-sealed inert operation descriptors, computed for
+   * the AUTHENTICATED principal. Discovery metadata only — no handler, no
+   * physical resource route, no admission authority; the `agentExposed`
+   * marking is sealed BUILD data and `principalAdmitted` mirrors the same
+   * Business-bound role pick an actual OperationCall would take.
+   */
+  describeOperationSurface(principal: V8GatewayPrincipal): readonly V8OperationSurfaceDescriptor[];
+  /**
+   * #1003 FR05/HF17/HF23: the retained Standard-SDK query/observer/agent
+   * projections surfaced for the trusted gateway exactly like the FR08
+   * retained decision-source endpoints — additive optional ABI members,
+   * wired all-or-none only when the sealed Standard SDK exports all three.
+   * Pure inert S projections: H authentication and the Kernel's own reads
+   * stay the authority; nothing here mints a revision or admits a call.
+   */
+  readonly retainedProjection?: {
+    /** FR05: deterministic multi-source projection over exact K-attested revision selectors. */
+    readonly projectRead: (declaration: unknown, snapshots: unknown) => unknown;
+    /** HF17: monotonic-epoch coalescing of delivered revision observations. */
+    readonly coalesceObservations: (observations: unknown) => unknown;
+    /** HF23: read-only agent tool surface over BUILD-sealed descriptors. */
+    readonly projectAgentTools: (operations: unknown) => unknown;
+  };
 }
 
 /** The shape of the wired Kernel mechanism the transport scope consumes. */
@@ -391,12 +415,41 @@ interface WiredOperation {
   readonly intentType?: string;
   /** Effectful: the Host physical resource route behind the Kernel's effect dispatch. */
   readonly resource?: { readonly key: string; readonly operation: string };
+  /**
+   * #1003 HF23: the BUILD-sealed agent exposure marking — pure operations
+   * only (the wiring refuses an effectful marking typed below). An inert
+   * discovery flag: it never widens dispatch, never bypasses the Business
+   * visibility gate and never admits a mutation.
+   */
+  readonly agent?: true;
 }
 
 interface WiredCapability {
   readonly packageId: string;
   readonly endpointId: string;
   readonly operations: Map<string, WiredOperation>;
+}
+
+/**
+ * #1003 HF23 — one BUILD-sealed operation descriptor for an authenticated
+ * principal: inert discovery metadata only. No handler, no physical
+ * resource route and no admission authority ever rides a descriptor; the
+ * `agentExposed` marking is the sealed BUILD approval, and
+ * `principalAdmitted` mirrors the same Business-bound role pick a call
+ * would take (requirePrincipalRole) without throwing.
+ */
+export interface V8OperationSurfaceDescriptor {
+  readonly capabilityId: string;
+  readonly operationId: string;
+  readonly effectClass: V8OperationEffectClass;
+  /** Pure operations only: the sealed BUILD `agent` approval marking. */
+  readonly agentExposed: boolean;
+  /** Pure: the sealed Business intent whose bound role set governs visibility. */
+  readonly visibilityIntentType?: string;
+  /** Effectful: the sealed Business intent that owns central admission. */
+  readonly admissionIntentType?: string;
+  /** Whether the authenticated principal holds the Business-bound role. */
+  readonly principalAdmitted: boolean;
 }
 
 const OPERATION_EFFECT_CLASSES: readonly V8OperationEffectClass[] = ['none', 'idempotent', 'non-idempotent'];
@@ -541,7 +594,7 @@ function assertOperationEffectBinding(input: {
         `${where} claims the Host physical route ${resource.key}.${resource.operation}, but Business effect ${effectType} dispatches ${route.resource.key}.${route.resource.operation}`,
       );
     }
-    routes.add(`${route.resource.key} ${route.resource.operation}`);
+    routes.add(`${route.resource.key}\u0000${route.resource.operation}`);
   }
   if (routes.size !== 1) {
     throw typedError(
@@ -706,12 +759,33 @@ function wireCapabilityOperations(input: {
         if (entry.intentType !== undefined || entry.resource !== undefined) {
           throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} pure operation ${operationId} cannot declare an admission intent or a physical resource route`);
         }
-        operations.set(operationId, { effectClass, handler, visibilityIntentType: visibility.intentType });
+        // #1003 HF23: the optional agent exposure marking is the exact
+        // boolean `true` or absent — anything else is a malformed seal.
+        if (entry.agent !== undefined && entry.agent !== true) {
+          throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} pure operation ${operationId} declares an agent exposure marking that is not the exact boolean true`);
+        }
+        operations.set(operationId, {
+          effectClass,
+          handler,
+          visibilityIntentType: visibility.intentType,
+          ...(entry.agent === true ? { agent: true } : {}),
+        });
         continue;
       }
       const intentType = entry.intentType;
       if (typeof intentType !== 'string' || intentType.length === 0) {
         throw typedError('OPERATION_ABI_INVALID', `capability ${binding.capabilityId} effectful operation ${operationId} must declare the sealed Business intentType that owns its admission`);
+      }
+      // #1003 HF23: an effectful operation can never carry the agent
+      // exposure marking — the agent surface is read-only BY SEAL, and a
+      // mutation reaches the Kernel only through the central occurrence
+      // admission the intent below owns. The refusal fires at wiring,
+      // BEFORE any facade escapes.
+      if (entry.agent === true) {
+        throw typedError(
+          'OPERATION_AGENT_MUTATION_REFUSED',
+          `capability ${binding.capabilityId} effectful operation ${operationId} cannot carry the agent exposure marking; the agent surface is read-only and effectful admission belongs to the sealed central occurrence path only`,
+        );
       }
       if (!input.sealedIntentTypes.has(intentType)) {
         throw typedError(
@@ -1251,6 +1325,30 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     ),
   );
   const capabilityOperations = wiredOperations.capabilities;
+  /**
+   * [#1003 FR05/HF17/HF23] The retained S query/observer/agent projections
+   * (projectRetainedRead / coalesceRetainedObservations /
+   * projectRetainedAgentTools) surfaced on the protected gateway ops —
+   * additive optional ABI members exactly like the FR08 retained
+   * decision-source endpoints; all three wire together or none does. The
+   * projections are the SEALED SDK's own code (the same module the Kernel
+   * validated at load), never a Host re-implementation.
+   */
+  const retainedProjection:
+    | {
+      readonly projectRead: (declaration: unknown, snapshots: unknown) => unknown;
+      readonly coalesceObservations: (observations: unknown) => unknown;
+      readonly projectAgentTools: (operations: unknown) => unknown;
+    }
+    | undefined = typeof sdkNamespace.projectRetainedRead === 'function'
+      && typeof sdkNamespace.coalesceRetainedObservations === 'function'
+      && typeof sdkNamespace.projectRetainedAgentTools === 'function'
+      ? Object.freeze({
+        projectRead: (declaration: unknown, snapshots: unknown) => (sdkNamespace.projectRetainedRead as (a: unknown, b: unknown) => unknown)(declaration, snapshots),
+        coalesceObservations: (observations: unknown) => (sdkNamespace.coalesceRetainedObservations as (v: unknown) => unknown)(observations),
+        projectAgentTools: (operations: unknown) => (sdkNamespace.projectRetainedAgentTools as (v: unknown) => unknown)(operations),
+      })
+      : undefined;
 
   let stopped = false;
   let stopDisposal: Promise<void> | undefined;
@@ -1422,6 +1520,18 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       );
     }
     return granted;
+  }
+
+  /**
+   * #1003 HF23: the non-throwing visibility probe of the SAME pick
+   * requirePrincipalRole makes (an intent without a bound role set admits
+   * everyone, exactly like the call gate's 'anonymous'); discovery hides
+   * what the authenticated principal could not call.
+   */
+  function roleAdmittedByIntent(principal: V8GatewayPrincipal, intentType: string): boolean {
+    const roles = resolveIntentRoles(intentType);
+    if (roles === undefined) return true;
+    return principal.roles.some((role) => roles.includes(role));
   }
 
   function requireInstanceKey(instanceKey: unknown): string {
@@ -1666,6 +1776,28 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       assertOpen();
       return resourceAdapters;
     },
+    describeOperationSurface(principal: V8GatewayPrincipal): readonly V8OperationSurfaceDescriptor[] {
+      assertOpen();
+      requirePrincipal(principal);
+      const out: V8OperationSurfaceDescriptor[] = [];
+      for (const [capabilityId, capability] of capabilityOperations) {
+      for (const [operationId, operation] of capability.operations) {
+        const pure = operation.effectClass === 'none';
+        const governingIntent = pure ? operation.visibilityIntentType : operation.intentType;
+        out.push(Object.freeze({
+          capabilityId,
+          operationId,
+          effectClass: operation.effectClass,
+          agentExposed: operation.agent === true,
+          ...(pure && operation.visibilityIntentType !== undefined ? { visibilityIntentType: operation.visibilityIntentType } : {}),
+          ...(!pure && operation.intentType !== undefined ? { admissionIntentType: operation.intentType } : {}),
+          principalAdmitted: governingIntent === undefined ? true : roleAdmittedByIntent(principal, governingIntent),
+        }));
+      }
+      }
+      return Object.freeze(out);
+    },
+    ...(retainedProjection === undefined ? {} : { retainedProjection }),
   };
 
   const facade: V8DomainFacade = Object.freeze({ send, query, subscribe, stop });
