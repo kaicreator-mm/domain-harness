@@ -50,6 +50,10 @@
       "types": "./dist/host-v8/index.d.ts",
       "import": "./dist/host-v8/index.js",
       "require": "./dist/host-v8/index.js"
+    },
+    "./v8/dac": {
+      "types": "./dist/public-v8/dac.d.ts",
+      "import": "./dist/public-v8/dac.js"
     }
   },
   "files": [
