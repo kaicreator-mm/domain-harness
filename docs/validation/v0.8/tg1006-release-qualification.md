@@ -1,3 +1,51 @@
+# DomainHarness v0.8 — T-G R13 One-shot Release Qualification evidence
+
+**Candidate local release gates: PASS; Web release decision: PENDING independent exact-subject closure review + main integration.** The immutable qualified Product/Runtime candidate is `v0.8@3d2833745d8831ff256aaf0a8f9b9b23ed63a71a`, tree `c8ba9eb47284e3400b8fedf17f00de926971f2b9`. This documentation update is *post-qualification evidence*, not an alteration to those qualified runtime bytes. It does not claim the eventual `main` merge tree has been tested, does not require a second Hidden campaign, and does not manufacture a Git Tag where this repository's prior releases historically used main/integration baselines.
+
+## Candidate evidence, exact source and gates (2026-10-16)
+
+| Subject | Verified receipt and outcome |
+| --- | --- |
+| Frozen v0.8 Product/L2/DAG | #953 Product Freeze, #999 L2 Freeze, T-A–T-F six closed; R12 [44-row ledger](tg1006-44-row-successor-outcome-ledger.md) **44/44** retained bounded positive/negative proofs |
+| Candidate Freeze | [T-G #1006@6213202593](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6213202593), SHA `3d2833745d8831ff256aaf0a8f9b9b23ed63a71a`, tree `c8ba9eb47284e3400b8fedf17f00de926971f2b9` |
+| FR11/HF24 exact-head CI | #1094 R2 `8cfd5298`, Woodpecker **#1310 SUCCESS**, superseding historical #1304 stale SDK oracle-pin failure |
+| R12 integrated tree CI | #1097 PR HEAD `56d1821`, Woodpecker **#1311 SUCCESS**; Git tree `c8ba9eb47284e3400b8fedf17f00de926971f2b9` exactly matches candidate. It ran on GitHub PR merge-ref rather than product commit `3d283374`, so only verified **tree-equivalent** CI evidence is attributed; not fictitious exact-SHA CI |
+| Native Full Regression | One clean Windows Node `24.21.0` + npm `11.19.0` + real `better-sqlite3 12.11.1` run, **3,856 pass, 0 fail, 0 skip**, 5 suite summaries (3188+394+203+62+9), build/lint/typecheck all EXIT0. Local archived command+exit logs recorded in [#1006@6213427283](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6213427283) |
+| Package, Critical Journeys & durability | Clean `npm pack` and isolated real Node consumer PASS; D2/D3 two production applications sharing real SQLite PASS; cross-process CAS, restart, Unknown/false-ACK negative and selected sensitive security refusal tests PASS at frozen candidate |
+| Hidden Validation | One final private FINAL `DH08-FP-53-01` **rev3**, bound to candidate SHA/tree above, **34/34 PASS, 0 public findings**, runner EXIT0; only public-safe result commitment exposed: `sha256:05ef949bdd1676816d7d89c8f0450bb6bd6e7b11cff5fc3d205ae32ff1b3779e`. Original rev2 produced 23 PASS / 11 fail due to outdated test adapter not asserting PRODUCTION under HF21; private adapter r4 was updated without modifying scenario oracles or product source and successful rev3 was executed once. Fail evidence retained in private archive. Source [#1006@6213427283](https://github.com/kaicreator-mm/domain-harness/issues/1006#issuecomment-6213427283) |
+| Private archive | Isolated `kaicreator-mm/hidden-validation` successor evidence at `task/hv-i53-succ-zcode@dbb0ba0f31e12dad4cf887df18bdc69d153b6ed9`; private [PR #62](https://github.com/kaicreator-mm/hidden-validation/pull/62) is **DRAFT / independent review pending**. Never expose scenario definitions or raw results into public product |
+| Blocker audit | No accepted runtime P0/P1 source failure or missing bounded functional row reported. **Main merge not yet verified**: `main` is ahead of `v0.8` by 15 commits (mostly v0.9 docs and one Node pack-consumer test change), while `v0.8` is ahead by 95. Current candidate qualification is **not** a claim about the prospective integration tree |
+
+## Remaining WEB closure path (no repeated Full/Hidden)
+
+1. Independent source/closure Reviewer checks exact frozen SHA/tree, CI statuses, public-safe Hidden checksum and archival evidence, truthful failure handling, Product scope and no outstanding P0/P1. Private [PR #62](https://github.com/kaicreator-mm/hidden-validation/pull/62) requires separate private review/merge; private raw material stays private.
+2. Prepare `v0.8 → main` integration PR preserving existing v0.9 records in main. Review the **actual prospective merge tree**, particularly the one main-only Node packed-consumer test, and use its auto-triggered CI/targeted validation as appropriate; main may not be advanced under an unreviewed merge conflict.
+3. On PASS record exact main SHA/tree, baseline and release outcome in T-G #1006 and close the Issue. Repository convention historically uses main SHA/tree version baselines instead of Git tags or GitHub Release objects (v0.6/v0.7 precedent); no invented tag or duplicate release artifact. Otherwise HOLD with a concrete changed-risk failure.
+
+```ini
+EVENT=DH08_TG_R13_ONE_SHOT_RELEASE_EVIDENCE
+QUALIFIED_PRODUCT_SHA=3d2833745d8831ff256aaf0a8f9b9b23ed63a71a
+QUALIFIED_PRODUCT_TREE=c8ba9eb47284e3400b8fedf17f00de926971f2b9
+FUNCTIONAL_PN=44_OF_44
+FORMAL_DAG_CLOSED=6_OF_7
+FULL_NATIVE=3856_PASS_0_FAIL_0_SKIP
+FULL_ENVIRONMENT=WINDOWS_NODE24_REAL_SQLITE
+FR11_HF24_CI1310=SUCCESS
+CANDIDATE_TREE_EQUIVALENT_CI1311=SUCCESS
+PACKED_D2_D3=PASS
+PRIVATE_HIDDEN=34_OF_34_PASS
+PRIVATE_HIDDEN_PUBLIC_FINAL_CHECKSUM=sha256:05ef949bdd1676816d7d89c8f0450bb6bd6e7b11cff5fc3d205ae32ff1b3779e
+RELEASE_LOCAL_GATES=PASS
+RELEASE_WEB_CLOSURE=AWAIT_INDEPENDENT_REVIEW_AND_MAIN_INTEGRATION
+PRIVATE_ARCHIVE_PR62=DRAFT
+TAG=NOT_CREATED_REPO_BASELINE_CONVENTION
+T_G_1006=OPEN
+```
+
+---
+
+## Historical R12 pre-qualification report (preserved verbatim below)
+
 # DomainHarness v0.8 — T-G Release Qualification R12 (44/44 functional, final candidate pending)
 
 **Current decision (2026-10-16): `FUNCTIONAL_PROOFS_COMPLETE__RELEASE_HOLD`.** All 44 frozen retained-function rows have bounded current positive/negative evidence, tracked in [the R12 44-row ledger](tg1006-44-row-successor-outcome-ledger.md). **No new exact integrated candidate Full/Hidden qualification is claimed.** The formal Task DAG remains **6/7**, T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) OPEN, Release HOLD, Tag NO.
