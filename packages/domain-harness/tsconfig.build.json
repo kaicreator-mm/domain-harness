@@ -28,6 +28,7 @@
     "src/public-v7/index.ts",
     "src/public-v7/execution.ts",
     "src/public-v8/index.ts",
+    "src/public-v8/dac.ts",
     "src/host-v8/index.ts",
     "src/workflow/index.ts",
     "src/workflow/internal/xstate-adapter.ts"
