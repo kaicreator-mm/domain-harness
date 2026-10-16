@@ -4,7 +4,8 @@ export { AppContractGenerationError } from './app-contract-errors.js';
 export const APP_CONTRACT_SOURCE_FORMAT = 'domain-harness.app-contracts.v1';
 export function generateTypedAppContracts(manifest, source, options = {}) {
     if (source.format !== APP_CONTRACT_SOURCE_FORMAT) {
-        throw new AppContractGenerationError('SOURCE_FORMAT_MISMATCH', 'source.format', `expected ${APP_CONTRACT_SOURCE_FORMAT}, got ${String(source.format)}`);
+        const expectedFormat = APP_CONTRACT_SOURCE_FORMAT;
+        throw new AppContractGenerationError('SOURCE_FORMAT_MISMATCH', 'source.format', `expected ${expectedFormat}, got ${String(source.format)}`);
     }
     if (source.packageId !== manifest.packageId) {
         throw new AppContractGenerationError('PACKAGE_MISMATCH', 'source.packageId', `expected ${manifest.packageId}, got ${source.packageId}`);
@@ -168,4 +169,3 @@ function assertUniqueIds(values, key, path) {
         seen.add(id);
     }
 }
-//# sourceMappingURL=app-contracts.js.map

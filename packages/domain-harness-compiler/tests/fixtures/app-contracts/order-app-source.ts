@@ -1,8 +1,8 @@
 import {
   APP_CONTRACT_SOURCE_FORMAT,
   type CompiledAppContractSource,
-} from '../../../src/compiler/app-contracts.js';
-import type { CompiledPackageManifest } from '../../../src/v2/contracts/package.js';
+} from '../../../src/app-contracts/app-contracts.js';
+import type { CompiledPackageManifest } from '../../../src/package/manifest.js';
 
 export const orderManifest = {
   formatVersion: '2',

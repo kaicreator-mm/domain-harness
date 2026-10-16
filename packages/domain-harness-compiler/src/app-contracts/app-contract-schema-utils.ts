@@ -1,4 +1,6 @@
-import type { JsonObject, JsonSchema, JsonValue } from '../contracts/json.js';
+// Portable JSON Schema primitives keep their single authoritative owner in
+// the core v2 contracts (issue #164); consumed via the compiler re-export.
+import type { JsonObject, JsonSchema, JsonValue } from '../raw/types.js';
 import { AppContractGenerationError } from './app-contract-errors.js';
 
 const METADATA_SCHEMA_KEYWORDS = new Set([

@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { JsonSchema } from '../../src/contracts/json.js';
+import type { JsonSchema } from '../src/raw/types.js';
 import {
   AppContractGenerationError,
   generateTypedAppContracts,
   type CompiledAppContractSource,
-} from '../../src/compiler/app-contracts.js';
+} from '../src/app-contracts/app-contracts.js';
 import {
   orderAppContracts,
   orderManifest,
-} from '../fixtures/app-contracts/order-app-source.js';
+} from './fixtures/app-contracts/order-app-source.js';
 
 const PROJECTION_SCHEMA_ID = 'ProjectionUnderTest';
 

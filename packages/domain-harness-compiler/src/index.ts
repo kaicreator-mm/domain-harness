@@ -128,3 +128,25 @@ export type {
   TrustedIssuers,
   UnsignedQualification,
 } from './qualified-package/index.js';
+
+// v0.8 T-G HF25 (#1006): the existing pure build-time typed App-contract
+// generator, delivered from its frozen BUILD owner (this compiler package)
+// instead of a private kernel source import. The generator is build tooling
+// only — it is deliberately NOT re-exported from the Microkernel
+// (@kaicreator/domain-harness) runtime ABI, and no runtime authority is
+// inferred from it. Additive to the COMPILER_PUBLIC_API_VERSION inventory.
+export {
+  APP_CONTRACT_SOURCE_FORMAT,
+  AppContractGenerationError,
+  generateTypedAppContracts,
+} from './app-contracts/app-contracts.js';
+export type {
+  AppCommandContractSource,
+  AppContractGenerationErrorCode,
+  AppDomainEventContractSource,
+  AppViewContractSource,
+  AppWatchContractSource,
+  CompiledAppContractSource,
+  GeneratedAppContractOptions,
+} from './app-contracts/app-contracts.js';
+

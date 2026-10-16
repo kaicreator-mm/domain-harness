@@ -1,4 +1,4 @@
-import type { JsonObject, JsonSchema, JsonValue } from '../contracts/json.js';
+import type { JsonObject, JsonSchema, JsonValue } from '../raw/types.js';
 export declare function assertReferenceHasOnlyMetadataSiblings(schema: JsonSchema, path: string): void;
 export declare function assertSupportedSchema(schema: JsonSchema, path: string): void;
 export declare function schemaArray(value: JsonValue | undefined, path: string): readonly JsonSchema[] | undefined;
@@ -11,4 +11,3 @@ export declare function isJsonObject(value: JsonValue | undefined): value is Jso
 export declare function renderLiteral(value: JsonValue | undefined, path: string): string;
 export declare function literal(value: string | number | boolean | null): string;
 export declare function toIdentifier(value: string): string;
-//# sourceMappingURL=app-contract-schema-utils.d.ts.map

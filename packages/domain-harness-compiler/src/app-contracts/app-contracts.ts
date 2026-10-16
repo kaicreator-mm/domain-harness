@@ -1,4 +1,8 @@
-import type { CompiledPackageManifest } from '../v2/contracts/package.js';
+// The compiled manifest consumed by the generator has exactly one
+// authoritative owner: the core v2 contracts (frozen L2 dependency rule
+// "compiler -> core contracts", issue #164), reached through the compiler
+// package's own re-export.
+import type { CompiledPackageManifest } from '../package/manifest.js';
 import { AppContractGenerationError } from './app-contract-errors.js';
 import {
   collectNamedSchemaClosure,
@@ -62,10 +66,11 @@ export function generateTypedAppContracts(
   options: GeneratedAppContractOptions = {},
 ): string {
   if (source.format !== APP_CONTRACT_SOURCE_FORMAT) {
+    const expectedFormat: string = APP_CONTRACT_SOURCE_FORMAT;
     throw new AppContractGenerationError(
       'SOURCE_FORMAT_MISMATCH',
       'source.format',
-      `expected ${APP_CONTRACT_SOURCE_FORMAT}, got ${String(source.format)}`,
+      `expected ${expectedFormat}, got ${String(source.format)}`,
     );
   }
 
