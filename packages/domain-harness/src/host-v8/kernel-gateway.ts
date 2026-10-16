@@ -427,6 +427,13 @@ export interface KernelGateway {
     readonly errorIntentType: string;
     readonly input?: unknown;
     readonly invocationOrdinal?: number;
+    /**
+     * [#1080 FR01] The parent instance's OWN incoming invocation — its
+     * durable lineage provenance. Required once the parent is itself a
+     * durable child (the Host cross-checks the pointer against durable
+     * truth); a lineage root declares nothing.
+     */
+    readonly parentLineage?: { readonly viaParentInstanceKey: string; readonly invocationOrdinal: number };
   }): Promise<unknown>;
   /**
    * [#1062 HF32] ONE authenticated correlated child terminal. The durable
@@ -1824,6 +1831,7 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       readonly errorIntentType: string;
       readonly input?: unknown;
       readonly invocationOrdinal?: number;
+      readonly parentLineage?: { readonly viaParentInstanceKey: string; readonly invocationOrdinal: number };
     }): Promise<unknown> {
       if (
         typeof request !== 'object' || request === null
@@ -1835,8 +1843,12 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         || typeof request.errorIntentType !== 'string' || request.errorIntentType.length === 0
         || (request.invocationOrdinal !== undefined
           && (typeof request.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.invocationOrdinal) || request.invocationOrdinal <= 0))
+        || (request.parentLineage !== undefined
+          && (typeof request.parentLineage !== 'object' || request.parentLineage === null
+            || typeof request.parentLineage.viaParentInstanceKey !== 'string' || request.parentLineage.viaParentInstanceKey.length === 0 || request.parentLineage.viaParentInstanceKey.includes(':')
+            || typeof request.parentLineage.invocationOrdinal !== 'number' || !Number.isSafeInteger(request.parentLineage.invocationOrdinal) || request.parentLineage.invocationOrdinal <= 0))
       ) {
-        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'sendChildMessage requires {appId, parentInstanceKey, childInstanceKey, childIntentType, doneIntentType, errorIntentType} with non-empty strings and an optional positive ordinal');
+        throw new HostBoundaryError('HOST_CONTROL_MALFORMED', 'sendChildMessage requires {appId, parentInstanceKey, childInstanceKey, childIntentType, doneIntentType, errorIntentType} with non-empty strings, an optional positive ordinal and an optional parentLineage {viaParentInstanceKey, invocationOrdinal}');
       }
       const principal = await authenticate(credential);
       assertIntentScope({ tenantId: principal.tenantId, appId: request.appId, instanceKey: request.parentInstanceKey }, principal);
@@ -1848,11 +1860,24 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
       // allocates nothing durable (the settlement-before-authorization
       // root is closed at allocation too).
       requireIntentRole(app, principal, request.childIntentType);
+      // [#1080 FR01] Durable child-lineage depth bound BEFORE the record
+      // is allocated: the depth is derived from the parent's own incoming
+      // invocation records (durable truth, never caller arithmetic) and
+      // the declared provenance pointer is cross-checked against that
+      // truth — missing/forged/overflowed depth refuses typed with zero
+      // allocation and zero Kernel activity.
+      const lineageDepth = await childInvocations.deriveLineageDepth({
+        appId: request.appId,
+        tenantId: principal.tenantId,
+        parentInstanceKey: request.parentInstanceKey,
+        ...(request.parentLineage === undefined ? {} : { declared: request.parentLineage }),
+      });
       const opened = await childInvocations.open({
         appId: request.appId,
         tenantId: principal.tenantId,
         parentInstanceKey: request.parentInstanceKey,
         childInstanceKey: request.childInstanceKey,
+        lineageDepth,
         ...(request.invocationOrdinal === undefined ? {} : { invocationOrdinal: request.invocationOrdinal }),
         childIntentType: request.childIntentType,
         doneIntentType: request.doneIntentType,

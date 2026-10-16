@@ -314,6 +314,9 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
   // T-E (#1004) added exactly one further additive key './v8/host' (trusted
   // Node Host bootstrap/physical CAS/scoped UX boundary subpath) under the
   // same additive-only rule.
+  // T-G (#1006 B2) added exactly one further additive key './v8/dac' (optional
+  // pure external-DAC fact-verifier subpath; types/import only, ESM-only by
+  // design — no require variant) under the same additive-only rule.
   assert.deepEqual(Object.keys(parsed.exports), [
     '.',
     './v2',
@@ -324,6 +327,7 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
     './v7/execution',
     './v8',
     './v8/host',
+    './v8/dac',
   ]);
   assert.deepEqual(parsed.exports['./v8'], {
     types: './dist/public-v8/index.d.ts',
@@ -334,6 +338,10 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
     types: './dist/host-v8/index.d.ts',
     import: './dist/host-v8/index.js',
     require: './dist/host-v8/index.js',
+  });
+  assert.deepEqual(parsed.exports['./v8/dac'], {
+    types: './dist/public-v8/dac.d.ts',
+    import: './dist/public-v8/dac.js',
   });
   // Pinned pre-change legacy targets (byte-identical, unmodified, unreordered).
   assert.deepEqual(parsed.exports['.'], {

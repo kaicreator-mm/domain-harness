@@ -148,16 +148,30 @@ test('T012-D1: internal helpers, digest-domain consts, caller-kind consts and th
 
 test('T012-D1: package exports map gains exactly ./v7/execution with types/import/require', () => {
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
-    exports: Record<string, { types: string; import: string; require: string }>;
+    exports: Record<string, Record<string, string>>;
   };
   const subpaths = Object.keys(packageJson.exports).sort();
   // T-A (#1000) added exactly one further additive key './v8' (qualified
   // package/component ABI subpath) — no legacy target modified, none reordered.
   // T-E (#1004) added exactly one further additive key './v8/host' (trusted
   // Node Host bootstrap/physical CAS/scoped UX boundary subpath).
+  // T-G (#1006 B2) added exactly one further additive key './v8/dac' (optional
+  // pure external-DAC fact-verifier subpath; types/import only, ESM-only by
+  // design — no require variant).
   assert.deepEqual(
     subpaths,
-    ['.', './v2', './v3', './v4', './v7', './v7/execution', './v8', './v8/host', './workflow'],
+    [
+      '.',
+      './v2',
+      './v3',
+      './v4',
+      './v7',
+      './v7/execution',
+      './v8',
+      './v8/dac',
+      './v8/host',
+      './workflow',
+    ],
   );
   assert.deepEqual(packageJson.exports['./v8'], {
     types: './dist/public-v8/index.d.ts',
@@ -168,6 +182,10 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
     types: './dist/host-v8/index.d.ts',
     import: './dist/host-v8/index.js',
     require: './dist/host-v8/index.js',
+  });
+  assert.deepEqual(packageJson.exports['./v8/dac'], {
+    types: './dist/public-v8/dac.d.ts',
+    import: './dist/public-v8/dac.js',
   });
   assert.deepEqual(packageJson.exports['./v7/execution'], {
     types: './dist/public-v7/execution.d.ts',

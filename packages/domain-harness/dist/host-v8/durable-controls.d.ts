@@ -32,7 +32,7 @@
  * correlation/timer ids validated HERE typed).
  */
 import type { CasDocumentStore } from './cas.js';
-export type DurableControlErrorCode = 'DURABLE_CONTROL_INVALID' | 'DURABLE_CONTROL_UNAVAILABLE' | 'EXTERNAL_WORK_IDENTITY_CONFLICT' | 'UNKNOWN_EXTERNAL_CORRELATION' | 'DEADLINE_TIMER_MISMATCH' | 'DEADLINE_NOT_DUE' | 'CALLBACK_IDENTITY_CONFLICT' | 'CHILD_INVOCATION_UNKNOWN' | 'CHILD_INVOCATION_NOT_ACCEPTED' | 'CHILD_INVOCATION_ALREADY_TERMINAL' | 'CHILD_INVOCATION_SETTLED' | 'CHILD_INVOCATION_REJECTED' | 'POISON_RECOVERY_INVALID' | 'POISON_RECOVERY_IDENTITY_CONFLICT' | 'POISON_RECOVERY_UNKNOWN' | 'DURABLE_CONTROL_CONTENTION';
+export type DurableControlErrorCode = 'DURABLE_CONTROL_INVALID' | 'DURABLE_CONTROL_UNAVAILABLE' | 'EXTERNAL_WORK_IDENTITY_CONFLICT' | 'UNKNOWN_EXTERNAL_CORRELATION' | 'DEADLINE_TIMER_MISMATCH' | 'DEADLINE_NOT_DUE' | 'CALLBACK_IDENTITY_CONFLICT' | 'CHILD_INVOCATION_UNKNOWN' | 'CHILD_INVOCATION_NOT_ACCEPTED' | 'CHILD_INVOCATION_ALREADY_TERMINAL' | 'CHILD_INVOCATION_SETTLED' | 'CHILD_INVOCATION_REJECTED' | 'CHILD_LINEAGE_REQUIRED' | 'CHILD_LINEAGE_FORGERY' | 'CHILD_DEPTH_EXCEEDED' | 'POISON_RECOVERY_INVALID' | 'POISON_RECOVERY_IDENTITY_CONFLICT' | 'POISON_RECOVERY_UNKNOWN' | 'DURABLE_CONTROL_CONTENTION';
 export declare class DurableControlError extends Error {
     readonly code: DurableControlErrorCode;
     constructor(code: DurableControlErrorCode, message: string);
@@ -183,6 +183,8 @@ export interface ChildInvocationRecord {
     readonly parentInstanceKey: string;
     readonly childInstanceKey: string;
     readonly invocationOrdinal: number;
+    /** [#1080 FR01] Durable lineage depth of THIS edge (a lineage root's edge = 1). */
+    readonly lineageDepth: number;
     readonly childIntentType: string;
     readonly doneIntentType: string;
     readonly errorIntentType: string;
@@ -237,6 +239,7 @@ export declare class ChildInvocationCoordinator {
         readonly parentInstanceKey: string;
         readonly childInstanceKey: string;
         readonly invocationOrdinal?: number;
+        readonly lineageDepth: number;
         readonly childIntentType: string;
         readonly doneIntentType: string;
         readonly errorIntentType: string;
@@ -245,6 +248,33 @@ export declare class ChildInvocationCoordinator {
         record: ChildInvocationRecord;
         disposition: 'created' | 'pending-retry';
     }>;
+    /**
+     * [#1080 FR01] Derive the lineage depth a NEW outgoing edge of
+     * `parentInstanceKey` would carry — from DURABLE truth only (the
+     * parent's own incoming invocation records), never caller arithmetic —
+     * and fail-closed adjudicate the caller's declared provenance pointer
+     * against that truth BEFORE any durable allocation:
+     *
+     *   missing    a non-root parent (it HAS incoming invocation records)
+     *              declares no provenance — a deep parent cannot root-claim
+     *   forged     a declared pointer that resolves to no incoming record of
+     *              THIS parent (tampered ordinal / foreign pair), or a root
+     *              parent declaring provenance it cannot have
+     *   overflowed  the derived edge depth would exceed the frozen maximum
+     *
+     * Every edge of a deep tree is itself a durable record allocated through
+     * this seam, so the incoming-record scan captures the WHOLE lineage —
+     * the bound cannot be bypassed by re-addressing or cross-pair sends.
+     */
+    deriveLineageDepth(input: {
+        readonly appId: string;
+        readonly tenantId: string;
+        readonly parentInstanceKey: string;
+        readonly declared?: {
+            readonly viaParentInstanceKey: string;
+            readonly invocationOrdinal: number;
+        };
+    }): Promise<number>;
     private adjudicateExisting;
     private pendingRecord;
     /**
