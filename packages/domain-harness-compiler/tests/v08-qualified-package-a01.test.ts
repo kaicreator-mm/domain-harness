@@ -249,6 +249,28 @@ test('V08-ABI-A01-B6 missing declared handler export is refused (AST, not a text
   refuses(QualificationError, 'QUALIFY_EXPORT_MISSING', () => qualifyPackageClosure(submission({ kernelSource: deceptive })));
 });
 
+test('V08-ABI-A01-B7a v0.8.1 refuses disjoint multi-B policy at BUILD (#1102)', () => {
+  const secondBusiness = moduleSource('business', 'biz:extra@1.0.0', 'demo.extra');
+  const input = submission({
+    extraBusiness: [{ packageId: 'biz:extra@1.0.0', source: secondBusiness, intentType: 'demo.extra' }],
+    bindingsOverride: [
+      { role: 'kernel', packageId: 'kernel:demo@1.0.0', endpointId: 'occurrence-runtime' },
+      { role: 'standard-sdk', packageId: 'std:demo@1.0.0', endpointId: 'rule-interpreter' },
+      { role: 'business', packageId: 'biz:demo@1.0.0', endpointId: 'business-policy' },
+      { role: 'business', packageId: 'biz:extra@1.0.0', endpointId: 'business-policy' },
+      { role: 'intent', intentType: 'demo.request', packageId: 'biz:demo@1.0.0', endpointId: 'business-policy' },
+      { role: 'intent', intentType: 'demo.extra', packageId: 'biz:extra@1.0.0', endpointId: 'business-policy' },
+    ],
+  });
+  refuses(QualificationError, 'QUALIFY_MULTI_BUSINESS_UNSUPPORTED', () => qualifyPackageClosure(input));
+  // Even an extra Business module omitted from role bindings cannot be
+  // permitted to reach the installer and execute top-level code.
+  const unbound = submission({
+    extraBusiness: [{ packageId: 'biz:extra@1.0.0', source: secondBusiness, intentType: 'demo.extra' }],
+  });
+  refuses(QualificationError, 'QUALIFY_MULTI_BUSINESS_UNSUPPORTED', () => qualifyPackageClosure(unbound));
+});
+
 test('V08-ABI-A01-B7 ambiguous provider at BUILD: two business packages providing one intent are refused', () => {
   const clash = moduleSource('business', 'biz:clash@1.0.0', 'demo.request');
   refuses(QualificationError, 'QUALIFY_PROVIDER_AMBIGUOUS', () =>
@@ -314,8 +336,8 @@ test('V08-ABI-A01-B10 slash-bearing qualified Graph tuples stay injective', () =
     ),
   };
   refuses(QualificationError, 'QUALIFY_GRAPH_ID_COLLISION', () => qualifyPackageClosure(doubleEndpoint));
-  // Two DIFFERENT slash-bearing pairs that would collide under naive
-  // concatenation both survive in one closure as distinct graph keys.
+  // Slash-bearing tuple keys remain injective even if a closure contains
+  // multiple Business descriptors; v0.8.1 rejects their activation (#1102).
   const slashClosure = submission({
     extraBusiness: [
       { packageId: 'a/b', source: moduleSource('business', 'a/b', 'x.one'), intentType: 'x.one' },
@@ -332,9 +354,7 @@ test('V08-ABI-A01-B10 slash-bearing qualified Graph tuples stay injective', () =
       { role: 'intent', intentType: 'x.two', packageId: 'a', endpointId: 'business-policy' },
     ],
   });
-  const qualified = qualifyPackageClosure(slashClosure);
-  assert.equal(qualified.packages.length, 5);
-  assert.equal(qualified.subjectDigest.length, 64);
+  refuses(QualificationError, 'QUALIFY_MULTI_BUSINESS_UNSUPPORTED', () => qualifyPackageClosure(slashClosure));
 });
 
 test('V08-ABI-A01-B11 BUILD cannot self-mint authority: the producer path takes no issuer secret', () => {
