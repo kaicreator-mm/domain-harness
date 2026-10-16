@@ -207,8 +207,12 @@ test('V08-ABI-A01-P approved sealed K/S/B closure loads byte-verified with prove
   const kernel = loaded.getModuleNamespace('kernel:demo@1.0.0');
   assert.equal(kernel.MODULE_ID, 'kernel:demo@1.0.0');
   assert.equal((kernel.createOccurrenceRuntime as () => { ok: boolean })().ok, true);
-  // Multiple business packages are legal in one closure (K/S/multiple-B).
-  const secondBusiness = businessModule('biz:extra@1.0.0', 'demo.extra');
+});
+
+test('V08-ABI-A01-N8 v0.8.1 refuses multi-B approved closure before executing the second module (#1102)', async () => {
+  // A second Business module must never get a chance to execute its top
+  // level. If imported, its throw would escape instead of the typed error.
+  const secondBusiness = `${businessModule('biz:extra@1.0.0', 'demo.extra')}\nthrow new Error('SECOND_BUSINESS_WAS_IMPORTED');\n`;
   const multi = buildRoot({
     extraBusiness: [{ packageId: 'biz:extra@1.0.0', source: secondBusiness, intentType: 'demo.extra' }],
     bindingsOverride: [
@@ -220,9 +224,7 @@ test('V08-ABI-A01-P approved sealed K/S/B closure loads byte-verified with prove
       { role: 'intent', intentType: 'demo.extra', packageId: 'biz:extra@1.0.0', endpointId: 'business-policy' },
     ],
   });
-  const loadedMulti = await load(multi);
-  assert.equal(loadedMulti.installedPackages.length, 4);
-  assert.equal(loadedMulti.getModuleNamespace('biz:extra@1.0.0').MODULE_ID, 'biz:extra@1.0.0');
+  await refuse(multi, 'LOAD_MULTI_BUSINESS_UNSUPPORTED');
 });
 
 test('V08-ABI-A01-N1 approval delegated/replayed onto a different closure is refused', async () => {
