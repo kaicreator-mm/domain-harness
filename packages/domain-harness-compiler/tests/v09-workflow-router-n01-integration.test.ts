@@ -21,7 +21,7 @@ import * as engineering from '../../../examples/v08-domain-apps/business-enginee
 
 test('V09-N01-PN: workspace test command actually runs the ten Router refusal/selection cases', () => {
   const testFile = fileURLToPath(new URL('./v09-workflow-router-n01.test.mjs', import.meta.url));
-  const result = spawnSync(process.execPath, ['--test', testFile], {
+  const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', testFile], {
     encoding: 'utf8',
     timeout: 30_000,
     maxBuffer: 1_048_576,
