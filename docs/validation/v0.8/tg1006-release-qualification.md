@@ -1,6 +1,6 @@
-# DomainHarness v0.8 — T-G Release Qualification R6 (HF16 selected success, successor production candidate still HOLD)
+# DomainHarness v0.8 — T-G Release Qualification R7 (FR01 selected P/N and packed DAC API; successor HOLD)
 
-**Decision (2026-10-16): `RELEASE_HOLD_RETAINED_FUNCTION_PN_GAPS` (R6 successor source: HF16 resolved, new production candidate not yet independently requalified).** This is a concrete evidence-based qualification, not a newly requested full test campaign, a tag authorization or a claim that all 44 retained functions passed. T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) stays OPEN (**formal DAG 6/7**).
+**Decision (2026-10-16): `RELEASE_HOLD_RETAINED_FUNCTION_PN_GAPS` (R7 successor sources: HF16 and FR01 selected P/N, but 11 accepted retained-function gaps still remain, source candidate not independently requalified).** This is a concrete evidence-based qualification, not a newly requested full test campaign, a tag authorization or a claim that all 44 retained functions passed. T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) stays OPEN (**formal DAG 6/7**).
 
 ## 1. Exact candidate and verified gates
 
@@ -18,6 +18,9 @@
 
 **R6 SOURCE SUCCESSOR (no frozen-candidate evidence mutation):** HF16 code PR [#1079](https://github.com/kaicreator-mm/domain-harness/pull/1079) merged at `0b53d95883c7af216ef9417db3ad646470a1a219`. Exact R2 HEAD `616bcf23...` source review #5539677584 PASS_BOUND_DELTA, real selected Node24/SQLite 5/5 focused plus 145/145 impacted tests, original poisoned effect never re-executes, authorized one-shot corrected turn, typed unverified/fabricated/foreign poison denial before durable CAS, duplicate/restart zero double-effect; R1 full remote CI #1285 SUCCESS, R2 #1286 was still PENDING at merge and is **NOT CLAIMED PASS**. Frozen old candidate full 3,786 and private Hidden 34/34 are evidence for **old product bytes**, not automatic release qualification for this successor source. This source update changes K/Host; final Release Qualification must pin source SHA, recheck affected safety and final unified acceptance, reusing unchanged evidence where justified. R6 44-row *proof coverage* now **32 P/N / 8 partial / 3 source-only / 1 legacy-only**, **12 material gaps**: FR01, HF21, HF29, FR11, HF24/25/30/34 and NF01–04. Separate Draft PR #1083 pure-DAC packaged export is unbuilt/unverified, not counted.
 
+
+**R7 current Web checkpoint (supersedes R6 count, not its history):** selected FR01 PR #1088, Node24 real SQLite and Woodpecker #1293 SUCCESS, merged `7dae04652d08b8a36ad0fcdcaee61039025ea1aa`, exact R1 Web review #5542898881. Confirmed durable lineage-derived 1..32 positive and >32/missing/foreign provenance typed refusals before child CAS or K Effect. Separate B2 PR #1083 merged `7ec19cbfb89fd51ed2c86ef536bdac3a3ea23fc7`, one optional pure external DAC-verifier npm `/v8/dac` export with real clean tarball P/N, generated dist, Woodpecker #1292 SUCCESS; **the shared shipping seam is closed, the frozen HF30/NF01–04 verification and activation facts remain unproven as full rows**. HF25 consumer test-only PR #1085 merged `daae86a1dd10b24d88fe8c57fc02bfb666e095d0`, Woodpecker #1289 SUCCESS, but build-generator distribution/qualified consumer still unproven. HF21 PR #1089 and HF29 PR #1087 remote CI green, Web exact-source R1 **NEEDS_REVISION** due respectively to classless production-effect bypass and JSON array-accessor evaluation before refusal; neither counts as closed. **Current 33 P/N / 7 PARTIAL / 3 SOURCE_ONLY / 1 LEGACY_ONLY = 44; 11 material acceptance gaps**, comprising HF21/HF29 plus 9 BUILD/DAC. Original frozen candidate's 3,786 Full and Hidden 34/34 cannot qualify later changed K/Host/SDK bytes. Do not create redundant full campaigns; one risk-aware unified successor qualification after implementation convergence. `RELEASE=HOLD; TAG=NO; T-G #1006=OPEN`.
+
 ## 2. Release-blocking evidence gap — frozen useful functions IN
 
 **R2 historical evidence reuse:** after R1 was merged in PR #1070 (`723a3445`), a source-only Web review matched three previously under-classified rows — FR06/HF22/HF31 — to *already executed* exact-candidate compiler/core accepted-and-refused assertions. No code/test bytes changed and no suites were rerun. The authorized successor 44-row ledger records exact test names and the revised counts below; the frozen manifest is unchanged. This R2 supersedes only R1's **27-row gap count**, not its underlying 3,786 + 6 + Hidden 34/34 evidence.
@@ -33,11 +36,11 @@ The approved [Product](../../product/DomainHarness_v0.8_PRODUCT_FREEZE.md) and [
 
 | Current retained-function outcome | Rows | Meaning |
 |---|---:|---|
-| `CANDIDATE-PN-PASS` | **32** | Exact current-candidate P AND N observable genuinely executed. |
-| `CANDIDATE-PARTIAL` | **8** | Relevant candidate tests passed but required individual P/N behavior remains partially unproven. |
+| `CANDIDATE-PN-PASS` | **33** | Exact current-candidate P AND N observable genuinely executed. |
+| `CANDIDATE-PARTIAL` | **7** | Relevant candidate tests passed but required individual P/N behavior remains partially unproven. |
 | `SOURCE-LEVEL-EXECUTED` | **3** | Compiler BUILD/unit source ran; independent consumer/physical scope is missing. |
 | `LEGACY-EXECUTED / SELECTED-NOT-RUN` | **1** | Historical tests ran, but selected v0.8 BUILD/DAC bridge behavior is not verified. |
-| **Total** | **44** | **12** entries still have unproven material acceptance, not failures. |
+| **Total** | **44** | **11** entries still have unproven material acceptance, not failures. |
 
 The 34/34 Hidden PASS is orthogonal: it proves the independently composed blind scenarios ran against the exact candidate, but **does not automatically establish each of 44 specified individual P/N acceptance rows**; private oracle/fixture mappings cannot be published to backfill the public ledger by guesswork.
 
@@ -52,7 +55,7 @@ The 34/34 Hidden PASS is orthogonal: it proves the independently composed blind 
 ## 3. Release disposition and non-waiver
 
 ```ini
-EVENT=DH08_TG_RELEASE_QUALIFICATION_R6_PROVISIONAL
+EVENT=DH08_TG_RELEASE_QUALIFICATION_R7_PROVISIONAL
 SOURCE_OF_TRUTH=LIVE_GITHUB
 CANDIDATE_SHA=b151320ee6835755ba043e2602c085c180c9c849
 CANDIDATE_TREE=a8135b2a217edff395da0a4f31dd7955d3b3db5a
@@ -66,16 +69,19 @@ HIDDEN=34_OF_34_PASS
 HIDDEN_PUBLIC_FINDINGS=0
 PRIVATE_EVIDENCE=HIDDEN_VALIDATION_PR60_PR61_MERGED
 CI=PASS_EXECUTABLE_EQUIVALENT_PR1069_62a7660
-RETAINED_44=32_PN_PASS_8_PARTIAL_3_SOURCE_ONLY_1_LEGACY_ONLY
-MATERIAL_PN_GAPS=12
+RETAINED_44=33_PN_PASS_7_PARTIAL_3_SOURCE_ONLY_1_LEGACY_ONLY
+MATERIAL_PN_GAPS=11
 PRODUCTION_COMPAT_PRE_V1=OUT
 OWNER_GITHUB_LOGIN_GATE=NONE
 RELEASE_QUALIFIED=NO
 TAG=NO
-SUCCESSOR_MERGE=0b53d95883c7af216ef9417db3ad646470a1a219
+SUCCESSOR_MERGE=7dae04652d08b8a36ad0fcdcaee61039025ea1aa
+R7_DAC_PACKAGED_PR=1083_MERGED_7ec19cbf_CI1292_SUCCESS
+R7_HF25_TEST_PR=1085_MERGED_daae86a1_CI1289_SUCCESS
+R7_FR01_PR=1088_MERGED_7dae0465_CI1293_SUCCESS
 HF16_R2_CI_AT_MERGE=PENDING_NOT_PASS
 ISSUE_1006=OPEN
-NEXT=FIX_OR_PRODUCT_DISPOSE_FR01_HF21_HF29_AND_PROVE_BUILD_DAC_NINE_NEW_CANDIDATE_VALIDATION
+NEXT=REPAIR_HF21_1089_AND_HF29_1087_PROVE_BUILD_DAC_NINE_THEN_NEW_CANDIDATE_RELEASE_QUALIFICATION
 ```
 
 This is a **HOLD on unproven acceptance, not a product test failure**. No security/CAS/false-ACK defect is waived. Re-evaluate after only the material unproven tests are matched or executed; a legitimate Product rescope of a historically *compatibility-only* item requires an explicit recorded decision rather than implicit status promotion. A subsequent qualification must name the exact source and actual test receipts.
