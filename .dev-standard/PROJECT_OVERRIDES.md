@@ -6,6 +6,22 @@
 - Product / Service: DomainHarness Domain Application Runtime + Scoped AI Execution
 - Standard revision: read `.dev-standard/VERSION` (immutable pin; never a mutable `main`/`latest` reference)
 
+## ADS v4.12.0 adoption checkpoint — effective for new dispatches after merge (2026-10-16)
+
+- Canonical effective standard: `.dev-standard/VERSION` **4.12.0** pinned to immutable `kaicreator-mm/ai-development-standard@ee8258106547abd2c2d7b9f5e87af9965e430bd2` — [published stable Release `v4.12.0`](https://github.com/kaicreator-mm/ai-development-standard/releases/tag/v4.12.0), source-qualified against exact frozen tree `bf5873b82a30a7b373f1dfea5dea8367d2bc93f8`. `main` / floating `latest` is **never** the effective standard.
+- Published-compatible ADS advisory discovery is an **opt-in read-only policy** (not auto-apply, not a Claim/Release gate):
+
+```ini
+standard_update_preference=TRACK_LATEST_COMPATIBLE_STABLE
+```
+
+  A future newly published compatible version (including possible `4.12.1`) requires an explicit separate project-local pin-change PR, exact release/compatibility proof and required independent review; never silently adopt an unreleased `VERSION` on ADS `main`. The v4.12 S05 selector deliberately returns `NO_SAFE_RECOMMENDATION` while this active v0.9 project still has open Issues/PRs or lacks an independently qualified `.dev-standard/ADOPTION_STATUS.json` checkpoint; this opt-in does **not** schedule or authorize automatic updates.
+- Retain `v4.adoption_level=A1_MANUAL_PROTOCOL`, `v4.compatibility_mode=v3.4-bridge`, `ai-dev:event:v2`, self-declared logical agent identity, native GitHub Issue Dependencies, manual Controller/Reviewer/Validator, risk-derived `review:required` for trust/contract/governance changes, and the existing actual-Host security, selected runtime and Release assurance floors. A1 is **not** a claim that optional reducers, project-updaters, controllers, automated Scaffold generators or actual cross-project verification are running.
+- **Mature v0.9 project adoption:** already-frozen Product/L1 (PR #1048), L2 (PR #1053) and native Task DAG (PR #1054, 11/11 edges) are reused. ADS v4.12 phase-scoped work selection, Source-Scaffold/DAG pair checker, Project Steward, environment planning, Task Learning and risk/value guidance apply prospectively only where material and lawful; do not create retroactive Scaffold/paired-Freeze Gates or artificial Issues for this mature project.
+- **In-flight work rule:** #1027 and open PR #1111/#1112 were admitted under the previous **4.0.0** effective pin and keep their original exact Task/Claim/Review/Validation subject evidence; a new pinned version does not retroactively revise their verdicts, freeze scopes, accepted Claims or merge permissions. New dispatches and any explicitly re-admitted prospective work must resolve **4.12.0** at the exact SHA. An in-flight worker MUST NOT silently rebind to another effective standard during a running Claim; reconcile its next authorized checkpoint under the project work-item rules.
+- **Compatibility decision (project-local, governance-only):** source/runtime/wire/schema — **NO PRODUCT CHANGE** from this two-file adoption; agent/authority/Claim/Review — preserve accepted canonical durable facts, adopt v4.12 self-declared executor attribution without GitHub-account-as-identity; validation/release/external effects — maintain existing real-evidence and negative/security gates, `PR PASS != RELEASE PASS`. Automated checker execution, cross-project actual-run proof and savings metrics are **NOT_RUN/UNKNOWN**, not PASS. If a required actual consumer compatibility proof becomes material at a future Task, evaluate it then under `standards/INTERFACE_COMPATIBILITY_GOVERNANCE_STANDARD.md`.
+- **Rollback:** only through another exact-SHA reviewed pin-change PR restoring prior `4.0.0@1edaee9291e25b6dd99303493bed75132cb54881` when justified; retain both revisions' historical evidence. Do not rewrite the v0.8 release baseline or re-run the entire v0.9 Full/Hidden validation campaign for a governance-only pin change.
+
 ## Repository profile
 
 - Project form: embedded portable TypeScript Runtime SDK + build-time compiler + host bindings; no server or generic admin UI.
@@ -57,7 +73,7 @@ Non-weakening rules:
 - `NOT_RUN`, `BLOCKED` and `NOT_APPLICABLE` retain their standard meanings; an unavailable required gate is never rewritten as `NOT_APPLICABLE`.
 - Disabling reducer/controllers is valid at A1 because every required gate retains its truthful manual execution path recorded in this file.
 
-Migration truth:
+Historical migration truth (v3.4.0 → v4.0.0; retained, **not** the current 4.12.0 pin):
 
 - This adoption (v3.4.0 → v4.0.0 at `A1_MANUAL_PROTOCOL`) changes the governance implementation surface only; Product/PRD/L2/DAC/runtime/package/test semantics are untouched.
 - Historical v3.4 A41/VC evidence keeps its original subject identity and status; it is NOT relabeled as newly produced v4 machine-contract evidence.
