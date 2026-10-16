@@ -614,6 +614,18 @@ async function loadScopedFacade(packageRoot) {
     // consumed by the claim-gated scoped resources view built below.
     const resourceScopeId = mintResourceScopeId(loaded.rootPackageId, loaded.build.closureDigest);
     const bindings = loaded.bindings;
+    // #1102: the facade wires exactly ONE Business policy into the selected
+    // Kernel. A sealed K/S/multiple-B closure is legal at the T-A ABI layer,
+    // but this facade has no per-intent Business routing, so serving it would
+    // silently govern every intent — including intents the sealed closure
+    // binds to another Business package — by the FIRST package's policy.
+    // Refuse typed BEFORE any lifecycle init, policy resolution, mechanism
+    // construction or facade exists (module top levels already evaluated
+    // during the qualified install, exactly like the other wiring refusals).
+    const businessBindingCount = bindings.filter((binding) => binding.role === 'business').length;
+    if (businessBindingCount !== 1) {
+        throw typedError('LOAD_MULTI_BUSINESS_UNSUPPORTED', `sealed closure ${loaded.rootPackageId} binds ${businessBindingCount} business packages; DomainHarness.load serves exactly one Business policy per closure and never routes an intent to a package other than the one its sealed binding names`);
+    }
     const kernelBinding = requireRoleBinding(bindings, 'kernel');
     const sdkBinding = requireRoleBinding(bindings, 'standard-sdk');
     const businessBinding = requireRoleBinding(bindings, 'business');
