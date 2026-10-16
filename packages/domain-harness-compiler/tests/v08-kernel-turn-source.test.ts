@@ -195,7 +195,7 @@ function runtime(policy: any, ports: ReturnType<typeof hostPorts>) {
 }
 
 async function freshInstance(rt: any): Promise<void> {
-  await rt.openInstance({ target: TARGET });
+  await rt.openInstance({ target: TARGET, authorityClass: 'PRODUCTION' });
 }
 
 async function submitWait(rt: any, messageId: string): Promise<any> {

@@ -55,8 +55,8 @@ try {
   // Both re-registrations must SUCCEED against the durable pins written by
   // the parent process (same closure identity + same audience ⇒ idempotent),
   // each minting its own fresh physical deployment identity.
-  await gateway.registerApp({ appId: APP_A, packageRoot: rootA, genesisRoles: ['platform-operator'] });
-  await gateway.registerApp({ appId: APP_B, packageRoot: rootB, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: APP_A, packageRoot: rootA, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await gateway.registerApp({ appId: APP_B, packageRoot: rootB, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 
   const call = (appId, cred, request) => gateway.invokeOperation(cred, { appId, capabilityId: 'cap:quote-tools', ...request });
 
@@ -96,7 +96,7 @@ try {
   // registry of this gateway) is what refuses.
   try {
     const forgedGateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await forgedGateway.registerApp({ appId: APP_A, packageRoot: rootB, genesisRoles: ['platform-operator'] });
+    await forgedGateway.registerApp({ appId: APP_A, packageRoot: rootB, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     outcome.forgedClosure = 'UNEXPECTEDLY_ALLOWED';
   } catch (error) {
     outcome.forgedClosure = error?.code ?? error?.message;

@@ -201,7 +201,7 @@ test('S01-P1 one REAL Approval app artifact activates through the installed refe
   });
   const appIds = ['s01-order-alpha', 's01-order-beta'];
   for (const appId of appIds) {
-    await gateway.registerApp({ appId, packageRoot: handle, genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId, packageRoot: handle, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const genesis = (await gateway.activateGenesis(credential(appId, `op:${appId}`, ['platform-operator', 'requester']), {
       appId,
       instanceKey: 'quote-s01',
@@ -220,7 +220,7 @@ test('S01-P1 one REAL Approval app artifact activates through the installed refe
   // idempotently: the pre-load pin check must resolve the installed reference
   // to its claimed closure identity (never refuse its own pinned closure).
   const gateway2 = createKernelGateway({ host: shared.handle.host, gatewaySessionCap: shared.handle.gatewaySessionCap });
-  await gateway2.registerApp({ appId: 's01-order-alpha', packageRoot: handle, genesisRoles: ['platform-operator'] });
+  await gateway2.registerApp({ appId: 's01-order-alpha', packageRoot: handle, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   assert.ok(gateway2.hasApp('s01-order-alpha'));
 });
 
@@ -387,7 +387,7 @@ test('S01-N3 a different closure under a pinned appId is refused before load and
   const gateway = createKernelGateway({ host: shared.handle.host, gatewaySessionCap: shared.handle.gatewaySessionCap });
   // s01-order-alpha is durably pinned to the S01-P1 closure by the previous test.
   await assert.rejects(
-    () => gateway.registerApp({ appId: 's01-order-alpha', packageRoot: handleG, genesisRoles: ['ops'] }),
+    () => gateway.registerApp({ appId: 's01-order-alpha', packageRoot: handleG, genesisRoles: ['ops'], authorityClass: 'PRODUCTION' }),
     (error: unknown) => {
       const code = (error as { code?: unknown }).code;
       assert.equal(code, 'GATEWAY_APP_CLOSURE_MISMATCH');
@@ -396,7 +396,7 @@ test('S01-N3 a different closure under a pinned appId is refused before load and
   );
   assertNeverExecuted(g);
   // The same closure registers cleanly under its OWN appId.
-  await gateway.registerApp({ appId: 's01-order-gamma', packageRoot: handleG, genesisRoles: ['ops'] });
+  await gateway.registerApp({ appId: 's01-order-gamma', packageRoot: handleG, genesisRoles: ['ops'], authorityClass: 'PRODUCTION' });
 });
 
 test('S01-N3 reinstalling the SAME sealed root publishes ONE immutable artifact and never advances its revision', async () => {

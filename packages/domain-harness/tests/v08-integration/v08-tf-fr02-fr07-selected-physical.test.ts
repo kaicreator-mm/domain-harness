@@ -279,8 +279,8 @@ test.before(async () => {
     return { recorded: true };
   });
   gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: FR02_APP, packageRoot: await sealSelectedApp('tf-fr02-fr07-expression.mjs', FR02_APP), genesisRoles: ['platform-operator'] });
-  await gateway.registerApp({ appId: FR07_APP, packageRoot: await sealSelectedApp('tf-fr02-fr07-harness.mjs', FR07_APP), genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: FR02_APP, packageRoot: await sealSelectedApp('tf-fr02-fr07-expression.mjs', FR02_APP), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await gateway.registerApp({ appId: FR07_APP, packageRoot: await sealSelectedApp('tf-fr02-fr07-harness.mjs', FR07_APP), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 });
 
 test.after(async () => {

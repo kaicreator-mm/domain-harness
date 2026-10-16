@@ -237,7 +237,7 @@ function runtime(businessPolicy: any, host = memoryHost()) {
 
 async function opened(businessPolicy = policy()) {
   const built = runtime(businessPolicy);
-  await built.rt.openInstance({ target: TARGET });
+  await built.rt.openInstance({ target: TARGET, authorityClass: 'PRODUCTION' });
   return built;
 }
 
@@ -383,7 +383,7 @@ test('D3-N3b: a K-resolved projection whose source field is absent on the admitt
     },
     businessEndpoint: businessPolicy,
   });
-  await rt.openInstance({ target: TARGET });
+  await rt.openInstance({ target: TARGET, authorityClass: 'PRODUCTION' });
   const before = await snapshotOf(host);
   await assert.rejects(
     submit(rt, 'reviewChange', 'm:review-sparse', REVIEW_A),

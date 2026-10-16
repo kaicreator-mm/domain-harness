@@ -234,7 +234,7 @@ function engineeringRuntime(host: FixtureHost = fixtureHostPorts()) {
 
 async function openedEngineering(host?: FixtureHost) {
   const ctx = engineeringRuntime(host);
-  await ctx.runtime.openInstance({ target: ENG_TARGET, correlationId: 'corr:change:DH-1' });
+  await ctx.runtime.openInstance({ target: ENG_TARGET, correlationId: 'corr:change:DH-1', authorityClass: 'PRODUCTION' });
   return ctx;
 }
 
@@ -922,7 +922,7 @@ test('V08-TF-D3-SHARED-P01: D2 Approval and D3 Engineering occurrences execute t
     sdkEndpoint,
     businessEndpoint: approval.getPolicy(),
   });
-  await d2.openInstance({ target: APPROVAL_TARGET, correlationId: 'corr:APX-R1' });
+  await d2.openInstance({ target: APPROVAL_TARGET, correlationId: 'corr:APX-R1', authorityClass: 'PRODUCTION' });
   const quote = await d2.submitOccurrence({
     kind: 'v08/tf-d3-intent',
     intentType: 'submitQuoteDecisionDynamic',

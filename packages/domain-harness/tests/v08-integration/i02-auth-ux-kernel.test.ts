@@ -50,8 +50,8 @@ async function setupHost() {
 /** One fresh gateway per scenario on the shared trusted host. */
 async function attachGateway(handle: Awaited<ReturnType<typeof setupHost>>['handle']) {
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
-  await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: await sealRealApp('engineering'), genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: await sealRealApp('engineering'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   return gateway;
 }
 

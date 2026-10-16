@@ -25,17 +25,26 @@
  *       tampered to PRODUCTION above the stored digest) refuses typed
  *       AUTHORITY_CLASS_MISMATCH with zero effects; a malformed class
  *       declaration refuses the registration typed;
+ *     - classless fail-closed (R2 #1089): a fresh app registered and
+ *       activated with NO declared class (the pre-HF21 compatibility shape)
+ *       refuses the identical effect-bearing turn typed
+ *       AUTHORITY_CLASS_MISMATCH with ZERO journal row, ZERO physical
+ *       dispatch and ZERO state commit;
  *     - restart currentness: after a genuine fresh-process reopen of the
  *       same physical SQLite store, the swapped-class re-registration
  *       refuses typed before load, both pins keep their exact classes, the
  *       SIMULATION refusal stands and the PRODUCTION replay dispatches
  *       nothing new.
  *
- *   Documented compatibility boundary (NOT claimed as strict): pins
- *   activated by classless registrations (all pre-HF21 activations) keep the
- *   byte-identical legacy digest material and keep executing effects — the
- *   historical classless boundary. They can never be re-bound with a class
- *   (bind-once conflict) and remain a reported product-disposition gap.
+ *   Documented compatibility boundary (R2 #1089: production-effect authority
+ *   is FAIL-CLOSED on the exact class): pins activated by classless
+ *   registrations (all pre-HF21 activations) keep the byte-identical legacy
+ *   digest material, but a classless pin is NOT production authority — a
+ *   fresh classless registered/activated occurrence refuses an effect-bearing
+ *   turn typed AUTHORITY_CLASS_MISMATCH with ZERO journal row, ZERO physical
+ *   dispatch and ZERO state commit. A classless pin can never be re-bound
+ *   with a class (bind-once conflict) and remains a reported
+ *   product-disposition gap, never an authority.
  */
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,6 +59,7 @@ const AUDIENCE = 'dh-hf21';
 const TENANT = 't1';
 const PROD_APP = 'order-prod';
 const SIM_APP = 'order-sim';
+const CLASSLESS_APP = 'order-classless';
 const JOURNAL_PREFIX = 'v08-kernel:effect-journal:';
 const PIN_PREFIX = 'v08-kernel:governance-pin:';
 
@@ -252,6 +262,34 @@ test('HF21-N2 forged/injected runtime authority class refuses typed on every pla
       return typed.code === 'GATEWAY_APP_MALFORMED' && String(typed.message).includes('PRODUCTION');
     },
   );
+});
+
+test('HF21-N3 classless activation refuses the production effect typed (fail-closed, R2 #1089)', { timeout: 120_000 }, async () => {
+  // A FRESH app registered and activated with NO declared class — the exact
+  // pre-HF21 compatibility shape (registration and genesis both succeed; the
+  // classless pin keeps the byte-identical legacy digest material) — must
+  // still never mint a production Effect/Journal: the production-effect
+  // authority gate is FAIL-CLOSED on the exact PRODUCTION class.
+  await gateway.registerApp({ appId: CLASSLESS_APP, packageRoot, genesisRoles: ['platform-operator'] });
+  await gateway.activateGenesis(operator(CLASSLESS_APP), { appId: CLASSLESS_APP, instanceKey: 'q-classless' });
+
+  const pin = await pinDoc('q-classless');
+  assert.equal(pin.value.authorityClass, undefined, 'the activation pin is genuinely classless');
+  assert.equal(typeof pin.value.bindingDigest, 'string');
+
+  const journalBefore = (await journalRows()).length;
+  await assert.rejects(
+    () => send(CLASSLESS_APP, 'm-cl-1', { amount: 30, requestId: 'CL1' }, 'q-classless'),
+    (error: unknown) => {
+      const typed = error as { code?: string; message?: string };
+      return typed.code === 'AUTHORITY_CLASS_MISMATCH' && String(typed.message).includes('classless');
+    },
+  );
+  assert.equal(dispatches.filter((id) => id === 'CL1').length, 0, 'zero physical dispatch');
+  assert.equal((await journalRows()).length - journalBefore, 0, 'zero journal row');
+  const snapshot = await gateway.queryInstance(requester(CLASSLESS_APP), target(CLASSLESS_APP, 'q-classless')) as { stateRevision: number; state: { stateKey: string } };
+  assert.equal(snapshot.stateRevision, 0, 'the refused turn committed nothing');
+  assert.equal(snapshot.state.stateKey, 'review');
 });
 
 test('HF21-R restart currentness: pinned classes survive a fresh-process reopen of the same store', { timeout: 300_000 }, async () => {

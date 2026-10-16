@@ -2720,9 +2720,12 @@ function pinDocKey(workflowInstanceId) {
 // SIMULATION instances, no Definition/policy identity ever implies a class,
 // and the class is woven into the ONE existing KernelGovernancePinStore
 // bindingDigest — never a second pin/currentness plane, never a parallel
-// authority registry, never a GitHub execution-identity check. A SIMULATION
-// pin can never mint authoritative production Effect/Journal; a forged or
-// substituted class fails typed before any production Effect/Journal; the
+// authority registry, never a GitHub execution-identity check. Only an exact
+// PRODUCTION pin can mint authoritative production Effect/Journal: a
+// SIMULATION pin — and EQUALLY a classless pin (the historical compatibility
+// boundary below) — can never mint one and refuses typed before any
+// production Effect/Journal; a forged or substituted class fails typed before
+// any production Effect/Journal; the
 // class persists across CAS/restart/replay because the pin doc is the same
 // physical durable record. Pins activated without a class keep the exact
 // legacy (pre-HF21) digest material — the historical classless compatibility
@@ -2966,22 +2969,27 @@ export class KernelGovernancePinStore {
   }
 
   /**
-   * [#1006 HF21] The production Effect/Journal authority gate (the selected-K
-   * port of the v0.7 T002D `requireProductionEffectAuthority` semantic). A
-   * SIMULATION-class occurrence can observe and execute simulation semantics,
-   * but can NEVER mint an authoritative production Effect, Journal record or
-   * publication — the typed refusal happens before any journal write or
-   * effect dispatch. Historical classless pins (pre-HF21 activations) stay on
-   * the documented compatibility boundary and are NOT silently up- or
-   * downgraded here; they can never be re-bound with a class (bind-once
-   * conflict) and remain a reported product-disposition gap, not an authority.
+   * [#1006 HF21, R2 #1089] The production Effect/Journal authority gate (the
+   * selected-K port of the v0.7 T002D `requireProductionEffectAuthority`
+   * semantic), FAIL-CLOSED on the exact class: only a durable pin carrying the
+   * exact PRODUCTION authority class can mint an authoritative production
+   * Effect, Journal record or publication. A SIMULATION-class occurrence can
+   * still observe and execute simulation semantics, but refuses production
+   * effect authority typed here; a CLASSLESS pin (the pre-HF21 historical
+   * compatibility boundary — including a fresh activation registered without
+   * a declared class) is NOT production authority either and refuses typed the
+   * same way, BEFORE any journal write or effect dispatch, with zero physical
+   * Effect. Nothing implicit, historical or absent can ever be substituted for
+   * the explicit PRODUCTION declaration; a classless pin also can never be
+   * re-bound with a class (bind-once conflict) and remains a reported
+   * product-disposition gap, never an authority.
    */
   async requireProductionEffectAuthority(workflowInstanceId) {
     const pin = await this.requirePinnedExecution(workflowInstanceId);
-    if (pin.authorityClass === SIMULATION_AUTHORITY_CLASS) {
+    if (pin.authorityClass !== PRODUCTION_AUTHORITY_CLASS) {
       throw new GovernanceExecutionBindingError(
         'AUTHORITY_CLASS_MISMATCH',
-        `workflow instance ${workflowInstanceId} is activated under the SIMULATION runtime authority class; a simulation occurrence can never mint authoritative production Effect, Journal or publication`,
+        `workflow instance ${workflowInstanceId} carries the ${JSON.stringify(pin.authorityClass ?? null)} runtime authority class; only an exact PRODUCTION-class pin can mint authoritative production Effect, Journal or publication — a SIMULATION or classless pin can never be substituted`,
       );
     }
     return pin;

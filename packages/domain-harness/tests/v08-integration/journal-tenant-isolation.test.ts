@@ -45,7 +45,7 @@ test('Journal falsifier: same appId/instanceKey/messageId/idempotency text admit
   });
   try {
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 
     const tenant = (tenantId: string) => ({
       operator: mintCredential({ tenantId, appId: 'order-approval', subject: `${tenantId}-op`, roles: ['platform-operator'], audience: AUDIENCE, grantId: `g-${tenantId}-op` }),

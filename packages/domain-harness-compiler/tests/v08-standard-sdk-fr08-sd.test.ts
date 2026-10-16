@@ -289,7 +289,7 @@ test('NF05-N (K submit): a post-wiring injected semantic-decision rule never run
     businessEndpoint: policy,
   });
   const target = { workflowId: 'sd-unit', instanceKey: 'u:1' };
-  await rt.openInstance({ target });
+  await rt.openInstance({ target, authorityClass: 'PRODUCTION' });
   const admitted = await rt.submitOccurrence({ intentType: 'rule:sd-unit', messageId: 'm1', input: INPUT, target });
   assert.equal(admitted.status, 'admitted');
 
@@ -349,7 +349,7 @@ test('NF05-N (K submit, R1 P1): an in-place mutation of a wired rule object neve
     businessEndpoint: policy,
   });
   const target = { workflowId: 'sd-unit', instanceKey: 'u:3' };
-  await rt.openInstance({ target });
+  await rt.openInstance({ target, authorityClass: 'PRODUCTION' });
 
   // AFTER wiring, the still-mutable original object is mutated IN PLACE —
   // same object identity, both values flipped inside the pre-approved
@@ -385,7 +385,7 @@ test('FR08-N-SD1 (K submit): declared unavailability terminates typed with zero 
     businessEndpoint: semanticPolicy({ 'rule:sd-unit-un': unavailableRule }),
   });
   const target = { workflowId: 'sd-unit', instanceKey: 'u:2' };
-  await rt.openInstance({ target });
+  await rt.openInstance({ target, authorityClass: 'PRODUCTION' });
   const receipt = await rt.submitOccurrence({ intentType: 'rule:sd-unit-un', messageId: 'm1', input: INPUT, target });
   assert.equal(receipt.status, 'terminated');
   assert.equal(receipt.terminal?.code, 'SEMANTIC_UNAVAILABLE');

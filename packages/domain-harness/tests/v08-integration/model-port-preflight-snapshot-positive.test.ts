@@ -56,7 +56,7 @@ test('R3: descriptor drift AFTER the preflight is neutralized — the staged pre
     assert.ok(reads >= 1, `the proxy descriptor trap really was consulted during preflight (reads=${reads})`);
     handle.host.resources.provision('ledger', () => ({ reserved: true }));
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway.registerApp({ appId: 'model-quote', packageRoot: await sealRealApp('model'), genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: 'model-quote', packageRoot: await sealRealApp('model'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const operatorC = mintCredential({ tenantId: 't1', appId: 'model-quote', subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
     const requesterC = mintCredential({ tenantId: 't1', appId: 'model-quote', subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
     await gateway.activateGenesis(operatorC, { appId: 'model-quote', instanceKey: 'quote-snap' });

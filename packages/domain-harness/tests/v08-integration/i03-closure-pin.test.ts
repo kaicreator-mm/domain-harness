@@ -40,7 +40,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
 
     // (1) First registration pins the closure identity durably.
     const gateway1 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway1.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'] });
+    await gateway1.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const pinEntry = await handle.host.docs.get('v8host:gateway:app-pin:order-approval');
     if (pinEntry === null) {
       throw new Error('the registration pin is missing from the physical store');
@@ -53,7 +53,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
     // post-restart state) re-registers the SAME closure over the SAME
     // physical store — the pin matches, so this succeeds.
     const gateway2 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway2.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'] });
+    await gateway2.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(gateway2.hasApp('order-approval'), true);
 
     // (3) Replacement: a SECOND independently valid signed closure (same
@@ -68,7 +68,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
     );
     const gateway3 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await assert.rejects(
-      () => gateway3.registerApp({ appId: 'order-approval', packageRoot: rootB, genesisRoles: ['platform-operator'] }),
+      () => gateway3.registerApp({ appId: 'order-approval', packageRoot: rootB, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' }),
       (error: unknown) => {
         assert.ok(error instanceof HostBoundaryError, `expected HostBoundaryError, got ${String(error)}`);
         assert.equal((error as HostBoundaryError).code, 'GATEWAY_APP_CLOSURE_MISMATCH');
@@ -77,7 +77,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
     );
     assert.equal(gateway3.hasApp('order-approval'), false, 'the replacement never registered');
     // Control: rootB is a perfectly valid closure under its OWN appId.
-    await gateway3.registerApp({ appId: 'order-approval-r2', packageRoot: rootB, genesisRoles: ['platform-operator'] });
+    await gateway3.registerApp({ appId: 'order-approval-r2', packageRoot: rootB, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(gateway3.hasApp('order-approval-r2'), true);
 
     // (4) Stale/tampered pin: rewriting the physical pin record (host-store
@@ -90,7 +90,7 @@ test('F-02: durable closure pin — restart idempotence, replacement and stale-p
     );
     const gateway4 = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     await assert.rejects(
-      () => gateway4.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'] }),
+      () => gateway4.registerApp({ appId: 'order-approval', packageRoot: rootA, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' }),
       (error: unknown) => {
         assert.ok(error instanceof HostBoundaryError);
         assert.equal((error as HostBoundaryError).code, 'GATEWAY_APP_CLOSURE_MISMATCH');

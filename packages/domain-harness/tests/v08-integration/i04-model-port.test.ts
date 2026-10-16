@@ -95,7 +95,7 @@ test('I04: protected ModelPort channel — honest FR08 evidence and typed negati
     // The integrated Domain journey still runs with the binding active:
     // load binds the resolver path, Genesis + authenticated send admit.
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: 'order-approval', packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const operatorC = mintCredential({ tenantId: TENANT, appId: 'order-approval', subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
     const requesterC = mintCredential({ tenantId: TENANT, appId: 'order-approval', subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
     await gateway.activateGenesis(operatorC, { appId: 'order-approval', instanceKey: 'quote-m1' });

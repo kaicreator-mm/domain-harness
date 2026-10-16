@@ -204,8 +204,8 @@ test.before(async () => {
     return { reserved: true };
   });
   gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: APP, packageRoot: await sealRealApp('continuation'), genesisRoles: ['platform-operator'] });
-  await gateway.registerApp({ appId: MODEL_APP, packageRoot: await sealRealApp('model'), genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: APP, packageRoot: await sealRealApp('continuation'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await gateway.registerApp({ appId: MODEL_APP, packageRoot: await sealRealApp('model'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 });
 
 test.after(async () => {

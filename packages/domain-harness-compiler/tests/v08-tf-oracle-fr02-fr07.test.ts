@@ -98,9 +98,13 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // The physical selected-path tests seal the current payload bytes.
 // [#1006 HF16] K blob re-pinned for the authorized poison-recovery turn
 // source (strictTurnSource admits kind:'recovery'); S bytes unchanged.
+// K_BLOB_PIN_REBOUND_AFTER_1089_R2: #1089 R2 P1 repair — the selected-K
+// production Effect/Journal authority gate is FAIL-CLOSED on the exact class
+// (only an exact PRODUCTION pin grants; SIMULATION and classless pins refuse
+// typed before any production Effect/Journal); S bytes unchanged.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 const V08_S_BLOB = '06c7988992478fb0614bf6e4d106f3ec6f7f8c44';
-const V08_K_BLOB = 'e9b35fa11ee74fd2b8e97c2b68584e49bc070629';
+const V08_K_BLOB = '0517539099ccad7fd0d1c85fb4a81aa1a746fabb';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
