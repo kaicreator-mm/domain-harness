@@ -16,6 +16,11 @@
  * public ./v9 façade (#1035), the Node24/SQLite CAS profile (#1028) and the
  * physical H→K principal token (#1036) — those interfaces do not exist in
  * this slice and no result below substitutes for them.
+ *
+ * R0 P1 remedy: Business intent membership is derived exclusively from the
+ * sealed root's `role:'intent'` rows (no caller businessIntents input); N3
+ * proves a forged intent injected without touching the sealed root refuses
+ * at BUILD binding, before any Router request or Kernel revalidation.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -136,14 +141,7 @@ const ROUTES = [
 
 async function boundTable() {
   const { root, closureDigest } = await realSealedRoot();
-  const table = bindSelectedClosure({
-    sealedRoot: root,
-    businessIntents: [
-      { packageId: approval.MODULE_ID, intentTypes: approval.INTENT_TYPES },
-      { packageId: engineering.MODULE_ID, intentTypes: engineering.INTENT_TYPES },
-    ],
-    routes: ROUTES,
-  });
+  const table = bindSelectedClosure({ sealedRoot: root, routes: ROUTES });
   return { root, closureDigest, table };
 }
 
@@ -157,6 +155,13 @@ test('V09-N01-ABI-P1: two real Business packages share ONE sealed K/S/C table wi
   assert.equal(table.kernel.packageId, kernel.MODULE_ID);
   assert.equal(table.standard.packageId, sdk.MODULE_ID);
   assert.deepEqual(table.businesses.map((b) => b.packageId), [approval.MODULE_ID, engineering.MODULE_ID]);
+  // R0 P1 witness: intent membership is derived from the sealed root's own
+  // role:'intent' rows and equals exactly what the two real Business
+  // packages declare — no caller intent list exists to differ from it.
+  assert.deepEqual(
+    table.businesses.map((b) => [...b.intentTypes].sort()),
+    [[...approval.INTENT_TYPES].sort(), [...engineering.INTENT_TYPES].sort()],
+  );
   assert.equal(table.basisDigest, `sha256:${closureDigest}`);
   assert.match(table.basisDigest, /^sha256:[0-9a-f]{64}$/);
   // Both businesses' real intents route through the same sealed capability.
@@ -201,14 +206,7 @@ test('V09-N01-ABI-P3: the published Standard interpreter supplies the data-only 
 test('V09-N01-ABI-N1: BUILD binding interface refuses duplicate/conflicting route rows', async () => {
   const { root } = await boundTable();
   const duplicate = [...ROUTES, { intentId: 'reviewChange', operationId: 'quote.preview-total', capabilityId: CAPABILITY_ID, handlerId: 'previewTotal' }];
-  refuses('SELECTED_ABI_ROUTE_DUPLICATE', () => bindSelectedClosure({
-    sealedRoot: root,
-    businessIntents: [
-      { packageId: approval.MODULE_ID, intentTypes: approval.INTENT_TYPES },
-      { packageId: engineering.MODULE_ID, intentTypes: engineering.INTENT_TYPES },
-    ],
-    routes: duplicate,
-  }));
+  refuses('SELECTED_ABI_ROUTE_DUPLICATE', () => bindSelectedClosure({ sealedRoot: root, routes: duplicate }));
 });
 
 test('V09-N01-ABI-N2: unbound capability, unsealed operation and dangling handler each refuse', async () => {
@@ -216,48 +214,66 @@ test('V09-N01-ABI-N2: unbound capability, unsealed operation and dangling handle
   const base = { intentId: 'reviewChange' as const };
   refuses('SELECTED_ABI_CAPABILITY_UNBOUND', () => bindSelectedClosure({
     sealedRoot: root,
-    businessIntents: [{ packageId: engineering.MODULE_ID, intentTypes: engineering.INTENT_TYPES }],
     routes: [{ ...base, operationId: 'quote.preview-total', capabilityId: 'cap:not-sealed', handlerId: 'previewTotal' }],
   }));
   refuses('SELECTED_ABI_OPERATION_UNBOUND', () => bindSelectedClosure({
     sealedRoot: root,
-    businessIntents: [{ packageId: engineering.MODULE_ID, intentTypes: engineering.INTENT_TYPES }],
     routes: [{ ...base, operationId: 'quote.unknown', capabilityId: CAPABILITY_ID, handlerId: 'previewTotal' }],
   }));
   refuses('SELECTED_ABI_HANDLER_MISMATCH', () => bindSelectedClosure({
     sealedRoot: root,
-    businessIntents: [{ packageId: engineering.MODULE_ID, intentTypes: engineering.INTENT_TYPES }],
     routes: [{ ...base, operationId: 'quote.preview-total', capabilityId: CAPABILITY_ID, handlerId: 'reserveLedger' }],
   }));
 });
 
-test('V09-N01-ABI-N3: a route for an intent no selected Business declares refuses', async () => {
+test('V09-N01-ABI-N3 (R0 P1): a forged intent injected WITHOUT touching the sealed root refuses at BUILD binding', async () => {
   const { root } = await boundTable();
+  // Exact reviewer vector: a valid sealed root plus a route for an intent the
+  // root never sealed. With caller intent lists eliminated there is no other
+  // input surface left; the refusal happens at bindSelectedClosure — before
+  // any Router request or Kernel revalidation can exist.
+  const forged = [...ROUTES, { intentId: 'fake.intent', operationId: 'quote.preview-total', capabilityId: CAPABILITY_ID, handlerId: 'previewTotal' }];
+  refuses('SELECTED_ABI_INTENT_UNDECLARED', () => bindSelectedClosure({ sealedRoot: root, routes: forged }));
+  // An intent sealed for a DIFFERENT closure's snapshot is equally absent
+  // here ('demo.request' belongs to the S02a demo world, not this root).
   refuses('SELECTED_ABI_INTENT_UNDECLARED', () => bindSelectedClosure({
     sealedRoot: root,
-    businessIntents: [{ packageId: approval.MODULE_ID, intentTypes: approval.INTENT_TYPES }],
-    routes: [{ intentId: 'reviewChange', operationId: 'quote.preview-total', capabilityId: CAPABILITY_ID, handlerId: 'previewTotal' }],
+    routes: [{ intentId: 'demo.request', operationId: 'quote.preview-total', capabilityId: CAPABILITY_ID, handlerId: 'previewTotal' }],
   }));
+  // The same forged intent also cannot sneak through the Standard-side
+  // request derivation of an already-bound table.
+  const { table } = await boundTable();
+  assert.throws(
+    () => routerRequestFor(table, 'fake.intent', [candidate('quote.preview-total')]),
+    (error: unknown) => error instanceof SelectedAbiError && error.code === 'SELECTED_ABI_INTENT_UNDECLARED',
+  );
 });
 
 test('V09-N01-ABI-N4: tampered sealed structure refuses: duplicate K role, K-role masquerade, duplicate capabilityId', async () => {
   const { root } = await boundTable();
-  const intents = [
-    { packageId: approval.MODULE_ID, intentTypes: approval.INTENT_TYPES },
-    { packageId: engineering.MODULE_ID, intentTypes: engineering.INTENT_TYPES },
-  ];
   const withSecondKernel = structuredClone(root);
   withSecondKernel.bindings.push(structuredClone(withSecondKernel.bindings[0]));
-  refuses('SELECTED_ABI_ROLE_INVALID', () => bindSelectedClosure({ sealedRoot: withSecondKernel, businessIntents: intents, routes: ROUTES }));
+  refuses('SELECTED_ABI_ROLE_INVALID', () => bindSelectedClosure({ sealedRoot: withSecondKernel, routes: ROUTES }));
   const masquerade = structuredClone(root);
   const kBinding = masquerade.bindings.find((binding: { role: string }) => binding.role === 'kernel');
   kBinding.packageId = capabilityModule.MODULE_ID;
   kBinding.endpointId = capabilityModule.ENDPOINTS[0].endpointId;
-  refuses('SELECTED_ABI_ROLE_INVALID', () => bindSelectedClosure({ sealedRoot: masquerade, businessIntents: intents, routes: ROUTES }));
+  refuses('SELECTED_ABI_ROLE_INVALID', () => bindSelectedClosure({ sealedRoot: masquerade, routes: ROUTES }));
   const twiceCapability = structuredClone(root);
   const capBinding = twiceCapability.bindings.find((binding: { role: string }) => binding.role === 'capability');
   twiceCapability.bindings.push(structuredClone(capBinding));
-  refuses('SELECTED_ABI_CAPABILITY_INVALID', () => bindSelectedClosure({ sealedRoot: twiceCapability, businessIntents: intents, routes: ROUTES }));
+  refuses('SELECTED_ABI_CAPABILITY_INVALID', () => bindSelectedClosure({ sealedRoot: twiceCapability, routes: ROUTES }));
+  // Derivation-side intent row checks: the same sealed intent re-owned by the
+  // other Business, and an intent row pointing at an endpoint its package
+  // never declared, both refuse before any route is considered.
+  const twiceIntent = structuredClone(root);
+  const intentRow = twiceIntent.bindings.find((binding: { role: string; intentType?: string }) => binding.role === 'intent' && binding.intentType === 'reviewChange');
+  twiceIntent.bindings.push({ ...intentRow, packageId: approval.MODULE_ID, endpointId: approval.ENDPOINTS[0].endpointId });
+  refuses('SELECTED_ABI_ROLE_INVALID', () => bindSelectedClosure({ sealedRoot: twiceIntent, routes: ROUTES }));
+  const danglingIntent = structuredClone(root);
+  const danglingRow = danglingIntent.bindings.find((binding: { role: string; intentType?: string }) => binding.role === 'intent' && binding.intentType === 'reviewChange');
+  danglingRow.endpointId = 'endpoint:never-declared';
+  refuses('SELECTED_ABI_ROLE_INVALID', () => bindSelectedClosure({ sealedRoot: danglingIntent, routes: ROUTES }));
 });
 
 test('V09-N01-ABI-K1: a genuinely sealed selected result yields one frozen Kernel admission receipt', async () => {

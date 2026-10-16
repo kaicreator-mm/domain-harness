@@ -18,6 +18,15 @@
  * public error names stay with the public façade owner (#1035); the physical
  * H→K principal/permit port and effect dispatch belong to #1032/#1036 and are
  * deliberately absent — nothing here can mint or accept a principal.
+ *
+ * Business intent membership is DERIVED from the sealed root's own
+ * `role:'intent'` binding rows; no caller-supplied intent list exists (R0 P1
+ * remedy). Trust boundary of the outputs: `bindSelectedClosure` yields a
+ * plain-data table and `authorizeSelectedOperation` yields a candidate
+ * revalidation datum — NEITHER is an issuer approval, an H-issued principal
+ * or an effect permit, and no physical Kernel/Host path may treat either as
+ * final authorization. Provenance-qualified tables reach the Kernel only
+ * through the protected BUILD/Host handoff owned by #1032/#1036.
  */
 export const V09_SELECTED_ABI_FORMAT = 'dh.v9.selected-abi/1';
 
@@ -131,7 +140,6 @@ const ROLE_BINDING_FIELDS = ['role', 'packageId', 'endpointId'];
 const INTENT_BINDING_FIELDS = ['role', 'intentType', 'packageId', 'endpointId'];
 const CAPABILITY_BINDING_FIELDS = ['role', 'capabilityId', 'packageId', 'endpointId', 'handlers'];
 const HANDLER_FIELDS = ['operationId', 'handler'];
-const BUSINESS_INTENTS_FIELDS = ['packageId', 'intentTypes'];
 const ROUTE_FIELDS = ['intentId', 'operationId', 'capabilityId', 'handlerId'];
 const KINDS = new Set(['kernel', 'standard-sdk', 'business', 'capability']);
 
@@ -139,12 +147,15 @@ const KINDS = new Set(['kernel', 'standard-sdk', 'business', 'capability']);
  * BUILD binding interface: admit the v0.9 intent→operation route table over
  * one sealed v0.8 qualified closure whose bytes, roles, handler exports,
  * approval and digest were already produced by the published v0.8 BUILD.
+ * Business intent membership is derived from the sealed root's own
+ * `role:'intent'` rows — a route may only name an intent the BUILD actually
+ * sealed; there is no caller-supplied intent authority.
  *
- * @param {unknown} input `{sealedRoot, businessIntents, routes}` plain data.
+ * @param {unknown} input `{sealedRoot, routes}` plain data.
  * @returns {object} Frozen SelectedClosureTable (see selected-abi.d.mts).
  */
 export function bindSelectedClosure(input) {
-  const root = obj(data(input), 'selected closure input', ['sealedRoot', 'businessIntents', 'routes']);
+  const root = obj(data(input), 'selected closure input', ['sealedRoot', 'routes']);
   const sealedRoot = obj(root.sealedRoot, 'sealed root', SEALED_ROOT_FIELDS);
   if (sealedRoot.formatVersion !== 'dhpkg/v8-qualified-root/1') {
     refuse('SELECTED_ABI_ROOT_FORMAT', 'only a sealed v0.8 qualified root may back a v0.9 selected table');
@@ -199,6 +210,10 @@ export function bindSelectedClosure(input) {
   // never masquerade as (or shadow) a closed role here.
   const roleBindings = new Map([['kernel', null], ['standard-sdk', null], ['business', []]]);
   const capabilityBindings = [];
+  // Sealed Business intent membership (R0 P1): retained from the root's own
+  // role:'intent' rows, never from caller input.
+  const sealedIntentsByPackage = new Map();
+  const sealedIntentOwners = new Map();
   for (const raw of bindingsValue) {
     if (raw === null || Array.isArray(raw) || typeof raw !== 'object') {
       refuse('SELECTED_ABI_CONTRACT_INVALID', 'sealed binding must be a record');
@@ -240,11 +255,25 @@ export function bindSelectedClosure(input) {
     }
     if (raw.role === 'intent') {
       const binding = obj(raw, 'intent binding', INTENT_BINDING_FIELDS);
-      routerIdent(binding.intentType, 'intent binding.intentType');
+      const intentType = routerIdent(binding.intentType, 'intent binding.intentType');
       const target = packagesById.get(binding.packageId);
       if (target === undefined || target.pkg.kind !== 'business') {
-        refuse('SELECTED_ABI_ROLE_INVALID', `sealed intent ${binding.intentType} does not bind a business package`);
+        refuse('SELECTED_ABI_ROLE_INVALID', `sealed intent ${intentType} does not bind a business package`);
       }
+      if (!target.endpointIds.has(binding.endpointId)) {
+        refuse('SELECTED_ABI_ROLE_INVALID', `sealed intent ${intentType} binds endpoint ${String(binding.endpointId)} which its business package does not declare`);
+      }
+      const owner = sealedIntentOwners.get(intentType);
+      if (owner !== undefined) {
+        refuse('SELECTED_ABI_ROLE_INVALID', `sealed intent ${intentType} is bound to more than one business package in this closure`);
+      }
+      sealedIntentOwners.set(intentType, binding.packageId);
+      let sealed = sealedIntentsByPackage.get(binding.packageId);
+      if (sealed === undefined) {
+        sealed = new Set();
+        sealedIntentsByPackage.set(binding.packageId, sealed);
+      }
+      sealed.add(intentType);
       continue;
     }
     const binding = obj(raw, 'role binding', ROLE_BINDING_FIELDS);
@@ -288,36 +317,13 @@ export function bindSelectedClosure(input) {
     }
   }
 
-  // BUILD-observed business intent declarations (the sealed v0.8 BUILD proves
-  // the module advertises them; this interface only consumes that evidence).
-  const businessIntentsValue = root.businessIntents;
-  if (!Array.isArray(businessIntentsValue)) {
-    refuse('SELECTED_ABI_CONTRACT_INVALID', 'businessIntents must be an array');
-  }
-  const declaredIntents = new Map();
-  const businessesOut = [];
-  const businessPackageById = new Map(businesses.map(binding => [binding.packageId, binding]));
-  for (const raw of businessIntentsValue) {
-    const entry = obj(raw, 'business intent declaration', BUSINESS_INTENTS_FIELDS);
-    const packageId = boundedString(entry.packageId, 'business intent packageId');
-    if (!businessPackageById.has(packageId)) {
-      refuse('SELECTED_ABI_INTENT_SOURCE_INVALID', `intent declaration names package ${packageId} which is not a business-role-bound package of this closure`);
-    }
-    if (declaredIntents.has(packageId)) {
-      refuse('SELECTED_ABI_INTENT_SOURCE_INVALID', `duplicate intent declaration for package ${packageId}`);
-    }
-    const typesValue = entry.intentTypes;
-    if (!Array.isArray(typesValue) || typesValue.length === 0) {
-      refuse('SELECTED_ABI_INTENT_SOURCE_INVALID', `business package ${packageId} must declare a non-empty intent list`);
-    }
-    const intentTypes = typesValue.map(type => routerIdent(type, 'intent type'));
-    if (new Set(intentTypes).size !== intentTypes.length) {
-      refuse('SELECTED_ABI_INTENT_SOURCE_INVALID', `business package ${packageId} declares a duplicate intent type`);
-    }
-    declaredIntents.set(packageId, new Set(intentTypes));
-    const bound = businessPackageById.get(packageId);
-    businessesOut.push({ ...bound, intentTypes });
-  }
+  // Business intent membership comes ONLY from the sealed role:'intent' rows
+  // above (R0 P1): each role-bound Business carries exactly the intents the
+  // BUILD sealed for it, and caller input cannot add, drop or re-own one.
+  const businessesOut = businesses.map(binding => ({
+    ...binding,
+    intentTypes: [...(sealedIntentsByPackage.get(binding.packageId) ?? [])],
+  }));
 
   // The v0.9 delta: exact intent→operation route rows resolved against the
   // sealed capability handler maps. One intent MAY carry several distinct
@@ -335,12 +341,8 @@ export function bindSelectedClosure(input) {
     const operationId = routerIdent(route.operationId, 'route.operationId');
     const capabilityId = routerIdent(route.capabilityId, 'route.capabilityId');
     const handlerId = routerIdent(route.handlerId, 'route.handlerId');
-    let declared = false;
-    for (const intents of declaredIntents.values()) {
-      if (intents.has(intentId)) { declared = true; break; }
-    }
-    if (!declared) {
-      refuse('SELECTED_ABI_INTENT_UNDECLARED', `route intent ${intentId} is not declared by any selected Business package`);
+    if (!sealedIntentOwners.has(intentId)) {
+      refuse('SELECTED_ABI_INTENT_UNDECLARED', `route intent ${intentId} is not sealed as a business intent binding of this closure`);
     }
     const capability = capabilityBindings.find(binding => binding.capabilityId === capabilityId);
     if (capability === undefined) {
@@ -435,6 +437,15 @@ const RESULT_SHAPES = {
  * H→K principal/permit port, State/Journal/Effect dispatch and UNKNOWN
  * handling stay with the selected Kernel/Host (#1032/#1036); this function
  * grants none of them.
+ *
+ * TRUST BOUNDARY (R0 reviewer question): the returned receipt is a pure
+ * candidate revalidation DATUM, not an issuer approval and not an H-issued
+ * authorization or permit. The `table` input is plain data — any fabricated
+ * table can be internally consistent, so the receipt proves at most internal
+ * agreement between the two given values. A provenance-qualified table
+ * reaches the Kernel only through the protected BUILD/Host handoff owned by
+ * #1032/#1036; no physical Kernel/Host path may treat this return value as
+ * final authorization, and no path from this function executes an effect.
  *
  * @param {unknown} input `{table, intentId, routerResult}` plain data.
  * @returns {object} Frozen Kernel admission revalidation receipt.
