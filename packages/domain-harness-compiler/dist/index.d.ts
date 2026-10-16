@@ -15,3 +15,5 @@ export type { CompiledPackageManifest } from './package/manifest.js';
 export type { CompiledSemanticDecisionDescriptor, SemanticDecisionCacheBypassReason, SemanticDecisionCachePolicy, SemanticDecisionContractVersion, SemanticDecisionPromotedReference, SemanticDecisionUnavailableDisposition, } from '@kaicreator/domain-harness/v2';
 export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';
 export type { BuildQualifiedPackageOptions, ModuleClosureReport, QualifiedPackageSubmission, QualificationSubmission, TrustedIssuers, UnsignedQualification, } from './qualified-package/index.js';
+export { APP_CONTRACT_SOURCE_FORMAT, AppContractGenerationError, generateTypedAppContracts, } from './app-contracts/app-contracts.js';
+export type { AppCommandContractSource, AppContractGenerationErrorCode, AppDomainEventContractSource, AppViewContractSource, AppWatchContractSource, CompiledAppContractSource, GeneratedAppContractOptions, } from './app-contracts/app-contracts.js';

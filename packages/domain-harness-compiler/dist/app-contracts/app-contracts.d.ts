@@ -1,4 +1,4 @@
-import type { CompiledPackageManifest } from '../v2/contracts/package.js';
+import type { CompiledPackageManifest } from '../package/manifest.js';
 export { AppContractGenerationError } from './app-contract-errors.js';
 export type { AppContractGenerationErrorCode } from './app-contract-errors.js';
 export declare const APP_CONTRACT_SOURCE_FORMAT: "domain-harness.app-contracts.v1";
@@ -39,4 +39,3 @@ export interface GeneratedAppContractOptions {
     readonly banner?: string;
 }
 export declare function generateTypedAppContracts(manifest: CompiledPackageManifest, source: CompiledAppContractSource, options?: GeneratedAppContractOptions): string;
-//# sourceMappingURL=app-contracts.d.ts.map

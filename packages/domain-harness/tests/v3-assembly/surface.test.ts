@@ -27,7 +27,10 @@ const EXPECTED_V3_NAMES = [
   'DurableControlCoordinator',
   'DurableControlError',
   'deriveCommandOutcome',
-  'APP_CONTRACT_SOURCE_FORMAT',
+  // v0.8 T-G HF25 (#1006): the typed App-contract generator bindings
+  // (APP_CONTRACT_SOURCE_FORMAT & co.) moved to their frozen BUILD owner,
+  // the @kaicreator/domain-harness-compiler root export; the Microkernel
+  // v3 lane no longer assembles compiler tooling (pre-v1 old-ABI parity out).
   'evaluateDomainWorkflowGuard',
   'PredicateContractViolation',
   // #312 durable ordered Runtime Observation Stream surface.

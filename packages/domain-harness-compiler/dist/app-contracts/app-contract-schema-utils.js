@@ -235,4 +235,3 @@ function assertKnownType(type, path) {
         throw new AppContractGenerationError('UNSUPPORTED_SCHEMA', path, type);
     }
 }
-//# sourceMappingURL=app-contract-schema-utils.js.map

@@ -8,4 +8,3 @@ export class AppContractGenerationError extends Error {
         this.path = path;
     }
 }
-//# sourceMappingURL=app-contract-errors.js.map

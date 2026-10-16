@@ -268,4 +268,3 @@ function hasPrimitiveConst(value) {
 function throwOneOfDisjointness(path) {
     throw new AppContractGenerationError('UNSUPPORTED_SCHEMA', path, 'oneOf branches must be provably disjoint through a shared required primitive const discriminator');
 }
-//# sourceMappingURL=app-contract-schema.js.map

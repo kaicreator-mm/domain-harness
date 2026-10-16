@@ -1,4 +1,4 @@
-import type { JsonSchema } from '../contracts/json.js';
+import type { JsonSchema } from '../raw/types.js';
 export interface SchemaRenderContext {
     readonly schemaAliases: ReadonlyMap<string, string>;
 }
@@ -8,4 +8,3 @@ export declare function collectNamedSchemaClosure(schemas: Readonly<Record<strin
 export declare function collectSchemaReferences(schema: JsonSchema, schemas: Readonly<Record<string, JsonSchema>>, target: Set<string>, path: string): void;
 export declare function requireSchemaAlias(schemas: Readonly<Record<string, JsonSchema>>, context: SchemaRenderContext, schemaId: string, path: string): string;
 export declare function renderSchema(schema: JsonSchema, context: SchemaRenderContext, path: string): string;
-//# sourceMappingURL=app-contract-schema.d.ts.map

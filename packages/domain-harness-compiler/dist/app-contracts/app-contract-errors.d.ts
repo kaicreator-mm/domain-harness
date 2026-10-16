@@ -4,4 +4,3 @@ export declare class AppContractGenerationError extends Error {
     readonly path: string;
     constructor(code: AppContractGenerationErrorCode, path: string, message: string);
 }
-//# sourceMappingURL=app-contract-errors.d.ts.map

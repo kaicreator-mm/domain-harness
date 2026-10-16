@@ -61,7 +61,10 @@ export * from '../runtime/process-command.js';
 export * from '../runtime/durable-control-contracts.js';
 export * from '../runtime/durable-control-coordinator.js';
 export * from '../tool/host-local-contract/index.js';
-export * from '../compiler/app-contracts.js';
+// v0.8 T-G HF25 (#1006): the typed App-contract generator moved to its frozen
+// BUILD owner (@kaicreator/domain-harness-compiler root export). The
+// Microkernel no longer re-exports compiler tooling (L2: kernel must not own
+// a compiler; pre-v1 old-ABI parity is explicitly out of scope).
 
 // Issue #312: durable ordered public Runtime Observation Stream (optional
 // capability; read-only evidence, atomic enabled-mode durability, fail-closed

@@ -7,13 +7,19 @@ import {
   AppContractGenerationError,
   generateTypedAppContracts,
   type CompiledAppContractSource,
-} from '../../src/compiler/app-contracts.js';
+} from '../src/app-contracts/app-contracts.js';
 import {
   orderAppContracts,
   orderManifest,
-} from '../fixtures/app-contracts/order-app-source.js';
+} from './fixtures/app-contracts/order-app-source.js';
 
-const GOLDEN_URL = new URL('../fixtures/app-contracts/order-app.generated.ts', import.meta.url);
+// The golden artifact stays in the kernel test tree beside the #1085 typed
+// consumer test that imports it as a module; this BUILD-side byte oracle
+// reads the same single committed copy rather than duplicating it.
+const GOLDEN_URL = new URL(
+  '../../domain-harness/tests/fixtures/app-contracts/order-app.generated.ts',
+  import.meta.url,
+);
 
 function readCheckoutNormalizedGolden(): string {
   const checkedOut = readFileSync(GOLDEN_URL, 'utf8');
