@@ -10,7 +10,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { authority, compatibility, compositionIntake, runtime } from '@kaicreator/domain-harness/v8/dac';
-import { adoptDacV0041RegistryReference } from '@kaicreator/domain-harness/v4';
+import {
+  adoptDacV0041RegistryReference,
+  mintCompatibilityValidationRequestRef,
+} from '@kaicreator/domain-harness/v4';
 import { IDENTITY, SCOPE, buildOwnerDirectPromotionLink } from '../dac-v0041-authority/helpers.js';
 import {
   IDENTITY as COMPAT_IDENTITY,
@@ -60,6 +63,12 @@ test('V08-DAC-N exported verifiers reject missing external facts and mint no app
  * rewritten, or auto-authorized here; malformed/foreign-fact tests remain
  * covered by the existing detailed DAC suites.
  *
+ * The two foundation REQUEST roles are nominal: generic adoption of them
+ * fails closed (ROLE_MISMATCH), so `compatibility-validation-request`
+ * carriers are re-minted through the public dedicated constructor
+ * `mintCompatibilityValidationRequestRef` — with their nested non-request
+ * refs re-minted first so the public foundation sees only its own refs.
+ *
  * Reuse the actual B3b selected-Host verifier seam #1095's source-established
  * fix rather than opening another broad CI trial for an unknown error.
  */
@@ -78,6 +87,25 @@ function remintPublicFactReferences<T>(value: T): T {
       'locatorHints', 'predecessorOrigin', 'opaque',
     ]) {
       if (entry[key] !== undefined) fields[key] = entry[key];
+    }
+    if (entry.role === 'compatibility-validation-request') {
+      const request: Record<string, unknown> = { ...fields };
+      delete request.role;
+      request.requesterIdentity = entry.requesterIdentity;
+      request.providerIdentity = entry.providerIdentity;
+      request.requestedCapabilityKind = entry.requestedCapabilityKind;
+      if (entry.descriptorRef !== undefined) {
+        request.descriptorRef = remintPublicFactReferences(entry.descriptorRef);
+      }
+      request.materialInputRefs = (entry.materialInputRefs as unknown[] | undefined ?? [])
+        .map((ref) => remintPublicFactReferences(ref));
+      if (entry.bindingTargetRef !== undefined) {
+        request.bindingTargetRef = remintPublicFactReferences(entry.bindingTargetRef);
+      }
+      request.advisoryTargetHints = entry.advisoryTargetHints ?? [];
+      return mintCompatibilityValidationRequestRef(
+        request as unknown as Parameters<typeof mintCompatibilityValidationRequestRef>[0],
+      ) as T;
     }
     return adoptDacV0041RegistryReference(
       fields as unknown as Parameters<typeof adoptDacV0041RegistryReference>[0],
