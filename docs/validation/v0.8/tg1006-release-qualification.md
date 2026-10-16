@@ -1,4 +1,33 @@
-# DomainHarness v0.8 — T-G Release Qualification R7 (FR01 selected P/N and packed DAC API; successor HOLD)
+# DomainHarness v0.8 — T-G Release Qualification R12 (44/44 functional, final candidate pending)
+
+**Current decision (2026-10-16): `FUNCTIONAL_PROOFS_COMPLETE__RELEASE_HOLD`.** All 44 frozen retained-function rows have bounded current positive/negative evidence, tracked in [the R12 44-row ledger](tg1006-44-row-successor-outcome-ledger.md). **No new exact integrated candidate Full/Hidden qualification is claimed.** The formal Task DAG remains **6/7**, T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) OPEN, Release HOLD, Tag NO.
+
+Current functional source base before this documentary R12 PR: `v0.8@eb8b1f9b4a053cc30f3c8f068ec7708f1df9c703`. Proof additions: #1089/HF21 CI #1298; #1087/HF29 #1299+#1301; #1093/HF34 #1303; #1095/HF30/NF03/NF04 #1305; #1096/HF25 #1306; #1094/FR11/HF24 real selected Node24 SQLite 6/6 (old #1304 CI solely stale S SHA, corrected exact PIN; **#1310 PENDING — not PASS** at R12 writing); #1092/NF01/NF02 #1308 SUCCESS. Existing 33 rows retained; the current total is **44/44**, not the historical R7 33/44 below.
+
+## R12 remaining release-only critical path
+
+1. Check #1094 R2 pipeline #1310 final terminal status and diagnose only any real failed step. Do not retroactively mark PENDING as PASS.
+2. Freeze **one new exact integration SHA**, including merged evidence documentation. Record source SHA + tree and release test environment, rather than using the historic b151320 digest.
+3. Execute **one** risk-aware final qualification at that candidate: Node24/real SQLite Full regression, required D2/D3 critical journeys, clean npm packing/install/typecheck and real SDK/Host, private Hidden validation (only publish aggregate pass/fail/commitment, never private cases), appropriate security/currentness negative oracles. Reuse already executed checks when same current subject and environment, do not duplicate full campaigns per function/PR.
+4. After real gates, record `RELEASE_QUALIFIED=YES/NO` and exact source evidence in this document; only if YES finish tag/baseline, appropriate main branch integration and close T-G #1006. `PR_PASS != RELEASE_PASS`.
+
+```ini
+EVENT=DH08_TG_RELEASE_R12_PRE_CANDIDATE
+FUNCTIONAL_PN=44_OF_44
+FORMAL_DAG=6_OF_7
+FUNCTIONAL_SOURCE_SHA=eb8b1f9b4a053cc30f3c8f068ec7708f1df9c703
+FR11_HF24_PR1094_CI1310=PENDING_NOT_PASS
+NEW_CANDIDATE_SHA=UNSET
+NEW_CANDIDATE_FULL=NOT_EXECUTED
+NEW_CANDIDATE_HIDDEN=NOT_EXECUTED
+RELEASE=HOLD
+TAG=NO
+```
+
+---
+
+## Historical R7 checkpoint — do not interpret as the current functional tally
+
 
 **Decision (2026-10-16): `RELEASE_HOLD_RETAINED_FUNCTION_PN_GAPS` (R7 successor sources: HF16 and FR01 selected P/N, but 11 accepted retained-function gaps still remain, source candidate not independently requalified).** This is a concrete evidence-based qualification, not a newly requested full test campaign, a tag authorization or a claim that all 44 retained functions passed. T-G [#1006](https://github.com/kaicreator-mm/domain-harness/issues/1006) stays OPEN (**formal DAG 6/7**).
 
