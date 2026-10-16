@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -9,21 +9,6 @@ import {
   packTarballFrom,
   stagePackedWorkspaces,
 } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
-
-
-/**
- * CI robustness (mirrors the sibling N18 probe, #953 Controller 090): this
- * journey npm-installs @types/node plus the packed tarballs into a clean
- * consumer; the registry fetch needs worker egress. Probe once and skip
- * explicitly when unreachable rather than hang the install to the step
- * timeout.
- */
-function npmRegistryReachable(): boolean {
-  const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
-    encoding: 'utf8', timeout: 15_000, shell: process.platform === 'win32',
-  });
-  return probe.status === 0;
-}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../..');
@@ -58,12 +43,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', async (t) => {
-  if (!npmRegistryReachable()) {
-    t.skip('T-016 PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
-    return;
-  }
-
+test('T-016 package consumer: packed core/node/expo expose the public v0.2 API to a clean TypeScript consumer', async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-t016-consumer-'));
   const packDirectory = join(root, 'packs');
   const consumerDirectory = join(root, 'consumer');
