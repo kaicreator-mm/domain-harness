@@ -21,13 +21,13 @@ Companion exact schema record: [DH09_ADS412_SPLIT_MUTATION_R0.json](./DH09_ADS41
 
 | New Issue | Independent concern | Primary source responsibility | Proposed true blocking condition |
 | --- | --- | --- | --- |
-| [#1118](https://github.com/kaicreator-mm/domain-harness/issues/1118) N06-PKG | Reproducible v9 SDK + selected artifact distribution; root exports/manifests, clean pack/checksum | Shared `package.json`, build export map and N06-PKG-only pack tests; does **not** implement H trust/BUILD AST/SQLite/public façade | `#1032` core H/BUILD merged and closed |
+| [#1118](https://github.com/kaicreator-mm/domain-harness/issues/1118) N06-PKG | Reproducible v9 SDK + selected artifact distribution; root exports/manifests, clean pack/checksum | Shared `package.json`, build export map and N06-PKG-only pack tests; does **not** implement H trust/BUILD AST/SQLite/public façade | `#1032` core H/BUILD **and** `#1035` public v9 API merged and closed |
 | [#1119](https://github.com/kaicreator-mm/domain-harness/issues/1119) N07-CONSUMER | New external repo install + public API example/Quickstart and negative clean-consumer proof | New external example, onboarding/docs and new consumer-only tests; does **not** author public API/Host | `#1035` public API and `#1118` packaged artifacts |
 | [#1120](https://github.com/kaicreator-mm/domain-harness/issues/1120) N08-LIFECYCLE | Per-app subscribe and per-delivery scope recheck, authenticated stop/dispose, redacted diagnostics | New versioned lifecycle/stream integration modules and scoped tests; no issuance of H principal or one-shot effect permit | `#1036` private authenticated H→K/effect permit integrated and closed |
 
 There is deliberately **no synthetic 11/18 Task target**. File count and estimate are not decomposition criteria; one coherent invariant defines each leaf. Contract and security atomicity is preserved: parser+byte gate stay with present N06 Core Builder, CAS+physical port stay with active N02 Builder, private H→K effect/revocation ordering stays with N08 Core. Owners of shared source paths are clarified before further Claims. Completion of the three new Issues adds to future *leaf* metrics but does **not** retroactively change the historical "1 / 6 original core parent concerns closed" denominator.
 
-## Graph: 11 existing edges are preserved; 7 new edges proposed
+## Graph: 11 existing edges are preserved; 8 new edges proposed
 
 ```mermaid
 flowchart TD
@@ -36,6 +36,7 @@ flowchart TD
     N01 --> N07["#1035 N07 Public API — ACTIVE"]
     N01 --> N02["#1028 N02 Physical CAS — ACTIVE"]
     N06 --> PKG["#1118 N06-PKG — PLANNED"]
+    N07 --> PKG
     N07 --> CONS["#1119 N07-CONSUMER — PLANNED"]
     PKG --> CONS
     N06 --> N08["#1036 N08 H→K/Effect — BLOCKED"]
@@ -54,12 +55,13 @@ flowchart TD
 Added GitHub-native `blocked_by` operations (use **actual GitHub Issue ID**, not displayed issue number when invoking REST):
 
 1. `#1118 ← #1032`
-2. `#1119 ← #1035`
-3. `#1119 ← #1118`
-4. `#1120 ← #1036`
-5. `#1037 ← #1118`
-6. `#1037 ← #1119`
-7. `#1037 ← #1120`
+2. `#1118 ← #1035` (v9 SDK public export must exist before final packaging)
+3. `#1119 ← #1035`
+4. `#1119 ← #1118`
+5. `#1120 ← #1036`
+6. `#1037 ← #1118`
+7. `#1037 ← #1119`
+8. `#1037 ← #1120`
 
 No existing native edges are to be deleted. This avoids a parent-child deadlock: each retained original Issue now has its own *narrowed* terminal contract, closes on that real completed concern, then its downstream split Issue may become ready. This parent acceptance narrowing is a **material Task Pack successor**, not silently effective from this prose. Required exact Issue pack amendments and live dependency verification precede any new child Claim.
 
@@ -67,7 +69,7 @@ No existing native edges are to be deleted. This avoids a parent-child deadlock:
 
 1. **Source/writer currentness:** JIT read `main` and current N06/N02/N07 Claim and PR heads. Accept the three successor concerns without moving any in-flight source byte or changing their accepted Builder operator. A conflicting write-set or materially changed source invokes a bounded new mutation, not automatic override.
 2. **Review + Controller acceptance:** Review this **exact successor PR HEAD and JSON schema** for Product/L2 invariant ownership, no extra duplicate Runtime/Host and no cycles; record accepted `SPLIT` decision. Do not treat a draft PR as already qualified.
-3. **Native materialization:** Use an authenticated GitHub-capable executor to add the seven GitHub native Issue Dependencies, verify all 18 exact edges (11 old + 7 added), ensure no extras and no partial write-on-failure. Until this point all three new Issues must stay **NOT_DISPATCHABLE**, independent of label or comment.
+3. **Native materialization:** Use an authenticated GitHub-capable executor to add the seven GitHub native Issue Dependencies, verify all 19 exact edges (11 old + 8 added), ensure no extras and no partial write-on-failure. Until this point all three new Issues must stay **NOT_DISPATCHABLE**, independent of label or comment.
 4. **Task Pack successor:** Update parent scopes for #1032, #1035 and #1036 at a safe checkpoint and record affected source owners; the child Task Pack facts already live in #1118/#1119/#1120 bodies. Never erase their or the parents' historic Claim/Review evidence. The parent scopes become effective **only after mutation acceptance**. #1027 stays CLOSED, #1028 Builder and PR #1116 stay untouched, #1037 final assurance remains one exact final candidate.
 5. **Execution + cost:** One concern per independently reviewable PR; targeted affected-source P/N and risk-derived reviews; no unnecessary full/hidden loop until final #1037. Ready sets follow native edges; the current new Issue state is intentionally OPEN without admitted Claims, **not ready**.
 
