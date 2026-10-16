@@ -130,15 +130,15 @@ test('HF21-P1 PRODUCTION positive: effect executes exactly once and replays idem
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.status, 'completed');
 
-  // Same messageId replay on the now-final state: no transition can ever
-  // re-admit the turn, so the physical effect stays exactly-once — the
+  // Same messageId replay: [v0.8.1 R01] the durable message-turn disposition
+  // replays the stored ACK, so the physical effect stays exactly-once — the
   // dispatch counter and journal are the physical truth.
   const replay = await send(PROD_APP, 'm-prod-1', { amount: 30, requestId: 'P1' }, 'q-prod') as {
     status: string;
-    denial?: { reason: string };
+    idempotentReplay?: boolean;
   };
-  assert.equal(replay.status, 'denied');
-  assert.equal(replay.denial?.reason, 'no-candidate-transition');
+  assert.equal(replay.status, 'admitted');
+  assert.equal(replay.idempotentReplay, true);
   assert.equal(dispatches.filter((id) => id === 'P1').length, 1, 'the replay dispatched nothing new');
   rows = await journalRows();
   assert.equal(rows.length, 1, 'the replay wrote no second journal row');
@@ -325,8 +325,9 @@ test('HF21-R restart currentness: pinned classes survive a fresh-process reopen 
   };
   assert.equal(result.swapCode, 'GATEWAY_APP_CLOSURE_MISMATCH', `swapped-class re-registration must refuse typed (got: ${result.swapMessage})`);
   assert.equal(result.simRetryCode, 'AUTHORITY_CLASS_MISMATCH', `the SIMULATION refusal must survive restart (got: ${result.simRetryMessage})`);
-  assert.equal(result.prodReplayStatus, 'denied');
-  assert.equal(result.prodReplayReason, 'no-candidate-transition');
+  // [v0.8.1 R01] the restarted replay answers the durable ACK, never a re-execution.
+  assert.equal(result.prodReplayStatus, 'admitted');
+  assert.equal(result.prodReplayReason, undefined);
   assert.equal(result.prodReplayDispatches, 0, 'the already-admitted PRODUCTION message never re-executes across restart');
   assert.equal(result.freshProdStatus, 'admitted', 'PRODUCTION authority still executes after the restart');
   assert.deepEqual(result.freshProdDispositions, ['executed']);

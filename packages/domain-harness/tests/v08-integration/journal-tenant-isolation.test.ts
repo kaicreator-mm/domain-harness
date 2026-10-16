@@ -122,8 +122,10 @@ test('Journal falsifier: same appId/instanceKey/messageId/idempotency text admit
       throw new Error('tenant t2 journal document missing');
     }
     const t2JournalBefore = JSON.stringify(t2Journal);
-    const t1Replay = await collide(t1, 't1') as { status: string; denial?: { reason?: string } };
-    assert.notEqual(t1Replay.status, 'admitted', 'the per-tenant replay of a final-state instance does not admit a second occurrence');
+    const t1Replay = await collide(t1, 't1') as { status: string; idempotentReplay?: boolean };
+    // [v0.8.1 R01] the replay answers t1's durable ACK — never a second occurrence.
+    assert.equal(t1Replay.status, 'admitted');
+    assert.equal(t1Replay.idempotentReplay, true, 'the per-tenant replay of a final-state instance does not admit a second occurrence');
     assert.equal(
       (await handle.host.docs.list(JOURNAL_PREFIX)).length,
       2,

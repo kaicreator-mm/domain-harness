@@ -567,12 +567,13 @@ test('S05-P1/P2/N1/P3: dual-app same-logical-key physical handler isolation on o
   assert.equal(dispatchesOn(keyA), 2, 'concurrency stays scoped: A key count 2');
   assert.equal(dispatchesOn(keyB), 2, 'concurrency stays scoped: B key count 2');
 
-  // Replay of a committed message refuses with zero dispatch.
+  // Replay of a committed message replays its durable ACK (v0.8.1 R01) with zero dispatch.
   const dispatchBeforeReplay = shared.handle.host.resources.callCount();
   const replayA = (await invoke(APP_A, credA, {
     operationId: 'quote.reserve', input: { amount: 30, requestId: 'S05-A-1' }, instanceKey: 'q-a', messageId: 'm-s05-a-1',
   })) as Record<string, any>;
-  assert.equal(replayA.status, 'denied', "replaying app A's committed occurrence message refuses");
+  assert.equal(replayA.status, 'admitted', "replaying app A's committed occurrence message replays its ACK");
+  assert.equal(replayA.idempotentReplay, true);
   assert.equal(shared.handle.host.resources.callCount(), dispatchBeforeReplay, 'the replay dispatched nothing');
 
   // ---- S05-N1: forged identity refusals WITHOUT dispatch ----

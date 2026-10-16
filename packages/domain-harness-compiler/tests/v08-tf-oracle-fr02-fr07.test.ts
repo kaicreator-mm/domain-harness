@@ -108,11 +108,17 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 // admission from a second runtime over the same store refuses typed
 // ADMISSION_STATE_CAS_CONFLICT (S bytes unchanged); all FR02/FR07 oracle
 // rows re-run unchanged below.
+// K_BLOB_PIN_REBOUND_AFTER_V081_R01: v0.8.1 R01 — message turns pass the
+// #1062 turn-disposition / #1066 same-CAS admission-history gate (durable
+// (target, messageId) dedup restored: a re-send replays the stored receipt,
+// a different intentType under the same messageId refuses typed); S bytes
+// unchanged; all FR02/FR07 oracle rows re-run unchanged below. Pinned to
+// the combined R02+R01 blob.
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 // FR11/HF24 adds the selected SDK compiled-data READ endpoint; FR02/FR07 semantics unchanged.
 // CI #1304 executed all prior affected oracle behavior but found the stale exact S pin.
 const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
-const V08_K_BLOB = '8d6db95f8d284902d77a2bf870bf765181edc9a1';
+const V08_K_BLOB = 'fa30e1204d47c12f3f5842c497a83a08501d515b';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

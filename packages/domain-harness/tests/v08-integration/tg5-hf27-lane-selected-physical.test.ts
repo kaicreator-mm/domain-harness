@@ -72,14 +72,15 @@ test('HF27-N same-instance concurrent duplicate: the serialized lane yields exac
   ]);
   const outcomes = settled.map((entry) => {
     assert.equal(entry.status, 'fulfilled', `the race loser must be a typed domain outcome, not a rejection (got ${entry.status === 'rejected' ? String(entry.reason).slice(0, 160) : 'ok'})`);
-    const receipt = (entry as PromiseFulfilledResult<{ status: string; denial?: { reason: string } }>).value;
-    return { status: receipt.status, denialReason: receipt.denial?.reason };
+    const receipt = (entry as PromiseFulfilledResult<{ status: string; idempotentReplay?: boolean }>).value;
+    return { status: receipt.status, idempotentReplay: receipt.idempotentReplay === true };
   });
-  const admitted = outcomes.filter((entry) => entry.status === 'admitted');
-  const denied = outcomes.filter((entry) => entry.status === 'denied');
-  assert.equal(admitted.length, 1, 'exactly one concurrent duplicate commits');
-  assert.equal(denied.length, 1, 'the other resolves to the settled-turn typed outcome');
-  assert.equal(denied[0]?.denialReason, 'no-candidate-transition');
+  // [v0.8.1 R01] the lane-serialized loser resolves to the durable
+  // message-turn disposition: an idempotent replay of the winner's ACK.
+  const committedTurns = outcomes.filter((entry) => entry.status === 'admitted' && !entry.idempotentReplay);
+  const replays = outcomes.filter((entry) => entry.status === 'admitted' && entry.idempotentReplay);
+  assert.equal(committedTurns.length, 1, 'exactly one concurrent duplicate commits');
+  assert.equal(replays.length, 1, 'the other resolves to the settled turn\'s idempotent replay');
 
   assert.equal(dispatches.filter((id) => id === 'RACE-1').length, 1, 'exactly ONE physical dispatch for the raced duplicate');
   assert.equal(await journalRowCount(), 1, 'exactly ONE journal row');

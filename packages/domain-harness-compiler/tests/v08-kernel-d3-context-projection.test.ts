@@ -498,11 +498,14 @@ test('D3-R2: UNKNOWN effect terminal → retry is AMBIGUOUS, exactly one dispatc
   assert.deepEqual(await committed(host), stateBefore, 'no state or lineage commit under UNKNOWN');
 });
 
-test('D3-R3: replaying an already-committed stage message is refused with no extra dispatch and no lineage change', async () => {
+test('D3-R3: replaying an already-committed stage message replays its ACK with no extra dispatch and no lineage change', async () => {
   const { rt, host } = await opened();
   await submit(rt, 'reviewChange', 'm:review', REVIEW_A);
   const before = await snapshotOf(host);
+  // [v0.8.1 R01] the durable message-turn disposition answers the re-send:
+  // the forged payload under the committed messageId is never admitted.
   const replay = await submit(rt, 'reviewChange', 'm:review', { ...REVIEW_A, reviewedSha: 'sha-forged' });
-  assert.equal(replay.status, 'denied');
+  assert.equal(replay.status, 'admitted');
+  assert.equal(replay.idempotentReplay, true);
   await assertUnchanged(host, before);
 });
