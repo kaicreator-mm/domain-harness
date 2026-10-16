@@ -31,6 +31,11 @@
 import { SchemaValidator } from '../execution/schema-validator.js';
 import type { JsonValue } from '../contracts/json.js';
 import type { V8SealedToolBinding } from '../public-v8/microkernel.js';
+/**
+ * The bounded plain-JSON array size: an array carrying more elements than
+ * this refuses typed before any element is inspected.
+ */
+export declare const HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH = 65536;
 /** Local transport kind (the frozen host-local tool contract family). */
 export declare const HOST_TOOL_CALL_TRANSPORT_LOCAL: "host-local-domain-tool@1";
 /** Remote HTTP/JSON transport kind (the frozen remote tool contract family). */
@@ -44,8 +49,10 @@ export declare const HOST_TOOL_CALL_TRANSPORT_REMOTE_HTTP_JSON: "remote-http-jso
 export declare const HOST_TOOL_CALL_APPROVED_TRANSPORTS: ReadonlySet<string>;
 /**
  * Bounded output: a Tool Call result whose canonical JSON encoding exceeds
- * this byte budget refuses typed — no unbounded Host adapter output ever
- * crosses the boundary.
+ * this UTF-8 byte budget refuses typed — no unbounded Host adapter output
+ * ever crosses the boundary. The budget counts true UTF-8 BYTES of the
+ * encoded JSON (Review #5542905557 P2), never the UTF-16 code-unit count of
+ * the in-memory string: multibyte emoji/CJK results are byte-accurate here.
  */
 export declare const HOST_TOOL_CALL_MAX_OUTPUT_BYTES: number;
 /**

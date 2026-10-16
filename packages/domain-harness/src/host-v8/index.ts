@@ -83,6 +83,7 @@ export type {
 // approved transport family every sealed Tool Call binding checks against.
 export {
   HOST_TOOL_CALL_APPROVED_TRANSPORTS,
+  HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH,
   HOST_TOOL_CALL_MAX_OUTPUT_BYTES,
   HOST_TOOL_CALL_TRANSPORT_LOCAL,
   HOST_TOOL_CALL_TRANSPORT_REMOTE_HTTP_JSON,

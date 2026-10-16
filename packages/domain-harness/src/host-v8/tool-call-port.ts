@@ -32,17 +32,89 @@
 import { HostBoundaryError } from './errors.js';
 import { SchemaValidator } from '../execution/schema-validator.js';
 import { ExecutorError } from '../execution/executor-error.js';
+import { portableUtf8ByteLength } from '../schema/domainharness-json-schema-v1.js';
 import type { JsonValue } from '../contracts/json.js';
 import type { V8SealedToolBinding } from '../public-v8/microkernel.js';
 
 type HostToolJsonCode = 'HOST_TOOL_INPUT_INVALID' | 'HOST_TOOL_OUTPUT_INVALID';
 
 /**
+ * The bounded plain-JSON array size: an array carrying more elements than
+ * this refuses typed before any element is inspected.
+ */
+export const HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH = 65_536;
+
+/**
+ * Descriptor-safe DENSE standard-array gate (Review #5542905557 P1). Every
+ * structural check runs BEFORE any element value is read — so a hostile
+ * ACCESSOR element (get/set) is always refused without invocation, and a
+ * verified element is a guaranteed own enumerable data slot whose value can
+ * be read inertly:
+ *   1. allowed prototype only (standard `Array.prototype` or null);
+ *   2. own `length` DATA descriptor carrying a safe non-negative integer,
+ *      within the array length bound;
+ *   3. the exact own-key set: `length` plus canonical indices `0..length-1`,
+ *      nothing else — extra named keys, out-of-range indices and ANY symbol
+ *      key refuse;
+ *   4. each exact index is an own, enumerable DATA slot — accessor slots and
+ *      sparse holes refuse WITHOUT touching the element value.
+ * The depth bound of the enclosing walk doubles as the cyclic guard: a
+ * self-referencing structure hits it and refuses.
+ */
+function assertPlainJsonArrayData(value: unknown[], path: string, code: HostToolJsonCode, depth: number): void {
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  if (prototype !== Array.prototype && prototype !== null) {
+    throw new HostBoundaryError(code, `${path} must be a standard dense JSON array (prototype Array.prototype or null)`);
+  }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  if (
+    lengthDescriptor === undefined
+    || !Object.hasOwn(lengthDescriptor, 'value')
+    || typeof lengthDescriptor.value !== 'number'
+    || !Number.isSafeInteger(lengthDescriptor.value)
+    || lengthDescriptor.value < 0
+  ) {
+    throw new HostBoundaryError(code, `${path}.length is not an own data slot carrying a safe non-negative integer`);
+  }
+  const length: number = lengthDescriptor.value;
+  if (length > HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH) {
+    throw new HostBoundaryError(
+      code,
+      `${path} carries ${length} elements, beyond the Tool Call JSON array length bound of ${HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH}`,
+    );
+  }
+  const allowedKeys = new Set<string | symbol>(['length']);
+  for (let index = 0; index < length; index += 1) allowedKeys.add(String(index));
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== allowedKeys.size || ownKeys.some((key) => !allowedKeys.has(key))) {
+    throw new HostBoundaryError(
+      code,
+      `${path} carries own keys outside the exact dense index range (extra named keys, out-of-range indices and symbol keys are refused)`,
+    );
+  }
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, index);
+    if (descriptor === undefined) {
+      throw new HostBoundaryError(code, `${path}[${index}] is a sparse hole (only dense standard arrays cross this boundary)`);
+    }
+    if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new HostBoundaryError(code, `${path}[${index}] is not an own enumerable data slot (accessors are refused)`);
+    }
+  }
+  // Structure fully verified above — only now are the guaranteed data-slot
+  // element values read and walked (no accessor exists, so nothing runs).
+  for (let index = 0; index < length; index += 1) {
+    assertPlainJsonData(value[index], `${path}[${index}]`, code, depth + 1);
+  }
+}
+
+/**
  * Descriptor-safe plain-JSON gate (the same discipline the OperationCall
  * boundary enforces): hostile ACCESSORS are refused WITHOUT invocation, so
- * a caller-supplied or adapter-returned object can never run code inside
- * the validation walk. Dangerous own keys and non-plain prototypes refuse
- * alike; the walk is depth-bounded.
+ * a caller-supplied or adapter-returned object (or ARRAY — see
+ * `assertPlainJsonArrayData`) can never run code inside the validation
+ * walk. Dangerous own keys and non-plain prototypes refuse alike; the walk
+ * is depth-bounded.
  */
 function assertPlainJsonData(value: unknown, path: string, code: HostToolJsonCode, depth = 0): void {
   if (depth > 32) {
@@ -56,7 +128,7 @@ function assertPlainJsonData(value: unknown, path: string, code: HostToolJsonCod
     return;
   }
   if (Array.isArray(value)) {
-    value.forEach((item, index) => assertPlainJsonData(item, `${path}[${index}]`, code, depth + 1));
+    assertPlainJsonArrayData(value, path, code, depth);
     return;
   }
   if (typeof value !== 'object') {
@@ -100,8 +172,10 @@ export const HOST_TOOL_CALL_APPROVED_TRANSPORTS: ReadonlySet<string> = new Set([
 
 /**
  * Bounded output: a Tool Call result whose canonical JSON encoding exceeds
- * this byte budget refuses typed — no unbounded Host adapter output ever
- * crosses the boundary.
+ * this UTF-8 byte budget refuses typed — no unbounded Host adapter output
+ * ever crosses the boundary. The budget counts true UTF-8 BYTES of the
+ * encoded JSON (Review #5542905557 P2), never the UTF-16 code-unit count of
+ * the in-memory string: multibyte emoji/CJK results are byte-accurate here.
  */
 export const HOST_TOOL_CALL_MAX_OUTPUT_BYTES = 256 * 1024;
 
@@ -274,10 +348,14 @@ export async function dispatchHostToolCall(input: {
     throw error;
   }
   const encoded = JSON.stringify(jsonOutput);
-  if (encoded.length > HOST_TOOL_CALL_MAX_OUTPUT_BYTES) {
+  // The budget measures the true UTF-8 byte length of the encoded JSON —
+  // never the UTF-16 code-unit count of the in-memory string, which
+  // under-counts multibyte emoji/CJK output by 2-4x.
+  const outputBytes = portableUtf8ByteLength(encoded);
+  if (outputBytes > HOST_TOOL_CALL_MAX_OUTPUT_BYTES) {
     throw new HostBoundaryError(
       'HOST_TOOL_OUTPUT_UNBOUNDED',
-      `tool ${sealed.toolId} produced ${encoded.length} bytes of output, beyond the ${HOST_TOOL_CALL_MAX_OUTPUT_BYTES}-byte Tool Call budget; unbounded output never crosses the Host boundary`,
+      `tool ${sealed.toolId} produced ${outputBytes} UTF-8 bytes of JSON output, beyond the ${HOST_TOOL_CALL_MAX_OUTPUT_BYTES}-byte Tool Call budget; unbounded output never crosses the Host boundary`,
     );
   }
   return jsonOutput;

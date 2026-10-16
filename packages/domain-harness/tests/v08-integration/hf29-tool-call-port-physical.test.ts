@@ -37,6 +37,13 @@
  *   HF29-W1  wiring-time TOOLS ABI validation — malformed/duplicated/
  *            unbound-intent binding tables refuse at load, before any
  *            facade escapes
+ *   HF29-R2  review #5542905557 — hostile ARRAY elements (accessor slots,
+ *            sparse holes, extra named keys, symbol keys) refuse on the
+ *            actual selected input AND output paths with ZERO getter
+ *            executions and the adapter untouched; genuine dense arrays
+ *            (multibyte content included) cross in and out; the output
+ *            budget measures true UTF-8 bytes, so multibyte emoji output
+ *            whose UTF-16 count fits the budget still refuses
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,11 +62,14 @@ import type { SealedQualifiedPackageRoot } from '../../src/public-v8/index.js';
 import {
   bootstrapTrustedHost,
   createKernelGateway,
+  HOST_TOOL_CALL_MAX_OUTPUT_BYTES,
   mintPrincipalCredential,
   type HostToolCallAdapter,
   type TrustedHostHandle,
 } from '../../src/host-v8/index.js';
 import type { KernelGateway, KernelGatewayToolCallRequest } from '../../src/host-v8/index.js';
+import type { JsonValue } from '../../src/contracts/json.js';
+import { portableUtf8ByteLength } from '../../src/schema/domainharness-json-schema-v1.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET } from './helpers.js';
 
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
@@ -194,6 +204,24 @@ export const TOOLS = [
     outputSchema: { type: 'object', required: ['ran'], additionalProperties: false, properties: { ran: { type: 'boolean' } } },
     visibility: { intentType: '${VISIBILITY_INTENT}' },
   },
+  {
+    toolId: 'inventory.tags-local',
+    effectClass: 'none',
+    binding: { kind: 'host-local-domain-tool@1', bindingId: 'hf29-tags-v1', digest: 'sha256:hf29-tags-v1' },
+    requiredCapabilities: ['cap:inventory-native'],
+    inputSchema: { type: 'object', required: ['tags'], additionalProperties: false, properties: { tags: { type: 'array', items: { type: 'string' } } } },
+    outputSchema: { type: 'array', items: { type: 'object', required: ['tag', 'note'], additionalProperties: false, properties: { tag: { type: 'string' }, note: { type: 'string' } } } },
+    visibility: { intentType: '${VISIBILITY_INTENT}' },
+  },
+  {
+    toolId: 'inventory.emoji-output',
+    effectClass: 'none',
+    binding: { kind: 'host-local-domain-tool@1', bindingId: 'hf29-emojiout-v1', digest: 'sha256:hf29-emojiout-v1' },
+    requiredCapabilities: ['cap:inventory-native'],
+    inputSchema: SKU_INPUT,
+    outputSchema: { type: 'object', required: ['blob'], additionalProperties: false, properties: { blob: { type: 'string' } } },
+    visibility: { intentType: '${VISIBILITY_INTENT}' },
+  },
 ];
 `;
 
@@ -293,6 +321,8 @@ interface Harness {
   readonly gateway: KernelGateway;
   readonly dir: string;
   readonly localCalls: unknown[];
+  readonly tagsCalls: unknown[];
+  readonly hostileOutputHolder: { value?: unknown };
   readonly refuseCalls: { readonly label: string }[];
   readonly httpFake: { adapter: HostToolCallAdapter; calls: unknown[] };
   credential(roles: readonly string[], subject?: string): string;
@@ -326,6 +356,26 @@ async function bootstrapHarness(root: SealedQualifiedPackageRoot): Promise<Harne
       return { reserved: true, sku };
     },
   };
+  // The array-in/array-out local adapter (HF29-R2): echoes a dense array of
+  // multibyte tag records; on the agreed `boom` trigger it returns whatever
+  // the test planted in `hostileOutputHolder` (the hostile accessor-array
+  // output vector).
+  const tagsCalls: unknown[] = [];
+  const hostileOutputHolder: { value?: unknown } = {};
+  const tagsAdapter: HostToolCallAdapter = {
+    transport: 'host-local-domain-tool@1',
+    capability: 'cap:inventory-native',
+    digest: 'sha256:hf29-tags-v1',
+    async execute(input) {
+      tagsCalls.push(input);
+      const record = input as { tags?: unknown };
+      const tags = Array.isArray(record.tags) ? (record.tags as unknown[]).map((tag) => String(tag)) : [];
+      if (tags.length === 1 && tags[0] === 'boom' && hostileOutputHolder.value !== undefined) {
+        return hostileOutputHolder.value as JsonValue;
+      }
+      return tags.map((tag) => ({ tag, note: `note:${tag}` }));
+    },
+  };
   // Refusal-target adapters: every one of these must stay at zero calls.
   const refuseCalls: { readonly label: string }[] = [];
   function refusingAdapter(label: string, init: Omit<HostToolCallAdapter, 'execute'>): HostToolCallAdapter {
@@ -340,6 +390,7 @@ async function bootstrapHarness(root: SealedQualifiedPackageRoot): Promise<Harne
   const httpFake = createNetworkFreeCatalogFake();
   const adapters: Record<string, HostToolCallAdapter> = {
     'hf29-local-v1': localAdapter,
+    'hf29-tags-v1': tagsAdapter,
     'hf29-http-v1': httpFake.adapter,
     'hf29-rogue-v1': refusingAdapter('rogue-capability', {
       transport: 'host-local-domain-tool@1',
@@ -377,6 +428,16 @@ async function bootstrapHarness(root: SealedQualifiedPackageRoot): Promise<Harne
         return { blob: 'x'.repeat(300 * 1024) };
       },
     },
+    'hf29-emojiout-v1': {
+      transport: 'host-local-domain-tool@1',
+      capability: 'cap:inventory-native',
+      digest: 'sha256:hf29-emojiout-v1',
+      async execute() {
+        // The P2 boundary vector: UTF-16 code units UNDER the 256KiB budget,
+        // true UTF-8 bytes OVER it (each emoji = 2 code units = 4 bytes).
+        return { blob: '😀'.repeat(65_600) };
+      },
+    },
     'hf29-effectful-v1': refusingAdapter('effectful', {
       transport: 'host-local-domain-tool@1',
       capability: 'cap:inventory-native',
@@ -406,6 +467,8 @@ async function bootstrapHarness(root: SealedQualifiedPackageRoot): Promise<Harne
     gateway,
     dir,
     localCalls,
+    tagsCalls,
+    hostileOutputHolder,
     refuseCalls,
     httpFake,
     credential(roles: readonly string[], subject = 'hf29-user'): string {
@@ -515,6 +578,80 @@ test('HF29-P1/P2 + N1–N5: approved Tool Call binding over the real seal path o
   const hugeOutput = await callCode(() => toolCall(harness, requester, 'inventory.huge-output', { sku: 'SKU-9' }));
   assert.equal(hugeOutput.code, 'HOST_TOOL_OUTPUT_UNBOUNDED', 'a schema-valid but oversized output refuses at the bounded budget');
 
+  // ---- HF29-R2 (Review #5542905557): hostile ARRAY elements + UTF-8 budget ----
+  // P1 input edge: an array whose element slot is a hostile ACCESSOR refuses
+  // typed with the getter counter at ZERO and the adapter never called —
+  // the descriptor-safe walk verifies structure BEFORE reading any value.
+  let inputArrayGetterCount = 0;
+  const hostileInputArray: unknown = [];
+  Object.defineProperty(hostileInputArray, '0', {
+    get() {
+      inputArrayGetterCount += 1;
+      return { tags: ['x'] };
+    },
+    enumerable: true,
+  });
+  (hostileInputArray as { length: number }).length = 1;
+  const hostileArrayInput = await callCode(() => toolCall(harness, requester, 'inventory.tags-local', hostileInputArray));
+  assert.equal(hostileArrayInput.code, 'HOST_TOOL_INPUT_INVALID', 'a hostile accessor array element refuses typed at the input walk');
+  assert.equal(inputArrayGetterCount, 0, 'the hostile array getter NEVER ran during validation');
+  assert.equal(harness.tagsCalls.length, 0, 'the adapter was never called for the hostile array input');
+
+  // P1 structural siblings on the same selected path: sparse hole, extra
+  // named key, own symbol key — all refuse before the adapter.
+  const sparseInput: unknown = new Array(2);
+  (sparseInput as unknown[])[0] = { tags: ['a'] };
+  const sparseArray = await callCode(() => toolCall(harness, requester, 'inventory.tags-local', sparseInput));
+  assert.equal(sparseArray.code, 'HOST_TOOL_INPUT_INVALID', 'a sparse array (hole at index 1) refuses');
+  const extraKeyInput: unknown = [{ tags: ['a'] }];
+  (extraKeyInput as Record<string, unknown>).smuggled = true;
+  const extraKeyArray = await callCode(() => toolCall(harness, requester, 'inventory.tags-local', extraKeyInput));
+  assert.equal(extraKeyArray.code, 'HOST_TOOL_INPUT_INVALID', 'an array with an extra own named key refuses');
+  const symbolKeyInput: unknown = [{ tags: ['a'] }];
+  Object.defineProperty(symbolKeyInput, Symbol('smuggled'), { value: true, enumerable: true });
+  const symbolKeyArray = await callCode(() => toolCall(harness, requester, 'inventory.tags-local', symbolKeyInput));
+  assert.equal(symbolKeyArray.code, 'HOST_TOOL_INPUT_INVALID', 'an array with an own symbol key refuses');
+  assert.equal(harness.tagsCalls.length, 0, 'every hostile array shape refused BEFORE the adapter');
+
+  // P1 positive: a genuine dense array with multibyte content crosses on the
+  // actual selected path — in AND out.
+  const dense = await toolCall(harness, requester, 'inventory.tags-local', { tags: ['产能', '😀'] });
+  assert.deepEqual(dense, [{ tag: '产能', note: 'note:产能' }, { tag: '😀', note: 'note:😀' }]);
+  assert.equal(harness.tagsCalls.length, 1, 'the dense-array positive reached the adapter exactly once');
+
+  // P1 output edge: the adapter returns the hostile accessor array — refused
+  // typed strictly AFTER the one adapter run it guards, getter still at zero.
+  let outputArrayGetterCount = 0;
+  const hostileOutputArray: unknown = [];
+  Object.defineProperty(hostileOutputArray, '0', {
+    get() {
+      outputArrayGetterCount += 1;
+      return { tag: 'x', note: 'x' };
+    },
+    enumerable: true,
+  });
+  (hostileOutputArray as { length: number }).length = 1;
+  harness.hostileOutputHolder.value = hostileOutputArray;
+  const hostileArrayOutput = await callCode(() => toolCall(harness, requester, 'inventory.tags-local', { tags: ['boom'] }));
+  assert.equal(hostileArrayOutput.code, 'HOST_TOOL_OUTPUT_INVALID', 'the hostile accessor array output refuses typed at the output walk');
+  assert.equal(outputArrayGetterCount, 0, 'the hostile output array getter NEVER ran');
+  assert.equal(harness.tagsCalls.length, 2, 'the output walk runs strictly after the single adapter invocation it guards');
+
+  // P2: multibyte emoji output — UTF-16 code units UNDER the budget, true
+  // UTF-8 bytes OVER it; only byte-accurate counting refuses it.
+  const encodedEmoji = JSON.stringify({ blob: '😀'.repeat(65_600) });
+  assert.ok(
+    encodedEmoji.length < HOST_TOOL_CALL_MAX_OUTPUT_BYTES,
+    `precondition: the UTF-16 code-unit count (${encodedEmoji.length}) stays under the budget — the legacy .length check would have passed this output`,
+  );
+  assert.ok(
+    portableUtf8ByteLength(encodedEmoji) > HOST_TOOL_CALL_MAX_OUTPUT_BYTES,
+    `precondition: the true UTF-8 byte length (${portableUtf8ByteLength(encodedEmoji)}) exceeds the budget`,
+  );
+  const emoji = await callCode(() => toolCall(harness, requester, 'inventory.emoji-output', { sku: 'SKU-9' }));
+  assert.equal(emoji.code, 'HOST_TOOL_OUTPUT_UNBOUNDED', 'a multibyte output over the true UTF-8 byte budget refuses even though its UTF-16 count fits');
+  assert.ok(emoji.message?.includes('UTF-8 bytes'), 'the refusal names the true UTF-8 byte measurement');
+
   // ---- HF29-N4: no protected Host implementation / unapproved transport ----
   const absent = await callCode(() => toolCall(harness, requester, 'inventory.missing-adapter', { sku: 'SKU-9' }));
   assert.equal(absent.code, 'HOST_TOOL_ADAPTER_MISSING', 'a sealed binding with no registered Host adapter refuses');
@@ -547,6 +684,7 @@ test('HF29-P1/P2 + N1–N5: approved Tool Call binding over the real seal path o
   assert.equal(await harness.journalCount(), 0, 'the whole file leaves the Kernel journal untouched');
   assert.equal(harness.dispatchCount(), dispatchAtStart, 'the whole file dispatches zero Kernel physical resources');
   assert.equal(harness.localCalls.length, 1, 'exactly the ONE legitimate local adapter call ran');
+  assert.equal(harness.tagsCalls.length, 2, 'the tags adapter saw exactly the dense positive and the hostile-output vector');
 });
 
 test('HF29-W1: wiring-time TOOLS ABI validation refuses malformed binding tables at load, before any facade escapes', { timeout: 180_000 }, async () => {
