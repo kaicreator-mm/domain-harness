@@ -83,12 +83,35 @@ const HF25_APP_CONTRACT_VALUES = [
   'AppContractGenerationError',
 ] as const;
 
+/** The additive v0.9 N06 (#1032) zero-import BUILD runtime bindings. */
+const N06_V09_BUILD_VALUES = [
+  // consts (6)
+  'V09_SUBJECT_DOMAIN',
+  'V09_SEALED_ROOT_FORMAT',
+  'V09_IMPORT_POLICY_REVISION',
+  'V09_RUNTIME_ABI',
+  'V09_HOST_ABI',
+  'V09_BUNDLER_REVISION',
+  // functions (6)
+  'buildV09QualifiedRoot',
+  'assertZeroImportBuildModule',
+  'assertVendoredParserBytes',
+  'canonicalV9Json',
+  'computeV09SealedRootSubjectDigest',
+  'computeV9QualifiedRootSubjectDigest',
+  // object const (1)
+  'V09_BUILD_PARSER_PIN',
+  // error classes (1)
+  'V09BuildError',
+] as const;
+
 /** The complete T008C-promised runtime inventory (legacy + additive markers). */
 const COMMITTED_RUNTIME_VALUES = [
   ...LEGACY_RUNTIME_VALUES,
   ...T008C_COMPATIBILITY_VALUES,
   ...TA_QUALIFIED_PACKAGE_VALUES,
   ...HF25_APP_CONTRACT_VALUES,
+  ...N06_V09_BUILD_VALUES,
 ];
 
 const COMMITTED_RUNTIME_SORTED = [...COMMITTED_RUNTIME_VALUES].sort((left, right) =>
@@ -100,8 +123,15 @@ const STRING_CONST_NAMES = new Set<string>([
   'SCRIPT_EXECUTION_CAPABILITY',
   'COMPILER_PUBLIC_API_VERSION',
   'APP_CONTRACT_SOURCE_FORMAT',
+  'V09_SUBJECT_DOMAIN',
+  'V09_SEALED_ROOT_FORMAT',
+  'V09_IMPORT_POLICY_REVISION',
+  'V09_RUNTIME_ABI',
+  'V09_HOST_ABI',
+  'V09_BUNDLER_REVISION',
 ]);
 const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE']);
+const PARSER_PIN_CONST_NAMES = new Set<string>(['V09_BUILD_PARSER_PIN']);
 const FUNCTION_NAMES = new Set<string>([
   'loadRawDomainPackage',
   'compileDomainPackage',
@@ -117,6 +147,12 @@ const FUNCTION_NAMES = new Set<string>([
   'qualifiedKey',
   'verifyApprovalProof',
   'generateTypedAppContracts',
+  'buildV09QualifiedRoot',
+  'assertZeroImportBuildModule',
+  'assertVendoredParserBytes',
+  'canonicalV9Json',
+  'computeV09SealedRootSubjectDigest',
+  'computeV9QualifiedRootSubjectDigest',
 ]);
 const ERROR_CLASS_NAMES = new Set<string>([
   'SemanticDecisionCompileError',
@@ -129,6 +165,7 @@ const ERROR_CLASS_NAMES = new Set<string>([
   'ClosureError',
   'QualificationError',
   'AppContractGenerationError',
+  'V09BuildError',
 ]);
 
 /** The exactly-15 successor `/v7` runtime names owned by the core package. */
@@ -217,6 +254,13 @@ test('T008C: every committed runtime binding has the promised kind', () => {
       assert.equal(typeof value, 'object', `${name} must be an object constant`);
       assert.ok(value !== null, `${name} must not be null`);
       assert.ok(!Array.isArray(value), `${name} must not be an array`);
+      continue;
+    }
+    if (PARSER_PIN_CONST_NAMES.has(name!)) {
+      assert.equal(typeof value, 'object', `${name} must be an object constant`);
+      assert.ok(value !== null, `${name} must not be null`);
+      assert.ok(!Array.isArray(value), `${name} must not be an array`);
+      assert.equal((value as { sha256?: unknown }).sha256, '76254fc76529713b4dfd2532972d17a991ffd9aafeebb1f977445b5506b9fb0b', `${name} must keep the pinned vendored parser digest`);
       continue;
     }
     if (FUNCTION_NAMES.has(name!)) {
