@@ -34,3 +34,13 @@ export { emitTargetCompiledPackageModule, } from './package/module-emitter.js';
 // The public compile path fails closed on untranslated script invokes.
 export { translateV01ScriptInvokes, V01ScriptTranslationError, } from './compat/v01-script/index.js';
 export { bundleScriptTool, ScriptCompileError, SCRIPT_EXECUTION_CAPABILITY, } from './script/script-bundle.js';
+// v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
+// external approval + sealed-root producer over the public core /v8 ABI.
+export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';
+// v0.8 T-G HF25 (#1006): the existing pure build-time typed App-contract
+// generator, delivered from its frozen BUILD owner (this compiler package)
+// instead of a private kernel source import. The generator is build tooling
+// only — it is deliberately NOT re-exported from the Microkernel
+// (@kaicreator/domain-harness) runtime ABI, and no runtime authority is
+// inferred from it. Additive to the COMPILER_PUBLIC_API_VERSION inventory.
+export { APP_CONTRACT_SOURCE_FORMAT, AppContractGenerationError, generateTypedAppContracts, } from './app-contracts/app-contracts.js';

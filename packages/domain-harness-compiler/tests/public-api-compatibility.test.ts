@@ -56,8 +56,40 @@ const LEGACY_RUNTIME_VALUES = [
 /** The one additive T008C compatibility commitment binding. */
 const T008C_COMPATIBILITY_VALUES = ['COMPILER_PUBLIC_API_VERSION'] as const;
 
-/** The complete T008C-promised runtime inventory (legacy + one additive marker). */
-const COMMITTED_RUNTIME_VALUES = [...LEGACY_RUNTIME_VALUES, ...T008C_COMPATIBILITY_VALUES];
+/** The additive T-A (#1000) qualified-package BUILD runtime bindings. */
+const TA_QUALIFIED_PACKAGE_VALUES = [
+  // functions (7)
+  'analyzeModuleClosure',
+  'assertDeclaredExports',
+  'buildQualifiedPackage',
+  'issueApprovalProof',
+  'qualifyPackageClosure',
+  'qualifiedKey',
+  'verifyApprovalProof',
+  // error classes (4)
+  'ApprovalError',
+  'BuildError',
+  'ClosureError',
+  'QualificationError',
+] as const;
+
+/** The additive v0.8 T-G HF25 (#1006) typed App-contract generator bindings. */
+const HF25_APP_CONTRACT_VALUES = [
+  // const (1)
+  'APP_CONTRACT_SOURCE_FORMAT',
+  // functions (1)
+  'generateTypedAppContracts',
+  // error classes (1)
+  'AppContractGenerationError',
+] as const;
+
+/** The complete T008C-promised runtime inventory (legacy + additive markers). */
+const COMMITTED_RUNTIME_VALUES = [
+  ...LEGACY_RUNTIME_VALUES,
+  ...T008C_COMPATIBILITY_VALUES,
+  ...TA_QUALIFIED_PACKAGE_VALUES,
+  ...HF25_APP_CONTRACT_VALUES,
+];
 
 const COMMITTED_RUNTIME_SORTED = [...COMMITTED_RUNTIME_VALUES].sort((left, right) =>
   left < right ? -1 : left > right ? 1 : 0,
@@ -67,6 +99,7 @@ const STRING_CONST_NAMES = new Set<string>([
   'DOMAIN_HARNESS_COMPILER_PACKAGE',
   'SCRIPT_EXECUTION_CAPABILITY',
   'COMPILER_PUBLIC_API_VERSION',
+  'APP_CONTRACT_SOURCE_FORMAT',
 ]);
 const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE']);
 const FUNCTION_NAMES = new Set<string>([
@@ -76,6 +109,14 @@ const FUNCTION_NAMES = new Set<string>([
   'emitTargetCompiledPackageModule',
   'translateV01ScriptInvokes',
   'bundleScriptTool',
+  'analyzeModuleClosure',
+  'assertDeclaredExports',
+  'buildQualifiedPackage',
+  'issueApprovalProof',
+  'qualifyPackageClosure',
+  'qualifiedKey',
+  'verifyApprovalProof',
+  'generateTypedAppContracts',
 ]);
 const ERROR_CLASS_NAMES = new Set<string>([
   'SemanticDecisionCompileError',
@@ -83,6 +124,11 @@ const ERROR_CLASS_NAMES = new Set<string>([
   'BusinessSourceCompileError',
   'V01ScriptTranslationError',
   'ScriptCompileError',
+  'ApprovalError',
+  'BuildError',
+  'ClosureError',
+  'QualificationError',
+  'AppContractGenerationError',
 ]);
 
 /** The exactly-15 successor `/v7` runtime names owned by the core package. */
@@ -199,6 +245,23 @@ test('T008C: PR #843 semantic-decision compile API is preserved on the barrel', 
     (compilerRoot.SemanticDecisionCompileError as unknown as abstract new () => Error)
       .prototype instanceof Error,
     'SemanticDecisionCompileError must extend Error',
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Pack test 4b: the HF25 additive generator binding keeps its frozen shape.
+// ---------------------------------------------------------------------------
+
+test('v0.8 HF25: the typed App-contract generator is an additive BUILD binding with its frozen source-format constant', () => {
+  assert.equal(
+    compilerRoot.APP_CONTRACT_SOURCE_FORMAT,
+    'domain-harness.app-contracts.v1',
+  );
+  assert.equal(typeof compilerRoot.generateTypedAppContracts, 'function');
+  assert.ok(
+    (compilerRoot.AppContractGenerationError as unknown as abstract new () => Error)
+      .prototype instanceof Error,
+    'AppContractGenerationError must extend Error',
   );
 });
 

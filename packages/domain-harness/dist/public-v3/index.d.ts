@@ -17,7 +17,6 @@ export * from '../runtime/process-command.js';
 export * from '../runtime/durable-control-contracts.js';
 export * from '../runtime/durable-control-coordinator.js';
 export * from '../tool/host-local-contract/index.js';
-export * from '../compiler/app-contracts.js';
 export * from '../observation/index.js';
 export * from '../control/index.js';
 export { computeCompiledPackageId } from '../package/validation.js';
