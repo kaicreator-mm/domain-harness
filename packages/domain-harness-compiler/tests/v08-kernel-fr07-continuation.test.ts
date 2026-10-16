@@ -364,7 +364,7 @@ test('an invalid model query input is an ordinary observation (recoverable), nev
     { step: 1, capabilityId: 'quote.readCustomer', ok: false, error: { code: 'QUERY_INPUT_INVALID' } },
   ]);
   const instanceReads = ports.docs.reads.slice(readsBefore).filter((key) => key.startsWith('v08-kernel:wf-instance:'));
-  assert.equal(instanceReads.length, 3, 'lane start + two commit reads; the refused query never read');
+  assert.equal(instanceReads.length, 4, 'lane start + admission-fence freshness read (v0.8.1 R02) + two commit reads; the refused query never read');
 });
 
 test('an SDK endpoint without the step surface refuses typed with zero activity', async () => {

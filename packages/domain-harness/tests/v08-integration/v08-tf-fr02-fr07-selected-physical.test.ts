@@ -520,7 +520,8 @@ test('V08-FR07-P-F01: two physical model turns around a K-authorized read ⇒ QU
   assert.deepEqual(second?.input.observations, [
     { step: 1, capabilityId: 'catalog.lookup', ok: true, output: { available: true, sku: 'P-1' } },
   ], 'turn #2 sees exactly the K-built observation of the K-owned read');
-  assert.equal(store.readsOf(instanceDocKey(FR07_APP, key)) - readsBefore, 4, 'lane-start read + ONE K query read + two commit-CAS reads');
+  // [v0.8.1 R02] +1: the pre-effect admission-fence claim re-reads the instance.
+  assert.equal(store.readsOf(instanceDocKey(FR07_APP, key)) - readsBefore, 5, 'lane-start read + ONE K query read + admission-fence freshness read + two commit-CAS reads');
 
   const resolver = receipt.admitted.resolver;
   assert.deepEqual(resolver.modelCallEvidence, MEASURED(2), 'K aggregate of trusted per-step evidence == physical count, never the caller 99');
