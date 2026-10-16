@@ -21,10 +21,16 @@ import * as engineering from '../../../examples/v08-domain-apps/business-enginee
 
 test('V09-N01-PN: workspace test command actually runs the ten Router refusal/selection cases', () => {
   const testFile = fileURLToPath(new URL('./v09-workflow-router-n01.test.mjs', import.meta.url));
+  // The runner executes this file with NODE_TEST_CONTEXT set; an inherited
+  // value makes the child runner skip all files ("run() is being called
+  // recursively") and exit 0 with empty output, so it must not leak in.
+  const childEnv = { ...process.env };
+  delete childEnv.NODE_TEST_CONTEXT;
   const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', testFile], {
     encoding: 'utf8',
     timeout: 30_000,
     maxBuffer: 1_048_576,
+    env: childEnv,
   });
   assert.equal(result.error, undefined, String(result.error ?? ''));
   assert.equal(result.signal, null, 'Router test subprocess must not be killed');
