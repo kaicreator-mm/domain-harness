@@ -39,6 +39,7 @@
  */
 
 import { QualifiedPackageError, sha256Hex, type QualifiedCleanupFailure, type QualifiedPackageKind, type V8PackageLifecycleContext } from './contracts.js';
+import type { JsonSchema } from '../contracts/json.js';
 import { currentKernelHostPorts, type V8KernelHostPorts } from './kernel-host.js';
 import { currentHostModelPort, type V8CancellationSignal } from './model-port.js';
 import { load } from './load.js';
@@ -271,6 +272,15 @@ export interface V8FacadeKernelOps {
    */
   describeOperationSurface(principal: V8GatewayPrincipal): readonly V8OperationSurfaceDescriptor[];
   /**
+   * #1006 HF29: the BUILD-sealed Tool Call bindings of this closure — the
+   * approved local/HTTP JSON binding table every authenticated Tool Call
+   * dispatch checks against. Inert sealed metadata only (binding identity,
+   * bound digest, exact schemas, Business-governed visibility): no handler
+   * ever rides a descriptor — the concrete implementation stays an
+   * explicitly provided Host adapter the trusted gateway matches by digest.
+   */
+  sealedToolBindings(): readonly V8SealedToolBinding[];
+  /**
    * #1003 FR05/HF17/HF23: the retained Standard-SDK query/observer/agent
    * projections surfaced for the trusted gateway exactly like the FR08
    * retained decision-source endpoints — additive optional ABI members,
@@ -489,6 +499,34 @@ export interface V8OperationSurfaceDescriptor {
   readonly admissionIntentType?: string;
   /** Whether the authenticated principal holds the Business-bound role. */
   readonly principalAdmitted: boolean;
+}
+
+/**
+ * #1006 R5 HF29 — one BUILD-sealed Tool Call binding descriptor. The sealed
+ * capability `TOOLS` ABI table entry behind the Host-owned dispatch port:
+ * inert approval metadata (binding identity + bound digest + exact JSON
+ * Schemas + the Business intent whose bound role set governs execution).
+ * No implementation rides the descriptor — the Host registers the concrete
+ * adapter and the dispatch refuses everything but the exact bound digest.
+ */
+export interface V8SealedToolBinding {
+  readonly capabilityId: string;
+  readonly toolId: string;
+  readonly effectClass: V8OperationEffectClass;
+  /** The sealed transport kind (frozen family: host-local / remote-http-json). */
+  readonly bindingKind: string;
+  /** The sealed binding identity the Host adapter registers under. */
+  readonly bindingId: string;
+  /** The bound artifact digest a Host adapter must match exactly. */
+  readonly bindingDigest: string;
+  /** The host capabilities this tool declared it requires. */
+  readonly requiredCapabilities: readonly string[];
+  /** Exact input JSON Schema (absent = any JSON input). */
+  readonly inputSchema?: JsonSchema;
+  /** Exact output JSON Schema. */
+  readonly outputSchema: JsonSchema;
+  /** The sealed Business intent whose issuer-bound role set authorizes a call. */
+  readonly visibilityIntentType: string;
 }
 
 const OPERATION_EFFECT_CLASSES: readonly V8OperationEffectClass[] = ['none', 'idempotent', 'non-idempotent'];
@@ -872,6 +910,114 @@ function wireCapabilityOperations(input: {
 }
 
 /**
+ * Wire the sealed Tool Call binding surface of every sealed S02a capability
+ * binding at THIS trusted activation boundary (#1006 R5 HF29): the module's
+ * optional `TOOLS` ABI table is the BUILD-approved local/HTTP JSON Tool
+ * Call binding — sealed module bytes, externally approved, closure-pinned.
+ * The table carries NO implementations: each entry names its transport kind,
+ * binding identity, BOUND DIGEST, exact JSON Schemas, required host
+ * capabilities and the sealed Business intent whose issuer-bound role set
+ * governs execution; the concrete adapter stays explicitly provided Host
+ * governance input the trusted gateway matches by digest at dispatch. A
+ * malformed, duplicated or unbound-intent ABI fails typed BEFORE any
+ * facade escapes. Tool identities are injective across the WHOLE closure —
+ * no runtime discovery, no ambiguity between capabilities.
+ */
+function wireCapabilityToolBindings(input: {
+  readonly bindings: readonly SealedQualifiedPackageRoot['bindings'][number][];
+  readonly getModuleNamespace: (packageId: string) => Record<string, unknown>;
+  readonly sealedIntentTypes: ReadonlySet<string>;
+}): { tools: Map<string, V8SealedToolBinding> } {
+  const tools = new Map<string, V8SealedToolBinding>();
+  const bindingIds = new Set<string>();
+  for (const binding of input.bindings) {
+    if (binding.role !== 'capability') continue;
+    const namespace = input.getModuleNamespace(binding.packageId);
+    const abiTable: unknown = namespace.TOOLS;
+    if (abiTable === undefined) continue;
+    if (!Array.isArray(abiTable) || abiTable.length === 0) {
+      throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} exports a TOOLS ABI that is not a non-empty array`);
+    }
+    for (const entry of abiTable) {
+      if (!isPlainRecordValue(entry)) {
+        throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} TOOLS entries must be plain records`);
+      }
+      const toolId = entry.toolId;
+      if (typeof toolId !== 'string' || toolId.length === 0) {
+        throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} declares a TOOLS entry without a non-empty toolId`);
+      }
+      if (tools.has(toolId)) {
+        throw typedError('TOOL_ABI_INVALID', `tool ${toolId} is declared by more than one capability in this sealed closure; tool identities must stay injective`);
+      }
+      const effectClass = entry.effectClass;
+      if (!isOperationEffectClass(effectClass)) {
+        throw typedError(
+          'TOOL_ABI_INVALID',
+          `capability ${binding.capabilityId} tool ${toolId} declares effectClass ${String(effectClass)}; the declaration family is none | idempotent | non-idempotent`,
+        );
+      }
+      const toolBinding = entry.binding;
+      if (!isPlainRecordValue(toolBinding)
+        || typeof toolBinding.kind !== 'string' || toolBinding.kind.length === 0
+        || typeof toolBinding.bindingId !== 'string' || toolBinding.bindingId.length === 0
+        || typeof toolBinding.digest !== 'string' || toolBinding.digest.length === 0) {
+        throw typedError(
+          'TOOL_ABI_INVALID',
+          `capability ${binding.capabilityId} tool ${toolId} must declare binding {kind, bindingId, digest} with non-empty strings (the bound digest pins the Host adapter)`,
+        );
+      }
+      if (bindingIds.has(toolBinding.bindingId)) {
+        throw typedError('TOOL_ABI_INVALID', `tool binding ${toolBinding.bindingId} is declared more than once in this sealed closure; binding identities must stay injective`);
+      }
+      bindingIds.add(toolBinding.bindingId);
+      const requiredCapabilities = entry.requiredCapabilities;
+      if (
+        !Array.isArray(requiredCapabilities)
+        || requiredCapabilities.length === 0
+        || !requiredCapabilities.every((capability) => typeof capability === 'string' && capability.length > 0)
+        || new Set(requiredCapabilities).size !== requiredCapabilities.length
+      ) {
+        throw typedError(
+          'TOOL_ABI_INVALID',
+          `capability ${binding.capabilityId} tool ${toolId} must declare requiredCapabilities as a non-empty injective array of non-empty capability ids`,
+        );
+      }
+      const outputSchema = entry.outputSchema;
+      if (!isPlainRecordValue(outputSchema)) {
+        throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} must declare an outputSchema record`);
+      }
+      const inputSchema = entry.inputSchema;
+      if (inputSchema !== undefined && !isPlainRecordValue(inputSchema)) {
+        throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} inputSchema, when present, must be a plain record`);
+      }
+      const visibility = entry.visibility;
+      if (!isPlainRecordValue(visibility) || typeof visibility.intentType !== 'string' || visibility.intentType.length === 0) {
+        throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} must declare visibility.intentType (Business-governed role set)`);
+      }
+      if (!input.sealedIntentTypes.has(visibility.intentType)) {
+        throw typedError(
+          'TOOL_ABI_INVALID',
+          `capability ${binding.capabilityId} tool ${toolId} visibility references intent ${visibility.intentType} which is not bound in this sealed closure`,
+        );
+      }
+      tools.set(toolId, Object.freeze({
+        capabilityId: binding.capabilityId,
+        toolId,
+        effectClass,
+        bindingKind: toolBinding.kind,
+        bindingId: toolBinding.bindingId,
+        bindingDigest: toolBinding.digest,
+        requiredCapabilities: Object.freeze((requiredCapabilities as unknown[]).map((capability) => String(capability))),
+        ...(inputSchema === undefined ? {} : { inputSchema: Object.freeze({ ...inputSchema }) as JsonSchema }),
+        outputSchema: Object.freeze({ ...outputSchema }) as JsonSchema,
+        visibilityIntentType: visibility.intentType,
+      }));
+    }
+  }
+  return { tools };
+}
+
+/**
  * Structurally validate ONE generic intent (ported from #994@b9ea4d1
  * contracts.mjs): JSON-only, no functions/symbols/handles — intents are
  * data and can never carry ports or callables across the transport scope.
@@ -1091,6 +1237,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
   let businessPolicy: object;
   let kernelRuntime: WiredKernelRuntime;
   let wiredOperations: { capabilities: Map<string, WiredCapability>; adapters: Map<string, Map<string, (payload: unknown) => unknown>> };
+  let wiredToolBindings: { tools: Map<string, V8SealedToolBinding> };
   try {
     // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
     // ModelPort binding, protected channel ONLY. When this process bootstrapped
@@ -1257,6 +1404,19 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       businessPolicy: businessPolicy as Record<string, unknown>,
     });
 
+    // ---- #1006 R5 HF29: sealed Tool Call binding wiring. The capability
+    // modules' optional sealed TOOLS ABI becomes the approved binding table
+    // the trusted Host gateway's tool-call dispatch port checks against —
+    // validated at the SAME trusted boundary (before the kernel mechanism),
+    // so a malformed binding table leaves no facade and no mechanism side
+    // effect. No implementation wires here: the concrete adapter stays
+    // explicitly provided Host governance input.
+    wiredToolBindings = wireCapabilityToolBindings({
+      bindings,
+      getModuleNamespace: (packageId: string) => loaded.getModuleNamespace(packageId),
+      sealedIntentTypes: new Set(intentIndex.keys()),
+    });
+
     // ---- #1023 S05: capability-owned physical Node adapter identity. Every
     // LOGICAL resource key THIS closure claims through its sealed effectful
     // OPERATIONS ABI is dispatched through THIS activation's injective
@@ -1364,6 +1524,9 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     ),
   );
   const capabilityOperations = wiredOperations.capabilities;
+  // #1006 HF29: the frozen approved Tool Call binding table (inert sealed
+  // descriptors; the Host gateway's dispatch port reads it, nothing else).
+  const sealedToolBindings: readonly V8SealedToolBinding[] = Object.freeze([...wiredToolBindings.tools.values()]);
   /**
    * [#1003 FR05/HF17/HF23] The retained S query/observer/agent projections
    * (projectRetainedRead / coalesceRetainedObservations /
@@ -1875,6 +2038,10 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       }
       }
       return Object.freeze(out);
+    },
+    sealedToolBindings(): readonly V8SealedToolBinding[] {
+      assertOpen();
+      return sealedToolBindings;
     },
     ...(retainedProjection === undefined ? {} : { retainedProjection }),
   };

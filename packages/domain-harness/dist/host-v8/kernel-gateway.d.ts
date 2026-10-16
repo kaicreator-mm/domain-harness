@@ -54,6 +54,7 @@ import type { TrustedNodeHost } from './bootstrap.js';
 import { type UxTarget } from './ux-transport.js';
 import type { HostEvent } from './events.js';
 import type { HostCredential } from './identity.js';
+import { type HostToolCallAdapters } from './tool-call-port.js';
 /** One registered qualified Domain App closure bound to a host appId. */
 export interface KernelGatewayAppInput {
     /** Host application identity; credentials are audience/tenant/app-bound to this. */
@@ -76,10 +77,19 @@ export interface KernelGatewayAppInput {
      */
     readonly controlRoles?: readonly string[];
     /**
+     * [#1006 HF29] The explicitly provided Host adapters for this app's
+     * SEALED Tool Call bindings (local / injected HTTP transports), keyed by
+     * the sealed bindingId. Host governance configuration — never caller
+     * data: no default adapter exists, and a Tool Call whose binding has no
+     * adapter here refuses typed before any effect. Concrete tool
+     * implementations live ONLY here — the microkernel never receives one.
+     */
+    readonly toolCallAdapters?: HostToolCallAdapters;
+    /**
      * [#1006 HF21] The runtime authority class of the installed closure:
      * exactly 'PRODUCTION' or 'SIMULATION'. Host governance configuration —
      * never caller data. When declared, every Genesis activation of this app
-     * binds the class into the durable Kernel GovernanceExecutionPin (woven
+     * binds the class into the durable Kernel GovernancePin (woven
      * into its bindingDigest), and a SIMULATION instance can never mint
      * authoritative production Effect/Journal. The declaration is pinned in
      * the durable app-registration record, so a restart re-registration under
@@ -123,6 +133,19 @@ export interface KernelGatewayOperationCall {
     readonly instanceKey?: string;
     /** Effectful operations only: the occurrence dedup/replay identity. */
     readonly messageId?: string;
+}
+/**
+ * #1006 R5 HF29 — one authenticated approved Tool Call through the
+ * Host-owned dispatch port. The tool must be a SEALED Tool Call binding of
+ * the registered closure (local/HTTP JSON transport, bound digest, exact
+ * schemas); the concrete implementation is the explicitly provided Host
+ * adapter whose digest matches the sealed binding. Pure JSON data only —
+ * no occurrence address rides a Tool Call.
+ */
+export interface KernelGatewayToolCallRequest {
+    readonly appId: string;
+    readonly toolId: string;
+    readonly input?: unknown;
 }
 /**
  * `cancel-requested`: the in-flight occurrence's signal was raised — the
@@ -268,6 +291,20 @@ export interface KernelGateway {
     queryAgentTools(credential: unknown, request: {
         readonly appId: string;
     }): Promise<KernelGatewayAgentToolQueryResult>;
+    /**
+     * [#1006 HF29] One authenticated approved Tool Call through the Host-owned
+     * dispatch port: the tool must be a sealed binding of the app's closure,
+     * the authenticated principal must hold a role the sealed Business
+     * visibility intent admits, every sealed required capability must be
+     * provided by this Host, and the explicitly provided adapter must match
+     * the sealed transport kind and BOUND DIGEST with exact input/output JSON
+     * Schemas — every refusal fires typed BEFORE the adapter (and any
+     * effect) runs. Effectful tool bindings and transports outside the frozen
+     * approved family (script is NOT in the selected v0.8 approved target
+     * profile) refuse typed; there is no default network, no module import
+     * and no fallback transport.
+     */
+    executeToolCall(credential: unknown, request: KernelGatewayToolCallRequest): Promise<unknown>;
     /** Protected Genesis activation (host-configured role authority). */
     activateGenesis(credential: unknown, request: {
         readonly appId: string;

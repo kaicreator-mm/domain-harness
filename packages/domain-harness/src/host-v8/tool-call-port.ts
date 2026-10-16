@@ -1,0 +1,362 @@
+/**
+ * #1006 R5 HF29 — Host-owned approved Tool Call dispatch port.
+ * ===========================================================================
+ *
+ * The Host-side execution seam for BUILD-approved local/HTTP JSON Tool Call
+ * bindings of a registered Domain App closure. It reuses the closed-world
+ * discipline of the frozen tool contracts (`src/tool/host-local-contract`,
+ * `src/tool/remote-contract`): a sealed tool binding, a Host-provided
+ * adapter pinned to the exact bound digest, capability allowlisting and
+ * exact JSON Schema checks on both edges — now exposed as one typed,
+ * authenticated gateway verb instead of the legacy in-process executor.
+ *
+ * What deliberately does NOT live here:
+ *   - concrete tool implementations — they stay in the Host governance
+ *     configuration (explicitly provided adapters, e.g. a local closure over
+ *     SQLite or an injected network-free HTTP transport fake). The
+ *     microkernel never receives one;
+ *   - a second approval service — the approved binding is the SEALED
+ *     capability `TOOLS` ABI of the qualified closure (module bytes digested
+ *     into the closure identity, externally approved, durably pinned by
+ *     registerApp). This port only re-checks that pinned truth;
+ *   - any default network, module import or fallback transport — an adapter
+ *     that was not explicitly registered never runs, and a binding whose
+ *     sealed kind is outside the frozen approved transport family (e.g.
+ *     script, which the selected v0.8 approved target profile does not
+ *     include) refuses typed BEFORE any effect.
+ *
+ * Every check below runs before the adapter executes; a refusal leaves the
+ * adapter untouched and produces zero Kernel/physical activity.
+ */
+
+import { HostBoundaryError } from './errors.js';
+import { SchemaValidator } from '../execution/schema-validator.js';
+import { ExecutorError } from '../execution/executor-error.js';
+import { portableUtf8ByteLength } from '../schema/domainharness-json-schema-v1.js';
+import type { JsonValue } from '../contracts/json.js';
+import type { V8SealedToolBinding } from '../public-v8/microkernel.js';
+
+type HostToolJsonCode = 'HOST_TOOL_INPUT_INVALID' | 'HOST_TOOL_OUTPUT_INVALID';
+
+/**
+ * The bounded plain-JSON array size: an array carrying more elements than
+ * this refuses typed before any element is inspected.
+ */
+export const HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH = 65_536;
+
+/**
+ * Descriptor-safe DENSE standard-array gate (Review #5542905557 P1). Every
+ * structural check runs BEFORE any element value is read — so a hostile
+ * ACCESSOR element (get/set) is always refused without invocation, and a
+ * verified element is a guaranteed own enumerable data slot whose value can
+ * be read inertly:
+ *   1. allowed prototype only (standard `Array.prototype` or null);
+ *   2. own `length` DATA descriptor carrying a safe non-negative integer,
+ *      within the array length bound;
+ *   3. the exact own-key set: `length` plus canonical indices `0..length-1`,
+ *      nothing else — extra named keys, out-of-range indices and ANY symbol
+ *      key refuse;
+ *   4. each exact index is an own, enumerable DATA slot — accessor slots and
+ *      sparse holes refuse WITHOUT touching the element value.
+ * The depth bound of the enclosing walk doubles as the cyclic guard: a
+ * self-referencing structure hits it and refuses.
+ */
+function assertPlainJsonArrayData(value: unknown[], path: string, code: HostToolJsonCode, depth: number): void {
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  if (prototype !== Array.prototype && prototype !== null) {
+    throw new HostBoundaryError(code, `${path} must be a standard dense JSON array (prototype Array.prototype or null)`);
+  }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  if (
+    lengthDescriptor === undefined
+    || !Object.hasOwn(lengthDescriptor, 'value')
+    || typeof lengthDescriptor.value !== 'number'
+    || !Number.isSafeInteger(lengthDescriptor.value)
+    || lengthDescriptor.value < 0
+  ) {
+    throw new HostBoundaryError(code, `${path}.length is not an own data slot carrying a safe non-negative integer`);
+  }
+  const length: number = lengthDescriptor.value;
+  if (length > HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH) {
+    throw new HostBoundaryError(
+      code,
+      `${path} carries ${length} elements, beyond the Tool Call JSON array length bound of ${HOST_TOOL_CALL_MAX_JSON_ARRAY_LENGTH}`,
+    );
+  }
+  const allowedKeys = new Set<string | symbol>(['length']);
+  for (let index = 0; index < length; index += 1) allowedKeys.add(String(index));
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== allowedKeys.size || ownKeys.some((key) => !allowedKeys.has(key))) {
+    throw new HostBoundaryError(
+      code,
+      `${path} carries own keys outside the exact dense index range (extra named keys, out-of-range indices and symbol keys are refused)`,
+    );
+  }
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, index);
+    if (descriptor === undefined) {
+      throw new HostBoundaryError(code, `${path}[${index}] is a sparse hole (only dense standard arrays cross this boundary)`);
+    }
+    if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new HostBoundaryError(code, `${path}[${index}] is not an own enumerable data slot (accessors are refused)`);
+    }
+  }
+  // Structure fully verified above — only now are the guaranteed data-slot
+  // element values read and walked (no accessor exists, so nothing runs).
+  for (let index = 0; index < length; index += 1) {
+    assertPlainJsonData(value[index], `${path}[${index}]`, code, depth + 1);
+  }
+}
+
+/**
+ * Descriptor-safe plain-JSON gate (the same discipline the OperationCall
+ * boundary enforces): hostile ACCESSORS are refused WITHOUT invocation, so
+ * a caller-supplied or adapter-returned object (or ARRAY — see
+ * `assertPlainJsonArrayData`) can never run code inside the validation
+ * walk. Dangerous own keys and non-plain prototypes refuse alike; the walk
+ * is depth-bounded.
+ */
+function assertPlainJsonData(value: unknown, path: string, code: HostToolJsonCode, depth = 0): void {
+  if (depth > 32) {
+    throw new HostBoundaryError(code, `${path} exceeds the Tool Call JSON depth bound`);
+  }
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new HostBoundaryError(code, `${path} carries a non-finite number`);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    assertPlainJsonArrayData(value, path, code, depth);
+    return;
+  }
+  if (typeof value !== 'object') {
+    throw new HostBoundaryError(code, `${path} carries unsupported ${typeof value}`);
+  }
+  const prototype = Object.getPrototypeOf(value) as object | null;
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new HostBoundaryError(code, `${path} must be a plain JSON object`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value as Record<string, unknown>);
+  for (const key of Object.keys(descriptors)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new HostBoundaryError(code, `${path}.${key} is a dangerous own key`);
+    }
+    const descriptor = descriptors[key];
+    if (descriptor === undefined || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new HostBoundaryError(code, `${path}.${key} is not an own enumerable data slot (accessors are refused)`);
+    }
+    assertPlainJsonData(descriptor.value, `${path}.${key}`, code, depth + 1);
+  }
+  if (Reflect.ownKeys(descriptors).length !== Object.keys(descriptors).length) {
+    throw new HostBoundaryError(code, `${path} has non-enumerable own keys`);
+  }
+}
+
+/** Local transport kind (the frozen host-local tool contract family). */
+export const HOST_TOOL_CALL_TRANSPORT_LOCAL = 'host-local-domain-tool@1' as const;
+/** Remote HTTP/JSON transport kind (the frozen remote tool contract family). */
+export const HOST_TOOL_CALL_TRANSPORT_REMOTE_HTTP_JSON = 'remote-http-json@1' as const;
+
+/**
+ * The frozen approved transport family of the selected v0.8 Host target
+ * profile. Script-style transports are NOT in the approved profile: a sealed
+ * script binding refuses typed at dispatch (it is never silently routed
+ * through another transport).
+ */
+export const HOST_TOOL_CALL_APPROVED_TRANSPORTS: ReadonlySet<string> = new Set([
+  HOST_TOOL_CALL_TRANSPORT_LOCAL,
+  HOST_TOOL_CALL_TRANSPORT_REMOTE_HTTP_JSON,
+]);
+
+/**
+ * Bounded output: a Tool Call result whose canonical JSON encoding exceeds
+ * this UTF-8 byte budget refuses typed — no unbounded Host adapter output
+ * ever crosses the boundary. The budget counts true UTF-8 BYTES of the
+ * encoded JSON (Review #5542905557 P2), never the UTF-16 code-unit count of
+ * the in-memory string: multibyte emoji/CJK results are byte-accurate here.
+ */
+export const HOST_TOOL_CALL_MAX_OUTPUT_BYTES = 256 * 1024;
+
+/**
+ * One explicitly provided Host adapter for a sealed Tool Call binding.
+ * `capability` is checked against the sealed tool's declared required
+ * capabilities (an adapter holding an undeclared capability is refused);
+ * `digest` must equal the sealed binding digest — a stale or wrong digest
+ * refuses before the adapter runs. `execute` closes over the Host-owned
+ * implementation (local resources, an injected HTTP transport fake, …) and
+ * is the ONLY thing that ever executes a Tool Call.
+ */
+export interface HostToolCallAdapter {
+  /** The transport family this adapter serves; must equal the sealed kind. */
+  readonly transport: string;
+  /** The Host capability this adapter provides for the sealed tool. */
+  readonly capability: string;
+  /** The exact binding artifact digest this adapter was built against. */
+  readonly digest: string;
+  execute(input: JsonValue): Promise<JsonValue>;
+}
+
+/** Host governance input: sealed bindingId → explicitly provided adapter. */
+export type HostToolCallAdapters = Readonly<Record<string, HostToolCallAdapter>>;
+
+/**
+ * Registration-time shape gate for the adapter map (registerApp input).
+ * Digest/capability/transport agreement with the SEALED binding is enforced
+ * per call below — the Host may register adapters for bindings a closure
+ * does not seal; they simply never dispatch.
+ */
+export function validateHostToolCallAdapters(adapters: unknown): asserts adapters is HostToolCallAdapters {
+  if (typeof adapters !== 'object' || adapters === null || Array.isArray(adapters)) {
+    throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp toolCallAdapters, when present, must be a plain record of bindingId → adapter');
+  }
+  for (const [bindingId, adapter] of Object.entries(adapters as Record<string, unknown>)) {
+    if (typeof adapter !== 'object' || adapter === null) {
+      throw new HostBoundaryError('GATEWAY_APP_MALFORMED', `toolCallAdapters['${bindingId}'] must be a plain adapter record`);
+    }
+    const record = adapter as { transport?: unknown; capability?: unknown; digest?: unknown; execute?: unknown };
+    if (typeof record.transport !== 'string' || record.transport.length === 0) {
+      throw new HostBoundaryError('GATEWAY_APP_MALFORMED', `toolCallAdapters['${bindingId}'].transport must be a non-empty string`);
+    }
+    if (typeof record.capability !== 'string' || record.capability.length === 0) {
+      throw new HostBoundaryError('GATEWAY_APP_MALFORMED', `toolCallAdapters['${bindingId}'].capability must be a non-empty string`);
+    }
+    if (typeof record.digest !== 'string' || record.digest.length === 0) {
+      throw new HostBoundaryError('GATEWAY_APP_MALFORMED', `toolCallAdapters['${bindingId}'].digest must be a non-empty string`);
+    }
+    if (typeof record.execute !== 'function') {
+      throw new HostBoundaryError('GATEWAY_APP_MALFORMED', `toolCallAdapters['${bindingId}'].execute must be a function`);
+    }
+  }
+}
+
+/**
+ * Execute ONE sealed Tool Call binding through its explicitly provided Host
+ * adapter. Check order (all before any adapter activity):
+ *   1. effect class — only inert JSON tool calls dispatch here; effectful
+ *      tool bindings refuse typed (the sealed central occurrence path owns
+ *      every effect admission);
+ *   2. sealed transport family — kinds outside the frozen approved profile
+ *      (script, unknown) refuse;
+ *   3. protected Host implementation — the adapter registered under the
+ *      exact sealed bindingId (no cross-binding fallback);
+ *   4. transport agreement — the adapter serves exactly the sealed kind,
+ *      never a substitute transport;
+ *   5. capability authorization — every sealed required capability is
+ *      provided by the Host, and the bound adapter's capability is one the
+ *      sealed tool declares;
+ *   6. bound digest — the adapter digest equals the sealed binding digest;
+ *   7. exact input JSON Schema;
+ * and after the adapter runs, the exact output JSON Schema plus the bounded
+ * output budget. Every refusal is typed and side-effect free.
+ */
+export async function dispatchHostToolCall(input: {
+  readonly sealed: V8SealedToolBinding;
+  readonly adapters: HostToolCallAdapters;
+  readonly validator: SchemaValidator;
+  readonly toolInput: unknown;
+}): Promise<JsonValue> {
+  const { sealed, adapters, validator } = input;
+  // 1. Effectful tool bindings never dispatch through this port.
+  if (sealed.effectClass !== 'none') {
+    throw new HostBoundaryError(
+      'HOST_TOOL_EFFECT_REFUSED',
+      `tool ${sealed.toolId} is sealed effectClass '${sealed.effectClass}'; effectful tool work belongs to the sealed central occurrence path, never to an inert Host Tool Call`,
+    );
+  }
+  // 2. The frozen approved transport family (script etc. refuse here).
+  if (!HOST_TOOL_CALL_APPROVED_TRANSPORTS.has(sealed.bindingKind)) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_TRANSPORT_UNAPPROVED',
+      `tool ${sealed.toolId} binding kind '${sealed.bindingKind}' is not in the frozen approved transport family of the selected Host target profile [${[...HOST_TOOL_CALL_APPROVED_TRANSPORTS].join(', ')}]; there is no fallback transport`,
+    );
+  }
+  // 3. The protected Host implementation for the exact sealed binding.
+  const adapter = adapters[sealed.bindingId];
+  if (adapter === undefined) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_ADAPTER_MISSING',
+      `tool ${sealed.toolId} has no Host adapter registered for sealed binding '${sealed.bindingId}'; a Tool Call never executes without an explicitly provided protected Host implementation`,
+    );
+  }
+  // 4. Transport agreement — no substitute transport for a sealed kind.
+  if (adapter.transport !== sealed.bindingKind) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_TRANSPORT_MISMATCH',
+      `the Host adapter for binding '${sealed.bindingId}' serves transport '${adapter.transport}' but tool ${sealed.toolId} is sealed '${sealed.bindingKind}'; there is no fallback between transports`,
+    );
+  }
+  // 5. Capability authorization, both directions:
+  //    every sealed required capability must be provided by the Host at
+  //    large, and the bound adapter's own capability must be one the sealed
+  //    tool declares (an undeclared capability can never execute it).
+  const provided = new Set(Object.values(adapters).map((candidate) => candidate.capability));
+  const missing = sealed.requiredCapabilities.filter((capability) => !provided.has(capability));
+  if (missing.length > 0) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_CAPABILITY_MISSING',
+      `tool ${sealed.toolId} requires host capabilities with no provided adapter: ${missing.join(', ')}`,
+    );
+  }
+  if (!sealed.requiredCapabilities.includes(adapter.capability)) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_CAPABILITY_NOT_ALLOWED',
+      `the Host adapter for binding '${sealed.bindingId}' provides capability '${adapter.capability}' which sealed tool ${sealed.toolId} does not declare; an undeclared capability never executes a Tool Call`,
+    );
+  }
+  // 6. The bound digest — a stale or wrong adapter refuses before it runs.
+  if (adapter.digest !== sealed.bindingDigest) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_BINDING_DIGEST_MISMATCH',
+      `the Host adapter for binding '${sealed.bindingId}' (digest ${adapter.digest}) does not match the sealed binding digest of tool ${sealed.toolId} (${sealed.bindingDigest}); a stale or replaced adapter implementation refuses typed`,
+    );
+  }
+  // 7. Exact input JSON Schema check (the plain-data walk already refused
+  //    hostile accessors without invoking them).
+  const toolInput = input.toolInput === undefined ? null : input.toolInput;
+  assertPlainJsonData(toolInput, '$toolCall.input', 'HOST_TOOL_INPUT_INVALID');
+  let jsonInput: JsonValue;
+  try {
+    jsonInput = validator.validate(sealed.inputSchema, toolInput, 'invalid_input', `tool ${sealed.toolId} input`);
+  } catch (error) {
+    if (error instanceof ExecutorError) {
+      throw new HostBoundaryError('HOST_TOOL_INPUT_INVALID', error.message);
+    }
+    throw error;
+  }
+  // The only effect: the explicitly provided adapter runs exactly once.
+  let output: JsonValue;
+  try {
+    output = await adapter.execute(jsonInput);
+  } catch (error) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_ADAPTER_FAILED',
+      `the Host adapter for binding '${sealed.bindingId}' (tool ${sealed.toolId}) failed: ${String((error as Error)?.message ?? error)}`,
+    );
+  }
+  // Exact output JSON Schema check (plain-data walk first — an adapter can
+  // never smuggle accessors past the boundary), then the bounded budget.
+  assertPlainJsonData(output, '$toolCall.output', 'HOST_TOOL_OUTPUT_INVALID');
+  let jsonOutput: JsonValue;
+  try {
+    jsonOutput = validator.validate(sealed.outputSchema, output, 'invalid_output', `tool ${sealed.toolId} output`);
+  } catch (error) {
+    if (error instanceof ExecutorError) {
+      throw new HostBoundaryError('HOST_TOOL_OUTPUT_INVALID', error.message);
+    }
+    throw error;
+  }
+  const encoded = JSON.stringify(jsonOutput);
+  // The budget measures the true UTF-8 byte length of the encoded JSON —
+  // never the UTF-16 code-unit count of the in-memory string, which
+  // under-counts multibyte emoji/CJK output by 2-4x.
+  const outputBytes = portableUtf8ByteLength(encoded);
+  if (outputBytes > HOST_TOOL_CALL_MAX_OUTPUT_BYTES) {
+    throw new HostBoundaryError(
+      'HOST_TOOL_OUTPUT_UNBOUNDED',
+      `tool ${sealed.toolId} produced ${outputBytes} UTF-8 bytes of JSON output, beyond the ${HOST_TOOL_CALL_MAX_OUTPUT_BYTES}-byte Tool Call budget; unbounded output never crosses the Host boundary`,
+    );
+  }
+  return jsonOutput;
+}

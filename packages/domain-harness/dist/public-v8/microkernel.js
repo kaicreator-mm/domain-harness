@@ -425,6 +425,97 @@ function wireCapabilityOperations(input) {
     return { capabilities, adapters };
 }
 /**
+ * Wire the sealed Tool Call binding surface of every sealed S02a capability
+ * binding at THIS trusted activation boundary (#1006 R5 HF29): the module's
+ * optional `TOOLS` ABI table is the BUILD-approved local/HTTP JSON Tool
+ * Call binding — sealed module bytes, externally approved, closure-pinned.
+ * The table carries NO implementations: each entry names its transport kind,
+ * binding identity, BOUND DIGEST, exact JSON Schemas, required host
+ * capabilities and the sealed Business intent whose issuer-bound role set
+ * governs execution; the concrete adapter stays explicitly provided Host
+ * governance input the trusted gateway matches by digest at dispatch. A
+ * malformed, duplicated or unbound-intent ABI fails typed BEFORE any
+ * facade escapes. Tool identities are injective across the WHOLE closure —
+ * no runtime discovery, no ambiguity between capabilities.
+ */
+function wireCapabilityToolBindings(input) {
+    const tools = new Map();
+    const bindingIds = new Set();
+    for (const binding of input.bindings) {
+        if (binding.role !== 'capability')
+            continue;
+        const namespace = input.getModuleNamespace(binding.packageId);
+        const abiTable = namespace.TOOLS;
+        if (abiTable === undefined)
+            continue;
+        if (!Array.isArray(abiTable) || abiTable.length === 0) {
+            throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} exports a TOOLS ABI that is not a non-empty array`);
+        }
+        for (const entry of abiTable) {
+            if (!isPlainRecordValue(entry)) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} TOOLS entries must be plain records`);
+            }
+            const toolId = entry.toolId;
+            if (typeof toolId !== 'string' || toolId.length === 0) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} declares a TOOLS entry without a non-empty toolId`);
+            }
+            if (tools.has(toolId)) {
+                throw typedError('TOOL_ABI_INVALID', `tool ${toolId} is declared by more than one capability in this sealed closure; tool identities must stay injective`);
+            }
+            const effectClass = entry.effectClass;
+            if (!isOperationEffectClass(effectClass)) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} declares effectClass ${String(effectClass)}; the declaration family is none | idempotent | non-idempotent`);
+            }
+            const toolBinding = entry.binding;
+            if (!isPlainRecordValue(toolBinding)
+                || typeof toolBinding.kind !== 'string' || toolBinding.kind.length === 0
+                || typeof toolBinding.bindingId !== 'string' || toolBinding.bindingId.length === 0
+                || typeof toolBinding.digest !== 'string' || toolBinding.digest.length === 0) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} must declare binding {kind, bindingId, digest} with non-empty strings (the bound digest pins the Host adapter)`);
+            }
+            if (bindingIds.has(toolBinding.bindingId)) {
+                throw typedError('TOOL_ABI_INVALID', `tool binding ${toolBinding.bindingId} is declared more than once in this sealed closure; binding identities must stay injective`);
+            }
+            bindingIds.add(toolBinding.bindingId);
+            const requiredCapabilities = entry.requiredCapabilities;
+            if (!Array.isArray(requiredCapabilities)
+                || requiredCapabilities.length === 0
+                || !requiredCapabilities.every((capability) => typeof capability === 'string' && capability.length > 0)
+                || new Set(requiredCapabilities).size !== requiredCapabilities.length) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} must declare requiredCapabilities as a non-empty injective array of non-empty capability ids`);
+            }
+            const outputSchema = entry.outputSchema;
+            if (!isPlainRecordValue(outputSchema)) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} must declare an outputSchema record`);
+            }
+            const inputSchema = entry.inputSchema;
+            if (inputSchema !== undefined && !isPlainRecordValue(inputSchema)) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} inputSchema, when present, must be a plain record`);
+            }
+            const visibility = entry.visibility;
+            if (!isPlainRecordValue(visibility) || typeof visibility.intentType !== 'string' || visibility.intentType.length === 0) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} must declare visibility.intentType (Business-governed role set)`);
+            }
+            if (!input.sealedIntentTypes.has(visibility.intentType)) {
+                throw typedError('TOOL_ABI_INVALID', `capability ${binding.capabilityId} tool ${toolId} visibility references intent ${visibility.intentType} which is not bound in this sealed closure`);
+            }
+            tools.set(toolId, Object.freeze({
+                capabilityId: binding.capabilityId,
+                toolId,
+                effectClass,
+                bindingKind: toolBinding.kind,
+                bindingId: toolBinding.bindingId,
+                bindingDigest: toolBinding.digest,
+                requiredCapabilities: Object.freeze(requiredCapabilities.map((capability) => String(capability))),
+                ...(inputSchema === undefined ? {} : { inputSchema: Object.freeze({ ...inputSchema }) }),
+                outputSchema: Object.freeze({ ...outputSchema }),
+                visibilityIntentType: visibility.intentType,
+            }));
+        }
+    }
+    return { tools };
+}
+/**
  * Structurally validate ONE generic intent (ported from #994@b9ea4d1
  * contracts.mjs): JSON-only, no functions/symbols/handles — intents are
  * data and can never carry ports or callables across the transport scope.
@@ -628,6 +719,7 @@ async function loadScopedFacade(packageRoot) {
     let businessPolicy;
     let kernelRuntime;
     let wiredOperations;
+    let wiredToolBindings;
     try {
         // ---- FR08 (#1013, I04 + R1 F-03 / ABI ruling #1013@6118426531): trusted
         // ModelPort binding, protected channel ONLY. When this process bootstrapped
@@ -768,6 +860,18 @@ async function loadScopedFacade(packageRoot) {
             sealedIntentTypes: new Set(intentIndex.keys()),
             businessPolicy: businessPolicy,
         });
+        // ---- #1006 R5 HF29: sealed Tool Call binding wiring. The capability
+        // modules' optional sealed TOOLS ABI becomes the approved binding table
+        // the trusted Host gateway's tool-call dispatch port checks against —
+        // validated at the SAME trusted boundary (before the kernel mechanism),
+        // so a malformed binding table leaves no facade and no mechanism side
+        // effect. No implementation wires here: the concrete adapter stays
+        // explicitly provided Host governance input.
+        wiredToolBindings = wireCapabilityToolBindings({
+            bindings,
+            getModuleNamespace: (packageId) => loaded.getModuleNamespace(packageId),
+            sealedIntentTypes: new Set(intentIndex.keys()),
+        });
         // ---- #1023 S05: capability-owned physical Node adapter identity. Every
         // LOGICAL resource key THIS closure claims through its sealed effectful
         // OPERATIONS ABI is dispatched through THIS activation's injective
@@ -869,6 +973,9 @@ async function loadScopedFacade(packageRoot) {
         operations: new Map(operations),
     })));
     const capabilityOperations = wiredOperations.capabilities;
+    // #1006 HF29: the frozen approved Tool Call binding table (inert sealed
+    // descriptors; the Host gateway's dispatch port reads it, nothing else).
+    const sealedToolBindings = Object.freeze([...wiredToolBindings.tools.values()]);
     /**
      * [#1003 FR05/HF17/HF23] The retained S query/observer/agent projections
      * (projectRetainedRead / coalesceRetainedObservations /
@@ -1316,6 +1423,10 @@ async function loadScopedFacade(packageRoot) {
                 }
             }
             return Object.freeze(out);
+        },
+        sealedToolBindings() {
+            assertOpen();
+            return sealedToolBindings;
         },
         ...(retainedProjection === undefined ? {} : { retainedProjection }),
     };
