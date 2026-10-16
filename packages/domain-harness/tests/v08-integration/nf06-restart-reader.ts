@@ -30,7 +30,7 @@ try {
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
   // Re-registration of the SAME closure must stay idempotent across the
   // restart (the durable app pin accepts the identical closure identity).
-  await gateway.registerApp({ appId: 'sd-quote', packageRoot: root, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: 'sd-quote', packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   const requester = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
   const outsider = mintCredential({ tenantId: 't1', appId: 'sd-quote', subject: 'out', roles: ['no-access'], audience: AUDIENCE, grantId: 'g-out' });
 

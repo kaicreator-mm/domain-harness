@@ -75,6 +75,19 @@ export interface KernelGatewayAppInput {
      * caller data.
      */
     readonly controlRoles?: readonly string[];
+    /**
+     * [#1006 HF21] The runtime authority class of the installed closure:
+     * exactly 'PRODUCTION' or 'SIMULATION'. Host governance configuration —
+     * never caller data. When declared, every Genesis activation of this app
+     * binds the class into the durable Kernel GovernanceExecutionPin (woven
+     * into its bindingDigest), and a SIMULATION instance can never mint
+     * authoritative production Effect/Journal. The declaration is pinned in
+     * the durable app-registration record, so a restart re-registration under
+     * the OTHER class refuses typed before load. Omitted = the historical
+     * classless compatibility boundary (pre-HF21 behavior, product
+     * disposition pending).
+     */
+    readonly authorityClass?: 'PRODUCTION' | 'SIMULATION';
 }
 export interface KernelGatewaySendIntent {
     readonly intentType: string;

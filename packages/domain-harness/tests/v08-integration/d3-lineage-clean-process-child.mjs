@@ -44,7 +44,7 @@ try {
     return { recorded: true };
   });
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: APP, packageRoot: root, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: APP, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 
   const send = async (intentType, messageId, input, roles) => {
     try {

@@ -316,6 +316,12 @@ export function createKernelGateway(input) {
                     || !registration.controlRoles.every((role) => typeof role === 'string' && role.length > 0))) {
                 throw new HostBoundaryError('GATEWAY_APP_MALFORMED', 'registerApp controlRoles, when present, must be a non-empty array of host governance roles');
             }
+            // [#1006 HF21] The closure runtime authority class is an explicit exact
+            // host governance declaration — never defaulted, derived or upgradable.
+            if (registration.authorityClass !== undefined
+                && registration.authorityClass !== 'PRODUCTION' && registration.authorityClass !== 'SIMULATION') {
+                throw new HostBoundaryError('GATEWAY_APP_MALFORMED', `registerApp authorityClass, when present, must be exactly 'PRODUCTION' or 'SIMULATION'; ${JSON.stringify(registration.authorityClass)} is forbidden`);
+            }
             if (apps.has(registration.appId)) {
                 throw new HostBoundaryError('GATEWAY_APP_ALREADY_REGISTERED', `app ${registration.appId} is already registered on this gateway`);
             }
@@ -330,11 +336,22 @@ export function createKernelGateway(input) {
             // effect or Genesis can run through the app.
             const pinKey = appPinKey(registration.appId);
             const pinnedEntry = await host.docs.get(pinKey);
-            const pinned = pinnedEntry !== null && typeof pinnedEntry.value === 'object' && pinnedEntry.value !== null
-                ? pinnedEntry.value.closurePin
+            const pinnedRecord = pinnedEntry !== null && typeof pinnedEntry.value === 'object' && pinnedEntry.value !== null
+                ? pinnedEntry.value
                 : undefined;
+            const pinned = pinnedRecord?.closurePin;
             if (pinnedEntry !== null && pinned === undefined) {
                 throw new HostBoundaryError('GATEWAY_APP_PIN_INVALID', `app ${registration.appId} carries an unreadable registration pin in the physical Host store`);
+            }
+            // [#1006 HF21] The durably declared runtime authority class: a restart
+            // (or any repeat) registration under a DIFFERENT class — or a class
+            // declaration over a durably classless pin, or a classless
+            // registration over a durably class-declared pin — refuses typed here,
+            // BEFORE any module byte of the closure loads. The class can never be
+            // swapped across a restart to re-forge instance authority.
+            const pinnedAuthorityClass = pinnedRecord?.authorityClass;
+            if (pinned !== undefined && pinnedAuthorityClass !== registration.authorityClass) {
+                throw new HostBoundaryError('GATEWAY_APP_CLOSURE_MISMATCH', `app ${registration.appId} is durably registered under runtime authority class ${JSON.stringify(pinnedAuthorityClass ?? null)} but this registration declares ${JSON.stringify(registration.authorityClass ?? null)}; the closure authority class is bind-once and can never be swapped, added or stripped across registrations`);
             }
             if (pinned !== undefined) {
                 // Pre-load refusal: descriptor-safe claimed identity, no module bytes.
@@ -431,6 +448,7 @@ export function createKernelGateway(input) {
                         closureDigest: installed.closureDigest,
                         packages: Object.freeze(installed.packages.map((pkg) => Object.freeze({ ...pkg }))),
                         closurePin: installedPin,
+                        ...(registration.authorityClass === undefined ? {} : { authorityClass: registration.authorityClass }),
                     });
                     try {
                         await host.docs.put(pinKey, record, { mustBeAbsent: true });
@@ -485,6 +503,7 @@ export function createKernelGateway(input) {
                 // the guard above narrowed the declared readonly string[]; restore it
                 genesisRoles: Object.freeze([...registration.genesisRoles]),
                 controlRoles: Object.freeze([...(registration.controlRoles ?? registration.genesisRoles)]),
+                authorityClass: registration.authorityClass,
             }));
         },
         hasApp(appId) {
@@ -493,6 +512,12 @@ export function createKernelGateway(input) {
         async send(credential, intent) {
             if (typeof intent !== 'object' || intent === null) {
                 throw new HostBoundaryError('UX_INTENT_MALFORMED', 'gateway send requires an intent record');
+            }
+            // [#1006 HF21] A caller-presented runtime authority class on the UX
+            // send plane is an injected authority claim: the class is registerApp
+            // host governance + activation-pin material and is never caller data.
+            if ('authorityClass' in intent) {
+                throw new HostBoundaryError('AUTHORITY_CLASS_FORBIDDEN', 'gateway send carries no caller-declared runtime authority class; the class is registerApp host governance material bound once at instance Genesis');
             }
             const principal = await authenticate(credential);
             assertIntentScope(intent.target, principal);
@@ -914,6 +939,13 @@ export function createKernelGateway(input) {
             if (typeof request !== 'object' || request === null) {
                 throw new HostBoundaryError('HOST_GENESIS_MALFORMED', 'activateGenesis requires {appId, instanceKey}');
             }
+            // [#1006 HF21] The runtime authority class is Host governance
+            // configuration declared ONCE at registerApp and pinned durably; a
+            // caller-presented class on the activation request is an injected
+            // authority claim and refuses typed before any instance or pin exists.
+            if ('authorityClass' in request) {
+                throw new HostBoundaryError('AUTHORITY_CLASS_FORBIDDEN', 'activateGenesis carries no caller-declared runtime authority class; the class is registerApp host governance material bound once into the durable GovernanceExecutionPin');
+            }
             const principal = await authenticate(credential);
             const app = requireApp(request.appId, principal);
             const authorized = app.genesisRoles.some((role) => principal.roles.includes(role));
@@ -925,9 +957,12 @@ export function createKernelGateway(input) {
             // submits to) its OWN physical instance — duplicate/conflicting
             // Genesis stays per-tenant, and no tenant can pre-empt another's
             // namespace by choosing the same instanceKey.
+            // [#1006 HF21] The declared closure class rides the protected genesis
+            // seam into the Kernel, which weaves it into the instance pin digest.
             return app.ops.provisionGenesis(principal, {
                 instanceKey: request.instanceKey,
                 ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
+                ...(app.authorityClass === undefined ? {} : { authorityClass: app.authorityClass }),
             });
         },
         async registerExternalWork(credential, request) {

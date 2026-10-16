@@ -75,7 +75,7 @@ if (mode === 'memory') {
   });
   try {
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const { operator: operatorCred } = makeCreds();
     let refused: string | null = null;
     try {
@@ -156,7 +156,7 @@ if (mode === 'memory') {
       return { reserved: true };
     });
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const { operator: operatorCred, requester } = makeCreds();
     await gateway.activateGenesis(operatorCred, { appId: APP_ID, instanceKey: instanceKey as string });
     const start = await gateway.send(requester, {
@@ -263,7 +263,7 @@ if (mode === 'memory') {
     });
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
     // Re-registration of the SAME closure after the restart is idempotent.
-    await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: APP_ID, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const { operator: operatorCred, requester } = makeCreds();
     void operatorCred;
     const record = await gateway.queryExternalWork(requester, {

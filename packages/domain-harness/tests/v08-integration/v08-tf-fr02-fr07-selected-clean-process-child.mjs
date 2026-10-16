@@ -91,8 +91,8 @@ try {
     return { recorded: true };
   });
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: FR02_APP, packageRoot: fr02Root, genesisRoles: ['platform-operator'] });
-  await gateway.registerApp({ appId: FR07_APP, packageRoot: fr07Root, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: FR02_APP, packageRoot: fr02Root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await gateway.registerApp({ appId: FR07_APP, packageRoot: fr07Root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   const fr02Operator = credential(FR02_APP, 'op', ['platform-operator']);
   const fr02Requester = credential(FR02_APP, 'req', ['requester']);
   const fr07Operator = credential(FR07_APP, 'op', ['platform-operator']);

@@ -125,7 +125,7 @@ const handle = await bootstrapTrustedHost({
 });
 handle.host.resources.provision('ledger', () => ({ reserved: true }));
 const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-await gateway.registerApp({ appId: 'order-approval', packageRoot: root, genesisRoles: ['platform-operator'] });
+await gateway.registerApp({ appId: 'order-approval', packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 const credential = (roles, subject, grantId) => mintPrincipalCredential({
   issuerId: ISSUER, grantId, tenantId: 't-real', appId: 'order-approval', subject, audience: AUDIENCE, roles,
   issuedAt: '2026-10-12T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
