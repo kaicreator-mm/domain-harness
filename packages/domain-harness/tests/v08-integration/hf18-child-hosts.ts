@@ -102,7 +102,8 @@ if (mode === 'memory') {
       store: {
         get: (key: string) => store.get(key),
         put: (key: string, value: unknown, conditions: never) => {
-          if (armed && key.startsWith('v08-kernel:turn-disposition:')) {
+          // [v0.8.1 R01] message turns record dispositions too: aim at the callback turn.
+          if (armed && key.startsWith('v08-kernel:turn-disposition:') && key.includes(':callback:')) {
             armed = false;
             return Promise.reject(Object.assign(new Error(`injected store failure for ${key}`), { code: 'HOST_STORE_INJECTED_FAILURE' }));
           }
@@ -121,7 +122,8 @@ if (mode === 'memory') {
       store: {
         get: (key: string) => store.get(key),
         put: (key: string, value: unknown, conditions: never) => {
-          if (dispositionFaultArmed && key.startsWith('v08-kernel:turn-disposition:')) {
+          // [v0.8.1 R01] message turns record dispositions too: aim at the callback turn.
+          if (dispositionFaultArmed && key.startsWith('v08-kernel:turn-disposition:') && key.includes(':callback:')) {
             dispositionFaultArmed = false;
             return Promise.reject(Object.assign(new Error(`injected store failure for ${key}`), { code: 'HOST_STORE_INJECTED_FAILURE' }));
           }

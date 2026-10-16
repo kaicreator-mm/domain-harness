@@ -16,8 +16,13 @@
  *           journal/state activity and the instance keeps serving.
  *   FR04-P  durable ACK + target sequence/replay → an identical duplicate
  *           message re-send NEVER re-executes or re-commits (zero new
- *           journal rows/effects, revision unchanged) and the denial still
- *           carries the SAME deterministic message-turn identity.
+ *           journal rows/effects, revision unchanged) and replays the SAME
+ *           admitted receipt (idempotentReplay) under the SAME deterministic
+ *           message-turn identity. [v0.8.1 R01] The vector now includes a
+ *           LEGAL SELF-LOOP re-send (durable-controls fixture), where a FINAL
+ *           business state cannot mask a second commit — the pre-v0.8.1
+ *           FINAL-state-only duplicate passed via 'no-candidate-transition'
+ *           while a self-loop re-send committed a second revision.
  *   FR04-N  duplicate / invalid target / wrong package contract — physical:
  *           WorkflowInstanceNotFoundError and INTENT_UNBOUND typed refusals.
  *   HF19-P  applied/rejected/processed terminal outcomes — applied: ONE
@@ -37,9 +42,16 @@
  */
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 
+import {
+  buildQualifiedPackage,
+  issueApprovalProof,
+  qualifyPackageClosure,
+  type QualificationSubmission,
+} from '../../../domain-harness-compiler/src/qualified-package/index.js';
 import { bootstrapTrustedHost, createKernelGateway } from '../../src/host-v8/index.js';
+import type { SealedQualifiedPackageRoot } from '../../src/public-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sealRealApp, sqliteTempPath } from './helpers.js';
 
 const AUDIENCE = 'dh-tg5-kernel-taxonomy';
@@ -70,6 +82,56 @@ const requester = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 'tg
 const target = (instanceKey: string) => ({ tenantId: TENANT, appId: APP_ID, instanceKey });
 const send = (messageId: string, input: Record<string, unknown>, instanceKey: string) =>
   gateway.send(requester, { intentType: 'submitQuoteDecisionDynamic', messageId, input, target: target(instanceKey) });
+
+// [v0.8.1 R01] The shared durable-controls fixture carries a LEGAL message
+// self-loop (pingFromCallback: waiting → progressing → progressing), sealed
+// with the SAME selected K/S payload bytes on the same physical SQLite Host.
+const CONTROLS_APP_ID = 'durable-controls';
+async function sealControlsClosure(): Promise<SealedQualifiedPackageRoot> {
+  const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
+  const [kernelSource, sdkSource, businessSource] = await Promise.all([
+    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('./fixtures/business-durable-controls.mjs', import.meta.url), 'utf8'),
+  ]);
+  const kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`);
+  const sdk = await import(`data:text/javascript;base64,${Buffer.from(sdkSource, 'utf8').toString('base64')}`);
+  const business = await import(`data:text/javascript;base64,${Buffer.from(businessSource, 'utf8').toString('base64')}`);
+  const submission: QualificationSubmission = {
+    rootPackageId: 'app:v08:durable-controls',
+    packages: [
+      { packageId: kernel.MODULE_ID as string, kind: 'kernel' as const, abiVersion: kernel.ABI_VERSION as string, modulePath: 'modules/kernel.mjs', moduleSource: kernelSource, endpoints: kernel.ENDPOINTS },
+      { packageId: sdk.MODULE_ID as string, kind: 'standard-sdk' as const, abiVersion: sdk.ABI_VERSION as string, modulePath: 'modules/standard.mjs', moduleSource: sdkSource, endpoints: sdk.ENDPOINTS },
+      { packageId: business.MODULE_ID as string, kind: 'business' as const, abiVersion: business.ABI_VERSION as string, modulePath: 'modules/business.mjs', moduleSource: businessSource, endpoints: business.ENDPOINTS, intentTypes: business.INTENT_TYPES },
+    ],
+    bindings: [
+      { role: 'kernel' as const, packageId: kernel.MODULE_ID as string, endpointId: kernel.ENDPOINTS[0].endpointId },
+      { role: 'standard-sdk' as const, packageId: sdk.MODULE_ID as string, endpointId: sdk.ENDPOINTS[0].endpointId },
+      { role: 'business' as const, packageId: business.MODULE_ID as string, endpointId: business.ENDPOINTS[0].endpointId },
+      ...(business.INTENT_TYPES as string[]).map((intentType) => ({
+        role: 'intent' as const, intentType, packageId: business.MODULE_ID as string, endpointId: business.ENDPOINTS[0].endpointId,
+      })),
+    ],
+  };
+  const unsigned = qualifyPackageClosure(submission);
+  const approval = issueApprovalProof({
+    subjectDigest: unsigned.subjectDigest,
+    issuerId: INTEG_ISSUER,
+    issuerSecret: INTEG_ISSUER_SECRET,
+    issuedAt: '2026-10-16T00:00:00.000Z',
+  });
+  return buildQualifiedPackage({
+    unsigned,
+    approval,
+    trustedIssuers: new Map([[INTEG_ISSUER, INTEG_ISSUER_SECRET]]),
+    moduleSources: new Map(submission.packages.map((pkg) => [pkg.modulePath, pkg.moduleSource])),
+    baseCommit: 'v0.8.1-tg5-fr04-self-loop',
+  }) as SealedQualifiedPackageRoot;
+}
+await gateway.registerApp({ appId: CONTROLS_APP_ID, packageRoot: await sealControlsClosure(), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+const controlsOperator = mintCredential({ tenantId: TENANT, appId: CONTROLS_APP_ID, subject: 'tg5-op', roles: ['platform-operator', 'requester'], audience: AUDIENCE, grantId: 'g-tg5-controls-op' });
+const controlsRequester = mintCredential({ tenantId: TENANT, appId: CONTROLS_APP_ID, subject: 'tg5-req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-tg5-controls-req' });
+const controlsTarget = (instanceKey: string) => ({ tenantId: TENANT, appId: CONTROLS_APP_ID, instanceKey });
 
 async function journalRows(): Promise<Array<Record<string, unknown>>> {
   const keys = await handle.host.docs.list(JOURNAL_PREFIX);
@@ -127,16 +189,61 @@ test('FR04-P/HF19-N duplicate message: idempotent identity, zero re-execution, z
 
   const duplicate = await send('m-apply-1', { amount: 30, requestId: 'APPLY-1' }, 'q-applied') as {
     status: string;
-    denial?: { reason: string; durableControlTurnId: string; governanceBindingDigest: string };
+    idempotentReplay?: boolean;
+    admitted?: { durableControlTurnId: string; transitionKey: string };
+    instance?: { stateRevision: number };
   };
-  // The already-committed turn is never re-executed: the settled terminal wins
-  // and the re-send resolves to a typed domain outcome for the SAME turn id.
-  assert.equal(duplicate.status, 'denied');
-  assert.equal(duplicate.denial?.reason, 'no-candidate-transition');
-  assert.match(duplicate.denial?.durableControlTurnId ?? '', /message:m-apply-1$/, 'the duplicate resolves under the SAME deterministic message-turn identity');
+  // [v0.8.1 R01] The already-committed turn is never re-executed: the durable
+  // message-turn disposition replays the ORIGINAL admitted receipt for the
+  // SAME turn id (v0.2–v0.7 FR04 DUPLICATE) — not a business-state denial.
+  assert.equal(duplicate.status, 'admitted');
+  assert.equal(duplicate.idempotentReplay, true);
+  assert.equal(duplicate.admitted?.transitionKey, 'approve');
+  assert.equal(duplicate.instance?.stateRevision, revisionBefore, 'the replay carries the original committed revision');
+  assert.match(duplicate.admitted?.durableControlTurnId ?? '', /message:m-apply-1$/, 'the duplicate resolves under the SAME deterministic message-turn identity');
   assert.equal((await journalRows()).length, before, 'zero new journal rows');
   assert.equal(dispatches.length, dispatchBefore, 'zero new physical dispatches');
   assert.equal(((await gateway.queryInstance(requester, target('q-applied'))) as { stateRevision: number }).stateRevision, revisionBefore, 'no duplicate commit — revision unchanged');
+});
+
+test('FR04-P/FR04-N self-loop duplicate: a re-sent messageId on a LEGAL self-loop replays and never re-commits; a different intent under it refuses typed', { timeout: 240_000 }, async () => {
+  const instanceKey = 'loop-1';
+  await gateway.activateGenesis(controlsOperator, { appId: CONTROLS_APP_ID, instanceKey });
+  const sendControls = (intentType: string, messageId: string, input: Record<string, unknown>) =>
+    gateway.send(controlsRequester, { intentType, messageId, input, target: controlsTarget(instanceKey) }) as Promise<{
+      status: string;
+      idempotentReplay?: boolean;
+      admitted?: { durableControlTurnId: string; transitionKey: string };
+      instance?: { stateRevision: number; state: { stateKey: string } };
+    }>;
+  const revision = async (): Promise<number> =>
+    ((await gateway.queryInstance(controlsRequester, controlsTarget(instanceKey))) as { stateRevision: number }).stateRevision;
+
+  assert.equal((await sendControls('submitStart', 'm-loop-start', { amount: 1 })).status, 'admitted');
+  const begun = await sendControls('pingFromCallback', 'm-loop-1', { amount: 1, requestId: 'LOOP-1' });
+  assert.equal(begun.admitted?.transitionKey, 'begin-progress');
+  const looped = await sendControls('pingFromCallback', 'm-loop-2', { amount: 1, requestId: 'LOOP-2' });
+  assert.equal(looped.status, 'admitted');
+  assert.equal(looped.admitted?.transitionKey, 'progress-again', 'the business state machine legally re-admits this trigger (self-loop)');
+  assert.equal(looped.instance?.state.stateKey, 'progressing');
+  assert.equal(await revision(), 3);
+
+  const rowsBefore = (await journalRows()).length;
+  const dispatchBefore = dispatches.length;
+  const duplicate = await sendControls('pingFromCallback', 'm-loop-2', { amount: 1, requestId: 'LOOP-2' });
+  assert.equal(duplicate.status, 'admitted');
+  assert.equal(duplicate.idempotentReplay, true, 'the self-loop re-send is a durable duplicate, never a second admission');
+  assert.equal(duplicate.admitted?.durableControlTurnId, looped.admitted?.durableControlTurnId);
+  assert.match(duplicate.admitted?.durableControlTurnId ?? '', /message:m-loop-2$/);
+  assert.equal(await revision(), 3, 'no second state revision under the same message-turn identity');
+  assert.equal((await journalRows()).length, rowsBefore, 'zero new journal rows');
+  assert.equal(dispatches.length, dispatchBefore, 'zero new physical dispatches');
+
+  await assert.rejects(
+    () => sendControls('timeOutOnDeadline', 'm-loop-2', {}),
+    (error: unknown) => (error as { code?: string }).code === 'ADMISSION_TURN_DISPOSITION_CONFLICT',
+  );
+  assert.equal(await revision(), 3, 'the conflicting re-use of the messageId refused before any admission');
 });
 
 test('FR01-N illegal transition against a FINAL state: typed denial, zero activity, instance keeps serving denials honestly', { timeout: 240_000 }, async () => {

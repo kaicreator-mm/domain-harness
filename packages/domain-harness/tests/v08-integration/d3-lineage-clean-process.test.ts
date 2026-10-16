@@ -131,7 +131,8 @@ test('D3-K: durable cross-stage lineage across two clean processes on one REAL S
     assert.deepEqual(stage2.releaseA.after.instance, {
       stateKey: 'release-qualified', context: { ...LINEAGE_AFTER_VALIDATION, qualifiedSha: 'sha-a' }, stateRevision: 3,
     });
-    assert.equal(stage2.releaseReplay.status, 'denied', 'replaying the qualified release is refused');
+    // [v0.8.1 R01] A re-sent committed messageId replays its durable ACK.
+    assert.equal(stage2.releaseReplay.status, 'admitted', 'replaying the qualified release replays its durable ACK');
     assert.equal(stage2.releaseReplay.unchanged, true, 'the replay adds no State/Journal/Effect');
     assert.equal(stage2.effectsThisProcess, 1, 'exactly one release evidence dispatch');
     assert.equal(stage2.journalTotal, 3);

@@ -249,9 +249,10 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
     assert.deepEqual(stage2.d3Release.context, {
       changeId: 'E2E-1', reviewedSha: 'sha256:e2e-head', validationId: 'VAL-E2E-1', testedSha: 'sha256:e2e-head', qualifiedSha: 'sha256:e2e-head',
     });
-    assert.equal(stage2.d3ReleaseReplay.status, 'denied', 'replaying the committed release message is refused');
+    // [v0.8.1 R01] committed messageIds replay their durable ACKs.
+    assert.equal(stage2.d3ReleaseReplay.status, 'admitted', 'replaying the committed release message replays its durable ACK');
     assert.equal(stage2.d3ReleaseReplay.unchanged, true, 'the replay adds no State/Journal/Effect');
-    assert.equal(stage2.d2QuoteReplay.status, 'denied', 'replaying the committed Approval message is refused');
+    assert.equal(stage2.d2QuoteReplay.status, 'admitted', 'replaying the committed Approval message replays its durable ACK');
     assert.equal(stage2.d2QuoteReplay.unchanged, true);
     assert.equal(stage2.evidenceEffects, 1, 'exactly one release evidence dispatch in stage2');
     assert.equal(stage2.journalTotal, 4);

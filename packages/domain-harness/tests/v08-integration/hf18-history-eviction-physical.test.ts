@@ -169,8 +169,9 @@ after(async () => {
 
 test('HF18-N 17th control turn fails closed while the oldest admitted turn lacks its disposition; recovery heals; the retry admits once', async () => {
   const instanceKey = 'evict-17';
-  // Open the instance and move it to 'waiting' (a MESSAGE turn — message
-  // turns never enter the non-message admission history).
+  // Open the instance and move it to 'waiting' (a MESSAGE turn — since
+  // v0.8.1 R01 it enters the same-CAS admission history too, with its
+  // disposition recorded, so evicting it is always safe).
   await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey });
   const started = await gateway.send(requester, {
     intentType: 'submitStart',

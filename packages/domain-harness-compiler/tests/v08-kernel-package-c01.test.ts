@@ -1001,11 +1001,13 @@ test('V08-ABI-C01-P3 (KPK07, bounded): durable restart recovers journal/pin/inst
     assert.equal(journal[0].status, 'completed');
     assert.equal(journal[0].effectId, EFFECT_ID);
 
-    // Duplicate message on the restarted runtime: denied no-candidate BEFORE
-    // any effect work; journal row and resource count untouched.
+    // Duplicate message on the restarted runtime: [v0.8.1 R01] the durable
+    // message-turn disposition replays the stored ACK BEFORE any effect
+    // work; journal row and resource count untouched.
     const replay = await runtime2.submitOccurrence(quoteIntent({ amount: 42 }));
-    assert.equal(replay.status, 'denied');
-    assert.equal(replay.denial.reason, 'no-candidate-transition');
+    assert.equal(replay.status, 'admitted');
+    assert.equal(replay.idempotentReplay, true);
+    assert.equal(replay.instance.stateRevision, 1);
     assert.equal(host2.resources.callCount(), 0);
 
     // Crash-before-commit on a fresh instance: the journal survives, the

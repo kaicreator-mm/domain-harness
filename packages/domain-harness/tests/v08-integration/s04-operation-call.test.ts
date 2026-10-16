@@ -419,7 +419,9 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
     const replay = (await invoke(harness, requester, {
       operationId: 'quote.reserve', input: { amount: 30, requestId: 'S04-R1' }, instanceKey: 'q-s04', messageId: 'm-s04-1',
     })) as Record<string, any>;
-    assert.equal(replay.status, 'denied', 'replaying the committed occurrence message is refused');
+    // [v0.8.1 R01] the committed messageId replays its durable ACK, nothing more.
+    assert.equal(replay.status, 'admitted', 'replaying the committed occurrence message replays its durable ACK');
+    assert.equal(replay.idempotentReplay, true);
     const duplicate = (await invoke(harness, requester, {
       operationId: 'quote.reserve', input: { amount: 30, requestId: 'S04-R1' }, instanceKey: 'q-s04', messageId: 'm-s04-1b',
     })) as Record<string, any>;
@@ -845,7 +847,7 @@ test('S04-C1: clean stock-Node packed consumer drives the OperationCall surface 
       reservedAmount: 20,
       requestId: 'S04-CLEAN-1',
     });
-    assert.equal(child.replay.status, 'denied');
+    assert.equal(child.replay.status, 'admitted', 'the replay answers the durable ACK (v0.8.1 R01)');
     assert.equal(child.wrongRole, 'PRINCIPAL_ROLE_NOT_BOUND');
   } finally {
     await rm(dir, { recursive: true, force: true });

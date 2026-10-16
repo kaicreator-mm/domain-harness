@@ -329,16 +329,16 @@ test('turn-source N: malformed turn sources refuse typed before any mutation', a
   assert.equal(ports.resourceCalls.length, 0, 'zero effect execution across every refusal');
 });
 
-test('turn-source N: message turns are untouched (no turnSource, no disposition)', async () => {
+test('turn-source N: message turns derive from messageId (no turnSource) and record a disposition (v0.8.1 R01)', async () => {
   const ports = hostPorts();
   const rt = runtime(businessPolicy(), ports);
   await freshInstance(rt);
   const wait = await submitWait(rt, 'm-msg-1');
   assert.equal(wait.status, 'admitted');
   assert.equal(wait.admitted.durableControlTurnId, expectedTurnId({ kind: 'message', sourceMessageId: 'm-msg-1' }));
-  assert.equal(wait.turnDisposition, undefined, 'message turns carry no turn disposition');
+  assert.deepEqual(wait.turnDisposition, { status: 'recorded' }, 'message turns record the durable (target, messageId) disposition');
   const keys = await ports.docs.list('v08-kernel:turn-disposition:');
-  assert.equal(keys.length, 0);
+  assert.deepEqual(keys, [`v08-kernel:turn-disposition:${wait.admitted.durableControlTurnId}`]);
 });
 
 // ---------------------------------------------------------------------------

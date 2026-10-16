@@ -2615,8 +2615,8 @@ export class WorkflowInstanceEngine {
    * serializes its whole admission+commit occurrence on the same lane, like
    * the v0.7 control-turn publication did around its engine).
    *
-   * [#1066 R1 P1-B] When the caller carries `admittedControlTurn` (a
-   * NON-message durable control turn), its identity is appended to the
+   * [#1066 R1 P1-B] When the caller carries `admittedControlTurn` (any
+   * durable turn — [v0.8.1 R01] message turns included), its identity is appended to the
    * bounded `admittedControlTurns` history INSIDE this same authoritative
    * state-CAS write — the turn admission becomes part of the committed
    * instance truth itself, so a crash between this CAS and the independent
@@ -2766,8 +2766,10 @@ function decisionReceiptDocKey(turnId) {
 }
 
 // ===========================================================================
-// [#1062 HF18/HF32 shared seam] K-owned turn dispositions for NON-message
-// durable control turns (timer/callback/child-terminal). One admitted turn
+// [#1062 HF18/HF32 shared seam] K-owned turn dispositions for durable
+// control turns (timer/callback/child-terminal) and — [v0.8.1 R01] restoring
+// the v0.2–v0.7 FR04 (target, messageId) dedup that the v0.8 port dropped —
+// message turns (the turn id derives from the messageId). One admitted turn
 // creates exactly one record at the deterministic turn-id key; a replay of
 // the SAME source (redelivery, restart recovery, heal-after-crash) reads it
 // inside the occurrence lane and replays the stored receipt with ZERO new
@@ -2788,7 +2790,8 @@ function turnDispositionDocKey(turnId) {
 
 /**
  * [#1066 R1 P1-B] The bounded same-CAS admission history bound: the last
- * 16 non-message turn admissions ride inside the instance document. The
+ * 16 turn admissions (message turns included since v0.8.1 R01) ride inside
+ * the instance document. The
  * history is the crash-window backstop for a LOST turn-disposition record
  * (written best-effort after the state CAS). Before evicting the oldest of
  * 16 entries K must verify its independent disposition exists with the
@@ -4881,50 +4884,56 @@ export function createOccurrenceRuntime(options) {
       // same-CAS admission history INSIDE the committed instance document
       // answers the same replay guarantee — the authoritative state CAS,
       // not the best-effort observation, owns the once-only truth.
+      // [v0.8.1 R01] MESSAGE turns pass the same gate: the v0.2–v0.7 FR04
+      // durable (target, messageId) dedup. A re-send of an admitted
+      // messageId (lost ACK, client retry, a later retry after further
+      // transitions) replays the stored receipt with zero new
+      // State/Journal/Effect activity even where a self-loop would legally
+      // re-admit it; the same messageId under a different intentType
+      // refuses typed. Denials are not dispositions (no state moved), so a
+      // re-sent denied message is evaluated afresh, exactly as before.
       const turn = occurrenceTurnOf(request);
-      const controlTurnId = turn.kind === 'message' ? undefined : deriveDurableControlTurnId(target, turn);
-      if (controlTurnId !== undefined) {
-        const replayed = await readTurnDispositionOrReplay(
-          controlTurnId,
-          turn,
-          request,
-          target,
-        );
-        if (replayed !== undefined) {
-          return replayed;
+      const controlTurnId = deriveDurableControlTurnId(target, turn);
+      const replayed = await readTurnDispositionOrReplay(
+        controlTurnId,
+        turn,
+        request,
+        target,
+      );
+      if (replayed !== undefined) {
+        return replayed;
+      }
+      const historyReplayed = await admittedControlTurnHistoryReplay(
+        snapshot,
+        controlTurnId,
+        turn,
+        request,
+        target,
+        workflowInstanceId,
+      );
+      if (historyReplayed !== undefined) {
+        return historyReplayed;
+      }
+      // [#1066 R2] The 16-entry SAME-CAS crash backstop may evict an
+      // older turn ONLY if its independent durable disposition exists.
+      // Otherwise a delayed Host recovery could re-admit the evicted
+      // turn. Refuse a NEW turn before any admission/effect until the
+      // older missing disposition is healed by replaying its source.
+      const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
+      if (history.length >= MAX_ADMITTED_CONTROL_TURN_HISTORY) {
+        const oldest = history[0];
+        if (!isJsonRecord(oldest) || typeof oldest.turnId !== 'string' || typeof oldest.identity !== 'string') {
+          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_INVALID', 'cannot evict an invalid committed control-turn admission');
         }
-        const historyReplayed = await admittedControlTurnHistoryReplay(
-          snapshot,
-          controlTurnId,
-          turn,
-          request,
-          target,
-          workflowInstanceId,
-        );
-        if (historyReplayed !== undefined) {
-          return historyReplayed;
+        let disposition;
+        try {
+          disposition = await docs.get(turnDispositionDocKey(oldest.turnId));
+        } catch {
+          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'cannot verify the oldest admitted control turn disposition; fail closed before eviction');
         }
-        // [#1066 R2] The 16-entry SAME-CAS crash backstop may evict an
-        // older turn ONLY if its independent durable disposition exists.
-        // Otherwise a delayed Host recovery could re-admit the evicted
-        // turn. Refuse a NEW turn before any admission/effect until the
-        // older missing disposition is healed by replaying its source.
-        const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
-        if (history.length >= MAX_ADMITTED_CONTROL_TURN_HISTORY) {
-          const oldest = history[0];
-          if (!isJsonRecord(oldest) || typeof oldest.turnId !== 'string' || typeof oldest.identity !== 'string') {
-            throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_INVALID', 'cannot evict an invalid committed control-turn admission');
-          }
-          let disposition;
-          try {
-            disposition = await docs.get(turnDispositionDocKey(oldest.turnId));
-          } catch {
-            throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'cannot verify the oldest admitted control turn disposition; fail closed before eviction');
-          }
-          if (disposition === null || !isJsonRecord(disposition.value)
-            || disposition.value.identity !== oldest.identity) {
-            throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'oldest committed control turn has no matching durable disposition; recover it before admitting another turn');
-          }
+        if (disposition === null || !isJsonRecord(disposition.value)
+          || disposition.value.identity !== oldest.identity) {
+          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'oldest committed control turn has no matching durable disposition; recover it before admitting another turn');
         }
       }
       const context = {
@@ -5092,13 +5101,12 @@ export function createOccurrenceRuntime(options) {
         // [#1066 R1 P1-B] The non-message turn's admission identity rides
         // INSIDE the authoritative state CAS (bounded same-CAS history), so
         // a lost disposition record can never turn a crash-recovery
-        // re-submission into a second State revision.
-        ...(controlTurnId === undefined ? {} : {
-          admittedControlTurn: {
-            turnId: controlTurnId,
-            identity: turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType),
-          },
-        }),
+        // re-submission into a second State revision. [v0.8.1 R01] Message
+        // turns ride the same history.
+        admittedControlTurn: {
+          turnId: controlTurnId,
+          identity: turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType),
+        },
         transition: (current) => ({
           nextState: {
             stateKey: outcome.admitted.targetState,
@@ -5146,22 +5154,19 @@ export function createOccurrenceRuntime(options) {
       // Kernel is the OUTWARD snapshot: the observation window and the
       // control-turn admission history stay internal carrier/replay truth.
       const outwardCommitted = outwardInstanceSnapshot(committed);
-      let turnDisposition;
-      if (controlTurnId !== undefined) {
-        turnDisposition = await writeTurnDisposition(
-          controlTurnId,
-          turn,
-          request,
-          target,
-          {
-            status: 'admitted',
-            admitted: outcome.admitted,
-            instance: outwardCommitted,
-            occurrence: { messageId: request.messageId, workflowInstanceId },
-            attribution: attribution(),
-          },
-        );
-      }
+      const turnDisposition = await writeTurnDisposition(
+        controlTurnId,
+        turn,
+        request,
+        target,
+        {
+          status: 'admitted',
+          admitted: outcome.admitted,
+          instance: outwardCommitted,
+          occurrence: { messageId: request.messageId, workflowInstanceId },
+          attribution: attribution(),
+        },
+      );
 
       const receipt = {
         status: 'admitted',
@@ -5170,7 +5175,7 @@ export function createOccurrenceRuntime(options) {
         occurrence: { messageId: request.messageId, workflowInstanceId },
         attribution: attribution(),
         ...(decisionReceipt === undefined ? {} : { decisionReceipt }),
-        ...(turnDisposition === undefined ? {} : { turnDisposition }),
+        turnDisposition,
       };
       safeObserve(receipt);
       return receipt;
