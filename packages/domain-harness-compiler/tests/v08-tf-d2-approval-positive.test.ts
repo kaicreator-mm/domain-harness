@@ -76,8 +76,8 @@ test('V08-TF-D2-P2: two authorized dynamic requests → distinct effect ids, per
 
   const targetA = d2Target('instance:d2-a');
   const targetB = d2Target('instance:d2-b');
-  await runtime.openInstance({ target: targetA, correlationId: 'corr:d2-a' });
-  await runtime.openInstance({ target: targetB, correlationId: 'corr:d2-b' });
+  await runtime.openInstance({ target: targetA, correlationId: 'corr:d2-a', authorityClass: 'PRODUCTION' });
+  await runtime.openInstance({ target: targetB, correlationId: 'corr:d2-b', authorityClass: 'PRODUCTION' });
 
   const r1 = await runtime.submitOccurrence({
     intentType: 'submitQuoteDecisionDynamic', target: targetA,
@@ -159,7 +159,7 @@ test('V08-TF-D2-P3: the static v0.7 golden intent keeps its exact declared paylo
   const { host, resources } = fixtureHostPorts();
   const runtime = wireSealedD2Runtime(app, host);
   const target = d2Target('instance:d2-static');
-  await runtime.openInstance({ target, correlationId: 'corr:d2-static' });
+  await runtime.openInstance({ target, correlationId: 'corr:d2-static', authorityClass: 'PRODUCTION' });
 
   const receipt = await runtime.submitOccurrence({
     intentType: 'submitQuoteDecision', target,

@@ -61,7 +61,7 @@ async function wiredRig(businessEndpointOverride?: any) {
 test('V08-TF-D2-N1: forged caller role is denied by Business policy with zero journal/resource activity (KPK-15c)', async () => {
   const { runtime, resources } = await wiredRig();
   const target = d2Target('instance:d2-n1');
-  await runtime.openInstance({ target, correlationId: 'corr:d2-n1' });
+  await runtime.openInstance({ target, correlationId: 'corr:d2-n1', authorityClass: 'PRODUCTION' });
 
   const denied = await runtime.submitOccurrence({
     intentType: 'submitQuoteDecisionDynamic', target,
@@ -82,7 +82,7 @@ test('V08-TF-D2-N1: forged caller role is denied by Business policy with zero jo
 test('V08-TF-D2-N2: amount 75 denies on guard:amount-ok AND amount 150 on inv:cap-100, zero activity (KPK-15d)', async () => {
   const { runtime, resources } = await wiredRig();
   const target = d2Target('instance:d2-n2');
-  await runtime.openInstance({ target, correlationId: 'corr:d2-n2' });
+  await runtime.openInstance({ target, correlationId: 'corr:d2-n2', authorityClass: 'PRODUCTION' });
 
   const invariantDenial = await runtime.submitOccurrence({
     intentType: 'submitQuoteDecisionDynamic', target,
@@ -112,7 +112,7 @@ test('V08-TF-D2-N3: crash-before-commit — identical re-drive replays; MUTATED 
   // (1) identical re-drive replays with zero double dispatch.
   const replay = await wiredRig();
   const targetReplay = d2Target('instance:d2-n3a');
-  await replay.runtime.openInstance({ target: targetReplay, correlationId: 'corr:d2-n3a' });
+  await replay.runtime.openInstance({ target: targetReplay, correlationId: 'corr:d2-n3a', authorityClass: 'PRODUCTION' });
   replay.docs.failNextPutMatching('v08-kernel:wf-instance:order-quote:instance:d2-n3a');
   await assert.rejects(
     () => replay.runtime.submitOccurrence({
@@ -137,7 +137,7 @@ test('V08-TF-D2-N3: crash-before-commit — identical re-drive replays; MUTATED 
   // the resolved dynamic input is part of the durable effect identity.
   const conflict = await wiredRig();
   const targetConflict = d2Target('instance:d2-n3b');
-  await conflict.runtime.openInstance({ target: targetConflict, correlationId: 'corr:d2-n3b' });
+  await conflict.runtime.openInstance({ target: targetConflict, correlationId: 'corr:d2-n3b', authorityClass: 'PRODUCTION' });
   conflict.docs.failNextPutMatching('v08-kernel:wf-instance:order-quote:instance:d2-n3b');
   await assert.rejects(
     () => conflict.runtime.submitOccurrence({
@@ -166,7 +166,7 @@ test('V08-TF-D2-N3: crash-before-commit — identical re-drive replays; MUTATED 
 test('V08-TF-D2-N4: UNKNOWN after lost journal completion → AMBIGUOUS on re-drive, exactly one dispatch (KPK-15h)', async () => {
   const { runtime, docs, resources } = await wiredRig();
   const target = d2Target('instance:d2-n4');
-  await runtime.openInstance({ target, correlationId: 'corr:d2-n4' });
+  await runtime.openInstance({ target, correlationId: 'corr:d2-n4', authorityClass: 'PRODUCTION' });
 
   // The dispatch SUCCEEDS, then the journal completion write physically
   // faults (skip=1: the begin write lands, the completion write faults).
@@ -204,7 +204,7 @@ test('V08-TF-D2-N4: UNKNOWN after lost journal completion → AMBIGUOUS on re-dr
 test('V08-TF-D2-N5: requestIds composing to unsafe idempotency keys fail typed BEFORE any journal write (KPK-15f)', async () => {
   const { runtime, resources } = await wiredRig();
   const target = d2Target('instance:d2-n5');
-  await runtime.openInstance({ target, correlationId: 'corr:d2-n5' });
+  await runtime.openInstance({ target, correlationId: 'corr:d2-n5', authorityClass: 'PRODUCTION' });
 
   const hostileRequestIds = ['bad key!', 'x/effect/1', 'A'.repeat(200)];
   for (const requestId of hostileRequestIds) {
@@ -268,7 +268,7 @@ test('V08-TF-D2-N6: binding declaration attacks fail typed at kernel wiring; liv
   const { host: liveHost, resources: liveResources } = fixtureHostPorts();
   const runtime = wireSealedD2Runtime(app, liveHost, pristine);
   const target = d2Target('instance:d2-n6');
-  await runtime.openInstance({ target, correlationId: 'corr:d2-n6' });
+  await runtime.openInstance({ target, correlationId: 'corr:d2-n6', authorityClass: 'PRODUCTION' });
   dynamicIntent(pristine).inputFrom.requestId = { source: 'event', path: ['payload', 'secret'] };
   dynamicIntent(pristine).idempotencyKeyFrom = { template: 'EVIL:{requestId}' };
   const receipt = await runtime.submitOccurrence({
@@ -286,7 +286,7 @@ test('V08-TF-D2-N6: binding declaration attacks fail typed at kernel wiring; liv
   //     refused typed before any journal write.
   staticApproveIntent(pristine).inputFrom = { amount: { source: 'event', path: ['payload', 'amount'] } };
   const target2 = d2Target('instance:d2-n6b');
-  await runtime.openInstance({ target: target2, correlationId: 'corr:d2-n6b' });
+  await runtime.openInstance({ target: target2, correlationId: 'corr:d2-n6b', authorityClass: 'PRODUCTION' });
   await assert.rejects(
     () => runtime.submitOccurrence({
       intentType: 'submitQuoteDecision', target: target2,
