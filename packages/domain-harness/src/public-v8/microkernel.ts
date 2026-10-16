@@ -40,6 +40,8 @@
 
 import { QualifiedPackageError, sha256Hex, type QualifiedCleanupFailure, type QualifiedPackageKind, type V8PackageLifecycleContext } from './contracts.js';
 import type { JsonSchema } from '../contracts/json.js';
+import { DomainDataIntegrityError, validateCompiledDomainDataSection } from '../package/domain-data-integrity.js';
+import { BusinessSourceIntegrityError, validateCompiledBusinessSourceSection } from '../package/business-source-integrity.js';
 import { currentKernelHostPorts, type V8KernelHostPorts } from './kernel-host.js';
 import { currentHostModelPort, type V8CancellationSignal } from './model-port.js';
 import { load } from './load.js';
@@ -295,6 +297,21 @@ export interface V8FacadeKernelOps {
     readonly coalesceObservations: (observations: unknown) => unknown;
     /** HF23: read-only agent tool surface over BUILD-sealed descriptors. */
     readonly projectAgentTools: (operations: unknown) => unknown;
+  };
+  /**
+   * #1006 FR11/HF24: the compiler-produced compiled package data (domainData
+   * + businessSources sections and the compiled projection declarations that
+   * bind them) that BUILD packed into the sealed Business module bytes —
+   * re-validated at this trusted load boundary with the production integrity
+   * validators BEFORE any facade or mechanism side effect exists. Optional
+   * ABI member, present only when the Business policy carries the section;
+   * the read itself stays the sealed Standard SDK's own projection.
+   */
+  readonly retainedCompiledData?: {
+    /** The validated frozen section (inert sealed BUILD data). */
+    readonly section: unknown;
+    /** The sealed SDK's retained read over that exact section. */
+    readonly project: (request: unknown) => unknown;
   };
 }
 
@@ -1235,6 +1252,17 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       .map((binding) => [binding.intentType, binding]),
   );
   let businessPolicy: object;
+  /**
+   * #1006 FR11/HF24: the validated compiled package data surfaced for the
+   * trusted gateway when the Business policy carries it (assigned inside
+   * the activation try below).
+   */
+  let retainedCompiledData:
+    | {
+      readonly section: unknown;
+      readonly project: (request: unknown) => unknown;
+    }
+    | undefined;
   let kernelRuntime: WiredKernelRuntime;
   let wiredOperations: { capabilities: Map<string, WiredCapability>; adapters: Map<string, Map<string, (payload: unknown) => unknown>> };
   let wiredToolBindings: { tools: Map<string, V8SealedToolBinding> };
@@ -1377,6 +1405,80 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     }
     if (businessPolicy === null || typeof businessPolicy !== 'object') {
       throw typedError('ACTIVATION_FAILED', `business package ${businessBinding.packageId} policy activation did not resolve to an object`);
+    }
+
+    // ---- #1006 FR11/HF24: compiler-produced compiled package data ----
+    // BUILD packs the PUBLIC compiler's domainData/businessSources sections
+    // plus the compiled projection declarations that bind them into the
+    // sealed Business module bytes; the policy surfaces the compound as
+    // inert `compiledPackageData`. The trusted load boundary re-validates
+    // the WHOLE section with the same production integrity validators the
+    // successor runtime admits packages through (real DomainHarness JSON
+    // Schema v1 evaluation and canonical digest recompute) BEFORE any
+    // facade or mechanism exists: a compromised producer whose bundled
+    // value violates its own compiled schema, or whose descriptor digest
+    // does not match the bundled bytes, refuses this load typed with zero
+    // effects — the selected-path analogue of the raw consumer admission.
+    const policyRecord = businessPolicy as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(policyRecord, 'compiledPackageData')) {
+      const raw = policyRecord.compiledPackageData;
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        throw typedError('COMPILED_PACKAGE_DATA_INVALID', `business package ${businessBinding.packageId} compiledPackageData must be an object`);
+      }
+      const rawRecord = raw as Record<string, unknown>;
+      const rawKeys = Object.keys(rawRecord).sort();
+      if (rawKeys.length !== 3 || rawKeys[0] !== 'businessSources' || rawKeys[1] !== 'domainData' || rawKeys[2] !== 'projections') {
+        throw typedError('COMPILED_PACKAGE_DATA_INVALID', 'compiledPackageData must carry exactly domainData, businessSources and projections');
+      }
+      let domainDataSection: Awaited<ReturnType<typeof validateCompiledDomainDataSection>>;
+      let businessSourceSection: ReturnType<typeof validateCompiledBusinessSourceSection>;
+      try {
+        domainDataSection = await validateCompiledDomainDataSection(rawRecord.domainData, {
+          digestUtf8: (value) => Promise.resolve(sha256Hex(value)),
+        });
+        businessSourceSection = validateCompiledBusinessSourceSection(rawRecord.businessSources, domainDataSection.packageDataBounds);
+      } catch (error) {
+        if (error instanceof DomainDataIntegrityError || error instanceof BusinessSourceIntegrityError) {
+          throw typedError(error.code, `business package ${businessBinding.packageId} compiledPackageData failed the trusted load boundary: ${error.message}`);
+        }
+        throw error;
+      }
+      // Compiled projection declarations: light fail-closed structural check
+      // only — the compiler's manifest assembly validated them and the seal
+      // pins the exact bytes; they ride the section as the binding evidence.
+      const rawProjections = rawRecord.projections;
+      if (typeof rawProjections !== 'object' || rawProjections === null || Array.isArray(rawProjections)) {
+        throw typedError('COMPILED_PACKAGE_DATA_INVALID', 'compiledPackageData projections must be a record of compiled projection declarations');
+      }
+      const projections = rawProjections as Record<string, unknown>;
+      for (const [id, projection] of Object.entries(projections)) {
+        const entry = projection as Record<string, unknown> | null;
+        if (entry === null || typeof entry !== 'object' || Array.isArray(entry)
+          || entry.projectionId !== id || typeof entry.expression !== 'string' || !Array.isArray(entry.dependencies)) {
+          throw typedError('COMPILED_PACKAGE_DATA_INVALID', `compiled projection '${id}' is not a valid compiled projection declaration`);
+        }
+      }
+      // Fail-closed composition (same discipline as the decision-source
+      // rules): a Business package carrying compiled data that the sealed
+      // Standard SDK cannot serve refuses the load.
+      if (typeof sdkNamespace.projectRetainedCompiledData !== 'function') {
+        throw typedError(
+          'COMPILED_PACKAGE_DATA_SDK_UNAVAILABLE',
+          `business package ${businessBinding.packageId} carries compiled package data but the Standard SDK exposes no projectRetainedCompiledData endpoint`,
+        );
+      }
+      const section = Object.freeze({
+        domainData: domainDataSection,
+        businessSources: businessSourceSection,
+        projections,
+      });
+      const project = sdkNamespace.projectRetainedCompiledData as (sectionValue: unknown, request: unknown) => unknown;
+      retainedCompiledData = Object.freeze({
+        section,
+        // The validators returned detached canonical snapshots, so the
+        // policy's own objects can never be read through this member.
+        project: (request: unknown) => project(section, request),
+      });
     }
 
     const kernelProvenance = loaded.installedPackages.find((pkg) => pkg.packageId === kernelBinding.packageId);
@@ -2044,6 +2146,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       return sealedToolBindings;
     },
     ...(retainedProjection === undefined ? {} : { retainedProjection }),
+    ...(retainedCompiledData === undefined ? {} : { retainedCompiledData }),
   };
 
   const facade: V8DomainFacade = Object.freeze({ send, query, subscribe, stop });

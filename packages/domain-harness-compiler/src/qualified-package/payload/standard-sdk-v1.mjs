@@ -1344,6 +1344,222 @@ export function projectRetainedAgentTools(rawOperations) {
   return { kind: 'agent-tool-surface', tools, authority: 'projection-only' };
 }
 
+// #1006 FR11/HF24 retained compiled-package-data read. The SECTION is the
+// BUILD-compiled package-data compound sealed inside the Business module
+// bytes (compiler domainData/businessSources sections plus the compiled
+// projection declarations that bind them); the trusted Host load boundary
+// already re-validated it with the production integrity validators before
+// this projection ever ran. This endpoint owns ONLY the deterministic,
+// fail-closed READ: declared-key projection in the compiled key order and
+// business-source observation admission against the compiler-declared
+// schema contract. It has no hash port — content digests are the sealed
+// descriptors', verified once at the trusted load boundary, never recomputed
+// here. No state, no effects, no authority: the result is inert data.
+const COMPILED_SCHEMA_TYPES = new Set(['string', 'integer', 'number', 'boolean', 'object', 'array', 'null']);
+const COMPILED_SCHEMA_KEYS = new Set(['type', 'required', 'properties', 'additionalProperties', 'minimum']);
+
+function compiledKeyOrder(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+/**
+ * Bounded evaluation of a compiler-declared valueSchema against one
+ * observation value. The authoritative DomainHarness JSON Schema v1
+ * validation runs at the trusted load boundary over the SECTION; this
+ * read-time check fail-closes stale/substituted OBSERVATIONS before they
+ * can enter a projection result. A declared schema using keywords outside
+ * this bounded subset refuses the read typed rather than under-validate.
+ */
+function assertCompiledSchema(rawSchema, value, label, violationCode) {
+  const schema = record(rawSchema, `${label} schema`);
+  for (const key of Object.keys(schema)) {
+    if (!COMPILED_SCHEMA_KEYS.has(key)) {
+      fail('SDK_COMPILED_DATA_SCHEMA_UNSUPPORTED', `${label} schema uses keyword '${key}' outside the retained read subset`);
+    }
+  }
+  if (schema.type !== undefined) {
+    if (typeof schema.type !== 'string' || !COMPILED_SCHEMA_TYPES.has(schema.type)) {
+      fail('SDK_COMPILED_DATA_SCHEMA_UNSUPPORTED', `${label} schema declares an unsupported type`);
+    }
+    const actual = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+    if (schema.type === 'integer') {
+      if (typeof value !== 'number' || !Number.isInteger(value)) {
+        fail(violationCode, `${label} value is ${actual}, expected integer`);
+      }
+    } else if (actual !== schema.type) {
+      fail(violationCode, `${label} value is ${actual}, expected ${schema.type}`);
+    }
+  }
+  if (schema.minimum !== undefined) {
+    if (typeof schema.minimum !== 'number' || !Number.isFinite(schema.minimum)) {
+      fail('SDK_COMPILED_DATA_SCHEMA_UNSUPPORTED', `${label} schema minimum must be a finite number`);
+    }
+    if (typeof value !== 'number' || value < schema.minimum) {
+      fail(violationCode, `${label} value is below the declared minimum`);
+    }
+  }
+  if (schema.required !== undefined) {
+    if (!Array.isArray(schema.required)) {
+      fail('SDK_COMPILED_DATA_SCHEMA_UNSUPPORTED', `${label} schema required must be an array`);
+    }
+    for (const name of schema.required) {
+      if (typeof name !== 'string') {
+        fail('SDK_COMPILED_DATA_SCHEMA_UNSUPPORTED', `${label} schema required entries must be strings`);
+      }
+      if (!Object.hasOwn(value ?? {}, name)) {
+        fail(violationCode, `${label} value is missing the required field ${name}`);
+      }
+    }
+  }
+  if (schema.properties !== undefined) {
+    const properties = record(schema.properties, `${label} schema properties`);
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [name, subSchema] of Object.entries(properties)) {
+        if (Object.hasOwn(value, name)) assertCompiledSchema(subSchema, value[name], `${label}.${name}`, violationCode);
+      }
+    }
+    if (schema.additionalProperties === false) {
+      for (const name of Object.keys(value ?? {})) {
+        if (!Object.hasOwn(properties, name)) {
+          fail(violationCode, `${label} value carries the undeclared field ${name}`);
+        }
+      }
+    }
+  } else if (schema.additionalProperties !== undefined && typeof schema.additionalProperties !== 'boolean') {
+    fail('SDK_COMPILED_DATA_SCHEMA_UNSUPPORTED', `${label} schema additionalProperties must be a boolean when present`);
+  }
+}
+
+function compiledDescriptorList(section, field, label) {
+  const container = record(section[field], `compiled package data ${label}`);
+  const descriptors = container.descriptors;
+  if (!Array.isArray(descriptors)) {
+    fail('SDK_COMPILED_DATA_INVALID', `compiled package data ${label} descriptors must be an array`);
+  }
+  return { container, descriptors };
+}
+
+/**
+ * FR11/HF24: project the sealed compiled Domain Data / Business Source
+ * section. `keys` selects Domain Data entries (undeclared keys refuse
+ * typed); the response ALWAYS carries entries in the compiled deterministic
+ * key order regardless of request order. `businessSources` are observation
+ * bindings `{source, value}`: each source must be declared by the compiled
+ * section and each value must satisfy the compiler-declared valueSchema
+ * (substituted/aliased sources and stale schemas fail closed before any
+ * observation enters the result). The compiled projection declarations are
+ * returned as inert binding evidence; this projection executes none of them.
+ */
+export function projectRetainedCompiledData(rawSection, rawRequest) {
+  const section = record(data(rawSection), 'compiled package data section');
+  const request = record(data(rawRequest), 'compiled package data read');
+  for (const key of Object.keys(section)) {
+    if (key !== 'domainData' && key !== 'businessSources' && key !== 'projections') {
+      fail('SDK_COMPILED_DATA_INVALID', `compiled package data section carries the unsupported field '${key}'`);
+    }
+  }
+  const { descriptors: dataDescriptors, container: dataContainer } = compiledDescriptorList(section, 'domainData', 'Domain Data');
+  const values = record(dataContainer.values, 'compiled Domain Data values');
+  const declaredKeys = [];
+  for (const descriptor of dataDescriptors) {
+    record(descriptor, 'Domain Data descriptor');
+    const key = ident(descriptor.key, 'Domain Data descriptor key');
+    if (typeof descriptor.contentDigest !== 'string' || descriptor.contentDigest.length === 0) {
+      fail('SDK_COMPILED_DATA_INVALID', `Domain Data descriptor '${key}' carries no content digest`);
+    }
+    if (descriptor.valueSchema !== undefined) record(descriptor.valueSchema, `Domain Data '${key}' valueSchema`);
+    if (!Object.hasOwn(values, key)) {
+      fail('SDK_COMPILED_DATA_INVALID', `Domain Data descriptor '${key}' has no bundled value`);
+    }
+    declaredKeys.push(key);
+  }
+  const sortedKeys = [...declaredKeys].sort(compiledKeyOrder);
+  if (declaredKeys.some((key, index) => key !== sortedKeys[index])) {
+    fail('SDK_COMPILED_DATA_ORDER_INVALID', 'Domain Data descriptors are not in the compiled deterministic key order');
+  }
+
+  const { container: sourceContainer, descriptors: sourceDescriptors } = compiledDescriptorList(section, 'businessSources', 'Business Sources');
+  // The schema contract version is a versioned contract identity (it may
+  // carry '/'), not a declaration identifier: bounded text, exact match
+  // pinned by the sealed section itself.
+  const schemaContractVersion = boundedText(sourceContainer.schemaContractVersion, 'Business Source schemaContractVersion');
+  const declaredSources = [];
+  for (const descriptor of sourceDescriptors) {
+    record(descriptor, 'Business Source descriptor');
+    const source = ident(descriptor.source, 'Business Source name');
+    record(descriptor.valueSchema, `Business Source '${source}' valueSchema`);
+    declaredSources.push(source);
+  }
+  const sortedSources = [...declaredSources].sort(compiledKeyOrder);
+  if (declaredSources.some((source, index) => source !== sortedSources[index])) {
+    fail('SDK_COMPILED_DATA_ORDER_INVALID', 'Business Source descriptors are not in the compiled deterministic source order');
+  }
+  const projections = record(section.projections ?? {}, 'compiled projections');
+  for (const [id, projection] of Object.entries(projections)) {
+    record(projection, `compiled projection '${id}'`);
+    if (projection.projectionId !== id) {
+      fail('SDK_COMPILED_DATA_INVALID', `compiled projection '${id}' carries a mismatched projectionId`);
+    }
+  }
+
+  const requestedKeys = request.keys === undefined ? [...declaredKeys] : request.keys;
+  if (!Array.isArray(requestedKeys) || requestedKeys.length > MAX_ITEMS) {
+    fail('SDK_COMPILED_DATA_INVALID', 'the read keys must be a bounded list');
+  }
+  const wanted = new Set();
+  for (const key of requestedKeys) {
+    ident(key, 'read key');
+    if (!Object.hasOwn(values, key)) {
+      fail('SDK_DOMAIN_DATA_KEY_UNDECLARED', `Domain Data key '${key}' is not declared by the compiled section`);
+    }
+    wanted.add(key);
+  }
+  const observations = request.businessSources === undefined ? [] : request.businessSources;
+  if (!Array.isArray(observations) || observations.length > MAX_ITEMS) {
+    fail('SDK_COMPILED_DATA_INVALID', 'business source observations must be a bounded list');
+  }
+  const boundSources = [];
+  const seenBindings = new Set();
+  for (const observation of observations) {
+    record(observation, 'business source observation');
+    const source = ident(observation.source, 'business source observation source');
+    if (seenBindings.has(source)) {
+      fail('SDK_BUSINESS_SOURCE_AMBIGUOUS', `business source '${source}' is bound more than once`);
+    }
+    seenBindings.add(source);
+    const descriptor = sourceDescriptors.find((entry) => entry.source === source);
+    if (descriptor === undefined) {
+      fail('SDK_BUSINESS_SOURCE_UNDECLARED', `business source '${source}' is not declared by the compiled section`);
+    }
+    assertCompiledSchema(descriptor.valueSchema, observation.value, `business source '${source}' observation`, 'SDK_BUSINESS_SOURCE_SCHEMA_VIOLATION');
+    boundSources.push({ source, schemaContractVersion });
+  }
+
+  // Entries are ALWAYS emitted in the compiled deterministic key order —
+  // the request order can never reorder the projection result.
+  const entries = [];
+  for (const key of declaredKeys) {
+    if (!wanted.has(key)) continue;
+    const descriptor = dataDescriptors.find((entry) => entry.key === key);
+    entries.push({
+      key,
+      value: values[key],
+      contentDigest: descriptor.contentDigest,
+      ...(descriptor.valueSchema === undefined ? {} : { valueSchema: descriptor.valueSchema }),
+    });
+  }
+  return {
+    kind: 'compiled-data-projection',
+    entries,
+    businessSourceContracts: boundSources,
+    compiledProjections: Object.keys(projections).sort(),
+    schemaContractVersion,
+    authority: 'proposal-only',
+  };
+}
+
 /**
  * #v0.6 NF05/NF06 retained decision handoff as inert data: exact assembly
  * qualification and durable append are K-owned, not Standard SDK authority.

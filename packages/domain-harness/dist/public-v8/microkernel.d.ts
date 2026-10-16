@@ -285,6 +285,21 @@ export interface V8FacadeKernelOps {
         /** HF23: read-only agent tool surface over BUILD-sealed descriptors. */
         readonly projectAgentTools: (operations: unknown) => unknown;
     };
+    /**
+     * #1006 FR11/HF24: the compiler-produced compiled package data (domainData
+     * + businessSources sections and the compiled projection declarations that
+     * bind them) that BUILD packed into the sealed Business module bytes —
+     * re-validated at this trusted load boundary with the production integrity
+     * validators BEFORE any facade or mechanism side effect exists. Optional
+     * ABI member, present only when the Business policy carries the section;
+     * the read itself stays the sealed Standard SDK's own projection.
+     */
+    readonly retainedCompiledData?: {
+        /** The validated frozen section (inert sealed BUILD data). */
+        readonly section: unknown;
+        /** The sealed SDK's retained read over that exact section. */
+        readonly project: (request: unknown) => unknown;
+    };
 }
 /** The pre-existing effect-class declaration family (L2 successor §4). */
 type V8OperationEffectClass = 'none' | 'idempotent' | 'non-idempotent';

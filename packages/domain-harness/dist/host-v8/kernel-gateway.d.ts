@@ -223,6 +223,15 @@ export interface KernelGatewayAgentToolQueryResult {
     }[];
     readonly projectionAuthority: string;
 }
+/**
+ * [#1006 FR11/HF24] One compiler-declared Business Source binding: the
+ * declared source identity plus the instance address whose authenticated
+ * K read serves the observation value.
+ */
+export interface KernelGatewayCompiledDataSourceBinding {
+    readonly source: string;
+    readonly instanceKey: string;
+}
 export interface KernelGateway {
     /** Host-context provisioning: load + bind one approved Domain App. */
     registerApp(input: KernelGatewayAppInput): Promise<void>;
@@ -291,6 +300,27 @@ export interface KernelGateway {
     queryAgentTools(credential: unknown, request: {
         readonly appId: string;
     }): Promise<KernelGatewayAgentToolQueryResult>;
+    /**
+     * [#1006 FR11/HF24] One authenticated compiled-package-data read over
+     * the compiler-produced domainData/businessSources sections sealed in
+     * the Business module bytes (load-boundary re-validated with the
+     * production integrity validators). `keys` selects Domain Data entries
+     * — the sealed SDK projection always returns them in the compiled
+     * deterministic key order and refuses undeclared keys typed. Each
+     * `businessSources` binding reads one instance through the SAME
+     * authenticated principal-qualified Kernel read as `queryInstance`; the
+     * SDK projection then gates the observation against the compiler-declared
+     * source identity and schema contract (substituted/undeclared source or
+     * stale schema refuses typed before any result escapes).
+     */
+    queryDomainData(credential: unknown, request: {
+        readonly appId: string;
+        readonly keys?: readonly string[];
+        readonly businessSources?: readonly {
+            readonly source: string;
+            readonly instanceKey: string;
+        }[];
+    }): Promise<unknown>;
     /**
      * [#1006 HF29] One authenticated approved Tool Call through the Host-owned
      * dispatch port: the tool must be a sealed binding of the app's closure,
