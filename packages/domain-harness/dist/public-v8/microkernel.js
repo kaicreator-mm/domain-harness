@@ -38,6 +38,8 @@
  * Host-provisioned resource adapters.
  */
 import { QualifiedPackageError, sha256Hex } from './contracts.js';
+import { DomainDataIntegrityError, validateCompiledDomainDataSection } from '../package/domain-data-integrity.js';
+import { BusinessSourceIntegrityError, validateCompiledBusinessSourceSection } from '../package/business-source-integrity.js';
 import { currentKernelHostPorts } from './kernel-host.js';
 import { currentHostModelPort } from './model-port.js';
 import { load } from './load.js';
@@ -717,6 +719,12 @@ async function loadScopedFacade(packageRoot) {
         .filter((binding) => binding.role === 'intent')
         .map((binding) => [binding.intentType, binding]));
     let businessPolicy;
+    /**
+     * #1006 FR11/HF24: the validated compiled package data surfaced for the
+     * trusted gateway when the Business policy carries it (assigned inside
+     * the activation try below).
+     */
+    let retainedCompiledData;
     let kernelRuntime;
     let wiredOperations;
     let wiredToolBindings;
@@ -836,6 +844,77 @@ async function loadScopedFacade(packageRoot) {
         }
         if (businessPolicy === null || typeof businessPolicy !== 'object') {
             throw typedError('ACTIVATION_FAILED', `business package ${businessBinding.packageId} policy activation did not resolve to an object`);
+        }
+        // ---- #1006 FR11/HF24: compiler-produced compiled package data ----
+        // BUILD packs the PUBLIC compiler's domainData/businessSources sections
+        // plus the compiled projection declarations that bind them into the
+        // sealed Business module bytes; the policy surfaces the compound as
+        // inert `compiledPackageData`. The trusted load boundary re-validates
+        // the WHOLE section with the same production integrity validators the
+        // successor runtime admits packages through (real DomainHarness JSON
+        // Schema v1 evaluation and canonical digest recompute) BEFORE any
+        // facade or mechanism exists: a compromised producer whose bundled
+        // value violates its own compiled schema, or whose descriptor digest
+        // does not match the bundled bytes, refuses this load typed with zero
+        // effects — the selected-path analogue of the raw consumer admission.
+        const policyRecord = businessPolicy;
+        if (Object.prototype.hasOwnProperty.call(policyRecord, 'compiledPackageData')) {
+            const raw = policyRecord.compiledPackageData;
+            if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+                throw typedError('COMPILED_PACKAGE_DATA_INVALID', `business package ${businessBinding.packageId} compiledPackageData must be an object`);
+            }
+            const rawRecord = raw;
+            const rawKeys = Object.keys(rawRecord).sort();
+            if (rawKeys.length !== 3 || rawKeys[0] !== 'businessSources' || rawKeys[1] !== 'domainData' || rawKeys[2] !== 'projections') {
+                throw typedError('COMPILED_PACKAGE_DATA_INVALID', 'compiledPackageData must carry exactly domainData, businessSources and projections');
+            }
+            let domainDataSection;
+            let businessSourceSection;
+            try {
+                domainDataSection = await validateCompiledDomainDataSection(rawRecord.domainData, {
+                    digestUtf8: (value) => Promise.resolve(sha256Hex(value)),
+                });
+                businessSourceSection = validateCompiledBusinessSourceSection(rawRecord.businessSources, domainDataSection.packageDataBounds);
+            }
+            catch (error) {
+                if (error instanceof DomainDataIntegrityError || error instanceof BusinessSourceIntegrityError) {
+                    throw typedError(error.code, `business package ${businessBinding.packageId} compiledPackageData failed the trusted load boundary: ${error.message}`);
+                }
+                throw error;
+            }
+            // Compiled projection declarations: light fail-closed structural check
+            // only — the compiler's manifest assembly validated them and the seal
+            // pins the exact bytes; they ride the section as the binding evidence.
+            const rawProjections = rawRecord.projections;
+            if (typeof rawProjections !== 'object' || rawProjections === null || Array.isArray(rawProjections)) {
+                throw typedError('COMPILED_PACKAGE_DATA_INVALID', 'compiledPackageData projections must be a record of compiled projection declarations');
+            }
+            const projections = rawProjections;
+            for (const [id, projection] of Object.entries(projections)) {
+                const entry = projection;
+                if (entry === null || typeof entry !== 'object' || Array.isArray(entry)
+                    || entry.projectionId !== id || typeof entry.expression !== 'string' || !Array.isArray(entry.dependencies)) {
+                    throw typedError('COMPILED_PACKAGE_DATA_INVALID', `compiled projection '${id}' is not a valid compiled projection declaration`);
+                }
+            }
+            // Fail-closed composition (same discipline as the decision-source
+            // rules): a Business package carrying compiled data that the sealed
+            // Standard SDK cannot serve refuses the load.
+            if (typeof sdkNamespace.projectRetainedCompiledData !== 'function') {
+                throw typedError('COMPILED_PACKAGE_DATA_SDK_UNAVAILABLE', `business package ${businessBinding.packageId} carries compiled package data but the Standard SDK exposes no projectRetainedCompiledData endpoint`);
+            }
+            const section = Object.freeze({
+                domainData: domainDataSection,
+                businessSources: businessSourceSection,
+                projections,
+            });
+            const project = sdkNamespace.projectRetainedCompiledData;
+            retainedCompiledData = Object.freeze({
+                section,
+                // The validators returned detached canonical snapshots, so the
+                // policy's own objects can never be read through this member.
+                project: (request) => project(section, request),
+            });
         }
         const kernelProvenance = loaded.installedPackages.find((pkg) => pkg.packageId === kernelBinding.packageId);
         // Unreachable after the qualified install (every bound package is
@@ -1429,6 +1508,7 @@ async function loadScopedFacade(packageRoot) {
             return sealedToolBindings;
         },
         ...(retainedProjection === undefined ? {} : { retainedProjection }),
+        ...(retainedCompiledData === undefined ? {} : { retainedCompiledData }),
     };
     const facade = Object.freeze({ send, query, subscribe, stop });
     facadeScopes.set(facade, Object.freeze(gatewayOps));

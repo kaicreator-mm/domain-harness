@@ -250,6 +250,16 @@ export interface KernelGatewayAgentToolQueryResult {
   readonly projectionAuthority: string;
 }
 
+/**
+ * [#1006 FR11/HF24] One compiler-declared Business Source binding: the
+ * declared source identity plus the instance address whose authenticated
+ * K read serves the observation value.
+ */
+export interface KernelGatewayCompiledDataSourceBinding {
+  readonly source: string;
+  readonly instanceKey: string;
+}
+
 export interface KernelGateway {
   /** Host-context provisioning: load + bind one approved Domain App. */
   registerApp(input: KernelGatewayAppInput): Promise<void>;
@@ -314,6 +324,24 @@ export interface KernelGateway {
    * central occurrence path (`send` / effectful OperationCall).
    */
   queryAgentTools(credential: unknown, request: { readonly appId: string }): Promise<KernelGatewayAgentToolQueryResult>;
+  /**
+   * [#1006 FR11/HF24] One authenticated compiled-package-data read over
+   * the compiler-produced domainData/businessSources sections sealed in
+   * the Business module bytes (load-boundary re-validated with the
+   * production integrity validators). `keys` selects Domain Data entries
+   * — the sealed SDK projection always returns them in the compiled
+   * deterministic key order and refuses undeclared keys typed. Each
+   * `businessSources` binding reads one instance through the SAME
+   * authenticated principal-qualified Kernel read as `queryInstance`; the
+   * SDK projection then gates the observation against the compiler-declared
+   * source identity and schema contract (substituted/undeclared source or
+   * stale schema refuses typed before any result escapes).
+   */
+  queryDomainData(credential: unknown, request: {
+    readonly appId: string;
+    readonly keys?: readonly string[];
+    readonly businessSources?: readonly { readonly source: string; readonly instanceKey: string }[];
+  }): Promise<unknown>;
   /**
    * [#1006 HF29] One authenticated approved Tool Call through the Host-owned
    * dispatch port: the tool must be a sealed binding of the app's closure,
@@ -1465,6 +1493,68 @@ export function createKernelGateway(input: { readonly host: TrustedNodeHost; rea
         appId: request.appId,
         tools: Object.freeze(tools),
         projectionAuthority,
+      });
+    },
+
+    /**
+     * [#1006 FR11/HF24] One authenticated compiled-package-data read. The
+     * sealed Business module carries the PUBLIC compiler's domainData and
+     * businessSources sections (load-boundary re-validated before any
+     * facade existed); the sealed Standard SDK's retained projection owns
+     * the deterministic fail-closed read semantics. Business-source
+     * observations resolve through the SAME authenticated principal-
+     * qualified Kernel read as `queryInstance`, then the SDK projection
+     * gates each observation against the compiler-declared source identity
+     * and schema contract — a substituted/undeclared source or a stale
+     * schema refuses typed before anything is returned or effected.
+     */
+    async queryDomainData(credential: unknown, request: {
+      readonly appId: string;
+      readonly keys?: readonly string[];
+      readonly businessSources?: readonly { readonly source: string; readonly instanceKey: string }[];
+    }): Promise<unknown> {
+      if (typeof request !== 'object' || request === null || typeof request.appId !== 'string' || request.appId.length === 0) {
+        throw new HostBoundaryError('HOST_COMPILED_DATA_MALFORMED', 'queryDomainData requires a non-empty appId');
+      }
+      if (request.keys !== undefined
+        && (!Array.isArray(request.keys) || request.keys.length > 32
+          || request.keys.some((key) => typeof key !== 'string' || key.length === 0))) {
+        throw new HostBoundaryError('HOST_COMPILED_DATA_MALFORMED', 'queryDomainData keys must be a bounded non-empty-string list');
+      }
+      const sourceBindings = request.businessSources ?? [];
+      if (!Array.isArray(sourceBindings) || sourceBindings.length > 8) {
+        throw new HostBoundaryError('HOST_COMPILED_DATA_MALFORMED', 'queryDomainData businessSources must be a bounded list');
+      }
+      // Re-assert the element type after the Array.isArray shape gate (the
+      // predicate narrows the readonly array's elements for type-aware
+      // lint, mirroring the queryProjection dependency handling); each
+      // field is re-validated above regardless.
+      const bindings = sourceBindings as readonly KernelGatewayCompiledDataSourceBinding[];
+      for (const binding of bindings) {
+        if (typeof binding !== 'object' || binding === null
+          || typeof binding.source !== 'string' || binding.source.length === 0
+          || typeof binding.instanceKey !== 'string' || binding.instanceKey.length === 0) {
+          throw new HostBoundaryError('HOST_COMPILED_DATA_MALFORMED', 'each business source binding requires non-empty source/instanceKey strings');
+        }
+      }
+      const principal = await authenticate(credential);
+      const app = requireApp(request.appId, principal);
+      const retained = app.ops.retainedCompiledData;
+      if (retained === undefined) {
+        throw new HostBoundaryError(
+          'HOST_COMPILED_DATA_UNAVAILABLE',
+          `the sealed closure of app ${app.appId} carries no compiler-produced compiled package data`,
+        );
+      }
+      const observations: Array<{ source: string; value: unknown }> = [];
+      for (const binding of bindings) {
+        const snapshot = await app.ops.queryInstance(principal, binding.instanceKey);
+        observations.push({ source: binding.source, value: snapshot });
+      }
+      const requestedKeys = request.keys as readonly string[] | undefined;
+      return retained.project({
+        ...(requestedKeys === undefined ? {} : { keys: [...requestedKeys] }),
+        ...(observations.length === 0 ? {} : { businessSources: observations }),
       });
     },
 
