@@ -316,11 +316,13 @@ try {
     appId: D2_APP,
     packageRoot: JSON.parse(await readFile('./sealed-approval-root.json', 'utf8')),
     genesisRoles: ['platform-operator'],
+    authorityClass: 'PRODUCTION',
   });
   await gateway.registerApp({
     appId: D3_APP,
     packageRoot: JSON.parse(await readFile('./sealed-engineering-root.json', 'utf8')),
     genesisRoles: ['platform-operator'],
+    authorityClass: 'PRODUCTION',
   });
   const operator = (appId) => credential(appId, 'op', ['platform-operator']);
   const send = async (appId, roles, intentType, messageId, input, instanceKey) => {

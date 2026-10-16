@@ -189,7 +189,7 @@ async function bootstrapHarness(root: SealedQualifiedPackageRoot): Promise<Harne
     storage: { path: sqlitePath },
   });
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: APP, packageRoot: root, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: APP, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   return {
     handle,
     gateway,
@@ -464,7 +464,7 @@ test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval
     // executing exactly its own BUILD-selected handler. ----
     const dispatchAtW2 = harness.dispatchCount();
     const keyCountAtW2 = harness.handle.host.resources.resourceKeys().length;
-    await harness.gateway.registerApp({ appId: 'order-approval-2', packageRoot: sealed.root, genesisRoles: ['platform-operator'] });
+    await harness.gateway.registerApp({ appId: 'order-approval-2', packageRoot: sealed.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(harness.gateway.hasApp('order-approval-2'), true, 'the second deployment registers on the same Host');
     assert.notEqual(
       await harness.handle.host.docs.get('v8host:gateway:app-pin:order-approval-2'),

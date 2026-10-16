@@ -493,8 +493,8 @@ test('S05-P1/P2/N1/P3: dual-app same-logical-key physical handler isolation on o
 
   // ---- S05-P1: BOTH independently approved closures register on the ONE
   // Host+gateway although they bind the SAME logical ledger.reserve ----
-  await shared.gateway.registerApp({ appId: APP_A, packageRoot: shared.appA.root, genesisRoles: ['platform-operator'] });
-  await shared.gateway.registerApp({ appId: APP_B, packageRoot: shared.appB.root, genesisRoles: ['platform-operator'] });
+  await shared.gateway.registerApp({ appId: APP_A, packageRoot: shared.appA.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await shared.gateway.registerApp({ appId: APP_B, packageRoot: shared.appB.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   assert.equal(shared.gateway.hasApp(APP_A), true);
   assert.equal(shared.gateway.hasApp(APP_B), true);
   // Two DISTINCT physical keys, both the same logical route, both retained.
@@ -621,7 +621,7 @@ test('S05-P1/P2/N1/P3: dual-app same-logical-key physical handler isolation on o
   // BEFORE any load/dispatch, and app A keeps working afterwards.
   const gateway2 = createKernelGateway({ host: shared.handle.host, gatewaySessionCap: shared.handle.gatewaySessionCap });
   const dispatchBeforeForgery = shared.handle.host.resources.callCount();
-  const forgedClosure = await callCode(() => gateway2.registerApp({ appId: APP_A, packageRoot: shared.appB.root, genesisRoles: ['platform-operator'] }));
+  const forgedClosure = await callCode(() => gateway2.registerApp({ appId: APP_A, packageRoot: shared.appB.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' }));
   assert.equal(forgedClosure.code, 'GATEWAY_APP_CLOSURE_MISMATCH', `the pinned appId refuses a different closure (got ${forgedClosure.code}: ${forgedClosure.message})`);
   assert.equal(shared.handle.host.resources.callCount(), dispatchBeforeForgery, 'the refused closure registration dispatched nothing');
   await shared.gateway.activateGenesis(opA, { appId: APP_A, instanceKey: 'q-a-after' });
@@ -689,7 +689,7 @@ test('S05-P1/P2/N1/P3: dual-app same-logical-key physical handler isolation on o
     baseCommit: 'v0.8-s05',
   }) as SealedQualifiedPackageRoot;
   const LEGACY_APP = 'order-approval-legacy';
-  await shared.gateway.registerApp({ appId: LEGACY_APP, packageRoot: plainRoot, genesisRoles: ['platform-operator'] });
+  await shared.gateway.registerApp({ appId: LEGACY_APP, packageRoot: plainRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   const legacyCred = credential(LEGACY_APP, ['requester'], 's05-legacy');
   const legacyOp = credential(LEGACY_APP, ['platform-operator'], 's05-legacy-op');
   await shared.gateway.activateGenesis(legacyOp, { appId: LEGACY_APP, instanceKey: 'q-legacy' });
@@ -729,7 +729,7 @@ test('S05-R1: the pin-CAS race rolls the losing registration back with zero resi
     // The gated closure's registration PENDS inside its S03 init (after the
     // pre-load pin read saw NO pin, strictly before its adapter batch and
     // pin commit).
-    const pending = gateway1.registerApp({ appId: RACE_APP, packageRoot: gatedApp.root, genesisRoles: ['platform-operator'] });
+    const pending = gateway1.registerApp({ appId: RACE_APP, packageRoot: gatedApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const deadline = Date.now() + 30_000;
     while (probe.initEntered === 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -738,7 +738,7 @@ test('S05-R1: the pin-CAS race rolls the losing registration back with zero resi
 
     // The competing registration of the SAME appId with a DIFFERENT closure
     // wins the durable pin while the first is still gated.
-    await gateway2.registerApp({ appId: RACE_APP, packageRoot: normalApp.root, genesisRoles: ['platform-operator'] });
+    await gateway2.registerApp({ appId: RACE_APP, packageRoot: normalApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(gateway2.hasApp(RACE_APP), true);
     assert.equal(shared.handle.host.resources.resourceKeys().length, keyBaseline + 1, 'exactly the winner\'s scoped adapter exists so far');
 
@@ -765,7 +765,7 @@ test('S05-R1: the pin-CAS race rolls the losing registration back with zero resi
     // a fresh appId on the same Host (the already-released gate resolves
     // immediately, so its lifecycle completes normally this time).
     const dispatchBefore = shared.handle.host.resources.callCount();
-    await gateway1.registerApp({ appId: 'order-approval-race-loser-retry', packageRoot: gatedApp.root, genesisRoles: ['platform-operator'] });
+    await gateway1.registerApp({ appId: 'order-approval-race-loser-retry', packageRoot: gatedApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(gateway1.hasApp('order-approval-race-loser-retry'), true);
     assert.ok(probe.initReleased >= 1, 'the retry re-activated the gated package lifecycle');
     assert.equal(shared.handle.host.resources.callCount(), dispatchBefore, 'the clean retry dispatched nothing');
@@ -790,9 +790,9 @@ test('S05-N2 (R1 P1-01): an undeclared resource key cannot reach another deploym
   // like the D2/D3 real Apps.
   const legacyRoot = await sealPlainApp('app:v08:s05:n2-legacy', parametrizedBusiness);
 
-  await shared.gateway.registerApp({ appId: ATTACK, packageRoot: attackApp.root, genesisRoles: ['platform-operator'] });
-  await shared.gateway.registerApp({ appId: TARGET, packageRoot: targetApp.root, genesisRoles: ['platform-operator'] });
-  await shared.gateway.registerApp({ appId: LEGACY, packageRoot: legacyRoot, genesisRoles: ['platform-operator'] });
+  await shared.gateway.registerApp({ appId: ATTACK, packageRoot: attackApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await shared.gateway.registerApp({ appId: TARGET, packageRoot: targetApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await shared.gateway.registerApp({ appId: LEGACY, packageRoot: legacyRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   const attackCred = credential(ATTACK, ['requester'], 's05-n2-attack');
   const attackOp = credential(ATTACK, ['platform-operator'], 's05-n2-attack');
   const targetCred = credential(TARGET, ['requester'], 's05-n2-target');
@@ -907,7 +907,7 @@ test('S05-N3 (R2 P1): the privileged callScoped member is runtime-absent from ev
   // accounting (no secret: the R1 review already established resource-string
   // secrecy is never an authorization boundary).
   const targetApp = await sealApp('app:v08:s05:n3-target', capabilitySourceB(), shared.dir);
-  await shared.gateway.registerApp({ appId: TARGET, packageRoot: targetApp.root, genesisRoles: ['platform-operator'] });
+  await shared.gateway.registerApp({ appId: TARGET, packageRoot: targetApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   const targetOp = credential(TARGET, ['platform-operator'], 's05-n3-target');
   const targetCred = credential(TARGET, ['requester'], 's05-n3-target');
   await shared.gateway.activateGenesis(targetOp, { appId: TARGET, instanceKey: 'q-n3-target' });
@@ -929,7 +929,7 @@ test('S05-N3 (R2 P1): the privileged callScoped member is runtime-absent from ev
   });
   try {
     const probeRoot = await sealPlainApp('app:v08:s05:n3-probe', await leakProbeBusinessSource());
-    await shared.gateway.registerApp({ appId: PROBE, packageRoot: probeRoot, genesisRoles: ['platform-operator'] });
+    await shared.gateway.registerApp({ appId: PROBE, packageRoot: probeRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const probeCred = credential(PROBE, ['requester'], 's05-n3-probe');
     const probeOp = credential(PROBE, ['platform-operator'], 's05-n3-probe');
     await shared.gateway.activateGenesis(probeOp, { appId: PROBE, instanceKey: 'q-n3-probe' });
@@ -956,7 +956,7 @@ test('S05-N3 (R2 P1): the privileged callScoped member is runtime-absent from ev
     // its Business sees the same runtime-narrowed port shape (the scoped
     // branch already built a fresh view; its claimed route stays functional).
     const scopedApp = await sealApp('app:v08:s05:n3-scoped', await capabilitySourceA(), shared.dir);
-    await shared.gateway.registerApp({ appId: SCOPED, packageRoot: scopedApp.root, genesisRoles: ['platform-operator'] });
+    await shared.gateway.registerApp({ appId: SCOPED, packageRoot: scopedApp.root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const scopedCred = credential(SCOPED, ['requester'], 's05-n3-scoped');
     const scopedOp = credential(SCOPED, ['platform-operator'], 's05-n3-scoped');
     await shared.gateway.activateGenesis(scopedOp, { appId: SCOPED, instanceKey: 'q-n3-scoped' });

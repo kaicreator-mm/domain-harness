@@ -236,6 +236,12 @@ export interface V8FacadeKernelOps {
   provisionGenesis(principal: V8GatewayPrincipal, request: {
     readonly instanceKey: string;
     readonly correlationId?: string;
+    /**
+     * [#1006 HF21] The registered closure runtime authority class forwarded
+     * by the trusted gateway (never genesis-caller data); the Kernel weaves
+     * it into the durable GovernanceExecutionPin bindingDigest.
+     */
+    readonly authorityClass?: 'PRODUCTION' | 'SIMULATION';
   }): Promise<unknown>;
   /**
    * #1023 S04: BUILD-fixed OperationCall dispatch on the protected gateway
@@ -1916,7 +1922,7 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       observers.add(observer);
       return () => observers.delete(observer);
     },
-    async provisionGenesis(principal: V8GatewayPrincipal, request: { readonly instanceKey: string; readonly correlationId?: string }): Promise<unknown> {
+    async provisionGenesis(principal: V8GatewayPrincipal, request: { readonly instanceKey: string; readonly correlationId?: string; readonly authorityClass?: 'PRODUCTION' | 'SIMULATION' }): Promise<unknown> {
       assertOpen();
       requirePrincipal(principal);
       const key = requireInstanceKey(request.instanceKey);
@@ -1929,9 +1935,13 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
       // this seam deliberately forwards NO caller-chosen initial context,
       // and the instance address is the principal's tenant/app-qualified
       // key (per-tenant Genesis by construction).
+      // [#1006 HF21] The runtime authority class is the REGISTERED closure
+      // class forwarded by the trusted gateway (never genesis-caller data);
+      // the Kernel exact-validates and weaves it into the instance pin.
       return runtimeWithOpener.openInstance({
         target: { workflowId: resolveWorkflowKey(), instanceKey: qualifiedInstanceKey(principal, key) },
         ...(request.correlationId === undefined ? {} : { correlationId: request.correlationId }),
+        ...(request.authorityClass === undefined ? {} : { authorityClass: request.authorityClass }),
       });
     },
     async invokeOperation(principal: V8GatewayPrincipal, call: V8OperationCall, control?: V8OccurrenceControl): Promise<unknown> {

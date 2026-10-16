@@ -157,7 +157,7 @@ before(async () => {
     return { reserved: true };
   });
   gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: APP_ID, packageRoot: await sealControlsClosure(), genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: APP_ID, packageRoot: await sealControlsClosure(), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   operator = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 'op', roles: ['platform-operator', 'requester'], audience: AUDIENCE, grantId: 'g-op' });
   requester = mintCredential({ tenantId: TENANT, appId: APP_ID, subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
 });

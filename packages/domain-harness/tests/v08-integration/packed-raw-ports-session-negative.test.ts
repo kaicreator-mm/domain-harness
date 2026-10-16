@@ -193,8 +193,8 @@ assert.equal(sqliteHeader, 'SQLite format 3\\u0000', 'the victim store is a REAL
 console.log('REAL_SQLITE_CONFIRMED');
 
 const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-await gateway.registerApp({ appId: 'order-approval', packageRoot: approvalRoot, genesisRoles: ['platform-operator'] });
-await gateway.registerApp({ appId: 'model-quote', packageRoot: modelRoot, genesisRoles: ['platform-operator'] });
+await gateway.registerApp({ appId: 'order-approval', packageRoot: approvalRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+await gateway.registerApp({ appId: 'model-quote', packageRoot: modelRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 const credential = (appId, roles, subject, grantId) => mintPrincipalCredential({
   issuerId: ISSUER, grantId, tenantId: 't-real', appId, subject, audience: AUDIENCE, roles,
   issuedAt: '2026-10-12T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',

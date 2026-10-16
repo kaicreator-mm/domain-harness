@@ -97,7 +97,7 @@ test('F-01 R3: truthfully-descriptored nested Proxy ModelPort with drifting get 
   try {
     handle.host.resources.provision('ledger', () => ({ reserved: true }));
     const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-    await gateway.registerApp({ appId: 'model-quote', packageRoot: await sealRealApp('model'), genesisRoles: ['platform-operator'] });
+    await gateway.registerApp({ appId: 'model-quote', packageRoot: await sealRealApp('model'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const operatorC = mintCredential({ tenantId: 't1', appId: 'model-quote', subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
     const requesterC = mintCredential({ tenantId: 't1', appId: 'model-quote', subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });
     await gateway.activateGenesis(operatorC, { appId: 'model-quote', instanceKey: 'quote-proxy' });

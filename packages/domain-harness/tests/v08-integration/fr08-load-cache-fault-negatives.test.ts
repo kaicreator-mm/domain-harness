@@ -155,6 +155,9 @@ test('#1057-N a post-commit exact-cache re-read fault never rejects the admitted
     appId: APP_ID,
     packageRoot: await sealRealApp('decisionSource'),
     genesisRoles: ['platform-operator'],
+    // [#1006 HF21 R2 #1089] the admitted turn carries a production Effect, so
+    // the app declares its exact runtime authority class (fail-closed gate).
+    authorityClass: 'PRODUCTION',
   });
   const operator = mintCredential({ tenantId: 't1', appId: APP_ID, subject: 'op', roles: ['platform-operator'], audience: AUDIENCE, grantId: 'g-op' });
   const requester = mintCredential({ tenantId: 't1', appId: APP_ID, subject: 'req', roles: ['requester'], audience: AUDIENCE, grantId: 'g-req' });

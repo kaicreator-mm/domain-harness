@@ -490,7 +490,7 @@ const HOST_CONTEXT_PRINCIPAL = Object.freeze({
 });
 
 async function register(harness: Harness, root: SealedQualifiedPackageRoot): Promise<void> {
-  await harness.gateway.registerApp({ appId: harness.appId, packageRoot: root, genesisRoles: ['platform-operator'] });
+  await harness.gateway.registerApp({ appId: harness.appId, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 }
 
 async function refusalCode(run: () => Promise<unknown>): Promise<{ code: string; message: string }> {
@@ -527,14 +527,14 @@ test('RA-A: the durable-pin CAS race refuses the losing registration with zero r
     const gatewayWinner = makeHarness(appId, 'cap:register-atomic-race');
     const keyBaseline = shared.handle.host.resources.resourceKeys().length;
 
-    const pending = gatewayLoser.gateway.registerApp({ appId, packageRoot: gatedRoot, genesisRoles: ['platform-operator'] });
+    const pending = gatewayLoser.gateway.registerApp({ appId, packageRoot: gatedRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     const deadline = Date.now() + 30_000;
     while (raceProbe().initEntered === 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     assert.equal(raceProbe().initEntered, 1, 'the gated closure reached its lifecycle init');
 
-    await gatewayWinner.gateway.registerApp({ appId, packageRoot: fastRoot, genesisRoles: ['platform-operator'] });
+    await gatewayWinner.gateway.registerApp({ appId, packageRoot: fastRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(gatewayWinner.gateway.hasApp(appId), true);
     assert.equal(shared.handle.host.resources.resourceKeys().length, keyBaseline + 2, 'exactly the winner\'s two scoped adapters exist so far');
 
@@ -569,7 +569,7 @@ test('RA-A: the durable-pin CAS race refuses the losing registration with zero r
     // immediately, so its lifecycle completes normally this time) ----
     const dispatchBefore = shared.handle.host.resources.callCount();
     const retryHarness = makeHarness('order-approval-ra-a-retry', 'cap:register-atomic-race');
-    await retryHarness.gateway.registerApp({ appId: 'order-approval-ra-a-retry', packageRoot: gatedRoot, genesisRoles: ['platform-operator'] });
+    await retryHarness.gateway.registerApp({ appId: 'order-approval-ra-a-retry', packageRoot: gatedRoot, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
     assert.equal(retryHarness.gateway.hasApp('order-approval-ra-a-retry'), true);
     assert.ok(raceProbe().initEntered >= 2, 'the retry re-activated the gated package lifecycle');
     assert.equal(shared.handle.host.resources.callCount(), dispatchBefore, 'the clean retry dispatched nothing');

@@ -55,8 +55,8 @@ try {
   });
 
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: 'order-approval', packageRoot: roots.approval, genesisRoles: ['platform-operator'] });
-  await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: roots.engineering, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: 'order-approval', packageRoot: roots.approval, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
+  await gateway.registerApp({ appId: 'domainharness-engineering', packageRoot: roots.engineering, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 
   // #1013 R1 F-02 restart leg: `register-only` mode runs in a SECOND clean
   // process against the SAME physical SQLite file. The durable closure
@@ -71,13 +71,13 @@ try {
       // in-process map): only the DURABLE pin governs the decision.
       const restartGateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
       try {
-        await restartGateway.registerApp({ appId: 'order-approval', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'] });
+        await restartGateway.registerApp({ appId: 'order-approval', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
         restart.replacementRefusal = 'NOT_REFUSED';
       } catch (error) {
         restart.replacementRefusal = error.code ?? error.message;
       }
       try {
-        await restartGateway.registerApp({ appId: 'order-approval-r2', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'] });
+        await restartGateway.registerApp({ appId: 'order-approval-r2', packageRoot: roots.approvalVariant, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
         restart.variantUnderOwnAppId = true;
       } catch (error) {
         restart.variantUnderOwnAppId = `REFUSED: ${error.code ?? error.message}`;

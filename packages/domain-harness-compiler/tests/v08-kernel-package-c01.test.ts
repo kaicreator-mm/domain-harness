@@ -539,7 +539,7 @@ function createRuntime(options: {
 
 async function openedRuntime(options?: Parameters<typeof createRuntime>[0]): Promise<RuntimeHandle> {
   const ctx = createRuntime(options);
-  await ctx.runtime.openInstance({ target: TARGET, correlationId: 'corr:42' });
+  await ctx.runtime.openInstance({ target: TARGET, correlationId: 'corr:42', authorityClass: 'PRODUCTION' });
   return ctx;
 }
 
@@ -820,7 +820,7 @@ test('V08-ABI-C01-N9a: live post-wiring mutation of a WIRED dynamic declaration 
   const intent = (policy.intentBindings.submitQuoteDecisionDynamic.definition as any).states[0].transitions[0].effectIntents[0] as any;
   intent.inputFrom.amount = { source: 'event', path: ['payload', 'amount'] };
   intent.inputFrom.requestId = { source: 'event', path: ['payload', 'hijacked'] };
-  await runtime.openInstance({ target: TARGET, correlationId: 'corr:42' });
+  await runtime.openInstance({ target: TARGET, correlationId: 'corr:42', authorityClass: 'PRODUCTION' });
   const receipt = await runtime.submitOccurrence(quoteIntent({ amount: 30, messageId: 'msg:d1', intentType: 'submitQuoteDecisionDynamic', requestId: 'R1' }));
   assert.equal(receipt.status, 'admitted');
   const journal = await runtime.getJournalRecords();
@@ -835,7 +835,7 @@ test('V08-ABI-C01-N9b: post-wiring INJECTED dynamic binding syntax is refused ty
     effectType: 'effect:reserve',
     inputFrom: { amount: { source: 'event', path: ['payload', 'amount'] } },
   }];
-  await runtime.openInstance({ target: TARGET, correlationId: 'corr:42' });
+  await runtime.openInstance({ target: TARGET, correlationId: 'corr:42', authorityClass: 'PRODUCTION' });
   await assert.rejects(
     () => runtime.submitOccurrence(quoteIntent({ amount: 30, messageId: 'msg:inj', intentType: 'submitQuoteDecisionStrict' })),
     isTypedError('CentralAdmissionError', 'ADMISSION_EFFECT_BINDING_UNVALIDATED'),
@@ -869,7 +869,7 @@ test('V08-ABI-C01-N10: journal records pinned to another kernel module digest fa
 test('V08-ABI-C01-N10b: an active runtime is never hot-swapped — a second module identity over the same docs fails the pin typed', async () => {
   const host = fixtureHostPorts();
   const first = createRuntime({ host });
-  await first.runtime.openInstance({ target: TARGET, correlationId: 'corr:42' });
+  await first.runtime.openInstance({ target: TARGET, correlationId: 'corr:42', authorityClass: 'PRODUCTION' });
 
   const second = createRuntime({ host, moduleSha256: KERNEL_V2_SHA256, moduleNamespace: kernelV2 });
   await assert.rejects(
@@ -984,7 +984,7 @@ test('V08-ABI-C01-P3 (KPK07, bounded): durable restart recovers journal/pin/inst
   try {
     const host1 = { docs: fileDocStore(dir), resources: resourcePort(), sha256: { async digestUtf8(value: string) { return sha256Hex(value); } }, clock: () => NOW };
     const runtime1 = createRuntime({ host: host1 as unknown as ReturnType<typeof fixtureHostPorts> }).runtime;
-    await runtime1.openInstance({ target: TARGET, correlationId: 'corr:42' });
+    await runtime1.openInstance({ target: TARGET, correlationId: 'corr:42', authorityClass: 'PRODUCTION' });
     const receipt1 = await runtime1.submitOccurrence(quoteIntent({ amount: 42 }));
     assert.equal(receipt1.status, 'admitted');
     assert.equal(host1.resources.callCount(), 1);
@@ -1013,7 +1013,7 @@ test('V08-ABI-C01-P3 (KPK07, bounded): durable restart recovers journal/pin/inst
     const target2 = { workflowId: 'order-quote', instanceKey: 'instance:43' };
     const host3 = { docs: fileDocStore(dir), resources: resourcePort(), sha256: { async digestUtf8(value: string) { return sha256Hex(value); } }, clock: () => NOW };
     const runtime3 = createRuntime({ host: host3 as unknown as ReturnType<typeof fixtureHostPorts> }).runtime;
-    await runtime3.openInstance({ target: target2, correlationId: 'corr:43' });
+    await runtime3.openInstance({ target: target2, correlationId: 'corr:43', authorityClass: 'PRODUCTION' });
     host3.docs.failNextPutMatching('v08-kernel:wf-instance:order-quote:instance:43');
     await assert.rejects(
       () => runtime3.submitOccurrence(quoteIntent({ amount: 42, messageId: 'msg:43', target: target2 })),
@@ -1065,8 +1065,8 @@ test('V08-ABI-C01-P5 (KPK15a): two dynamic occurrences produce DISTINCT per-occu
   const { runtime, host } = await openedRuntime();
   const target1 = { workflowId: 'order-quote', instanceKey: 'instance:d1' };
   const target2 = { workflowId: 'order-quote', instanceKey: 'instance:d2' };
-  await runtime.openInstance({ target: target1, correlationId: 'corr:d1' });
-  await runtime.openInstance({ target: target2, correlationId: 'corr:d2' });
+  await runtime.openInstance({ target: target1, correlationId: 'corr:d1', authorityClass: 'PRODUCTION' });
+  await runtime.openInstance({ target: target2, correlationId: 'corr:d2', authorityClass: 'PRODUCTION' });
   const receipt1 = await runtime.submitOccurrence(quoteIntent({ amount: 30, messageId: 'msg:d1', intentType: 'submitQuoteDecisionDynamic', requestId: 'R1', target: target1 }));
   assert.equal(receipt1.status, 'admitted');
   const receipt2 = await runtime.submitOccurrence(quoteIntent({ amount: 40, messageId: 'msg:d2', intentType: 'submitQuoteDecisionDynamic', requestId: 'R2', target: target2 }));
@@ -1098,7 +1098,7 @@ test('V08-ABI-C01-P5b (KPK15l): a decision-source inputFrom field resolves from 
 
 test('V08-ABI-C01-P5c (KPK15f): an injected unsafe idempotency key fails typed BEFORE any journal write', async () => {
   const { runtime, host } = await openedRuntime();
-  await runtime.openInstance({ target: { workflowId: 'order-quote', instanceKey: 'instance:unsafe' }, correlationId: 'corr:unsafe' });
+  await runtime.openInstance({ target: { workflowId: 'order-quote', instanceKey: 'instance:unsafe' }, correlationId: 'corr:unsafe', authorityClass: 'PRODUCTION' });
   await assert.rejects(
     () => runtime.submitOccurrence({
       kind: 'v08/tc-intent',
@@ -1117,7 +1117,7 @@ test('V08-ABI-C01-P5c (KPK15f): an injected unsafe idempotency key fails typed B
 test('V08-ABI-C01-P5d (KPK15g): crash-before-commit re-drive — identical payload replays; MUTATED payload is a typed journal conflict', async () => {
   const targetB = { workflowId: 'order-quote', instanceKey: 'instance:div-a' };
   const { runtime, host } = createRuntime({});
-  await runtime.openInstance({ target: targetB, correlationId: 'corr:da' });
+  await runtime.openInstance({ target: targetB, correlationId: 'corr:da', authorityClass: 'PRODUCTION' });
   host.docs.failNextPutMatching('v08-kernel:wf-instance:order-quote:instance:div-a');
   await assert.rejects(
     () => runtime.submitOccurrence(quoteIntent({ amount: 30, messageId: 'msg:da1', intentType: 'submitQuoteDecisionDynamic', requestId: 'APX-G1', target: targetB })),
@@ -1134,7 +1134,7 @@ test('V08-ABI-C01-P5d (KPK15g): crash-before-commit re-drive — identical paylo
   // MUTATED re-drive (same messageId, different amount): the resolved input
   // is part of the durable effect identity — typed journal conflict.
   const targetC = { workflowId: 'order-quote', instanceKey: 'instance:div-b' };
-  await runtime.openInstance({ target: targetC, correlationId: 'corr:db' });
+  await runtime.openInstance({ target: targetC, correlationId: 'corr:db', authorityClass: 'PRODUCTION' });
   host.docs.failNextPutMatching('v08-kernel:wf-instance:order-quote:instance:div-b');
   await assert.rejects(
     () => runtime.submitOccurrence(quoteIntent({ amount: 30, messageId: 'msg:db1', intentType: 'submitQuoteDecisionDynamic', requestId: 'APX-G2', target: targetC })),

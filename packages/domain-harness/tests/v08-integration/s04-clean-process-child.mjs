@@ -43,7 +43,7 @@ try {
     storage: { path: sqlitePath },
   });
   const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
-  await gateway.registerApp({ appId: APP, packageRoot: root, genesisRoles: ['platform-operator'] });
+  await gateway.registerApp({ appId: APP, packageRoot: root, genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
   await gateway.activateGenesis(credential(['platform-operator'], 'op', 'g-op'), { appId: APP, instanceKey: 'q-clean' });
 
   const call = (roles, request) => gateway.invokeOperation(credential(roles, roles[0], `g-${roles[0]}`), {
