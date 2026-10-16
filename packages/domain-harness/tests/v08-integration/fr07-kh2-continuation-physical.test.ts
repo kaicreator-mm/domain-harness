@@ -290,7 +290,9 @@ test('FR07-P1: two physical turns around an allowlisted K read; measured(2); cal
   assert.deepEqual(second?.input.observations, [
     { step: 1, capabilityId: 'quote.readCustomer', ok: true, output: { creditLimit: 40, tier: 'gold' } },
   ], 'turn #2 sees exactly the K-built observation of the K-owned read');
-  assert.equal(store.readsOf(instanceDocKey(key)) - readsBefore, 4, 'lane-start read + ONE K query read + the two commit-CAS reads (current + committed verification)');
+  // [v0.8.1 R02] +1: the pre-effect admission-fence claim re-reads the
+  // instance to refuse a stale admission before any journal/effect activity.
+  assert.equal(store.readsOf(instanceDocKey(key)) - readsBefore, 5, 'lane-start read + ONE K query read + the admission-fence freshness read + the two commit-CAS reads (current + committed verification)');
 
   const resolver = receipt.admitted.resolver;
   assert.deepEqual(resolver.modelCallEvidence, MEASURED(2), 'K aggregate of trusted per-step evidence — never the caller numbers');

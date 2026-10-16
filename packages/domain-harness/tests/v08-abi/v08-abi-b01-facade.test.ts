@@ -58,6 +58,8 @@ import { installKernelHostPorts } from '../../src/public-v8/kernel-host.js';
 import { getFacadeKernelOps, installGatewaySessionCap, type V8FacadeKernelOps, type V8GatewayPrincipal } from '../../src/public-v8/microkernel.js';
 import {
   QualificationError,
+  buildQualifiedPackage,
+  issueApprovalProof,
   qualifyPackageClosure,
 } from '../../../domain-harness-compiler/src/qualified-package/index.js';
 import {
@@ -343,6 +345,57 @@ test('V08-ABI-B01-KPK08 identical kernel+SDK bytes serve two business domains; p
   await refuseFacade(kSend(facadeA, { intentType: 'demo.approval', target: TARGET, messageId: 'ma2', input: { amount: 1 } }), 'FACADE_STOPPED');
   const stillOpen = asReceipt(await kSend(facadeB, { intentType: 'demo.parts', target: TARGET, messageId: 'mb3', input: { amount: 1 } }));
   assert.equal(stillOpen.status, 'admitted');
+});
+
+test('V08-ABI-B01-N9 (#1102) a K/S/multiple-B closure is refused typed by the facade: no intent is ever governed by another Business package', async () => {
+  // The BUILD/T-A ABI accepts a multiple-B closure, but the facade wires one
+  // Business policy; serving it would admit the B2-bound intent under B1's
+  // policy (B1 cap 100 admitted amount 50 for the cap-10 B2 intent before
+  // the repair). It must fail closed before lifecycle/mechanism/facade.
+  const ids = b01PackageIds({ tag: 'n9multib' });
+  const secondBusinessId = 'biz:b01-n9multib-parts@1.0.0';
+  const base = b01Submission({
+    tag: 'n9multib',
+    kernelSource: kernelFixture({ packageId: ids.kernelId }),
+    sdkSource: sdkFixture(ids.sdkId),
+    businessSource: businessFixture({ packageId: ids.businessId, intentType: 'demo.n9approval', cap: 100 }),
+    businessIntentType: 'demo.n9approval',
+  });
+  const submission = {
+    ...base,
+    packages: [
+      ...base.packages,
+      {
+        packageId: secondBusinessId,
+        kind: 'business' as const,
+        abiVersion: 'v08-business-abi/1',
+        modulePath: 'modules/business-parts.mjs',
+        moduleSource: businessFixture({ packageId: secondBusinessId, intentType: 'demo.n9parts', cap: 10 }),
+        endpoints: [{ endpointId: 'business-policy', kind: 'business-policy' }],
+        intentTypes: ['demo.n9parts'],
+      },
+    ],
+    bindings: [
+      ...base.bindings,
+      { role: 'business' as const, packageId: secondBusinessId, endpointId: 'business-policy' },
+      { role: 'intent' as const, intentType: 'demo.n9parts', packageId: secondBusinessId, endpointId: 'business-policy' },
+    ],
+  };
+  const unsigned = qualifyPackageClosure(submission);
+  const approval = issueApprovalProof({ subjectDigest: unsigned.subjectDigest, issuerId: B01_ISSUER, issuerSecret: B01_ISSUER_SECRET });
+  const root = buildQualifiedPackage({
+    unsigned,
+    approval,
+    trustedIssuers: new Map([[B01_ISSUER, B01_ISSUER_SECRET]]),
+    moduleSources: new Map(submission.packages.map((pkg) => [pkg.modulePath, pkg.moduleSource])),
+  });
+  const putsBefore = host.puts.length;
+  await assert.rejects(DomainHarness.load(root), (error: unknown) => {
+    assert.ok(error instanceof QualifiedPackageError);
+    assert.equal(error.code, 'LOAD_MULTI_BUSINESS_UNSUPPORTED');
+    return true;
+  });
+  assert.equal(host.puts.length, putsBefore, 'no Kernel mechanism was constructed: zero Host document writes');
 });
 
 test('V08-ABI-B01-KPK12 no whole-package rehash: install performs zero Host digests, invoke/query perform none beyond the mechanism own pin', async () => {

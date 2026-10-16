@@ -1281,6 +1281,15 @@ export async function admitCentralDecision(request, ports) {
     await requireProductionEffectAuthority.call(ports.governance, request.workflowInstanceId);
   }
 
+  // [v0.8.1 R02] Pre-effect admission fence: the caller's durable claim on
+  // the exact snapshot this decision was evaluated against. A stale
+  // admission (another runtime over the same durable store claimed or
+  // committed after this snapshot) loses HERE, typed — before any journal
+  // begin or effect dispatch.
+  if (typeof ports.admissionFence === 'function') {
+    await ports.admissionFence(turnId);
+  }
+
   const effects = await executeEffectIntents(
     effectIntents,
     request,
@@ -2510,6 +2519,38 @@ function instanceDocKey(address) {
   return `v08-kernel:wf-instance:${address.workflowId}:${address.instanceKey}`;
 }
 
+// ===========================================================================
+// [v0.8.1 R02] Admission fence. The per-instance serialized lane is
+// in-process only: two runtimes over ONE durable store (two Host processes
+// over one SQLite file) each hold their own lane, so the v0.7
+// expectedTargetSequence discipline must be enforced by the durable store
+// itself. Every admission (a) claims this per-instance fence document by CAS
+// at the revision observed with its snapshot BEFORE any journal begin or
+// effect dispatch, and (b) commits the state CAS only at that exact
+// snapshot stateRevision while still holding the fence. The fence is a
+// SEPARATE document so the instance document revision stays equal to its
+// stateRevision (the continuation query read relies on that invariant).
+// The v0.8 Host true-CAS store has no cross-document atomic batch: an
+// admission whose snapshot predates another claim always loses before
+// effects; a claim taken over while its holder is still dispatching (the
+// holder's whole effect window overlapping another runtime's fresh
+// read→decide→claim) makes the holder lose at commit, journaled exactly
+// like the existing crash window — atomicity is never claimed.
+// ===========================================================================
+
+function admissionFenceDocKey(address) {
+  return `v08-kernel:admission-fence:${address.workflowId}:${address.instanceKey}`;
+}
+
+function admissionStateCasConflict(message) {
+  return new CentralAdmissionError('ADMISSION_STATE_CAS_CONFLICT', message);
+}
+
+function isHostWriteConflict(error) {
+  return typeof error === 'object' && error !== null
+    && (error.code === 'HOST_CAS_CONFLICT' || error.code === 'HOST_KEY_EXISTS');
+}
+
 export class WorkflowInstanceNotFoundError extends Error {
   constructor(address) {
     super(`Workflow instance not found: ${address.workflowId}/${address.instanceKey}`);
@@ -2610,6 +2651,65 @@ export class WorkflowInstanceEngine {
   }
 
   /**
+   * [v0.8.1 R02] The admission fence revision observed together with an
+   * admission snapshot (null: no admission was ever claimed). It is the CAS
+   * precondition of that admission's later pre-effect claim.
+   */
+  async readAdmissionFenceRevision(target) {
+    const doc = await this.#docs.get(admissionFenceDocKey(target));
+    return doc === null ? null : doc.revision;
+  }
+
+  /**
+   * [v0.8.1 R02] Pre-effect claim of the admission fence at the snapshot's
+   * fence revision, then a fresh check that the instance is still at the
+   * snapshot stateRevision. Either failing is a stale admission and refuses
+   * typed (ADMISSION_STATE_CAS_CONFLICT) before any journal/effect activity.
+   */
+  async claimAdmissionFence(request) {
+    const { target, turnId, expectedTargetSequence, snapshotFenceRevision } = request;
+    let written;
+    try {
+      written = await this.#docs.put(
+        admissionFenceDocKey(target),
+        { pinVersion: 1, stateRevision: expectedTargetSequence, turnId, claimedAt: this.#now() },
+        snapshotFenceRevision === null ? { mustBeAbsent: true } : { mustMatchRevision: snapshotFenceRevision },
+      );
+    } catch (error) {
+      if (isHostWriteConflict(error)) {
+        throw admissionStateCasConflict(
+          `another admission claimed instance ${target.workflowId}/${target.instanceKey} after this admission's snapshot at stateRevision ${expectedTargetSequence}; the stale admission is refused before any journal or effect activity`,
+        );
+      }
+      throw error;
+    }
+    const current = await this.#instances.require(target);
+    if (current.stateRevision !== expectedTargetSequence) {
+      throw admissionStateCasConflict(
+        `instance ${target.workflowId}/${target.instanceKey} is at stateRevision ${current.stateRevision}; the admission was evaluated against ${expectedTargetSequence} and is refused before any journal or effect activity`,
+      );
+    }
+    return {
+      turnId,
+      stateRevision: expectedTargetSequence,
+      ...(Number.isSafeInteger(written?.revision) ? { revision: written.revision } : {}),
+    };
+  }
+
+  async #requireHeldAdmissionFence(target, fence) {
+    const doc = await this.#docs.get(admissionFenceDocKey(target));
+    const held = doc !== null && isJsonRecord(doc.value)
+      && doc.value.turnId === fence.turnId
+      && doc.value.stateRevision === fence.stateRevision
+      && (fence.revision === undefined || doc.revision === fence.revision);
+    if (!held) {
+      throw admissionStateCasConflict(
+        `the admission fence of instance ${target.workflowId}/${target.instanceKey} at stateRevision ${fence.stateRevision} is no longer held by turn ${fence.turnId}`,
+      );
+    }
+  }
+
+  /**
    * [KPK-01 adaptation] Same v0.7 commit body, for a caller that ALREADY
    * holds this instance's serialized lane (the kernel occurrence runtime
    * serializes its whole admission+commit occurrence on the same lane, like
@@ -2625,6 +2725,19 @@ export class WorkflowInstanceEngine {
    */
   async commitAcceptedTransitionInLane(request) {
     const current = await this.#instances.require(request.target);
+    // [v0.8.1 R02] The v0.7 expectedTargetSequence fence: the commit lands
+    // ONLY on the exact revision the admission was evaluated against — never
+    // on a fresh re-read, which would let a stale admission from another
+    // runtime overwrite a committed (even FINAL) state.
+    const expectedTargetSequence = request.expectedTargetSequence ?? current.stateRevision;
+    if (current.stateRevision !== expectedTargetSequence) {
+      throw admissionStateCasConflict(
+        `instance ${request.target.workflowId}/${request.target.instanceKey} is at stateRevision ${current.stateRevision}; the admission was evaluated against ${expectedTargetSequence}`,
+      );
+    }
+    if (request.admissionFence !== undefined) {
+      await this.#requireHeldAdmissionFence(request.target, request.admissionFence);
+    }
     const transition = await request.transition(current);
     const updatedAt = this.#now();
     if (this.#counters !== undefined) this.#counters.engineCommits += 1;
@@ -2658,21 +2771,30 @@ export class WorkflowInstanceEngine {
       updatedAt,
     ).window;
 
-    await this.#docs.put(instanceDocKey(request.target), {
-      address: current.address,
-      correlationId: current.correlationId,
-      packageId: current.packageId,
-      lifecycle: transition.nextLifecycle ?? current.lifecycle,
-      stateRevision: current.stateRevision + 1,
-      state: transition.nextState,
-      ...(transition.output === undefined ? {} : { output: transition.output }),
-      ...(current.output === undefined || transition.output !== undefined ? {} : { output: current.output }),
-      lastMessageId: request.messageId,
-      createdAt: current.createdAt,
-      updatedAt,
-      mutationObservations,
-      ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
-    }, { mustMatchRevision: current.stateRevision });
+    try {
+      await this.#docs.put(instanceDocKey(request.target), {
+        address: current.address,
+        correlationId: current.correlationId,
+        packageId: current.packageId,
+        lifecycle: transition.nextLifecycle ?? current.lifecycle,
+        stateRevision: current.stateRevision + 1,
+        state: transition.nextState,
+        ...(transition.output === undefined ? {} : { output: transition.output }),
+        ...(current.output === undefined || transition.output !== undefined ? {} : { output: current.output }),
+        lastMessageId: request.messageId,
+        createdAt: current.createdAt,
+        updatedAt,
+        mutationObservations,
+        ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
+      }, { mustMatchRevision: expectedTargetSequence });
+    } catch (error) {
+      if (isHostWriteConflict(error)) {
+        throw admissionStateCasConflict(
+          `instance ${request.target.workflowId}/${request.target.instanceKey} moved past stateRevision ${expectedTargetSequence} before this commit`,
+        );
+      }
+      throw error;
+    }
 
     const committed = await this.#instances.require(request.target);
     if (!workflowAddressesEqual(committed.address, current.address)) {
@@ -4871,6 +4993,9 @@ export function createOccurrenceRuntime(options) {
       if (snapshot === null) {
         throw new WorkflowInstanceNotFoundError(target);
       }
+      // [v0.8.1 R02] The admission fence revision observed WITH this
+      // snapshot: the CAS precondition of the pre-effect claim below.
+      const snapshotFenceRevision = await engine.readAdmissionFenceRevision(target);
       // Cancelled during the lane-start read: no model turn may start.
       if (latch.cancelled) {
         return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 0 });
@@ -5069,6 +5194,7 @@ export function createOccurrenceRuntime(options) {
         now: clock(),
       };
 
+      let admissionFence;
       const outcome = await admitCentralDecision(request_shape, {
         governance: pinStore,
         baselines,
@@ -5078,6 +5204,16 @@ export function createOccurrenceRuntime(options) {
         effectBindings,
         contextProjections,
         trace: counters,
+        // [v0.8.1 R02] Claimed after every denial gate, before any journal
+        // begin/effect dispatch; the commit below requires it still held.
+        admissionFence: async (turnId) => {
+          admissionFence = await engine.claimAdmissionFence({
+            target,
+            turnId,
+            expectedTargetSequence: snapshot.stateRevision,
+            snapshotFenceRevision,
+          });
+        },
       });
 
       if (outcome.status === 'denied') {
@@ -5098,6 +5234,7 @@ export function createOccurrenceRuntime(options) {
         target,
         messageId: request.messageId,
         expectedTargetSequence: snapshot.stateRevision,
+        ...(admissionFence === undefined ? {} : { admissionFence }),
         // [#1066 R1 P1-B] The non-message turn's admission identity rides
         // INSIDE the authoritative state CAS (bounded same-CAS history), so
         // a lost disposition record can never turn a crash-recovery
