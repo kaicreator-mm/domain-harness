@@ -4,7 +4,7 @@
   "mutation_class": "SPLIT",
   "requested_by": "User explicit instruction in 2026-10-17 ChatGPT conversation: apply ADS v4.12 targeted task decomposition, preserve completed work",
   "approved_by": "User authorized targeted SPLIT direction; exact new topology pending independent Controller acceptance (not yet mutation-ready)",
-  "reason": "Frozen six-Issue version-level concerns include separately reviewable package distribution, external consumer proof and runtime lifecycle, while N06/N02 accepted active Claims cannot be rehomed or invalidated in-flight. Keep completed N01 historical and terminal. Materialize only three genuinely independent remaining concerns; retain scope/assurance floors and one-writer discipline.",
+  "reason": "Frozen six-Issue version-level concerns include separately reviewable package distribution, external consumer proof and runtime lifecycle, while N06/N02 accepted active Claims cannot be rehomed or invalidated in-flight. Keep completed N01 historical and terminal. Materialize only three genuinely independent remaining concerns; retain scope/assurance floors and one-writer discipline. Packaged v9 exports require both Host/BUILD and the accepted v9 public API, so N06-PKG also has a real #1035 predecessor.",
   "affected_task_refs": [
     "#1027 CLOSED historical no new Task",
     "#1032 N06 active BUILD/Host core",
@@ -44,6 +44,7 @@
     "#1037 blocked_by #1028",
     "#1037 blocked_by #1036",
     "#1118 blocked_by #1032",
+    "#1118 blocked_by #1035",
     "#1119 blocked_by #1035",
     "#1119 blocked_by #1118",
     "#1120 blocked_by #1036",
@@ -64,7 +65,7 @@
     "#1037 current Release issue plus exact new native blockers"
   ],
   "review_impact": "Required independent exact-SHA review of scope/owner/edge change before DAG mutation; in-flight code Reviews remain pinned. Leaf implementation reviews risk-based per applicable frozen owner; no duplicate full-suite or reviewer cycle. Existing qualified #1027 outcome reused.",
-  "validation_impact_ref": "GitHub native blocked_by 11 existing + 7 proposed (18 total), plus readback of all targets; current new Issue blockers 0/7, NOT_MATERIALIZED. Check no cycles/duplicate writer, accepted active Claims unchanged, no source changes. Real runtime validation remains on each future accepted source PR and final #1037.",
+  "validation_impact_ref": "GitHub native blocked_by 11 existing + 8 proposed (19 total), plus readback of all targets; current new Issue blockers 0/8, NOT_MATERIALIZED. Check no cycles/duplicate writer, accepted active Claims unchanged, no source changes. Real runtime validation remains on each future accepted source PR and final #1037.",
   "created_at": "2026-10-17T02:24:00+08:00",
   "notes_ref": "docs/implementation/v0.9/DH09_TASK_DAG_SPLIT_SUCCESSOR_R0.md"
 }
