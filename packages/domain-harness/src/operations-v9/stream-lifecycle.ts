@@ -108,7 +108,7 @@ export function createV09ScopedLifecycle(ports: V09ScopedLifecyclePorts) {
     }
     if (stopped) throw lifecycleError();
 
-    const state: SubscriptionState = { active: true, detach: () => {}, tail: Promise.resolve() };
+    const state: SubscriptionState = { active: true, detach: () => undefined, tail: Promise.resolve() };
     const onReceipt = (event: V09SelectedReceipt): void => {
       if (!state.active || stopped) return;
       // Deliver in selected-K emission order. Never allow an out-of-order
