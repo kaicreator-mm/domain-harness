@@ -17,6 +17,7 @@
  * physical effect (which remains Kernel/Journal authority).
  */
 import { DomainHarnessV9Error, V9_PUBLIC_ERROR_CODES } from './errors.js';
+import { isV09AuthenticatedBridgeHarness } from './operation-bridge.js';
 import type { V9DomainFacade, V9DomainHarness } from './contracts.js';
 
 const trustedBridges = new Set<V9DomainHarness>();
@@ -26,8 +27,9 @@ const trustedBridges = new Set<V9DomainHarness>();
  * Called only by createV09DomainHarnessBridge after its bootstrap checks.
  */
 export function attachV09TrustedBridge(harness: V9DomainHarness): () => void {
-  if (harness === null || typeof harness !== 'object'
-    || typeof harness.load !== 'function') {
+  // Reject a same-shape object or arbitrary deep-import attempt: the brand
+  // is minted only by the real protected H→K bridge composer.
+  if (!isV09AuthenticatedBridgeHarness(harness)) {
     throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
   }
   trustedBridges.add(harness);
