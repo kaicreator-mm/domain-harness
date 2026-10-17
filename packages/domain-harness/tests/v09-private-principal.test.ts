@@ -22,6 +22,7 @@ function fixture() {
     hostAudience: 'host.prod',
     tenantId: 'tenant.alpha',
     appId: 'app.alpha',
+    selectedClosureDigest: SHA,
     issuerAuthEpoch: 7,
     expiresAtMs: 4000,
     grants: ['send:demo.create', 'query:demo.read', 'delivery:demo.events'],
@@ -75,6 +76,8 @@ test('V09-N08-SCOPE02: scope, audience, tenant and app mismatches fail closed', 
   await assert.rejects(() => f.auth.issue(P, 'demo.create', 'send'), { code: 'V09_PRIVATE_SCOPE_DENIED' });
   f.current = { ...f.current, appId: 'app.alpha', hostAudience: 'host.other' };
   await assert.rejects(() => f.auth.issue(P, 'demo.create', 'send'), { code: 'V09_PRIVATE_SCOPE_DENIED' });
+  f.current = { ...f.current, hostAudience: 'host.prod', selectedClosureDigest: '0'.repeat(64) };
+  await assert.rejects(() => f.auth.issue(P, 'demo.create', 'send'), { code: 'V09_PRIVATE_SCOPE_DENIED' });
 });
 
 test('V09-N08-SCOPE03: epoch change, issuer withdrawal and expiry refuse before sensitive use', async () => {
@@ -87,6 +90,7 @@ test('V09-N08-SCOPE03: epoch change, issuer withdrawal and expiry refuse before 
   await assert.rejects(() => f.auth.recheck(token, 'demo.create', 'send'), { code: 'V09_PRIVATE_SCOPE_DENIED' });
   f.accepted = true;
   f.now = 4000;
+  f.current = { ...f.current, expiresAtMs: 6000 }; // fresh H auth cannot extend an already expired issued ticket
   await assert.rejects(() => f.auth.recheck(token, 'demo.create', 'send'), { code: 'V09_PRIVATE_SCOPE_DENIED' });
 });
 
@@ -112,7 +116,7 @@ test('V09-N08-SCOPE05: forged caller cannot bypass actual Host-authenticator ref
 test('V09-N08-SCOPE06: stop during pending trusted auth denies late ticket and delivery', async () => {
   const caller: V09HostVerifiedIdentity = {
     principalId: 'principal.alpha', hostAudience: 'host.prod',
-    tenantId: 'tenant.alpha', appId: 'app.alpha',
+    tenantId: 'tenant.alpha', appId: 'app.alpha', selectedClosureDigest: SHA,
     issuerAuthEpoch: 7, expiresAtMs: 4000,
     grants: ['send:demo.create'],
   };
