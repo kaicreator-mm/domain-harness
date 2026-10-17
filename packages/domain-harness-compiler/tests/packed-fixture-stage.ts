@@ -346,6 +346,15 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
 
     stagePackageSkeleton(CORE_PACKAGE_ROOT, join(root, 'core'), true);
     tscBuildToStage(join(CORE_PACKAGE_ROOT, 'tsconfig.build.json'), join(root, 'core', 'dist'));
+    // Byte-parity with the package's real build script: tsc never emits the
+    // vendored non-TS assets that scripts/copy-vendored-dist-assets.mjs
+    // copies into the live dist (#1132) — without this copy the fresh-source
+    // stage would silently lack the pinned host-v9 parser modules.
+    for (const asset of ['host-v9/generated/acorn.mjs', 'host-v9/generated/acorn.d.mts']) {
+      const destination = join(root, 'core', 'dist', asset);
+      mkdirSync(dirname(destination), { recursive: true });
+      cpSync(join(CORE_PACKAGE_ROOT, 'src', asset), destination);
+    }
 
     // P2-01 fail-closed staleness guard: the staged node build type-resolves
     // core declarations from the LIVE workspace dist, so a live dist that is

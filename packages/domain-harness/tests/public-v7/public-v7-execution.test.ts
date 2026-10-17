@@ -160,7 +160,9 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
   // design — no require variant).
   // N06-PKG (#1123) added exactly one further additive key './v9' (public
   // versioned v0.9 ESM/types anchor subpath; types/import only, ESM-only by
-  // design — no require variant).
+  // design — no require variant). #1118 P1-01 added exactly one further
+  // additive key './v9/deployment' (the ONE deployment-owned trusted
+  // bootstrap entry, isolated from the ordinary ./v9 consumer app API).
   assert.deepEqual(
     subpaths,
     [
@@ -174,6 +176,7 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
       './v8/dac',
       './v8/host',
       './v9',
+      './v9/deployment',
       './workflow',
     ],
   );

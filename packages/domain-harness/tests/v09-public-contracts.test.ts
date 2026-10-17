@@ -42,15 +42,19 @@ const ambiguous = {
 const denied = { kind: 'denied', reasonCode: 'SCOPE' } as const satisfies V9WorkflowRouterResult;
 const missing = { kind: 'missing', intentId: 'demo.request' } as const satisfies V9WorkflowRouterResult;
 
-test('V09-N07-API01: public runtime exports are error-only until protected facade wiring', () => {
+test('V09-N07-API01: public runtime exports are the wired one-verb value plus the frozen error surface', () => {
+  // #1132/#1118 wired the real protected facade: DomainHarness exposes
+  // exactly load(installedRef) under the trusted Host request scope. The
+  // namespace still carries no privileged name.
   assert.deepEqual(Object.keys(publicV9).sort(), [
-    'DomainHarnessV9Error', 'V9_PUBLIC_ERROR_CODES', 'publicInstalledReferenceFailure',
+    'DomainHarness', 'DomainHarnessV9Error', 'V9_PUBLIC_ERROR_CODES', 'publicInstalledReferenceFailure',
   ]);
+  assert.deepEqual(Object.keys(publicV9.DomainHarness), ['load']);
+  assert.equal(publicV9.DomainHarness.load.length, 1);
   assert.equal('createProtectedHostV09' in publicV9, false);
   assert.equal('issueV09ApprovalProof' in publicV9, false);
   assert.equal('getModuleNamespace' in publicV9, false);
   assert.equal('install' in publicV9, false);
-  assert.equal('DomainHarness' in publicV9, false);
 });
 
 test('V09-N07-API02: Standard selection discriminants preserve D05 pure outcomes', () => {
