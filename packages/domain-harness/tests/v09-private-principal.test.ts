@@ -108,3 +108,27 @@ test('V09-N08-SCOPE05: forged caller cannot bypass actual Host-authenticator ref
   );
   assert.equal(f.calls, 1);
 });
+
+test('V09-N08-SCOPE06: stop during pending trusted auth denies late ticket and delivery', async () => {
+  const caller: V09HostVerifiedIdentity = {
+    principalId: 'principal.alpha', hostAudience: 'host.prod',
+    tenantId: 'tenant.alpha', appId: 'app.alpha',
+    issuerAuthEpoch: 7, expiresAtMs: 4000,
+    grants: ['send:demo.create'],
+  };
+  let held: Promise<V09HostVerifiedIdentity> | undefined;
+  let release = (_identity: V09HostVerifiedIdentity): void => {};
+  const gate = createV09PrivatePrincipalAuthority({
+    hostAudience: 'host.prod', tenantId: 'tenant.alpha', appId: 'app.alpha',
+    subjectDigest: SHA, nowMs: () => 1000,
+    authenticator: { authenticate: async () => held ?? caller },
+  });
+  const validToken = await gate.issue(P, 'demo.create', 'send');
+  held = new Promise<V09HostVerifiedIdentity>(resolve => { release = resolve; });
+  const lateCheck = gate.recheck(validToken, 'demo.create', 'send');
+  const lateTicket = gate.issue(P, 'demo.create', 'send');
+  gate.close();
+  release(caller);
+  await assert.rejects(() => lateCheck, { code: 'V09_PRIVATE_SCOPE_DENIED' });
+  await assert.rejects(() => lateTicket, { code: 'V09_PRIVATE_SCOPE_DENIED' });
+});
