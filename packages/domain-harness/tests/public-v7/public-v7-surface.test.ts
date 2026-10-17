@@ -317,6 +317,9 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
   // T-G (#1006 B2) added exactly one further additive key './v8/dac' (optional
   // pure external-DAC fact-verifier subpath; types/import only, ESM-only by
   // design — no require variant) under the same additive-only rule.
+  // N06-PKG (#1123) added exactly one further additive key './v9' (public
+  // versioned v0.9 ESM/types anchor subpath; types/import only, ESM-only by
+  // design — no require variant) under the same additive-only rule.
   assert.deepEqual(Object.keys(parsed.exports), [
     '.',
     './v2',
@@ -325,6 +328,7 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
     './v4',
     './v7',
     './v7/execution',
+    './v9',
     './v8',
     './v8/host',
     './v8/dac',
@@ -342,6 +346,10 @@ test('T001E: package.json exports diff is exactly the additive ./v7 keys; versio
   assert.deepEqual(parsed.exports['./v8/dac'], {
     types: './dist/public-v8/dac.d.ts',
     import: './dist/public-v8/dac.js',
+  });
+  assert.deepEqual(parsed.exports['./v9'], {
+    types: './dist/public-v9/index.d.ts',
+    import: './dist/public-v9/index.js',
   });
   // Pinned pre-change legacy targets (byte-identical, unmodified, unreordered).
   assert.deepEqual(parsed.exports['.'], {

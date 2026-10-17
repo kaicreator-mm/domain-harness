@@ -41,6 +41,10 @@
       "import": "./dist/public-v7/execution.js",
       "require": "./dist/public-v7/execution.js"
     },
+    "./v9": {
+      "types": "./dist/public-v9/index.d.ts",
+      "import": "./dist/public-v9/index.js"
+    },
     "./v8": {
       "types": "./dist/public-v8/index.d.ts",
       "import": "./dist/public-v8/index.js",
