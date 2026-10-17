@@ -86,7 +86,7 @@ function identityShape(value: unknown): value is V09HostVerifiedIdentity {
   try {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
     // Only inert own-data, no accessors, extra properties or Proxy traps.
-    const proto = Object.getPrototypeOf(value);
+    const proto = Object.getPrototypeOf(value) as object | null;
     if (proto !== Object.prototype && proto !== null) return false;
     const fields = ['principalId', 'hostAudience', 'appId', 'tenantId', 'selectedClosureDigest', 'issuerAuthEpoch', 'expiresAtMs', 'grants'];
     const descriptors = Object.getOwnPropertyDescriptors(value);
