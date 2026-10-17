@@ -120,7 +120,7 @@ test('V09-N08-SCOPE06: stop during pending trusted auth denies late ticket and d
     issuerAuthEpoch: 7, expiresAtMs: 4000,
     grants: ['send:demo.create'],
   };
-  let held: Promise<V09HostVerifiedIdentity> | undefined;
+  let held: Promise<V09HostVerifiedIdentity> | null = null;
   let release = (_identity: V09HostVerifiedIdentity): void => {};
   const gate = createV09PrivatePrincipalAuthority({
     hostAudience: 'host.prod', tenantId: 'tenant.alpha', appId: 'app.alpha',
