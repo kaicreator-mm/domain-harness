@@ -158,6 +158,9 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
   // T-G (#1006 B2) added exactly one further additive key './v8/dac' (optional
   // pure external-DAC fact-verifier subpath; types/import only, ESM-only by
   // design — no require variant).
+  // N06-PKG (#1123) added exactly one further additive key './v9' (public
+  // versioned v0.9 ESM/types anchor subpath; types/import only, ESM-only by
+  // design — no require variant).
   assert.deepEqual(
     subpaths,
     [
@@ -170,6 +173,7 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
       './v8',
       './v8/dac',
       './v8/host',
+      './v9',
       './workflow',
     ],
   );
@@ -186,6 +190,10 @@ test('T012-D1: package exports map gains exactly ./v7/execution with types/impor
   assert.deepEqual(packageJson.exports['./v8/dac'], {
     types: './dist/public-v8/dac.d.ts',
     import: './dist/public-v8/dac.js',
+  });
+  assert.deepEqual(packageJson.exports['./v9'], {
+    types: './dist/public-v9/index.d.ts',
+    import: './dist/public-v9/index.js',
   });
   assert.deepEqual(packageJson.exports['./v7/execution'], {
     types: './dist/public-v7/execution.d.ts',

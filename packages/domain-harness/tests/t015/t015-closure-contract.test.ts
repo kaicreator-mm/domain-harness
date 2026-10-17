@@ -79,16 +79,19 @@ void test('t015: closure doc NORMATIVE_EXPORT_MAP_KEYS == live package.json expo
   // (trusted Node Host bootstrap/physical CAS/scoped UX boundary), and T-G
   // (#1006 B2) added exactly one additive v0.8 key './v8/dac' (optional pure
   // external-DAC fact-verifier subpath; types/import only, ESM-only by
-  // design — no require variant). The frozen doc itself stays byte-untouched;
+  // design — no require variant). N06-PKG (#1123) added exactly one additive
+  // v0.9 key './v9' (public versioned v0.9 ESM/types anchor subpath;
+  // types/import only, ESM-only by design — no require variant). The frozen
+  // doc itself stays byte-untouched;
   // the guard admits the doc keys plus exactly those documented additive keys.
   const docKeys = [...EXPORT_MAP_KEYS_DOC].sort();
-  const esmOnlySubpaths = new Set(['./v8/dac']);
+  const esmOnlySubpaths = new Set(['./v8/dac', './v9']);
   assert.deepEqual(
     liveKeys,
-    [...docKeys, './v8', './v8/host', './v8/dac'].sort(),
-    'export map keys drifted from the frozen closure doc plus the documented additive v0.8 keys',
+    [...docKeys, './v8', './v8/host', './v8/dac', './v9'].sort(),
+    'export map keys drifted from the frozen closure doc plus the documented additive v0.8 and v0.9 keys',
   );
-  assert.equal(liveKeys.length, 10, 'the public SDK surface is the frozen 7-key v0.7 map plus the additive v0.8, v0.8/host and v0.8/dac keys');
+  assert.equal(liveKeys.length, 11, 'the public SDK surface is the frozen 7-key v0.7 map plus the additive v0.8, v0.8/host, v0.8/dac and v0.9 keys');
   for (const key of liveKeys) {
     assert.ok(!key.includes('*'), `wildcard export key is forbidden: ${key}`);
     const conditions = pkg.exports[key];
