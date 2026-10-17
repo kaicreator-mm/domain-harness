@@ -72,6 +72,39 @@ export const DomainHarness: V9DomainHarness = Object.freeze({
     if (current === undefined || !activeHosts.has(current)) {
       throw refused(); // no ambient privileged Host => no executable runtime
     }
-    return current.load(installedRef);
+    const loaded = await current.load(installedRef);
+    // The Host-bound facade itself must remain request-scoped. Otherwise
+    // a caller could capture another tenant's facade in one request and
+    // later invoke send/query/stop under a different Host's authority.
+    const requireCurrentHost = (): void => {
+      if (callerHost.getStore() !== current || !activeHosts.has(current)) {
+        throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.CALLER_SCOPE_DENIED);
+      }
+    };
+    return Object.freeze({
+      package: loaded.package,
+      send(intent) {
+        requireCurrentHost();
+        return loaded.send(intent);
+      },
+      query(query) {
+        requireCurrentHost();
+        return loaded.query(query);
+      },
+      async subscribe(observer) {
+        requireCurrentHost();
+        const subscription = await loaded.subscribe(observer);
+        return Object.freeze({
+          async unsubscribe(): Promise<void> {
+            requireCurrentHost();
+            await subscription.unsubscribe();
+          },
+        });
+      },
+      stop() {
+        requireCurrentHost();
+        return loaded.stop();
+      },
+    }) satisfies V9DomainFacade;
   },
 });
