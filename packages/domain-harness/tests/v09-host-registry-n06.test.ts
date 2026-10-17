@@ -4,9 +4,19 @@
  * Covers the D02 governance-install vs installedRef-only-load boundary over
  * the injected in-memory CAS port, the D04 canonical vectors, the pinned
  * vendored parser assertion, inert installation (no package source
- * executes), post-install byte mutation, CAS-ordered revocation, audience
- * mismatch, ABI mismatch, forged installedRef and the real Node24 `data:`
- * activation cache identity.
+ * executes), post-install byte mutation, shared-authority CAS-ordered
+ * revocation, audience mismatch, ABI mismatch, forged installedRef and the
+ * real Node24 `data:` activation cache identity.
+ *
+ * R1 (review delta on #1117) adds two deterministic Node24 negatives:
+ *  - a revoke-committed-inside-the-activation-window TOCTOU negative over a
+ *    promise-gated store seam (no sleeps/timing) at the shared per-subject
+ *    CAS authority commit, with the preserved in-flight-before-revoke
+ *    positive; and
+ *  - a byte-identical public refusal shape across protected causes
+ *    (forged/revoked/foreign/tampered/non-string): no diagnosticCode own
+ *    field, no cause, identical JSON — protected subcodes stay on the
+ *    H-private trusted diagnostics channel.
  *
  * NOT claimed here: physical SQLite durability (#1028), the public ./v9
  * facade (#1035), per-op H→K principals/effect permits (#1036) and final
@@ -35,6 +45,7 @@ import {
   type V09HostDocumentStore,
   type V09StorePutCondition,
 } from '../src/host-v9/index.js';
+import { V09PublicRefusalError } from '../src/host-v9/errors.js';
 
 const ISSUER = 'issuer:n06-host-test';
 const SECRET = 'n06-local-external-issuer-proof-only-not-a-deployment-secret';
@@ -89,6 +100,67 @@ class MemoryV09Store implements V09HostDocumentStore {
 
   async rawCasPut(key: string, value: unknown, revision: number): Promise<void> {
     await this.put(key, value, { kind: 'cas', revision });
+  }
+}
+
+/**
+ * Deterministic store seam (R1): gates the FIRST put whose key carries the
+ * armed prefix — the activation commit write — so an interleaved revocation
+ * can be committed inside the observation→commit window with promise
+ * handoff only (no sleeps, no wall-clock timing).
+ */
+class GatedStore implements V09HostDocumentStore {
+  readonly #inner: MemoryV09Store;
+  #gatePrefix: string | null = null;
+  #gated = false;
+  #signalReached: (() => void) | undefined;
+  #gatePromise: Promise<void> | undefined;
+
+  constructor(inner: MemoryV09Store) {
+    this.#inner = inner;
+  }
+
+  /** Arm the seam: the first matching put signals `reached`, then blocks until `release()`. */
+  arm(prefix: string): { reached: Promise<void>; release: () => void } {
+    this.#gatePrefix = prefix;
+    let releaseResolve!: () => void;
+    const gatePromise = new Promise<void>((resolve) => {
+      releaseResolve = resolve;
+    });
+    this.#gatePromise = gatePromise;
+    const reached = new Promise<void>((resolve) => {
+      this.#signalReached = resolve;
+    });
+    return { reached, release: (): void => releaseResolve() };
+  }
+
+  async get(key: string): Promise<{ value: unknown; revision: number } | null> {
+    return this.#inner.get(key);
+  }
+
+  async put(key: string, value: unknown, condition: V09StorePutCondition): Promise<{ revision: number }> {
+    if (this.#gatePrefix !== null && !this.#gated && key.startsWith(this.#gatePrefix)) {
+      this.#gated = true;
+      this.#signalReached?.();
+      await this.#gatePromise;
+    }
+    return this.#inner.put(key, value, condition);
+  }
+
+  async close(): Promise<void> {
+    return this.#inner.close();
+  }
+
+  keys(): string[] {
+    return this.#inner.keys();
+  }
+
+  async rawGet(key: string): Promise<{ value: any; revision: number }> {
+    return this.#inner.rawGet(key);
+  }
+
+  async rawCasPut(key: string, value: unknown, revision: number): Promise<void> {
+    await this.#inner.rawCasPut(key, value, revision);
   }
 }
 
@@ -219,6 +291,42 @@ const diagnosticOf = async (run: () => Promise<unknown>): Promise<{ code: string
   throw new Error('expected a typed refusal but the call passed');
 };
 
+/** Every caller-visible observable of a PUBLIC load refusal (D04 oracle negative). */
+interface PublicRefusalObservation {
+  readonly code: string;
+  readonly name: string;
+  readonly keys: readonly string[];
+  readonly values: readonly string[];
+  readonly json: string;
+  readonly hasDiagnosticCode: boolean;
+  readonly cause: unknown;
+  readonly isPublicRefusalError: boolean;
+  readonly isHostError: boolean;
+}
+
+/** Catch a PUBLIC load refusal and observe every caller-visible field of it. */
+const observePublicRefusal = async (run: () => Promise<unknown>): Promise<PublicRefusalObservation> => {
+  try {
+    await run();
+  } catch (error) {
+    assert.ok(error instanceof V09PublicRefusalError, `expected V09PublicRefusalError, got ${String(error)}`);
+    assert.ok(!(error instanceof V09HostError), 'the public refusal must not be a protected V09HostError');
+    const keys = Object.keys(error);
+    return {
+      code: error.code,
+      name: error.name,
+      keys: [...keys].sort(),
+      values: keys.map((key) => String((error as unknown as Record<string, unknown>)[key])),
+      json: JSON.stringify(error),
+      hasDiagnosticCode: Object.hasOwn(error, 'diagnosticCode'),
+      cause: (error as unknown as { cause?: unknown }).cause,
+      isPublicRefusalError: true,
+      isHostError: false,
+    };
+  }
+  throw new Error('expected a public refusal but the call passed');
+};
+
 test('D04 canonical byte-test vector V1 (encoding only) is reproduced verbatim', () => {
   const digest = computeV9QualifiedRootSubjectDigest({
     bindings: [{ packageId: 'K', role: 'kernel' }],
@@ -300,15 +408,19 @@ test('activate evaluates the verified bytes through a private data: URL; load is
 
   // Exactly one string: objects/numbers/raw roots are refused, not falling back.
   for (const bogus of [123, null, root, { installedRef }, { formatVersion: V09_SEALED_ROOT_FORMAT }]) {
-    const diag = await diagnosticOf(() => host.load(bogus as unknown as string));
-    assert.equal(diag.code, 'PACKAGE_NOT_AUTHORIZED', `non-string input ${String(typeof bogus)} collapses into the public family`);
-    assert.equal(diag.diagnosticCode, 'INSTALL_HANDLE_UNKNOWN');
+    const diag = await diagnosticOf(() => host.activate(bogus as unknown as string));
+    assert.equal(diag.code, 'INSTALL_HANDLE_UNKNOWN', `non-string input ${String(typeof bogus)} refuses typed on the protected path`);
   }
+  const publicBogus = await observePublicRefusal(() => host.load(123 as unknown as string));
+  assert.equal(publicBogus.code, 'PACKAGE_NOT_AUTHORIZED', 'non-string input collapses into the public family');
+  assert.equal(publicBogus.hasDiagnosticCode, false, 'the public refusal carries no diagnostic own field');
 
   // A well-formed but never-issued reference has no installed record.
-  const forged = await diagnosticOf(() => host.load('dhv9inst-forged-not-a-real-reference-0000000000000'));
-  assert.equal(forged.code, 'PACKAGE_NOT_AUTHORIZED');
-  assert.equal(forged.diagnosticCode, 'INSTALL_HANDLE_UNKNOWN');
+  const forged = await diagnosticOf(() => host.activate('dhv9inst-forged-not-a-real-reference-0000000000000'));
+  assert.equal(forged.code, 'INSTALL_HANDLE_UNKNOWN');
+  const forgedPublic = await observePublicRefusal(() => host.load('dhv9inst-forged-not-a-real-reference-0000000000000'));
+  assert.equal(forgedPublic.code, 'PACKAGE_NOT_AUTHORIZED');
+  assert.equal(forgedPublic.hasDiagnosticCode, false);
   await host.close();
 });
 
@@ -370,9 +482,11 @@ test('revocation is CAS-ordered: the first revoke wins and later activations ref
   const diag = await diagnosticOf(() => host.activate(installedRef));
   assert.equal(diag.diagnosticCode, 'APPROVAL_REVOKED', 'protected path keeps the typed subcode');
 
-  const publicDiag = await diagnosticOf(() => host.load(installedRef));
+  const publicDiag = await observePublicRefusal(() => host.load(installedRef));
   assert.equal(publicDiag.code, 'PACKAGE_NOT_AUTHORIZED', 'public path collapses into the one family');
-  assert.equal(publicDiag.diagnosticCode, 'APPROVAL_REVOKED', 'protected diagnostics preserve the typed subcode');
+  assert.equal(publicDiag.hasDiagnosticCode, false, 'the protected subcode never appears as a public own field');
+  const drainedSubcodes = host.drainProtectedDiagnostics().map((entry) => entry.diagnosticCode);
+  assert.ok(drainedSubcodes.includes('APPROVAL_REVOKED'), 'the typed subcode is preserved on the H-private trusted diagnostics channel');
   await host.close();
 });
 
@@ -385,8 +499,9 @@ test('an installed reference cannot be replayed into another audience', async ()
   const { installedRef } = await hostA.install(root, approval, 'aud:A');
   const diag = await diagnosticOf(() => hostB.activate(installedRef));
   assert.equal(diag.diagnosticCode, 'INSTALL_AUDIENCE_MISMATCH');
-  const publicDiag = await diagnosticOf(() => hostB.load(installedRef));
+  const publicDiag = await observePublicRefusal(() => hostB.load(installedRef));
   assert.equal(publicDiag.code, 'PACKAGE_NOT_AUTHORIZED');
+  assert.equal(publicDiag.hasDiagnosticCode, false);
   await hostA.close();
   await hostB.close();
 });
@@ -468,5 +583,122 @@ test('every activation gets a fresh cache identity: module state never leaks acr
 
   const activationRecords = store.keys().filter((key) => key.startsWith('v9/activation/'));
   assert.equal(activationRecords.length, 2, 'one CAS decision record per activation');
+  await host.close();
+});
+
+test('a revocation committing inside the activation window refuses the activation before any import (deterministic TOCTOU)', async () => {
+  resetCanary();
+  const gated = new GatedStore(new MemoryV09Store());
+  const host = await createProtectedHostV09({ store: gated, trustedIssuers: new Map([[ISSUER, SECRET]]), audience: AUDIENCE, runtimeAbi: V09_RUNTIME_ABI, hostAbi: V09_HOST_ABI });
+  const root = makeV9Root({ moduleSource: CANARY_SOURCE });
+  const approval = issueV09ApprovalProof({ subjectDigest: root.subjectDigest as string, issuerId: ISSUER, issuerSecret: SECRET });
+  const { installedRef, subjectDigest } = await host.install(root, approval, AUDIENCE);
+
+  // Arm the store seam exactly on the shared per-subject authority commit —
+  // the activation's linearization write — and pause the activation there,
+  // strictly between its revocation-state observation and its own commit.
+  // Then commit a revocation inside that window before releasing.
+  const seam = gated.arm('v9/revocation/');
+  const pending = host.activate(installedRef);
+  await seam.reached;
+  const revocation = await host.revoke(subjectDigest, 'deterministic interleave: revoke wins the window');
+  assert.equal(revocation.subjectDigest, subjectDigest, 'the revocation committed inside the window');
+  seam.release();
+
+  await assert.rejects(pending, (error: unknown) => {
+    assert.ok(error instanceof V09HostError, 'the windowed activation refuses typed');
+    assert.equal((error as V09HostError).code, 'APPROVAL_REVOKED');
+    assert.equal((error as V09HostError).diagnosticCode, 'APPROVAL_REVOKED');
+    return true;
+  });
+  assert.equal(canary(), undefined, 'zero package imports after a revocation committed inside the window');
+  assert.equal(gated.keys().filter((key) => key.startsWith('v9/activation/')).length, 0, 'no activation decision record was committed');
+  assert.equal(gated.keys().filter((key) => key.startsWith('v9/revocation/')).length, 1, 'the shared authority holds exactly the winning revocation');
+  await host.close();
+});
+
+test('an activation already committed before the revoke stays in-flight and succeeds (existing rule not over-tightened)', async () => {
+  resetCanary();
+  const gated = new GatedStore(new MemoryV09Store());
+  const host = await createProtectedHostV09({ store: gated, trustedIssuers: new Map([[ISSUER, SECRET]]), audience: AUDIENCE, runtimeAbi: V09_RUNTIME_ABI, hostAbi: V09_HOST_ABI });
+  const root = makeV9Root({ moduleSource: CANARY_SOURCE });
+  const approval = issueV09ApprovalProof({ subjectDigest: root.subjectDigest as string, issuerId: ISSUER, issuerSecret: SECRET });
+  const { installedRef, subjectDigest } = await host.install(root, approval, AUDIENCE);
+
+  // Arm the seam on the per-activation decision-record write, which happens
+  // strictly AFTER the shared-authority commit: pausing here guarantees the
+  // activation is already linearized (in-flight) when the revoke commits.
+  const seam = gated.arm('v9/activation/');
+  const pending = host.activate(installedRef);
+  await seam.reached;
+  await host.revoke(subjectDigest, 'revoke after an in-flight activation commit');
+  seam.release();
+
+  const record = await pending;
+  assert.equal(record.subjectDigest, subjectDigest, 'the already-committed activation is not retroactively cancelled');
+  assert.equal(canary(), 1, 'the in-flight activation evaluated the verified bytes exactly once');
+  assert.equal(gated.keys().filter((key) => key.startsWith('v9/activation/')).length, 1, 'its decision record carries the committed authority epoch');
+
+  // Every FURTHER activation refuses typed at the shared authority.
+  const diag = await diagnosticOf(() => host.activate(installedRef));
+  assert.equal(diag.code, 'APPROVAL_REVOKED');
+  assert.equal(diag.diagnosticCode, 'APPROVAL_REVOKED');
+  await host.close();
+});
+
+test('public load refusals are byte-identical across protected causes (no reference-existence or revocation oracle)', async () => {
+  resetCanary();
+  const store = new MemoryV09Store();
+  const host = await createProtectedHostV09({ store, trustedIssuers: new Map([[ISSUER, SECRET]]), audience: AUDIENCE, runtimeAbi: V09_RUNTIME_ABI, hostAbi: V09_HOST_ABI });
+  const root = makeV9Root({ moduleSource: CANARY_SOURCE });
+  const approval = issueV09ApprovalProof({ subjectDigest: root.subjectDigest as string, issuerId: ISSUER, issuerSecret: SECRET });
+  const { installedRef, subjectDigest } = await host.install(root, approval, AUDIENCE);
+
+  // Cause 1: a well-formed but never-issued (forged) reference.
+  const forgedObs = await observePublicRefusal(() => host.load('dhv9inst-forged-not-a-real-reference-0000000000000'));
+  // Cause 2: a revoked subject.
+  await host.revoke(subjectDigest, 'public-shape oracle probe');
+  const revokedObs = await observePublicRefusal(() => host.load(installedRef));
+  // Cause 3: a foreign audience replay of the same reference.
+  const hostForeign = await createProtectedHostV09({ store, trustedIssuers: new Map([[ISSUER, SECRET]]), audience: 'aud:foreign-n06', runtimeAbi: V09_RUNTIME_ABI, hostAbi: V09_HOST_ABI });
+  const foreignObs = await observePublicRefusal(() => hostForeign.load(installedRef));
+  // Cause 4: tampered stored bytes (post-install mutation).
+  const tamperStore = new MemoryV09Store();
+  const hostTamper = await createProtectedHostV09({ store: tamperStore, trustedIssuers: new Map([[ISSUER, SECRET]]), audience: AUDIENCE, runtimeAbi: V09_RUNTIME_ABI, hostAbi: V09_HOST_ABI });
+  const tamperRoot = makeV9Root({ moduleSource: CANARY_SOURCE });
+  const tamperApproval = issueV09ApprovalProof({ subjectDigest: tamperRoot.subjectDigest as string, issuerId: ISSUER, issuerSecret: SECRET });
+  const tamperedRef = (await hostTamper.install(tamperRoot, tamperApproval, AUDIENCE)).installedRef;
+  const artifactKey = tamperStore.keys().find((key) => key.startsWith('v9/artifact/'));
+  assert.ok(artifactKey);
+  const artifactDoc = await tamperStore.rawGet(artifactKey);
+  const mutated = structuredClone(artifactDoc.value) as Record<string, any>;
+  mutated.packages[0].moduleSource = `${mutated.packages[0].moduleSource as string}\nexport const smuggled = 1;\n`;
+  await tamperStore.rawCasPut(artifactKey, mutated, artifactDoc.revision);
+  const tamperedObs = await observePublicRefusal(() => hostTamper.load(tamperedRef));
+  // Cause 5: a non-string public input.
+  const nonStringObs = await observePublicRefusal(() => host.load(123 as unknown as string));
+
+  // Every public observable is identical across all protected causes: the
+  // caller cannot distinguish unknown from revoked from foreign from
+  // tampered, byte for byte.
+  const observations = [forgedObs, revokedObs, foreignObs, tamperedObs, nonStringObs];
+  const first = JSON.stringify(observations[0]);
+  for (const obs of observations) {
+    assert.equal(JSON.stringify(obs), first, `public observables must be byte-identical across protected causes (cause code ${obs.code})`);
+    assert.equal(obs.code, 'PACKAGE_NOT_AUTHORIZED');
+    assert.deepEqual(obs.keys, ['code', 'name'], 'own enumerable fields collapse to the constant public shape');
+    assert.equal(obs.hasDiagnosticCode, false, 'no diagnosticCode own field may exist on the public error');
+    assert.equal(obs.cause, undefined, 'the public error carries no cause');
+  }
+
+  // The differentiated protected subcodes stay INSIDE H on the trusted channel.
+  const hostSubcodes = host.drainProtectedDiagnostics().map((entry) => entry.diagnosticCode).sort();
+  assert.deepEqual(hostSubcodes, ['APPROVAL_REVOKED', 'INSTALL_HANDLE_UNKNOWN', 'INSTALL_HANDLE_UNKNOWN']);
+  assert.deepEqual(hostForeign.drainProtectedDiagnostics().map((entry) => entry.diagnosticCode), ['INSTALL_AUDIENCE_MISMATCH']);
+  assert.deepEqual(hostTamper.drainProtectedDiagnostics().map((entry) => entry.diagnosticCode), ['PACKAGE_BYTES_MISMATCH']);
+  assert.equal(canary(), undefined, 'none of the refusal causes ever evaluated package bytes');
+
+  await hostForeign.close();
+  await hostTamper.close();
   await host.close();
 });

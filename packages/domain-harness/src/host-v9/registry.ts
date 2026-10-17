@@ -21,29 +21,43 @@
  *    verifier/Host port). Every activation re-resolves the reference,
  *    re-checks the audience/app/subject/issuer/ABI binding, re-verifies the
  *    stored bytes (SHA-256) and re-runs the zero-import AST gate on the
- *    stored bytes, re-verifies the current approval attestation, and
- *    re-checks the CAS-ordered revocation record — all BEFORE any module
- *    evaluation. Activation then maps each verified package byte source to
- *    a private Node `data:` ESM URL carrying a fresh nonsecret per-
- *    activation cache discriminator scoped by
+ *    stored bytes, and re-verifies the current approval attestation. Its
+ *    FINAL pre-import step is the shared per-subject CAS authority commit:
+ *    a conditional epoch transition on ONE store key per subjectDigest that
+ *    is ALSO the key revocation commits through, so activation and revoke
+ *    share exactly one CAS linearization point. The conditional write is the
+ *    actual activation decision: a revocation that committed earlier either
+ *    shows in the observed authority state (typed refusal) or consumes the
+ *    expected revision (conflict → re-read → typed refusal), so no
+ *    activation can commit an import past an already-committed revocation
+ *    (frozen L2 §11 D02). Activation then maps each verified package byte
+ *    source to a private Node `data:` ESM URL carrying a fresh nonsecret
+ *    per-activation cache discriminator scoped by
  *    (hostAudience, subjectDigest, installedReference, activationNonce,
  *    packageId, moduleSha256), so repeated activations never share mutable
- *    module state. One CAS activation decision record is committed per
- *    activation.
+ *    module state. One CAS activation decision record (auditing the
+ *    committed authority epoch) is written per activation.
  *
  *  - `revoke(subjectDigest, reason)` is the governance revocation entry; it
- *    CAS-creates the revocation record on the same store, so the store's
- *    linear CAS order decides revoke-vs-activation. A revocation that
- *    committed before an activation's currentness read refuses the
- *    activation before any import. Already-started in-flight work is NOT
- *    retroactively rolled back (honest in-flight rule, D02/D03); teardown of
- *    loaded resources is lifecycle integration owned by #1036.
+ *    commits the revocation record onto the SAME shared per-subject
+ *    authority key (conditional create over absent, CAS over a live epoch),
+ *    so revoke and activation decide their order at one physical CAS point
+ *    instead of two independent keys. A revocation that lands before an
+ *    activation's authority commit refuses that activation before any
+ *    import. Already-started in-flight work (activation committed before
+ *    the revocation landed) is NOT retroactively rolled back (honest
+ *    in-flight rule, D02/D03); teardown of loaded resources is lifecycle
+ *    integration owned by #1036.
  *
  *  - `load(installedRef)` is the public one-argument forward: exactly one
  *    string into the protected path, with every refusal collapsed into the
- *    caller-visible `PACKAGE_NOT_AUTHORIZED` family (plus the separate
- *    ABI/lifecycle families) while the protected diagnostic keeps the typed
- *    subcode (D04). The public record is redacted — it carries no module
+ *    caller-visible public family error (`V09PublicRefusalError`:
+ *    `PACKAGE_NOT_AUTHORIZED` plus the separate ABI/lifecycle families, a
+ *    CONSTANT message per family, and NO protected subcode, `cause` or any
+ *    other extra enumerable field — byte-identical per family). The
+ *    protected typed diagnostic subcode is recorded on the H-private
+ *    trusted diagnostics channel and never travels on the public error
+ *    (D04). The public record is redacted — it carries no module
  *    namespace; the namespace-bearing activation record stays on the
  *    protected path for the Microkernel bootstrap (#1036 integration). The
  *    public `./v9` facade and its names are #1035.
@@ -56,10 +70,10 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { canonicalSnapshot } from '../public-v8/contracts.js';
 import { computeV09SealedRootSubjectDigest, V09_IMPORT_POLICY_REVISION, V09_SEALED_ROOT_FORMAT } from './digest.js';
-import { governanceRefusal, publicRefusal, V09HostError, V09_PUBLIC_FAMILY_HOST_ABI, V09_PUBLIC_FAMILY_LIFECYCLE, V09_PUBLIC_FAMILY_NOT_AUTHORIZED, V09_PUBLIC_FAMILY_RUNTIME_ABI } from './errors.js';
+import { governanceRefusal, publicRefusal, V09HostError, V09ProtectedDiagnosticChannel, V09_PUBLIC_FAMILY_HOST_ABI, V09_PUBLIC_FAMILY_LIFECYCLE, V09_PUBLIC_FAMILY_NOT_AUTHORIZED, V09_PUBLIC_FAMILY_RUNTIME_ABI, type V09ProtectedDiagnostic, type V09PublicFamily, type V09PublicRefusalError } from './errors.js';
 import { assertZeroImportEsmModule } from './ast-gate.js';
 import { verifyV09ApprovalProof, type V09ApprovalProof, type V09TrustedIssuers } from './approval.js';
-import { probeV09Store, storeFailureToHostError, V09HostStoreError, type V09HostDocumentStore } from './store-port.js';
+import { probeV09Store, storeFailureToHostError, V09HostStoreError, type V09HostDocumentStore, type V09StoreDocument, type V09StorePutCondition } from './store-port.js';
 
 const HEX64 = /^[0-9a-f]{64}$/;
 const PACKAGE_KINDS = new Set(['kernel', 'standard-sdk', 'business', 'capability']);
@@ -153,8 +167,10 @@ export interface ProtectedHostV09 {
   activate(installedRef: unknown): Promise<V09ActivationRecord>;
   /** Public one-argument forward: exactly one installed-reference string. */
   load(installedRef: unknown): Promise<V09LoadedPackageRecord>;
-  /** Governance revocation (CAS create; first revoke wins). */
+  /** Governance revocation (shared per-subject CAS authority; first revoke wins). */
   revoke(subjectDigest: unknown, reason: unknown): Promise<{ readonly subjectDigest: string; readonly revokedAt: string }>;
+  /** Governance/trusted-internal drain of the protected diagnostics channel (never public). */
+  drainProtectedDiagnostics(): readonly V09ProtectedDiagnostic[];
   close(): Promise<void>;
 }
 
@@ -432,6 +448,36 @@ function activationKey(installedRef: string, nonce: string): string {
 }
 
 /**
+ * The ONE shared per-subject CAS authority: a single store key per
+ * subjectDigest (the revocation key) through which BOTH the activation
+ * decision and the governance revocation commit their transition as a
+ * conditional write. The key holds either a live epoch record or the
+ * revocation record, so the store's serial CAS order — not two independent
+ * keys — decides revoke-vs-activate (frozen L2 §11 D02).
+ */
+interface V09SubjectEpochDoc {
+  readonly kind: 'v9/subject-epoch';
+  readonly subjectDigest: string;
+  readonly epoch: number;
+}
+
+interface V09SubjectRevocationDoc {
+  readonly kind: 'v9/revocation';
+  readonly subjectDigest: string;
+  readonly revokedAt: string;
+  readonly reason: string;
+  readonly epoch: number;
+}
+
+type V09SubjectAuthorityState =
+  | { readonly status: 'absent' }
+  | { readonly status: 'active'; readonly epoch: number; readonly revision: number }
+  | { readonly status: 'revoked'; readonly revision: number };
+
+/** Bounded retry budget for authority transitions under physical contention. */
+const SUBJECT_AUTHORITY_ATTEMPTS = 8;
+
+/**
  * Nonsecret per-activation `data:` URL cache discriminator scoped by
  * (hostAudience, subjectDigest, installedReference, activationNonce,
  * packageId, moduleSha256) — D01. Fresh per activation, never caller
@@ -465,20 +511,31 @@ function artifactValue(root: V09SealedQualifiedRootData): Record<string, unknown
   };
 }
 
+interface V09PublicRefusalPlan {
+  /** The stripped public error thrown to the untrusted caller. */
+  readonly refusal: V09PublicRefusalError;
+  /** Protected typed subcode — for the H-private diagnostics channel ONLY. */
+  readonly diagnosticCode: string;
+}
+
 /** Map any protected-path refusal onto the D04 caller-visible families. */
-function toPublicLoadError(error: unknown): V09HostError {
+function toPublicLoadError(error: unknown): V09PublicRefusalPlan {
+  const plan = (family: V09PublicFamily, diagnosticCode: string): V09PublicRefusalPlan => ({
+    refusal: publicRefusal(family, diagnosticCode),
+    diagnosticCode,
+  });
   if (!(error instanceof V09HostError)) {
-    return publicRefusal(V09_PUBLIC_FAMILY_NOT_AUTHORIZED, 'UNKNOWN_REFUSAL');
+    return plan(V09_PUBLIC_FAMILY_NOT_AUTHORIZED, 'UNKNOWN_REFUSAL');
   }
   switch (error.code) {
     case 'UNSUPPORTED_RUNTIME_ABI':
-      return publicRefusal(V09_PUBLIC_FAMILY_RUNTIME_ABI, error.diagnosticCode);
+      return plan(V09_PUBLIC_FAMILY_RUNTIME_ABI, error.diagnosticCode);
     case 'UNSUPPORTED_HOST_ABI':
-      return publicRefusal(V09_PUBLIC_FAMILY_HOST_ABI, error.diagnosticCode);
+      return plan(V09_PUBLIC_FAMILY_HOST_ABI, error.diagnosticCode);
     case 'ACTIVATION_EVAL_FAILED':
-      return publicRefusal(V09_PUBLIC_FAMILY_LIFECYCLE, error.diagnosticCode);
+      return plan(V09_PUBLIC_FAMILY_LIFECYCLE, error.diagnosticCode);
     default:
-      return publicRefusal(V09_PUBLIC_FAMILY_NOT_AUTHORIZED, error.diagnosticCode);
+      return plan(V09_PUBLIC_FAMILY_NOT_AUTHORIZED, error.diagnosticCode);
   }
 }
 
@@ -553,6 +610,71 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
       }
       throw storeFailureToHostError(error, operation);
     }
+  }
+
+  /** H-private trusted diagnostics channel for public-refusal subcodes (D04). */
+  const protectedDiagnostics = new V09ProtectedDiagnosticChannel();
+
+  /**
+   * Observe the shared per-subject CAS authority. Fails closed typed on ANY
+   * store failure and on an unrecognized record shape — the authority is
+   * never degraded into an unguarded read.
+   */
+  async function readSubjectAuthority(subjectDigest: string, operation: string): Promise<V09SubjectAuthorityState> {
+    let doc: V09StoreDocument | null;
+    try {
+      doc = await store.get(revocationKey(subjectDigest));
+    } catch (error) {
+      throw storeFailureToHostError(error, operation);
+    }
+    if (doc === null) {
+      return { status: 'absent' };
+    }
+    const value: unknown = doc.value;
+    if (isRecord(value) && value.kind === 'v9/revocation') {
+      return { status: 'revoked', revision: doc.revision };
+    }
+    if (isRecord(value) && value.kind === 'v9/subject-epoch' && typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
+      return { status: 'active', epoch: value.epoch, revision: doc.revision };
+    }
+    fail('SUBJECT_AUTHORITY_INVALID', `${operation}: ${revocationKey(subjectDigest)} holds an unrecognized authority record; the shared CAS authority fails closed instead of guessing`);
+  }
+
+  /**
+   * D02 linearization: commit THIS activation's epoch transition on the
+   * shared per-subject CAS authority. The conditional write is the actual
+   * activation commit/linearization point — it lands only while the
+   * authority is still live at the observed revision. A revocation that
+   * committed before it either shows in the observed state (typed refusal
+   * before any import) or consumes the expected revision (V09_STORE_CONFLICT
+   * → re-read → typed refusal), so no activation can commit past an
+   * already-committed revocation. The honest in-flight rule is untouched: a
+   * revocation landing AFTER this write does not retroactively cancel this
+   * activation. Returns the committed epoch for the audit record.
+   */
+  async function commitActivationEpoch(subjectDigest: string): Promise<number> {
+    for (let attempt = 0; attempt < SUBJECT_AUTHORITY_ATTEMPTS; attempt += 1) {
+      const state = await readSubjectAuthority(subjectDigest, 'activation authority read');
+      if (state.status === 'revoked') {
+        fail('APPROVAL_REVOKED', 'the approval for this installed subject has been revoked; activation is refused at the shared per-subject CAS authority before any module import');
+      }
+      const next: V09SubjectEpochDoc = {
+        kind: 'v9/subject-epoch',
+        subjectDigest,
+        epoch: state.status === 'active' ? state.epoch + 1 : 1,
+      };
+      const condition: V09StorePutCondition = state.status === 'active' ? { kind: 'cas', revision: state.revision } : { kind: 'create' };
+      try {
+        await store.put(revocationKey(subjectDigest), next, condition);
+        return next.epoch;
+      } catch (error) {
+        if (error instanceof V09HostStoreError && error.code === 'V09_STORE_CONFLICT') {
+          continue; // a concurrent transition won the revision; the next iteration re-reads and decides (revoked → typed refusal)
+        }
+        throw storeFailureToHostError(error, 'activation authority commit');
+      }
+    }
+    fail('SUBJECT_AUTHORITY_CONTENTION', 'the shared per-subject CAS authority kept conflicting under sustained contention; activation fails closed instead of racing');
   }
 
   async function installImpl(sealedRoot: unknown, approval: unknown, audience: unknown): Promise<{
@@ -684,25 +806,16 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
       fail('APPROVAL_PROOF_INVALID', 'the current approval proof no longer matches the installed reference binding');
     }
 
-    // CAS-ordered currentness: a revocation that committed before this read
-    // refuses the activation before any import. The activation decision
-    // record below is committed on the same store, so the physical CAS order
-    // linearizes revoke-vs-activate (D02).
-    let revocation: unknown;
-    try {
-      const doc = await store.get(revocationKey(root.subjectDigest));
-      revocation = doc === null ? null : doc.value;
-    } catch (error) {
-      throw storeFailureToHostError(error, 'revocation lookup');
-    }
-    if (revocation !== null) {
-      fail('APPROVAL_REVOKED', 'the approval for this installed subject has been revoked; activation is refused before any module import');
-    }
+    // D02 revocation-vs-activation linearization at the ACTUAL commit point:
+    // the conditional write on the shared per-subject CAS authority below is
+    // both the revocation re-check and the activation commit — no unguarded
+    // window remains between observing the revocation state and committing.
+    const authorityEpoch = await commitActivationEpoch(root.subjectDigest);
 
     const activationNonce = randomUUID();
     await createIfAbsent(
       activationKey(installedRef, activationNonce),
-      { kind: 'v9/activation-decision', installedRef, subjectDigest: root.subjectDigest, checkedRevocation: 'absent', at: new Date().toISOString() },
+      { kind: 'v9/activation-decision', installedRef, subjectDigest: root.subjectDigest, authorityEpoch, at: new Date().toISOString() },
       'activation decision record',
     );
 
@@ -744,7 +857,11 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
     try {
       record = await activateImpl(installedRef);
     } catch (error) {
-      throw toPublicLoadError(error);
+      const plan = toPublicLoadError(error);
+      // D04: the protected typed subcode is recorded on the H-private
+      // trusted channel and NEVER travels on the public error object.
+      protectedDiagnostics.record({ at: new Date().toISOString(), channel: 'public-load-refusal', family: plan.refusal.code, diagnosticCode: plan.diagnosticCode });
+      throw plan.refusal;
     }
     return Object.freeze({
       installedRef: record.installedRef,
@@ -760,16 +877,38 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
   async function revokeImpl(subjectDigest: unknown, reason: unknown): Promise<{ readonly subjectDigest: string; readonly revokedAt: string }> {
     const digest = hex64(subjectDigest, 'revocation subjectDigest');
     const reasonText = boundedString(reason, 'revocation reason');
-    const record = { kind: 'v9/revocation', subjectDigest: digest, revokedAt: new Date().toISOString(), reason: reasonText };
-    try {
-      await store.put(revocationKey(digest), record, { kind: 'create' });
-    } catch (error) {
-      if (error instanceof V09HostStoreError && error.code === 'V09_STORE_CONFLICT') {
-        fail('APPROVAL_ALREADY_REVOKED', 'this subject is already revoked; the first revocation wins (CAS create)');
+    const revokedAt = new Date().toISOString();
+    // The revocation commits through the SAME shared per-subject conditional
+    // transition the activation commits through — one common CAS
+    // linearization point (D02): whoever's write lands on the authority
+    // first wins the physical order, and a revocation landing before an
+    // activation's authority commit refuses that activation before any
+    // import. `create` bootstraps the authority on a never-touched subject;
+    // CAS over a live epoch replaces it with the revocation record.
+    for (let attempt = 0; attempt < SUBJECT_AUTHORITY_ATTEMPTS; attempt += 1) {
+      const state = await readSubjectAuthority(digest, 'revocation authority read');
+      if (state.status === 'revoked') {
+        fail('APPROVAL_ALREADY_REVOKED', 'this subject is already revoked; the first revocation wins (shared per-subject CAS authority)');
       }
-      throw storeFailureToHostError(error, 'revocation record create');
+      const record: V09SubjectRevocationDoc = {
+        kind: 'v9/revocation',
+        subjectDigest: digest,
+        revokedAt,
+        reason: reasonText,
+        epoch: state.status === 'active' ? state.epoch + 1 : 1,
+      };
+      const condition: V09StorePutCondition = state.status === 'active' ? { kind: 'cas', revision: state.revision } : { kind: 'create' };
+      try {
+        await store.put(revocationKey(digest), record, condition);
+        return Object.freeze({ subjectDigest: digest, revokedAt });
+      } catch (error) {
+        if (error instanceof V09HostStoreError && error.code === 'V09_STORE_CONFLICT') {
+          continue; // a concurrent activation/revocation transition won; re-read and retry
+        }
+        throw storeFailureToHostError(error, 'revocation record create');
+      }
     }
-    return Object.freeze({ subjectDigest: digest, revokedAt: record.revokedAt });
+    fail('SUBJECT_AUTHORITY_CONTENTION', 'the shared per-subject CAS authority kept conflicting under sustained contention; revocation fails closed instead of overwriting');
   }
 
   async function closeImpl(): Promise<void> {
@@ -788,6 +927,7 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
     activate: activateImpl,
     load: loadImpl,
     revoke: revokeImpl,
+    drainProtectedDiagnostics: (): readonly V09ProtectedDiagnostic[] => protectedDiagnostics.drain(),
     close: closeImpl,
   }) satisfies ProtectedHostV09;
 }
