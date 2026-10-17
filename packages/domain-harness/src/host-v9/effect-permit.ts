@@ -49,6 +49,14 @@
  * expired → refuse (the permit was short-lived by construction). Physical
  * I/O already dispatched under a committed permit is never claimed to be
  * rolled back (honest in-flight rule, D02/D03).
+ *
+ * Honest in-flight admission (review P1-01/P1-02): expiry and lifecycle are
+ * re-checked on EVERY CAS retry BEFORE the awaited write AND again AFTER the
+ * write resolves, at receipt handout. A permit whose physical CAS landed
+ * while the trusted clock passed the principal expiry, or while the
+ * authority was closed, is NEVER handed out as a dispatchable receipt — the
+ * committed entry simply remains in the authority record as one-shot replay
+ * memory; no rollback of the physical commit is claimed.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -216,13 +224,23 @@ export function createV09EffectPermitAuthority(bootstrap: V09EffectPermitAuthori
       if (state.status === 'absent') {
         fail('EFFECT_PERMIT_SUBJECT_INACTIVE', 'no activation epoch has committed for this subject; physical effect permits require the live shared per-subject authority an activation created');
       }
+      // Fresh expiry on EVERY retry: the trusted clock may have passed the
+      // principal expiry while an approval read, authority read or a held CAS
+      // write was pending (D03 requires fresh scope+expiry at admission).
+      const attemptAt = now();
+      if (!Number.isSafeInteger(attemptAt)) {
+        fail('EFFECT_PERMIT_CLOCK_INVALID', 'the trusted Host clock returned a non-safe-integer value; refusing to order permits on it');
+      }
+      if (identity.expiresAtMs <= attemptAt) {
+        fail('EFFECT_PERMIT_EXPIRED_INFLIGHT', 'the trusted clock passed the principal expiry while the permit admission was pending; the one-shot permit is refused before its commit');
+      }
       // Prune expired entries first: an expired permit can no longer be
       // validly replayed because the principal recheck refuses expired
       // presentations before this loop is ever reached.
       const kept: Record<string, { expiresAtMs: number }> = {};
       let retained = 0;
       for (const [digest, entry] of Object.entries(state.permits)) {
-        if (entry.expiresAtMs > at) {
+        if (entry.expiresAtMs > attemptAt) {
           kept[digest] = entry;
           retained += 1;
         }
@@ -239,33 +257,55 @@ export function createV09EffectPermitAuthority(bootstrap: V09EffectPermitAuthori
         epoch: state.epoch,
         permits: { ...kept, [permitDigest]: { expiresAtMs: identity.expiresAtMs } },
       };
+      let committedRevision: number;
       try {
-        const committed = await store.put(revocationKey(subjectDigest), next, { kind: 'cas', revision: state.revision });
-        return Object.freeze({
-          subjectDigest,
-          appId: identity.appId,
-          tenantId: identity.tenantId,
-          principalId: identity.principalId,
-          operationId,
-          effectId,
-          nonce,
-          permitDigest,
-          authorityEpoch: state.epoch,
-          authorityRevision: committed.revision,
-          expiresAtMs: identity.expiresAtMs,
-          mintedAt: new Date(at).toISOString(),
-        }) satisfies V09EffectPermitReceipt;
+        committedRevision = (await store.put(revocationKey(subjectDigest), next, { kind: 'cas', revision: state.revision })).revision;
       } catch (error) {
         if (error instanceof V09HostStoreError && error.code === 'V09_STORE_CONFLICT') {
           continue; // an activation/permit/revoke transition won the revision; re-read and decide again
         }
         throw storeFailureToHostError(error, 'effect-permit authority commit');
       }
+      // Guarded post-commit admission: lifecycle and expiry are re-checked at
+      // handout, not only before the awaited write. A permit whose CAS
+      // physically landed while the authority closed or the trusted clock
+      // passed the principal expiry is NEVER handed out as a dispatchable
+      // receipt; the committed entry stays in the authority record as one-shot
+      // replay memory and no rollback of the physical commit is claimed
+      // (honest in-flight rule, D02/D03).
+      if (closed) {
+        fail('EFFECT_PERMIT_CLOSED', 'trusted Host lifecycle closed this authority while the permit CAS was pending; the physical commit is not claimed to be rolled back, but no dispatchable receipt is handed out');
+      }
+      const landedAt = now();
+      if (!Number.isSafeInteger(landedAt)) {
+        fail('EFFECT_PERMIT_CLOCK_INVALID', 'the trusted Host clock returned a non-safe-integer value; refusing to order permits on it');
+      }
+      if (identity.expiresAtMs <= landedAt) {
+        fail('EFFECT_PERMIT_EXPIRED_INFLIGHT', 'the trusted clock passed the principal expiry while the permit CAS was pending; the committed entry remains recorded as replay memory and no dispatchable receipt is handed out');
+      }
+      return Object.freeze({
+        subjectDigest,
+        appId: identity.appId,
+        tenantId: identity.tenantId,
+        principalId: identity.principalId,
+        operationId,
+        effectId,
+        nonce,
+        permitDigest,
+        authorityEpoch: state.epoch,
+        authorityRevision: committedRevision,
+        expiresAtMs: identity.expiresAtMs,
+        mintedAt: new Date(landedAt).toISOString(),
+      }) satisfies V09EffectPermitReceipt;
     }
     fail('SUBJECT_AUTHORITY_CONTENTION', 'the shared per-subject CAS authority kept conflicting under sustained contention; the effect permit fails closed instead of racing');
   }
 
-  /** Trusted-lifecycle closure invalidates every further mint on this authority. */
+  /**
+   * Trusted-lifecycle closure invalidates every further mint on this
+   * authority — including a mint whose physical CAS was already pending (or
+   * even landed): such an entry stays recorded, but no receipt is handed out.
+   */
   function close(): void {
     closed = true;
   }

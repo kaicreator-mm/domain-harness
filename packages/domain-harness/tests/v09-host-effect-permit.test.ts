@@ -97,13 +97,15 @@ class MemoryV09Store implements V09HostDocumentStore {
 }
 
 /**
- * Deterministic store seam: gates the FIRST put whose key carries the armed
- * prefix, so an interleaved authority transition can commit inside the
- * observation→commit window with promise handoff only (no sleeps/timing).
+ * Deterministic store seam: gates the FIRST get OR put (per the armed
+ * operation kind) whose key carries the armed prefix, so an interleaved
+ * transition or clock elapse can land inside the observation→commit or
+ * commit→handout window with promise handoff only (no sleeps/timing).
  */
 class GatedStore implements V09HostDocumentStore {
   readonly #inner: MemoryV09Store;
   #gatePrefix: string | null = null;
+  #gateOp: 'get' | 'put' = 'put';
   #gated = false;
   #signalReached: (() => void) | undefined;
   #gatePromise: Promise<void> | undefined;
@@ -112,8 +114,9 @@ class GatedStore implements V09HostDocumentStore {
     this.#inner = inner;
   }
 
-  arm(prefix: string): { reached: Promise<void>; release: () => void } {
+  arm(prefix: string, op: 'get' | 'put' = 'put'): { reached: Promise<void>; release: () => void } {
     this.#gatePrefix = prefix;
+    this.#gateOp = op;
     let releaseResolve!: () => void;
     this.#gatePromise = new Promise<void>((resolve) => {
       releaseResolve = resolve;
@@ -125,11 +128,16 @@ class GatedStore implements V09HostDocumentStore {
   }
 
   async get(key: string): Promise<{ value: unknown; revision: number } | null> {
+    if (this.#gatePrefix !== null && !this.#gated && this.#gateOp === 'get' && key.startsWith(this.#gatePrefix)) {
+      this.#gated = true;
+      this.#signalReached?.();
+      await this.#gatePromise;
+    }
     return this.#inner.get(key);
   }
 
   async put(key: string, value: unknown, condition: V09StorePutCondition): Promise<{ revision: number }> {
-    if (this.#gatePrefix !== null && !this.#gated && key.startsWith(this.#gatePrefix)) {
+    if (this.#gatePrefix !== null && !this.#gated && this.#gateOp === 'put' && key.startsWith(this.#gatePrefix)) {
       this.#gated = true;
       this.#signalReached?.();
       await this.#gatePromise;
@@ -559,5 +567,63 @@ test('PERMIT13 (N): a closed permit authority refuses mints, including one pendi
   (release as (identity: Readonly<V09HostVerifiedIdentity>) => void)(f.principal.identity);
   assert.equal((await diagnosticOf(() => pending)).code, 'EFFECT_PERMIT_CLOSED');
   assert.equal((await diagnosticOf(() => gate.mint(token, { operationId: 'demo.create', effectId: 'effect-2' }))).code, 'EFFECT_PERMIT_CLOSED');
+  await f.host.close();
+});
+
+test('PERMIT14 (N): principal expiry elapsing while admission is pending refuses typed — pre-commit nothing lands, post-commit the entry stays but no receipt is handed out (review P1-01)', async () => {
+  // (a) Expiry elapses while the approval lookup is pending: the refusal
+  // happens BEFORE any CAS write — the authority record stays untouched.
+  {
+    const inner = new MemoryV09Store();
+    const gated = new GatedStore(inner);
+    const f = await setup({ store: inner });
+    const permits = createV09EffectPermitAuthority({ store: gated, trustedIssuers: issuerRegistry(), audience: AUDIENCE, subjectDigest: f.subjectDigest, principal: f.principal.authority, nowMs: () => f.principal.now });
+    const token = await f.principal.authority.issue(PRESENTATION, 'demo.create', 'effect');
+    const seam = gated.arm('v9/approval/', 'get');
+    const minting = permits.mint(token, { operationId: 'demo.create', effectId: 'effect-1', nonce: 'attempt-1' });
+    await seam.reached;
+    f.principal.now += 61_000; // past the identity expiry captured at recheck
+    seam.release();
+    assert.equal((await diagnosticOf(() => minting)).code, 'EFFECT_PERMIT_EXPIRED_INFLIGHT');
+    const doc = await authorityDoc(inner, f.subjectDigest);
+    assert.equal(doc.value.permits, undefined, 'no permit entry was committed on the pre-commit expiry refusal');
+    await f.host.close();
+  }
+  // (b) Expiry elapses while the authority CAS write itself is pending: the
+  // write physically lands, but the already-stale permit is NEVER handed out
+  // as a dispatchable receipt; the committed entry stays as replay memory.
+  {
+    const inner = new MemoryV09Store();
+    const gated = new GatedStore(inner);
+    const f = await setup({ store: inner });
+    const permits = createV09EffectPermitAuthority({ store: gated, trustedIssuers: issuerRegistry(), audience: AUDIENCE, subjectDigest: f.subjectDigest, principal: f.principal.authority, nowMs: () => f.principal.now });
+    const token = await f.principal.authority.issue(PRESENTATION, 'demo.create', 'effect');
+    const seam = gated.arm('v9/revocation/', 'put');
+    const minting = permits.mint(token, { operationId: 'demo.create', effectId: 'effect-1', nonce: 'attempt-1' });
+    await seam.reached;
+    f.principal.now += 61_000;
+    seam.release();
+    assert.equal((await diagnosticOf(() => minting)).code, 'EFFECT_PERMIT_EXPIRED_INFLIGHT');
+    const doc = await authorityDoc(inner, f.subjectDigest);
+    assert.equal(Object.keys(doc.value.permits).length, 1, 'the physically committed in-flight entry stays recorded (no rollback is claimed)');
+    await f.host.close();
+  }
+});
+
+test('PERMIT15 (N): lifecycle close while the permit CAS is pending refuses the handout; the committed entry stays without any rollback claim (review P1-02)', async () => {
+  const inner = new MemoryV09Store();
+  const gated = new GatedStore(inner);
+  const f = await setup({ store: inner });
+  const permits = createV09EffectPermitAuthority({ store: gated, trustedIssuers: issuerRegistry(), audience: AUDIENCE, subjectDigest: f.subjectDigest, principal: f.principal.authority, nowMs: () => f.principal.now });
+  const token = await f.principal.authority.issue(PRESENTATION, 'demo.create', 'effect');
+  const seam = gated.arm('v9/revocation/', 'put');
+  const minting = permits.mint(token, { operationId: 'demo.create', effectId: 'effect-1', nonce: 'attempt-1' });
+  await seam.reached;
+  permits.close();
+  seam.release();
+  assert.equal((await diagnosticOf(() => minting)).code, 'EFFECT_PERMIT_CLOSED');
+  const doc = await authorityDoc(inner, f.subjectDigest);
+  assert.equal(Object.keys(doc.value.permits).length, 1, 'the physically committed in-flight entry stays recorded (no dispatchable receipt exists for it)');
+  assert.equal((await diagnosticOf(() => permits.mint(token, { operationId: 'demo.create', effectId: 'effect-2' }))).code, 'EFFECT_PERMIT_CLOSED');
   await f.host.close();
 });
