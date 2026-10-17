@@ -38,7 +38,7 @@ test('V09-N07-E02: every installed-ref denial is one indistinguishable public fa
       assert.equal(error.message.includes(value), false);
     }
     assert.equal(Object.hasOwn(error, 'cause'), false);
-    assert.deepEqual(Object.keys(error), ['name', 'code']);
+    assert.deepEqual(Object.keys(error).sort(), ['code', 'name']);
   }
 });
 
