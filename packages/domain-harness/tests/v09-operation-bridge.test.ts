@@ -457,34 +457,52 @@ function onlyKey(keys: readonly string[]): string {
 
 // ---------------------------------------------------------------------------
 
-test('V09-PKG-P1: public /v9 one-arg DomainHarness dispatches only through trusted live two-App bridge and detaches on close', async () => {
+test('V09-PKG-P1: public /v9 DomainHarness is bound to the CURRENT trusted Host scope, with two real Apps', async () => {
   const world = await setupWorld();
-  const otherWorld = await setupWorld(); // separate physical store across Hosts
+  const otherWorld = await setupWorld(); // independently owned physical Host storage
   const firstBridge = world.bridge('app:bridge:a', 'tenant:one');
   const secondBridge = otherWorld.bridge('app:bridge:b', 'tenant:one');
   assert.deepEqual(Object.keys(DomainHarness), ['load']);
 
-  // An unknown, raw or forged ref is never a Host configuration channel.
-  for (const bad of [null, {}, 1, 'dhv9inst-unknown']) {
-    await assert.rejects(DomainHarness.load(bad as string), (error: unknown) => publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  // With NO trusted scope, even valid installed refs and forged inputs refuse.
+  for (const bad of [null, {}, 1, world.ref('app:bridge:a')]) {
+    await assert.rejects(DomainHarness.load(bad as string), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
   }
-  const a = await DomainHarness.load(world.ref('app:bridge:a'));
-  const b = await DomainHarness.load(otherWorld.ref('app:bridge:b'));
+
+  // Each caller runs inside its own trusted H request context, never by
+  // selecting another Host from a process-global set of credentials.
+  const [a, b] = await Promise.all([
+    firstBridge.runWithinTrustedContext(() => DomainHarness.load(world.ref('app:bridge:a'))),
+    secondBridge.runWithinTrustedContext(() => DomainHarness.load(otherWorld.ref('app:bridge:b'))),
+  ]);
   assert.equal(a.package.rootPackageId, 'app:bridge:a');
   assert.equal(b.package.rootPackageId, 'app:bridge:b');
+  await firstBridge.runWithinTrustedContext(async () => {
+    await assert.rejects(DomainHarness.load(otherWorld.ref('app:bridge:b')), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  });
+  await secondBridge.runWithinTrustedContext(async () => {
+    await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  });
   assert.equal(((await a.send(dynamicIntent('instance:published-a', 'msg:published-a'))) as { status: string }).status, 'admitted');
   assert.equal(((await b.send(dynamicIntent('instance:published-b', 'msg:published-b'))) as { status: string }).status, 'admitted');
   assert.equal(journalKeys(world, 'app:bridge:a', 'tenant:one').length, 1);
   assert.equal(journalKeys(otherWorld, 'app:bridge:b', 'tenant:one').length, 1);
 
-  await firstBridge.close();
-  await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) => publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
-  // Closing one trusted Host must not unregister another Host's public load.
-  const b2 = await DomainHarness.load(otherWorld.ref('app:bridge:b'));
+  await firstBridge.runWithinTrustedContext(async () => {
+    await firstBridge.close();
+    await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  });
+  const b2 = await secondBridge.runWithinTrustedContext(() => DomainHarness.load(otherWorld.ref('app:bridge:b')));
   assert.equal(b2.package.rootPackageId, 'app:bridge:b');
   await secondBridge.close();
-  await assert.rejects(DomainHarness.load(otherWorld.ref('app:bridge:b')), (error: unknown) => publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  await assert.rejects(DomainHarness.load(otherWorld.ref('app:bridge:b')), (error: unknown) =>
+    publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
 });
+
 
 test('V09-BRIDGE-P1: two real Apps execute the full protected path; the public surface is exactly the facade contract', async () => {
   const world = await setupWorld();
