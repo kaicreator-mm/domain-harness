@@ -465,6 +465,39 @@ test('a tampered binding set (same bytes) is refused by subject recompute', asyn
   await host.close();
 });
 
+test('D03 shared subject authority refuses foreign-subject epoch or revocation records before import', async () => {
+  for (const kind of ['v9/subject-epoch', 'v9/revocation'] as const) {
+    resetCanary();
+    const store = new MemoryV09Store();
+    const host = await createProtectedHostV09({
+      store,
+      trustedIssuers: new Map([[ISSUER, SECRET]]),
+      audience: AUDIENCE,
+      runtimeAbi: V09_RUNTIME_ABI,
+      hostAbi: V09_HOST_ABI,
+    });
+    const root = makeV9Root({ moduleSource: CANARY_SOURCE });
+    const approval = issueV09ApprovalProof({
+      subjectDigest: root.subjectDigest as string,
+      issuerId: ISSUER,
+      issuerSecret: SECRET,
+    });
+    const { installedRef, subjectDigest } = await host.install(root, approval, AUDIENCE);
+    const otherSubject = '0'.repeat(64);
+    assert.notEqual(otherSubject, subjectDigest, 'negative uses a genuinely foreign subject');
+    const corrupt = kind === 'v9/subject-epoch'
+      ? { kind, subjectDigest: otherSubject, epoch: 1 }
+      : { kind, subjectDigest: otherSubject, epoch: 1, revokedAt: '2026-10-17T00:00:00.000Z', reason: 'foreign' };
+    await store.put(`v9/revocation/${subjectDigest}`, corrupt, { kind: 'create' });
+
+    const denial = await diagnosticOf(() => host.activate(installedRef));
+    assert.equal(denial.code, 'SUBJECT_AUTHORITY_INVALID', `${kind} must not authenticate another subject's CAS state`);
+    assert.equal(canary(), undefined, 'no package bytes execute after the foreign-subject record');
+    assert.equal(store.keys().filter((key) => key.startsWith('v9/activation/')).length, 0);
+    await host.close();
+  }
+});
+
 test('revocation is CAS-ordered: the first revoke wins and later activations refuse', async () => {
   const store = new MemoryV09Store();
   const host = await createProtectedHostV09({ store, trustedIssuers: new Map([[ISSUER, SECRET]]), audience: AUDIENCE, runtimeAbi: V09_RUNTIME_ABI, hostAbi: V09_HOST_ABI });
