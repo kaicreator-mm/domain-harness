@@ -35,8 +35,12 @@ test('V09-PKG-VALUE-N2: a same-shape fake H provider cannot bind the public SDK 
 });
 
 test('V09-PKG-VALUE-N3: public export never contains issuer, Host or registrar privileges', async () => {
+  // src instance (this file runs from source via tsx) and the dist instance
+  // (self-reference below resolves the package exports map) are two module
+  // instantiations: identity equality is structurally impossible, so the
+  // published surface is pinned by shape, not by reference.
   const sdk = await import('@kaicreator/domain-harness/v9');
-  assert.equal(sdk.DomainHarness, DomainHarness);
+  assert.deepEqual(Object.keys(sdk.DomainHarness), ['load']);
   assert.equal(typeof sdk.DomainHarness.load, 'function');
   for (const name of [
     'attachV09TrustedBridge', 'isV09AuthenticatedBridgeHarness',

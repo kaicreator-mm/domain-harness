@@ -18,7 +18,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { DomainHarnessV9Error, V9_PUBLIC_ERROR_CODES } from './errors.js';
 import { isV09AuthenticatedBridgeHarness } from './operation-bridge.js';
-import type { V9DomainFacade, V9DomainHarness } from './contracts.js';
+import type { V9DomainFacade, V9DomainHarness, V9PublicInstanceQuery, V9PublicSendIntent } from './contracts.js';
 
 const callerHost = new AsyncLocalStorage<V9DomainHarness>();
 const activeHosts = new WeakSet<object>();
@@ -81,17 +81,20 @@ export const DomainHarness: V9DomainHarness = Object.freeze({
         throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.CALLER_SCOPE_DENIED);
       }
     };
+    // Every facade verb re-checks the SAME current Host scope at use time and
+    // refuses asynchronously: the facade contract is promise-returning, so a
+    // denial must be a rejected promise, never a synchronous throw.
     return Object.freeze({
       package: loaded.package,
-      send(intent) {
+      async send(intent: Readonly<V9PublicSendIntent>) {
         requireCurrentHost();
         return loaded.send(intent);
       },
-      query(query) {
+      async query(query: Readonly<V9PublicInstanceQuery>) {
         requireCurrentHost();
         return loaded.query(query);
       },
-      async subscribe(observer) {
+      async subscribe(observer: (receipt: unknown) => void) {
         requireCurrentHost();
         const subscription = await loaded.subscribe(observer);
         return Object.freeze({
@@ -101,7 +104,7 @@ export const DomainHarness: V9DomainHarness = Object.freeze({
           },
         });
       },
-      stop() {
+      async stop() {
         requireCurrentHost();
         return loaded.stop();
       },
