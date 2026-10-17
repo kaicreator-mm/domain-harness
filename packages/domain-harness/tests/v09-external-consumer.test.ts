@@ -29,9 +29,9 @@ const payloadSources = [
   'examples/v08-domain-apps/capability-quote-tools.mjs',
 ];
 
-function npm(args, options) {
+function npm(args: readonly string[], options: { cwd: string }): string {
   if (process.platform === 'win32') {
-    const command = ['npm.cmd', ...args.map((a) => `"${a}"`)].join(' ');
+    const command = ['npm.cmd', ...args.map((a: string) => `"${a}"`)].join(' ');
     return execFileSync(command, { shell: true, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
   }
   return execFileSync('npm', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
