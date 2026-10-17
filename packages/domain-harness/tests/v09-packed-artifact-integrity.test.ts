@@ -44,6 +44,7 @@ function runNpmPack(destination: string): NpmPackReport {
   const reports = JSON.parse(stdout) as NpmPackReport[];
   assert.ok(Array.isArray(reports) && reports.length === 1, 'npm pack --json must report exactly one actual artifact');
   const report = reports[0];
+  assert.ok(report, 'npm pack --json must report a present first artifact record');
   assert.ok(typeof report.filename === 'string' && report.filename.endsWith('.tgz'));
   assert.equal(report.filename, basename(report.filename), 'npm archive filename must be local to the output directory');
   assert.equal(report.name, packageName);
