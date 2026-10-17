@@ -42,23 +42,30 @@
  * H-issued reference string. `send`/`query` accept caller business data
  * only; authenticated identity and scope are always H-sourced. Public
  * failures collapse onto the frozen D04 families; protected subcodes stay
- * on the internal bridge diagnostics channel. `subscribe`/`stop` fail typed
- * `LIFECYCLE_FAILED` — they are owned by #1120, and an honest typed refusal
- * is never a fake implementation.
+ * on the internal bridge diagnostics channel.
  *
- * #1120 lifecycle handoff: the private `recheckDeliveryAuthorization`
- * seam answers from the CURRENT shared per-subject authority record
- * (revoked / expired / unknown-permit refuse; a recorded unexpired permit
- * digest is authorized with its epoch).
+ * #1120 lifecycle wiring: `subscribe`/`stop` are the #1120 scoped
+ * lifecycle over THIS bridge's trusted ports — the selected Kernel's own
+ * `observe` receipt side-channel (wired into `createOccurrenceRuntime`),
+ * a REAL #1126 one-shot delivery permit minted on the shared per-subject
+ * CAS authority at subscription, the #1124 fresh principal issue at every
+ * `subscribe`/`delivery`/`stop` purpose, and the private #1120
+ * `recheckDeliveryAuthorization` seam answering from the CURRENT authority
+ * record (revoked / expired / unknown-permit refuse; a recorded unexpired
+ * permit digest is authorized with its epoch) on EVERY sensitive delivery.
+ * The per-facade `dispose` mirrors the bridge's own trusted teardown for
+ * exactly that facade. No second Runtime, Journal, issuer or observer
+ * authority is created here.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createProtectedHostV09, parseV09SealedRoot, readV09SubjectAuthority, type ProtectedHostV09, type V09ActivationRecord, type V09SealedQualifiedRootData } from '../host-v9/registry.js';
 import { V09HostError, governanceRefusal } from '../host-v9/errors.js';
 import { storeFailureToHostError, V09HostStoreError, type V09HostDocumentStore, type V09StorePutCondition } from '../host-v9/store-port.js';
 import type { V09TrustedIssuers } from '../host-v9/approval.js';
 import { createV09EffectPermitAuthority } from '../host-v9/effect-permit.js';
 import { createV09PrivatePrincipalAuthority, V09PrivateScopeError, type V09HostVerifiedIdentity, type V09PrivateHostAuthenticator, type V09PrivatePrincipalToken } from '../operations-v9/private-principal.js';
+import { createV09ScopedLifecycle, type V09SelectedReceipt, type V09ScopedLifecyclePorts } from '../operations-v9/stream-lifecycle.js';
 import { DomainHarnessV9Error, V9_PUBLIC_ERROR_CODES, type V9PublicErrorCode } from './errors.js';
 import type {
   V9DomainFacade,
@@ -66,6 +73,7 @@ import type {
   V9PublicLoadedPackage,
   V9PublicSendIntent,
   V9PublicInstanceQuery,
+  V9PublicSubscription,
 } from './contracts.js';
 
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -283,6 +291,17 @@ interface FacadeRuntime {
   readonly getSnapshot: (target: unknown) => Promise<unknown>;
 }
 
+/**
+ * One #1120 subscription's seat on the selected Kernel receipt side-channel.
+ * The permitDigest is the REAL #1126 one-shot delivery permit minted (on the
+ * shared per-subject CAS authority) when this subscription attached; every
+ * envelope built for it re-presents that digest for the live #1120 recheck.
+ */
+interface ReceiptListenerRegistration {
+  readonly permitDigest: string;
+  readonly deliver: (event: V09SelectedReceipt) => void;
+}
+
 interface ActiveFacade {
   readonly packageRecord: V9PublicLoadedPackage;
   readonly tables: SealedTables;
@@ -291,6 +310,7 @@ interface ActiveFacade {
   readonly principal: ReturnType<typeof createV09PrivatePrincipalAuthority>;
   readonly permit: ReturnType<typeof createV09EffectPermitAuthority>;
   readonly runtimes: Map<string, FacadeRuntime>;
+  readonly receiptListeners: Set<ReceiptListenerRegistration>;
   closed: boolean;
 }
 
@@ -425,6 +445,117 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
     }
   }
 
+  /** The #1124 grant purpose-operation for every scoped lifecycle check. */
+  const LIFECYCLE_OPERATION_ID = 'lifecycle';
+
+  /**
+   * The selected Kernel's `observe` receipt side-channel for ONE facade
+   * (passed into every `createOccurrenceRuntime` this bridge composes).
+   * Each committed K occurrence fans out as a scope-bound, permit-carrying
+   * envelope to the #1120 lifecycle subscriptions attached to this facade.
+   * The Kernel's side-channel is best-effort by its own contract; a failing
+   * downstream entry never mutates the authoritative occurrence.
+   */
+  function kernelObserveFor(facade: ActiveFacade): (receipt: unknown) => void {
+    return (receipt: unknown): void => {
+      for (const registration of facade.receiptListeners) {
+        try {
+          registration.deliver({
+            subjectDigest: facade.tables.root.subjectDigest,
+            appId: facade.packageRecord.rootPackageId,
+            tenantId: facade.tenantId,
+            permitDigest: registration.permitDigest,
+            // One private copy per subscriber: an observer mutating its own
+            // receipt can never corrupt the send caller's value, another
+            // subscriber's copy, or any durable K record. A non-cloneable
+            // receipt fails closed into the swallow below.
+            receipt: structuredClone(receipt),
+          });
+        } catch {
+          // Same best-effort discipline as K's own safeObserve; the #1120
+          // lifecycle itself never throws synchronously into this seam.
+        }
+      }
+    };
+  }
+
+  /**
+   * Compose the #1120 scoped lifecycle for ONE activated facade over this
+   * bridge's real trusted ports only: #1124 fresh principal issues at every
+   * subscribe/delivery/stop purpose, a REAL #1126 delivery-permit mint on
+   * the shared per-subject CAS authority at attachment, the #1129 CURRENT
+   * delivery recheck on every sensitive delivery, and the per-facade
+   * trusted teardown as dispose. No second authority is created here.
+   *
+   * Honest liveness semantics (fail-closed by design, #1120 N-cases): the
+   * delivery permit lives exactly as long as the verified presentation
+   * scope; once it expires or the subject authority is revoked, later
+   * deliveries are silently REFUSED (a stale stream never delivers) and
+   * only a fresh subscribe under a current principal re-attaches.
+   */
+  function composeFacadeLifecycle(facade: ActiveFacade): ReturnType<typeof createV09ScopedLifecycle> {
+    const ports: V09ScopedLifecyclePorts = {
+      subjectDigest: facade.tables.root.subjectDigest,
+      appId: facade.packageRecord.rootPackageId,
+      tenantId: facade.tenantId,
+      authorize: async (purpose): Promise<void> => {
+        try {
+          if (facade.closed || bridgeClosed) {
+            throw new V09BridgeRefusalError('BRIDGE_CLOSED', V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED, `the facade lifecycle requires an open facade at purpose ${purpose}`);
+          }
+          // D03: a FRESH trusted principal issue per purpose — the frozen
+          // composition presentation re-authenticated at every use.
+          await facade.principal.issue(presentation, LIFECYCLE_OPERATION_ID, purpose);
+        } catch (error) {
+          void toPublicError(error, `lifecycle-${purpose}`); // protected subcode stays internal
+          throw error;
+        }
+      },
+      recheckDeliveryAuthorization: async (subjectDigest, permitDigest) => {
+        try {
+          return await recheckDeliveryAuthorization(subjectDigest, permitDigest);
+        } catch (error) {
+          void toPublicError(error, 'lifecycle-delivery'); // protected subcode stays internal
+          throw error;
+        }
+      },
+      observeSelectedReceipts: async (listener) => {
+        // The delivery credential: ONE real one-shot #1126 permit tuple on
+        // the shared per-subject CAS authority (fresh #1124 effect-purpose
+        // recheck at mint). Its recorded, unexpired presence — re-read from
+        // the CURRENT record on EVERY delivery — is what later authorizes
+        // each sensitive delivery; revocation or expiry refuses it.
+        let permitReceipt: Awaited<ReturnType<typeof facade.permit.mint>>;
+        try {
+          if (facade.closed || bridgeClosed) {
+            throw new V09BridgeRefusalError('BRIDGE_CLOSED', V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED, 'the facade lifecycle requires an open facade to attach a subscription');
+          }
+          const token: V09PrivatePrincipalToken = await facade.principal.issue(presentation, 'delivery', 'effect');
+          const nonce = `dhv9sub-${randomUUID()}`;
+          permitReceipt = await facade.permit.mint(token, { operationId: 'delivery', effectId: `dhv9dly-${sha256Hex(nonce)}`, nonce });
+        } catch (error) {
+          void toPublicError(error, 'lifecycle-subscribe'); // protected subcode stays internal
+          throw error;
+        }
+        const registration: ReceiptListenerRegistration = { permitDigest: permitReceipt.permitDigest, deliver: listener };
+        facade.receiptListeners.add(registration);
+        return async (): Promise<void> => {
+          facade.receiptListeners.delete(registration);
+        };
+      },
+      dispose: async (): Promise<void> => {
+        // Trusted teardown of exactly THIS facade's resources, mirroring the
+        // bridge's own close loop: no further send/query/subscribe/effect
+        // or lifecycle purpose can start on it.
+        facade.closed = true;
+        facade.permit.close();
+        facade.principal.close();
+        facades.delete(facade);
+      },
+    };
+    return createV09ScopedLifecycle(ports);
+  }
+
   async function loadImpl(installedRef: string): Promise<V9DomainFacade> {
     if (bridgeClosed) {
       recordDiag('load', 'BRIDGE_CLOSED', V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
@@ -514,23 +645,19 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
       principal,
       permit,
       runtimes: new Map(),
+      receiptListeners: new Set(),
       closed: false,
     };
     facades.add(facade);
+    const lifecycle = composeFacadeLifecycle(facade);
     return Object.freeze({
       package: facade.packageRecord,
       send: (intent: Readonly<V9PublicSendIntent>): Promise<unknown> => sendImpl(facade, intent),
       query: (query: Readonly<V9PublicInstanceQuery>): Promise<unknown> => queryImpl(facade, query),
-      // #1120 owns subscription and stop; an honest typed refusal is not a
-      // fake implementation.
-      subscribe: async (): Promise<never> => {
-        recordDiag('subscribe', 'BRIDGE_LIFECYCLE_NOT_OWNED', V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
-        throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
-      },
-      stop: async (): Promise<void> => {
-        recordDiag('stop', 'BRIDGE_LIFECYCLE_NOT_OWNED', V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
-        throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
-      },
+      // #1120 scoped lifecycle over this facade's real trusted ports; the
+      // H-private delivery drain stays internal to the lifecycle helper.
+      subscribe: (observer: (receipt: unknown) => void): Promise<V9PublicSubscription> => lifecycle.subscribe(observer),
+      stop: (): Promise<void> => lifecycle.stop(),
     } satisfies V9DomainFacade);
   }
 
@@ -633,6 +760,10 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
         interpret: (declaration: unknown, input: unknown, context: unknown): unknown => interpret(declaration, input, context),
       },
       businessEndpoint: policy,
+      // The selected Kernel's own receipt side-channel (#1120 delivery
+      // source): every committed occurrence of this facade fans out through
+      // the scoped lifecycle's per-delivery authorization chain.
+      observe: kernelObserveFor(facade),
     });
     facade.runtimes.set(businessPackageId, runtime);
     return runtime;

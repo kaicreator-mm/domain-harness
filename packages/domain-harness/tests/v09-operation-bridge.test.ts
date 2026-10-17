@@ -745,7 +745,10 @@ test('V09-BRIDGE-A1: a sealed route naming a dangling handler export refuses at 
   assert.ok(bridge.drainBridgeDiagnostics().some((entry) => entry.internalCode === 'BRIDGE_ABI_INVALID'));
 });
 
-test('V09-BRIDGE-L1: subscribe/stop fail typed LIFECYCLE — #1120 owns them, and a typed refusal is not a fake implementation', async () => {
+test('V09-BRIDGE-L1: a caller without #1120 lifecycle grants gets typed LIFECYCLE refusals from the real subscribe/stop path', async () => {
+  // The #1120 scoped lifecycle is wired (real #1124 purpose issues); this
+  // world's grants deliberately carry no subscribe/delivery/stop:lifecycle,
+  // so the REAL path refuses the caller typed and fails closed.
   const world = await setupWorld();
   const facade = await world.bridge('app:bridge:a', 'tenant:one').harness.load(world.ref('app:bridge:a'));
   await assert.rejects(facade.subscribe(() => {}), (error: unknown) => publicErrorOf(error).code === 'LIFECYCLE_FAILED');
