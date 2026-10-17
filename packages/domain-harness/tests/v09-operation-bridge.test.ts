@@ -300,7 +300,7 @@ function makeRoot(payloads: Payloads, spec: RootSpec): { root: Record<string, un
   return { root, subjectDigest };
 }
 
-type Sabotage = 'none' | 'foreign-app' | 'foreign-audience' | 'foreign-subject' | 'expired';
+type Sabotage = 'none' | 'foreign-app' | 'foreign-audience' | 'foreign-subject' | 'expired' | 'bad-tenant-grammar';
 
 const GRANTS: Readonly<Record<string, readonly string[]>> = {
   'app:bridge:a': ['send:submitQuoteDecisionDynamic', 'send:submitQuoteDecision', 'query:instance', 'effect:reserve', 'effect:preview'],
@@ -386,6 +386,9 @@ async function setupWorld(wrap?: (memory: MemoryV09Store) => V09HostDocumentStor
         if (sabotage === 'foreign-audience') identity.hostAudience = 'aud:somewhere-else';
         if (sabotage === 'foreign-subject') identity.selectedClosureDigest = 'a'.repeat(64);
         if (sabotage === 'expired') identity.expiresAtMs = clock.now - 1;
+        // Review P1-01 vector: a string tenantId that passes the load preflight's
+        // duck-type check but violates the #1124 identifier grammar.
+        if (sabotage === 'bad-tenant-grammar') identity.tenantId = 'tenant/one';
         return identity as unknown as V09HostVerifiedIdentity;
       },
     };
@@ -535,6 +538,21 @@ test('V09-BRIDGE-N2: forged/foreign/expired trusted identities never load', asyn
     const bridge = world.bridge('app:bridge:a', 'tenant:one', sabotage);
     await assert.rejects(bridge.harness.load(world.ref('app:bridge:a')), (error: unknown) => publicErrorOf(error).code === 'CALLER_SCOPE_DENIED');
   }
+});
+
+test('V09-BRIDGE-N2b (review P1-01): a grammar-violating trusted tenantId still collapses onto the public CALLER_SCOPE_DENIED family', async () => {
+  const world = await setupWorld();
+  const bridge = world.bridge('app:bridge:a', 'tenant:one', 'bad-tenant-grammar');
+  await assert.rejects(bridge.harness.load(world.ref('app:bridge:a')), (error: unknown) => {
+    // The raw #1124 V09PrivateScopeError must NEVER escape the public load:
+    // the caller sees exactly the frozen D04 family shape.
+    const publicError = publicErrorOf(error);
+    assert.equal(publicError.code, 'CALLER_SCOPE_DENIED');
+    assert.equal(publicError.message, 'Caller scope is not authorized.');
+    assert.equal('cause' in publicError, false);
+    return true;
+  });
+  assert.ok(bridge.drainBridgeDiagnostics().some((entry) => entry.internalCode === 'V09_PRIVATE_SCOPE_DENIED'));
 });
 
 test('V09-BRIDGE-N3: smuggled authority fields in public intents are refused, not ignored', async () => {

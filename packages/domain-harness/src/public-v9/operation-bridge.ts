@@ -473,19 +473,31 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
     } catch (error) {
       throw toPublicError(error, 'load');
     }
-    const principal = createV09PrivatePrincipalAuthority({
-      hostAudience: audience,
-      appId: record.rootPackageId,
-      tenantId: identity.tenantId,
-      subjectDigest: record.subjectDigest,
-      authenticator,
-      nowMs: (): number => now(),
-    });
-    const permit = createV09EffectPermitAuthority({
-      store, trustedIssuers, audience,
-      subjectDigest: record.subjectDigest,
-      principal, nowMs: (): number => now(),
-    });
+    // Review P1-01 repair: the per-facade authority composition enforces its
+    // own identifier grammar (SAFE_ID app/tenant); a trusted-side data defect
+    // (e.g. a rootPackageId/tenantId that passes the registry's bounded-string
+    // checks but not #1124's grammar) must still collapse onto the frozen D04
+    // public families like every other load failure — never leak a raw
+    // protected-namespace error shape on the public path.
+    let principal: ReturnType<typeof createV09PrivatePrincipalAuthority>;
+    let permit: ReturnType<typeof createV09EffectPermitAuthority>;
+    try {
+      principal = createV09PrivatePrincipalAuthority({
+        hostAudience: audience,
+        appId: record.rootPackageId,
+        tenantId: identity.tenantId,
+        subjectDigest: record.subjectDigest,
+        authenticator,
+        nowMs: (): number => now(),
+      });
+      permit = createV09EffectPermitAuthority({
+        store, trustedIssuers, audience,
+        subjectDigest: record.subjectDigest,
+        principal, nowMs: (): number => now(),
+      });
+    } catch (error) {
+      throw toPublicError(error, 'load');
+    }
     const facade: ActiveFacade = {
       packageRecord: Object.freeze({
         installedRef: record.installedRef,
