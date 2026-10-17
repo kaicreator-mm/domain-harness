@@ -1,9 +1,9 @@
 /**
  * v0.9 public SDK CONTRACT surface (N07), portable JS/TS.
  *
- * @kaicreator/domain-harness/v9 is wired by #1118 after the actual #1036
- * protected H→K operations bridge. Exporting types here does not create a
- * fake DomainHarness runtime or allow a caller-supplied verifier.
+ * The published DomainHarness value forwards only a single installed-ref
+ * string to an existing trusted Host bootstrap (if any). It cannot create
+ * Host/Kernels, accept a caller-supplied verifier or install raw packages.
  */
 export {
   DomainHarnessV9Error,
@@ -11,6 +11,9 @@ export {
   publicInstalledReferenceFailure,
 } from './errors.js';
 export type { V9PublicErrorCode } from './errors.js';
+
+/** Public one-argument executable facade; no privileged bootstrap export. */
+export { DomainHarness } from './runtime-channel.js';
 
 export type {
   V9DomainFacade,

@@ -46,6 +46,7 @@ import {
 import { createV09DomainHarnessBridge, type V09ComposedBridge } from '../src/public-v9/operation-bridge.js';
 import type { V09HostVerifiedIdentity } from '../src/operations-v9/private-principal.js';
 import { DomainHarnessV9Error } from '../src/public-v9/errors.js';
+import { DomainHarness } from '../src/public-v9/index.js';
 
 const ISSUER = 'issuer:v09-bridge-test';
 const SECRET = 'v09-bridge-local-external-issuer-proof-only-not-a-deployment-secret';
@@ -455,6 +456,65 @@ function onlyKey(keys: readonly string[]): string {
 }
 
 // ---------------------------------------------------------------------------
+
+test('V09-PKG-P1: public /v9 DomainHarness is bound to the CURRENT trusted Host scope, with two real Apps', async () => {
+  const world = await setupWorld();
+  const otherWorld = await setupWorld(); // independently owned physical Host storage
+  const firstBridge = world.bridge('app:bridge:a', 'tenant:one');
+  const secondBridge = otherWorld.bridge('app:bridge:b', 'tenant:one');
+  assert.deepEqual(Object.keys(DomainHarness), ['load']);
+
+  // With NO trusted scope, even valid installed refs and forged inputs refuse.
+  for (const bad of [null, {}, 1, world.ref('app:bridge:a')]) {
+    await assert.rejects(DomainHarness.load(bad as string), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  }
+
+  // Each caller runs inside its own trusted H request context, never by
+  // selecting another Host from a process-global set of credentials.
+  const [a, b] = await Promise.all([
+    firstBridge.runWithinTrustedContext(() => DomainHarness.load(world.ref('app:bridge:a'))),
+    secondBridge.runWithinTrustedContext(() => DomainHarness.load(otherWorld.ref('app:bridge:b'))),
+  ]);
+  assert.equal(a.package.rootPackageId, 'app:bridge:a');
+  assert.equal(b.package.rootPackageId, 'app:bridge:b');
+  await firstBridge.runWithinTrustedContext(async () => {
+    await assert.rejects(DomainHarness.load(otherWorld.ref('app:bridge:b')), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  });
+  await secondBridge.runWithinTrustedContext(async () => {
+    await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  });
+  // A loaded public facade must not become a transferable bearer capability
+  // that authorizes an unrelated caller outside the selected H request.
+  await assert.rejects(a.send(dynamicIntent('instance:leak', 'msg:leak')), (error: unknown) =>
+    publicErrorOf(error).code === 'CALLER_SCOPE_DENIED');
+  await secondBridge.runWithinTrustedContext(async () => {
+    await assert.rejects(a.query({ kind: 'instance', instanceKey: 'instance:published-a' }), (error: unknown) =>
+      publicErrorOf(error).code === 'CALLER_SCOPE_DENIED');
+  });
+  const [receiptA, receiptB] = await Promise.all([
+    firstBridge.runWithinTrustedContext(() => a.send(dynamicIntent('instance:published-a', 'msg:published-a'))),
+    secondBridge.runWithinTrustedContext(() => b.send(dynamicIntent('instance:published-b', 'msg:published-b'))),
+  ]);
+  assert.equal((receiptA as { status: string }).status, 'admitted');
+  assert.equal((receiptB as { status: string }).status, 'admitted');
+  assert.equal(journalKeys(world, 'app:bridge:a', 'tenant:one').length, 1);
+  assert.equal(journalKeys(otherWorld, 'app:bridge:b', 'tenant:one').length, 1);
+
+  await firstBridge.runWithinTrustedContext(async () => {
+    await firstBridge.close();
+    await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) =>
+      publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  });
+  const b2 = await secondBridge.runWithinTrustedContext(() => DomainHarness.load(otherWorld.ref('app:bridge:b')));
+  assert.equal(b2.package.rootPackageId, 'app:bridge:b');
+  await secondBridge.close();
+  await assert.rejects(DomainHarness.load(otherWorld.ref('app:bridge:b')), (error: unknown) =>
+    publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+});
+
 
 test('V09-BRIDGE-P1: two real Apps execute the full protected path; the public surface is exactly the facade contract', async () => {
   const world = await setupWorld();
