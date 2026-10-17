@@ -448,6 +448,11 @@ function activationKey(installedRef: string, nonce: string): string {
   return `${ACTIVATION_PREFIX}${installedRef}/${nonce}`;
 }
 
+/** One consumed one-shot effect permit entry riding the shared authority record (D03). */
+export interface V09ConsumedPermitEntry {
+  readonly expiresAtMs: number;
+}
+
 /**
  * The ONE shared per-subject CAS authority: a single store key per
  * subjectDigest (the revocation key) through which BOTH the activation
@@ -456,11 +461,6 @@ function activationKey(installedRef: string, nonce: string): string {
  * revocation record, so the store's serial CAS order — not two independent
  * keys — decides revoke-vs-activate (frozen L2 §11 D02).
  */
-/** One consumed one-shot effect permit entry riding the shared authority record (D03). */
-export interface V09ConsumedPermitEntry {
-  readonly expiresAtMs: number;
-}
-
 interface V09SubjectEpochDoc {
   readonly kind: 'v9/subject-epoch';
   readonly subjectDigest: string;
