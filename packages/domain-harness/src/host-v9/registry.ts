@@ -631,10 +631,17 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
       return { status: 'absent' };
     }
     const value: unknown = doc.value;
-    if (isRecord(value) && value.kind === 'v9/revocation') {
+    // D02/D03: the document stored at this subject's CAS authority key
+    // must attest to THIS subject. A foreign-subject record (including a
+    // forged revocation-kind record) is corruption, never a valid authority.
+    if (isRecord(value) && value.kind === 'v9/revocation' &&
+        value.subjectDigest === subjectDigest &&
+        typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
       return { status: 'revoked', revision: doc.revision };
     }
-    if (isRecord(value) && value.kind === 'v9/subject-epoch' && typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
+    if (isRecord(value) && value.kind === 'v9/subject-epoch' &&
+        value.subjectDigest === subjectDigest &&
+        typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
       return { status: 'active', epoch: value.epoch, revision: doc.revision };
     }
     fail('SUBJECT_AUTHORITY_INVALID', `${operation}: ${revocationKey(subjectDigest)} holds an unrecognized authority record; the shared CAS authority fails closed instead of guessing`);
