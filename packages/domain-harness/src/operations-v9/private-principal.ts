@@ -82,23 +82,34 @@ function validId(value: unknown): value is string {
 }
 
 function identityShape(value: unknown): value is V09HostVerifiedIdentity {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  // Host returns inert own-data; accessors and prototype tricks are refused
-  // before identity is used or copied into the internal proof.
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) return false;
-  const fields = ['principalId', 'hostAudience', 'appId', 'tenantId', 'issuerAuthEpoch', 'expiresAtMs', 'grants'];
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (Reflect.ownKeys(descriptors).length !== fields.length) return false;
-  if (!fields.every(field => Object.hasOwn(descriptors, field) && Object.hasOwn(descriptors[field], 'value'))) return false;
-  const v = value as V09HostVerifiedIdentity;
-  if (![v.principalId, v.hostAudience, v.appId, v.tenantId].every(validId)) return false;
-  if (!Number.isSafeInteger(v.issuerAuthEpoch) || v.issuerAuthEpoch < 1) return false;
-  if (!Number.isSafeInteger(v.expiresAtMs)) return false;
-  if (!Array.isArray(v.grants) || v.grants.length === 0 || v.grants.length > 128 || Object.getPrototypeOf(v.grants) !== Array.prototype) return false;
-  const desc = Object.getOwnPropertyDescriptors(v.grants);
-  if (Reflect.ownKeys(desc).length !== v.grants.length + 1) return false;
-  return v.grants.every(x => typeof x === 'string' && x.length > 0 && x.length <= 256);
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+    // Only inert own-data, no accessors, extra properties or Proxy traps.
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) return false;
+    const fields = ['principalId', 'hostAudience', 'appId', 'tenantId', 'issuerAuthEpoch', 'expiresAtMs', 'grants'];
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (Reflect.ownKeys(descriptors).length !== fields.length) return false;
+    if (!fields.every(field => {
+      const d = descriptors[field];
+      return d !== undefined && d.enumerable === true && Object.hasOwn(d, 'value');
+    })) return false;
+    const v = value as V09HostVerifiedIdentity;
+    if (![v.principalId, v.hostAudience, v.appId, v.tenantId].every(validId)) return false;
+    if (!Number.isSafeInteger(v.issuerAuthEpoch) || v.issuerAuthEpoch < 1) return false;
+    if (!Number.isSafeInteger(v.expiresAtMs)) return false;
+    if (!Array.isArray(v.grants) || v.grants.length === 0 || v.grants.length > 128 || Object.getPrototypeOf(v.grants) !== Array.prototype) return false;
+    const desc = Object.getOwnPropertyDescriptors(v.grants);
+    if (Reflect.ownKeys(desc).length !== v.grants.length + 1) return false;
+    for (let i = 0; i < v.grants.length; i += 1) {
+      const d = desc[String(i)];
+      if (d === undefined || d.enumerable !== true || !Object.hasOwn(d, 'value') ||
+          typeof d.value !== 'string' || d.value.length === 0 || d.value.length > 256) return false;
+    }
+    return true;
+  } catch {
+    return false; // hostile/revoked identity projection always fails closed
+  }
 }
 
 function cloneIdentity(v: V09HostVerifiedIdentity): V09HostVerifiedIdentity {
