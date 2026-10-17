@@ -46,6 +46,7 @@ import {
 import { createV09DomainHarnessBridge, type V09ComposedBridge } from '../src/public-v9/operation-bridge.js';
 import type { V09HostVerifiedIdentity } from '../src/operations-v9/private-principal.js';
 import { DomainHarnessV9Error } from '../src/public-v9/errors.js';
+import { DomainHarness } from '../src/public-v9/index.js';
 
 const ISSUER = 'issuer:v09-bridge-test';
 const SECRET = 'v09-bridge-local-external-issuer-proof-only-not-a-deployment-secret';
@@ -455,6 +456,34 @@ function onlyKey(keys: readonly string[]): string {
 }
 
 // ---------------------------------------------------------------------------
+
+test('V09-PKG-P1: public /v9 one-arg DomainHarness dispatches only through trusted live two-App bridge and detaches on close', async () => {
+  const world = await setupWorld();
+  const firstBridge = world.bridge('app:bridge:a', 'tenant:one');
+  const secondBridge = world.bridge('app:bridge:b', 'tenant:one');
+  assert.deepEqual(Object.keys(DomainHarness), ['load']);
+
+  // An unknown, raw or forged ref is never a Host configuration channel.
+  for (const bad of [null, {}, 1, 'dhv9inst-unknown']) {
+    await assert.rejects(DomainHarness.load(bad as string), (error: unknown) => publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  }
+  const a = await DomainHarness.load(world.ref('app:bridge:a'));
+  const b = await DomainHarness.load(world.ref('app:bridge:b'));
+  assert.equal(a.package.rootPackageId, 'app:bridge:a');
+  assert.equal(b.package.rootPackageId, 'app:bridge:b');
+  assert.equal(((await a.send(dynamicIntent('instance:published-a', 'msg:published-a'))) as { status: string }).status, 'admitted');
+  assert.equal(((await b.send(dynamicIntent('instance:published-b', 'msg:published-b'))) as { status: string }).status, 'admitted');
+  assert.equal(journalKeys(world, 'app:bridge:a', 'tenant:one').length, 1);
+  assert.equal(journalKeys(world, 'app:bridge:b', 'tenant:one').length, 1);
+
+  await firstBridge.close();
+  await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) => publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+  // Closing one trusted Host must not unregister another Host's public load.
+  const b2 = await DomainHarness.load(world.ref('app:bridge:b'));
+  assert.equal(b2.package.rootPackageId, 'app:bridge:b');
+  await secondBridge.close();
+  await assert.rejects(DomainHarness.load(world.ref('app:bridge:b')), (error: unknown) => publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
+});
 
 test('V09-BRIDGE-P1: two real Apps execute the full protected path; the public surface is exactly the facade contract', async () => {
   const world = await setupWorld();
