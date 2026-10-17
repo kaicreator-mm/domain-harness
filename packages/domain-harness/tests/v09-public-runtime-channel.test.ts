@@ -18,7 +18,7 @@ test('V09-PKG-VALUE-N1: without protected bootstrap the one-string load refuses 
       return true;
     });
   }
-  await assert.rejects(DomainHarness.load('dhv9inst-forged', {} as never), (error: unknown) =>
+  await assert.rejects((DomainHarness.load as unknown as (...args: unknown[]) => Promise<unknown>)('dhv9inst-forged', {}), (error: unknown) =>
     error instanceof DomainHarnessV9Error && error.code === 'PACKAGE_NOT_AUTHORIZED');
 });
 
@@ -29,7 +29,7 @@ test('V09-PKG-VALUE-N2: a same-shape fake H provider cannot bind the public SDK 
     },
   });
   assert.throws(
-    () => attachV09TrustedBridge(forged),
+    () => attachV09TrustedBridge(forged as never),
     (error: unknown) => error instanceof DomainHarnessV9Error && error.code === 'LIFECYCLE_FAILED',
   );
 });
