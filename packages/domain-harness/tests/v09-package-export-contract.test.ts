@@ -37,9 +37,14 @@ test('V09-PKG-EX02: real Node ESM resolves the published /v9 subpath; no H autho
   // Import from the package name itself, never from private source paths.
   const publicSdk = await import('@kaicreator/domain-harness/v9');
   assert.equal(typeof publicSdk.DomainHarnessV9Error, 'function');
+  assert.deepEqual(Object.keys(publicSdk.DomainHarness), ['load'], 'public SDK has one installed-ref-only load verb');
+  assert.equal(typeof publicSdk.DomainHarness.load, 'function');
   assert.equal(publicSdk.V9_PUBLIC_ERROR_CODES.PACKAGE_NOT_AUTHORIZED, 'PACKAGE_NOT_AUTHORIZED');
   assert.equal(typeof publicSdk.publicInstalledReferenceFailure, 'function');
   for (const forbidden of [
+    'attachV09TrustedBridge',
+    'isV09AuthenticatedBridgeHarness',
+    'createV09DomainHarnessBridge',
     'createProtectedHostV09',
     'issueV09ApprovalProof',
     'drainProtectedDiagnostics',
@@ -49,5 +54,6 @@ test('V09-PKG-EX02: real Node ESM resolves the published /v9 subpath; no H autho
   ]) {
     assert.equal(Object.hasOwn(publicSdk, forbidden), false);
   }
-  // This PR does NOT assert send/query works; executable dispatch is #1036.
+  // Executable dispatch was accepted under #1036; the actual published-value
+  // positive and cleanup test is a separate focused integration assertion.
 });
