@@ -62,9 +62,10 @@
  *    protected path for the Microkernel bootstrap (#1036 integration). The
  *    public `./v9` facade and its names are #1035.
  *
- * D03 boundary (per-op H→K principal tokens and one-shot effect permits) is
- * #1036's and is deliberately absent here; nothing in this module mints a
- * principal, a permit or an authorization from caller input.
+ * D03 boundary: the trusted-H one-shot physical effect permit port lives in
+ * `effect-permit.ts` and commits on the SAME shared per-subject authority
+ * record this registry owns (see `readV09SubjectAuthority`); nothing in THIS
+ * module mints a principal, a permit or an authorization from caller input.
  */
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -431,11 +432,11 @@ function artifactKey(subjectDigest: string): string {
   return `${ARTIFACT_PREFIX}${subjectDigest}`;
 }
 
-function approvalKey(subjectDigest: string): string {
+export function approvalKey(subjectDigest: string): string {
   return `${APPROVAL_PREFIX}${subjectDigest}`;
 }
 
-function revocationKey(subjectDigest: string): string {
+export function revocationKey(subjectDigest: string): string {
   return `${REVOCATION_PREFIX}${subjectDigest}`;
 }
 
@@ -455,10 +456,17 @@ function activationKey(installedRef: string, nonce: string): string {
  * revocation record, so the store's serial CAS order — not two independent
  * keys — decides revoke-vs-activate (frozen L2 §11 D02).
  */
+/** One consumed one-shot effect permit entry riding the shared authority record (D03). */
+export interface V09ConsumedPermitEntry {
+  readonly expiresAtMs: number;
+}
+
 interface V09SubjectEpochDoc {
   readonly kind: 'v9/subject-epoch';
   readonly subjectDigest: string;
   readonly epoch: number;
+  /** Consumed one-shot effect permits (D03) on the SAME record; PRESERVED across epoch transitions. */
+  readonly permits?: Readonly<Record<string, V09ConsumedPermitEntry>>;
 }
 
 interface V09SubjectRevocationDoc {
@@ -469,9 +477,9 @@ interface V09SubjectRevocationDoc {
   readonly epoch: number;
 }
 
-type V09SubjectAuthorityState =
+export type V09SubjectAuthorityState =
   | { readonly status: 'absent' }
-  | { readonly status: 'active'; readonly epoch: number; readonly revision: number }
+  | { readonly status: 'active'; readonly epoch: number; readonly revision: number; readonly permits: Readonly<Record<string, V09ConsumedPermitEntry>> }
   | { readonly status: 'revoked'; readonly revision: number };
 
 /** Bounded retry budget for authority transitions under physical contention. */
@@ -537,6 +545,71 @@ function toPublicLoadError(error: unknown): V09PublicRefusalPlan {
     default:
       return plan(V09_PUBLIC_FAMILY_NOT_AUTHORIZED, error.diagnosticCode);
   }
+}
+
+/** Sanity bound for a stored permits map; the mint path enforces the real capacity. */
+const MAX_STORED_PERMIT_ENTRIES = 4096;
+
+/**
+ * Strictly parse the consumed one-shot effect permits carried ON the live
+ * subject-epoch record (D03). Absent is an empty map; ANY malformed entry is
+ * corruption → typed `SUBJECT_AUTHORITY_INVALID` (fail closed, the same
+ * discipline as the authority record itself).
+ */
+function parseConsumedPermits(value: unknown, operation: string): Readonly<Record<string, V09ConsumedPermitEntry>> {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isRecord(value)) {
+    fail('SUBJECT_AUTHORITY_INVALID', `${operation}: the consumed-permit map on the subject authority record is not a record; the shared CAS authority fails closed`);
+  }
+  const entries = Object.entries(value);
+  if (entries.length > MAX_STORED_PERMIT_ENTRIES) {
+    fail('SUBJECT_AUTHORITY_INVALID', `${operation}: the consumed-permit map carries ${String(entries.length)} entries beyond the sanity bound; the shared CAS authority fails closed`);
+  }
+  const permits: Record<string, V09ConsumedPermitEntry> = {};
+  for (const [digest, entry] of entries) {
+    if (!HEX64.test(digest) || !isRecord(entry) || Object.keys(entry).length !== 1 ||
+        typeof entry.expiresAtMs !== 'number' || !Number.isSafeInteger(entry.expiresAtMs)) {
+      fail('SUBJECT_AUTHORITY_INVALID', `${operation}: the consumed-permit map holds a malformed entry; the shared CAS authority fails closed instead of guessing`);
+    }
+    permits[digest] = { expiresAtMs: entry.expiresAtMs };
+  }
+  return Object.freeze(permits);
+}
+
+/**
+ * Observe the shared per-subject CAS authority over one injected store.
+ * Module-level so the protected H registry AND the trusted-H effect-permit
+ * port (`effect-permit.ts`) use ONE authority implementation. Fails closed
+ * typed on ANY store failure and on an unrecognized record shape — the
+ * authority is never degraded into an unguarded read.
+ */
+export async function readV09SubjectAuthority(store: V09HostDocumentStore, subjectDigest: string, operation: string): Promise<V09SubjectAuthorityState> {
+  let doc: V09StoreDocument | null;
+  try {
+    doc = await store.get(revocationKey(subjectDigest));
+  } catch (error) {
+    throw storeFailureToHostError(error, operation);
+  }
+  if (doc === null) {
+    return { status: 'absent' };
+  }
+  const value: unknown = doc.value;
+  // D02/D03: the document stored at this subject's CAS authority key
+  // must attest to THIS subject. A foreign-subject record (including a
+  // forged revocation-kind record) is corruption, never a valid authority.
+  if (isRecord(value) && value.kind === 'v9/revocation' &&
+      value.subjectDigest === subjectDigest &&
+      typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
+    return { status: 'revoked', revision: doc.revision };
+  }
+  if (isRecord(value) && value.kind === 'v9/subject-epoch' &&
+      value.subjectDigest === subjectDigest &&
+      typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
+    return { status: 'active', epoch: value.epoch, revision: doc.revision, permits: parseConsumedPermits(value.permits, operation) };
+  }
+  fail('SUBJECT_AUTHORITY_INVALID', `${operation}: ${revocationKey(subjectDigest)} holds an unrecognized authority record; the shared CAS authority fails closed instead of guessing`);
 }
 
 /**
@@ -616,38 +689,6 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
   const protectedDiagnostics = new V09ProtectedDiagnosticChannel();
 
   /**
-   * Observe the shared per-subject CAS authority. Fails closed typed on ANY
-   * store failure and on an unrecognized record shape — the authority is
-   * never degraded into an unguarded read.
-   */
-  async function readSubjectAuthority(subjectDigest: string, operation: string): Promise<V09SubjectAuthorityState> {
-    let doc: V09StoreDocument | null;
-    try {
-      doc = await store.get(revocationKey(subjectDigest));
-    } catch (error) {
-      throw storeFailureToHostError(error, operation);
-    }
-    if (doc === null) {
-      return { status: 'absent' };
-    }
-    const value: unknown = doc.value;
-    // D02/D03: the document stored at this subject's CAS authority key
-    // must attest to THIS subject. A foreign-subject record (including a
-    // forged revocation-kind record) is corruption, never a valid authority.
-    if (isRecord(value) && value.kind === 'v9/revocation' &&
-        value.subjectDigest === subjectDigest &&
-        typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
-      return { status: 'revoked', revision: doc.revision };
-    }
-    if (isRecord(value) && value.kind === 'v9/subject-epoch' &&
-        value.subjectDigest === subjectDigest &&
-        typeof value.epoch === 'number' && Number.isSafeInteger(value.epoch) && value.epoch >= 1) {
-      return { status: 'active', epoch: value.epoch, revision: doc.revision };
-    }
-    fail('SUBJECT_AUTHORITY_INVALID', `${operation}: ${revocationKey(subjectDigest)} holds an unrecognized authority record; the shared CAS authority fails closed instead of guessing`);
-  }
-
-  /**
    * D02 linearization: commit THIS activation's epoch transition on the
    * shared per-subject CAS authority. The conditional write is the actual
    * activation commit/linearization point — it lands only while the
@@ -661,7 +702,7 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
    */
   async function commitActivationEpoch(subjectDigest: string): Promise<number> {
     for (let attempt = 0; attempt < SUBJECT_AUTHORITY_ATTEMPTS; attempt += 1) {
-      const state = await readSubjectAuthority(subjectDigest, 'activation authority read');
+      const state = await readV09SubjectAuthority(store, subjectDigest, 'activation authority read');
       if (state.status === 'revoked') {
         fail('APPROVAL_REVOKED', 'the approval for this installed subject has been revoked; activation is refused at the shared per-subject CAS authority before any module import');
       }
@@ -669,6 +710,10 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
         kind: 'v9/subject-epoch',
         subjectDigest,
         epoch: state.status === 'active' ? state.epoch + 1 : 1,
+        // An epoch transition must never drop the consumed one-shot permit
+        // memory riding the same record — that would reopen a replay window
+        // (D03); the permits map is carried forward verbatim.
+        ...(state.status === 'active' && Object.keys(state.permits).length > 0 ? { permits: state.permits } : {}),
       };
       const condition: V09StorePutCondition = state.status === 'active' ? { kind: 'cas', revision: state.revision } : { kind: 'create' };
       try {
@@ -893,10 +938,13 @@ export async function createProtectedHostV09(options: ProtectedHostV09Options): 
     // import. `create` bootstraps the authority on a never-touched subject;
     // CAS over a live epoch replaces it with the revocation record.
     for (let attempt = 0; attempt < SUBJECT_AUTHORITY_ATTEMPTS; attempt += 1) {
-      const state = await readSubjectAuthority(digest, 'revocation authority read');
+      const state = await readV09SubjectAuthority(store, digest, 'revocation authority read');
       if (state.status === 'revoked') {
         fail('APPROVAL_ALREADY_REVOKED', 'this subject is already revoked; the first revocation wins (shared per-subject CAS authority)');
       }
+      // The revocation record intentionally REPLACES the live epoch record and
+      // drops its consumed-permit map: the revoked state itself refuses every
+      // new permit, so the replay memory is no longer reachable or needed.
       const record: V09SubjectRevocationDoc = {
         kind: 'v9/revocation',
         subjectDigest: digest,
