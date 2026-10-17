@@ -119,7 +119,8 @@ export function createV09ScopedLifecycle(ports: V09ScopedLifecyclePorts) {
           || event.tenantId !== ports.tenantId) return;
         try {
           await ports.authorize('delivery');
-          await ports.recheckDeliveryAuthorization(ports.subjectDigest, event.permitDigest);
+          const current = await ports.recheckDeliveryAuthorization(ports.subjectDigest, event.permitDigest);
+          if (current?.decision !== 'authorized') return; // a non-throwing denial never grants delivery
           if (!state.active || stopped) return; // late auth/revoke/stop race
           observer(event.receipt);
         } catch {
@@ -184,5 +185,10 @@ export function createV09ScopedLifecycle(ports: V09ScopedLifecyclePorts) {
     return stopping;
   }
 
-  return Object.freeze({ subscribe, stop });
+  /** H-private deterministic delivery drain; never part of the public facade. */
+  async function drainSelectedDeliveries(): Promise<void> {
+    await Promise.all([...subscriptions].map(state => state.tail));
+  }
+
+  return Object.freeze({ subscribe, stop, drainSelectedDeliveries });
 }
