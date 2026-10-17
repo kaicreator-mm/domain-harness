@@ -99,6 +99,11 @@ test('V09-PKG-ARC01: two real npm packs preserve exact ./v9 JS/types and reprodu
       }
     }
     assert.ok(included.has('dist/public-v9/errors.js'), 'pack must include v9 typed public error implementation');
+    // The deployment entry statically imports the vendored parser assets;
+    // a files-narrowing regression would otherwise ship an unimportable
+    // ./v9/deployment while both packs stay self-consistent.
+    assert.ok(included.has('dist/host-v9/generated/acorn.mjs'), 'pack must include the vendored host-v9 parser asset');
+    assert.ok(included.has('dist/host-v9/generated/acorn.d.mts'), 'pack must include the vendored host-v9 parser types');
     assert.ok(included.has('package.json'), 'npm pack must include its own versioned manifest');
     for (const file of included) {
       assert.equal(file.startsWith('src/'), false, `source file mistakenly published: ${file}`);

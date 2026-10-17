@@ -18,6 +18,11 @@ const shippedEntries = {
     'dist/public-v2/index.js',
     'dist/public-v3/index.js',
     'dist/public-v7/index.js',
+    'dist/public-v9/index.js',
+    'dist/public-v9/deployment.js',
+    'dist/public-v9/runtime-channel.js',
+    'dist/public-v9/operation-bridge.js',
+    'dist/host-v9/generated/acorn.mjs',
     'dist/workflow/index.js',
   ],
   'packages/domain-harness-compiler': [
