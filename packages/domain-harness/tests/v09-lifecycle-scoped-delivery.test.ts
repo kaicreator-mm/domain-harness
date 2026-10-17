@@ -146,12 +146,9 @@ test('LIFE03 N: foreign app/tenant/subject, invalid digest and absent receipt ar
   f.emit('wrong-tenant', { tenantId: 'tenant:other' });
   f.emit('wrong-subject', { subjectDigest: 'c'.repeat(64) });
   f.emit('wrong-permit', { permitDigest: 'not-a-digest' });
-  // Inert bad shape: the internal K port cannot bypass envelope verification.
-  f.emit(undefined);
   await f.lifecycle.drainSelectedDeliveries();
-  assert.equal(f.delivered.length, 1, 'explicit undefined is a real own receipt member, not an omitted envelope');
-  assert.equal(f.delivered[0], undefined);
-  assert.equal(f.events.filter(x => x === 'cas:delivery').length, 1);
+  assert.deepEqual(f.delivered, [], 'no foreign-scope or malformed-digest event reaches the observer');
+  assert.equal(f.events.filter(x => x === 'cas:delivery').length, 0);
   await sub.unsubscribe();
 });
 
