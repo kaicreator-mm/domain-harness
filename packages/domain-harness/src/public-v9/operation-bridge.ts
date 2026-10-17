@@ -87,6 +87,14 @@ const K_DOCS_PREFIX = 'v9/k/';
 /** Bounded internal diagnostics retention; protected subcodes never travel publicly. */
 const MAX_DIAGNOSTICS = 256;
 
+/** A private brand: arbitrary same-shape JS objects may not register as H. */
+const constructedV09Harnesses = new WeakSet<object>();
+
+/** Internal channel verification; does NOT return a Host or privileged port. */
+export function isV09AuthenticatedBridgeHarness(value: unknown): value is V9DomainHarness {
+  return typeof value === 'object' && value !== null && constructedV09Harnesses.has(value);
+}
+
 export interface V09BridgeBootstrap {
   /** The SAME physical store the protected H registry was bootstrapped with. */
   readonly store: V09HostDocumentStore;
@@ -906,6 +914,7 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
 
   // Only this selected trusted H→K composition may bind a public load target.
   const harness = Object.freeze({ load: loadImpl }) satisfies V9DomainHarness;
+  constructedV09Harnesses.add(harness); // only this trusted composer can brand
   const detachPublic = attachV09TrustedBridge(harness);
   return Object.freeze({
     harness,
