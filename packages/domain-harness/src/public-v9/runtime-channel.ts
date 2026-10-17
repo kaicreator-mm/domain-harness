@@ -1,69 +1,77 @@
 /**
  * v0.9 published DomainHarness.load(installedRef) dispatch boundary.
  *
- * Only a TRUSTED deployment/Host bootstrap may compose and attach an
- * internally authorized H→K bridge. The normal ./v9 public SDK exports
- * DomainHarness (exactly one-argument load), never this registrar or any
- * Host, verifier, store, governance control or module namespace.
+ * A caller request MUST run in exactly one selected trusted Host scope,
+ * installed by the trusted deployment/Host bootstrap, not chosen by the
+ * public caller. There is no process-global iteration over other Host
+ * identities: an opaque reference from tenant B cannot cause public load
+ * invoked in A's caller context to borrow B's authenticated principal.
  *
- * Having no protected Host installed is a uniform D04 refusal; a valid
- * looking reference is not proof of installation or issuer approval.
- * The selected bridge itself rechecks physical store/current approval,
- * caller scope, and per-effect permits on every relevant operation.
+ * The published ./v9 entry exports only DomainHarness.load(installedRef).
+ * It NEVER exports the Host-context binder, issuer, verifier, Kernel, store,
+ * bridge composer or raw module namespace. The protected H independently
+ * checks installed reference/audience/issuer/bytes and scope at each call.
  *
- * This process-local routing registry contains no credentials or protected
- * ports. Its members are the **existing** selected bridge's public facades.
- * Trusted bridge close detaches its routing entry, not an already committed
- * physical effect (which remains Kernel/Journal authority).
+ * First qualified selected profile is Node24, whose AsyncLocalStorage keeps
+ * the trusted context isolated across concurrent async caller requests.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { DomainHarnessV9Error, V9_PUBLIC_ERROR_CODES } from './errors.js';
 import { isV09AuthenticatedBridgeHarness } from './operation-bridge.js';
 import type { V9DomainFacade, V9DomainHarness } from './contracts.js';
 
-const trustedBridges = new Set<V9DomainHarness>();
+const callerHost = new AsyncLocalStorage<V9DomainHarness>();
+const activeHosts = new WeakSet<object>();
+
+function refused(): DomainHarnessV9Error {
+  return new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.PACKAGE_NOT_AUTHORIZED);
+}
 
 /**
- * TRUSTED INTERNAL ENTRY — never export from ./v9 or package root.
- * Called only by createV09DomainHarnessBridge after its bootstrap checks.
+ * TRUSTED INTERNAL REGISTRATION — never re-exported from the published SDK.
+ * A same-shape object cannot bind itself: only the actual #1036 selected
+ * H→K bridge module can mint the module-private WeakSet brand.
  */
 export function attachV09TrustedBridge(harness: V9DomainHarness): () => void {
-  // Reject a same-shape object or arbitrary deep-import attempt: the brand
-  // is minted only by the real protected H→K bridge composer.
   if (!isV09AuthenticatedBridgeHarness(harness)) {
     throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
   }
-  trustedBridges.add(harness);
+  activeHosts.add(harness);
   let attached = true;
   return (): void => {
     if (!attached) return;
     attached = false;
-    trustedBridges.delete(harness);
+    activeHosts.delete(harness);
   };
 }
 
-/** Exactly one public verb. No public registration or permission capability. */
+/**
+ * TRUSTED Host dispatch-only wrapper. Public clients cannot select the Host,
+ * inject a presentation or create an AsyncLocalStorage caller scope through
+ * DomainHarness.load. The privileged bootstrap must enter its own context
+ * after it has authenticated the ambient caller/presentation.
+ */
+export async function runV09InTrustedHostScope<T>(
+  harness: V9DomainHarness,
+  action: () => T | Promise<T>,
+): Promise<T> {
+  if (!isV09AuthenticatedBridgeHarness(harness) || !activeHosts.has(harness)
+    || typeof action !== 'function') {
+    throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.LIFECYCLE_FAILED);
+  }
+  return callerHost.run(harness, action);
+}
+
+/** Exactly one public verb: select ONLY the Host bound to this request. */
 export const DomainHarness: V9DomainHarness = Object.freeze({
   async load(installedRef: string): Promise<V9DomainFacade> {
-    // Reject anything other than one installed-reference string before
-    // touching any Host. No caller-supplied raw sealed root or config object.
     if (arguments.length !== 1 || typeof installedRef !== 'string' || installedRef.length === 0) {
-      throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.PACKAGE_NOT_AUTHORIZED);
+      throw refused();
     }
-    // Each attached H independently verifies the opaque ref and current
-    // audience/issuer/bytes. A foreign/unknown ref is indistinguishable from
-    // an unconfigured Host to the caller (D04).
-    for (const trusted of trustedBridges) {
-      try {
-        return await trusted.load(installedRef);
-      } catch (error) {
-        // The only reason to try the next trusted Host is that this Host
-        // does not recognize/authorize that reference. Never downgrade an
-        // authorized Host's other refusal (scope/ABI/lifecycle) into a
-        // successful dispatch on another Host.
-        if (!(error instanceof DomainHarnessV9Error)
-          || error.code !== V9_PUBLIC_ERROR_CODES.PACKAGE_NOT_AUTHORIZED) throw error;
-      }
+    const current = callerHost.getStore();
+    if (current === undefined || !activeHosts.has(current)) {
+      throw refused(); // no ambient privileged Host => no executable runtime
     }
-    throw new DomainHarnessV9Error(V9_PUBLIC_ERROR_CODES.PACKAGE_NOT_AUTHORIZED);
+    return current.load(installedRef);
   },
 });
