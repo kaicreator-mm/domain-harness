@@ -486,8 +486,20 @@ test('V09-PKG-P1: public /v9 DomainHarness is bound to the CURRENT trusted Host 
     await assert.rejects(DomainHarness.load(world.ref('app:bridge:a')), (error: unknown) =>
       publicErrorOf(error).code === 'PACKAGE_NOT_AUTHORIZED');
   });
-  assert.equal(((await a.send(dynamicIntent('instance:published-a', 'msg:published-a'))) as { status: string }).status, 'admitted');
-  assert.equal(((await b.send(dynamicIntent('instance:published-b', 'msg:published-b'))) as { status: string }).status, 'admitted');
+  // A loaded public facade must not become a transferable bearer capability
+  // that authorizes an unrelated caller outside the selected H request.
+  await assert.rejects(a.send(dynamicIntent('instance:leak', 'msg:leak')), (error: unknown) =>
+    publicErrorOf(error).code === 'CALLER_SCOPE_DENIED');
+  await secondBridge.runWithinTrustedContext(async () => {
+    await assert.rejects(a.query({ kind: 'instance', instanceKey: 'instance:published-a' }), (error: unknown) =>
+      publicErrorOf(error).code === 'CALLER_SCOPE_DENIED');
+  });
+  const [receiptA, receiptB] = await Promise.all([
+    firstBridge.runWithinTrustedContext(() => a.send(dynamicIntent('instance:published-a', 'msg:published-a'))),
+    secondBridge.runWithinTrustedContext(() => b.send(dynamicIntent('instance:published-b', 'msg:published-b'))),
+  ]);
+  assert.equal((receiptA as { status: string }).status, 'admitted');
+  assert.equal((receiptB as { status: string }).status, 'admitted');
   assert.equal(journalKeys(world, 'app:bridge:a', 'tenant:one').length, 1);
   assert.equal(journalKeys(otherWorld, 'app:bridge:b', 'tenant:one').length, 1);
 
