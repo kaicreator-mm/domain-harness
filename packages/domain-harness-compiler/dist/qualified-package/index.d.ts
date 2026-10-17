@@ -11,3 +11,7 @@ export { issueApprovalProof, verifyApprovalProof, ApprovalError } from './approv
 export type { TrustedIssuers } from './approval.js';
 export { buildQualifiedPackage, BuildError } from './build.js';
 export type { BuildQualifiedPackageOptions } from './build.js';
+export { buildV09QualifiedRoot, V09BuildError } from './v09build/index.js';
+export type { BuildV09QualifiedRootOptions, V09BindingRecord, V09SealedPackage, V09SealedQualifiedRoot, } from './v09build/index.js';
+export { assertVendoredParserBytes, assertZeroImportBuildModule, canonicalV9Json, computeV09SealedRootSubjectDigest, computeV9QualifiedRootSubjectDigest, V09_BUNDLER_REVISION, V09_HOST_ABI, V09_IMPORT_POLICY_REVISION, V09_RUNTIME_ABI, V09_SEALED_ROOT_FORMAT, V09_SUBJECT_DOMAIN, V09_BUILD_PARSER_PIN, } from './v09build/index.js';
+export type { V09BuildParserPin } from './v09build/index.js';
