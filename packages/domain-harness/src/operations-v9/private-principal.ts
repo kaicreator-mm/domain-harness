@@ -22,6 +22,7 @@ export interface V09HostVerifiedIdentity {
   readonly hostAudience: string;
   readonly appId: string;
   readonly tenantId: string;
+  readonly selectedClosureDigest: string;
   readonly issuerAuthEpoch: number;
   readonly expiresAtMs: number;
   /** Exact operation-purpose grants, minted from current H policy. */
@@ -87,7 +88,7 @@ function identityShape(value: unknown): value is V09HostVerifiedIdentity {
     // Only inert own-data, no accessors, extra properties or Proxy traps.
     const proto = Object.getPrototypeOf(value);
     if (proto !== Object.prototype && proto !== null) return false;
-    const fields = ['principalId', 'hostAudience', 'appId', 'tenantId', 'issuerAuthEpoch', 'expiresAtMs', 'grants'];
+    const fields = ['principalId', 'hostAudience', 'appId', 'tenantId', 'selectedClosureDigest', 'issuerAuthEpoch', 'expiresAtMs', 'grants'];
     const descriptors = Object.getOwnPropertyDescriptors(value);
     if (Reflect.ownKeys(descriptors).length !== fields.length) return false;
     if (!fields.every(field => {
@@ -96,6 +97,7 @@ function identityShape(value: unknown): value is V09HostVerifiedIdentity {
     })) return false;
     const v = value as V09HostVerifiedIdentity;
     if (![v.principalId, v.hostAudience, v.appId, v.tenantId].every(validId)) return false;
+    if (typeof v.selectedClosureDigest !== 'string' || !SHA256.test(v.selectedClosureDigest)) return false;
     if (!Number.isSafeInteger(v.issuerAuthEpoch) || v.issuerAuthEpoch < 1) return false;
     if (!Number.isSafeInteger(v.expiresAtMs)) return false;
     if (!Array.isArray(v.grants) || v.grants.length === 0 || v.grants.length > 128 || Object.getPrototypeOf(v.grants) !== Array.prototype) return false;
@@ -118,6 +120,7 @@ function cloneIdentity(v: V09HostVerifiedIdentity): V09HostVerifiedIdentity {
     hostAudience: v.hostAudience,
     appId: v.appId,
     tenantId: v.tenantId,
+    selectedClosureDigest: v.selectedClosureDigest,
     issuerAuthEpoch: v.issuerAuthEpoch,
     expiresAtMs: v.expiresAtMs,
     grants: Object.freeze([...v.grants]),
@@ -141,6 +144,7 @@ export function createV09PrivatePrincipalAuthority(bootstrap: V09PrivateScopeBoo
         v.hostAudience !== bootstrap.hostAudience ||
         v.appId !== bootstrap.appId ||
         v.tenantId !== bootstrap.tenantId ||
+        v.selectedClosureDigest !== bootstrap.subjectDigest ||
         !v.grants.includes(`${purpose}:${operationId}`) ||
         v.expiresAtMs <= at ||
         v.expiresAtMs - at > MAX_TOKEN_LIFETIME_MS) {
@@ -187,7 +191,8 @@ export function createV09PrivatePrincipalAuthority(bootstrap: V09PrivateScopeBoo
     const at = now();
     if (!Number.isSafeInteger(at)) refuse();
     assertVerified(verified, operationId, purpose, at);
-    if (verified.principalId !== saved.identity.principalId ||
+    if (saved.identity.expiresAtMs <= at ||
+        verified.principalId !== saved.identity.principalId ||
         verified.issuerAuthEpoch !== saved.identity.issuerAuthEpoch ||
         verified.expiresAtMs < saved.identity.expiresAtMs) {
       refuse();
