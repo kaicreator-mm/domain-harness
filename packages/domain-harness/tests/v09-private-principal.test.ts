@@ -43,6 +43,7 @@ function fixture() {
     get calls() { return calls; },
     set now(value: number) { nowMs = value; },
     set accepted(value: boolean) { accepted = value; },
+    get current() { return current; },
     set current(value: V09HostVerifiedIdentity) { current = value; },
   };
 }
