@@ -68,7 +68,7 @@ test('V09-EXT-CONSUMER01: clean packed two-B load/send/query/subscribe/stop jour
     const resultLine = run.split(/\r?\n/u).find((line) => line.startsWith('JOURNEY_RESULT '));
     assert.ok(resultLine !== undefined, `operator must print a JOURNEY_RESULT line, got: ${run.slice(-400)}`);
     const journey = JSON.parse(resultLine.slice('JOURNEY_RESULT '.length));
-    const stepNames = journey.steps.map((step) => step.name);
+    const stepNames = journey.steps.map((step: { name: string; ok: boolean }) => step.name);
     assert.equal(journey.steps.length, 20, 'the journey is exactly its pinned 20 steps');
     for (const expected of [
       'install.twoBusinessClosure',
@@ -94,7 +94,7 @@ test('V09-EXT-CONSUMER01: clean packed two-B load/send/query/subscribe/stop jour
     ]) {
       assert.ok(stepNames.includes(expected), `journey must include ${expected}`);
     }
-    const failed = journey.steps.filter((step) => !step.ok);
+    const failed = journey.steps.filter((step: { name: string; ok: boolean }) => !step.ok);
     assert.deepEqual(failed, [], `every journey step must pass: ${JSON.stringify(failed)}`);
     assert.equal(journey.ok, true);
     console.info(`V09_EXT_CONSUMER_STEPS=${journey.steps.length} ALL_OK`);
