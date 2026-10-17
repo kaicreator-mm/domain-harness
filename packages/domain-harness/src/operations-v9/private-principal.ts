@@ -157,6 +157,7 @@ export function createV09PrivatePrincipalAuthority(bootstrap: V09PrivateScopeBoo
     } catch {
       refuse();
     }
+    if (closed) refuse(); // lifecycle may close while async Host auth is pending
     const at = now();
     if (!Number.isSafeInteger(at)) refuse();
     assertVerified(verified, operationId, purpose, at);
@@ -182,6 +183,7 @@ export function createV09PrivatePrincipalAuthority(bootstrap: V09PrivateScopeBoo
     } catch {
       refuse();
     }
+    if (closed) refuse(); // lifecycle may close while async Host auth is pending
     const at = now();
     if (!Number.isSafeInteger(at)) refuse();
     assertVerified(verified, operationId, purpose, at);
