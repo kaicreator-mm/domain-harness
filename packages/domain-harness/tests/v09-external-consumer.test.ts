@@ -69,12 +69,14 @@ test('V09-EXT-CONSUMER01: clean packed two-B load/send/query/subscribe/stop jour
     assert.ok(resultLine !== undefined, `operator must print a JOURNEY_RESULT line, got: ${run.slice(-400)}`);
     const journey = JSON.parse(resultLine.slice('JOURNEY_RESULT '.length));
     const stepNames = journey.steps.map((step) => step.name);
+    assert.equal(journey.steps.length, 20, 'the journey is exactly its pinned 20 steps');
     for (const expected of [
       'install.twoBusinessClosure',
+      'install.foreignSingleBusinessApp',
       'negative.wrongRuntimeAbiLoadRefused',
       'consumer.surface',
       'negative.loadRefusesWithoutDeploymentScope',
-      'negative.rawObjectReferenceRefused',
+      'negative.rawAndObjectReferenceRefused',
       'negative.smuggledAuthorityRefused',
       'positive.loadTwoBusinessFacade',
       'negative.foreignScopeCannotBorrowReference',
@@ -88,7 +90,7 @@ test('V09-EXT-CONSUMER01: clean packed two-B load/send/query/subscribe/stop jour
       'negative.unapprovedToolCallRefused',
       'positive.stopIsIdempotentAndFailsClosed',
       'negative.capturedFacadeDiesOutsideTrustedScope',
-      'teardown.deploymentClose',
+      'teardown.deploymentCloseDetachesSynchronously',
     ]) {
       assert.ok(stepNames.includes(expected), `journey must include ${expected}`);
     }

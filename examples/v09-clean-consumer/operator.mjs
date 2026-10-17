@@ -266,11 +266,16 @@ export async function runExternalConsumerJourney(payloadDirUrl) {
     return result;
   });
 
-  await step('negative.rawObjectReferenceRefused', async () => {
+  await step('negative.rawAndObjectReferenceRefused', async () => {
+    // A raw sealed-root JSON string is not an installed reference...
     const rawRootJson = JSON.stringify(makeTwoBusinessRoot(payloads, 'app:clean:two-b'));
-    const result = await loadRequest(rawRootJson);
-    assert.deepEqual(result, { ok: false, code: 'PACKAGE_NOT_AUTHORIZED' });
-    return result;
+    const raw = await loadRequest(rawRootJson);
+    assert.deepEqual(raw, { ok: false, code: 'PACKAGE_NOT_AUTHORIZED' });
+    // ...and neither is a non-string object: the public load's own type
+    // check refuses before any registry access, whatever the shape.
+    const object = await primary.runWithinTrustedContext(() => loadRequest({ installedRef: refs['app:clean:two-b'], root: makeTwoBusinessRoot(payloads, 'app:clean:two-b') }));
+    assert.deepEqual(object, { ok: false, code: 'PACKAGE_NOT_AUTHORIZED' });
+    return { raw, object };
   });
 
   await step('negative.smuggledAuthorityRefused', async () => {
@@ -313,6 +318,7 @@ export async function runExternalConsumerJourney(payloadDirUrl) {
   await step('positive.approvalSendCommitsRealEffect', async () => {
     const result = await primary.runWithinTrustedContext(() => sendRequest(facade, approvalIntent('instance:clean-approval', 'msg:clean-approval')));
     assert.equal(result.ok, true);
+    assert.notEqual(result.value, undefined, 'a committed occurrence returns a real Kernel receipt');
     return { receiptKind: String(result.value?.kind ?? typeof result.value) };
   });
 
@@ -405,14 +411,22 @@ export async function runExternalConsumerJourney(payloadDirUrl) {
     return outside;
   });
 
-  await step('teardown.deploymentClose', async () => {
+  await step('teardown.deploymentCloseDetachesSynchronously', async () => {
     await primary.close();
     await limited.close();
     await foreign.close();
     await store.close();
-    const afterClose = await loadRequest(refs['app:clean:two-b']);
-    assert.deepEqual(afterClose, { ok: false, code: 'PACKAGE_NOT_AUTHORIZED' });
-    return afterClose;
+    // Entering the CLOSED bridge's own request channel refuses synchronously
+    // (LIFECYCLE_FAILED): this pins the synchronous detach of the trusted
+    // scope itself, not just the missing-scope branch of load.
+    const insideClosedScope = await primary.runWithinTrustedContext(() => loadRequest(refs['app:clean:two-b'])).then(
+      () => 'RESOLVED',
+      (error) => String(error?.code ?? error?.message),
+    );
+    assert.equal(insideClosedScope, 'LIFECYCLE_FAILED');
+    const outsideScope = await loadRequest(refs['app:clean:two-b']);
+    assert.deepEqual(outsideScope, { ok: false, code: 'PACKAGE_NOT_AUTHORIZED' });
+    return { insideClosedScope, outsideScope };
   });
 
   const failed = events.filter((event) => !event.ok);
