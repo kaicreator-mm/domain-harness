@@ -1,0 +1,174 @@
+/**
+ * DomainHarness v0.9 N08 (#1036): protected-H private principal proof capsule.
+ *
+ * INTERNAL ONLY. This module must NOT be re-exported from the package root,
+ * ./v9, or any public runtime namespace. Only the actual trusted Host
+ * bootstrap can supply the verifier below; the UX/user/Domain Package/Agent
+ * cannot inject one via the public one-string load API. No plain
+ * "AuthorizedPrincipal" object is proof: capabilities are object identities
+ * registered in a private WeakMap, and checked against a FRESH trusted Host
+ * authentication result before every sensitive use.
+ *
+ * This is one bounded CONTRACT/CORE SLICE, not an executable facade, Kernel
+ * admission decision or physical effect permit. Per-effect/revoke atomicity
+ * must separately use #1117's shared per-subject H CAS authority (#1036);
+ * #1120 consumes the eventual protected delivery-recheck port.
+ */
+/** Generic public-facing denial; never echoes principal IDs or scopes. */
+export class V09PrivateScopeError extends Error {
+    code = 'V09_PRIVATE_SCOPE_DENIED';
+    constructor() {
+        super('Protected caller authorization is unavailable or no longer current.');
+        this.name = 'V09PrivateScopeError';
+    }
+}
+const MAX_TOKEN_LIFETIME_MS = 300_000;
+const SAFE_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+function refuse() {
+    throw new V09PrivateScopeError();
+}
+function validId(value) {
+    return typeof value === 'string' && SAFE_ID.test(value);
+}
+function identityShape(value) {
+    try {
+        if (value === null || typeof value !== 'object' || Array.isArray(value))
+            return false;
+        // Only inert own-data, no accessors, extra properties or Proxy traps.
+        const proto = Object.getPrototypeOf(value);
+        if (proto !== Object.prototype && proto !== null)
+            return false;
+        const fields = ['principalId', 'hostAudience', 'appId', 'tenantId', 'selectedClosureDigest', 'issuerAuthEpoch', 'expiresAtMs', 'grants'];
+        const descriptors = Object.getOwnPropertyDescriptors(value);
+        if (Reflect.ownKeys(descriptors).length !== fields.length)
+            return false;
+        if (!fields.every(field => {
+            const d = descriptors[field];
+            return d !== undefined && d.enumerable === true && Object.hasOwn(d, 'value');
+        }))
+            return false;
+        const v = value;
+        if (![v.principalId, v.hostAudience, v.appId, v.tenantId].every(validId))
+            return false;
+        if (typeof v.selectedClosureDigest !== 'string' || !SHA256.test(v.selectedClosureDigest))
+            return false;
+        if (!Number.isSafeInteger(v.issuerAuthEpoch) || v.issuerAuthEpoch < 1)
+            return false;
+        if (!Number.isSafeInteger(v.expiresAtMs))
+            return false;
+        if (!Array.isArray(v.grants) || v.grants.length === 0 || v.grants.length > 128 || Object.getPrototypeOf(v.grants) !== Array.prototype)
+            return false;
+        const desc = Object.getOwnPropertyDescriptors(v.grants);
+        if (Reflect.ownKeys(desc).length !== v.grants.length + 1)
+            return false;
+        for (let i = 0; i < v.grants.length; i += 1) {
+            const d = desc[String(i)];
+            if (d === undefined || d.enumerable !== true || !Object.hasOwn(d, 'value') ||
+                typeof d.value !== 'string' || d.value.length === 0 || d.value.length > 256)
+                return false;
+        }
+        return true;
+    }
+    catch {
+        return false; // hostile/revoked identity projection always fails closed
+    }
+}
+function cloneIdentity(v) {
+    return Object.freeze({
+        principalId: v.principalId,
+        hostAudience: v.hostAudience,
+        appId: v.appId,
+        tenantId: v.tenantId,
+        selectedClosureDigest: v.selectedClosureDigest,
+        issuerAuthEpoch: v.issuerAuthEpoch,
+        expiresAtMs: v.expiresAtMs,
+        grants: Object.freeze([...v.grants]),
+    });
+}
+export function createV09PrivatePrincipalAuthority(bootstrap) {
+    if (!validId(bootstrap.hostAudience) || !validId(bootstrap.appId) ||
+        !validId(bootstrap.tenantId) || typeof bootstrap.subjectDigest !== 'string' ||
+        !SHA256.test(bootstrap.subjectDigest) ||
+        typeof bootstrap.authenticator?.authenticate !== 'function') {
+        refuse();
+    }
+    const now = bootstrap.nowMs ?? Date.now;
+    if (typeof now !== 'function')
+        refuse();
+    const issued = new WeakMap();
+    let closed = false;
+    function assertVerified(v, operationId, purpose, at) {
+        if (!identityShape(v) ||
+            v.hostAudience !== bootstrap.hostAudience ||
+            v.appId !== bootstrap.appId ||
+            v.tenantId !== bootstrap.tenantId ||
+            v.selectedClosureDigest !== bootstrap.subjectDigest ||
+            !v.grants.includes(`${purpose}:${operationId}`) ||
+            v.expiresAtMs <= at ||
+            v.expiresAtMs - at > MAX_TOKEN_LIFETIME_MS) {
+            refuse();
+        }
+    }
+    async function issue(presentation, operationId, purpose) {
+        if (closed || !validId(operationId) ||
+            !['send', 'query', 'subscribe', 'delivery', 'effect', 'stop'].includes(purpose))
+            refuse();
+        let verified;
+        try {
+            verified = await bootstrap.authenticator.authenticate(presentation);
+        }
+        catch {
+            refuse();
+        }
+        if (closed)
+            refuse(); // lifecycle may close while async Host auth is pending
+        const at = now();
+        if (!Number.isSafeInteger(at))
+            refuse();
+        assertVerified(verified, operationId, purpose, at);
+        const token = Object.freeze(Object.create(null));
+        issued.set(token, Object.freeze({
+            presentation, identity: cloneIdentity(verified), operationId, purpose,
+        }));
+        return token;
+    }
+    /**
+     * Every sensitive use re-authenticates with the trusted Host: expiry,
+     * tenant/app/scope and issuer epoch are compared again. This is NOT a
+     * durable effect-permit CAS commit and cannot be used in its place.
+     */
+    async function recheck(token, operationId, purpose) {
+        if (closed || token === null || typeof token !== 'object')
+            refuse();
+        const saved = issued.get(token);
+        if (!saved || saved.operationId !== operationId || saved.purpose !== purpose)
+            refuse();
+        let verified;
+        try {
+            verified = await bootstrap.authenticator.authenticate(saved.presentation);
+        }
+        catch {
+            refuse();
+        }
+        if (closed)
+            refuse(); // lifecycle may close while async Host auth is pending
+        const at = now();
+        if (!Number.isSafeInteger(at))
+            refuse();
+        assertVerified(verified, operationId, purpose, at);
+        if (saved.identity.expiresAtMs <= at ||
+            verified.principalId !== saved.identity.principalId ||
+            verified.issuerAuthEpoch !== saved.identity.issuerAuthEpoch ||
+            verified.expiresAtMs < saved.identity.expiresAtMs) {
+            refuse();
+        }
+        return cloneIdentity(verified);
+    }
+    /** Lifecycle-owned closure invalidates every existing token at once. */
+    function close() {
+        closed = true;
+    }
+    return Object.freeze({ issue, recheck, close });
+}
+//# sourceMappingURL=private-principal.js.map
