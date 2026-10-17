@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "mutation_id": "DH09-ADS412-TARGETED-SPLIT-R0-20261017",
+  "mutation_id": "DH09-ADS412-TARGETED-SPLIT-R1-20261017",
   "mutation_class": "SPLIT",
   "requested_by": "User explicit instruction in 2026-10-17 ChatGPT conversation: apply ADS v4.12 targeted task decomposition, preserve completed work",
-  "approved_by": "User authorized targeted SPLIT direction; exact new topology pending independent Controller acceptance (not yet mutation-ready)",
-  "reason": "Frozen six-Issue version-level concerns include separately reviewable package distribution, external consumer proof and runtime lifecycle, while N06/N02 accepted active Claims cannot be rehomed or invalidated in-flight. Keep completed N01 historical and terminal. Materialize only three genuinely independent remaining concerns; retain scope/assurance floors and one-writer discipline. Packaged v9 exports require both Host/BUILD and the accepted v9 public API, so N06-PKG also has a real #1035 predecessor.",
+  "approved_by": "User authorized targeted SPLIT direction only; exact R1 topology/scope must receive an independent PASS and Controller acceptance before any native mutation. R0 review was FAIL, not approval.",
+  "reason": "Frozen six-Issue version-level concerns include separately reviewable package distribution, external consumer proof and runtime lifecycle, while N06/N02 accepted active Claims cannot be rehomed or invalidated in-flight. Keep completed N01 historical and terminal. Materialize only three genuinely independent remaining concerns; retain scope/assurance floors and one-writer discipline. Packaged v9 exports require both Host/BUILD and the accepted v9 public API, so N06-PKG also has a real #1035 predecessor. Review R0 #1121 found #1119's physical two-B send/query/lifecycle proof depends on #1120; explicitly add #1119 blocked_by #1120 rather than diluting its real clean-consumer acceptance. Original #1036 N08 retains actual send/query operation execution and single protected facade-to-operations bridge writer, not just H permit issuance.",
   "affected_task_refs": [
     "#1027 CLOSED historical no new Task",
-    "#1032 N06 active BUILD/Host core",
+    "#1032 N06 active BUILD/Host core; PR #1117@5d8c74b51b10c45fa997125d998c97ffff48e5e6 remains exact in-flight source",
     "#1118 new N06-PKG",
     "#1035 N07 active public API",
     "#1119 new N07-CONSUMER",
@@ -17,7 +17,7 @@
     "#1037 N09 release adjudication unchanged"
   ],
   "old_topology_ref": "PR #1054 frozen docs/implementation/DomainHarness_v0.9_TASK_DAG_FROZEN.md, live native readback 11/11 at main@44308ae2e1679df8244cf0d248df613a899b55a0",
-  "new_topology_ref": "docs/implementation/v0.9/DH09_TASK_DAG_SPLIT_SUCCESSOR_R0.md (PROPOSED; authoritative only after required review and native 18/18 readback)",
+  "new_topology_ref": "docs/implementation/v0.9/DH09_TASK_DAG_SPLIT_SUCCESSOR_R0.md (PROPOSED; authoritative only after required review and native 20/20 readback)",
   "old_edges": [
     "#1027 blocked_by #1006",
     "#1032 blocked_by #1027",
@@ -47,25 +47,28 @@
     "#1118 blocked_by #1035",
     "#1119 blocked_by #1035",
     "#1119 blocked_by #1118",
+    "#1119 blocked_by #1120",
     "#1120 blocked_by #1036",
     "#1037 blocked_by #1118",
     "#1037 blocked_by #1119",
     "#1037 blocked_by #1120"
   ],
-  "scope_impact": "#1027 remains closed; its four merged PR slices are historical acceptance, not reopened child Tasks. #1032 keeps its already accepted active BUILD+protected H claim, with future distribution/SDK manifest concern transferred to #1118 after lawful acceptance; #1035 preserves PR1115 error/typed facade and transfers external clean consumer/docs/tests to #1119; #1028 live physical CAS claim/PR1116 unchanged; #1036 owns H→K scoped principal+one-shot Effect permit and moves stream/stop/cleanup/diagnostics to #1120; #1037 remains sole independent release adjudicator. File ownership/Task Packs and exact currentness verified JIT before each dispatch. NO v0.8 edits.",
-  "release_impact": "No change to v0.9 Product/L2 scope or supported Node24/SQLite reference profile. #1037 stays blocked on original prerequisites plus #1118 package, #1119 external clean consumer, #1120 lifecycle. Required real security/Full/Hidden/Critical Journeys/packed Release Qualification stays once per immutable candidate. No PR PASS promoted to Release PASS.",
+  "scope_impact": "#1027 remains closed; its four merged PR slices are historical acceptance, not reopened child Tasks. #1032 preserves active BUILD+protected H claim and PR #1117@5d8c74b51b10c45fa997125d998c97ffff48e5e6, with future distribution/SDK manifest concern transferred to #1118 after lawful acceptance; #1035 preserves PR1115 error/typed facade and transfers external clean consumer/docs/tests to #1119; #1028 live physical CAS claim/PR1116 unchanged; #1036 owns H→K scoped principal+one-shot Effect permit, REAL send/query execution, and the ONE post-#1035 facade→operations adapter/bridge writer (including type-only lifecycle seam); #1120 consumes the protected delivery-currentness re-check port and implements stream/stop/cleanup/diagnostics via the already-defined adapter WITHOUT writing public-v9; #1119 now also requires #1120 for real two-B operations and lifecycle walkthrough; #1037 remains sole independent release adjudicator. File ownership/Task Packs and exact currentness verified JIT before each dispatch. NO v0.8 edits.",
+  "release_impact": "No change to v0.9 Product/L2 scope or supported Node24/SQLite reference profile. #1037 stays blocked on original prerequisites plus #1118 package, #1119 external real executed clean consumer, #1120 lifecycle (with new #1119←#1120 prerequisite). Required real security/Full/Hidden/Critical Journeys/packed Release Qualification stays once per immutable candidate. No PR PASS promoted to Release PASS.",
   "task_pack_impact_refs": [
     "#1032 in-flight Claim scope preserved; parent task amendment pending accepted SPLIT",
     "#1118 durable task body and N06-PKG write-set",
     "#1035 in-flight PR1115 preserved; parent task amendment pending SPLIT",
     "#1119 durable task body and N07-CONSUMER write-set",
     "#1028 active Claim PR1116 unchanged",
-    "#1036 parent task amendment before first Claim",
+    "#1036 retained: private H→K principal/permit AND real send/query dispatch plus exclusive post-#1035 public-v9 runtime bridge writer; successor parent pack before first Claim",
     "#1120 durable task body and N08-LIFECYCLE write-set",
-    "#1037 current Release issue plus exact new native blockers"
+    "#1037 current Release issue plus exact new native blockers",
+    "#1120 consumes protected recheckDeliveryAuthorization() (from #1036) for every sensitive delivery; no duplicate auth or public-v9 writes",
+    "#1119 clean external two-B send/query/lifecycle proof waits natively on #1120; preserve full acceptance"
   ],
-  "review_impact": "Required independent exact-SHA review of scope/owner/edge change before DAG mutation; in-flight code Reviews remain pinned. Leaf implementation reviews risk-based per applicable frozen owner; no duplicate full-suite or reviewer cycle. Existing qualified #1027 outcome reused.",
-  "validation_impact_ref": "GitHub native blocked_by 11 existing + 8 proposed (19 total), plus readback of all targets; current new Issue blockers 0/8, NOT_MATERIALIZED. Check no cycles/duplicate writer, accepted active Claims unchanged, no source changes. Real runtime validation remains on each future accepted source PR and final #1037.",
+  "review_impact": "Required independent exact-SHA review of scope/owner/edge change before DAG mutation; in-flight code Reviews remain pinned. Leaf implementation reviews risk-based per applicable frozen owner; no duplicate full-suite or reviewer cycle. Existing qualified #1027 outcome reused. R0 separate independent reviewer PR #1121@991dd3c95bd17fc479fae3f66d9621f9b56c89d1 FAIL P1×3 (review PRR_kwDOUd_jbM8AAAABSvTlQQ) triggered R1; R1 requires new exact-head independent PASS before Controller acceptance. R0 is not approving authority.",
+  "validation_impact_ref": "GitHub native blocked_by 11 existing + 9 proposed (20 total), plus readback of all targets; current new Issue blockers 0/9, NOT_MATERIALIZED. Check no cycles/duplicate writer, accepted active Claims unchanged, no source changes. Real runtime validation remains on each future accepted source PR and final #1037.",
   "created_at": "2026-10-17T02:24:00+08:00",
-  "notes_ref": "docs/implementation/v0.9/DH09_TASK_DAG_SPLIT_SUCCESSOR_R0.md"
+  "notes_ref": "docs/implementation/v0.9/DH09_TASK_DAG_SPLIT_SUCCESSOR_R0.md (R1 content, historical filename)"
 }
