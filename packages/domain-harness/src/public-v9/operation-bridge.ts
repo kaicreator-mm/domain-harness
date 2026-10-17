@@ -67,6 +67,7 @@ import { createV09EffectPermitAuthority } from '../host-v9/effect-permit.js';
 import { createV09PrivatePrincipalAuthority, V09PrivateScopeError, type V09HostVerifiedIdentity, type V09PrivateHostAuthenticator, type V09PrivatePrincipalToken } from '../operations-v9/private-principal.js';
 import { createV09ScopedLifecycle, type V09SelectedReceipt, type V09ScopedLifecyclePorts } from '../operations-v9/stream-lifecycle.js';
 import { DomainHarnessV9Error, V9_PUBLIC_ERROR_CODES, type V9PublicErrorCode } from './errors.js';
+import { attachV09TrustedBridge, runV09InTrustedHostScope } from './runtime-channel.js';
 import type {
   V9DomainFacade,
   V9DomainHarness,
@@ -85,6 +86,14 @@ const ARTIFACT_PREFIX = 'v9/artifact/';
 const K_DOCS_PREFIX = 'v9/k/';
 /** Bounded internal diagnostics retention; protected subcodes never travel publicly. */
 const MAX_DIAGNOSTICS = 256;
+
+/** A private brand: arbitrary same-shape JS objects may not register as H. */
+const constructedV09Harnesses = new WeakSet<object>();
+
+/** Internal channel verification; does NOT return a Host or privileged port. */
+export function isV09AuthenticatedBridgeHarness(value: unknown): value is V9DomainHarness {
+  return typeof value === 'object' && value !== null && constructedV09Harnesses.has(value);
+}
 
 export interface V09BridgeBootstrap {
   /** The SAME physical store the protected H registry was bootstrapped with. */
@@ -132,6 +141,8 @@ export interface V09DeliveryAuthorization {
 export interface V09ComposedBridge {
   /** The public value: `load` is the ONLY method; no host/kernel/namespace escape. */
   readonly harness: V9DomainHarness;
+  /** Host-only request scope: never exposed from the published ./v9 value. */
+  runWithinTrustedContext<T>(action: () => T | Promise<T>): Promise<T>;
   /** The trusted governance channel (the protected H this bridge composed). */
   host(): Promise<ProtectedHostV09>;
   /** Private #1120 seam: current-authority delivery authorization recheck. */
@@ -903,8 +914,13 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
     return { decision: 'authorized', authorityEpoch: state.epoch, expiresAtMs: entry.expiresAtMs };
   }
 
+  // Only this selected trusted H→K composition may bind a public load target.
+  const harness = Object.freeze({ load: loadImpl }) satisfies V9DomainHarness;
+  constructedV09Harnesses.add(harness); // only this trusted composer can brand
+  const detachPublic = attachV09TrustedBridge(harness);
   return Object.freeze({
-    harness: Object.freeze({ load: loadImpl }) satisfies V9DomainHarness,
+    harness,
+    runWithinTrustedContext: <T>(action: () => T | Promise<T>): Promise<T> => runV09InTrustedHostScope(harness, action),
     host: (): Promise<ProtectedHostV09> => hostInstance(),
     recheckDeliveryAuthorization,
     drainBridgeDiagnostics: (): readonly V09BridgeDiagnostic[] => {
@@ -914,6 +930,7 @@ export function createV09DomainHarnessBridge(bootstrap: V09BridgeBootstrap): V09
     },
     close: async (): Promise<void> => {
       bridgeClosed = true;
+      detachPublic(); // before async teardown, public loads fail closed
       for (const facade of facades) {
         facade.closed = true;
         facade.permit.close();

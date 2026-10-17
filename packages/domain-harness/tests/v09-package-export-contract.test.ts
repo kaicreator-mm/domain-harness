@@ -24,22 +24,40 @@ test('V09-PKG-EX01: versioned ESM and types paths point to emitted files, no pri
     types: './dist/public-v9/index.d.ts',
     import: './dist/public-v9/index.js',
   });
+  // P1-01 bounded repair: ./v9/deployment is the ONE deployment-owned trusted
+  // bootstrap entry, isolated from the ordinary ./v9 consumer app API.
+  assert.deepEqual(manifest.exports['./v9/deployment'], {
+    types: './dist/public-v9/deployment.d.ts',
+    import: './dist/public-v9/deployment.js',
+  });
   for (const key of Object.keys(manifest.exports)) {
     assert.equal(key.startsWith('./host-v9'), false);
     assert.equal(key.startsWith('./v9/host'), false);
     assert.equal(key.startsWith('./v9/internal'), false);
   }
+  assert.deepEqual(
+    Object.keys(manifest.exports).filter((key) => key.startsWith('./v9')).sort(),
+    ['./v9', './v9/deployment'],
+    'the v9 namespace publishes exactly the consumer entry and the deployment bootstrap entry',
+  );
   await stat(join(packageDir, 'dist/public-v9/index.js'));
   await stat(join(packageDir, 'dist/public-v9/index.d.ts'));
+  await stat(join(packageDir, 'dist/public-v9/deployment.js'));
+  await stat(join(packageDir, 'dist/public-v9/deployment.d.ts'));
 });
 
 test('V09-PKG-EX02: real Node ESM resolves the published /v9 subpath; no H authority escapes', async () => {
   // Import from the package name itself, never from private source paths.
   const publicSdk = await import('@kaicreator/domain-harness/v9');
   assert.equal(typeof publicSdk.DomainHarnessV9Error, 'function');
+  assert.deepEqual(Object.keys(publicSdk.DomainHarness), ['load'], 'public SDK has one installed-ref-only load verb');
+  assert.equal(typeof publicSdk.DomainHarness.load, 'function');
   assert.equal(publicSdk.V9_PUBLIC_ERROR_CODES.PACKAGE_NOT_AUTHORIZED, 'PACKAGE_NOT_AUTHORIZED');
   assert.equal(typeof publicSdk.publicInstalledReferenceFailure, 'function');
   for (const forbidden of [
+    'attachV09TrustedBridge',
+    'isV09AuthenticatedBridgeHarness',
+    'createV09DomainHarnessBridge',
     'createProtectedHostV09',
     'issueV09ApprovalProof',
     'drainProtectedDiagnostics',
@@ -49,5 +67,29 @@ test('V09-PKG-EX02: real Node ESM resolves the published /v9 subpath; no H autho
   ]) {
     assert.equal(Object.hasOwn(publicSdk, forbidden), false);
   }
-  // This PR does NOT assert send/query works; executable dispatch is #1036.
+  // Executable dispatch was accepted under #1036; the actual published-value
+  // positive and cleanup test is a separate focused integration assertion.
+});
+
+test('V09-PKG-EX03: real Node ESM resolves the deployment bootstrap subpath; consumer/deployment surfaces stay isolated both ways', async () => {
+  const deployment = await import('@kaicreator/domain-harness/v9/deployment');
+  // Exactly the supported trusted deployment composition surface.
+  assert.equal(typeof deployment.createV09DomainHarnessBridge, 'function');
+  assert.equal(typeof deployment.createProtectedHostV09, 'function');
+  assert.equal(typeof deployment.issueV09ApprovalProof, 'function');
+  assert.equal(typeof deployment.verifyV09ApprovalProof, 'function');
+  assert.equal(typeof deployment.computeV09SealedRootSubjectDigest, 'function');
+  assert.equal(typeof deployment.V09HostStoreError, 'function');
+  assert.equal(typeof deployment.V09_RUNTIME_ABI, 'string');
+  assert.equal(typeof deployment.V09_HOST_ABI, 'string');
+  // No consumer facade and no raw trusted-channel registrar escape here.
+  for (const forbidden of [
+    'DomainHarness',
+    'attachV09TrustedBridge',
+    'runV09InTrustedHostScope',
+    'isV09AuthenticatedBridgeHarness',
+    'parseV09SealedRoot',
+  ]) {
+    assert.equal(Object.hasOwn(deployment, forbidden), false, `deployment entry must not expose ${forbidden}`);
+  }
 });

@@ -45,6 +45,10 @@
       "types": "./dist/public-v9/index.d.ts",
       "import": "./dist/public-v9/index.js"
     },
+    "./v9/deployment": {
+      "types": "./dist/public-v9/deployment.d.ts",
+      "import": "./dist/public-v9/deployment.js"
+    },
     "./v8": {
       "types": "./dist/public-v8/index.d.ts",
       "import": "./dist/public-v8/index.js",
@@ -65,7 +69,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs",
     "build:legacy-test": "tsc -p tsconfig.legacy-test.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"

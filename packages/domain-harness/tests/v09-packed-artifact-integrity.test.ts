@@ -74,6 +74,10 @@ test('V09-PKG-ARC01: two real npm packs preserve exact ./v9 JS/types and reprodu
     types: './dist/public-v9/index.d.ts',
     import: './dist/public-v9/index.js',
   }, 'published ./v9 must remain ESM-only with a real types entry');
+  assert.deepEqual(manifest.exports['./v9/deployment'], {
+    types: './dist/public-v9/deployment.d.ts',
+    import: './dist/public-v9/deployment.js',
+  }, 'published ./v9/deployment must remain ESM-only with a real types entry');
 
   const firstDir = mkdtempSync(join(tmpdir(), 'dh-v09-pack-a-'));
   const secondDir = mkdtempSync(join(tmpdir(), 'dh-v09-pack-b-'));
@@ -85,11 +89,21 @@ test('V09-PKG-ARC01: two real npm packs preserve exact ./v9 JS/types and reprodu
     assert.equal(first.filename, second.filename);
 
     const included = new Set(first.files.map(file => file.path));
-    for (const exportPath of [manifest.exports['./v9'].import, manifest.exports['./v9'].types]) {
-      assert.ok(exportPath?.startsWith('./dist/public-v9/'), 'v9 exports must resolve into its public dist leaf');
-      assert.ok(included.has(exportPath.slice(2)), `actual packed tarball is missing ${exportPath}`);
+    for (const subpath of ['./v9', './v9/deployment'] as const) {
+      const entry = manifest.exports[subpath];
+      assert.ok(entry !== undefined, `${subpath} must be declared`);
+      for (const exportPath of [entry.import, entry.types]) {
+        assert.ok(typeof exportPath === 'string', `${subpath} must declare both import and types`);
+        assert.ok(exportPath.startsWith('./dist/public-v9/'), `${subpath} exports must resolve into its public dist leaf`);
+        assert.ok(included.has(exportPath.slice(2)), `actual packed tarball is missing ${exportPath}`);
+      }
     }
     assert.ok(included.has('dist/public-v9/errors.js'), 'pack must include v9 typed public error implementation');
+    // The deployment entry statically imports the vendored parser assets;
+    // a files-narrowing regression would otherwise ship an unimportable
+    // ./v9/deployment while both packs stay self-consistent.
+    assert.ok(included.has('dist/host-v9/generated/acorn.mjs'), 'pack must include the vendored host-v9 parser asset');
+    assert.ok(included.has('dist/host-v9/generated/acorn.d.mts'), 'pack must include the vendored host-v9 parser types');
     assert.ok(included.has('package.json'), 'npm pack must include its own versioned manifest');
     for (const file of included) {
       assert.equal(file.startsWith('src/'), false, `source file mistakenly published: ${file}`);
