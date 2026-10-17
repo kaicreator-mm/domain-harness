@@ -1,10 +1,14 @@
+# DomainHarness: inexpensive PR/push assurance, with one explicit full regression
+# on the final frozen release candidate. The workflow name/path stays 'verify'
+# to preserve the existing ci/woodpecker/pr/verify status context.
 when:
   - event: pull_request
   - event: push
     branch: [main, v0.2, v0.3, v0.4]
+  - event: manual
 
-# ECF elastic workers run the agent with backend=local (VM-is-the-sandbox):
-# steps execute on the Alpine host (node24 + git preinstalled).
+# ECF elastic workers use Woodpecker's local backend: steps run on the
+# Alpine worker VM (Node 24 + git), NOT inside the 'bash' image container.
 labels:
   backend: local
 
@@ -16,7 +20,21 @@ steps:
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
       - npm ci
+      # Fast, cross-workspace static/packaging gates (includes committed-dist check).
       - npm run build
       - npm run lint
       - npm run typecheck
+      # Stable, bounded v0.9 trust/ABI smoke; NOT the whole workspace test suite.
+      # Task-specific changed-risk P/N remains a separate, required Task receipt.
+      - node --import tsx --test packages/domain-harness/tests/v09-host-registry-n06.test.ts packages/domain-harness/tests/v09-private-principal.test.ts packages/domain-harness-compiler/tests/v09-build-zero-import-n06.test.ts
+
+  # Trigger this workflow MANUALLY on the pinned final release-candidate ref.
+  # Do not run full regression automatically on every PR or main push.
+  # Hidden validation, physical-host qualification and Critical Journeys are
+  # independently evidenced by #1037, never inferred from this step alone.
+  - name: full-regression
+    image: bash
+    when:
+      - event: manual
+    commands:
       - npm test
