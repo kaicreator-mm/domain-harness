@@ -15,9 +15,17 @@ generated_at: "2026-10-19"
 dependency_completion: []
 material_paths:
   - packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
+  - packages/domain-harness/src/host-v8/bootstrap.ts
+  - packages/domain-harness/src/public-v8/kernel-host.ts
+  - packages/domain-harness/dist/host-v8
+  - packages/domain-harness/dist/public-v8/kernel-host.js
   - packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts
+  - packages/domain-harness/tests/v08-integration/i01-kernel-ports.test.ts
+  - packages/domain-harness/tests/v08-integration/i01-bootstrap-failclosed-occupied-kernel.test.ts
   - packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
   - packages/domain-harness/tests/v08-host/children/k01-fence-worker.mjs
+  - packages/domain-harness/tests/v08-abi/v08-tb-fixture.ts
+  - packages/domain-harness-compiler/tests/v08-tf-oracle-fr02-fr07.test.ts
 core_artifacts:
   - MANIFEST.yaml
   - EXECUTION_CONTRACT.md

@@ -1285,17 +1285,50 @@ export async function admitCentralDecision(request, ports) {
   // the exact snapshot this decision was evaluated against. A stale
   // admission (another runtime over the same durable store claimed or
   // committed after this snapshot) loses HERE, typed — before any journal
-  // begin or effect dispatch.
+  // begin or effect dispatch. [#1108 K01] The claim is also the protected
+  // grant: once held, no rival can take the fence at this stateRevision, so
+  // the effects below dispatch under a live grant the commit will still find
+  // held (#requireHeldAdmissionFence).
+  let heldAdmissionFence;
   if (typeof ports.admissionFence === 'function') {
-    await ports.admissionFence(turnId);
+    heldAdmissionFence = await ports.admissionFence(turnId);
   }
 
-  const effects = await executeEffectIntents(
-    effectIntents,
-    request,
-    ports,
-    turnId,
-  );
+  let effects;
+  try {
+    effects = await executeEffectIntents(
+      effectIntents,
+      request,
+      ports,
+      turnId,
+    );
+  } catch (error) {
+    // [#1108 K01] Fence liveness on the failure path: release ONLY when this
+    // failed turn leaves zero dispatch-ambiguous journal records — every begun
+    // effect of the turn is durably `failed` (none `started`/`completed`).
+    // Any `started`/`completed` record, an unreadable journal, an unwired
+    // release port, or a failed removal keeps the fence held (fail-closed
+    // until the holder's replay reconciles through the journal). The original
+    // typed effect error is never masked.
+    if (isJsonRecord(heldAdmissionFence) && typeof ports.admissionFenceRelease === 'function') {
+      try {
+        let ambiguous = false;
+        for (let ordinal = 1; ordinal <= effectIntents.length; ordinal += 1) {
+          const record = await ports.effectJournal?.getEffect(`${turnId}/effect/${String(ordinal)}`);
+          if (record !== null && record !== undefined && record.status !== 'failed') {
+            ambiguous = true;
+            break;
+          }
+        }
+        if (!ambiguous) {
+          await ports.admissionFenceRelease(heldAdmissionFence);
+        }
+      } catch {
+        // keep held — fail-closed
+      }
+    }
+    throw error;
+  }
 
   return {
     status: 'admitted',
@@ -2665,9 +2698,34 @@ export class WorkflowInstanceEngine {
    * fence revision, then a fresh check that the instance is still at the
    * snapshot stateRevision. Either failing is a stale admission and refuses
    * typed (ADMISSION_STATE_CAS_CONFLICT) before any journal/effect activity.
+   *
+   * [#1108 K01] The claim is also REFUSED when the fence document is still
+   * held by ANOTHER turn at the SAME stateRevision: that holder is an
+   * in-flight (or crashed, not yet reconciled) protected admission whose
+   * non-idempotent effects may already be dispatched, and admitCentralDecision
+   * commits only later, at #requireHeldAdmissionFence — a rival that
+   * CAS-overwrote such a fence here would make the holder lose AFTER its
+   * external dispatch (duplicated non-idempotent effect + orphaned
+   * unaccounted dispatch). Only a strictly OLDER held fence (its holder
+   * committed, so the instance advanced past that revision — a snapshot at a
+   * higher stateRevision cannot exist otherwise) is superseded by the revision
+   * CAS below, and the SAME turn re-claiming its own fence is the crash
+   * recovery replay path. There is no expiry lease: a crashed holder's fence
+   * stays held and rivals keep refusing typed until durable reconciliation
+   * (same-turn replay through the effect journal, or the zero-ambiguity
+   * release path in admitCentralDecision).
    */
   async claimAdmissionFence(request) {
     const { target, turnId, expectedTargetSequence, snapshotFenceRevision } = request;
+    const held = await this.#docs.get(admissionFenceDocKey(target));
+    if (held !== null && isJsonRecord(held.value)
+      && typeof held.value.turnId === 'string'
+      && held.value.turnId !== turnId
+      && held.value.stateRevision === expectedTargetSequence) {
+      throw admissionStateCasConflict(
+        `instance ${target.workflowId}/${target.instanceKey} at stateRevision ${expectedTargetSequence} has an admission fence still held by turn ${held.value.turnId}; the competing claim of turn ${turnId} is refused before any journal or effect activity (fail-closed until the holder commits or is reconciled)`,
+      );
+    }
     let written;
     try {
       written = await this.#docs.put(
@@ -2694,6 +2752,22 @@ export class WorkflowInstanceEngine {
       stateRevision: expectedTargetSequence,
       ...(Number.isSafeInteger(written?.revision) ? { revision: written.revision } : {}),
     };
+  }
+
+  /**
+   * [#1108 K01] Conditional release of a held admission fence by its own
+   * claimant, used ONLY on the zero-ambiguity effect-failure path (every begun
+   * effect of the turn is durably `failed`; none is `started`/`completed` —
+   * see admitCentralDecision). Keeps a transiently failed turn from
+   * permanently wedging the instance at its stateRevision now that
+   * same-revision takeover is refused. The remove is a CAS on the exact claim
+   * revision; a fence without a safe-integer claim revision is never released
+   * (an unconditional fence write does not exist). A failed removal leaves the
+   * fence held — fail-closed; the caller reports the original typed error.
+   */
+  async releaseAdmissionFence(target, fence) {
+    if (!Number.isSafeInteger(fence.revision)) return;
+    await this.#docs.remove(admissionFenceDocKey(target), { mustMatchRevision: fence.revision });
   }
 
   async #requireHeldAdmissionFence(target, fence) {
@@ -5206,6 +5280,8 @@ export function createOccurrenceRuntime(options) {
         trace: counters,
         // [v0.8.1 R02] Claimed after every denial gate, before any journal
         // begin/effect dispatch; the commit below requires it still held.
+        // [#1108 K01] The claim result is RETURNED so admitCentralDecision
+        // can apply its zero-ambiguity failure policy to the held fence.
         admissionFence: async (turnId) => {
           admissionFence = await engine.claimAdmissionFence({
             target,
@@ -5213,6 +5289,12 @@ export function createOccurrenceRuntime(options) {
             expectedTargetSequence: snapshot.stateRevision,
             snapshotFenceRevision,
           });
+          return admissionFence;
+        },
+        // [#1108 K01] Zero-ambiguity failure release (all-failed journal);
+        // see admitCentralDecision. Unconditional fence writes do not exist.
+        admissionFenceRelease: async (fence) => {
+          await engine.releaseAdmissionFence(target, fence);
         },
       });
 
@@ -5230,7 +5312,9 @@ export function createOccurrenceRuntime(options) {
       const nextLifecycle = stateKindIsTerminal(definition, outcome.admitted.targetState)
         ? 'completed'
         : 'active';
-      const committed = await engine.commitAcceptedTransitionInLane({
+      let committed;
+      try {
+        committed = await engine.commitAcceptedTransitionInLane({
         target,
         messageId: request.messageId,
         expectedTargetSequence: snapshot.stateRevision,
@@ -5259,7 +5343,34 @@ export function createOccurrenceRuntime(options) {
             effects: outcome.admitted.effects,
           },
         }),
-      });
+        });
+      } catch (error) {
+        // [#1108 K01] Commit-phase failure fence policy: while ANY journal
+        // record of this turn exists, the fence stays held (effects may have
+        // dispatched; the same-turn replay reconciles through the journal).
+        // A turn with ZERO begun journal records (effect-free, or failed
+        // before any begin) has nothing durable to protect — the fence is
+        // released so a transient store fault cannot wedge the instance at
+        // this stateRevision. A failed release keeps the fence held.
+        if (admissionFence !== undefined) {
+          try {
+            const effectCount = Array.isArray(outcome.admitted?.effects) ? outcome.admitted.effects.length : 0;
+            let anyRecord = false;
+            for (let ordinal = 1; ordinal <= effectCount; ordinal += 1) {
+              if (await effectJournal.getEffect(`${controlTurnId}/effect/${String(ordinal)}`) !== null) {
+                anyRecord = true;
+                break;
+              }
+            }
+            if (!anyRecord) {
+              await engine.releaseAdmissionFence(target, admissionFence);
+            }
+          } catch {
+            // keep held — fail-closed
+          }
+        }
+        throw error;
+      }
 
       // [#1003 FR08 general] The exact-cache write happens only AFTER the
       // authoritative state commit: a candidate denied by any admission

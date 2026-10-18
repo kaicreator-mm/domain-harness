@@ -39,6 +39,33 @@ engine.releaseAdmissionFence(target, fence)` to the same ports object.
   (stock-node child processes; kernel imported from the exact current payload source;
   host store via package self-reference `@kaicreator/domain-harness/v8/host`).
 
+## Edit 5 — Host kernel-ports `remove` seam (discovered from the real repo during implementation)
+The v0.8 Host installs the Kernel's docs port as a frozen {get,put,list} tuple
+(`packages/domain-harness/src/host-v8/bootstrap.ts` kernelPorts; installed via
+`packages/domain-harness/src/public-v8/kernel-host.ts` preflight/install), while
+the store contract (`host-v8/cas.ts`) HAS conditional `remove`. Without `remove`
+on the installed port, Edit 2's release throws and is swallowed — the fence is
+never released (fail-closed wedge; witnessed by HF16/HF20/HF33 neighbor suites).
+Changes: bootstrap kernelPorts.docs gains `remove` (conditions forwarded
+verbatim); kernel-host preflight REQUIRES docs.remove (complete-set fail-closed
+discipline) and install forwards it; `V8KernelHostPorts.docs` type gains
+remove. Committed-dist discipline: `packages/domain-harness/dist/**` rebuilt and
+committed. Test-side port constructions updated: `i01-kernel-ports.test.ts`
+(fixture + positive remove assertion), `i01-bootstrap-failclosed-occupied-kernel.test.ts`
+(occupier), `v08-tb-fixture.ts` b01MemoryHost (memory remove).
+
+## Edit 6 — commit-phase zero-record release (runner)
+Anchor: the `commitAcceptedTransitionInLane` call in `createOccurrenceRuntime`'s
+submit path is wrapped: on failure, the fence is released ONLY when the turn has
+ZERO begun journal records (effect-free turns faulted at the commit CAS — HF20
+witness); any existing record keeps it held (replay reconciles).
+
+## Edit 7 — selected-blob rebind (mechanical consequence)
+`packages/domain-harness-compiler/tests/v08-tf-oracle-fr02-fr07.test.ts`
+`V08_K_BLOB` rebind to the post-fix payload blob (the WEB-ORACLE-1 META pin of
+the physically selected K file; the pin's purpose is byte-exactness of the
+CURRENT selection, not an immutable historical digest).
+
 ## Ordering discipline
 1. Tests written and committed-intent pinned. 2. Pre-fix two-process reproduction of
 #1108 captured on the UNMODIFIED base (dispatch requirement). 3. Edits 1-4. 4. Same

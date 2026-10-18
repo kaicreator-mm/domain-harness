@@ -50,6 +50,14 @@ export interface V8KernelHostPorts {
         readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
         /** Journal read-back (`list(prefix)`). */
         readonly list: (prefix: string) => unknown;
+        /**
+         * [#1108 K01] Conditional document removal (the admission-fence release
+         * path): the store contract never accepts an unconditional delete — the
+         * conditions argument is REQUIRED and forwarded verbatim, exactly like
+         * `put`. A port without `remove` cannot install: the selected Kernel's
+         * fence lifecycle would silently degrade to never-released fences.
+         */
+        readonly remove: (key: string, conditions: V8KernelDocsPutConditions) => unknown;
     };
     readonly sha256: {
         readonly digestUtf8: (value: string) => string;

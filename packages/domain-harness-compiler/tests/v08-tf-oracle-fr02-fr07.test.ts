@@ -118,7 +118,7 @@ const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 // FR11/HF24 adds the selected SDK compiled-data READ endpoint; FR02/FR07 semantics unchanged.
 // CI #1304 executed all prior affected oracle behavior but found the stale exact S pin.
 const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
-const V08_K_BLOB = 'fa30e1204d47c12f3f5842c497a83a08501d515b';
+const V08_K_BLOB = '4eea7d91cf4bd25e21f5539e428729f683a594e2';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

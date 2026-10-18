@@ -54,6 +54,14 @@ export interface V8KernelHostPorts {
     readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
     /** Journal read-back (`list(prefix)`). */
     readonly list: (prefix: string) => unknown;
+    /**
+     * [#1108 K01] Conditional document removal (the admission-fence release
+     * path): the store contract never accepts an unconditional delete — the
+     * conditions argument is REQUIRED and forwarded verbatim, exactly like
+     * `put`. A port without `remove` cannot install: the selected Kernel's
+     * fence lifecycle would silently degrade to never-released fences.
+     */
+    readonly remove: (key: string, conditions: V8KernelDocsPutConditions) => unknown;
   };
   readonly sha256: {
     readonly digestUtf8: (value: string) => string;
@@ -137,7 +145,7 @@ export function preflightKernelHostPorts(ports: unknown, sessionCap: unknown): v
     );
   }
   const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
-  const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown } | undefined;
+  const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown; remove?: unknown } | undefined;
   const sha256 = candidate.sha256 as { digestUtf8?: unknown } | undefined;
   const resources = candidate.resources as { call?: unknown; callScoped?: unknown } | undefined;
   if (
@@ -146,13 +154,14 @@ export function preflightKernelHostPorts(ports: unknown, sessionCap: unknown): v
     || !isCallable(docs.get)
     || !isCallable(docs.put)
     || !isCallable(docs.list)
+    || !isCallable(docs.remove)
     || typeof sha256 !== 'object'
     || sha256 === null
     || !isCallable(sha256.digestUtf8)
   ) {
     throw new QualifiedPackageError(
       'KERNEL_HOST_INVALID',
-      'kernel Host ports must provide docs.get, docs.put, docs.list and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)',
+      'kernel Host ports must provide docs.get, docs.put, docs.list, docs.remove and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)',
     );
   }
   if (
@@ -191,7 +200,7 @@ export function preflightKernelHostPorts(ports: unknown, sessionCap: unknown): v
 export function installKernelHostPorts(ports: unknown, sessionCap: unknown): void {
   preflightKernelHostPorts(ports, sessionCap);
   const candidate = ports as { docs?: unknown; sha256?: unknown; resources?: unknown; clock?: unknown };
-  const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown };
+  const docs = candidate.docs as { get?: unknown; put?: unknown; list?: unknown; remove?: unknown };
   const sha256 = candidate.sha256 as { digestUtf8?: unknown };
   const resources = candidate.resources as { call?: unknown; callScoped?: unknown };
   kernelHost = Object.freeze({
@@ -199,6 +208,7 @@ export function installKernelHostPorts(ports: unknown, sessionCap: unknown): voi
       get: docs.get as (key: string) => unknown,
       put: docs.put as (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown,
       list: docs.list as (prefix: string) => unknown,
+      remove: docs.remove as (key: string, conditions: V8KernelDocsPutConditions) => unknown,
     }),
     sha256: Object.freeze({
       digestUtf8: sha256.digestUtf8 as (value: string) => string,

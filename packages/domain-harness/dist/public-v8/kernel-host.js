@@ -80,10 +80,11 @@ export function preflightKernelHostPorts(ports, sessionCap) {
         || !isCallable(docs.get)
         || !isCallable(docs.put)
         || !isCallable(docs.list)
+        || !isCallable(docs.remove)
         || typeof sha256 !== 'object'
         || sha256 === null
         || !isCallable(sha256.digestUtf8)) {
-        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put, docs.list and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)');
+        throw new QualifiedPackageError('KERNEL_HOST_INVALID', 'kernel Host ports must provide docs.get, docs.put, docs.list, docs.remove and sha256.digestUtf8 callables (the COMPLETE selected-K set; a minimal get/put tuple is not an installable production configuration)');
     }
     if (typeof resources !== 'object'
         || resources === null
@@ -120,6 +121,7 @@ export function installKernelHostPorts(ports, sessionCap) {
             get: docs.get,
             put: docs.put,
             list: docs.list,
+            remove: docs.remove,
         }),
         sha256: Object.freeze({
             digestUtf8: sha256.digestUtf8,

@@ -31,7 +31,7 @@ test('I01-N: the COMPLETE port set is required — a partial tuple installs NOTH
   const NEGATIVE_CAP = 'i01-negative-preflight-session-capability-0123456789abcdef0123456789abcdef';
   // The complete bounded set a trusted bootstrap installs.
   const full = {
-    docs: { get: (key: string) => key, put: (_key: string, value: unknown) => value, list: (prefix: string) => [prefix] },
+    docs: { get: (key: string) => key, put: (_key: string, value: unknown) => value, list: (prefix: string) => [prefix], remove: (_key: string) => undefined },
     sha256: { digestUtf8: (value: string) => value },
     resources: { call: (_key: string, _op: string, payload: unknown) => payload, callScoped: (_scopeId: string, _key: string, _op: string, payload: unknown) => payload },
     clock: () => '2026-10-12T00:00:00.000Z',
@@ -101,6 +101,7 @@ test('I01-P: bootstrapTrustedHost installs the COMPLETE protected port set over 
     assert.equal(typeof ports.docs.get, 'function');
     assert.equal(typeof ports.docs.put, 'function');
     assert.equal(typeof ports.docs.list, 'function');
+    assert.equal(typeof ports.docs.remove, 'function', '[#1108 K01] the installed channel carries the conditional fence-release remove');
     assert.equal(typeof (ports.resources as Record<string, unknown>).call, 'function');
     assert.equal(typeof (ports.resources as Record<string, unknown>).callScoped, 'function');
     assert.equal(typeof ports.clock, 'function');

@@ -250,27 +250,78 @@ test('R02-a engine commit honors expectedTargetSequence: a stale sequence refuse
   assert.equal(current.state.stateKey, 'approved');
 });
 
-test('R02-b a displaced admission-fence holder can never commit; a stale fence claim refuses typed', async () => {
+test('R02-b/K01 a same-revision competing fence claim refuses (#1108); same-turn replay and post-commit supersede stay legal', async () => {
   const engine = new kernel.WorkflowInstanceEngine(storeA, { now: () => NOW });
   const engineB = new kernel.WorkflowInstanceEngine(storeB, { now: () => NOW });
   const address = target('t:a:fence');
   await engine.createInstance({ address, correlationId: 'c', packageId: 'biz:quote@1.0.0', initialState: { stateKey: 'review', context: {} } });
 
   assert.equal(await engine.readAdmissionFenceRevision(address), null);
-  const held = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: null });
+  await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: null });
+  // A claim whose own snapshot predates the holder's claim (stale
+  // snapshotFenceRevision) still refuses — pre-existing #1100 discipline.
   await assert.rejects(
     engineB.claimAdmissionFence({ target: address, turnId: 'turn:stale', expectedTargetSequence: 0, snapshotFenceRevision: null }),
     (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
   );
+  // [#1108 K01] A FRESH-snapshot rival (its read observed the holder's fence
+  // revision) must ALSO refuse at the same stateRevision: pre-fix this claim
+  // CAS-overwrote the in-flight holder, letting the rival dispatch a competing
+  // non-idempotent effect and orphan the first writer's dispatch. The holder is
+  // protected until it commits, fails unambiguously, or is reconciled by replay.
   const observed = await engineB.readAdmissionFenceRevision(address);
-  const takeover = await engineB.claimAdmissionFence({ target: address, turnId: 'turn:y', expectedTargetSequence: 0, snapshotFenceRevision: observed });
-
-  const transition = () => ({ nextState: { stateKey: 'approved', context: {} } });
   await assert.rejects(
-    engine.processAcceptedTransition({ target: address, messageId: 'mx', expectedTargetSequence: 0, admissionFence: held, transition }),
+    engineB.claimAdmissionFence({ target: address, turnId: 'turn:y', expectedTargetSequence: 0, snapshotFenceRevision: observed }),
     (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
   );
-  const committed = await engineB.processAcceptedTransition({ target: address, messageId: 'my', expectedTargetSequence: 0, admissionFence: takeover, transition });
+  // The SAME turn re-claiming its own fence is the crash-recovery replay path.
+  const reclaimed = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) });
+
+  const transition = () => ({ nextState: { stateKey: 'approved', context: {} } });
+  // A commit whose fence document was displaced (simulated directly on the
+  // physical store — post-fix no claim path can produce this) refuses typed.
+  const fenceKey = `v08-kernel:admission-fence:${String(address.workflowId)}:${String(address.instanceKey)}`;
+  await storeB.put(fenceKey, { pinVersion: 1, stateRevision: 0, turnId: 'turn:evil', claimedAt: NOW }, { mustMatchRevision: reclaimed.revision as number });
+  await assert.rejects(
+    engine.processAcceptedTransition({ target: address, messageId: 'mx', expectedTargetSequence: 0, admissionFence: reclaimed, transition }),
+    (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
+  );
+  // Defense in depth: even the OLD holder cannot re-claim a fence that a
+  // different turn now holds at the same stateRevision — the corrupted/
+  // displaced fence is fail-closed for everyone until reconciliation.
+  await assert.rejects(
+    engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) }),
+    (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
+  );
+  // Operator reconciliation of the simulated corruption restores the holder's
+  // fence document; the holder re-claims its own turn and commits.
+  const displaced = await storeB.get(fenceKey);
+  await storeB.put(fenceKey, { pinVersion: 1, stateRevision: 0, turnId: 'turn:x', claimedAt: NOW }, { mustMatchRevision: (displaced?.revision ?? 0) as number });
+  const healed = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) });
+  const committed = await engine.processAcceptedTransition({ target: address, messageId: 'mx', expectedTargetSequence: 0, admissionFence: healed, transition });
   assert.equal(committed.stateRevision, 1);
-  assert.equal(committed.lastMessageId, 'my');
+  assert.equal(committed.lastMessageId, 'mx');
+
+  // Post-commit: the leftover fence is at an OLDER stateRevision than the next
+  // snapshot — the normal revision-CAS supersede keeps the sequential path live.
+  const supersede = await engineB.claimAdmissionFence({ target: address, turnId: 'turn:z', expectedTargetSequence: 1, snapshotFenceRevision: await engineB.readAdmissionFenceRevision(address) });
+  assert.equal(supersede.stateRevision, 1);
+});
+
+test('K01-e zero-ambiguity release frees the fence for the next turn; a fence without a claim revision stays held', async () => {
+  const engine = new kernel.WorkflowInstanceEngine(storeA, { now: () => NOW });
+  const address = target('t:a:release');
+  await engine.createInstance({ address, correlationId: 'c', packageId: 'biz:quote@1.0.0', initialState: { stateKey: 'review', context: {} } });
+
+  const held = await engine.claimAdmissionFence({ target: address, turnId: 'turn:f1', expectedTargetSequence: 0, snapshotFenceRevision: null });
+  // A release without the claim's physical revision cannot be conditional, so
+  // it must be a no-op (fail-closed: the fence stays held).
+  await engine.releaseAdmissionFence(address, { turnId: 'turn:f1', stateRevision: 0 });
+  assert.notEqual(await engine.readAdmissionFenceRevision(address), null);
+  // The conditional release removes exactly the holder's revision.
+  await engine.releaseAdmissionFence(address, held);
+  assert.equal(await engine.readAdmissionFenceRevision(address), null);
+  // The next turn claims cleanly at the same stateRevision.
+  const next = await engine.claimAdmissionFence({ target: address, turnId: 'turn:f2', expectedTargetSequence: 0, snapshotFenceRevision: null });
+  assert.equal(next.stateRevision, 0);
 });

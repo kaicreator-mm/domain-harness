@@ -206,15 +206,18 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
   // #1013 (I01): the COMPLETE protected Kernel Host ports over the probed
   // physical storage. The physically selected Kernel mechanism consumes
   // exactly this bounded contract (kernel-mechanism-v1.mjs): true-CAS docs
-  // get/put/list over the SAME probed physical store (conditions forwarded
-  // verbatim — the store's refusal of unconditional writes stays
-  // authoritative), a trusted sha256 digest, the physical resource dispatch
-  // port for Business effect handlers, and the trusted clock.
+  // get/put/remove/list over the SAME probed physical store (conditions
+  // forwarded verbatim — the store's refusal of unconditional writes and
+  // unconditional deletes stays authoritative; [#1108 K01] remove is the
+  // conditional admission-fence release path), a trusted sha256 digest, the
+  // physical resource dispatch port for Business effect handlers, and the
+  // trusted clock.
   const kernelPorts = {
     docs: Object.freeze({
       get: (key: string) => store.get(key),
       put: (key: string, value: unknown, conditions?: CasPutConditions) => store.put(key, value, conditions as CasPutConditions),
       list: (prefix: string) => store.list(prefix),
+      remove: (key: string, conditions: CasPutConditions) => store.remove(key, conditions),
     }),
     sha256: Object.freeze({
       // Trusted digest (same construction as the compiler/verifier digest).
