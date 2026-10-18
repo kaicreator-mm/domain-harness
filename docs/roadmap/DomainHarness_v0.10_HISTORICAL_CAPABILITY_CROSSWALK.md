@@ -17,6 +17,38 @@ Audit columns below are **target ownership**, not proven actual current ownershi
 
 **Initial per-row v9 reachability: `AUDIT_PENDING` (not "missing").** v0.8 already had 44/44 bounded functional proof in its own frozen candidate and a real qualification; don't conflate the two. The v0.9 baseline has 9/9 split Issue closure and qualified Full/Hidden/packed consumer evidence; however that does not automatically prove full four-source decision/Meta/Memory routes.
 
+## 1a. Required migration classification: Semantic vs Tool/Operation vs Kernel
+
+**Decision rule:** Determine **what this feature does and who owns its runtime authority**, before deciding whether it is an independently callable Tool. The v0.7 PRD already distinguishes **Semantic Component** from **Tool Component** and says Agent Tool is only an optional projection of a Tool, not a separate ontology. v0.10's composable Package Families must retain this boundary. This section is a **candidate assignment**, not proof of selected-v9 implementation.
+
+- `SEMANTIC`: declaration/interpretation/rule/decision/workflow/control/evaluation; explicit S Feature or B component, **not necessarily a Tool** even if implemented by callable TypeScript.
+- `TOOL_READ`: independently addressable capability call, e.g. model inference, document lookup, external retrieval/search or independently callable calculation. It may be pure and has no automatic effect privileges.
+- `TOOL_EFFECT`: selected operation that writes external Domain data, Memory, files or remote work; caller/currentness and K Effect identity/Journal/UNKNOWN control remain mandatory.
+- `KERNEL_PROTOCOL`: authoritative State/Admission/Journal/Effect/replay/fence/Disposition, query current-instance view and verified control turns; **internal K mechanism**, not an ordinary Tool.
+- `BUILD_OR_LIFECYCLE`: immutable component qualification, dependency resolution, approved install/activation and Package init/dispose; not an ordinary runtime business Tool.
+- `SPLIT`: separate semantic logic, tool IO and/or K protocol instead of classifying the whole feature in one bucket.
+
+| Historic candidate | Migration classification | Tool boundary decision | Authority / failure rule |
+|---|---|---|---|
+| Rule, Guard, portable expression, WorkflowRouter | SEMANTIC | No separate Tool; Standard interpreted function or declared component | Guard failure before effect; no extra Tool invocation |
+| DecisionResolver four-source precedence (v0.3) | SEMANTIC + SPLIT | Resolver is NOT a Tool; cache/model/procedure services may be separate calls | S selects, current K admission still decides |
+| HarnessMachine, bounded Model↔Query/Tool loop | SEMANTIC + SPLIT | Loop is a Workflow; each approved model/query is an independent Tool Operation | max-step/budget, model no direct mutation |
+| Compiled Workflow V3 IR, child, WAIT/RESUME | SEMANTIC + KERNEL_PROTOCOL | Workflow transitions are not Tool Calls; remote notification adapter may be | K-owned durable control turn/recovery |
+| Exact Semantic Cache | SPLIT | cache currentness/key/eligibility = SEMANTIC; scoped physical read/write = Capability Operation | a cache hit never counts as Journal/Effect replay |
+| ObservedDependencySet / Context Assembly | SEMANTIC + SPLIT | dependency/packing = non Tool; external source retrieval = TOOL_READ | dependency version/currentness and scope |
+| Memory get/search vs put/delete | TOOL_READ / TOOL_EFFECT | yes, independently callable Memory Capability Operations | read scope; write authorized effect and revision; no K Journal reinterpretation |
+| LLM inference / search / external calculations | TOOL_READ | yes, where independently addressable via Model/Search/Compute Capability | no ModelPort policy duplication, no implicit Effect |
+| Runtime Evidence, DecisionResolutionReceipt | SEMANTIC + KERNEL_PROTOCOL | provenance projection not Tool; durable recording through K/Host observation path | observational append cannot rewrite committed truth |
+| Shadow L4 comparison, candidate scoring | SEMANTIC + SPLIT | comparator is not a Tool; model/evaluation service call may be TOOL_READ | shadow yields zero production State/Effect writes |
+| Candidate validation | SEMANTIC + optional TOOL_READ | local deterministic validation not Tool; remote simulator optional bounded Capability | Candidate has no execution rights |
+| Promotion / selection / activation | BUILD_OR_LIFECYCLE + SEMANTIC | non Tool policy/proposal; protected BUILD/deployment action, NOT free Agent Tool | distinct external authorization, future pinned version only |
+| External HTTP/Job effect and #1138 | TOOL_EFFECT | yes, selected sealed C + Host adapter | K Admission/Journal/UNKNOWN; no false remote-complete ACK |
+| Timer / callback / DomainMessage | KERNEL_PROTOCOL + SPLIT | K control-turn primitives not Tools; external transport may be TOOL_EFFECT | dedup, recovery, caller/target binding |
+| #1108 Admission Fence / #1109 Disposition recovery | KERNEL_PROTOCOL | NEVER make independently privileged effectful Tool or optional plugin | one Kernel Primary owns CAS/fence/state safety |
+| Pure DAC verifier, BUILD graph, Package lifecycle | BUILD_OR_LIFECYCLE | no runtime business Tool by default | verifies externally supplied facts; never issues own authority |
+
+**T01 output rule per selected legacy row:** record `historic-id → target-owner → migration-class → exposed-as-tool? → operation effect-class → caller/visibility → data/schema identity → current public-v9 reachability → selected-v10 test witness`. A `SPLIT` row may produce multiple component and Tool bindings **without** creating multiple independent Kernel control loops. Do not create 44 separate Issue/PRs for 44 rows. Model-facing Agent Tool projection is independently opt-in and read-only by default; a Capability Operation is not automatically visible to an Agent.
+
 ## 2. All frozen v0.8 historic slots (44/44 mapped to v0.10 review owner)
 
 Historical source paths and row IDs are from the 44-entry JSON manifest. The `v0.10 disposition` is a candidate: **REUSE** existing current behavior; **ADV** richer selected-v9 semantics; **MIGRATE** older functionality to current Package ABI if reachability fails; **NO LEGACY ABI** do not preserve old artifacts.
