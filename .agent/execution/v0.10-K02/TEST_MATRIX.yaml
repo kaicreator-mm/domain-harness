@@ -1,0 +1,52 @@
+# K02 targeted test matrix — phase-1 independent modules (base 1e6d4be0)
+# Runners:
+#   compiler unit:  cd packages/domain-harness-compiler && npm test   (auto-glob tests/*.test.ts)
+#   host physical:  cd packages/domain-harness && npx tsx --test tests/v08-host/k02-*.test.ts
+# Evidence discipline: EXIT=<rc> recorded per command; no PASS claimed without a real exit 0.
+
+- id: K02-U1
+  file: packages/domain-harness-compiler/tests/v08-k02-durable-receipt-carrier.test.ts
+  kind: unit
+  covers: canonical input digest equivalence/injectivity; scope identity validation; namespaced key grammar injectivity; turn receipt identity stability (key order, build identity separation)
+  verdicts: [P-equivalent-inputs-same-digest, N-changed-value/intent-different-identity, N-malformed-scope-typed]
+
+- id: K02-P1
+  file: packages/domain-harness/tests/v08-host/k02-receipt-cas-physical.test.ts
+  kind: physical-sqlite
+  covers: same-CAS original receipt + state in ONE put (doc revision == stateRevision); identical retry exact-original replay zero new effect; changed input typed conflict; different intentType typed conflict; legacy/unknown envelope fail-closed; ring eviction without archive never blocks new turns
+  verdicts: [P-one-physical-cas, P-exact-original-replay, N-changed-input-conflict, N-intent-conflict, N-legacy-fail-closed, P-eviction-liveness]
+
+- id: K02-P2
+  file: packages/domain-harness/tests/v08-host/k02-receipt-cas-physical.test.ts
+  kind: physical-sqlite
+  covers: 17+ distinct admitted turns after EVERY derived archive record destroyed (list+remove) keep admitting; replay of turn #1..#17 answers idempotentReplay from same-CAS receipts with zero new journal/effect rows; store closed+reopened mid-sequence (restart durability)
+  verdicts: [P-17plus-turns-after-archive-loss, P-restart-durability]
+
+- id: K02-P3
+  file: packages/domain-harness/tests/v08-host/k02-receipt-cas-physical.test.ts
+  kind: physical-sqlite-fault
+  covers: injected fatal store fault on the receipt-bearing CAS put fails typed with zero durable partial state (no receipt, no state move, no effect); fault on archive write never fails the committed ACK (archive is observational)
+  verdicts: [N-store-fault-fail-closed, P-archive-fault-ack-survives]
+
+- id: K02-N1
+  file: packages/domain-harness/tests/v08-host/k02-namespace-two-b-physical.test.ts
+  kind: physical-sqlite-real-kernel
+  covers: REAL unmodified selected kernel (exact payload bytes, data-URL import) x two deployment scopes (two B) with IDENTICAL workflowId+instanceKey over ONE SQLite file via scoped docs adapter; disjoint instance/fence/journal/disposition keys; independent state progression; no cross-B read/fence/receipt
+  verdicts: [P-two-b-isolated-instance, P-two-b-independent-transitions, N-no-cross-namespace-keys]
+
+- id: K02-R1
+  file: packages/domain-harness/tests/v08-host/k02-receipt-race-multiprocess.test.ts
+  kind: physical-two-process
+  covers: two REAL stock-node child processes (children/k02-receipt-worker.mjs) sharing ONE SQLite file race the SAME turn; exactly one child commits+ACKs admitted, the loser replays the SAME original receipt idempotentReplay with zero new effect; a changed-input racing second submission refuses typed; sequential 20-turn interleave across processes stays consistent
+  verdicts: [P-single-winner-original-ack, P-loser-idempotent-replay, N-changed-input-race-typed-conflict, P-cross-process-sequence]
+
+- id: K02-G1
+  file: tools/task-check.sh
+  kind: gate
+  covers: lint+typecheck+targeted tests at exact HEAD; real exit codes
+  verdicts: [EXIT-0]
+
+neighbors_regression:
+  - packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts   # K01-modified file: NOT run/edited by K02 (K01 owns); recorded as coordination fact, not a K02 gate
+  - packages/domain-harness/tests/v08-host/v08-host-c01-cas.test.ts                          # CAS store direct neighbor (unmodified)
+  - packages/domain-harness/tests/v08-host/v08-host-multiprocess.test.ts                     # multiprocess store neighbor (unmodified)
