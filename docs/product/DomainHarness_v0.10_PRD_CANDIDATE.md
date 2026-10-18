@@ -39,8 +39,8 @@ Primary sources:
 ## 3. Frozen v0.9 boundary retained
 
 - **Microkernel:** minimal `load`, selected immutable package binding and necessary hooks only. It is not a business controller, Agent engine or Memory store.
-- **Selected Kernel Package (K):** sole State/Guard/Admission/Effect/Journal/UNKNOWN/Replay authority; approved Host protects physical caller identity, actual installed bytes/currentness, one-shot permits and selected resources.
-- **Selected Standard Package (S):** workflow/decision/route, schema and reusable Component semantics. v0.9 physically selects **one Standard Package**. Multiple logical Components do **not** imply multiple concurrently loaded Standard Packages without an independently justified BUILD/ABI successor.
+- **Kernel Package family:** exactly one **Kernel Primary** owns State/Guard/Admission/Effect/Journal/UNKNOWN/Replay authority. v0.10 may BUILD-select zero or more separate **Kernel Extension Packages** through bounded typed extension points; they cannot become independent authorities. Approved Host protects caller identity, actual bytes/currentness and one-shot permits.
+- **Standard SDK Package family:** exactly one **Standard Primary/dispatcher** (Basic) plus zero or more separate, BUILD-selected **Standard Feature Packages** (Advanced Workflow/Decision, Context, Evidence/Shadow) with explicit component-provider bindings and conflict rules. v0.9 physically selected one Standard; v0.10 must provide a new selected multi-package ABI to make composition real.
 - **Business Packages (B1..Bn):** one-to-one owning Business for each sealed Intent, own policies, Workflow definitions, Agent or ordinary business behavior. Several Business runtimes may make progress in one Assembly.
 - **Capability Packages (C):** memory, retrieval, model, tools, semantic-cache provider, Evidence/Artifact store, platform adapters, with declared Operation contracts/handlers and bounded lifecycle. Memory storage is external data, not Kernel journal truth.
 - **BUILD/compiler (outside runtime):** package binding, semantic schemas, capability selection, compiled Domain Data/Workflow contracts and qualified immutable new App generations. No arbitrary post-load package discovery, hot code mutation or runtime compile.
@@ -49,6 +49,26 @@ Primary sources:
 A protected Agent/LLM-exposed Tool remains **read-only by default**; effectful business changes are separately authorized K operations. [Post-v0.9 external effect Host Tool Port #1138](https://github.com/kaicreator-mm/domain-harness/issues/1138) is a separate Product intake, not silently included as an automatic P0 dependency.
 
 ## 4. Product feature groups and acceptance
+
+### P0 — PC: Composable Kernel and Standard Package families ([#1141](https://github.com/kaicreator-mm/domain-harness/issues/1141))
+
+**PC-01** A minimal Domain App MUST build and run with only **Kernel Basic Primary + Standard Basic Primary + its B and required C**. No Agent/Memory/L4 advanced module is forced into the installed closure, evaluated during load or charged to cold start. Selecting a component is explicit BUILD policy, not automatic discovery or runtime dynamic loading.
+
+**PC-02** A complex App MAY BUILD-compose **one authoritative Kernel Primary plus 0..N physically distinct Kernel Extension Packages**, and **one Standard Primary plus 0..N physically distinct Standard Feature Packages**. A Feature Package is independently pinned and loaded—not just a logical namespace inside a monolithic "all features" Standard bundle.
+
+**PC-03** Selected Kernel Primary remains the **only** State/Guard/Admission/Effect/Journal/UNKNOWN/Replay commit authority and the only source of `createOccurrenceRuntime`. Kernel extensions can supply **only named typed preapproved hooks or candidate mechanisms** (e.g. pure recovery advice, read-only observations) that are invoked and revalidated by the Primary. They MUST NOT write raw Kernel State/Journal, mint Effect permission, supplant the commit path or constitute a second Runtime. An invariant whose safe implementation requires shared atomic commit must stay within the Primary instead of being split into a plugin. #1108/#1109 are Primary correctness fixes, not permission to delegate those invariants.
+
+**PC-04** The Standard Primary/dispatcher owns the one selected `interpret`/routing entry surface and delegates a **named, BUILD-bound Component/Kind/Feature** to an exactly identified Standard Feature Package. A Feature Package implements a bounded semantic function, never K admission/mutation. No last-installed-wins provider resolution, silent first match, or floating fallback. Advanced Workflow, Context Assembly and L4 Shadow are valid example feature packages; Memory storage remains a Capability Package.
+
+**PC-05** The v0.10 BUILD/ABI SHALL distinguish Primary and Extension/Feature roles (naming to be chosen at L2), close transitive dependency+version+module-digest graph, detect cycles and duplicate provider identities/hook collisions, and pin explicit dispatch and initialization order. Unknown required behavior, incompatible ABI or missing provider is rejected **before executing any affected Package**. Existing per-package self-contained zero-import ESM + trusted installed-byte checks and closed-world roster remain.
+
+**PC-06** One approved Assembly produces one frozen composition profile/digest covering the whole feature graph. Only selected packages are imported/initialized; reverse-order disposal applies to actually initialized modules on failure. Restart reactivates the same immutable closure with no live Feature hot swap. Runtime may not fabricate capabilities, dynamically resolve unapproved dependencies or allow a model to invent an executable extension.
+
+**PC-07** The public v0.10 facade stays independent of internal package count (App consumes capabilities, not feature module handles); the selected H→K bridge exposes only scoped extension tables and a single authoritative K runtime. This is **not** a relaxation of current caller, revocation, host-scope or one-shot effect permits.
+
+**PC-08** Before any broad rollout, validate **two clean packed consumers**: (A) tiny App selecting only K/S Basic and a B; (B) complex App selecting at least **two independent K extension modules and three independent S feature modules**, two B and selected C, with real selected dispatch and without duplicate K authority. Negative cases: two primaries, same Kind/provider twice, missing/wrong version, cycle, forged extension hook, forbidden K commit access, post-seal drift, partial init and foreign Host scope. Measure exact packaged module set; don't claim reduced resource cost without measurement. If two useful K extension examples cannot be made genuinely independent without granting unsafe authority, report **K_EXTENSION_FEASIBILITY_HOLD** and do not weaken single-K authority; S composition is still independently deliverable.
+
+**Scope note:** v0.9 has exactly one physical K and S by design. Product L1 here selects multi-package families as a v0.10 **P0 candidate**, not an implemented runtime, and requires a versioned BUILD/ABI design at L2. No v0.9 ABI compatibility obligation is added pre-1.0.
 
 ### P0 — AW: Advanced Workflow Components
 
@@ -108,7 +128,7 @@ Historical register `FR01–FR15`, `HF16–HF34`, `NEW-FUNCTION-01–06`, and fo
 
 ## 6. Minimum integrated acceptance — ONE small reference App
 
-BUILD seals **one Kernel + one Standard + two distinct Business Packages + selected Capabilities**. B1 handles deterministic ordinary business, B2 handles an Agent Workflow; a third logical Meta Workflow belongs to an approved Business Package and is not a peer runtime. Tests:
+BUILD seals **one Kernel Primary + optional Kernel Extensions + one Standard Primary + optional Standard Feature Packages + two distinct Business Packages + selected Capabilities**. B1 handles deterministic ordinary business, B2 handles an Agent Workflow; a third logical Meta Workflow belongs to an approved Business Package and is not a peer runtime. A minimal App uses **only** the two Primary basics; a complex App selects only necessary independent extensions. Tests:
 1. Both B packages handle disjoint sealed Intents; actual same-instanceKey collision is query-ambiguous unless scoped; explicit aggregate shows both with provenance/current caller permissions.
 2. B1 Rule/Exact Cache/Promoted Procedure Model avoidance; B2 fallback with Model/Query limited steps, enforced hard guards and no unapproved model-owned effect.
 3. Memory put/restart/read/search scoped to the correct app/tenant/Business/Agent; Context Assembly uses only authorized current memory and respects budget. Prove cross-B/tenant denied cases.
@@ -120,13 +140,13 @@ BUILD seals **one Kernel + one Standard + two distinct Business Packages + selec
 
 ## 7. Scope discipline and staged roadmap
 
-**P0 release target:** historical selected-v9 reachability audit, AW core (AW01–06), MC basic (MC01–04), EV safe foundation (EV01–04), single integrated qualified reference scenario. **P1 candidate within v0.10 only if bounded and validated:** ME01–03, QR01–03. P1 may be deferred to successor without false P0 acceptance. Since the user explicitly requested Meta/L4 and multi-B planning, they remain visible and traceable rather than silently dropped.
+**P0 release target:** composable selected Package families PC-01–08, historical selected-v9 reachability audit, AW core (AW01–06), MC basic (MC01–04), EV safe foundation (EV01–04), minimal and complex qualified reference scenarios. If K extension feasibility fails without safe authority preservation, freeze must explicitly decide a narrower K composition scope rather than inventing success. **P1 candidate within v0.10 only if bounded and validated:** ME01–03, QR01–03. P1 may be deferred to successor without false P0 acceptance. Since the user explicitly requested Meta/L4 and multi-B planning, they remain visible and traceable rather than silently dropped.
 
 **OUT:** separate Agent/Meta Kernel or Runtime, general memory platform, arbitrary live package installation/hot swap, automatic self-approval, universal scheduler/obligation solver, global default model calls, v0.1–v0.7 API/asset/digest compatibility, full generic system administration, agent model/provider routing policy, direct mutation by Agent's read-only Tool discovery.
 
 **L1 open decisions to resolve before Freeze**:
 - Is EV03 Shadow foundation P0 while an actual repeated autonomous Meta Workflow remains P1? Proposed **YES**.
-- Preserve single physical Standard Package in v0.10? Proposed **YES**; logical Advanced/Context/Evolution Components composed inside selected S or supported B/Capabilities; widen BUILD ABI only on a measured necessity.
+- Preserve **one authority-bearing Primary Kernel and one entry Standard** but allow separately shipped selected K Extensions and S Feature Packages? Proposed **YES, v0.10 P0** (see PC-01–PC-08), with bounded typed K hooks, deterministic module selection, no peer State/Journal authority. Exact ABI and feasibility must be validated at L2; unsupported powerful Kernel hooks remain out.
 - Query API approach: explicit scoped single result and bounded aggregate, no implicit first-hit; P1 until primary AW/MC/EV integration is qualified.
 - Memory consistency: per-item CAS/scoped operations first; no cross-package atomic transaction claim.
 - v0.3 explicit human promotion wording vs user's current low-overhead process: require real external approved authority, not GitHub-identity/human-count gating; independently validate this successor Product choice.
