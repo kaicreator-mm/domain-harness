@@ -135,6 +135,53 @@ export type {
   V09SealedQualifiedRoot,
 } from './qualified-package/index.js';
 
+// v0.10 T00 (#1166): closed-world Node24 BUILD composition — once-only
+// static composition preflight (one target profile, one K/S/B/C graph,
+// sealed ordinary node/npm/native imports) plus its trusted-activation
+// counterpart (load → connect → init → execute → dispose, no runtime
+// static re-attestation under accepted Product A01). Additive to the
+// COMPILER_PUBLIC_API_VERSION inventory.
+export {
+  V10ActivationError,
+  V10AppFacade,
+  V10BuildError,
+  V10PortDeniedError,
+  V10_BUILD_FORMAT,
+  V10_BUNDLER_REVISION,
+  V10_HOST_ABI,
+  V10_IMPORT_POLICY_REVISION,
+  V10_KEXT_ABI,
+  V10_RUNTIME_ABI,
+  V10_SFEATURE_ABI,
+  V10_TARGET_PROFILE,
+  V10_SELECTED_ROLE_ABI,
+  activateV10App,
+  assertSealedImportClosure,
+  buildV10App,
+  canonicalJson,
+  collectModuleEdges,
+  emptyExternalImports,
+  freshV10Counters,
+  sha256Canonical,
+  sha256Hex,
+} from './qualified-package/index.js';
+export type {
+  ActivateV10AppOptions,
+  BuildV10AppOptions,
+  V10Activation,
+  V10AppView,
+  V10BuiltApp,
+  V10Counters,
+  V10DocStore,
+  V10ExternalImports,
+  V10ModuleEdge,
+  V10ModuleInput,
+  V10ModuleRole,
+  V10PublicIntent,
+  V10RouteRowInput,
+  V10SealedModule,
+} from './qualified-package/index.js';
+
 // v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
 // external approval + sealed-root producer over the public core /v8 ABI.
 export {
