@@ -1,0 +1,8 @@
+# v0.10 K-extension feasibility spike — evidence run
+date: 2026-10-18T07:19:21Z
+git HEAD: 0492cf4fd756c952631d7d94f1095c78949a3bdb
+git branch: research/v010-k-extension-feasibility
+working tree: 1 untracked/modified paths (evidence dir only)
+node: v24.21.0
+npm: 11.19.0
+os: MINGW64_NT-10.0-26300 3.6.10-710e5275.x86_64
