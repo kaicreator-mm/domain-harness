@@ -13,8 +13,8 @@
 - id: K02-P1
   file: packages/domain-harness/tests/v08-host/k02-receipt-cas-physical.test.ts
   kind: physical-sqlite
-  covers: same-CAS original receipt + state in ONE put (doc revision == stateRevision); identical retry exact-original replay zero new effect; changed input typed conflict; different intentType typed conflict; legacy/unknown envelope fail-closed; ring eviction without archive never blocks new turns
-  verdicts: [P-one-physical-cas, P-exact-original-replay, N-changed-input-conflict, N-intent-conflict, N-legacy-fail-closed, P-eviction-liveness]
+  covers: same-CAS original receipt + state in ONE put (doc revision == stateRevision); identical retry exact-original replay zero new effect; changed input typed conflict; different intentType typed conflict; denied turn records nothing and the same source admits fresh later; legacy/unknown envelope fail-closed; ring eviction without archive never blocks new turns
+  verdicts: [P-one-physical-cas, P-exact-original-replay, N-changed-input-conflict, N-intent-conflict, P-denial-records-nothing, N-legacy-fail-closed, P-eviction-liveness]
 
 - id: K02-P2
   file: packages/domain-harness/tests/v08-host/k02-receipt-cas-physical.test.ts
