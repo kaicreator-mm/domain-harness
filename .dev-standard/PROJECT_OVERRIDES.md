@@ -1,5 +1,12 @@
 # DomainHarness Project Overrides
 
+## Permanent project architecture — inherited across versions
+
+- **Authoritative project-specific architecture**: [`docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md`](../docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md) (CV-01..08). Required at every new Product/L1 → L2 → Task DAG planning cycle and material SDK/Package/Host review. Treat older version-specific product docs as historical snapshots, not substitutes for this current project baseline.
+- **Essential rule**: SDK and Package implementations target the BUILD-selected single Domain App Runtime; BUILD owns static compatibility, dependency resolution and complete composition; installed Package code is trusted. The runtime SDK loads/links/inits/executes/disposes, rather than revalidating static Package provenance, digests, module imports and versions. Checks happen **once at the earliest feasible stage**; runtime only handles genuinely live input, CAS/effect/UNKNOWN and lifecycle correctness.
+- **Engineering scope**: v0.10 actually implements TypeScript → JS → Node, not mandatory QuickJS/Browser/multi-OS targets. Normal private Node/npm/native imports are implementation details, not automatic Tool calls. No speculative Host/Crypto/Parser/XState/SQL abstraction framework; existing necessary Kernel CAS and exposed Tool/Operation boundaries remain.
+- **Version carry-forward**: each new PRD/L2 should record `CV-01..08: INHERITED_UNCHANGED`, or cite specific IDs with reasons and a focused Product/Architecture amendment. No duplicate eight-item Issue set, full audit or runtime validation framework is implied. A pending version amendment cannot silently supersede frozen Product: **v0.10 PC-05 change requires reviewed Product A01 PR #1158 acceptance** before L2 can rely on ordinary imports/no runtime re-attestation.
+
 ## Project Identity
 
 - Repository: `kaicreator-mm/domain-harness`
