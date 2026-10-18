@@ -13,7 +13,7 @@
   test: K02-P1, K02-P2, K02-R1
 
 - trigger: derived archive record(s) lost (deleted / never written) for admitted turns
-  expected: replay still answers from the same-CAS receipt (atomic truth); NEW turns keep admitting (no global block); only an evicted-from-ring AND archive-lost ANCIENT turn refuses typed for itself
+  expected: replay still answers from the same-CAS receipt (atomic truth); NEW turns keep admitting (no global block); ring eviction is archive-gated — an entry stays past the bound while its archive write faults (fault-tolerant growth, admission never blocked, admission never forgotten)
   test: K02-P2
 
 - trigger: fatal physical store fault during the receipt-bearing CAS put
