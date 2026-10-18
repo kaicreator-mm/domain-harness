@@ -1,5 +1,11 @@
 # DomainHarness Project Overrides
 
+## Project-level architecture source of truth (cross-version)
+
+- **Product architecture (not ADS process config):** follow [`docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md`](../docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md) CV-01..12, as linked by root `AGENTS.md`. This file only locates that source; do not duplicate its normative clauses here.
+- **New version intake:** record `CV-01..12: INHERITED_UNCHANGED` in the new PRD/L2, or cite a focused architecture/Product amendment for specific deviations. A project-wide principle does not silently supersede an existing frozen version requirement (v0.10 PC-05 remains gated by Product A01 #1158).
+- **Legacy text boundary:** `Repository profile`, `Runtime / Platform Requirements`, `Frozen authority`, `Project-specific hard boundaries`, `Release boundary` and `v0.8 Sealed Standard SDK implementation patterns` below contain historical v0.3/v0.8-era assertions. Do **not** infer they define the latest Product contract or current runtime target without checking the version's actual frozen Product/L2 and cross-version decision. Existing historical acceptance is not rewritten by this note.
+
 ## Project Identity
 
 - Repository: `kaicreator-mm/domain-harness`
