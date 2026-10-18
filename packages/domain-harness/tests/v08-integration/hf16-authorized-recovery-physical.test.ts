@@ -66,6 +66,11 @@ handle.host.resources.provision('ledger', (_operation: string, payload: unknown)
   const requestId = String((payload as { requestId?: unknown })?.requestId ?? '?');
   dispatches.push(requestId);
   if (requestId.startsWith('POISON')) {
+    // [#1108 K01 R1] Deliberately UNCERTAIN (a plain throw, no pre-dispatch
+    // declaration): this fixture's poison outcome may have landed, so the
+    // kernel keeps the admission fence held and ONLY the operator-authorized
+    // poison-recovery corrective turn (trusted-seam recovery turn source) can
+    // supersede the durably-failed holder.
     throw new Error(`physical ledger outage for ${requestId}`);
   }
   return { reserved: true, ledgerEntryId: `ledger:${requestId}` };

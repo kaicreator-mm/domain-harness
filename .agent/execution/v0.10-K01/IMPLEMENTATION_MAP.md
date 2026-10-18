@@ -70,3 +70,38 @@ CURRENT selection, not an immutable historical digest).
 1. Tests written and committed-intent pinned. 2. Pre-fix two-process reproduction of
 #1108 captured on the UNMODIFIED base (dispatch requirement). 3. Edits 1-4. 4. Same
 tests green + R02-N1/N2/P/a regression green. 5. Targeted package suite + task-check.
+
+## R1 addendum (review #6254726103 P1 — lost-ACK fence release)
+Review finding: a journal `failed` record reflects a THROWN adapter call, NOT
+proof of zero external mutation; the R0 release-on-all-failed rule could free
+the fence after a real external dispatch with a lost ACK, letting a competing
+turn redispatch. Bounded fix (kernel + declared-protocol, no behavior change to
+frozen surfaces):
+- Dispatch probe: the runtime's own effectTools.execute wraps the resources
+  port handed to the Business handler; `probe.invoked` records whether the
+  physical dispatch port was ever called. A missing/non-object port passes
+  through verbatim (handler guard shapes unchanged).
+- Provable zero-external-effect classes ONLY: handler never invoked the port;
+  dispatcher-level pre-impl refusals (HOST_RESOURCE_MALFORMED / _UNKNOWN /
+  _NAMESPACE_RESERVED); adapter-declared HOST_RESOURCE_PRE_DISPATCH (the
+  sealed resource layer asserts its failure performed no external mutation —
+  the truthful home of the "outage before the ledger" class). Everything else
+  (handler fault, timeout, lost ACK) is UNCERTAIN.
+- The classification persists into the durable failure record
+  (`error.zeroExternalEffect`) so a same-turn replay refusal restores the same
+  fence policy (fixes the retry-reclaim wedge witnessed by HF33-N).
+- admitCentralDecision releases ONLY on error.zeroExternalEffect === true AND
+  all-failed journal scan. Uncertain outcomes keep the fence held
+  (fail-closed UNKNOWN).
+- Trusted-seam reconciliation supersede: a turn source of kind `recovery`
+  (operator-credentialed, durably CAS-delivered poison recovery) may claim a
+  fence held at the same stateRevision ONLY when the holder's every begun
+  journal effect is durably `failed` (>=1 record, none started/completed) —
+  HF16 authorized recovery stays live for genuinely uncertain poisons.
+- Fixtures: tg5-hf16 outage becomes a declared HOST_RESOURCE_PRE_DISPATCH
+  (truthful: the outage never reached the ledger — follower drain preserved);
+  hf16-authorized-recovery's poison stays UNDECLARED/uncertain and now drains
+  via the recovery supersede. K01 multiprocess suite: F1 keeps provable
+  pre-port release liveness; new N3 is the reviewer-required lost-ACK
+  falsifier (real ledger line then throw → fence held, zero second dispatch,
+  honest typed refusals, no false ACK).

@@ -33,7 +33,7 @@ import { rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootstrapTrustedHost, createKernelGateway } from '../../src/host-v8/index.js';
+import { bootstrapTrustedHost, createKernelGateway, HostBoundaryError } from '../../src/host-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sealRealApp, sqliteTempPath } from './helpers.js';
 
 const AUDIENCE = 'dh-tg5-hf16';
@@ -53,7 +53,13 @@ handle.host.resources.provision('ledger', (_operation: string, payload: unknown)
   const requestId = String(record?.requestId ?? '?');
   dispatches.push(requestId);
   if (requestId.startsWith('POISON')) {
-    throw new Error(`physical ledger outage for ${requestId}`);
+    // [#1108 K01 R1] The outage adapter declares the truthful class: the
+    // physical ledger was DOWN — the external mutation never happened. The
+    // kernel treats HOST_RESOURCE_PRE_DISPATCH as a provable zero-external-
+    // effect refusal, so the failed turn releases its admission fence and a
+    // follower occurrence may drain (an UNCERTAIN outage/lost-ACK would keep
+    // the fence held until reconciliation instead).
+    throw new HostBoundaryError('HOST_RESOURCE_PRE_DISPATCH', `physical ledger outage for ${requestId}`);
   }
   return { reserved: true, ledgerEntryId: `ledger:${requestId}` };
 });

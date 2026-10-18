@@ -1074,10 +1074,13 @@ async function executeEffectIntents(intents, request, ports, turnId) {
     const effectId = `${turnId}/effect/${ordinal}`;
     const binding = ports.effectTools.resolve(intent.effectType);
     if (binding === undefined) {
-      throw new CentralAdmissionError(
+      const unbound = new CentralAdmissionError(
         'ADMISSION_EFFECT_TOOL_UNBOUND',
         `no mutation-capable tool binding is declared for effect type ${intent.effectType}`,
       );
+      // [#1108 K01 R1 P1] Provable: no executor was ever invoked.
+      unbound.zeroExternalEffect = true;
+      throw unbound;
     }
     const record = {
       effectId,
@@ -1097,11 +1100,18 @@ async function executeEffectIntents(intents, request, ports, turnId) {
     try {
       begun = await ports.effectJournal.beginEffect(record);
     } catch (error) {
-      if (error instanceof CentralAdmissionError) throw error;
-      throw new CentralAdmissionError(
+      if (error instanceof CentralAdmissionError) {
+        // [#1108 K01 R1 P1] A typed journal begin refusal happens BEFORE any
+        // executor invocation — provably zero external effect.
+        error.zeroExternalEffect = true;
+        throw error;
+      }
+      const conflict = new CentralAdmissionError(
         'ADMISSION_EFFECT_JOURNAL_CONFLICT',
         `effect journal begin failed for ${effectId}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      conflict.zeroExternalEffect = true;
+      throw conflict;
     }
     const durable = begun.record;
 
@@ -1118,10 +1128,19 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       continue;
     }
     if (durable.status === 'failed') {
-      throw new CentralAdmissionError(
+      const replayRefusal = new CentralAdmissionError(
         'ADMISSION_EFFECT_FAILED',
         `effect ${effectId} has a durably failed outcome; operator recovery owns any retry`,
       );
+      // [#1108 K01 R1] This REPLAY attempt itself executed nothing; whether
+      // the fence may be released follows the ORIGINAL failure's persisted
+      // classification (the adapter-declared or dispatcher-proved
+      // zero-external-effect marker rides the durable failure record). An
+      // unclassified (possibly landed) original keeps the fence held.
+      if (isJsonRecord(durable.error) && durable.error.zeroExternalEffect === true) {
+        replayRefusal.zeroExternalEffect = true;
+      }
+      throw replayRefusal;
     }
     if (begun.disposition === 'existing' && durable.effectSemantics === 'non-idempotent') {
       throw new CentralAdmissionError(
@@ -1131,6 +1150,9 @@ async function executeEffectIntents(intents, request, ports, turnId) {
     }
 
     let output;
+    // [#1108 K01 R1 P1] The dispatch probe: the runtime's own executor marks
+    // whether the Business handler ever invoked the physical resource port.
+    const externalDispatchProbe = { supported: false, invoked: false };
     try {
       output = await ports.effectTools.execute({
         effectId,
@@ -1141,11 +1163,16 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         input: intent.input,
         ...(intent.idempotencyKey === undefined ? {} : { idempotencyKey: intent.idempotencyKey }),
         logicalTime: request.now,
+        externalDispatchProbe,
       });
       canonicalizeJson(output);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failure = { message };
+      // [#1108 K01 R1 P1] Classify BEFORE the failure record is made durable:
+      // the proof (or its absence) persists IN the journal record so a later
+      // same-turn replay refusal can restore the same fence policy.
+      const zeroEffect = probeProvesZeroExternalEffect(externalDispatchProbe, error);
+      const failure = { message, ...(zeroEffect ? { zeroExternalEffect: true } : {}) };
       try {
         await ports.effectJournal.completeEffect(
           effectId,
@@ -1153,16 +1180,28 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         );
       } catch (commitError) {
         // Never lose the journal-unreadable signal: the host must see that the
-        // failure record itself is not durable (P3-2).
+        // failure record itself is not durable (P3-2). The outcome is doubly
+        // unknown (the failure record could not even be made durable), so no
+        // zero-external-effect proof is attached.
         throw new CentralAdmissionError(
           'ADMISSION_EFFECT_JOURNAL_CONFLICT',
           `effect ${effectId} failed (${message}) and the failure record could not be committed: ${commitError instanceof Error ? commitError.message : String(commitError)}`,
         );
       }
-      throw new CentralAdmissionError(
+      // [#1108 K01 R1 P1] A journal `failed` record reflects a THROWN adapter
+      // call, NOT proof that the remote resource performed zero mutations.
+      // Only the probe-backed classification above proves a zero-external-
+      // effect fault; a possibly-landed lost-ACK outcome carries NO proof and
+      // the admission fence policy in admitCentralDecision keeps the fence
+      // held (fail-closed UNKNOWN until reconciliation).
+      const typed = new CentralAdmissionError(
         'ADMISSION_EFFECT_FAILED',
         `effect ${effectId} (${intent.effectType}) failed: ${message}`,
       );
+      if (zeroEffect) {
+        typed.zeroExternalEffect = true;
+      }
+      throw typed;
     }
 
     let committed;
@@ -1303,14 +1342,22 @@ export async function admitCentralDecision(request, ports) {
       turnId,
     );
   } catch (error) {
-    // [#1108 K01] Fence liveness on the failure path: release ONLY when this
-    // failed turn leaves zero dispatch-ambiguous journal records — every begun
-    // effect of the turn is durably `failed` (none `started`/`completed`).
-    // Any `started`/`completed` record, an unreadable journal, an unwired
-    // release port, or a failed removal keeps the fence held (fail-closed
-    // until the holder's replay reconciles through the journal). The original
-    // typed effect error is never masked.
-    if (isJsonRecord(heldAdmissionFence) && typeof ports.admissionFenceRelease === 'function') {
+    // [#1108 K01 R1 P1] Fence liveness on the failure path: release ONLY on a
+    // PROVEN zero-external-effect fault. The thrown error carries
+    // `zeroExternalEffect` solely when the dispatch probe proved the Business
+    // handler never invoked the physical resources port, or the trusted
+    // dispatcher refused before any resource handler ran — AND every begun
+    // effect of the turn is durably `failed` (an earlier `completed`/
+    // `started` record keeps the fence held). A lost-ACK / uncertain outcome
+    // carries NO proof — the external non-idempotent mutation may already
+    // have landed, so the fence stays held: fail-closed UNKNOWN until
+    // reconciliation (same-turn replay through the journal, or a trusted-seam
+    // recovery turn over a durably all-failed holder). An unreadable journal,
+    // an unwired release port, or a failed removal also keeps it held. The
+    // original typed effect error is never masked.
+    if (isJsonRecord(heldAdmissionFence)
+      && typeof ports.admissionFenceRelease === 'function'
+      && error !== null && typeof error === 'object' && error.zeroExternalEffect === true) {
       try {
         let ambiguous = false;
         for (let ordinal = 1; ordinal <= effectIntents.length; ordinal += 1) {
@@ -2584,6 +2631,46 @@ function isHostWriteConflict(error) {
     && (error.code === 'HOST_CAS_CONFLICT' || error.code === 'HOST_KEY_EXISTS');
 }
 
+// [#1108 K01 R1 P1] Host resource-port refusals that PROVABLY caused zero
+// external mutation, so a failed effect may safely release its fence:
+//   - the trusted dispatcher's own refusals, thrown BEFORE any provisioned
+//     resource handler is invoked (malformed arguments, unprovisioned key,
+//     reserved scoped-physical namespace) — constructive pre-dispatch;
+//   - HOST_RESOURCE_PRE_DISPATCH: the sealed resource ADAPTER's explicit
+//     declaration that its handler failed WITHOUT performing the external
+//     mutation (e.g. an outage that never reached the ledger). The adapter
+//     is the only party that knows; the declaration rides the same trusted
+//     resource-layer contract as effectSemantics.
+// Everything else that escapes a resources port call (a generic handler
+// fault, a transport timeout, a lost ACK after the mutation landed) is
+// UNCERTAIN and keeps the admission fence held.
+const PRE_DISPATCH_RESOURCE_REFUSALS = new Set([
+  'HOST_RESOURCE_MALFORMED',
+  'HOST_RESOURCE_UNKNOWN',
+  'HOST_RESOURCE_NAMESPACE_RESERVED',
+  'HOST_RESOURCE_PRE_DISPATCH',
+]);
+
+/**
+ * [#1108 K01 R1 P1] Zero-external-effect PROOF for an execute() that threw.
+ * The probe is created by executeEffectIntents and honored by this runtime's
+ * own effectTools executor (probe.supported); a foreign executor that ignores
+ * it leaves `supported` false and NOTHING is provable — fail-closed.
+ *   !invoked            → the Business handler never called the physical
+ *                         dispatch port → provably zero external effect
+ *   invoked + typed PRE_DISPATCH_RESOURCE_REFUSAL → the dispatcher refused
+ *                         before any resource handler ran → provably zero
+ *   anything else       → possibly landed (lost ACK / handler fault) → NOT
+ *                         provable; the admission fence must stay held
+ */
+function probeProvesZeroExternalEffect(probe, error) {
+  if (probe === undefined || probe === null || typeof probe !== 'object') return false;
+  if (probe.supported !== true) return false;
+  if (probe.invoked !== true) return true;
+  const code = typeof error === 'object' && error !== null ? error.code : undefined;
+  return typeof code === 'string' && PRE_DISPATCH_RESOURCE_REFUSALS.has(code);
+}
+
 export class WorkflowInstanceNotFoundError extends Error {
   constructor(address) {
     super(`Workflow instance not found: ${address.workflowId}/${address.instanceKey}`);
@@ -2722,9 +2809,22 @@ export class WorkflowInstanceEngine {
       && typeof held.value.turnId === 'string'
       && held.value.turnId !== turnId
       && held.value.stateRevision === expectedTargetSequence) {
-      throw admissionStateCasConflict(
-        `instance ${target.workflowId}/${target.instanceKey} at stateRevision ${expectedTargetSequence} has an admission fence still held by turn ${held.value.turnId}; the competing claim of turn ${turnId} is refused before any journal or effect activity (fail-closed until the holder commits or is reconciled)`,
-      );
+      // [#1108 K01 R1] Trusted-seam reconciliation supersede: a turn source of
+      // kind `recovery` (constructed ONLY by the trusted Host's operator-
+      // credentialed, durably CAS-delivered poison-recovery flow) may take the
+      // fence of a holder whose EVERY begun effect is durably `failed` — the
+      // operator-authorized corrective action IS the durable reconciliation of
+      // the failed turn's uncertain external outcome. A holder with any
+      // non-failed (or zero) journal records stays protected: in-flight and
+      // dispatched turns are never displaced, only terminally-failed ones are
+      // reconciled. The revision CAS below still arbitrates the takeover.
+      const reconciles = request.reconcilesHeldFence === true
+        && await this.#heldFenceIsDurablyFailed(target, held.value.turnId);
+      if (!reconciles) {
+        throw admissionStateCasConflict(
+          `instance ${target.workflowId}/${target.instanceKey} at stateRevision ${expectedTargetSequence} has an admission fence still held by turn ${held.value.turnId}; the competing claim of turn ${turnId} is refused before any journal or effect activity (fail-closed until the holder commits or is reconciled)`,
+        );
+      }
     }
     let written;
     try {
@@ -2752,6 +2852,30 @@ export class WorkflowInstanceEngine {
       stateRevision: expectedTargetSequence,
       ...(Number.isSafeInteger(written?.revision) ? { revision: written.revision } : {}),
     };
+  }
+
+  /**
+   * [#1108 K01 R1] Reconciliation gate for claimAdmissionFence: is the given
+   * held turn terminally failed — EVERY begun effect of that turn is durably
+   * `failed`, and at least one exists? A zero-record holder is NOT terminal
+   * (it may still be in-flight pre-journal); any `started`/`completed` record
+   * or an unreadable journal refuses (fail-closed).
+   */
+  async #heldFenceIsDurablyFailed(target, heldTurnId) {
+    try {
+      const keys = await this.#docs.list(journalDocKey(`${heldTurnId}/effect/`));
+      if (keys.length === 0) return false;
+      for (const key of keys) {
+        const doc = await this.#docs.get(key);
+        const status = isJsonRecord(doc?.value) && isJsonRecord(doc.value.record)
+          ? doc.value.record.status
+          : undefined;
+        if (status !== 'failed') return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -4904,6 +5028,40 @@ export function createOccurrenceRuntime(options) {
     async execute(request) {
       counters.effectDispatches += 1;
       const binding = businessEndpoint.effectBindings[request.binding.effectType];
+      // [#1108 K01 R1 P1] The Business handler's ONLY external-mutation
+      // authority is the physical resources port (v0.8 Host contract). The
+      // dispatch probe records whether the handler ever invoked it, so an
+      // execute() that threw can be classified: never-invoked (or a typed
+      // dispatcher-level pre-dispatch refusal) is PROVABLY zero external
+      // effect; anything else may have landed and keeps the admission fence
+      // held. The probe object itself is created by this kernel's
+      // executeEffectIntents — marking `supported` here is what makes the
+      // proof kernel-owned rather than caller-asserted.
+      const probe = request.externalDispatchProbe;
+      const rawResources = hostPorts.resources;
+      // A missing/non-object resources port passes through VERBATIM: the
+      // Business handler's own port guard (and its typed failure) keeps its
+      // exact pre-existing shape; nothing is wrapped, nothing is invented.
+      const handlerResources = (probe === undefined || probe === null || typeof probe !== 'object'
+        || rawResources === null || typeof rawResources !== 'object')
+        ? rawResources
+        : {
+            call: (resourceKey, operation, payload) => {
+              probe.invoked = true;
+              return rawResources.call(resourceKey, operation, payload);
+            },
+            ...(typeof rawResources.callScoped === 'function'
+              ? {
+                  callScoped: (scopeId, resourceKey, operation, payload) => {
+                    probe.invoked = true;
+                    return rawResources.callScoped(scopeId, resourceKey, operation, payload);
+                  },
+                }
+              : {}),
+          };
+      if (probe !== undefined && probe !== null && typeof probe === 'object') {
+        probe.supported = true;
+      }
       return binding.handler({
         input: request.input,
         effectId: request.effectId,
@@ -4912,7 +5070,7 @@ export function createOccurrenceRuntime(options) {
         idempotencyKey: request.idempotencyKey,
         logicalTime: request.logicalTime,
         target: request.target,
-        resources: hostPorts.resources,
+        resources: handlerResources,
       });
     },
   };
@@ -5288,6 +5446,10 @@ export function createOccurrenceRuntime(options) {
             turnId,
             expectedTargetSequence: snapshot.stateRevision,
             snapshotFenceRevision,
+            // [#1108 K01 R1] A trusted-seam recovery turn (operator-authorized
+            // poison reconciliation) may supersede a durably all-failed fence
+            // holder at this stateRevision; message turns never carry this.
+            ...(turn.kind === 'recovery' ? { reconcilesHeldFence: true } : {}),
           });
           return admissionFence;
         },

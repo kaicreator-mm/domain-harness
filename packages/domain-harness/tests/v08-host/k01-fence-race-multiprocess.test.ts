@@ -24,11 +24,14 @@
  *   K01-N2  crash after dispatch + journal 'completed', before the commit CAS:
  *           rivals refuse; the same-turn replay replays the journal (NO second
  *           dispatch) and commits — the external effect stays accounted once.
- *   K01-F1  zero-ambiguity failure release: an effect that fails BEFORE any
- *           external call releases the fence; a fresh turn admits at the same
- *           stateRevision (no permanent wedge).
- *   K01-F2  post-dispatch failure honesty: the attempt is durably 'failed'
- *           and accounted; a fresh turn still proceeds.
+ *   K01-F1  provable pre-port failure release: a handler that throws BEFORE
+ *           invoking the resources port releases the fence; a fresh turn
+ *           admits at the same stateRevision (no permanent wedge).
+ *   K01-N3  lost ACK (R1 P1 falsifier): the adapter appends one real external
+ *           effect record then throws a lost-ACK error — the journal `failed`
+ *           record is NOT zero-effect proof; the fence stays held, no
+ *           competing turn obtains a second dispatch, the same-turn replay
+ *           refuses re-execution typed, and no false terminal ACK exists.
  *   K01-S1  sequential cross-process reuse: an OLDER held fence (its holder
  *           committed) is superseded by the normal revision CAS — the normal
  *           multi-process path stays live.
@@ -319,26 +322,40 @@ test('K01-F1 an effect failing before any external call releases the fence; a fr
   assert.equal(doc.stateRevision, 1);
 });
 
-test('K01-F2 an effect failing after the external call is durably accounted; a fresh turn still proceeds', async () => {
-  const fx = await namedFixture('f2');
-  const instance = 't:a:f2';
+test('K01-N3 lost ACK after a real external dispatch: the fence stays held — no second dispatch by any competing turn, no false ACK (R1 P1 falsifier)', async () => {
+  const fx = await namedFixture('n3');
+  const instance = 't:a:n3';
   await openInstance(fx, instance);
 
-  const a = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-a', '--worker', 'a', '--fail', 'after']));
+  // The adapter performs the real external mutation (one ledger line) and
+  // then throws a lost-ACK error. A journal `failed` record is NOT proof of
+  // zero external effect — the fence must NOT be released.
+  const a = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-a', '--worker', 'a', '--fail', 'lost-ack']));
   assert.equal(a.result?.status, 'error');
   assert.equal(a.result?.error_code, 'ADMISSION_EFFECT_FAILED', `A outcome: ${a.stdout}\n${a.stderr}`);
-  assert.equal((await fx.ledgerLines()).length, 1, 'the failed attempt DID reach the external call');
+  assert.equal((await fx.ledgerLines()).length, 1, 'the real external dispatch landed exactly once');
   const journal = await fx.journalRecords(instance);
   assert.equal(journal.length, 1);
   assert.equal(journal[0]?.status, 'failed');
-  assert.equal(await fx.fenceDoc(instance), null, 'durable failed record anchors reconciliation; the fence is released');
-
+  // Fail-closed: the uncertain holder keeps the fence — a competing turn
+  // must NOT obtain a second dispatch.
+  assert.notEqual(await fx.fenceDoc(instance), null, 'the fence stays held (lost-ACK outcome is UNCERTAIN, not zero-effect)');
   const b = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-b', '--worker', 'b']));
-  assert.equal(b.result?.status, 'admitted', `B outcome: ${b.stdout}\n${b.stderr}`);
-  assert.equal((await fx.ledgerLines()).length, 2);
+  assert.equal(b.result?.status, 'error');
+  assert.equal(b.result?.error_code, 'ADMISSION_STATE_CAS_CONFLICT', `B outcome: ${b.stdout}\n${b.stderr}`);
+  assert.equal((await fx.ledgerLines()).length, 1, 'zero second dispatch by the competing turn');
+  // Same-turn replay: the durably failed record refuses re-execution typed
+  // (honest UNKNOWN — operator reconciliation owns the outcome); still no
+  // second dispatch and no false terminal ACK.
+  const replay = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-a', '--worker', 'a2']));
+  assert.equal(replay.result?.status, 'error');
+  assert.equal(replay.result?.error_code, 'ADMISSION_EFFECT_FAILED', `replay outcome: ${replay.stdout}\n${replay.stderr}`);
+  assert.equal((await fx.ledgerLines()).length, 1, 'replay never re-executes the non-idempotent effect');
   const doc = await fx.instanceDoc(instance);
-  assert.equal(doc.state.stateKey, 'approved');
-  assert.equal(doc.stateRevision, 1);
+  assert.equal(doc.stateRevision, 0);
+  assert.equal(doc.state.stateKey, 'review');
+  assert.equal(doc.lifecycle, 'active');
+  assert.notEqual(await fx.fenceDoc(instance), null, 'the fence remains held until durable reconciliation');
 });
 
 test('K01-S1 sequential cross-process admissions supersede an OLDER held fence normally', async () => {

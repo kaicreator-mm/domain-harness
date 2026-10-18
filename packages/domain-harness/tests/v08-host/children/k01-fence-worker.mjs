@@ -18,9 +18,11 @@
  *       Submit one occurrence. --park parks INSIDE the effect handler after
  *       the admission fence claim and journal begin, before the external
  *       dispatch: publish ctrl:<enteredKey>, wait for ctrl:<goKey>. --fail
- *       throws before (no ledger line) / after (ledger line) the external
- *       dispatch. --kill-at-commit exits(70) at the instance-document commit
- *       CAS seam (after journal completion, before the state write lands).
+ *       before throws in the handler BEFORE the resources port (provable
+ *       zero-effect); --fail lost-ack appends the real ledger line then
+ *       throws (uncertain post-dispatch outcome). --kill-at-commit exits(70)
+ *       at the instance-document commit CAS seam (after journal completion,
+ *       before the state write lands).
  *
  * Prints exactly one JSON result line as the last stdout line.
  */
@@ -98,8 +100,20 @@ const policy = {
   effectBindings: {
     'effect:reserve': {
       semantics: 'non-idempotent',
-      handler: async ({ input, effectId, resources }) =>
-        resources.call('ledger', 'reserve', { ...input, effectId }),
+      // [#1108 K01 R1] The failure modes live at their truthful seams:
+      //   --fail before   -> the HANDLER throws BEFORE invoking the resources
+      //                      port (provably zero external effect; the kernel
+      //                      may release the fence);
+      //   --fail lost-ack -> the handler invokes the port, the physical ledger
+      //                      appends (the external mutation LANDS) and the
+      //                      call then throws a lost-ACK error (uncertain
+      //                      outcome; the fence must stay held).
+      handler: async ({ input, effectId, resources }) => {
+        if (arg('fail') === 'before') {
+          throw new Error(`pre-dispatch handler refusal (${String(effectId)})`);
+        }
+        return resources.call('ledger', 'reserve', { ...input, effectId });
+      },
     },
   },
 };
@@ -148,13 +162,13 @@ async function main() {
               await sleep(10);
             }
           }
+          // The physical non-idempotent ledger: one appended line = one real
+          // external call. --fail lost-ack appends FIRST and then throws: the
+          // mutation landed, the ACK is lost (uncertain outcome by design).
           const failMode = arg('fail');
-          if (failMode === 'before') {
-            throw new Error(`external dispatch refused before the call (${String(payload.effectId)})`);
-          }
           await appendFile(ledgerPath, `${JSON.stringify({ worker: workerName, effectId: payload.effectId, at: NOW })}\n`, 'utf8');
-          if (failMode === 'after') {
-            throw new Error(`external dispatch transport failed after the call (${String(payload.effectId)})`);
+          if (failMode === 'lost-ack') {
+            throw new Error(`lost ACK after the external dispatch (${String(payload.effectId)})`);
           }
           return { reserved: true };
         },
