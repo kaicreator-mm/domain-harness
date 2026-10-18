@@ -1,0 +1,48 @@
+# K01 failure handling matrix — every failure mode the repair touches, its typed
+# classification, its durable residue, and its resolution path. None may produce a
+# false terminal success; unresolved means fail-closed/UNKNOWN until reconciliation.
+modes:
+  - mode: rival claims fence while holder in-flight at same stateRevision
+    typed: ADMISSION_STATE_CAS_CONFLICT (claim refusal, before journal begin / dispatch)
+    residue: zero rival journal rows, zero rival external dispatch
+    resolution: rival retries with a fresh snapshot after the holder commits (instance
+      advanced; supersede at the newer revision is legal)
+  - mode: holder's effect throws before any external dispatch
+    typed: ADMISSION_EFFECT_FAILED (journal record durably 'failed')
+    residue: fence RELEASED by the claimant (zero ambiguity: no 'started'/'completed')
+    resolution: a fresh turn may admit at the same stateRevision; operator owns retry of
+      the failed external call per existing §18 semantics
+  - mode: holder's effect errors after the external call was made
+    typed: ADMISSION_EFFECT_FAILED (journal durably 'failed'; the attempt is accounted)
+    residue: fence released (durable 'failed' record is the reconciliation anchor)
+    resolution: fresh turns proceed; the failed attempt remains durable operator evidence
+  - mode: holder crashes between claim and dispatch (journal 'started')
+    typed: rivals => ADMISSION_STATE_CAS_CONFLICT; replay => ADMISSION_EFFECT_AMBIGUOUS
+    residue: fence stays HELD by the dead turn; journal 'started' + non-idempotent
+    resolution: fail-closed UNKNOWN — same-turn replay re-claims its own fence and refuses
+      re-execution typed; no lease, no auto-expiry, no invented exactly-once
+  - mode: holder crashes after dispatch + journal 'completed', before commit CAS
+    typed: rivals => ADMISSION_STATE_CAS_CONFLICT
+    residue: fence HELD; journal 'completed'; ledger has the single real dispatch
+    resolution: same-turn replay re-claims, journal replays (no second dispatch), commit
+      lands — the external effect stays accounted exactly once
+  - mode: commit attempted with a fence no longer held by the turn
+    typed: ADMISSION_STATE_CAS_CONFLICT (requireHeldAdmissionFence — unchanged)
+    residue: no state write
+    resolution: n/a (protection leg; post-fix displacement cannot be produced by claims,
+      the leg is pinned by a hand-displaced fence document)
+  - mode: fence release itself fails (store fault / revision mismatch)
+    typed: original effect error propagates unchanged (release failure never masks it)
+    residue: fence stays HELD (fail-closed)
+    resolution: same-turn replay / operator reconciliation; rivals keep refusing
+  - mode: journal unreadable at release-decision time
+    typed: original effect error propagates; release skipped
+    residue: fence stays HELD (ambiguous until readable)
+    resolution: replay reconciles through the journal once readable
+  - mode: stale admission whose snapshot predates a committed state (pre-existing #1100)
+    typed: ADMISSION_STATE_CAS_CONFLICT at claim (fence CAS or instance re-read) or commit
+    residue: unchanged from v0.8.1 R02 (zero journal/effect on the stale side)
+    resolution: n/a (regression protection only — R02-N1/N2 must stay green)
+honesty_rules:
+  - 'BLOCKED/NOT_RUN is recorded as such; never a generic waiver, never PASS by omission'
+  - 'physical two-process claims only from real child processes; otherwise NOT_RUN'

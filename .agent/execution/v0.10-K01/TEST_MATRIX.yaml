@@ -1,0 +1,80 @@
+# K01 targeted test matrix — tests written FIRST (L3 order), run pre-fix (expected red on
+# the #1108 legs) and post-fix (all green). All physical legs use REAL stock-node child
+# processes over ONE SQLite file (openSqliteCasStore, WAL + IMMEDIATE + busy_timeout).
+suite:
+  - id: R02-N1/N2/P/a
+    file: packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts
+    change: unchanged expectations (stale-admission CAS protection #1100 must stay green)
+  - id: R02-b-rework
+    file: packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts
+    change: same-revision rival claim (fresh observed fence revision) now REFUSES typed
+      (pre-fix: CAS-overwrote the in-flight holder — the #1108 bug witness at engine level);
+      same-turnId re-claim still allowed; hand-displaced fence still refuses commit; holder
+      commits; post-commit newer-revision claim supersedes the leftover fence normally.
+  - id: K01-P1
+    file: packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
+    body: >
+      Two real processes A/B, one SQLite file, non-idempotent external effect ledger
+      (append-only file line = one real external call). A parks inside the effect handler
+      AFTER its fence claim (claim precedes executeEffectIntents in admitCentralDecision);
+      parent observes the entered-control doc, then B submits the same effect-bearing
+      intent with a different messageId. POST-FIX: B refuses typed
+      ADMISSION_STATE_CAS_CONFLICT with ZERO B journal rows and ZERO ledger lines; after
+      release A dispatches EXACTLY ONCE and commits; instance @1 approved; ledger = 1 line;
+      A journal row completed. PRE-FIX (reproduction, uncommitted): B takes over the fence,
+      dispatches (ledger = 2 lines), commits; A's commit refuses AFTER its dispatch —
+      orphaned unaccounted effect.
+  - id: K01-N1
+    file: packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
+    body: >
+      Crash before dispatch: A killed (SIGKILL) while parked after fence claim and journal
+      begin, before external dispatch. Rival B refuses typed (fence held by dead turn —
+      fail-closed UNKNOWN, no lease). A-replay (same messageId, NEW process) re-claims its
+      own fence and hits journal 'started' + non-idempotent => typed
+      ADMISSION_EFFECT_AMBIGUOUS; ledger stays 0 lines; instance still @0 active. Zero
+      false terminal success.
+  - id: K01-N2
+    file: packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
+    body: >
+      Crash after dispatch + journal 'completed', before the commit CAS (worker exits at
+      the instance-doc commit seam — deterministic crash injection, store untouched).
+      Ledger = 1 line (A's real external dispatch). B refuses typed. A-replay re-claims its
+      fence, journal 'completed' => disposition 'replayed' (NO second external dispatch —
+      ledger still 1 line), commit lands; instance @1 approved. Restart + resolution.
+  - id: K01-F1
+    file: packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
+    body: >
+      Zero-ambiguity failure release: A's effect throws BEFORE any external dispatch;
+      journal record durably 'failed'; typed ADMISSION_EFFECT_FAILED; fence RELEASED
+      (revocation liveness). B (fresh messageId) then admits and commits at the SAME
+      stateRevision; ledger = 1 line (B's). No permanent wedge from a transient failure.
+  - id: K01-F2
+    file: packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
+    body: >
+      Post-dispatch failure honesty: A appends its ledger line then throws (external call
+      made, outcome errored); journal durably 'failed' (operator-owned retry per existing
+      §18 semantics); fence released; B commits at the same stateRevision; ledger accounts
+      both lines; instance @1 approved by B. No false success for A, no silent loss of A's
+      durable 'failed' accounting.
+  - id: K01-S1
+    file: packages/domain-harness/tests/v08-host/k01-fence-race-multiprocess.test.ts
+    body: >
+      Sequential cross-process reuse: A note @0→1 commits; B approve @1→2 commits
+      (leftover fence at older stateRevision superseded by the normal revision CAS);
+      ledger = 1 line; both admitted. Proves grant/revocation currentness keeps the normal
+      multi-process path live (no over-blocking).
+negatives_explicitly_proven:
+  - rival same-revision claim => typed refusal BEFORE journal/effect (zero rival activity)
+  - crash holder => fail-closed refusal for rivals (no lease, no auto-expiry)
+  - journal 'started' + non-idempotent on replay => typed AMBIGUOUS (no re-execution)
+  - displaced-looking commit fence => typed refusal (commit-side protection intact)
+  - effect failure => typed ADMISSION_EFFECT_FAILED (never a false terminal success)
+synthetic_banned:
+  - in-process-only fence race sold as two-process proof
+  - mocked/deferred CAS store in any K01 physical leg
+  - PASS claimed from NOT_RUN/BLOCKED legs
+preflight_reproduction:
+  requirement: dispatch #6253939912 — reproduce #1108 with two real Node processes on the
+    UNMODIFIED base before changing behavior
+  artifact: _tmp evidence transcript in the task worktree session log + summarized on the
+    task Issue; committed tests carry the post-fix assertions only
