@@ -8,26 +8,33 @@
 
 ```mermaid
 flowchart TD
-  P[Product Review / Freeze] --> A[L2 package ABI & scope]
-  A --> B[T01 Historical v9 reachability audit]
+  P[Product Freeze] --> A[L2 Package/ABI architecture]
+  A --> B[T01 Historical v9 + Tool audit]
   B --> Z[T00 Composable K/S package families]
-  Z --> C[T02 Four-source Decision + bounded inner loop]
-  Z --> D[T03 Workflow semantics + child/wait/recovery]
+  A --> K1[K01 Admission Fence integrity]
+  A --> K2[K02 Durable Disposition healing]
+  Z --> C[T02 Four-source Decision + bounded loop]
+  Z --> D[T03 Workflow child / wait / recovery]
   Z --> E[T04 Memory Capability]
+  Z --> Q[T10 Precise two-B query P0]
+  K1 --> X[C01 External Effect Tool P0]
+  K2 --> X
+  Z --> X
   C --> F[T05 Context & Agent Workflow]
   D --> F
   E --> F
   C --> G[T06 Decision Evidence + Receipt]
   G --> H[T07 Candidate + Shadow L4]
-  H --> I[T08 Governed new-version workflow selection]
-  F --> J[T11 Single integrated app/closure]
+  H --> I[T08 Governed new-version selection]
+  F --> J[T11 Two packed reference consumers]
   I --> J
-  J --> K[Version Closure/Release Qualification]
-  Z --> L[T09 Meta Feedback Workflow: optional P1]
-  H --> L
-  Z --> M[T10 Query scoped/Many: optional P1]
-  L -. optional extension .-> K
-  M -. optional extension .-> K
+  Q --> J
+  X --> J
+  J --> R[Version Closure/Release Qualification]
+  H --> L[T09 Meta Feedback P1 optional]
+  Q --> M[T10B cross-B queryMany P1 optional]
+  L -. if admitted .-> R
+  M -. if admitted .-> R
 ```
 
 - **One authoritative K Primary and one S Primary/entry** plus selected, independently sealed **K extensions and S feature packages** in the proposed v0.10 ABI (v0.9 has exactly 1 physical K/S); independent B1..Bn and selected Capabilities. Standard **logical components** may co-reside inside one S.
@@ -48,11 +55,15 @@ flowchart TD
 | **T07** | P0 | **Candidate Validation + Shadow L4** reference as approved Package Components | T06 | Candidate validation, shadow counterexample, 0 production State/Effect writes, exact stable fallback, no floating alias |
 | **T08** | P0 | **Governed versioned Pattern/Workflow selection** using existing BUILD/DAC/H approval | T07,T03 | Validated candidate selected only through new sealed approved assembly; revocation/wrong digest/pre-change pin fail-safe; old instance unchanged |
 | **T09** | P1 | **Meta Feedback Workflow** over Runtime Evidence → Candidate → Shadow comparison | T07 | Ordinary Business/Meta Workflow, bounded evidence access, no own approval authority; no automatic production activation |
-| **T10** | P1 | **Multi-B scoped query / queryMany** | T00 | Duplicate `instanceKey` typed ambiguity, scoped lookup precise, fan-out independent target checks, partial failures recorded, no cross-B transaction claim |
-| **T11** | P0 | **One selected external Consumer** 2B + Agent + Shadow + Memory real Node/SQLite | T05,T08 (+T09/T10 if admitted) | Clean packed consumer, no deep import; zero Tool calls on deterministic Rule/Cache path; read-only Tool/Model optional; denied/forged effect has zero dispatch; real restart/CAS/UNKNOWN, two-B, receipt, Shadow 0 effects |
+| **K01** | P0 | **#1108 Kernel Primary Admission Fence concurrency integrity**; independent earlier hotfix accepted when already proven | L2 | Two real H processes/true-CAS, non-idempotent Effect in flight, competing same-revision admission: no orphaned unaccounted successful effect or unsupported unsafe success; UNKNOWN/reconcile/fail-closed where remote commit cannot be fenced |
+| **K02** | P0 | **#1109 Kernel Primary missing-Disposition self-healing and 17+ history liveness** | L2 | Lost best-effort append AFTER committed State, new message progress after history fills without original resend, safe CAS healing, 0 duplicate Effect, mismatch/host-failure negatives |
+| **C01** | P0 | **#1138 Generic sealed Host external effect adapter**: accept/running/terminal/UNKNOWN, idempotency→adapter, callback/query reconciliation; no runx-specific code | T00,K01,K02 | Two different synthetic external adapters through real v10 public K/H, accepted≠terminal, restart/lost response/duplicate callback/outage/revocation; unsafe profile refused before dispatch |
+| **T10** | P0 | **Multi-B scoped query + ambiguity refusal (QR01/QR03)** | T00 | Two B same `instanceKey`, explicit target yields correct scoped result; unscoped collision refuses, independent authorization, no first-match leak |
+| **T10B** | P1 | **Optional queryMany cross-B aggregation (QR02)** | T10 | Per-target authorized results and partial failure; no cross-B atomicity claim or P0 release dependency |
+| **T11** | P0 | **TWO packed consumers**: tiny Basic only + rich 2B/Agent/Shadow/Memory/Host External Effect on qualified Node/SQLite | T05,T08,T10,C01 (and proven K01/K02 through C01); T09/T10B optional | Tiny imports no advanced module. Rich: separate physical K/S feature modules; exact scoped two-B query (no required queryMany), 0 unnecessary Tool calls, denied effect 0 dispatch, real restart/CAS/UNKNOWN and disposition recovery, truthful receipt, Shadow 0 production effects |
 | **R01** | Release | One fixed-SHA full/hidden/CJ/security/packaging + release qualification, tag decision | T11 + admitted P1 | Full source + independent release evidence; `PR_PASS != RELEASE_PASS` |
 
-**No progress percentage should be reported from this candidate DAG as if work had begun.** This is a planning count (**12 task seeds including T00 + release**), not 0/12 GitHub Issues. Once Product/L2 frozen, synthesize **only actual missing** executable Issues and their necessary dependency edges.
+**No progress percentage should be reported from this candidate DAG as if work had begun.** This is a planning count (**16 proposed task seeds including K01/K02/C01/T10B + release**), not 0/16 executable GitHub Issues. Once Product/L2 frozen, synthesize **only actual missing** executable Issues and their necessary dependency edges.
 
 ## 3. Task-to-historic proof reuse guidance
 
@@ -65,8 +76,10 @@ flowchart TD
 - **T06** FR08 SD1/SD2, HF26, NF06 optional receipt history; no mandatory cross-record durability claim.
 - **T07/T08** `runtime-evidence/{capture,shadow,fallback}.ts`, `candidate/`, `promoted-artifact/` and `promoted-child/`; migration to v9 sealed ABI.
 - **T09** new Meta Workflow built from L4 proposal seam, not an old shipped autonomous runtime.
-- **T10** v0.2 FR05 multi-source projection + v0.9 public `query()` v9 first-match limitation; no broad Query platform in Kernel.
-- **T11/R01** one representative fully integrated scenario; no fixed OS matrix beyond actually supported selected Host profile.
+- **K01/K02** use current official selected K Primary implementation at `packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs`; fix real two-process fence and 16-entry disposition liveness under actual true-CAS. Do not delegate core safety to a plugin; existing targeted earlier hotfix may qualify as exact reused evidence.
+- **C01** #1138 reuse Host Tool binding #1082 and durable callback #1062, add only minimal external Effect Port (no general streaming/PTY/cancel), requires K01/K02 selected safety or explicit non-admission of unsafe profile.
+- **T10** P0 v0.9 public `query()` first-match limitation becomes scoped unambiguous two-B lookup; **T10B** optional P1 aggregates per-B reads, never required in P0 fixture.
+- **T11/R01** TWO bounded clean-packed consumers: tiny Basic-only and rich two-B/Agent/Shadow/Memory/External Tool scenario. One final version-level full/hidden/CJ/packaging wave; no fixed OS matrix beyond actually supported selected Host profile.
 
 ## 4. Definition of Done for Product/L2 planning (before opening task Issues)
 
@@ -74,8 +87,8 @@ flowchart TD
 2. Exact `main` SHA, v0.9 delivered public-v9 ABI, available selected S roles/capabilities, and gap mapping reviewed.
 3. L2 interface for deterministic BUILD package graph/role resolution, K typed extension hooks, **non-Tool Standard Semantic Component dispatch vs separate Tool/Operation contracts (read-only/effectful/visibility)**, plus Loop, SemanticDecision, Model and Tool observations, Memory, Context, evidence, Candidate and Shadow. One Primary K and entry S, physically selected optional extensions/feature packages; no unapproved Agent write Tool.
 4. Explicit source of authorization for newly promoted artifacts without mandatory GitHub owner/account identity or falsely automatic model self-approval.
-5. Decide whether P1 queryMany and full Meta Workflow join v0.10 release gate; this candidate says **no** unless later admitted.
-6. Proposed DAG then split into smallest sensible independent Issues; existing post-v0.9 external effect Tool Port #1138 separately assessed, not assumed required for these tasks.
+5. Product P0 is fixed at scoped QR01/QR03, KH01/KH02 and EX01–04; P1 queryMany (T10B), recurring Meta Workflow (T09) and rich Tool stream/cancel are **NOT required** for v0.10 P0 Release unless separately admitted via an explicit successor decision.
+6. Proposed DAG then split into smallest independent implementation Issues; #1108/#1109 remain independently repairable Kernel issues, and #1138 P0 minimal Host Port is a **separate concern** that depends on their physical selected safety proof. No second scheduler, K Journal or runx-specific implementation.
 
 ## 5. Scope protection and test cost
 
