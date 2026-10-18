@@ -1,10 +1,13 @@
 # v0.10 K-Extension Feasibility — Architecture Research Demo Report (#1150)
 
-> Status: RESEARCH_EVIDENCE_COMPLETE / REVIEW_REQUIRED. Research branch
-> `research/v010-k-extension-feasibility`, NOT merged to production. This
-> report resolves the `K_EXTENSION_FEASIBILITY_HOLD` of L2 R0 §C with
-> measured executable evidence; it does not freeze architecture, admit a
-> Task DAG node, or imply any v0.10 implementation PASS.
+> Status: REVIEW_R1_REPAIR_APPLIED / R2_DELTA_REVIEW_REQUIRED. Research
+> branch `research/v010-k-extension-feasibility`, NOT merged to production.
+> The initial evidence (below) resolved the `K_EXTENSION_FEASIBILITY_HOLD`
+> of L2 R0 §C at seam scope; independent review PRR 5562125052 requested
+> changes (P1 advisory replay/isolation, P2 execution host), and THIS HEAD
+> carries the bounded repair plus the focused R6 scenarios — see "Review R1
+> repair" near the end. It does not freeze architecture, admit a Task DAG
+> node, or imply any v0.10 implementation PASS.
 
 ## Hypothesis (falsifiable, from #1150)
 
@@ -39,11 +42,13 @@ zero-activity counters rather than absence of errors.
 |---|---|
 | Research base (frozen product main) | `2c511118821587e9abf1135cbccd3b001caadd87` |
 | Evidence run commit (code+fixtures frozen) | `0492cf4fd756c952631d7d94f1095c78949a3bdb` |
-| Final research branch HEAD | branch tip carrying this report; recorded in the PR description and the #1150 evidence comment (the binding test identity is the evidence-run SHA above) |
+| Review R1 repair code commit (R6 suite added) | `77216a2aac3595207c5e5bae2d4195900bd3685f` |
+| Final research branch HEAD | branch tip carrying this report; recorded in the PR description and the #1150 evidence comment (the binding test identity is the evidence-run SHA above, plus the repair SHA for R6) |
 | L2 DRAFT consumed | PR #1149 head `3932e4be61839c094a9f40d57f9f27b707b04d3b`, doc blob `085fbb00b8b6564530997c6add1253f79ead0242` (no drift vs #1150's recorded initial HEAD) |
 | PRD blob / Crosswalk blob | `673da42ad90acde5ef942beb8ac63b58836a649f` / `2832ce0b4269737d934b071a6c2e830deefec629` (unchanged, read-only) |
 | Standard | ADS 4.13.1@`f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd` |
-| Runtime | Node v24.21.0, npm 11.19.0, Git Bash MINGW64_NT-10.0-26300 (Ubuntu Build Host family; Windows Node host used — E2 does not require a specific OS for this seam) |
+| Runtime (initial R1–R5 evidence) | Node v24.21.0, npm 11.19.0, Git Bash MINGW64_NT-10.0-26300 — review P2 flagged this as a deviation from #1150's Ubuntu Build Host requirement |
+| Runtime (review R1 repair runs) | Windows: Node v24.21.0, npm 11.19.0, Git Bash MINGW64_NT-10.0-26300. Ubuntu (WSL2): Ubuntu 26.04.1 LTS, Linux 6.18.54.1-microsoft-standard-WSL2, Node v22.23.2, npm 10.9.8 — both at repair SHA `77216a2a`, 23/23 green, exit 0 (`evidence/repair-r1/`) |
 | Real bytes consumed | kernel-mechanism-v1.mjs sha256 `5a3ece5868da99d62f3f9c839c067918b51309369d437beb2186bb559a9980c6`; standard vendored bundle `5b032e1096ef2372f4ca5650c1c77e5d64ab72662aa83b07bd1415433bd211a1`; business-approval `fd494e6e91234d983727715cd379635d9951de65b99e240e56923fd21947a7d8`; capability-quote-tools `957ba228767f7ae0450cbcdf0bcfde615ed6595c44c1f96a49688bd9ff506dfa`; budget extension `aa38a6215ba5d747b79634767d07954961b5d9ee5982091fabe004f39a901b9d`; recovery extension `790db4c0ad5dace7f5729fb6944a64c2da2a93fd5413ad4fc767d27e4ae0192e` |
 
 Commands and raw outputs: `evidence/commands.md`, `evidence/run.tap`,
@@ -205,6 +210,76 @@ counter; oversize-beyond-plausibility classified malformed instead of
 clamped) were design corrections made BEFORE the evidence run, visible in
 the branch history.
 
+## Review R1 repair — advisory replay/isolation (R6), bounded to this Issue
+
+Independent review PRR 5562125052 (CHANGES_REQUESTED, P1+P2) on the initial
+evidence found a real defect in the research Primary composition: the
+advisory consultation record was created with `mustBeAbsent` BEFORE real K
+admission, keyed `kext-advisory:${messageId}` scoped only by
+subject/tenant. An unchanged messageId retry or a distinct occurrence
+reusing the same messageId would fail `HOST_CAS_CONFLICT` in front of real K
+replay — observational advice had become a liveness/authority gate,
+contradicting the claimed Basic preservation and the v0.10 #1110 replay
+contract. Repair (research-branch only, no production code):
+
+1. **No durable write before K.** `#consultBudgetAdvice` is now pure data
+   (hook call + Primary validation/clamp); nothing touches the store until
+   the authoritative K receipt (or honest UNKNOWN) exists.
+2. **Occurrence+turn-scoped key.** The observation is appended under
+   `kext-advisory:turn:<workflowId>:<instanceKey>:message:<messageId>` —
+   the same components the kernel's own durable turn id derives from, so a
+   record can never collide across distinct occurrences reusing a messageId.
+3. **Best-effort append that never alters the ACK.** The post-K create is
+   observational: a lost create re-reads the winner and compares the
+   identity core (everything except the volatile `at` timestamp) — identical
+   → idempotent replay; different → typed `conflict` observation, the stored
+   record is never overwritten; any storage failure → typed `failed`. None
+   of these outcomes can change, delay or refuse the authoritative K
+   receipt (new counters `advisoryRecords/Replays/Conflicts/Failures`).
+4. **Explicit non-claim (review instruction followed).** The real selected
+   v0.9 kernel's turn-disposition identity binds (kernelSha, target,
+   messageId, intentType) and EXCLUDES the input payload: a changed-input
+   resubmission under the same target+messageId REPLAYS the original
+   receipt. #1110 changed-payload conflict refusal is NOT implemented by
+   the selected kernel and is NOT implemented here — it remains a v0.10 K02
+   obligation. R6 records this as an observed seam gap, not a PASS.
+5. **R2–R5 preserved.** All original R2–R5 scenarios and assertions are
+   unchanged; R1/R2 only re-point their advisory-record assertions to the
+   new occurrence+turn key required by the repair itself.
+
+### R6 measured (expected vs actual, at repair SHA `77216a2a`)
+
+- **Unchanged messageId retry (positive)**: the retry reaches the REAL
+  kernel and returns the original receipt with `idempotentReplay=true`;
+  durable activity stays once-only (`journalBegins=1, journalCompletes=1,
+  effectDispatches=1`, one journal record) while the kernel's `admissions`
+  counter — which counts submit ATTEMPTS, replay included — reads 2. The
+  advisory observation re-reads its own record and reports
+  `budget.record='replayed'` (identity-core match, `at` excluded); exactly
+  one advisory key exists.
+- **Distinct target, same messageId (positive)**: `instanceKey='b'` reusing
+  the first turn's messageId admits independently (`admissions=2,
+  effectDispatches=2`, no `idempotentReplay`), with its own advisory record
+  under its own occurrence+turn key — `advisoryRecordConflicts=0`.
+- **Changed input under same target+messageId (honest gap record)**: the
+  real kernel replays the original admitted receipt
+  (`idempotentReplay=true`, `journalBegins=1, effectDispatches=1`); the
+  changed payload is not detected. Recorded as
+  `changedInputDetectedByRealK=false` with the #1110 K02 gap note — NOT
+  claimed as working.
+- **Conflicting pre-existing advisory record (negative)**: a different
+  record pre-written under the turn's advisory key does not refuse, block
+  or mutate anything: the turn admits, `budget.disposition='honored'`
+  rides intact, `budget.record='conflict'` is the typed observation, the
+  winner is not overwritten (revision 0), one real effect dispatched.
+
+Both focused environments at the same repair SHA: Windows (Node v24.21.0)
+and Ubuntu 26.04.1 WSL2 (Node v22.23.2) — 23/23 scenarios, exit 0, TAP +
+environment + measurements under `evidence/repair-r1/{windows,ubuntu}/`
+(commands in `evidence/commands.md` §5). This satisfies review P2 (focused
+Ubuntu run at the repaired exact HEAD, no matrix); the initial-round
+Windows-only execution remains recorded above as history.
+
 ## KEEP / ADAPT / DROP
 
 - **KEEP** — strict order of activation: whole-closure data-only preflight
@@ -251,5 +326,5 @@ the branch history.
 `tests/architecture-v010-k-extensions/` — loader pipeline, bounded advisory
 context, K Primary composition over real v0.9 bytes, malicious-fixture
 library (oversize/smuggled/malformed/forged-terminal/privileged-init/
-port-probe/init-throw/eval-sentinel), and the R1–R5 falsifier suite with
+port-probe/init-throw/eval-sentinel), and the R1–R6 falsifier suite with
 measurement materialization.

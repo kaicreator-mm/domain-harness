@@ -1,0 +1,27 @@
+++ date -u +%Y-%m-%dT%H:%M:%SZ
++ echo run_at_utc=2026-10-18T08:52:48Z
+run_at_utc=2026-10-18T08:52:48Z
+++ git rev-parse HEAD
++ echo clone_head=77216a2aac3595207c5e5bae2d4195900bd3685f
+clone_head=77216a2aac3595207c5e5bae2d4195900bd3685f
+++ git branch --show-current
++ echo clone_branch=research/v010-k-extension-feasibility
+clone_branch=research/v010-k-extension-feasibility
+++ git status --porcelain
+++ wc -l
++ echo clone_dirty=0
+clone_dirty=0
+++ node -v
++ echo node=v22.23.2
+node=v22.23.2
+++ npm -v
++ echo npm=10.9.8
+npm=10.9.8
+++ uname -s
+++ uname -r
++ echo 'kernel=Linux 6.18.54.1-microsoft-standard-WSL2'
+kernel=Linux 6.18.54.1-microsoft-standard-WSL2
+++ lsb_release -ds
++ echo 'os=Ubuntu 26.04.1 LTS'
+os=Ubuntu 26.04.1 LTS
+lockfile_dirty_after_install=0

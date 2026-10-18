@@ -1,0 +1,272 @@
+{
+  "generatedAt": "2026-10-18T08:53:31.837Z",
+  "node": "v24.21.0",
+  "scenarioCount": 22,
+  "measurements": [
+    {
+      "scenario": "R1-tiny",
+      "extensionImports": 0,
+      "runtimeFactoryInvocations": 1,
+      "kCounters": {
+        "admissions": 3,
+        "guardEvaluations": 3,
+        "hardInvariantEvaluations": 3,
+        "journalBegins": 3,
+        "journalCompletes": 3,
+        "effectDispatches": 3,
+        "engineCommits": 3,
+        "instanceCreates": 3,
+        "instanceReads": 9,
+        "decisionReceiptAppends": 0,
+        "decisionCacheWrites": 0,
+        "decisionCacheWriteFailures": 0,
+        "mutationObservationReads": 0,
+        "promotedPins": 0,
+        "turnDispositions": 3,
+        "turnAdmissionReplays": 0,
+        "turnDispositionReplays": 0
+      },
+      "moduleSha256": {
+        "kernel": "5a3ece5868da99d62f3f9c839c067918b51309369d437beb2186bb559a9980c6",
+        "standard": "5b032e1096ef2372f4ca5650c1c77e5d64ab72662aa83b07bd1415433bd211a1",
+        "business": "fd494e6e91234d983727715cd379635d9951de65b99e240e56923fd21947a7d8",
+        "capability": "957ba228767f7ae0450cbcdf0bcfde615ed6595c44c1f96a49688bd9ff506dfa"
+      }
+    },
+    {
+      "scenario": "R2-rich",
+      "extensionImports": 2,
+      "selectedModules": [
+        {
+          "packageId": "kext:admission-budget-advice@1",
+          "providerId": "admission-budget-advice",
+          "hook": "admission-budget-advice/v1"
+        },
+        {
+          "packageId": "kext:recovery-diagnostics@1",
+          "providerId": "recovery-diagnostics",
+          "hook": "recovery-diagnostics/v1"
+        }
+      ],
+      "moduleSha256": {
+        "budget": "aa38a6215ba5d747b79634767d07954961b5d9ee5982091fabe004f39a901b9d",
+        "recovery": "790db4c0ad5dace7f5729fb6944a64c2da2a93fd5413ad4fc767d27e4ae0192e"
+      },
+      "runtimeFactoryInvocations": 1,
+      "advisoryCounters": {
+        "advisoryConsultations": 3,
+        "adviceHonored": 3,
+        "adviceClamped": 0,
+        "adviceIgnoredMalformed": 0,
+        "adviceIgnoredFields": 0,
+        "adviceIgnoredError": 0,
+        "budgetRefusals": 0,
+        "advisoryRecords": 3,
+        "advisoryRecordReplays": 0,
+        "advisoryRecordConflicts": 0,
+        "advisoryRecordFailures": 0,
+        "recoveryConsultations": 1,
+        "hintsAccepted": 2,
+        "hintsDroppedFields": 0,
+        "hintsDroppedUnknown": 0,
+        "hintsDroppedMalformed": 0,
+        "hintReturnsIgnored": 0,
+        "recoveryObservations": 1,
+        "receiptsObserved": 1,
+        "resourceCalls": 3
+      },
+      "kCounters": {
+        "admissions": 3,
+        "guardEvaluations": 3,
+        "hardInvariantEvaluations": 3,
+        "journalBegins": 3,
+        "journalCompletes": 3,
+        "effectDispatches": 3,
+        "engineCommits": 1,
+        "instanceCreates": 3,
+        "instanceReads": 9,
+        "decisionReceiptAppends": 0,
+        "decisionCacheWrites": 0,
+        "decisionCacheWriteFailures": 0,
+        "mutationObservationReads": 0,
+        "promotedPins": 0,
+        "turnDispositions": 1,
+        "turnAdmissionReplays": 0,
+        "turnDispositionReplays": 0
+      },
+      "unknownOutstanding": 2
+    },
+    {
+      "scenario": "R3-duplicate-primary",
+      "refusal": "V10_ROLE_PRIMARY_CARDINALITY",
+      "importsByPackage": {}
+    },
+    {
+      "scenario": "R3-duplicate-provider",
+      "refusal": "V10_PROVIDER_COLLISION",
+      "importsByPackage": {}
+    },
+    {
+      "scenario": "R3-forged-init-return",
+      "refusal": "V10_INIT_CONTRACT_REFUSED",
+      "runtimeFactoryInvocations": 0,
+      "journalKeys": 0
+    },
+    {
+      "scenario": "R3-port-probes",
+      "portProbes": 8,
+      "portDenials": 8,
+      "admitted": "admitted"
+    },
+    {
+      "scenario": "R3-oversize-smuggled",
+      "advisoryCounters": {
+        "advisoryConsultations": 2,
+        "adviceHonored": 0,
+        "adviceClamped": 1,
+        "adviceIgnoredMalformed": 0,
+        "adviceIgnoredFields": 1,
+        "adviceIgnoredError": 0,
+        "budgetRefusals": 0,
+        "advisoryRecords": 2,
+        "advisoryRecordReplays": 0,
+        "advisoryRecordConflicts": 0,
+        "advisoryRecordFailures": 0,
+        "recoveryConsultations": 0,
+        "hintsAccepted": 0,
+        "hintsDroppedFields": 0,
+        "hintsDroppedUnknown": 0,
+        "hintsDroppedMalformed": 0,
+        "hintReturnsIgnored": 0,
+        "recoveryObservations": 0,
+        "receiptsObserved": 2,
+        "resourceCalls": 2
+      },
+      "effectDispatches": 2
+    },
+    {
+      "scenario": "R3-malformed-advice",
+      "dispositions": [
+        "ignored-malformed",
+        "ignored-malformed",
+        "ignored-malformed",
+        "ignored-malformed",
+        "ignored-fields",
+        "ignored-error"
+      ],
+      "advisoryCounters": {
+        "advisoryConsultations": 6,
+        "adviceHonored": 0,
+        "adviceClamped": 0,
+        "adviceIgnoredMalformed": 4,
+        "adviceIgnoredFields": 1,
+        "adviceIgnoredError": 1,
+        "budgetRefusals": 0,
+        "advisoryRecords": 6,
+        "advisoryRecordReplays": 0,
+        "advisoryRecordConflicts": 0,
+        "advisoryRecordFailures": 0,
+        "recoveryConsultations": 0,
+        "hintsAccepted": 0,
+        "hintsDroppedFields": 0,
+        "hintsDroppedUnknown": 0,
+        "hintsDroppedMalformed": 0,
+        "hintReturnsIgnored": 0,
+        "recoveryObservations": 0,
+        "receiptsObserved": 6,
+        "resourceCalls": 6
+      }
+    },
+    {
+      "scenario": "R3-forged-terminal",
+      "hintsDroppedFields": 2,
+      "hintsDroppedUnknown": 1,
+      "outstandingStillStarted": 2
+    },
+    {
+      "scenario": "R3-over-hard-budget",
+      "budgetRefusals": 1,
+      "journalKeysAtRefusal": 0
+    },
+    {
+      "scenario": "R4-changed-digest",
+      "refusal": "V10_DIGEST_MISMATCH",
+      "importsByPackage": {},
+      "evalSentinels": []
+    },
+    {
+      "scenario": "R4-missing-dependency",
+      "refusal": "V10_DEPENDENCY_MISSING",
+      "importsByPackage": {},
+      "evalSentinels": []
+    },
+    {
+      "scenario": "R4-cycle",
+      "refusal": "V10_DEPENDENCY_CYCLE",
+      "importsByPackage": {},
+      "evalSentinels": []
+    },
+    {
+      "scenario": "R4-invalid-abi",
+      "refusal": "V10_ABI_UNSUPPORTED",
+      "importsByPackage": {},
+      "evalSentinels": []
+    },
+    {
+      "scenario": "R4-feature-mismatch",
+      "refusal": "V10_FEATURE_MISSING",
+      "importsByPackage": {},
+      "evalSentinels": []
+    },
+    {
+      "scenario": "R4-sentinel-positive-control",
+      "evalSentinels": [
+        "kext:side-effect-sentinel@1"
+      ],
+      "extensionImports": 2
+    },
+    {
+      "scenario": "R5-optional-missing",
+      "optionalMissing": [
+        "kext:side-effect-sentinel@1"
+      ],
+      "extensionImports": 0,
+      "admitted": "admitted"
+    },
+    {
+      "scenario": "R5-init-fault",
+      "disposals": [
+        "kext:admission-budget-advice@1"
+      ],
+      "runtimeFactoryInvocations": 0,
+      "storeByteStable": true
+    },
+    {
+      "scenario": "R6-retry-idempotent",
+      "retryReceipt": "idempotentReplay=true",
+      "submitAttempts": 2,
+      "journalBegins": 1,
+      "effectDispatches": 1,
+      "advisoryRecord": "replayed"
+    },
+    {
+      "scenario": "R6-cross-instance-reuse",
+      "admissions": 2,
+      "effectDispatches": 2,
+      "advisoryKeys": 2,
+      "advisoryRecordConflicts": 0
+    },
+    {
+      "scenario": "R6-changed-input-gap",
+      "changedInputDetectedByRealK": false,
+      "observed": "idempotent replay of the original receipt (turn identity excludes the input payload)",
+      "gap": "#1110 changed-payload conflict refusal is NOT implemented by the selected v0.9 kernel; v0.10 K02 obligation"
+    },
+    {
+      "scenario": "R6-advisory-conflict-observation",
+      "ack": "admitted, unchanged by the advisory conflict",
+      "advisoryRecord": "conflict",
+      "winnerOverwritten": false
+    }
+  ]
+}
