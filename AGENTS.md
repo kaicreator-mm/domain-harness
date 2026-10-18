@@ -6,8 +6,8 @@ This project follows the immutable `kaicreator-mm/ai-development-standard` revis
 
 1. Read `.dev-standard/VERSION`.
 2. Read `.dev-standard/PROJECT_OVERRIDES.md`.
-3. **For any DomainHarness Product/L1, L2, Task DAG, SDK/Package/Host change or new version**, read `docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md` and its freeze/amendment status. This project-wide baseline survives version transitions; chat or a version-specific Issue does not replace it.
-4. Read the pinned standard's `AGENTS.md`.
+3. Read the pinned standard's `AGENTS.md`.
+4. **For any DomainHarness Product/L1, L2, Task DAG, SDK/Package/Host change or new version**, read `docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md` and its freeze/amendment status. This project-wide baseline survives version transitions; chat or a version-specific Issue does not replace it.
 5. For lifecycle work, read `standards/DEVELOPMENT_WORKFLOW.md`.
 6. For repository structure/docs/tests, read `standards/PROJECT_STRUCTURE.md`, `DOCUMENTATION_STANDARD.md`, `TESTING_STANDARD.md`, and `REPOSITORY_STANDARD.md` as relevant.
 7. For validation/release work, read `VALIDATION_STANDARD.md` and `RELEASE_STANDARD.md`.
