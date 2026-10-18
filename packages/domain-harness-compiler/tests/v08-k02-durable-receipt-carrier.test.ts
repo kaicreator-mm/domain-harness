@@ -65,6 +65,12 @@ test('U1 canonical input digest: equivalence, injectivity, typed non-JSON refusa
   }
 
   assert.throws(() => canonicalInputDigest(sha256, { bad: undefined }), (error: unknown) => typed(error).code === 'K02_INPUT_NOT_JSON');
+  // non-finite numbers are refused typed: JSON.stringify would coerce them to
+  // null and silently collide three DIFFERENT inputs into one digest
+  for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    assert.throws(() => canonicalInputDigest(sha256, { a: bad }), (error: unknown) => typed(error).code === 'K02_INPUT_NOT_JSON');
+  }
+  assert.throws(() => canonicalInputDigest(sha256, { list: [1, Number.NaN] }), (error: unknown) => typed(error).code === 'K02_INPUT_NOT_JSON');
   assert.throws(() => canonicalInputDigest(sha256, Symbol('x')), (error: unknown) => typed(error).code === 'K02_INPUT_NOT_JSON');
   assert.throws(() => canonicalInputDigest(sha256, () => 1), (error: unknown) => typed(error).code === 'K02_INPUT_NOT_JSON');
 });

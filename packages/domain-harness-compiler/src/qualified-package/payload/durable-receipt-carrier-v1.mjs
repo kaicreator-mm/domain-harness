@@ -120,7 +120,19 @@ function sortJsonValue(value) {
     }
     return sorted;
   }
-  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    // JSON.stringify coerces NaN/Infinity to null, which would silently make
+    // a changed input digest-identical to a different literal value — refuse
+    // non-finite numbers typed instead (canonical-JSON boundary, RFC 8785).
+    if (!Number.isFinite(value)) {
+      throw new CarrierAdmissionError(
+        'K02_INPUT_NOT_JSON',
+        'a non-finite number (NaN/Infinity/-Infinity) is not a JSON value; the carrier persists JSON documents only',
+      );
+    }
     return value;
   }
   throw new CarrierAdmissionError(
@@ -354,7 +366,8 @@ function requireOrdinal(value, field) {
 // exists (written/retried at eviction time). If that archive write faults,
 // the entry STAYS in the ring and the document temporarily grows past the
 // bound — admission of new turns is NEVER blocked, and an admitted turn is
-// NEVER silently forgotten (no re-admission, no double effect). The next
+// never silently forgotten while the ring or its durable archive retains
+// the entry (no re-admission, no double effect in that coverage). The next
 // admission retries the pending archive, so growth is bounded by the fault
 // duration; a store that keeps faulting fails admissions typed anyway.
 // ---------------------------------------------------------------------------
@@ -729,7 +742,13 @@ export class ReceiptCarryingEngine {
       return true;
     } catch (error) {
       if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
-        const existing = await this.#docs.get(carrierArchiveKey(this.#scope, turnId));
+        let existing;
+        try {
+          existing = await this.#docs.get(carrierArchiveKey(this.#scope, turnId));
+        } catch {
+          this.counters.archiveWriteFailures += 1;
+          return false; // cannot verify right now: keep the ring entry, retry next admission
+        }
         if (existing !== null && isJsonRecord(existing.value) && existing.value.identity === envelope.identity) {
           return true; // already durably archived by an earlier best-effort write
         }

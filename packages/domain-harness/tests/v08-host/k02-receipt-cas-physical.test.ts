@@ -189,6 +189,37 @@ test('K02-P1 changed input and changed intentType under the same messageId refus
   assert.equal(dispatches.length, dispatchesBefore, 'zero dispatches on refused resubmission');
 });
 
+test('K02-P1 a denied turn records nothing: no state move, no receipt, and a later legal submission of the SAME source admits', async () => {
+  const ik = 'k02:i:p1-denial';
+  const engine = makeEngine({ instanceKey: ik });
+  await engine.openInstance({ target: target(ik), packageId: 'pkg' });
+  await engine.admitTurn({ target: target(ik), messageId: 'm-seed', intentType: 'note', input: { amount: 1 }, decide: decideCounter, dispatch: dispatchEffect });
+  const before = await rawInstanceDocument(ik);
+  const dispatchesBefore = dispatches.length;
+
+  const denied = await engine.admitTurn({
+    target: target(ik),
+    messageId: 'm-denied',
+    intentType: 'note',
+    input: { deny: true },
+    decide: decideCounter,
+    dispatch: dispatchEffect,
+  });
+  assert.equal(denied.status, 'denied');
+  assert.equal(denied.denial.reason, 'policy');
+  const after = await rawInstanceDocument(ik);
+  assert.equal(after.revision, before.revision, 'a denial moves no state');
+  assert.ok(after.value.durableOriginalReceipts[turnIdOf(ik, 'm-denied')] === undefined, 'a denial records no receipt — denials are not dispositions');
+  assert.equal(dispatches.length, dispatchesBefore, 'a denial dispatches nothing');
+
+  // The denied source is NOT a disposition: a later legal submission under the
+  // same messageId admits fresh (exactly the kernel discipline).
+  const later = await engine.admitTurn({ target: target(ik), messageId: 'm-denied', intentType: 'note', input: { amount: 2 }, decide: decideCounter, dispatch: dispatchEffect });
+  assert.equal(later.status, 'admitted');
+  assert.equal(later.idempotentReplay, false);
+  assert.equal(later.stateRevision, 2);
+});
+
 test('K02-P1 legacy/unknown envelope shapes fail closed typed (no pre-1.0 migration)', async () => {
   const ik = 'k02:i:p1-legacy';
   const engine = makeEngine({ instanceKey: ik });
@@ -344,7 +375,7 @@ test('K02-P1 ring maintenance: archive-gated eviction with fault-tolerant growth
   const nineteenth = await engine.admitTurn({ target: target(ik), messageId: 'ring-19', intentType: 'note', input: { seq: 19 }, decide: decideCounter, dispatch: dispatchEffect });
   assert.equal(nineteenth.status, 'admitted');
   receipts = (await rawInstanceDocument(ik)).value.durableOriginalReceipts;
-  assert.ok(Object.keys(receipts).length <= 18, 'the ring returns toward its bound once the archive is durable');
+  assert.equal(Object.keys(receipts).length, 17, 'the ring returns to exactly its bound once the archive is durable');
   const evictedReplay = await engine.admitTurn({ target: target(ik), messageId: 'ring-1', intentType: 'note', input: { seq: 1 }, decide: decideCounter, dispatch: dispatchEffect });
   assert.equal(evictedReplay.idempotentReplay, true, 'a ring-evicted turn replays from its durable archive');
 });

@@ -26,20 +26,30 @@ Host ports injected, JSON-only documents). Exports:
 - `ReceiptCarryingEngine` — the same-CAS original-receipt carrier over a docs port:
   - `openInstance({target, correlationId, packageId})` — revision-0 create with empty
     `durableOriginalReceipts` map (`mustBeAbsent`).
-  - `admitTurn({target, messageId, intentType, input, decide, dispatch, expectedRevision?})` —
-    the occurrence lane: (1) `readOriginalReceipt` short-circuit (replay/conflict);
-    (2) read current doc; (3) pure `decide(current, input)` → admitted transition or
-    denial (denials move nothing and record nothing — same kernel discipline);
-    (4) compose the ENTIRE next document (state fields + append-only
-    `durableOriginalReceipts[turnId] = immutableOriginalReceipt` built against the
-    composed next projection) and commit it as ONE `put(..., { mustMatchRevision })`;
-    (5) post-commit best-effort archive copy + effect dispatch (winner-only,
-    idempotency-keyed, journaled through the same scoped store).
-  - ring bound default 64 (≥ 4× the frozen 16-entry history; covers the 17+ acceptance
-    with margin); eviction of the oldest ring entry never requires any archive record.
-  - `readOriginalReceipt({target, messageId, intentType, input, turnSource?})` — ring →
-    archive → typed refusal ladder; legacy/unknown envelope shapes fail closed
-    (`K02_TURN_RECEIPT_LEGACY_UNREADABLE`), no pre-1.0 migration.
+  - `admitTurn({target, messageId, intentType, input, decide, dispatch, turnSource?})` —
+    the SINGLE-SNAPSHOT occurrence lane: (1) ONE read of the instance document;
+    (2) ring adjudication FROM THAT SNAPSHOT (exact-original replay / typed
+    changed-input or changed-intent conflict), then archive adjudication for
+    ring-evicted turns; (3) pure `decide(current.state, input)` — a denial
+    moves nothing and records nothing; (4) compose the ENTIRE next document
+    (state fields + append-only `durableOriginalReceipts[turnId]` immutable
+    original receipt built against the composed next projection) and commit as
+    ONE `put(..., { mustMatchRevision: snapshotRevision })` — a competing
+    writer inside the lane makes this CAS lose honestly (raw HOST conflict;
+    retry replays the winner's original), never a double admission;
+    (5) post-commit best-effort archive copy + winner-only effect dispatch
+    (idempotency-keyed, through the same scoped store).
+  - ring bound default 64 (≥ 4× the frozen 16-entry history; covers the 17+
+    acceptance with margin); eviction from the ring is ARCHIVE-GATED: the
+    oldest entry leaves only once its independent durable archive record
+    exists (written/retried at eviction time); an archive-write fault keeps
+    the entry and the document temporarily grows past the bound (admission
+    never blocks, the entry is never dropped while unverified).
+  - `readOriginalReceipt({target, messageId, input, intentType, turnSource?})` —
+    standalone query lane: ring → archive → typed-refusal ladder; legacy/unknown
+    envelope shapes fail closed (`K02_TURN_RECEIPT_LEGACY_UNREADABLE`), no
+    pre-1.0 migration; an unreadable archive read fails closed typed for that
+    turn.
 
 ## New file 2 — `packages/domain-harness-compiler/tests/v08-k02-durable-receipt-carrier.test.ts`
 Unit semantics (K02-U1): digest equivalence under key order/whitespace; injectivity under
@@ -63,7 +73,7 @@ file (K02-N1). Unmodified kernel — proves the namespace needs no kernel edit t
 Two REAL stock-node children (built package self-reference `@kaicreator/domain-harness/v8/host`
 for the store; fragment imported as plain .mjs) sharing ONE SQLite file (K02-R1):
 single-winner original ACK, loser idempotent replay, changed-input race typed conflict,
-20-turn cross-process interleave.
+20-turn sequence across two real child processes.
 
 ## Kernel splice anchors — READ-ONLY until K01 releases (PARTIAL_BLOCKED_PENDING_K01_RELEASE)
 After explicit K01 release/merge, rebase onto K01's integrated `v0.10` SHA and splice:

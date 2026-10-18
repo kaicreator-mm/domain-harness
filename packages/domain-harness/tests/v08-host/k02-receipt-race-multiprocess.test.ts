@@ -14,9 +14,10 @@
  *            double effect, no lost update.
  *   K02-R1b  same messageId + CHANGED input raced: the first writer wins; the
  *            changed submission refuses typed K02_TURN_RECEIPT_INPUT_CONFLICT.
- *   K02-R1c  20-turn sequence interleaved across BOTH processes (10 each) on
- *            one instance: 20 fresh admissions, revision 20, and a replay of
- *            an early turn answered from the OTHER process's writer side.
+ *   K02-R1c  20-turn sequence distributed across BOTH real child processes
+ *            (two phases over one instance and one file): 20 fresh admissions,
+ *            revision 20, and a replay probe answered from the second
+ *            process of the first process's turn.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -148,7 +149,7 @@ test('K02-R1b changed input raced under the same messageId: first writer wins, t
   assert.equal(conflicted.dispatches, 0, 'the conflicting submission executed nothing');
 });
 
-test('K02-R1c 20-turn sequence interleaved across both processes: 20 fresh admissions, revision 20, cross-process replay', async () => {
+test('K02-R1c 20-turn sequence across two real processes on one store: 20 fresh admissions, revision 20, cross-process replay', async () => {
   const ik = 'k02:mp:sequence';
   await openInstanceForChildren(ik);
   const alpha = await runWorker(['sequence', sqlitePath, ik, '', 'note', '{}', '10', 'alpha', '']);
