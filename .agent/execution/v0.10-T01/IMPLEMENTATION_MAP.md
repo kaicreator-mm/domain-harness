@@ -1,6 +1,6 @@
 # T01 source map at `v0.10@32b6e776`
 
-Allowed output: `docs/roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md` only. The six `.agent/execution/v0.10-T01/` pack files were created by the scheduler **before** Builder Claim; they carry no Product/K runtime code and are excluded from package output.
+Allowed output: `docs/validation/v0.10/T01_SELECTED_V9_44_SOURCE_AUDIT.md` only. The six `.agent/execution/v0.10-T01/` pack files were created by the scheduler **before** Builder Claim; they carry no Product/K runtime code and are excluded from package output.
 
 Source inputs (read-only):
 - `docs/implementation/DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json` exact blob `a9954b82eab6e57e9ac1af1bf7b7d5b268d61c49`
@@ -13,3 +13,5 @@ Source inputs (read-only):
 - Frozen Product R3/A01, L2 R3, DAG Stage2.4.
 
 Tests → Contract → Implementation → Failure Handling → Reference are bound by this Pack. Reader classification is per *selected published v09 path*, not whole source tree. Never treat old v08 P/N test file as public v09 witness without independently observed bridge reachability.
+
+**Frozen original Product/L1 source remains READ-ONLY:** `docs/roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md` blob `2832ce0b4269737d934b071a6c2e830deefec629`; new audit MUST be separate, no patch to original.

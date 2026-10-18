@@ -1,9 +1,9 @@
-pack_id: DH010-T01-EP-v1
+pack_id: DH010-T01-EP-v2
 task_id: T01
 repository: kaicreator-mm/domain-harness
 version: v0.10
 base_sha: "32b6e776000669014c0384110e0340be59d5fd4b"
-task_pack_ref: "#1165@6253004820"
+task_pack_ref: "#1165@6253116633"
 parent_issue: "#1165"
 branch: task/v0.10-t01-selected-v9-capability-audit
 agent_freedom: F1_BOUNDED_IMPLEMENTATION
@@ -16,7 +16,7 @@ material_paths:
   - docs/validation/v08-retained-44-web-source-evidence-map.md
   - packages/domain-harness/src/public-v9
   - packages/domain-harness/tests/v09-
-  - docs/roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md
+  - docs/validation/v0.10/T01_SELECTED_V9_44_SOURCE_AUDIT.md
 core_artifacts:
   - MANIFEST.yaml
   - EXECUTION_CONTRACT.md

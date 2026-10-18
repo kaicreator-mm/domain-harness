@@ -6,3 +6,5 @@
 4. Uncovered capabilities list owning v0.10 Task K01/K02/T02..T11/T00/C01 as appropriate; optional P1 doesn't block R01.
 5. A01 static trust checks at BUILD; K owns live Admission/CAS/fence/effects; Capability I/O READ and governed EFFECT distinct.
 6. Inspect changed-risk failures only. Reviewer policy is `recommended`; if SKIP selected, publish explicit REVIEW_DECISION, do not assert Review PASS. Version closure Full/Hidden/CJ/pack NOT_RUN.
+
+7. The original Product/L1 crosswalk `docs/roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md` remains untouched; audit goes only to `docs/validation/v0.10/T01_SELECTED_V9_44_SOURCE_AUDIT.md`.
