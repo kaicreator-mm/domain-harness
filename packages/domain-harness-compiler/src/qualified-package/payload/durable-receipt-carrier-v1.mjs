@@ -543,20 +543,27 @@ export class ReceiptCarryingEngine {
   }
 
   /**
-   * The occurrence lane. Order is the K02 contract:
-   *   1. replay/conflict short-circuit (zero activity on replay),
-   *   2. read current document, pure `decide` (a denial moves nothing and
-   *      records nothing — denials are not dispositions),
-   *   3. compose the ENTIRE next document INCLUDING the immutable original
+   * The occurrence lane. Order is the K02 contract — adjudication and commit
+   * share ONE document snapshot, so a competing writer that commits between
+   * this lane's snapshot and its CAS makes the CAS LOSE (honest conflict /
+   * replay on retry), never a second admission of the same turn:
+   *   1. ONE snapshot read of the instance document,
+   *   2. ring adjudication FROM THAT SNAPSHOT (replay/conflict
+   *      short-circuit), then archive adjudication for evicted turns,
+   *   3. pure `decide` (a denial moves nothing and records nothing —
+   *      denials are not dispositions),
+   *   4. compose the ENTIRE next document INCLUDING the immutable original
    *      receipt of this turn (built against the composed next projection),
    *      with archive-gated ring maintenance,
-   *   4. ONE physical CAS put (mustMatchRevision at the observed revision),
-   *   5. post-commit best-effort archive copy of THIS turn + winner-only
+   *   5. ONE physical CAS put (mustMatchRevision at the SNAPSHOT revision),
+   *   6. post-commit best-effort archive copy of THIS turn + winner-only
    *      effect dispatch.
    */
   async admitTurn({ target, messageId, intentType, input, decide, dispatch, turnSource }) {
-    const replay = await this.readOriginalReceipt({ target, messageId, input, intentType, turnSource });
-    if (replay !== undefined) return replay;
+    const turn = turnSource === undefined ? { kind: 'message', sourceMessageId: messageId } : turnSource;
+    const turnId = deriveCarrierTurnId(target, turn);
+    const inputDigest = canonicalInputDigest(this.#sha256, input);
+    const identity = durableTurnReceiptIdentity({ scope: this.#scope, target, turn, intentType, inputDigest });
 
     const current = await this.#readDocument(target);
     if (current === null) {
@@ -565,6 +572,28 @@ export class ReceiptCarryingEngine {
         `instance ${target.workflowId}/${target.instanceKey} does not exist in this deployment scope`,
       );
     }
+    const currentReceipts = isJsonRecord(current.value.durableOriginalReceipts)
+      ? current.value.durableOriginalReceipts
+      : {};
+    const storedRing = currentReceipts[turnId];
+    if (storedRing !== undefined) {
+      requireReadableEnvelope(storedRing, turnId, 'the same-CAS original receipt of turn');
+      return this.#adjudicate(storedRing, identity, turnId, intentType);
+    }
+    let archive;
+    try {
+      archive = await this.#docs.get(carrierArchiveKey(this.#scope, turnId));
+    } catch (error) {
+      throw new CarrierAdmissionError(
+        'K02_TURN_RECEIPT_STORE_FAULT',
+        `the archived original receipt of turn ${turnId} is unreadable; fail closed for this turn (${String(error instanceof Error ? error.message : error)})`,
+      );
+    }
+    if (archive !== null) {
+      const storedArchive = requireReadableEnvelope(archive.value, turnId, 'the archived original receipt of turn');
+      return this.#adjudicate(storedArchive, identity, turnId, intentType);
+    }
+
     const decision = await decide(snapshotJson(current.value.state), input);
     if (!isJsonRecord(decision)) {
       throw new CarrierAdmissionError('K02_SCOPE_INVALID', 'decide must return a record');
@@ -573,10 +602,6 @@ export class ReceiptCarryingEngine {
       this.counters.turnsDenied += 1;
       return { status: 'denied', denial: decision.denial ?? { reason: 'denied' }, occurrence: { messageId } };
     }
-    const turn = turnSource === undefined ? { kind: 'message', sourceMessageId: messageId } : turnSource;
-    const turnId = deriveCarrierTurnId(target, turn);
-    const inputDigest = canonicalInputDigest(this.#sha256, input);
-    const identity = durableTurnReceiptIdentity({ scope: this.#scope, target, turn, intentType, inputDigest });
     const attributedAt = this.#now();
 
     const nextState = decision.nextState ?? current.value.state;
@@ -637,14 +662,14 @@ export class ReceiptCarryingEngine {
     // Post-commit observational archive of THIS turn: best-effort, extends
     // replay depth immediately, never falsifies the original, never fails
     // the ACK.
-    let archive;
+    let archiveOutcome;
     try {
       await this.#docs.put(carrierArchiveKey(this.#scope, turnId), envelope, { mustBeAbsent: true });
       this.counters.archiveWrites += 1;
-      archive = { status: 'recorded' };
+      archiveOutcome = { status: 'recorded' };
     } catch {
       this.counters.archiveWriteFailures += 1;
-      archive = { status: 'not_recorded' };
+      archiveOutcome = { status: 'not_recorded' };
     }
 
     let effects;
@@ -664,7 +689,7 @@ export class ReceiptCarryingEngine {
       stateRevision: nextDocument.stateRevision,
       committedRevision,
       turnId,
-      archive,
+      archive: archiveOutcome,
       ...(effects === undefined ? {} : { effects }),
       occurrence: { messageId },
     };

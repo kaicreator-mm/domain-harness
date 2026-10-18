@@ -111,12 +111,15 @@ test('K02-R1a two real processes race the same turn: ONE fresh ACK + ONE idempot
   assert.equal(errors.length, 0, `no worker errors: ${JSON.stringify(outcomes)}`);
   assert.equal(fresh.length, 1, `exactly one fresh admission: ${JSON.stringify(outcomes)}`);
   assert.equal(replays.length, 1, `exactly one idempotent replay: ${JSON.stringify(outcomes)}`);
-  assert.equal(fresh[0].dispatches, 1, 'the winner executed the effect exactly once');
-  assert.equal(replays[0].dispatches, 0, 'the loser re-executed nothing');
+  const winner = fresh[0];
+  const loser = replays[0];
+  assert.ok(winner !== undefined && loser !== undefined);
+  assert.equal(winner.dispatches, 1, 'the winner executed the effect exactly once');
+  assert.equal(loser.dispatches, 0, 'the loser re-executed nothing');
   // Both children hold the SAME original acknowledged receipt bytes.
-  assert.equal(replays[0].originalReceipt?.attributedAt, fresh[0].originalReceipt?.attributedAt, 'identical original attribution');
-  assert.deepEqual(replays[0].originalReceipt?.instance, fresh[0].originalReceipt?.instance, 'identical original post-turn projection');
-  assert.equal(fresh[0].stateRevision, 1);
+  assert.equal(loser.originalReceipt?.attributedAt, winner.originalReceipt?.attributedAt, 'identical original attribution');
+  assert.deepEqual(loser.originalReceipt?.instance, winner.originalReceipt?.instance, 'identical original post-turn projection');
+  assert.equal(winner.stateRevision, 1);
   // Physical truth: one instance revision, one archive record, no doubles.
   const engine = new ReceiptCarryingEngine(store, { scope: SCOPE, sha256 });
   const receipts = await engine.readDurableOriginalReceipts(target(ik));
@@ -138,8 +141,11 @@ test('K02-R1b changed input raced under the same messageId: first writer wins, t
   const replays = outcomes.filter((o) => o.status === 'replayed');
   assert.equal(admitted.length + replays.length, 1, `exactly one non-conflicting writer outcome: ${JSON.stringify(outcomes)}`);
   assert.equal(conflicts.length, 1, `exactly one typed changed-input conflict: ${JSON.stringify(outcomes)}`);
-  assert.equal((admitted[0] ?? replays[0]).dispatches, 1, 'the winning input executed its effect once');
-  assert.equal(conflicts[0].dispatches, 0, 'the conflicting submission executed nothing');
+  const winner = admitted[0] ?? replays[0];
+  const conflicted = conflicts[0];
+  assert.ok(winner !== undefined && conflicted !== undefined);
+  assert.equal(winner.dispatches, 1, 'the winning input executed its effect once');
+  assert.equal(conflicted.dispatches, 0, 'the conflicting submission executed nothing');
 });
 
 test('K02-R1c 20-turn sequence interleaved across both processes: 20 fresh admissions, revision 20, cross-process replay', async () => {

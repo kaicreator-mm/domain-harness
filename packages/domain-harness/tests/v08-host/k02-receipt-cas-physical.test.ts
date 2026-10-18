@@ -35,9 +35,8 @@ const CARRIER_SOURCE = await readFile(
   new URL('../../../domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs', import.meta.url),
   'utf8',
 );
-const CARRIER_SHA256 = createHash('sha256').update(CARRIER_SOURCE, 'utf8').digest('hex');
 const carrier: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(CARRIER_SOURCE, 'utf8').toString('base64')}`);
-const { ReceiptCarryingEngine, canonicalInputDigest, createScopedDocumentStore, deriveCarrierTurnId, scopedDocKey, scopedNamespacePrefix } = carrier;
+const { ReceiptCarryingEngine, canonicalInputDigest, deriveCarrierTurnId, scopedDocKey, scopedNamespacePrefix } = carrier;
 
 const sha256 = { digestUtf8: (value: string) => createHash('sha256').update(value, 'utf8').digest('hex') };
 const SCOPE = { deployedAppId: 'app-k02', tenantId: 'tenant-1', appId: 'app-1', businessPackageId: 'pkg-quote-1.0.0' };
