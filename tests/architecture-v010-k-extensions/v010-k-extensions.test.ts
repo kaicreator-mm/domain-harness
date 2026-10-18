@@ -25,6 +25,15 @@
  *  R5 Faults  — absent optional extension falls back to Basic; post-preflight
  *               init failure disposes ONLY initialized modules in reverse,
  *               never rolls back durable K state, leaks no Host port.
+ *  R6 Repair  — review R1 P1: unchanged messageId retry reaches REAL K
+ *               idempotent replay (zero new activity); a distinct target
+ *               reusing the same messageId admits independently (advisory
+ *               records scoped to full occurrence+turn, no collision); the
+ *               same target+messageId with CHANGED input replays the
+ *               original receipt because the real v0.9 turn identity EXCLUDES
+ *               the input payload — recorded honestly as the #1110 v0.10 K02
+ *               gap, NOT claimed as working; a conflicting advisory record is
+ *               a typed observation that never alters the authoritative ACK.
  *
  * NOT claimed: malicious-JS isolation (same-realm trusted JS is not a
  * sandbox), SQLite/process-kill/network effects, #1124/#1126 principal and
@@ -52,10 +61,11 @@ import {
   evalSentinels,
   freshCounters,
 } from './harness/v10-loader.js';
-import { V10PrimaryError } from './harness/v10-kernel-primary.js';
+import { V10PrimaryError, advisoryDocKey } from './harness/v10-kernel-primary.js';
 
 const BASE_MS = Date.UTC(2026, 9, 18, 9, 0, 0);
 const TENANT = 'tenant:spike';
+const WORKFLOW_ID = 'order-quote'; // the sealed Business approval workflowKey
 
 type ExtensionSubjectEntry = Awaited<ReturnType<typeof extensionEntry>>;
 
@@ -70,6 +80,11 @@ const intent = (instanceKey: string, messageId: string, amount = 30) => ({
   messageId,
   input: { amount, requestId: `R-${messageId}` },
 });
+
+/** Full physical path of a turn's advisory observation document. */
+function advisoryDocFullPath(activation: { digest: string }, instanceKey: string, messageId: string): string {
+  return `v10/k/${activation.digest}/${TENANT}/${advisoryDocKey(WORKFLOW_ID, instanceKey, messageId)}`;
+}
 
 async function adviceFixture(overrides: { packageId?: string; dependencies?: readonly string[]; requires?: readonly string[]; abiVersion?: string } = {}): Promise<ExtensionSubjectEntry> {
   return extensionEntry({
@@ -143,8 +158,10 @@ test('R1 Tiny: Basic K/S/B/C only — zero extension activity, one runtime, stab
   assert.equal(k.journalCompletes, 3);
   assert.equal(k.effectDispatches, 3);
 
-  // Basic budget behavior: no provider, hard ceiling only, durably recorded.
-  const advisory = await memory.rawGet(`v10/k/${activation.digest}/${TENANT}/kext-advisory:msg:r1-1`);
+  // Basic budget behavior: no provider, hard ceiling only, durably recorded
+  // (review R1 P1 repair: scoped to the full occurrence+turn identity and
+  // appended only AFTER the authoritative K admission).
+  const advisory = await memory.rawGet(advisoryDocFullPath(activation, 'instance:r1-1', 'msg:r1-1'));
   assert.equal(advisory.value.disposition, 'none');
   assert.equal(advisory.value.providerId, null);
   assert.equal(advisory.value.effectiveCeiling, 8);
@@ -192,7 +209,7 @@ test('R2 Rich: two independently sealed K extensions — bounded useful advice, 
   assert.equal(admitted.budget.adviceCeiling, 5);
   assert.equal(admitted.budget.effectiveCeiling, 5);
   assert.ok((admitted.budget.effectiveCeiling as number) <= (admitted.budget.hardCeiling as number));
-  const advisory = await memory.rawGet(`v10/k/${activation.digest}/${TENANT}/kext-advisory:msg:r2-1`);
+  const advisory = await memory.rawGet(advisoryDocFullPath(activation, 'instance:r2-1', 'msg:r2-1'));
   assert.equal(advisory.value.providerId, 'admission-budget-advice');
   assert.equal(advisory.value.disposition, 'honored');
   assert.equal(advisory.value.effectiveCeiling, 5);
@@ -598,6 +615,178 @@ test('R5 fault: post-preflight init failure — bounded reverse disposal, durabl
   assert.deepEqual(memory.snapshot(), before);
   assert.deepEqual(counters.portProbes, []);
   record('R5-init-fault', { disposals: counters.disposals, runtimeFactoryInvocations: 0, storeByteStable: true });
+});
+
+// ---------------------------------------------------------------------------
+// R6 — review R1 P1 repair: real-K replay/isolation through the seam
+// ---------------------------------------------------------------------------
+
+test('R6 repair P: unchanged messageId retry reaches real K idempotent replay — zero new K activity, idempotent advisory observation', async () => {
+  clearEvalSentinels();
+  const memory = new MemoryCasStore();
+  const store = new FailTerminalEffectCompletions(memory);
+  const clock = tickingClock();
+  const budget = await adviceFixture();
+  const recovery = await recoveryFixture();
+  const { subject } = await buildSubject({ extensions: [budget, recovery] });
+  const counters = freshCounters();
+  const activation = await activateV10Subject(subject, { store, tenantId: TENANT, now: clock.now, counters });
+
+  const first = await activation.facade.send(intent('instance:r6-a', 'msg:r6-m'));
+  assert.equal(first.status, 'admitted');
+  assert.equal(first.budget.record, 'recorded');
+  const kAfterFirst = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
+  assert.equal(kAfterFirst.admissions, 1);
+  assert.equal(kAfterFirst.effectDispatches, 1);
+
+  // Unchanged retry (lost ACK / client retry) must reach the REAL kernel and
+  // replay the original receipt — the advisory observation can never sit as a
+  // CAS gate in front of K replay.
+  const retry = await activation.facade.send(intent('instance:r6-a', 'msg:r6-m'));
+  assert.equal(retry.status, 'admitted');
+  assert.equal(retry.idempotentReplay, true);
+  const kAfterRetry = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
+  // 'admissions' counts submit ATTEMPTS at the kernel seam (the retry passed
+  // through submitOccurrence); the once-only truth is the unchanged durable
+  // journal/effect activity plus the replayed receipt itself.
+  assert.equal(kAfterRetry.admissions, 2);
+  assert.equal(kAfterRetry.journalBegins, 1);
+  assert.equal(kAfterRetry.journalCompletes, 1);
+  assert.equal(kAfterRetry.effectDispatches, 1);
+  assert.equal((await journalRecords(memory)).length, 1);
+
+  // The advisory observation replays idempotently under its own turn key.
+  assert.equal(retry.budget.record, 'replayed');
+  assert.equal(retry.budget.disposition, 'honored');
+  assert.deepEqual(memory.keys().filter((key) => key.includes('kext-advisory:')), [
+    advisoryDocFullPath(activation, 'instance:r6-a', 'msg:r6-m'),
+  ]);
+  const advisory = activation.facade.advisoryCounters;
+  assert.equal(advisory.advisoryRecords, 1);
+  assert.equal(advisory.advisoryRecordReplays, 1);
+  assert.equal(advisory.advisoryRecordConflicts, 0);
+
+  record('R6-retry-idempotent', {
+    retryReceipt: 'idempotentReplay=true',
+    submitAttempts: kAfterRetry.admissions,
+    journalBegins: kAfterRetry.journalBegins,
+    effectDispatches: kAfterRetry.effectDispatches,
+    advisoryRecord: 'replayed',
+  });
+});
+
+test('R6 repair P: a distinct authorized target reusing the same messageId admits independently — no cross-occurrence advisory collision', async () => {
+  clearEvalSentinels();
+  const memory = new MemoryCasStore();
+  const budget = await adviceFixture();
+  const { subject } = await buildSubject({ extensions: [budget] });
+  const counters = freshCounters();
+  const activation = await activateV10Subject(subject, { store: memory, tenantId: TENANT, now: tickingClock().now, counters });
+
+  const a = await activation.facade.send(intent('instance:r6-b1', 'msg:r6-shared'));
+  assert.equal(a.status, 'admitted');
+  assert.notEqual(a.idempotentReplay, true);
+  const b = await activation.facade.send(intent('instance:r6-b2', 'msg:r6-shared'));
+  assert.equal(b.status, 'admitted');
+  assert.notEqual(b.idempotentReplay, true);
+
+  // Distinct K identities: both admit, both dispatch their own single effect.
+  const k = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
+  assert.equal(k.admissions, 2);
+  assert.equal(k.effectDispatches, 2);
+  // Each turn holds its own advisory record under its own occurrence+turn key.
+  assert.equal(b.budget.record, 'recorded');
+  assert.deepEqual(memory.keys().filter((key) => key.includes('kext-advisory:')), [
+    advisoryDocFullPath(activation, 'instance:r6-b1', 'msg:r6-shared'),
+    advisoryDocFullPath(activation, 'instance:r6-b2', 'msg:r6-shared'),
+  ]);
+  const advisory = activation.facade.advisoryCounters;
+  assert.equal(advisory.advisoryRecords, 2);
+  assert.equal(advisory.advisoryRecordConflicts, 0);
+
+  record('R6-cross-instance-reuse', {
+    admissions: k.admissions,
+    effectDispatches: k.effectDispatches,
+    advisoryKeys: 2,
+    advisoryRecordConflicts: 0,
+  });
+});
+
+test('R6 repair N (gap record): same target+messageId with CHANGED input replays the original receipt — real v0.9 K does NOT detect changed-payload resubmission', async () => {
+  clearEvalSentinels();
+  const memory = new MemoryCasStore();
+  const budget = await adviceFixture();
+  const { subject } = await buildSubject({ extensions: [budget] });
+  const counters = freshCounters();
+  const activation = await activateV10Subject(subject, { store: memory, tenantId: TENANT, now: tickingClock().now, counters });
+
+  const original = await activation.facade.send(intent('instance:r6-c', 'msg:r6-mc', 30));
+  assert.equal(original.status, 'admitted');
+  assert.notEqual(original.idempotentReplay, true);
+
+  // OBSERVED real-K behavior, recorded honestly: the durable turn identity
+  // binds (kernelSha, target, messageId, intentType) and EXCLUDES the input
+  // payload, so a changed-input resubmission replays the original receipt
+  // with zero new activity. This test does NOT claim #1110 changed-payload
+  // conflict refusal — that remains a v0.10 K02 implementation gap in the
+  // selected kernel (documented in REPORT.md; no production K02 here).
+  const changed = await activation.facade.send(intent('instance:r6-c', 'msg:r6-mc', 45));
+  assert.equal(changed.status, 'admitted');
+  assert.equal(changed.idempotentReplay, true);
+  const k = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
+  // Two submit attempts, but only the ORIGINAL admission's durable activity.
+  assert.equal(k.admissions, 2);
+  assert.equal(k.journalBegins, 1);
+  assert.equal(k.effectDispatches, 1);
+
+  record('R6-changed-input-gap', {
+    changedInputDetectedByRealK: false,
+    observed: 'idempotent replay of the original receipt (turn identity excludes the input payload)',
+    gap: '#1110 changed-payload conflict refusal is NOT implemented by the selected v0.9 kernel; v0.10 K02 obligation',
+  });
+});
+
+test('R6 repair N: a conflicting pre-existing advisory record is a typed observation and never alters the authoritative ACK', async () => {
+  clearEvalSentinels();
+  const memory = new MemoryCasStore();
+  const budget = await adviceFixture();
+  const { subject } = await buildSubject({ extensions: [budget] });
+  const counters = freshCounters();
+  const activation = await activateV10Subject(subject, { store: memory, tenantId: TENANT, now: tickingClock().now, counters });
+
+  // A different record already occupies this turn's advisory key (a prior
+  // observation with different advice): the create must lose, surface as a
+  // typed conflict observation, and leave the K receipt fully intact.
+  const key = advisoryDocFullPath(activation, 'instance:r6-d', 'msg:r6-md');
+  await memory.put(key, {
+    turn: { workflowId: WORKFLOW_ID, instanceKey: 'instance:r6-d', messageId: 'msg:r6-md' },
+    intentType: 'submitQuoteDecisionDynamic',
+    providerId: 'admission-budget-advice',
+    disposition: 'stale-different',
+    adviceCeiling: 3,
+    hardCeiling: 8,
+    requestedCeiling: 8,
+    effectiveCeiling: 3,
+    at: '2026-10-18T00:00:00.000Z',
+  }, { kind: 'create' });
+
+  const receipt = await activation.facade.send(intent('instance:r6-d', 'msg:r6-md'));
+  assert.equal(receipt.status, 'admitted');
+  assert.equal(receipt.budget.disposition, 'honored');
+  assert.equal(receipt.budget.record, 'conflict');
+  assert.equal(activation.facade.kCounters(BUSINESS_PACKAGE_ID).effectDispatches, 1);
+
+  // The conflicting winner is never overwritten (revision still 0).
+  const stored = await memory.rawGet(key);
+  assert.equal(stored.value.disposition, 'stale-different');
+  assert.equal(stored.revision, 0);
+  assert.equal(activation.facade.advisoryCounters.advisoryRecordConflicts, 1);
+
+  record('R6-advisory-conflict-observation', {
+    ack: 'admitted, unchanged by the advisory conflict',
+    advisoryRecord: 'conflict',
+    winnerOverwritten: false,
+  });
 });
 
 test('measurements dump (evidence materialization)', async () => {

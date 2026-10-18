@@ -11,9 +11,15 @@
  *    projection plus the immutable hard budget profile and returns a bounded
  *    suggested step ceiling. The Primary INDEPENDENTLY validates the return
  *    (exact fields, plain data, bounded integer), clamps it against its OWN
- *    hard ceiling, and records the consultation durably in its own document
- *    namespace. Oversize advice clamps; malformed or authority-shaped advice
- *    is ignored typed; no advice is ever a permit or a success decision.
+ *    hard ceiling, and records the consultation AFTER the authoritative K
+ *    admission as a best-effort observation scoped to the COMPLETE
+ *    occurrence+turn identity (workflowId+instanceKey+messageId). The
+ *    observation can never gate, block or replay-break real K: an unchanged
+ *    messageId retry re-reads its own record idempotently, a different record
+ *    under the same key is a typed conflict observation, and neither outcome
+ *    alters the authoritative K receipt. Oversize advice clamps; malformed or
+ *    authority-shaped advice is ignored typed; no advice is ever a permit or
+ *    a success decision.
  *  - 'recovery-diagnostics/v1' receives an immutable, permission-filtered
  *    projection of outstanding UNKNOWN journal correlation IDs and returns
  *    prioritized observation-only hints. Hints with authority-shaped fields
@@ -27,7 +33,7 @@ import { createHash } from 'node:crypto';
 
 import type { KDocumentStore, CasPutCondition } from './memory-cas-store.js';
 import type { V10Counters } from './v10-loader.js';
-import type { V10Subject, V10SubjectEntry } from './v10-subject.js';
+import { canonicalJson, type V10Subject, type V10SubjectEntry } from './v10-subject.js';
 
 const K_DOCS_PREFIX = 'v10/k/';
 const MAX_HINTS = 16;
@@ -67,6 +73,10 @@ export interface AdvisoryCounters {
   adviceIgnoredFields: number;
   adviceIgnoredError: number;
   budgetRefusals: number;
+  advisoryRecords: number;
+  advisoryRecordReplays: number;
+  advisoryRecordConflicts: number;
+  advisoryRecordFailures: number;
   recoveryConsultations: number;
   hintsAccepted: number;
   hintsDroppedFields: number;
@@ -76,6 +86,18 @@ export interface AdvisoryCounters {
   recoveryObservations: number;
   receiptsObserved: number;
   resourceCalls: number;
+}
+
+export type AdvisoryRecordStatus = 'recorded' | 'replayed' | 'conflict' | 'failed';
+
+/**
+ * Advisory observation document key: the COMPLETE occurrence+turn identity
+ * (the same target+messageId components the kernel's own durable turn id
+ * derives from). A record written for one occurrence can never collide with a
+ * different occurrence reusing the same messageId.
+ */
+export function advisoryDocKey(workflowId: string, instanceKey: string, messageId: string): string {
+  return `kext-advisory:turn:${workflowId}:${instanceKey}:message:${messageId}`;
 }
 
 interface KRuntime {
@@ -127,6 +149,10 @@ export class V10PrimaryFacade {
     adviceIgnoredFields: 0,
     adviceIgnoredError: 0,
     budgetRefusals: 0,
+    advisoryRecords: 0,
+    advisoryRecordReplays: 0,
+    advisoryRecordConflicts: 0,
+    advisoryRecordFailures: 0,
     recoveryConsultations: 0,
     hintsAccepted: 0,
     hintsDroppedFields: 0,
@@ -329,8 +355,10 @@ export class V10PrimaryFacade {
       throw new V10PrimaryError('ROUTING_BINDING_UNMATCHED', 'the Router result does not exactly match a sealed route row of this subject');
     }
 
-    // Advisory budget consultation + Primary-owned clamping/revalidation,
-    // durably recorded in the Primary's own document namespace.
+    // Advisory budget consultation + Primary-owned clamping/revalidation.
+    // Review R1 P1 repair: NO durable write happens before K — the advice is
+    // pure data here; its observation is appended best-effort only AFTER the
+    // authoritative K receipt exists and can never gate or replay-break K.
     const budgetOutcome = await this.#consultBudgetAdvice(intent, workflowId);
 
     // Primary hard work-units gate: BEFORE any K admission activity.
@@ -359,13 +387,15 @@ export class V10PrimaryFacade {
       if (!isPlainRecord(receipt)) {
         throw new V10PrimaryError('K_RECEIPT_INVALID', 'the Kernel admission receipt is not a record');
       }
-      return { ...receipt, budget: budgetOutcome };
+      const record = await this.#recordAdvisoryObservation(intent, workflowId, budgetOutcome);
+      return { ...receipt, budget: { ...budgetOutcome, record } };
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === 'ADMISSION_EFFECT_AMBIGUOUS' || code === 'ADMISSION_EFFECT_JOURNAL_CONFLICT') {
         // The kernel's own honest UNKNOWN: the effect may have landed but its
         // terminal journal commit could not; no false ACK, no retry.
-        return { status: 'UNKNOWN', messageId, code, budget: budgetOutcome };
+        const record = await this.#recordAdvisoryObservation(intent, workflowId, budgetOutcome);
+        return { status: 'UNKNOWN', messageId, code, budget: { ...budgetOutcome, record } };
       }
       throw error;
     }
@@ -431,7 +461,11 @@ export class V10PrimaryFacade {
     }
 
     const effectiveCeiling = Math.min(requested, adviceCeiling ?? hard.maxStepsPerTurn);
-    const outcome = {
+    // The observation is scoped to the COMPLETE occurrence+turn identity; the
+    // volatile `at` timestamp is excluded from idempotence adjudication.
+    return {
+      turn: { workflowId, instanceKey, messageId },
+      intentType,
       providerId,
       disposition,
       adviceCeiling,
@@ -440,8 +474,41 @@ export class V10PrimaryFacade {
       effectiveCeiling,
       at: new Date(this.#deps.now()).toISOString(),
     };
-    await this.#docs.put(`kext-advisory:${messageId}`, outcome, { mustBeAbsent: true });
-    return outcome;
+  }
+
+  /**
+   * Best-effort post-K append of the advisory observation (review R1 P1
+   * repair). Runs only AFTER the authoritative K receipt/UNKNOWN exists,
+   * scopes the record to the complete occurrence+turn identity, and NEVER
+   * alters the ACK: a lost create re-reads the winner (identity-matching →
+   * idempotent replay; different → typed conflict observation, the stored
+   * record is never overwritten), and any storage failure is a typed
+   * 'failed' observation, never a thrown error.
+   */
+  async #recordAdvisoryObservation(intent: V10PublicIntent, workflowId: string, outcome: Record<string, unknown>): Promise<AdvisoryRecordStatus> {
+    const key = advisoryDocKey(workflowId, intent.instanceKey, intent.messageId);
+    const { at: _volatile, ...core } = outcome;
+    try {
+      await this.#docs.put(key, outcome, { mustBeAbsent: true });
+      this.#advisory.advisoryRecords += 1;
+      return 'recorded';
+    } catch {
+      try {
+        const winner = await this.#docs.get(key);
+        if (winner !== null && isPlainRecord(winner.value)) {
+          const { at: _storedAt, ...storedCore } = winner.value;
+          if (canonicalJson(storedCore) === canonicalJson(core)) {
+            this.#advisory.advisoryRecordReplays += 1;
+            return 'replayed';
+          }
+        }
+        this.#advisory.advisoryRecordConflicts += 1;
+        return 'conflict';
+      } catch {
+        this.#advisory.advisoryRecordFailures += 1;
+        return 'failed';
+      }
+    }
   }
 
   // -------------------------------------------------------------------------

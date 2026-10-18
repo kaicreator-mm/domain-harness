@@ -22,7 +22,11 @@ production code and changes nothing under `packages/**`.
   invokes the real `createOccurrenceRuntime` and alone owns
   Admission/State/Journal/Effect/Replay/UNKNOWN; extensions participate only
   through two data-only advisory hooks (`admission-budget-advice/v1`,
-  `recovery-diagnostics/v1`);
+  `recovery-diagnostics/v1`). The advisory consultation is recorded durably
+  only AFTER the authoritative K admission, as a best-effort observation
+  scoped to the complete occurrence+turn identity — it can never gate, block
+  or replay-break real K, and a conflicting record is a typed observation
+  that never alters the authoritative ACK (review R1 P1 repair, R6 tests);
 - physically distinct **kernel-extension ESM fixtures** (`fixtures/`):
   two benign useful providers plus malicious/fault variants (oversize and
   smuggled advice, malformed returns, forged recovery terminal, privileged
@@ -44,4 +48,8 @@ V10_EVIDENCE_DIR=docs/experiments/v010-k-extension-feasibility/evidence \
 
 NOT claimed: malicious-JS isolation (same-realm trusted JS is not a sandbox),
 SQLite/process-kill/network, #1124/#1126 principal/permit machinery,
-multi-Host CAS interleaving (K01/C01 scope).
+multi-Host CAS interleaving (K01/C01 scope), and #1110 changed-payload
+conflict refusal — the selected real v0.9 kernel's turn identity excludes the
+input payload, so a changed-input resubmission replays the original receipt
+(R6 records this honestly; it remains a v0.10 K02 implementation gap, not
+something this research implements).
