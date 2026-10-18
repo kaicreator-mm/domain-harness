@@ -14,7 +14,6 @@ import {
   buildV10App,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import {
-  AUDIENCE,
   basicComposition,
   clearEvalLog,
   evalLog,

@@ -8,7 +8,7 @@ export const EXTENSION_ABI = 'dh.v10.k-extension/1';
 export const PROVIDER_ID = 'advisory-beta';
 export const HOOK = 'advisory-beta-observation/v1';
 
-export function init(context) {
+export function init() {
   return { ok: true, providerId: PROVIDER_ID, hook: HOOK };
 }
 
