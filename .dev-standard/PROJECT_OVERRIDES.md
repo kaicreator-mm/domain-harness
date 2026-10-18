@@ -3,7 +3,7 @@
 ## Project-level architecture source of truth (cross-version)
 
 - **Product architecture (not ADS process config):** follow [`docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md`](../docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md) CV-01..12, as linked by root `AGENTS.md`. This file only locates that source; do not duplicate its normative clauses here.
-- **New version intake:** record `CV-01..12: INHERITED_UNCHANGED` in the new PRD/L2, or cite a focused architecture/Product amendment for specific deviations. A project-wide principle does not silently supersede an existing frozen version requirement (v0.10 PC-05 remains gated by Product A01 #1158).
+- **New version intake:** record `CV-01..12: INHERITED_UNCHANGED` in the new PRD/L2, or cite a focused architecture/Product amendment for specific deviations. A project-wide principle never silently supersedes a version freeze: v0.10's explicitly scoped PC-05 successor now derives from [accepted A01 Product checkpoint](../docs/product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_ACCEPTANCE.md), not CV text alone.
 - **Historical version boundary:** v0.3/v0.8 legacy environment requirements, frozen Product lists, implementation-specific no-import and release-gate text are retained in [`docs/governance/archive/PROJECT_OVERRIDES_HISTORICAL_20261018.md`](../docs/governance/archive/PROJECT_OVERRIDES_HISTORICAL_20261018.md), not in the active execution profile. Old acceptance remains valid for its own version, never an implicit constraint on v0.10 or a successor; the selected version's actual frozen Product/L2 still governs.
 
 ## Project Identity
@@ -21,7 +21,7 @@
 
 ## Repository profile
 
-- Repository: TypeScript/JavaScript SDK, compiler/build tooling, selected Domain Packages and target-specific implementations; monorepo. Current v0.10 target is Node.js 24, with ordinary Node/npm implementations as selected by BUILD **subject to accepted v0.10 Product A01**. Do not infer that every SDK module must be source-portable to Expo/Browser/QuickJS.
+- Repository: TypeScript/JavaScript SDK, compiler/build tooling, selected Domain Packages and target-specific implementations; monorepo. Current v0.10 target is Node.js 24, with ordinary Node/npm implementations selected by BUILD **under accepted v0.10 Product A01**. Do not infer that every SDK module must be source-portable to Expo/Browser/QuickJS.
 - Delivery is an embedded Domain App runtime/SDK, not a new server, Admin UI, Agent platform or model gateway. Product behavior and boundaries live in [cross-version principles](../docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md) and the *owning version* frozen Product/L2.
 - Previously frozen v0.1–v0.9 claims/host-target evidence remain historical and available in version Freeze/Release documentation, not as implicit new v0.10 gates. Prior long release ledger preserved verbatim in [historical overrides](../docs/governance/archive/PROJECT_OVERRIDES_HISTORICAL_20261018.md).
 
@@ -238,13 +238,13 @@ Task packs may define a narrower focused command set, but may not weaken require
 ## Runtime / Platform Requirements
 
 - **Repository development/CI:** Node.js `>=22` remains the existing workspace/CI toolchain floor; see actual `engines` and `.woodpecker/verify.yaml` for executable enforcement. This is **not** a claim of every Runtime target being supported.
-- **Selected v0.10 Domain App execution target:** TS→JS on **Node.js 24**; BUILD selects compatible SDK+Package implementations and dependencies. Future runtimes use their own implementations only when a specific Product version admits them. The selected App is trusted prebuilt code; SDK startup is not an AST/hash/dependency certification phase. **The frozen v0.10 PC-05 still applies until Product A01 #1158 is actually accepted.**
+- **Selected v0.10 Domain App execution target:** TS→JS on **Node.js 24**; BUILD selects compatible SDK+Package implementations and dependencies. Future runtimes use their own implementations only when a specific Product version admits them. The selected App is trusted prebuilt code; SDK startup is not an AST/hash/dependency certification phase. **v0.10 A01 is ACCEPTED** as the scoped successor to historical frozen PC-05/related Host mechanism, via [Product acceptance checkpoint](../docs/product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_ACCEPTANCE.md); the untouched original Product snapshot still governs unmodified requirements.
 - **Historical targets:** Expo/Hermes/Android and mandatory Node-built-in-neutral Core belong to the owning v0.3 and other frozen legacy Product/L2/host-test subjects, **not** to v0.10 by inheritance. Required services/real devices always follow the current Task/accepted Product scope, not a permanent universal matrix.
 
 ## Frozen authority
 
 - **Current version authority:** use the exact Product/L1, scoped accepted amendments, L2 Freeze and admitted Task DAG of the specific version/Task being executed. Historical v0.1–v0.9 frozen contracts remain authoritative **for their own versions** but are not a new-version requirements union.
-- **Project-wide product/architecture decisions:** [CV-01..12](../docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md); new Product/L2 records inheritance or an explicitly reviewed scoped divergence. Do not treat this link as acceptance of the still-pending v0.10 A01 correction to PC-05.
+- **Project-wide product/architecture decisions:** [CV-01..12](../docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md); new Product/L2 records inheritance or an explicitly reviewed scoped divergence. Accepted Product A01 is independently recorded in the [v0.10 A01 acceptance checkpoint](../docs/product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_ACCEPTANCE.md), not inferred from the CV reference.
 - v0.3 frozen-composition registry, exact evidence lineage and release subject details are preserved in [historical overrides](../docs/governance/archive/PROJECT_OVERRIDES_HISTORICAL_20261018.md) and their original freeze files.
 
 ## Project-specific hard boundaries
