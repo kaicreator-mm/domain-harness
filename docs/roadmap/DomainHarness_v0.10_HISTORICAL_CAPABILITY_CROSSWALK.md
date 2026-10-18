@@ -58,7 +58,7 @@ Historical source paths and row IDs are from the 44-entry JSON manifest. The `v0
 | FR01 | Workflow state/child/WAIT-RESUME | K + S | REUSE; ADV generic bounded loop; prove parent/child on selected K |
 | FR02 | Portable expression, Rule, safe script | S / Tool C | REUSE; no second script engine |
 | FR03 | Durable Tool/Operation effect | K + C/H | REUSE; exact idempotence/UNKNOWN |
-| FR04 | DomainMessage admission/ACK/dedup | K | REUSE; typed duplicate/refusal |
+| FR04 | DomainMessage admission/ACK/dedup ([#1110](https://github.com/kaicreator-mm/domain-harness/issues/1110)) | K Primary | **v0.10 P0: CHANGE** — commit/retain canonical input digest in same-CAS admitted turn identity + Disposition; same target/messageId + intentType + canonically identical input → original `idempotentReplay`, no new effects; same messageId + different intentType **or input** → typed `ADMISSION_TURN_DISPOSITION_CONFLICT`, **no accepted ACK or dispatch**. K02 repair restores/compares exactly that complete identity from committed history. Existing v0.9 lacks input in identity; **not already implemented**; targeted P/N incl. restart, missing Disposition, wrong payload/intent and unchanged replay. |
 | FR05 | Query / multi-source projection | S + K read | REUSE; ADV explicit B scope/aggregate |
 | FR06 | Compiled root load/integrity | BUILD + Microkernel/H | REUSE; no legacy format |
 | FR07 | Bounded Harness/child execution | S + Agent B | ADV: bounded Model↔Query child, public selected path |
