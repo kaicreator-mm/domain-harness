@@ -6,6 +6,8 @@
 >
 > Source inspection (selected v0.9, not copied old Runtime): BUILD v09build/build.ts blob f601c45344865ad7c30f5dcbdbb6e7730c076097; selected ABI v09/selected-abi.mjs blob c5d706a8a6fce4e21378265467650b099fe5f5ca; public bridge operation-bridge.ts blob 66a7404d265d9f1dbddbe34cf03bf359fa89e381; physical K kernel-mechanism-v1.mjs blob fa30e1204d47c12f3f5842c497a83a08501d515b. These are evidence anchors, not v0.10 test PASS.
 
+> **Cross-version baseline:** `CV-01..12: INHERITED_UNCHANGED` from `docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md` on main. Ordinary Node imports and moving Package static checks upstream remain *conditional on accepted Product A01*, not authorized by this declaration alone.
+>
 > **File-name provenance:** this `..._R0.md` path preserves the original candidate/review subject for PR #1149. **The contents are now R3**, after R0/R1 independent reviews and R2 rework; do not infer R0 status from the historical filename. A freeze checkpoint may reference this exact filename + reviewed blob; no rename-only PR or extra approval loop required.
 >
 > **Product successor is still conditional:** [A01 trusted BUILD output](../product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_TRUSTED_BUILD_OUTPUT.md) in PR #1158 is pending separate Product review and acceptance. §B and Product P2-5 below are proposed A01-dependent L2 design, not permission to disregard currently frozen PC-05. Selected v0.9 registry/loader are historical source, not a mandated successor implementation.
