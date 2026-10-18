@@ -70,6 +70,22 @@ A protected Agent/LLM-exposed Tool remains **read-only by default**; effectful b
 
 **Scope note:** v0.9 has exactly one physical K and S by design. Product L1 here selects multi-package families as a v0.10 **P0 candidate**, not an implemented runtime, and requires a versioned BUILD/ABI design at L2. No v0.9 ABI compatibility obligation is added pre-1.0.
 
+### P0 — CT: Semantic/Tool/Kernel contract classification during historical recovery
+
+> This is a **migration decision and L2 contract**, not a new Tool framework or a requirement that every callable function become an Operation. Preserve the [v0.7 Semantic Component vs Tool Component distinction](DomainHarness_v0.7_PRD.md) and separate **Capability contract identity** from its Tool implementation. See [historical classification matrix](../roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md).
+
+**CT-01** For every historical feature chosen for migration, T01 SHALL record the **public behavior + execution shape**: `SEMANTIC` (declarative/pure Rule/Decision/Workflow/Projection), `TOOL_READ` (independent authorized query/model/search/calculation call), `TOOL_EFFECT` (effectful external or memory/artifact write Operation), `KERNEL_PROTOCOL` (State/Admission/Journal/Effect/Replay/UNKNOWN control), `BUILD_OR_LIFECYCLE` (immutable composition/installation/init), or `SPLIT` when a feature contains more than one. The class does **not** automatically determine Package family; S/B/C/K ownership and external authorization must also be specified.
+
+**CT-02** A function's being callable, async, implemented in TS, or exposed to an Agent is **not by itself** grounds for Tool wrapping. Prefer direct named semantic dispatch inside Standard Features for Rule/Guard, DecisionResolver, workflow loop/control, Context Assembly, Shadow comparator and candidate schema validation. These components can **invoke** Tool Operations; they do not themselves become a general Tool API.
+
+**CT-03** A Tool/Operation boundary is appropriate when an independently addressed capability is invoked via a stable input/output/error/permission contract, especially model inference, retrieval/search, external HTTP/Job/Tool, file/device action, Memory get/search/write, cache persistence, or independent compute service. Read-only and pure Tool calls are valid; Tool does **not** imply an Effect. Conversely, a pure internal helper need not be a Tool.
+
+**CT-04** A Tool declared `effectful` requires a BUILD-sealed selected binding, current protected H authorization and the single Kernel Primary's Admission, effect identity/Journal/UNKNOWN/recovery. A model-facing Agent Tool projection remains **read-only by default**. No ordinary Tool may write the raw authoritative Kernel Store or issue independent approval, promotion, activation or mutation authority. The authorized **Business Workflow** may request effects through the K-controlled Operation path; the LLM's output is a proposal, not a permit.
+
+**CT-05** Mixed semantics MUST be **split without creating a second engine**: e.g. cache hit/currentness decision = S Semantic, cache read/write storage = C Operations; Context selection/packing = S Semantic, external retrieval = C read Tool; Shadow comparator = S Semantic, model queries = C Tool; Promotion policy/evidence = governed semantic/BUILD facts, approved deployment side effect = protected H operation **never a freely exposed Agent Tool**; timers/callback/WAIT/RESUME = K/S control semantics while actual notification transport MAY be a capability. Physical callback dispatch must preserve one K turn authority.
+
+**CT-06** Validation must demonstrate **both sides** of representative split components: semantic decision with zero unnecessary Tool calls, valid optional Tool invocation with typed/read-only vs effectful distinction, guard failure with **zero effectful dispatch**, forged capability and prohibited model-owned mutation denied, restart/UNKNOWN truthful, no duplicate State/Journal/Effect. A small App uses no unnecessary Tool adapters; a richer App installs only its selected Tool Capabilities. Do not turn T01's 44 historic records into 44 new Tasks.
+
 ### P0 — AW: Advanced Workflow Components
 
 **AW-01** Bounded SemanticDecision (compiled and BUILD-sealed) supports finite allowed outcomes/events, deterministic current guards and structured results. No model drives an internal engine state id or direct mutation.
