@@ -89,16 +89,25 @@ Every row is **initially AUDIT_PENDING for public-v9 reachability**. A grouped v
 
 Historical source anchors are indicative; for an exact diff use `git show <historic SHA>:<path>`. The v0.5 source introduced `compiled-workflow-runtime-v3.ts` and related messaging; the v0.6 source introduced SemanticDecision binding/receipt; neither should create a peer Kernel.
 
-## 4. Architecture conversion map: logical roles, no Kernel growth
+## 4. New v0.10 Package composition prerequisite: actual multi-K/S modules ([#1141](https://github.com/kaicreator-mm/domain-harness/issues/1141))
+
+**v0.9 actual state:** BUILD `roleCounts(kernel)=1`, `roleCounts(standard-sdk)=1`, v09 selected ABI retains exactly one K/S, and `operation-bridge.ts` forwards one `createOccurrenceRuntime` and one `interpret`. Historical Domain Components are not therefore automatically physically independent Standard Packages.
+
+**v0.10 proposed targeted delta:** select **exactly one authority-bearing K Primary + 0..N physically sealed K Extension Packages**, exactly **one Standard Primary entry + 0..N independently sealed Standard Feature Packages**, and multiple approved B/C Packages as already supported. Kernel extensions may only provide **named typed bounded hooks/proposals** consumed by Primary; they cannot mint another State/Effect/Journal authority or bypass H. S modules contribute declared Kind/Decision/Workflow/Context/Evolution semantic handlers; explicit BUILD-bound dispatcher selects each by identity without silent first provider.
+
+The 44 rows remain audit input. For each `S` row whose semantics are to be independent, audit selected v0.10 Feature Package `providerId → exported hook/handler → selected dispatcher → one K` reachability. For true `K` invariant rows, preserve Primary ownership rather than pretending the safety fix is pluggable (notably #1108/#1109). Closure requires deterministic dependency graphs, conflicting-provider/cycle refusal, actual no-extension minimal App, rich App with nontrivial multi-K/S feature modules, trusted install/restart and exact byte pins. **Product feasibility condition:** if a proposed K Extension must own primary commit state or journal to work, it is not a safe independent K Extension and requires Product/L2 revision.
+
+## 5. Architecture conversion map: logical roles, no Kernel growth
 
 ```text
 Approved v0.10 Assembly (BUILD-sealed immutable)
   Microkernel: load + necessary package lifecycle/binding hooks ONLY
-  Kernel Package: State/Admission/Effect/Journal/UNKNOWN/Replay
-  one selected Standard Package:
-    - WorkflowRouter / generic Workflow + bounded Loop
-    - SemanticDecision / DecisionResolver / reusable procedure
-    - Context Assembly / Evidence and Candidate semantics (logical components)
+  Kernel Primary Package: State/Admission/Effect/Journal/UNKNOWN/Replay
+  0..N Kernel Extension Packages: declared bounded recovery/observation hooks ONLY
+  Standard Primary Package: one interpret/router dispatch entry
+  0..N Standard Feature Packages:
+    - Advanced Workflow / SemanticDecision / DecisionResolver
+    - Context Assembly / Evidence and Candidate semantics
   Business Packages:
     - B1 deterministic workflow
     - B2 Agent workflow (same Workflow protocol)
@@ -107,9 +116,9 @@ Approved v0.10 Assembly (BUILD-sealed immutable)
   Host/BUILD: physical authority, approved adapters, exact selected install/activation
 ```
 
-Do **not** treat the diagram as proof that today's single v9 Standard ABI permits several separately loaded S Packages. Use logical components within S first. Similarly, memory retrieval and tool invocation cannot bypass protected H→K caller and operation scope.
+The diagram is a **v0.10 candidate target**, NOT proof of v0.9 support. v0.10 explicitly proposes multiple **physical** S Feature and K Extension Package modules with a new versioned BUILD/ABI; do not fallback silently to a monolithic Standard bundle as if the independent Package composition requirement passed. Similarly, memory retrieval and tool invocation cannot bypass protected H→K caller and operation scope.
 
-## 5. Audit algorithm and exit evidence
+## 6. Audit algorithm and exit evidence
 
 1. Fix one **exact v9 SHA and selected host**. List real public `load/send/query/subscribe/stop` paths, sealed interpreter and selected bindings from actual code.
 2. For all 44 rows, map **one or more** existing v0.8 release oracles to an actual v9 selected K/S/B/H positive/negative witness (or state explicit `S/L/O`).
@@ -118,7 +127,7 @@ Do **not** treat the diagram as proof that today's single v9 Standard ABI permit
 5. Repeat one integrated scenario across **two active Business Packages** with overlapping `instanceKey` + one Agent workflow + Meta Shadow. No arbitrary claim of cross-B read atomicity.
 6. One final frozen candidate Full/Hidden/critical journey/packed-consumer once; PR delta tests/reviews before merge, Woodpecker unavailability alone should not block with recorded waiver. Do not manufacture PASS from historic test source existence.
 
-## 6. Explicitly outside the recovery effort
+## 7. Explicitly outside the recovery effort
 
 - Restoring v0.1–v0.7 API/ABI, old compiled assets or rolling replay format compatibility.
 - Retrofitting XState as a Kernel-required product ontology; old v0.3 selected engine is an implementation detail.
@@ -126,7 +135,7 @@ Do **not** treat the diagram as proof that today's single v9 Standard ABI permit
 - Loading dynamically generated executable code into an already-running closed-world Assembly.
 - Adding a generic goal planner/obligation solver/Agent Runtime and duplicating AI Runtime/Tally/Cairn or runx.
 
-## 7. Known current selected-v9 paths to inspect first
+## 8. Known current selected-v9 paths to inspect first
 
 - `packages/domain-harness/src/public-v9/operation-bridge.ts`: protected public-v9 H→K send/read path, `routeWorkflowIntent`, single selected S, B-to-intent binding, first-match read ambiguity.
 - `packages/domain-harness-compiler/src/qualified-package/v09/selected-abi.mjs`: sealed ABI, selected Standard and Business binding.
