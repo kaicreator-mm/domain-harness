@@ -129,6 +129,20 @@ Historical source anchors are indicative; for an exact diff use `git show <histo
 
 The 44 rows remain audit input. For each `S` row whose semantics are to be independent, audit selected v0.10 Feature Package `providerId → exported hook/handler → selected dispatcher → one K` reachability. For true `K` invariant rows, preserve Primary ownership rather than pretending the safety fix is pluggable (notably #1108/#1109). Closure requires deterministic dependency graphs, conflicting-provider/cycle refusal, actual no-extension minimal App, rich App with nontrivial multi-K/S feature modules, trusted install/restart and exact byte pins. **Product feasibility condition:** if a proposed K Extension must own primary commit state or journal to work, it is not a safe independent K Extension and requires Product/L2 revision.
 
+### v0.10 Product Freeze candidate disposition of inherited live Issues
+
+These are distinct from generic historical recovery (and all require new selected-v0.10 proof if not already satisfied by exact reusable safety evidence):
+
+| Issue | v0.10 admission | Correct owner and scope |
+|---|---|---|
+| [#1108](https://github.com/kaicreator-mm/domain-harness/issues/1108) | **P0, K01** | Real cross-Host admission-fence takeover during external non-idempotent Effect; repair **Kernel Primary** with valid fencing/reconcile/fail-closed unsupported profile, not a K Extension or Tool |
+| [#1109](https://github.com/kaicreator-mm/domain-harness/issues/1109) | **P0, K02** | Heal absent Disposition from durable same-CAS turn history before 17+-turn eviction; never require old `messageId` resend; not a general Agent Tool |
+| [#1138](https://github.com/kaicreator-mm/domain-harness/issues/1138) | **P0 minimal, C01** | Independently selected Host external Effect Tool adapter for approved K Operation, accepted/terminal/UNKNOWN and correlation; depends on K01/K02 safety proof or denies unsafe profiles, no runx/Tally/PTY/streaming inside K |
+| [#1031](https://github.com/kaicreator-mm/domain-harness/issues/1031) | **P1 / deferred** | Rich streaming/cancel/remote tool enhancements are not an implied P0 requirement |
+| Multi-B query | **P0 QR01/QR03**, **P1 QR02** | Explicit single-B target and typed unscoped collision refusal required; `queryMany` optional and never a P0 critical journey |
+
+**Release acceptance split:** tiny packed App (no extension imports) and rich packed App (nontrivial K/S extensions, Agent/Memory/Evidence, two B, minimal external effect) are **two** bounded consumers. P0 does not require recurring autonomous Meta Feedback Workflow (P1), only one approved bounded Shadow L4 scenario, nor automatic production activation.
+
 ## 5. Architecture conversion map: logical roles, no Kernel growth
 
 ```text
