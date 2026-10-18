@@ -1,0 +1,14 @@
+task: T01
+scenarios:
+  - trigger: selected public-v9 path lacks row P/N test sources
+    disposition: ABSENT_or_SELECTED_V9_PARTIAL_and_route_to_owner
+  - trigger: historic-v08 witness on different version SHA
+    disposition: historical_only_no_current_PN_claim
+  - trigger: BUILD/currentness misattributed to K runtime under accepted A01
+    disposition: CONTRACT_MISMATCH_record_and_correct_crosswalk
+  - trigger: missing or contradictory retained ID
+    disposition: STOP_source_audit_blocked
+  - trigger: v0.10 integration SHA changes materially
+    disposition: RECHECK_exact_source_affected_by_delta
+no_effects: true
+no_source_code_changes: true
