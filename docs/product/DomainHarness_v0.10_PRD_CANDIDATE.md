@@ -11,8 +11,8 @@ Keep **v0.9's small JS/TS Microkernel + physically selected Kernel/Standard/Busi
 A Domain Application can:
 1. Run deterministic or adaptive **Domain Workflows** using the minimum sufficient, correct decision mechanism (Rule → exact semantic reuse → validated reusable procedure → bounded model/query reasoning).
 2. Use **Memory and Context** as independently selected Domain Package capabilities, shared across approved Business and Agent workflows.
-3. Run a second **Meta Workflow** to consume provenance-bound Runtime Evidence, prepare validated Candidates, perform non-mutating **L4 Shadow** evaluation and request governed promotion/activation of a **future immutable version**.
-4. Execute multiple Business Packages concurrently within one qualified Assembly; queries identify their target Business(es) without first-match ambiguity.
+3. In **P0**, capture provenance-bound Runtime Evidence and execute non-mutating **L4 Shadow** on a bounded approved Workflow scenario, validating Candidates for future immutable versions. The recurring/automated **Meta Workflow** that analyzes evidence and proposes improvements is **P1**; no autonomous production activation is promised.
+4. Execute multiple Business Packages concurrently within one qualified Assembly; **P0** requires precise scoped single-B query and unscoped ambiguity refusal; bounded cross-B aggregate `queryMany` is **P1**.
 
 **No Agent Loop Runtime**: an Agent Loop is a bounded/recoverable Workflow. **No Meta Runtime**: Meta Harness is a workflow role. **No Kernel Memory/LLM/Agent branches.**
 
@@ -46,7 +46,7 @@ Primary sources:
 - **BUILD/compiler (outside runtime):** package binding, semantic schemas, capability selection, compiled Domain Data/Workflow contracts and qualified immutable new App generations. No arbitrary post-load package discovery, hot code mutation or runtime compile.
 - **External ecosystem:** AI Runtime owns model/provider policy, Cairn may own knowledge/retrieval, Forge compiles Domain Data, Simulator evaluates Candidate, domain-ux handles UX, Tally orchestrates engineering, runx owns execution environments. No copying their full products into domain-harness.
 
-A protected Agent/LLM-exposed Tool remains **read-only by default**; effectful business changes are separately authorized K operations. [Post-v0.9 external effect Host Tool Port #1138](https://github.com/kaicreator-mm/domain-harness/issues/1138) is a separate Product intake, not silently included as an automatic P0 dependency.
+A protected Agent/LLM-exposed Tool remains **read-only by default**; effectful business changes are separately authorized K operations. This version **explicitly admits a minimal generic Host external Effect Port (#1138) as P0** under EX-01–04 and Kernel safeguards KH-01/02, while keeping rich streaming, PTY, generic cancel and unbounded remote transports outside v0.10. The external Port is not a general-purpose privileged Agent Tool.
 
 ## 4. Product feature groups and acceptance
 
@@ -120,6 +120,24 @@ A protected Agent/LLM-exposed Tool remains **read-only by default**; effectful b
 
 **EV-04** New-version Promotion/Activation contract: distinct validation, promotion and activation; only independent authorized/build-approved deployment can qualify new immutable selections. LLM/Meta output cannot self-sign permission, alter the running instance, reduce its own checks or rewrite old execution pins. No GitHub-account/owner-identity gate; rely on actual authorized execution evidence and independent Host/DAC truth.
 
+### P0 — KH: Selected Kernel correctness and liveness fixes ([#1108](https://github.com/kaicreator-mm/domain-harness/issues/1108), [#1109](https://github.com/kaicreator-mm/domain-harness/issues/1109))
+
+**KH-01** Correct the official selected Kernel Primary's cross-Host **Admission Fence takeover after external non-idempotent Effect dispatch**. A competing admission at the same state revision MUST NOT silently invalidate a still-executing Effect and admit a conflicting successful second Effect. Define a durable reservation/fencing/reconciliation protocol, not **lease-timeout-only**. In the unavoidable crash/unknown remote outcome, preserve journaled actual Effect/UNKNOWN truth, refuse unsupported non-fenced non-idempotent concurrency profiles or reconcile using independently proven adapter idempotency. Do **not** assert general cross-system exactly-once. Targeted two-actual-Host/CAS interleaving P/N is required. This repair is eligible for independent earlier hotfix; if already merged and independently proven, reuse the exact qualifying evidence without a duplicate feature implementation.
+
+**KH-02** Repair the **16-entry committed control-turn-history eviction liveness defect**: after an admitted message's authoritative same-CAS State write, if its independent best-effort turn-Disposition append fails, later admission MUST NOT require the original client to resend that `messageId` to unblock the instance. Reconstruct a safe minimal disposition from validated authoritative admitted history before eviction using conditional matching write (or equivalent Host-authorized bounded recovery); never invent old payload/results or allow a wrong-identity collision. Transient append failure heals; persistent store unavailability returns honest typed failure; restart, 17+ turns, duplicate message and wrong-identity negative prove no duplicate Effect/State/Journal.
+
+**KH-03** These are **Kernel Primary invariants**, not arbitrary Kernel Extension hooks or optional Agent Tools. Their selected-v0.10 qualification is **P0** regardless of the Advanced/Memory optional extensions; independent K fix PRs may merge as soon as targeted evidence passes, without waiting for all v0.10 features.
+
+### P0 — EX: Generic external Effect Tool Port ([#1138](https://github.com/kaicreator-mm/domain-harness/issues/1138))
+
+**EX-01** Support an approved **BUILD-sealed Capability/Operation identity → protected deployment-owned Host external-effect adapter** so the chosen Kernel Primary may dispatch an authorized effectful external Tool without arbitrary package network imports or Host credential leakage. Existing approved read-only Host Tool binding and v0.9 K effect permits are reused, not duplicated. No runx/Tally/SSH/Agent-specific mechanism is inside DomainHarness.
+
+**EX-02** Exact K `effectId`, occurrence/target/tenant/app, selected binding digest, idempotency key **actually delivered to the adapter**, bounded AttemptRef and ProviderOperationRef/correlation (when available) distinguish `not_dispatched / accepted-running / terminal_success / terminal_failure / UNKNOWN-reconcile`. External accepted/HTTP ACK is **not** terminal business success. One authorized callback or query-reconciliation control turn records genuine terminal evidence and drives any next K transition through current Admission; stale/duplicate/foreign/late callback never bypasses K.
+
+**EX-03** An uncertain remote result, crash or timeout is UNKNOWN until sufficient external observation/remote idempotency proof; no blind retry of irreversible non-idempotent work. Unsupported adapter, missing current approval, weak idempotency, wrong scope/binding, failed permit, wrong schema and competing-writer unsafe profiles refuse before dispatch where provably unsupported. Host owns transport, currentness and credentials; external provider owns its own commit truth. Cancellation request != cancellation proof.
+
+**EX-04** One Tally→runx-shaped **fake/generic** adapter and one unrelated external effect adapter use the same selected contract (no runtime import of Tally or runx), including real selected Node24+SQLite restart, lost accepted response, duplicate callback and missing disposition; #1108/#1109 safeguards are mandatory integration dependencies or explicit fail-closed non-admission for unsupported effectful profiles. Streaming, PTY and comprehensive cancel are deferred to [#1031](https://github.com/kaicreator-mm/domain-harness/issues/1031).
+
 ### P1 — ME: Meta Workflow and feedback evolution
 
 **ME-01** Meta Harness role as ordinary scheduled/on-event Workflow in a Business Domain Package: consume allowed Runtime Evidence, detect repeated outcomes/failed decisions, propose scoped Candidates, invoke deterministic validation, dispatch shadow evaluation and publish comparison reports.
@@ -128,13 +146,15 @@ A protected Agent/LLM-exposed Tool remains **read-only by default**; effectful b
 
 **ME-03** Optional auto-analysis and candidate proposal; production experiment scheduler/canary/automatic activation, online self-modification, generic goal-first replanning and unrestricted Agent navigation are **out** absent separate Product decision. Promotion is governed and should not require repetitive redundant human review when actual independent authorization is already supplied.
 
-### P1 — QR: Multi-B Query and Observation semantics
+### P0 — QR: Safe multi-B identity and precise single query
 
-**QR-01** Scoped `query(instanceKey, businessPackageId)` returns the target's result or typed absence. Unscoped lookup that finds multiple Business instances with same key MUST NOT silently return whichever Business was searched first; make ambiguity explicit.
+**QR-01 (P0)** Scoped `query(instanceKey, businessPackageId)` (or an equivalent explicit target) returns exactly the authorized Business target or typed absence. Unscoped lookup with the same `instanceKey` in multiple Business Packages MUST refuse as **ambiguous**, not silently pick the first B; preserve single-B unscoped behavior when the match is unique. No cross-tenant existence oracle.
 
-**QR-02** Bounded `queryMany({targets, instanceKey})` (or equivalent) provides independent per-B result with source ID/status, current caller/scope checks **for every target**, explicit partial failures, no fabricated multi-B atomic snapshot. Do not fan out through unapproved Business targets. Coalesce/observe existing substrate where possible.
+**QR-03 (P0)** Two Business/Agent independent workflows and lifecycle in one Assembly, concurrent progress and same-`instanceKey` collisions; K State/Journal/effect identities stay distinct for each target. Closed-world intent ownership and K target scope checked per Business.
 
-**QR-03** Two Business/Agent independent workflows and lifecycle in one Assembly, concurrent progress and query collisions; separate State/Journal/effect identities for each B with one authoritative selected K package implementation.
+### P1 — QR: Optional cross-B aggregation
+
+**QR-02 (P1)** Bounded `queryMany({targets, instanceKey})` (or equivalent) provides independent per-B result with source ID/status, caller/scope checks **for every target**, explicit partial failures and no fabricated cross-B atomic snapshot. No fan-out through unapproved Business targets. **Not** required for v0.10 P0 reference consumer or P0 release qualification.
 
 ## 5. Source-anchored legacy semantics to migrate (not copy as old ABI)
 
@@ -142,30 +162,32 @@ Historical register `FR01–FR15`, `HF16–HF34`, `NEW-FUNCTION-01–06`, and fo
 
 **v0.6 NF05/NF06 high-priority:** compiled SemanticDecision → resolved decision → one K admission; truthful optional receipt after admitted result. The old v0.6 source disappeared from main after v0.7 but v0.8 selected-source test evidence reported retention. Reverify on the **v0.9 ABI**, not by path existence.
 
-## 6. Minimum integrated acceptance — ONE small reference App
+## 6. Minimum integrated acceptance — two bounded packed consumers (one tiny + one rich)
 
-BUILD seals **one Kernel Primary + optional Kernel Extensions + one Standard Primary + optional Standard Feature Packages + two distinct Business Packages + selected Capabilities**. B1 handles deterministic ordinary business, B2 handles an Agent Workflow; a third logical Meta Workflow belongs to an approved Business Package and is not a peer runtime. A minimal App uses **only** the two Primary basics; a complex App selects only necessary independent extensions. Tests:
-1. Both B packages handle disjoint sealed Intents; actual same-instanceKey collision is query-ambiguous unless scoped; explicit aggregate shows both with provenance/current caller permissions.
+**Consumer A (tiny):** BUILD seals one Kernel Basic Primary + one Standard Basic Primary + one Business + only its required Capability dependencies. No advanced feature imports. **Consumer B (rich):** BUILD seals one authoritative Kernel Primary + independent selected K Extensions (PC-08 feasibility), one Standard Primary + independent selected Standard Feature Packages, two Business Packages and selected Model/Memory/Tool/Evidence Capabilities. B1 is deterministic ordinary business, B2 an Agent Workflow. Shadow is a bounded approved B workflow demonstration in P0; recurring autonomous Meta Workflow remains P1. Tests:
+1. Both B packages handle disjoint sealed Intents; actual same-instanceKey collision yields typed **unscoped ambiguity** and correct **scoped** reads with current caller permissions. `queryMany` aggregation only when P1 is explicitly admitted.
 2. B1 Rule/Exact Cache/Promoted Procedure Model avoidance; B2 fallback with Model/Query limited steps, enforced hard guards and no unapproved model-owned effect.
 3. Memory put/restart/read/search scoped to the correct app/tenant/Business/Agent; Context Assembly uses only authorized current memory and respects budget. Prove cross-B/tenant denied cases.
-4. WAIT → restart → RESUME; duplicate message/attempt, concurrent writers, timed-out tool and UNKNOWN: no duplicate Effects or false journal success.
-5. Evidence and source receipts are truthful (including Model-call `unmeasured`); Shadow L4 runs alternative candidate and records counterexample with **zero business State/Effect writes**.
+4. WAIT → restart → RESUME; duplicate message/attempt, real competing Kernel writers, timed-out external Tool and UNKNOWN: no false terminal ACK. Physically exercise **KH-01** cross-host fence recovery, **KH-02** lost-Disposition 17+-turn healing and **EX-01–04** approved external accepted→terminal/reconcile; reject profiles where idempotency/fencing cannot be shown.
+5. Evidence and source receipts are truthful (including Model-call `unmeasured`); Shadow L4 runs an alternate candidate and records non-authoritative counterevidence with **zero production Business State/Effect/Memory mutations and zero unauthorized external Tool effects**. Only explicitly scoped Evidence output is allowed.
 6. Deterministically validated Candidate is proposed for a **new approved sealed version** with exact fallback; running instance remains pinned. No requirement to autonomously deploy/canary in P0.
 7. Real Node24/ESM + selected physical SQLite Host is allowed as the initially qualified reference. Do not make broad Windows/Linux/WSL2/QuickJS compatibility a Core P0 burden.
 8. Reuse historical P/N oracles; narrow changed-risk checks per PR, one final frozen SHA Full/Hidden/Critical Journeys/packed-clean consumer validation. `PR_PASS != RELEASE_PASS`.
 
 ## 7. Scope discipline and staged roadmap
 
-**P0 release target:** composable selected Package families PC-01–08, historical selected-v9 reachability audit, AW core (AW01–06), MC basic (MC01–04), EV safe foundation (EV01–04), minimal and complex qualified reference scenarios. If K extension feasibility fails without safe authority preservation, freeze must explicitly decide a narrower K composition scope rather than inventing success. **P1 candidate within v0.10 only if bounded and validated:** ME01–03, QR01–03. P1 may be deferred to successor without false P0 acceptance. Since the user explicitly requested Meta/L4 and multi-B planning, they remain visible and traceable rather than silently dropped.
+**P0 release target:** composable selected Package families PC-01–08, historical selected-v9 reachability audit + Tool/Non-Tool classification, AW01–06, MC01–04, EV01–04, **KH01–03**, **EX01–04**, **QR01/QR03**, two bounded qualified packed consumers. A K extension requiring Primary commit authority is not a safe extension: L2 MUST report a feasibility HOLD and request explicit Product rescope, not silently claim PC-08 PASS. **P1 (not required for v0.10 P0 release):** ME01–03 full recurring Meta Workflow, QR02 cross-B aggregate and #1031 rich streaming/cancel. P1 can be separately qualified or deferred; no hidden promotion to P0 via examples.
 
 **OUT:** separate Agent/Meta Kernel or Runtime, general memory platform, arbitrary live package installation/hot swap, automatic self-approval, universal scheduler/obligation solver, global default model calls, v0.1–v0.7 API/asset/digest compatibility, full generic system administration, agent model/provider routing policy, direct mutation by Agent's read-only Tool discovery.
 
-**L1 open decisions to resolve before Freeze**:
-- Is EV03 Shadow foundation P0 while an actual repeated autonomous Meta Workflow remains P1? Proposed **YES**.
-- Preserve **one authority-bearing Primary Kernel and one entry Standard** but allow separately shipped selected K Extensions and S Feature Packages? Proposed **YES, v0.10 P0** (see PC-01–PC-08), with bounded typed K hooks, deterministic module selection, no peer State/Journal authority. Exact ABI and feasibility must be validated at L2; unsupported powerful Kernel hooks remain out.
-- Query API approach: explicit scoped single result and bounded aggregate, no implicit first-hit; P1 until primary AW/MC/EV integration is qualified.
-- Memory consistency: per-item CAS/scoped operations first; no cross-package atomic transaction claim.
-- v0.3 explicit human promotion wording vs user's current low-overhead process: require real external approved authority, not GitHub-identity/human-count gating; independently validate this successor Product choice.
-- Confirm scope and readiness of post-v0.9 external effect Host port #1138 separately; do not accidentally merge it into v0.10's P0.
+**Product/L1 scope dispositions for Freeze review** (these are explicit successor proposals, not statements that the review passed):
+- **Shadow/Meta:** EV03 Shadow evidence **P0**; recurring Meta Feedback Workflow **P1**; no automatic production activation.
+- **Package composition:** exactly one K Primary and one S Primary plus physically independent optional K Extensions/S Features are **P0**. A privileged commit-capable K Extension is OUT. ABI feasibility is L2's concrete proof task, with explicit rescope request on genuine contradiction—not silent permission to violate single authority.
+- **Multi-B:** QR01/QR03 (precise scoped single query + ambiguity refusal + actual two B execution) **P0**; QR02 cross-B aggregate **P1**.
+- **Kernel residuals:** #1108/#1109 **P0 correctness** in K Primary; earlier hotfix evidence reusable, not two duplicate long-lived implementations.
+- **External effect:** #1138 **P0 minimal bounded sealed Host external Effect Port**; #1031 streaming/PTY/rich cancel remains P1/OUT. Integrate after KH01/KH02 safety demonstration or fail closed for unsupported profiles.
+- **Memory:** per-item CAS/scoped operations P0; no general cross-package transaction or global memory platform.
+- **Promotion:** future qualified version and external approved current deployment, with no mandatory GitHub-account/human-identity gate and no model self-approval; this successor Product explicitly changes any older human-promotion requirement only for new v0.10 contracts.
+- **Validation:** two physically distinct packed consumers (tiny/basic + rich/advanced); one final version-level Full/Hidden/CJ/packaging qualification; no redundant independent OS compatibility matrix.
 
 **Next steps:** Product/L1 focused review → frozen Product decisions → architecture/API seam test → L2 Freeze → admitted bounded DAG → one concern/PR merges → one version-level Release Qualification. See [v0.10 candidate Task DAG](../implementation/DomainHarness_v0.10_TASK_DAG_PROPOSAL.md).
