@@ -10,9 +10,10 @@
 flowchart TD
   P[Product Review / Freeze] --> A[L2 package ABI & scope]
   A --> B[T01 Historical v9 reachability audit]
-  B --> C[T02 Four-source Decision + bounded inner loop]
-  B --> D[T03 Workflow semantics + child/wait/recovery]
-  B --> E[T04 Memory Capability]
+  B --> Z[T00 Composable K/S package families]
+  Z --> C[T02 Four-source Decision + bounded inner loop]
+  Z --> D[T03 Workflow semantics + child/wait/recovery]
+  Z --> E[T04 Memory Capability]
   C --> F[T05 Context & Agent Workflow]
   D --> F
   E --> F
@@ -22,15 +23,15 @@ flowchart TD
   F --> J[T11 Single integrated app/closure]
   I --> J
   J --> K[Version Closure/Release Qualification]
-  A --> L[T09 Meta Feedback Workflow: optional P1]
+  Z --> L[T09 Meta Feedback Workflow: optional P1]
   H --> L
-  A --> M[T10 Query scoped/Many: optional P1]
+  Z --> M[T10 Query scoped/Many: optional P1]
   L -. optional extension .-> K
   M -. optional extension .-> K
 ```
 
-- **One already qualified K**, one selected S in v0.9 Package ABI, independent B1..Bn and selected Capabilities. Standard **logical components** may co-reside inside one S.
-- **L2 first** must check the exact selected K/S API contract for loops, scope binding, currently permitted Operation/Handler class, host read vs mutation and multi-B identity. Broaden K/BUILD only if actual targeted P/N falsification shows a generic missing primitive.
+- **One authoritative K Primary and one S Primary/entry** plus selected, independently sealed **K extensions and S feature packages** in the proposed v0.10 ABI (v0.9 has exactly 1 physical K/S); independent B1..Bn and selected Capabilities. Standard **logical components** may co-reside inside one S.
+- **L2 first** must decide typed Primary/Extension roles, scoped K hooks, deterministic Standard feature dispatch, transitive exact dependencies, ordered init/dispose and unsupported-required-feature typed refusal; then check the exact selected K/S API contract for loops, scope binding, currently permitted Operation/Handler class, host read vs mutation and multi-B identity. Broaden K/BUILD only if actual targeted P/N falsification shows a generic missing primitive.
 - All code in current public-v9 selected execution path or selected/package-owned implementation; never import `/v3` private runtime state into new runtime facade as a shortcut.
 
 ## 2. Candidate DAG table
@@ -38,22 +39,24 @@ flowchart TD
 | Task | Stage | Concern / minimal deliverable | Dependencies | Targeted P/N acceptance |
 |---|---|---|---|---|
 | **T01** | P0 | **v0.1–v0.6 → v0.9 44-row capability audit** with exact selected public-v9 reachability classifications (R/S/L/O), source/tests and real missing gaps | L2 | One consolidated crosswalk; actual packed-v9 or existing exact witness for every retained row; no 44 separate full suites |
-| **T02** | P0 | **Advanced Decision Component**: 4-source resolver + bounded Business Harness/Model↔read-query inner loop, declared semantic decision compiled ABI | T01 | Rule/cache/promoted avoid Model call; LLM optional; maxSteps/timeout; wrong event/capability denied before Effect; one K admission |
-| **T03** | P0 | **Generic Workflow extension**: bounded loops/child/WAIT/RESUME/deadline/callback and compiled IR reference reuse | T01 | Child result, suspend/restart, duplicate callback/message, a bounded cycle with exact K state/journal; no new RuntimeV3 |
-| **T04** | P0 | **Memory Capability Basic**: scoped put/get/search/delete, CAS revision, TTL and data isolation | T01 | Real selected Host/Storage read-write, cross-B/tenant negative, restart persistence, no Memory Kernel branch |
+| **T00** | P0 | **Composable K/S package families**: one K Primary + 0..N bounded K Extensions; one S Primary + 0..N physically separate Standard Feature Packages; BUILD/ABI closure, typed hooks and scoped dispatch. [#1141](https://github.com/kaicreator-mm/domain-harness/issues/1141) | T01 | Two actual packed consumers (minimal 0 extensions vs complex 2K ext + 3S feature), deterministic conflicts/missing/cyclic deps, no duplicate K authority, forbidden-effect/role negatives |
+| **T02** | P0 | **Advanced Decision Component**: 4-source resolver + bounded Business Harness/Model↔read-query inner loop, declared semantic decision compiled ABI | T00 | Rule/cache/promoted avoid Model call; LLM optional; maxSteps/timeout; wrong event/capability denied before Effect; one K admission |
+| **T03** | P0 | **Generic Workflow extension**: bounded loops/child/WAIT/RESUME/deadline/callback and compiled IR reference reuse | T00 | Child result, suspend/restart, duplicate callback/message, a bounded cycle with exact K state/journal; no new RuntimeV3 |
+| **T04** | P0 | **Memory Capability Basic**: scoped put/get/search/delete, CAS revision, TTL and data isolation | T00 | Real selected Host/Storage read-write, cross-B/tenant negative, restart persistence, no Memory Kernel branch |
 | **T05** | P0 | **Context Assembly + Agent Workflow** through generic AW and Memory Capability; model optional | T02,T03,T04 | Context source provenance, budget, bounded Agent work, deterministic/no-model mode, no unapproved business mutation |
 | **T06** | P0 | **Decision/Evidence Component**: dependency refs, truthful source/model-count, optional DecisionResolutionReceipt and failures | T02 | Origin and `unmeasured` truth, denied/unavailable vs admitted, optional append failure leaves K truth unchanged; forged source rejected |
 | **T07** | P0 | **Candidate Validation + Shadow L4** reference as approved Package Components | T06 | Candidate validation, shadow counterexample, 0 production State/Effect writes, exact stable fallback, no floating alias |
 | **T08** | P0 | **Governed versioned Pattern/Workflow selection** using existing BUILD/DAC/H approval | T07,T03 | Validated candidate selected only through new sealed approved assembly; revocation/wrong digest/pre-change pin fail-safe; old instance unchanged |
 | **T09** | P1 | **Meta Feedback Workflow** over Runtime Evidence → Candidate → Shadow comparison | T07 | Ordinary Business/Meta Workflow, bounded evidence access, no own approval authority; no automatic production activation |
-| **T10** | P1 | **Multi-B scoped query / queryMany** | T01 | Duplicate `instanceKey` typed ambiguity, scoped lookup precise, fan-out independent target checks, partial failures recorded, no cross-B transaction claim |
+| **T10** | P1 | **Multi-B scoped query / queryMany** | T00 | Duplicate `instanceKey` typed ambiguity, scoped lookup precise, fan-out independent target checks, partial failures recorded, no cross-B transaction claim |
 | **T11** | P0 | **One selected external Consumer** 2B + Agent + Shadow + Memory real Node/SQLite | T05,T08 (+T09/T10 if admitted) | Clean packed v9, no deep import; real restart, CAS/UNKNOWN/effect negative, simultaneous two-B, receipt, Shadow 0 effects |
 | **R01** | Release | One fixed-SHA full/hidden/CJ/security/packaging + release qualification, tag decision | T11 + admitted P1 | Full source + independent release evidence; `PR_PASS != RELEASE_PASS` |
 
-**No progress percentage should be reported from this candidate DAG as if work had begun.** This is a planning count (11 task seeds + release), not 0/11 GitHub Issues. Once Product/L2 frozen, synthesize **only actual missing** executable Issues and their necessary dependency edges.
+**No progress percentage should be reported from this candidate DAG as if work had begun.** This is a planning count (**12 task seeds including T00 + release**), not 0/12 GitHub Issues. Once Product/L2 frozen, synthesize **only actual missing** executable Issues and their necessary dependency edges.
 
 ## 3. Task-to-historic proof reuse guidance
 
+- **T00** implement/verify selected BUILD/ABI multi-package closure and protected H→K composition without giving any extension a second State/Journal/Effect authority. Two real packed App cases: Basic-only and rich selected extensions; no monolithic bundle pretending to be modular. If 2 useful K extension mechanisms cannot stay safe/independent, raise a Product feasibility HOLD for that slice rather than relaxing the invariant.
 - **T01** consult [v0.8 frozen 44](./DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json), [R12 successor ledger](../validation/v0.8/tg1006-44-row-successor-outcome-ledger.md), [v0.8 Release qualification](../validation/v0.8/tg1006-release-qualification.md), [v0.9 qualification](../validation/v0.9/n09-release-qualification.md); source presence != current ABI acceptance.
 - **T02** re-use v0.3 `harness-machine.ts`, `decision-resolver/resolver.ts`, `semantic-cache/`, v0.6 `runtime/decision-resolver-binding.ts` at historic `7c367188…`; FR07/FR08/FR12/NF05.
 - **T03** re-use FR01/HF18/HF32, v0.5 `compiled-workflow-ir-v3.ts`, `compiled-workflow-runtime-v3.ts`, `compiled-workflow-message-effects-v3.ts`; only preserve semantics, not authority.
@@ -66,9 +69,9 @@ flowchart TD
 
 ## 4. Definition of Done for Product/L2 planning (before opening task Issues)
 
-1. User-approved Product priority and P0/P1 cut, with realistic v0.10 version budget; candidate's potential overruns routed as next-version P1 follow-ups.
+1. User-approved Product priority including composable K/S package families (one Primary per family + selected extension/feature packages) and P0/P1 cut, with realistic v0.10 version budget; candidate's potential overruns routed as next-version P1 follow-ups.
 2. Exact `main` SHA, v0.9 delivered public-v9 ABI, available selected S roles/capabilities, and gap mapping reviewed.
-3. L2 interface for Loop, SemanticDecision, Model and Tool observations, Memory, Context, evidence, Candidate and Shadow that respects closed-world BUILD and physical one-S binding.
+3. L2 interface for deterministic BUILD package graph/role resolution, K typed extension hooks and Standard dispatch, plus Loop, SemanticDecision, Model and Tool observations, Memory, Context, evidence, Candidate and Shadow that respects closed-world BUILD and physical one-S binding.
 4. Explicit source of authorization for newly promoted artifacts without mandatory GitHub owner/account identity or falsely automatic model self-approval.
 5. Decide whether P1 queryMany and full Meta Workflow join v0.10 release gate; this candidate says **no** unless later admitted.
 6. Proposed DAG then split into smallest sensible independent Issues; existing post-v0.9 external effect Tool Port #1138 separately assessed, not assumed required for these tasks.
@@ -80,4 +83,4 @@ flowchart TD
 - Current authorized Host/Kernel permission is required; LLM/Meta/Memory never mint new execution rights or overwrite in-flight pins.
 - No v0.1–v0.7 wire format compatibility, unrelated new operating system test matrix, general distributed transaction engine or automatic Meta promotion in the first version.
 
-**Provisional planned stage = Product/L1 candidate only.**
+**Provisional planned stage = Product/L1 candidate only.** #1141 is a Product intake issue, not an executable implementation Issue. This v0.10 proposal supersedes the single-physical-S default for *future v0.10 only*, while preserving exactly one K authority and one Standard entry.
