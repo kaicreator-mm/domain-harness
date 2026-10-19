@@ -34,4 +34,6 @@ export { HF20_MUTATION_OBSERVATION_CONTRACT_VERSION, HF20_MUTATION_OBSERVATION_K
 export { ChildInvocationCoordinator, DurableControlError, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf } from './durable-controls.js';
 // v0.10 optional C/Host Memory capability (no Kernel state authority).
 export { V10ScopedMemoryCapability, V10MemoryError, createV10ScopedMemory } from './v010-scoped-memory.js';
+// v0.10 T10 authorized Multi-B explicit scoped query (no Kernel write authority).
+export { V10AuthorizedMultiBQuery, V10MultiBQueryError, createV10AuthorizedMultiBQuery } from './v010-authorized-multib-query.js';
 //# sourceMappingURL=index.js.map

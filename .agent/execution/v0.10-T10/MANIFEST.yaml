@@ -1,0 +1,24 @@
+schema: ads/execution-pack-v1
+task: T10
+issue: 1176
+integration_branch: v0.10
+base_at_preparation: 89fd642bb078b2a894a969d61f6cb76d8bbba82f
+base_at_local_claim: 2dc56e9b3690e8aad6934a66b6748f8d41b7fe3e
+ads_pin: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: PHYSICAL_TWO_B_WITNESS_GREEN_FACADE_SEAM_DEFERRED
+builder_claim: "#1176@6265454526 (LOCAL_AGENT zcode:dh010-t10-local-builder, generation 2; web predecessor #1176@6264493792 relinquished)"
+priority: P0
+scope: explicit-scoped-query-over-two-B
+
+source_slice_committed:
+  - packages/domain-harness/src/host-v8/v010-authorized-multib-query.ts
+  - packages/domain-harness/src/host-v8/index.ts (additive exports)
+  - tests/hosts/node/v010-authorized-multib-query.test.ts
+  - packages/domain-harness/tests/v08-host/t10-multib-query-physical.test.ts
+  - packages/domain-harness/dist/host-v8/v010-authorized-multib-query.* + index.* (regenerated, matching)
+source_tests_run: PASS node v24.21.0 (isolated 8/8 EXIT=0; physical 7/7 EXIT=0)
+node24_sqlite_2b_integration: PASS over REAL K02-spliced kernel blob c164f491efc0047b7654088f8c359cb3fd58ceaf + openSqliteCasStore (one file, two B namespaces, one deployment)
+compiled_dist: REGENERATED_AND_COMMITTED
+local_gate: "tools/task-check.sh PASS (lint+typecheck+test, all workspaces + root, exit 0; first run had 2 contention transients HF21-R/#305 green standalone+rerun, 1 fresh-worktree expo dist precondition fixed by build; final run all green)"
+pr: THIS_PR (task/v0.10-t10-multib-query -> v0.10)
+final_acceptance: SELECTED_APP_FACADE_SEAM_DEFERRED — activation.ts is C01 #1177's accepted single-writer zone and outside T10's allowed write set; the Host-owned query mechanism, its exports and the physical two-B witness are complete. T11 composes the facade seam once C01 lands.

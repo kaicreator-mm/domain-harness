@@ -1,0 +1,8 @@
+schema: dh010/t10-failure
+unauthorized: deny-before-read-no-disclosure
+unknown-target: typed-not-found-without-hidden-B-oracle
+ambiguous-visible-targets: typed-ambiguous-visible-only
+stale-build-or-B-identity: typed-conflict-no-silent-alias
+wrong-caller: typed-deny-no-search
+shared-facade-writer-T02-active: remain-prepared-stop
+physical-evidence-unavailable: NOT_RUN-no-fake-pass
