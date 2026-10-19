@@ -50,6 +50,7 @@ import { Buffer } from 'node:buffer';
 import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createV10AuthorizedMultiBQuery, } from '@kaicreator/domain-harness/v8/host';
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
 export class V10ActivationError extends Error {
@@ -366,6 +367,8 @@ export class V10AppFacade {
     #runtimes = new Map();
     #deploymentIdentity;
     #scopedDocs = new Map();
+    #queryAuthority;
+    #query;
     #closed = false;
     constructor(deps) {
         this.#app = deps.app;
@@ -373,6 +376,7 @@ export class V10AppFacade {
         this.#now = deps.now;
         this.#counters = deps.counters;
         this.#deploymentIdentity = deps.deploymentIdentity;
+        this.#queryAuthority = deps.queryAuthority;
         this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
         this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
     }
@@ -417,6 +421,64 @@ export class V10AppFacade {
     kCounters(businessPackageId) {
         const runtime = this.#runtimeFor(businessPackageId);
         return { ...runtime.counters };
+    }
+    /**
+     * [v0.10 T10 #1176] Authorized, explicit scoped snapshot query over the
+     * selected kernel. The public caller supplies ONLY workflowId, instanceKey
+     * and optionally the Business packageId — never a principal, grant,
+     * deployment or reader. Authorization is Host wiring fixed at activation,
+     * runs on every selected candidate BEFORE any snapshot read and is
+     * rechecked immediately before the single read. Unscoped ambiguity is
+     * decided among VISIBLE selected Business packages only (never storage
+     * existence or a denied package), denied/unselected/absent targets collapse
+     * into one non-oracle refusal, and no query path writes K state or
+     * dispatches an effect.
+     */
+    async queryScopedSnapshot(selector) {
+        this.#assertOpen();
+        const authority = this.#queryAuthority;
+        if (authority === undefined) {
+            refuse('QUERY_AUTHORIZATION_REQUIRED', 'this activation carries no Host-owned query authority; authorized scoped queries are disabled (no allow-all default exists)');
+        }
+        const deployment = this.#deploymentIdentity;
+        if (deployment === undefined) {
+            refuse('QUERY_DEPLOYMENT_REQUIRED', 'an authorized scoped query requires the K02 deployment identity; no unscoped cross-B fallback exists');
+        }
+        return await this.#querySelector(deployment, authority).query(selector);
+    }
+    /**
+     * The ONE Host composition of the reviewed Multi-B selector: BUILD-selected
+     * Business routes (their sealed workflow keys, never caller data), the
+     * Host-verified principal/authorization, and the per-B K02 scoped kernel
+     * snapshot reader. Constructed once per activation, lazily.
+     */
+    #querySelector(deployment, authority) {
+        const existing = this.#query;
+        if (existing !== undefined)
+            return existing;
+        const selectedRoutes = [];
+        for (const module of this.#app.modules) {
+            if (module.role !== 'business')
+                continue;
+            selectedRoutes.push(Object.freeze({
+                businessPackageId: module.packageId,
+                workflowId: this.#policyWorkflowId(module.packageId),
+            }));
+        }
+        const query = createV10AuthorizedMultiBQuery({
+            verifiedPrincipal: authority.principal,
+            deployment: Object.freeze({ ...deployment }),
+            selectedRoutes: Object.freeze(selectedRoutes),
+            authorize: authority.authorize,
+            readSnapshot: async (target) => {
+                // The exact B's own K02 scoped view via its real selected runtime;
+                // this is the ONLY physical read any query path performs.
+                const runtime = this.#runtimeFor(target.businessPackageId);
+                return await runtime.getSnapshot({ workflowId: target.workflowId, instanceKey: target.instanceKey });
+            },
+        });
+        this.#query = query;
+        return query;
     }
     #assertOpen() {
         if (this.#closed) {
@@ -775,6 +837,22 @@ export async function activateV10App(app, options) {
             }
             deploymentIdentity = identity;
         }
+        // [v0.10 T10 #1176] Host-owned query authority: validated once here so a
+        // malformed deployment wiring fails activation instead of silently
+        // degrading query authorization. Never sourced from public query input.
+        let queryAuthority;
+        if (options.queryAuthority !== undefined) {
+            const raw = options.queryAuthority;
+            if (!isPlainRecord(raw) || raw.principal === null || raw.principal === undefined
+                || typeof raw.authorize !== 'function') {
+                refuse('V10_APP_INVALID', 'queryAuthority must be Host-owned wiring carrying a verified principal and an authorize(principal, target) function');
+            }
+            const authorize = raw.authorize;
+            queryAuthority = Object.freeze({
+                principal: raw.principal,
+                authorize: (principal, target) => authorize.call(raw, principal, target),
+            });
+        }
         const facade = new V10AppFacade({
             app: appView,
             namespaces,
@@ -784,6 +862,7 @@ export async function activateV10App(app, options) {
             now: options.now ?? (() => 0),
             counters,
             ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
+            ...(queryAuthority === undefined ? {} : { queryAuthority }),
         });
         const failActivation = (code, failedPackageId, message) => {
             for (let index = initialized.length - 1; index >= 0; index -= 1) {

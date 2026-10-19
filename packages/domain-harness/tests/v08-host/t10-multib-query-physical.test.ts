@@ -50,10 +50,13 @@ import {
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8');
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
-// Same read-only pin as the K02 physical suite: the K02-spliced integrated
-// kernel blob recorded at the phase-2 splice. T10 composes over it and never
-// edits kernel bytes.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = 'c164f491efc0047b7654088f8c359cb3fd58ceaf';
+// Same read-only pin as the K02 physical suite. Rebound after C01 (#1177)
+// legitimately advanced the selected kernel payload with the external-effect
+// binding/permit configuration: the pre-C01 blob was c164f491; the current
+// C01-integrated blob is 1a6a1394 and the K02 physical suite already pins
+// exactly that post-C01 byte identity. T10 composes over it and never edits
+// kernel bytes; the blob assertion below is the byte proof of this rebind.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = '1a6a1394a505f4727306208d588fcab841e72980';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the selected kernel payload is byte-identical to the K02-spliced integration blob');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
