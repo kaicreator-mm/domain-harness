@@ -20,9 +20,14 @@
  *       dispatch: publish ctrl:<enteredKey>, wait for ctrl:<goKey>. --fail
  *       before throws in the handler BEFORE the resources port (provable
  *       zero-effect); --fail lost-ack appends the real ledger line then
- *       throws (uncertain post-dispatch outcome). --kill-at-commit exits(70)
- *       at the instance-document commit CAS seam (after journal completion,
- *       before the state write lands).
+ *       throws (uncertain post-dispatch outcome). --fail lost-ack-tagged and
+ *       --fail lost-ack-tagged-predispatch append the real ledger line and
+ *       then throw an error carrying a TYPED code — respectively
+ *       HOST_RESOURCE_MALFORMED (a dispatcher-owned name) and
+ *       HOST_RESOURCE_PRE_DISPATCH (the historical adapter-declared class) —
+ *       the R2 P1 falsifier: a thrown code string must never be zero-effect
+ *       proof. --kill-at-commit exits(70) at the instance-document commit CAS
+ *       seam (after journal completion, before the state write lands).
  *
  * Prints exactly one JSON result line as the last stdout line.
  */
@@ -165,10 +170,21 @@ async function main() {
           // The physical non-idempotent ledger: one appended line = one real
           // external call. --fail lost-ack appends FIRST and then throws: the
           // mutation landed, the ACK is lost (uncertain outcome by design).
+          // --fail lost-ack-tagged / -tagged-predispatch do the same but the
+          // thrown error carries a typed code — the honest-code-collision
+          // counterexample (R2 P1): the code rides AFTER the physical
+          // mutation, so no reader may treat it as zero-effect proof.
           const failMode = arg('fail');
           await appendFile(ledgerPath, `${JSON.stringify({ worker: workerName, effectId: payload.effectId, at: NOW })}\n`, 'utf8');
           if (failMode === 'lost-ack') {
             throw new Error(`lost ACK after the external dispatch (${String(payload.effectId)})`);
+          }
+          if (failMode === 'lost-ack-tagged' || failMode === 'lost-ack-tagged-predispatch') {
+            const code = failMode === 'lost-ack-tagged' ? 'HOST_RESOURCE_MALFORMED' : 'HOST_RESOURCE_PRE_DISPATCH';
+            throw Object.assign(
+              new Error(`lost ACK (tagged refusal ${code}) after the external dispatch (${String(payload.effectId)})`),
+              { code },
+            );
           }
           return { reserved: true };
         },

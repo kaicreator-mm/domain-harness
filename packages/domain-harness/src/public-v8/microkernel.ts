@@ -42,7 +42,7 @@ import { QualifiedPackageError, sha256Hex, type QualifiedCleanupFailure, type Qu
 import type { JsonSchema } from '../contracts/json.js';
 import { DomainDataIntegrityError, validateCompiledDomainDataSection } from '../package/domain-data-integrity.js';
 import { BusinessSourceIntegrityError, validateCompiledBusinessSourceSection } from '../package/business-source-integrity.js';
-import { currentKernelHostPorts, type V8KernelHostPorts } from './kernel-host.js';
+import { currentKernelHostPorts, type V8KernelDispatchAttestation, type V8KernelHostPorts } from './kernel-host.js';
 import { currentHostModelPort, type V8CancellationSignal } from './model-port.js';
 import { load } from './load.js';
 import type { QualifiedIntentBinding, QualifiedRoleBinding, SealedQualifiedPackageRoot } from './contracts.js';
@@ -1573,13 +1573,16 @@ async function loadScopedFacade(packageRoot: unknown): Promise<V8DomainFacade> {
     const runtimeHostPorts: V8KernelMechanismHostPorts = Object.freeze({
       docs: hostPorts.docs,
       sha256: hostPorts.sha256,
+      // [#1108 K01 R2 P1]: the kernel-minted per-call attestation rides the
+      // dedicated trailing argument through BOTH branches verbatim — the
+      // trusted dispatcher stays the only writer of `preHandlerRefusal`.
       resources: Object.freeze({
         call: claimedResourceKeys.size === 0
           ? hostPorts.resources.call
-          : (resourceKey: string, operation: string, payload: unknown) =>
+          : (resourceKey: string, operation: string, payload: unknown, attest?: V8KernelDispatchAttestation) =>
             claimedResourceKeys.has(resourceKey)
-              ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload)
-              : hostPorts.resources.call(resourceKey, operation, payload),
+              ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload, attest)
+              : hostPorts.resources.call(resourceKey, operation, payload, attest),
       }),
       clock: hostPorts.clock,
     });

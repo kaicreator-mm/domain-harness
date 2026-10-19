@@ -105,3 +105,76 @@ frozen surfaces):
   pre-port release liveness; new N3 is the reviewer-required lost-ACK
   falsifier (real ledger line then throw → fence held, zero second dispatch,
   honest typed refusals, no false ACK).
+
+## R2 addendum (review #6258041474 P1 — post-invocation error codes prove nothing; dispatcher per-call pre-handler attestation only)
+Review finding: under R1, `probeProvesZeroExternalEffect` trusted the THROWN
+error's `code` string (the `PRE_DISPATCH_RESOURCE_REFUSALS` set). A resource
+adapter / Business handler can land the physical mutation and only THEN throw
+an error carrying any of those code names — an honest code collision with no
+hostile code required (tagged lost-ACK: append the ledger line, then throw
+`code: 'HOST_RESOURCE_MALFORMED'`). The journal `failed` row would carry
+`zeroExternalEffect:true`, the fence would release, and a rival turn could
+re-dispatch the already-landed non-idempotent mutation at the unchanged
+stateRevision. Pure "invoked===false only" was REJECTED: it would permanently
+break the tg5 follower-drain journey (dispatcher refusals would also keep the
+fence, with no recovery seam on the selected runtime for that journey).
+
+Adopted contract (B) — the attest has FOUR load-bearing properties:
+1. KERNEL-MINTED: `effectTools.execute` mints one fresh
+   `{ preHandlerRefusal: null }` per resources-port call and pushes it into
+   `probe.dispatchAttests` BEFORE the call (a synchronous throw still leaves
+   an unmarked attest in the probe — fail-closed).
+2. PER-CALL, DEDICATED ARGUMENT: threaded as the trailing argument of
+   `resources.call(key, op, payload, attest)` / `callScoped(scope, key, op,
+   payload, attest)` — never the payload, never the DispatchContext.
+3. TRUSTED-DISPATCHER-WRITTEN ONLY: `ResourceDispatcher`
+   call/callScoped/#dispatch mark `attest.preHandlerRefusal = '<code>'`
+   synchronously BEFORE throwing ONLY its own pre-handler refusals
+   (HOST_RESOURCE_MALFORMED, HOST_RESOURCE_NAMESPACE_RESERVED,
+   HOST_RESOURCE_UNKNOWN). HOST_FAULT_INJECTED is NEVER marked (uncertain).
+   Once the handler runs, nothing is marked and nothing is provable; the
+   handler signature stays `(operation, payload, context)`.
+4. NEVER FORWARDED TO THE ADAPTER: the attest is invisible to the resource
+   handler and any Business code — it cannot be marked, stripped or faked
+   downstream. Wiring: bootstrap kernelPorts.resources forwards it;
+   microkernel's runtime-narrowed view forwards it through BOTH branches
+   (claimed → callScoped as 5th arg, bare → call as 4th arg); the
+   adapter-less branch passes the raw port reference verbatim. A host that
+   ignores the attest simply never marks it → fail-closed.
+
+Code strings are PERMANENTLY disqualified as zero-effect evidence — including
+HOST_RESOURCE_PRE_DISPATCH and every dispatcher-owned name.
+
+Fail-closed proof matrix (`probeProvesZeroExternalEffect(probe)`, error no
+longer an input):
+- `supported !== true` (foreign executor) → NOT provable;
+- `invoked !== true` (port never called) → provable zero effect;
+- `invoked === true`  → provable ONLY when `dispatchAttests.length > 0` and
+  EVERY attest has `typeof preHandlerRefusal === 'string'` (all calls
+  attested pre-handler refusals);
+- everything else (any unattested call, handler fault, fault injection, lost
+  ACK, post-mutation tagged throw) → NOT provable; fence stays held.
+
+Test surface changes:
+- k01-fence-worker.mjs: `--fail lost-ack-tagged` (throws
+  `code:'HOST_RESOURCE_MALFORMED'`) and `--fail lost-ack-tagged-predispatch`
+  (throws `code:'HOST_RESOURCE_PRE_DISPATCH'`), both AFTER the real ledger
+  append; K01-N4 parameterized falsifier: fence held, rival refused typed at
+  the same revision, ledger exactly 1 line, journal failed row carries NO
+  zeroExternalEffect.
+- tg5-hf16: journey semantics change — the adapter-thrown
+  HOST_RESOURCE_PRE_DISPATCH poison (q-poison, q-uncertain) now keeps the
+  fence HELD (fail-closed, materialized by the new q-uncertain leg: a
+  follower occurrence is refused ADMISSION_STATE_CAS_CONFLICT); the
+  follower-drain journey rides a TRUSTED DISPATCHER refusal seam instead
+  (unprovision 'ledger' → pre-handler HOST_RESOURCE_UNKNOWN → attested →
+  fence released → follower drains); physical dispatch accounting moved to
+  the dispatcher-side callCount (sees refused pre-handler dispatches an
+  adapter-side counter cannot); HF16-N durable-failed-row / same-messageId
+  typed retry / fresh-process reopen legs unchanged in meaning.
+- hf16-authorized-recovery: unaffected (its poison was already a plain
+  uncertain throw; drains via the operator-authorized recovery supersede).
+
+This file is the T00/K02 contract: the attest parameter is the ONLY sanctioned
+zero-external-effect proof channel between the kernel and the trusted host
+dispatcher; do not reintroduce code-string classification.

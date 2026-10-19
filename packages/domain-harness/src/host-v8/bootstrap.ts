@@ -32,7 +32,7 @@ import { installHostModelPort, preflightHostModelPort } from '../public-v8/model
 import { installGatewaySessionCap, preflightGatewaySessionCap } from '../public-v8/microkernel.js';
 import { sha256Hex } from '../public-v8/contracts.js';
 import { probeTrueCasStore, InMemoryCasStore, type CasDocumentStore, type CasPutConditions } from './cas.js';
-import { ResourceDispatcher } from './dispatcher.js';
+import { ResourceDispatcher, type DispatchAttestation } from './dispatcher.js';
 import { ScopedEventHub } from './events.js';
 import { HostIdentityVerifier, revocationKey, type HostCredential, type HostPrincipal } from './identity.js';
 import { HostBoundaryError } from './errors.js';
@@ -235,10 +235,14 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
       // loader hands the Kernel mechanism forwards NEITHER this privileged
       // member nor any scope: a Business package or caller can never present
       // a scope, only its own closure's claimed logical keys.
-      call: (resourceKey: string, operation: string, payload: unknown) =>
-        resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
-      callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown) =>
-        resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
+      // [#1108 K01 R2 P1]: the kernel-minted per-call attestation rides a
+      // DEDICATED trailing argument straight into the dispatcher — the only
+      // writer of `preHandlerRefusal` is the trusted dispatcher itself,
+      // before its own pre-handler refusals throw.
+      call: (resourceKey: string, operation: string, payload: unknown, attest?: DispatchAttestation) =>
+        resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
+      callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown, attest?: DispatchAttestation) =>
+        resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
     }),
     clock: () => now().toISOString(),
   };

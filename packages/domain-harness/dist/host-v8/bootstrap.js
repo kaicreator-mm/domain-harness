@@ -146,8 +146,12 @@ export async function bootstrapTrustedHost(input) {
             // loader hands the Kernel mechanism forwards NEITHER this privileged
             // member nor any scope: a Business package or caller can never present
             // a scope, only its own closure's claimed logical keys.
-            call: (resourceKey, operation, payload) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
-            callScoped: (scopeId, resourceKey, operation, payload) => resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
+            // [#1108 K01 R2 P1]: the kernel-minted per-call attestation rides a
+            // DEDICATED trailing argument straight into the dispatcher — the only
+            // writer of `preHandlerRefusal` is the trusted dispatcher itself,
+            // before its own pre-handler refusals throw.
+            call: (resourceKey, operation, payload, attest) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
+            callScoped: (scopeId, resourceKey, operation, payload, attest) => resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
         }),
         clock: () => now().toISOString(),
     };

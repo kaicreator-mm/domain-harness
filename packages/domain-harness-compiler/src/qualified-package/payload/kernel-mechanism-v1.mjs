@@ -1134,9 +1134,9 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       );
       // [#1108 K01 R1] This REPLAY attempt itself executed nothing; whether
       // the fence may be released follows the ORIGINAL failure's persisted
-      // classification (the adapter-declared or dispatcher-proved
-      // zero-external-effect marker rides the durable failure record). An
-      // unclassified (possibly landed) original keeps the fence held.
+      // classification (the dispatcher-attested zero-external-effect marker
+      // rides the durable failure record). An unclassified (possibly landed)
+      // original keeps the fence held.
       if (isJsonRecord(durable.error) && durable.error.zeroExternalEffect === true) {
         replayRefusal.zeroExternalEffect = true;
       }
@@ -1150,9 +1150,12 @@ async function executeEffectIntents(intents, request, ports, turnId) {
     }
 
     let output;
-    // [#1108 K01 R1 P1] The dispatch probe: the runtime's own executor marks
-    // whether the Business handler ever invoked the physical resource port.
-    const externalDispatchProbe = { supported: false, invoked: false };
+    // [#1108 K01 R1 P1 / R2 P1] The dispatch probe: the runtime's own executor
+    // marks whether the Business handler ever invoked the physical resource
+    // port, and collects one kernel-minted per-call attestation object per
+    // port call (the ONLY channel a trusted host dispatcher can mark its own
+    // pre-handler refusals through — see probeProvesZeroExternalEffect).
+    const externalDispatchProbe = { supported: false, invoked: false, dispatchAttests: [] };
     try {
       output = await ports.effectTools.execute({
         effectId,
@@ -1171,7 +1174,7 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       // [#1108 K01 R1 P1] Classify BEFORE the failure record is made durable:
       // the proof (or its absence) persists IN the journal record so a later
       // same-turn replay refusal can restore the same fence policy.
-      const zeroEffect = probeProvesZeroExternalEffect(externalDispatchProbe, error);
+      const zeroEffect = probeProvesZeroExternalEffect(externalDispatchProbe);
       const failure = { message, ...(zeroEffect ? { zeroExternalEffect: true } : {}) };
       try {
         await ports.effectJournal.completeEffect(
@@ -1342,19 +1345,19 @@ export async function admitCentralDecision(request, ports) {
       turnId,
     );
   } catch (error) {
-    // [#1108 K01 R1 P1] Fence liveness on the failure path: release ONLY on a
-    // PROVEN zero-external-effect fault. The thrown error carries
+    // [#1108 K01 R1 P1 / R2 P1] Fence liveness on the failure path: release
+    // ONLY on a PROVEN zero-external-effect fault. The thrown error carries
     // `zeroExternalEffect` solely when the dispatch probe proved the Business
-    // handler never invoked the physical resources port, or the trusted
-    // dispatcher refused before any resource handler ran — AND every begun
-    // effect of the turn is durably `failed` (an earlier `completed`/
-    // `started` record keeps the fence held). A lost-ACK / uncertain outcome
-    // carries NO proof — the external non-idempotent mutation may already
-    // have landed, so the fence stays held: fail-closed UNKNOWN until
-    // reconciliation (same-turn replay through the journal, or a trusted-seam
-    // recovery turn over a durably all-failed holder). An unreadable journal,
-    // an unwired release port, or a failed removal also keeps it held. The
-    // original typed effect error is never masked.
+    // handler never invoked the physical resources port, or EVERY port call
+    // it made was attested by the trusted dispatcher as its own pre-handler
+    // refusal — AND every begun effect of the turn is durably `failed` (an
+    // earlier `completed`/`started` record keeps the fence held). A lost-ACK
+    // / uncertain outcome carries NO proof — the external non-idempotent
+    // mutation may already have landed, so the fence stays held: fail-closed
+    // UNKNOWN until reconciliation (same-turn replay through the journal, or
+    // a trusted-seam recovery turn over a durably all-failed holder). An
+    // unreadable journal, an unwired release port, or a failed removal also
+    // keeps it held. The original typed effect error is never masked.
     if (isJsonRecord(heldAdmissionFence)
       && typeof ports.admissionFenceRelease === 'function'
       && error !== null && typeof error === 'object' && error.zeroExternalEffect === true) {
@@ -2631,44 +2634,55 @@ function isHostWriteConflict(error) {
     && (error.code === 'HOST_CAS_CONFLICT' || error.code === 'HOST_KEY_EXISTS');
 }
 
-// [#1108 K01 R1 P1] Host resource-port refusals that PROVABLY caused zero
-// external mutation, so a failed effect may safely release its fence:
-//   - the trusted dispatcher's own refusals, thrown BEFORE any provisioned
-//     resource handler is invoked (malformed arguments, unprovisioned key,
-//     reserved scoped-physical namespace) — constructive pre-dispatch;
-//   - HOST_RESOURCE_PRE_DISPATCH: the sealed resource ADAPTER's explicit
-//     declaration that its handler failed WITHOUT performing the external
-//     mutation (e.g. an outage that never reached the ledger). The adapter
-//     is the only party that knows; the declaration rides the same trusted
-//     resource-layer contract as effectSemantics.
-// Everything else that escapes a resources port call (a generic handler
-// fault, a transport timeout, a lost ACK after the mutation landed) is
-// UNCERTAIN and keeps the admission fence held.
-const PRE_DISPATCH_RESOURCE_REFUSALS = new Set([
-  'HOST_RESOURCE_MALFORMED',
-  'HOST_RESOURCE_UNKNOWN',
-  'HOST_RESOURCE_NAMESPACE_RESERVED',
-  'HOST_RESOURCE_PRE_DISPATCH',
-]);
+// [#1108 K01 R1 P1 / R2 P1] Zero-external-effect proof for a FAILED effect
+// dispatch. The ONLY trustworthy proof channels are the ones a resource
+// adapter can neither forge nor propagate:
+//   - the Business handler NEVER invoked the physical resources port
+//     (probe.invoked stays false) — nothing could have been dispatched;
+//   - EVERY resources-port call the handler made carries a kernel-minted
+//     per-call ATTESTATION marked by the trusted host dispatcher for one of
+//     its OWN pre-handler refusals (malformed arguments, reserved
+//     scoped-physical namespace, unprovisioned key) — refusals thrown
+//     BEFORE any resource adapter handler was ever invoked.
+// Any error OBJECT or `code` STRING thrown out of a port call proves
+// NOTHING: a resource adapter / Business handler can perform the physical
+// mutation and only then throw an error carrying any code name — including
+// HOST_RESOURCE_PRE_DISPATCH and every code the dispatcher itself owns — as
+// an honest collision with no malicious code required (the R2 reviewer's
+// tagged lost-ACK counterexample: append the ledger line, then throw
+// `code: 'HOST_RESOURCE_MALFORMED'`). Code strings are therefore PERMANENTLY
+// disqualified as zero-effect evidence. The attestation object is minted by
+// this kernel, threaded per call, marked only by the trusted host
+// dispatcher synchronously before its refusal throws, and NEVER forwarded
+// to the adapter or its handler — an adapter cannot mark, strip or fake it.
+// Everything else (any unattested call, any handler fault, a transport
+// timeout, a lost ACK after the mutation landed, the uncertain
+// HOST_FAULT_INJECTED injection) is UNCERTAIN and keeps the admission fence
+// held: fail-closed.
 
 /**
- * [#1108 K01 R1 P1] Zero-external-effect PROOF for an execute() that threw.
- * The probe is created by executeEffectIntents and honored by this runtime's
- * own effectTools executor (probe.supported); a foreign executor that ignores
- * it leaves `supported` false and NOTHING is provable — fail-closed.
+ * [#1108 K01 R1 P1 / R2 P1] Zero-external-effect PROOF for an execute() that
+ * threw. The probe is created by executeEffectIntents and honored by this
+ * runtime's own effectTools executor (probe.supported); a foreign executor
+ * that ignores it leaves `supported` false and NOTHING is provable —
+ * fail-closed. The thrown error is deliberately NOT an input: error codes
+ * prove nothing (see the block above).
  *   !invoked            → the Business handler never called the physical
  *                         dispatch port → provably zero external effect
- *   invoked + typed PRE_DISPATCH_RESOURCE_REFUSAL → the dispatcher refused
- *                         before any resource handler ran → provably zero
- *   anything else       → possibly landed (lost ACK / handler fault) → NOT
- *                         provable; the admission fence must stay held
+ *   invoked + EVERY call attested pre-handler-refused by the trusted
+ *                         dispatcher → provably zero
+ *   anything else       → possibly landed (unattested call, handler fault,
+ *                         lost ACK) → NOT provable; the admission fence must
+ *                         stay held
  */
-function probeProvesZeroExternalEffect(probe, error) {
+function probeProvesZeroExternalEffect(probe) {
   if (probe === undefined || probe === null || typeof probe !== 'object') return false;
   if (probe.supported !== true) return false;
   if (probe.invoked !== true) return true;
-  const code = typeof error === 'object' && error !== null ? error.code : undefined;
-  return typeof code === 'string' && PRE_DISPATCH_RESOURCE_REFUSALS.has(code);
+  const attests = probe.dispatchAttests;
+  return Array.isArray(attests) && attests.length > 0
+    && attests.every((attest) => attest !== null && typeof attest === 'object'
+      && typeof attest.preHandlerRefusal === 'string');
 }
 
 export class WorkflowInstanceNotFoundError extends Error {
@@ -5028,15 +5042,18 @@ export function createOccurrenceRuntime(options) {
     async execute(request) {
       counters.effectDispatches += 1;
       const binding = businessEndpoint.effectBindings[request.binding.effectType];
-      // [#1108 K01 R1 P1] The Business handler's ONLY external-mutation
+      // [#1108 K01 R1 P1 / R2 P1] The Business handler's ONLY external-mutation
       // authority is the physical resources port (v0.8 Host contract). The
-      // dispatch probe records whether the handler ever invoked it, so an
-      // execute() that threw can be classified: never-invoked (or a typed
-      // dispatcher-level pre-dispatch refusal) is PROVABLY zero external
-      // effect; anything else may have landed and keeps the admission fence
-      // held. The probe object itself is created by this kernel's
-      // executeEffectIntents — marking `supported` here is what makes the
-      // proof kernel-owned rather than caller-asserted.
+      // dispatch probe records whether the handler ever invoked it, and every
+      // invocation carries a fresh kernel-minted ATTESTATION object (an extra
+      // dedicated argument, never part of the payload or the handler
+      // context): the trusted host dispatcher marks it synchronously BEFORE
+      // throwing one of its OWN pre-handler refusals. A thrown error's code
+      // string proves nothing (a post-mutation throw can carry any code), so
+      // the attestation channel is the ONLY dispatcher-side proof. The probe
+      // object itself is created by this kernel's executeEffectIntents —
+      // marking `supported` here is what makes the proof kernel-owned rather
+      // than caller-asserted.
       const probe = request.externalDispatchProbe;
       const rawResources = hostPorts.resources;
       // A missing/non-object resources port passes through VERBATIM: the
@@ -5047,14 +5064,21 @@ export function createOccurrenceRuntime(options) {
         ? rawResources
         : {
             call: (resourceKey, operation, payload) => {
+              // Mint and register the attest BEFORE the call: a synchronous
+              // throw below still leaves the (unmarked) attestation in the
+              // probe, which fails the all-attested proof — fail-closed.
+              const attest = { preHandlerRefusal: null };
+              probe.dispatchAttests.push(attest);
               probe.invoked = true;
-              return rawResources.call(resourceKey, operation, payload);
+              return rawResources.call(resourceKey, operation, payload, attest);
             },
             ...(typeof rawResources.callScoped === 'function'
               ? {
                   callScoped: (scopeId, resourceKey, operation, payload) => {
+                    const attest = { preHandlerRefusal: null };
+                    probe.dispatchAttests.push(attest);
                     probe.invoked = true;
-                    return rawResources.callScoped(scopeId, resourceKey, operation, payload);
+                    return rawResources.callScoped(scopeId, resourceKey, operation, payload, attest);
                   },
                 }
               : {}),

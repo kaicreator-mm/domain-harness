@@ -32,6 +32,15 @@
  *           record is NOT zero-effect proof; the fence stays held, no
  *           competing turn obtains a second dispatch, the same-turn replay
  *           refuses re-execution typed, and no false terminal ACK exists.
+ *   K01-N4  tagged lost ACK (R2 P1 falsifier): the adapter appends one real
+ *           external effect record and THEN throws an error carrying a typed
+ *           code — HOST_RESOURCE_MALFORMED (a dispatcher-owned name) or
+ *           HOST_RESOURCE_PRE_DISPATCH (the historical adapter-declared
+ *           class). An error CODE thrown after the physical mutation proves
+ *           nothing (honest code collision, no hostile code required): the
+ *           journal `failed` record carries NO zeroExternalEffect marker and
+ *           the fence stays held — only the trusted dispatcher's own
+ *           per-call pre-handler attestation can prove zero effect.
  *   K01-S1  sequential cross-process reuse: an OLDER held fence (its holder
  *           committed) is superseded by the normal revision CAS — the normal
  *           multi-process path stays live.
@@ -133,7 +142,7 @@ interface Fixture {
   waitForCtrl(key: string): Promise<void>;
   putCtrl(key: string): Promise<void>;
   instanceDoc(instanceKey: string): Promise<any>;
-  journalRecords(instanceKey: string): Promise<{ status: string; effectId: string }[]>;
+  journalRecords(instanceKey: string): Promise<{ status: string; effectId: string; zeroExternalEffect: boolean }[]>;
   fenceDoc(instanceKey: string): Promise<{ value: any; revision: number } | null>;
 }
 
@@ -158,12 +167,16 @@ async function fixture(name: string): Promise<Fixture> {
     instanceDoc: async (instanceKey: string) => (await store.get(`v08-kernel:wf-instance:${WORKFLOW_ID}:${instanceKey}`))?.value ?? null,
     journalRecords: async (instanceKey: string) => {
       const keys = await store.list('v08-kernel:effect-journal:');
-      const records: { status: string; effectId: string }[] = [];
+      const records: { status: string; effectId: string; zeroExternalEffect: boolean }[] = [];
       for (const key of keys.filter((candidate) => candidate.includes(encodeURIComponent(instanceKey)))) {
         const doc = await store.get(key);
-        const record = (doc as { value?: { record?: { status?: unknown; effectId?: unknown } } } | null)?.value?.record;
+        const record = (doc as { value?: { record?: { status?: unknown; effectId?: unknown; error?: { zeroExternalEffect?: unknown } } } } | null)?.value?.record;
         if (record !== undefined) {
-          records.push({ status: String(record.status), effectId: String(record.effectId) });
+          records.push({
+            status: String(record.status),
+            effectId: String(record.effectId),
+            zeroExternalEffect: record.error?.zeroExternalEffect === true,
+          });
         }
       }
       return records;
@@ -357,6 +370,45 @@ test('K01-N3 lost ACK after a real external dispatch: the fence stays held — n
   assert.equal(doc.lifecycle, 'active');
   assert.notEqual(await fx.fenceDoc(instance), null, 'the fence remains held until durable reconciliation');
 });
+
+// R2 P1 (review #6258041474): a resource adapter / Business handler can land
+// the physical mutation and only THEN throw an error carrying any typed code
+// — including dispatcher-owned names — as an honest code collision. Only the
+// trusted dispatcher's own per-call pre-handler attestation (kernel-minted,
+// never forwarded to the adapter) proves zero external effect; a code string
+// thrown by the losing side proves nothing, so the fence must stay held.
+for (const failMode of ['lost-ack-tagged', 'lost-ack-tagged-predispatch'] as const) {
+  test(`K01-N4 tagged lost ACK (${failMode}): a thrown error CODE proves nothing — fence held, zero second dispatch, no zero-effect marker (R2 P1 falsifier)`, async () => {
+    const fx = await namedFixture(`n4-${failMode}`);
+    const instance = 't:a:n4';
+    await openInstance(fx, instance);
+
+    // The adapter performs the real external mutation (one ledger line) and
+    // then throws a TYPED error. A typed code on a post-mutation throw is NOT
+    // a dispatcher attestation — the journal `failed` record must carry NO
+    // zeroExternalEffect proof and the fence must NOT be released.
+    const a = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-a', '--worker', 'a', '--fail', failMode]));
+    assert.equal(a.result?.status, 'error');
+    assert.equal(a.result?.error_code, 'ADMISSION_EFFECT_FAILED', `A outcome: ${a.stdout}\n${a.stderr}`);
+    assert.equal((await fx.ledgerLines()).length, 1, 'the real external dispatch landed exactly once');
+    const journal = await fx.journalRecords(instance);
+    assert.equal(journal.length, 1);
+    assert.equal(journal[0]?.status, 'failed');
+    assert.equal(journal[0]?.zeroExternalEffect, false, 'the durable failed record carries NO zero-external-effect proof');
+    // Fail-closed: the tagged holder keeps the fence — a competing turn must
+    // NOT obtain a second dispatch at the same stateRevision.
+    assert.notEqual(await fx.fenceDoc(instance), null, 'the fence stays held (a thrown code is not a trusted pre-handler attestation)');
+    const b = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-b', '--worker', 'b']));
+    assert.equal(b.result?.status, 'error');
+    assert.equal(b.result?.error_code, 'ADMISSION_STATE_CAS_CONFLICT', `B outcome: ${b.stdout}\n${b.stderr}`);
+    assert.equal((await fx.ledgerLines()).length, 1, 'zero second dispatch by the competing turn');
+    const doc = await fx.instanceDoc(instance);
+    assert.equal(doc.stateRevision, 0);
+    assert.equal(doc.state.stateKey, 'review');
+    assert.equal(doc.lifecycle, 'active');
+    assert.notEqual(await fx.fenceDoc(instance), null, 'the fence remains held until durable reconciliation');
+  });
+}
 
 test('K01-S1 sequential cross-process admissions supersede an OLDER held fence normally', async () => {
   const fx = await namedFixture('s1');
