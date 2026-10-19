@@ -1,0 +1,24 @@
+task: R01
+version: v0.10
+candidate_sha: df3dc4bbd9fca1bf3064ab81b4af0bcf495033ed
+gates:
+  - id: RELEASE_P0_SOURCES
+    expected: frozen_product_l2_dag_and_all_required_p0_task_merge_receipts
+  - id: RELEASE_P1_BUILD
+    expected: exact_candidate_build_lint_typecheck_committed_dist_freshness
+  - id: RELEASE_P2_FULL
+    expected: all_applicable_full_tests_and_regression_suites
+  - id: RELEASE_P3_HIDDEN
+    expected: actual_hidden_validation_pack_on_exact_candidate_or_honest_not_run_blocked
+  - id: RELEASE_P4_CJ
+    expected: physical_K01_K02_T03_C01_T07_T08_T10_T11_Node24_SQLite
+  - id: RELEASE_P5_PACK
+    expected: independent_clean_packed_Tiny_Rich_no_monorepo_path_real_native_sqlite
+  - id: RELEASE_P6_SECURITY
+    expected: live_effect_permit_no_bypass_unprivileged_scope_no_oracle_failure_unknown
+  - id: RELEASE_P7_SCOPE
+    expected: explicit_P0_only_or_accepted_optional_scope_matching_sha
+  - id: RELEASE_P8_REVIEW
+    expected: independent_exact_head_release_review_P0_P1_zero_and_version_PR
+all_results: NOT_RUN
+release_qualified: NO

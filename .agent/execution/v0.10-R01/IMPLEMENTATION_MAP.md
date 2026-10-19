@@ -1,0 +1,8 @@
+# R01 — frozen candidate selection and one complete closure
+
+- Baseline after T11: `v0.10@57a3ed6650a65042d39cfd073b6669b4d708757b`, T11 [PR #1199] merged, P0 14/14 closed. Optional T09 [PR #1200], T10B [PR #1201] remain separate and do not block R01; decide scope before freezing.
+- Locate repo's real validation scripts, root `package.json`, `AGENTS.md`, `.dev-standard/PROJECT_OVERRIDES.md`, frozen Product/L2/DAG and all original hidden-test availability/pins. Do not invent commands or a hidden pack.
+- For actual Host run: checkout exact candidate SHA on fresh isolated worktree/checkout, verify clean tree and manifest. Record Node/npm/SQLite ABI, OS, package hashes, baseline Git commit/tree and planned risk-specific suites. Use `tests/integration/v010-clean-consumers/clean-consumers.test.ts`, installed Tiny/Rich recipes, plus `tests/critical-journeys/**` and actual repo full-suite commands.
+- Evidence file `docs/validation/v0.10/R01_RELEASE_CLOSURE.md`: one table per gate: exact candidate, tool environment, commands, P/N cases, pass/fail counts, evidence URLs, blockers and disposition. Include optional scope/waiver (not fake PASS) and PR/CI references. Post Issue #1181 release verdict and exact evidence to GitHub.
+- If source code repair necessary, record reproducible issue, patch in one narrow PR to `v0.10`, independently review and merge, then new candidate SHA. Avoid repeated R01 full runs for every tiny difference by caching unaffected predecessor proofs and validating source change only until final candidate; final full pass once.
+- Only after independent R01 review confirms no P0/P1, initiate final `v0.10 → main` version PR/merge. No interim main merge; no tag/release without authorization.
