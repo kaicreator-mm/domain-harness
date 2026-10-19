@@ -1,0 +1,39 @@
+# T00 FAILURE_MATRIX — failure modes → owner stage → typed outcome
+
+# BUILD-side (buildV10App) — every deterministic refusal happens at BUILD,
+# never deferred to runtime static attestation (A01-PC05/PC08).
+build_failures:
+  - { code: BUILD_INPUT_INVALID,    stage: build,  trigger: "non-plain-data options/hostile accessors/oversized strings", behavior: "typed V10BuildError, zero module evaluation, no output" }
+  - { code: BUILD_GRAPH_INVALID,    stage: build,  trigger: "unknown fields, duplicate packageId, malformed role/handler shapes, uncovered capability package", behavior: "typed refusal, zero evaluation" }
+  - { code: V10_ROLE_CARDINALITY,   stage: build,  trigger: "two K primaries / two S primaries / zero business", behavior: "typed refusal (A01-PC08 two-primaries is a BUILD failure)" }
+  - { code: V10_PROVIDER_COLLISION, stage: build,  trigger: "duplicate advisory providerId or hook", behavior: "typed refusal" }
+  - { code: V10_FEATURE_COLLISION,  stage: build,  trigger: "duplicate standard:* feature key", behavior: "typed refusal" }
+  - { code: V10_INTENT_CONFLICT,    stage: build,  trigger: "two business packages providing the same intent: key", behavior: "typed refusal" }
+  - { code: V10_AUTHORITY_FORGERY,  stage: build,  trigger: "non-K-primary providing kernel:/cas:/admission:/journal:/effect: keys; business declaring handlers; kernel-namespace advisory hook", behavior: "typed refusal (forged extension hook fails BUILD)" }
+  - { code: V10_DEPENDENCY_MISSING, stage: build,  trigger: "dependency outside selected closure", behavior: "typed refusal" }
+  - { code: V10_DEPENDENCY_CYCLE,   stage: build,  trigger: "declared dependency cycle", behavior: "typed refusal with deterministic traversal" }
+  - { code: V10_FEATURE_MISSING,    stage: build,  trigger: "required feature unprovided by closure (hidden mandatory dependency)", behavior: "typed refusal" }
+  - { code: V10_ABI_UNSUPPORTED,    stage: build,  trigger: "per-role selected ABI mismatch", behavior: "typed refusal (wrong version is a BUILD failure)" }
+  - { code: V10_TARGET_UNSUPPORTED, stage: build,  trigger: "target profile != node24-esm/1", behavior: "typed refusal (profile rejection at BUILD)" }
+  - { code: V10_DIGEST_MISMATCH,    stage: build,  trigger: "declared sha256 != actual bytes", behavior: "typed refusal (byte substitution refused)" }
+  - { code: V10_IMPORT_POLICY_DENIED, stage: build, trigger: "undeclared node:/npm/native import; computed dynamic import; require/eval/Function; relative/absolute/data: edge; cross-packageId import", behavior: "typed refusal — import closure is sealed, no dynamic discovery edge" }
+  - { code: V10_ROUTE_INVALID,      stage: build,  trigger: "unsealed intent/capability/operation/handler; duplicate route", behavior: "typed refusal" }
+
+# Activation-side (activateV10App) — runtime fail-fast limited to the A01
+# classes: structural plain-data shape, actual missing callable exports,
+# init contract violations. NO digest/AST/dependency/approval re-checks.
+activation_failures:
+  - { code: V10_APP_INVALID,        stage: activation, trigger: "wrong formatVersion/target profile/missing load order", behavior: "typed V10ActivationError before any import; import counter and eval sentinel stay 0" }
+  - { code: V10_IMPORT_EVAL_FAILED, stage: activation, trigger: "sealed module fails to evaluate (real ESM error)", behavior: "typed failure; already-imported modules are not disposed as initialized advisory modules (nothing initialized yet)" }
+  - { code: V10_EXPORT_CONTRACT_REFUSED, stage: activation, trigger: "missing callable role export / advisory surface mismatch", behavior: "typed failure (A01-allowed missing-hook fail-fast)" }
+  - { code: V10_EXTENSION_INIT_FAILED, stage: activation, trigger: "advisory init throws (incl. protected-port probe denial)", behavior: "typed failure; ONLY initialized advisory modules disposed in reverse; K documents untouched" }
+  - { code: V10_INIT_CONTRACT_REFUSED, stage: activation, trigger: "init return not plain data / non-contract or authority-shaped fields / identity mismatch", behavior: "typed failure + reverse disposal" }
+  - { code: KEXT_PORT_DENIED,       stage: activation, trigger: "advisory context probe of protected K port name", behavior: "denying stub recorded (counters.portDenials) then thrown; never exposes a live port" }
+  - { code: FACADE_CLOSED,          stage: execute,    trigger: "send/dispose after close", behavior: "typed refusal; no further K activity" }
+
+# Deliberate non-goals recorded as NOT_RUN (owner task):
+not_run:
+  - { scope: "two-process physical SQLite CAS / fence / effect races", owner: "K01 #1167" }
+  - { scope: "canonical-input receipt replay repair",                  owner: "K02 #1169" }
+  - { scope: "two real packed clean-room consumers (npm install, native addon)", owner: "T11 #1180" }
+  - { scope: "hidden validation / version closure / release",          owner: "R01 #1181" }

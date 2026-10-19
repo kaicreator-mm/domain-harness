@@ -1,0 +1,116 @@
+# T00 TEST_MATRIX — targeted P/N/fault rows (Node 24, real ESM execution)
+# Commands (run from repo root; exit code 0 required, recorded verbatim):
+#   node --import tsx --test tests/compiler/v10build-composition.test.ts
+#   node --import tsx --test tests/assembly/v010-build-activation.test.ts
+# Scoped gates: npm run build && npm run typecheck && npm run lint
+# (workspace-wide by repo policy; changed surface is compiler + root tests).
+
+suite: v10build-composition        # tests/compiler/v10build-composition.test.ts
+rows:
+  - id: P-BUILD-BASIC
+    kind: positive
+    what: Tiny Basic composition (real K/S/B/C payload bytes, no advisory/advanced module, no advanced import) builds; output is plain frozen dh.v10.build/1 data with sealed load order, empty advisory roster and one K/S primary each.
+  - id: P-BUILD-DETERMINISM
+    kind: positive
+    what: Same input built twice yields byte-identical plain-data output and identical subjectDigest (no ambient clock/random).
+  - id: P-BUILD-RICH
+    kind: positive
+    what: Rich composition builds with 2 physically distinct K advisory extensions (distinct packageId+moduleSha256+provider+hook) and 3 physically distinct S feature modules (distinct packageId+sha+feature key), B/C graph + sealed routes.
+  - id: P-BUILD-ORDINARY-IMPORTS-SEALED
+    kind: positive
+    what: A module importing node:crypto (and one declaring a bare npm specifier + one declaring a native specifier) is accepted exactly when each specifier is declared in that module's sealed externalImports policy (A01 sealed ordinary imports).
+  - id: P-BUILD-OPTIONAL-SKIP
+    kind: positive
+    what: An optional advisory module with no bytes is excluded from load order and recorded as skipped (Basic fallback at BUILD).
+  - id: N-BUILD-DUPLICATE-K-PRIMARY
+    kind: negative
+    what: Two kernel-primary entries refuse typed (V10_ROLE_CARDINALITY) — "two primaries" is a BUILD failure (A01-PC08).
+  - id: N-BUILD-DUPLICATE-S-PRIMARY
+    kind: negative
+    what: Two standard-primary entries refuse typed (V10_ROLE_CARDINALITY).
+  - id: N-BUILD-CONFLICT-PROVIDER
+    kind: negative
+    what: Two K extensions claiming the same providerId (or the same advisory hook) refuse typed (V10_PROVIDER_COLLISION).
+  - id: N-BUILD-CONFLICT-FEATURE
+    kind: negative
+    what: Two S feature modules claiming the same standard:* feature key refuse typed (V10_FEATURE_COLLISION).
+  - id: N-BUILD-CONFLICT-INTENT
+    kind: negative
+    what: Two business packages providing the same intent: key refuse typed (V10_INTENT_CONFLICT).
+  - id: N-BUILD-MISSING-DEPENDENCY
+    kind: negative
+    what: A dependency naming a package outside the selected closure refuses typed (V10_DEPENDENCY_MISSING).
+  - id: N-BUILD-DEPENDENCY-CYCLE
+    kind: negative
+    what: A declared dependency cycle refuses typed (V10_DEPENDENCY_CYCLE).
+  - id: N-BUILD-MISSING-FEATURE
+    kind: negative
+    what: A required (requires) feature no selected package provides refuses typed (V10_FEATURE_MISSING) — hidden mandatory dependency cannot slip in.
+  - id: N-BUILD-ABI-MISMATCH
+    kind: negative
+    what: An entry whose abiVersion is not the selected per-role ABI (e.g. kernel-primary carrying v08-business-abi/1, or extension carrying a wrong ABI) refuses typed (V10_ABI_UNSUPPORTED).
+  - id: N-BUILD-TARGET-MISMATCH
+    kind: negative
+    what: A target profile other than the exact Node24 ESM profile (or a module pinned to a different runtime) refuses typed (V10_TARGET_UNSUPPORTED).
+  - id: N-BUILD-DIGEST-MISMATCH
+    kind: negative
+    what: Declared moduleSha256 not equal to sha256(moduleSource) refuses typed (V10_DIGEST_MISMATCH).
+  - id: N-BUILD-IMPORT-UNDECLARED
+    kind: negative
+    what: A module importing node:fs (or a bare npm specifier) absent from its sealed policy refuses typed (V10_IMPORT_POLICY_DENIED).
+  - id: N-BUILD-IMPORT-COMPUTED
+    kind: negative
+    what: Computed (non-literal) dynamic import(), require(), eval()/Function code-string constructors, relative/absolute/data: file edges and cross-packageId imports refuse typed — no dynamic discovery edge (A01/no second engine).
+  - id: N-BUILD-AUTHORITY-FORGERY
+    kind: negative
+    what: A non-K-primary module providing kernel:/cas:/admission:/journal:/effect: authority keys (or a business entry declaring capability handlers, or an extension hook squatting the kernel namespace) refuses typed (V10_AUTHORITY_FORGERY).
+  - id: N-BUILD-ROUTE-FORGERY
+    kind: negative
+    what: A route row naming an unsealed intent/capability/operation or a mismatched handler refuses typed (V10_ROUTE_INVALID); duplicate route refuses.
+  - id: N-BUILD-SHAPE-STRICT
+    kind: negative
+    what: Unknown fields, non-plain-data inputs (accessor traps), oversized/duplicate packageIds refuse typed (BUILD_INPUT_INVALID / BUILD_GRAPH_INVALID) — hostile input is refused unread where applicable.
+  - id: S-BUILD-ZERO-EVAL
+    kind: sentinel
+    what: For every refusal above AND for successful builds, a would-be-imported sentinel module that records global state on evaluation keeps its evaluation counter at exactly 0 — BUILD never evaluates source (zero unintended source evaluation before preflight).
+
+suite: v010-build-activation       # tests/assembly/v010-build-activation.test.ts
+rows:
+  - id: P-ACT-BASIC-LIFECYCLE
+    kind: positive
+    what: Built Tiny Basic app activates on a plain CAS doc store: exactly the sealed modules are imported (per-package count 1, advanced/advisory count 0, optional-skipped absent), role exports connect, zero advisory init, one send() through the real selected kernel yields an admitted receipt (one runtime factory invocation; kernel admission/journal/effect counters advance), dispose runs cleanly.
+  - id: P-ACT-BASIC-SKIPS-ADVANCED
+    kind: positive
+    what: Basic activation never imports/evaluates advanced modules: an eval-sentinel advanced fixture stays 0; importsByPackage has no extension/feature entries.
+  - id: P-ACT-RICH-LIFECYCLE
+    kind: positive
+    what: Rich app activates: 2 K advisory extensions + 3 S features imported as physically distinct modules, init called in sealed order with confirmed identities, selectedExtensions/selectedFeatures exposed, one admitted send() via the real kernel, dispose in reverse init order.
+  - id: P-ACT-ORDINARY-BUILTIN-IMPORT
+    kind: positive
+    what: A sealed S feature that really imports node:crypto evaluates and hashes through the ordinary Node module system inside the composed activation (sealed ordinary Node import is real, not a policy fiction).
+  - id: P-ACT-NO-RESTATTESTATION
+    kind: positive
+    what: Tampering a sealed moduleSha256 (bytes unchanged) does NOT block activation and no hash/AST check runs at activation — A01 "runtime SDK is not a second Package checker" asserted from the consumer side.
+  - id: N-ACT-REFUSE-BEFORE-IMPORT
+    kind: negative
+    what: Wrong formatVersion / non-plain-data app input refuses typed with import counter and eval sentinel at exactly 0 (zero unintended source evaluation before activation trust boundary).
+  - id: N-ACT-INIT-FAILURE-REVERSE-DISPOSAL
+    kind: fault
+    what: A later advisory module whose init throws closes the facade typed; ONLY successfully initialized modules are disposed in reverse order; K state documents unchanged; earlier module dispose observed.
+  - id: N-ACT-FORGED-INIT-RETURN
+    kind: fault
+    what: An advisory init return carrying authority-shaped/non-contract fields refuses typed and triggers the same reverse disposal.
+  - id: N-ACT-PORT-PROBE-DENIED
+    kind: fault
+    what: An advisory module probing protected K port names (resources/docs/cas/createOccurrenceRuntime/...) hits a denying stub; probe recorded, port denial thrown, activation fails closed with reverse disposal — K ports stay protected.
+  - id: N-ACT-EXPORT-MISSING
+    kind: fault
+    what: A sealed module whose bytes do not actually export the sealed role surface fails activation typed at connect (actual missing callable hook — the A01-allowed runtime fail-fast class).
+
+notes:
+  - Physical two-process SQLite CAS, real npm install/packed consumers, hidden
+    validation: owned by K01/K02/T11/R01 — recorded NOT_RUN for T00, never
+    inferred from these rows.
+  - Both suites are deterministic; no network, no clock dependence (fixed
+    clock injected), no filesystem mutation outside OS temp semantics (no
+    writes: data: URL imports only).
