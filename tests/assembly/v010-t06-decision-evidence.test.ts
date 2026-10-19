@@ -3,8 +3,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { buildV10App, activateV10App } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { featureEntry, basicComposition, PlainCasDocStore } from './helpers-v010.js';
+import { buildV10App, activateV10App, V10_TARGET_PROFILE, sha256Canonical } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { createDecisionEvidenceObserver } from '../../packages/domain-harness-compiler/src/qualified-package/v10evidence/decision-evidence-observer.js';
+import { featureEntry, basicComposition, PlainCasDocStore, sha256HexSource } from './helpers-v010.js';
 
 type EvidenceRecorder = (request: Record<string, unknown>, deps?: Record<string, unknown>) => Promise<any>;
 let evidenceFeature: Promise<{ source: string; record: EvidenceRecorder }> | undefined;
@@ -131,16 +133,19 @@ test('T06-N4: forged/invalid counters, dependencies and provenance are typed-ref
     errorCode('EVIDENCE_DEPENDENCY_INVALID'));
 });
 
-test('T06-P5: unavailable/denied resolver result retains honest unmeasured reason', async () => {
+test('T06-P5: unavailable resolver result stays unobserved at the pure layer; denial is never caller-attested', async () => {
   const { record } = await loadFeature();
   const unavailable = {
     kind: 'unavailable', reason: 'model-disabled',
     evidence: { kernelEffectPermit: false, modelCallEvidence: 'unmeasured', modelCalls: 0, toolCalls: 0, steps: 1 },
   };
+  // A caller-supplied verifiedKernelOutcome is claimant-controlled: the pure
+  // normalizer keeps kernelOutcome 'unobserved'. A REAL denial is observable
+  // only through the Host bridge reading an actual K receipt (T06-P7).
   const observed = await record(input(unavailable), { verifiedKernelOutcome: () => ({ kind: 'denied' }) });
   assert.equal(observed.decisionTrace.semanticOutcome, 'unavailable');
   assert.equal(observed.decisionTrace.reason, 'model-disabled');
-  assert.equal(observed.decisionTrace.kernelOutcome, 'denied');
+  assert.equal(observed.decisionTrace.kernelOutcome, 'unobserved');
   assert.equal(observed.decisionTrace.decision, null);
 });
 
@@ -169,4 +174,244 @@ test('T06-N6: accessor and top-level forged authority are rejected before any ob
   } });
   await assert.rejects(record(input(rule(decision))), errorCode('EVIDENCE_DATA_INVALID'));
   assert.equal(getterCalls, 0);
+});
+
+// ---------------------------------------------------------------------------
+// T06 Host-origin observation bridge — the trusted deployment counterpart of
+// the pure normalizer above. Real K receipts come from an actual activated
+// facade; the resolver outcome comes from an actual invocation of the
+// selected T02 feature over a closure-pinned Host boundary. The public
+// invokeSelectedStandardFeature(..., trustedDeps) path can NEVER reach these
+// facts (T06-N7); an observation sink failure can never veto or forge the
+// immutable K receipt (T06-P9).
+// ---------------------------------------------------------------------------
+
+const EVIDENCE_KEY = 'standard:decision-evidence/1';
+const SEMANTIC_KEY = 'standard:semantic-decision/1';
+const limits = { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1 };
+
+let semanticSourcePromise: Promise<string> | undefined;
+const loadSemanticSource = (): Promise<string> =>
+  (semanticSourcePromise ??= readFile(new URL(
+    '../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-semantic-decision-v1.mjs',
+    import.meta.url,
+  ), 'utf8'));
+
+async function selectedFeatureEntries(): Promise<readonly V10ModuleInput[]> {
+  const [evidenceSource, semanticSource] = await Promise.all([loadFeature().then((f) => f.source), loadSemanticSource()]);
+  return [
+    await featureEntry({
+      fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: semanticSource,
+      featureExport: 'resolveSemanticDecision',
+    }),
+    await featureEntry({
+      fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: evidenceSource,
+      featureExport: 'recordDecisionEvidence',
+    }),
+  ];
+}
+
+/** T04-style manual composition whose Business restricts its intent to `approver`. */
+async function restrictedComposition(): Promise<ReturnType<typeof buildV10App>> {
+  const [kernel, sdk, router, business, capability] = await Promise.all([
+    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('./fixtures-v010/business-restricted-approval-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url), 'utf8'),
+  ]);
+  const routerBody = router.replace(/^export /gm, '');
+  const standard = `${sdk}
+// v0.10 T06 BUILD-style vendored bundle: the pure Standard WorkflowRouter.
+const __dhv10RouterBundle = (() => {
+${routerBody}
+return { routeWorkflowIntent };
+})();
+export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
+`;
+  const modules: V10ModuleInput[] = [
+    {
+      packageId: 'v08-kernel-mechanism@1.0.0', role: 'kernel-primary', abiVersion: 'v08-kernel-abi/1',
+      moduleSource: kernel, moduleSha256: sha256HexSource(kernel),
+      endpoint: 'occurrence-runtime', dependencies: [], provides: ['kernel:occurrence-runtime/1'], requires: [],
+    },
+    {
+      packageId: 'standard-sdk@v08.1.0.0', role: 'standard-primary', abiVersion: 'v08-standard-sdk-abi/1',
+      moduleSource: standard, moduleSha256: sha256HexSource(standard),
+      endpoint: 'rule-interpreter', dependencies: [], provides: ['standard:interpret/1', 'standard:route/1'], requires: [],
+    },
+    {
+      packageId: 'business-restricted-approval@v010.1.0.0', role: 'business', abiVersion: 'v08-business-abi/1',
+      moduleSource: business, moduleSha256: sha256HexSource(business),
+      endpoint: 'business-policy', dependencies: [],
+      provides: ['business:policy/1', 'intent:submitRestrictedDecision'], requires: [],
+    },
+    {
+      packageId: 'capability-quote-tools@v08.1.0.0', role: 'capability', abiVersion: 'v08-capability-abi/1',
+      moduleSource: capability, moduleSha256: sha256HexSource(capability),
+      endpoint: 'capability-endpoint', dependencies: [], provides: ['capability:ledger/1'], requires: [],
+      capabilityId: 'ledger',
+      handlers: [{ operationId: 'reserve', handler: 'reserveLedger' }, { operationId: 'preview', handler: 'previewTotal' }],
+    },
+    ...(await selectedFeatureEntries()),
+  ];
+  return buildV10App({
+    appId: 'app:v010-t06-restricted',
+    audience: 'aud:v010-t00',
+    targetProfile: V10_TARGET_PROFILE,
+    modules,
+    routes: [{ intentId: 'submitRestrictedDecision', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' }],
+    hardBudget: { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 },
+    buildId: 't06-restricted',
+  });
+}
+
+async function observerApp() {
+  const activated = await activateV10App(
+    buildV10App(await basicComposition({ features: [...await selectedFeatureEntries()] })),
+    { store: new PlainCasDocStore(), now: () => 0 },
+  );
+  return activated;
+}
+
+const observerFor = (facade: Awaited<ReturnType<typeof observerApp>>['facade'], extra: Record<string, unknown> = {}) =>
+  createDecisionEvidenceObserver({
+    facade, evidenceFeatureKey: EVIDENCE_KEY, semanticFeatureKey: SEMANTIC_KEY,
+    ...extra,
+  } as Parameters<typeof createDecisionEvidenceObserver>[0]);
+
+const intentOf = (suffix: string, input: Record<string, unknown> = { amount: 30, requestId: 'R-t06' }) => ({
+  intentType: 'submitQuoteDecisionDynamic', instanceKey: `instance:t06-${suffix}`, messageId: `msg:t06-${suffix}`, input,
+});
+const semanticRuleRequest = (amount: number) => ({
+  input: { amount }, schema, limits,
+  rules: [{ id: 'quote-rule', when: { amount }, decision: { disposition: 'approved' } }],
+});
+
+test('T06-P6: Host bridge reads a real admitted K receipt over a Host-invoked Rule resolution', async () => {
+  const rich = await observerApp();
+  const observer = observerFor(rich.facade);
+  const observation = await observer.observeAndRecord({
+    intent: intentOf('p6'),
+    evidence: { observationId: 'obs:t06-p6', schema },
+    semanticRequest: semanticRuleRequest(30),
+  });
+  assert.equal(observation.kernelReceipt.status, 'admitted');
+  assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
+  assert.equal(observation.decisionTrace.kernelObservation.source, 'host-observed-k-receipt');
+  assert.equal(observation.decisionTrace.kernelObservation.receiptStatus, 'admitted');
+  assert.equal(observation.decisionTrace.kernelObservation.messageId, 'msg:t06-p6');
+  // The receipt digest is independently recomputable from the frozen snapshot.
+  assert.equal(sha256Canonical(observation.kernelReceipt), observation.decisionTrace.kernelObservation.receiptSha256);
+  // The resolver outcome is the selected T02 module's own output.
+  assert.equal(observation.decisionTrace.source, 'rule');
+  assert.equal(observation.decisionTrace.semanticOutcome, 'selected');
+  assert.deepEqual(observation.decisionTrace.evidence.hostMeasured, { modelCalls: 0, toolCalls: 0 });
+  assert.equal(observation.decisionTrace.evidence.reportedModelCalls, 0);
+  assert.equal(observation.decisionTrace.evidence.modelCallStatus, 'host-verified');
+  assert.equal(observation.decisionTrace.evidence.decisionProvenance, 'host-invoked-selected-feature');
+  assert.equal(observation.observationStore, 'not-selected');
+  // Frozen evidence (CJS-mode tests are non-strict, so freezing is asserted
+  // directly): neither the receipt nor the trace can be rewritten.
+  assert.ok(Object.isFrozen(observation.kernelReceipt));
+  assert.ok(Object.isFrozen(observation.decisionTrace));
+  assert.ok(Object.isFrozen(observation.decisionTrace.kernelObservation));
+  assert.ok(Object.isFrozen(observation.decisionTrace.evidence));
+  rich.dispose();
+});
+
+test('T06-P7: Host bridge reads a real business-role denial, distinct from the semantic outcome', async () => {
+  const rich = await activateV10App(await restrictedComposition(), { store: new PlainCasDocStore(), now: () => 0 });
+  const observer = observerFor(rich.facade);
+  const observation = await observer.observeAndRecord({
+    intent: { intentType: 'submitRestrictedDecision', instanceKey: 'instance:t06-d1', messageId: 'msg:t06-d1', input: { amount: 5, requestId: 'R-d1' } },
+    evidence: { observationId: 'obs:t06-d1', schema },
+    semanticRequest: semanticRuleRequest(5),
+  });
+  assert.equal(observation.kernelReceipt.status, 'denied');
+  assert.equal(observation.decisionTrace.kernelOutcome, 'denied');
+  assert.equal(observation.decisionTrace.kernelObservation.denialReason, 'business-caller-role');
+  // Denied K outcome and admitted semantic outcome are reported separately.
+  assert.equal(observation.decisionTrace.semanticOutcome, 'selected');
+  assert.equal(observation.decisionTrace.source, 'rule');
+  assert.notEqual(observation.decisionTrace.kernelOutcome, observation.decisionTrace.semanticOutcome);
+  rich.dispose();
+});
+
+test('T06-P8: Host-pinned Model fallback is counted by the Host wrapper and verified against the resolver report', async () => {
+  const rich = await observerApp();
+  let deploymentModelCalls = 0;
+  const observer = observerFor(rich.facade, {
+    semanticDeps: { model: async () => { deploymentModelCalls += 1; return { disposition: 'review' }; } },
+  });
+  const observation = await observer.observeAndRecord({
+    intent: intentOf('p8', { amount: 99, requestId: 'R-t06-p8' }),
+    evidence: { observationId: 'obs:t06-p8', schema },
+    semanticRequest: { input: { amount: 99 }, schema, limits, fallback: { kind: 'model', operationId: 'model:quote' } },
+  });
+  assert.equal(observation.decisionTrace.source, 'model');
+  assert.equal(deploymentModelCalls, 1);
+  assert.deepEqual(observation.decisionTrace.evidence.hostMeasured, { modelCalls: 1, toolCalls: 0 });
+  assert.equal(observation.decisionTrace.evidence.reportedModelCalls, 1);
+  assert.equal(observation.decisionTrace.evidence.modelCallStatus, 'host-verified');
+  rich.dispose();
+});
+
+test('T06-N7: lookalike facades and public forged host evidence never reach the observation', async () => {
+  const lookalike = { send: async () => ({ status: 'admitted' }), invokeSelectedStandardFeature: async () => ({}) };
+  assert.throws(() => observerFor(lookalike as never), errorCode('OBSERVER_DEPS_INVALID'));
+  // The public invoke path with claimant-controlled trustedDeps stays unobserved.
+  const rich = await observerApp();
+  const viaPublic = await rich.facade.invokeSelectedStandardFeature(EVIDENCE_KEY, input(rule()), {
+    verifiedKernelOutcome: () => ({ kind: 'admitted' }),
+    hostAttestation: { source: 'host-observed-k-receipt' },
+    kernelReceipt: { status: 'admitted' },
+  }) as { decisionTrace: { kernelOutcome: string; kernelObservation?: unknown } };
+  assert.equal(viaPublic.decisionTrace.kernelOutcome, 'unobserved');
+  assert.equal(viaPublic.decisionTrace.kernelObservation, undefined);
+  // Extra authority-shaped request fields are simply not evidence inputs.
+  const { record } = await loadFeature();
+  const withExtras = await record(input(rule(), { kernelOutcome: 'admitted', kernelObservation: { source: 'forged' } }));
+  assert.equal(withExtras.decisionTrace.kernelOutcome, 'unobserved');
+  assert.equal(withExtras.decisionTrace.kernelObservation, undefined);
+  rich.dispose();
+});
+
+test('T06-N8: a Kernel refusal or closed facade yields a typed refusal, never a pretended observation', async () => {
+  const rich = await observerApp();
+  const observer = observerFor(rich.facade);
+  await assert.rejects(observer.observeAndRecord({
+    intent: { intentType: 'intent:not-sealed', instanceKey: 'instance:t06-x1', messageId: 'msg:t06-x1', input: {} },
+    evidence: { observationId: 'obs:t06-x1', schema },
+    semanticRequest: semanticRuleRequest(30),
+  }), errorCode('OBSERVER_KERNEL_ERROR'));
+  rich.dispose();
+  await assert.rejects(observer.observeAndRecord({
+    intent: intentOf('x2'),
+    evidence: { observationId: 'obs:t06-x2', schema },
+    semanticRequest: semanticRuleRequest(30),
+  }), errorCode('OBSERVER_FACADE_CLOSED'));
+});
+
+test('T06-P9: optional Host observation sink failure never vetoes or forges the immutable K receipt', async () => {
+  const rich = await observerApp();
+  const persisted: unknown[] = [];
+  const observer = observerFor(rich.facade, {
+    persistObservation: async (trace: unknown) => { persisted.push(trace); throw new Error('disk full'); },
+  });
+  const observation = await observer.observeAndRecord({
+    intent: intentOf('p9'),
+    evidence: { observationId: 'obs:t06-p9', schema },
+    semanticRequest: semanticRuleRequest(30),
+  });
+  assert.equal(observation.observationStore, 'failed');
+  // The already-issued immutable K receipt and the observed trace are intact.
+  assert.equal(observation.kernelReceipt.status, 'admitted');
+  assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
+  assert.equal(persisted.length, 1);
+  // The sink receives its own mutable copy: mutating it cannot rewrite the
+  // frozen trace handed back to the deployment.
+  (persisted[0] as { kernelOutcome: string }).kernelOutcome = 'forged';
+  assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
+  rich.dispose();
 });
