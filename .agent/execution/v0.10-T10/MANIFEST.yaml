@@ -1,0 +1,10 @@
+schema: ads/execution-pack-v1
+task: T10
+issue: 1176
+integration_branch: v0.10
+base_at_preparation: 89fd642bb078b2a894a969d61f6cb76d8bbba82f
+ads_pin: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: PREPARED_BUT_SHARED_FACADE_WRITER_BLOCKED
+builder_claim: NONE
+priority: P0
+scope: explicit-scoped-query-over-two-B
