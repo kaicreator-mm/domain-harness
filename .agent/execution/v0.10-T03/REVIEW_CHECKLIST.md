@@ -1,0 +1,2 @@
+# T03 focused reviewer checklist
+Prove selected Standard workflow behavior through genuine K02 selected Kernel, not a shadow Runtime. Parent and child IDs, callback/ordinal/tenant/B scoped identity survive SQLite restart; bounded loops, WAIT/RESUME race, callback duplications, deadline and false K Effect negative checked. No duplicate K State/Journal, no hidden K permits or extension of v0.9 compatibility. Reuse K02 physical proofs still current; run only new focused cases + required CI. Review exact HEAD; target v0.10 only; closure belongs R01.

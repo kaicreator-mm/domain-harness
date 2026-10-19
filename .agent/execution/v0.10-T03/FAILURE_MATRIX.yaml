@@ -1,0 +1,9 @@
+schema: dh010/t03-failure
+over-budget: bounded-typed-refusal
+wrong-parent-child: typed-target-denial
+duplicate-callback: immutable-replay-or-typed-conflict
+deadline-exceeded: bounded-recovery-no-effect
+storage-error: honest-UNKNOWN-or-fail-closed
+T02-shared-file-in-use: wait-for-free-writer-and-work-on-independent-new-files
+unexpected-K02-identity: halt-no-secondary-runtime
+runtime-evidence-absent: NOT_RUN
