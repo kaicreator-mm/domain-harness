@@ -1,0 +1,9 @@
+schema: dh010/t04-failures
+denied-authority: typed-deny-no-read-write
+bad-scope: typed-refuse
+stale-revision: host-CAS-conflict-preserved
+expired: hidden-not-matched
+sqlite-driver-absent: typed-unavailable
+storage-failure: propagate-honest-host-error
+parent-contract-conflict: stop-and-escalate
+CI-required-red: no-merge
