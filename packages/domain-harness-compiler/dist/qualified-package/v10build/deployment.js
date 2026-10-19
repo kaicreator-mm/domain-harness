@@ -628,6 +628,10 @@ class GovernedBuildActivation {
         this.#assertOpen();
         return await this.#activation.facade.queryScopedSnapshot(selector);
     }
+    async queryManyScopedSnapshots(selectors) {
+        this.#assertOpen();
+        return await this.#activation.facade.queryManyScopedSnapshots(selectors);
+    }
     kCounters(businessPackageId) {
         this.#assertOpen();
         return this.#activation.facade.kCounters(businessPackageId);

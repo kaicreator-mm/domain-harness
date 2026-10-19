@@ -513,6 +513,27 @@ export class V10AppFacade {
         return await this.#querySelector(deployment, authority).query(selector);
     }
     /**
+     * [v0.10 T10B #1179] Explicit multi-target variant of
+     * `queryScopedSnapshot`. Every requested selector is independently
+     * authorized and read; each result is correlated to its input index and a
+     * failure is confined to that entry. The public selector still carries only
+     * workflow/instance/optional B — the Host authority and deployment identity
+     * remain activation wiring. No cross-B transaction or hidden-B oracle is
+     * introduced, and no query path writes K state or dispatches an Effect.
+     */
+    async queryManyScopedSnapshots(selectors) {
+        this.#assertOpen();
+        const authority = this.#queryAuthority;
+        if (authority === undefined) {
+            refuse('QUERY_AUTHORIZATION_REQUIRED', 'this activation carries no Host-owned query authority; authorized scoped queries are disabled (no allow-all default exists)');
+        }
+        const deployment = this.#deploymentIdentity;
+        if (deployment === undefined) {
+            refuse('QUERY_DEPLOYMENT_REQUIRED', 'an authorized scoped query requires the K02 deployment identity; no unscoped cross-B fallback exists');
+        }
+        return await this.#querySelector(deployment, authority).queryMany(selectors);
+    }
+    /**
      * The ONE Host composition of the reviewed Multi-B selector: BUILD-selected
      * Business routes (their sealed workflow keys, never caller data), the
      * Host-verified principal/authorization, and the per-B K02 scoped kernel
