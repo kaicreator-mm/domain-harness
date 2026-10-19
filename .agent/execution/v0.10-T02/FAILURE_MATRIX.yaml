@@ -1,0 +1,18 @@
+schema: dh010/t02-failure-matrix
+cases:
+  - case: wrong-source
+    response: REFUSE
+  - case: identity-collision
+    response: REFUSE
+  - case: budget-exhausted
+    response: BOUNDED_UNAVAILABLE
+  - case: model-unavailable
+    response: TYPED_UNAVAILABLE
+  - case: denied-effect
+    response: NEVER_MINT_K_PERMIT
+  - case: dependency-not-current
+    response: STOP_AND_REPORT
+  - case: file-claim-overlap
+    response: STOP_AND_REPORT
+  - case: CI-red
+    response: INVESTIGATE_EXACT_COMMAND_NO_FAKE_PASS
