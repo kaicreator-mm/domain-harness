@@ -49,6 +49,10 @@ export type {
   V10DocStore,
   V10DocWriteCondition,
   V10PublicIntent,
+  V10QueryAuthority,
+  V10ScopedQueryTarget,
+  V10ScopedSnapshotAnswer,
+  V10ScopedSnapshotQuery,
 } from './activation.js';
 export {
   dispatchThroughExternalEffectGate,

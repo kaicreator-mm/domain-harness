@@ -1,0 +1,9 @@
+schema: dh010/t10-selected-app-failure
+missing-Host-policy: QUERY_AUTHORIZATION_REQUIRED
+denied: QUERY_NOT_FOUND_NO_ORACLE
+multiple-visible: QUERY_AMBIGUOUS
+snapshot-transport-error: QUERY_READ_FAILED
+selected-B-not-found: QUERY_NOT_FOUND
+namespace-currentness-mismatch: TYPED_BLOCKED_NO_LEGACY_FALLBACK
+CI-failure: NOT_MERGEABLE
+real-host-not-run: NOT_RUN

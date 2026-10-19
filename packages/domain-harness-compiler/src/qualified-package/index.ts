@@ -84,6 +84,10 @@ export type {
   V10ModuleInput,
   V10ModuleRole,
   V10PublicIntent,
+  V10QueryAuthority,
   V10RouteRowInput,
+  V10ScopedQueryTarget,
+  V10ScopedSnapshotAnswer,
+  V10ScopedSnapshotQuery,
   V10SealedModule,
 } from './v10build/index.js';

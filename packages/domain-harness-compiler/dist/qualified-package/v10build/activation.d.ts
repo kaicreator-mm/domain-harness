@@ -97,6 +97,47 @@ export interface V10Counters {
     externalEffectRefusals: number;
 }
 export declare function freshV10Counters(): V10Counters;
+/**
+ * [v0.10 T10 #1176] The exact scoped-query target tuple. Deliberately
+ * declared structurally here instead of re-exporting the Host module's type:
+ * the compiler's public declaration surface must not pull the Host package's
+ * deep type graph (its physical SQLite adapter types require the optional
+ * better-sqlite3 driver at consumer typecheck time). Runtime composition
+ * still uses the reviewed Host selector.
+ */
+export interface V10ScopedQueryTarget {
+    readonly deployedAppId: string;
+    readonly tenantId: string;
+    readonly appId: string;
+    readonly businessPackageId: string;
+    readonly workflowId: string;
+    readonly instanceKey: string;
+}
+/**
+ * [v0.10 T10 #1176] The Host-owned authority that enables authorized scoped
+ * queries on one activation. This is DEPLOYMENT WIRING, never public query
+ * input: `principal` is the Host-authenticated identity and `authorize` is
+ * the Host's own current policy over the exact deployment/B/instance tuple.
+ * A public query supplies only workflowId/instanceKey/optional B; any
+ * principal- or grant-shaped field a caller passes is ignored.
+ */
+export interface V10QueryAuthority {
+    /** Host-verified identity; MUST NOT be sourced from public query input. */
+    readonly principal: unknown;
+    /** Trusted current authorization for the exact scoped target tuple. */
+    readonly authorize: (principal: unknown, target: V10ScopedQueryTarget) => boolean | Promise<boolean>;
+}
+/** Public selector accepted by `facade.queryScopedSnapshot` (never a grant). */
+export interface V10ScopedSnapshotQuery {
+    readonly workflowId: string;
+    readonly instanceKey: string;
+    readonly businessPackageId?: string;
+}
+/** The exact authorized target and the selected kernel snapshot it answered. */
+export interface V10ScopedSnapshotAnswer {
+    readonly target: Readonly<V10ScopedQueryTarget>;
+    readonly snapshot: unknown;
+}
 export interface V10PublicIntent {
     readonly intentType: string;
     readonly instanceKey: string;
@@ -161,6 +202,14 @@ export interface ActivateV10AppOptions {
         readonly appId: string;
     };
     /**
+     * [v0.10 T10 #1176] Host-authenticated query authority. Absent: scoped
+     * queries are disabled typed (`QUERY_AUTHORIZATION_REQUIRED`) — there is
+     * deliberately no allow-all default. Present without `deploymentIdentity`:
+     * every query refuses typed (`QUERY_DEPLOYMENT_REQUIRED`) because no K02
+     * scoped namespace exists and no unscoped cross-B fallback is permitted.
+     */
+    readonly queryAuthority?: V10QueryAuthority;
+    /**
      * Deployment anchor for resolving the DECLARED bare npm/native imports of
      * sealed modules — the deployment root whose `node_modules` physically
      * holds the installed dependencies (the A01-PC05 "installed" half of the
@@ -198,6 +247,7 @@ export declare class V10AppFacade {
             tenantId: string;
             appId: string;
         };
+        queryAuthority?: V10QueryAuthority;
     });
     get selectedExtensions(): readonly {
         packageId: string;
@@ -219,6 +269,19 @@ export declare class V10AppFacade {
     close(): void;
     /** The real kernel's own counters for one business package. */
     kCounters(businessPackageId: string): Record<string, number>;
+    /**
+     * [v0.10 T10 #1176] Authorized, explicit scoped snapshot query over the
+     * selected kernel. The public caller supplies ONLY workflowId, instanceKey
+     * and optionally the Business packageId — never a principal, grant,
+     * deployment or reader. Authorization is Host wiring fixed at activation,
+     * runs on every selected candidate BEFORE any snapshot read and is
+     * rechecked immediately before the single read. Unscoped ambiguity is
+     * decided among VISIBLE selected Business packages only (never storage
+     * existence or a denied package), denied/unselected/absent targets collapse
+     * into one non-oracle refusal, and no query path writes K state or
+     * dispatches an effect.
+     */
+    queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
     /** One public intent through the sealed route and the real kernel. */
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
 }
