@@ -1,0 +1,15 @@
+schema: dh010/t07-test-matrix
+positive:
+  - approved_exact_SHA_revision_candidate
+  - approved_exact_baseline_fallback
+  - deterministic_candidate_vs_baseline_comparison
+  - Tiny-omits-advanced-shadow-module
+negative:
+  - unapproved_or_revoked_candidate_typed
+  - digest_revision_provenance_mismatch_typed
+  - oversized_candidate_test_budget_refused
+  - effect_shape_or_unsafe_mutable_input_rejected
+  - unpinned_implicit_latest_fallback_refused
+  - production_physical_SQLite_zero_writes_during_shadow
+  - injected_shadow_failure_does_not_touch_K_or_Memory
+actual_execution: Web tests NOT_RUN; Node24 SQLite Host+CI required before Task closed

@@ -615,6 +615,7 @@ export class V10AppFacade {
   // recorded in .agent/execution/v0.10-T00/HANDOFFS.md — and is deliberately
   // NOT changed here in T00.
   readonly #docsPrefix: string;
+  readonly #activatedTenantId: string;
   readonly #docs: V10DocsPort;
   readonly #runtimes = new Map<string, KRuntime>();
   readonly #deploymentIdentity: { deployedAppId: string; tenantId: string; appId: string } | undefined;
@@ -640,6 +641,7 @@ export class V10AppFacade {
     this.#counters = deps.counters;
     this.#deploymentIdentity = deps.deploymentIdentity;
     this.#queryAuthority = deps.queryAuthority;
+    this.#activatedTenantId = deps.tenantId;
     this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
     this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
   }
@@ -654,6 +656,33 @@ export class V10AppFacade {
     return this.#app.modules
       .filter((module) => module.role === 'standard-feature')
       .map((module) => ({ packageId: module.packageId, featureKey: module.provides[0] ?? null }));
+  }
+
+  /**
+   * T07: read-only, activation-origin BUILD/tenant identity used by the Host
+   * Shadow L4 verifier. Derived exclusively from private activated state,
+   * never a caller-provided digest or a user-supplied matching claim.
+   */
+  get selectedShadowBinding(): Readonly<{
+    subjectDigest: string;
+    appId: string;
+    tenantId: string;
+    deploymentAppId: string | null;
+    businessPackageIds: readonly string[];
+  }> {
+    this.#assertOpen();
+    return Object.freeze({
+      subjectDigest: this.#app.subjectDigest,
+      appId: this.#app.appId,
+      tenantId: this.#activatedTenantId,
+      deploymentAppId: this.#deploymentIdentity?.appId ?? null,
+      businessPackageIds: Object.freeze(
+        this.#app.modules
+          .filter((module) => module.role === 'business')
+          .map((module) => module.packageId)
+          .sort(),
+      ),
+    });
   }
 
   /**

@@ -1,0 +1,11 @@
+schema: ads/execution-pack-v1
+task: T07
+issue: 1174
+version_branch: v0.10
+task_branch: task/v0.10-t07-candidate-shadow
+base_sha: 7fd21abac0632d57c88b5189866aa1e397cc5c3a
+ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+dependency: T06#1173_CLOSED_MERGED
+status: JIT_PREPARED
+source_tests_executed: NOT_RUN
+host_shadow_real_sqlite: NOT_RUN

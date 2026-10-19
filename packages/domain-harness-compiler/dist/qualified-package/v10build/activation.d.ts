@@ -259,6 +259,16 @@ export declare class V10AppFacade {
         featureKey: string | null;
     }[];
     /**
+     * T07: read-only activation-origin BUILD/tenant identity for Shadow L4.
+     */
+    get selectedShadowBinding(): Readonly<{
+        subjectDigest: string;
+        appId: string;
+        tenantId: string;
+        deploymentAppId: string | null;
+        businessPackageIds: readonly string[];
+    }>;
+    /**
      * Invoke one actually selected Standard feature through its sealed ABI.
      * The Host supplies any trusted read/query/model dependencies; merely
      * possessing semantic data never creates a K Permit or Effect authority.
