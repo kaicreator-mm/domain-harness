@@ -51,13 +51,11 @@ export type {
   V10PublicIntent,
 } from './activation.js';
 export {
-  admissionFenceDocKey,
   dispatchThroughExternalEffectGate,
-  effectJournalDocKey,
-  effectPermitDocKey,
   normalizeExternalEffectEnvelope,
 } from './external-effect.js';
 export type {
+  ExternalEffectAuthorityKeys,
   ExternalEffectEnvelope,
   ExternalEffectDispatchRequest,
   ExternalEffectGateDeps,

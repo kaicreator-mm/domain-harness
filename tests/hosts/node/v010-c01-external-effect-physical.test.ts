@@ -40,8 +40,10 @@ import {
   V10_TARGET_PROFILE,
   activateV10App,
   buildV10App,
+  dispatchThroughExternalEffectGate,
   sha256Hex,
 } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { createV10DocsPort } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import type { V10DocStore, V10DocWriteCondition, V10ModuleInput } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import * as extjobConsole from '../../assembly/fixtures-v010/capability-extjob-runx-v1.mjs';
@@ -129,6 +131,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
       provides: [
         'business:policy/1', 'intent:submitExternalJob', 'intent:checkExternalJob', 'intent:reconcileExternalJob',
         'intent:sendNotification', 'intent:submitUnpermittedJobProbe', 'intent:submitCrossCapabilityProbe', 'intent:submitExpiringJob',
+        'intent:submitDoubleDispatchProbe', 'intent:submitConcurrentDispatchProbe',
       ], requires: [],
     },
     {
@@ -171,6 +174,47 @@ async function buildC01App() {
     hardBudget: { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 },
     buildId: 'c01-external-effect',
   });
+}
+
+/**
+ * [R1 P1-2] The two-B scoped composition: B1 and B2 share the SAME
+ * workflowId (`external-jobs`) and instanceKey, so only the K02 scoped
+ * deployment tuple (each B's own businessPackageId) keeps their K records
+ * physically disjoint — the exact scenario C01 must support.
+ */
+async function buildC01TwoBApp() {
+  const modules = await c01Modules();
+  const second = await readFile(new URL('../../assembly/fixtures-v010/business-external-b-second-v1.mjs', import.meta.url), 'utf8');
+  modules.push({
+    packageId: 'business-external-jobs-b@v010.1.0.0', role: 'business', abiVersion: 'v08-business-abi/1',
+    moduleSource: second, moduleSha256: sha256Hex(second),
+    endpoint: 'business-policy', dependencies: [],
+    provides: ['business:policy/1', 'intent:submitSecondBJob'], requires: [],
+  });
+  return buildV10App({
+    appId: 'app:v010-c01-external-effects',
+    audience: 'aud:v010-c01',
+    targetProfile: V10_TARGET_PROFILE,
+    modules,
+    routes: [
+      { intentId: 'submitExternalJob', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
+      { intentId: 'checkExternalJob', operationId: 'job.status', capabilityId: 'extjob', handlerId: 'jobStatus' },
+      { intentId: 'reconcileExternalJob', operationId: 'job.reconcile', capabilityId: 'extjob', handlerId: 'jobReconcile' },
+      { intentId: 'submitSecondBJob', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
+    ],
+    hardBudget: { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 },
+    buildId: 'c01-external-effect-two-b',
+  });
+}
+
+/** The K02 key-component encoding (percent and colon only). */
+function encK02(value: string): string {
+  return value.replace(/%/g, '%25').replace(/:/g, '%3A');
+}
+
+/** The K02 scoped namespace prefix of one deployment tuple (the Host composition). */
+function scopePrefix(identity: { deployedAppId: string; tenantId: string; appId: string }, businessPackageId: string): string {
+  return ['v010-k02', encK02(identity.deployedAppId), encK02(identity.tenantId), encK02(identity.appId), encK02(businessPackageId)].join(':') + ':';
 }
 
 function fullInput(input: Record<string, unknown>): Record<string, unknown> {
@@ -389,6 +433,125 @@ test('PH-R1 TWO-PROCESS RACE: two real child processes, one shared SQLite K file
 
     // And the K store holds exactly one effect journal row for the turn.
     assert.equal(countRowsLike(pinned.kPath, 'effect-journal'), 1);
+  } finally {
+    clearPins();
+    extjobConsole.shutdown();
+  }
+});
+
+test('PH-P2 SCOPED TWO-B (R1 P1-2): two B on one workflow/instance over ONE SQLite file stay disjoint under the K02 scoped grammar', async () => {
+  const pinned = await freshPhysical();
+  const B1 = 'business-external-jobs@v010.1.0.0';
+  const B2 = 'business-external-jobs-b@v010.1.0.0';
+  const identity = { deployedAppId: 'deploy:c01-scoped', tenantId: 'tenant:c01-scoped', appId: 'app:v010-c01-external-effects' };
+  try {
+    const app = await buildC01TwoBApp();
+    const store = await openSqliteCasStore({ path: pinned.kPath });
+    const activation = await activateV10App(app, {
+      store: new SqliteV10DocStore(store),
+      tenantId: identity.tenantId,
+      deploymentIdentity: identity,
+      now: () => BASE_MS,
+    });
+
+    // B1 and B2 share workflowId + instanceKey + messageId by construction:
+    // ONLY the K02 scoped namespace keeps their records physically disjoint.
+    const b1 = await activation.facade.send({
+      intentType: 'submitExternalJob', instanceKey: 'instance:scoped-shared', messageId: 'msg:scoped-shared',
+      input: fullInput({ requestId: 'R-SCOPED-B1', jobSpec: { kind: 'scoped' } }),
+    });
+    const b2 = await activation.facade.send({
+      intentType: 'submitSecondBJob', instanceKey: 'instance:scoped-shared', messageId: 'msg:scoped-shared',
+      input: fullInput({ requestId: 'R-SCOPED-B2', jobSpec: { kind: 'scoped' } }),
+    });
+    const b1Output = firstEffectOutput(b1) as { phase: string; externalRef: string };
+    const b2Output = firstEffectOutput(b2) as { phase: string; externalRef: string };
+    assert.equal(b1Output.externalRef, 'job:R-SCOPED-B1');
+    assert.equal(b2Output.externalRef, 'job:R-SCOPED-B2');
+    assert.equal(extjobConsole.dispatchCounts()['job.submit'], 2, 'both B dispatched exactly once each');
+
+    const e1 = String((b1.admitted as { effects: { effectId: string }[] }).effects[0].effectId);
+    const e2 = String((b2.admitted as { effects: { effectId: string }[] }).effects[0].effectId);
+    // The logical turn identity is the SAME for both B (same workflow,
+    // instance and messageId); disjointness is the K02 namespace's job —
+    // exactly the composition K02's own two-B witness proves.
+    assert.equal(e1, e2, 'the logical turn identity is shared; the deployment namespace separates the records');
+    assert.notEqual(
+      `${scopePrefix(identity, B1)}${e1}`,
+      `${scopePrefix(identity, B2)}${e1}`,
+      'the two physical permit addresses differ by the deployed business identity',
+    );
+
+    // Physical K rows: TWO disjoint records per family, all under the K02
+    // scoped grammar, and ZERO legacy-family keys (no unscoped fallback).
+    const allKeys = await store.list('');
+    assert.ok(allKeys.every((key) => key.startsWith('v10/k/')), 'every K document stays behind the facade prefix');
+    assert.ok(allKeys.every((key) => key.includes('v010-k02:')), 'every record is addressed through the K02 scoped namespace prefix');
+    const permits = allKeys.filter((key) => key.includes(':effect-permit:'));
+    const journals = allKeys.filter((key) => key.includes(':effect-journal:'));
+    const claims = allKeys.filter((key) => key.includes(':effect-dispatch-claim:'));
+    assert.equal(permits.length, 2, 'one permit per B');
+    assert.equal(journals.length, 2, 'one journal per B');
+    assert.equal(claims.length, 2, 'one dispatch claim per B');
+    assert.ok(permits.some((key) => key.includes(encK02(B1))), 'B1 permit lives under B1\'s scoped tuple');
+    assert.ok(permits.some((key) => key.includes(encK02(B2))), 'B2 permit lives under B2\'s scoped tuple');
+
+    // Cross-B: B1's effect addressed under B2's scoped family resolves to
+    // NOTHING — a foreign scoped B never reaches another B's permit, and the
+    // invoker stays untouched (zero invocation).
+    const docs = createV10DocsPort({
+      store: new SqliteV10DocStore(store),
+      docsPrefix: `v10/k/${app.subjectDigest}/${identity.tenantId}/`,
+      assertOpen: () => {},
+    });
+    let invoked = 0;
+    const invoke = async (): Promise<unknown> => {
+      invoked += 1;
+      return { phase: 'terminal', externalRef: 'forged', outcome: { ok: true, output: {} } };
+    };
+
+    // A LIVE permit that exists ONLY in B1's namespace: B2 naming the exact
+    // same logical address can never resolve it (zero cross-B reachability).
+    const foreignEffectId = 'turn:synthetic:message:foreign-live';
+    await store.put(
+      `v10/k/${app.subjectDigest}/${identity.tenantId}/${scopePrefix(identity, B1)}v08-kernel:effect-permit:${foreignEffectId}`,
+      {
+        pinVersion: 1, state: 'live', effectId: foreignEffectId, durableControlTurnId: 'turn:synthetic:foreign',
+        businessPackageId: B1, capabilityKey: 'extjob', operations: ['job.submit'], awaitPolicy: 'phase',
+        attempt: 1, expiresAt: new Date(BASE_MS + 60_000).toISOString(),
+        target: { workflowId: 'external-jobs', instanceKey: 'instance:scoped-shared' },
+      },
+      { mustBeAbsent: true },
+    );
+    await assert.rejects(
+      dispatchThroughExternalEffectGate({ docs: { get: async (bp: string, key: string) => await docs.get(`${scopePrefix(identity, bp)}${key}`) }, nowIso: () => new Date(BASE_MS).toISOString() }, {
+        capabilityId: 'extjob',
+        operationId: 'job.submit',
+        payload: { requestId: 'R-FOREIGN' },
+        attest: {
+          effectPermit: {
+            effectId: foreignEffectId,
+            durableControlTurnId: 'turn:synthetic:foreign',
+            businessPackageId: B2,
+            keys: {
+              permit: `v08-kernel:effect-permit:${foreignEffectId}`,
+              journal: `v08-kernel:effect-journal:${foreignEffectId}`,
+              fence: 'unreached-fence',
+              dispatchClaim: 'unreached-claim',
+            },
+          },
+        },
+        invoke,
+      }),
+      (error: unknown) => {
+        assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_UNKNOWN');
+        return true;
+      },
+    );
+    assert.equal(invoked, 0, 'a foreign scoped B invocation never reached an adapter');
+
+    activation.dispose();
+    await store.close();
   } finally {
     clearPins();
     extjobConsole.shutdown();

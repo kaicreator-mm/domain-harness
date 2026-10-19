@@ -31,19 +31,20 @@
  */
 import { V10ActivationError } from './activation.js';
 
-/** The K docs key of one live external Effect Permit (kernel legacy family). */
-export function effectPermitDocKey(effectId: string): string {
-  return `v08-kernel:effect-permit:${effectId}`;
-}
-
-/** The K docs key of one effect journal record (kernel legacy family). */
-export function effectJournalDocKey(effectId: string): string {
-  return `v08-kernel:effect-journal:${effectId}`;
-}
-
-/** The K docs key of one instance's admission fence (kernel legacy family). */
-export function admissionFenceDocKey(workflowId: string, instanceKey: string): string {
-  return `v08-kernel:admission-fence:${workflowId}:${instanceKey}`;
+/**
+ * The K-issued address context of ONE external effect dispatch (review R1
+ * P1-2): the kernel resolves these EXACT doc keys from its OWN doc-key
+ * family — the legacy `v08-kernel:` family OR the K02 scoped
+ * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:<kind>:`
+ * family — and hands them to the trusted gate through the kernel-minted
+ * attest channel. The gate never reconstructs a key and never falls back to
+ * the unscoped legacy family for a scoped deployment.
+ */
+export interface ExternalEffectAuthorityKeys {
+  readonly permit: string;
+  readonly journal: string;
+  readonly fence: string;
+  readonly dispatchClaim: string;
 }
 
 /** The selected external Effect Operation's phase envelope. */
@@ -102,9 +103,9 @@ export function normalizeExternalEffectEnvelope(raw: unknown): ExternalEffectEnv
   return { phase: 'terminal', externalRef: raw.externalRef, outcome: { ok: false, error: { code: error.code, message: error.message } } };
 }
 
-/** The read-only view of the K docs port the gate needs. */
+/** The read-only K docs view the gate needs: scoped by the dispatching business. */
 export interface ExternalEffectDocsPort {
-  get(key: string): Promise<{ value: unknown; revision: number } | null>;
+  get(businessPackageId: string, key: string): Promise<{ value: unknown; revision: number } | null>;
 }
 
 export interface ExternalEffectGateDeps {
@@ -158,22 +159,40 @@ export async function dispatchThroughExternalEffectGate(
   const { attest } = request;
 
   // (1) The claim channel: only the kernel's wrapper hands a permit claim to
-  // the raw resources port. No claim ⇒ no K-issued live permit ⇒ typed
-  // refusal with zero dispatch, whatever the caller is.
+  // the raw resources port. The claim carries the kernel-issued ADDRESS
+  // CONTEXT (exact document keys + business identity) — a scoped deployment
+  // is addressed under its own K02 grammar, never a legacy fallback. No
+  // claim ⇒ no K-issued live permit ⇒ typed refusal with zero dispatch.
   if (!isPlainRecord(attest) || !isPlainRecord(attest.effectPermit)
     || typeof attest.effectPermit.effectId !== 'string' || attest.effectPermit.effectId.length === 0
-    || typeof attest.effectPermit.durableControlTurnId !== 'string' || attest.effectPermit.durableControlTurnId.length === 0) {
+    || typeof attest.effectPermit.durableControlTurnId !== 'string' || attest.effectPermit.durableControlTurnId.length === 0
+    || typeof attest.effectPermit.businessPackageId !== 'string' || attest.effectPermit.businessPackageId.length === 0
+    || !isPlainRecord(attest.effectPermit.keys)) {
     refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_REQUIRED',
       `external effect capability ${request.capabilityId} dispatches only under a live K-issued effect permit; this call carries none`);
   }
-  const claim = attest.effectPermit as { effectId: string; durableControlTurnId: string };
+  const claim = attest.effectPermit as {
+    effectId: string;
+    durableControlTurnId: string;
+    businessPackageId: string;
+    keys: Record<string, unknown>;
+  };
+  const keys = { permit: '', journal: '', fence: '', dispatchClaim: '' };
+  for (const name of ['permit', 'journal', 'fence', 'dispatchClaim'] as const) {
+    const value = claim.keys[name];
+    if (typeof value !== 'string' || value.length === 0) {
+      refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_REQUIRED',
+        `the K-issued permit claim for ${claim.effectId} carries no ${name} document address; the gate refuses an address-less dispatch`);
+    }
+    keys[name] = value;
+  }
 
   // (2) The durable permit document is the authority (a claim alone proves
-  // nothing): live, unexpired, this very turn, this capability+operation.
-  const permitDoc = await deps.docs.get(effectPermitDocKey(claim.effectId));
+  // nothing): live, unexpired, this very turn/business, this capability+operation.
+  const permitDoc = await deps.docs.get(claim.businessPackageId, keys.permit);
   if (permitDoc === null) {
     refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_UNKNOWN',
-      `no K-issued effect permit ${claim.effectId} exists in this App's K documents`);
+      `no K-issued effect permit ${claim.effectId} exists at its kernel-issued address (business ${claim.businessPackageId})`);
   }
   const permit = isPlainRecord(permitDoc.value) ? permitDoc.value : null;
   if (permit === null || permit.state !== 'live') {
@@ -183,6 +202,12 @@ export async function dispatchThroughExternalEffectGate(
   if (permit.durableControlTurnId !== claim.durableControlTurnId) {
     refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_SCOPE',
       `K-issued effect permit ${claim.effectId} belongs to turn ${JSON.stringify(String(permit.durableControlTurnId))}, not ${claim.durableControlTurnId}`);
+  }
+  if (permit.businessPackageId !== claim.businessPackageId) {
+    // The scoped B identity is part of the authority tuple: a foreign B can
+    // never consume another B's live permit, even if it somehow named it.
+    refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_SCOPE',
+      `K-issued effect permit ${claim.effectId} belongs to business ${JSON.stringify(String(permit.businessPackageId))}, not the dispatching ${claim.businessPackageId}`);
   }
   if (permit.capabilityKey !== request.capabilityId) {
     refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_SCOPE',
@@ -201,7 +226,7 @@ export async function dispatchThroughExternalEffectGate(
 
   // (3) The journal cross-check: the effect this permit opens must be durably
   // `started` right now — completed/failed/missing records never dispatch.
-  const journalDoc = await deps.docs.get(effectJournalDocKey(claim.effectId));
+  const journalDoc = await deps.docs.get(claim.businessPackageId, keys.journal);
   const journalRecord = journalDoc !== null && isPlainRecord(journalDoc.value) && isPlainRecord(journalDoc.value.record)
     ? journalDoc.value.record
     : null;
@@ -217,7 +242,7 @@ export async function dispatchThroughExternalEffectGate(
     refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_SCOPE',
       `K-issued effect permit ${claim.effectId} carries no scoped target identity`);
   }
-  const fenceDoc = await deps.docs.get(admissionFenceDocKey(target.workflowId, target.instanceKey));
+  const fenceDoc = await deps.docs.get(claim.businessPackageId, keys.fence);
   const fence = fenceDoc !== null && isPlainRecord(fenceDoc.value) ? fenceDoc.value : null;
   if (fence === null || fence.turnId !== claim.durableControlTurnId) {
     refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_FENCE',

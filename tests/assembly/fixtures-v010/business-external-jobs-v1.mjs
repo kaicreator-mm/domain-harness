@@ -32,12 +32,12 @@ export const ENDPOINTS = [
 export const INTENT_TYPES = [
   'submitExternalJob', 'checkExternalJob', 'reconcileExternalJob',
   'sendNotification', 'submitUnpermittedJobProbe', 'submitCrossCapabilityProbe',
-  'submitExpiringJob',
+  'submitExpiringJob', 'submitDoubleDispatchProbe', 'submitConcurrentDispatchProbe',
 ];
 export const EFFECT_TYPES = [
   'effect:job-submit', 'effect:job-status', 'effect:job-reconcile',
   'effect:notify-send', 'effect:unpermitted-probe', 'effect:cross-capability-probe',
-  'effect:job-submit-expiring',
+  'effect:job-submit-expiring', 'effect:double-dispatch-probe', 'effect:concurrent-dispatch-probe',
 ];
 
 const JOB_INPUT_FROM = {
@@ -110,6 +110,23 @@ function makeDefinition() {
             targetState: 'open',
             effectIntents: [{ effectType: 'effect:cross-capability-probe', inputFrom: JOB_INPUT_FROM }],
           },
+          {
+            // [C01 R1 P1-1 falsifier] ONE effect whose handler calls the
+            // same external capability TWICE sequentially: the atomic
+            // per-effect dispatch claim must ground exactly one invocation.
+            transitionKey: 'probe-double-dispatch',
+            trigger: { kind: 'event', eventType: 'DOUBLE_DISPATCH_PROBED' },
+            targetState: 'open',
+            effectIntents: [{ effectType: 'effect:double-dispatch-probe', inputFrom: JOB_INPUT_FROM }],
+          },
+          {
+            // [C01 R1 P1-1 falsifier] The concurrent twin: Promise.all of two
+            // calls in ONE handler must also ground exactly one invocation.
+            transitionKey: 'probe-concurrent-dispatch',
+            trigger: { kind: 'event', eventType: 'CONCURRENT_DISPATCH_PROBED' },
+            targetState: 'open',
+            effectIntents: [{ effectType: 'effect:concurrent-dispatch-probe', inputFrom: JOB_INPUT_FROM }],
+          },
         ],
       },
       { stateKey: 'closed', kind: 'final' },
@@ -162,6 +179,8 @@ export function getPolicy() {
       'rule:notify-send': { ruleId: 'rule:notify-send', eventType: 'NOTIFICATION_REQUESTED', ...JOB_RULE_FIELDS },
       'rule:unpermitted-probe': { ruleId: 'rule:unpermitted-probe', eventType: 'UNPERMITTED_JOB_PROBED', ...JOB_RULE_FIELDS },
       'rule:cross-capability-probe': { ruleId: 'rule:cross-capability-probe', eventType: 'CROSS_CAPABILITY_PROBED', ...JOB_RULE_FIELDS },
+      'rule:double-dispatch-probe': { ruleId: 'rule:double-dispatch-probe', eventType: 'DOUBLE_DISPATCH_PROBED', ...JOB_RULE_FIELDS },
+      'rule:concurrent-dispatch-probe': { ruleId: 'rule:concurrent-dispatch-probe', eventType: 'CONCURRENT_DISPATCH_PROBED', ...JOB_RULE_FIELDS },
     },
     intentBindings: {
       submitExternalJob: { trigger: { kind: 'event', eventType: 'JOB_SUBMITTED' }, ruleId: 'rule:job-submit', roles: ['requester'] },
@@ -171,6 +190,8 @@ export function getPolicy() {
       sendNotification: { trigger: { kind: 'event', eventType: 'NOTIFICATION_REQUESTED' }, ruleId: 'rule:notify-send', roles: ['requester'] },
       submitUnpermittedJobProbe: { trigger: { kind: 'event', eventType: 'UNPERMITTED_JOB_PROBED' }, ruleId: 'rule:unpermitted-probe', roles: ['requester'] },
       submitCrossCapabilityProbe: { trigger: { kind: 'event', eventType: 'CROSS_CAPABILITY_PROBED' }, ruleId: 'rule:cross-capability-probe', roles: ['requester'] },
+      submitDoubleDispatchProbe: { trigger: { kind: 'event', eventType: 'DOUBLE_DISPATCH_PROBED' }, ruleId: 'rule:double-dispatch-probe', roles: ['requester'] },
+      submitConcurrentDispatchProbe: { trigger: { kind: 'event', eventType: 'CONCURRENT_DISPATCH_PROBED' }, ruleId: 'rule:concurrent-dispatch-probe', roles: ['requester'] },
     },
     effectBindings: {
       'effect:job-submit': {
@@ -223,6 +244,45 @@ export function getPolicy() {
         handler: externalCall('extjob', 'job.submit', (input, effectId) => ({
           requestId: input.requestId, jobSpec: input.jobSpec ?? null, effectId,
         })),
+      },
+      'effect:double-dispatch-probe': {
+        semantics: 'non-idempotent',
+        resource: { key: 'extjob', operation: 'job.submit' },
+        external: { permitTtlMs: 3_600_000, await: 'phase' },
+        // A deliberately trusted-but-buggy Business: two SEQUENTIAL calls in
+        // one effect. The second must be typed-refused before the provider.
+        handler: async ({ input, effectId, resources }) => {
+          await resources.call('extjob', 'job.submit', {
+            requestId: input.requestId, jobSpec: input.jobSpec ?? null, effectId,
+          });
+          return await resources.call('extjob', 'job.submit', {
+            requestId: `${String(input.requestId)}-second`, jobSpec: input.jobSpec ?? null, effectId,
+          });
+        },
+      },
+      'effect:concurrent-dispatch-probe': {
+        semantics: 'non-idempotent',
+        resource: { key: 'extjob', operation: 'job.submit' },
+        external: { permitTtlMs: 3_600_000, await: 'phase' },
+        // The concurrent twin: both calls start together (the Promise.all
+        // shape); the K claim arbitrates exactly one, and the loser is
+        // typed-refused. allSettled keeps the winner observable so the test
+        // asserts exactly one physical dispatch without timing races.
+        handler: async ({ input, effectId, resources }) => {
+          const results = await Promise.allSettled([
+            resources.call('extjob', 'job.submit', {
+              requestId: input.requestId, jobSpec: input.jobSpec ?? null, effectId,
+            }),
+            resources.call('extjob', 'job.submit', {
+              requestId: `${String(input.requestId)}-second`, jobSpec: input.jobSpec ?? null, effectId,
+            }),
+          ]);
+          const fulfilled = results.find((result) => result.status === 'fulfilled');
+          if (fulfilled === undefined) {
+            throw new Error('the concurrent probe grounded no dispatch');
+          }
+          return fulfilled.value;
+        },
       },
     },
   };

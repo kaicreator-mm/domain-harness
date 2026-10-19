@@ -1,9 +1,18 @@
-/** The K docs key of one live external Effect Permit (kernel legacy family). */
-export declare function effectPermitDocKey(effectId: string): string;
-/** The K docs key of one effect journal record (kernel legacy family). */
-export declare function effectJournalDocKey(effectId: string): string;
-/** The K docs key of one instance's admission fence (kernel legacy family). */
-export declare function admissionFenceDocKey(workflowId: string, instanceKey: string): string;
+/**
+ * The K-issued address context of ONE external effect dispatch (review R1
+ * P1-2): the kernel resolves these EXACT doc keys from its OWN doc-key
+ * family — the legacy `v08-kernel:` family OR the K02 scoped
+ * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:<kind>:`
+ * family — and hands them to the trusted gate through the kernel-minted
+ * attest channel. The gate never reconstructs a key and never falls back to
+ * the unscoped legacy family for a scoped deployment.
+ */
+export interface ExternalEffectAuthorityKeys {
+    readonly permit: string;
+    readonly journal: string;
+    readonly fence: string;
+    readonly dispatchClaim: string;
+}
 /** The selected external Effect Operation's phase envelope. */
 export type ExternalEffectEnvelope = {
     readonly phase: 'accepted';
@@ -27,9 +36,9 @@ export type ExternalEffectEnvelope = {
 };
 /** Typed normalization of ONE adapter return into the phase envelope. */
 export declare function normalizeExternalEffectEnvelope(raw: unknown): ExternalEffectEnvelope;
-/** The read-only view of the K docs port the gate needs. */
+/** The read-only K docs view the gate needs: scoped by the dispatching business. */
 export interface ExternalEffectDocsPort {
-    get(key: string): Promise<{
+    get(businessPackageId: string, key: string): Promise<{
         value: unknown;
         revision: number;
     } | null>;

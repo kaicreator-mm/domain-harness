@@ -132,6 +132,7 @@ async function c01Modules(): Promise<V10ModuleInput[]> {
       provides: [
         'business:policy/1', 'intent:submitExternalJob', 'intent:checkExternalJob', 'intent:reconcileExternalJob',
         'intent:sendNotification', 'intent:submitUnpermittedJobProbe', 'intent:submitCrossCapabilityProbe', 'intent:submitExpiringJob',
+        'intent:submitDoubleDispatchProbe', 'intent:submitConcurrentDispatchProbe',
       ], requires: [],
     },
     {
@@ -170,6 +171,8 @@ const ROUTES = [
   { intentId: 'sendNotification', operationId: 'notify.send', capabilityId: 'extnotify', handlerId: 'notifySend' },
   { intentId: 'submitUnpermittedJobProbe', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
   { intentId: 'submitCrossCapabilityProbe', operationId: 'notify.send', capabilityId: 'extnotify', handlerId: 'notifySend' },
+  { intentId: 'submitDoubleDispatchProbe', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
+  { intentId: 'submitConcurrentDispatchProbe', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
 ];
 
 async function buildC01App() {
@@ -566,12 +569,41 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
       invoked += 1;
       return { phase: 'terminal', externalRef: 'job:R-GATE', outcome: { ok: true, output: {} } };
     };
-    const claim = { effectPermit: { effectId, durableControlTurnId: turnId } };
+    // The K-issued address context: the legacy family of this unscoped
+    // activation. The gate reads EXACTLY these addresses (never a hardcoded
+    // family), so a scoped deployment is addressed under its own grammar.
+    const permitDoc = await docs.get(`v08-kernel:effect-permit:${effectId}`);
+    assert.ok(permitDoc !== null, 'the settled permit document exists at its kernel-issued address');
+    const permitTarget = (permitDoc.value as { target: { workflowId: string; instanceKey: string } }).target;
+    const keys = {
+      permit: `v08-kernel:effect-permit:${effectId}`,
+      journal: `v08-kernel:effect-journal:${effectId}`,
+      fence: `v08-kernel:admission-fence:${permitTarget.workflowId}:${permitTarget.instanceKey}`,
+      dispatchClaim: `v08-kernel:effect-dispatch-claim:${effectId}/attempt/1`,
+    };
+    const claim = {
+      effectPermit: {
+        effectId,
+        durableControlTurnId: turnId,
+        businessPackageId: BUSINESS_ID,
+        keys,
+      },
+    };
 
     // The settled turn's own permit claim: consumed ⇒ refused, zero invoke.
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs, nowIso: () => new Date(clock.now()).toISOString() }, {
-        capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' }, attest: { ...claim }, invoke,
+      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, nowIso: () => new Date(clock.now()).toISOString() }, {
+        capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' }, attest: claim, invoke,
+      }),
+      (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_CONSUMED'); return true; },
+    );
+
+    // A foreign business identity can never consume this permit, even when it
+    // names the exact live address: the scoped B is part of the authority tuple.
+    await assert.rejects(
+      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, nowIso: () => new Date(clock.now()).toISOString() }, {
+        capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' },
+        attest: { effectPermit: { ...claim.effectPermit, businessPackageId: 'business-foreign@v010.1.0.0' } }, invoke,
       }),
       (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_CONSUMED'); return true; },
     );
@@ -580,11 +612,103 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
     const foreignDocs = createV10DocsPort({ store: kStore, docsPrefix: `v10/k/${app.subjectDigest}/tenant:v010-foreign/`, assertOpen: () => {} });
     await assert.rejects(
       dispatchThroughExternalEffectGate({ docs: foreignDocs, nowIso: () => new Date(clock.now()).toISOString() }, {
-        capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' }, attest: { ...claim }, invoke,
+        capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' }, attest: claim, invoke,
       }),
       (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_UNKNOWN'); return true; },
     );
+    // A synthetic LIVE permit proves the scoped BUSINESS identity itself is
+    // part of the authority tuple: a foreign B naming the exact live address
+    // is typed-refused before journal/fence/adapter activity.
+    const liveEffectId = 'turn:synthetic:message:live-foreign';
+    await docs.put(`v08-kernel:effect-permit:${liveEffectId}`, {
+      pinVersion: 1, state: 'live', effectId: liveEffectId, durableControlTurnId: 'turn:synthetic',
+      businessPackageId: BUSINESS_ID, capabilityKey: 'extjob', operations: ['job.submit'],
+      awaitPolicy: 'phase', attempt: 1, expiresAt: new Date(clock.now() + 60_000).toISOString(),
+      target: { workflowId: 'external-jobs', instanceKey: 'instance:synthetic' },
+    }, { mustBeAbsent: true });
+    await assert.rejects(
+      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, nowIso: () => new Date(clock.now()).toISOString() }, {
+        capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-FOREIGN-B' },
+        attest: {
+          effectPermit: {
+            effectId: liveEffectId, durableControlTurnId: 'turn:synthetic',
+            businessPackageId: 'business-foreign@v010.1.0.0',
+            keys: {
+              permit: `v08-kernel:effect-permit:${liveEffectId}`,
+              journal: `v08-kernel:effect-journal:${liveEffectId}`,
+              fence: 'unreached-fence',
+              dispatchClaim: 'unreached-claim',
+            },
+          },
+        },
+        invoke,
+      }),
+      (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_SCOPE'); return true; },
+    );
+
     assert.equal(invoked, 0, 'the invoker never ran');
+  } finally {
+    clearPins();
+    extjobConsole.shutdown();
+  }
+});
+
+test('N-DOUBLE-DISPATCH (R1 P1-1 falsifier): two SEQUENTIAL calls in ONE effect ground exactly one adapter invocation', async () => {
+  await pinAdapterStores();
+  const clock = controlledClock();
+  try {
+    const activation = await activateV10App(await buildC01App(), { store: new PlainCasDocStore(), tenantId: TENANT, now: clock.now });
+
+    // The reviewed falsifier literally: one admitted effect, two sequential
+    // resources.call invocations of a non-idempotent external operation with
+    // DIFFERENT requestIds. The second must be typed-refused by the atomic
+    // per-(effectId,attempt) claim BEFORE the provider sees it.
+    await assert.rejects(
+      activation.facade.send(send({
+        intentType: 'submitDoubleDispatchProbe', messageId: 'msg:dbl-1',
+        input: { requestId: 'R-DBL', jobSpec: { kind: 'double' } },
+      })),
+      (error: unknown) => {
+        assert.match(effectFailureCode(error), /ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT/);
+        return true;
+      },
+    );
+    assert.equal(extjobConsole.dispatchCounts()['job.submit'], 1, 'the provider saw EXACTLY one submission');
+    assert.ok(extjobConsole.jobByKey('R-DBL') !== undefined, 'the first call landed');
+    assert.equal(extjobConsole.jobByKey('R-DBL-second'), undefined, 'the second call never reached the provider');
+
+    const kc = activation.facade.kCounters(BUSINESS_ID);
+    assert.equal(kc.effectDispatchClaims, 1, 'exactly one dispatch claim was taken');
+    assert.equal(kc.effectDispatchClaimRefusals, 1, 'the second call was typed-refused at the claim');
+    assert.equal(kc.effectPermitsMinted, 1, 'one effect still mints exactly one permit');
+
+    activation.dispose();
+  } finally {
+    clearPins();
+    extjobConsole.shutdown();
+  }
+});
+
+test('N-CONCURRENT-DISPATCH (R1 P1-1 falsifier): CONCURRENT calls in ONE effect ground exactly one adapter invocation', async () => {
+  await pinAdapterStores();
+  const clock = controlledClock();
+  try {
+    const activation = await activateV10App(await buildC01App(), { store: new PlainCasDocStore(), tenantId: TENANT, now: clock.now });
+
+    const receipt = await activation.facade.send(send({
+      intentType: 'submitConcurrentDispatchProbe', messageId: 'msg:conc-1',
+      input: { requestId: 'R-CONC', jobSpec: { kind: 'concurrent' } },
+    }));
+    assert.equal(receipt.status, 'admitted', 'the winning concurrent call admits the effect');
+    assert.equal(extjobConsole.dispatchCounts()['job.submit'], 1, 'the provider saw EXACTLY one submission under true concurrency');
+    const landed = ['R-CONC', 'R-CONC-second'].filter((key) => extjobConsole.jobByKey(key) !== undefined);
+    assert.equal(landed.length, 1, `exactly one requestId landed, got ${JSON.stringify(landed)}`);
+
+    const kc = activation.facade.kCounters(BUSINESS_ID);
+    assert.equal(kc.effectDispatchClaims, 1);
+    assert.equal(kc.effectDispatchClaimRefusals, 1, 'the concurrent loser was typed-refused at the atomic claim');
+
+    activation.dispose();
   } finally {
     clearPins();
     extjobConsole.shutdown();

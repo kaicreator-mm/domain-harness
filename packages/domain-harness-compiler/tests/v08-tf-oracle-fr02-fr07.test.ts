@@ -132,7 +132,7 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // effectPermitAdmin mint/consume on external bindings only, attest-channel
 // permit claim, additive effect-permit doc kind and counters);
 // FR02/FR07 semantics unchanged.
-const V08_K_BLOB = 'c208e3cc67fcdd5f138a373b76625be0fce4dacf';
+const V08_K_BLOB = '1a6a1394a505f4727306208d588fcab841e72980';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

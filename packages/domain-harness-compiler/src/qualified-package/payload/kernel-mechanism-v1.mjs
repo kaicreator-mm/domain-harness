@@ -1254,6 +1254,7 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         input: intent.input,
         ...(intent.idempotencyKey === undefined ? {} : { idempotencyKey: intent.idempotencyKey }),
         logicalTime: request.now,
+        attempt: record.attempt,
         externalDispatchProbe,
       });
       canonicalizeJson(output);
@@ -2774,6 +2775,9 @@ const K02_SCOPED_DOC_KINDS = [
   // scoped grammar so a scoped deployment keeps its permits inside its own
   // injective key namespace (additive kind; the six K02 kinds are unchanged).
   'effect-permit',
+  // [v0.10 C01 #1177 R1 P1-1] The atomic per-(effectId,attempt) external
+  // dispatch claim: one effect grounds at most one adapter invocation.
+  'effect-dispatch-claim',
 ];
 
 /**
@@ -2871,6 +2875,8 @@ function legacyKernelDocKeys() {
     receiptArchive: (turnId) => `v08-kernel:receipt-archive:${turnId}`,
     // [v0.10 C01 #1177] Legacy-family permit key (the v0.10 T00 facade path).
     effectPermit: (effectId) => `v08-kernel:effect-permit:${effectId}`,
+    // [v0.10 C01 #1177 R1 P1-1] Atomic external dispatch claim per effect+attempt.
+    effectDispatchClaim: (effectId, attempt) => `v08-kernel:effect-dispatch-claim:${effectId}/attempt/${attempt}`,
   };
 }
 
@@ -2907,6 +2913,7 @@ function scopedKernelDocKeys(scope) {
     decisionReceipt: (turnId) => scopedDocKey(frozen, 'decision-receipt', turnId),
     receiptArchive: (turnId) => scopedDocKey(frozen, 'receipt-archive', turnId),
     effectPermit: (effectId) => scopedDocKey(frozen, 'effect-permit', effectId),
+    effectDispatchClaim: (effectId, attempt) => scopedDocKey(frozen, 'effect-dispatch-claim', `${effectId}/attempt/${attempt}`),
   };
 }
 
@@ -4755,6 +4762,8 @@ export function createOccurrenceRuntime(options) {
     // [v0.10 C01 #1177] Live K-issued external Effect Permit observability.
     effectPermitsMinted: 0,
     effectPermitsConsumed: 0,
+    effectDispatchClaims: 0,
+    effectDispatchClaimRefusals: 0,
     engineCommits: 0,
     instanceCreates: 0,
     instanceReads: 0,
@@ -5646,6 +5655,61 @@ export function createOccurrenceRuntime(options) {
       counters.effectDispatches += 1;
       const binding = businessEndpoint.effectBindings[request.binding.effectType];
       const externalConfig = normalizeExternalEffectConfig(binding?.external);
+      // [v0.10 C01 #1177 R1 P1-1] The exact per-effect dispatch attempt this
+      // executor call represents (the kernel passes its journaled attempt).
+      const attempt = Number.isSafeInteger(request.attempt) ? request.attempt : 1;
+      // The K-issued ADDRESS CONTEXT of this effect's authority documents: the
+      // gate re-reads exactly these keys - never a hardcoded legacy family -
+      // so a scoped deployment is addressed under its own injective grammar.
+      const authorityContext = externalConfig === null ? null : {
+        effectId: request.effectId,
+        durableControlTurnId: request.durableControlTurnId,
+        businessPackageId: businessEndpoint.packageId,
+        keys: {
+          permit: docKeys.effectPermit(request.effectId),
+          journal: docKeys.journal(request.effectId),
+          fence: docKeys.admissionFence(request.target),
+          dispatchClaim: docKeys.effectDispatchClaim(request.effectId, attempt),
+        },
+        attempt,
+      };
+      // Atomic per-(effectId,attempt) claim: ONE effect grounds at most ONE
+      // adapter invocation, enforced by a physical mustBeAbsent CAS before
+      // any raw resources call. A refusal is fail-closed typed and carries NO
+      // zero-external-effect proof (an earlier invocation may have landed).
+      const claimExternalDispatch = async () => {
+        if (authorityContext === null) return;
+        try {
+          await docs.put(
+            authorityContext.keys.dispatchClaim,
+            {
+              pinVersion: 1,
+              effectId: authorityContext.effectId,
+              durableControlTurnId: authorityContext.durableControlTurnId,
+              businessPackageId: authorityContext.businessPackageId,
+              attempt: authorityContext.attempt,
+              claimedAt: clock(),
+            },
+            { mustBeAbsent: true },
+          );
+          counters.effectDispatchClaims += 1;
+        } catch (error) {
+          counters.effectDispatchClaimRefusals += 1;
+          // The attest stays UNMARKED (preHandlerRefusal remains null): an
+          // ambiguous or repeated dispatch claim proves nothing about the
+          // external world, so the #1108 zero-effect policy must not act on it.
+          if (isHostWriteConflict(error)) {
+            throw new CentralAdmissionError(
+              'ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT',
+              `[ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT] effect ${request.effectId} already grounded an external dispatch attempt ${authorityContext.attempt}; one effect never dispatches twice`,
+            );
+          }
+          throw new CentralAdmissionError(
+            'ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT',
+            `[ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT] the external dispatch claim for ${request.effectId} is ambiguous: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      };
       // [#1108 K01 R1 P1 / R2 P1] The Business handler's ONLY external-mutation
       // authority is the physical resources port (v0.8 Host contract). The
       // dispatch probe records whether the handler ever invoked it, and every
@@ -5667,39 +5731,35 @@ export function createOccurrenceRuntime(options) {
         || rawResources === null || typeof rawResources !== 'object')
         ? rawResources
           : {
-            call: (resourceKey, operation, payload) => {
+            call: async (resourceKey, operation, payload) => {
               // Mint and register the attest BEFORE the call: a synchronous
               // throw below still leaves the (unmarked) attestation in the
               // probe, which fails the all-attested proof — fail-closed.
               const attest = { preHandlerRefusal: null };
-              if (externalConfig !== null) {
+              if (authorityContext !== null) {
                 // [v0.10 C01 #1177] The kernel-issued live permit CLAIM rides
                 // the attest channel — the only channel a trusted host
                 // dispatcher reads. The durable permit document remains the
                 // authority the host gate re-reads; a claim alone proves
                 // nothing and a Business handler can neither mint nor strip
                 // this channel.
-                attest.effectPermit = {
-                  effectId: request.effectId,
-                  durableControlTurnId: request.durableControlTurnId,
-                };
+                attest.effectPermit = { ...authorityContext };
               }
               probe.dispatchAttests.push(attest);
               probe.invoked = true;
+              await claimExternalDispatch();
               return rawResources.call(resourceKey, operation, payload, attest);
             },
             ...(typeof rawResources.callScoped === 'function'
               ? {
-                  callScoped: (scopeId, resourceKey, operation, payload) => {
+                  callScoped: async (scopeId, resourceKey, operation, payload) => {
                     const attest = { preHandlerRefusal: null };
-                    if (externalConfig !== null) {
-                      attest.effectPermit = {
-                        effectId: request.effectId,
-                        durableControlTurnId: request.durableControlTurnId,
-                      };
+                    if (authorityContext !== null) {
+                      attest.effectPermit = { ...authorityContext };
                     }
                     probe.dispatchAttests.push(attest);
                     probe.invoked = true;
+                    await claimExternalDispatch();
                     return rawResources.callScoped(scopeId, resourceKey, operation, payload, attest);
                   },
                 }
