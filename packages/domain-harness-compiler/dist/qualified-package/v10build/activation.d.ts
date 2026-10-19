@@ -33,6 +33,8 @@ export interface V10AppView {
             handler: string;
         }[] | null;
         readonly capabilityId?: string | null;
+        /** Sealed external Effect provider flag (BUILD fact, C01 #1177). */
+        readonly externalEffect?: boolean | null;
     }[];
     readonly loadOrder: readonly string[];
     readonly routes: readonly {
@@ -91,6 +93,8 @@ export interface V10Counters {
         code: string;
         message: string;
     }[];
+    externalEffectDispatches: number;
+    externalEffectRefusals: number;
 }
 export declare function freshV10Counters(): V10Counters;
 export interface V10PublicIntent {
@@ -143,6 +147,20 @@ export interface ActivateV10AppOptions {
     readonly now?: () => number;
     readonly counters?: V10Counters;
     /**
+     * [v0.10 C01 #1177 R1 P1-2] The stable deployment identity of this App
+     * (deployedAppId/tenantId/appId). When present, EVERY business runtime is
+     * created under the K02 SCOPED document grammar with its own
+     * businessPackageId appended — the exact injective tuple the K02 selected
+     * kernel owns — so C01 permits/journals/fences live in the same scoped
+     * namespace as every other K record. Absent: the historical unscoped
+     * legacy family, byte-for-byte compatible.
+     */
+    readonly deploymentIdentity?: {
+        readonly deployedAppId: string;
+        readonly tenantId: string;
+        readonly appId: string;
+    };
+    /**
      * Deployment anchor for resolving the DECLARED bare npm/native imports of
      * sealed modules — the deployment root whose `node_modules` physically
      * holds the installed dependencies (the A01-PC05 "installed" half of the
@@ -175,6 +193,11 @@ export declare class V10AppFacade {
         tenantId: string;
         now: () => number;
         counters: V10Counters;
+        deploymentIdentity?: {
+            deployedAppId: string;
+            tenantId: string;
+            appId: string;
+        };
     });
     get selectedExtensions(): readonly {
         packageId: string;

@@ -13,3 +13,5 @@ export { buildV10App } from './build.js';
 export type { BuildV10AppOptions, V10BuiltApp, V10ModuleInput, V10RouteRowInput, V10SealedModule, } from './build.js';
 export { V10ActivationError, V10AppFacade, V10PortDeniedError, activateV10App, freshV10Counters, } from './activation.js';
 export type { ActivateV10AppOptions, V10Activation, V10AppView, V10Counters, V10DocStore, V10DocWriteCondition, V10PublicIntent, } from './activation.js';
+export { dispatchThroughExternalEffectGate, normalizeExternalEffectEnvelope, } from './external-effect.js';
+export type { ExternalEffectAuthorityKeys, ExternalEffectEnvelope, ExternalEffectDispatchRequest, ExternalEffectGateDeps, } from './external-effect.js';

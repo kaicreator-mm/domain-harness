@@ -31,6 +31,13 @@ export interface V10ModuleInput {
         operationId: string;
         handler: string;
     }[];
+    /**
+     * [v0.10 C01 #1177] Seal this capability as an external Effect provider:
+     * every resource call to it dispatches ONLY through the selected K→C
+     * external Effect Operation gate (live K-issued permit required). A BUILD
+     * trust fact, capability role only — never caller data.
+     */
+    readonly externalEffect?: boolean;
 }
 export interface V10RouteRowInput {
     readonly intentId: string;
@@ -73,6 +80,8 @@ export interface V10SealedModule {
         operationId: string;
         handler: string;
     }[] | null;
+    /** Sealed external Effect provider flag (capability role only, C01 #1177). */
+    readonly externalEffect: boolean;
 }
 /** The v0.10 built App: plain frozen data, no approval, sealed load order. */
 export interface V10BuiltApp {

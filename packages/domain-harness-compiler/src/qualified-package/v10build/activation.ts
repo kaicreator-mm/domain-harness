@@ -52,6 +52,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
+import { dispatchThroughExternalEffectGate } from './external-effect.js';
 
 export class V10ActivationError extends Error {
   readonly code: string;
@@ -95,6 +96,8 @@ export interface V10AppView {
     readonly featureExport?: string | null;
     readonly handlers?: readonly { operationId: string; handler: string }[] | null;
     readonly capabilityId?: string | null;
+    /** Sealed external Effect provider flag (BUILD fact, C01 #1177). */
+    readonly externalEffect?: boolean | null;
   }[];
   readonly loadOrder: readonly string[];
   readonly routes: readonly { intentId: string; operationId: string; capabilityId: string; handlerId: string }[];
@@ -132,6 +135,8 @@ export interface V10Counters {
   portProbes: { packageId: string; name: string }[];
   portDenials: number;
   activationRefusals: { code: string; message: string }[];
+  externalEffectDispatches: number;
+  externalEffectRefusals: number;
 }
 
 export function freshV10Counters(): V10Counters {
@@ -147,6 +152,8 @@ export function freshV10Counters(): V10Counters {
     portProbes: [],
     portDenials: 0,
     activationRefusals: [],
+    externalEffectDispatches: 0,
+    externalEffectRefusals: 0,
   };
 }
 
@@ -413,6 +420,47 @@ export function createV10DocsPort(deps: { store: V10DocStore; docsPrefix: string
   };
 }
 
+/** The K02 key-component encoding (percent and colon only). */
+function encodeK02Component(value: string): string {
+  return value.replace(/%/g, '%25').replace(/:/g, '%3A');
+}
+
+/**
+ * [v0.10 C01 #1177 R1 P1-2] The K02 SCOPED document-store composition: the
+ * exact two-B namespace mechanism the K02 physical witness exercises. Every
+ * key of one deployment tuple — instance, fence, journal, permit, dispatch
+ * claim, disposition, governance pin, receipt archive — is addressed under
+ * the injective `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
+ * prefix, applied by the HOST docs port. The kernel keeps issuing its own
+ * relative keys; a scoped deployment physically cannot resolve an unprefixed
+ * key through this view (no legacy fallback exists). The composition (rather
+ * than re-keying only the six kernel families) is required because the
+ * governance pin family must be disjoint for two B sharing one
+ * workflowId/instanceKey — K02's own witness proves exactly this shape.
+ */
+function scopedDocsView(base: V10DocsPort, scope: {
+  deployedAppId: string; tenantId: string; appId: string; businessPackageId: string;
+}): V10DocsPort {
+  const prefix = ['v010-k02',
+    encodeK02Component(scope.deployedAppId),
+    encodeK02Component(scope.tenantId),
+    encodeK02Component(scope.appId),
+    encodeK02Component(scope.businessPackageId),
+  ].join(':') + ':';
+  const view: V10DocsPort = {
+    get: async (key) => await base.get(`${prefix}${key}`),
+    put: async (key, value, condition) => await base.put(`${prefix}${key}`, value, condition),
+    list: async (keyPrefix) => (await base.list(`${prefix}${keyPrefix}`)).map((key) => key.slice(prefix.length)),
+  };
+  if (base.remove === undefined) return view;
+  return {
+    ...view,
+    remove: async (key, condition) => {
+      await (base.remove as (key: string, condition: unknown) => Promise<void>)(`${prefix}${key}`, condition);
+    },
+  };
+}
+
 /** One bounded, data-only, port-denying init context for ONE advisory module. */
 function advisoryContext(app: V10AppView, counters: V10Counters, packageId: string): Record<string, unknown> {
   const base: Record<string, unknown> = Object.freeze({
@@ -454,6 +502,20 @@ export interface ActivateV10AppOptions {
   readonly now?: () => number;
   readonly counters?: V10Counters;
   /**
+   * [v0.10 C01 #1177 R1 P1-2] The stable deployment identity of this App
+   * (deployedAppId/tenantId/appId). When present, EVERY business runtime is
+   * created under the K02 SCOPED document grammar with its own
+   * businessPackageId appended — the exact injective tuple the K02 selected
+   * kernel owns — so C01 permits/journals/fences live in the same scoped
+   * namespace as every other K record. Absent: the historical unscoped
+   * legacy family, byte-for-byte compatible.
+   */
+  readonly deploymentIdentity?: {
+    readonly deployedAppId: string;
+    readonly tenantId: string;
+    readonly appId: string;
+  };
+  /**
    * Deployment anchor for resolving the DECLARED bare npm/native imports of
    * sealed modules — the deployment root whose `node_modules` physically
    * holds the installed dependencies (the A01-PC05 "installed" half of the
@@ -492,6 +554,8 @@ export class V10AppFacade {
   readonly #docsPrefix: string;
   readonly #docs: V10DocsPort;
   readonly #runtimes = new Map<string, KRuntime>();
+  readonly #deploymentIdentity: { deployedAppId: string; tenantId: string; appId: string } | undefined;
+  readonly #scopedDocs = new Map<string, V10DocsPort>();
   #closed = false;
 
   constructor(deps: {
@@ -502,11 +566,13 @@ export class V10AppFacade {
     tenantId: string;
     now: () => number;
     counters: V10Counters;
+    deploymentIdentity?: { deployedAppId: string; tenantId: string; appId: string };
   }) {
     this.#app = deps.app;
     this.#namespaces = deps.namespaces;
     this.#now = deps.now;
     this.#counters = deps.counters;
+    this.#deploymentIdentity = deps.deploymentIdentity;
     this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
     this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
   }
@@ -571,9 +637,29 @@ export class V10AppFacade {
     }
   }
 
+  /**
+   * [R1 P1-2] The docs view ONE business runtime (and its external-effect
+   * gate) must use: the plain K port for the historical unscoped wiring, or
+   * the per-B K02 scoped view of a deployment-identity activation. The view
+   * is cached per business package — one B, one namespace.
+   */
+  #docsFor(businessPackageId: string): V10DocsPort {
+    if (this.#deploymentIdentity === undefined) return this.#docs;
+    const cached = this.#scopedDocs.get(businessPackageId);
+    if (cached !== undefined) return cached;
+    const view = scopedDocsView(this.#docs, {
+      deployedAppId: this.#deploymentIdentity.deployedAppId,
+      tenantId: this.#deploymentIdentity.tenantId,
+      appId: this.#deploymentIdentity.appId,
+      businessPackageId,
+    });
+    this.#scopedDocs.set(businessPackageId, view);
+    return view;
+  }
+
   /** Sealed capability dispatch: the ONLY physical resource port here. */
   readonly #resources = {
-    call: async (capabilityId: unknown, operationId: unknown, payload: unknown): Promise<unknown> => {
+    call: async (capabilityId: unknown, operationId: unknown, payload: unknown, attest?: unknown): Promise<unknown> => {
       this.#assertOpen();
       if (typeof capabilityId !== 'string' || typeof operationId !== 'string' || !isPlainRecord(payload)) {
         refuse('RESOURCE_INPUT_INVALID', 'a resource call requires (capabilityId, operationId, record payload)');
@@ -581,11 +667,51 @@ export class V10AppFacade {
       const entry = this.#app.modules.find((module) => module.role === 'capability' && module.capabilityId === capabilityId);
       const handlerName = entry?.handlers?.find((handler) => handler.operationId === operationId)?.handler;
       if (entry === undefined || handlerName === undefined) {
+        if (entry?.externalEffect === true && isPlainRecord(attest)) {
+          (attest as { preHandlerRefusal: unknown }).preHandlerRefusal = 'RESOURCE_ROUTE_UNSEALED';
+        }
         refuse('RESOURCE_ROUTE_UNSEALED', `resource ${capabilityId}:${operationId} is not sealed in this App`);
       }
       const handler = this.#namespaces.get(entry.packageId)?.[handlerName];
       if (typeof handler !== 'function') {
+        if (entry.externalEffect === true && isPlainRecord(attest)) {
+          (attest as { preHandlerRefusal: unknown }).preHandlerRefusal = 'RESOURCE_ABI_INVALID';
+        }
         refuse('RESOURCE_ABI_INVALID', `sealed handler ${handlerName} is not callable`);
+      }
+      if (entry.externalEffect === true) {
+        // [v0.10 C01 #1177] A sealed external Effect provider dispatches ONLY
+        // through the selected K→C external Effect Operation gate: a live
+        // K-issued permit — re-read from the durable K docs together with the
+        // journal record and the held admission fence — authorizes exactly
+        // this capability/operation/turn. Anything less is a typed refusal
+        // with ZERO adapter dispatch, marked into the kernel-minted attest
+        // (the trusted pre-handler-refusal discipline of #1108 K01).
+        return await dispatchThroughExternalEffectGate(
+          {
+            // [R1 P1-2] The gate reads through the DISPATCHING business's own
+            // K docs view: a scoped deployment resolves the kernel-issued
+            // addresses inside that B's namespace only (no legacy fallback).
+            docs: {
+              get: async (businessPackageId: string, key: string) => await this.#docsFor(businessPackageId).get(key),
+            },
+            nowIso: (): string => new Date(this.#now()).toISOString(),
+            onDispatch: (): void => {
+              this.#counters.externalEffectDispatches += 1;
+            },
+            onRefusal: (): void => {
+              this.#counters.externalEffectRefusals += 1;
+            },
+          },
+          {
+            capabilityId,
+            operationId,
+            payload,
+            attest,
+            invoke: (adapterPayload, dispatchContext): Promise<unknown> =>
+              (handler as (input: unknown, context: unknown) => Promise<unknown>)(adapterPayload, dispatchContext),
+          },
+        );
       }
       return await (handler as (input: unknown) => unknown)(payload);
     },
@@ -615,7 +741,9 @@ export class V10AppFacade {
     const runtime = createRuntime({
       moduleIdentity: { packageId: kernelEntry.packageId, moduleSha256: kernelEntry.moduleSha256 ?? null },
       hostPorts: {
-        docs: this.#docs,
+        // Each B owns its own K docs view; under a deployment identity that
+        // view is the K02 scoped namespace of THIS business package.
+        docs: this.#docsFor(businessPackageId),
         resources: this.#resources,
         sha256: { digestUtf8: (value: string): string => sha256Hex(value) },
         clock: (): string => new Date(this.#now()).toISOString(),
@@ -846,14 +974,36 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
         dispose: undefined,
       });
     }
+    // [v0.10 C01 #1177 R1 P1-2] Optional deployment identity: validated here
+    // once, then carried into every business runtime's K02 scoped namespace.
+    let deploymentIdentity: { deployedAppId: string; tenantId: string; appId: string } | undefined;
+    if (options.deploymentIdentity !== undefined) {
+      const raw = options.deploymentIdentity as unknown;
+      if (!isPlainRecord(raw)) {
+        refuse('V10_APP_INVALID', 'deploymentIdentity must be a plain record');
+      }
+      const identity = { deployedAppId: '', tenantId: '', appId: '' };
+      for (const field of ['deployedAppId', 'tenantId', 'appId'] as const) {
+        const value = raw[field];
+        if (typeof value !== 'string' || value.length === 0 || value.length > 256) {
+          refuse('V10_APP_INVALID', `deploymentIdentity.${field} must be a bounded non-empty string`);
+        }
+        identity[field] = value;
+      }
+      if (options.tenantId !== undefined && options.tenantId !== identity.tenantId) {
+        refuse('V10_APP_INVALID', 'options.tenantId and deploymentIdentity.tenantId disagree; one deployment owns one tenant identity');
+      }
+      deploymentIdentity = identity;
+    }
     const facade = new V10AppFacade({
       app: appView,
       namespaces,
       advisories,
       store: options.store,
-      tenantId: options.tenantId ?? 'tenant:v010-default',
+      tenantId: deploymentIdentity?.tenantId ?? options.tenantId ?? 'tenant:v010-default',
       now: options.now ?? (() => 0),
       counters,
+      ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
     });
     const failActivation = (code: string, failedPackageId: string, message: string): never => {
       for (let index = initialized.length - 1; index >= 0; index -= 1) {

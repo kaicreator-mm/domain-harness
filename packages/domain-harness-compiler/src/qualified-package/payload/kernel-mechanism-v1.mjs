@@ -1066,6 +1066,48 @@ function selectAdmittedTransition(request, input, trace) {
   return { rejected: lastRejected ?? { transitionKey: candidates[0]?.transitionKey ?? '' } };
 }
 
+// ===========================================================================
+// [v0.10 C01 #1177] External Effect binding configuration. A Business effect
+// binding may declare `external` to route its dispatch through the selected
+// K→C external Effect Operation: the kernel then mints a LIVE one-time Effect
+// Permit document (see effectPermitAdmin) before the executor runs and
+// consumes it (exact-revision CAS) as soon as the dispatch settles. The
+// config is bounded data only — ttl, await policy and an optional extra
+// operation allowlist; no authority is configurable from here.
+// ===========================================================================
+function normalizeExternalEffectConfig(raw) {
+  if (raw === undefined || raw === null) return null;
+  if (!isJsonRecord(raw)) {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      'an external effect binding config must be a plain record',
+    );
+  }
+  const permitTtlMs = raw.permitTtlMs === undefined ? 60_000 : raw.permitTtlMs;
+  if (!Number.isSafeInteger(permitTtlMs) || permitTtlMs < 1 || permitTtlMs > 3_600_000) {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      'external.permitTtlMs must be a safe integer within 1..3600000 milliseconds',
+    );
+  }
+  const awaitPolicy = raw.await === undefined ? 'phase' : raw.await;
+  if (awaitPolicy !== 'phase' && awaitPolicy !== 'terminal') {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      "external.await must be 'phase' (honest accepted/running envelopes) or 'terminal' (fail-closed pending)",
+    );
+  }
+  const extra = raw.operations === undefined ? [] : raw.operations;
+  if (!Array.isArray(extra) || extra.length > 8
+    || extra.some((op) => typeof op !== 'string' || op.length === 0 || op.length > 128)) {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      'external.operations must be a bounded array of non-empty operation id strings',
+    );
+  }
+  return { permitTtlMs, awaitPolicy, operations: [...extra] };
+}
+
 async function executeEffectIntents(intents, request, ports, turnId) {
   const outcomes = [];
   let ordinal = 0;
@@ -1149,6 +1191,52 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       );
     }
 
+    // [v0.10 C01 #1177] Live K-issued permit for an external effect binding:
+    // minted AFTER the journal begin/replay gates and BEFORE the executor
+    // runs. A mint refusal is journaled as a proven zero-external-effect
+    // failure first (mirroring the executor-failure discipline below), then
+    // throws typed — the fence policy can act on it, and no executor ran.
+    let permit = null;
+    if (binding.external !== null && ports.effectPermitAdmin !== undefined) {
+      try {
+        const minted = await ports.effectPermitAdmin.mint({
+          effectId,
+          turnId,
+          effectType: intent.effectType,
+          effectSemantics: binding.effectSemantics,
+          external: binding.external,
+          resource: binding.resource,
+          target: request.target,
+          attempt: record.attempt,
+          issuedAt: request.now,
+        });
+        permit = { effectId, revision: minted.revision };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        let marked = false;
+        try {
+          await ports.effectJournal.completeEffect(
+            effectId,
+            { status: 'failed', error: { message, zeroExternalEffect: true }, completedAt: request.now },
+          );
+          marked = true;
+        } catch {
+          // The failure record itself is not durable: doubly unknown — no
+          // zero-external-effect proof is attached and the fence stays held.
+        }
+        const typed = error instanceof CentralAdmissionError && error.code === 'ADMISSION_EFFECT_PERMIT_CONFLICT'
+          ? error
+          : new CentralAdmissionError(
+              'ADMISSION_EFFECT_PERMIT_CONFLICT',
+              `effect permit mint for ${effectId} failed: ${message}`,
+            );
+        if (marked) {
+          typed.zeroExternalEffect = true;
+        }
+        throw typed;
+      }
+    }
+
     let output;
     // [#1108 K01 R1 P1 / R2 P1] The dispatch probe: the runtime's own executor
     // marks whether the Business handler ever invoked the physical resource
@@ -1166,6 +1254,7 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         input: intent.input,
         ...(intent.idempotencyKey === undefined ? {} : { idempotencyKey: intent.idempotencyKey }),
         logicalTime: request.now,
+        attempt: record.attempt,
         externalDispatchProbe,
       });
       canonicalizeJson(output);
@@ -1197,6 +1286,21 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       // effect fault; a possibly-landed lost-ACK outcome carries NO proof and
       // the admission fence policy in admitCentralDecision keeps the fence
       // held (fail-closed UNKNOWN until reconciliation).
+      // [v0.10 C01] The executor failed; the live permit is still consumed
+      // (dead) once the failure record IS durable. A consume failure here is
+      // MORE uncertain than the failure itself: surface the journal-conflict
+      // class (UNKNOWN), never a clean FAILED the zero-ambiguity fence
+      // release could act on.
+      if (permit !== null) {
+        try {
+          await ports.effectPermitAdmin.consume(permit.effectId, permit.revision);
+        } catch (consumeError) {
+          throw new CentralAdmissionError(
+            'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+            `effect ${effectId} failed (${message}) and its permit consume is ambiguous: ${consumeError instanceof Error ? consumeError.message : String(consumeError)}`,
+          );
+        }
+      }
       const typed = new CentralAdmissionError(
         'ADMISSION_EFFECT_FAILED',
         `effect ${effectId} (${intent.effectType}) failed: ${message}`,
@@ -1205,6 +1309,21 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         typed.zeroExternalEffect = true;
       }
       throw typed;
+    }
+
+    // [v0.10 C01 #1177] Consume the live permit BEFORE the journal completes:
+    // an ambiguous consume surfaces as a typed journal conflict (the UNKNOWN
+    // class) — the executor output is discarded, nothing terminal is claimed,
+    // and the journal stays `started` so every replay gate stays honest.
+    if (permit !== null) {
+      try {
+        await ports.effectPermitAdmin.consume(permit.effectId, permit.revision);
+      } catch (error) {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+          `effect permit consume for ${effectId} is ambiguous after the executor settled: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     let committed;
@@ -2652,6 +2771,13 @@ const K02_SCOPED_DOC_KINDS = [
   'turn-disposition',
   'decision-receipt',
   'receipt-archive',
+  // [v0.10 C01 #1177] The K-issued live external Effect Permit rides the same
+  // scoped grammar so a scoped deployment keeps its permits inside its own
+  // injective key namespace (additive kind; the six K02 kinds are unchanged).
+  'effect-permit',
+  // [v0.10 C01 #1177 R1 P1-1] The atomic per-(effectId,attempt) external
+  // dispatch claim: one effect grounds at most one adapter invocation.
+  'effect-dispatch-claim',
 ];
 
 /**
@@ -2747,6 +2873,10 @@ function legacyKernelDocKeys() {
     turnDisposition: (turnId) => turnDispositionDocKey(turnId),
     decisionReceipt: (turnId) => decisionReceiptDocKey(turnId),
     receiptArchive: (turnId) => `v08-kernel:receipt-archive:${turnId}`,
+    // [v0.10 C01 #1177] Legacy-family permit key (the v0.10 T00 facade path).
+    effectPermit: (effectId) => `v08-kernel:effect-permit:${effectId}`,
+    // [v0.10 C01 #1177 R1 P1-1] Atomic external dispatch claim per effect+attempt.
+    effectDispatchClaim: (effectId, attempt) => `v08-kernel:effect-dispatch-claim:${effectId}/attempt/${attempt}`,
   };
 }
 
@@ -2782,6 +2912,8 @@ function scopedKernelDocKeys(scope) {
     turnDisposition: (turnId) => scopedDocKey(frozen, 'turn-disposition', turnId),
     decisionReceipt: (turnId) => scopedDocKey(frozen, 'decision-receipt', turnId),
     receiptArchive: (turnId) => scopedDocKey(frozen, 'receipt-archive', turnId),
+    effectPermit: (effectId) => scopedDocKey(frozen, 'effect-permit', effectId),
+    effectDispatchClaim: (effectId, attempt) => scopedDocKey(frozen, 'effect-dispatch-claim', `${effectId}/attempt/${attempt}`),
   };
 }
 
@@ -4627,6 +4759,11 @@ export function createOccurrenceRuntime(options) {
     journalBegins: 0,
     journalCompletes: 0,
     effectDispatches: 0,
+    // [v0.10 C01 #1177] Live K-issued external Effect Permit observability.
+    effectPermitsMinted: 0,
+    effectPermitsConsumed: 0,
+    effectDispatchClaims: 0,
+    effectDispatchClaimRefusals: 0,
     engineCommits: 0,
     instanceCreates: 0,
     instanceReads: 0,
@@ -5503,11 +5640,76 @@ export function createOccurrenceRuntime(options) {
     resolve(effectType) {
       const binding = businessEndpoint.effectBindings?.[effectType];
       if (binding === undefined) return undefined;
-      return { effectType, effectSemantics: binding.semantics };
+      return {
+        effectType,
+        effectSemantics: binding.semantics,
+        // [v0.10 C01 #1177] The binding's external routing config, validated
+        // here so a malformed declaration refuses at resolve time — before
+        // any journal begin. `resource` rides along so the minted permit is
+        // scoped to the declared capability key and operation set.
+        external: normalizeExternalEffectConfig(binding.external),
+        resource: isJsonRecord(binding.resource) ? binding.resource : null,
+      };
     },
     async execute(request) {
       counters.effectDispatches += 1;
       const binding = businessEndpoint.effectBindings[request.binding.effectType];
+      const externalConfig = normalizeExternalEffectConfig(binding?.external);
+      // [v0.10 C01 #1177 R1 P1-1] The exact per-effect dispatch attempt this
+      // executor call represents (the kernel passes its journaled attempt).
+      const attempt = Number.isSafeInteger(request.attempt) ? request.attempt : 1;
+      // The K-issued ADDRESS CONTEXT of this effect's authority documents: the
+      // gate re-reads exactly these keys - never a hardcoded legacy family -
+      // so a scoped deployment is addressed under its own injective grammar.
+      const authorityContext = externalConfig === null ? null : {
+        effectId: request.effectId,
+        durableControlTurnId: request.durableControlTurnId,
+        businessPackageId: businessEndpoint.packageId,
+        keys: {
+          permit: docKeys.effectPermit(request.effectId),
+          journal: docKeys.journal(request.effectId),
+          fence: docKeys.admissionFence(request.target),
+          dispatchClaim: docKeys.effectDispatchClaim(request.effectId, attempt),
+        },
+        attempt,
+      };
+      // Atomic per-(effectId,attempt) claim: ONE effect grounds at most ONE
+      // adapter invocation, enforced by a physical mustBeAbsent CAS before
+      // any raw resources call. A refusal is fail-closed typed and carries NO
+      // zero-external-effect proof (an earlier invocation may have landed).
+      const claimExternalDispatch = async () => {
+        if (authorityContext === null) return;
+        try {
+          await docs.put(
+            authorityContext.keys.dispatchClaim,
+            {
+              pinVersion: 1,
+              effectId: authorityContext.effectId,
+              durableControlTurnId: authorityContext.durableControlTurnId,
+              businessPackageId: authorityContext.businessPackageId,
+              attempt: authorityContext.attempt,
+              claimedAt: clock(),
+            },
+            { mustBeAbsent: true },
+          );
+          counters.effectDispatchClaims += 1;
+        } catch (error) {
+          counters.effectDispatchClaimRefusals += 1;
+          // The attest stays UNMARKED (preHandlerRefusal remains null): an
+          // ambiguous or repeated dispatch claim proves nothing about the
+          // external world, so the #1108 zero-effect policy must not act on it.
+          if (isHostWriteConflict(error)) {
+            throw new CentralAdmissionError(
+              'ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT',
+              `[ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT] effect ${request.effectId} already grounded an external dispatch attempt ${authorityContext.attempt}; one effect never dispatches twice`,
+            );
+          }
+          throw new CentralAdmissionError(
+            'ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT',
+            `[ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT] the external dispatch claim for ${request.effectId} is ambiguous: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      };
       // [#1108 K01 R1 P1 / R2 P1] The Business handler's ONLY external-mutation
       // authority is the physical resources port (v0.8 Host contract). The
       // dispatch probe records whether the handler ever invoked it, and every
@@ -5528,22 +5730,36 @@ export function createOccurrenceRuntime(options) {
       const handlerResources = (probe === undefined || probe === null || typeof probe !== 'object'
         || rawResources === null || typeof rawResources !== 'object')
         ? rawResources
-        : {
-            call: (resourceKey, operation, payload) => {
+          : {
+            call: async (resourceKey, operation, payload) => {
               // Mint and register the attest BEFORE the call: a synchronous
               // throw below still leaves the (unmarked) attestation in the
               // probe, which fails the all-attested proof — fail-closed.
               const attest = { preHandlerRefusal: null };
+              if (authorityContext !== null) {
+                // [v0.10 C01 #1177] The kernel-issued live permit CLAIM rides
+                // the attest channel — the only channel a trusted host
+                // dispatcher reads. The durable permit document remains the
+                // authority the host gate re-reads; a claim alone proves
+                // nothing and a Business handler can neither mint nor strip
+                // this channel.
+                attest.effectPermit = { ...authorityContext };
+              }
               probe.dispatchAttests.push(attest);
               probe.invoked = true;
+              await claimExternalDispatch();
               return rawResources.call(resourceKey, operation, payload, attest);
             },
             ...(typeof rawResources.callScoped === 'function'
               ? {
-                  callScoped: (scopeId, resourceKey, operation, payload) => {
+                  callScoped: async (scopeId, resourceKey, operation, payload) => {
                     const attest = { preHandlerRefusal: null };
+                    if (authorityContext !== null) {
+                      attest.effectPermit = { ...authorityContext };
+                    }
                     probe.dispatchAttests.push(attest);
                     probe.invoked = true;
+                    await claimExternalDispatch();
                     return rawResources.callScoped(scopeId, resourceKey, operation, payload, attest);
                   },
                 }
@@ -5562,6 +5778,84 @@ export function createOccurrenceRuntime(options) {
         target: request.target,
         resources: handlerResources,
       });
+    },
+  };
+
+  // [v0.10 C01 #1177] The K-issued live external Effect Permit — the durable
+  // authority half of the selected K→C external Effect Operation. The kernel
+  // mints ONE permit document per external effect dispatch (mustBeAbsent
+  // create, same-turn identical replay reuses the live original), scoped to
+  // the exact effectId/turn/target/business/capability/operation set with a
+  // bounded logical expiry, and consumes it (exact-revision CAS) as soon as
+  // the dispatch settles. The trusted Host gate re-reads THIS document —
+  // plus the journal `started` record and the held admission fence — before
+  // any adapter invocation: a permit is never a bearer token, and only the
+  // kernel's own attest channel can even CLAIM one.
+  const effectPermitAdmin = {
+    async mint(spec) {
+      const key = docKeys.effectPermit(spec.effectId);
+      const value = {
+        pinVersion: 1,
+        state: 'live',
+        effectId: spec.effectId,
+        durableControlTurnId: spec.turnId,
+        effectType: spec.effectType,
+        effectSemantics: spec.effectSemantics,
+        businessPackageId: businessEndpoint.packageId,
+        target: { workflowId: spec.target.workflowId, instanceKey: spec.target.instanceKey },
+        capabilityKey: spec.resource !== null && typeof spec.resource.key === 'string' ? spec.resource.key : null,
+        operations: [
+          ...(spec.resource !== null && typeof spec.resource.operation === 'string' ? [spec.resource.operation] : []),
+          ...spec.external.operations,
+        ],
+        awaitPolicy: spec.external.awaitPolicy,
+        attempt: spec.attempt,
+        nonce: sha256.digestUtf8(`${spec.effectId}#${spec.attempt}#${spec.issuedAt}`),
+        issuedAt: spec.issuedAt,
+        expiresAt: new Date(Date.parse(spec.issuedAt) + spec.external.permitTtlMs).toISOString(),
+      };
+      let written;
+      try {
+        written = await docs.put(key, value, { mustBeAbsent: true });
+      } catch (error) {
+        if (isHostWriteConflict(error)) {
+          // The same-turn crash-recovery replay of THIS live permit: an
+          // identical live original is reused (its exact revision returned);
+          // anything else (consumed, drifted, foreign) refuses typed.
+          const existing = await docs.get(key);
+          const candidate = existing !== null && isJsonRecord(existing.value) ? existing.value : null;
+          const identical = candidate !== null
+            && candidate.state === 'live'
+            && candidate.durableControlTurnId === spec.turnId
+            && candidate.effectType === spec.effectType
+            && candidate.attempt === spec.attempt;
+          if (!identical) {
+            throw new CentralAdmissionError(
+              'ADMISSION_EFFECT_PERMIT_CONFLICT',
+              `effect permit ${spec.effectId} already exists and is not this dispatch's live original`,
+            );
+          }
+          return { revision: existing.revision };
+        }
+        throw error;
+      }
+      counters.effectPermitsMinted += 1;
+      return { revision: written.revision };
+    },
+    async consume(effectId, revision) {
+      const doc = await docs.get(docKeys.effectPermit(effectId));
+      if (doc === null || !isJsonRecord(doc.value) || doc.value.state !== 'live') {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_PERMIT_CONFLICT',
+          `effect permit ${effectId} is not live for consumption`,
+        );
+      }
+      await docs.put(
+        docKeys.effectPermit(effectId),
+        { ...doc.value, state: 'consumed' },
+        { mustMatchRevision: revision },
+      );
+      counters.effectPermitsConsumed += 1;
     },
   };
 
@@ -5937,6 +6231,9 @@ export function createOccurrenceRuntime(options) {
         effectBindings,
         contextProjections,
         trace: counters,
+        // [v0.10 C01 #1177] The K-issued live external Effect Permit admin —
+        // the only component that can mint or consume a permit document.
+        effectPermitAdmin,
         // [v0.8.1 R02] Claimed after every denial gate, before any journal
         // begin/effect dispatch; the commit below requires it still held.
         // [#1108 K01] The claim result is RETURNED so admitCentralDecision

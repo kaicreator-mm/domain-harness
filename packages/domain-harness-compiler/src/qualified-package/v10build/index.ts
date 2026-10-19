@@ -50,3 +50,13 @@ export type {
   V10DocWriteCondition,
   V10PublicIntent,
 } from './activation.js';
+export {
+  dispatchThroughExternalEffectGate,
+  normalizeExternalEffectEnvelope,
+} from './external-effect.js';
+export type {
+  ExternalEffectAuthorityKeys,
+  ExternalEffectEnvelope,
+  ExternalEffectDispatchRequest,
+  ExternalEffectGateDeps,
+} from './external-effect.js';

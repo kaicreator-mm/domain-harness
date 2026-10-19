@@ -127,7 +127,12 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // carrier spliced into the selected kernel (input-complete deployment-scoped
 // turn identity, same-CAS original receipts, scoped key grammar, ring-backed
 // disposition liveness); FR02/FR07 semantics unchanged.
-const V08_K_BLOB = 'c164f491efc0047b7654088f8c359cb3fd58ceaf';
+// K_BLOB_PIN_REBOUND_AFTER_1177_C01: the C01 kernel-issued live external
+// Effect Permit carrier spliced in (external binding config validation,
+// effectPermitAdmin mint/consume on external bindings only, attest-channel
+// permit claim, additive effect-permit doc kind and counters);
+// FR02/FR07 semantics unchanged.
+const V08_K_BLOB = '1a6a1394a505f4727306208d588fcab841e72980';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

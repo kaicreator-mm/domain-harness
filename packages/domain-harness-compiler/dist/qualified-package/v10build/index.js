@@ -9,3 +9,4 @@ export { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY
 export { assertSealedImportClosure, collectModuleEdges, emptyExternalImports, } from './import-policy.js';
 export { buildV10App } from './build.js';
 export { V10ActivationError, V10AppFacade, V10PortDeniedError, activateV10App, freshV10Counters, } from './activation.js';
+export { dispatchThroughExternalEffectGate, normalizeExternalEffectEnvelope, } from './external-effect.js';
