@@ -33,11 +33,22 @@ test('T02-P0: real T00 BUILD selects optional S feature; Tiny omits it without l
   const rich = buildV10App(await basicComposition({ features: [selected] }));
   const activated = await activateV10App(rich, { store: new PlainCasDocStore(), now: () => 0 });
   assert.deepEqual(activated.facade.selectedFeatures.map((v) => v.featureKey), ['standard:semantic-decision/1']);
+  const live = await activated.facade.invokeSelectedStandardFeature(
+    'standard:semantic-decision/1',
+    request({ rules: [{ id: 'via-facade', when: { amount: 12 }, decision: { disposition: 'approved' } }] }),
+  ) as { kind: string; source: string; decision: { disposition: string } };
+  assert.equal(live.kind, 'selected');
+  assert.equal(live.source, 'rule');
+  assert.equal(live.decision.disposition, 'approved');
   activated.dispose();
 
   const tiny = buildV10App(await basicComposition());
   const tinyActivated = await activateV10App(tiny, { store: new PlainCasDocStore(), now: () => 0 });
   assert.deepEqual(tinyActivated.facade.selectedFeatures, []);
+  await assert.rejects(
+    tinyActivated.facade.invokeSelectedStandardFeature('standard:semantic-decision/1', request()),
+    code('V10_FEATURE_NOT_SELECTED'),
+  );
   tinyActivated.dispose();
 });
 
