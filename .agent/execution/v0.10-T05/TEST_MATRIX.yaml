@@ -1,0 +1,16 @@
+schema: dh010/t05-tests
+positive:
+  - deterministic-context-order-and-budget
+  - source-and-provenance-at-every-context-entry
+  - selected-rich-app-feature-and-tiny-omission
+  - ordinary-business-agent-turn-through-real-K
+  - scoped-memory-read-and-trusted-tool-advice
+  - bounded-no-model-agent-path
+  - original-K02-receipt-replay
+negative:
+  - cross-tenant-context-rejected-with-zero-memory-read
+  - over-budget-or-duplicate-entry-typed-refusal
+  - forged-effect-permit-or-kernel-receipt-refused
+  - external-Model-unavailable-typed-not-false-success
+  - unbounded-agent-cycle-typed-denial
+environment: changed-risk Node24 SQLite physical selected App, CI review, no extra per-substep CI
