@@ -1,0 +1,13 @@
+schema: ai-dev/execution-pack-v1
+task: T04
+issue: 1171
+integration_branch: v0.10
+base_sha: 32fbd987ee1641440c50173ffd18af6f2f646951
+ads_pin: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: JIT_PREPARED
+references:
+  - EXECUTION_CONTRACT.md
+  - TEST_MATRIX.yaml
+  - IMPLEMENTATION_MAP.md
+  - FAILURE_MATRIX.yaml
+  - REVIEW_CHECKLIST.md
