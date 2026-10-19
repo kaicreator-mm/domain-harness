@@ -52,6 +52,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
+import { dispatchThroughExternalEffectGate } from './external-effect.js';
 
 export class V10ActivationError extends Error {
   readonly code: string;
@@ -95,6 +96,8 @@ export interface V10AppView {
     readonly featureExport?: string | null;
     readonly handlers?: readonly { operationId: string; handler: string }[] | null;
     readonly capabilityId?: string | null;
+    /** Sealed external Effect provider flag (BUILD fact, C01 #1177). */
+    readonly externalEffect?: boolean | null;
   }[];
   readonly loadOrder: readonly string[];
   readonly routes: readonly { intentId: string; operationId: string; capabilityId: string; handlerId: string }[];
@@ -132,6 +135,8 @@ export interface V10Counters {
   portProbes: { packageId: string; name: string }[];
   portDenials: number;
   activationRefusals: { code: string; message: string }[];
+  externalEffectDispatches: number;
+  externalEffectRefusals: number;
 }
 
 export function freshV10Counters(): V10Counters {
@@ -147,6 +152,8 @@ export function freshV10Counters(): V10Counters {
     portProbes: [],
     portDenials: 0,
     activationRefusals: [],
+    externalEffectDispatches: 0,
+    externalEffectRefusals: 0,
   };
 }
 
@@ -573,7 +580,7 @@ export class V10AppFacade {
 
   /** Sealed capability dispatch: the ONLY physical resource port here. */
   readonly #resources = {
-    call: async (capabilityId: unknown, operationId: unknown, payload: unknown): Promise<unknown> => {
+    call: async (capabilityId: unknown, operationId: unknown, payload: unknown, attest?: unknown): Promise<unknown> => {
       this.#assertOpen();
       if (typeof capabilityId !== 'string' || typeof operationId !== 'string' || !isPlainRecord(payload)) {
         refuse('RESOURCE_INPUT_INVALID', 'a resource call requires (capabilityId, operationId, record payload)');
@@ -581,11 +588,46 @@ export class V10AppFacade {
       const entry = this.#app.modules.find((module) => module.role === 'capability' && module.capabilityId === capabilityId);
       const handlerName = entry?.handlers?.find((handler) => handler.operationId === operationId)?.handler;
       if (entry === undefined || handlerName === undefined) {
+        if (entry?.externalEffect === true && isPlainRecord(attest)) {
+          (attest as { preHandlerRefusal: unknown }).preHandlerRefusal = 'RESOURCE_ROUTE_UNSEALED';
+        }
         refuse('RESOURCE_ROUTE_UNSEALED', `resource ${capabilityId}:${operationId} is not sealed in this App`);
       }
       const handler = this.#namespaces.get(entry.packageId)?.[handlerName];
       if (typeof handler !== 'function') {
+        if (entry.externalEffect === true && isPlainRecord(attest)) {
+          (attest as { preHandlerRefusal: unknown }).preHandlerRefusal = 'RESOURCE_ABI_INVALID';
+        }
         refuse('RESOURCE_ABI_INVALID', `sealed handler ${handlerName} is not callable`);
+      }
+      if (entry.externalEffect === true) {
+        // [v0.10 C01 #1177] A sealed external Effect provider dispatches ONLY
+        // through the selected K→C external Effect Operation gate: a live
+        // K-issued permit — re-read from the durable K docs together with the
+        // journal record and the held admission fence — authorizes exactly
+        // this capability/operation/turn. Anything less is a typed refusal
+        // with ZERO adapter dispatch, marked into the kernel-minted attest
+        // (the trusted pre-handler-refusal discipline of #1108 K01).
+        return await dispatchThroughExternalEffectGate(
+          {
+            docs: this.#docs,
+            nowIso: (): string => new Date(this.#now()).toISOString(),
+            onDispatch: (): void => {
+              this.#counters.externalEffectDispatches += 1;
+            },
+            onRefusal: (): void => {
+              this.#counters.externalEffectRefusals += 1;
+            },
+          },
+          {
+            capabilityId,
+            operationId,
+            payload,
+            attest,
+            invoke: (adapterPayload, dispatchContext): Promise<unknown> =>
+              (handler as (input: unknown, context: unknown) => Promise<unknown>)(adapterPayload, dispatchContext),
+          },
+        );
       }
       return await (handler as (input: unknown) => unknown)(payload);
     },

@@ -73,7 +73,7 @@ const ROUTE_FIELDS = new Set(['intentId', 'operationId', 'capabilityId', 'handle
 const MODULE_FIELDS = new Set([
   'packageId', 'role', 'abiVersion', 'moduleSource', 'moduleSha256', 'endpoint',
   'dependencies', 'externalImports', 'provides', 'requires', 'optional',
-  'providerId', 'hookExport', 'featureExport', 'capabilityId', 'handlers',
+  'providerId', 'hookExport', 'featureExport', 'capabilityId', 'handlers', 'externalEffect',
 ]);
 const HANDLER_FIELDS = new Set(['operationId', 'handler']);
 const EXTERNAL_IMPORT_FIELDS = new Set(['node', 'npm', 'native']);
@@ -114,6 +114,13 @@ export interface V10ModuleInput {
   readonly featureExport?: string;
   readonly capabilityId?: string;
   readonly handlers?: readonly { operationId: string; handler: string }[];
+  /**
+   * [v0.10 C01 #1177] Seal this capability as an external Effect provider:
+   * every resource call to it dispatches ONLY through the selected K→C
+   * external Effect Operation gate (live K-issued permit required). A BUILD
+   * trust fact, capability role only — never caller data.
+   */
+  readonly externalEffect?: boolean;
 }
 
 export interface V10RouteRowInput {
@@ -153,6 +160,8 @@ export interface V10SealedModule {
   readonly featureExport: string | null;
   readonly capabilityId: string | null;
   readonly handlers: readonly { operationId: string; handler: string }[] | null;
+  /** Sealed external Effect provider flag (capability role only, C01 #1177). */
+  readonly externalEffect: boolean;
 }
 
 /** The v0.10 built App: plain frozen data, no approval, sealed load order. */
@@ -266,6 +275,7 @@ interface ParsedModule {
   readonly featureExport: string | null;
   readonly capabilityId: string | null;
   readonly handlers: readonly { operationId: string; handler: string }[] | null;
+  readonly externalEffect: boolean;
 }
 
 function parseHandlers(raw: unknown, packageId: string): { operationId: string; handler: string }[] {
@@ -348,6 +358,7 @@ function parseModules(rawModules: readonly unknown[]): ParsedModule[] {
       featureExport: raw.featureExport === undefined ? null : boundedString(raw.featureExport, `module ${packageId} featureExport`),
       capabilityId: raw.capabilityId === undefined ? null : boundedString(raw.capabilityId, `module ${packageId} capabilityId`),
       handlers: raw.handlers === undefined ? null : parseHandlers(raw.handlers, packageId),
+      externalEffect: raw.externalEffect === undefined ? false : (typeof raw.externalEffect === 'boolean' ? raw.externalEffect : fail('BUILD_INPUT_INVALID', `module ${packageId} externalEffect must be a boolean`)),
     });
   }
   return parsed;
@@ -366,6 +377,9 @@ function checkAuthorityReservation(module: ParsedModule, kernelPrimary: ParsedMo
   }
   if (module.handlers !== null && module.role !== 'capability') {
     fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) declares capability handlers; operation handler maps belong to capability packages only`);
+  }
+  if (module.externalEffect && module.role !== 'capability') {
+    fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) declares externalEffect; the external Effect Operation gate is sealed to capability packages only`);
   }
 }
 
@@ -600,6 +614,7 @@ export function buildV10App(options: BuildV10AppOptions): V10BuiltApp {
       featureExport: module.featureExport,
       capabilityId: module.capabilityId,
       handlers: module.handlers === null ? null : Object.freeze(module.handlers.map((handler) => Object.freeze({ ...handler }))),
+      externalEffect: module.externalEffect,
     }));
   }
 
@@ -659,6 +674,7 @@ export function buildV10App(options: BuildV10AppOptions): V10BuiltApp {
     featureExport: module.featureExport,
     capabilityId: module.capabilityId,
     handlers: module.handlers === null ? null : module.handlers.map((handler) => ({ ...handler })),
+    externalEffect: module.externalEffect,
   }));
   const subjectDigest = sha256Canonical({
     formatVersion: V10_BUILD_FORMAT,

@@ -51,6 +51,7 @@ import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
+import { dispatchThroughExternalEffectGate } from './external-effect.js';
 export class V10ActivationError extends Error {
     code;
     constructor(code, message) {
@@ -82,6 +83,8 @@ export function freshV10Counters() {
         portProbes: [],
         portDenials: 0,
         activationRefusals: [],
+        externalEffectDispatches: 0,
+        externalEffectRefusals: 0,
     };
 }
 const PROTECTED_CONTEXT_NAMES = new Set([
@@ -381,7 +384,7 @@ export class V10AppFacade {
     }
     /** Sealed capability dispatch: the ONLY physical resource port here. */
     #resources = {
-        call: async (capabilityId, operationId, payload) => {
+        call: async (capabilityId, operationId, payload, attest) => {
             this.#assertOpen();
             if (typeof capabilityId !== 'string' || typeof operationId !== 'string' || !isPlainRecord(payload)) {
                 refuse('RESOURCE_INPUT_INVALID', 'a resource call requires (capabilityId, operationId, record payload)');
@@ -389,11 +392,42 @@ export class V10AppFacade {
             const entry = this.#app.modules.find((module) => module.role === 'capability' && module.capabilityId === capabilityId);
             const handlerName = entry?.handlers?.find((handler) => handler.operationId === operationId)?.handler;
             if (entry === undefined || handlerName === undefined) {
+                if (entry?.externalEffect === true && isPlainRecord(attest)) {
+                    attest.preHandlerRefusal = 'RESOURCE_ROUTE_UNSEALED';
+                }
                 refuse('RESOURCE_ROUTE_UNSEALED', `resource ${capabilityId}:${operationId} is not sealed in this App`);
             }
             const handler = this.#namespaces.get(entry.packageId)?.[handlerName];
             if (typeof handler !== 'function') {
+                if (entry.externalEffect === true && isPlainRecord(attest)) {
+                    attest.preHandlerRefusal = 'RESOURCE_ABI_INVALID';
+                }
                 refuse('RESOURCE_ABI_INVALID', `sealed handler ${handlerName} is not callable`);
+            }
+            if (entry.externalEffect === true) {
+                // [v0.10 C01 #1177] A sealed external Effect provider dispatches ONLY
+                // through the selected K→C external Effect Operation gate: a live
+                // K-issued permit — re-read from the durable K docs together with the
+                // journal record and the held admission fence — authorizes exactly
+                // this capability/operation/turn. Anything less is a typed refusal
+                // with ZERO adapter dispatch, marked into the kernel-minted attest
+                // (the trusted pre-handler-refusal discipline of #1108 K01).
+                return await dispatchThroughExternalEffectGate({
+                    docs: this.#docs,
+                    nowIso: () => new Date(this.#now()).toISOString(),
+                    onDispatch: () => {
+                        this.#counters.externalEffectDispatches += 1;
+                    },
+                    onRefusal: () => {
+                        this.#counters.externalEffectRefusals += 1;
+                    },
+                }, {
+                    capabilityId,
+                    operationId,
+                    payload,
+                    attest,
+                    invoke: (adapterPayload, dispatchContext) => handler(adapterPayload, dispatchContext),
+                });
             }
             return await handler(payload);
         },

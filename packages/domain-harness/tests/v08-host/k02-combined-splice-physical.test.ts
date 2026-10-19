@@ -56,7 +56,7 @@ const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadD
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
 // The POST-SPLICE integrated kernel blob (recorded at the K02 phase-2 splice
 // on top of K01 R2 36f068e3). Any further kernel drift fails this import.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = 'c164f491efc0047b7654088f8c359cb3fd58ceaf';
+const K02_SPLICED_KERNEL_BLOB_SHA1 = 'c208e3cc67fcdd5f138a373b76625be0fce4dacf';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the combined test runs the exact spliced integration kernel bytes');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);

@@ -61,7 +61,7 @@ const ROUTE_FIELDS = new Set(['intentId', 'operationId', 'capabilityId', 'handle
 const MODULE_FIELDS = new Set([
     'packageId', 'role', 'abiVersion', 'moduleSource', 'moduleSha256', 'endpoint',
     'dependencies', 'externalImports', 'provides', 'requires', 'optional',
-    'providerId', 'hookExport', 'featureExport', 'capabilityId', 'handlers',
+    'providerId', 'hookExport', 'featureExport', 'capabilityId', 'handlers', 'externalEffect',
 ]);
 const HANDLER_FIELDS = new Set(['operationId', 'handler']);
 const EXTERNAL_IMPORT_FIELDS = new Set(['node', 'npm', 'native']);
@@ -226,6 +226,7 @@ function parseModules(rawModules) {
             featureExport: raw.featureExport === undefined ? null : boundedString(raw.featureExport, `module ${packageId} featureExport`),
             capabilityId: raw.capabilityId === undefined ? null : boundedString(raw.capabilityId, `module ${packageId} capabilityId`),
             handlers: raw.handlers === undefined ? null : parseHandlers(raw.handlers, packageId),
+            externalEffect: raw.externalEffect === undefined ? false : (typeof raw.externalEffect === 'boolean' ? raw.externalEffect : fail('BUILD_INPUT_INVALID', `module ${packageId} externalEffect must be a boolean`)),
         });
     }
     return parsed;
@@ -243,6 +244,9 @@ function checkAuthorityReservation(module, kernelPrimary) {
     }
     if (module.handlers !== null && module.role !== 'capability') {
         fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) declares capability handlers; operation handler maps belong to capability packages only`);
+    }
+    if (module.externalEffect && module.role !== 'capability') {
+        fail('V10_AUTHORITY_FORGERY', `module ${module.packageId} (${module.role}) declares externalEffect; the external Effect Operation gate is sealed to capability packages only`);
     }
 }
 /**
@@ -476,6 +480,7 @@ export function buildV10App(options) {
             featureExport: module.featureExport,
             capabilityId: module.capabilityId,
             handlers: module.handlers === null ? null : Object.freeze(module.handlers.map((handler) => Object.freeze({ ...handler }))),
+            externalEffect: module.externalEffect,
         }));
     }
     // ---- Route admission against the sealed graph's OWN authority ----
@@ -533,6 +538,7 @@ export function buildV10App(options) {
         featureExport: module.featureExport,
         capabilityId: module.capabilityId,
         handlers: module.handlers === null ? null : module.handlers.map((handler) => ({ ...handler })),
+        externalEffect: module.externalEffect,
     }));
     const subjectDigest = sha256Canonical({
         formatVersion: V10_BUILD_FORMAT,

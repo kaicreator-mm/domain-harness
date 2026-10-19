@@ -33,6 +33,8 @@ export interface V10AppView {
             handler: string;
         }[] | null;
         readonly capabilityId?: string | null;
+        /** Sealed external Effect provider flag (BUILD fact, C01 #1177). */
+        readonly externalEffect?: boolean | null;
     }[];
     readonly loadOrder: readonly string[];
     readonly routes: readonly {
@@ -91,6 +93,8 @@ export interface V10Counters {
         code: string;
         message: string;
     }[];
+    externalEffectDispatches: number;
+    externalEffectRefusals: number;
 }
 export declare function freshV10Counters(): V10Counters;
 export interface V10PublicIntent {
