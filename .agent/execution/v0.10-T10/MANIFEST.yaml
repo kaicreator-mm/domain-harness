@@ -19,5 +19,6 @@ source_slice_committed:
 source_tests_run: PASS node v24.21.0 (isolated 8/8 EXIT=0; physical 7/7 EXIT=0)
 node24_sqlite_2b_integration: PASS over REAL K02-spliced kernel blob c164f491efc0047b7654088f8c359cb3fd58ceaf + openSqliteCasStore (one file, two B namespaces, one deployment)
 compiled_dist: REGENERATED_AND_COMMITTED
-pr: NOT_CREATED
+local_gate: "tools/task-check.sh PASS (lint+typecheck+test, all workspaces + root, exit 0; first run had 2 contention transients HF21-R/#305 green standalone+rerun, 1 fresh-worktree expo dist precondition fixed by build; final run all green)"
+pr: THIS_PR (task/v0.10-t10-multib-query -> v0.10)
 final_acceptance: SELECTED_APP_FACADE_SEAM_DEFERRED — activation.ts is C01 #1177's accepted single-writer zone and outside T10's allowed write set; the Host-owned query mechanism, its exports and the physical two-B witness are complete. T11 composes the facade seam once C01 lands.
