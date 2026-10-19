@@ -1,0 +1,17 @@
+schema: dh010/c01-tests
+positive:
+  - effect-operation-with-live-k-issued-permit-one-job-adapter
+  - same-contract-unrelated-provider-adapter
+  - external-accepted-and-running-not-terminal
+  - external-terminal-confirmation-correct
+  - multi-process-restart-reconcile-journal-receipt
+negative:
+  - B-or-S-direct-adapter-call-without-permit-zero-external-mutation
+  - replayed-or-expired-permit-zero-dispatch
+  - fake-accepted-ack-never-success
+  - lost-ack-after-remote-effect-fence-remains-and-UNKNOWN
+  - duplicate-external-callback-no-new-effect
+  - missing-best-effort-disposition-original-K02-receipt-liveness
+  - cross-tenant-or-B-identity-denied
+required: focused Node24 plus real SQLite two-process, configured PR CI and independent high-risk review
+no_per_atomic_step_CI: true
