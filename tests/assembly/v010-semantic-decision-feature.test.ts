@@ -9,12 +9,20 @@ import { readFile } from 'node:fs/promises';
 import { buildV10App, activateV10App } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { basicComposition, featureEntry, PlainCasDocStore } from './helpers-v010.js';
 
-const source = await readFile(
-  new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-semantic-decision-v1.mjs', import.meta.url),
-  'utf8',
-);
-const feature = await import('data:text/javascript;base64,' + Buffer.from(source, 'utf8').toString('base64'));
-const resolve = feature.resolveSemanticDecision as (input: Record<string, any>, ports?: Record<string, any>) => Promise<any>;
+// Memoized loader (no top-level await: tests load as CJS through tsx).
+type ResolveSemanticDecision = (input: Record<string, any>, ports?: Record<string, any>) => Promise<any>;
+let selectedFeature: Promise<{ source: string; resolve: ResolveSemanticDecision }> | undefined;
+const loadSelectedFeature = (): Promise<{ source: string; resolve: ResolveSemanticDecision }> =>
+  (selectedFeature ??= (async () => {
+    const source = await readFile(
+      new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-semantic-decision-v1.mjs', import.meta.url),
+      'utf8',
+    );
+    const feature = await import('data:text/javascript;base64,' + Buffer.from(source, 'utf8').toString('base64')) as {
+      resolveSemanticDecision: ResolveSemanticDecision;
+    };
+    return { source, resolve: feature.resolveSemanticDecision };
+  })());
 const schema = { id: 'schema:quote', revision: 'r1', provenanceKey: 'approved:2026-10' };
 const basis = { amount: 12, name: 'quote' };
 const request = (extra: Record<string, unknown> = {}) => ({
@@ -25,6 +33,7 @@ const code = (expected: string) => (error: unknown) =>
   typeof error === 'object' && error !== null && (error as { code?: string }).code === expected;
 
 test('T02-P0: real T00 BUILD selects optional S feature; Tiny omits it without loading', async () => {
+  const { source } = await loadSelectedFeature();
   const selected = await featureEntry({
     fixture: 'sfeature-validation-v1.mjs',
     moduleSourceOverride: source,
@@ -53,6 +62,7 @@ test('T02-P0: real T00 BUILD selects optional S feature; Tiny omits it without l
 });
 
 test('T02-P1: Rule priority avoids Model and external Tool', async () => {
+  const { resolve } = await loadSelectedFeature();
   let called = 0;
   const value = await resolve(request({
     rules: [
@@ -70,6 +80,7 @@ test('T02-P1: Rule priority avoids Model and external Tool', async () => {
 });
 
 test('T02-P2/N1: canonical key-order reuse only under exact schema/provenance/revision', async () => {
+  const { resolve } = await loadSelectedFeature();
   const entry = { schemaId: 'schema:quote', schemaRevision: 'r1', provenanceKey: 'approved:2026-10',
     canonicalInput: '{"amount":12,"name":"quote"}', decision: { disposition: 'cached' } };
   assert.equal((await resolve(request({ reuse: entry }))).source, 'reuse');
@@ -84,6 +95,7 @@ test('T02-P2/N1: canonical key-order reuse only under exact schema/provenance/re
 });
 
 test('T02-P3/N2: promoted pinned procedure only; unpinned procedure is not invoked', async () => {
+  const { resolve } = await loadSelectedFeature();
   let calls = 0;
   const procedures = new Map([['exact', { revision: 'approved:r7', resolve: async (_: unknown) => {
     calls++;
@@ -98,6 +110,7 @@ test('T02-P3/N2: promoted pinned procedure only; unpinned procedure is not invok
 });
 
 test('T02-P4/N3: bounded Model/Tool fallback counts real calls and supports no-model', async () => {
+  const { resolve } = await loadSelectedFeature();
   let modelCalls = 0;
   const withModel = await resolve(request({
     fallback: { kind: 'model', operationId: 'model:quote' },
@@ -124,6 +137,7 @@ test('T02-P4/N3: bounded Model/Tool fallback counts real calls and supports no-m
 });
 
 test('T02-N4: budget/deadline limits are fail-closed with zero fallback calls', async () => {
+  const { resolve } = await loadSelectedFeature();
   let calls = 0;
   const bounded = await resolve(request({
     rules: [{ id: 'miss', when: { amount: 99 }, decision: { disposition: 'wrong' } }],
@@ -145,6 +159,7 @@ test('T02-N4: budget/deadline limits are fail-closed with zero fallback calls', 
 });
 
 test('T02-N5: semantic proposals cannot mint K/effect authority', async () => {
+  const { resolve } = await loadSelectedFeature();
   await assert.rejects(() => resolve(request({
     rules: [{ id: 'evil', when: {}, decision: { effectPermit: { action: 'reserve' } } }],
   })), code('SEMANTIC_AUTHORITY_FORBIDDEN'));

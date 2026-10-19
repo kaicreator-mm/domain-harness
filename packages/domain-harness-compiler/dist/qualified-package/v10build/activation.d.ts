@@ -185,6 +185,13 @@ export declare class V10AppFacade {
         packageId: string;
         featureKey: string | null;
     }[];
+    /**
+     * Invoke one actually selected Standard feature through its sealed ABI.
+     * The Host supplies any trusted read/query/model dependencies; merely
+     * possessing semantic data never creates a K Permit or Effect authority.
+     * An unselected feature is NOT dynamically discovered or imported.
+     */
+    invokeSelectedStandardFeature(featureKey: string, request: unknown, trustedDependencies?: unknown): Promise<unknown>;
     isClosed(): boolean;
     close(): void;
     /** The real kernel's own counters for one business package. */
