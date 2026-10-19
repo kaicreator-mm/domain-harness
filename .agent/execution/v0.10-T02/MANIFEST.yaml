@@ -1,0 +1,15 @@
+schema: ai-dev/execution-pack-v1
+task: T02
+issue: 1169
+integration_branch: v0.10
+base_sha: 027f3b7405504a7e309991736d0336fd4147f8fd
+standard_revision: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: JIT_PREPARED
+files:
+  - EXECUTION_CONTRACT.md
+  - TEST_MATRIX.yaml
+  - IMPLEMENTATION_MAP.md
+  - FAILURE_MATRIX.yaml
+  - REVIEW_CHECKLIST.md
+scope: semantic-decision-standard-feature
+builder_claim: PENDING_ACCEPTANCE
