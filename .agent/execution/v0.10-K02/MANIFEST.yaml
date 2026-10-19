@@ -1,0 +1,56 @@
+pack_id: DH010-K02-EP-v1
+task_id: K02
+repository: kaicreator-mm/domain-harness
+version: v0.10
+base_sha: "1e6d4be027172c0261f2a1d53afd922bf1e4df35"
+task_pack_ref: "#1168@6253228158"
+dispatch_ref: "#1168@6254193807"
+parent_issue: "#1168"
+root_cause_issues: "#1109/#1110"
+branch: task/v0.10-k02-durable-receipt
+agent_freedom: F1_BOUNDED_IMPLEMENTATION
+pinned_standard_revision: "f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd"
+generated_by: dh010-k02-local-builder-zcode
+generated_at: "2026-10-19"
+dependency_completion: []
+parallel_coordination:
+  mode: PARALLEL_DISJOINT_FILESET
+  k01_claim_ref: "#1167@6254163915"
+  k01_single_writer_file: packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
+  k02_kernel_splice_state: PARTIAL_BLOCKED_PENDING_K01_RELEASE
+phase2_integration:
+  base_sha: "027f3b7405504a7e309991736d0336fd4147f8fd"
+  base_composition: "t016 #1186 (5a9683cf) + T00 #1184 (87de82d8) + K01 #1183"
+  k01_release_ref: "#1183 merged (head 36f068e3)"
+  splice_commit: "24747e39"
+  typecheck_repair_commit: "d0992d57"
+  kernel_blob: "c164f491efc0047b7654088f8c359cb3fd58ceaf"
+  kernel_blob_note: "post-R1-repair blob (continuation-read docKeys threading + journalPrefix); pre-R1 splice blob was d7909b8ff8071e1f15d8b55fe6f967d883f6b4ac"
+  k02_kernel_splice_state_after: EXECUTED_COMBINED_PHYSICAL_RUN
+  full_gate: "tools/task-check.sh EXIT=0, 4070 pass / 0 fail at d0992d57 (pre-R1 HEAD; R1 gates rerun below)"
+material_paths:
+  - packages/domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs
+  - packages/domain-harness-compiler/tests/v08-k02-durable-receipt-carrier.test.ts
+  - packages/domain-harness/tests/v08-host/k02-receipt-cas-physical.test.ts
+  - packages/domain-harness/tests/v08-host/k02-namespace-two-b-physical.test.ts
+  - packages/domain-harness/tests/v08-host/k02-receipt-race-multiprocess.test.ts
+  - packages/domain-harness/tests/v08-host/children/k02-receipt-worker.mjs
+  # phase-2 (splice + review R1 repairs)
+  - packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
+  - packages/domain-harness/tests/v08-host/k02-combined-splice-physical.test.ts
+  - packages/domain-harness/tests/v08-host/children/k02-splice-worker.mjs
+kernel_read_only_anchors:
+  # phase-1 status (historical): the kernel file was K01-owned and read-only for K02.
+  # phase-2: after the K01 release (#1183 merged) this file is K02's splice target;
+  # see phase2_integration.kernel_blob for the authoritative post-splice identity.
+  - packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
+core_artifacts:
+  - MANIFEST.yaml
+  - EXECUTION_CONTRACT.md
+  - TEST_MATRIX.yaml
+  - FAILURE_MATRIX.yaml
+  - IMPLEMENTATION_MAP.md
+  - REVIEW_CHECKLIST.md
+retention: full-provenance
+package_excluded: true
+pack_state_at_generation: PACK_CURRENT

@@ -1,0 +1,64 @@
+# K02 failure matrix — typed refusal for every falsifier; honest BLOCKED/NOT_RUN otherwise.
+
+- trigger: occurrence denied by the pure decision (deny input)
+  expected: status denied with the typed denial; ZERO state move, ZERO receipt (denials are not dispositions), ZERO dispatch; a later LEGAL submission under the SAME messageId admits fresh
+  test: K02-P1
+
+- trigger: non-finite number inside an otherwise JSON occurrence input (NaN/Infinity/-Infinity)
+  expected: typed K02_INPUT_NOT_JSON at digest time — JSON.stringify's null-coercion must never silently make a changed input digest-identical to a different literal value
+  test: K02-U1
+
+- trigger: same messageId re-sent with canonically CHANGED input after the original was admitted
+  expected: typed K02_TURN_RECEIPT_INPUT_CONFLICT BEFORE any state mutation / journal row / effect dispatch; the original receipt and state stand untouched; no second effect
+  test: K02-P1, K02-R1
+
+- trigger: same messageId re-sent under a DIFFERENT intentType
+  expected: typed K02_TURN_RECEIPT_INTENT_CONFLICT (one source is exactly one turn); zero new activity
+  test: K02-P1
+
+- trigger: identical retry (same canonical input digest, same intent, same scope) after further state transitions
+  expected: the EXACT original acknowledged receipt (original attributedAt/instance projection) + idempotentReplay=true; zero new journal/effect; never a re-derived pseudo-receipt from the newest snapshot
+  test: K02-P1, K02-P2, K02-R1
+
+- trigger: derived archive record(s) lost (deleted / never written) for admitted turns
+  expected: replay still answers from the same-CAS receipt (atomic truth); NEW turns keep admitting (no global block); ring eviction is archive-gated — an entry stays past the bound while its archive write faults (fault-tolerant growth, admission never blocked, admission never forgotten)
+  test: K02-P2
+
+- trigger: fatal physical store fault during the receipt-bearing CAS put
+  expected: typed K02_TURN_RECEIPT_STORE_FAULT (Host fault code pass-through) with zero durable partial state — no state move, no receipt, no effect; atomicity never claimed across a failed put
+  test: K02-P3
+
+- trigger: fault during the OPTIONAL post-commit archive write
+  expected: the committed ACK stands (archive is observational; its failure is reported as an independent field, never falsifies the original)
+  test: K02-P3
+
+- trigger: legacy/unknown envelope shape at a receipt key (pre-1.0 record: missing pinVersion/inputDigest)
+  expected: typed K02_TURN_RECEIPT_LEGACY_UNREADABLE fail-closed; NO migration, NO silent reinterpretation as replay or conflict
+  test: K02-P1
+
+- trigger: malformed deployment scope (missing/empty/unbounded-identifier component)
+  expected: typed K02_SCOPE_INVALID at adapter construction, before any store access
+  test: K02-U1
+
+- trigger: non-JSON-representable occurrence input
+  expected: typed K02_INPUT_NOT_JSON at digest time, before any admission
+  test: K02-U1
+
+- trigger: two B (deployment scopes) with IDENTICAL workflowId+instanceKey on ONE physical store
+  expected: fully disjoint instance/fence/journal/disposition/receipt keys; independent state revisions; a read/claim/replay from B1 never observes B2 truth (real kernel, scoped adapter)
+  test: K02-N1
+
+- trigger: two real processes race the same turn (identical input)
+  expected: exactly ONE admitted commit; loser replays the same original receipt with zero new effect; no forged ACK, no double effect, no lost update
+  test: K02-R1
+
+- trigger: two real processes race the same messageId with CHANGED input
+  expected: first writer wins; the changed submission refuses typed conflict; original truth stands
+  test: K02-R1
+
+- trigger: kernel splice required for default-path integration
+  expected: PARTIAL_BLOCKED_PENDING_K01_RELEASE (kernel-mechanism-v1.mjs is K01's accepted single-writer file #1167@6254163915). Phase-1 ships the carrier + scoped adapter + physical proofs; splice anchors documented; no overlap claim, no fake combined PASS
+  test: none (coordination state)
+
+- trigger: environment/data unavailable (better-sqlite3 binding, Node major mismatch)
+  expected: BLOCKED/NOT_RUN recorded with exact reason; never a generic waiver, never PASS
