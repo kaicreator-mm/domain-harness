@@ -17,7 +17,6 @@ const AUTHORITY_KEYS = new Set([
   'hostPorts', 'resources', 'kernelState', 'createOccurrenceRuntime', 'submitOccurrence',
 ]);
 const SOURCE_KINDS = new Set(['rule', 'reuse', 'procedure', 'model', 'tool']);
-const OUTCOME_KINDS = new Set(['admitted', 'denied', 'unknown']);
 const LIMIT_DEPENDENCIES = 32;
 
 class EvidenceError extends Error {
@@ -50,6 +49,9 @@ function copyData(data) {
       if (seen.has(v)) refuse('EVIDENCE_DATA_INVALID', 'cyclic evidence arrays are forbidden');
       seen.add(v);
       if (v.length > 128) refuse('EVIDENCE_DATA_INVALID', 'evidence array too long');
+      if (Object.keys(v).length !== v.length || v.some((_, idx) => !Object.hasOwn(v, idx))) {
+        refuse('EVIDENCE_DATA_INVALID', 'evidence array holes or extra enumerable fields are forbidden');
+      }
       const result = v.map(item => visit(item, depth + 1));
       seen.delete(v);
       return result;
@@ -61,10 +63,14 @@ function copyData(data) {
     if (keys.length > 64) refuse('EVIDENCE_DATA_INVALID', 'evidence object too wide');
     const result = Object.create(null);
     for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(v, key);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+        refuse('EVIDENCE_DATA_INVALID', 'evidence getters are forbidden');
+      }
       if (AUTHORITY_KEYS.has(key) || key === '__proto__' || key === 'constructor' || key === 'prototype') {
         refuse('EVIDENCE_AUTHORITY_FORBIDDEN', 'evidence must not carry Kernel authority or unsafe object keys');
       }
-      result[key] = visit(v[key], depth + 1);
+      result[key] = visit(descriptor.value, depth + 1);
     }
     seen.delete(v);
     return result;
@@ -97,7 +103,9 @@ export async function recordDecisionEvidence(request, deps = {}) {
     provenanceKey: boundedText(schema.provenanceKey, 'schema.provenanceKey'),
   };
   const observationId = boundedText(request.observationId, 'observationId');
-  const decisionResult = request.decisionResult;
+  // Copy before interpreting: a public caller's getters, forged Kernel fields,
+  // or subsequent mutation cannot change this observed snapshot.
+  const decisionResult = copyData(request.decisionResult);
   if (!['selected', 'unavailable'].includes(decisionResult.kind)) {
     refuse('EVIDENCE_DECISION_INVALID', 'decision result kind must be selected or unavailable');
   }
