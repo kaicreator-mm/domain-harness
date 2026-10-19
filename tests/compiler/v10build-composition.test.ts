@@ -87,21 +87,19 @@ test('P-BUILD-ORDINARY-IMPORTS-SEALED: declared node/npm/native imports seal; un
   });
   const npmFeature = await featureEntry({
     fixture: 'sfeature-npm-declared-v1.mjs',
-    featureExport: 'pad',
-    externalImports: { npm: ['left-pad'] },
+    featureExport: 'parseDocument',
+    externalImports: { npm: ['yaml'] },
   });
-  const { readFile } = await import('node:fs/promises');
-  const nativeSource = await readFile(new URL('../assembly/fixtures-v010/sfeature-npm-declared-v1.mjs', import.meta.url), 'utf8');
   const nativeFeature = await featureEntry({
-    fixture: 'sfeature-npm-declared-v1.mjs',
-    packageId: 'sfeature-native-declared@v010.1.0.0',
-    featureKey: 'standard:native-declared/1',
-    moduleSourceOverride: nativeSource,
-    externalImports: { native: ['left-pad'] },
+    fixture: 'sfeature-native-declared-v1.mjs',
+    featureExport: 'memoryValue',
+    externalImports: { native: ['better-sqlite3'] },
   });
   const okApp = buildOk(await richComposition({ features: [cryptoFeature, npmFeature, nativeFeature] }));
-  const sealed = okApp.modules.find((module) => module.packageId === 'sfeature-formatting@v010.1.0.0');
-  assert.deepEqual(sealed?.externalImports.node, ['node:crypto']);
+  const sealedNpm = okApp.modules.find((module) => module.packageId === 'sfeature-npm-declared@v010.1.0.0');
+  assert.deepEqual(sealedNpm?.externalImports.npm, ['yaml']);
+  const sealedNative = okApp.modules.find((module) => module.packageId === 'sfeature-native-declared@v010.1.0.0');
+  assert.deepEqual(sealedNative?.externalImports.native, ['better-sqlite3']);
 
   // Same ordinary imports WITHOUT the sealed allowance refuse at BUILD.
   const undeclaredCrypto = await featureEntry({
@@ -112,9 +110,21 @@ test('P-BUILD-ORDINARY-IMPORTS-SEALED: declared node/npm/native imports seal; un
   assert.equal(buildCode(await richComposition({ features: [undeclaredCrypto] })), 'V10_IMPORT_POLICY_DENIED');
   const undeclaredNpm = await featureEntry({
     fixture: 'sfeature-npm-declared-v1.mjs',
-    featureExport: 'pad',
+    featureExport: 'parseDocument',
   });
   assert.equal(buildCode(await richComposition({ features: [undeclaredNpm] })), 'V10_IMPORT_POLICY_DENIED');
+  // A declared-but-different specifier is equally an unsealed edge (allowances are edge-exact).
+  const declaredElsewhere = await featureEntry({
+    fixture: 'sfeature-npm-declared-v1.mjs',
+    featureExport: 'parseDocument',
+    externalImports: { npm: ['left-pad'] },
+  });
+  assert.equal(buildCode(await richComposition({ features: [declaredElsewhere] })), 'V10_IMPORT_POLICY_DENIED');
+  const undeclaredNative = await featureEntry({
+    fixture: 'sfeature-native-declared-v1.mjs',
+    featureExport: 'memoryValue',
+  });
+  assert.equal(buildCode(await richComposition({ features: [undeclaredNative] })), 'V10_IMPORT_POLICY_DENIED');
 });
 
 test('P-BUILD-OPTIONAL-SKIP: an optional advisory module without bytes falls back to Basic', async () => {

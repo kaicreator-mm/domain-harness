@@ -93,8 +93,11 @@
   `kext-advisory-alpha-v1.mjs`, `kext-advisory-beta-v1.mjs`,
   `sfeature-validation-v1.mjs`, `sfeature-aggregation-v1.mjs`,
   `sfeature-formatting-v1.mjs` (uses node:crypto — ordinary builtin import),
-  `sfeature-npm-declared-v1.mjs` (declared bare npm specifier; BUILD-only,
-  never evaluated — physical npm resolution is T11),
+  `sfeature-npm-declared-v1.mjs` (declared bare npm specifier `yaml`, really
+  evaluated at activation via the deployment-anchored resolve seam — R1
+  review 6254726674 P1-1; BUILD stays purely static),
+  `sfeature-native-declared-v1.mjs` (declared installed native add-on
+  `better-sqlite3`, really evaluated at activation),
   `kext-eval-sentinel.mjs` (records global on evaluation),
   `kext-init-throws.mjs`, `kext-init-forged-return.mjs`,
   `kext-init-probes-ports.mjs`, `kext-missing-export.mjs`.

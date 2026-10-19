@@ -173,6 +173,7 @@ export type {
   V10BuiltApp,
   V10Counters,
   V10DocStore,
+  V10DocWriteCondition,
   V10ExternalImports,
   V10ModuleEdge,
   V10ModuleInput,

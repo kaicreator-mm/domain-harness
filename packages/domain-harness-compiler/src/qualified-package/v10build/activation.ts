@@ -9,7 +9,16 @@
  *   (1) structural plain-data check of the consumed App record;
  *   (2) import the sealed modules in the SEALED load order through private
  *       per-activation `data:` URLs (fresh cache discriminators; the
- *       sealed graph is the whole graph — nothing else is imported);
+ *       sealed graph is the whole graph — nothing else is imported). A
+ *       `data:` URL has no package hierarchy, so each module's DECLARED
+ *       npm/native import allowance is honored through one process-wide
+ *       synchronous resolve hook (`node:module registerHooks`): a sealed
+ *       bare specifier resolves against the real deployment context's
+ *       installed packages; every other request falls through to the
+ *       default resolver, which fail-closed refuses it. Sealed bytes are
+ *       never rewritten; the hook is deregistered at activation close; a
+ *       runtime without the hook refuses activations that declare
+ *       npm/native imports typed (`V10_IMPORT_HOOK_UNAVAILABLE`);
  *   (3) connect: structural per-role export checks (the A01 runtime
  *       fail-fast class: an actually missing callable hook);
  *   (4) init the advisory modules (S features, then K extensions) in
@@ -38,6 +47,9 @@
  */
 import { randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
+import { registerHooks } from 'node:module';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
 
@@ -88,10 +100,23 @@ export interface V10AppView {
   readonly routes: readonly { intentId: string; operationId: string; capabilityId: string; handlerId: string }[];
 }
 
+/** The physical CAS condition of one K document write/removal. */
+export type V10DocWriteCondition = { kind: 'create' } | { kind: 'cas'; revision: number };
+
 /** Caller-owned plain CAS document store (physical owner is K01/K02/T11). */
 export interface V10DocStore {
   get(key: string): Promise<{ value: unknown; revision: number } | null>;
-  put(key: string, value: unknown, condition: { kind: 'create' } | { kind: 'cas'; revision: number }): Promise<{ revision: number }>;
+  put(key: string, value: unknown, condition: V10DocWriteCondition): Promise<{ revision: number }>;
+  /**
+   * Physical CAS conditional removal — the zero-ambiguity release seam K01's
+   * admission-fence teardown needs (#1183: `releaseAdmissionFence` removes
+   * its fence key under an exact revision match). Optional by design: a
+   * physical owner implements it only when its medium supports conditional
+   * deletes; the K docs port then exposes `remove`, and exposes NO remove at
+   * all otherwise (fail-closed: a fence release that cannot happen beats a
+   * fake success).
+   */
+  remove?(key: string, condition: V10DocWriteCondition): Promise<void>;
   keys?(): readonly string[];
 }
 
@@ -164,9 +189,228 @@ function assertPlainRecord(value: unknown, label: string): Record<string, unknow
   return value;
 }
 
+function privateModuleFragment(activationNonce: string, packageId: string): string {
+  return `#v10-${activationNonce}-${encodeURIComponent(packageId)}`;
+}
+
 function privateModuleUrl(source: string, activationNonce: string, packageId: string): string {
   const bytes = Buffer.from(source, 'utf8').toString('base64');
-  return `data:text/javascript;base64,${bytes}#v10-${activationNonce}-${encodeURIComponent(packageId)}`;
+  return `data:text/javascript;base64,${bytes}${privateModuleFragment(activationNonce, packageId)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Declared bare-import resolution (review 6254726674, P1-1).
+//
+// A sealed module imported through a `data:` URL has no package hierarchy,
+// so a bare npm/native specifier inside it cannot resolve through the
+// default resolver (`ERR_UNSUPPORTED_RESOLVE_REQUEST`). BUILD seals each
+// module's declared npm/native allowance statically; this activation side
+// honors exactly that allowance with ONE process-wide synchronous resolve
+// hook (`node:module registerHooks`, Node >= 22.15): when the parent URL is
+// a `data:` module this activation minted AND the specifier is in THAT
+// module's sealed allowance, the specifier resolves against the deployment
+// context's actually installed packages and short-circuits; every other
+// request falls through to the default resolver, which fail-closed refuses
+// it. Sealed bytes are never rewritten — hooking resolve is the only
+// intervention. The hook is reference-counted across concurrent activations
+// and deregistered when the last one closes; a runtime without the hook
+// refuses allowances-bearing activations typed instead of silently dropping
+// their declared resolution context.
+// ---------------------------------------------------------------------------
+
+type ModuleHooksHandle = ReturnType<typeof registerHooks>;
+
+interface DeclaredBareImportAllowance {
+  readonly specifiers: ReadonlySet<string>;
+  readonly deploymentRoot: string | undefined;
+}
+
+/** Minted parent-URL fragment -> the declared bare specifiers it may resolve. */
+const declaredBareImportAllowances = new Map<string, DeclaredBareImportAllowance>();
+let importHookHandle: ModuleHooksHandle | null = null;
+let importHookUsers = 0;
+
+/** The default deployment anchor: this activation module's own resolution context. */
+const ACTIVATION_MODULE_URL = import.meta.url;
+
+function ensureImportResolveHook(): ModuleHooksHandle | null {
+  if (typeof registerHooks !== 'function') return null;
+  if (importHookHandle === null) {
+    importHookHandle = registerHooks({
+      resolve(specifier, context, nextResolve) {
+        const parentURL = context.parentURL;
+        // The fragment carries this machinery's per-activation nonce; the
+        // keyed lookup is the authority (a foreign URL is never keyed).
+        if (typeof parentURL === 'string' && parentURL.startsWith('data:text/javascript;base64,') && parentURL.includes('#v10-')) {
+          const allowance = declaredBareImportAllowances.get(parentURL.slice(parentURL.indexOf('#')));
+          if (allowance !== undefined && allowance.specifiers.has(specifier)) {
+            // Resolve through the REAL default ESM resolver against a
+            // synthetic file: parent inside the deployment context (the
+            // legitimately deployed node_modules lookup), instead of the
+            // hierarchy-less data: parent. Everything unsealed keeps going
+            // to the next resolver, which refuses bare specifiers from a
+            // data: parent — the fail-closed default.
+            const anchorParentURL = allowance.deploymentRoot === undefined
+              ? ACTIVATION_MODULE_URL
+              : pathToFileURL(join(allowance.deploymentRoot, 'package.json')).href;
+            return nextResolve(specifier, { parentURL: anchorParentURL });
+          }
+        }
+        return nextResolve(specifier, context);
+      },
+    });
+  }
+  importHookUsers += 1;
+  return importHookHandle;
+}
+
+function releaseImportResolveHook(): void {
+  importHookUsers -= 1;
+  if (importHookUsers === 0 && importHookHandle !== null) {
+    importHookHandle.deregister();
+    importHookHandle = null;
+  }
+}
+
+/** The npm/native specifiers a consumed module record declares (defensive plain-data read). */
+function declaredBareImportsOf(module: V10AppView['modules'][number]): readonly string[] {
+  const external = (module as { externalImports?: unknown }).externalImports;
+  if (!isPlainRecord(external)) return [];
+  const declared: string[] = [];
+  for (const kind of ['npm', 'native'] as const) {
+    const list = external[kind];
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        if (typeof item === 'string' && item.length > 0) declared.push(item);
+      }
+    }
+  }
+  return declared;
+}
+
+/**
+ * Honor the consumed record's declared npm/native allowances for the `data:`
+ * URLs this activation is about to import. Returns the release closure that
+ * unregisters the allowances (and the process hook when this was its last
+ * user). Refuses typed when the runtime cannot host the resolve hook.
+ */
+function registerDeclaredBareImports(deps: {
+  activationNonce: string;
+  appView: V10AppView;
+  deploymentRoot: string | undefined;
+}): () => void {
+  const mintedFragments: string[] = [];
+  let hasDeclaredBareImports = false;
+  for (const module of deps.appView.modules) {
+    if (typeof module.moduleSource !== 'string' || module.moduleSource.length === 0) continue;
+    const declared = declaredBareImportsOf(module);
+    const fragment = privateModuleFragment(deps.activationNonce, module.packageId);
+    mintedFragments.push(fragment);
+    if (declared.length > 0) {
+      declaredBareImportAllowances.set(fragment, { specifiers: new Set(declared), deploymentRoot: deps.deploymentRoot });
+      hasDeclaredBareImports = true;
+    }
+  }
+  if (!hasDeclaredBareImports) return () => {};
+  const handle = ensureImportResolveHook();
+  if (handle === null) {
+    for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
+    refuse(
+      'V10_IMPORT_HOOK_UNAVAILABLE',
+      'this Node runtime lacks the node:module registerHooks resolve seam; an App declaring npm/native external imports refuses fail-closed instead of importing without its declared resolution context',
+    );
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
+    releaseImportResolveHook();
+  };
+}
+
+/**
+ * The kernel-facing K docs port: prefix-bounded physical CAS conditionals
+ * only. `remove` is exposed when — and only when — the physical store
+ * implements it (review 6254726674, P1-2).
+ */
+export interface V10DocsPort {
+  get(key: string): Promise<{ value: unknown; revision: number } | null>;
+  put(key: string, value: unknown, condition: unknown): Promise<{ revision: number }>;
+  list(prefix: string): Promise<readonly string[]>;
+  /**
+   * Zero-ambiguity CAS removal (K01 admission-fence release, #1183).
+   * Conditions mirror `put`: `{ mustMatchRevision }` deletes under an exact
+   * revision match; `{ mustBeAbsent: true }` ensures absence (a no-op over
+   * an absent key, a typed refusal over a present one — it never deletes).
+   * Present only when the physical store implements `remove`: a missing
+   * physical remove must surface as "no such port", never as fake success.
+   */
+  remove?(key: string, condition: unknown): Promise<void>;
+}
+
+/** Map the kernel-side condition shape onto the physical store condition. */
+function mapDocCondition(key: string, condition: unknown): V10DocWriteCondition {
+  if (isPlainRecord(condition) && condition.mustBeAbsent === true) {
+    return { kind: 'create' };
+  }
+  if (isPlainRecord(condition) && typeof condition.mustMatchRevision === 'number' && Number.isSafeInteger(condition.mustMatchRevision)) {
+    return { kind: 'cas', revision: condition.mustMatchRevision };
+  }
+  refuse('K_DOC_CONDITION_REQUIRED', `K document operation on ${key} requires a physical revision expectation`);
+}
+
+/** Normalize a physical store refusal into the typed CAS-conflict error. */
+function casConflictError(error: unknown): Error {
+  return Object.assign(new Error(error instanceof Error ? error.message : String(error)), { code: 'HOST_CAS_CONFLICT' });
+}
+
+/** Build the prefix-bounded K docs port over one physical store. */
+export function createV10DocsPort(deps: { store: V10DocStore; docsPrefix: string; assertOpen: () => void }): V10DocsPort {
+  const port: V10DocsPort = {
+    get: async (key) => {
+      deps.assertOpen();
+      return await deps.store.get(`${deps.docsPrefix}${key}`);
+    },
+    put: async (key, value, condition) => {
+      deps.assertOpen();
+      const mapped = mapDocCondition(key, condition);
+      try {
+        return await deps.store.put(`${deps.docsPrefix}${key}`, value, mapped);
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'HOST_CAS_CONFLICT' || code === undefined) throw casConflictError(error);
+        throw error;
+      }
+    },
+    list: async (prefix) => {
+      deps.assertOpen();
+      const full = `${deps.docsPrefix}${prefix}`;
+      const keys = deps.store.keys?.() ?? [];
+      return keys.filter((key) => key.startsWith(full)).map((key) => key.slice(deps.docsPrefix.length));
+    },
+  };
+  if (deps.store.remove === undefined) {
+    // Fail-closed: without a physical conditional remove the port exposes NO
+    // remove member at all — a K01 fence release then fails loudly instead
+    // of pretending to succeed.
+    return port;
+  }
+  const physicalRemove = deps.store.remove.bind(deps.store);
+  return {
+    ...port,
+    remove: async (key, condition) => {
+      deps.assertOpen();
+      const mapped = mapDocCondition(key, condition);
+      try {
+        await physicalRemove(`${deps.docsPrefix}${key}`, mapped);
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'HOST_CAS_CONFLICT' || code === undefined) throw casConflictError(error);
+        throw error;
+      }
+    },
+  };
 }
 
 /** One bounded, data-only, port-denying init context for ONE advisory module. */
@@ -209,6 +453,16 @@ export interface ActivateV10AppOptions {
   readonly tenantId?: string;
   readonly now?: () => number;
   readonly counters?: V10Counters;
+  /**
+   * Deployment anchor for resolving the DECLARED bare npm/native imports of
+   * sealed modules — the deployment root whose `node_modules` physically
+   * holds the installed dependencies (the A01-PC05 "installed" half of the
+   * allowance). Defaults to this activation module's own resolution context.
+   * Bounded: only specifiers sealed in a consumed module's externalImports
+   * allowance are ever resolved through it; everything else is left to the
+   * default resolver, which refuses.
+   */
+  readonly deploymentRoot?: string;
 }
 
 export interface V10Activation {
@@ -227,10 +481,16 @@ export interface V10Activation {
 export class V10AppFacade {
   readonly #app: V10AppView;
   readonly #namespaces: ReadonlyMap<string, Namespace>;
-  readonly #store: V10DocStore;
   readonly #now: () => number;
   readonly #counters: V10Counters;
+  // Key-namespace handoff (review 6254726674, P2): the docs key namespace
+  // derives its deployment identity from the BUILD subjectDigest, which is
+  // not the stable deployedAppId + B-domain identity Product/L2 require.
+  // The key-shape repair belongs to K02/T10/T08 — the concrete handoff is
+  // recorded in .agent/execution/v0.10-T00/HANDOFFS.md — and is deliberately
+  // NOT changed here in T00.
   readonly #docsPrefix: string;
+  readonly #docs: V10DocsPort;
   readonly #runtimes = new Map<string, KRuntime>();
   #closed = false;
 
@@ -245,10 +505,10 @@ export class V10AppFacade {
   }) {
     this.#app = deps.app;
     this.#namespaces = deps.namespaces;
-    this.#store = deps.store;
     this.#now = deps.now;
     this.#counters = deps.counters;
     this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
+    this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
   }
 
   get selectedExtensions(): readonly { packageId: string; providerId: string | null; hook: string | null }[] {
@@ -282,39 +542,6 @@ export class V10AppFacade {
       refuse('FACADE_CLOSED', 'the v0.10 App facade is closed; no further K activity can start');
     }
   }
-
-  readonly #docs = {
-    get: async (key: string): Promise<{ value: unknown; revision: number } | null> => {
-      this.#assertOpen();
-      return await this.#store.get(`${this.#docsPrefix}${key}`);
-    },
-    put: async (key: string, value: unknown, condition: unknown): Promise<{ revision: number }> => {
-      this.#assertOpen();
-      let mapped: { kind: 'create' } | { kind: 'cas'; revision: number };
-      if (isPlainRecord(condition) && condition.mustBeAbsent === true) {
-        mapped = { kind: 'create' };
-      } else if (isPlainRecord(condition) && typeof condition.mustMatchRevision === 'number' && Number.isSafeInteger(condition.mustMatchRevision)) {
-        mapped = { kind: 'cas', revision: condition.mustMatchRevision };
-      } else {
-        refuse('K_DOC_CONDITION_REQUIRED', `K document write of ${key} requires a physical revision expectation`);
-      }
-      try {
-        return await this.#store.put(`${this.#docsPrefix}${key}`, value, mapped);
-      } catch (error) {
-        const code = (error as { code?: string }).code;
-        if (code === 'HOST_CAS_CONFLICT' || code === undefined) {
-          throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), { code: 'HOST_CAS_CONFLICT' });
-        }
-        throw error;
-      }
-    },
-    list: async (prefix: string): Promise<readonly string[]> => {
-      this.#assertOpen();
-      const full = `${this.#docsPrefix}${prefix}`;
-      const keys = this.#store.keys?.() ?? [];
-      return keys.filter((key) => key.startsWith(full)).map((key) => key.slice(this.#docsPrefix.length));
-    },
-  };
 
   /** Sealed capability dispatch: the ONLY physical resource port here. */
   readonly #resources = {
@@ -465,6 +692,9 @@ export class V10AppFacade {
  */
 export async function activateV10App(app: unknown, options: ActivateV10AppOptions): Promise<V10Activation> {
   const counters = options.counters ?? freshV10Counters();
+  // Set once this activation's declared bare-import allowances are registered;
+  // invoked at close (dispose) and on any activation refusal path.
+  let releaseDeclaredImports: (() => void) | undefined;
   try {
     // ---- (1) structural plain-data check; nothing imported yet ----
     const record = assertPlainRecord(app, 'built App');
@@ -492,8 +722,15 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
     const appView = record as unknown as V10AppView;
     const byId = new Map(appView.modules.map((module) => [module.packageId, module]));
 
-    // ---- (2) import the sealed modules in the SEALED order ----
+    // ---- (1.5) declared bare-import resolution context (no bytes touched) ----
     const activationNonce = randomUUID();
+    releaseDeclaredImports = registerDeclaredBareImports({
+      activationNonce,
+      appView,
+      deploymentRoot: options.deploymentRoot,
+    });
+
+    // ---- (2) import the sealed modules in the SEALED order ----
     const namespaces = new Map<string, Namespace>();
     for (const packageId of appView.loadOrder) {
       const module = byId.get(packageId);
@@ -647,6 +884,9 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       facade,
       counters,
       dispose: (): void => {
+        // Close the declared-import resolution seam first: after activation
+        // close, this App's allowances stop being honored (fail-closed).
+        releaseDeclaredImports?.();
         facade.close();
         for (let index = initialized.length - 1; index >= 0; index -= 1) {
           const advisory = initialized[index] as SelectedAdvisory;
@@ -660,6 +900,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       },
     };
   } catch (error) {
+    releaseDeclaredImports?.();
     if (error instanceof V10ActivationError) {
       counters.activationRefusals.push({ code: error.code, message: error.message });
     }

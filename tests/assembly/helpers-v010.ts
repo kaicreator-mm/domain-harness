@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import type { BuildV10AppOptions, V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import type { BuildV10AppOptions, V10DocWriteCondition, V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { V10_KEXT_ABI, V10_RUNTIME_ABI, V10_HOST_ABI, V10_SFEATURE_ABI, V10_TARGET_PROFILE } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import type { V10DocStore } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 
@@ -231,7 +231,7 @@ export class PlainCasDocStore implements V10DocStore {
     return doc === undefined ? null : { value: structuredClone(doc.value), revision: doc.revision };
   }
 
-  async put(key: string, value: unknown, condition: { kind: 'create' } | { kind: 'cas'; revision: number }): Promise<{ revision: number }> {
+  async put(key: string, value: unknown, condition: V10DocWriteCondition): Promise<{ revision: number }> {
     const existing = this.#documents.get(key);
     if (condition.kind === 'create') {
       if (existing !== undefined) {
@@ -246,6 +246,24 @@ export class PlainCasDocStore implements V10DocStore {
     const revision = existing.revision + 1;
     this.#documents.set(key, { value: structuredClone(value), revision });
     return { revision };
+  }
+
+  /** Physical CAS conditional removal (K01 admission-fence release seam, #1183). */
+  async remove(key: string, condition: V10DocWriteCondition): Promise<void> {
+    const existing = this.#documents.get(key);
+    if (condition.kind === 'create') {
+      // The create-conditioned remove is the `mustBeAbsent` dual: ensure
+      // absence — a no-op over an absent key, a typed refusal over a present
+      // one (it never deletes). The fence-release path uses the CAS form.
+      if (existing !== undefined) {
+        throw Object.assign(new Error(`CAS conflict on ${key}: document exists; a create-conditioned remove refuses to delete it`), { code: 'HOST_CAS_CONFLICT' });
+      }
+      return;
+    }
+    if (existing === undefined || existing.revision !== condition.revision) {
+      throw Object.assign(new Error(`CAS conflict on ${key}: revision moved (expected ${condition.revision})`), { code: 'HOST_CAS_CONFLICT' });
+    }
+    this.#documents.delete(key);
   }
 
   keys(): readonly string[] {
@@ -273,6 +291,20 @@ export function disposalLog(): readonly string[] {
 
 export function clearDisposalLog(): void {
   delete (globalThis as { __v010Disposals?: string[] }).__v010Disposals;
+}
+
+/**
+ * Physical-evidence log for DECLARED npm/native imports really evaluating
+ * inside sealed module bytes (`<MODULE_ID>:<fact>` entries, pushed by the
+ * fixtures themselves at module-evaluation time — review 6254726674 P1-1).
+ */
+export function declaredImportEvidence(): readonly string[] {
+  const log = (globalThis as { __v010DeclaredImportEvidence?: string[] }).__v010DeclaredImportEvidence;
+  return log === undefined ? [] : [...log];
+}
+
+export function clearDeclaredImportEvidence(): void {
+  delete (globalThis as { __v010DeclaredImportEvidence?: string[] }).__v010DeclaredImportEvidence;
 }
 
 export const INTENT = {

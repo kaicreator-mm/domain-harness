@@ -16,6 +16,8 @@ import {
   buildV10App,
   freshV10Counters,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import type { V10DocStore } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { createV10DocsPort } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import {
   BUSINESS_PACKAGE_ID,
   CAPABILITY_PACKAGE_ID,
@@ -24,11 +26,14 @@ import {
   PlainCasDocStore,
   STANDARD_PACKAGE_ID,
   basicComposition,
+  clearDeclaredImportEvidence,
   clearDisposalLog,
   clearEvalLog,
+  declaredImportEvidence,
   disposalLog,
   evalLog,
   extensionEntry,
+  featureEntry,
   richComposition,
 } from './helpers-v010.js';
 
@@ -139,6 +144,130 @@ test('P-ACT-ORDINARY-BUILTIN-IMPORT: a sealed node:crypto import really evaluate
   const receipt = await activation.facade.send({ ...INTENT });
   assert.equal(receipt.status, 'admitted');
   activation.dispose();
+});
+
+const NPM_FEATURE = {
+  fixture: 'sfeature-npm-declared-v1.mjs',
+  featureExport: 'parseDocument',
+  externalImports: { npm: ['yaml'] },
+} as const;
+const NATIVE_FEATURE = {
+  fixture: 'sfeature-native-declared-v1.mjs',
+  featureExport: 'memoryValue',
+  externalImports: { native: ['better-sqlite3'] },
+} as const;
+
+test('P-ACT-REAL-NPM-IMPORT: a sealed npm-declared feature really evaluates against the installed yaml via the deployment-anchored resolve seam', async () => {
+  clearEvalLog();
+  clearDeclaredImportEvidence();
+  const npmFeature = await featureEntry({ ...NPM_FEATURE });
+  const app = buildV10App(await basicComposition({ features: [npmFeature] }));
+  const activation = await activateV10App(app, { store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now });
+  assert.equal(activation.counters.importsByPackage['sfeature-npm-declared@v010.1.0.0'], 1);
+  assert.equal(activation.counters.featureImports, 1);
+  assert.deepEqual(
+    declaredImportEvidence(),
+    ['sfeature-npm-declared@v010.1.0.0:yaml-roundtrip-ok'],
+    'the sealed module physically parsed with the installed yaml at evaluation time',
+  );
+  const receipt = await activation.facade.send({ ...INTENT });
+  assert.equal(receipt.status, 'admitted');
+
+  // Lifecycle: dispose releases the hook user slot; a fresh activation
+  // re-acquires it under a fresh nonce and resolves the declared import again.
+  activation.dispose();
+  clearDeclaredImportEvidence();
+  const second = await activateV10App(buildV10App(await basicComposition({ features: [npmFeature] })), {
+    store: new PlainCasDocStore(),
+    tenantId: TENANT,
+    now: tickingClock().now,
+  });
+  assert.deepEqual(declaredImportEvidence(), ['sfeature-npm-declared@v010.1.0.0:yaml-roundtrip-ok']);
+  second.dispose();
+  clearDeclaredImportEvidence();
+});
+
+test('P-ACT-REAL-NATIVE-IMPORT: a sealed native-declared feature really evaluates the installed better-sqlite3 binary', async () => {
+  clearDeclaredImportEvidence();
+  const nativeFeature = await featureEntry({ ...NATIVE_FEATURE });
+  const app = buildV10App(await basicComposition({ features: [nativeFeature] }));
+  const activation = await activateV10App(app, { store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now });
+  assert.equal(activation.counters.importsByPackage['sfeature-native-declared@v010.1.0.0'], 1);
+  assert.deepEqual(
+    declaredImportEvidence(),
+    ['sfeature-native-declared@v010.1.0.0:sqlite-roundtrip-ok'],
+    'the sealed module physically opened an in-memory sqlite database through the native add-on',
+  );
+  const receipt = await activation.facade.send({ ...INTENT });
+  assert.equal(receipt.status, 'admitted');
+  activation.dispose();
+  clearDeclaredImportEvidence();
+});
+
+test('N-ACT-UNDECLARED-BARE-IMPORT: a consumed record that lost its sealed allowance fails closed — the resolve seam does not help', async () => {
+  clearDeclaredImportEvidence();
+  const npmFeature = await featureEntry({ ...NPM_FEATURE });
+  const app = buildV10App(await basicComposition({ features: [npmFeature] }));
+  const tampered = JSON.parse(JSON.stringify(app)) as typeof app;
+  for (const module of tampered.modules) {
+    if (module.packageId === 'sfeature-npm-declared@v010.1.0.0') {
+      (module as { externalImports?: unknown }).externalImports = { node: [], npm: [], native: [] };
+    }
+  }
+  await assert.rejects(
+    activateV10App(tampered, { store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now }),
+    (error: unknown) => {
+      assert.equal(activationCode(error), 'V10_IMPORT_EVAL_FAILED');
+      assert.match((error as Error).message, /yaml/, 'the refusal names the unresolvable bare specifier');
+      return true;
+    },
+  );
+  assert.deepEqual(declaredImportEvidence(), [], 'the resolve seam never resolved the undeclared specifier');
+  clearDeclaredImportEvidence();
+});
+
+test('P-ACT-DOCS-REMOVE-SEAM: the K docs port maps fence-release conditions onto the physical CAS remove (K01 #1183 seam)', async () => {
+  const store = new PlainCasDocStore();
+  const docs = createV10DocsPort({ store, docsPrefix: 'v10/k/digest/tenant:v010-t00/', assertOpen: () => {} });
+
+  await docs.put('admission:fence:wf1', { holder: 'k01' }, { mustBeAbsent: true });
+  // Negative: a revision mismatch is a zero-ambiguity typed conflict; nothing is deleted.
+  await assert.rejects(
+    docs.remove('admission:fence:wf1', { mustMatchRevision: 7 }),
+    (error: unknown) => (error as { code?: string }).code === 'HOST_CAS_CONFLICT',
+  );
+  const stillThere = await docs.get('admission:fence:wf1');
+  assert.equal(stillThere?.revision, 0, 'a CAS-conflicted remove deletes nothing');
+  // Recovery: the matching revision releases the fence key.
+  await docs.remove('admission:fence:wf1', { mustMatchRevision: 0 });
+  assert.equal(await docs.get('admission:fence:wf1'), null, 'the released key is physically gone');
+  // Re-removal of the now-absent key under the stale expectation conflicts again.
+  await assert.rejects(
+    docs.remove('admission:fence:wf1', { mustMatchRevision: 0 }),
+    (error: unknown) => (error as { code?: string }).code === 'HOST_CAS_CONFLICT',
+  );
+  // A released fence key is re-armable (create-condition succeeds again).
+  const rearm = await docs.put('admission:fence:wf1', { holder: 'k01-2' }, { mustBeAbsent: true });
+  assert.equal(rearm.revision, 0);
+  // The port stays prefix-bounded: the kernel-visible key maps onto exactly one physical key.
+  assert.deepEqual(store.keys(), ['v10/k/digest/tenant:v010-t00/admission:fence:wf1']);
+  // Kernel-driven end-to-end unambiguous fence release is exercised by K01's
+  // own kernel after #1183 lands (integration / R01); this worktree's kernel
+  // never calls remove.
+});
+
+test('N-ACT-DOCS-REMOVE-ABSENT: a store without a physical remove exposes no remove port (fail-closed, not fake success)', async () => {
+  const minimal: V10DocStore = {
+    get: async () => null,
+    put: async (_key, _value, condition) => ({ revision: condition.kind === 'create' ? 0 : condition.revision + 1 }),
+  };
+  const docs = createV10DocsPort({ store: minimal, docsPrefix: 'v10/k/d/', assertOpen: () => {} });
+  assert.equal('remove' in docs, false, 'no physical conditional remove means no port remove at all');
+  assert.equal(docs.remove, undefined);
+  await assert.rejects(
+    docs.put('k', 1, 'bogus'),
+    (error: unknown) => activationCode(error) === 'K_DOC_CONDITION_REQUIRED',
+  );
 });
 
 test('P-ACT-NO-RESTATTESTATION: a tampered sealed digest still activates — the SDK is not a second Package checker', async () => {

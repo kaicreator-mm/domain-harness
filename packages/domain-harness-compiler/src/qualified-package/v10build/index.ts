@@ -47,5 +47,6 @@ export type {
   V10AppView,
   V10Counters,
   V10DocStore,
+  V10DocWriteCondition,
   V10PublicIntent,
 } from './activation.js';

@@ -42,20 +42,32 @@ export interface V10AppView {
         handlerId: string;
     }[];
 }
+/** The physical CAS condition of one K document write/removal. */
+export type V10DocWriteCondition = {
+    kind: 'create';
+} | {
+    kind: 'cas';
+    revision: number;
+};
 /** Caller-owned plain CAS document store (physical owner is K01/K02/T11). */
 export interface V10DocStore {
     get(key: string): Promise<{
         value: unknown;
         revision: number;
     } | null>;
-    put(key: string, value: unknown, condition: {
-        kind: 'create';
-    } | {
-        kind: 'cas';
-        revision: number;
-    }): Promise<{
+    put(key: string, value: unknown, condition: V10DocWriteCondition): Promise<{
         revision: number;
     }>;
+    /**
+     * Physical CAS conditional removal — the zero-ambiguity release seam K01's
+     * admission-fence teardown needs (#1183: `releaseAdmissionFence` removes
+     * its fence key under an exact revision match). Optional by design: a
+     * physical owner implements it only when its medium supports conditional
+     * deletes; the K docs port then exposes `remove`, and exposes NO remove at
+     * all otherwise (fail-closed: a fence release that cannot happen beats a
+     * fake success).
+     */
+    remove?(key: string, condition: V10DocWriteCondition): Promise<void>;
     keys?(): readonly string[];
 }
 export interface V10Counters {
@@ -95,11 +107,51 @@ interface SelectedAdvisory {
     readonly identityKey: string;
     readonly dispose: (() => void) | undefined;
 }
+/**
+ * The kernel-facing K docs port: prefix-bounded physical CAS conditionals
+ * only. `remove` is exposed when — and only when — the physical store
+ * implements it (review 6254726674, P1-2).
+ */
+export interface V10DocsPort {
+    get(key: string): Promise<{
+        value: unknown;
+        revision: number;
+    } | null>;
+    put(key: string, value: unknown, condition: unknown): Promise<{
+        revision: number;
+    }>;
+    list(prefix: string): Promise<readonly string[]>;
+    /**
+     * Zero-ambiguity CAS removal (K01 admission-fence release, #1183).
+     * Conditions mirror `put`: `{ mustMatchRevision }` deletes under an exact
+     * revision match; `{ mustBeAbsent: true }` ensures absence (a no-op over
+     * an absent key, a typed refusal over a present one — it never deletes).
+     * Present only when the physical store implements `remove`: a missing
+     * physical remove must surface as "no such port", never as fake success.
+     */
+    remove?(key: string, condition: unknown): Promise<void>;
+}
+/** Build the prefix-bounded K docs port over one physical store. */
+export declare function createV10DocsPort(deps: {
+    store: V10DocStore;
+    docsPrefix: string;
+    assertOpen: () => void;
+}): V10DocsPort;
 export interface ActivateV10AppOptions {
     readonly store: V10DocStore;
     readonly tenantId?: string;
     readonly now?: () => number;
     readonly counters?: V10Counters;
+    /**
+     * Deployment anchor for resolving the DECLARED bare npm/native imports of
+     * sealed modules — the deployment root whose `node_modules` physically
+     * holds the installed dependencies (the A01-PC05 "installed" half of the
+     * allowance). Defaults to this activation module's own resolution context.
+     * Bounded: only specifiers sealed in a consumed module's externalImports
+     * allowance are ever resolved through it; everything else is left to the
+     * default resolver, which refuses.
+     */
+    readonly deploymentRoot?: string;
 }
 export interface V10Activation {
     readonly facade: V10AppFacade;
