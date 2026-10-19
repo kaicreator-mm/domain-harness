@@ -239,9 +239,12 @@ test('FR04-P/FR04-N self-loop duplicate: a re-sent messageId on a LEGAL self-loo
   assert.equal((await journalRows()).length, rowsBefore, 'zero new journal rows');
   assert.equal(dispatches.length, dispatchBefore, 'zero new physical dispatches');
 
+  // [v0.10 K02 #1168 splice] The changed-intent conflict on an admitted
+  // messageId is detected by the same-CAS original-receipt ladder, which
+  // answers before the archive-only disposition ladder.
   await assert.rejects(
     () => sendControls('timeOutOnDeadline', 'm-loop-2', {}),
-    (error: unknown) => (error as { code?: string }).code === 'ADMISSION_TURN_DISPOSITION_CONFLICT',
+    (error: unknown) => (error as { code?: string }).code === 'K02_TURN_RECEIPT_INTENT_CONFLICT',
   );
   assert.equal(await revision(), 3, 'the conflicting re-use of the messageId refused before any admission');
 });

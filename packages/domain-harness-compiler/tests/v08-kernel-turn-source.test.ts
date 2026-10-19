@@ -20,7 +20,10 @@
  *   - turn disposition: a replay of the SAME non-message source replays the
  *     stored receipt (idempotentReplay, zero new state revision, zero new
  *     effect execution); the SAME source under a DIFFERENT intentType
- *     refuses typed ADMISSION_TURN_DISPOSITION_CONFLICT before admission;
+ *     refuses typed before admission — [v0.10 K02 #1168 splice] the
+ *     same-CAS original-receipt ladder answers FIRST, so the surfaced code
+ *     is K02_TURN_RECEIPT_INTENT_CONFLICT (the disposition ladder below it
+ *     keeps ADMISSION_TURN_DISPOSITION_CONFLICT for pre-ring records);
  *   - the honest UNKNOWN window: a disposition create that fails after the
  *     authoritative state CAS is reported not_recorded (the ACK stays
  *     admitted), and a replay of that turn CANNOT double the terminal
@@ -275,7 +278,10 @@ test('turn-source P: the same source replayed is an idempotent replay with zero 
   assert.equal((replay as { idempotentReplay?: boolean }).idempotentReplay, true);
   assert.equal(replay.instance.stateRevision, revisionAfterFirst, 'a replay commits no new state revision');
   assert.equal(ports.resourceCalls.length, 1, 'a replay executes no second effect');
-  assert.equal(rt.counters.turnDispositionReplays, 1);
+  // [v0.10 K02 #1168 splice] The same-CAS original-receipt ring answers the
+  // replay; the disposition ladder below it is archive-only.
+  assert.equal(rt.counters.durableOriginalReceiptReplays, 1);
+  assert.equal(rt.counters.turnDispositionReplays, 0);
 });
 
 test('turn-source P: timer and child-terminal ids are deterministic and mutually distinct', async () => {
@@ -356,9 +362,12 @@ test('turn-source N: the same source under a different intentType refuses typed 
   assert.equal(first.status, 'admitted');
   const revision = first.instance.stateRevision;
 
+  // [v0.10 K02 #1168 splice] The changed-intent conflict is detected by the
+  // same-CAS original-receipt ladder (ring), which answers before the
+  // disposition ladder.
   await assertTyped(
     rt.submitOccurrence(callbackRequest('submitResumeAlt', CALLBACK_SOURCE, 'ctrl:callback:corr-1:alt')),
-    'ADMISSION_TURN_DISPOSITION_CONFLICT',
+    'K02_TURN_RECEIPT_INTENT_CONFLICT',
   );
   const after = await rt.getSnapshot(TARGET);
   assert.equal(after.stateRevision, revision, 'the colliding submission mutated nothing');
@@ -382,22 +391,23 @@ test('turn-source N: honest UNKNOWN window — failed disposition create never d
   assert.equal(ports.resourceCalls.length, 1);
 
   // [#1066 R1 P1-B] The healed replay finds no disposition record (the
-  // UNKNOWN window) but the SAME-CAS admission history INSIDE the committed
-  // instance document answers the once-only guarantee at the protocol
-  // level: the re-submitted turn is recognized as already admitted with
-  // ZERO new State/Journal/Effect activity — never again left to the
-  // business state machine's refusal to mask the window.
+  // UNKNOWN window) but the SAME-CAS original-receipt ring INSIDE the
+  // committed instance document answers the once-only guarantee at the
+  // protocol level ([v0.10 K02 #1168 splice]: the ORIGINAL acknowledged
+  // receipt rode the same state CAS, so the replay carries the exact
+  // original projection) — ZERO new State/Journal/Effect activity.
   const replay = await rt.submitOccurrence(callbackRequest('submitResume', CALLBACK_SOURCE, 'ctrl:callback:corr-1:1'));
-  assert.equal(replay.status, 'admitted', 'the replay is answered from the committed admission history');
+  assert.equal(replay.status, 'admitted', 'the replay is answered from the same-CAS original-receipt ring');
   assert.equal(replay.idempotentReplay, true);
-  assert.equal(replay.turnAdmission.turnId, expectedTurnId(CALLBACK_SOURCE));
+  assert.equal(replay.turnId, expectedTurnId(CALLBACK_SOURCE));
   const after = await rt.getSnapshot(TARGET);
   assert.equal(after.stateRevision, revision, 'terminal state is not doubled');
   assert.equal(after.state.stateKey, 'resumed');
   assert.equal(ports.resourceCalls.length, 1, 'no duplicate effect execution');
 
-  // The replay heals the lost disposition observation: a THIRD delivery
-  // now replays from the healed record itself.
+  // The replay heals the lost disposition observation (the receipt ladder's
+  // best-effort observational heal): a THIRD delivery now replays from the
+  // healed record itself.
   const third = await rt.submitOccurrence(callbackRequest('submitResume', CALLBACK_SOURCE, 'ctrl:callback:corr-1:1'));
   assert.equal(third.status, 'admitted');
   assert.equal(third.idempotentReplay, true);

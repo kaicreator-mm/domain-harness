@@ -123,7 +123,11 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // dispatcher's own per-call pre-handler attestation (kernel-minted,
 // dispatcher-marked, never adapter-visible) proves it; FR02/FR07 semantics
 // unchanged.
-const V08_K_BLOB = '77704350bb2fac13cbcae245f7e49e7b42254107';
+// K_BLOB_PIN_REBOUND_AFTER_1168_PHASE2: the K02 durable original-receipt
+// carrier spliced into the selected kernel (input-complete deployment-scoped
+// turn identity, same-CAS original receipts, scoped key grammar, ring-backed
+// disposition liveness); FR02/FR07 semantics unchanged.
+const V08_K_BLOB = 'd7909b8ff8071e1f15d8b55fe6f967d883f6b4ac';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

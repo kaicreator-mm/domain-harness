@@ -1,25 +1,32 @@
 /**
- * #1066 K bounded admission history — the 17th-turn eviction guard
- * (final-candidate negative, #1006 targeted gap check).
+ * #1066 bounded admission history — [v0.10 K02 #1168 phase-2 splice] the
+ * same-CAS ORIGINAL RECEIPT replaces the missing-disposition eviction wedge
+ * (anchor 4 of the K02 kernel splice; the former
+ * ADMISSION_TURN_HISTORY_EVICTION_BLOCKED negative materialized the wedge
+ * the splice repairs: a lost derived disposition could block ALL new turns
+ * forever at 16+ admissions).
  * ====================================================================
  *
- * The last 16 non-message control-turn admissions ride inside the
- * committed instance document (the same-CAS crash backstop). Before
- * evicting the oldest of the 16, K must verify that turn's independent
- * durable disposition; with the OLDEST turn caught in the crash window
+ * The last 16 turn admissions still ride inside the committed instance
+ * document (MAX_ADMITTED_CONTROL_TURN_HISTORY — the crash-backstop bound),
+ * and since the splice the IMMUTABLE ORIGINAL RECEIPT of every admitted
+ * turn rides the SAME state CAS (`durableOriginalReceipts`, ring bound 64,
+ * archive-gated eviction). With the OLDEST turn caught in the crash window
  * (state CAS committed, BOTH the K turn-disposition record AND the Host
  * submittedTurn marker absent), this witness proves on the REAL selected
  * path (Node24 + real SQLite):
  *
- *   - admitting the 17th control turn FAILS CLOSED typed
- *     (`ADMISSION_TURN_HISTORY_EVICTION_BLOCKED`) before any
- *     State/Effect — a delayed recovery cannot silently pass beyond the
- *     bounded backstop;
- *   - caller-driven durable recovery re-submits the OLDEST source, the
- *     Kernel recognizes its own committed admission from the history and
- *     HEALS the lost disposition (idempotent replay, zero new
- *     State/Effect);
- *   - the retried 17th turn then admits exactly ONCE.
+ *   - the 17th control turn ADMITS: the missing-disposition fail-closed
+ *     block is replaced by the same-CAS receipt ring — progress no longer
+ *     depends on any derived record (the 17+ liveness repair);
+ *   - the crash-window turn's ORIGINAL acknowledged receipt is physically
+ *     present in the committed instance document (same-CAS: it survived
+ *     BOTH lost post-commit observations) and its replay answers from that
+ *     ring with the EXACT original projection;
+ *   - caller-driven durable recovery re-submits the crash-window source,
+ *     the receipt-ring replay HEALS the observational disposition
+ *     (idempotent, zero new State/Effect), and once-only still holds: a
+ *     redelivery is a typed duplicate, a fresh turn admits.
  *
  * The self-loop `pingFromCallback` turns come from the shared
  * business-durable-controls fixture (16 separate correlations, one
@@ -167,11 +174,11 @@ after(async () => {
   await store.close();
 });
 
-test('HF18-N 17th control turn fails closed while the oldest admitted turn lacks its disposition; recovery heals; the retry admits once', async () => {
+test('HF18-P [K02 splice] the same-CAS original receipt replaces the missing-disposition wedge: the 17th turn admits, the crash-window turn replays its EXACT original receipt, once-only holds', { timeout: 300_000 }, async () => {
   const instanceKey = 'evict-17';
   // Open the instance and move it to 'waiting' (a MESSAGE turn — since
-  // v0.8.1 R01 it enters the same-CAS admission history too, with its
-  // disposition recorded, so evicting it is always safe).
+  // v0.8.1 R01 it enters the same-CAS admission history too, and since the
+  // K02 splice its ORIGINAL receipt rides the same state CAS).
   await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey });
   const started = await gateway.send(requester, {
     intentType: 'submitStart',
@@ -209,73 +216,87 @@ test('HF18-N 17th control turn fails closed while the oldest admitted turn lacks
     const doc = await store.get(`${DISPOSITION_PREFIX}${turnId}`);
     return doc === null ? null : doc.value;
   };
+  type ReceiptEnvelope = {
+    carrierVersion?: number;
+    receipt?: { turnId?: string; instance?: { stateRevision?: number }; inputDigest?: string };
+  };
+  const instanceRingOf = async (): Promise<Record<string, ReceiptEnvelope>> => {
+    // The legacy (unscoped-wiring) instance key of this gateway instance:
+    // workflowId = WORKFLOW_KEY, instanceKey = tenant:app:key.
+    const doc = await store.get(`v08-kernel:wf-instance:${WORKFLOW_KEY}:${TENANT}:${APP_ID}:${instanceKey}`);
+    assert.ok(doc !== null, 'the instance document exists on the raw store');
+    const value = (doc as { value: { durableOriginalReceipts?: Record<string, ReceiptEnvelope> } }).value;
+    return value.durableOriginalReceipts ?? {};
+  };
 
-  // Correlations 1..16, one self-loop ping turn each → the bounded
-  // history holds exactly these 16 non-message admissions.
+  // Correlations 1..16, one self-loop ping turn each.
   for (let index = 1; index <= 16; index += 1) {
     await register(`ev-${index}`);
   }
 
   // The OLDEST turn (ev-1) goes through the injected crash window: the
-  // authoritative state CAS (and history append) commit, the disposition
-  // create AND the heal marker both fail — the delivery call rejects.
+  // authoritative state CAS (history append + ORIGINAL RECEIPT) commits,
+  // the disposition create AND the heal marker both fail — the delivery
+  // call rejects. The receipt itself is NOT lost: it rode the state CAS.
   dispositionFaultArmed = true;
   markerFaultArmed = true;
   const crashed = await ping('ev-1', 'r-ev-1');
   assert.equal(crashed.status, 'threw', 'the crash-window delivery rejects honestly (the marker write failure propagates)');
-  assert.equal(await dispositionOf(callbackTurnId(instanceKey, 'ev-1', 1)), null, 'the oldest turn\'s durable disposition is physically absent (crash window)');
+  assert.equal(await dispositionOf(callbackTurnId(instanceKey, 'ev-1', 1)), null, "the oldest turn's OBSERVATIONAL disposition is physically absent (crash window)");
 
-  // Correlations 2..16 deliver normally → history is full at 16 with the
-  // disposition-less ev-1 turn as its OLDEST entry.
+  // Correlations 2..16 deliver normally.
   for (let index = 2; index <= 16; index += 1) {
     const outcome = await ping(`ev-${index}`, `r-ev-${index}`);
     assert.equal(outcome.status, 'accepted');
     assert.equal(outcome.receipt?.status, 'admitted');
   }
   const revisionAtFull = await revision();
-  const ledgerAtFull = ledgerCalls.length;
 
-  // ---- the 17th control turn fails CLOSED before any State/Effect ----
+  // ---- [K02 anchor 4] the 17th control turn ADMITS: the same-CAS
+  // original-receipt ring replaced the missing-disposition fail-closed
+  // eviction block, so a lost derived disposition can no longer wedge the
+  // instance ----
   await register('ev-17');
-  await assert.rejects(
-    gateway.acceptExternalCallback(requester, {
-      appId: APP_ID, instanceKey, externalCorrelationId: 'ev-17',
-      callbackOrdinal: 1, payload: { amount: 1, requestId: 'r-ev-17' },
-    }),
-    (error: unknown) => {
-      assert.equal(
-        (error as { code?: string }).code,
-        'ADMISSION_TURN_HISTORY_EVICTION_BLOCKED',
-        'the eviction guard refuses typed while the oldest admitted turn\'s disposition cannot be verified',
-      );
-      return true;
-    },
-  );
-  assert.equal(await revision(), revisionAtFull, 'zero State mutation — the refusal happened before any admission activity');
-  assert.equal(ledgerCalls.length, ledgerAtFull, 'zero Effect dispatch');
+  const seventeenth = await ping('ev-17', 'r-ev-17');
+  assert.equal(seventeenth.status, 'accepted', 'the 17th turn admits — the former ADMISSION_TURN_HISTORY_EVICTION_BLOCKED wedge is repaired by the same-CAS receipt ring');
+  assert.equal(seventeenth.receipt?.status, 'admitted');
+  assert.equal(await revision(), revisionAtFull + 1, 'exactly one new state revision: the 17th admission');
+  assert.ok((await dispositionOf(callbackTurnId(instanceKey, 'ev-17', 1))) !== null, "the 17th turn's durable disposition is recorded — it admitted exactly once");
 
-  // ---- caller-driven recovery: the OLDEST source replays from the
-  // committed history and HEALS its lost disposition (zero new
-  // State/Effect for it); the same pass completes the pending 17th
-  // delivery whose submission the guard had refused (its Host record was
-  // already settled by the blocked attempt) — exactly ONE admission ----
+  // ---- [K02 root-cause-2] the crash-window turn's ORIGINAL receipt is IN
+  // the committed instance document (same-CAS with the state it
+  // acknowledges), carrying the ORIGINAL projection ----
+  const ring = await instanceRingOf();
+  const ev1Envelope = ring[callbackTurnId(instanceKey, 'ev-1', 1)];
+  assert.ok(ev1Envelope !== undefined, "the crash-window turn's original receipt rode the state CAS and survived both lost post-commit observations");
+  assert.equal(ev1Envelope?.carrierVersion, 1);
+  assert.equal(ev1Envelope?.receipt?.turnId, callbackTurnId(instanceKey, 'ev-1', 1));
+  // ev-1 is the SECOND admission of this instance (after the start message turn):
+  // its original projection is stateRevision 2 — the exact state this ACK acknowledged.
+  assert.equal(ev1Envelope?.receipt?.instance?.stateRevision, 2, 'the original receipt carries the projection as it stood at the ORIGINAL admission');
+  assert.match(ev1Envelope?.receipt?.inputDigest ?? '', /^sha256:[0-9a-f]{64}$/, 'the original receipt identity is input-complete (canonical input digest)');
+  assert.ok(ring[callbackTurnId(instanceKey, 'ev-17', 1)] !== undefined, "the 17th turn's original receipt is in the ring too");
+
+  // ---- caller-driven recovery: ONLY the crash-window ev-1 source is
+  // settled-unsubmitted; the receipt-ring replay answers with the EXACT
+  // original projection and HEALS the observational disposition (zero new
+  // State/Effect for it) ----
   const recovery = await gateway.recoverDurableControls(operator, { appId: APP_ID }) as { status: string; healed: number };
   assert.equal(recovery.status, 'recovered');
-  assert.equal(recovery.healed, 2, 'the recovery re-submitted exactly the two settled-unsubmitted sources: the crash-window ev-1 and the guard-refused ev-17');
-  assert.ok((await dispositionOf(callbackTurnId(instanceKey, 'ev-1', 1))) !== null, 'the OLDEST turn\'s durable disposition was healed by the history replay');
-  assert.ok((await dispositionOf(callbackTurnId(instanceKey, 'ev-17', 1))) !== null, 'the 17th turn\'s durable disposition is recorded — it admitted exactly once');
-  assert.equal(await revision(), revisionAtFull + 1, 'exactly ONE new state revision total: the pending 17th admission completed; the ev-1 heal replay committed nothing');
-  assert.ok(ledgerCalls.length >= ledgerAtFull, 'no effect was lost or re-executed out of turn (the shared idempotencyKey may legally dedupe the physical dispatch)');
+  assert.equal(recovery.healed, 1, 'only the crash-window ev-1 source is settled-unsubmitted (the 17th delivered and admitted on first delivery)');
+  assert.ok((await dispositionOf(callbackTurnId(instanceKey, 'ev-1', 1))) !== null, "the OLDEST turn's observational disposition was healed by the original-receipt replay");
+  assert.equal(await revision(), revisionAtFull + 1, 'the heal replay committed nothing');
 
-  // ---- once-only: a redelivery of the same 17th source is a typed
-  // duplicate, and a FRESH control turn admits again (the guard no
-  // longer blocks new admissions after the heal) ----
+  // ---- once-only: redeliveries are typed duplicates, a fresh turn admits,
+  // and the ring never blocks liveness ----
+  const replayEv1 = await ping('ev-1', 'r-ev-1');
+  assert.equal(replayEv1.status, 'duplicate', 'a redelivery of the crash-window source replays its original receipt (typed duplicate)');
   const replay = await ping('ev-17', 'r-ev-17');
   assert.equal(replay.status, 'duplicate', 'a redelivery of the same 17th source is a typed duplicate — admitted once, never twice');
   await register('ev-18');
   const eighteenth = await ping('ev-18', 'r-ev-18');
   assert.equal(eighteenth.status, 'accepted');
-  assert.equal(eighteenth.receipt?.status, 'admitted', 'a fresh control turn admits again after the heal');
+  assert.equal(eighteenth.receipt?.status, 'admitted', 'a fresh control turn admits — the ring never blocks new-turn liveness');
   assert.equal(await revision(), revisionAtFull + 2);
   const replayEighteenth = await ping('ev-18', 'r-ev-18');
   assert.equal(replayEighteenth.status, 'duplicate');

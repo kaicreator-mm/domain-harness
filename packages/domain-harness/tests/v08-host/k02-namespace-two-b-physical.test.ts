@@ -11,17 +11,23 @@
  * deployable TODAY over the UNMODIFIED selected kernel bytes.
  *
  * Physical witnesses over the REAL Node Host SqliteCasStore (one file) and
- * the EXACT selected kernel payload (data-URL import; blob asserted equal to
- * the frozen base blob fa30e1204d47c12f3f5842c497a83a08501d515b — this test
- * itself proves the K01 single-writer file is untouched here):
+ * the EXACT selected kernel payload (data-URL import). [v0.10 K02 #1168
+ * phase-2 splice] The kernel asserted here is the POST-SPLICE integration
+ * blob (the durable original-receipt carrier spliced into the selected
+ * kernel after the K01 release); the exact spliced digest is pinned in this
+ * file so any further kernel drift fails the import:
  *
- *   K02-N0  control (root cause): two unscoped runtimes over one store with
- *           colliding workflowId+instanceKey — the second create refuses
- *           HOST_KEY_EXISTS (the physical collision being repaired).
+ *   K02-N0  control (root cause): two UNSCOPED-WIRING runtimes over one
+ *           store with colliding workflowId+instanceKey — the second create
+ *           refuses HOST_KEY_EXISTS (the physical collision being repaired;
+ *           post-splice the unscoped wiring is the byte-compatible mode).
  *   K02-N1  two scoped runtimes (two B), IDENTICAL workflowId+instanceKey:
  *           both create, transition and complete independently; instance /
  *           admission-fence / journal / turn-disposition doc families are
  *           physically disjoint; neither B can enumerate or read the other.
+ *           Post-splice these runtimes are the REAL integrated kernel with
+ *           its same-CAS original-receipt ring — replay truth now answers
+ *           from the ring inside the scoped namespace.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -37,7 +43,14 @@ const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadD
 // Git blob SHA-1 of the payload file (the frozen identity form used across
 // the v0.10 planning/claim records).
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
-assert.equal(KERNEL_BLOB_SHA1, 'fa30e1204d47c12f3f5842c497a83a08501d515b', 'the selected kernel payload is byte-identical to the frozen base (K01 single-writer file untouched by K02)');
+// [v0.10 K02 #1168 phase-2 splice] This test no longer asserts the UNMODIFIED
+// base blob fa30e1204d47c12f3f5842c497a83a08501d515b: phase-2 spliced the
+// durable original-receipt carrier INTO the selected kernel (after the K01
+// single-writer release, #1167@36f068e3). The pinned digest below is the
+// POST-SPLICE integrated kernel — the test itself records and re-verifies the
+// exact spliced bytes so any further drift fails here.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = 'd7909b8ff8071e1f15d8b55fe6f967d883f6b4ac';
+assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the selected kernel payload is byte-identical to the K02-spliced integration blob (recorded at the phase-2 splice)');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
 

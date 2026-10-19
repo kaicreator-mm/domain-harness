@@ -2086,11 +2086,21 @@ export class KernelDurableEffectJournal {
   #docs;
   #moduleSha256;
   #counters;
+  #docKeys;
 
-  constructor(docs, moduleSha256, counters) {
+  constructor(docs, moduleSha256, counters, docKeys = legacyKernelDocKeys()) {
     this.#docs = docs;
     this.#moduleSha256 = moduleSha256;
     this.#counters = counters;
+    this.#docKeys = docKeys;
+  }
+
+  /**
+   * [v0.10 K02] The journal doc-key builder of THIS runtime (legacy
+   * `v08-kernel:` keys or the deployment-scoped grammar).
+   */
+  get docKeys() {
+    return this.#docKeys;
   }
 
   /**
@@ -2103,7 +2113,7 @@ export class KernelDurableEffectJournal {
    * end-to-end and every write below is a strongly conditional CAS.
    */
   async #readEnvelope(effectId) {
-    const doc = await this.#docs.get(journalDocKey(effectId));
+    const doc = await this.#docs.get(this.#docKeys.journal(effectId));
     return doc === null ? null : { value: doc.value, revision: doc.revision };
   }
 
@@ -2138,7 +2148,7 @@ export class KernelDurableEffectJournal {
     }
     if (this.#counters !== undefined) this.#counters.journalBegins += 1;
     try {
-      await this.#docs.put(journalDocKey(record.effectId), {
+      await this.#docs.put(this.#docKeys.journal(record.effectId), {
         kernelModuleSha256: this.#moduleSha256,
         record: snapshotJson(record),
       }, { mustBeAbsent: true });
@@ -2210,7 +2220,7 @@ export class KernelDurableEffectJournal {
       // expectation is the exact revision read above. A concurrent terminal
       // completion bumps the revision, so at most ONE of the competing
       // completions can land — the terminal status is never overwritten.
-      await this.#docs.put(journalDocKey(effectId), {
+      await this.#docs.put(this.#docKeys.journal(effectId), {
         kernelModuleSha256: this.#moduleSha256,
         record: completed,
       }, { mustMatchRevision: envelope.revision });
@@ -2244,7 +2254,7 @@ export class KernelDurableEffectJournal {
   }
 
   async getRecords() {
-    const keys = await this.#docs.list('v08-kernel:effect-journal:');
+    const keys = await this.#docs.list(this.#docKeys.journal(''));
     const envelopes = await Promise.all(keys.map((key) => this.#docs.get(key)));
     return envelopes
       .filter((doc) => doc !== null)
@@ -2571,18 +2581,21 @@ function projectHf20ObservationPage(window, request) {
 /**
  * [#1063 HF20 read-scope boundary] The outward projection of one instance
  * snapshot: the K-only carrier fields (`mutationObservations` — HF20;
- * `admittedControlTurns` — #1066 same-CAS turn admission history) stay
+ * `admittedControlTurns` — #1066 same-CAS turn admission history;
+ * `durableOriginalReceipts` — v0.10 K02 same-CAS original-receipt ring) stay
  * INTERNAL next-CAS/replay truth and never leave the Kernel through
  * queryInstance/FR05/Genesis/receipt surfaces; the protected
  * mutation-observation read verb is the ONLY authorized reader of the
- * observation window, and the turn history has no outward reader at all.
+ * observation window, and the turn history and receipt ring have no outward
+ * reader at all.
  */
 function outwardInstanceSnapshot(snapshot) {
   if (!isJsonRecord(snapshot)) return snapshot;
-  if (!('mutationObservations' in snapshot) && !('admittedControlTurns' in snapshot)) return snapshot;
+  if (!('mutationObservations' in snapshot) && !('admittedControlTurns' in snapshot)
+    && !('durableOriginalReceipts' in snapshot)) return snapshot;
   const outward = {};
   for (const key of Object.keys(snapshot)) {
-    if (key === 'mutationObservations' || key === 'admittedControlTurns') continue;
+    if (key === 'mutationObservations' || key === 'admittedControlTurns' || key === 'durableOriginalReceipts') continue;
     outward[key] = snapshot[key];
   }
   return outward;
@@ -2597,6 +2610,156 @@ function outwardInstanceSnapshot(snapshot) {
 // reads, one-writer serialized lane — stays entirely in this Kernel Package
 // code, verbatim from v0.7. The Host never learns workflow semantics.
 // ===========================================================================
+
+// ===========================================================================
+// [v0.10 K02 #1168 phase-2] Durable original-receipt carrier — SPLICED into
+// the selected kernel after the K01 single-writer release (#1167@36f068e3).
+// The spliced discipline (from the phase-1 fragment
+// durable-receipt-carrier-v1.mjs, dependency-free restatement):
+//   1. Turn identity is input-complete and deployment-scoped: the canonical
+//      input digest and the deployment scope tuple join
+//      turnDispositionIdentity; the pinned module SHA rides the envelope as
+//      buildIdentity (identity stable across releases).
+//   2. The original acknowledged receipt of every admitted turn is composed
+//      BEFORE the authoritative state CAS and committed INSIDE the same
+//      document value (append-only `durableOriginalReceipts` map) — one
+//      physical row write makes the state, the revision and the original
+//      receipt durable together or not at all.
+//   3. The submit lane consults the same-CAS receipt (ring → archive) BEFORE
+//      the history/disposition ladder; the post-commit disposition/receipt
+//      records stay best-effort observations (archive-only) that never
+//      falsify the original and never block admission.
+//   4. The bounded in-document receipt ring (default 64 ≥ 4× the frozen
+//      16-entry history) replaces the missing-disposition fail-closed
+//      eviction block: the oldest entry leaves only once its independent
+//      durable archive record exists (archive-gated, fault-tolerant growth —
+//      admission never blocks, an admitted turn is never forgotten).
+//   5. The six durable doc families route through the injective deployment-
+//      scoped key grammar `v010-k02:<app>:<tenant>:<appId>:<pkg>:<kind>:<parts>`
+//      when the runtime wires a deployment scope; without one the historical
+//      `v08-kernel:` keys are kept byte-for-byte (the unscoped wiring is the
+//      compatibility mode — the two-B physical namespace is opt-in until a
+//      deployment wires its identity).
+// ===========================================================================
+
+const K02_CARRIER_VERSION = 1;
+const K02_SCOPED_KEY_ROOT = 'v010-k02';
+const K02_SCOPE_FIELDS = ['deployedAppId', 'tenantId', 'appId', 'businessPackageId'];
+const K02_SCOPED_DOC_KINDS = [
+  'wf-instance',
+  'admission-fence',
+  'effect-journal',
+  'turn-disposition',
+  'decision-receipt',
+  'receipt-archive',
+];
+
+/**
+ * [v0.10 K02] Validate ONE deployment scope tuple. Exactly the four bounded
+ * non-empty identifier fields; unknown fields and control characters refuse
+ * typed K02_SCOPE_INVALID before any key or document can exist.
+ */
+function deploymentScopeIdentity(scope) {
+  const fail = (message) => new CentralAdmissionError('K02_SCOPE_INVALID', message);
+  if (!isJsonRecord(scope)) {
+    throw fail('a deployment scope must be a record {deployedAppId, tenantId, appId, businessPackageId}');
+  }
+  for (const key of Object.keys(scope)) {
+    if (!K02_SCOPE_FIELDS.includes(key)) {
+      throw fail(`a deployment scope carries the unsupported field ${JSON.stringify(key)}`);
+    }
+  }
+  for (const field of K02_SCOPE_FIELDS) {
+    const value = scope[field];
+    if (typeof value !== 'string' || value.length === 0 || value.length > 256) {
+      throw fail(`scope.${field} must be a bounded non-empty string identifier`);
+    }
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000-\u001f]/.test(value)) {
+      throw fail(`scope.${field} must not contain control characters`);
+    }
+  }
+  return Object.freeze({
+    deployedAppId: scope.deployedAppId,
+    tenantId: scope.tenantId,
+    appId: scope.appId,
+    businessPackageId: scope.businessPackageId,
+  });
+}
+
+/**
+ * [v0.10 K02] Percent-encode ONE key component so the positional
+ * `:`-joined grammar stays injective even when identifiers legitimately
+ * carry the separator (package ids like `pkg:quote@1.0.0`).
+ */
+function encodeK02KeyComponent(value) {
+  return value.replace(/%/g, '%25').replace(/:/g, '%3A');
+}
+
+function requireK02KeyPart(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 1024) {
+    throw new CentralAdmissionError('K02_SCOPE_INVALID', 'a doc key part must be a bounded non-empty string');
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f]/.test(value)) {
+    throw new CentralAdmissionError('K02_SCOPE_INVALID', 'a doc key part must not contain control characters');
+  }
+  return value;
+}
+
+/**
+ * [v0.10 K02] The closed scoped key grammar:
+ * `v010-k02:<app>:<tenant>:<appId>:<pkg>:<kind>:<parts...>`. Positional,
+ * percent-encoded, injective across scopes, kinds and parts.
+ */
+function scopedDocKey(scope, kind, ...parts) {
+  const frozen = deploymentScopeIdentity(scope);
+  if (!K02_SCOPED_DOC_KINDS.includes(kind)) {
+    throw new CentralAdmissionError(
+      'K02_SCOPE_INVALID',
+      `unknown scoped doc kind ${JSON.stringify(kind)}; the grammar is closed`,
+    );
+  }
+  return [
+    K02_SCOPED_KEY_ROOT,
+    encodeK02KeyComponent(frozen.deployedAppId),
+    encodeK02KeyComponent(frozen.tenantId),
+    encodeK02KeyComponent(frozen.appId),
+    encodeK02KeyComponent(frozen.businessPackageId),
+    encodeK02KeyComponent(kind),
+    ...parts.map((part) => encodeK02KeyComponent(requireK02KeyPart(part))),
+  ].join(':');
+}
+
+/**
+ * [v0.10 K02] The per-runtime doc-key builders of the six durable families.
+ * Legacy (unscoped) wiring keeps the historical `v08-kernel:` keys
+ * byte-for-byte; a wired deployment scope routes every family through the
+ * injective scoped grammar. Key builders are chosen ONCE at the runtime
+ * wiring boundary — never per call.
+ */
+function legacyKernelDocKeys() {
+  return {
+    instance: (address) => instanceDocKey(address),
+    admissionFence: (address) => admissionFenceDocKey(address),
+    journal: (effectId) => journalDocKey(effectId),
+    turnDisposition: (turnId) => turnDispositionDocKey(turnId),
+    decisionReceipt: (turnId) => decisionReceiptDocKey(turnId),
+    receiptArchive: (turnId) => `v08-kernel:receipt-archive:${turnId}`,
+  };
+}
+
+function scopedKernelDocKeys(scope) {
+  const frozen = deploymentScopeIdentity(scope);
+  return {
+    instance: (address) => scopedDocKey(frozen, 'wf-instance', address.workflowId, address.instanceKey),
+    admissionFence: (address) => scopedDocKey(frozen, 'admission-fence', address.workflowId, address.instanceKey),
+    journal: (effectId) => scopedDocKey(frozen, 'effect-journal', effectId),
+    turnDisposition: (turnId) => scopedDocKey(frozen, 'turn-disposition', turnId),
+    decisionReceipt: (turnId) => scopedDocKey(frozen, 'decision-receipt', turnId),
+    receiptArchive: (turnId) => scopedDocKey(frozen, 'receipt-archive', turnId),
+  };
+}
 
 function instanceDocKey(address) {
   return `v08-kernel:wf-instance:${address.workflowId}:${address.instanceKey}`;
@@ -2700,10 +2863,12 @@ function workflowAddressesEqual(left, right) {
 export class PersistentWorkflowInstanceRepository {
   #docs;
   #now;
+  #docKeys;
 
-  constructor(docs, now = () => new Date().toISOString()) {
+  constructor(docs, now = () => new Date().toISOString(), docKeys = legacyKernelDocKeys()) {
     this.#docs = docs;
     this.#now = now;
+    this.#docKeys = docKeys;
   }
 
   async create(request) {
@@ -2724,16 +2889,19 @@ export class PersistentWorkflowInstanceRepository {
       stateRevision: 0,
       state: request.initialState,
       mutationObservations: opened.window,
+      // [v0.10 K02] The append-only original-receipt ring exists from byte
+      // zero (redacted from every outward projection).
+      durableOriginalReceipts: {},
       createdAt: timestamp,
       updatedAt: timestamp,
     };
 
-    await this.#docs.put(instanceDocKey(request.address), snapshot, { mustBeAbsent: true });
+    await this.#docs.put(this.#docKeys.instance(request.address), snapshot, { mustBeAbsent: true });
     return this.require(request.address);
   }
 
   async resolve(address) {
-    const doc = await this.#docs.get(instanceDocKey(address));
+    const doc = await this.#docs.get(this.#docKeys.instance(address));
     return doc === null ? null : doc.value;
   }
 
@@ -2752,13 +2920,24 @@ export class WorkflowInstanceEngine {
   #lane;
   #now;
   #counters;
+  #docKeys;
+  #durableReceiptRingBound;
 
   constructor(docs, options = {}) {
     this.#docs = docs;
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#lane = options.lane ?? new PerInstanceSerializedLane();
-    this.#instances = new PersistentWorkflowInstanceRepository(docs, this.#now);
+    this.#docKeys = options.docKeys ?? legacyKernelDocKeys();
+    this.#instances = new PersistentWorkflowInstanceRepository(docs, this.#now, this.#docKeys);
     this.#counters = options.counters;
+    const ringBound = options.durableReceiptRingBound ?? K02_DURABLE_RECEIPT_RING_BOUND_DEFAULT;
+    if (!Number.isSafeInteger(ringBound) || ringBound < 17) {
+      throw new CentralAdmissionError(
+        'K02_SCOPE_INVALID',
+        'durableReceiptRingBound must be a safe integer >= 17 (the once-only acceptance floor)',
+      );
+    }
+    this.#durableReceiptRingBound = ringBound;
   }
 
   get lane() {
@@ -2790,7 +2969,7 @@ export class WorkflowInstanceEngine {
    * precondition of that admission's later pre-effect claim.
    */
   async readAdmissionFenceRevision(target) {
-    const doc = await this.#docs.get(admissionFenceDocKey(target));
+    const doc = await this.#docs.get(this.#docKeys.admissionFence(target));
     return doc === null ? null : doc.revision;
   }
 
@@ -2818,7 +2997,7 @@ export class WorkflowInstanceEngine {
    */
   async claimAdmissionFence(request) {
     const { target, turnId, expectedTargetSequence, snapshotFenceRevision } = request;
-    const held = await this.#docs.get(admissionFenceDocKey(target));
+    const held = await this.#docs.get(this.#docKeys.admissionFence(target));
     if (held !== null && isJsonRecord(held.value)
       && typeof held.value.turnId === 'string'
       && held.value.turnId !== turnId
@@ -2843,7 +3022,7 @@ export class WorkflowInstanceEngine {
     let written;
     try {
       written = await this.#docs.put(
-        admissionFenceDocKey(target),
+        this.#docKeys.admissionFence(target),
         { pinVersion: 1, stateRevision: expectedTargetSequence, turnId, claimedAt: this.#now() },
         snapshotFenceRevision === null ? { mustBeAbsent: true } : { mustMatchRevision: snapshotFenceRevision },
       );
@@ -2877,7 +3056,7 @@ export class WorkflowInstanceEngine {
    */
   async #heldFenceIsDurablyFailed(target, heldTurnId) {
     try {
-      const keys = await this.#docs.list(journalDocKey(`${heldTurnId}/effect/`));
+      const keys = await this.#docs.list(this.#docKeys.journal(`${heldTurnId}/effect/`));
       if (keys.length === 0) return false;
       for (const key of keys) {
         const doc = await this.#docs.get(key);
@@ -2905,11 +3084,11 @@ export class WorkflowInstanceEngine {
    */
   async releaseAdmissionFence(target, fence) {
     if (!Number.isSafeInteger(fence.revision)) return;
-    await this.#docs.remove(admissionFenceDocKey(target), { mustMatchRevision: fence.revision });
+    await this.#docs.remove(this.#docKeys.admissionFence(target), { mustMatchRevision: fence.revision });
   }
 
   async #requireHeldAdmissionFence(target, fence) {
-    const doc = await this.#docs.get(admissionFenceDocKey(target));
+    const doc = await this.#docs.get(this.#docKeys.admissionFence(target));
     const held = doc !== null && isJsonRecord(doc.value)
       && doc.value.turnId === fence.turnId
       && doc.value.stateRevision === fence.stateRevision
@@ -2983,21 +3162,36 @@ export class WorkflowInstanceEngine {
       updatedAt,
     ).window;
 
+    // [v0.10 K02 anchor 2] The NEXT document value is composed FIRST so the
+    // immutable ORIGINAL RECEIPT of the admitted turn can be built against
+    // this exact next projection BEFORE the put — the state move, the
+    // revision and the original receipt are ONE physical row write: durable
+    // together or not at all. The K01 fence precondition above stays first.
+    const nextValue = {
+      address: current.address,
+      correlationId: current.correlationId,
+      packageId: current.packageId,
+      lifecycle: transition.nextLifecycle ?? current.lifecycle,
+      stateRevision: current.stateRevision + 1,
+      state: transition.nextState,
+      ...(transition.output === undefined ? {} : { output: transition.output }),
+      ...(current.output === undefined || transition.output !== undefined ? {} : { output: current.output }),
+      lastMessageId: request.messageId,
+      createdAt: current.createdAt,
+      updatedAt,
+      mutationObservations,
+      ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
+    };
+    const durableOriginalReceipts = await this.#nextDurableOriginalReceipts(
+      current,
+      nextValue,
+      request.durableOriginalReceipt,
+      updatedAt,
+    );
     try {
-      await this.#docs.put(instanceDocKey(request.target), {
-        address: current.address,
-        correlationId: current.correlationId,
-        packageId: current.packageId,
-        lifecycle: transition.nextLifecycle ?? current.lifecycle,
-        stateRevision: current.stateRevision + 1,
-        state: transition.nextState,
-        ...(transition.output === undefined ? {} : { output: transition.output }),
-        ...(current.output === undefined || transition.output !== undefined ? {} : { output: current.output }),
-        lastMessageId: request.messageId,
-        createdAt: current.createdAt,
-        updatedAt,
-        mutationObservations,
-        ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
+      await this.#docs.put(this.#docKeys.instance(request.target), {
+        ...nextValue,
+        ...(durableOriginalReceipts === undefined ? {} : { durableOriginalReceipts }),
       }, { mustMatchRevision: expectedTargetSequence });
     } catch (error) {
       if (isHostWriteConflict(error)) {
@@ -3022,6 +3216,103 @@ export class WorkflowInstanceEngine {
     }
 
     return committed;
+  }
+
+  /**
+   * [v0.10 K02 anchors 2+4] The append-only `durableOriginalReceipts` map of
+   * the NEXT document: the current map of the SAME snapshot the CAS is bound
+   * to, with the admitted turn's immutable original-receipt envelope appended
+   * and the ring bounded by ARCHIVE-GATED eviction — the oldest entry leaves
+   * only once its independent durable archive record exists. On an
+   * archive-write fault the entry STAYS and the document temporarily grows
+   * past the bound: admission NEVER blocks, and an admitted turn is never
+   * silently forgotten while the ring or its durable archive retains it. An
+   * existing entry under this turnId refuses typed — the map is append-only,
+   * never rewritten, whatever the identity.
+   */
+  async #nextDurableOriginalReceipts(current, nextValue, descriptor, attributedAt) {
+    const existing = isJsonRecord(current.durableOriginalReceipts) ? current.durableOriginalReceipts : {};
+    if (descriptor === undefined) {
+      return Object.keys(existing).length === 0 ? undefined : snapshotJson(existing);
+    }
+    if (!isJsonRecord(descriptor) || typeof descriptor.turnId !== 'string' || typeof descriptor.identity !== 'string') {
+      throw new CentralAdmissionError(
+        'K02_SCOPE_INVALID',
+        'a durable original-receipt descriptor requires { turnId, identity, intentType, inputDigest, turn, messageId }',
+      );
+    }
+    if (existing[descriptor.turnId] !== undefined) {
+      throw new CentralAdmissionError(
+        'K02_TURN_RECEIPT_INPUT_CONFLICT',
+        `turn ${descriptor.turnId} is already durably admitted in the same-CAS original-receipt ring; one source is exactly one turn and the ring is append-only`,
+      );
+    }
+    const envelope = {
+      carrierVersion: 1,
+      identity: descriptor.identity,
+      intentType: descriptor.intentType,
+      turn: descriptor.turn,
+      ...(descriptor.buildIdentity === undefined ? {} : { buildIdentity: descriptor.buildIdentity }),
+      receipt: {
+        status: 'admitted',
+        turnId: descriptor.turnId,
+        intentType: descriptor.intentType,
+        inputDigest: descriptor.inputDigest,
+        ...(descriptor.admitted === undefined ? {} : { admitted: snapshotJson(descriptor.admitted) }),
+        // The receipt's instance projection is the OUTWARD next projection
+        // this very CAS commits — the ACK bytes acknowledge exactly what this
+        // write makes durable.
+        instance: outwardInstanceSnapshot(nextValue),
+        occurrence: { messageId: descriptor.messageId },
+        attributedAt,
+      },
+    };
+    const receipts = { ...existing, [descriptor.turnId]: envelope };
+    let keys = Object.keys(receipts);
+    while (keys.length > this.#durableReceiptRingBound) {
+      const oldestKey = keys[0];
+      const archived = await this.#ensureDurableReceiptArchived(oldestKey, receipts[oldestKey]);
+      if (!archived) {
+        if (this.#counters !== undefined) this.#counters.durableRingGrowthEvents += 1;
+        break; // fault-tolerant growth: keep the entry; the next admission retries the archive
+      }
+      delete receipts[oldestKey];
+      keys = Object.keys(receipts);
+    }
+    return receipts;
+  }
+
+  /**
+   * [v0.10 K02 anchor 4] The eviction-time durable archive write of ONE ring
+   * entry (mustBeAbsent). A KEY_EXISTS whose stored identity matches counts
+   * as archived (an earlier best-effort copy or eviction wrote it); a
+   * different identity is an honest typed anomaly; any other fault KEEPS the
+   * ring entry (returns false — fault-tolerant growth, admission proceeds).
+   */
+  async #ensureDurableReceiptArchived(turnId, envelope) {
+    try {
+      await this.#docs.put(this.#docKeys.receiptArchive(turnId), envelope, { mustBeAbsent: true });
+      if (this.#counters !== undefined) this.#counters.durableReceiptArchiveWrites += 1;
+      return true;
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
+        try {
+          const existing = await this.#docs.get(this.#docKeys.receiptArchive(turnId));
+          if (existing !== null && isJsonRecord(existing.value) && existing.value.identity === envelope.identity) {
+            return true;
+          }
+        } catch {
+          if (this.#counters !== undefined) this.#counters.durableReceiptArchiveFailures += 1;
+          return false;
+        }
+        throw new CentralAdmissionError(
+          'K02_TURN_RECEIPT_STORE_FAULT',
+          `the original-receipt archive of turn ${turnId} holds a different identity; honest anomaly — fail closed`,
+        );
+      }
+      if (this.#counters !== undefined) this.#counters.durableReceiptArchiveFailures += 1;
+      return false; // fault-tolerant growth: keep the ring entry
+    }
   }
 }
 
@@ -3135,12 +3426,42 @@ function turnDispositionDocKey(turnId) {
  */
 const MAX_ADMITTED_CONTROL_TURN_HISTORY = 16;
 
-function turnDispositionIdentity(moduleSha256, target, turn, intentType) {
+/**
+ * [v0.10 K02] The bounded in-document original-receipt ring: 4x the frozen
+ * 16-entry history bound, covering the 17+ once-only acceptance with margin.
+ * MAX_ADMITTED_CONTROL_TURN_HISTORY stays the kernel's crash-backstop
+ * history bound; the ring is the same-CAS once-only truth whose eviction is
+ * archive-gated (never admission-blocking).
+ */
+const K02_DURABLE_RECEIPT_RING_BOUND_DEFAULT = 64;
+
+/**
+ * [v0.10 K02 anchor 1] The turn receipt identity is INPUT-COMPLETE and
+ * DEPLOYMENT-SCOPED: canonical JSON of {deploymentScope?, target, turn,
+ * intentType, inputDigest} where inputDigest = sha256(canonicalJson(input)).
+ * An identical retry yields the identical identity (replay); a changed
+ * canonical input or a changed intentType yields a different identity (typed
+ * conflict). The pinned build identity (kernel module SHA) is deliberately
+ * OUTSIDE the identity — it rides the envelope as `buildIdentity` — so the
+ * target identity is stable across releases while the build switch stays
+ * observable. A runtime wired WITHOUT a deployment scope (the compatibility
+ * mode) omits the member entirely; the scope, when wired, is validated
+ * bounded-identifier material.
+ */
+function turnDispositionIdentity(deploymentScope, target, turn, intentType, inputDigest) {
   return canonicalJsonStringify({
-    kernelModuleSha256: moduleSha256,
+    ...(deploymentScope === undefined ? {} : {
+      deploymentScope: {
+        deployedAppId: deploymentScope.deployedAppId,
+        tenantId: deploymentScope.tenantId,
+        appId: deploymentScope.appId,
+        businessPackageId: deploymentScope.businessPackageId,
+      },
+    }),
     target: { workflowId: target.workflowId, instanceKey: target.instanceKey },
     turn,
     intentType,
+    inputDigest,
   });
 }
 
@@ -4096,7 +4417,7 @@ async function executeContinuationRead(descriptor, callInput, read) {
     selected = [...fields];
   }
 
-  const doc = await read.docs.get(instanceDocKey(read.target));
+  const doc = await read.docs.get((read.docKeys ?? legacyKernelDocKeys()).instance(read.target));
   let material;
   try {
     material = canonicalizeJson(doc);
@@ -4293,14 +4614,51 @@ export function createOccurrenceRuntime(options) {
     turnDispositions: 0,
     turnAdmissionReplays: 0,
     turnDispositionReplays: 0,
+    durableOriginalReceiptReplays: 0,
+    durableReceiptArchiveWrites: 0,
+    durableReceiptArchiveFailures: 0,
+    durableRingGrowthEvents: 0,
   };
 
   const docs = hostPorts.docs;
   const sha256 = hostPorts.sha256;
   const clock = hostPorts.clock ?? (() => new Date().toISOString());
 
-  const engine = new WorkflowInstanceEngine(docs, { now: clock, counters });
-  const effectJournal = new KernelDurableEffectJournal(docs, moduleIdentity.moduleSha256, counters);
+  // [v0.10 K02 anchor 5] The runtime's deployment-identity wiring: a wired
+  // deployment scope routes the six durable doc families through the
+  // injective scoped grammar (`v010-k02:<app>:<tenant>:<appId>:<pkg>:<kind>:
+  // <parts>`) and joins the deployment tuple in every turn identity; the
+  // unscoped wiring keeps the historical `v08-kernel:` keys byte-for-byte
+  // (compatibility mode). Key builders are chosen ONCE here — never per call.
+  const deploymentScope = options.deploymentScope === undefined
+    ? undefined
+    : deploymentScopeIdentity(options.deploymentScope);
+  const docKeys = deploymentScope === undefined ? legacyKernelDocKeys() : scopedKernelDocKeys(deploymentScope);
+
+  // [v0.10 K02] The canonical input digest of ONE occurrence input: sha256
+  // over the kernel's own canonical JSON form. An ABSENT input normalizes to
+  // null (the same normalization the Host gateway applies), so the omitted
+  // and the explicit-null forms are one canonical input; any present
+  // non-JSON-representable value refuses typed K02_INPUT_NOT_JSON at the
+  // admission boundary.
+  const canonicalInputDigestK02 = (input) => {
+    try {
+      return `sha256:${sha256.digestUtf8(canonicalJsonStringify(input === undefined ? null : input))}`;
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'K02_INPUT_NOT_JSON',
+        `the occurrence input is not a canonical JSON value; the durable original-receipt identity requires canonical JSON (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+  };
+
+  const engine = new WorkflowInstanceEngine(docs, {
+    now: clock,
+    counters,
+    docKeys,
+    ...(options.durableReceiptRingBound === undefined ? {} : { durableReceiptRingBound: options.durableReceiptRingBound }),
+  });
+  const effectJournal = new KernelDurableEffectJournal(docs, moduleIdentity.moduleSha256, counters, docKeys);
   const pinStore = new KernelGovernancePinStore(docs, sha256, moduleIdentity.moduleSha256);
   const baselines = new KernelBaselineStore(docs);
 
@@ -4797,7 +5155,7 @@ export function createOccurrenceRuntime(options) {
       }),
     };
     counters.decisionReceiptAppends += 1;
-    const key = decisionReceiptDocKey(turnId);
+    const key = docKeys.decisionReceipt(turnId);
     try {
       await docs.put(key, envelope, { mustBeAbsent: true });
       return { status: 'recorded', receiptKey: key, durability: 'observational-optional' };
@@ -4838,6 +5196,82 @@ export function createOccurrenceRuntime(options) {
   }
 
   /**
+   * [v0.10 K02 anchor 3] The same-CAS original-receipt ladder of ONE
+   * occurrence, consulted INSIDE the occurrence lane BEFORE the
+   * history/disposition ladder: ring (THIS snapshot's durableOriginalReceipts
+   * — single-snapshot discipline: adjudication and the later commit CAS share
+   * one snapshot) → independent durable archive → undefined (not admitted;
+   * the caller may admit). An identity match is an idempotent replay of the
+   * EXACT ORIGINAL receipt; a different identity under the same turn id
+   * refuses typed BEFORE any admission activity. A legacy/unreadable envelope
+   * fails closed typed; an archive READ fault fails closed typed for THIS
+   * turn (a faulting store is not a policy wedge).
+   */
+  async function readDurableOriginalReceiptOrReplay(snapshot, turnId, identity, request, target, workflowInstanceId, inputDigest) {
+    const ring = isJsonRecord(snapshot.durableOriginalReceipts) ? snapshot.durableOriginalReceipts : {};
+    const storedRing = ring[turnId];
+    if (storedRing !== undefined) {
+      return adjudicateDurableOriginalReceipt(storedRing, turnId, identity, request, target, workflowInstanceId, inputDigest);
+    }
+    let archive;
+    try {
+      archive = await docs.get(docKeys.receiptArchive(turnId));
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'K02_TURN_RECEIPT_STORE_FAULT',
+        `the archived original receipt of turn ${turnId} is unreadable; fail closed for this turn (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+    if (archive !== null) {
+      return adjudicateDurableOriginalReceipt(archive.value, turnId, identity, request, target, workflowInstanceId, inputDigest);
+    }
+    return undefined;
+  }
+
+  /**
+   * [v0.10 K02] Adjudicate ONE stored original-receipt envelope against this
+   * occurrence's identity: legacy shape → typed fail-closed (no pre-1.0
+   * migration); identity match → idempotent replay of the EXACT ORIGINAL
+   * acknowledged receipt (never a pseudo-receipt re-derived from the newest
+   * snapshot); identity mismatch → typed input/intent conflict. The replay
+   * best-effort HEALS the observational turn-disposition record (the
+   * archive-only role since the splice); the heal never falsifies the
+   * original and never fails the replay ACK.
+   */
+  async function adjudicateDurableOriginalReceipt(envelope, turnId, identity, request, target, workflowInstanceId, inputDigest) {
+    if (!isJsonRecord(envelope)
+      || envelope.carrierVersion !== K02_CARRIER_VERSION
+      || typeof envelope.identity !== 'string'
+      || !isJsonRecord(envelope.receipt)) {
+      throw new CentralAdmissionError(
+        'K02_TURN_RECEIPT_LEGACY_UNREADABLE',
+        `the durable original receipt of turn ${turnId} carries no readable v1 envelope; fail closed, no pre-1.0 migration`,
+      );
+    }
+    if (envelope.identity !== identity) {
+      const changedIntent = typeof envelope.intentType === 'string' && envelope.intentType !== request.intentType;
+      throw new CentralAdmissionError(
+        changedIntent ? 'K02_TURN_RECEIPT_INTENT_CONFLICT' : 'K02_TURN_RECEIPT_INPUT_CONFLICT',
+        `turn ${turnId} is already durably admitted with a different ${changedIntent ? 'intentType' : 'canonical input'}; one source is exactly one turn — the original receipt stands`,
+      );
+    }
+    counters.durableOriginalReceiptReplays += 1;
+    const replayed = { ...envelope.receipt, idempotentReplay: true };
+    const healTurn = isJsonRecord(envelope.turn) ? envelope.turn : undefined;
+    const receipt = { ...replayed };
+    if (healTurn !== undefined) {
+      try {
+        const healedDisposition = await writeTurnDisposition(turnId, healTurn, request, target, replayed, inputDigest);
+        if (healedDisposition !== undefined) receipt.turnDisposition = healedDisposition;
+      } catch {
+        // the observational heal never fails the replay
+      }
+    }
+    safeObserve(receipt);
+    return receipt;
+  }
+
+  /**
    * [#1062 shared seam] Read the turn disposition of ONE non-message turn
    * inside the occurrence lane. An identity-matching record is an
    * idempotent replay of the already-admitted turn (zero new activity); a
@@ -4845,17 +5279,20 @@ export function createOccurrenceRuntime(options) {
    * BEFORE any admission — one source is exactly one turn, whatever intent
    * a later submission claims for it.
    */
-  async function readTurnDispositionOrReplay(turnId, turn, request, target) {
+  async function readTurnDispositionOrReplay(turnId, turn, request, target, inputDigest) {
     let envelope;
     try {
-      envelope = await docs.get(turnDispositionDocKey(turnId));
+      envelope = await docs.get(docKeys.turnDisposition(turnId));
     } catch {
       return undefined; // an unreadable disposition cannot veto the turn
     }
     if (envelope === null || !isJsonRecord(envelope.value)) return undefined;
     const stored = envelope.value;
     if (!isJsonRecord(stored.receipt) || typeof stored.identity !== 'string') return undefined;
-    const identity = turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType);
+    // [v0.10 K02] Identity is input-complete and deployment-scoped; the
+    // disposition record is the ARCHIVE-ONLY observational ladder since the
+    // splice (the same-CAS receipt answers first).
+    const identity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
     if (stored.identity !== identity) {
       throw new CentralAdmissionError(
         'ADMISSION_TURN_DISPOSITION_CONFLICT',
@@ -4876,23 +5313,28 @@ export function createOccurrenceRuntime(options) {
    * INSIDE this boundary (identical identity → idempotent; different →
    * typed conflict observation, the stored record is never overwritten).
    */
-  async function writeTurnDisposition(turnId, turn, request, target, receipt) {
-    const identity = turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType);
+  async function writeTurnDisposition(turnId, turn, request, target, receipt, inputDigest) {
+    // [v0.10 K02] The pinned module SHA rides the envelope as buildIdentity
+    // (identity stable across releases); the disposition record itself is
+    // the ARCHIVE-ONLY observation of the admission (the same-CAS receipt
+    // owns the once-only truth).
+    const identity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
     const envelope = {
       pinVersion: 1,
       identity,
+      ...(deploymentScope === undefined ? {} : { buildIdentity: { kernelModuleSha256: moduleIdentity.moduleSha256 } }),
       turn: snapshotJson(turn),
       intentType: request.intentType,
       receipt: snapshotJson(receipt),
     };
     try {
-      await docs.put(turnDispositionDocKey(turnId), envelope, { mustBeAbsent: true });
+      await docs.put(docKeys.turnDisposition(turnId), envelope, { mustBeAbsent: true });
       counters.turnDispositions += 1;
       return { status: 'recorded' };
     } catch (error) {
       if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
         try {
-          const winner = await docs.get(turnDispositionDocKey(turnId));
+          const winner = await docs.get(docKeys.turnDisposition(turnId));
           const winnerIdentity = winner !== null && isJsonRecord(winner.value)
             && typeof winner.value.identity === 'string' ? winner.value.identity : undefined;
           if (winnerIdentity === identity) {
@@ -4930,11 +5372,11 @@ export function createOccurrenceRuntime(options) {
    * heals the lost disposition observation; the stored receipt is this
    * reconstructed replay truth, never invented business detail.
    */
-  async function admittedControlTurnHistoryReplay(snapshot, turnId, turn, request, target, workflowInstanceId) {
+  async function admittedControlTurnHistoryReplay(snapshot, turnId, turn, request, target, workflowInstanceId, inputDigest) {
     const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
     const admission = history.find((entry) => isJsonRecord(entry) && entry.turnId === turnId);
     if (admission === undefined) return undefined;
-    const identity = turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType);
+    const identity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
     if (admission.identity !== identity) {
       throw new CentralAdmissionError(
         'ADMISSION_TURN_DISPOSITION_CONFLICT',
@@ -4952,7 +5394,7 @@ export function createOccurrenceRuntime(options) {
     };
     // Heal the lost disposition observation (best-effort; the outcome rides
     // the replay receipt as an independent field and never fails it).
-    const healedDisposition = await writeTurnDisposition(turnId, turn, request, target, replay);
+    const healedDisposition = await writeTurnDisposition(turnId, turn, request, target, replay, inputDigest);
     const receipt = { ...replay, ...(healedDisposition === undefined ? {} : { turnDisposition: healedDisposition }) };
     safeObserve(receipt);
     return receipt;
@@ -5004,7 +5446,7 @@ export function createOccurrenceRuntime(options) {
       );
     }
     const turnId = deriveDurableControlTurnId(target, { kind: 'message', sourceMessageId: messageId });
-    const doc = await docs.get(decisionReceiptDocKey(turnId));
+    const doc = await docs.get(docKeys.decisionReceipt(turnId));
     if (doc === null) return null;
     const envelope = doc.value;
     if (!isJsonRecord(envelope) || envelope.kernelModuleSha256 !== moduleIdentity.moduleSha256) {
@@ -5275,11 +5717,35 @@ export function createOccurrenceRuntime(options) {
       // re-sent denied message is evaluated afresh, exactly as before.
       const turn = occurrenceTurnOf(request);
       const controlTurnId = deriveDurableControlTurnId(target, turn);
+      // [v0.10 K02 anchor 1] The input-complete, deployment-scoped identity
+      // material of THIS occurrence: the canonical input digest is computed
+      // ONCE here (non-JSON input refuses typed BEFORE any admission
+      // activity) and threads every ladder and the commit descriptor.
+      const inputDigest = canonicalInputDigestK02(request.input);
+      const turnIdentity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
+      // [v0.10 K02 anchor 3] The same-CAS original-receipt ladder FIRST:
+      // ring (this snapshot) → durable archive → undefined.
+      const receiptReplayed = await readDurableOriginalReceiptOrReplay(
+        snapshot,
+        controlTurnId,
+        turnIdentity,
+        request,
+        target,
+        workflowInstanceId,
+        inputDigest,
+      );
+      if (receiptReplayed !== undefined) {
+        return receiptReplayed;
+      }
+      // The observation ladders follow (archive-only since the splice): the
+      // independent disposition record, then the bounded same-CAS admission
+      // history.
       const replayed = await readTurnDispositionOrReplay(
         controlTurnId,
         turn,
         request,
         target,
+        inputDigest,
       );
       if (replayed !== undefined) {
         return replayed;
@@ -5291,32 +5757,19 @@ export function createOccurrenceRuntime(options) {
         request,
         target,
         workflowInstanceId,
+        inputDigest,
       );
       if (historyReplayed !== undefined) {
         return historyReplayed;
       }
-      // [#1066 R2] The 16-entry SAME-CAS crash backstop may evict an
-      // older turn ONLY if its independent durable disposition exists.
-      // Otherwise a delayed Host recovery could re-admit the evicted
-      // turn. Refuse a NEW turn before any admission/effect until the
-      // older missing disposition is healed by replaying its source.
-      const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
-      if (history.length >= MAX_ADMITTED_CONTROL_TURN_HISTORY) {
-        const oldest = history[0];
-        if (!isJsonRecord(oldest) || typeof oldest.turnId !== 'string' || typeof oldest.identity !== 'string') {
-          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_INVALID', 'cannot evict an invalid committed control-turn admission');
-        }
-        let disposition;
-        try {
-          disposition = await docs.get(turnDispositionDocKey(oldest.turnId));
-        } catch {
-          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'cannot verify the oldest admitted control turn disposition; fail closed before eviction');
-        }
-        if (disposition === null || !isJsonRecord(disposition.value)
-          || disposition.value.identity !== oldest.identity) {
-          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'oldest committed control turn has no matching durable disposition; recover it before admitting another turn');
-        }
-      }
+      // [v0.10 K02 anchor 4] The former missing-disposition fail-closed
+      // eviction block is REPLACED by the same-CAS original-receipt ring:
+      // the once-only truth is atomic with the state (the ring rides the
+      // instance document) and its eviction is archive-gated inside the
+      // commit, so a LOST derived disposition can no longer wedge all new
+      // turns (the 17+ liveness repair). MAX_ADMITTED_CONTROL_TURN_HISTORY
+      // stays the bounded crash-backstop history bound; the disposition
+      // records remain observational archive depth.
       const context = {
         ...snapshot.state.context,
         callerRole: caller.role,
@@ -5512,7 +5965,23 @@ export function createOccurrenceRuntime(options) {
         // turns ride the same history.
         admittedControlTurn: {
           turnId: controlTurnId,
-          identity: turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType),
+          identity: turnIdentity,
+        },
+        // [v0.10 K02 anchor 2] The immutable ORIGINAL RECEIPT of this turn
+        // rides the SAME authoritative state CAS: the engine composes the
+        // receipt against the NEXT projection BEFORE the put and commits
+        // state + revision + receipt in ONE document write. buildIdentity
+        // (the pinned kernel module SHA) rides the envelope — the identity
+        // itself is build-stable.
+        durableOriginalReceipt: {
+          turnId: controlTurnId,
+          identity: turnIdentity,
+          intentType: request.intentType,
+          inputDigest,
+          turn: snapshotJson(turn),
+          messageId: request.messageId,
+          admitted: outcome.admitted,
+          buildIdentity: { kernelModuleSha256: moduleIdentity.moduleSha256 },
         },
         transition: (current) => ({
           nextState: {
@@ -5588,6 +6057,10 @@ export function createOccurrenceRuntime(options) {
       // Kernel is the OUTWARD snapshot: the observation window and the
       // control-turn admission history stay internal carrier/replay truth.
       const outwardCommitted = outwardInstanceSnapshot(committed);
+      // [v0.10 K02] The disposition record is the post-commit OBSERVATIONAL
+      // archive of the admission (the same-CAS original receipt, committed
+      // above, owns the once-only truth); a failure here stays a typed
+      // observation that never fails the committed ACK.
       const turnDisposition = await writeTurnDisposition(
         controlTurnId,
         turn,
@@ -5600,6 +6073,7 @@ export function createOccurrenceRuntime(options) {
           occurrence: { messageId: request.messageId, workflowInstanceId },
           attribution: attribution(),
         },
+        inputDigest,
       );
 
       const receipt = {

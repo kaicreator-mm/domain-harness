@@ -40,6 +40,12 @@
   covers: two REAL stock-node child processes (children/k02-receipt-worker.mjs) sharing ONE SQLite file race the SAME turn; exactly one child commits+ACKs admitted, the loser replays the SAME original receipt idempotentReplay with zero new effect; a changed-input racing second submission refuses typed; sequential 20-turn interleave across processes stays consistent
   verdicts: [P-single-winner-original-ack, P-loser-idempotent-replay, N-changed-input-race-typed-conflict, P-cross-process-sequence]
 
+- id: K02-CB (phase-2 TRUE combined physical, spliced kernel)
+  file: packages/domain-harness/tests/v08-host/k02-combined-splice-physical.test.ts (+ children/k02-splice-worker.mjs)
+  kind: physical-sqlite-real-kernel-spliced + physical-two-process
+  covers: real SPLICED selected kernel (exact bytes, blob pinned in-file) x real openSqliteCasStore — same-CAS original-receipt atomicity (doc revision == stateRevision, receipt rides the same row, restart durability, exact-original replay, canonical-equivalence), changed-input/intent typed conflicts on the integrated kernel, fence/receipt coordination under the K01 R2 attest contract (adapter-tagged throw keeps the fence with NO receipt; attested dispatcher pre-handler refusal releases via docs.remove; follower receipt lands), REAL two-process same-turn race (honest ADMISSION_EFFECT_AMBIGUOUS duplicate, honest holder commit loss after the same-turn re-claim, journal-reconcile retry lands the ORIGINAL receipt with exactly-once effect, cross-process changed-input typed refusal)
+  verdicts: [P-same-cas-receipt-atomicity, P-restart-durability, P-exact-original-replay, N-changed-input-conflict, N-changed-intent-conflict, P-fence-attested-release-coordination, P-two-process-same-turn-exactly-once, N-cross-process-changed-input]
+
 - id: K02-G1
   file: tools/task-check.sh
   kind: gate
