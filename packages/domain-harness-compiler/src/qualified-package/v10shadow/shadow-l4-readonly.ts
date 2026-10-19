@@ -17,9 +17,16 @@
  *       "latest" fallback.
  *   (2) READ-ONLY OBSERVATION — the actual selected K documents are read
  *       through a narrow `get`/`keys` view of the production store under the
- *       exact `v10/k/<subjectDigest>/<tenantId>/` prefix of this App. The
- *       runner never receives `put`, `remove`, `resources`, Memory, cache or
- *       the facade dispatcher. The observations are canonicalized, bounded
+ *       EXACT K02 physical prefixes of this activated deployment: the
+ *       `v10/k/<subjectDigest>/<tenantId>/v010-k02:<deployedAppId>:<tenantId>:
+ *       <appId>:<businessPackageId>:` prefixes of the selected Business
+ *       packages, derived from the facade's private deployment identity. The
+ *       BUILD/tenant arguments are only cross-checked against that binding;
+ *       they never widen or define the observed prefix set. A nil deployment
+ *       binding is a typed refusal, never a fallback to the whole App/Tenant
+ *       namespace (two deployments of one BUILD/Tenant must stay disjoint).
+ *       The runner never receives `put`, `remove`, `resources`, Memory, cache
+ *       or the facade dispatcher. The observations are canonicalized, bounded
  *       and deep-frozen before any evaluator sees them.
  *   (3) ISOLATED EVALUATION — candidate and fallback source bytes are
  *       compiled and executed in a fresh `node:vm` context per evaluator
@@ -42,7 +49,7 @@
  */
 import * as vm from 'node:vm';
 
-import { V10AppFacade } from '../v10build/activation.js';
+import { V10AppFacade, v10K02DocumentPrefix } from '../v10build/activation.js';
 import type { V10AppView } from '../v10build/activation.js';
 import { canonicalJson, sha256Canonical, sha256Hex } from '../v10build/digest.js';
 
@@ -156,6 +163,21 @@ export interface ShadowKReadStore {
   keys(): readonly string[] | Promise<readonly string[]>;
 }
 
+/**
+ * The activation-origin identity a shadow run is pinned to. Every field is
+ * read from the real facade's private state; the runner's own tenant/BUILD
+ * arguments only have to agree with it.
+ */
+interface ShadowActivatedIdentity {
+  readonly subjectDigest: string;
+  readonly appId: string;
+  readonly tenantId: string;
+  readonly deployedAppId: string;
+  readonly businessPackageIds: readonly string[];
+  readonly namespace: string;
+  readonly documentPrefixes: readonly string[];
+}
+
 export interface ShadowL4CaseEvidence {
   readonly caseId: string;
   readonly key: string;
@@ -176,6 +198,8 @@ export interface ShadowL4Report {
   readonly kind: typeof SHADOW_L4_EVIDENCE_KIND;
   readonly shadowAbi: typeof SHADOW_L4_ABI;
   readonly appSubjectDigest: string;
+  /** The exact activated deployment instance whose K rows were observed. */
+  readonly deployedAppId: string;
   readonly tenantId: string;
   readonly candidate: ShadowL4VersionPin;
   readonly candidateApproval: {
@@ -185,7 +209,10 @@ export interface ShadowL4Report {
   readonly approvedFallback: ShadowL4VersionPin & { readonly selectedPackageId: string };
   readonly budget: { readonly maxCases: number; readonly maxComparisons: number };
   readonly observations: {
+    /** The App/Tenant K namespace; selection is narrowed to `documentPrefixes`. */
     readonly prefix: string;
+    /** The exact deployment/B K02 prefixes the snapshot was selected from. */
+    readonly documentPrefixes: readonly string[];
     readonly total: number;
     readonly considered: number;
     readonly truncated: boolean;
@@ -356,7 +383,8 @@ function pinIdentity(pin: ShadowL4VersionPin): string {
 }
 
 interface CapturedSnapshot {
-  readonly prefix: string;
+  readonly namespace: string;
+  readonly documentPrefixes: readonly string[];
   readonly total: number;
   readonly considered: number;
   readonly truncated: boolean;
@@ -366,7 +394,8 @@ interface CapturedSnapshot {
 
 async function captureSelectedKSnapshot(
   store: ShadowKReadStore,
-  prefix: string,
+  namespace: string,
+  documentPrefixes: readonly string[],
   limit: number,
   reads: { count: number },
 ): Promise<CapturedSnapshot> {
@@ -381,8 +410,13 @@ async function captureSelectedKSnapshot(
     if (error instanceof ShadowL4Error) throw error;
     refuse('SHADOW_READ_INTERFACE_MISSING', `the Host read-only store view cannot list keys: ${errorMessage(error)}`, { cause: error });
   }
+  // [T07 R2 P1] Selection is the UNION of this deployment's exact K02 per-B
+  // prefixes only. A sibling deployment of the same BUILD/Tenant shares the
+  // parent namespace but never one of these prefixes, so its keys cannot
+  // consume the case budget or masquerade as this deployment's observations.
   const matching = keys
-    .filter((key): key is string => typeof key === 'string' && key.startsWith(prefix))
+    .filter((key): key is string => typeof key === 'string'
+      && documentPrefixes.some((documentPrefix) => key.startsWith(documentPrefix)))
     .sort();
   const selected = matching.slice(0, limit);
   const observations: ShadowKObservation[] = [];
@@ -417,7 +451,8 @@ async function captureSelectedKSnapshot(
     }));
   }
   const snapshotSha256 = sha256Canonical({
-    prefix,
+    namespace,
+    documentPrefixes,
     observations: observations.map((observation) => ({
       key: observation.key,
       revision: observation.revision,
@@ -425,7 +460,8 @@ async function captureSelectedKSnapshot(
     })),
   });
   return Object.freeze({
-    prefix,
+    namespace,
+    documentPrefixes: Object.freeze([...documentPrefixes]),
     total: matching.length,
     considered: observations.length,
     truncated: matching.length > observations.length,
@@ -778,7 +814,7 @@ function evaluateSelectedObservations(
   });
 }
 
-function assertFacadeMatchesApp(facade: V10AppFacade, app: V10AppView, tenantId: string): void {
+function assertFacadeMatchesApp(facade: V10AppFacade, app: V10AppView, tenantId: string): ShadowActivatedIdentity {
   // Read the original V10AppFacade getter *on its prototype*, not a virtual
   // member that a subclass can override. Its #private fields are the actual
   // Host activation's selection; caller-supplied digest/tenant claims do not
@@ -803,9 +839,39 @@ function assertFacadeMatchesApp(facade: V10AppFacade, app: V10AppView, tenantId:
   if (binding.subjectDigest !== app.subjectDigest
     || binding.appId !== app.appId
     || binding.tenantId !== tenantId
-    || (binding.deploymentAppId !== null && binding.deploymentAppId !== app.appId)
     || sha256Canonical(binding.businessPackageIds) !== sha256Canonical(expectedBusinesses)) {
-    refuse('SHADOW_APP_FACADE_MISMATCH', 'BUILD digest, App, tenant, deployment or selected Business identity differs from the activated facade');
+    refuse('SHADOW_APP_FACADE_MISMATCH', 'BUILD digest, App, tenant or selected Business identity differs from the activated facade');
+  }
+  // [T07 R2 P1] An activation without a deployment identity has no K02 scoped
+  // namespace: its K rows cannot be attributed to one deployment instance, so
+  // there is no honest narrow observation set. STOP typed instead of silently
+  // widening to the whole App/Tenant namespace.
+  const deployedAppId = binding.deployedAppId;
+  if (typeof deployedAppId !== 'string' || deployedAppId.length === 0 || deployedAppId.length > 256) {
+    refuse(
+      'SHADOW_DEPLOYMENT_BINDING_MISSING',
+      'the activated facade carries no deployment identity; Shadow L4 cannot attribute K documents to one deployment instance (no unscoped fallback exists)',
+    );
+  }
+  if (binding.deploymentAppId !== app.appId) {
+    refuse('SHADOW_APP_FACADE_MISMATCH', 'the activated deployment App identity differs from the BUILD App view');
+  }
+  // Re-derive the exact per-B physical prefixes from the binding's deployment
+  // tuple and require the facade to report exactly those. This is an integrity
+  // agreement of two independently produced values, never a caller claim.
+  const namespace = `${SHADOW_K_DOCS_PREFIX}${binding.subjectDigest}/${binding.tenantId}/`;
+  const expectedPrefixes = expectedBusinesses.map((businessPackageId) =>
+    `${namespace}${v10K02DocumentPrefix({
+      deployedAppId,
+      tenantId: binding.tenantId,
+      appId: app.appId,
+      businessPackageId,
+    })}`);
+  const reportedPrefixes = binding.k02DocumentPrefixes;
+  if (!Array.isArray(reportedPrefixes)
+    || reportedPrefixes.length !== expectedPrefixes.length
+    || sha256Canonical(reportedPrefixes) !== sha256Canonical(expectedPrefixes)) {
+    refuse('SHADOW_APP_FACADE_MISMATCH', 'the activated facade did not report the exact K02 document prefixes of its deployment');
   }
   const expected = app.modules
     .filter((module) => module.role === 'standard-feature')
@@ -815,6 +881,15 @@ function assertFacadeMatchesApp(facade: V10AppFacade, app: V10AppView, tenantId:
   if (sha256Canonical(actual) !== sha256Canonical(expected)) {
     refuse('SHADOW_APP_FACADE_MISMATCH', 'the BUILD App view and the activated facade do not describe the same selected features');
   }
+  return Object.freeze({
+    subjectDigest: binding.subjectDigest,
+    appId: binding.appId,
+    tenantId: binding.tenantId,
+    deployedAppId,
+    businessPackageIds: Object.freeze([...expectedBusinesses]),
+    namespace,
+    documentPrefixes: Object.freeze(expectedPrefixes),
+  });
 }
 
 function validateBudget(raw: unknown): { readonly maxCases: number; readonly maxComparisons: number } {
@@ -858,7 +933,7 @@ export async function runShadowL4(options: ShadowL4RunnerOptions): Promise<Shado
     refuse('SHADOW_OPTIONS_INVALID', 'tenantId must be a bounded nonempty string');
   }
   // Identity must match BEFORE any store.keys()/get() or physical witness.
-  assertFacadeMatchesApp(options.facade, app, options.tenantId);
+  const identity = assertFacadeMatchesApp(options.facade, app, options.tenantId);
   if (!isPlainRecord(options.store) || typeof options.store.get !== 'function' || typeof options.store.keys !== 'function') {
     refuse(
       'SHADOW_READ_INTERFACE_MISSING',
@@ -944,9 +1019,8 @@ export async function runShadowL4(options: ShadowL4RunnerOptions): Promise<Shado
   }
 
   const limit = Math.min(budget.maxCases, budget.maxComparisons);
-  const prefix = `${SHADOW_K_DOCS_PREFIX}${app.subjectDigest}/${options.tenantId}/`;
   const reads = { count: 0 };
-  const before = await captureSelectedKSnapshot(options.store, prefix, limit, reads);
+  const before = await captureSelectedKSnapshot(options.store, identity.namespace, identity.documentPrefixes, limit, reads);
   const witnessBefore = await captureWitness(options.physicalWitness);
 
   let outcome: EvaluationOutcome;
@@ -954,7 +1028,7 @@ export async function runShadowL4(options: ShadowL4RunnerOptions): Promise<Shado
     outcome = failedOutcome(
       'SHADOW_NO_OBSERVATIONS',
       null,
-      'no actual selected K documents exist under this App/Tenant prefix; there is nothing to shadow',
+      'no actual selected K documents exist under this deployment\'s exact K02 prefixes; there is nothing to shadow',
       0,
       [],
       [],
@@ -984,15 +1058,15 @@ export async function runShadowL4(options: ShadowL4RunnerOptions): Promise<Shado
         : { code: 'SHADOW_EVALUATOR_COMPILE_FAILED', message: errorMessage(error) };
       outcome = failedOutcome(failure.code, null, failure.message, 0, [], [], []);
       return finalizeShadowReport({
-        options, app, candidatePin, candidateApprovalAuthority, fallbackPin, fallbackModule,
-        budget, prefix, before, witnessBefore, reads, outcome,
+        options, identity, candidatePin, candidateApprovalAuthority, fallbackPin, fallbackModule,
+        budget, before, witnessBefore, reads, outcome,
       });
     }
     const deps = Object.freeze({
       app: Object.freeze({
         subjectDigest: app.subjectDigest,
         appId: app.appId,
-        tenantId: options.tenantId,
+        tenantId: identity.tenantId,
       }),
       observations: before.observations,
     });
@@ -1000,30 +1074,29 @@ export async function runShadowL4(options: ShadowL4RunnerOptions): Promise<Shado
   }
 
   return finalizeShadowReport({
-    options, app, candidatePin, candidateApprovalAuthority, fallbackPin, fallbackModule,
-    budget, prefix, before, witnessBefore, reads, outcome,
+    options, identity, candidatePin, candidateApprovalAuthority, fallbackPin, fallbackModule,
+    budget, before, witnessBefore, reads, outcome,
   });
 }
 
 async function finalizeShadowReport(input: {
   readonly options: ShadowL4RunnerOptions;
-  readonly app: V10AppView;
+  readonly identity: ShadowActivatedIdentity;
   readonly candidatePin: ShadowL4VersionPin;
   readonly candidateApprovalAuthority: 'host-admission' | 'explicit-candidate';
   readonly fallbackPin: ShadowL4VersionPin;
   readonly fallbackModule: V10AppView['modules'][number];
   readonly budget: { readonly maxCases: number; readonly maxComparisons: number };
-  readonly prefix: string;
   readonly before: CapturedSnapshot;
   readonly witnessBefore: string;
   readonly reads: { count: number };
   readonly outcome: EvaluationOutcome;
 }): Promise<ShadowL4Report> {
-  const { options, app, candidatePin, fallbackPin, budget, prefix, before, reads } = input;
+  const { options, identity, candidatePin, fallbackPin, budget, before, reads } = input;
   let after: CapturedSnapshot | null = null;
   let afterError: string | null = null;
   try {
-    after = await captureSelectedKSnapshot(options.store, prefix, Math.min(budget.maxCases, budget.maxComparisons), reads);
+    after = await captureSelectedKSnapshot(options.store, identity.namespace, identity.documentPrefixes, Math.min(budget.maxCases, budget.maxComparisons), reads);
   } catch (error) {
     afterError = errorMessage(error);
   }
@@ -1063,8 +1136,9 @@ async function finalizeShadowReport(input: {
   }
 
   const replayDigest = sha256Canonical({
-    appSubjectDigest: app.subjectDigest,
-    tenantId: options.tenantId,
+    appSubjectDigest: identity.subjectDigest,
+    deployedAppId: identity.deployedAppId,
+    tenantId: identity.tenantId,
     candidate: candidatePin,
     approvedFallback: { ...fallbackPin, selectedPackageId: input.fallbackModule.packageId },
     budget,
@@ -1085,8 +1159,9 @@ async function finalizeShadowReport(input: {
   return deepFreeze({
     kind: SHADOW_L4_EVIDENCE_KIND,
     shadowAbi: SHADOW_L4_ABI,
-    appSubjectDigest: app.subjectDigest,
-    tenantId: options.tenantId,
+    appSubjectDigest: identity.subjectDigest,
+    deployedAppId: identity.deployedAppId,
+    tenantId: identity.tenantId,
     candidate: candidatePin,
     candidateApproval: Object.freeze({
       state: candidatePin.approvalState,
@@ -1095,7 +1170,8 @@ async function finalizeShadowReport(input: {
     approvedFallback: Object.freeze({ ...fallbackPin, selectedPackageId: input.fallbackModule.packageId }),
     budget,
     observations: Object.freeze({
-      prefix,
+      prefix: identity.namespace,
+      documentPrefixes: identity.documentPrefixes,
       total: before.total,
       considered: before.considered,
       truncated: before.truncated,

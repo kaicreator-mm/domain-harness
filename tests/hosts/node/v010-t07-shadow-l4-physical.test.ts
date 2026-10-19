@@ -26,7 +26,15 @@
  *   PH-N6  fallback digest/revision/provenance/approval mismatches STOP with
  *          a typed no-fallback refusal, production unchanged;
  *   PH-P3  two runs over the same physical snapshot produce the same replay
- *          digest and still write nothing.
+ *          digest and still write nothing;
+ *   PH-N11 two legitimate deployments of the SAME BUILD/Tenant (distinct
+ *          deployedAppId) share one SQLite store: Shadow on one deployment
+ *          observes ONLY its own exact K02 prefixes, even when the other
+ *          deployment's keys sort first and outnumber the whole case budget;
+ *   PH-N12 the same isolation survives a store/facade restart: the replay
+ *          digest and the observed key set are identical, still zero writes;
+ *   PH-N13 an activation without a deployment identity refuses typed before
+ *          any K read; it never widens to the unscoped App/Tenant namespace.
  *
  * Every test also asserts the instrumented production store's put/remove
  * counters stay at zero, the full `v8_host_docs` table is row-identical, the
@@ -50,6 +58,7 @@ import {
 } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import type { V10BuiltApp, V10DocStore, V10DocWriteCondition, V10ModuleInput } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import {
+  SHADOW_K_DOCS_PREFIX,
   ShadowL4Error,
   pinCandidateSource,
   runShadowL4,
@@ -293,30 +302,64 @@ async function runShadow(
     readonly tenantId?: string;
     readonly trustedCandidateApproval?: NonNullable<ShadowL4RunnerOptions['trustedCandidateApproval']>;
     readonly evaluationTimeoutMs?: number;
+    readonly budget?: { readonly maxCases: number; readonly maxComparisons: number };
   } = {},
 ): Promise<ShadowL4Report> {
-  const runnerOptions: ShadowL4RunnerOptions = {
+  return await runShadowWith({
     facade: harness.activation.facade,
     app: options.app ?? harness.app,
     store: {
       get: async (key: string) => await harness.store.get(key),
       keys: async () => await harness.store.keys(),
     },
+    witness: harness.witness,
+    fallbackPin: harness.fallbackPin,
+    source,
+    pin,
     tenantId: options.tenantId ?? TENANT,
-    candidate: { pin, source, exportName: 'evaluate' },
-    approvedFallback: options.approvedFallback ?? {
-      pin: harness.fallbackPin,
-      selectedPackageId: FALLBACK_PACKAGE_ID,
-      exportName: 'evaluate',
-    },
-    budget: { maxCases: 8, maxComparisons: 8 },
-    physicalWitness: harness.witness,
-    evaluationTimeoutMs: options.evaluationTimeoutMs ?? 100,
+    budget: options.budget ?? { maxCases: 8, maxComparisons: 8 },
+    ...(options.approvedFallback === undefined ? {} : { approvedFallback: options.approvedFallback }),
     ...(options.trustedCandidateApproval === undefined
       ? {}
       : { trustedCandidateApproval: options.trustedCandidateApproval }),
-  };
-  return await runShadowL4(runnerOptions);
+    ...(options.evaluationTimeoutMs === undefined ? {} : { evaluationTimeoutMs: options.evaluationTimeoutMs }),
+  });
+}
+
+interface ShadowRunSurface {
+  readonly facade: ShadowL4RunnerOptions['facade'];
+  readonly app: V10BuiltApp;
+  readonly store: ShadowKReadStore;
+  readonly witness: () => unknown;
+  readonly fallbackPin: ShadowL4VersionPin;
+  readonly source: string;
+  readonly pin: ShadowL4VersionPin;
+  readonly tenantId: string;
+  readonly budget: { readonly maxCases: number; readonly maxComparisons: number };
+  readonly approvedFallback?: ShadowL4RunnerOptions['approvedFallback'];
+  readonly trustedCandidateApproval?: NonNullable<ShadowL4RunnerOptions['trustedCandidateApproval']>;
+  readonly evaluationTimeoutMs?: number;
+}
+
+async function runShadowWith(surface: ShadowRunSurface): Promise<ShadowL4Report> {
+  return await runShadowL4({
+    facade: surface.facade,
+    app: surface.app,
+    store: surface.store,
+    tenantId: surface.tenantId,
+    candidate: { pin: surface.pin, source: surface.source, exportName: 'evaluate' },
+    approvedFallback: surface.approvedFallback ?? {
+      pin: surface.fallbackPin,
+      selectedPackageId: FALLBACK_PACKAGE_ID,
+      exportName: 'evaluate',
+    },
+    budget: surface.budget,
+    physicalWitness: surface.witness,
+    evaluationTimeoutMs: surface.evaluationTimeoutMs ?? 100,
+    ...(surface.trustedCandidateApproval === undefined
+      ? {}
+      : { trustedCandidateApproval: surface.trustedCandidateApproval }),
+  });
 }
 
 async function assertZeroProductionWrites(harness: ShadowHarness, report: ShadowL4Report): Promise<void> {
@@ -701,4 +744,339 @@ test('T07-PH-N10: a BUILD view with forged Business identity refuses before any 
     assert.equal(harness.store.removeCalls, 0);
     assert.deepEqual(readRows(harness.kPath), harness.beforeRows);
   });
+});
+
+
+const OWN_DEPLOYMENT_ID = 'deploy:z-owned';
+const FOREIGN_DEPLOYMENT_ID = 'deploy:a-foreign';
+
+interface SharedDeploymentHarness {
+  readonly dir: string;
+  readonly kPath: string;
+  readonly app: V10BuiltApp;
+  readonly baselineSource: string;
+  readonly fallbackPin: ShadowL4VersionPin;
+  readonly ownPrefix: string;
+  readonly activation: Awaited<ReturnType<typeof activateV10App>>;
+  readonly store: InstrumentedStore;
+  rows(): readonly SqliteRow[];
+  witness(): unknown;
+  restart(): Promise<void>;
+  cleanup(): Promise<void>;
+}
+
+/**
+ * Two legitimate activations of the SAME built App and tenant with distinct
+ * `deployedAppId`s on ONE file-backed SQLite store. The foreign deployment id
+ * sorts strictly before the observed one, so its K02 keys come first in the
+ * physical key order and are numerous enough to consume a small case budget.
+ */
+async function createSharedDeploymentHarness(): Promise<SharedDeploymentHarness> {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-v010-t07-shared-deploy-'));
+  const kPath = join(dir, 'k.sqlite');
+  const { app, baselineSource } = await buildShadowApp();
+  const fallbackPin = selectedFallbackPin(app, {
+    selectedPackageId: FALLBACK_PACKAGE_ID,
+    kind: 'Rule',
+    id: 'rule:quote-approval',
+  });
+  const ownDeployment = { deployedAppId: OWN_DEPLOYMENT_ID, tenantId: TENANT, appId: app.appId };
+  let raw = await openSqliteCasStore({ path: kPath });
+  let keyReader = new Database(kPath, { readonly: true, fileMustExist: true });
+  keyReader.pragma('query_only = ON');
+  let reader = new Database(kPath, { readonly: true, fileMustExist: true });
+  reader.pragma('query_only = ON');
+  let store = new InstrumentedStore(raw, keyReader);
+  let activation: Awaited<ReturnType<typeof activateV10App>> | null = null;
+  const closeConnections = async (): Promise<void> => {
+    keyReader.close();
+    reader.close();
+    await raw.close();
+  };
+  try {
+    activation = await activateV10App(app, {
+      store,
+      tenantId: TENANT,
+      deploymentIdentity: ownDeployment,
+      now: () => BASE_MS,
+    });
+    const ownReceipt = await activation.facade.send({
+      ...SEED_INTENT,
+      instanceKey: 'instance:t07-own',
+      messageId: 'msg:t07-own',
+    });
+    assert.equal(ownReceipt.status, 'admitted', `own deployment seed must be admitted: ${JSON.stringify(ownReceipt).slice(0, 400)}`);
+
+    const foreign = await activateV10App(app, {
+      store,
+      tenantId: TENANT,
+      deploymentIdentity: { ...ownDeployment, deployedAppId: FOREIGN_DEPLOYMENT_ID },
+      now: () => BASE_MS,
+    });
+    try {
+      const foreignReceipt = await foreign.facade.send({
+        ...SEED_INTENT,
+        instanceKey: 'instance:t07-foreign',
+        messageId: 'msg:t07-foreign',
+      });
+      assert.equal(foreignReceipt.status, 'admitted', `foreign deployment seed must be admitted: ${JSON.stringify(foreignReceipt).slice(0, 400)}`);
+    } finally {
+      foreign.dispose();
+    }
+
+    // The expected prefix is derived HERE, independently of the code under
+    // test, so an over-wide selector is observable rather than self-consistent.
+    const encodeComponent = (value: string): string => value.replace(/%/g, '%25').replace(/:/g, '%3A');
+    const base = `${SHADOW_K_DOCS_PREFIX}${app.subjectDigest}/${TENANT}/`;
+    const ownPrefix = `${base}v010-k02:${encodeComponent(OWN_DEPLOYMENT_ID)}:${encodeComponent(TENANT)}:${encodeComponent(app.appId)}:${encodeComponent(BUSINESS_PACKAGE_ID)}:`;
+    const baseKeys = readRows(kPath).map((row) => row.key).filter((key) => key.startsWith(base));
+    const ownKeys = baseKeys.filter((key) => key.startsWith(ownPrefix));
+    const foreignKeys = baseKeys.filter((key) => !key.startsWith(ownPrefix));
+    assert.ok(ownKeys.length > 0, 'the own deployment must have written real K documents');
+    assert.ok(foreignKeys.length > 0, 'the shared SQLite store must hold the foreign deployment\'s real K documents');
+
+    let cleaned = false;
+    return {
+      dir,
+      kPath,
+      app,
+      baselineSource,
+      fallbackPin,
+      ownPrefix,
+      get activation(): Awaited<ReturnType<typeof activateV10App>> {
+        if (activation === null) throw new Error('shared deployment harness is not activated');
+        return activation;
+      },
+      get store(): InstrumentedStore {
+        return store;
+      },
+      rows: (): readonly SqliteRow[] => readRows(kPath),
+      witness: (): unknown => physicalWitness(kPath, reader),
+      restart: async (): Promise<void> => {
+        const current = activation;
+        if (current === null) throw new Error('shared deployment harness is not activated');
+        current.dispose();
+        await closeConnections();
+        raw = await openSqliteCasStore({ path: kPath });
+        keyReader = new Database(kPath, { readonly: true, fileMustExist: true });
+        keyReader.pragma('query_only = ON');
+        reader = new Database(kPath, { readonly: true, fileMustExist: true });
+        reader.pragma('query_only = ON');
+        store = new InstrumentedStore(raw, keyReader);
+        const next = await activateV10App(app, {
+          store,
+          tenantId: TENANT,
+          deploymentIdentity: ownDeployment,
+          now: () => BASE_MS,
+        });
+        activation = next;
+        const rebound = next.facade.selectedShadowBinding;
+        assert.equal(rebound.deployedAppId, OWN_DEPLOYMENT_ID);
+        assert.deepEqual([...rebound.k02DocumentPrefixes], [ownPrefix]);
+        store.resetCounters();
+      },
+      cleanup: async (): Promise<void> => {
+        if (cleaned) return;
+        cleaned = true;
+        try {
+          activation?.dispose();
+        } finally {
+          await closeConnections();
+          await rm(dir, { recursive: true, force: true });
+        }
+      },
+    };
+  } catch (error) {
+    activation?.dispose();
+    await closeConnections();
+    await rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function assertPhysicalZeroWrites(
+  store: InstrumentedStore,
+  kPath: string,
+  beforeRows: readonly SqliteRow[],
+  report: ShadowL4Report,
+): Promise<void> {
+  assert.equal(
+    report.production.productionWritesVerifiedZero,
+    true,
+    `the physical witness must verify zero writes (failure: ${JSON.stringify(report.failure)})`,
+  );
+  assert.equal(report.production.snapshotUnchanged, true);
+  assert.equal(report.production.physicalWitnessUnchanged, true);
+  assert.equal(report.production.storeMutationMethodsUsed, 0);
+  assert.equal(report.production.externalEffectCalls, 0);
+  assert.equal(report.production.memoryWrites, 0);
+  assert.equal(report.production.cacheWrites, 0);
+  assert.ok(report.production.storeReads > 0, 'the runner must have read real selected K documents');
+  assert.equal(store.putCalls, 0, 'production docs.put must never be called');
+  assert.equal(store.removeCalls, 0, 'production docs.remove must never be called');
+  assert.deepEqual(readRows(kPath), beforeRows, 'the physical v8_host_docs rows must be identical');
+}
+
+function assertOnlyOwnDeploymentObserved(
+  report: ShadowL4Report,
+  ownPrefix: string,
+  ownKeys: readonly string[],
+  limit: number,
+): void {
+  const expected = [...ownKeys].sort().slice(0, limit);
+  assert.deepEqual([...report.observations.keys], expected, 'the bounded selection must be this deployment\'s keys, in physical order');
+  assert.ok(report.observations.keys.every((key) => key.startsWith(ownPrefix)), 'every observation must sit under the exact deployment prefix');
+  assert.equal(report.observations.total, ownKeys.length, 'the observation total must count ONLY this deployment\'s K rows');
+  assert.equal(report.observations.considered, expected.length);
+  assert.equal(report.observations.truncated, ownKeys.length > expected.length);
+  assert.equal(report.deployedAppId, OWN_DEPLOYMENT_ID);
+  assert.deepEqual([...report.observations.documentPrefixes], [ownPrefix]);
+}
+
+test('T07-PH-N11: a sibling deployment of the same BUILD/Tenant never enters the Shadow snapshot, even when its keys sort first and exceed the budget', async () => {
+  const harness = await createSharedDeploymentHarness();
+  try {
+    const base = `${SHADOW_K_DOCS_PREFIX}${harness.app.subjectDigest}/${TENANT}/`;
+    const baseKeys = harness.rows().map((row) => row.key).filter((key) => key.startsWith(base)).sort();
+    const ownKeys = baseKeys.filter((key) => key.startsWith(harness.ownPrefix));
+    const foreignKeys = baseKeys.filter((key) => !key.startsWith(harness.ownPrefix));
+    assert.ok(foreignKeys.length >= 2, 'the foreign deployment must outnumber a maxCases=2 budget');
+    assert.ok(
+      foreignKeys[foreignKeys.length - 1] < ownKeys[0],
+      'every foreign deployment key must sort before this deployment\'s first key (the falsifying order)',
+    );
+
+    harness.store.resetCounters();
+    const beforeRows = harness.rows();
+    const source = `// T07 deployment-isolation candidate.\n${harness.baselineSource}`;
+    const pin = candidatePin(source, { revision: 'candidate:deployment-isolation' });
+    const report = await runShadowWith({
+      facade: harness.activation.facade,
+      app: harness.app,
+      store: { get: async (key: string) => await harness.store.get(key), keys: async () => await harness.store.keys() },
+      witness: harness.witness,
+      fallbackPin: harness.fallbackPin,
+      source,
+      pin,
+      tenantId: TENANT,
+      budget: { maxCases: 2, maxComparisons: 2 },
+    });
+
+    assert.equal(report.status, 'match');
+    assertOnlyOwnDeploymentObserved(report, harness.ownPrefix, ownKeys, 2);
+    assert.ok(
+      report.observations.keys.every((key) => !foreignKeys.includes(key)),
+      'no foreign deployment key may be observed or charged to the case budget',
+    );
+    const binding = harness.activation.facade.selectedShadowBinding;
+    assert.equal(binding.deployedAppId, OWN_DEPLOYMENT_ID, 'the Host binding must name the activated deployment instance');
+    assert.deepEqual([...binding.k02DocumentPrefixes], [harness.ownPrefix], 'the Host binding must report the exact deployed tuple');
+    await assertPhysicalZeroWrites(harness.store, harness.kPath, beforeRows, report);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('T07-PH-N12: deployment isolation and the replay digest survive a store/facade restart with zero writes', async () => {
+  const harness = await createSharedDeploymentHarness();
+  try {
+    const source = `// T07 restart-isolation candidate.\n${harness.baselineSource}`;
+    const pin = candidatePin(source, { revision: 'candidate:restart-isolation' });
+    const surface = {
+      app: harness.app,
+      witness: harness.witness,
+      fallbackPin: harness.fallbackPin,
+      source,
+      pin,
+      tenantId: TENANT,
+      budget: { maxCases: 2, maxComparisons: 2 },
+    };
+    const ownKeys = harness.rows()
+      .map((row) => row.key)
+      .filter((key) => key.startsWith(harness.ownPrefix))
+      .sort();
+    harness.store.resetCounters();
+    const beforeRows = harness.rows();
+    const first = await runShadowWith({
+      ...surface,
+      facade: harness.activation.facade,
+      store: { get: async (key: string) => await harness.store.get(key), keys: async () => await harness.store.keys() },
+    });
+    assert.equal(first.status, 'match');
+    assertOnlyOwnDeploymentObserved(first, harness.ownPrefix, ownKeys, 2);
+    await assertPhysicalZeroWrites(harness.store, harness.kPath, beforeRows, first);
+
+    await harness.restart();
+    const afterRestartRows = harness.rows();
+    assert.deepEqual(afterRestartRows, beforeRows, 'reopening the store and reactivating must not mutate any row');
+    harness.store.resetCounters();
+    const second = await runShadowWith({
+      ...surface,
+      facade: harness.activation.facade,
+      store: { get: async (key: string) => await harness.store.get(key), keys: async () => await harness.store.keys() },
+    });
+    assert.equal(second.status, 'match');
+    assertOnlyOwnDeploymentObserved(second, harness.ownPrefix, ownKeys, 2);
+    assert.deepEqual([...second.observations.keys], [...first.observations.keys], 'the restart must observe the same physical keys');
+    assert.equal(second.replayDigest, first.replayDigest, 'the replay digest must be identical after a restart');
+    await assertPhysicalZeroWrites(harness.store, harness.kPath, beforeRows, second);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('T07-PH-N13: an activation without a deployment binding refuses typed before any K read instead of widening unscoped', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-v010-t07-no-deployment-'));
+  const kPath = join(dir, 'k.sqlite');
+  const raw = await openSqliteCasStore({ path: kPath });
+  const keyReader = new Database(kPath, { readonly: true, fileMustExist: true });
+  keyReader.pragma('query_only = ON');
+  const store = new InstrumentedStore(raw, keyReader);
+  const { app, baselineSource } = await buildShadowApp();
+  const activation = await activateV10App(app, { store, tenantId: TENANT, now: () => BASE_MS });
+  try {
+    const receipt = await activation.facade.send(SEED_INTENT);
+    assert.equal(receipt.status, 'admitted', 'the unscoped legacy activation must still admit its seed turn');
+
+    const base = `${SHADOW_K_DOCS_PREFIX}${app.subjectDigest}/${TENANT}/`;
+    const beforeRows = readRows(kPath);
+    assert.ok(
+      beforeRows.some((row) => row.key.startsWith(base)),
+      'the unscoped activation physically wrote K rows under the broad App/Tenant prefix',
+    );
+    store.resetCounters();
+    const source = `// T07 missing-deployment-binding falsifier.\n${baselineSource}`;
+    const fallbackPin = selectedFallbackPin(app, {
+      selectedPackageId: FALLBACK_PACKAGE_ID,
+      kind: 'Rule',
+      id: 'rule:quote-approval',
+    });
+    await assert.rejects(
+      runShadowWith({
+        facade: activation.facade,
+        app,
+        store: { get: async (key: string) => await store.get(key), keys: async () => await store.keys() },
+        witness: () => physicalWitness(kPath, new Database(kPath, { readonly: true, fileMustExist: true })),
+        fallbackPin,
+        source,
+        pin: candidatePin(source, { revision: 'candidate:no-deployment' }),
+        tenantId: TENANT,
+        budget: { maxCases: 8, maxComparisons: 8 },
+      }),
+      shadowCode('SHADOW_DEPLOYMENT_BINDING_MISSING'),
+    );
+    const binding = activation.facade.selectedShadowBinding;
+    assert.equal(binding.deployedAppId, null, 'a deployment-identity-less activation carries no deployment instance');
+    assert.deepEqual([...binding.k02DocumentPrefixes], [], 'and therefore reports no exact K02 prefixes');
+    assert.equal(store.keysCalls, 0, 'a missing deployment binding must refuse before listing K keys');
+    assert.equal(store.getCalls, 0, 'a missing deployment binding must refuse before the first K read');
+    assert.equal(store.putCalls, 0);
+    assert.equal(store.removeCalls, 0);
+    assert.deepEqual(readRows(kPath), beforeRows, 'the refusal must not mutate any row');
+  } finally {
+    activation.dispose();
+    keyReader.close();
+    await raw.close();
+    await rm(dir, { recursive: true, force: true });
+  }
 });

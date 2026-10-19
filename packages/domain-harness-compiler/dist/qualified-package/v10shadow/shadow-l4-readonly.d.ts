@@ -58,6 +58,8 @@ export interface ShadowL4Report {
     readonly kind: typeof SHADOW_L4_EVIDENCE_KIND;
     readonly shadowAbi: typeof SHADOW_L4_ABI;
     readonly appSubjectDigest: string;
+    /** The exact activated deployment instance whose K rows were observed. */
+    readonly deployedAppId: string;
     readonly tenantId: string;
     readonly candidate: ShadowL4VersionPin;
     readonly candidateApproval: {
@@ -72,7 +74,10 @@ export interface ShadowL4Report {
         readonly maxComparisons: number;
     };
     readonly observations: {
+        /** The App/Tenant K namespace; selection is narrowed to `documentPrefixes`. */
         readonly prefix: string;
+        /** The exact deployment/B K02 prefixes the snapshot was selected from. */
+        readonly documentPrefixes: readonly string[];
         readonly total: number;
         readonly considered: number;
         readonly truncated: boolean;
