@@ -1,0 +1,16 @@
+schema: dh010/t06-validation
+positive:
+  - rule-origin-actual-zero-model
+  - exact-reuse-preserves-provenance-and-no-model
+  - real-model-call-count-measured
+  - denied-distinct-from-admitted
+  - unmeasured-honest-not-zero
+  - optional-persist-actual-write-success
+negative:
+  - fake-kernel-admission-or-effect-permit-rejected
+  - forged-model-count-denied-or-unmeasured
+  - optional-persist-rejection-does-not-veto-primary
+  - malformed-or-overlong-observed-dependencies-refused
+  - conflicting-schema-revision-mismatch-provenance-refused
+  - selected-Tiny-omits-evidence-no-evaluation
+validate: focused Node24 + existing required CI, risk-selected review recommended
