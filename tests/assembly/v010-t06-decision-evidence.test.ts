@@ -107,7 +107,7 @@ test('T06-P4/N2: optional persistence success/failure cannot veto original decis
   assert.equal(persisted.length, 1);
   const fail = await record(input(reference), { persistObservation: async () => { throw new Error('disk full'); } });
   assert.equal(fail.observationStore, 'failed');
-  assert.equal(fail.decisionResult, reference, 'failure never alters primary resolver decision');
+  assert.equal(JSON.stringify(fail.decisionResult), JSON.stringify(reference), 'failure never alters primary resolver decision');
 });
 
 test('T06-N3: unauthorized Effect-shaped data cannot hide in nested evidence', async () => {
@@ -154,4 +154,19 @@ test('T06-N5: hanging optional observation sink cannot veto the decision or clai
   assert.equal(result.observationStore, 'unknown-timeout');
   assert.equal(result.decisionTrace.kernelOutcome, 'unobserved');
   assert.equal(result.decisionResult.kind, 'selected');
+});
+
+
+test('T06-N6: accessor and top-level forged authority are rejected before any observation', async () => {
+  const { record } = await loadFeature();
+  const payload = { ...rule(), effectPermit: { fake: true } };
+  await assert.rejects(record(input(payload)), errorCode('EVIDENCE_AUTHORITY_FORBIDDEN'));
+  let getterCalls = 0;
+  const decision: Record<string, unknown> = {};
+  Object.defineProperty(decision, 'quote', { enumerable: true, get() {
+    getterCalls++;
+    return 'approved';
+  } });
+  await assert.rejects(record(input(rule(decision))), errorCode('EVIDENCE_DATA_INVALID'));
+  assert.equal(getterCalls, 0);
 });
