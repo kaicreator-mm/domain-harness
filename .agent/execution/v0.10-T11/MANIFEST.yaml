@@ -1,0 +1,28 @@
+schema: ads/execution-pack-v1
+task: T11
+issue: 1180
+version: v0.10
+integration_branch: v0.10
+task_branch: task/v0.10-t11-clean-packed-apps
+base_sha: a420807413c33f8dfb9cbc4c1f6628f8f47eb385
+ads_version: 4.13.1
+ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+type: integration
+risk: critical
+predecessors:
+  - T01#1165_CLOSED
+  - T05#1172_CLOSED
+  - T08#1175_CLOSED_MERGE_a420807413c33f8dfb9cbc4c1f6628f8f47eb385
+  - T10#1176_CLOSED
+  - C01#1177_CLOSED
+state: FOCUSED_PASS_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW
+builder_claim: ACCEPTED_ISSUE_COMMENT_6275488483
+expected_host: Node24_SQLite_RealCleanInstall
+executed_host: LOCAL_WINDOWS_NODE24_24.21.0_BETTER_SQLITE3_12
+ubuntu_build_host: NOT_RUN
+physical_tests_executed: PASS_LOCAL_NODE24_SQLITE_FOCUSED
+evidence: .agent/execution/v0.10-T11/EVIDENCE.md
+ci: PENDING_EXACT_HEAD
+full_release_qualification: DEFER_R01
+release_pass: NOT_CLAIMED
+main_merge: FORBIDDEN

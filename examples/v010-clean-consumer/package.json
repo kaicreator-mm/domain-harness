@@ -1,0 +1,10 @@
+{
+  "name": "@kaicreator-example/v010-clean-consumer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "v0.10 T11 clean-built/packed/installed Tiny and Rich Domain Apps",
+  "scripts": {
+    "build": "node build-apps.mjs"
+  }
+}
