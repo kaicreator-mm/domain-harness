@@ -134,3 +134,7 @@ export type {
   ExternalWorkTurnSource,
   RegisterExternalWorkInput,
 } from './durable-controls.js';
+
+// v0.10 optional C/Host Memory capability (no Kernel state authority).
+export { V10ScopedMemoryCapability, V10MemoryError, createV10ScopedMemory } from './v010-scoped-memory.js';
+export type { V10MemoryHost, V10MemoryScope, V10MemoryRead, V10MemoryProvenance, V10MemoryAuthRequest, V10MemoryOperation } from './v010-scoped-memory.js';
