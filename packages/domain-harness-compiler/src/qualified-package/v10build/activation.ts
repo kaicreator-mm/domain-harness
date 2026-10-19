@@ -212,6 +212,26 @@ export interface V10ScopedSnapshotAnswer {
   readonly snapshot: unknown;
 }
 
+/**
+ * [v0.10 T10B #1179] One truthfully correlated entry of an explicit
+ * multi-target query. Each entry is independently authorized and read; a
+ * refusal is scoped to its own input position and never masks another
+ * target's answer.
+ */
+export type V10ScopedSnapshotManyAnswer =
+  | {
+    readonly status: 'answered';
+    readonly index: number;
+    readonly target: Readonly<V10ScopedQueryTarget>;
+    readonly snapshot: unknown;
+  }
+  | {
+    readonly status: 'refused';
+    readonly index: number;
+    readonly code: string;
+    readonly message: string;
+  };
+
 export interface V10PublicIntent {
   readonly intentType: string;
   readonly instanceKey: string;
@@ -808,6 +828,36 @@ export class V10AppFacade {
       );
     }
     return await this.#querySelector(deployment, authority).query(selector);
+  }
+
+  /**
+   * [v0.10 T10B #1179] Explicit multi-target variant of
+   * `queryScopedSnapshot`. Every requested selector is independently
+   * authorized and read; each result is correlated to its input index and a
+   * failure is confined to that entry. The public selector still carries only
+   * workflow/instance/optional B — the Host authority and deployment identity
+   * remain activation wiring. No cross-B transaction or hidden-B oracle is
+   * introduced, and no query path writes K state or dispatches an Effect.
+   */
+  async queryManyScopedSnapshots(
+    selectors: readonly V10ScopedSnapshotQuery[],
+  ): Promise<readonly V10ScopedSnapshotManyAnswer[]> {
+    this.#assertOpen();
+    const authority = this.#queryAuthority;
+    if (authority === undefined) {
+      refuse(
+        'QUERY_AUTHORIZATION_REQUIRED',
+        'this activation carries no Host-owned query authority; authorized scoped queries are disabled (no allow-all default exists)',
+      );
+    }
+    const deployment = this.#deploymentIdentity;
+    if (deployment === undefined) {
+      refuse(
+        'QUERY_DEPLOYMENT_REQUIRED',
+        'an authorized scoped query requires the K02 deployment identity; no unscoped cross-B fallback exists',
+      );
+    }
+    return await this.#querySelector(deployment, authority).queryMany(selectors);
   }
 
   /**

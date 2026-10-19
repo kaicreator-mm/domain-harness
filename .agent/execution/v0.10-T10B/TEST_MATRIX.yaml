@@ -1,0 +1,14 @@
+task: T10B
+test_environment: Node24_real_SQLite_for_physical_claims
+positive_negative_failure:
+  - "positive 2 visible B / mixed target; one visible-one denied B indistinguishable from absent target; one target SQLite fault while others succeed; duplicate targets ordering; foreign tenant; empty/malformed selectors; zero put/remove/effect; restart"
+required:
+  - source_reflects_actual_selected_runtime_not_synthetic_only
+  - typed_refusal_no_K_Effect_authority_escalation
+  - focused_tests_and_build_lint_typecheck
+  - committed_dist_fresh_if_generated
+  - exact_head_ci_and_review_before_merge
+excluded:
+  - full_R01_release_regression
+  - T11_clean_consumer_fixtures
+result: NOT_RUN

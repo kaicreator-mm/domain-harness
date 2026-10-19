@@ -39,6 +39,31 @@ export interface V10MultiBQueryHost<T> {
   readonly readSnapshot: (target: V10MultiBQueryTarget) => T | null | Promise<T | null>;
 }
 
+/** One answered entry of an explicit multi-target query, correlated by input index. */
+export interface V10MultiBQueryManyAnswered<T> {
+  readonly status: 'answered';
+  /** Zero-based position of the exact input selector this entry answers. */
+  readonly index: number;
+  readonly target: Readonly<V10MultiBQueryTarget>;
+  readonly snapshot: T;
+}
+
+/**
+ * One truthfully refused entry. The code/message pair never distinguishes a
+ * denied selected B from an unselected, absent or hidden one.
+ */
+export interface V10MultiBQueryManyRefused {
+  readonly status: 'refused';
+  readonly index: number;
+  readonly code: string;
+  readonly message: string;
+}
+
+export type V10MultiBQueryManyEntry<T> = V10MultiBQueryManyAnswered<T> | V10MultiBQueryManyRefused;
+
+/** Upper bound on one explicit queryMany call; fail closed above it. */
+export const MAX_QUERY_MANY_SELECTORS = 32;
+
 export class V10MultiBQueryError extends Error {
   constructor(readonly code: string, message: string) {
     super(message);
@@ -65,6 +90,29 @@ function routeId(route: V10SelectedBusinessQueryRoute): string {
  */
 function isRouteArray(value: unknown): value is readonly V10SelectedBusinessQueryRoute[] {
   return Array.isArray(value);
+}
+
+/**
+ * Bounded snapshot of ONE explicit queryMany selector. A malformed entry is
+ * isolated to its own result: it never aborts the other requested targets.
+ */
+function manySelector(raw: unknown): V10MultiBQuerySelector | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const candidate = raw as Record<string, unknown>;
+  const workflowId = candidate.workflowId;
+  const instanceKey = candidate.instanceKey;
+  const businessPackageId = candidate.businessPackageId;
+  if (typeof workflowId !== 'string' || workflowId.length === 0 || workflowId.length > 512) return null;
+  if (typeof instanceKey !== 'string' || instanceKey.length === 0 || instanceKey.length > 512) return null;
+  if (businessPackageId !== undefined
+    && (typeof businessPackageId !== 'string' || businessPackageId.length === 0 || businessPackageId.length > 512)) return null;
+  return businessPackageId === undefined
+    ? { workflowId, instanceKey }
+    : { workflowId, instanceKey, businessPackageId };
+}
+
+function refused(index: number, code: string, message: string): V10MultiBQueryManyRefused {
+  return Object.freeze({ status: 'refused', index, code, message });
 }
 
 /** Results never expose a denied or unselected Business identity. */
@@ -160,6 +208,89 @@ export class V10AuthorizedMultiBQuery<T> {
       reject('QUERY_NOT_FOUND', 'no visible query target');
     }
     return { target, snapshot };
+  }
+
+  /**
+   * Explicit multi-target variant: every requested selector is authorized and
+   * read INDEPENDENTLY, and results are correlated to the input position. A
+   * malformed selector, denied/hidden target, authorization fault or physical
+   * read fault is reported only for its own entry; the remaining entries still
+   * answer. There is deliberately no cross-B transaction, rollback or
+   * all-or-nothing assumption: earlier entries are never revoked because a
+   * later one failed. Enumeration and denial shapes match `query`, so a hidden
+   * B remains indistinguishable from an absent one.
+   */
+  async queryMany(
+    selectors: readonly V10MultiBQuerySelector[],
+  ): Promise<readonly V10MultiBQueryManyEntry<T>[]> {
+    if (!Array.isArray(selectors)
+      || selectors.length === 0
+      || selectors.length > MAX_QUERY_MANY_SELECTORS) {
+      reject(
+        'QUERY_SELECTORS_INVALID',
+        'queryMany requires a non-empty explicit array of at most ' + String(MAX_QUERY_MANY_SELECTORS) + ' selectors',
+      );
+    }
+    const results: V10MultiBQueryManyEntry<T>[] = [];
+    for (let index = 0; index < selectors.length; index += 1) {
+      results.push(await this.#queryManyOne(selectors[index], index));
+    }
+    return Object.freeze(results);
+  }
+
+  async #queryManyOne(raw: unknown, index: number): Promise<V10MultiBQueryManyEntry<T>> {
+    const selector = manySelector(raw);
+    if (selector === null) {
+      // One generic message for every malformed field: the refusal itself
+      // must not become a shape oracle.
+      return refused(index, 'QUERY_SELECTOR_INVALID', 'query selector is invalid');
+    }
+
+    // All candidates are BUILD-selected identities; no physical K lookup
+    // happens during enumeration, and unselected B identities are invisible.
+    const visible: V10MultiBQueryTarget[] = [];
+    for (const route of this.#routes) {
+      if (route.workflowId !== selector.workflowId
+        || (selector.businessPackageId !== undefined && route.businessPackageId !== selector.businessPackageId)) continue;
+      const target: V10MultiBQueryTarget = Object.freeze({
+        ...this.#host.deployment,
+        businessPackageId: route.businessPackageId,
+        workflowId: selector.workflowId,
+        instanceKey: selector.instanceKey,
+      });
+      let authorized: boolean;
+      try {
+        authorized = await this.#authorized(target);
+      } catch {
+        return refused(index, 'QUERY_AUTHORIZATION_UNAVAILABLE', 'cannot verify scoped query authorization');
+      }
+      if (authorized) visible.push(target);
+    }
+
+    // Denied/unselected/absent all collapse into one non-oracle result for
+    // THIS entry only.
+    if (visible.length === 0) return refused(index, 'QUERY_NOT_FOUND', 'no visible query target');
+    if (visible.length !== 1) {
+      return refused(index, 'QUERY_AMBIGUOUS', 'multiple visible Business targets; specify businessPackageId');
+    }
+
+    const target = visible[0]!;
+    // Recheck authorization immediately before this entry's only read.
+    try {
+      if (!await this.#authorized(target)) return refused(index, 'QUERY_NOT_FOUND', 'no visible query target');
+    } catch {
+      return refused(index, 'QUERY_AUTHORIZATION_UNAVAILABLE', 'cannot verify scoped query authorization');
+    }
+    let snapshot: T | null;
+    try {
+      snapshot = await this.#host.readSnapshot(target);
+    } catch {
+      return refused(index, 'QUERY_READ_FAILED', 'the scoped snapshot reader failed');
+    }
+    if (snapshot === null || snapshot === undefined) {
+      return refused(index, 'QUERY_NOT_FOUND', 'no visible query target');
+    }
+    return Object.freeze({ status: 'answered', index, target, snapshot });
   }
 }
 

@@ -52,6 +52,7 @@ export type {
   V10QueryAuthority,
   V10ScopedQueryTarget,
   V10ScopedSnapshotAnswer,
+  V10ScopedSnapshotManyAnswer,
   V10ScopedSnapshotQuery,
 } from './activation.js';
 export {
