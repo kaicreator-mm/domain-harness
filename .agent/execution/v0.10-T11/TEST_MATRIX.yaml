@@ -1,0 +1,56 @@
+task: T11
+matrix:
+  - id: TINY_P1
+    criterion: fresh_pack_install_execute_basic_K_S_one_B_required_C
+    witness: real_Node24_process_and_SQLite_CAS_original_receipt_Journal_restart
+  - id: TINY_N1
+    criterion: zero_advanced_Kext_Sfeature_agent_llm_import_init_and_installed_bytes
+    witness: installed_file_graph_and_executed_handler_manifest
+  - id: RICH_P1
+    criterion: physically_independent_two_Kext_three_Sfeatures_two_B_selected_and_invoked
+    witness: separate_package_build_artifacts_install_graph_hook_and_handler_calls
+  - id: RICH_P2
+    criterion: same_workflowId_instanceKey_two_B_disjoint_state_fence_journal_receipt
+    witness: single_physical_SQLite_before_after_CAS_and_restart
+  - id: RICH_P3
+    criterion: authorized_scoped_query_visible_unscoped_ambiguity_hidden_B_denial
+    witness: real_query_provider_authorization_counters_non_oracle
+  - id: RICH_P4
+    criterion: Rule_cache_promoted_fallback_truthful_model_calls_and_budget
+    witness: real_selected_Sfeature_invocation_and_instrumented_counters
+  - id: RICH_P5
+    criterion: isolated_Memory_Context_Agent_and_child_WAIT_RESUME_callback_deadline
+    witness: durable_selected_host_state_and_no_K_authority_injection
+  - id: EX04_P1
+    criterion: job_shaped_and_unrelated_effect_adapter_same_C01_contract
+    witness: two_selected_adapters_real_k_permit_distinct_provider_receipts
+  - id: EX04_F1
+    criterion: accepted_not_terminal_lost_reply_unknown_reconciliation_dup_callback_missing_disposition
+    witness: file_backed_SQLite_effect_attempt_receipt_original_history
+  - id: K01_P1
+    criterion: competing_writers_same_target_nonidempotent_effect
+    witness: real_two_processes_or_connections_one_CAS_owner
+  - id: K02_P1
+    criterion: 17_plus_turns_lost_optional_disposition_original_receipt_replay_and_changed_input_conflict
+    witness: original_atomic_receipt_replay_no_new_effect
+  - id: SHADOW_P1
+    criterion: selected_T07_shadow_from_Rich_zero_State_Journal_Effect_Memory_cache_write
+    witness: real_physical_before_after_witness_exception_timeout
+  - id: VERSION_P1
+    criterion: authorized_B_only_new_occurrence_original_A_pin_replay_after_restart
+    witness: two_real_BUILD_versions_same_stable_deployedAppId_Node24_SQLite
+  - id: DENY_N1
+    criterion: credentialed_adapter_from_B_or_S_without_live_K_permit_refuses
+    witness: actual_zero_provider_calls_no_journal_no_receipt
+  - id: DENY_N2
+    criterion: private_npm_http_business_effect_bypass_is_code_review_violation
+    witness: source_review_no_claimed_JS_network_sandbox
+  - id: PACK_P1
+    criterion: independent_clean_install_no_monorepo_fallback_and_reproducible_attestation
+    witness: fixed_SHA_pack_manifest_Npm_Node24_native_dependency_logs
+gates:
+  physical_clean_host: required
+  exact_head_ci: required
+  reviewer: critical_independent
+  full_hidden_regression: R01_only
+result: NOT_RUN

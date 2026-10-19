@@ -1,0 +1,23 @@
+schema: ads/execution-pack-v1
+task: T11
+issue: 1180
+version: v0.10
+integration_branch: v0.10
+task_branch: task/v0.10-t11-clean-packed-apps
+base_sha: a420807413c33f8dfb9cbc4c1f6628f8f47eb385
+ads_version: 4.13.1
+ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+type: integration
+risk: critical
+predecessors:
+  - T01#1165_CLOSED
+  - T05#1172_CLOSED
+  - T08#1175_CLOSED_MERGE_a420807413c33f8dfb9cbc4c1f6628f8f47eb385
+  - T10#1176_CLOSED
+  - C01#1177_CLOSED
+state: JIT_PREPARED_NO_IMPLEMENTATION
+builder_claim: NOT_YET_ACCEPTED
+expected_host: Ubuntu_Node24_SQLite_RealCleanInstall
+physical_tests_executed: NOT_RUN
+ci: NOT_RUN
+full_release_qualification: DEFER_R01
