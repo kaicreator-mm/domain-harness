@@ -153,6 +153,7 @@ test('T08-R1: ordinary approval expiry restores the pinned A BUILD across a real
     assert.equal(childResult.misrouteKPuts, 0, 'the cross-process misroute writes no K row');
     assert.equal(childResult.wrongVersionCode, 'BUILD_SUBJECT_DIGEST_MISMATCH', 'a wrong BUILD version cannot restore A');
     assert.equal(childResult.revokedCode, 'DEPLOYMENT_APPROVAL_REVOKED', 'explicit revocation is not ordinary expiry');
+    assert.equal(childResult.recordMismatchCode, 'DEPLOYMENT_ACTIVATION_RECORD_MISMATCH', 'the durable record must bind this exact BUILD identity');
     assert.equal(childResult.corruptCode, 'DEPLOYMENT_ACTIVATION_RECORD_INVALID', 'a corrupt activation record fails closed');
     assert.equal(childResult.missingCode, 'DEPLOYMENT_ACTIVATION_RECORD_MISSING', 'a missing activation record fails closed');
     assert.equal(childResult.finalOldRowHash, originalRowHash, 'every negative restore attempt leaves the old A row byte-identical');

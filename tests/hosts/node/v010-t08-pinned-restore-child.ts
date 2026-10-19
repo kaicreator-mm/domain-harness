@@ -170,11 +170,34 @@ async function main(): Promise<void> {
       now: atT2,
     }));
 
-    // A corrupt durable activation record fails closed...
+    // A shape-valid durable record that names a DIFFERENT BUILD identity is
+    // not a restoration of A, even though its decision id/key still match.
     const recordKey = v10DeploymentActivationKey(T08_DEPLOYMENT.deployedAppId, decisionA.decisionId);
     const recordDoc = await store.get(recordKey);
     if (recordDoc === null) throw new Error('the parent left no durable A activation record');
-    await store.put(recordKey, { kind: 'v10/deployment-activation', corrupted: true }, { mustMatchRevision: recordDoc.revision });
+    const originalRecord = recordDoc.value as Record<string, unknown>;
+    const tamperedWrite = await store.put(recordKey, {
+      ...originalRecord,
+      subjectDigest: buildB.subjectDigest,
+      packageClosureDigest: decisionB.packageClosureDigest,
+      buildId: buildB.buildId,
+    }, { mustMatchRevision: recordDoc.revision });
+    const recordMismatchCode = await refusalCode(() => activateGovernedV10Build(buildA, {
+      store: counting,
+      deployment: T08_DEPLOYMENT,
+      decision: decisionA,
+      authorization: authority,
+      selection: 'PINNED_ONLY',
+      now: atT2,
+    }));
+
+    // Restore the exact accepted record, then prove a corrupt one fails closed.
+    const restoredWrite = await store.put(recordKey, originalRecord, { mustMatchRevision: tamperedWrite.revision });
+    const corruptWrite = await store.put(
+      recordKey,
+      { kind: 'v10/deployment-activation', corrupted: true },
+      { mustMatchRevision: restoredWrite.revision },
+    );
     const corruptCode = await refusalCode(() => activateGovernedV10Build(buildA, {
       store: counting,
       deployment: T08_DEPLOYMENT,
@@ -185,9 +208,7 @@ async function main(): Promise<void> {
     }));
 
     // ...and so does a missing one.
-    const corruptDoc = await store.get(recordKey);
-    if (corruptDoc === null) throw new Error('the corrupted activation record disappeared');
-    await store.remove(recordKey, { mustMatchRevision: corruptDoc.revision });
+    await store.remove(recordKey, { mustMatchRevision: corruptWrite.revision });
     const missingCode = await refusalCode(() => activateGovernedV10Build(buildA, {
       store: counting,
       deployment: T08_DEPLOYMENT,
@@ -213,6 +234,7 @@ async function main(): Promise<void> {
       misrouteKPuts,
       wrongVersionCode,
       revokedCode,
+      recordMismatchCode,
       corruptCode,
       missingCode,
       finalOldRowHash: finalRow === undefined ? 'MISSING' : t08HashText(finalRow.value),
