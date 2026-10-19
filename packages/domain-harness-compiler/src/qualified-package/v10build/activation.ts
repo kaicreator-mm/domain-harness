@@ -523,6 +523,34 @@ export class V10AppFacade {
       .map((module) => ({ packageId: module.packageId, featureKey: module.provides[0] ?? null }));
   }
 
+  /**
+   * Invoke one actually selected Standard feature through its sealed ABI.
+   * The Host supplies any trusted read/query/model dependencies; merely
+   * possessing semantic data never creates a K Permit or Effect authority.
+   * An unselected feature is NOT dynamically discovered or imported.
+   */
+  async invokeSelectedStandardFeature(
+    featureKey: string,
+    request: unknown,
+    trustedDependencies: unknown = {},
+  ): Promise<unknown> {
+    this.#assertOpen();
+    const feature = this.#app.modules.find(
+      (module) => module.role === 'standard-feature' && module.provides[0] === featureKey,
+    );
+    if (feature === undefined) {
+      refuse('V10_FEATURE_NOT_SELECTED', 'Standard feature is not selected in this built App');
+    }
+    const declaredExport = feature.featureExport;
+    const invoke = typeof declaredExport === 'string'
+      ? this.#namespaces.get(feature.packageId)?.[declaredExport]
+      : undefined;
+    if (typeof invoke !== 'function') {
+      refuse('V10_FEATURE_ABI_INVALID', 'sealed Standard feature export is not callable');
+    }
+    return await (invoke as (data: unknown, deps: unknown) => unknown)(request, trustedDependencies);
+  }
+
   isClosed(): boolean {
     return this.#closed;
   }
