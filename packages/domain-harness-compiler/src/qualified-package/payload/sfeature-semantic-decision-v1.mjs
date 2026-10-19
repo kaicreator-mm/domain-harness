@@ -102,9 +102,29 @@ export function init(context) {
  * request.procedure: {id, revision} — actual callable is trusted selected port
  * request.fallback: {kind: 'model'|'tool', operationId}
  * request.limits: maxSteps, maxModelCalls, maxToolCalls, deadlineEpochMs
- * deps: { procedures: Map, model: fn?, tool: fn?, now: fn? } — host-selected
- *       boundary only; return data is never a privileged K admission.
+ * deps: { procedures: Map, model: fn?, tool: fn?, now: fn?,
+ *         createTimeoutSignal: fn? } — host-selected boundary only; return data
+ *       is never a privileged K admission. createTimeoutSignal, when the host
+ *       provides it, yields { signal, abort(reason) }; the signal is passed to
+ *       each asynchronous external call and abort is observed on deadline so a
+ *       trusted host can cancel for real. Racing a timer is NOT a claim the
+ *       external call stopped executing: without a trusted signal the timeout
+ *       is recorded as cancellation 'unsupported' and call counts stay honest.
  */
+
+// Optional trusted cancellation handle from the host; anything malformed or
+// absent degrades honestly to 'unsupported', never to a fabricated cancel.
+function timeoutSignalHandle(deps) {
+  if (typeof deps.createTimeoutSignal !== 'function') return null;
+  try {
+    const handle = deps.createTimeoutSignal();
+    if (handle === null || typeof handle !== 'object' || typeof handle.abort !== 'function') return null;
+    return handle;
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveSemanticDecision(request, deps = {}) {
   if (!record(request) || !record(request.input) || !record(request.schema)) {
     refuse('SEMANTIC_REQUEST_INVALID', 'request requires plain input and schema');
@@ -118,23 +138,64 @@ export async function resolveSemanticDecision(request, deps = {}) {
   const fingerprint = canonical(request.input);
   const limit = bounds(request);
   const now = typeof deps.now === 'function' ? deps.now : () => Date.now();
-  const evidence = { steps: 0, modelCalls: 0, toolCalls: 0, modelCallEvidence: 'unmeasured' };
-  const exhausted = () => evidence.steps >= limit.maxSteps
-    || (limit.deadlineEpochMs !== null && now() > limit.deadlineEpochMs);
-  const step = () => {
-    if (exhausted()) return false;
+  const evidence = { steps: 0, modelCalls: 0, toolCalls: 0, modelCallEvidence: 'unmeasured', timedOutCalls: [] };
+  // Distinguishes WHY no further step may start: an expired deadline is never
+  // reported as a consumed-step budget exhaustion.
+  const stepOutcome = () => {
+    if (limit.deadlineEpochMs !== null && now() > limit.deadlineEpochMs) return 'deadline-exceeded';
+    if (evidence.steps >= limit.maxSteps) return 'budget-exhausted';
     evidence.steps += 1;
-    return true;
+    return null;
   };
   const unavailable = (reason) => ({
     kind: 'unavailable', reason,
     evidence: { ...evidence, kernelEffectPermit: false },
   });
+  const requestAbort = (handle) => {
+    if (handle === null) return 'unsupported';
+    try {
+      handle.abort('deadline-exceeded');
+      return 'requested';
+    } catch {
+      return 'requested';
+    }
+  };
+  // Real bounded wait: a hanging Procedure/Model/Tool promise settles the
+  // resolver at the deadline instead of pending forever. Losing the race does
+  // not undo the started call; its counts and this record stay truthful.
+  const awaitBounded = async (promise, handle, call) => {
+    if (limit.deadlineEpochMs === null) return { ok: true, value: await promise };
+    const remainingMs = limit.deadlineEpochMs - now();
+    if (remainingMs <= 0) {
+      evidence.timedOutCalls.push({ ...call, cancellation: requestAbort(handle) });
+      return { ok: false };
+    }
+    let timer = null;
+    try {
+      const value = await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            evidence.timedOutCalls.push({ ...call, cancellation: requestAbort(handle) });
+            reject(new SemanticDecisionRefusal('SEMANTIC_DEADLINE_EXCEEDED', 'external semantic call exceeded the declared deadline'));
+          }, remainingMs);
+        }),
+      ]);
+      return { ok: true, value };
+    } catch (error) {
+      if (error instanceof SemanticDecisionRefusal && error.code === 'SEMANTIC_DEADLINE_EXCEEDED') {
+        return { ok: false };
+      }
+      throw error;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  };
 
   // 1. Rule: first matching declaration, with no Model or Tool.
   if (!Array.isArray(request.rules ?? [])) refuse('SEMANTIC_RULES_INVALID', 'rules must be an array');
   for (const rule of request.rules ?? []) {
-    if (!step()) return unavailable('budget-exhausted');
+    { const blocked = stepOutcome(); if (blocked !== null) return unavailable(blocked); }
     if (!record(rule) || !record(rule.when) || typeof rule.id !== 'string') {
       refuse('SEMANTIC_RULES_INVALID', 'rule requires id and plain when');
     }
@@ -145,7 +206,7 @@ export async function resolveSemanticDecision(request, deps = {}) {
 
   // 2. Reuse: exact schema/revision/provenance and canonical input; never fuzzy.
   if (request.reuse !== undefined && request.reuse !== null) {
-    if (!step()) return unavailable('budget-exhausted');
+    { const blocked = stepOutcome(); if (blocked !== null) return unavailable(blocked); }
     const cached = request.reuse;
     if (!record(cached)) refuse('SEMANTIC_REUSE_INVALID', 'reuse must be a record');
     if (cached.schemaId === schema.id && cached.schemaRevision === schema.revision
@@ -157,21 +218,26 @@ export async function resolveSemanticDecision(request, deps = {}) {
 
   // 3. Procedure: only a named, pinned procedure from a trusted registry.
   if (request.procedure !== undefined && request.procedure !== null) {
-    if (!step()) return unavailable('budget-exhausted');
+    { const blocked = stepOutcome(); if (blocked !== null) return unavailable(blocked); }
     const p = request.procedure;
     if (!record(p) || typeof p.id !== 'string' || typeof p.revision !== 'string') {
       refuse('SEMANTIC_PROCEDURE_INVALID', 'procedure id and revision are required');
     }
     const selected = deps.procedures instanceof Map ? deps.procedures.get(p.id) : undefined;
     if (selected !== undefined && selected.revision === p.revision && typeof selected.resolve === 'function') {
-      const output = await selected.resolve(JSON.parse(fingerprint));
-      return decisionResult('procedure', output, evidence);
+      const handle = timeoutSignalHandle(deps);
+      const callArgs = [JSON.parse(fingerprint)];
+      if (handle !== null) callArgs.push({ signal: handle.signal });
+      const outcome = await awaitBounded(selected.resolve(...callArgs), handle,
+        { kind: 'procedure', operationId: p.id });
+      if (!outcome.ok) return unavailable('deadline-exceeded');
+      return decisionResult('procedure', outcome.value, evidence);
     }
   }
 
   // 4. Declared bounded fallback; an absent model is a valid no-model mode.
   if (request.fallback === null || request.fallback === undefined) return unavailable('no-declared-fallback');
-  if (!step()) return unavailable('budget-exhausted');
+  { const blocked = stepOutcome(); if (blocked !== null) return unavailable(blocked); }
   const route = request.fallback;
   if (!record(route) || !['model', 'tool'].includes(route.kind)
     || typeof route.operationId !== 'string' || !route.operationId) {
@@ -182,11 +248,15 @@ export async function resolveSemanticDecision(request, deps = {}) {
   if (!isModel && limit.maxToolCalls === 0) return unavailable('tool-disabled');
   const fn = isModel ? deps.model : deps.tool;
   if (typeof fn !== 'function') return unavailable(isModel ? 'model-unavailable' : 'tool-unavailable');
-  if (limit.deadlineEpochMs !== null && now() > limit.deadlineEpochMs) return unavailable('deadline-exceeded');
   if (isModel) { evidence.modelCalls += 1; evidence.modelCallEvidence = 'measured'; }
   else evidence.toolCalls += 1;
-  const output = await fn({ operationId: route.operationId, input: JSON.parse(fingerprint),
-    schema: { ...schema }, budget: { maxSteps: limit.maxSteps, deadlineEpochMs: limit.deadlineEpochMs } });
+  const handle = timeoutSignalHandle(deps);
+  const payload = { operationId: route.operationId, input: JSON.parse(fingerprint),
+    schema: { ...schema }, budget: { maxSteps: limit.maxSteps, deadlineEpochMs: limit.deadlineEpochMs } };
+  if (handle !== null) payload.signal = handle.signal;
+  const outcome = await awaitBounded(fn(payload), handle,
+    { kind: route.kind, operationId: route.operationId });
+  if (!outcome.ok) return unavailable('deadline-exceeded');
   if (limit.deadlineEpochMs !== null && now() > limit.deadlineEpochMs) return unavailable('deadline-exceeded');
-  return decisionResult(route.kind, output, evidence);
+  return decisionResult(route.kind, outcome.value, evidence);
 }

@@ -168,3 +168,97 @@ test('T02-N5: semantic proposals cannot mint K/effect authority', async () => {
   }), { tool: async () => ({ nested: { effectIntents: [{ effectType: 'reserve' }] } }) }),
   code('SEMANTIC_AUTHORITY_FORBIDDEN'));
 });
+
+// Every timeout case below keeps an OUTER watchdog so a regression back to
+// unbounded waiting fails the suite instead of hanging CI forever.
+const hungLimits = () => ({
+  maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1, deadlineEpochMs: Date.now() + 25,
+});
+
+test('T02-P5/N6: hanging Model settles deadline-exceeded, call counts stay honest', { timeout: 5000 }, async () => {
+  const { resolve } = await loadSelectedFeature();
+  const result = await resolve(request({
+    limits: hungLimits(),
+    fallback: { kind: 'model', operationId: 'model:hang' },
+  }), { model: () => new Promise(() => {}) });
+  assert.equal(result.kind, 'unavailable');
+  assert.equal(result.reason, 'deadline-exceeded');
+  // The call DID start; racing a timer is not a claim it did not execute.
+  assert.equal(result.evidence.modelCalls, 1);
+  assert.equal(result.evidence.modelCallEvidence, 'measured');
+  assert.deepEqual(result.evidence.timedOutCalls,
+    [{ kind: 'model', operationId: 'model:hang', cancellation: 'unsupported' }]);
+  assert.equal(result.evidence.kernelEffectPermit, false);
+});
+
+test('T02-P6/N7: hanging pinned Procedure settles deadline-exceeded', { timeout: 5000 }, async () => {
+  const { resolve } = await loadSelectedFeature();
+  let started = 0;
+  const procedures = new Map([['hang', { revision: 'approved:r1', resolve: (): Promise<never> => {
+    started++;
+    return new Promise(() => {});
+  } }]]);
+  const result = await resolve(request({
+    limits: hungLimits(),
+    procedure: { id: 'hang', revision: 'approved:r1' },
+  }), { procedures });
+  assert.equal(result.kind, 'unavailable');
+  assert.equal(result.reason, 'deadline-exceeded');
+  assert.equal(started, 1);
+  assert.equal(result.evidence.modelCalls, 0);
+  assert.deepEqual(result.evidence.timedOutCalls,
+    [{ kind: 'procedure', operationId: 'hang', cancellation: 'unsupported' }]);
+});
+
+test('T02-N8: already-expired deadline never starts the fallback call', { timeout: 5000 }, async () => {
+  const { resolve } = await loadSelectedFeature();
+  let calls = 0;
+  const result = await resolve(request({
+    limits: { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1, deadlineEpochMs: 10 },
+    fallback: { kind: 'model', operationId: 'model:x' },
+  }), { now: () => 11, model: async () => { calls++; return {}; } });
+  assert.equal(result.kind, 'unavailable');
+  assert.equal(result.reason, 'deadline-exceeded');
+  assert.equal(calls, 0);
+  assert.equal(result.evidence.modelCalls, 0);
+  assert.deepEqual(result.evidence.timedOutCalls, []);
+});
+
+test('T02-P7/N9: late Model output cannot override the deadline settlement', { timeout: 5000 }, async () => {
+  const { resolve } = await loadSelectedFeature();
+  const result = await resolve(request({
+    limits: hungLimits(),
+    fallback: { kind: 'model', operationId: 'model:late' },
+  }), { model: () => new Promise((done) => {
+    // Resolves well after the deadline carrying forbidden authority: if the
+    // late value were ever adopted the resolver would throw or mint authority.
+    setTimeout(() => done({ disposition: 'late', effectPermit: { action: 'reserve' } }), 120);
+  }) });
+  assert.equal(result.kind, 'unavailable');
+  assert.equal(result.reason, 'deadline-exceeded');
+  await new Promise((done) => setTimeout(done, 160));
+  assert.equal(result.kind, 'unavailable');
+  assert.equal(result.reason, 'deadline-exceeded');
+  assert.equal(result.evidence.kernelEffectPermit, false);
+});
+
+test('T02-P8/N10: trusted timeout signal is passed and aborted; unsupported stays honest', { timeout: 5000 }, async () => {
+  const { resolve } = await loadSelectedFeature();
+  const aborted: string[] = [];
+  const seenSignals: unknown[] = [];
+  const result = await resolve(request({
+    limits: hungLimits(),
+    fallback: { kind: 'tool', operationId: 'tool:hang' },
+  }), {
+    tool: (payload: { signal?: unknown }) => { seenSignals.push(payload.signal); return new Promise(() => {}); },
+    createTimeoutSignal: () => ({
+      signal: { marker: 'trusted-cancellation' },
+      abort: (reason: string) => { aborted.push(reason); },
+    }),
+  });
+  assert.equal(result.reason, 'deadline-exceeded');
+  assert.deepEqual(seenSignals, [{ marker: 'trusted-cancellation' }]);
+  assert.deepEqual(aborted, ['deadline-exceeded']);
+  assert.deepEqual(result.evidence.timedOutCalls,
+    [{ kind: 'tool', operationId: 'tool:hang', cancellation: 'requested' }]);
+});
