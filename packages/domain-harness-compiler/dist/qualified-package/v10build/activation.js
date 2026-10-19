@@ -284,6 +284,23 @@ function encodeK02Component(value) {
     return value.replace(/%/g, '%25').replace(/:/g, '%3A');
 }
 /**
+ * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
+ * and ONE selected Business: the injective
+ * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
+ * component the Host docs port prepends. This is the ONE derivation both the
+ * write path (`scopedDocsView`) and the read-only deployment binding use, so
+ * a Shadow observation set can never drift wider than what this deployment
+ * physically writes.
+ */
+export function v10K02DocumentPrefix(scope) {
+    return ['v010-k02',
+        encodeK02Component(scope.deployedAppId),
+        encodeK02Component(scope.tenantId),
+        encodeK02Component(scope.appId),
+        encodeK02Component(scope.businessPackageId),
+    ].join(':') + ':';
+}
+/**
  * [v0.10 C01 #1177 R1 P1-2] The K02 SCOPED document-store composition: the
  * exact two-B namespace mechanism the K02 physical witness exercises. Every
  * key of one deployment tuple — instance, fence, journal, permit, dispatch
@@ -297,12 +314,7 @@ function encodeK02Component(value) {
  * workflowId/instanceKey — K02's own witness proves exactly this shape.
  */
 function scopedDocsView(base, scope) {
-    const prefix = ['v010-k02',
-        encodeK02Component(scope.deployedAppId),
-        encodeK02Component(scope.tenantId),
-        encodeK02Component(scope.appId),
-        encodeK02Component(scope.businessPackageId),
-    ].join(':') + ':';
+    const prefix = v10K02DocumentPrefix(scope);
     const view = {
         get: async (key) => await base.get(`${prefix}${key}`),
         put: async (key, value, condition) => await base.put(`${prefix}${key}`, value, condition),
@@ -363,6 +375,7 @@ export class V10AppFacade {
     // recorded in .agent/execution/v0.10-T00/HANDOFFS.md — and is deliberately
     // NOT changed here in T00.
     #docsPrefix;
+    #activatedTenantId;
     #docs;
     #runtimes = new Map();
     #deploymentIdentity;
@@ -377,6 +390,7 @@ export class V10AppFacade {
         this.#counters = deps.counters;
         this.#deploymentIdentity = deps.deploymentIdentity;
         this.#queryAuthority = deps.queryAuthority;
+        this.#activatedTenantId = deps.tenantId;
         this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
         this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
     }
@@ -389,6 +403,43 @@ export class V10AppFacade {
         return this.#app.modules
             .filter((module) => module.role === 'standard-feature')
             .map((module) => ({ packageId: module.packageId, featureKey: module.provides[0] ?? null }));
+    }
+    /**
+     * T07: read-only, activation-origin BUILD/tenant identity used by the Host
+     * Shadow L4 verifier. Derived exclusively from private activated state,
+     * never a caller-provided digest or a user-supplied matching claim.
+     *
+     * [T07 R2 P1] `deployedAppId` and `k02DocumentPrefixes` are the exact
+     * deployment instance and its per-B physical document prefixes. They are
+     * derived here from the same private deployment identity the write path
+     * uses (`v10K02DocumentPrefix`), so a shadow can select one deployment's K
+     * rows without accepting a caller's deployment/tenant/B claim. A facade
+     * activated WITHOUT a deployment identity reports `deployedAppId: null` and
+     * no prefixes; its K rows carry no deployment attribution and a shadow must
+     * refuse rather than widen to the whole App/Tenant namespace.
+     */
+    get selectedShadowBinding() {
+        this.#assertOpen();
+        const deployment = this.#deploymentIdentity;
+        const businessPackageIds = this.#app.modules
+            .filter((module) => module.role === 'business')
+            .map((module) => module.packageId)
+            .sort();
+        const namespace = `${K_DOCS_PREFIX}${this.#app.subjectDigest}/${this.#activatedTenantId}/`;
+        return Object.freeze({
+            subjectDigest: this.#app.subjectDigest,
+            appId: this.#app.appId,
+            tenantId: this.#activatedTenantId,
+            deployedAppId: deployment?.deployedAppId ?? null,
+            deploymentAppId: deployment?.appId ?? null,
+            businessPackageIds: Object.freeze(businessPackageIds),
+            k02DocumentPrefixes: Object.freeze(deployment === undefined ? [] : businessPackageIds.map((businessPackageId) => `${namespace}${v10K02DocumentPrefix({
+                deployedAppId: deployment.deployedAppId,
+                tenantId: deployment.tenantId,
+                appId: deployment.appId,
+                businessPackageId,
+            })}`)),
+        });
     }
     /**
      * Invoke one actually selected Standard feature through its sealed ABI.

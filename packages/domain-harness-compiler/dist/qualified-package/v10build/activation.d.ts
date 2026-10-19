@@ -182,6 +182,21 @@ export declare function createV10DocsPort(deps: {
     docsPrefix: string;
     assertOpen: () => void;
 }): V10DocsPort;
+/**
+ * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
+ * and ONE selected Business: the injective
+ * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
+ * component the Host docs port prepends. This is the ONE derivation both the
+ * write path (`scopedDocsView`) and the read-only deployment binding use, so
+ * a Shadow observation set can never drift wider than what this deployment
+ * physically writes.
+ */
+export declare function v10K02DocumentPrefix(scope: {
+    deployedAppId: string;
+    tenantId: string;
+    appId: string;
+    businessPackageId: string;
+}): string;
 export interface ActivateV10AppOptions {
     readonly store: V10DocStore;
     readonly tenantId?: string;
@@ -258,6 +273,29 @@ export declare class V10AppFacade {
         packageId: string;
         featureKey: string | null;
     }[];
+    /**
+     * T07: read-only, activation-origin BUILD/tenant identity used by the Host
+     * Shadow L4 verifier. Derived exclusively from private activated state,
+     * never a caller-provided digest or a user-supplied matching claim.
+     *
+     * [T07 R2 P1] `deployedAppId` and `k02DocumentPrefixes` are the exact
+     * deployment instance and its per-B physical document prefixes. They are
+     * derived here from the same private deployment identity the write path
+     * uses (`v10K02DocumentPrefix`), so a shadow can select one deployment's K
+     * rows without accepting a caller's deployment/tenant/B claim. A facade
+     * activated WITHOUT a deployment identity reports `deployedAppId: null` and
+     * no prefixes; its K rows carry no deployment attribution and a shadow must
+     * refuse rather than widen to the whole App/Tenant namespace.
+     */
+    get selectedShadowBinding(): Readonly<{
+        subjectDigest: string;
+        appId: string;
+        tenantId: string;
+        deployedAppId: string | null;
+        deploymentAppId: string | null;
+        businessPackageIds: readonly string[];
+        k02DocumentPrefixes: readonly string[];
+    }>;
     /**
      * Invoke one actually selected Standard feature through its sealed ABI.
      * The Host supplies any trusted read/query/model dependencies; merely
