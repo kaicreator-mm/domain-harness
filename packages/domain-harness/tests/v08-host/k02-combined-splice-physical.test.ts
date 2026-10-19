@@ -221,7 +221,10 @@ test('CB-P1 same-CAS original-receipt atomicity, restart durability and exact-or
   // SAME physical row: revision == stateRevision, and the ORIGINAL receipt
   // of the turn is IN the committed document with the projection it
   // acknowledges.
-  const row = await inProcessStore.get(scopedInstanceKey(TARGET.instanceKey));
+  const row = (await inProcessStore.get(scopedInstanceKey(TARGET.instanceKey))) as {
+    revision: number;
+    value: Record<string, any>;
+  } | null;
   assert.ok(row !== null);
   assert.equal(row!.revision, row!.value.stateRevision, 'the instance doc revision stays equal to its stateRevision');
   assert.equal(row!.value.stateRevision, 1);
@@ -242,7 +245,10 @@ test('CB-P1 same-CAS original-receipt atomicity, restart durability and exact-or
   // Restart durability: close + reopen the SAME SQLite file.
   await inProcessStore.close();
   inProcessStore = await openSqliteCasStore({ path: inProcessDb });
-  const reopenedRow = await inProcessStore.get(scopedInstanceKey(TARGET.instanceKey));
+  const reopenedRow = (await inProcessStore.get(scopedInstanceKey(TARGET.instanceKey))) as {
+    revision: number;
+    value: Record<string, any>;
+  } | null;
   assert.equal(reopenedRow!.value.stateRevision, 1, 'the committed row (state + original receipt) survived the restart');
   assert.ok(readRing(reopenedRow!.value)[messageTurnId('m-cb-1')] !== undefined, 'the original receipt survived the restart');
 
@@ -288,7 +294,10 @@ test('CB-N1 changed-input / changed-intent refuse typed BEFORE any admission act
     },
   );
   assert.equal(inProcessDispatches.length, dispatchesBefore, 'the conflicts dispatched nothing');
-  const row = await inProcessStore.get(scopedInstanceKey(TARGET.instanceKey));
+  const row = (await inProcessStore.get(scopedInstanceKey(TARGET.instanceKey))) as {
+    revision: number;
+    value: Record<string, any>;
+  } | null;
   assert.equal(row!.value.stateRevision, 1, 'the conflicts committed nothing');
   const ring = readRing(row!.value);
   assert.equal(Object.keys(ring).length, 1, 'the ring still holds exactly the one admitted turn');
@@ -410,7 +419,9 @@ test('CB-F1 fence/receipt coordination under the K01 R2 attest contract: tagged 
   const followerEnvelope = ring[`turn:${enc(WORKFLOW_ID)}:${enc(drainTarget.instanceKey)}:message:${enc('m-follow')}`];
   assert.ok(followerEnvelope !== undefined);
   assert.equal(followerEnvelope.receipt?.instance?.stateRevision, 1, 'the follower receipt carries the projection its CAS committed');
-  const followerFence = await inProcessStore.get(scopedFenceKey(drainTarget.instanceKey));
+  const followerFence = (await inProcessStore.get(scopedFenceKey(drainTarget.instanceKey))) as {
+    value: { turnId: string };
+  } | null;
   assert.equal(followerFence?.value?.turnId, `turn:${enc(WORKFLOW_ID)}:${enc(drainTarget.instanceKey)}:message:${enc('m-follow')}`, "the fence is the follower's own claim (a committed holder's fence persists until the next admission supersedes it by the revision CAS)");
 
   // The poison turn stays refused typed with zero new dispatch and never
