@@ -58,6 +58,15 @@ function routeId(route: V10SelectedBusinessQueryRoute): string {
   return JSON.stringify([route.businessPackageId, route.workflowId]);
 }
 
+/**
+ * Typed array check: `Array.isArray` alone narrows to `any[]` (its builtin
+ * predicate), which would silently degrade every selected route to `any`
+ * after the constructor guard; this guard keeps the declared route type.
+ */
+function isRouteArray(value: unknown): value is readonly V10SelectedBusinessQueryRoute[] {
+  return Array.isArray(value);
+}
+
 /** Results never expose a denied or unselected Business identity. */
 export class V10AuthorizedMultiBQuery<T> {
   readonly #host: V10MultiBQueryHost<T>;
@@ -66,7 +75,7 @@ export class V10AuthorizedMultiBQuery<T> {
   constructor(host: V10MultiBQueryHost<T>) {
     if (!host || typeof host.authorize !== 'function' || typeof host.readSnapshot !== 'function'
       || host.verifiedPrincipal === null || host.verifiedPrincipal === undefined
-      || !host.deployment || !Array.isArray(host.selectedRoutes)) {
+      || !host.deployment || !isRouteArray(host.selectedRoutes)) {
       reject('QUERY_HOST_INVALID', 'trusted principal, selected routes, authorization and reader required');
     }
     for (const field of ['deployedAppId', 'tenantId', 'appId'] as const) {

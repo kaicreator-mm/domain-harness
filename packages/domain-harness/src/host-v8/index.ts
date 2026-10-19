@@ -138,3 +138,13 @@ export type {
 // v0.10 optional C/Host Memory capability (no Kernel state authority).
 export { V10ScopedMemoryCapability, V10MemoryError, createV10ScopedMemory } from './v010-scoped-memory.js';
 export type { V10MemoryHost, V10MemoryScope, V10MemoryRead, V10MemoryProvenance, V10MemoryAuthRequest, V10MemoryOperation } from './v010-scoped-memory.js';
+
+// v0.10 T10 authorized Multi-B explicit scoped query (no Kernel write authority).
+export { V10AuthorizedMultiBQuery, V10MultiBQueryError, createV10AuthorizedMultiBQuery } from './v010-authorized-multib-query.js';
+export type {
+  V10QueryDeployment,
+  V10SelectedBusinessQueryRoute,
+  V10MultiBQuerySelector,
+  V10MultiBQueryTarget,
+  V10MultiBQueryHost,
+} from './v010-authorized-multib-query.js';
