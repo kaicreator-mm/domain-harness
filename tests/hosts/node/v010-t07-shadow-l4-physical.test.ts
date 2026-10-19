@@ -677,3 +677,28 @@ test('T07-PH-N9: real activated facade tenant cannot be replaced by a caller-sel
     assert.equal(harness.store.removeCalls, 0);
   });
 });
+
+test('T07-PH-N10: a BUILD view with forged Business identity refuses before any K read', async () => {
+  await withHarness(async (harness) => {
+    const businesses = harness.app.modules.filter((module) => module.role === 'business');
+    assert.ok(businesses.length > 0, 'the selected BUILD must carry at least one Business package');
+    // Same subject digest and App id as the activated facade; only the
+    // reported selected Business roster is forged.
+    const forgedApp = {
+      ...harness.app,
+      modules: harness.app.modules.map((module) => module.role === 'business'
+        ? { ...module, packageId: 'business-forged@v08.1.0.0' }
+        : module),
+    } as unknown as V10BuiltApp;
+    const source = `// Forged Business identity falsifier.\n${harness.baselineSource}`;
+    await assert.rejects(
+      runShadow(harness, source, candidatePin(source), { app: forgedApp }),
+      shadowCode('SHADOW_APP_FACADE_MISMATCH'),
+    );
+    assert.equal(harness.store.keysCalls, 0, 'forged Business identity must refuse before listing K keys');
+    assert.equal(harness.store.getCalls, 0, 'forged Business identity must refuse before first K read');
+    assert.equal(harness.store.putCalls, 0);
+    assert.equal(harness.store.removeCalls, 0);
+    assert.deepEqual(readRows(harness.kPath), harness.beforeRows);
+  });
+});
