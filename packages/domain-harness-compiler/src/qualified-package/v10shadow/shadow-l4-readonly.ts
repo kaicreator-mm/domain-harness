@@ -783,6 +783,7 @@ function assertFacadeMatchesApp(facade: V10AppFacade, app: V10AppView, tenantId:
   // member that a subclass can override. Its #private fields are the actual
   // Host activation's selection; caller-supplied digest/tenant claims do not
   // establish which BUILD/deployment is being observed.
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- the prototype getter is deliberately detached and invoked with an explicit facade receiver below
   const getter = Object.getOwnPropertyDescriptor(V10AppFacade.prototype, 'selectedShadowBinding')?.get;
   let binding: V10AppFacade['selectedShadowBinding'];
   let observed: readonly { packageId: string; featureKey: string | null }[];

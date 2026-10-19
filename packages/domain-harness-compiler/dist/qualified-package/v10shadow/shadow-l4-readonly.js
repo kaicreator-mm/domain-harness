@@ -558,7 +558,11 @@ function evaluateSelectedObservations(snapshot, candidate, baseline, deps) {
     });
 }
 function assertFacadeMatchesApp(facade, app, tenantId) {
-    // Access the original facade private-state getter, never an overridable subclass accessor.
+    // Read the original V10AppFacade getter *on its prototype*, not a virtual
+    // member that a subclass can override. Its #private fields are the actual
+    // Host activation's selection; caller-supplied digest/tenant claims do not
+    // establish which BUILD/deployment is being observed.
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- the prototype getter is deliberately detached and invoked with an explicit facade receiver below
     const getter = Object.getOwnPropertyDescriptor(V10AppFacade.prototype, 'selectedShadowBinding')?.get;
     let binding;
     let observed;
@@ -632,7 +636,7 @@ export async function runShadowL4(options) {
     if (typeof options.tenantId !== 'string' || options.tenantId.length === 0 || options.tenantId.length > 256) {
         refuse('SHADOW_OPTIONS_INVALID', 'tenantId must be a bounded nonempty string');
     }
-    // Refuse mismatched activated identity before the first store read.
+    // Identity must match BEFORE any store.keys()/get() or physical witness.
     assertFacadeMatchesApp(options.facade, app, options.tenantId);
     if (!isPlainRecord(options.store) || typeof options.store.get !== 'function' || typeof options.store.keys !== 'function') {
         refuse('SHADOW_READ_INTERFACE_MISSING', 'the Host must supply a read-only selected-K view exposing get() and keys(); a shadow without a physical read interface STOPs with evidence');

@@ -393,7 +393,9 @@ export class V10AppFacade {
             .map((module) => ({ packageId: module.packageId, featureKey: module.provides[0] ?? null }));
     }
     /**
-     * T07: read-only activation-origin BUILD/tenant identity for Shadow L4.
+     * T07: read-only, activation-origin BUILD/tenant identity used by the Host
+     * Shadow L4 verifier. Derived exclusively from private activated state,
+     * never a caller-provided digest or a user-supplied matching claim.
      */
     get selectedShadowBinding() {
         this.#assertOpen();
