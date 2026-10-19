@@ -27,8 +27,12 @@
  *       so the trace records Host-measured call counts next to the resolver's
  *       self-reported ones and marks agreement or mismatch honestly;
  *   (4) the evidence feature itself is still invoked through the real facade
- *       and stays the author of the base trace; this bridge only annotates
- *   the outcome/provenance facts it observed itself and freezes the result.
+ *       (with NO persistence side effect) and stays the author of the base
+ *       trace; this bridge annotates the outcome/provenance facts it observed
+ *       itself, freezes the result, and only THEN hands the final attested
+ *       trace to the optional Host-owned sink under a bounded timeout — the
+ *       sink stores the real evidence, and its failure or timeout cannot veto
+ *       or rewrite the already-issued immutable K receipt.
  *
  * The bridge grants no authority: no K State/Journal/Fence/Effect/Permit is
  * read or written beyond the public send receipt, the optional observation

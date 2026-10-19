@@ -409,9 +409,104 @@ test('T06-P9: optional Host observation sink failure never vetoes or forges the 
   assert.equal(observation.kernelReceipt.status, 'admitted');
   assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
   assert.equal(persisted.length, 1);
-  // The sink receives its own mutable copy: mutating it cannot rewrite the
-  // frozen trace handed back to the deployment.
+  // The sink receives the frozen attested trace itself: a write through it is
+  // silently void (non-strict CJS) and can never rewrite the evidence handed
+  // back to the deployment.
+  assert.ok(Object.isFrozen(persisted[0]));
   (persisted[0] as { kernelOutcome: string }).kernelOutcome = 'forged';
   assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
+  rich.dispose();
+});
+
+test('T06-N9: concurrent observations keep per-invocation Host counters isolated (review P1-1)', async () => {
+  for (const order of ['rule-passes-while-model-held', 'second-model-passes-while-first-held'] as const) {
+    const rich = await observerApp();
+    let releaseHeld: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => { releaseHeld = resolve; });
+    let modelEntries = 0;
+    // First model call parks on the gate; later calls settle immediately.
+    const model = async (): Promise<{ disposition: string }> => {
+      const entry = ++modelEntries;
+      if (entry === 1) await held;
+      return { disposition: 'review' };
+    };
+    const observer = observerFor(rich.facade, { semanticDeps: { model } });
+    const requestWith = (suffix: string, semanticRequest: Record<string, unknown>) => observer.observeAndRecord({
+      intent: intentOf(suffix, { amount: 42, requestId: `R-${suffix}` }),
+      evidence: { observationId: `obs:t06-${suffix}`, schema },
+      semanticRequest,
+    });
+    const modelRequest = { input: { amount: 42 }, schema, limits, fallback: { kind: 'model', operationId: 'model:quote' } };
+    // Held observation A enters its model call first; observation B runs to
+    // completion while A is parked, then A is released. Under the OLD shared
+    // counter, B's start reset A's count (A read 0) or A's parked count
+    // leaked into B — both orders must stay isolated here.
+    const a = requestWith(`n9a-${order === 'rule-passes-while-model-held' ? 'r' : 'm'}`, modelRequest);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const b = order === 'rule-passes-while-model-held'
+      ? requestWith('n9b-r', semanticRuleRequest(30))
+      : requestWith('n9b-m', modelRequest);
+    const bDone = await b;
+    releaseHeld?.();
+    const aDone = await a;
+    assert.equal(aDone.decisionTrace.source, 'model');
+    assert.deepEqual(aDone.decisionTrace.evidence.hostMeasured, { modelCalls: 1, toolCalls: 0 },
+      `[${order}] the held model observation must count exactly its own call`);
+    assert.equal(aDone.decisionTrace.evidence.modelCallStatus, 'host-verified');
+    if (order === 'rule-passes-while-model-held') {
+      assert.equal(bDone.decisionTrace.source, 'rule');
+      assert.deepEqual(bDone.decisionTrace.evidence.hostMeasured, { modelCalls: 0, toolCalls: 0 },
+        '[rule-passes-while-model-held] the Rule observation must see zero model calls despite the parked neighbor');
+    } else {
+      assert.equal(bDone.decisionTrace.source, 'model');
+      assert.deepEqual(bDone.decisionTrace.evidence.hostMeasured, { modelCalls: 1, toolCalls: 0 },
+        '[second-model-passes-while-first-held] each concurrent model observation must count exactly one call');
+    }
+    assert.equal(bDone.decisionTrace.evidence.modelCallStatus, 'host-verified');
+    rich.dispose();
+  }
+});
+
+test('T06-N10: the Host sink receives the final attested trace, not the pre-annotation base (review P1-2)', async () => {
+  const rich = await observerApp();
+  const stored: unknown[] = [];
+  const observer = observerFor(rich.facade, {
+    semanticDeps: { model: async () => ({ disposition: 'review' }) },
+    persistObservation: async (trace: unknown) => { stored.push(trace); },
+  });
+  const observation = await observer.observeAndRecord({
+    intent: intentOf('n10', { amount: 7, requestId: 'R-n10' }),
+    evidence: { observationId: 'obs:t06-n10', schema },
+    semanticRequest: { input: { amount: 7 }, schema, limits, fallback: { kind: 'model', operationId: 'model:quote' } },
+  });
+  assert.equal(observation.observationStore, 'callback-reported-success');
+  assert.equal(stored.length, 1);
+  const sinkTrace = stored[0] as Record<string, any>;
+  // The stored evidence carries the exact attested facts, not 'unobserved'.
+  assert.equal(sinkTrace.kernelOutcome, 'admitted');
+  assert.equal(sinkTrace.kernelObservation.receiptSha256, observation.decisionTrace.kernelObservation.receiptSha256);
+  assert.equal(sinkTrace.kernelObservation.messageId, 'msg:t06-n10');
+  assert.deepEqual(sinkTrace.evidence.hostMeasured, { modelCalls: 1, toolCalls: 0 });
+  assert.equal(sinkTrace.evidence.modelCallStatus, 'host-verified');
+  assert.equal(sinkTrace.evidence.decisionProvenance, 'host-invoked-selected-feature');
+  assert.ok(Object.isFrozen(sinkTrace));
+  assert.equal(sinkTrace, observation.decisionTrace, 'the sink stores the very frozen trace returned to the deployment');
+  rich.dispose();
+});
+
+test('T06-N11: a hanging Host sink reports unknown-timeout without vetoing the observation', async () => {
+  const rich = await observerApp();
+  const observer = observerFor(rich.facade, {
+    persistObservation: () => new Promise<void>(() => {}),
+    observationTimeoutMs: 10,
+  });
+  const observation = await observer.observeAndRecord({
+    intent: intentOf('n11'),
+    evidence: { observationId: 'obs:t06-n11', schema },
+    semanticRequest: semanticRuleRequest(30),
+  });
+  assert.equal(observation.observationStore, 'unknown-timeout');
+  assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
+  assert.equal(observation.kernelReceipt.status, 'admitted');
   rich.dispose();
 });

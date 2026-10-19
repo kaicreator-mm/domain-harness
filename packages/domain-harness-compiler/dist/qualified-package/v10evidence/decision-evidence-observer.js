@@ -27,8 +27,12 @@
  *       so the trace records Host-measured call counts next to the resolver's
  *       self-reported ones and marks agreement or mismatch honestly;
  *   (4) the evidence feature itself is still invoked through the real facade
- *       and stays the author of the base trace; this bridge only annotates
- *   the outcome/provenance facts it observed itself and freezes the result.
+ *       (with NO persistence side effect) and stays the author of the base
+ *       trace; this bridge annotates the outcome/provenance facts it observed
+ *       itself, freezes the result, and only THEN hands the final attested
+ *       trace to the optional Host-owned sink under a bounded timeout — the
+ *       sink stores the real evidence, and its failure or timeout cannot veto
+ *       or rewrite the already-issued immutable K receipt.
  *
  * The bridge grants no authority: no K State/Journal/Fence/Effect/Permit is
  * read or written beyond the public send receipt, the optional observation
@@ -115,33 +119,12 @@ export function createDecisionEvidenceObserver(deps) {
         && (!Number.isSafeInteger(deps.observationTimeoutMs) || deps.observationTimeoutMs < 1 || deps.observationTimeoutMs > 10_000)) {
         refuse('OBSERVER_DEPS_INVALID', 'observationTimeoutMs must be an integer in [1, 10000]');
     }
-    // Host-measured counters wrap the pinned endpoints transparently; a count
-    // increments before the call settles, so a failed/timeout call stays counted
-    // exactly like the resolver's own started-call accounting.
-    const hostMeasured = { modelCalls: 0, toolCalls: 0 };
-    const pinnedBoundary = {};
-    if (semanticDeps.procedures !== undefined)
-        pinnedBoundary.procedures = semanticDeps.procedures;
-    if (semanticDeps.now !== undefined)
-        pinnedBoundary.now = semanticDeps.now;
-    if (semanticDeps.createTimeoutSignal !== undefined)
-        pinnedBoundary.createTimeoutSignal = semanticDeps.createTimeoutSignal;
-    const pinnedModel = semanticDeps.model;
-    if (pinnedModel !== undefined) {
-        const model = pinnedModel;
-        pinnedBoundary.model = async (payload) => {
-            hostMeasured.modelCalls += 1;
-            return await model(payload);
-        };
-    }
-    const pinnedTool = semanticDeps.tool;
-    if (pinnedTool !== undefined) {
-        const tool = pinnedTool;
-        pinnedBoundary.tool = async (payload) => {
-            hostMeasured.toolCalls += 1;
-            return await tool(payload);
-        };
-    }
+    // NOTE (review P1-1): no cross-request mutable counter lives here. The
+    // Host-measured counters and their wrapper closures are created INSIDE each
+    // observeAndRecord invocation, so concurrent observations can never reset
+    // or cross-count each other's model/tool calls.
+    const sink = deps.persistObservation;
+    const sinkTimeoutMs = deps.observationTimeoutMs ?? 1000;
     return {
         observerAbi: OBSERVER_ABI,
         async observeAndRecord(request) {
@@ -164,13 +147,38 @@ export function createDecisionEvidenceObserver(deps) {
             if (facade.isClosed()) {
                 refuse('OBSERVER_FACADE_CLOSED', 'the observed App facade is closed; no further observation can start');
             }
-            // (1) The real selected T02 resolution through the same facade, with the
-            // closure-pinned boundary. Errors of the selected feature propagate
-            // typed before any occurrence is sent; the bridge never fabricates a
-            // decision result.
-            hostMeasured.modelCalls = 0;
-            hostMeasured.toolCalls = 0;
-            const decisionResult = await facade.invokeSelectedStandardFeature(deps.semanticFeatureKey, semanticRequest, Object.freeze({ ...pinnedBoundary }));
+            // (1) The real selected T02 resolution through the same facade. The
+            // Host-measured counters and their wrappers are per-invocation: a count
+            // increments before the call settles, so a failed/timeout call stays
+            // counted exactly like the resolver's own started-call accounting, and a
+            // concurrent observation never touches this invocation's counters.
+            // Errors of the selected feature propagate typed before any occurrence
+            // is sent; the bridge never fabricates a decision result.
+            const hostMeasured = { modelCalls: 0, toolCalls: 0 };
+            const boundary = {};
+            if (semanticDeps.procedures !== undefined)
+                boundary.procedures = semanticDeps.procedures;
+            if (semanticDeps.now !== undefined)
+                boundary.now = semanticDeps.now;
+            if (semanticDeps.createTimeoutSignal !== undefined)
+                boundary.createTimeoutSignal = semanticDeps.createTimeoutSignal;
+            const pinnedModel = semanticDeps.model;
+            if (pinnedModel !== undefined) {
+                const model = pinnedModel;
+                boundary.model = async (payload) => {
+                    hostMeasured.modelCalls += 1;
+                    return await model(payload);
+                };
+            }
+            const pinnedTool = semanticDeps.tool;
+            if (pinnedTool !== undefined) {
+                const tool = pinnedTool;
+                boundary.tool = async (payload) => {
+                    hostMeasured.toolCalls += 1;
+                    return await tool(payload);
+                };
+            }
+            const decisionResult = await facade.invokeSelectedStandardFeature(deps.semanticFeatureKey, semanticRequest, Object.freeze(boundary));
             if (!isPlainRecord(decisionResult)) {
                 refuse('OBSERVER_SEMANTIC_RESULT_INVALID', 'the selected semantic feature did not return a plain record');
             }
@@ -193,19 +201,16 @@ export function createDecisionEvidenceObserver(deps) {
             const occurrence = isPlainRecord(receipt.occurrence) ? receipt.occurrence : {};
             const denial = isPlainRecord(receipt.denial) ? receipt.denial : null;
             // (3) The evidence feature authors the base trace over the actual
-            // resolver output. Only whitelisted identity fields are carried; caller
-            // request fields never reach the feature through this bridge.
-            const evidenceInvokeDeps = {};
-            if (deps.persistObservation !== undefined)
-                evidenceInvokeDeps.persistObservation = deps.persistObservation;
-            if (deps.observationTimeoutMs !== undefined)
-                evidenceInvokeDeps.observationTimeoutMs = deps.observationTimeoutMs;
+            // resolver output, with NO persistence side effect (review P1-2): the
+            // durable sink must receive the attested trace, not this pre-annotation
+            // base. Only whitelisted identity fields are carried; caller request
+            // fields never reach the feature through this bridge.
             const base = await facade.invokeSelectedStandardFeature(deps.evidenceFeatureKey, Object.freeze({
                 observationId: evidence.observationId,
                 schema: evidence.schema,
                 decisionResult,
                 ...(evidence.observedDependencies === undefined ? {} : { observedDependencies: evidence.observedDependencies }),
-            }), evidenceInvokeDeps);
+            }), Object.freeze({}));
             if (!isPlainRecord(base) || !isPlainRecord(base.decisionTrace) || !isPlainRecord(base.decisionTrace.evidence)) {
                 refuse('OBSERVER_EVIDENCE_RESULT_INVALID', 'the selected evidence feature did not author a trace');
             }
@@ -237,10 +242,37 @@ export function createDecisionEvidenceObserver(deps) {
                     decisionProvenance: 'host-invoked-selected-feature',
                 }),
             });
+            // (4) The optional Host-owned sink receives the FINAL attested trace
+            // (review P1-2) — the exact frozen evidence handed back, carrying the
+            // real K receipt digest and Host-measured counters. Its failure or
+            // timeout cannot veto or rewrite the already-issued immutable K
+            // receipt; only an honest callback outcome is reported (`callback-
+            // reported-success` is callback success, never physical durability).
+            let observationStore = 'not-selected';
+            if (sink !== undefined) {
+                let timer = null;
+                try {
+                    const write = Promise.resolve().then(() => sink?.(decisionTrace));
+                    const sinkOutcome = await Promise.race([
+                        write.then(() => 'callback-reported-success', () => 'failed'),
+                        new Promise((resolve) => {
+                            timer = setTimeout(() => resolve('unknown-timeout'), sinkTimeoutMs);
+                        }),
+                    ]);
+                    observationStore = sinkOutcome;
+                }
+                catch {
+                    observationStore = 'failed';
+                }
+                finally {
+                    if (timer !== null)
+                        clearTimeout(timer);
+                }
+            }
             return Object.freeze({
                 kernelReceipt: receiptSnapshot,
                 decisionTrace,
-                observationStore: typeof base.observationStore === 'string' ? base.observationStore : 'not-selected',
+                observationStore,
                 observerAbi: OBSERVER_ABI,
             });
         },
