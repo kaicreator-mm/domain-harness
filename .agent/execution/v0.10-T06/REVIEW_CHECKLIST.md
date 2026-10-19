@@ -1,0 +1,2 @@
+# T06 exact-HEAD review
+Trace derives only from observed selected decision and declared dependency facts, no invented admissions. ObservedDependencySet has bounded canonical identity, provenance, revision and actual measured/unmeasured status; Rule/reuse never claims Model calls. Optional store failure cannot block/forge immutable K original receipt. No K/C01 effects/Host privilege, no second Runtime. Selected BUILD feature and Tiny optionality P/N. Focused Node24 tests; required CI and recommended independent review. PR into v0.10; R01 owns Full Regression.

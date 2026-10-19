@@ -1,0 +1,38 @@
+schema: dh010/t06-validation
+positive:
+  - rule-origin-actual-zero-model
+  - exact-reuse-preserves-provenance-and-no-model
+  - real-model-call-count-measured
+  - denied-distinct-from-admitted
+  - unmeasured-honest-not-zero
+  - optional-persist-actual-write-success
+  - host-bridge-real-admitted-receipt-recomputable-digest-frozen (T06-P6)
+  - host-bridge-real-business-role-denial-distinct-from-semantic-outcome (T06-P7)
+  - host-pinned-model-fallback-counted-and-verified-against-resolver-report (T06-P8)
+negative:
+  - fake-kernel-admission-or-effect-permit-rejected
+  - forged-model-count-denied-or-unmeasured
+  - optional-persist-rejection-does-not-veto-primary
+  - malformed-or-overlong-observed-dependencies-refused
+  - conflicting-schema-revision-mismatch-provenance-refused
+  - selected-Tiny-omits-evidence-no-evaluation
+  - lookalike-facade-and-public-forged-host-evidence-refused-or-ignored (T06-N7)
+  - kernel-refusal-or-closed-facade-typed-refused-never-pretend-admitted (T06-N8)
+  - host-sink-failure-never-vetoes-or-forges-immutable-k-receipt (T06-P9)
+  - concurrent-observations-keep-per-invocation-host-counters-isolated (T06-N9, review r1 P1-1; falsified red against the old shared-counter shape)
+  - host-sink-receives-final-attested-trace-with-receiptsha256-and-hostmeasured (T06-N10, review r1 P1-2)
+  - hanging-host-sink-reports-unknown-timeout-without-vetoing (T06-N11)
+validate: focused Node24 + existing required CI, risk-selected review recommended
+notes: |
+  Focused Node24 run 2026-10-19: 19/19 pass (`node --import tsx --test
+  tests/assembly/v010-t06-decision-evidence.test.ts`, Node v24.21.0).
+  Review r1 (CHANGES_REQUESTED, exact HEAD 27d4cf16) closed:
+  P1-1 per-invocation counters (T06-N9, both interleavings, falsified red
+  against the old shape) and P1-2 the Host sink now receives the FINAL
+  attested frozen trace after annotation, under a bounded timeout, with no
+  persistence side effect on the selected feature call (T06-N10/N11/P9).
+  The `unknown` kernel-outcome mapping (facade UNKNOWN pass-through and any
+  unexpected receipt status degrade to `unknown`) is implemented fail-safe in
+  the observer; a REAL `UNKNOWN` positive instance requires an actual
+  admission-ambiguous/journal-conflict occurrence (K01/K02 assets, C01 scope)
+  and was not re-staged here — no synthetic receipt was fabricated to cover it.
