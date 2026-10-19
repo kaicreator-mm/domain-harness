@@ -1,0 +1,10 @@
+schema: ads/execution-pack-v1
+task: T06
+issue: 1173
+version: v0.10
+integration_branch: v0.10
+base_sha: 2dc56e9b3690e8aad6934a66b6748f8d41b7fe3e
+ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: JIT_PREPARED
+predecessor: T02#1169_CLOSED
+scope: optional selected Standard DecisionTrace and truthful ObservedDependencySet
