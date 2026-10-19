@@ -24,9 +24,10 @@ phase2_integration:
   k01_release_ref: "#1183 merged (head 36f068e3)"
   splice_commit: "24747e39"
   typecheck_repair_commit: "d0992d57"
-  kernel_blob: "d7909b8ff8071e1f15d8b55fe6f967d883f6b4ac"
+  kernel_blob: "c164f491efc0047b7654088f8c359cb3fd58ceaf"
+  kernel_blob_note: "post-R1-repair blob (continuation-read docKeys threading + journalPrefix); pre-R1 splice blob was d7909b8ff8071e1f15d8b55fe6f967d883f6b4ac"
   k02_kernel_splice_state_after: EXECUTED_COMBINED_PHYSICAL_RUN
-  full_gate: "tools/task-check.sh EXIT=0, 4070 pass / 0 fail at d0992d57"
+  full_gate: "tools/task-check.sh EXIT=0, 4070 pass / 0 fail at d0992d57 (pre-R1 HEAD; R1 gates rerun below)"
 material_paths:
   - packages/domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs
   - packages/domain-harness-compiler/tests/v08-k02-durable-receipt-carrier.test.ts
@@ -34,7 +35,14 @@ material_paths:
   - packages/domain-harness/tests/v08-host/k02-namespace-two-b-physical.test.ts
   - packages/domain-harness/tests/v08-host/k02-receipt-race-multiprocess.test.ts
   - packages/domain-harness/tests/v08-host/children/k02-receipt-worker.mjs
+  # phase-2 (splice + review R1 repairs)
+  - packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
+  - packages/domain-harness/tests/v08-host/k02-combined-splice-physical.test.ts
+  - packages/domain-harness/tests/v08-host/children/k02-splice-worker.mjs
 kernel_read_only_anchors:
+  # phase-1 status (historical): the kernel file was K01-owned and read-only for K02.
+  # phase-2: after the K01 release (#1183 merged) this file is K02's splice target;
+  # see phase2_integration.kernel_blob for the authoritative post-splice identity.
   - packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
 core_artifacts:
   - MANIFEST.yaml

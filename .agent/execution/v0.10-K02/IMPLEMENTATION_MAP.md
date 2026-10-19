@@ -88,7 +88,7 @@ typecheck repair `d0992d57` (`CasGetResult.value` is `unknown`; the combined
 suite's four raw row reads now cast exactly like the phase-1 suites — caught
 ONLY by the domain-harness test-chain tail `tsc -p tsconfig.test.json`, which
 targeted gates bypass). Integrated kernel blob (git SHA-1, final after lint fix):
-**d7909b8ff8071e1f15d8b55fe6f967d883f6b4ac**
+**c164f491efc0047b7654088f8c359cb3fd58ceaf**
 (the file is byte-frozen from here).
 
 1. `turnDispositionIdentity` (~L3433 post-merge): identity is now canonical JSON of
@@ -142,6 +142,20 @@ targeted gates bypass). Integrated kernel blob (git SHA-1, final after lint fix)
    governance-pin/baseline/decision-cache/promoted-pin families stay unscoped (not in
    the closed grammar).
 
+   **Review R1 repairs on this anchor (kernel blob →
+   `c164f491efc0047b7654088f8c359cb3fd58ceaf`):** (1) the continuation query read
+   descriptor NOW actually carries the wiring's `docKeys` (R1 P1: it previously fell
+   back to the legacy key grammar, making a same-address legacy-namespace instance
+   document REACHABLE from a scoped runtime on a mixed store and breaking the pure
+   scoped mode's FR07 loop outright); (2) the journal family gained a dedicated
+   `journalPrefix()` key builder so the public `getJournalRecords()` list surface works
+   in scoped wiring (R1 P2: `journal('')` ran an empty key part through the bounded-
+   identifier check and threw `K02_SCOPE_INVALID`). Both are physically falsified by
+   the new combined legs CB-Q1 (counting read-log: the legacy same-address key is
+   never read; a poison-document behavioral probe terminates any non-gold observation)
+   and CB-J1 (scoped journal list sees exactly its own records; legacy and
+   foreign-scope journal documents on the SAME store are not enumerable).
+
 K01 semantics preserved: the dispatch-attest mechanism, `probeProvesZeroExternalEffect`,
 `releaseAdmissionFence`/`#docs.remove` CAS, same-revision rival refusal and the
 trusted-seam recovery supersede are untouched; k01-fence-race-multiprocess (8/8,
@@ -185,6 +199,7 @@ exact bytes (data-URL, blob pinned in-file), real `openSqliteCasStore`, scoped w
 | oracle rebind | node --import tsx --test tests/v08-tf-oracle-fr02-fr07.test.ts (compiler) | EXIT=0, 15/15 |
 | gates | build (both pkgs) / typecheck (both pkgs) / targeted eslint | EXIT=0; committed dist byte-identical (no src change under domain-harness/src) |
 | full gate on rebased HEAD `d0992d57` | tools/task-check.sh (lint → workspaces typecheck → workspaces test + test:root), Node v24.21.0 | EXIT=0 **全绿: 4070 pass / 0 fail** (t016 fixed on base by #1186; two transient work-tree-only repairs were needed first: the tests-dir typecheck row above, and building the untracked local expo/node dist inputs that tests/tools/script consumes) |
+| review R1 repairs (P1 continuation-read docKeys + P2 journalPrefix; kernel blob → `c164f491`) | combined suite incl. NEW CB-Q1/CB-J1 physical legs | EXIT=0, 6/6 — the legacy same-address instance key is physically never read in scoped wiring; the scoped journal list surface works and cannot enumerate foreign namespaces |
 
 ## Ordering discipline
 1. This pack + claim (done first). 2. Carrier fragment + unit tests. 3. Physical suites

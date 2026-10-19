@@ -2254,7 +2254,7 @@ export class KernelDurableEffectJournal {
   }
 
   async getRecords() {
-    const keys = await this.#docs.list(this.#docKeys.journal(''));
+    const keys = await this.#docs.list(this.#docKeys.journalPrefix());
     const envelopes = await Promise.all(keys.map((key) => this.#docs.get(key)));
     return envelopes
       .filter((doc) => doc !== null)
@@ -2743,10 +2743,33 @@ function legacyKernelDocKeys() {
     instance: (address) => instanceDocKey(address),
     admissionFence: (address) => admissionFenceDocKey(address),
     journal: (effectId) => journalDocKey(effectId),
+    journalPrefix: () => 'v08-kernel:effect-journal:',
     turnDisposition: (turnId) => turnDispositionDocKey(turnId),
     decisionReceipt: (turnId) => decisionReceiptDocKey(turnId),
     receiptArchive: (turnId) => `v08-kernel:receipt-archive:${turnId}`,
   };
+}
+
+// [v0.10 K02 R1 P2-1] The journal family's list channel needs its OWN
+// prefix constructor: a scoped `journal('')` would run an empty key part
+// through requireK02KeyPart and refuse typed, breaking the public
+// getJournalRecords surface for every scoped deployment.
+function scopedDocKeyPrefix(scope, kind) {
+  const frozen = deploymentScopeIdentity(scope);
+  if (!K02_SCOPED_DOC_KINDS.includes(kind)) {
+    throw new CentralAdmissionError(
+      'K02_SCOPE_INVALID',
+      `unknown scoped doc kind ${JSON.stringify(kind)}; the grammar is closed`,
+    );
+  }
+  return [
+    K02_SCOPED_KEY_ROOT,
+    encodeK02KeyComponent(frozen.deployedAppId),
+    encodeK02KeyComponent(frozen.tenantId),
+    encodeK02KeyComponent(frozen.appId),
+    encodeK02KeyComponent(frozen.businessPackageId),
+    encodeK02KeyComponent(kind),
+  ].join(':') + ':';
 }
 
 function scopedKernelDocKeys(scope) {
@@ -2755,6 +2778,7 @@ function scopedKernelDocKeys(scope) {
     instance: (address) => scopedDocKey(frozen, 'wf-instance', address.workflowId, address.instanceKey),
     admissionFence: (address) => scopedDocKey(frozen, 'admission-fence', address.workflowId, address.instanceKey),
     journal: (effectId) => scopedDocKey(frozen, 'effect-journal', effectId),
+    journalPrefix: () => scopedDocKeyPrefix(frozen, 'effect-journal'),
     turnDisposition: (turnId) => scopedDocKey(frozen, 'turn-disposition', turnId),
     decisionReceipt: (turnId) => scopedDocKey(frozen, 'decision-receipt', turnId),
     receiptArchive: (turnId) => scopedDocKey(frozen, 'receipt-archive', turnId),
@@ -5842,7 +5866,7 @@ export function createOccurrenceRuntime(options) {
           sdkEndpoint,
           latch,
           requestInput: request.input,
-          read: { docs, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
+          read: { docs, docKeys, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
         });
         if (run.terminal !== undefined) {
           return terminatedReceipt(request, workflowInstanceId, run.terminal, run.evidence);

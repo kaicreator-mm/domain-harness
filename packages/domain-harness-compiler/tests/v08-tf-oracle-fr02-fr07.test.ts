@@ -127,7 +127,7 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // carrier spliced into the selected kernel (input-complete deployment-scoped
 // turn identity, same-CAS original receipts, scoped key grammar, ring-backed
 // disposition liveness); FR02/FR07 semantics unchanged.
-const V08_K_BLOB = 'd7909b8ff8071e1f15d8b55fe6f967d883f6b4ac';
+const V08_K_BLOB = 'c164f491efc0047b7654088f8c359cb3fd58ceaf';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

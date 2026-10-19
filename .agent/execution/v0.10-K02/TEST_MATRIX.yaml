@@ -46,6 +46,18 @@
   covers: real SPLICED selected kernel (exact bytes, blob pinned in-file) x real openSqliteCasStore — same-CAS original-receipt atomicity (doc revision == stateRevision, receipt rides the same row, restart durability, exact-original replay, canonical-equivalence), changed-input/intent typed conflicts on the integrated kernel, fence/receipt coordination under the K01 R2 attest contract (adapter-tagged throw keeps the fence with NO receipt; attested dispatcher pre-handler refusal releases via docs.remove; follower receipt lands), REAL two-process same-turn race (honest ADMISSION_EFFECT_AMBIGUOUS duplicate, honest holder commit loss after the same-turn re-claim, journal-reconcile retry lands the ORIGINAL receipt with exactly-once effect, cross-process changed-input typed refusal)
   verdicts: [P-same-cas-receipt-atomicity, P-restart-durability, P-exact-original-replay, N-changed-input-conflict, N-changed-intent-conflict, P-fence-attested-release-coordination, P-two-process-same-turn-exactly-once, N-cross-process-changed-input]
 
+- id: K02-CB-Q1 (review R1 P1 physical regression)
+  file: packages/domain-harness/tests/v08-host/k02-combined-splice-physical.test.ts
+  kind: physical-sqlite-real-kernel-spliced
+  covers: the K-owned continuation query read threads the SCOPED doc keys in kernel deploymentScope wiring — a physical read-log over the real store proves the legacy same-address instance key (a poison document shaped to be accepted by the legacy fallback: matching address, revision 0, valid context) is NEVER read, and a behavioral poison probe (any non-gold observation maps to a DISALLOWED final outcome) proves the admitted turn observed only the scoped document's context
+  verdicts: [P-continuation-read-scoped-key, N-legacy-namespace-unreachable, P-poison-probe-admits-only-gold]
+
+- id: K02-CB-J1 (review R1 P2 physical regression)
+  file: packages/domain-harness/tests/v08-host/k02-combined-splice-physical.test.ts
+  kind: physical-sqlite-real-kernel-spliced
+  covers: the public getJournalRecords() list surface works in scoped wiring (journalPrefix repair; previously threw K02_SCOPE_INVALID) and enumerates exactly this deployment's own records — legacy-namespace and foreign-scope journal documents physically present on the SAME store are not enumerable
+  verdicts: [P-journal-list-scoped-surface, N-foreign-journal-unenumerable]
+
 - id: K02-G1
   file: tools/task-check.sh
   kind: gate

@@ -19,8 +19,11 @@ items PASS.
       equivalence (key order/whitespace) replays, never conflicts.
 - [ ] H4 Liveness: 17+ turns after total derived-archive destruction still admit and
       replay from same-CAS receipts; no global admission block exists on any missing
-      derived record; ancients (evicted ring + lost archive) refuse typed for themselves
-      only.
+      derived record; an ancient turn whose archive record READ fails refuses typed
+      for that turn only — an ancient with the archive record physically ABSENT
+      (evicted ring + lost/never-written archive) is not identifiable as
+      previously-admitted and re-admits as a new turn (honest physical limit, not a
+      migration gap).
 - [ ] H5 Namespace injectivity: scope tuple prefix is injective for all doc families;
       two-B test uses the REAL unmodified kernel bytes; no cross-namespace key is
       reachable (list/get/put all scoped).
@@ -30,9 +33,14 @@ items PASS.
 - [ ] H7 Two-process honesty: exactly one winner ACK; loser replays the SAME original
       receipt (byte-equal original fields) with zero new effect; changed-input racer
       refuses typed; children are real stock-node processes over one real SQLite file.
-- [ ] H8 K01 boundary respected: `kernel-mechanism-v1.mjs` byte-identical to base blob
-      `fa30e1204d47c12f3f5842c497a83a08501d515b` at PR HEAD; K01's test files untouched;
-      no fabricated K01→K02 DAG dependency; splice work marked PARTIAL_BLOCKED, not DONE.
+- [ ] H8 K01 boundary respected (phase-1 form, historical): kernel byte-identity to the
+      pre-splice base blob `fa30e1204d47c12f3f5842c497a83a08501d515b` held through
+      phase-1. Phase-2 (after the K01 release #1183 and the v0.10@027f3b74 rebase)
+      SPLICES this file by design: the authoritative post-splice blob is recorded in
+      IMPLEMENTATION_MAP.md / MANIFEST.yaml (`phase2_integration.kernel_blob`, after
+      the R1 repairs: `c164f491efc0047b7654088f8c359cb3fd58ceaf`); K01's test files stay
+      untouched; K01 semantics (attest mechanism, zero-effect release, rival-refusal)
+      re-proven on the spliced bytes; no fabricated K01→K02 DAG dependency.
 - [ ] H9 No scope expansion: no frozen Product/A01/L2/DAG edits; no other DAG node's
       concern; no per-package VM; no speculative Host Port; no pre-1.0 migration; out-of-
       scope SDK provenance checks absent.

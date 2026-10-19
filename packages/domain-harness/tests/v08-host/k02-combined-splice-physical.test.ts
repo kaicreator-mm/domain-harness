@@ -46,7 +46,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { openSqliteCasStore, type SqliteCasStore } from '../../src/host-v8/index.js';
+import { openSqliteCasStore, type CasPutConditions, type SqliteCasStore } from '../../src/host-v8/index.js';
 
 // ---------------------------------------------------------------------------
 // The REAL spliced selected kernel, imported by exact current bytes.
@@ -56,7 +56,7 @@ const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadD
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
 // The POST-SPLICE integrated kernel blob (recorded at the K02 phase-2 splice
 // on top of K01 R2 36f068e3). Any further kernel drift fails this import.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = 'd7909b8ff8071e1f15d8b55fe6f967d883f6b4ac';
+const K02_SPLICED_KERNEL_BLOB_SHA1 = 'c164f491efc0047b7654088f8c359cb3fd58ceaf';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the combined test runs the exact spliced integration kernel bytes');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
@@ -164,7 +164,12 @@ function trustedDispatcherResources(options: {
   };
 }
 
-function scopedRuntime(store: SqliteCasStore, resources: unknown) {
+function scopedRuntime(
+  store: SqliteCasStore | Record<string, unknown>,
+  resources: unknown,
+  policyOverride?: Record<string, unknown>,
+  sdkEndpointOverride?: Record<string, unknown>,
+) {
   return kernel.createOccurrenceRuntime({
     moduleIdentity: { packageId: 'kernel:k02-combined', moduleSha256: KERNEL_SHA256 },
     deploymentScope: SCOPE,
@@ -174,7 +179,7 @@ function scopedRuntime(store: SqliteCasStore, resources: unknown) {
       sha256: { digestUtf8: (value: string) => createHash('sha256').update(value, 'utf8').digest('hex') },
       clock: () => NOW,
     },
-    sdkEndpoint: {
+    sdkEndpoint: (sdkEndpointOverride as Record<string, any> | undefined) ?? {
       packageId: 'std:k02-combined',
       async interpret(declaration: { ruleId: string; eventType: string }) {
         return {
@@ -187,7 +192,7 @@ function scopedRuntime(store: SqliteCasStore, resources: unknown) {
         };
       },
     },
-    businessEndpoint: policy,
+    businessEndpoint: (policyOverride as Record<string, any> | undefined) ?? policy,
   });
 }
 
@@ -617,4 +622,140 @@ test('CB-R1 two real processes race the SAME turn over ONE SQLite file: exactly-
   assert.equal((await fx.ledgerLines()).length, 1, 'the conflict dispatched nothing');
   const finalRing = await fx.ringOf(instance);
   assert.equal(Object.keys(finalRing).length, 1, 'the ring holds exactly the single admitted turn');
+});
+
+// ---------------------------------------------------------------------------
+// CB-Q1 / CB-J1 — review round-1 P1/P2 physical regression legs: the
+// continuation query read and the public journal list surface must thread
+// the SCOPED doc keys (kernel deploymentScope wiring). A same-address LEGACY
+// document on the SAME physical store must stay unreachable, and
+// getJournalRecords must work in scoped wiring (before the journalPrefix
+// repair it threw K02_SCOPE_INVALID on every scoped deployment).
+// ---------------------------------------------------------------------------
+test('CB-Q1 the continuation query reads the SCOPED instance document; a same-address LEGACY document on the same store is unreachable', { timeout: 120_000 }, async () => {
+  const SDK_SOURCE = await readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8');
+  const sdk: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(SDK_SOURCE, 'utf8').toString('base64')}`);
+  const q1Dir = await mkdtemp(path.join(tmpdir(), 'dh-k02-cbq1-'));
+  const q1Store = await openSqliteCasStore({ path: path.join(q1Dir, 'cbq1.sqlite') });
+  try {
+    const q1Target = { workflowId: WORKFLOW_ID, instanceKey: 'cb-q1' };
+    const legacyInstanceKey = `v08-kernel:wf-instance:${WORKFLOW_ID}:cb-q1`;
+
+    // Physical read log over the REAL store (the FR07-KH2 counting-wrapper
+    // discipline): which instance key the K-owned continuation read touched.
+    const reads: string[] = [];
+    const countingStore = {
+      async get(key: string) { reads.push(key); return q1Store.get(key); },
+      async put(key: string, value: unknown, conditions: CasPutConditions) { return q1Store.put(key, value, conditions); },
+      async remove(key: string, conditions: CasPutConditions) { return q1Store.remove(key, conditions); },
+      async list(prefix: string) { return q1Store.list(prefix); },
+      async close() { return q1Store.close(); },
+    };
+
+    // The POISON: a legacy-namespace instance document at the SAME address,
+    // shaped exactly so the unscoped legacy-key fallback would ACCEPT it
+    // (matching address, revision 0 == the pre-turn stateRevision, valid context).
+    await q1Store.put(legacyInstanceKey, {
+      address: { workflowId: WORKFLOW_ID, instanceKey: q1Target.instanceKey },
+      stateRevision: 0,
+      state: { stateKey: 'review', context: { customerTier: 'BRONZE-POISON' } },
+    }, { mustBeAbsent: true });
+
+    // Behavioral poison probe: the model turns any NON-gold observation into
+    // a DISALLOWED final outcome — if the query ever read the legacy poison
+    // document, this turn terminates FINAL_OUTCOME_NOT_ALLOWED instead of
+    // admitting. Only the scoped document's 'gold' admits.
+    const resolver = sdk.createHostBoundModelResolver({
+      invoke: async (request: { input: any }) => {
+        const input = request.input;
+        if (input.step === 1) {
+          return { kind: 'query', call: { capabilityId: 'quote.readTier', input: {} } };
+        }
+        const observedTier = input.observations?.[0]?.output?.tier;
+        const outcome = observedTier === 'gold' ? 'decide' : 'poison-detected';
+        return {
+          kind: 'final',
+          result: { decision: { outcome, data: { tier: observedTier } }, event: { type: 'APPROVED', payload: {} } },
+        };
+      },
+    });
+    const continuationPolicy: Record<string, unknown> = {
+      ...policy,
+      policyId: 'quote-continuation',
+      initialContext: { customerTier: 'gold' },
+      rules: {
+        ...policy.rules,
+        'rule:tiered': {
+          kind: 'model-decision',
+          id: 'rule:tiered',
+          modelOperation: 'quote.continue',
+          harness: {
+            maxSteps: 3,
+            capabilities: {
+              'quote.readTier': { mode: 'read', source: 'instance-context', fields: { tier: 'customerTier' }, outputSchema: { tier: 'string' } },
+            },
+            allowedOutcomes: ['decide'],
+            allowedEvents: ['APPROVED'],
+          },
+        },
+      },
+      intentBindings: {
+        ...policy.intentBindings,
+        tieredApprove: { trigger: { kind: 'event', eventType: 'APPROVED' }, ruleId: 'rule:tiered', roles: ['approver'] },
+      },
+    };
+    const rt = scopedRuntime(countingStore, {
+      async call(_resourceKey: string, _operation: string, _payload: unknown) { return { reserved: true }; },
+    }, continuationPolicy, {
+      packageId: 'std:k02-combined',
+      interpret: async () => { throw new Error('the continuation rule must run through invokeStep, never interpret'); },
+      invokeStep: (declaration: unknown, input: unknown, context: unknown, control: unknown) =>
+        resolver.invokeStep(declaration, input, context, control),
+    });
+
+    await rt.openInstance({ target: q1Target, authorityClass: 'PRODUCTION' });
+    const receipt = await rt.submitOccurrence({ intentType: 'tieredApprove', messageId: 'm-q1', input: {}, target: q1Target, caller });
+    assert.equal(receipt.status, 'admitted', `the continuation turn admits from the SCOPED document (a poison read would terminate FINAL_OUTCOME_NOT_ALLOWED): ${JSON.stringify(receipt)}`);
+    assert.equal(receipt.admitted.resolver.continuation.queries, 1, 'exactly one K-owned query executed and produced a valid observation');
+    assert.equal(receipt.admitted.targetState, 'approved');
+    assert.ok(reads.includes(scopedInstanceKey(q1Target.instanceKey)), 'the continuation read touched the SCOPED instance key');
+    assert.ok(!reads.includes(legacyInstanceKey), 'the LEGACY same-address instance key was never read — cross-namespace documents are physically unreachable');
+  } finally {
+    await q1Store.close();
+    await rm(q1Dir, { recursive: true, force: true });
+  }
+});
+
+test('CB-J1 the public journal list surface works in scoped wiring and cannot enumerate foreign namespaces', { timeout: 120_000 }, async () => {
+  const j1Dir = await mkdtemp(path.join(tmpdir(), 'dh-k02-cbj1-'));
+  const j1Store = await openSqliteCasStore({ path: path.join(j1Dir, 'cbj1.sqlite') });
+  try {
+    // Foreign journal documents on the SAME physical store: a legacy-namespace
+    // record and another deployment scope's record.
+    await j1Store.put('v08-kernel:effect-journal:foreign-legacy', { record: { effectId: 'foreign-legacy' } }, { mustBeAbsent: true });
+    await j1Store.put(
+      `v010-k02:${enc('deploy-other')}:${enc(SCOPE.tenantId)}:${enc(SCOPE.appId)}:${enc('pkg:quote:other')}:effect-journal:foreign-b2`,
+      { record: { effectId: 'foreign-b2' } },
+      { mustBeAbsent: true },
+    );
+
+    const j1Dispatches: unknown[] = [];
+    const rt = scopedRuntime(j1Store, {
+      async call(_resourceKey: string, _operation: string, payload: unknown) { j1Dispatches.push(payload); return { reserved: true }; },
+    });
+    const j1Target = { workflowId: WORKFLOW_ID, instanceKey: 'cb-j1' };
+    await rt.openInstance({ target: j1Target, authorityClass: 'PRODUCTION' });
+    const receipt = await rt.submitOccurrence({ intentType: 'approve', messageId: 'm-j1', input: {}, target: j1Target, caller });
+    assert.equal(receipt.status, 'admitted');
+    assert.equal(j1Dispatches.length, 1, 'one real effect dispatch settled this deployment\'s own journal record');
+
+    // The scoped journal list surface (before the journalPrefix repair this
+    // threw K02_SCOPE_INVALID on every scoped deployment).
+    const records: { effectId?: unknown }[] = await rt.getJournalRecords();
+    assert.equal(records.length, 1, 'exactly this deployment\'s own journal record is visible');
+    assert.ok(records.every((record) => !String(record.effectId).includes('foreign')), 'no foreign-namespace journal record is enumerable');
+  } finally {
+    await j1Store.close();
+    await rm(j1Dir, { recursive: true, force: true });
+  }
 });
