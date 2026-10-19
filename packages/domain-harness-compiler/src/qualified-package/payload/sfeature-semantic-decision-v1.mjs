@@ -138,7 +138,7 @@ export async function resolveSemanticDecision(request, deps = {}) {
     if (!record(rule) || !record(rule.when) || typeof rule.id !== 'string') {
       refuse('SEMANTIC_RULES_INVALID', 'rule requires id and plain when');
     }
-    if (Object.keys(rule.when).every((key) => canonical(request.input[key]) === canonical(rule.when[key]))) {
+    if (Object.keys(rule.when).every((key) => Object.hasOwn(request.input, key) && canonical(request.input[key]) === canonical(rule.when[key]))) {
       return decisionResult('rule', rule.decision, evidence);
     }
   }
