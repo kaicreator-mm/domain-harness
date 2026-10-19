@@ -13,7 +13,7 @@
  *
  *   T09-P1  round 1 consumes real T06 DecisionEvidence + real candidate/Shadow
  *           reports, produces bounded proposals, admits exactly one selected
- *           business turn and writes one durable ledger row.
+ *           business turn and writes one durable claim + ledger row.
  *   T09-P2  the same round is idempotent: same proposal/receipt, no second
  *           business turn.
  *   T09-P3  after a real SQLite close/reopen the same round still replays and
@@ -22,7 +22,8 @@
  *   T09-N2  malformed/oversized evidence fails typed before any turn/write.
  *   T09-N3  authority/effect material in any consumed record is typed refused
  *           and leaves K State/Journal/Effect unchanged.
- *   T09-N4  invalid rounds and conflicting ledger reuse fail typed.
+ *   T09-N4  invalid rounds, foreign-scope evidence and conflicting ledger
+ *           reuse fail typed.
  */
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -30,25 +31,39 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after, before } from 'node:test';
 
+import { sha256Canonical, type V10BuiltApp } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import {
-  V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-  sha256Canonical,
-  type V10Activation,
-  type V10BuiltApp,
-  type V10DocStore,
-  type V10DocWriteCondition,
-  type V10ModuleInput,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { createDecisionEvidenceObserver } from '../../../packages/domain-harness-compiler/src/qualified-package/v10evidence/decision-evidence-observer.js';
-import {
-  MetaFeedbackError,
+  META_FEEDBACK_ABI,
+  META_FEEDBACK_CLAIM_STATE,
+  META_FEEDBACK_LEDGER_KIND,
+  META_FEEDBACK_LEDGER_STATE,
   runMetaFeedbackWorkflow,
   type MetaFeedbackResult,
 } from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
-import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
-import { featureEntry, sha256HexSource } from '../../assembly/helpers-v010.js';
+import {
+  BUSINESS_ID,
+  CANDIDATE_KEY,
+  EVIDENCE_KEY,
+  HEX64,
+  MAIN_INSTANCE,
+  NOW,
+  SCHEDULE,
+  SCOPE,
+  SHADOW_KEY,
+  buildT09App,
+  candidatePins,
+  claimKeyFor,
+  evidenceKeyFor,
+  ledgerKeyFor,
+  openHarness,
+  payloadDir,
+  refusal,
+  roundIntent,
+  seedEvidence,
+  sources,
+  stateOf,
+  type Harness,
+} from './v010-t09-meta-fixture.js';
 
 assert.equal(
   Number(process.versions.node.split('.')[0]),
@@ -56,287 +71,18 @@ assert.equal(
   `the T09 meta feedback physical witness targets Node24 (running ${process.versions.node})`,
 );
 
-const payloadDir = new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-const routerUrl = new URL('../../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url);
-const capabilityUrl = new URL('../../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url);
-
-const TENANT = 'tenant:v010-t09-meta';
-const APP_ID = 'app:v010-t09-meta-feedback';
-const BUSINESS_ID = 'business-meta-feedback@v010.1.0.0';
-const CAPABILITY_ID = 'capability-quote-tools@v08.1.0.0';
-const DEPLOYMENT = Object.freeze({
-  deployedAppId: 'deploy:v010-t09-meta',
-  tenantId: TENANT,
-  appId: APP_ID,
-});
-const NOW = Date.UTC(2026, 9, 20, 4, 0, 0);
-const MAIN_INSTANCE = 'instance:t09-main';
-const SCHEDULE = 'schedule:t09-main';
-const EVIDENCE_KEY = 'v10/t09/evidence/obs-1';
-const CANDIDATE_KEY = 'v10/t09/candidate/1';
-const SHADOW_KEY = 'v10/t09/shadow/1';
-const HEX64 = /^[0-9a-f]{64}$/;
-
-interface Counts { gets: number; puts: number; removes: number; }
-
-function v10Store(sqlite: SqliteCasStore, counts: Counts): V10DocStore {
-  return {
-    get: async (key) => {
-      counts.gets += 1;
-      return await sqlite.get(key);
-    },
-    put: async (key, value, condition: V10DocWriteCondition) => {
-      counts.puts += 1;
-      return await sqlite.put(key, value, condition.kind === 'create'
-        ? { mustBeAbsent: true }
-        : { mustMatchRevision: condition.revision });
-    },
-    remove: async (key, condition: V10DocWriteCondition) => {
-      counts.removes += 1;
-      await sqlite.remove(key, condition.kind === 'create'
-        ? { mustBeAbsent: true }
-        : { mustMatchRevision: condition.revision });
-    },
-    keys: async () => await sqlite.list(''),
-  };
-}
-
-interface Harness {
-  readonly activation: V10Activation;
-  readonly store: V10DocStore;
-  readonly counts: Counts;
-  readonly sqlite: SqliteCasStore;
-}
-
-const candidatePins = {
-  candidate: {
-    kind: 'Rule', id: 'rule:meta', revision: 'r2',
-    sha256: 'd'.repeat(64), provenance: 'pinned:approved-source', approvalState: 'candidate',
-  },
-  approvedFallback: {
-    kind: 'Rule', id: 'rule:meta', revision: 'r1',
-    sha256: 'e'.repeat(64), provenance: 'pinned:approved-source', approvalState: 'approved',
-  },
-};
-const candidateRequest = {
-  ...candidatePins,
-  budget: { maxCases: 4, maxComparisons: 4 },
-  cases: [{
-    id: 'case:t09-1',
-    candidateOutput: { quote: 'review' },
-    baselineOutput: { quote: 'approved' },
-    candidatePinSha256: candidatePins.candidate.sha256,
-    baselinePinSha256: candidatePins.approvedFallback.sha256,
-  }],
-};
-
-function shadowReport(app: V10BuiltApp): Record<string, unknown> {
-  return {
-    kind: 'shadow-l4-evidence',
-    shadowAbi: 'dh.v10.shadow-l4-readonly/1',
-    appSubjectDigest: app.subjectDigest,
-    deployedAppId: DEPLOYMENT.deployedAppId,
-    tenantId: TENANT,
-    status: 'difference',
-    productionWritesVerifiedZero: true,
-    replayDigest: 'c'.repeat(64),
-    candidate: candidatePins.candidate,
-    approvedFallback: candidatePins.approvedFallback,
-    canSelfApprove: false,
-    canPromote: false,
-    kernelEffectPermit: false,
-  };
-}
-
-async function buildT09App(metaSourceOverride?: string): Promise<V10BuiltApp> {
-  const [kernel, sdk, router, business, capability, evidenceSource, semanticSource, candidateSource, defaultMetaSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
-    readFile(routerUrl, 'utf8'),
-    readFile(new URL('business-meta-feedback-v1.mjs', payloadDir), 'utf8'),
-    readFile(capabilityUrl, 'utf8'),
-    readFile(new URL('sfeature-decision-evidence-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('sfeature-semantic-decision-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('sfeature-candidate-validation-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('sfeature-meta-feedback-v1.mjs', payloadDir), 'utf8'),
-  ]);
-  const metaSource = metaSourceOverride ?? defaultMetaSource;
-  const routerBody = router.replace(/^export /gm, '');
-  const standardBundle = `${sdk}
-const __dhv10RouterBundle = (() => {
-${routerBody}
-return { routeWorkflowIntent };
-})();
-export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
-`;
-  const modules: V10ModuleInput[] = [
-    {
-      packageId: 'v08-kernel-mechanism@1.0.0', role: 'kernel-primary', abiVersion: 'v08-kernel-abi/1',
-      moduleSource: kernel, moduleSha256: sha256HexSource(kernel),
-      endpoint: 'occurrence-runtime', dependencies: [], provides: ['kernel:occurrence-runtime/1'], requires: [],
-    },
-    {
-      packageId: 'standard-sdk@v08.1.0.0', role: 'standard-primary', abiVersion: 'v08-standard-sdk-abi/1',
-      moduleSource: standardBundle, moduleSha256: sha256HexSource(standardBundle),
-      endpoint: 'rule-interpreter', dependencies: [], provides: ['standard:interpret/1', 'standard:route/1'], requires: [],
-    },
-    {
-      packageId: BUSINESS_ID, role: 'business', abiVersion: 'v08-business-abi/1',
-      moduleSource: business, moduleSha256: sha256HexSource(business),
-      endpoint: 'business-policy', dependencies: [],
-      provides: ['business:policy/1', 'intent:recordMetaFeedback', 'intent:closeMetaFeedback'], requires: [],
-    },
-    {
-      packageId: CAPABILITY_ID, role: 'capability', abiVersion: 'v08-capability-abi/1',
-      moduleSource: capability, moduleSha256: sha256HexSource(capability),
-      endpoint: 'capability-endpoint', dependencies: [], provides: ['capability:ledger/1'], requires: [],
-      capabilityId: 'ledger',
-      handlers: [{ operationId: 'reserve', handler: 'reserveLedger' }, { operationId: 'preview', handler: 'previewTotal' }],
-    },
-    await featureEntry({
-      fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: semanticSource,
-      featureExport: 'resolveSemanticDecision',
-    }),
-    await featureEntry({
-      fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: evidenceSource,
-      featureExport: 'recordDecisionEvidence',
-    }),
-    await featureEntry({
-      fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: candidateSource,
-      featureExport: 'validateCandidateReport',
-    }),
-    await featureEntry({
-      fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: metaSource,
-      featureExport: 'proposeMetaFeedback',
-    }),
-  ];
-  return buildV10App({
-    appId: APP_ID,
-    audience: 'aud:v010-t09',
-    targetProfile: V10_TARGET_PROFILE,
-    modules,
-    routes: [
-      { intentId: 'recordMetaFeedback', operationId: 'preview', capabilityId: 'ledger', handlerId: 'previewTotal' },
-      { intentId: 'closeMetaFeedback', operationId: 'preview', capabilityId: 'ledger', handlerId: 'previewTotal' },
-    ],
-    hardBudget: { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 },
-    buildId: 't09-meta-feedback',
-  });
-}
-
-const queryAuthority = {
-  principal: Object.freeze({ source: 'host-authenticated', subject: 'host:t09', tenantId: TENANT }),
-  authorize: () => true,
-};
-
-async function activateApp(appToActivate: V10BuiltApp, store: V10DocStore): Promise<V10Activation> {
-  return await activateV10App(appToActivate, {
-    store,
-    tenantId: TENANT,
-    now: () => NOW,
-    deploymentIdentity: DEPLOYMENT,
-    queryAuthority,
-  });
-}
-
-async function activate(store: V10DocStore): Promise<V10Activation> {
-  return await activateApp(app, store);
-}
-
-async function seedEvidence(activation: V10Activation, store: V10DocStore): Promise<void> {
-  const observer = createDecisionEvidenceObserver({
-    facade: activation.facade,
-    evidenceFeatureKey: 'standard:decision-evidence/1',
-    semanticFeatureKey: 'standard:semantic-decision/1',
-  });
-  const schema = { id: 'schema:meta', revision: 'r1', provenanceKey: 'approved:t09' };
-  const observation = await observer.observeAndRecord({
-    intent: {
-      intentType: 'recordMetaFeedback',
-      instanceKey: 'instance:t09-evidence',
-      messageId: 'msg:t09-evidence',
-      input: {
-        disposition: 'proposal-only',
-        effectCount: 0,
-        proposalId: 'seed-proposal',
-        proposalDigest: 'a'.repeat(64),
-        evidenceDigest: 'b'.repeat(64),
-      },
-    },
-    evidence: {
-      observationId: 'obs:t09-1',
-      schema,
-      observedDependencies: [],
-    },
-    semanticRequest: {
-      input: { amount: 30 },
-      schema,
-      limits: { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1 },
-      rules: [{ id: 'meta-rule', when: { amount: 30 }, decision: { disposition: 'approved' } }],
-    },
-  });
-  assert.equal(observation.kernelReceipt.status, 'admitted', 'the seeded T06 evidence came from a real admitted K receipt');
-  await store.put(EVIDENCE_KEY, observation.decisionTrace, { kind: 'create' });
-
-  const candidate = await activation.facade.invokeSelectedStandardFeature(
-    'standard:candidate-validation/1',
-    candidateRequest,
-  ) as Record<string, unknown>;
-  assert.equal(candidate.status, 'reported-difference');
-  await store.put(CANDIDATE_KEY, candidate, { kind: 'create' });
-  await store.put(SHADOW_KEY, shadowReport(app), { kind: 'create' });
-}
-
-function roundIntent(round: number): {
-  intentType: string;
-  instanceKey: string;
-  scheduleKey: string;
-  round: number;
-} {
-  return { intentType: 'recordMetaFeedback', instanceKey: MAIN_INSTANCE, scheduleKey: SCHEDULE, round };
-}
-
-const sources = { evidenceKeys: [EVIDENCE_KEY], candidateKey: CANDIDATE_KEY, shadowKey: SHADOW_KEY } as const;
-const ledgerKeyFor = (round: number): string => `v10-meta-feedback:schedule%3At09-main:${String(round)}`;
-
-async function stateOf(activation: V10Activation): Promise<Record<string, any>> {
-  const answer = await activation.facade.queryScopedSnapshot({
-    workflowId: 'meta-feedback-loop',
-    instanceKey: MAIN_INSTANCE,
-  });
-  return answer.snapshot as Record<string, any>;
-}
-
-async function refusal(promise: Promise<unknown>): Promise<MetaFeedbackError> {
-  try {
-    await promise;
-  } catch (error) {
-    assert.ok(error instanceof MetaFeedbackError, `expected a MetaFeedbackError, got ${String(error)}`);
-    return error;
-  }
-  assert.fail('expected the meta feedback round to be refused');
-}
-
 let dir = '';
 let kPath = '';
 let app: V10BuiltApp;
 let harness: Harness;
 let first: MetaFeedbackResult;
 
-async function openHarness(): Promise<Harness> {
-  const sqlite = await openSqliteCasStore({ path: kPath });
-  const counts: Counts = { gets: 0, puts: 0, removes: 0 };
-  const store = v10Store(sqlite, counts);
-  const activation = await activate(store);
-  return { sqlite, counts, store, activation };
-}
-
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), 'dh010-t09-meta-'));
   kPath = join(dir, 'k.sqlite');
   app = await buildT09App();
-  harness = await openHarness();
-  await seedEvidence(harness.activation, harness.store);
+  harness = await openHarness(kPath, { app });
+  await seedEvidence(harness.activation, harness.store, { app });
 });
 
 after(async () => {
@@ -363,6 +109,7 @@ test('T09-P1 round 1 consumes real evidence and admits exactly one proposal-only
 
   assert.equal(first.status, 'proposed');
   assert.equal(first.replayed, false);
+  assert.equal(first.recovered, false);
   assert.ok(first.proposals.length >= 1 && first.proposals.length <= 4, 'proposal count is bounded');
   assert.ok(first.proposals.some((proposal) => proposal.kind === 'review-candidate'), 'the candidate difference produced a proposal');
   assert.ok(first.proposals.some((proposal) => proposal.kind === 'shadow-integrity'), 'the shadow difference produced a proposal');
@@ -373,6 +120,7 @@ test('T09-P1 round 1 consumes real evidence and admits exactly one proposal-only
   assert.match(first.proposalDigest as string, HEX64);
   assert.match(first.receiptDigest as string, HEX64);
   assert.equal(first.ledgerKey, ledgerKeyFor(1));
+  assert.equal(first.claimKey, claimKeyFor(1));
   assert.equal(first.receipt?.status, 'admitted');
   assert.deepEqual(first.authority, {
     proposalOnly: true,
@@ -389,9 +137,16 @@ test('T09-P1 round 1 consumes real evidence and admits exactly one proposal-only
   assert.equal(harness.activation.facade.kCounters(BUSINESS_ID).effectDispatches, 0, 'the meta workflow dispatches no K effect');
   assert.equal(harness.activation.counters.externalEffectDispatches, 0);
 
+  const claim = await harness.store.get(claimKeyFor(1));
+  assert.ok(claim !== null && claim !== undefined, 'the durable pre-admission reservation exists');
+  assert.equal((claim.value as Record<string, unknown>).kind, 'v10/meta-feedback-round-claim');
+  assert.equal((claim.value as Record<string, unknown>).state, META_FEEDBACK_CLAIM_STATE);
+
   const ledger = await harness.store.get(first.ledgerKey as string);
   assert.ok(ledger !== null && ledger !== undefined, 'the durable ledger row exists');
   assert.equal((ledger.value as Record<string, unknown>).kind, 'v10/meta-feedback-round');
+  assert.equal((ledger.value as Record<string, unknown>).abi, META_FEEDBACK_ABI);
+  assert.equal((ledger.value as Record<string, unknown>).state, META_FEEDBACK_LEDGER_STATE);
   assert.equal(sha256Canonical(first.receipt), first.receiptDigest);
 });
 
@@ -406,9 +161,11 @@ test('T09-P2 replaying the same round is idempotent and starts no second busines
   });
   assert.equal(replay.status, 'proposed');
   assert.equal(replay.replayed, true);
+  assert.equal(replay.recovered, false);
   assert.equal(replay.proposalDigest, first.proposalDigest);
   assert.equal(replay.receiptDigest, first.receiptDigest);
   assert.deepEqual(replay.proposals, first.proposals);
+  assert.equal(replay.claimKey, claimKeyFor(1));
   const after = await stateOf(harness.activation);
   assert.equal(after.stateRevision, before.stateRevision, 'the replay created no business turn');
 });
@@ -416,8 +173,7 @@ test('T09-P2 replaying the same round is idempotent and starts no second busines
 test('T09-P3 restart replays round 1 and round 2 is a distinct durable turn', async () => {
   harness.activation.dispose();
   await harness.sqlite.close();
-  harness = await openHarness();
-
+  harness = await openHarness(kPath, { app });
   const replay = await runMetaFeedbackWorkflow({
     facade: harness.activation.facade,
     store: harness.store,
@@ -426,6 +182,7 @@ test('T09-P3 restart replays round 1 and round 2 is a distinct durable turn', as
     now: () => NOW,
   });
   assert.equal(replay.replayed, true);
+  assert.equal(replay.recovered, false);
   assert.equal(replay.proposalDigest, first.proposalDigest);
   assert.equal(replay.receiptDigest, first.receiptDigest);
   assert.equal((await stateOf(harness.activation)).stateRevision, 1);
@@ -439,7 +196,9 @@ test('T09-P3 restart replays round 1 and round 2 is a distinct durable turn', as
   });
   assert.equal(second.status, 'proposed');
   assert.equal(second.replayed, false);
+  assert.equal(second.recovered, false);
   assert.equal(second.ledgerKey, ledgerKeyFor(2));
+  assert.equal(second.claimKey, claimKeyFor(2));
   assert.notEqual(second.receiptDigest, first.receiptDigest, 'round 2 has its own immutable K receipt');
   assert.match(String(second.receipt?.occurrence && (second.receipt.occurrence as Record<string, unknown>).messageId), /:2:/);
   assert.equal((await stateOf(harness.activation)).stateRevision, 2, 'round 2 admitted exactly one new turn');
@@ -458,6 +217,7 @@ test('T09-N1 no durable observation yields an honest no-observation with zero tu
   assert.equal(empty.status, 'no-observation');
   assert.equal(empty.proposals.length, 0);
   assert.equal(empty.ledgerKey, null);
+  assert.equal(empty.claimKey, null);
   assert.equal(empty.receipt, null);
   assert.equal(empty.counters.evidenceRecords, 0);
   assert.equal(harness.counts.puts, putsBefore, 'no ledger row is written');
@@ -467,7 +227,7 @@ test('T09-N1 no durable observation yields an honest no-observation with zero tu
     facade: harness.activation.facade,
     store: harness.store,
     workflow: roundIntent(3),
-    sources: { evidenceKeys: ['v10/t09/evidence/does-not-exist'] },
+    sources: { evidenceKeys: [evidenceKeyFor('evidence/does-not-exist')] },
     now: () => NOW,
   });
   assert.equal(missing.status, 'no-observation');
@@ -477,24 +237,26 @@ test('T09-N1 no durable observation yields an honest no-observation with zero tu
 
 test('T09-N2 malformed and oversized durable evidence refuse before any turn or ledger write', async () => {
   const stateBefore = await stateOf(harness.activation);
-  await harness.store.put('v10/t09/evidence/malformed', 'not-a-record', { kind: 'create' });
+  const malformedKey = evidenceKeyFor('evidence/malformed');
+  await harness.store.put(malformedKey, 'not-a-record', { kind: 'create' });
   const malformed = await refusal(runMetaFeedbackWorkflow({
     facade: harness.activation.facade,
     store: harness.store,
     workflow: roundIntent(4),
-    sources: { evidenceKeys: ['v10/t09/evidence/malformed'] },
+    sources: { evidenceKeys: [malformedKey] },
     now: () => NOW,
   }));
   assert.equal(malformed.code, 'META_EVIDENCE_INVALID');
 
+  const oversizedKey = evidenceKeyFor('evidence/oversized');
   const oversized = { padding: 'x'.repeat(70_000) };
-  await harness.store.put('v10/t09/evidence/oversized', oversized, { kind: 'create' });
+  await harness.store.put(oversizedKey, oversized, { kind: 'create' });
   const putsAfterSeed = harness.counts.puts;
   const tooLarge = await refusal(runMetaFeedbackWorkflow({
     facade: harness.activation.facade,
     store: harness.store,
     workflow: roundIntent(4),
-    sources: { evidenceKeys: ['v10/t09/evidence/oversized'] },
+    sources: { evidenceKeys: [oversizedKey] },
     now: () => NOW,
   }));
   assert.equal(tooLarge.code, 'META_EVIDENCE_OVERSIZED');
@@ -505,19 +267,21 @@ test('T09-N2 malformed and oversized durable evidence refuse before any turn or 
 test('T09-N3 authority/effect material in consumed records is refused with unchanged K state', async () => {
   const stateBefore = await stateOf(harness.activation);
   const putsBefore = harness.counts.puts;
-  await harness.store.put('v10/t09/evidence/self-approve', {
+  const selfApproveKey = evidenceKeyFor('evidence/self-approve');
+  await harness.store.put(selfApproveKey, {
     kernelOutcome: 'denied', selfApprove: true,
   }, { kind: 'create' });
   const selfApprove = await refusal(runMetaFeedbackWorkflow({
     facade: harness.activation.facade,
     store: harness.store,
     workflow: roundIntent(5),
-    sources: { evidenceKeys: ['v10/t09/evidence/self-approve'] },
+    sources: { evidenceKeys: [selfApproveKey] },
     now: () => NOW,
   }));
   assert.equal(selfApprove.code, 'META_AUTHORITY_FORBIDDEN');
 
-  await harness.store.put('v10/t09/candidate/effect', {
+  const effectCandidateKey = evidenceKeyFor('candidate/effect');
+  await harness.store.put(effectCandidateKey, {
     ...candidatePins,
     effectIntents: [],
     status: 'reported-match',
@@ -526,7 +290,7 @@ test('T09-N3 authority/effect material in consumed records is refused with uncha
     facade: harness.activation.facade,
     store: harness.store,
     workflow: roundIntent(5),
-    sources: { evidenceKeys: [EVIDENCE_KEY], candidateKey: 'v10/t09/candidate/effect' },
+    sources: { evidenceKeys: [EVIDENCE_KEY], candidateKey: effectCandidateKey },
     now: () => NOW,
   }));
   assert.equal(effect.code, 'META_AUTHORITY_FORBIDDEN');
@@ -557,6 +321,15 @@ test('T09-N4 invalid rounds and conflicting ledger reuse fail typed before a tur
   }));
   assert.equal(outsidePrefix.code, 'META_OPTIONS_INVALID');
 
+  const foreignScope = await refusal(runMetaFeedbackWorkflow({
+    facade: harness.activation.facade,
+    store: harness.store,
+    workflow: roundIntent(7),
+    sources: { evidenceKeys: ['v10/t09/evidence/legacy-global'] },
+    now: () => NOW,
+  }));
+  assert.equal(foreignScope.code, 'META_EVIDENCE_FOREIGN_SCOPE');
+
   const otherIntent = await refusal(runMetaFeedbackWorkflow({
     facade: harness.activation.facade,
     store: harness.store,
@@ -568,15 +341,23 @@ test('T09-N4 invalid rounds and conflicting ledger reuse fail typed before a tur
 
   const stateBefore = await stateOf(harness.activation);
   const conflictingKey = ledgerKeyFor(6);
+  const seededProposals = [{
+    proposalId: 'p-seeded', kind: 'no-action', summary: 'seeded',
+    evidenceRefs: [] as string[], authority: 'proposal-only', canApply: false,
+  }];
   await harness.store.put(conflictingKey, {
-    kind: 'v10/meta-feedback-round',
+    kind: META_FEEDBACK_LEDGER_KIND,
+    abi: META_FEEDBACK_ABI,
+    state: META_FEEDBACK_LEDGER_STATE,
+    scope: SCOPE,
+    instanceKey: MAIN_INSTANCE,
     scheduleKey: SCHEDULE,
     round: 6,
     inputDigest: 'f'.repeat(64),
-    proposalDigest: 'f'.repeat(64),
-    proposals: [],
+    proposalDigest: sha256Canonical(seededProposals),
+    proposals: seededProposals,
     receipt: { status: 'admitted' },
-    receiptDigest: 'f'.repeat(64),
+    receiptDigest: sha256Canonical({ status: 'admitted' }),
     createdAt: new Date(NOW).toISOString(),
   }, { kind: 'create' });
   const conflict = await refusal(runMetaFeedbackWorkflow({
@@ -639,11 +420,8 @@ export function proposeMetaFeedback() {
 
 test('T09-N6 a malicious selected proposal feature is refused before any K or ledger mutation', async () => {
   const maliciousPath = join(dir, 'k-malicious.sqlite');
-  const maliciousSqlite = await openSqliteCasStore({ path: maliciousPath });
-  const counts: Counts = { gets: 0, puts: 0, removes: 0 };
-  const store = v10Store(maliciousSqlite, counts);
-  const maliciousApp = await buildT09App(MALICIOUS_META_SOURCE);
-  const activation = await activateApp(maliciousApp, store);
+  const maliciousHarness = await openHarness(maliciousPath, { app: await buildT09App(MALICIOUS_META_SOURCE) });
+  const { activation, store, counts, sqlite } = maliciousHarness;
   try {
     for (const key of [EVIDENCE_KEY, CANDIDATE_KEY, SHADOW_KEY]) {
       const doc = await harness.store.get(key);
@@ -670,7 +448,7 @@ test('T09-N6 a malicious selected proposal feature is refused before any K or le
     );
   } finally {
     activation.dispose();
-    await maliciousSqlite.close();
+    await sqlite.close();
     for (const suffix of ['', '-wal', '-shm']) {
       await rm(`${maliciousPath}${suffix}`, { force: true });
     }

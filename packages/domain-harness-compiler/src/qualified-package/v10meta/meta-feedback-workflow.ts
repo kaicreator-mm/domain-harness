@@ -1,13 +1,15 @@
 /**
- * DomainHarness v0.10 T09 (#1178) — recurring proposal-only Meta Feedback
- * Workflow.
+ * DomainHarness v0.10 T09 (#1178, R1 repair) — recurring proposal-only Meta
+ * Feedback Workflow.
  * ====================================================================
  *
  * This Host-owned runner composes ONLY already-selected v0.10 surfaces:
  *
  *   (1) durable Decision Evidence / Candidate / Shadow records are read from
  *       the production document store through `get` only, bounded before any
- *       evaluator sees them;
+ *       evaluator sees them, and ONLY from the exact deployment/tenant/App/
+ *       Business evidence namespace derived from the trusted activation
+ *       binding (never a public caller claim);
  *   (2) a selected Standard feature (`standard:meta-feedback/1`) turns those
  *       bounded observations into at most four PROPOSAL records;
  *   (3) exactly ONE ordinary selected Business workflow turn records that
@@ -15,30 +17,45 @@
  *       self-transition whose guard accepts only `disposition:
  *       'proposal-only'` and `effectCount: 0`, and it declares no effect
  *       intent/binding at all;
- *   (4) a durable per-`(scheduleKey, round)` ledger makes a repeated round
- *       idempotent across process/SQLite restarts and refuses a conflicting
- *       reuse. Recurrence is explicit Host rounds (1..32), never an
- *       autonomous timer or a new Agent/Kernel runtime.
+ *   (4) a durable create-only RESERVATION is written BEFORE any business turn
+ *       can be admitted, and a create-only ledger is written after the turn.
+ *       Two simultaneous fresh writers of one round therefore cannot both
+ *       reach `facade.send`: the one reservation CAS winner owns the send and
+ *       every other fresh writer refuses typed. A later call that observes an
+ *       existing reservation (a crashed or still-running earlier attempt)
+ *       recovers by re-sending the SAME stable message identity with the
+ *       reservation's own recorded input — the selected Kernel's durable
+ *       message dedup replays the original receipt with zero new
+ *       State/Journal/Effect activity — and then finalizes the terminal
+ *       ledger. A pending reservation is never reported as success.
+ *       Recurrence is explicit Host rounds (1..32), never an autonomous timer
+ *       or a new Agent/Kernel runtime.
  *
  * The runner cannot approve, publish, promote a BUILD, activate a deployment
  * or dispatch an external Effect: it exposes no such operation and every
  * authority-shaped record is refused typed BEFORE any business turn or
- * ledger write. K State/Journal/Effect, the K02 fence and the immutable
- * original receipt remain exclusively the selected Kernel's.
+ * reservation/ledger write. K State/Journal/Effect, the K02 fence and the
+ * immutable original receipt remain exclusively the selected Kernel's.
  */
 import { V10AppFacade } from '../v10build/activation.js';
 import type { V10DocStore } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
 
-export const META_FEEDBACK_ABI = 'dh.v10.meta-feedback-workflow/1';
+export const META_FEEDBACK_ABI = 'dh.v10.meta-feedback-workflow/2';
 export const META_FEEDBACK_LEDGER_KIND = 'v10/meta-feedback-round';
+export const META_FEEDBACK_CLAIM_KIND = 'v10/meta-feedback-round-claim';
+export const META_FEEDBACK_CLAIM_STATE = 'reserved';
+export const META_FEEDBACK_LEDGER_STATE = 'committed';
 export const META_FEEDBACK_EVIDENCE_KEY_PREFIX = 'v10/t09/';
 export const META_FEEDBACK_LEDGER_PREFIX = 'v10-meta-feedback:';
+export const META_FEEDBACK_CLAIM_PREFIX = 'v10-meta-feedback-claim:';
 export const MAX_META_ROUNDS = 32;
 export const MAX_META_EVIDENCE_KEYS = 8;
 export const MAX_META_RECORD_CHARS = 32_768;
 
 const MAX_IDENTIFIER = 512;
+const MAX_SCOPE_COMPONENT = 256;
+const MAX_CREATED_AT = 64;
 const HEX64 = /^[0-9a-f]{64}$/;
 const AUTHORITY_KEYS = new Set([
   'approve', 'approved', 'approval', 'promote', 'promotion', 'activate',
@@ -54,6 +71,10 @@ const OPTION_FIELDS = new Set(['facade', 'store', 'workflow', 'sources', 'maxPro
 const WORKFLOW_FIELDS = new Set(['intentType', 'instanceKey', 'scheduleKey', 'round']);
 const SOURCE_FIELDS = new Set(['evidenceKeys', 'candidateKey', 'shadowKey']);
 const PROPOSAL_FIELDS = new Set(['proposalId', 'kind', 'summary', 'evidenceRefs', 'authority', 'canApply']);
+const TURN_INPUT_FIELDS = new Set([
+  'disposition', 'effectCount', 'proposalId', 'proposalDigest', 'evidenceDigest',
+  'candidateDigest', 'shadowDigest',
+]);
 
 export class MetaFeedbackError extends Error {
   readonly code: string;
@@ -91,13 +112,35 @@ function bounded(value: unknown, label: string, max = MAX_IDENTIFIER): string {
   return value;
 }
 
+/**
+ * Injective key-component encoding for BOTH delimiters this module uses:
+ * `:` between ledger/claim components and `/` between evidence-namespace
+ * components. `%` is escaped first, so the encoding is reversible and two
+ * distinct identity tuples can never alias one key.
+ */
 function encodeKeyComponent(value: string): string {
-  return value.replace(/%/g, '%25').replace(/:/g, '%3A');
+  return value.replace(/%/g, '%25').replace(/:/g, '%3A').replace(/\//g, '%2F');
 }
 
 function isCasConflict(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   return code === 'HOST_CAS_CONFLICT' || code === 'HOST_KEY_EXISTS';
+}
+
+/**
+ * The selected Kernel's durable message dedup returns the EXACT original
+ * receipt plus its honest `idempotentReplay` marker (and an optional healed
+ * `turnDisposition`). Those two annotations are replay metadata, not original
+ * receipt content: two concurrent recovery callers may observe one original
+ * and one replay-marked copy of the SAME receipt. Compare the stable original
+ * payload when a raced ledger must be adjudicated, and keep the recorded
+ * receipt itself byte-for-byte intact.
+ */
+function stableReceiptDigest(receipt: Record<string, unknown>): string {
+  const copy = { ...receipt };
+  delete copy.idempotentReplay;
+  delete copy.turnDisposition;
+  return sha256Canonical(copy);
 }
 
 /**
@@ -158,13 +201,68 @@ function snapshotValue(value: unknown, state: { nodes: number }, depth: number, 
   return result;
 }
 
-/** The explicit Host-driven recurrence address and its durable ledger key. */
-export function metaFeedbackLedgerKey(scheduleKey: string, round: number): string {
-  const key = bounded(scheduleKey, 'workflow.scheduleKey', 256);
+/**
+ * The exact selected deployment/Business identity that scopes BOTH the
+ * read-only evidence namespace and the create-only round records. It is
+ * derived from the trusted activation binding, never from public input.
+ */
+export interface MetaFeedbackScope {
+  readonly deployedAppId: string;
+  readonly tenantId: string;
+  readonly appId: string;
+  readonly businessPackageId: string;
+}
+
+function scopeSnapshot(scope: MetaFeedbackScope): MetaFeedbackScope {
+  if (!isPlainRecord(scope)) {
+    refuse('META_OPTIONS_INVALID', 'meta feedback scope must be a plain record');
+  }
+  return Object.freeze({
+    deployedAppId: bounded(scope.deployedAppId, 'scope.deployedAppId', MAX_SCOPE_COMPONENT),
+    tenantId: bounded(scope.tenantId, 'scope.tenantId', MAX_SCOPE_COMPONENT),
+    appId: bounded(scope.appId, 'scope.appId', MAX_SCOPE_COMPONENT),
+    businessPackageId: bounded(scope.businessPackageId, 'scope.businessPackageId', MAX_SCOPE_COMPONENT),
+  });
+}
+
+/**
+ * The read-only evidence namespace of ONE deployment/tenant/App/Business
+ * tuple. Every component is injectively encoded, so Tenant A can never point
+ * Tenant B's runner at its records through an ambiguous key.
+ */
+export function metaFeedbackEvidencePrefix(scope: MetaFeedbackScope): string {
+  const frozen = scopeSnapshot(scope);
+  return `${META_FEEDBACK_EVIDENCE_KEY_PREFIX}${encodeKeyComponent(frozen.deployedAppId)}/${encodeKeyComponent(frozen.tenantId)}/${encodeKeyComponent(frozen.appId)}/${encodeKeyComponent(frozen.businessPackageId)}/`;
+}
+
+function roundIdentity(scope: MetaFeedbackScope, instanceKey: string, scheduleKey: string, round: number): string {
+  const frozen = scopeSnapshot(scope);
   if (!Number.isSafeInteger(round) || round < 1 || round > MAX_META_ROUNDS) {
     refuse('META_ROUND_INVALID', `workflow.round must be an integer in [1, ${String(MAX_META_ROUNDS)}]`);
   }
-  return `${META_FEEDBACK_LEDGER_PREFIX}${encodeKeyComponent(key)}:${String(round)}`;
+  return [
+    encodeKeyComponent(frozen.deployedAppId),
+    encodeKeyComponent(frozen.tenantId),
+    encodeKeyComponent(frozen.appId),
+    encodeKeyComponent(frozen.businessPackageId),
+    encodeKeyComponent(bounded(instanceKey, 'workflow.instanceKey')),
+    encodeKeyComponent(bounded(scheduleKey, 'workflow.scheduleKey', 256)),
+    String(round),
+  ].join(':');
+}
+
+/** The terminal create-only ledger key of one exact round. */
+export function metaFeedbackLedgerKey(scope: MetaFeedbackScope, instanceKey: string, scheduleKey: string, round: number): string {
+  return `${META_FEEDBACK_LEDGER_PREFIX}${roundIdentity(scope, instanceKey, scheduleKey, round)}`;
+}
+
+/** The create-only pre-admission reservation key of one exact round. */
+export function metaFeedbackClaimKey(scope: MetaFeedbackScope, instanceKey: string, scheduleKey: string, round: number): string {
+  return `${META_FEEDBACK_CLAIM_PREFIX}${roundIdentity(scope, instanceKey, scheduleKey, round)}`;
+}
+
+function messageIdOf(scheduleKey: string, round: number, proposalDigest: string): string {
+  return `meta:${scheduleKey}:${String(round)}:${proposalDigest}`;
 }
 
 export interface MetaFeedbackSources {
@@ -185,7 +283,7 @@ export interface MetaFeedbackWorkflowAddress {
 export interface RunMetaFeedbackWorkflowOptions {
   /** The REAL activated selected App facade; a lookalike is refused. */
   readonly facade: V10AppFacade;
-  /** Durable production document store (read evidence, create-only ledger). */
+  /** Durable production document store (read evidence, create-only round records). */
   readonly store: V10DocStore;
   readonly workflow: MetaFeedbackWorkflowAddress;
   readonly sources: MetaFeedbackSources;
@@ -205,11 +303,19 @@ export interface MetaFeedbackAuthorityFlags {
 export interface MetaFeedbackResult {
   readonly status: 'proposed' | 'no-observation';
   readonly replayed: boolean;
+  /**
+   * True when this call consumed a pre-existing durable reservation left by
+   * an earlier (crashed or still-running) attempt and finalized it. A fresh
+   * reservation winner reports false.
+   */
+  readonly recovered: boolean;
   readonly proposals: readonly Readonly<Record<string, unknown>>[];
   readonly proposalDigest: string | null;
   readonly inputDigest: string;
   readonly round: number;
   readonly ledgerKey: string | null;
+  /** The pre-admission reservation key of this round, when one was addressed. */
+  readonly claimKey: string | null;
   readonly receipt: Readonly<Record<string, unknown>> | null;
   readonly receiptDigest: string | null;
   readonly counters: Readonly<{
@@ -236,6 +342,10 @@ interface ValidatedMetaFeedbackOptions {
   readonly store: V10DocStore;
   readonly workflow: MetaFeedbackWorkflowAddress;
   readonly sources: MetaFeedbackSources;
+  readonly scope: MetaFeedbackScope;
+  readonly evidencePrefix: string;
+  readonly ledgerKey: string;
+  readonly claimKey: string;
   readonly maxProposals: number;
   readonly now: () => number;
 }
@@ -255,9 +365,9 @@ function optionsSnapshot(options: unknown): ValidatedMetaFeedbackOptions {
   if (options.facade.isClosed()) {
     refuse('META_FACADE_CLOSED', 'the observed App facade is closed');
   }
-  if (!isPlainRecord(options.store)
-    || typeof options.store.get !== 'function'
-    || typeof options.store.put !== 'function') {
+  if (options.store === null || typeof options.store !== 'object'
+    || typeof (options.store as { get?: unknown }).get !== 'function'
+    || typeof (options.store as { put?: unknown }).put !== 'function') {
     refuse('META_OPTIONS_INVALID', 'a durable document store with get/put is required');
   }
   if (!isPlainRecord(options.workflow)) {
@@ -278,6 +388,38 @@ function optionsSnapshot(options: unknown): ValidatedMetaFeedbackOptions {
   if (!Number.isSafeInteger(round) || (round as number) < 1 || (round as number) > MAX_META_ROUNDS) {
     refuse('META_ROUND_INVALID', `workflow.round must be an integer in [1, ${String(MAX_META_ROUNDS)}]`);
   }
+
+  // Trusted activation binding — the ONLY source of the evidence/ledger scope.
+  // A caller cannot supply tenant/deployment/B claims; a facade activated
+  // without a deployment identity is refused rather than degrading to a
+  // shared global namespace.
+  let binding: V10AppFacade['selectedShadowBinding'];
+  let target: ReturnType<V10AppFacade['resolveIntentTarget']>;
+  try {
+    binding = options.facade.selectedShadowBinding;
+    target = options.facade.resolveIntentTarget(intentType);
+  } catch (error) {
+    refuse('META_OPTIONS_INVALID', 'the facade exposes no trusted activation binding for this Business', {
+      cause: error instanceof Error ? error.message : String(error),
+    });
+  }
+  if (binding.deployedAppId === null || binding.deploymentAppId === null) {
+    refuse(
+      'META_DEPLOYMENT_REQUIRED',
+      'scoped meta feedback requires an activation deployment identity (deployedAppId/tenantId/appId); no unscoped fallback exists',
+    );
+  }
+  const scope = scopeSnapshot({
+    deployedAppId: binding.deployedAppId,
+    tenantId: binding.tenantId,
+    appId: binding.deploymentAppId,
+    businessPackageId: target.businessPackageId,
+  });
+  if (!binding.businessPackageIds.includes(scope.businessPackageId)) {
+    refuse('META_OPTIONS_INVALID', 'the resolved intent target is not a selected Business package of this activation');
+  }
+  const evidencePrefix = metaFeedbackEvidencePrefix(scope);
+
   if (!isPlainRecord(options.sources)) {
     refuse('META_OPTIONS_INVALID', 'sources must be a plain record');
   }
@@ -294,6 +436,14 @@ function optionsSnapshot(options: unknown): ValidatedMetaFeedbackOptions {
     const key = bounded(raw, label);
     if (!key.startsWith(META_FEEDBACK_EVIDENCE_KEY_PREFIX)) {
       refuse('META_OPTIONS_INVALID', `${label} must live under the meta evidence prefix ${META_FEEDBACK_EVIDENCE_KEY_PREFIX}`);
+    }
+    // Refuse a foreign scope BEFORE any physical read: the key must already
+    // carry this exact deployment/tenant/App/Business tuple.
+    if (!key.startsWith(evidencePrefix)) {
+      refuse('META_EVIDENCE_FOREIGN_SCOPE', `${label} belongs to another deployment/tenant/Business evidence scope`, {
+        key,
+        expectedPrefix: evidencePrefix,
+      });
     }
     return key;
   };
@@ -317,6 +467,10 @@ function optionsSnapshot(options: unknown): ValidatedMetaFeedbackOptions {
     store: options.store as unknown as V10DocStore,
     workflow: Object.freeze({ intentType, instanceKey, scheduleKey, round: round as number }),
     sources: Object.freeze({ evidenceKeys: Object.freeze(evidenceKeys), ...(candidateKey === undefined ? {} : { candidateKey }), ...(shadowKey === undefined ? {} : { shadowKey }) }),
+    scope,
+    evidencePrefix,
+    ledgerKey: metaFeedbackLedgerKey(scope, instanceKey, scheduleKey, round as number),
+    claimKey: metaFeedbackClaimKey(scope, instanceKey, scheduleKey, round as number),
     maxProposals: maxProposals as number,
     now: now as () => number,
   };
@@ -328,19 +482,12 @@ async function readRecord(store: V10DocStore, key: string, label: string): Promi
   return { present: true, value: snapshotRecord(doc.value, label) };
 }
 
-function ledgerRecord(value: unknown, scheduleKey: string, round: number): Record<string, unknown> {
-  const record = snapshotRecord(value, 'meta feedback ledger');
-  if (record.kind !== META_FEEDBACK_LEDGER_KIND
-    || record.scheduleKey !== scheduleKey
-    || record.round !== round
-    || typeof record.inputDigest !== 'string' || !HEX64.test(record.inputDigest)
-    || typeof record.proposalDigest !== 'string' || !HEX64.test(record.proposalDigest)
-    || typeof record.receiptDigest !== 'string' || !HEX64.test(record.receiptDigest)
-    || !Array.isArray(record.proposals)
-    || !isPlainRecord(record.receipt)) {
-    refuse('META_LEDGER_INVALID', 'the durable meta feedback ledger record has an unrecognized shape');
-  }
-  return record;
+function sameScope(value: unknown, expected: MetaFeedbackScope): boolean {
+  return isPlainRecord(value)
+    && value.deployedAppId === expected.deployedAppId
+    && value.tenantId === expected.tenantId
+    && value.appId === expected.appId
+    && value.businessPackageId === expected.businessPackageId;
 }
 
 function validateProposalOutput(raw: unknown, maxProposals: number): readonly Readonly<Record<string, unknown>>[] {
@@ -389,43 +536,302 @@ function validateProposalOutput(raw: unknown, maxProposals: number): readonly Re
   return Object.freeze(proposals);
 }
 
-function resultOf(
-  status: 'proposed' | 'no-observation',
-  replayed: boolean,
-  proposals: readonly Readonly<Record<string, unknown>>[],
-  proposalDigest: string | null,
+interface Reservation {
+  readonly inputDigest: string;
+  readonly proposalDigest: string;
+  readonly proposals: readonly Readonly<Record<string, unknown>>[];
+  readonly messageId: string;
+  readonly turnInput: Readonly<Record<string, unknown>>;
+  readonly createdAt: string;
+}
+
+/**
+ * Validate the create-only pre-admission reservation of THIS exact round.
+ * The message identity and the full turn input are recovered from the
+ * reservation itself, so recovery cannot depend on a re-run feature result
+ * or a caller-supplied digest.
+ */
+function reservationRecord(value: unknown, validated: ValidatedMetaFeedbackOptions): Reservation {
+  const record = snapshotRecord(value, 'meta feedback reservation');
+  const { scope, workflow, maxProposals } = validated;
+  if (record.kind !== META_FEEDBACK_CLAIM_KIND
+    || record.abi !== META_FEEDBACK_ABI
+    || record.state !== META_FEEDBACK_CLAIM_STATE
+    || !sameScope(record.scope, scope)
+    || record.instanceKey !== workflow.instanceKey
+    || record.scheduleKey !== workflow.scheduleKey
+    || record.round !== workflow.round
+    || typeof record.inputDigest !== 'string' || !HEX64.test(record.inputDigest)
+    || typeof record.proposalDigest !== 'string' || !HEX64.test(record.proposalDigest)
+    || !Array.isArray(record.proposals)
+    || typeof record.messageId !== 'string' || record.messageId.length === 0 || record.messageId.length > MAX_IDENTIFIER
+    || typeof record.createdAt !== 'string' || record.createdAt.length === 0 || record.createdAt.length > MAX_CREATED_AT) {
+    refuse('META_CLAIM_INVALID', 'the durable meta feedback reservation has an unrecognized shape');
+  }
+  const proposals = validateProposalOutput({
+    proposalOnly: true,
+    canApprove: false,
+    canPromote: false,
+    canActivate: false,
+    canPublish: false,
+    kernelEffectPermit: false,
+    proposals: record.proposals,
+  }, maxProposals);
+  if (sha256Canonical(proposals) !== record.proposalDigest) {
+    refuse('META_CLAIM_INVALID', 'the durable reservation proposal digest does not match its recorded proposals');
+  }
+  if (record.messageId !== messageIdOf(workflow.scheduleKey, workflow.round, record.proposalDigest)) {
+    refuse('META_CLAIM_INVALID', 'the durable reservation message identity is not the exact stable round identity');
+  }
+  const turnInput = snapshotRecord(record.turnInput, 'meta feedback reservation turn input');
+  for (const key of Object.keys(turnInput)) {
+    if (!TURN_INPUT_FIELDS.has(key)) {
+      refuse('META_CLAIM_INVALID', `the durable reservation turn input carries an unsupported field '${key}'`);
+    }
+  }
+  const firstProposal = proposals[0];
+  if (turnInput.disposition !== 'proposal-only'
+    || turnInput.effectCount !== 0
+    || turnInput.proposalId !== firstProposal?.proposalId
+    || turnInput.proposalDigest !== record.proposalDigest
+    || typeof turnInput.evidenceDigest !== 'string' || !HEX64.test(turnInput.evidenceDigest)
+    || (turnInput.candidateDigest !== undefined && (typeof turnInput.candidateDigest !== 'string' || !HEX64.test(turnInput.candidateDigest)))
+    || (turnInput.shadowDigest !== undefined && (typeof turnInput.shadowDigest !== 'string' || !HEX64.test(turnInput.shadowDigest)))) {
+    refuse('META_CLAIM_INVALID', 'the durable reservation turn input is not the exact proposal-only input');
+  }
+  return Object.freeze({
+    inputDigest: record.inputDigest,
+    proposalDigest: record.proposalDigest,
+    proposals,
+    messageId: record.messageId,
+    turnInput: deepFreeze(turnInput),
+    createdAt: record.createdAt,
+  });
+}
+
+interface Ledger {
+  readonly inputDigest: string;
+  readonly proposalDigest: string;
+  readonly proposals: readonly Readonly<Record<string, unknown>>[];
+  readonly receipt: Readonly<Record<string, unknown>>;
+  readonly receiptDigest: string;
+  readonly createdAt: string;
+}
+
+/** Validate the terminal create-only ledger of THIS exact round. */
+function ledgerRecord(value: unknown, validated: ValidatedMetaFeedbackOptions): Ledger {
+  const record = snapshotRecord(value, 'meta feedback ledger');
+  const { scope, workflow, maxProposals } = validated;
+  if (record.kind !== META_FEEDBACK_LEDGER_KIND
+    || record.abi !== META_FEEDBACK_ABI
+    || record.state !== META_FEEDBACK_LEDGER_STATE
+    || !sameScope(record.scope, scope)
+    || record.instanceKey !== workflow.instanceKey
+    || record.scheduleKey !== workflow.scheduleKey
+    || record.round !== workflow.round
+    || typeof record.inputDigest !== 'string' || !HEX64.test(record.inputDigest)
+    || typeof record.proposalDigest !== 'string' || !HEX64.test(record.proposalDigest)
+    || typeof record.receiptDigest !== 'string' || !HEX64.test(record.receiptDigest)
+    || !Array.isArray(record.proposals)
+    || !isPlainRecord(record.receipt)
+    || typeof record.createdAt !== 'string' || record.createdAt.length === 0 || record.createdAt.length > MAX_CREATED_AT) {
+    refuse('META_LEDGER_INVALID', 'the durable meta feedback ledger record has an unrecognized shape');
+  }
+  const proposals = validateProposalOutput({
+    proposalOnly: true,
+    canApprove: false,
+    canPromote: false,
+    canActivate: false,
+    canPublish: false,
+    kernelEffectPermit: false,
+    proposals: record.proposals,
+  }, maxProposals);
+  if (sha256Canonical(proposals) !== record.proposalDigest) {
+    refuse('META_LEDGER_INVALID', 'the durable ledger proposal digest does not match its recorded proposals');
+  }
+  if (sha256Canonical(record.receipt) !== record.receiptDigest) {
+    refuse('META_LEDGER_INVALID', 'the durable ledger receipt digest does not match its recorded receipt');
+  }
+  return Object.freeze({
+    inputDigest: record.inputDigest,
+    proposalDigest: record.proposalDigest,
+    proposals,
+    receipt: deepFreeze(record.receipt),
+    receiptDigest: record.receiptDigest,
+    createdAt: record.createdAt,
+  });
+}
+
+function resultOf(input: {
+  status: 'proposed' | 'no-observation';
+  replayed: boolean;
+  recovered: boolean;
+  proposals: readonly Readonly<Record<string, unknown>>[];
+  proposalDigest: string | null;
+  inputDigest: string;
+  round: number;
+  ledgerKey: string | null;
+  claimKey: string | null;
+  receipt: Readonly<Record<string, unknown>> | null;
+  receiptDigest: string | null;
+  counters: MetaFeedbackResult['counters'];
+}): MetaFeedbackResult {
+  return Object.freeze({
+    status: input.status,
+    replayed: input.replayed,
+    recovered: input.recovered,
+    proposals: input.proposals,
+    proposalDigest: input.proposalDigest,
+    inputDigest: input.inputDigest,
+    round: input.round,
+    ledgerKey: input.ledgerKey,
+    claimKey: input.claimKey,
+    receipt: input.receipt,
+    receiptDigest: input.receiptDigest,
+    counters: input.counters,
+    authority: AUTHORITY,
+  });
+}
+
+function replayFromLedger(
+  validated: ValidatedMetaFeedbackOptions,
+  value: unknown,
   inputDigest: string,
-  round: number,
-  ledgerKey: string | null,
-  receipt: Readonly<Record<string, unknown>> | null,
-  receiptDigest: string | null,
   counters: MetaFeedbackResult['counters'],
 ): MetaFeedbackResult {
-  return Object.freeze({
-    status,
-    replayed,
-    proposals,
-    proposalDigest,
+  const record = ledgerRecord(value, validated);
+  if (record.inputDigest !== inputDigest) {
+    refuse('META_ROUND_CONFLICT', 'this schedule round already recorded a different evidence/candidate/shadow input', {
+      ledgerKey: validated.ledgerKey,
+      recordedInputDigest: record.inputDigest,
+      currentInputDigest: inputDigest,
+    });
+  }
+  return resultOf({
+    status: 'proposed',
+    replayed: true,
+    recovered: false,
+    proposals: record.proposals,
+    proposalDigest: record.proposalDigest,
     inputDigest,
-    round,
-    ledgerKey,
-    receipt,
+    round: validated.workflow.round,
+    ledgerKey: validated.ledgerKey,
+    claimKey: validated.claimKey,
+    receipt: record.receipt,
+    receiptDigest: record.receiptDigest,
+    counters: Object.freeze({ ...counters, proposals: record.proposals.length }),
+  });
+}
+
+/**
+ * Send the ONE reserved business turn using the reservation's own durable
+ * message identity and input, then commit the terminal ledger. Re-sending an
+ * already-admitted identity is exactly the selected Kernel's replay path: it
+ * returns the original receipt with no new State/Journal/Effect activity.
+ */
+async function finalizeReserved(
+  validated: ValidatedMetaFeedbackOptions,
+  reservation: Reservation,
+  counters: MetaFeedbackResult['counters'],
+  recovered: boolean,
+): Promise<MetaFeedbackResult> {
+  let receipt: Record<string, unknown>;
+  try {
+    const raw = await validated.facade.send({
+      intentType: validated.workflow.intentType,
+      instanceKey: validated.workflow.instanceKey,
+      messageId: reservation.messageId,
+      input: { ...reservation.turnInput },
+    });
+    if (!isPlainRecord(raw)) {
+      refuse('META_WORKFLOW_DENIED', 'the selected Business workflow returned no honest receipt');
+    }
+    receipt = raw;
+  } catch (error) {
+    if (error instanceof MetaFeedbackError) throw error;
+    refuse('META_WORKFLOW_DENIED', 'the selected Business workflow refused the proposal turn', {
+      cause: error instanceof Error ? error.message : String(error),
+    });
+  }
+  if (receipt.status !== 'admitted') {
+    refuse('META_WORKFLOW_DENIED', 'the selected Business workflow did not admit the proposal-only turn', {
+      receiptStatus: receipt.status,
+    });
+  }
+  const receiptSnapshot = deepFreeze(structuredClone(receipt));
+  const receiptDigest = sha256Canonical(receiptSnapshot);
+  const ledger = Object.freeze({
+    kind: META_FEEDBACK_LEDGER_KIND,
+    abi: META_FEEDBACK_ABI,
+    state: META_FEEDBACK_LEDGER_STATE,
+    scope: validated.scope,
+    instanceKey: validated.workflow.instanceKey,
+    scheduleKey: validated.workflow.scheduleKey,
+    round: validated.workflow.round,
+    inputDigest: reservation.inputDigest,
+    proposalDigest: reservation.proposalDigest,
+    proposals: reservation.proposals,
+    receipt: receiptSnapshot,
     receiptDigest,
-    counters,
-    authority: AUTHORITY,
+    createdAt: reservation.createdAt,
+  });
+
+  let recordedReceipt: Readonly<Record<string, unknown>> = receiptSnapshot;
+  let recordedReceiptDigest = receiptDigest;
+  try {
+    await validated.store.put(validated.ledgerKey, ledger, { kind: 'create' });
+  } catch (error) {
+    if (!isCasConflict(error)) throw error;
+    const raced = await validated.store.get(validated.ledgerKey);
+    if (raced === null || raced === undefined) {
+      refuse('META_ROUND_CONFLICT', 'the durable meta feedback ledger conflicted and could not be re-read', {
+        ledgerKey: validated.ledgerKey,
+      });
+    }
+    const record = ledgerRecord(raced.value, validated);
+    if (record.inputDigest !== reservation.inputDigest || record.proposalDigest !== reservation.proposalDigest) {
+      refuse('META_ROUND_CONFLICT', 'a concurrent writer recorded a different proposal for this schedule round', {
+        ledgerKey: validated.ledgerKey,
+      });
+    }
+    if (record.receiptDigest !== receiptDigest
+      && stableReceiptDigest(record.receipt) !== stableReceiptDigest(receiptSnapshot)) {
+      refuse('META_ROUND_CONFLICT', 'a concurrent writer recorded a different original receipt for this schedule round', {
+        ledgerKey: validated.ledgerKey,
+      });
+    }
+    recordedReceipt = record.receipt;
+    recordedReceiptDigest = record.receiptDigest;
+  }
+
+  return resultOf({
+    status: 'proposed',
+    replayed: false,
+    recovered,
+    proposals: reservation.proposals,
+    proposalDigest: reservation.proposalDigest,
+    inputDigest: reservation.inputDigest,
+    round: validated.workflow.round,
+    ledgerKey: validated.ledgerKey,
+    claimKey: validated.claimKey,
+    receipt: recordedReceipt,
+    receiptDigest: recordedReceiptDigest,
+    counters: Object.freeze({ ...counters, proposals: reservation.proposals.length }),
   });
 }
 
 /**
  * Run exactly one explicit Host round of the recurring proposal-only meta
- * feedback workflow. The same `(scheduleKey, round)` is idempotent; the next
- * round is a distinct bounded business turn. No approval/promotion/
- * activation/publication/Effect operation exists on this surface.
+ * feedback workflow. The same `(scope, instance, schedule, round)` is
+ * idempotent; the next round is a distinct bounded business turn. At most one
+ * fresh writer can reserve a round, and only a reservation owner (or a later
+ * recovery caller that observes the existing reservation) may send. No
+ * approval/promotion/activation/publication/Effect operation exists on this
+ * surface.
  */
 export async function runMetaFeedbackWorkflow(options: RunMetaFeedbackWorkflowOptions): Promise<MetaFeedbackResult> {
   const validated = optionsSnapshot(options);
   const { facade, store, workflow, sources, maxProposals, now } = validated;
-  const ledgerKey = metaFeedbackLedgerKey(workflow.scheduleKey, workflow.round);
 
   const evidence: { key: string; value: Record<string, unknown> }[] = [];
   let missingEvidence = 0;
@@ -457,60 +863,44 @@ export async function runMetaFeedbackWorkflow(options: RunMetaFeedbackWorkflowOp
     proposals: 0,
   });
 
-  if (evidence.length === 0) {
-    return resultOf(
-      'no-observation',
-      false,
-      Object.freeze([]),
-      null,
-      inputDigest,
-      workflow.round,
-      null,
-      null,
-      null,
-      counters,
-    );
+  // A terminal committed round is authoritative: replay it without invoking
+  // the feature or sending a second business turn.
+  const existing = await store.get(validated.ledgerKey);
+  if (existing !== null && existing !== undefined) {
+    return replayFromLedger(validated, existing.value, inputDigest, counters);
   }
 
-  // A durable accepted round is authoritative: replay it without invoking
-  // the feature or sending a second business turn.
-  const existing = await store.get(ledgerKey);
-  if (existing !== null && existing !== undefined) {
-    const record = ledgerRecord(existing.value, workflow.scheduleKey, workflow.round);
-    if (record.inputDigest !== inputDigest) {
-      refuse('META_ROUND_CONFLICT', 'this schedule round already recorded a different evidence/candidate/shadow input', {
-        ledgerKey,
-        recordedInputDigest: record.inputDigest,
+  // A reservation observed BEFORE any proposal work is an earlier attempt
+  // (crashed or still running), never a simultaneous fresh competitor. It is
+  // recovered from its own durable message identity and input.
+  const existingClaim = await store.get(validated.claimKey);
+  if (existingClaim !== null && existingClaim !== undefined) {
+    const reservation = reservationRecord(existingClaim.value, validated);
+    if (reservation.inputDigest !== inputDigest) {
+      refuse('META_ROUND_CONFLICT', 'this schedule round was already reserved with a different evidence/candidate/shadow input', {
+        claimKey: validated.claimKey,
+        recordedInputDigest: reservation.inputDigest,
         currentInputDigest: inputDigest,
       });
     }
-    const recordedProposals = validateProposalOutput({
-      proposalOnly: true,
-      canApprove: false,
-      canPromote: false,
-      canActivate: false,
-      canPublish: false,
-      kernelEffectPermit: false,
-      proposals: record.proposals,
-    }, maxProposals);
-    return resultOf(
-      'proposed',
-      true,
-      recordedProposals,
-      record.proposalDigest as string,
+    return await finalizeReserved(validated, reservation, counters, true);
+  }
+
+  if (evidence.length === 0) {
+    return resultOf({
+      status: 'no-observation',
+      replayed: false,
+      recovered: false,
+      proposals: Object.freeze([]),
+      proposalDigest: null,
       inputDigest,
-      workflow.round,
-      ledgerKey,
-      record.receipt as Readonly<Record<string, unknown>>,
-      record.receiptDigest as string,
-      Object.freeze({
-        evidenceRecords: evidence.length,
-        missingEvidence,
-        candidateRecords: candidate.present ? 1 : 0,
-        shadowRecords: shadow.present ? 1 : 0,
-        proposals: recordedProposals.length,
-      }),
-    );
+      round: workflow.round,
+      ledgerKey: null,
+      claimKey: null,
+      receipt: null,
+      receiptDigest: null,
+      counters,
+    });
   }
 
   let report: unknown;
@@ -532,83 +922,59 @@ export async function runMetaFeedbackWorkflow(options: RunMetaFeedbackWorkflowOp
   }
   const proposals = validateProposalOutput(report, maxProposals);
   const proposalDigest = sha256Canonical(proposals);
-  const firstProposalId = typeof proposals[0]?.proposalId === 'string' ? proposals[0].proposalId : 'none';
-  const messageId = `meta:${workflow.scheduleKey}:${String(workflow.round)}:${proposalDigest}`;
-
-  let receipt: Record<string, unknown>;
-  try {
-    const raw = await facade.send({
-      intentType: workflow.intentType,
-      instanceKey: workflow.instanceKey,
-      messageId,
-      input: {
-        disposition: 'proposal-only',
-        effectCount: 0,
-        proposalId: firstProposalId,
-        proposalDigest,
-        evidenceDigest,
-        ...(candidateDigest === null ? {} : { candidateDigest }),
-        ...(shadowDigest === null ? {} : { shadowDigest }),
-      },
-    });
-    if (!isPlainRecord(raw)) {
-      refuse('META_WORKFLOW_DENIED', 'the selected Business workflow returned no honest receipt');
-    }
-    receipt = raw;
-  } catch (error) {
-    if (error instanceof MetaFeedbackError) throw error;
-    refuse('META_WORKFLOW_DENIED', 'the selected Business workflow refused the proposal turn', {
-      cause: error instanceof Error ? error.message : String(error),
-    });
-  }
-  if (receipt.status !== 'admitted') {
-    refuse('META_WORKFLOW_DENIED', 'the selected Business workflow did not admit the proposal-only turn', {
-      receiptStatus: receipt.status,
-    });
-  }
-  const receiptSnapshot = deepFreeze(structuredClone(receipt));
-  const receiptDigest = sha256Canonical(receiptSnapshot);
+  const firstProposal = proposals[0];
+  const firstProposalId = typeof firstProposal?.proposalId === 'string' ? firstProposal.proposalId : 'none';
+  const messageId = messageIdOf(workflow.scheduleKey, workflow.round, proposalDigest);
+  const turnInput = Object.freeze({
+    disposition: 'proposal-only',
+    effectCount: 0,
+    proposalId: firstProposalId,
+    proposalDigest,
+    evidenceDigest,
+    ...(candidateDigest === null ? {} : { candidateDigest }),
+    ...(shadowDigest === null ? {} : { shadowDigest }),
+  });
   const createdAt = new Date(now()).toISOString();
-  const ledger = Object.freeze({
-    kind: META_FEEDBACK_LEDGER_KIND,
+  const reservation = Object.freeze({
+    kind: META_FEEDBACK_CLAIM_KIND,
+    abi: META_FEEDBACK_ABI,
+    state: META_FEEDBACK_CLAIM_STATE,
+    scope: validated.scope,
+    instanceKey: workflow.instanceKey,
     scheduleKey: workflow.scheduleKey,
     round: workflow.round,
     inputDigest,
     proposalDigest,
     proposals,
-    receipt: receiptSnapshot,
-    receiptDigest,
+    messageId,
+    turnInput,
     createdAt,
   });
 
-  let recorded: Record<string, unknown> = { ...ledger };
+  // Pre-admission CAS arbitration: exactly ONE fresh writer may proceed from
+  // here to `facade.send`. A concurrent loser NEVER sends, even when its
+  // proposal happens to match, because the reservation owner owns the turn.
   try {
-    await store.put(ledgerKey, ledger, { kind: 'create' });
+    await store.put(validated.claimKey, reservation, { kind: 'create' });
   } catch (error) {
     if (!isCasConflict(error)) throw error;
-    const raced = await store.get(ledgerKey);
+    const raced = await store.get(validated.claimKey);
     if (raced === null || raced === undefined) {
-      refuse('META_ROUND_CONFLICT', 'the durable meta feedback ledger conflicted and could not be re-read', { ledgerKey });
-    }
-    const record = ledgerRecord(raced.value, workflow.scheduleKey, workflow.round);
-    if (record.inputDigest !== inputDigest || record.proposalDigest !== proposalDigest) {
-      refuse('META_ROUND_CONFLICT', 'a concurrent writer recorded a different proposal for this schedule round', {
-        ledgerKey,
+      refuse('META_ROUND_CONFLICT', 'the durable meta feedback reservation conflicted and could not be re-read', {
+        claimKey: validated.claimKey,
       });
     }
-    recorded = record;
+    const other = reservationRecord(raced.value, validated);
+    if (other.inputDigest !== inputDigest || other.proposalDigest !== proposalDigest) {
+      refuse('META_ROUND_CONFLICT', 'a concurrent writer reserved this schedule round with a different selected proposal', {
+        claimKey: validated.claimKey,
+      });
+    }
+    refuse('META_ROUND_IN_PROGRESS', 'another writer owns this schedule round reservation; retry after it finalizes', {
+      claimKey: validated.claimKey,
+    });
   }
 
-  return resultOf(
-    'proposed',
-    false,
-    proposals,
-    proposalDigest,
-    inputDigest,
-    workflow.round,
-    ledgerKey,
-    recorded.receipt as Readonly<Record<string, unknown>>,
-    recorded.receiptDigest as string,
-    Object.freeze({ ...counters, proposals: proposals.length }),
-  );
+  const reserved = reservationRecord(reservation, validated);
+  return await finalizeReserved(validated, reserved, counters, false);
 }

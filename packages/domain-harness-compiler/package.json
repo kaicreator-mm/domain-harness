@@ -9,7 +9,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./v10meta": {
+      "types": "./dist/qualified-package/v10meta/index.d.ts",
+      "import": "./dist/qualified-package/v10meta/index.js"
+    },
+    "./payload/business-meta-feedback-v1": "./src/qualified-package/payload/business-meta-feedback-v1.mjs",
+    "./payload/sfeature-meta-feedback-v1": "./src/qualified-package/payload/sfeature-meta-feedback-v1.mjs",
+    "./payload/kernel-mechanism-v1": "./src/qualified-package/payload/kernel-mechanism-v1.mjs",
+    "./payload/standard-sdk-v1": "./src/qualified-package/payload/standard-sdk-v1.mjs"
   },
   "files": [
     "dist",
