@@ -474,6 +474,21 @@ export class V10AppFacade {
         return { ...runtime.counters };
     }
     /**
+     * [v0.10 T08 #1175] Read-only resolution of ONE sealed public intent to
+     * its exact selected Business package and policy workflow id. Deployment
+     * governance uses this to address the immutable occurrence→BUILD pin; it
+     * grants no admission/query authority, reads no K storage and cannot
+     * change route selection.
+     */
+    resolveIntentTarget(intentType) {
+        this.#assertOpen();
+        if (typeof intentType !== 'string' || intentType.length === 0) {
+            refuse('INTENT_UNSEALED', 'intentType must be a non-empty sealed intent id');
+        }
+        const businessPackageId = this.#businessFor(intentType);
+        return Object.freeze({ businessPackageId, workflowId: this.#policyWorkflowId(businessPackageId) });
+    }
+    /**
      * [v0.10 T10 #1176] Authorized, explicit scoped snapshot query over the
      * selected kernel. The public caller supplies ONLY workflowId, instanceKey
      * and optionally the Business packageId — never a principal, grant,

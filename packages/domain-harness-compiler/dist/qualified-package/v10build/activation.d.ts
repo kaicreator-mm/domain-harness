@@ -308,6 +308,17 @@ export declare class V10AppFacade {
     /** The real kernel's own counters for one business package. */
     kCounters(businessPackageId: string): Record<string, number>;
     /**
+     * [v0.10 T08 #1175] Read-only resolution of ONE sealed public intent to
+     * its exact selected Business package and policy workflow id. Deployment
+     * governance uses this to address the immutable occurrence→BUILD pin; it
+     * grants no admission/query authority, reads no K storage and cannot
+     * change route selection.
+     */
+    resolveIntentTarget(intentType: string): Readonly<{
+        businessPackageId: string;
+        workflowId: string;
+    }>;
+    /**
      * [v0.10 T10 #1176] Authorized, explicit scoped snapshot query over the
      * selected kernel. The public caller supplies ONLY workflowId, instanceKey
      * and optionally the Business packageId — never a principal, grant,
