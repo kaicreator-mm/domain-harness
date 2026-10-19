@@ -27,6 +27,8 @@
  *   T10-N3  a malformed selector is refused without key search.
  *   T10-N4  queries never write: every query path above leaves the physical
  *           store put/remove counters and the effect dispatch log unchanged.
+ *   T10-P4  after a physical store close/reopen (restart), the query answers
+ *           from DURABLE per-B state — each B still exactly its own.
  *
  * The kernel asserted here is the exact K02-spliced integration blob (same
  * pin as k02-namespace-two-b-physical.test.ts); any kernel drift fails the
@@ -338,4 +340,26 @@ test('T10-N4 physical: every query path leaves the physical store and effect log
   assert.equal(physicalPuts, putsBefore, 'queries perform zero physical writes');
   assert.equal(physicalRemoves, removesBefore);
   assert.equal(dispatches.length, dispatchesBefore, 'queries dispatch zero effects');
+});
+
+test('T10-P4 physical: after a store close/reopen (restart) the query answers from DURABLE per-B state', async () => {
+  // Restart: close the physical SQLite file, reopen it, rebuild the scoped
+  // runtimes over the SAME file — the query must answer from durable bytes,
+  // not from any in-memory runtime state left over from the setup phase.
+  await store.close();
+  store = await openSqliteCasStore({ path: sqlitePath });
+  const reopenedAlpha = runtime(createScopedDocumentStore(SCOPE_ALPHA, countedStore), B_ALPHA);
+  const reopenedBeta = runtime(createScopedDocumentStore(SCOPE_BETA, countedStore), B_BETA);
+  runtimes.set(B_ALPHA, reopenedAlpha);
+  runtimes.set(B_BETA, reopenedBeta);
+
+  const h = makeQuery();
+  const alphaAnswer = await h.query.query({ ...SHARED_TARGET, businessPackageId: B_ALPHA });
+  assert.equal(alphaAnswer.snapshot.state.stateKey, 'approved', 'B1\'s durable completed state survives the restart');
+  assert.equal(alphaAnswer.snapshot.lifecycle, 'completed');
+  const betaAnswer = await h.query.query({ ...SHARED_TARGET, businessPackageId: B_BETA });
+  assert.equal(betaAnswer.snapshot.state.stateKey, 'review', 'B2\'s durable mid-flight state survives the restart, still untouched by B1');
+  assert.equal(betaAnswer.snapshot.stateRevision, 1);
+  // The restarted deployment stays ambiguous for a both-visible unscoped query.
+  await assert.rejects(h.query.query({ ...SHARED_TARGET }), refusal('QUERY_AMBIGUOUS'));
 });
