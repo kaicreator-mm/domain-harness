@@ -18,6 +18,15 @@ parallel_coordination:
   k01_claim_ref: "#1167@6254163915"
   k01_single_writer_file: packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs
   k02_kernel_splice_state: PARTIAL_BLOCKED_PENDING_K01_RELEASE
+phase2_integration:
+  base_sha: "027f3b7405504a7e309991736d0336fd4147f8fd"
+  base_composition: "t016 #1186 (5a9683cf) + T00 #1184 (87de82d8) + K01 #1183"
+  k01_release_ref: "#1183 merged (head 36f068e3)"
+  splice_commit: "24747e39"
+  typecheck_repair_commit: "d0992d57"
+  kernel_blob: "d7909b8ff8071e1f15d8b55fe6f967d883f6b4ac"
+  k02_kernel_splice_state_after: EXECUTED_COMBINED_PHYSICAL_RUN
+  full_gate: "tools/task-check.sh EXIT=0, 4070 pass / 0 fail at d0992d57"
 material_paths:
   - packages/domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs
   - packages/domain-harness-compiler/tests/v08-k02-durable-receipt-carrier.test.ts

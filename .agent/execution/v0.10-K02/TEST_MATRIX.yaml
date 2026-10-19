@@ -52,6 +52,12 @@
   covers: lint+typecheck+targeted tests at exact HEAD; real exit codes
   verdicts: [EXIT-0]
 
+- id: K02-G2
+  file: tools/task-check.sh
+  kind: gate-full
+  covers: phase-2 full gate on the rebased branch (v0.10@027f3b74 + phase-1 + splice, HEAD d0992d57) — lint -> workspaces typecheck -> workspaces test + test:root on Node v24.21.0; 4070 pass / 0 fail; the pre-existing t016 red from phase-1 is fixed on the base by #1186
+  verdicts: [EXIT-0]
+
 neighbors_regression:
   - packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts   # K01-modified file: NOT run/edited by K02 (K01 owns); recorded as coordination fact, not a K02 gate
   - packages/domain-harness/tests/v08-host/v08-host-c01-cas.test.ts                          # CAS store direct neighbor (unmodified)

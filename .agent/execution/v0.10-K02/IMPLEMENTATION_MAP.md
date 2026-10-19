@@ -75,12 +75,19 @@ for the store; fragment imported as plain .mjs) sharing ONE SQLite file (K02-R1)
 single-winner original ACK, loser idempotent replay, changed-input race typed conflict,
 20-turn sequence across two real child processes.
 
-## Kernel splice anchors — EXECUTED (phase-2, integration/k02-splice-on-k01)
+## Kernel splice anchors — EXECUTED (phase-2; rebased onto integrated v0.10)
 K01 released its single-writer file at #1183 head 36f068e3fd6531c71138d67250fd56c2eb675c44
-(dispatch attest mechanism + docs.remove seam included). The integration branch
-`integration/k02-splice-on-k01` merges that commit into the K02 phase-1 branch
-(merge 968ca952, conflict-free) and executes all five anchors on
-`kernel-mechanism-v1.mjs`. Integrated kernel blob (git SHA-1, final after lint fix):
+(dispatch attest mechanism + docs.remove seam included; merged into `v0.10` as
+`027f3b74`). The splice was first executed on `integration/k02-splice-on-k01`
+(merge of the K01 head into the phase-1 branch, conflict-free); the task branch
+`task/v0.10-k02-durable-receipt` was then rebuilt LINEARLY on `v0.10@027f3b74`
+(= t016 oracle #1186 `5a9683cf` + T00 #1184 `87de82d8` + K01 #1183): the six
+phase-1 commits cherry-picked conflict-free, the splice re-applied as `24747e39`
+(kernel bytes identical — blob unchanged across the rebase), plus tests-dir
+typecheck repair `d0992d57` (`CasGetResult.value` is `unknown`; the combined
+suite's four raw row reads now cast exactly like the phase-1 suites — caught
+ONLY by the domain-harness test-chain tail `tsc -p tsconfig.test.json`, which
+targeted gates bypass). Integrated kernel blob (git SHA-1, final after lint fix):
 **d7909b8ff8071e1f15d8b55fe6f967d883f6b4ac**
 (the file is byte-frozen from here).
 
@@ -177,6 +184,7 @@ exact bytes (data-URL, blob pinned in-file), real `openSqliteCasStore`, scoped w
 | tg5-kernel-taxonomy (conflict code) | node --import tsx --test tests/v08-integration/tg5-kernel-taxonomy-selected-physical.test.ts (domain-harness) | EXIT=0, 6/6 |
 | oracle rebind | node --import tsx --test tests/v08-tf-oracle-fr02-fr07.test.ts (compiler) | EXIT=0, 15/15 |
 | gates | build (both pkgs) / typecheck (both pkgs) / targeted eslint | EXIT=0; committed dist byte-identical (no src change under domain-harness/src) |
+| full gate on rebased HEAD `d0992d57` | tools/task-check.sh (lint → workspaces typecheck → workspaces test + test:root), Node v24.21.0 | EXIT=0 **全绿: 4070 pass / 0 fail** (t016 fixed on base by #1186; two transient work-tree-only repairs were needed first: the tests-dir typecheck row above, and building the untracked local expo/node dist inputs that tests/tools/script consumes) |
 
 ## Ordering discipline
 1. This pack + claim (done first). 2. Carrier fragment + unit tests. 3. Physical suites
