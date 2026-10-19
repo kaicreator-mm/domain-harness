@@ -1,0 +1,3 @@
+# T04 — Optional scoped Memory Basic
+Source authority #1171; Task Breakdown #1171@6259400336; predecessor #1166 CLOSED; DAG #1163@6252973905; v0.10 only.
+Deliver typed put/get/search/delete behind trusted per-operation authorization, injective tenant/app/B/agent/thread scope, revision-CAS, TTL and provenance on actual SQLite document backing. Memory has no K State/Journal/Effect/Receipt authority. Tiny does not select memory. Source authority exact SHA re-read before writes. Web builds isolated Host C capability slice; additional BUILD/selected-C integration must be demonstrated for Task terminal acceptance. No false CI/Host PASS.
