@@ -32,4 +32,6 @@ export { HF20_MUTATION_OBSERVATION_CONTRACT_VERSION, HF20_MUTATION_OBSERVATION_K
 // deadline + callback correlation; the Kernel keeps sole State/Journal/
 // Effect/turn-identity authority).
 export { ChildInvocationCoordinator, DurableControlError, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf } from './durable-controls.js';
+// v0.10 optional C/Host Memory capability (no Kernel state authority).
+export { V10ScopedMemoryCapability, V10MemoryError, createV10ScopedMemory } from './v010-scoped-memory.js';
 //# sourceMappingURL=index.js.map

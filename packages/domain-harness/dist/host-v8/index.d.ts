@@ -35,4 +35,6 @@ export { HF20_MUTATION_OBSERVATION_CONTRACT_VERSION, HF20_MUTATION_OBSERVATION_K
 export type { Hf20MutationCommitIntent, Hf20MutationObservationKind, Hf20MutationObservationRecord, Hf20MutationObservationWindow, Hf20ObservationCursor, Hf20ObservationErrorCode, Hf20ObservationGap, Hf20ObservationGapKind, Hf20ObservationPage, Hf20ObservationReadRequest, } from './hf20-mutation-observation.js';
 export { ChildInvocationCoordinator, DurableControlError, ExternalWorkCoordinator, childInvocationCorrelationId, kernelTurnSourceOf } from './durable-controls.js';
 export type { ChildInvocationRecord, ChildInvocationTurnPlan, DurableControlErrorCode, ExternalWorkRecord, ExternalWorkTurnSource, RegisterExternalWorkInput, } from './durable-controls.js';
+export { V10ScopedMemoryCapability, V10MemoryError, createV10ScopedMemory } from './v010-scoped-memory.js';
+export type { V10MemoryHost, V10MemoryScope, V10MemoryRead, V10MemoryProvenance, V10MemoryAuthRequest, V10MemoryOperation } from './v010-scoped-memory.js';
 //# sourceMappingURL=index.d.ts.map

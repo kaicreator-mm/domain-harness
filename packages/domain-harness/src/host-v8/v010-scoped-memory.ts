@@ -119,10 +119,10 @@ export class V10ScopedMemoryCapability {
       || !v.provenance || typeof v.provenance !== 'object') {
       refuse('MEMORY_RECORD_INVALID', 'stored memory value, expiry or provenance malformed');
     }
-    if (v.expiresAtMs !== null && this.#now() >= (v.expiresAtMs as number)) return null;
+    if (v.expiresAtMs !== null && this.#now() >= v.expiresAtMs) return null;
     return { value: canonicalJson(v.value), revision,
       provenance: validProvenance(v.provenance as V10MemoryProvenance),
-      expiresAtMs: v.expiresAtMs as number | null };
+      expiresAtMs: v.expiresAtMs };
   }
   async put(input: {
     scope: V10MemoryScope;
