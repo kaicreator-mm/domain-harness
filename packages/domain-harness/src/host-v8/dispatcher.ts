@@ -12,6 +12,14 @@
  * Every dispatch carries the AUTHENTICATED principal (verified credential),
  * so a resource can never mistake caller-declared user data for identity.
  *
+ * [#1108 K01 R2 P1] The kernel may thread one kernel-minted per-call
+ * attestation object (`DispatchAttestation`) as the DEDICATED trailing
+ * argument of `call`/`callScoped` (never the payload, never the dispatch
+ * context, never the handler). The dispatcher marks it only for its OWN
+ * pre-handler refusals (MALFORMED / NAMESPACE_RESERVED / UNKNOWN) — the sole
+ * trusted zero-external-effect proof channel; once a handler runs, nothing
+ * is provable and no code string an adapter throws can change that.
+ *
  * #1023 S05 — the dispatcher's map keys are PHYSICAL keys. Deployment-owned
  * handlers install under their bare logical key (this module's historical
  * shape); capability-owned adapters install under the INJECTIVE composed
@@ -36,6 +44,29 @@ export interface DispatchContext {
 }
 
 export type ResourceHandler = (operation: string, payload: unknown, context: DispatchContext) => unknown;
+
+/**
+ * [#1108 K01 R2 P1] The kernel-minted per-call attestation object. The
+ * kernel's effect executor mints ONE fresh attestation per resources-port
+ * call and threads it as a DEDICATED trailing argument (never inside the
+ * payload, never inside the DispatchContext, never forwarded to the resource
+ * handler). The dispatcher marks it — synchronously, BEFORE the refusal
+ * throws — for its OWN pre-handler refusals only. Anything else a port call
+ * throws (adapter/handler faults, fault injection, post-mutation errors
+ * carrying any code string, including the dispatcher's own code names) is
+ * NEVER attested: a thrown `code` proves nothing about external effects.
+ */
+export interface DispatchAttestation {
+  /** Set only by the trusted dispatcher, only for its own pre-handler refusals. */
+  preHandlerRefusal: string | null;
+}
+
+/** Marks the attestation when the value is a kernel-minted attestation object. */
+function attestPreHandlerRefusal(attest: DispatchAttestation | undefined, code: string): void {
+  if (attest !== undefined && attest !== null && typeof attest === 'object') {
+    attest.preHandlerRefusal = code;
+  }
+}
 
 /**
  * #1023 S05 R1 P1-01: the delimiter of the scoped-physical namespace. Every
@@ -163,8 +194,12 @@ export class ResourceDispatcher {
     this.#failNextResource = resourceKey;
   }
 
-  async call(resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown> {
+  async call(resourceKey: string, operation: string, payload: unknown, context: DispatchContext, attest?: DispatchAttestation): Promise<unknown> {
     if (typeof resourceKey !== 'string' || resourceKey.length === 0 || typeof operation !== 'string' || operation.length === 0) {
+      // [#1108 K01 R2 P1] A dispatcher-OWNED pre-handler refusal: marked on
+      // the kernel-minted attestation BEFORE the throw (the only trusted
+      // zero-external-effect proof channel).
+      attestPreHandlerRefusal(attest, 'HOST_RESOURCE_MALFORMED');
       throw new HostBoundaryError('HOST_RESOURCE_MALFORMED', 'resource dispatch requires non-empty resourceKey and operation strings');
     }
     // #1023 S05 R1 P1-01: the scoped-physical namespace is reserved. A key
@@ -185,12 +220,13 @@ export class ResourceDispatcher {
         resourceKey,
         operation,
       });
+      attestPreHandlerRefusal(attest, 'HOST_RESOURCE_NAMESPACE_RESERVED');
       throw new HostBoundaryError(
         'HOST_RESOURCE_NAMESPACE_RESERVED',
         `HOST_RESOURCE_NAMESPACE_RESERVED: resource keys containing the scoped-physical delimiter are reserved for the trusted per-activation capability port; dispatching a scoped physical key by name through the raw Host resource port is refused`,
       );
     }
-    return this.#dispatch(resourceKey, operation, payload, context);
+    return this.#dispatch(resourceKey, operation, payload, context, attest);
   }
 
   /**
@@ -203,18 +239,20 @@ export class ResourceDispatcher {
    * the Kernel mechanism, the Business packages or any caller (the raw ports
    * are additionally session-capability-gated in kernel-host.ts).
    */
-  async callScoped(scopeId: string, resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown> {
+  async callScoped(scopeId: string, resourceKey: string, operation: string, payload: unknown, context: DispatchContext, attest?: DispatchAttestation): Promise<unknown> {
     if (typeof scopeId !== 'string' || scopeId.length === 0 || scopeId.includes(SCOPED_RESOURCE_DELIMITER)) {
+      attestPreHandlerRefusal(attest, 'HOST_RESOURCE_MALFORMED');
       throw new HostBoundaryError('HOST_RESOURCE_MALFORMED', 'scoped resource dispatch requires a non-empty scopeId without the scoped-physical delimiter');
     }
     if (typeof resourceKey !== 'string' || resourceKey.length === 0 || typeof operation !== 'string' || operation.length === 0) {
+      attestPreHandlerRefusal(attest, 'HOST_RESOURCE_MALFORMED');
       throw new HostBoundaryError('HOST_RESOURCE_MALFORMED', 'resource dispatch requires non-empty resourceKey and operation strings');
     }
-    return this.#dispatch(`${scopeId}${SCOPED_RESOURCE_DELIMITER}${resourceKey}`, operation, payload, context);
+    return this.#dispatch(`${scopeId}${SCOPED_RESOURCE_DELIMITER}${resourceKey}`, operation, payload, context, attest);
   }
 
   /** The shared physical dispatch core: accounting, fault injection, handler. */
-  async #dispatch(resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown> {
+  async #dispatch(resourceKey: string, operation: string, payload: unknown, context: DispatchContext, attest?: DispatchAttestation): Promise<unknown> {
     const handler = this.#handlers.get(resourceKey);
     if (handler === undefined) {
       // Accounting happens BEFORE any refusal: an unprovisioned dispatch is
@@ -229,6 +267,8 @@ export class ResourceDispatcher {
         resourceKey,
         operation,
       });
+      // [#1108 K01 R2 P1] Dispatcher-owned pre-handler refusal — attested.
+      attestPreHandlerRefusal(attest, 'HOST_RESOURCE_UNKNOWN');
       throw new HostBoundaryError('HOST_RESOURCE_UNKNOWN', `host resource ${resourceKey}.${operation} is not provisioned on this host`);
     }
     this.#calls.push({
@@ -243,8 +283,16 @@ export class ResourceDispatcher {
     });
     if (this.#failNextResource !== null && this.#failNextResource === resourceKey) {
       this.#failNextResource = null;
+      // NOT attested: the injected fault is UNCERTAIN by contract (it fires
+      // after dispatch accounting, with the handler never running) — but
+      // uncertainty is the honest class, and only the dispatcher's structural
+      // pre-handler refusals above are provable zero-effect.
       throw new HostBoundaryError('HOST_FAULT_INJECTED', `physical resource ${resourceKey}.${operation} timed out after dispatch (uncertain outcome)`);
     }
+    // [#1108 K01 R2 P1] The attestation NEVER reaches the handler: the
+    // handler signature stays (operation, payload, context). Once the handler
+    // runs, zero-external-effect is no longer provable by anyone — every
+    // attestation stays unmarked and the kernel's proof fails closed.
     return handler(operation, payload, context);
   }
 

@@ -32,7 +32,7 @@ import { installHostModelPort, preflightHostModelPort } from '../public-v8/model
 import { installGatewaySessionCap, preflightGatewaySessionCap } from '../public-v8/microkernel.js';
 import { sha256Hex } from '../public-v8/contracts.js';
 import { probeTrueCasStore, InMemoryCasStore, type CasDocumentStore, type CasPutConditions } from './cas.js';
-import { ResourceDispatcher } from './dispatcher.js';
+import { ResourceDispatcher, type DispatchAttestation } from './dispatcher.js';
 import { ScopedEventHub } from './events.js';
 import { HostIdentityVerifier, revocationKey, type HostCredential, type HostPrincipal } from './identity.js';
 import { HostBoundaryError } from './errors.js';
@@ -206,15 +206,18 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
   // #1013 (I01): the COMPLETE protected Kernel Host ports over the probed
   // physical storage. The physically selected Kernel mechanism consumes
   // exactly this bounded contract (kernel-mechanism-v1.mjs): true-CAS docs
-  // get/put/list over the SAME probed physical store (conditions forwarded
-  // verbatim — the store's refusal of unconditional writes stays
-  // authoritative), a trusted sha256 digest, the physical resource dispatch
-  // port for Business effect handlers, and the trusted clock.
+  // get/put/remove/list over the SAME probed physical store (conditions
+  // forwarded verbatim — the store's refusal of unconditional writes and
+  // unconditional deletes stays authoritative; [#1108 K01] remove is the
+  // conditional admission-fence release path), a trusted sha256 digest, the
+  // physical resource dispatch port for Business effect handlers, and the
+  // trusted clock.
   const kernelPorts = {
     docs: Object.freeze({
       get: (key: string) => store.get(key),
       put: (key: string, value: unknown, conditions?: CasPutConditions) => store.put(key, value, conditions as CasPutConditions),
       list: (prefix: string) => store.list(prefix),
+      remove: (key: string, conditions: CasPutConditions) => store.remove(key, conditions),
     }),
     sha256: Object.freeze({
       // Trusted digest (same construction as the compiler/verifier digest).
@@ -232,10 +235,14 @@ export async function bootstrapTrustedHost(input: TrustedNodeHostInput): Promise
       // loader hands the Kernel mechanism forwards NEITHER this privileged
       // member nor any scope: a Business package or caller can never present
       // a scope, only its own closure's claimed logical keys.
-      call: (resourceKey: string, operation: string, payload: unknown) =>
-        resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
-      callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown) =>
-        resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
+      // [#1108 K01 R2 P1]: the kernel-minted per-call attestation rides a
+      // DEDICATED trailing argument straight into the dispatcher — the only
+      // writer of `preHandlerRefusal` is the trusted dispatcher itself,
+      // before its own pre-handler refusals throw.
+      call: (resourceKey: string, operation: string, payload: unknown, attest?: DispatchAttestation) =>
+        resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
+      callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown, attest?: DispatchAttestation) =>
+        resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
     }),
     clock: () => now().toISOString(),
   };

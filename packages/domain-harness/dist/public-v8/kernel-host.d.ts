@@ -31,6 +31,20 @@ export interface V8KernelDocsPutConditions {
     readonly mustMatchRevision?: number;
 }
 /**
+ * [#1108 K01 R2 P1] The kernel-minted per-call dispatch attestation shape
+ * (structural twin of the trusted dispatcher's `DispatchAttestation`): the
+ * kernel mints one per resources-port call and threads it as a dedicated
+ * trailing port argument; the trusted host dispatcher alone may set
+ * `preHandlerRefusal`, synchronously before its own pre-handler refusal
+ * throws. The port signature keeps the parameter OPTIONAL and structurally
+ * typed so the mechanism blob (plain ESM) and alternate hosts stay decoupled
+ * — a host that ignores the attestation simply never marks it, and the
+ * kernel's proof fails closed.
+ */
+export interface V8KernelDispatchAttestation {
+    preHandlerRefusal: string | null;
+}
+/**
  * The generic Host ports the wired Kernel mechanism consumes. Ports are
  * caller-shape-agnostic at the mechanism boundary; this channel only
  * verifies that every required member is a callable.
@@ -50,6 +64,14 @@ export interface V8KernelHostPorts {
         readonly put: (key: string, value: unknown, conditions?: V8KernelDocsPutConditions) => unknown;
         /** Journal read-back (`list(prefix)`). */
         readonly list: (prefix: string) => unknown;
+        /**
+         * [#1108 K01] Conditional document removal (the admission-fence release
+         * path): the store contract never accepts an unconditional delete — the
+         * conditions argument is REQUIRED and forwarded verbatim, exactly like
+         * `put`. A port without `remove` cannot install: the selected Kernel's
+         * fence lifecycle would silently degrade to never-released fences.
+         */
+        readonly remove: (key: string, conditions: V8KernelDocsPutConditions) => unknown;
     };
     readonly sha256: {
         readonly digestUtf8: (value: string) => string;
@@ -61,10 +83,16 @@ export interface V8KernelHostPorts {
      * exists for the trusted loader's per-activation resources view alone —
      * the view the loader hands the Kernel mechanism never forwards it, so no
      * package or caller can present a scope.
+     * [#1108 K01 R2 P1]: both members take an OPTIONAL trailing kernel-minted
+     * dispatch attestation (never the payload, never a handler-visible
+     * context). The attestation is marked ONLY by the trusted dispatcher for
+     * its own pre-handler refusals; an attestation parameter is a proof
+     * SINK, not a proof source — a caller-provided object can never mint a
+     * refusal marking it did not earn.
      */
     readonly resources: {
-        readonly call: (resourceKey: string, operation: string, payload: unknown) => unknown;
-        readonly callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown) => unknown;
+        readonly call: (resourceKey: string, operation: string, payload: unknown, attest?: V8KernelDispatchAttestation) => unknown;
+        readonly callScoped: (scopeId: string, resourceKey: string, operation: string, payload: unknown, attest?: V8KernelDispatchAttestation) => unknown;
     };
     /** Trusted clock (ISO string) used for Kernel instance/journal timestamps. */
     readonly clock: () => string;

@@ -12,6 +12,14 @@
  * Every dispatch carries the AUTHENTICATED principal (verified credential),
  * so a resource can never mistake caller-declared user data for identity.
  *
+ * [#1108 K01 R2 P1] The kernel may thread one kernel-minted per-call
+ * attestation object (`DispatchAttestation`) as the DEDICATED trailing
+ * argument of `call`/`callScoped` (never the payload, never the dispatch
+ * context, never the handler). The dispatcher marks it only for its OWN
+ * pre-handler refusals (MALFORMED / NAMESPACE_RESERVED / UNKNOWN) — the sole
+ * trusted zero-external-effect proof channel; once a handler runs, nothing
+ * is provable and no code string an adapter throws can change that.
+ *
  * #1023 S05 — the dispatcher's map keys are PHYSICAL keys. Deployment-owned
  * handlers install under their bare logical key (this module's historical
  * shape); capability-owned adapters install under the INJECTIVE composed
@@ -32,6 +40,21 @@ export interface DispatchContext {
     readonly principal: HostPrincipal;
 }
 export type ResourceHandler = (operation: string, payload: unknown, context: DispatchContext) => unknown;
+/**
+ * [#1108 K01 R2 P1] The kernel-minted per-call attestation object. The
+ * kernel's effect executor mints ONE fresh attestation per resources-port
+ * call and threads it as a DEDICATED trailing argument (never inside the
+ * payload, never inside the DispatchContext, never forwarded to the resource
+ * handler). The dispatcher marks it — synchronously, BEFORE the refusal
+ * throws — for its OWN pre-handler refusals only. Anything else a port call
+ * throws (adapter/handler faults, fault injection, post-mutation errors
+ * carrying any code string, including the dispatcher's own code names) is
+ * NEVER attested: a thrown `code` proves nothing about external effects.
+ */
+export interface DispatchAttestation {
+    /** Set only by the trusted dispatcher, only for its own pre-handler refusals. */
+    preHandlerRefusal: string | null;
+}
 export interface ResourceCallRecord {
     readonly resourceKey: string;
     readonly operation: string;
@@ -76,7 +99,7 @@ export declare class ResourceDispatcher {
     unprovision(resourceKey: string): void;
     /** Physical resource fault: the NEXT call to resourceKey fails after accounting (KPK-06 port). */
     failNextCall(resourceKey: string): void;
-    call(resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown>;
+    call(resourceKey: string, operation: string, payload: unknown, context: DispatchContext, attest?: DispatchAttestation): Promise<unknown>;
     /**
      * #1023 S05 R1 P1-01: the privileged scoped dispatch. Composes the given
      * deployment scope with the logical key and dispatches the retained
@@ -87,7 +110,7 @@ export declare class ResourceDispatcher {
      * the Kernel mechanism, the Business packages or any caller (the raw ports
      * are additionally session-capability-gated in kernel-host.ts).
      */
-    callScoped(scopeId: string, resourceKey: string, operation: string, payload: unknown, context: DispatchContext): Promise<unknown>;
+    callScoped(scopeId: string, resourceKey: string, operation: string, payload: unknown, context: DispatchContext, attest?: DispatchAttestation): Promise<unknown>;
     /** Call accounting (diagnostics, host context only). */
     calls(): readonly ResourceCallRecord[];
     callCount(): number;

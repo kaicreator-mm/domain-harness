@@ -304,6 +304,7 @@ export function b01MemoryHost(): B01MemoryHost {
           puts.push({ key, value });
         },
         list: (prefix: string) => [...docs.keys()].filter((key) => key.startsWith(prefix)),
+        remove: (key: string) => docs.delete(key),
       },
       sha256: {
         digestUtf8: (value: string) => {
