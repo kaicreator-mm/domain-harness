@@ -383,6 +383,13 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
     const stagePayload = join(root, 'compiler', 'src', 'qualified-package', 'payload');
     mkdirSync(dirname(stagePayload), { recursive: true });
     cpSync(livePayload, stagePayload, { recursive: true });
+    // The compiler `files` inventory also declares the selected Standard SDK
+    // WorkflowRouter source module. Stage the exact declared bytes; a missing
+    // source must fail closed here rather than leaving a live-only file.
+    const liveWorkflowRouter = join(PACKAGE_ROOT, 'src', 'qualified-package', 'v09', 'workflow-router.mjs');
+    const stageWorkflowRouter = join(root, 'compiler', 'src', 'qualified-package', 'v09', 'workflow-router.mjs');
+    mkdirSync(dirname(stageWorkflowRouter), { recursive: true });
+    cpSync(liveWorkflowRouter, stageWorkflowRouter);
 
     const coreTarball = packStage(join(root, 'core'), packsDirectory, 'domain-harness-0.2.0', 1);
     const compilerTarball = packStage(join(root, 'compiler'), packsDirectory, 'compiler', 1);
