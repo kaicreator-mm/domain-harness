@@ -1,0 +1,17 @@
+task: T08
+typed_failures:
+  - invalid_or_unqualified_build_version
+  - revoked_or_missing_external_deployment_approval
+  - changed_digest_or_closed_world_closure
+  - unauthorized_shadow_or_agent_promotion
+  - old_occurrence_redirected_to_new_build
+  - ambiguous_or_missing_old_occurrence_build_pin
+  - incompatible_reused_deployment_decision
+  - foreign_tenant_or_business_scope
+  - transient_restart_reconciliation_unknown
+requirements:
+  fail_before_new_activation_on_invalid_inputs: true
+  never_rewrite_original_receipt: true
+  no_extra_effect_on_denial: true
+  no_floating_latest_for_in_flight_instances: true
+  preserve_existing_kernel_effect_admission: true

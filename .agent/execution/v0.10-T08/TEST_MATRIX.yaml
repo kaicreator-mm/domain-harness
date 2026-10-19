@@ -1,0 +1,29 @@
+task: T08
+scope: concern_only
+required:
+  - id: P01
+    scenario: two_real_independent_builds_A_B_and_approved_B_activation_on_Node24
+  - id: P02
+    scenario: same_stable_deployedAppId_tenant_two_subjectDigests_new_instance_on_B_old_active_instance_on_A
+  - id: P03
+    scenario: old_A_original_receipt_replay_and_canonical_changed_input_conflict_after_B_activated
+  - id: P04
+    scenario: restart_and_restore_exact_original_build_occurrence_pin_after_B_activation
+  - id: N01
+    scenario: revoked_or_stale_approval_or_wrong_exact_build_digest_refuse_before_activation
+  - id: N02
+    scenario: unauthorized_candidate_shadow_evidence_and_model_proposal_cannot_promote
+  - id: N03
+    scenario: attempt_to_route_old_A_occurrence_to_B_is_typed_refusal_no_state_effect_or_receipt_mutation
+  - id: N04
+    scenario: failed_or_partial_deploy_old_A_remains_readable_and_replayable
+  - id: N05
+    scenario: multi_B_and_cross_tenant_no_namespace_leakage_with_same_logical_instance_key
+  - id: F01
+    scenario: lost_deployment_selection_response_and_retry_same_decision_are_safe_no_duplicate_activation
+  - id: G01
+    scenario: Node24_real_file_backed_SQLite_and_required_exact_HEAD_CI_build_lint_typecheck
+gates:
+  independent_review: required
+  full_regression: deferred_to_R01
+results: NOT_RUN
