@@ -1,0 +1,10 @@
+schema: ads/execution-pack-v1
+task: C01
+issue: 1177
+integration_branch: v0.10
+base_at_preparation: 89fd642bb078b2a894a969d61f6cb76d8bbba82f
+pinned_ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: PREPARED_AWAIT_JIT_BUILDER_CLAIM
+claim: NONE
+required_environment: Node24, real SQLite, two independent Node processes, deterministic simulated adapters
+scope: kernel-authorized external-effect C operation and two unrelated adapters
