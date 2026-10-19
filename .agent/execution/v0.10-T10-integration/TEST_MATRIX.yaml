@@ -1,0 +1,15 @@
+schema: dh010/t10-selected-app-test-matrix
+positive:
+  - selected-build-two-business-one-workflow-instance-exact-scoped-query
+  - one-visible-only-physical-read
+  - both-visible-unscoped-typed-ambiguous-before-read
+  - same-messageId-separate-B-replay-preserved
+  - sqlite-restart-snapshot-stable
+negative:
+  - no-Host-verification-denied
+  - caller-forged-principal-or-grant-ignored
+  - hidden-B-presence-not-an-oracle
+  - cross-tenant-and-foreign-B-zero-physical-reads
+  - bogus-selector-zero-read-and-write
+  - query-never-dispatches-effect
+environment: Node24 + file-backed SQLite, focused tests + configured CI, independent high-risk review
