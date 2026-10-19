@@ -22,7 +22,7 @@ const schema = { id: 'schema:quote', revision: 'r1', provenanceKey: 'approved:20
 const input = (result: unknown, extra: Record<string, unknown> = {}) => ({
   observationId: 'obs:one', schema, decisionResult: result, observedDependencies: [], ...extra,
 });
-const rule = (decision = { quote: 'approved' }) => ({
+const rule = (decision: Record<string, unknown> = { quote: 'approved' }) => ({
   kind: 'selected', source: 'rule', decision,
   evidence: { kernelEffectPermit: false, modelCallEvidence: 'unmeasured', modelCalls: 0, toolCalls: 0, steps: 1 },
 });
