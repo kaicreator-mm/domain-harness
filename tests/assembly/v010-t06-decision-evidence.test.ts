@@ -61,7 +61,7 @@ test('T06-P1: deterministic Rule/reuse report no measured Model calls and correc
   for (const source of ['rule', 'reuse', 'procedure']) {
     const val = await record(input({ ...rule(), source }));
     assert.equal(val.decisionTrace.source, source);
-    assert.equal(val.decisionTrace.evidence.modelCallStatus, 'unmeasured');
+    assert.equal(val.decisionTrace.evidence.modelCallStatus, 'unverified');
     assert.equal(val.decisionTrace.evidence.modelCalls, null);
     assert.equal(val.decisionTrace.evidence.reportedModelCalls, 0);
     assert.equal(val.decisionTrace.kernelOutcome, 'unobserved');
@@ -77,20 +77,22 @@ test('T06-P2: Model measured call and exact dependency tuple observable', async 
     }],
   }), { verifiedKernelOutcome: async () => ({ kind: 'admitted' }) });
   assert.equal(seen.decisionTrace.source, 'model');
-  assert.equal(seen.decisionTrace.evidence.modelCalls, 1);
-  assert.equal(seen.decisionTrace.kernelOutcome, 'admitted');
+  assert.equal(seen.decisionTrace.evidence.modelCalls, null);
+  assert.equal(seen.decisionTrace.evidence.reportedModelCalls, 1);
+  assert.equal(seen.decisionTrace.evidence.modelCallStatus, 'unverified');
+  assert.equal(seen.decisionTrace.kernelOutcome, 'unobserved');
   assert.deepEqual(seen.decisionTrace.observedDependencies[0], {
     kind: 'tool', id: 'catalog', revision: 'r2', provenanceKey: 'approved', observation: 'measured',
   });
 });
 
-test('T06-P3/N1: denied, admitted, unknown are read only from Host observer; caller claims ignored', async () => {
+test('T06-P3/N1: public caller cannot forge K admitted/denied through dependencies', async () => {
   const { record } = await loadFeature();
   const plain = await record(input(rule(), { admission: 'admitted', kernelReceipt: { status: 'admitted' } }));
   assert.equal(plain.decisionTrace.kernelOutcome, 'unobserved');
   for (const kind of ['denied', 'admitted', 'unknown']) {
     const res = await record(input(rule()), { verifiedKernelOutcome: () => ({ kind }) });
-    assert.equal(res.decisionTrace.kernelOutcome, kind);
+    assert.equal(res.decisionTrace.kernelOutcome, 'unobserved');
   }
   const badObserver = await record(input(rule()), { verifiedKernelOutcome: () => { throw new Error('offline'); } });
   assert.equal(badObserver.decisionTrace.kernelOutcome, 'unobserved');
@@ -101,7 +103,7 @@ test('T06-P4/N2: optional persistence success/failure cannot veto original decis
   const reference = rule();
   const persisted: unknown[] = [];
   const yes = await record(input(reference), { persistObservation: async (trace: unknown) => { persisted.push(trace); } });
-  assert.equal(yes.observationStore, 'persisted');
+  assert.equal(yes.observationStore, 'callback-reported-success');
   assert.equal(persisted.length, 1);
   const fail = await record(input(reference), { persistObservation: async () => { throw new Error('disk full'); } });
   assert.equal(fail.observationStore, 'failed');
@@ -140,4 +142,16 @@ test('T06-P5: unavailable/denied resolver result retains honest unmeasured reaso
   assert.equal(observed.decisionTrace.reason, 'model-disabled');
   assert.equal(observed.decisionTrace.kernelOutcome, 'denied');
   assert.equal(observed.decisionTrace.decision, null);
+});
+
+
+test('T06-N5: hanging optional observation sink cannot veto the decision or claim persistence', async () => {
+  const { record } = await loadFeature();
+  const result = await record(input(rule()), {
+    persistObservation: () => new Promise(() => {}),
+    observationTimeoutMs: 10,
+  });
+  assert.equal(result.observationStore, 'unknown-timeout');
+  assert.equal(result.decisionTrace.kernelOutcome, 'unobserved');
+  assert.equal(result.decisionResult.kind, 'selected');
 });
