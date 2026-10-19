@@ -16,7 +16,7 @@ const OWNED_AUTHORITY_FIELDS = new Set([
   'createOccurrenceRuntime', 'submitOccurrence',
 ]);
 
-export class SemanticDecisionRefusal extends Error {
+class SemanticDecisionRefusal extends Error {
   constructor(code, message) {
     super(message);
     this.name = 'SemanticDecisionRefusal';
