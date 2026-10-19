@@ -168,6 +168,9 @@ export function proposeMetaFeedback(request) {
   if (shadow !== null && !plain(shadow)) {
     refuse('META_FEEDBACK_REQUEST_INVALID', 'shadow must be a plain record');
   }
+  if (canonical([observations, candidate, shadow]).length > MAX_JSON_CHARS) {
+    refuse('META_FEEDBACK_OVERSIZED', 'proposal input exceeds the bounded size');
+  }
 
   const proposals = [];
   for (let index = 0; index < observations.length; index += 1) {

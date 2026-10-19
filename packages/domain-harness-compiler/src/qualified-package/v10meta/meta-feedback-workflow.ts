@@ -36,7 +36,7 @@ export const META_FEEDBACK_EVIDENCE_KEY_PREFIX = 'v10/t09/';
 export const META_FEEDBACK_LEDGER_PREFIX = 'v10-meta-feedback:';
 export const MAX_META_ROUNDS = 32;
 export const MAX_META_EVIDENCE_KEYS = 8;
-export const MAX_META_RECORD_CHARS = 65_536;
+export const MAX_META_RECORD_CHARS = 32_768;
 
 const MAX_IDENTIFIER = 512;
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -269,6 +269,9 @@ function optionsSnapshot(options: unknown): ValidatedMetaFeedbackOptions {
     }
   }
   const intentType = bounded(options.workflow.intentType, 'workflow.intentType', 256);
+  if (intentType !== 'recordMetaFeedback') {
+    refuse('META_OPTIONS_INVALID', 'this workflow drives only the selected recordMetaFeedback intent');
+  }
   const instanceKey = bounded(options.workflow.instanceKey, 'workflow.instanceKey');
   const scheduleKey = bounded(options.workflow.scheduleKey, 'workflow.scheduleKey', 256);
   const round = options.workflow.round;
@@ -287,13 +290,20 @@ function optionsSnapshot(options: unknown): ValidatedMetaFeedbackOptions {
   if (!Array.isArray(rawKeys) || rawKeys.length > MAX_META_EVIDENCE_KEYS) {
     refuse('META_OPTIONS_INVALID', `sources.evidenceKeys must be an array of at most ${String(MAX_META_EVIDENCE_KEYS)} keys`);
   }
-  const evidenceKeys = [...new Set(rawKeys.map((key) => bounded(key, 'sources.evidenceKeys entry')))].sort();
+  const evidenceKey = (raw: unknown, label: string): string => {
+    const key = bounded(raw, label);
+    if (!key.startsWith(META_FEEDBACK_EVIDENCE_KEY_PREFIX)) {
+      refuse('META_OPTIONS_INVALID', `${label} must live under the meta evidence prefix ${META_FEEDBACK_EVIDENCE_KEY_PREFIX}`);
+    }
+    return key;
+  };
+  const evidenceKeys = [...new Set(rawKeys.map((key) => evidenceKey(key, 'sources.evidenceKeys entry')))].sort();
   const candidateKey = options.sources.candidateKey === undefined
     ? undefined
-    : bounded(options.sources.candidateKey, 'sources.candidateKey');
+    : evidenceKey(options.sources.candidateKey, 'sources.candidateKey');
   const shadowKey = options.sources.shadowKey === undefined
     ? undefined
-    : bounded(options.sources.shadowKey, 'sources.shadowKey');
+    : evidenceKey(options.sources.shadowKey, 'sources.shadowKey');
   const maxProposals = options.maxProposals ?? 4;
   if (!Number.isSafeInteger(maxProposals) || (maxProposals as number) < 1 || (maxProposals as number) > 4) {
     refuse('META_OPTIONS_INVALID', 'maxProposals must be an integer in [1, 4]');

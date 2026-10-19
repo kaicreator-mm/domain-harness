@@ -34,7 +34,7 @@ export declare const META_FEEDBACK_EVIDENCE_KEY_PREFIX = "v10/t09/";
 export declare const META_FEEDBACK_LEDGER_PREFIX = "v10-meta-feedback:";
 export declare const MAX_META_ROUNDS = 32;
 export declare const MAX_META_EVIDENCE_KEYS = 8;
-export declare const MAX_META_RECORD_CHARS = 65536;
+export declare const MAX_META_RECORD_CHARS = 32768;
 export declare class MetaFeedbackError extends Error {
     readonly code: string;
     readonly detail: Readonly<Record<string, unknown>> | undefined;

@@ -548,6 +548,24 @@ test('T09-N4 invalid rounds and conflicting ledger reuse fail typed before a tur
     assert.equal(error.code, 'META_ROUND_INVALID');
   }
 
+  const outsidePrefix = await refusal(runMetaFeedbackWorkflow({
+    facade: harness.activation.facade,
+    store: harness.store,
+    workflow: roundIntent(7),
+    sources: { evidenceKeys: ['v10/k/not-meta-evidence'] },
+    now: () => NOW,
+  }));
+  assert.equal(outsidePrefix.code, 'META_OPTIONS_INVALID');
+
+  const otherIntent = await refusal(runMetaFeedbackWorkflow({
+    facade: harness.activation.facade,
+    store: harness.store,
+    workflow: { ...roundIntent(7), intentType: 'closeMetaFeedback' },
+    sources,
+    now: () => NOW,
+  }));
+  assert.equal(otherIntent.code, 'META_OPTIONS_INVALID');
+
   const stateBefore = await stateOf(harness.activation);
   const conflictingKey = ledgerKeyFor(6);
   await harness.store.put(conflictingKey, {
