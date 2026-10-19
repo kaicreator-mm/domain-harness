@@ -23,7 +23,9 @@ required:
     scenario: lost_deployment_selection_response_and_retry_same_decision_are_safe_no_duplicate_activation
   - id: G01
     scenario: Node24_real_file_backed_SQLite_and_required_exact_HEAD_CI_build_lint_typecheck
+  - id: P05
+    scenario: t0_t1_t2_real_second_process_ordinary_approval_expiry_restores_accepted_pinned_A_BUILD_while_current_revocation_missing_corrupt_record_wrong_version_and_unpinned_new_occurrence_still_refuse
 gates:
   independent_review: required
   full_regression: deferred_to_R01
-results: NOT_RUN
+results: NODE24_T08_7_OF_7_PASS_LOCAL

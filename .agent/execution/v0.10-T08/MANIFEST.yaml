@@ -11,8 +11,8 @@ predecessors:
   - T07#1174_CLOSED_MERGED_PR1195_SHA_b8acbf46614ecb600d13a0f320f78af92e391bb9
 priority: P0
 risk: high
-status: JIT_PREPARED_SOURCE_NOT_IMPLEMENTED
+status: R1_REPAIR_IMPLEMENTED_R2_REVIEW_PENDING
 runtime: Node24_ESM_Real_SQLite_CAS
-tests_executed: NOT_RUN
+tests_executed: NODE24_T08_7_OF_7_PASS_LOCAL
 review_required: true
 release_closure: NOT_RUN

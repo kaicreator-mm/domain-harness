@@ -7,6 +7,7 @@ typed_failures:
   - old_occurrence_redirected_to_new_build
   - ambiguous_or_missing_old_occurrence_build_pin
   - incompatible_reused_deployment_decision
+  - missing_or_corrupt_durable_activation_record
   - foreign_tenant_or_business_scope
   - transient_restart_reconciliation_unknown
 requirements:
@@ -14,4 +15,7 @@ requirements:
   never_rewrite_original_receipt: true
   no_extra_effect_on_denial: true
   no_floating_latest_for_in_flight_instances: true
+  ordinary_expired_promotion_window_does_not_invalidate_accepted_pinned_build: true
+  pinned_restore_requires_durable_accepted_decision_and_exact_prior_pin: true
+  explicit_revocation_blocks_pinned_restore: true
   preserve_existing_kernel_effect_admission: true

@@ -475,21 +475,27 @@ export async function readV10DeploymentActivationRecord(
   });
 }
 
-interface VerifiedDecision {
+interface VerifiedBuildDecision {
   readonly decision: V10BuildActivationDecision;
   readonly decisionDigest: string;
   readonly closureDigest: string;
+}
+
+interface VerifiedCurrentDecision extends VerifiedBuildDecision {
   readonly authorizedAt: string;
   readonly expiresAt: string;
 }
 
-async function verifyDecision(
+/**
+ * Structural and identity proof of one decision against one built App. This
+ * is shared by the fresh-promotion path (`CURRENT`) and the restore path
+ * (`PINNED_ONLY`); it deliberately says nothing about the clock.
+ */
+function verifyDecisionIdentity(
   app: V10BuiltApp,
   deployment: V10DeploymentIdentity,
   rawDecision: unknown,
-  authorization: unknown,
-  nowMs: number,
-): Promise<VerifiedDecision> {
+): VerifiedBuildDecision {
   const decision = snapshotDecision(rawDecision);
   if (app.appId !== deployment.appId
     || decision.deployedAppId !== deployment.deployedAppId
@@ -515,14 +521,12 @@ async function verifyDecision(
     || app.targetProfile !== V10_TARGET_PROFILE) {
     refuse('INVALID_BUILD_VERSION', 'the activation decision and the App must both carry the selected v0.10 Node24 profile/ABI');
   }
-  const approvedAt = Date.parse(decision.approvedAt);
-  const validUntil = Date.parse(decision.validUntil);
-  if (!(nowMs >= approvedAt && nowMs < validUntil)) {
-    refuse('DEPLOYMENT_APPROVAL_STALE', 'the external deployment approval is not currently valid', {
-      approvedAt: decision.approvedAt,
-      validUntil: decision.validUntil,
-    });
-  }
+  return Object.freeze({ decision, decisionDigest: sha256Canonical(decision), closureDigest });
+}
+
+function requireAuthorizationAuthority(
+  authorization: unknown,
+): (request: V10DeploymentAuthorizationRequest) => unknown {
   if (!isPlainRecord(authorization)) {
     refuse('DEPLOYMENT_APPROVAL_MISSING', 'a trusted Host deployment authorization authority is required; candidate/Shadow data is not one');
   }
@@ -535,67 +539,213 @@ async function verifyDecision(
   if (typeof verify !== 'function') {
     refuse('DEPLOYMENT_APPROVAL_MISSING', 'a trusted Host deployment authorization authority with verify() is required; candidate/Shadow data is not one');
   }
-  const decisionDigest = sha256Canonical(decision);
-  const request: V10DeploymentAuthorizationRequest = Object.freeze({
+  return verify as (request: V10DeploymentAuthorizationRequest) => unknown;
+}
+
+function authorizationRequest(
+  app: V10BuiltApp,
+  deployment: V10DeploymentIdentity,
+  verified: VerifiedBuildDecision,
+  nowMs: number,
+): V10DeploymentAuthorizationRequest {
+  return Object.freeze({
     requestKind: 'v10/deployment-authorization-request',
-    decisionDigest,
-    decision,
+    decisionDigest: verified.decisionDigest,
+    decision: verified.decision,
     build: Object.freeze({
       deployedAppId: deployment.deployedAppId,
       tenantId: deployment.tenantId,
       appId: deployment.appId,
       subjectDigest: app.subjectDigest,
-      packageClosureDigest: closureDigest,
+      packageClosureDigest: verified.closureDigest,
       buildId: app.buildId,
     }),
     nowIso: new Date(nowMs).toISOString(),
   });
+}
+
+async function callAuthorization(
+  verify: (request: V10DeploymentAuthorizationRequest) => unknown,
+  request: V10DeploymentAuthorizationRequest,
+): Promise<Record<string, unknown>> {
   let verdict: unknown;
   try {
-    verdict = await (verify as (request: V10DeploymentAuthorizationRequest) => unknown)(request);
+    verdict = await verify(request);
   } catch (error) {
     refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', `the Host authorization authority failed closed: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (!isPlainRecord(verdict)) {
     refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization authority returned no bounded verdict');
   }
+  return verdict;
+}
+
+function deniedVerdict(verdict: Record<string, unknown>): { readonly reasonCode: string; readonly reason: string } {
+  return Object.freeze({
+    reasonCode: typeof verdict.reasonCode === 'string' ? verdict.reasonCode : '',
+    reason: typeof verdict.reason === 'string' ? verdict.reason : 'deployment authorization denied',
+  });
+}
+
+function refuseDenied(reasonCode: string, reason: string): never {
+  if (reasonCode === 'DEPLOYMENT_APPROVAL_REVOKED') refuse('DEPLOYMENT_APPROVAL_REVOKED', reason);
+  if (reasonCode === 'DEPLOYMENT_APPROVAL_STALE') refuse('DEPLOYMENT_APPROVAL_STALE', reason);
+  refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', reason, { reasonCode });
+}
+
+/** Validate that an AUTHORIZED verdict binds this exact decision/BUILD. */
+function authorizedWindow(
+  verdict: Record<string, unknown>,
+  app: V10BuiltApp,
+  verified: VerifiedBuildDecision,
+): { readonly authorizedAt: string; readonly expiresAt: string } {
+  if (verdict.decisionDigest !== verified.decisionDigest
+    || verdict.authorizationRef !== verified.decision.approvalRef
+    || verdict.subjectDigest !== app.subjectDigest
+    || verdict.packageClosureDigest !== verified.closureDigest) {
+    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization verdict does not bind this exact decision, approval reference, subject and closure');
+  }
+  const authorizedAtText = verdict.authorizedAt;
+  const expiresAtText = verdict.expiresAt;
+  if (typeof authorizedAtText !== 'string' || typeof expiresAtText !== 'string') {
+    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization verdict carries no bounded validity window');
+  }
+  const authorizedAt = Date.parse(authorizedAtText);
+  const expiresAt = Date.parse(expiresAtText);
+  if (!Number.isFinite(authorizedAt) || !Number.isFinite(expiresAt)) {
+    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization verdict validity window is not ISO-8601');
+  }
+  return Object.freeze({
+    authorizedAt: new Date(authorizedAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+  });
+}
+
+/**
+ * `CURRENT` is the fresh new-BUILD authorization: the decision's promotion
+ * window and the trusted authority's CURRENT unrevoked verdict must both be
+ * valid right now.
+ */
+async function verifyCurrentDecision(
+  app: V10BuiltApp,
+  deployment: V10DeploymentIdentity,
+  rawDecision: unknown,
+  authorization: unknown,
+  nowMs: number,
+): Promise<VerifiedCurrentDecision> {
+  const verified = verifyDecisionIdentity(app, deployment, rawDecision);
+  const approvedAt = Date.parse(verified.decision.approvedAt);
+  const validUntil = Date.parse(verified.decision.validUntil);
+  if (!(nowMs >= approvedAt && nowMs < validUntil)) {
+    refuse('DEPLOYMENT_APPROVAL_STALE', 'the external deployment approval is not currently valid', {
+      approvedAt: verified.decision.approvedAt,
+      validUntil: verified.decision.validUntil,
+    });
+  }
+  const verify = requireAuthorizationAuthority(authorization);
+  const verdict = await callAuthorization(verify, authorizationRequest(app, deployment, verified, nowMs));
   if (verdict.status === 'DENIED') {
-    const reasonCode = typeof verdict.reasonCode === 'string' ? verdict.reasonCode : '';
-    const reason = typeof verdict.reason === 'string' ? verdict.reason : 'deployment authorization denied';
-    if (reasonCode === 'DEPLOYMENT_APPROVAL_REVOKED') refuse('DEPLOYMENT_APPROVAL_REVOKED', reason);
-    if (reasonCode === 'DEPLOYMENT_APPROVAL_STALE') refuse('DEPLOYMENT_APPROVAL_STALE', reason);
-    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', reason, { reasonCode });
+    const denied = deniedVerdict(verdict);
+    refuseDenied(denied.reasonCode, denied.reason);
   }
   if (verdict.status !== 'AUTHORIZED') {
     refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization authority returned an unrecognized verdict');
   }
-  if (verdict.decisionDigest !== decisionDigest
-    || verdict.authorizationRef !== decision.approvalRef
-    || verdict.subjectDigest !== app.subjectDigest
-    || verdict.packageClosureDigest !== closureDigest) {
-    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization verdict does not bind this exact decision, approval reference, subject and closure');
-  }
-  if (typeof verdict.authorizedAt !== 'string' || typeof verdict.expiresAt !== 'string') {
-    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization verdict carries no bounded validity window');
-  }
-  const authorizedAt = Date.parse(verdict.authorizedAt);
-  const expiresAt = Date.parse(verdict.expiresAt);
-  if (!Number.isFinite(authorizedAt) || !Number.isFinite(expiresAt)) {
-    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization verdict validity window is not ISO-8601');
-  }
-  if (!(nowMs >= authorizedAt && nowMs < expiresAt)) {
+  const window = authorizedWindow(verdict, app, verified);
+  if (!(nowMs >= Date.parse(window.authorizedAt) && nowMs < Date.parse(window.expiresAt))) {
     refuse('DEPLOYMENT_APPROVAL_STALE', 'the Host authorization verdict is outside its current validity window', {
-      authorizedAt: verdict.authorizedAt,
-      expiresAt: verdict.expiresAt,
+      authorizedAt: window.authorizedAt,
+      expiresAt: window.expiresAt,
     });
   }
-  return Object.freeze({
-    decision,
-    decisionDigest,
-    closureDigest,
-    authorizedAt: new Date(authorizedAt).toISOString(),
-    expiresAt: new Date(expiresAt).toISOString(),
-  });
+  return Object.freeze({ ...verified, ...window });
+}
+
+function assertRestorableRecord(
+  record: V10DeploymentActivationRecord,
+  app: V10BuiltApp,
+  deployment: V10DeploymentIdentity,
+  verified: VerifiedBuildDecision,
+): void {
+  if (record.decisionDigest !== verified.decisionDigest
+    || record.deployedAppId !== deployment.deployedAppId
+    || record.tenantId !== deployment.tenantId
+    || record.appId !== deployment.appId
+    || record.subjectDigest !== app.subjectDigest
+    || record.packageClosureDigest !== verified.closureDigest
+    || record.buildId !== app.buildId
+    || record.approvalRef !== verified.decision.approvalRef) {
+    refuse('DEPLOYMENT_ACTIVATION_RECORD_MISMATCH', 'the durable activation record does not bind this exact BUILD/deployment identity', {
+      decisionId: verified.decision.decisionId,
+      buildId: app.buildId,
+    });
+  }
+}
+
+/**
+ * `PINNED_ONLY` restores an ALREADY accepted, durably pinned BUILD. Its trust
+ * anchor is the create-only activation record written by the original
+ * `CURRENT` acceptance, not a fresh promotion window: a routine expiry of
+ * that window must not invalidate occurrences admitted while it was valid.
+ *
+ * The external authority is still consulted, exactly so an explicit
+ * revocation fails typed. On ordinary expiry the exact accepted decision is
+ * re-verified at the durable acceptance instant, which re-proves the
+ * decision/approval/BUILD binding without moving the clock; missing or
+ * foreign approval material still fails closed. No activation record is
+ * written on this path, and `send` still refuses any occurrence without an
+ * exact prior BUILD pin.
+ */
+async function verifyPinnedRestoration(
+  app: V10BuiltApp,
+  deployment: V10DeploymentIdentity,
+  rawDecision: unknown,
+  authorization: unknown,
+  store: V10DocStore,
+  nowMs: number,
+): Promise<VerifiedBuildDecision> {
+  const verified = verifyDecisionIdentity(app, deployment, rawDecision);
+  const record = await readV10DeploymentActivationRecord(
+    store, deployment.deployedAppId, verified.decision.decisionId,
+  );
+  if (record === null) {
+    refuse('DEPLOYMENT_ACTIVATION_RECORD_MISSING', 'PINNED_ONLY restores only a durably accepted BUILD; no activation record exists for this decision', {
+      decisionId: verified.decision.decisionId,
+      buildId: app.buildId,
+    });
+  }
+  assertRestorableRecord(record, app, deployment, verified);
+  const verify = requireAuthorizationAuthority(authorization);
+  const current = await callAuthorization(
+    verify,
+    authorizationRequest(app, deployment, verified, nowMs),
+  );
+  if (current.status === 'DENIED') {
+    const denied = deniedVerdict(current);
+    if (denied.reasonCode !== 'DEPLOYMENT_APPROVAL_STALE') {
+      refuseDenied(denied.reasonCode, denied.reason);
+    }
+    // Ordinary promotion-window expiry: ask the same authority about the
+    // durable acceptance instant. Revocation/missing material still refuses.
+    const historical = await callAuthorization(
+      verify,
+      authorizationRequest(app, deployment, verified, Date.parse(record.authorizedAt)),
+    );
+    if (historical.status === 'DENIED') {
+      const deniedAgain = deniedVerdict(historical);
+      refuseDenied(deniedAgain.reasonCode, deniedAgain.reason);
+    }
+    if (historical.status !== 'AUTHORIZED') {
+      refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization authority returned an unrecognized restoration verdict');
+    }
+    authorizedWindow(historical, app, verified);
+    return verified;
+  }
+  if (current.status !== 'AUTHORIZED') {
+    refuse('DEPLOYMENT_AUTHORIZATION_UNAUTHORIZED', 'the Host authorization authority returned an unrecognized verdict');
+  }
+  authorizedWindow(current, app, verified);
+  return verified;
 }
 
 function recordMatches(record: V10DeploymentActivationRecord, candidate: V10DeploymentActivationRecord): boolean {
@@ -858,7 +1008,12 @@ export async function activateGovernedV10Build(
     refuse('INVALID_BUILD_VERSION', 'selection must be CURRENT or PINNED_ONLY');
   }
   const nowMs = now();
-  const verified = await verifyDecision(app, deployment, options.decision, options.authorization, nowMs);
+  const current = selection === 'CURRENT'
+    ? await verifyCurrentDecision(app, deployment, options.decision, options.authorization, nowMs)
+    : null;
+  const verified: VerifiedBuildDecision = current !== null
+    ? current
+    : await verifyPinnedRestoration(app, deployment, options.decision, options.authorization, options.store, nowMs);
   const activation = await activateV10App(app, {
     store: options.store,
     tenantId: deployment.tenantId,
@@ -879,31 +1034,35 @@ export async function activateGovernedV10Build(
     decisionDigest: verified.decisionDigest,
     approvalRef: verified.decision.approvalRef,
   });
-  try {
-    const record: V10DeploymentActivationRecord = Object.freeze({
-      kind: RECORD_KIND,
-      decisionId: verified.decision.decisionId,
-      decisionDigest: verified.decisionDigest,
-      deployedAppId: deployment.deployedAppId,
-      tenantId: deployment.tenantId,
-      appId: deployment.appId,
-      subjectDigest: app.subjectDigest,
-      packageClosureDigest: verified.closureDigest,
-      buildId: app.buildId,
-      approvalRef: verified.decision.approvalRef,
-      authorizedAt: verified.authorizedAt,
-      expiresAt: verified.expiresAt,
-      activatedAt: new Date(now()).toISOString(),
-    });
-    // Re-check currentness after module evaluation; a decision that expired
-    // while the App was being activated must not leave an accepted record.
-    if (now() >= Date.parse(record.expiresAt) || now() >= Date.parse(verified.decision.validUntil)) {
-      refuse('DEPLOYMENT_APPROVAL_STALE', 'the deployment approval expired during activation');
+  // Only a fresh CURRENT promotion writes the durable accepted decision.
+  // PINNED_ONLY restores that record and may never mint a new acceptance.
+  if (current !== null) {
+    try {
+      const record: V10DeploymentActivationRecord = Object.freeze({
+        kind: RECORD_KIND,
+        decisionId: verified.decision.decisionId,
+        decisionDigest: verified.decisionDigest,
+        deployedAppId: deployment.deployedAppId,
+        tenantId: deployment.tenantId,
+        appId: deployment.appId,
+        subjectDigest: app.subjectDigest,
+        packageClosureDigest: verified.closureDigest,
+        buildId: app.buildId,
+        approvalRef: verified.decision.approvalRef,
+        authorizedAt: current.authorizedAt,
+        expiresAt: current.expiresAt,
+        activatedAt: new Date(now()).toISOString(),
+      });
+      // Re-check currentness after module evaluation; a decision that expired
+      // while the App was being activated must not leave an accepted record.
+      if (now() >= Date.parse(record.expiresAt) || now() >= Date.parse(verified.decision.validUntil)) {
+        refuse('DEPLOYMENT_APPROVAL_STALE', 'the deployment approval expired during activation');
+      }
+      await ensureActivationRecord(options.store, record);
+    } catch (error) {
+      activation.dispose();
+      throw error;
     }
-    await ensureActivationRecord(options.store, record);
-  } catch (error) {
-    activation.dispose();
-    throw error;
   }
   return new GovernedBuildActivation({
     store: options.store,

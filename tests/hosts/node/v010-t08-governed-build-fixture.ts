@@ -54,6 +54,8 @@ export const T08_CAPABILITY_A = 'capability-quote-tools@v08.1.0.0';
 export const T08_CAPABILITY_B = 'capability-quote-tools@v08.1.0.1';
 export const T08_WORKFLOW_ID = 'order-quote';
 export const T08_NOW = Date.UTC(2026, 9, 20, 12, 0, 0);
+export const T08_T1 = Date.UTC(2026, 9, 20, 13, 0, 0);
+export const T08_T2 = Date.UTC(2026, 9, 20, 16, 0, 0);
 export const T08_APPROVED_AT = '2026-10-20T11:00:00.000Z';
 export const T08_VALID_UNTIL = '2026-10-20T15:00:00.000Z';
 
