@@ -1,0 +1,18 @@
+schema: ads/execution-pack-v1
+task: T08
+issue: 1175
+version_branch: v0.10
+task_branch: task/v0.10-t08-governed-build-version
+base_sha: b8acbf46614ecb600d13a0f320f78af92e391bb9
+ads_version: 4.13.1
+ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+predecessors:
+  - T03#1170_CLOSED_MERGED
+  - T07#1174_CLOSED_MERGED_PR1195_SHA_b8acbf46614ecb600d13a0f320f78af92e391bb9
+priority: P0
+risk: high
+status: R1_REPAIR_IMPLEMENTED_R2_REVIEW_PENDING
+runtime: Node24_ESM_Real_SQLite_CAS
+tests_executed: NODE24_T08_7_OF_7_PASS_LOCAL
+review_required: true
+release_closure: NOT_RUN

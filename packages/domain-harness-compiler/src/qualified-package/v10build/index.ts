@@ -64,3 +64,26 @@ export type {
   ExternalEffectDispatchRequest,
   ExternalEffectGateDeps,
 } from './external-effect.js';
+export {
+  V10DeploymentError,
+  activateGovernedV10Build,
+  readV10DeploymentActivationRecord,
+  readV10OccurrenceBuildPin,
+  v10BuildActivationDecisionDigest,
+  v10BuildPackageClosureDigest,
+  v10DeploymentActivationKey,
+  v10OccurrenceBuildPinKey,
+} from './deployment.js';
+export type {
+  ActivateGovernedV10BuildOptions,
+  V10BuildActivationDecision,
+  V10DeploymentActivationRecord,
+  V10DeploymentAuthorizationAuthority,
+  V10DeploymentAuthorizationRequest,
+  V10DeploymentAuthorizationVerdict,
+  V10DeploymentIdentity,
+  V10GovernedBuildActivation,
+  V10GovernedBuildIdentity,
+  V10OccurrenceBuildPin,
+  V10OccurrenceTarget,
+} from './deployment.js';
