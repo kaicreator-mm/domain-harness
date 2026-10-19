@@ -3,8 +3,9 @@
  *
  * Observes a genuine SemanticDecision result; it NEVER acts as the K receipt,
  * K State, Effect, Permit, admission authority or an external Tool executor.
- * Recording is advisory. A failed optional evidence store cannot change the
- * original semantic decision or immutable Kernel receipt.
+ * Recording is advisory. Publicly supplied evidence is NEVER an attested
+ * Kernel receipt or a trusted measurement. A failed optional observation
+ * sink cannot change the original semantic decision or Kernel state.
  */
 export const MODULE_ID = 'sfeature-decision-evidence@v010.1.0.0';
 export const PACKAGE_KIND = 'standard-feature';
@@ -79,9 +80,11 @@ export function init(context) {
  * @param request {observationId,schema:{id,revision,provenanceKey},
  *   decisionResult: resolver result from a selected T02 semantic feature,
  *   observedDependencies:[{kind,id,revision,provenanceKey,observation:'measured'|'unmeasured'}]}
- * @param deps {verifiedKernelOutcome?:fn,persistObservation?:fn}.
- * Verified Kernel receipt is a *trusted Host-only read port*; absent port
- * always yields 'unobserved', NEVER "admitted" from caller's own claims.
+ * @param deps {persistObservation?:fn, observationTimeoutMs?:number}.
+ * The public selected-S facade currently permits caller-supplied dependency
+ * functions. Such inputs are NOT Host-attested. Consequently this pure layer
+ * never claims a Kernel admission or verified measured Model usage. Those
+ * require an actual trusted Host integration in the follow-up T06 slice.
  */
 export async function recordDecisionEvidence(request, deps = {}) {
   if (!isRecord(request) || !isRecord(request.schema) || !isRecord(request.decisionResult)) {
@@ -157,19 +160,9 @@ export async function recordDecisionEvidence(request, deps = {}) {
   const reason = decisionResult.kind === 'unavailable'
     ? boundedText(decisionResult.reason, 'unavailable.reason')
     : null;
-  // The observed status is read ONLY from a trusted Host receipt observer.
-  // Any missing/faulty/untrusted observation cannot manufacture admitted.
-  let kernelOutcome = 'unobserved';
-  if (typeof deps.verifiedKernelOutcome === 'function') {
-    try {
-      const witnessed = await deps.verifiedKernelOutcome();
-      if (isRecord(witnessed) && OUTCOME_KINDS.has(witnessed.kind)) {
-        kernelOutcome = witnessed.kind;
-      }
-    } catch {
-      kernelOutcome = 'unobserved';
-    }
-  }
+  // No caller-supplied callback may attest K admission/denial. Only a
+  // trusted deployment-bound Host adapter may add that in a future slice.
+  const kernelOutcome = 'unobserved';
 
   const trace = {
     observationId,
@@ -179,8 +172,9 @@ export async function recordDecisionEvidence(request, deps = {}) {
     reason,
     decision,
     evidence: {
-      modelCalls: counterEvidence === 'measured' ? modelCalls : null,
-      modelCallStatus: counterEvidence,
+      modelCalls: null,
+      modelCallStatus: 'unverified',
+      reportedModelCallStatus: counterEvidence,
       reportedModelCalls: modelCalls,
       toolCalls,
       steps: Number.isSafeInteger(decisionProof.steps) ? decisionProof.steps : null,
@@ -189,15 +183,28 @@ export async function recordDecisionEvidence(request, deps = {}) {
     observedDependencies,
   };
 
-  // Optional persistence does not control Kernel admission, original receipt,
-  // or success of the already computed semantic decision.
+  // The optional caller-provided sink is NOT a privileged K or C capability,
+  // and its return never proves physical durability. Timeout leaves the write
+  // result unknown rather than blocking the immutable primary outcome.
   let observationStore = 'not-selected';
   if (typeof deps.persistObservation === 'function') {
+    const ms = Number.isSafeInteger(deps.observationTimeoutMs)
+      && deps.observationTimeoutMs >= 1 && deps.observationTimeoutMs <= 10_000
+      ? deps.observationTimeoutMs : 1000;
+    let timer = null;
     try {
-      await deps.persistObservation(copyData(trace));
-      observationStore = 'persisted';
+      const write = Promise.resolve().then(() => deps.persistObservation(copyData(trace)));
+      const outcome = await Promise.race([
+        write.then(() => 'callback-reported-success', () => 'failed'),
+        new Promise(resolve => {
+          timer = setTimeout(() => resolve('unknown-timeout'), ms);
+        }),
+      ]);
+      observationStore = outcome;
     } catch {
       observationStore = 'failed';
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
   }
   return { decisionResult, decisionTrace: trace, observationStore };
