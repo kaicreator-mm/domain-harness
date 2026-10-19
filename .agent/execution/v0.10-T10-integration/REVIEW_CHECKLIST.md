@@ -1,0 +1,2 @@
+# T10 exact-HEAD review
+C01's selected K02 per-B qualified deployment namespace preserved. Host authenticated principal, not public caller, is the only authority. Sealed selected routes exactly bound to BUILD, no first-match. Test hidden-B no-oracle on actual two-B file SQLite, no K writes or external effects; original receipt replay unaffected. Compiler tracked dist current. CI and actual local Node24 focused test current exact SHA. One concern PR into v0.10, parent only DONE after this integration meets full Issue. R01 later.
