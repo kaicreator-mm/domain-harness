@@ -32,6 +32,11 @@
  *   N-GATE-DIRECT       replaying a settled turn's permit claim against the
  *                       gate directly is refused (consumed permit / foreign
  *                       tenant docs namespace) with the invoker untouched.
+ *   P-READ-THEN-EXTERNAL (#1222)
+ *                       an ordinary read Tool call (non-external directory
+ *                       lookup) runs FIRST inside one external effect; it never
+ *                       consumes the effect's one durable dispatch claim, so
+ *                       the authorized job.submit still dispatches exactly once.
  *   P-KEYSPACE          every K document stays under v10/k/** — the adapters
  *                       never write the Kernel's namespace.
  */
@@ -53,12 +58,14 @@ import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/
 import { PlainCasDocStore, sha256HexSource } from './helpers-v010.js';
 import * as extjobConsole from './fixtures-v010/capability-extjob-runx-v1.mjs';
 import * as extnotifyConsole from './fixtures-v010/capability-extnotify-provider-v1.mjs';
+import * as directoryConsole from './fixtures-v010/capability-directory-read-v1.mjs';
 
 const KERNEL_PACKAGE_ID = 'v08-kernel-mechanism@v0.10.0';
 const STANDARD_PACKAGE_ID = 'standard-sdk@v08.1.0.0';
 const BUSINESS_ID = 'business-external-jobs@v010.1.0.0';
 const EXTJOB_ID = 'capability-extjob-runx@v010.1.0.0';
 const EXTNOTIFY_ID = 'capability-extnotify-provider@v010.1.0.0';
+const DIRECTORY_ID = 'capability-directory-read@v010.1.0.0';
 const TENANT = 'tenant:v010-c01';
 
 const BASE_MS = Date.UTC(2026, 9, 19, 11, 0, 0);
@@ -88,6 +95,7 @@ function clearPins(): void {
   delete (globalThis as { __c01NotifyStorePath?: string }).__c01NotifyStorePath;
   delete (globalThis as { __c01JobFaults?: string }).__c01JobFaults;
   delete (globalThis as { __c01NotifyMode?: string }).__c01NotifyMode;
+  delete (globalThis as { __c01DirectoryLookups?: number }).__c01DirectoryLookups;
 }
 
 async function standardBundle(): Promise<string> {
@@ -107,12 +115,13 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 }
 
 async function c01Modules(): Promise<V10ModuleInput[]> {
-  const [kernel, sdk, business, extjob, extnotify] = await Promise.all([
+  const [kernel, sdk, business, extjob, extnotify, directory] = await Promise.all([
     readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
     standardBundle(),
     readFile(new URL('./fixtures-v010/business-external-jobs-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/capability-extjob-runx-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/capability-extnotify-provider-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('./fixtures-v010/capability-directory-read-v1.mjs', import.meta.url), 'utf8'),
   ]);
   return [
     {
@@ -132,7 +141,7 @@ async function c01Modules(): Promise<V10ModuleInput[]> {
       provides: [
         'business:policy/1', 'intent:submitExternalJob', 'intent:checkExternalJob', 'intent:reconcileExternalJob',
         'intent:sendNotification', 'intent:submitUnpermittedJobProbe', 'intent:submitCrossCapabilityProbe', 'intent:submitExpiringJob',
-        'intent:submitDoubleDispatchProbe', 'intent:submitConcurrentDispatchProbe',
+        'intent:submitDoubleDispatchProbe', 'intent:submitConcurrentDispatchProbe', 'intent:submitReadThenExternalProbe',
       ], requires: [],
     },
     {
@@ -160,6 +169,17 @@ async function c01Modules(): Promise<V10ModuleInput[]> {
         { operationId: 'notify.status', handler: 'notifyStatus' },
       ],
     },
+    {
+      // #1222: a NON-external read-only capability — the ordinary read Tool of
+      // the read-then-external positive witness. No externalEffect, no permit.
+      packageId: DIRECTORY_ID, role: 'capability', abiVersion: 'v08-capability-abi/1',
+      moduleSource: directory, moduleSha256: sha256HexSource(directory),
+      endpoint: 'capability-endpoint', dependencies: [], provides: ['capability:directory/1'], requires: [],
+      capabilityId: 'directory',
+      handlers: [
+        { operationId: 'directory.lookup', handler: 'directoryLookup' },
+      ],
+    },
   ];
 }
 
@@ -173,6 +193,7 @@ const ROUTES = [
   { intentId: 'submitCrossCapabilityProbe', operationId: 'notify.send', capabilityId: 'extnotify', handlerId: 'notifySend' },
   { intentId: 'submitDoubleDispatchProbe', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
   { intentId: 'submitConcurrentDispatchProbe', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
+  { intentId: 'submitReadThenExternalProbe', operationId: 'job.submit', capabilityId: 'extjob', handlerId: 'jobSubmit' },
 ];
 
 async function buildC01App() {
@@ -647,6 +668,42 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
     );
 
     assert.equal(invoked, 0, 'the invoker never ran');
+  } finally {
+    clearPins();
+    extjobConsole.shutdown();
+  }
+});
+
+test('P-READ-THEN-EXTERNAL (#1222): an ordinary read Tool call first never consumes the authorized external Effect\u2019s one durable claim', async () => {
+  await pinAdapterStores();
+  const clock = controlledClock();
+  try {
+    const counters = freshV10Counters();
+    const activation = await activateV10App(await buildC01App(), { store: new PlainCasDocStore(), tenantId: TENANT, now: clock.now, counters });
+
+    // The witness order inside ONE effect: a plain non-external read Tool call
+    // (directory lookup) FIRST, then the permitted external job.submit. The
+    // read is outside the effect's K-minted permit scope, so the durable
+    // dispatch claim remains for the authorized dispatch.
+    const receipt = await activation.facade.send(send({
+      intentType: 'submitReadThenExternalProbe', messageId: 'msg:read-then-ext-1',
+      input: { requestId: 'R-READ-1', jobSpec: { kind: 'export', rows: 2 } },
+    }));
+    assert.deepEqual(
+      firstEffect(receipt).output,
+      { phase: 'accepted', externalRef: 'job:R-READ-1' },
+      'the authorized external effect completes honestly AFTER the ordinary read call',
+    );
+    assert.equal(directoryConsole.directoryLookupCount(), 1, 'the read Tool call physically executed exactly once');
+    const kc = activation.facade.kCounters(BUSINESS_ID);
+    assert.equal(kc.effectDispatchClaims, 1, 'only the permitted external call took the durable claim');
+    assert.equal(kc.effectDispatchClaimRefusals, 0, 'the preceding read was never refused at the claim');
+    assert.equal(kc.effectPermitsMinted, 1, 'one effect still mints exactly one permit');
+    assert.equal(counters.externalEffectDispatches, 1, 'the gate dispatched exactly once');
+    assert.equal(extjobConsole.dispatchCounts()['job.submit'], 1, 'the adapter physically dispatched once');
+    assert.ok(extjobConsole.jobByKey('R-READ-1') !== undefined, 'the job physically landed at the provider');
+
+    activation.dispose();
   } finally {
     clearPins();
     extjobConsole.shutdown();
