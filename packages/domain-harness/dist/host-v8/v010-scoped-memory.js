@@ -107,11 +107,22 @@ export class V10ScopedMemoryCapability {
         if (expiresAtMs !== null && (!Number.isSafeInteger(expiresAtMs) || expiresAtMs <= this.#now())) {
             refuse('MEMORY_TTL_INVALID', 'expiration must be a future safe-integer instant');
         }
+        // An expired row is invisible to callers, but remains a physical CAS row.
+        // A create may reclaim it only by matching its observed revision; two
+        // concurrent creators must never both succeed. Live rows still reject
+        // mustBeAbsent, and explicit revision-CAS semantics remain unchanged.
+        let condition = validCondition(input.condition);
+        if (condition.mustBeAbsent === true) {
+            const existing = await this.#store.get(physical);
+            if (existing !== null && this.#visible(existing.value, existing.revision) === null) {
+                condition = { mustMatchRevision: existing.revision };
+            }
+        }
         return await this.#store.put(physical, {
             value: canonicalJson(input.value),
             provenance: validProvenance(input.provenance),
             expiresAtMs,
-        }, validCondition(input.condition));
+        }, condition);
     }
     async get(scope, key) {
         const physical = await this.#admit('get', scope, key);

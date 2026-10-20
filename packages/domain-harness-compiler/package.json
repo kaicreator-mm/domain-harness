@@ -42,7 +42,7 @@
     "src/qualified-package/v09/workflow-router.mjs"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.15.0"
   },
   "scripts": {
     "prebuild": "npm run build -w @kaicreator/domain-harness",

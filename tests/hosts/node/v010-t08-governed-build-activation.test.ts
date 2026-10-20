@@ -52,6 +52,7 @@ import {
   buildT08GovernedApp,
   createT08AuthorizationAuthority,
   instanceRowOf,
+  instanceRowsOf,
   kRowsOf,
   readT08Rows,
   t08Decision,
@@ -115,10 +116,14 @@ test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, r
     assert.equal(oldPinA.businessPackageId, T08_BUSINESS_ALPHA);
 
     const rowsAfterOld = readT08Rows(kPath);
-    assert.ok(kRowsOf(rowsAfterOld, buildA.subjectDigest).length > 0, 'A wrote real K rows');
-    assert.equal(kRowsOf(rowsAfterOld, buildB.subjectDigest).length, 0, 'B has no K rows yet');
+    // #1217: A and B share ONE stable deployment K namespace; a BUILD
+    // subjectDigest is no longer a physical address component, so per-subject
+    // row attribution has no physical referent. BUILD attribution is the
+    // immutable occurrence pin (asserted above); the physical facts are the
+    // shared-namespace row set and its byte stability.
+    assert.ok(kRowsOf(rowsAfterOld, T08_DEPLOYMENT).length > 0, 'A wrote real K rows under the stable deployment namespace');
     const oldInstanceRow = instanceRowOf(
-      rowsAfterOld, T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+      rowsAfterOld, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
     );
     assert.ok(oldInstanceRow !== undefined, 'the old A occurrence has a physical instance row');
     const oldInstanceRowHash = t08HashText(oldInstanceRow.value);
@@ -140,11 +145,10 @@ test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, r
     assert.equal(activationB.build.packageClosureDigest, decisionB.packageClosureDigest);
 
     const rowsAfterBActivation = readT08Rows(kPath);
-    assert.equal(kRowsOf(rowsAfterBActivation, buildB.subjectDigest).length, 0, 'B activation alone writes no B K rows');
     assert.deepEqual(
-      kRowsOf(rowsAfterBActivation, buildA.subjectDigest),
-      kRowsOf(rowsAfterOld, buildA.subjectDigest),
-      'B activation cannot touch any existing A K row',
+      kRowsOf(rowsAfterBActivation, T08_DEPLOYMENT),
+      kRowsOf(rowsAfterOld, T08_DEPLOYMENT),
+      'B activation alone adds no K row and cannot touch any existing row (the accepted decision record lives outside the K namespace)',
     );
     const activationRecordB = await readV10DeploymentActivationRecord(
       store, T08_DEPLOYMENT.deployedAppId, decisionB.decisionId,
@@ -172,18 +176,15 @@ test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, r
 
     const rowsAfterNew = readT08Rows(kPath);
     assert.ok(instanceRowOf(
-      rowsAfterNew, T08_DEPLOYMENT, buildB.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_NEW_INTENT.instanceKey,
-    ) !== undefined, 'the new B occurrence is physically under B subject + alpha B scope');
+      rowsAfterNew, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_NEW_INTENT.instanceKey,
+    ) !== undefined, 'the new B occurrence is physically under the shared deployment namespace + alpha B scope (its BUILD attribution is the B pin asserted above)');
     assert.ok(instanceRowOf(
-      rowsAfterNew, T08_DEPLOYMENT, buildB.subjectDigest, T08_BUSINESS_BETA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+      rowsAfterNew, T08_DEPLOYMENT, T08_BUSINESS_BETA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
     ) !== undefined, 'the second B shares workflowId+instanceKey without aliasing A');
-    assert.equal(instanceRowOf(
-      rowsAfterNew, T08_DEPLOYMENT, buildB.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
-    ), undefined, 'B alpha has no physical row for the old A instance key');
-    assert.equal(
-      instanceRowOf(rowsAfterNew, T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
-      oldInstanceRow.value,
-      'B activity leaves the old A instance row byte-identical',
+    assert.deepEqual(
+      instanceRowsOf(rowsAfterNew, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey).map((row) => row.value),
+      [oldInstanceRow.value],
+      'exactly one physical row serves the old A instance key under the shared namespace — B activity never forked or rewrote it',
     );
 
     // ---- P03: old A replay / changed-input conflict after B activation ----
@@ -194,7 +195,7 @@ test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, r
     const replayCoreDigest = t08ReceiptCoreDigest(replayAfterB);
     const rowsAfterReplay = readT08Rows(kPath);
     assert.equal(
-      instanceRowOf(rowsAfterReplay, T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
+      instanceRowOf(rowsAfterReplay, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
       oldInstanceRow.value,
       'the durable original-receipt row is byte-identical after B activation and replay',
     );
@@ -211,7 +212,7 @@ test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, r
     );
     assert.deepEqual(readT08Rows(kPath), rowsBeforeConflict, 'a changed-input conflict writes nothing');
     assert.equal(
-      instanceRowOf(readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
+      instanceRowOf(readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
       oldInstanceRow.value,
       'the conflict leaves the original receipt intact',
     );
@@ -243,7 +244,7 @@ test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, r
     const replayAfterPartial = await activationA.send(T08_OLD_INTENT);
     assert.equal(t08ReceiptCoreDigest(replayAfterPartial), replayCoreDigest);
     assert.equal(
-      instanceRowOf(readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
+      instanceRowOf(readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
       oldInstanceRow.value,
       'old A remains fully readable/replayable after the failed B deployment',
     );
