@@ -101,7 +101,7 @@ AssertionError [ERR_ASSERTION]: at least one competing writer must admit:
               \"code\":\"ADMISSION_EFFECT_AMBIGUOUS\"}}"]
 ```
 
-Three independent runs on the same candidate produced the same result:
+Three independent official runs on the same candidate source tree produced the same result:
 
 | Run | Exit | Suite duration | Result |
 |---|---|---|---|
@@ -231,10 +231,10 @@ refusal with unchanged K state. No blanket JavaScript network-sandbox claim is m
 | P0 findings | **0** |
 | P1 findings | **1** — T11/K01 live same-turn fence re-claim allows both concurrent writers to fail after one non-idempotent external job was dispatched and journaled; no double dispatch; `wf-instance` stays at revision 0 with no turn disposition. Possible P0 escalation if the orphaned effect is adjudicated unaccounted. |
 | P2 observations | (1) lint emits one pre-existing unused eslint-disable warning in a test fixture; (2) Windows concurrent node-suite timing sensitivity remains possible under load; (3) Ubuntu Build Host remains NOT_RUN (Windows evidence only) |
-| Full regression | PASS at `dcf4b313` (4234 / 0 fail / 0 skip) |
-| Critical journeys | PASS at `dcf4b313` (82, plus T09 15) |
-| Security negatives | PASS at `dcf4b313` (59) |
-| Independent packaging | **FAIL** at `dcf4b313` (T11 3/3 race rejection) |
+| Full regression | PASS at run head `4f703641` / candidate tree `3d2a29c7` (4234 / 0 fail / 0 skip) |
+| Critical journeys | PASS at run head `4f703641` / candidate tree `3d2a29c7` (82 non-T11, plus T09 15) |
+| Security negatives | PASS at run head `4f703641` / candidate tree `3d2a29c7` (59) |
+| Independent packaging | **FAIL** at run head `4f703641` / candidate tree `3d2a29c7` (T11 3/3 race rejection) |
 | Hidden Validation | **BLOCKED — no v0.10 pack** |
 | `RELEASE_QUALIFIED` | **NO** — P1 open and hidden gate blocked |
 | `v0.10 → main` | **NOT MERGED** |
