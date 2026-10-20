@@ -5699,6 +5699,14 @@ export function createOccurrenceRuntime(options) {
       // adapter invocation, enforced by a physical mustBeAbsent CAS before
       // any raw resources call. A refusal is fail-closed typed and carries NO
       // zero-external-effect proof (an earlier invocation may have landed).
+      // Generic read calls preceding the external effect cannot consume its
+      // one durable claim. Only operations in this effect's K-minted permit
+      // scope may claim; a foreign external adapter still fails at the Host gate.
+      const isPermittedExternalCall = (resourceKey, operation) =>
+        authorityContext !== null
+        && isJsonRecord(binding?.resource)
+        && resourceKey === binding.resource.key
+        && (operation === binding.resource.operation || externalConfig.operations.includes(operation));
       const claimExternalDispatch = async () => {
         if (authorityContext === null) return;
         try {
@@ -5769,7 +5777,7 @@ export function createOccurrenceRuntime(options) {
               }
               probe.dispatchAttests.push(attest);
               probe.invoked = true;
-              await claimExternalDispatch();
+              if (isPermittedExternalCall(resourceKey, operation)) await claimExternalDispatch();
               return rawResources.call(resourceKey, operation, payload, attest);
             },
             ...(typeof rawResources.callScoped === 'function'
@@ -5781,7 +5789,7 @@ export function createOccurrenceRuntime(options) {
                     }
                     probe.dispatchAttests.push(attest);
                     probe.invoked = true;
-                    await claimExternalDispatch();
+                    if (isPermittedExternalCall(resourceKey, operation)) await claimExternalDispatch();
                     return rawResources.callScoped(scopeId, resourceKey, operation, payload, attest);
                   },
                 }
