@@ -1288,7 +1288,11 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
       ...(queryAuthority === undefined ? {} : { queryAuthority }),
     });
-    const failActivation = (code: string, failedPackageId: string, message: string): never => {
+    // A `function` declaration (not a const arrow) so the explicit `never`
+    // return is on the referenced declaration itself: TypeScript only treats
+    // the call as a control-flow terminator that way, which is what narrows
+    // `initReturn` to a plain record after the guard below.
+    function failActivation(code: string, failedPackageId: string, message: string): never {
       for (let index = initialized.length - 1; index >= 0; index -= 1) {
         const advisory = initialized[index] as SelectedAdvisory;
         counters.disposals.push(advisory.packageId);
@@ -1302,7 +1306,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       facade.close();
       counters.initFailures.push({ packageId: failedPackageId, message });
       refuse(code, message);
-    };
+    }
     for (const advisory of advisories) {
       const namespace = namespaces.get(advisory.packageId) as Namespace;
       const init = namespace.init as (context: unknown) => unknown;
