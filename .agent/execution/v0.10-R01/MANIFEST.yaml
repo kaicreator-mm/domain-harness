@@ -17,6 +17,7 @@ candidate_tree: 30c8ab6328543d8ffc0a4581c4d44aa35b3293f3
 previous_candidate_sha: dcf4b31306e1a33b85782ada0507f7b53aee3b0f
 previous_r01_evidence: docs/validation/v0.10/R01_PRE_K01_REPAIR_CANDIDATE_dcf4b313.md
 older_r01_evidence: docs/validation/v0.10/R01_PRE_T09_CANDIDATE_df3dc4bb.md
+source_dag_gate: PASS_16_OF_16_CLOSED_FIVE_FROZEN_BLOBS_MATCH
 builder_claim_current: NOT_YET_ACCEPTED
 full_regression_at_candidate: NOT_RUN
 critical_journeys_at_candidate: NOT_RUN

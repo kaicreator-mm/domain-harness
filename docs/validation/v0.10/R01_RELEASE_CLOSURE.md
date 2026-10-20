@@ -26,7 +26,7 @@
 
 | Gate | Status **at `7cbfaf5a`** | Notes |
 |---|---|---|
-| 16/16 Task source + frozen Product/A01/L2/DAG | SOURCE MERGED, release readback pending | R01 must verify all frozen blob hashes |
+| 16/16 Task source + frozen Product/A01/L2/DAG | **PASS — direct exact-SHA GitHub readback** | All 16 DAG Issue #1165–#1180 are CLOSED and `state:done`; five frozen source blobs match |
 | Build / lint / typecheck / tracked-dist freshness | **NOT_RUN** | Task repair had PASS on pre-squash HEAD only |
 | Full `npm test` regression | **NOT_RUN** | Previous version passed 4234 tests, distinct exact SHA |
 | K01/K02/C01/T03/T07/T08/T09/T10/T10B CJ | **NOT_RUN** | Reuse unchanged Task evidence as provenance; run required final CJ on candidate |
@@ -38,7 +38,21 @@
 
 The accepted repair [PR #1206](https://github.com/kaicreator-mm/domain-harness/pull/1206) had real Node24/SQLite physical K01 **10/10 PASS** and clean-packed Tiny/Rich **3/3 PASS**, plus build/lint/typecheck and exact-head CI #1575 success at `828966e4`. Retain those proof links, but run the final release candidate gates at the actual `v0.10` merge SHA.
 
-## 3. Hidden Validation — independent exact-candidate PASS
+## 3. Source/DAG gate — direct exact-candidate PASS
+
+Direct readback of GitHub contents at the exact `v0.10@7cbfaf5a` candidate verified frozen input blob identities:
+
+| Frozen source file | Exact Git blob | Result |
+|---|---|---|
+| `docs/implementation/DomainHarness_v0.10_TASK_DAG_FREEZE_CANDIDATE.md` | `f375bb0acd1099da76f0849a1929ad11831b12f7` | MATCH |
+| `docs/product/DomainHarness_v0.10_PRD_CANDIDATE.md` | `673da42ad90acde5ef942beb8ac63b58836a649f` | MATCH |
+| `docs/product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_ACCEPTANCE.md` | `6777acf013a24229e7aa28b4c5b7768e6070b350` | MATCH |
+| `docs/architecture/DomainHarness_v0.10_L2_ARCHITECTURE_R0.md` | `9e58c629b0a2074617ca3d38ac85d9527f284aab` | MATCH |
+| `docs/architecture/DomainHarness_v0.10_L2_FREEZE.md` | `b7712055debbd8d36762e0a721cf69ab1a38516e` | MATCH |
+
+Each of the 16 implementation Issue numbers 1165–1180 was independently read from GitHub and was CLOSED with the `state:done` label. `#1205` K01 P1 repair was also CLOSED, merge #1206 included at the selected SHA. Source/DAG gate is PASS; this **does not substitute for Host execution** or final Release approval.
+
+## 4. Hidden Validation — independent exact-candidate PASS
 
 - **Result:** 31/31 PASS, 0 FAIL and 0 flake, in **two** independent clean-room runs on Node 24.21.0 + file-backed SQLite 3.53.2 / better-sqlite3 12.11.1 (Windows x64).
 - **Candidate:** `7cbfaf5ab8e21a0e2ff0e98625694132d7d21bb4`; tree `30c8ab6328543d8ffc0a4581c4d44aa35b3293f3`; all 16 Tasks included.
@@ -48,7 +62,7 @@ The accepted repair [PR #1206](https://github.com/kaicreator-mm/domain-harness/p
 - Private pack commit, public-safe report and exact release-candidate binding were inspected through the connected repo. Private assertions/fixture logic remain private.
 - **This is Hidden PASS only**, not final R01 PASS; no main merge/tag.
 
-## 4. Release validation dispatch and completion
+## 5. Release validation dispatch and completion
 
 Read `.agent/execution/v0.10-R01/`, this report and #1181. Claim Builder execution as self-declared local Agent under ADS `4.13.1@f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd`, not a GitHub-account owner gate. Confirm candidate SHA/tree and clean worktree; run the true root full regression, build/lint/typecheck, physical critical journeys and security negatives, plus independently packed Tiny/Rich from this exact tree (including repaired live K01 and T09/T10B). The independent hidden suite has ALREADY been re-pinned and executed on this exact candidate ([private #66](https://github.com/kaicreator-mm/hidden-validation/issues/66)); do not rerun it without further candidate drift. Record **actual commands, exit codes, test counts, OS/Node/SQLite, raw log SHA256 and package digests** here and in Issue #1181.
 
