@@ -117,7 +117,14 @@ try {
       messageId,
       input: { requestId, jobSpec: { kind: 'race' }, jobId: null, idempotencyKey: null, channel: null, message: null },
     });
-    outcome = { ok: true, status: receipt.status, effect: receipt.admitted?.effects?.[0] ?? null };
+    // R01-C01 #1211: a non-throwing UNKNOWN/denied receipt is NOT admitted.
+    // Only an actual admitted receipt is a winner. Preserve the genuine K02/K01
+    // code on the fail-closed loser; never invent an ADMISSION_* error.
+    // If an admitted receipt has no effect, keep ok=true/effect=null so the
+    // parent's exact-effect witness still detects any broken original replay.
+    outcome = receipt.status === 'admitted'
+      ? { ok: true, status: receipt.status, effect: receipt.admitted?.effects?.[0] ?? null }
+      : { ok: false, status: receipt.status, code: receipt.code ?? null, message: JSON.stringify(receipt).slice(0, 500) };
   } finally {
     activation.dispose();
   }
