@@ -639,8 +639,10 @@ export interface ActivateV10AppOptions {
 export interface V10Activation {
   readonly facade: V10AppFacade;
   readonly counters: V10Counters;
-  /** Dispose: facade closes first, then advisory modules in reverse init order. */
+  /** Explicit, idempotent cleanup: closes facade and all import allowances. */
   dispose(): void;
+  /** Node >=22.15: permits `using activation = await activateV10App(...)`. */
+  [Symbol.dispose](): void;
 }
 
 /**
@@ -1361,24 +1363,30 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
     }
 
     // ---- (5)+(6) the facade is the execute surface; dispose closes in reverse ----
+    // Explicit cleanup is authoritative; GC/FinalizationRegistry are not
+    // reliable security or process-global hook cleanup mechanisms.
+    let disposed = false;
+    const dispose = (): void => {
+      if (disposed) return;
+      disposed = true;
+      // Stop honoring this activation's bare imports before any other teardown.
+      releaseDeclaredImports?.();
+      facade.close();
+      for (let index = initialized.length - 1; index >= 0; index -= 1) {
+        const advisory = initialized[index] as SelectedAdvisory;
+        counters.disposals.push(advisory.packageId);
+        try {
+          advisory.dispose?.();
+        } catch {
+          // bounded best-effort teardown
+        }
+      }
+    };
     return {
       facade,
       counters,
-      dispose: (): void => {
-        // Close the declared-import resolution seam first: after activation
-        // close, this App's allowances stop being honored (fail-closed).
-        releaseDeclaredImports?.();
-        facade.close();
-        for (let index = initialized.length - 1; index >= 0; index -= 1) {
-          const advisory = initialized[index] as SelectedAdvisory;
-          counters.disposals.push(advisory.packageId);
-          try {
-            advisory.dispose?.();
-          } catch {
-            // bounded best-effort teardown
-          }
-        }
-      },
+      dispose,
+      [Symbol.dispose]: dispose,
     };
   } catch (error) {
     releaseDeclaredImports?.();
