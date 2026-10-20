@@ -31,7 +31,7 @@
  * use that App. The physical K namespaces remain K02's own scoped tuples;
  * this module adds a separate immutable occurrence pin dimension.
  */
-import type { V10Activation, V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotQuery } from './activation.js';
+import type { V10Activation, V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
 import { activateV10App, V10AppFacade } from './activation.js';
 import type { V10BuiltApp } from './build.js';
 import {
@@ -880,6 +880,7 @@ export interface V10GovernedBuildActivation {
   readonly selectedShadowBinding: V10AppFacade['selectedShadowBinding'];
   send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
   queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
+  queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
   kCounters(businessPackageId: string): Record<string, number>;
   resolveIntentTarget(intentType: string): Readonly<{ businessPackageId: string; workflowId: string }>;
   readPin(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<V10OccurrenceBuildPin | null>;
@@ -951,6 +952,13 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
   async queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer> {
     this.#assertOpen();
     return await this.#activation.facade.queryScopedSnapshot(selector);
+  }
+
+  async queryManyScopedSnapshots(
+    selectors: readonly V10ScopedSnapshotQuery[],
+  ): Promise<readonly V10ScopedSnapshotManyAnswer[]> {
+    this.#assertOpen();
+    return await this.#activation.facade.queryManyScopedSnapshots(selectors);
   }
 
   kCounters(businessPackageId: string): Record<string, number> {

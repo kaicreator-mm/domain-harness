@@ -138,6 +138,23 @@ export interface V10ScopedSnapshotAnswer {
     readonly target: Readonly<V10ScopedQueryTarget>;
     readonly snapshot: unknown;
 }
+/**
+ * [v0.10 T10B #1179] One truthfully correlated entry of an explicit
+ * multi-target query. Each entry is independently authorized and read; a
+ * refusal is scoped to its own input position and never masks another
+ * target's answer.
+ */
+export type V10ScopedSnapshotManyAnswer = {
+    readonly status: 'answered';
+    readonly index: number;
+    readonly target: Readonly<V10ScopedQueryTarget>;
+    readonly snapshot: unknown;
+} | {
+    readonly status: 'refused';
+    readonly index: number;
+    readonly code: string;
+    readonly message: string;
+};
 export interface V10PublicIntent {
     readonly intentType: string;
     readonly instanceKey: string;
@@ -331,6 +348,16 @@ export declare class V10AppFacade {
      * dispatches an effect.
      */
     queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
+    /**
+     * [v0.10 T10B #1179] Explicit multi-target variant of
+     * `queryScopedSnapshot`. Every requested selector is independently
+     * authorized and read; each result is correlated to its input index and a
+     * failure is confined to that entry. The public selector still carries only
+     * workflow/instance/optional B — the Host authority and deployment identity
+     * remain activation wiring. No cross-B transaction or hidden-B oracle is
+     * introduced, and no query path writes K state or dispatches an Effect.
+     */
+    queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
     /** One public intent through the sealed route and the real kernel. */
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
 }

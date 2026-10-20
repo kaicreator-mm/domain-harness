@@ -136,6 +136,20 @@ const T00_V10BUILD_VALUES = [
   'V10AppFacade',
 ] as const;
 
+/** v0.10 T08/T10B (#1175/#1179): governed BUILD selection and deployment activation (additive group). */
+const T08_T10B_V10GOVERNED_VALUES = [
+  // functions (7)
+  'activateGovernedV10Build',
+  'readV10DeploymentActivationRecord',
+  'readV10OccurrenceBuildPin',
+  'v10BuildActivationDecisionDigest',
+  'v10BuildPackageClosureDigest',
+  'v10DeploymentActivationKey',
+  'v10OccurrenceBuildPinKey',
+  // error classes (1)
+  'V10DeploymentError',
+] as const;
+
 /** The complete T008C-promised runtime inventory (legacy + additive markers). */
 const COMMITTED_RUNTIME_VALUES = [
   ...LEGACY_RUNTIME_VALUES,
@@ -144,6 +158,7 @@ const COMMITTED_RUNTIME_VALUES = [
   ...HF25_APP_CONTRACT_VALUES,
   ...N06_V09_BUILD_VALUES,
   ...T00_V10BUILD_VALUES,
+  ...T08_T10B_V10GOVERNED_VALUES,
 ];
 
 const COMMITTED_RUNTIME_SORTED = [...COMMITTED_RUNTIME_VALUES].sort((left, right) =>
@@ -206,6 +221,14 @@ const FUNCTION_NAMES = new Set<string>([
   'freshV10Counters',
   'sha256Canonical',
   'sha256Hex',
+  // v0.10 T08/T10B functions
+  'activateGovernedV10Build',
+  'readV10DeploymentActivationRecord',
+  'readV10OccurrenceBuildPin',
+  'v10BuildActivationDecisionDigest',
+  'v10BuildPackageClosureDigest',
+  'v10DeploymentActivationKey',
+  'v10OccurrenceBuildPinKey',
 ]);
 const ERROR_CLASS_NAMES = new Set<string>([
   'SemanticDecisionCompileError',
@@ -223,6 +246,8 @@ const ERROR_CLASS_NAMES = new Set<string>([
   'V10ActivationError',
   'V10BuildError',
   'V10PortDeniedError',
+  // v0.10 T10B error classes
+  'V10DeploymentError',
 ]);
 
 /** The exactly-15 successor `/v7` runtime names owned by the core package. */

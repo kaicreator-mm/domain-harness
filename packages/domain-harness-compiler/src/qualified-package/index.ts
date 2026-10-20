@@ -107,6 +107,7 @@ export type {
   V10RouteRowInput,
   V10ScopedQueryTarget,
   V10ScopedSnapshotAnswer,
+  V10ScopedSnapshotManyAnswer,
   V10ScopedSnapshotQuery,
   V10SealedModule,
 } from './v10build/index.js';

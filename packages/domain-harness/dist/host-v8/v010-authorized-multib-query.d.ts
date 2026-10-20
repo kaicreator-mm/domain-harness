@@ -38,6 +38,27 @@ export interface V10MultiBQueryHost<T> {
     /** Real selected K02 reader, physical addressing bound to the entire tuple. */
     readonly readSnapshot: (target: V10MultiBQueryTarget) => T | null | Promise<T | null>;
 }
+/** One answered entry of an explicit multi-target query, correlated by input index. */
+export interface V10MultiBQueryManyAnswered<T> {
+    readonly status: 'answered';
+    /** Zero-based position of the exact input selector this entry answers. */
+    readonly index: number;
+    readonly target: Readonly<V10MultiBQueryTarget>;
+    readonly snapshot: T;
+}
+/**
+ * One truthfully refused entry. The code/message pair never distinguishes a
+ * denied selected B from an unselected, absent or hidden one.
+ */
+export interface V10MultiBQueryManyRefused {
+    readonly status: 'refused';
+    readonly index: number;
+    readonly code: string;
+    readonly message: string;
+}
+export type V10MultiBQueryManyEntry<T> = V10MultiBQueryManyAnswered<T> | V10MultiBQueryManyRefused;
+/** Upper bound on one explicit queryMany call; fail closed above it. */
+export declare const MAX_QUERY_MANY_SELECTORS = 32;
 export declare class V10MultiBQueryError extends Error {
     readonly code: string;
     constructor(code: string, message: string);
@@ -50,6 +71,17 @@ export declare class V10AuthorizedMultiBQuery<T> {
         readonly target: Readonly<V10MultiBQueryTarget>;
         readonly snapshot: T;
     }>;
+    /**
+     * Explicit multi-target variant: every requested selector is authorized and
+     * read INDEPENDENTLY, and results are correlated to the input position. A
+     * malformed selector, denied/hidden target, authorization fault or physical
+     * read fault is reported only for its own entry; the remaining entries still
+     * answer. There is deliberately no cross-B transaction, rollback or
+     * all-or-nothing assumption: earlier entries are never revoked because a
+     * later one failed. Enumeration and denial shapes match `query`, so a hidden
+     * B remains indistinguishable from an absent one.
+     */
+    queryMany(selectors: readonly V10MultiBQuerySelector[]): Promise<readonly V10MultiBQueryManyEntry<T>[]>;
 }
 export declare function createV10AuthorizedMultiBQuery<T>(host: V10MultiBQueryHost<T>): V10AuthorizedMultiBQuery<T>;
 //# sourceMappingURL=v010-authorized-multib-query.d.ts.map

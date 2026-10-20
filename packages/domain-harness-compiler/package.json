@@ -10,6 +10,22 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./v10build": {
+      "types": "./dist/qualified-package/v10build/index.d.ts",
+      "import": "./dist/qualified-package/v10build/index.js"
+    },
+    "./v10shadow": {
+      "types": "./dist/qualified-package/v10shadow/index.d.ts",
+      "import": "./dist/qualified-package/v10shadow/index.js"
+    },
+    "./v10payload/kernel-mechanism": "./src/qualified-package/payload/kernel-mechanism-v1.mjs",
+    "./v10payload/standard-sdk": "./src/qualified-package/payload/standard-sdk-v1.mjs",
+    "./v10payload/workflow-router": "./src/qualified-package/v09/workflow-router.mjs",
+    "./v10payload/sfeature-semantic-decision": "./src/qualified-package/payload/sfeature-semantic-decision-v1.mjs",
+    "./v10payload/sfeature-workflow-control": "./src/qualified-package/payload/sfeature-workflow-control-v1.mjs",
+    "./v10payload/sfeature-context-assembly": "./src/qualified-package/payload/sfeature-context-assembly-v1.mjs",
+    "./v10payload/sfeature-decision-evidence": "./src/qualified-package/payload/sfeature-decision-evidence-v1.mjs",
+    "./v10payload/sfeature-candidate-validation": "./src/qualified-package/payload/sfeature-candidate-validation-v1.mjs",
     "./v10meta": {
       "types": "./dist/qualified-package/v10meta/index.d.ts",
       "import": "./dist/qualified-package/v10meta/index.js"
@@ -22,7 +38,8 @@
   "files": [
     "dist",
     "README.md",
-    "src/qualified-package/payload/*.mjs"
+    "src/qualified-package/payload/*.mjs",
+    "src/qualified-package/v09/workflow-router.mjs"
   ],
   "engines": {
     "node": ">=22"
