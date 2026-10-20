@@ -15,13 +15,14 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import Database from 'better-sqlite3';
 import {
   V10_TARGET_PROFILE,
   activateV10App,
   activateGovernedV10Build,
   freshV10Counters,
 } from '@kaicreator/domain-harness-compiler/v10build';
+
+import { openSharedSqliteDatabase } from './sqlite-open.mjs';
 
 export { V10_TARGET_PROFILE, activateV10App, activateGovernedV10Build, freshV10Counters };
 
@@ -32,10 +33,15 @@ export class SqliteDocStore {
   constructor(path) {
     mkdirSync(dirname(path), { recursive: true });
     this.path = path;
-    this.db = new Database(path);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('busy_timeout = 10000');
-    this.db.exec('CREATE TABLE IF NOT EXISTS docs (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, value TEXT NOT NULL)');
+    // Two App processes may FIRST-open this shared file concurrently (the T11
+    // same-turn race): the WAL transition is not covered by the connection
+    // busy handler, so the whole open+configure sequence goes through the
+    // bounded SQLITE_BUSY retry (see ./sqlite-open.mjs).
+    this.db = openSharedSqliteDatabase(path, (db) => {
+      db.pragma('journal_mode = WAL');
+      db.pragma('busy_timeout = 10000');
+      db.exec('CREATE TABLE IF NOT EXISTS docs (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, value TEXT NOT NULL)');
+    });
     this.counts = { reads: 0, writes: 0, removes: 0 };
     this.consumeFault = false;
   }
