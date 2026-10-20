@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     authority.grant(t08Decision(buildB, 'B'));
 
     const oldRowBefore = instanceRowOf(
-      readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+      readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
     );
     if (oldRowBefore === undefined) throw new Error('the parent left no physical old A instance row');
     if (t08HashText(oldRowBefore.value) !== expectedInstanceRowHash) {
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
       restoredA.close();
     }
     const oldRowAfter = instanceRowOf(
-      readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+      readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
     );
     const oldInstanceRowHash = oldRowAfter === undefined ? 'MISSING' : t08HashText(oldRowAfter.value);
     if (oldInstanceRowHash !== expectedInstanceRowHash) {

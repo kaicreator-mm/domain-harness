@@ -501,6 +501,17 @@ function encodeK02Component(value: string): string {
 }
 
 /**
+ * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
+ * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
+ * binding and the Shadow L4 verifier's independent re-derivation — the three
+ * must never drift apart.
+ */
+export function v10DeploymentDocsPrefix(deployment: { deployedAppId: string; tenantId: string; appId: string }): string {
+  return `${K_DOCS_PREFIX}deployment:${encodeK02Component(deployment.deployedAppId)}:${encodeK02Component(deployment.tenantId)}:${encodeK02Component(deployment.appId)}/`;
+}
+
+/**
  * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
@@ -643,12 +654,9 @@ export class V10AppFacade {
   readonly #namespaces: ReadonlyMap<string, Namespace>;
   readonly #now: () => number;
   readonly #counters: V10Counters;
-  // Key-namespace handoff (review 6254726674, P2): the docs key namespace
-  // derives its deployment identity from the BUILD subjectDigest, which is
-  // not the stable deployedAppId + B-domain identity Product/L2 require.
-  // The key-shape repair belongs to K02/T10/T08 — the concrete handoff is
-  // recorded in .agent/execution/v0.10-T00/HANDOFFS.md — and is deliberately
-  // NOT changed here in T00.
+  // In governed deployments the outer K namespace is derived solely from
+  // the stable deployment tuple, not from subjectDigest (a BUILD revision).
+  // K02 applies the per-B scoped prefix inside this outer namespace.
   readonly #docsPrefix: string;
   readonly #activatedTenantId: string;
   readonly #docs: V10DocsPort;
@@ -677,7 +685,9 @@ export class V10AppFacade {
     this.#deploymentIdentity = deps.deploymentIdentity;
     this.#queryAuthority = deps.queryAuthority;
     this.#activatedTenantId = deps.tenantId;
-    this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
+    this.#docsPrefix = deps.deploymentIdentity === undefined
+      ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
+      : v10DeploymentDocsPrefix(deps.deploymentIdentity);
     this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
   }
 
@@ -722,7 +732,7 @@ export class V10AppFacade {
       .filter((module) => module.role === 'business')
       .map((module) => module.packageId)
       .sort();
-    const namespace = `${K_DOCS_PREFIX}${this.#app.subjectDigest}/${this.#activatedTenantId}/`;
+    const namespace = this.#docsPrefix;
     return Object.freeze({
       subjectDigest: this.#app.subjectDigest,
       appId: this.#app.appId,
@@ -1283,12 +1293,16 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       advisories,
       store: options.store,
       tenantId: deploymentIdentity?.tenantId ?? options.tenantId ?? 'tenant:v010-default',
-      now: options.now ?? (() => 0),
+      now: options.now ?? Date.now,
       counters,
       ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
       ...(queryAuthority === undefined ? {} : { queryAuthority }),
     });
-    const failActivation = (code: string, failedPackageId: string, message: string): never => {
+    // A `function` declaration (not a const arrow) so the explicit `never`
+    // return is on the referenced declaration itself: TypeScript only treats
+    // the call as a control-flow terminator that way, which is what narrows
+    // `initReturn` to a plain record after the guard below.
+    function failActivation(code: string, failedPackageId: string, message: string): never {
       for (let index = initialized.length - 1; index >= 0; index -= 1) {
         const advisory = initialized[index] as SelectedAdvisory;
         counters.disposals.push(advisory.packageId);
@@ -1302,7 +1316,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       facade.close();
       counters.initFailures.push({ packageId: failedPackageId, message });
       refuse(code, message);
-    };
+    }
     for (const advisory of advisories) {
       const namespace = namespaces.get(advisory.packageId) as Namespace;
       const init = namespace.init as (context: unknown) => unknown;
@@ -1313,7 +1327,13 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       } catch (error) {
         failActivation('V10_EXTENSION_INIT_FAILED', advisory.packageId, `advisory module ${advisory.packageId} init threw: ${error instanceof Error ? error.message : String(error)}`);
       }
-      const initRecord = assertPlainRecord(initReturn, `advisory module ${advisory.packageId} init return`);
+      // Contract rejection is a late init failure: run the SAME reverse
+      // teardown path as a thrown init, never bypass the initialized stack.
+      if (!isPlainRecord(initReturn)) {
+        failActivation('V10_INIT_CONTRACT_REFUSED', advisory.packageId,
+          `advisory module ${advisory.packageId} init return must be a plain record`);
+      }
+      const initRecord = initReturn;
       const fields = Object.keys(initRecord);
       if (fields.some((field) => !INIT_RETURN_FIELDS.has(field))) {
         // A forged createOccurrenceRuntime / effectPermit / principal rides

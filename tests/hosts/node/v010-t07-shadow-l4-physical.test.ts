@@ -91,6 +91,9 @@ const SEED_INTENT = {
   messageId: 'msg:t07-seed',
 } as const;
 
+/** K02 key-component escaping (% → %25, : → %3A), mirroring the product encoder. */
+const encodeKComponent = (value: string): string => value.replace(/%/g, '%25').replace(/:/g, '%3A');
+
 interface SqliteRow {
   readonly key: string;
   readonly revision: number;
@@ -183,6 +186,7 @@ interface ShadowHarness {
   readonly receipt: Record<string, unknown>;
   readonly beforeRows: readonly SqliteRow[];
   readonly kCountersBefore: Record<string, number>;
+  readonly kDocsBase: string;
   witness(): unknown;
   cleanup(): Promise<void>;
 }
@@ -250,6 +254,9 @@ async function createHarness(): Promise<ShadowHarness> {
     kind: 'Rule',
     id: 'rule:quote-approval',
   });
+  // [i1217] The activation carries a deployment identity, so every K document
+  // sits under the deployment-tuple prefix, not the legacy digest prefix.
+  const kDocsBase = `${SHADOW_K_DOCS_PREFIX}deployment:${encodeKComponent(DEPLOYED_APP_ID)}:${encodeKComponent(TENANT)}:${encodeKComponent(app.appId)}/`;
   let cleaned = false;
   return {
     dir,
@@ -267,6 +274,7 @@ async function createHarness(): Promise<ShadowHarness> {
     receipt,
     beforeRows,
     kCountersBefore,
+    kDocsBase,
     witness: (): unknown => physicalWitness(kPath, reader),
     cleanup: async (): Promise<void> => {
       if (cleaned) return;
@@ -436,7 +444,7 @@ test('T07-PH-P1: approved byte-pinned candidate matches the exact selected fallb
     assert.equal(report.approvedFallback.provenance, harness.fallbackPin.provenance);
     assert.ok(report.observations.total >= report.observations.considered);
     assert.equal(report.observations.truncated, report.observations.total > report.observations.considered);
-    assert.ok(report.observations.keys.every((key) => key.startsWith(`v10/k/${harness.app.subjectDigest}/${TENANT}/`)));
+    assert.ok(report.observations.keys.every((key) => key.startsWith(harness.kDocsBase)));
     assert.equal(report.canSelfApprove, false);
     assert.equal(report.canPromote, false);
     assert.equal(report.kernelEffectPermit, false);
@@ -757,6 +765,8 @@ interface SharedDeploymentHarness {
   readonly baselineSource: string;
   readonly fallbackPin: ShadowL4VersionPin;
   readonly ownPrefix: string;
+  readonly ownBase: string;
+  readonly foreignBase: string;
   readonly activation: Awaited<ReturnType<typeof activateV10App>>;
   readonly store: InstrumentedStore;
   rows(): readonly SqliteRow[];
@@ -826,12 +836,16 @@ async function createSharedDeploymentHarness(): Promise<SharedDeploymentHarness>
 
     // The expected prefix is derived HERE, independently of the code under
     // test, so an over-wide selector is observable rather than self-consistent.
-    const encodeComponent = (value: string): string => value.replace(/%/g, '%25').replace(/:/g, '%3A');
-    const base = `${SHADOW_K_DOCS_PREFIX}${app.subjectDigest}/${TENANT}/`;
-    const ownPrefix = `${base}v010-k02:${encodeComponent(OWN_DEPLOYMENT_ID)}:${encodeComponent(TENANT)}:${encodeComponent(app.appId)}:${encodeComponent(BUSINESS_PACKAGE_ID)}:`;
-    const baseKeys = readRows(kPath).map((row) => row.key).filter((key) => key.startsWith(base));
-    const ownKeys = baseKeys.filter((key) => key.startsWith(ownPrefix));
-    const foreignKeys = baseKeys.filter((key) => !key.startsWith(ownPrefix));
+    // #1217: governed K rows are addressed by the stable deployment tuple —
+    // `v10/k/deployment:<deployedAppId>:<tenantId>:<appId>/` — never by the
+    // BUILD subjectDigest. The two deployments therefore occupy two DISTINCT
+    // outer namespaces on the shared store.
+    const ownBase = `${SHADOW_K_DOCS_PREFIX}deployment:${encodeKComponent(OWN_DEPLOYMENT_ID)}:${encodeKComponent(TENANT)}:${encodeKComponent(app.appId)}/`;
+    const foreignBase = `${SHADOW_K_DOCS_PREFIX}deployment:${encodeKComponent(FOREIGN_DEPLOYMENT_ID)}:${encodeKComponent(TENANT)}:${encodeKComponent(app.appId)}/`;
+    const ownPrefix = `${ownBase}v010-k02:${encodeKComponent(OWN_DEPLOYMENT_ID)}:${encodeKComponent(TENANT)}:${encodeKComponent(app.appId)}:${encodeKComponent(BUSINESS_PACKAGE_ID)}:`;
+    const allKeys = readRows(kPath).map((row) => row.key);
+    const ownKeys = allKeys.filter((key) => key.startsWith(ownBase));
+    const foreignKeys = allKeys.filter((key) => key.startsWith(foreignBase));
     assert.ok(ownKeys.length > 0, 'the own deployment must have written real K documents');
     assert.ok(foreignKeys.length > 0, 'the shared SQLite store must hold the foreign deployment\'s real K documents');
 
@@ -843,6 +857,8 @@ async function createSharedDeploymentHarness(): Promise<SharedDeploymentHarness>
       baselineSource,
       fallbackPin,
       ownPrefix,
+      ownBase,
+      foreignBase,
       get activation(): Awaited<ReturnType<typeof activateV10App>> {
         if (activation === null) throw new Error('shared deployment harness is not activated');
         return activation;
@@ -936,10 +952,12 @@ function assertOnlyOwnDeploymentObserved(
 test('T07-PH-N11: a sibling deployment of the same BUILD/Tenant never enters the Shadow snapshot, even when its keys sort first and exceed the budget', async () => {
   const harness = await createSharedDeploymentHarness();
   try {
-    const base = `${SHADOW_K_DOCS_PREFIX}${harness.app.subjectDigest}/${TENANT}/`;
-    const baseKeys = harness.rows().map((row) => row.key).filter((key) => key.startsWith(base)).sort();
-    const ownKeys = baseKeys.filter((key) => key.startsWith(harness.ownPrefix));
-    const foreignKeys = baseKeys.filter((key) => !key.startsWith(harness.ownPrefix));
+    // #1217: the sibling occupies its OWN outer deployment namespace on the
+    // shared store. The falsifier still stands: enumerated broadly in physical
+    // key order, every foreign key sorts before this deployment's first key.
+    const baseKeys = harness.rows().map((row) => row.key).sort();
+    const ownKeys = baseKeys.filter((key) => key.startsWith(harness.ownBase));
+    const foreignKeys = baseKeys.filter((key) => key.startsWith(harness.foreignBase));
     assert.ok(foreignKeys.length >= 2, 'the foreign deployment must outnumber a maxCases=2 budget');
     assert.ok(
       foreignKeys[foreignKeys.length - 1] < ownKeys[0],
