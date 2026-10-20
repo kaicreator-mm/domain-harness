@@ -220,7 +220,7 @@ async function main() {
     const receipt = await runtime.submitOccurrence({
       intentType: arg('intent'),
       messageId: arg('message'),
-      input: {},
+      input: arg('input-tag') === undefined ? {} : { tag: arg('input-tag') },
       target,
       caller,
     });
