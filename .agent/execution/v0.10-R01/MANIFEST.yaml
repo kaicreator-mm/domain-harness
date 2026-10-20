@@ -22,8 +22,10 @@ full_regression_at_candidate: NOT_RUN
 critical_journeys_at_candidate: NOT_RUN
 security_at_candidate: NOT_RUN
 clean_packed_tiny_rich_at_candidate: NOT_RUN
-hidden_validation_at_candidate: NOT_RUN
-hidden_repin_issue: kaicreator-mm/hidden-validation#66
+hidden_validation_at_candidate: PASS_DH010_HIDDEN_FP_1181_01_REV2_31_OF_31_X2
+hidden_repin_issue: kaicreator-mm/hidden-validation#66_CLOSED_PASS
+hidden_pack_commit: 48467d119255a4afdd8f6dc962fcd10ca540925d
+hidden_pack_manifest_sha256: ccc06600d738fe077d82c87a6749f2067ffeddc9ac291043e4a56cf0e4e78726
 independent_release_review: NOT_RUN
 release_qualification: NO
 main_merge: NO
