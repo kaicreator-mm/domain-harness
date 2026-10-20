@@ -60,20 +60,12 @@ import {
 
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
+import { V10Error, V10ActivationError } from './errors.js';
+export { V10ActivationError } from './errors.js';
 
-export class V10ActivationError extends Error {
-  readonly code: string;
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = 'V10ActivationError';
-    this.code = code;
-  }
-}
-
-export class V10PortDeniedError extends Error {
-  readonly code = 'KEXT_PORT_DENIED';
+export class V10PortDeniedError extends V10Error {
   constructor(name: string) {
-    super(`advisory init context exposes no protected port '${name}'; the probe is denied`);
+    super('KEXT_PORT_DENIED', `advisory init context exposes no protected port '${name}'; the probe is denied`);
     this.name = 'V10PortDeniedError';
   }
 }
@@ -1010,7 +1002,7 @@ export class V10AppFacade {
     const businessNamespace = this.#namespaces.get(businessPackageId) as Namespace;
     const policy = (businessNamespace.getPolicy as () => unknown)();
     if (!isPlainRecord(policy)) {
-      refuse('V10_APP_INVALID', `Business ${businessPackageId} policy is not a record`);
+      refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} policy is not a record`);
     }
     this.#counters.runtimeFactoryInvocations += 1;
     const runtime = createRuntime({
@@ -1053,7 +1045,7 @@ export class V10AppFacade {
       ? policy.workflowDefinition.workflowKey
       : undefined;
     if (typeof workflowKey !== 'string' || workflowKey.length === 0) {
-      refuse('V10_APP_INVALID', `Business ${businessPackageId} declares no workflowKey`);
+      refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} declares no workflowKey`);
     }
     return workflowKey;
   }
@@ -1255,18 +1247,18 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
     if (options.deploymentIdentity !== undefined) {
       const raw = options.deploymentIdentity as unknown;
       if (!isPlainRecord(raw)) {
-        refuse('V10_APP_INVALID', 'deploymentIdentity must be a plain record');
+        refuse('V10_ACTIVATION_OPTIONS_INVALID', 'deploymentIdentity must be a plain record');
       }
       const identity = { deployedAppId: '', tenantId: '', appId: '' };
       for (const field of ['deployedAppId', 'tenantId', 'appId'] as const) {
         const value = raw[field];
         if (typeof value !== 'string' || value.length === 0 || value.length > 256) {
-          refuse('V10_APP_INVALID', `deploymentIdentity.${field} must be a bounded non-empty string`);
+          refuse('V10_ACTIVATION_OPTIONS_INVALID', `deploymentIdentity.${field} must be a bounded non-empty string`);
         }
         identity[field] = value;
       }
       if (options.tenantId !== undefined && options.tenantId !== identity.tenantId) {
-        refuse('V10_APP_INVALID', 'options.tenantId and deploymentIdentity.tenantId disagree; one deployment owns one tenant identity');
+        refuse('V10_ACTIVATION_OPTIONS_INVALID', 'options.tenantId and deploymentIdentity.tenantId disagree; one deployment owns one tenant identity');
       }
       deploymentIdentity = identity;
     }
@@ -1278,7 +1270,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       const raw = options.queryAuthority as unknown;
       if (!isPlainRecord(raw) || raw.principal === null || raw.principal === undefined
         || typeof raw.authorize !== 'function') {
-        refuse('V10_APP_INVALID', 'queryAuthority must be Host-owned wiring carrying a verified principal and an authorize(principal, target) function');
+        refuse('V10_ACTIVATION_OPTIONS_INVALID', 'queryAuthority must be Host-owned wiring carrying a verified principal and an authorize(principal, target) function');
       }
       const authorize = raw.authorize as V10QueryAuthority['authorize'];
       queryAuthority = Object.freeze({
