@@ -12,7 +12,7 @@ Executor self-declaration: `DISPATCH_CLAIMED` posted as [Issue #1181 comment 628
 | `origin/v0.10` head AFTER all gates | `fed515be45c4e48233f20dcbc76d6f3410780f34` (no drift) |
 | Execution worktree | `dh-i1181-r3final`, HEAD == candidate, tree == candidate tree, clean, isolated `npm ci` |
 | Host | Windows (MINGW64), Node `v24.21.0`, npm `11.19.0`, better-sqlite3 `12.11.1` prebuilt, real file-backed SQLite (WAL), 16 CPU / 55.2 GB RAM |
-| Exact-head CI | Woodpecker pipeline [#1589](https://ci.kaicreator.com/repos/18/pipeline/1589) **SUCCESS** at PR #1202 head `c87a2c25` (verify step exit 0); PR diff vs candidate = only 10 R01 execution/docs paths, zero production/test/lock/CI payload |
+| Exact-head CI | Woodpecker pipeline [#1589](https://ci.kaicreator.com/repos/18/pipeline/1589) **SUCCESS** at PR #1202 head `c87a2c25` (verify step exit 0; diff vs candidate = 10 R01 docs paths only); pipeline [#1591](https://ci.kaicreator.com/repos/18/pipeline/1591) **SUCCESS** at final evidence head `61c97a44` (verify exit 0) |
 | Raw logs | `C:\xDev\kAiCreator\_tmp\dh-i1181-r3final\` (52 logs + `sha256sums.txt`; _tmp retention 7 days) — every quoted result is bound to a SHA256 in §8 |
 
 ## 1. Source/DAG gate — PASS
@@ -140,4 +140,4 @@ Disposition per the R01 repair route: bounded **test-only** repair PR into `v0.1
 
 ## 9. Posture
 
-All dispatched R01-R3 physical gates PASS at the exact candidate with real exit codes recorded: build/lint/typecheck 0/0/0; bounded full regression 4236/4236 (vanilla `npm test` honestly recorded as environment-OOM EXIT 1, not claimed PASS); CJ 84/84; T09 15/15; T10B 8/8; security negatives 59/59; clean-packed Tiny/Rich 3/3 consecutive; Hidden (independent, private #67) 31/31 ×2 PASS at the same SHA. One pre-existing deterministic Tier-3 test-assertion staleness (G29) is reported unfixed with its repair route (§7b). `RELEASE_QUALIFIED` remains **NO** pending the independent Release R01 review and the G29 disposition. No main merge, no tag.
+All dispatched R01-R3 physical gates PASS at the exact candidate with real exit codes recorded: build/lint/typecheck 0/0/0; bounded full regression 4236/4236 (vanilla `npm test` honestly recorded as environment-OOM EXIT 1, not claimed PASS); CJ 84/84; T09 15/15; T10B 8/8; security negatives 59/59; clean-packed Tiny/Rich 3/3 consecutive; Hidden (independent, private #67) 31/31 ×2 PASS at the same SHA. One pre-existing deterministic Tier-3 test-assertion staleness (G29) is reported unfixed with its repair route (§7b). Completion event [comment 6291244174](https://github.com/kaicreator-mm/domain-harness/issues/1181#issuecomment-6291244174) posted on #1181; independent Release R01 review submitted on PR #1202 (review `5585279796`, COMMENT state, P0=0 / P1=1 G29 disposition / P2=0). `RELEASE_QUALIFIED` remains **NO** pending review acceptance and the G29 disposition. No main merge, no tag.
