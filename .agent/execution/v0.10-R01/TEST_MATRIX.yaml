@@ -11,8 +11,10 @@ gates:
   security_negative_fault: NOT_RUN_AT_CANDIDATE
   T09_T10B: NOT_RUN_AT_CANDIDATE
   clean_packed_tiny_rich_3x: NOT_RUN_AT_CANDIDATE
-  hidden_private_rev3_31x2: NOT_RUN_PRIVATE_ISSUE_67
+  hidden_private_rev3_31x2: PASS_31_OF_31_X2_PRIVATE_ISSUE_67_CLOSED
   independent_release_review: NOT_RUN_AT_CANDIDATE
 previous_r2_archive: docs/validation/v0.10/R01_PRE_R3_CANDIDATE_7cbfaf5a.md
+r01_public_dispatch: REDISPATCH_REQUESTED_AFTER_SUPERSEDED_CLAIM_6289285774
+hidden_private_commit: fe12c8a9115d38a8c6878275e85182411ba09115
 release_qualified: NO
 main_merge: NO
