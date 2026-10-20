@@ -234,6 +234,38 @@ test('N-BUILD import-closure refusals (undeclared/computed/code-string/edges)', 
   assert.deepEqual(evalLog(), []);
 });
 
+
+test('N-I1221: reject statically visible indirect code-string evaluators and bare Node builtins', async () => {
+  // The gate is bounded AST hygiene, not a sandbox or dynamic JS proof.
+  const { assertSealedImportClosure } = await import(
+    '../../packages/domain-harness-compiler/src/qualified-package/v10build/import-policy.js'
+  );
+  const empty = { node: [], npm: [], native: [] };
+  const rejected = [
+    "globalThis.eval('1');",
+    "(0, eval)('1');",
+    "const F = Function; F('return 1')();",
+    "globalThis.Function('return 1')();",
+    "(function(){}).constructor('return 1')();",
+    "const make = globalThis['Function'];",
+    "const { eval: run } = globalThis;",
+    "import fs from 'fs'; export const name = fs;",
+    "import fs from 'fs/promises'; export const name = fs;",
+  ];
+  for (const source of rejected) {
+    assert.throws(
+      () => assertSealedImportClosure('probe', source, { ...empty, npm: ['fs', 'fs/promises'] }, new Set()),
+      (error: unknown) => error instanceof V10BuildError && error.code === 'V10_IMPORT_POLICY_DENIED',
+      `expected BUILD policy refusal for ${source}`,
+    );
+  }
+  assert.doesNotThrow(() => assertSealedImportClosure(
+    'probe', "import { readFileSync } from 'node:fs'; export const read = readFileSync;",
+    { ...empty, node: ['node:fs'] }, new Set(),
+  ));
+});
+
+
 test('N-BUILD authority forgery refusals (kernel namespace / handler squatting)', async () => {
   clearEvalLog();
   const forgedHook = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha', hook: 'kernel:occurrence-runtime/1' });
