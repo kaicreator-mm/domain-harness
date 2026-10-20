@@ -1,0 +1,9 @@
+schema: dh010/t05-failure
+unknown-context-provenance: typed-refusal
+budget-overflow: typed-refusal
+untrusted-host-scope: no-physical-read
+Model-unavailable: honest-no-model
+Memory-store-fault: typed-unavailable-no-K-false-receipt
+unauthorized-effect: never-mint-K-permit
+shared-writer: stop-coordinate
+missing-physical-test: NOT_RUN

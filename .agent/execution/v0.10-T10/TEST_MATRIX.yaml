@@ -1,0 +1,15 @@
+schema: dh010/t10-tests
+positive:
+  - two-visible-B-same-workflow-instance-exact-scoped-snapshot
+  - one-visible-B-selects-only-authorized-data
+  - two-visible-B-unscoped-typed-ambiguous
+  - original-K02-receipt-exact-B-replayed
+negative:
+  - hidden-B-presence-does-not-alter-visible-error
+  - unauthorized-explicit-B-zero-snapshot-read
+  - cross-tenant-denied-before-key-existence
+  - no-first-match
+  - malformed-scope-no-key-search
+  - query-no-effect-dispatch-or-K-write
+physical: Node24 SQLite real two-B concurrency/restart
+ci: existing required Woodpecker + focused tests + independent high-risk review

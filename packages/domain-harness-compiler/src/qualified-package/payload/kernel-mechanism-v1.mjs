@@ -1066,6 +1066,48 @@ function selectAdmittedTransition(request, input, trace) {
   return { rejected: lastRejected ?? { transitionKey: candidates[0]?.transitionKey ?? '' } };
 }
 
+// ===========================================================================
+// [v0.10 C01 #1177] External Effect binding configuration. A Business effect
+// binding may declare `external` to route its dispatch through the selected
+// K→C external Effect Operation: the kernel then mints a LIVE one-time Effect
+// Permit document (see effectPermitAdmin) before the executor runs and
+// consumes it (exact-revision CAS) as soon as the dispatch settles. The
+// config is bounded data only — ttl, await policy and an optional extra
+// operation allowlist; no authority is configurable from here.
+// ===========================================================================
+function normalizeExternalEffectConfig(raw) {
+  if (raw === undefined || raw === null) return null;
+  if (!isJsonRecord(raw)) {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      'an external effect binding config must be a plain record',
+    );
+  }
+  const permitTtlMs = raw.permitTtlMs === undefined ? 60_000 : raw.permitTtlMs;
+  if (!Number.isSafeInteger(permitTtlMs) || permitTtlMs < 1 || permitTtlMs > 3_600_000) {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      'external.permitTtlMs must be a safe integer within 1..3600000 milliseconds',
+    );
+  }
+  const awaitPolicy = raw.await === undefined ? 'phase' : raw.await;
+  if (awaitPolicy !== 'phase' && awaitPolicy !== 'terminal') {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      "external.await must be 'phase' (honest accepted/running envelopes) or 'terminal' (fail-closed pending)",
+    );
+  }
+  const extra = raw.operations === undefined ? [] : raw.operations;
+  if (!Array.isArray(extra) || extra.length > 8
+    || extra.some((op) => typeof op !== 'string' || op.length === 0 || op.length > 128)) {
+    throw new CentralAdmissionError(
+      'ADMISSION_EFFECT_EXTERNAL_INVALID',
+      'external.operations must be a bounded array of non-empty operation id strings',
+    );
+  }
+  return { permitTtlMs, awaitPolicy, operations: [...extra] };
+}
+
 async function executeEffectIntents(intents, request, ports, turnId) {
   const outcomes = [];
   let ordinal = 0;
@@ -1074,10 +1116,13 @@ async function executeEffectIntents(intents, request, ports, turnId) {
     const effectId = `${turnId}/effect/${ordinal}`;
     const binding = ports.effectTools.resolve(intent.effectType);
     if (binding === undefined) {
-      throw new CentralAdmissionError(
+      const unbound = new CentralAdmissionError(
         'ADMISSION_EFFECT_TOOL_UNBOUND',
         `no mutation-capable tool binding is declared for effect type ${intent.effectType}`,
       );
+      // [#1108 K01 R1 P1] Provable: no executor was ever invoked.
+      unbound.zeroExternalEffect = true;
+      throw unbound;
     }
     const record = {
       effectId,
@@ -1097,11 +1142,18 @@ async function executeEffectIntents(intents, request, ports, turnId) {
     try {
       begun = await ports.effectJournal.beginEffect(record);
     } catch (error) {
-      if (error instanceof CentralAdmissionError) throw error;
-      throw new CentralAdmissionError(
+      if (error instanceof CentralAdmissionError) {
+        // [#1108 K01 R1 P1] A typed journal begin refusal happens BEFORE any
+        // executor invocation — provably zero external effect.
+        error.zeroExternalEffect = true;
+        throw error;
+      }
+      const conflict = new CentralAdmissionError(
         'ADMISSION_EFFECT_JOURNAL_CONFLICT',
         `effect journal begin failed for ${effectId}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      conflict.zeroExternalEffect = true;
+      throw conflict;
     }
     const durable = begun.record;
 
@@ -1118,10 +1170,19 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       continue;
     }
     if (durable.status === 'failed') {
-      throw new CentralAdmissionError(
+      const replayRefusal = new CentralAdmissionError(
         'ADMISSION_EFFECT_FAILED',
         `effect ${effectId} has a durably failed outcome; operator recovery owns any retry`,
       );
+      // [#1108 K01 R1] This REPLAY attempt itself executed nothing; whether
+      // the fence may be released follows the ORIGINAL failure's persisted
+      // classification (the dispatcher-attested zero-external-effect marker
+      // rides the durable failure record). An unclassified (possibly landed)
+      // original keeps the fence held.
+      if (isJsonRecord(durable.error) && durable.error.zeroExternalEffect === true) {
+        replayRefusal.zeroExternalEffect = true;
+      }
+      throw replayRefusal;
     }
     if (begun.disposition === 'existing' && durable.effectSemantics === 'non-idempotent') {
       throw new CentralAdmissionError(
@@ -1130,7 +1191,59 @@ async function executeEffectIntents(intents, request, ports, turnId) {
       );
     }
 
+    // [v0.10 C01 #1177] Live K-issued permit for an external effect binding:
+    // minted AFTER the journal begin/replay gates and BEFORE the executor
+    // runs. A mint refusal is journaled as a proven zero-external-effect
+    // failure first (mirroring the executor-failure discipline below), then
+    // throws typed — the fence policy can act on it, and no executor ran.
+    let permit = null;
+    if (binding.external !== null && ports.effectPermitAdmin !== undefined) {
+      try {
+        const minted = await ports.effectPermitAdmin.mint({
+          effectId,
+          turnId,
+          effectType: intent.effectType,
+          effectSemantics: binding.effectSemantics,
+          external: binding.external,
+          resource: binding.resource,
+          target: request.target,
+          attempt: record.attempt,
+          issuedAt: request.now,
+        });
+        permit = { effectId, revision: minted.revision };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        let marked = false;
+        try {
+          await ports.effectJournal.completeEffect(
+            effectId,
+            { status: 'failed', error: { message, zeroExternalEffect: true }, completedAt: request.now },
+          );
+          marked = true;
+        } catch {
+          // The failure record itself is not durable: doubly unknown — no
+          // zero-external-effect proof is attached and the fence stays held.
+        }
+        const typed = error instanceof CentralAdmissionError && error.code === 'ADMISSION_EFFECT_PERMIT_CONFLICT'
+          ? error
+          : new CentralAdmissionError(
+              'ADMISSION_EFFECT_PERMIT_CONFLICT',
+              `effect permit mint for ${effectId} failed: ${message}`,
+            );
+        if (marked) {
+          typed.zeroExternalEffect = true;
+        }
+        throw typed;
+      }
+    }
+
     let output;
+    // [#1108 K01 R1 P1 / R2 P1] The dispatch probe: the runtime's own executor
+    // marks whether the Business handler ever invoked the physical resource
+    // port, and collects one kernel-minted per-call attestation object per
+    // port call (the ONLY channel a trusted host dispatcher can mark its own
+    // pre-handler refusals through — see probeProvesZeroExternalEffect).
+    const externalDispatchProbe = { supported: false, invoked: false, dispatchAttests: [] };
     try {
       output = await ports.effectTools.execute({
         effectId,
@@ -1141,11 +1254,17 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         input: intent.input,
         ...(intent.idempotencyKey === undefined ? {} : { idempotencyKey: intent.idempotencyKey }),
         logicalTime: request.now,
+        attempt: record.attempt,
+        externalDispatchProbe,
       });
       canonicalizeJson(output);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failure = { message };
+      // [#1108 K01 R1 P1] Classify BEFORE the failure record is made durable:
+      // the proof (or its absence) persists IN the journal record so a later
+      // same-turn replay refusal can restore the same fence policy.
+      const zeroEffect = probeProvesZeroExternalEffect(externalDispatchProbe);
+      const failure = { message, ...(zeroEffect ? { zeroExternalEffect: true } : {}) };
       try {
         await ports.effectJournal.completeEffect(
           effectId,
@@ -1153,16 +1272,58 @@ async function executeEffectIntents(intents, request, ports, turnId) {
         );
       } catch (commitError) {
         // Never lose the journal-unreadable signal: the host must see that the
-        // failure record itself is not durable (P3-2).
+        // failure record itself is not durable (P3-2). The outcome is doubly
+        // unknown (the failure record could not even be made durable), so no
+        // zero-external-effect proof is attached.
         throw new CentralAdmissionError(
           'ADMISSION_EFFECT_JOURNAL_CONFLICT',
           `effect ${effectId} failed (${message}) and the failure record could not be committed: ${commitError instanceof Error ? commitError.message : String(commitError)}`,
         );
       }
-      throw new CentralAdmissionError(
+      // [#1108 K01 R1 P1] A journal `failed` record reflects a THROWN adapter
+      // call, NOT proof that the remote resource performed zero mutations.
+      // Only the probe-backed classification above proves a zero-external-
+      // effect fault; a possibly-landed lost-ACK outcome carries NO proof and
+      // the admission fence policy in admitCentralDecision keeps the fence
+      // held (fail-closed UNKNOWN until reconciliation).
+      // [v0.10 C01] The executor failed; the live permit is still consumed
+      // (dead) once the failure record IS durable. A consume failure here is
+      // MORE uncertain than the failure itself: surface the journal-conflict
+      // class (UNKNOWN), never a clean FAILED the zero-ambiguity fence
+      // release could act on.
+      if (permit !== null) {
+        try {
+          await ports.effectPermitAdmin.consume(permit.effectId, permit.revision);
+        } catch (consumeError) {
+          throw new CentralAdmissionError(
+            'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+            `effect ${effectId} failed (${message}) and its permit consume is ambiguous: ${consumeError instanceof Error ? consumeError.message : String(consumeError)}`,
+          );
+        }
+      }
+      const typed = new CentralAdmissionError(
         'ADMISSION_EFFECT_FAILED',
         `effect ${effectId} (${intent.effectType}) failed: ${message}`,
       );
+      if (zeroEffect) {
+        typed.zeroExternalEffect = true;
+      }
+      throw typed;
+    }
+
+    // [v0.10 C01 #1177] Consume the live permit BEFORE the journal completes:
+    // an ambiguous consume surfaces as a typed journal conflict (the UNKNOWN
+    // class) — the executor output is discarded, nothing terminal is claimed,
+    // and the journal stays `started` so every replay gate stays honest.
+    if (permit !== null) {
+      try {
+        await ports.effectPermitAdmin.consume(permit.effectId, permit.revision);
+      } catch (error) {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_JOURNAL_CONFLICT',
+          `effect permit consume for ${effectId} is ambiguous after the executor settled: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     let committed;
@@ -1285,17 +1446,58 @@ export async function admitCentralDecision(request, ports) {
   // the exact snapshot this decision was evaluated against. A stale
   // admission (another runtime over the same durable store claimed or
   // committed after this snapshot) loses HERE, typed — before any journal
-  // begin or effect dispatch.
+  // begin or effect dispatch. [#1108 K01] The claim is also the protected
+  // grant: once held, no rival can take the fence at this stateRevision, so
+  // the effects below dispatch under a live grant the commit will still find
+  // held (#requireHeldAdmissionFence).
+  let heldAdmissionFence;
   if (typeof ports.admissionFence === 'function') {
-    await ports.admissionFence(turnId);
+    heldAdmissionFence = await ports.admissionFence(turnId);
   }
 
-  const effects = await executeEffectIntents(
-    effectIntents,
-    request,
-    ports,
-    turnId,
-  );
+  let effects;
+  try {
+    effects = await executeEffectIntents(
+      effectIntents,
+      request,
+      ports,
+      turnId,
+    );
+  } catch (error) {
+    // [#1108 K01 R1 P1 / R2 P1] Fence liveness on the failure path: release
+    // ONLY on a PROVEN zero-external-effect fault. The thrown error carries
+    // `zeroExternalEffect` solely when the dispatch probe proved the Business
+    // handler never invoked the physical resources port, or EVERY port call
+    // it made was attested by the trusted dispatcher as its own pre-handler
+    // refusal — AND every begun effect of the turn is durably `failed` (an
+    // earlier `completed`/`started` record keeps the fence held). A lost-ACK
+    // / uncertain outcome carries NO proof — the external non-idempotent
+    // mutation may already have landed, so the fence stays held: fail-closed
+    // UNKNOWN until reconciliation (same-turn replay through the journal, or
+    // a trusted-seam recovery turn over a durably all-failed holder). An
+    // unreadable journal, an unwired release port, or a failed removal also
+    // keeps it held. The original typed effect error is never masked.
+    if (isJsonRecord(heldAdmissionFence)
+      && typeof ports.admissionFenceRelease === 'function'
+      && error !== null && typeof error === 'object' && error.zeroExternalEffect === true) {
+      try {
+        let ambiguous = false;
+        for (let ordinal = 1; ordinal <= effectIntents.length; ordinal += 1) {
+          const record = await ports.effectJournal?.getEffect(`${turnId}/effect/${String(ordinal)}`);
+          if (record !== null && record !== undefined && record.status !== 'failed') {
+            ambiguous = true;
+            break;
+          }
+        }
+        if (!ambiguous) {
+          await ports.admissionFenceRelease(heldAdmissionFence);
+        }
+      } catch {
+        // keep held — fail-closed
+      }
+    }
+    throw error;
+  }
 
   return {
     status: 'admitted',
@@ -2003,11 +2205,21 @@ export class KernelDurableEffectJournal {
   #docs;
   #moduleSha256;
   #counters;
+  #docKeys;
 
-  constructor(docs, moduleSha256, counters) {
+  constructor(docs, moduleSha256, counters, docKeys = legacyKernelDocKeys()) {
     this.#docs = docs;
     this.#moduleSha256 = moduleSha256;
     this.#counters = counters;
+    this.#docKeys = docKeys;
+  }
+
+  /**
+   * [v0.10 K02] The journal doc-key builder of THIS runtime (legacy
+   * `v08-kernel:` keys or the deployment-scoped grammar).
+   */
+  get docKeys() {
+    return this.#docKeys;
   }
 
   /**
@@ -2020,7 +2232,7 @@ export class KernelDurableEffectJournal {
    * end-to-end and every write below is a strongly conditional CAS.
    */
   async #readEnvelope(effectId) {
-    const doc = await this.#docs.get(journalDocKey(effectId));
+    const doc = await this.#docs.get(this.#docKeys.journal(effectId));
     return doc === null ? null : { value: doc.value, revision: doc.revision };
   }
 
@@ -2055,7 +2267,7 @@ export class KernelDurableEffectJournal {
     }
     if (this.#counters !== undefined) this.#counters.journalBegins += 1;
     try {
-      await this.#docs.put(journalDocKey(record.effectId), {
+      await this.#docs.put(this.#docKeys.journal(record.effectId), {
         kernelModuleSha256: this.#moduleSha256,
         record: snapshotJson(record),
       }, { mustBeAbsent: true });
@@ -2127,7 +2339,7 @@ export class KernelDurableEffectJournal {
       // expectation is the exact revision read above. A concurrent terminal
       // completion bumps the revision, so at most ONE of the competing
       // completions can land — the terminal status is never overwritten.
-      await this.#docs.put(journalDocKey(effectId), {
+      await this.#docs.put(this.#docKeys.journal(effectId), {
         kernelModuleSha256: this.#moduleSha256,
         record: completed,
       }, { mustMatchRevision: envelope.revision });
@@ -2161,7 +2373,7 @@ export class KernelDurableEffectJournal {
   }
 
   async getRecords() {
-    const keys = await this.#docs.list('v08-kernel:effect-journal:');
+    const keys = await this.#docs.list(this.#docKeys.journalPrefix());
     const envelopes = await Promise.all(keys.map((key) => this.#docs.get(key)));
     return envelopes
       .filter((doc) => doc !== null)
@@ -2488,18 +2700,21 @@ function projectHf20ObservationPage(window, request) {
 /**
  * [#1063 HF20 read-scope boundary] The outward projection of one instance
  * snapshot: the K-only carrier fields (`mutationObservations` — HF20;
- * `admittedControlTurns` — #1066 same-CAS turn admission history) stay
+ * `admittedControlTurns` — #1066 same-CAS turn admission history;
+ * `durableOriginalReceipts` — v0.10 K02 same-CAS original-receipt ring) stay
  * INTERNAL next-CAS/replay truth and never leave the Kernel through
  * queryInstance/FR05/Genesis/receipt surfaces; the protected
  * mutation-observation read verb is the ONLY authorized reader of the
- * observation window, and the turn history has no outward reader at all.
+ * observation window, and the turn history and receipt ring have no outward
+ * reader at all.
  */
 function outwardInstanceSnapshot(snapshot) {
   if (!isJsonRecord(snapshot)) return snapshot;
-  if (!('mutationObservations' in snapshot) && !('admittedControlTurns' in snapshot)) return snapshot;
+  if (!('mutationObservations' in snapshot) && !('admittedControlTurns' in snapshot)
+    && !('durableOriginalReceipts' in snapshot)) return snapshot;
   const outward = {};
   for (const key of Object.keys(snapshot)) {
-    if (key === 'mutationObservations' || key === 'admittedControlTurns') continue;
+    if (key === 'mutationObservations' || key === 'admittedControlTurns' || key === 'durableOriginalReceipts') continue;
     outward[key] = snapshot[key];
   }
   return outward;
@@ -2514,6 +2729,193 @@ function outwardInstanceSnapshot(snapshot) {
 // reads, one-writer serialized lane — stays entirely in this Kernel Package
 // code, verbatim from v0.7. The Host never learns workflow semantics.
 // ===========================================================================
+
+// ===========================================================================
+// [v0.10 K02 #1168 phase-2] Durable original-receipt carrier — SPLICED into
+// the selected kernel after the K01 single-writer release (#1167@36f068e3).
+// The spliced discipline (from the phase-1 fragment
+// durable-receipt-carrier-v1.mjs, dependency-free restatement):
+//   1. Turn identity is input-complete and deployment-scoped: the canonical
+//      input digest and the deployment scope tuple join
+//      turnDispositionIdentity; the pinned module SHA rides the envelope as
+//      buildIdentity (identity stable across releases).
+//   2. The original acknowledged receipt of every admitted turn is composed
+//      BEFORE the authoritative state CAS and committed INSIDE the same
+//      document value (append-only `durableOriginalReceipts` map) — one
+//      physical row write makes the state, the revision and the original
+//      receipt durable together or not at all.
+//   3. The submit lane consults the same-CAS receipt (ring → archive) BEFORE
+//      the history/disposition ladder; the post-commit disposition/receipt
+//      records stay best-effort observations (archive-only) that never
+//      falsify the original and never block admission.
+//   4. The bounded in-document receipt ring (default 64 ≥ 4× the frozen
+//      16-entry history) replaces the missing-disposition fail-closed
+//      eviction block: the oldest entry leaves only once its independent
+//      durable archive record exists (archive-gated, fault-tolerant growth —
+//      admission never blocks, an admitted turn is never forgotten).
+//   5. The six durable doc families route through the injective deployment-
+//      scoped key grammar `v010-k02:<app>:<tenant>:<appId>:<pkg>:<kind>:<parts>`
+//      when the runtime wires a deployment scope; without one the historical
+//      `v08-kernel:` keys are kept byte-for-byte (the unscoped wiring is the
+//      compatibility mode — the two-B physical namespace is opt-in until a
+//      deployment wires its identity).
+// ===========================================================================
+
+const K02_CARRIER_VERSION = 1;
+const K02_SCOPED_KEY_ROOT = 'v010-k02';
+const K02_SCOPE_FIELDS = ['deployedAppId', 'tenantId', 'appId', 'businessPackageId'];
+const K02_SCOPED_DOC_KINDS = [
+  'wf-instance',
+  'admission-fence',
+  'effect-journal',
+  'turn-disposition',
+  'decision-receipt',
+  'receipt-archive',
+  // [v0.10 C01 #1177] The K-issued live external Effect Permit rides the same
+  // scoped grammar so a scoped deployment keeps its permits inside its own
+  // injective key namespace (additive kind; the six K02 kinds are unchanged).
+  'effect-permit',
+  // [v0.10 C01 #1177 R1 P1-1] The atomic per-(effectId,attempt) external
+  // dispatch claim: one effect grounds at most one adapter invocation.
+  'effect-dispatch-claim',
+];
+
+/**
+ * [v0.10 K02] Validate ONE deployment scope tuple. Exactly the four bounded
+ * non-empty identifier fields; unknown fields and control characters refuse
+ * typed K02_SCOPE_INVALID before any key or document can exist.
+ */
+function deploymentScopeIdentity(scope) {
+  const fail = (message) => new CentralAdmissionError('K02_SCOPE_INVALID', message);
+  if (!isJsonRecord(scope)) {
+    throw fail('a deployment scope must be a record {deployedAppId, tenantId, appId, businessPackageId}');
+  }
+  for (const key of Object.keys(scope)) {
+    if (!K02_SCOPE_FIELDS.includes(key)) {
+      throw fail(`a deployment scope carries the unsupported field ${JSON.stringify(key)}`);
+    }
+  }
+  for (const field of K02_SCOPE_FIELDS) {
+    const value = scope[field];
+    if (typeof value !== 'string' || value.length === 0 || value.length > 256) {
+      throw fail(`scope.${field} must be a bounded non-empty string identifier`);
+    }
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000-\u001f]/.test(value)) {
+      throw fail(`scope.${field} must not contain control characters`);
+    }
+  }
+  return Object.freeze({
+    deployedAppId: scope.deployedAppId,
+    tenantId: scope.tenantId,
+    appId: scope.appId,
+    businessPackageId: scope.businessPackageId,
+  });
+}
+
+/**
+ * [v0.10 K02] Percent-encode ONE key component so the positional
+ * `:`-joined grammar stays injective even when identifiers legitimately
+ * carry the separator (package ids like `pkg:quote@1.0.0`).
+ */
+function encodeK02KeyComponent(value) {
+  return value.replace(/%/g, '%25').replace(/:/g, '%3A');
+}
+
+function requireK02KeyPart(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 1024) {
+    throw new CentralAdmissionError('K02_SCOPE_INVALID', 'a doc key part must be a bounded non-empty string');
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f]/.test(value)) {
+    throw new CentralAdmissionError('K02_SCOPE_INVALID', 'a doc key part must not contain control characters');
+  }
+  return value;
+}
+
+/**
+ * [v0.10 K02] The closed scoped key grammar:
+ * `v010-k02:<app>:<tenant>:<appId>:<pkg>:<kind>:<parts...>`. Positional,
+ * percent-encoded, injective across scopes, kinds and parts.
+ */
+function scopedDocKey(scope, kind, ...parts) {
+  const frozen = deploymentScopeIdentity(scope);
+  if (!K02_SCOPED_DOC_KINDS.includes(kind)) {
+    throw new CentralAdmissionError(
+      'K02_SCOPE_INVALID',
+      `unknown scoped doc kind ${JSON.stringify(kind)}; the grammar is closed`,
+    );
+  }
+  return [
+    K02_SCOPED_KEY_ROOT,
+    encodeK02KeyComponent(frozen.deployedAppId),
+    encodeK02KeyComponent(frozen.tenantId),
+    encodeK02KeyComponent(frozen.appId),
+    encodeK02KeyComponent(frozen.businessPackageId),
+    encodeK02KeyComponent(kind),
+    ...parts.map((part) => encodeK02KeyComponent(requireK02KeyPart(part))),
+  ].join(':');
+}
+
+/**
+ * [v0.10 K02] The per-runtime doc-key builders of the six durable families.
+ * Legacy (unscoped) wiring keeps the historical `v08-kernel:` keys
+ * byte-for-byte; a wired deployment scope routes every family through the
+ * injective scoped grammar. Key builders are chosen ONCE at the runtime
+ * wiring boundary — never per call.
+ */
+function legacyKernelDocKeys() {
+  return {
+    instance: (address) => instanceDocKey(address),
+    admissionFence: (address) => admissionFenceDocKey(address),
+    journal: (effectId) => journalDocKey(effectId),
+    journalPrefix: () => 'v08-kernel:effect-journal:',
+    turnDisposition: (turnId) => turnDispositionDocKey(turnId),
+    decisionReceipt: (turnId) => decisionReceiptDocKey(turnId),
+    receiptArchive: (turnId) => `v08-kernel:receipt-archive:${turnId}`,
+    // [v0.10 C01 #1177] Legacy-family permit key (the v0.10 T00 facade path).
+    effectPermit: (effectId) => `v08-kernel:effect-permit:${effectId}`,
+    // [v0.10 C01 #1177 R1 P1-1] Atomic external dispatch claim per effect+attempt.
+    effectDispatchClaim: (effectId, attempt) => `v08-kernel:effect-dispatch-claim:${effectId}/attempt/${attempt}`,
+  };
+}
+
+// [v0.10 K02 R1 P2-1] The journal family's list channel needs its OWN
+// prefix constructor: a scoped `journal('')` would run an empty key part
+// through requireK02KeyPart and refuse typed, breaking the public
+// getJournalRecords surface for every scoped deployment.
+function scopedDocKeyPrefix(scope, kind) {
+  const frozen = deploymentScopeIdentity(scope);
+  if (!K02_SCOPED_DOC_KINDS.includes(kind)) {
+    throw new CentralAdmissionError(
+      'K02_SCOPE_INVALID',
+      `unknown scoped doc kind ${JSON.stringify(kind)}; the grammar is closed`,
+    );
+  }
+  return [
+    K02_SCOPED_KEY_ROOT,
+    encodeK02KeyComponent(frozen.deployedAppId),
+    encodeK02KeyComponent(frozen.tenantId),
+    encodeK02KeyComponent(frozen.appId),
+    encodeK02KeyComponent(frozen.businessPackageId),
+    encodeK02KeyComponent(kind),
+  ].join(':') + ':';
+}
+
+function scopedKernelDocKeys(scope) {
+  const frozen = deploymentScopeIdentity(scope);
+  return {
+    instance: (address) => scopedDocKey(frozen, 'wf-instance', address.workflowId, address.instanceKey),
+    admissionFence: (address) => scopedDocKey(frozen, 'admission-fence', address.workflowId, address.instanceKey),
+    journal: (effectId) => scopedDocKey(frozen, 'effect-journal', effectId),
+    journalPrefix: () => scopedDocKeyPrefix(frozen, 'effect-journal'),
+    turnDisposition: (turnId) => scopedDocKey(frozen, 'turn-disposition', turnId),
+    decisionReceipt: (turnId) => scopedDocKey(frozen, 'decision-receipt', turnId),
+    receiptArchive: (turnId) => scopedDocKey(frozen, 'receipt-archive', turnId),
+    effectPermit: (effectId) => scopedDocKey(frozen, 'effect-permit', effectId),
+    effectDispatchClaim: (effectId, attempt) => scopedDocKey(frozen, 'effect-dispatch-claim', `${effectId}/attempt/${attempt}`),
+  };
+}
 
 function instanceDocKey(address) {
   return `v08-kernel:wf-instance:${address.workflowId}:${address.instanceKey}`;
@@ -2551,6 +2953,57 @@ function isHostWriteConflict(error) {
     && (error.code === 'HOST_CAS_CONFLICT' || error.code === 'HOST_KEY_EXISTS');
 }
 
+// [#1108 K01 R1 P1 / R2 P1] Zero-external-effect proof for a FAILED effect
+// dispatch. The ONLY trustworthy proof channels are the ones a resource
+// adapter can neither forge nor propagate:
+//   - the Business handler NEVER invoked the physical resources port
+//     (probe.invoked stays false) — nothing could have been dispatched;
+//   - EVERY resources-port call the handler made carries a kernel-minted
+//     per-call ATTESTATION marked by the trusted host dispatcher for one of
+//     its OWN pre-handler refusals (malformed arguments, reserved
+//     scoped-physical namespace, unprovisioned key) — refusals thrown
+//     BEFORE any resource adapter handler was ever invoked.
+// Any error OBJECT or `code` STRING thrown out of a port call proves
+// NOTHING: a resource adapter / Business handler can perform the physical
+// mutation and only then throw an error carrying any code name — including
+// HOST_RESOURCE_PRE_DISPATCH and every code the dispatcher itself owns — as
+// an honest collision with no malicious code required (the R2 reviewer's
+// tagged lost-ACK counterexample: append the ledger line, then throw
+// `code: 'HOST_RESOURCE_MALFORMED'`). Code strings are therefore PERMANENTLY
+// disqualified as zero-effect evidence. The attestation object is minted by
+// this kernel, threaded per call, marked only by the trusted host
+// dispatcher synchronously before its refusal throws, and NEVER forwarded
+// to the adapter or its handler — an adapter cannot mark, strip or fake it.
+// Everything else (any unattested call, any handler fault, a transport
+// timeout, a lost ACK after the mutation landed, the uncertain
+// HOST_FAULT_INJECTED injection) is UNCERTAIN and keeps the admission fence
+// held: fail-closed.
+
+/**
+ * [#1108 K01 R1 P1 / R2 P1] Zero-external-effect PROOF for an execute() that
+ * threw. The probe is created by executeEffectIntents and honored by this
+ * runtime's own effectTools executor (probe.supported); a foreign executor
+ * that ignores it leaves `supported` false and NOTHING is provable —
+ * fail-closed. The thrown error is deliberately NOT an input: error codes
+ * prove nothing (see the block above).
+ *   !invoked            → the Business handler never called the physical
+ *                         dispatch port → provably zero external effect
+ *   invoked + EVERY call attested pre-handler-refused by the trusted
+ *                         dispatcher → provably zero
+ *   anything else       → possibly landed (unattested call, handler fault,
+ *                         lost ACK) → NOT provable; the admission fence must
+ *                         stay held
+ */
+function probeProvesZeroExternalEffect(probe) {
+  if (probe === undefined || probe === null || typeof probe !== 'object') return false;
+  if (probe.supported !== true) return false;
+  if (probe.invoked !== true) return true;
+  const attests = probe.dispatchAttests;
+  return Array.isArray(attests) && attests.length > 0
+    && attests.every((attest) => attest !== null && typeof attest === 'object'
+      && typeof attest.preHandlerRefusal === 'string');
+}
+
 export class WorkflowInstanceNotFoundError extends Error {
   constructor(address) {
     super(`Workflow instance not found: ${address.workflowId}/${address.instanceKey}`);
@@ -2566,10 +3019,12 @@ function workflowAddressesEqual(left, right) {
 export class PersistentWorkflowInstanceRepository {
   #docs;
   #now;
+  #docKeys;
 
-  constructor(docs, now = () => new Date().toISOString()) {
+  constructor(docs, now = () => new Date().toISOString(), docKeys = legacyKernelDocKeys()) {
     this.#docs = docs;
     this.#now = now;
+    this.#docKeys = docKeys;
   }
 
   async create(request) {
@@ -2590,16 +3045,19 @@ export class PersistentWorkflowInstanceRepository {
       stateRevision: 0,
       state: request.initialState,
       mutationObservations: opened.window,
+      // [v0.10 K02] The append-only original-receipt ring exists from byte
+      // zero (redacted from every outward projection).
+      durableOriginalReceipts: {},
       createdAt: timestamp,
       updatedAt: timestamp,
     };
 
-    await this.#docs.put(instanceDocKey(request.address), snapshot, { mustBeAbsent: true });
+    await this.#docs.put(this.#docKeys.instance(request.address), snapshot, { mustBeAbsent: true });
     return this.require(request.address);
   }
 
   async resolve(address) {
-    const doc = await this.#docs.get(instanceDocKey(address));
+    const doc = await this.#docs.get(this.#docKeys.instance(address));
     return doc === null ? null : doc.value;
   }
 
@@ -2618,13 +3076,24 @@ export class WorkflowInstanceEngine {
   #lane;
   #now;
   #counters;
+  #docKeys;
+  #durableReceiptRingBound;
 
   constructor(docs, options = {}) {
     this.#docs = docs;
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#lane = options.lane ?? new PerInstanceSerializedLane();
-    this.#instances = new PersistentWorkflowInstanceRepository(docs, this.#now);
+    this.#docKeys = options.docKeys ?? legacyKernelDocKeys();
+    this.#instances = new PersistentWorkflowInstanceRepository(docs, this.#now, this.#docKeys);
     this.#counters = options.counters;
+    const ringBound = options.durableReceiptRingBound ?? K02_DURABLE_RECEIPT_RING_BOUND_DEFAULT;
+    if (!Number.isSafeInteger(ringBound) || ringBound < 17) {
+      throw new CentralAdmissionError(
+        'K02_SCOPE_INVALID',
+        'durableReceiptRingBound must be a safe integer >= 17 (the once-only acceptance floor)',
+      );
+    }
+    this.#durableReceiptRingBound = ringBound;
   }
 
   get lane() {
@@ -2656,7 +3125,7 @@ export class WorkflowInstanceEngine {
    * precondition of that admission's later pre-effect claim.
    */
   async readAdmissionFenceRevision(target) {
-    const doc = await this.#docs.get(admissionFenceDocKey(target));
+    const doc = await this.#docs.get(this.#docKeys.admissionFence(target));
     return doc === null ? null : doc.revision;
   }
 
@@ -2665,14 +3134,74 @@ export class WorkflowInstanceEngine {
    * fence revision, then a fresh check that the instance is still at the
    * snapshot stateRevision. Either failing is a stale admission and refuses
    * typed (ADMISSION_STATE_CAS_CONFLICT) before any journal/effect activity.
+   *
+   * [#1108 K01] The claim is also REFUSED when the fence document is still
+   * held by ANOTHER turn at the SAME stateRevision: that holder is an
+   * in-flight (or crashed, not yet reconciled) protected admission whose
+   * non-idempotent effects may already be dispatched, and admitCentralDecision
+   * commits only later, at #requireHeldAdmissionFence — a rival that
+   * CAS-overwrote such a fence here would make the holder lose AFTER its
+   * external dispatch (duplicated non-idempotent effect + orphaned
+   * unaccounted dispatch). Only a strictly OLDER held fence (its holder
+   * committed, so the instance advanced past that revision — a snapshot at a
+   * higher stateRevision cannot exist otherwise) is superseded by the revision
+   * CAS below, and the SAME turn re-claiming its own fence is the crash
+   * recovery replay path. There is no expiry lease: a crashed holder's fence
+   * stays held and rivals keep refusing typed until durable reconciliation
+   * (same-turn replay through the effect journal, or the zero-ambiguity
+   * release path in admitCentralDecision).
    */
   async claimAdmissionFence(request) {
     const { target, turnId, expectedTargetSequence, snapshotFenceRevision } = request;
+    const held = await this.#docs.get(this.#docKeys.admissionFence(target));
+    // R01-RACE-01 #1205: same canonical turn may attach to its existing
+    // fence, NEVER CAS-replacing a live claimant's revision after dispatch.
+    if (held !== null && isJsonRecord(held.value)
+      && held.value.turnId === turnId && held.value.stateRevision === expectedTargetSequence) {
+      if (!Number.isSafeInteger(held.revision)
+        || typeof request.turnIdentity !== 'string'
+        || held.value.turnIdentity !== request.turnIdentity) {
+        throw admissionStateCasConflict('same-turn held fence does not match canonical intent/input identity');
+      }
+      const current = await this.#instances.require(target);
+      if (current.stateRevision !== expectedTargetSequence) {
+        throw admissionStateCasConflict('same-turn fence stateRevision changed');
+      }
+      const recheck = await this.#docs.get(this.#docKeys.admissionFence(target));
+      if (recheck === null || !isJsonRecord(recheck.value)
+        || recheck.revision !== held.revision || recheck.value.turnId !== turnId
+        || recheck.value.turnIdentity !== request.turnIdentity
+        || recheck.value.stateRevision !== expectedTargetSequence) {
+        throw admissionStateCasConflict('same-turn fence changed during read-only attachment');
+      }
+      return { turnId, stateRevision: expectedTargetSequence, revision: held.revision };
+    }
+    if (held !== null && isJsonRecord(held.value)
+      && typeof held.value.turnId === 'string'
+      && held.value.turnId !== turnId
+      && held.value.stateRevision === expectedTargetSequence) {
+      // [#1108 K01 R1] Trusted-seam reconciliation supersede: a turn source of
+      // kind `recovery` (constructed ONLY by the trusted Host's operator-
+      // credentialed, durably CAS-delivered poison-recovery flow) may take the
+      // fence of a holder whose EVERY begun effect is durably `failed` — the
+      // operator-authorized corrective action IS the durable reconciliation of
+      // the failed turn's uncertain external outcome. A holder with any
+      // non-failed (or zero) journal records stays protected: in-flight and
+      // dispatched turns are never displaced, only terminally-failed ones are
+      // reconciled. The revision CAS below still arbitrates the takeover.
+      const reconciles = request.reconcilesHeldFence === true
+        && await this.#heldFenceIsDurablyFailed(target, held.value.turnId);
+      if (!reconciles) {
+        throw admissionStateCasConflict(
+          `instance ${target.workflowId}/${target.instanceKey} at stateRevision ${expectedTargetSequence} has an admission fence still held by turn ${held.value.turnId}; the competing claim of turn ${turnId} is refused before any journal or effect activity (fail-closed until the holder commits or is reconciled)`,
+        );
+      }
+    }
     let written;
     try {
       written = await this.#docs.put(
-        admissionFenceDocKey(target),
-        { pinVersion: 1, stateRevision: expectedTargetSequence, turnId, claimedAt: this.#now() },
+        this.#docKeys.admissionFence(target),
+        { pinVersion: 1, stateRevision: expectedTargetSequence, turnId, turnIdentity: request.turnIdentity, claimedAt: this.#now() },
         snapshotFenceRevision === null ? { mustBeAbsent: true } : { mustMatchRevision: snapshotFenceRevision },
       );
     } catch (error) {
@@ -2696,8 +3225,48 @@ export class WorkflowInstanceEngine {
     };
   }
 
+  /**
+   * [#1108 K01 R1] Reconciliation gate for claimAdmissionFence: is the given
+   * held turn terminally failed — EVERY begun effect of that turn is durably
+   * `failed`, and at least one exists? A zero-record holder is NOT terminal
+   * (it may still be in-flight pre-journal); any `started`/`completed` record
+   * or an unreadable journal refuses (fail-closed).
+   */
+  async #heldFenceIsDurablyFailed(target, heldTurnId) {
+    try {
+      const keys = await this.#docs.list(this.#docKeys.journal(`${heldTurnId}/effect/`));
+      if (keys.length === 0) return false;
+      for (const key of keys) {
+        const doc = await this.#docs.get(key);
+        const status = isJsonRecord(doc?.value) && isJsonRecord(doc.value.record)
+          ? doc.value.record.status
+          : undefined;
+        if (status !== 'failed') return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * [#1108 K01] Conditional release of a held admission fence by its own
+   * claimant, used ONLY on the zero-ambiguity effect-failure path (every begun
+   * effect of the turn is durably `failed`; none is `started`/`completed` —
+   * see admitCentralDecision). Keeps a transiently failed turn from
+   * permanently wedging the instance at its stateRevision now that
+   * same-revision takeover is refused. The remove is a CAS on the exact claim
+   * revision; a fence without a safe-integer claim revision is never released
+   * (an unconditional fence write does not exist). A failed removal leaves the
+   * fence held — fail-closed; the caller reports the original typed error.
+   */
+  async releaseAdmissionFence(target, fence) {
+    if (!Number.isSafeInteger(fence.revision)) return;
+    await this.#docs.remove(this.#docKeys.admissionFence(target), { mustMatchRevision: fence.revision });
+  }
+
   async #requireHeldAdmissionFence(target, fence) {
-    const doc = await this.#docs.get(admissionFenceDocKey(target));
+    const doc = await this.#docs.get(this.#docKeys.admissionFence(target));
     const held = doc !== null && isJsonRecord(doc.value)
       && doc.value.turnId === fence.turnId
       && doc.value.stateRevision === fence.stateRevision
@@ -2771,21 +3340,36 @@ export class WorkflowInstanceEngine {
       updatedAt,
     ).window;
 
+    // [v0.10 K02 anchor 2] The NEXT document value is composed FIRST so the
+    // immutable ORIGINAL RECEIPT of the admitted turn can be built against
+    // this exact next projection BEFORE the put — the state move, the
+    // revision and the original receipt are ONE physical row write: durable
+    // together or not at all. The K01 fence precondition above stays first.
+    const nextValue = {
+      address: current.address,
+      correlationId: current.correlationId,
+      packageId: current.packageId,
+      lifecycle: transition.nextLifecycle ?? current.lifecycle,
+      stateRevision: current.stateRevision + 1,
+      state: transition.nextState,
+      ...(transition.output === undefined ? {} : { output: transition.output }),
+      ...(current.output === undefined || transition.output !== undefined ? {} : { output: current.output }),
+      lastMessageId: request.messageId,
+      createdAt: current.createdAt,
+      updatedAt,
+      mutationObservations,
+      ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
+    };
+    const durableOriginalReceipts = await this.#nextDurableOriginalReceipts(
+      current,
+      nextValue,
+      request.durableOriginalReceipt,
+      updatedAt,
+    );
     try {
-      await this.#docs.put(instanceDocKey(request.target), {
-        address: current.address,
-        correlationId: current.correlationId,
-        packageId: current.packageId,
-        lifecycle: transition.nextLifecycle ?? current.lifecycle,
-        stateRevision: current.stateRevision + 1,
-        state: transition.nextState,
-        ...(transition.output === undefined ? {} : { output: transition.output }),
-        ...(current.output === undefined || transition.output !== undefined ? {} : { output: current.output }),
-        lastMessageId: request.messageId,
-        createdAt: current.createdAt,
-        updatedAt,
-        mutationObservations,
-        ...(admittedControlTurns === undefined || admittedControlTurns.length === 0 ? {} : { admittedControlTurns }),
+      await this.#docs.put(this.#docKeys.instance(request.target), {
+        ...nextValue,
+        ...(durableOriginalReceipts === undefined ? {} : { durableOriginalReceipts }),
       }, { mustMatchRevision: expectedTargetSequence });
     } catch (error) {
       if (isHostWriteConflict(error)) {
@@ -2810,6 +3394,103 @@ export class WorkflowInstanceEngine {
     }
 
     return committed;
+  }
+
+  /**
+   * [v0.10 K02 anchors 2+4] The append-only `durableOriginalReceipts` map of
+   * the NEXT document: the current map of the SAME snapshot the CAS is bound
+   * to, with the admitted turn's immutable original-receipt envelope appended
+   * and the ring bounded by ARCHIVE-GATED eviction — the oldest entry leaves
+   * only once its independent durable archive record exists. On an
+   * archive-write fault the entry STAYS and the document temporarily grows
+   * past the bound: admission NEVER blocks, and an admitted turn is never
+   * silently forgotten while the ring or its durable archive retains it. An
+   * existing entry under this turnId refuses typed — the map is append-only,
+   * never rewritten, whatever the identity.
+   */
+  async #nextDurableOriginalReceipts(current, nextValue, descriptor, attributedAt) {
+    const existing = isJsonRecord(current.durableOriginalReceipts) ? current.durableOriginalReceipts : {};
+    if (descriptor === undefined) {
+      return Object.keys(existing).length === 0 ? undefined : snapshotJson(existing);
+    }
+    if (!isJsonRecord(descriptor) || typeof descriptor.turnId !== 'string' || typeof descriptor.identity !== 'string') {
+      throw new CentralAdmissionError(
+        'K02_SCOPE_INVALID',
+        'a durable original-receipt descriptor requires { turnId, identity, intentType, inputDigest, turn, messageId }',
+      );
+    }
+    if (existing[descriptor.turnId] !== undefined) {
+      throw new CentralAdmissionError(
+        'K02_TURN_RECEIPT_INPUT_CONFLICT',
+        `turn ${descriptor.turnId} is already durably admitted in the same-CAS original-receipt ring; one source is exactly one turn and the ring is append-only`,
+      );
+    }
+    const envelope = {
+      carrierVersion: 1,
+      identity: descriptor.identity,
+      intentType: descriptor.intentType,
+      turn: descriptor.turn,
+      ...(descriptor.buildIdentity === undefined ? {} : { buildIdentity: descriptor.buildIdentity }),
+      receipt: {
+        status: 'admitted',
+        turnId: descriptor.turnId,
+        intentType: descriptor.intentType,
+        inputDigest: descriptor.inputDigest,
+        ...(descriptor.admitted === undefined ? {} : { admitted: snapshotJson(descriptor.admitted) }),
+        // The receipt's instance projection is the OUTWARD next projection
+        // this very CAS commits — the ACK bytes acknowledge exactly what this
+        // write makes durable.
+        instance: outwardInstanceSnapshot(nextValue),
+        occurrence: { messageId: descriptor.messageId },
+        attributedAt,
+      },
+    };
+    const receipts = { ...existing, [descriptor.turnId]: envelope };
+    let keys = Object.keys(receipts);
+    while (keys.length > this.#durableReceiptRingBound) {
+      const oldestKey = keys[0];
+      const archived = await this.#ensureDurableReceiptArchived(oldestKey, receipts[oldestKey]);
+      if (!archived) {
+        if (this.#counters !== undefined) this.#counters.durableRingGrowthEvents += 1;
+        break; // fault-tolerant growth: keep the entry; the next admission retries the archive
+      }
+      delete receipts[oldestKey];
+      keys = Object.keys(receipts);
+    }
+    return receipts;
+  }
+
+  /**
+   * [v0.10 K02 anchor 4] The eviction-time durable archive write of ONE ring
+   * entry (mustBeAbsent). A KEY_EXISTS whose stored identity matches counts
+   * as archived (an earlier best-effort copy or eviction wrote it); a
+   * different identity is an honest typed anomaly; any other fault KEEPS the
+   * ring entry (returns false — fault-tolerant growth, admission proceeds).
+   */
+  async #ensureDurableReceiptArchived(turnId, envelope) {
+    try {
+      await this.#docs.put(this.#docKeys.receiptArchive(turnId), envelope, { mustBeAbsent: true });
+      if (this.#counters !== undefined) this.#counters.durableReceiptArchiveWrites += 1;
+      return true;
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
+        try {
+          const existing = await this.#docs.get(this.#docKeys.receiptArchive(turnId));
+          if (existing !== null && isJsonRecord(existing.value) && existing.value.identity === envelope.identity) {
+            return true;
+          }
+        } catch {
+          if (this.#counters !== undefined) this.#counters.durableReceiptArchiveFailures += 1;
+          return false;
+        }
+        throw new CentralAdmissionError(
+          'K02_TURN_RECEIPT_STORE_FAULT',
+          `the original-receipt archive of turn ${turnId} holds a different identity; honest anomaly — fail closed`,
+        );
+      }
+      if (this.#counters !== undefined) this.#counters.durableReceiptArchiveFailures += 1;
+      return false; // fault-tolerant growth: keep the ring entry
+    }
   }
 }
 
@@ -2923,12 +3604,42 @@ function turnDispositionDocKey(turnId) {
  */
 const MAX_ADMITTED_CONTROL_TURN_HISTORY = 16;
 
-function turnDispositionIdentity(moduleSha256, target, turn, intentType) {
+/**
+ * [v0.10 K02] The bounded in-document original-receipt ring: 4x the frozen
+ * 16-entry history bound, covering the 17+ once-only acceptance with margin.
+ * MAX_ADMITTED_CONTROL_TURN_HISTORY stays the kernel's crash-backstop
+ * history bound; the ring is the same-CAS once-only truth whose eviction is
+ * archive-gated (never admission-blocking).
+ */
+const K02_DURABLE_RECEIPT_RING_BOUND_DEFAULT = 64;
+
+/**
+ * [v0.10 K02 anchor 1] The turn receipt identity is INPUT-COMPLETE and
+ * DEPLOYMENT-SCOPED: canonical JSON of {deploymentScope?, target, turn,
+ * intentType, inputDigest} where inputDigest = sha256(canonicalJson(input)).
+ * An identical retry yields the identical identity (replay); a changed
+ * canonical input or a changed intentType yields a different identity (typed
+ * conflict). The pinned build identity (kernel module SHA) is deliberately
+ * OUTSIDE the identity — it rides the envelope as `buildIdentity` — so the
+ * target identity is stable across releases while the build switch stays
+ * observable. A runtime wired WITHOUT a deployment scope (the compatibility
+ * mode) omits the member entirely; the scope, when wired, is validated
+ * bounded-identifier material.
+ */
+function turnDispositionIdentity(deploymentScope, target, turn, intentType, inputDigest) {
   return canonicalJsonStringify({
-    kernelModuleSha256: moduleSha256,
+    ...(deploymentScope === undefined ? {} : {
+      deploymentScope: {
+        deployedAppId: deploymentScope.deployedAppId,
+        tenantId: deploymentScope.tenantId,
+        appId: deploymentScope.appId,
+        businessPackageId: deploymentScope.businessPackageId,
+      },
+    }),
     target: { workflowId: target.workflowId, instanceKey: target.instanceKey },
     turn,
     intentType,
+    inputDigest,
   });
 }
 
@@ -3884,7 +4595,7 @@ async function executeContinuationRead(descriptor, callInput, read) {
     selected = [...fields];
   }
 
-  const doc = await read.docs.get(instanceDocKey(read.target));
+  const doc = await read.docs.get((read.docKeys ?? legacyKernelDocKeys()).instance(read.target));
   let material;
   try {
     material = canonicalizeJson(doc);
@@ -4070,6 +4781,11 @@ export function createOccurrenceRuntime(options) {
     journalBegins: 0,
     journalCompletes: 0,
     effectDispatches: 0,
+    // [v0.10 C01 #1177] Live K-issued external Effect Permit observability.
+    effectPermitsMinted: 0,
+    effectPermitsConsumed: 0,
+    effectDispatchClaims: 0,
+    effectDispatchClaimRefusals: 0,
     engineCommits: 0,
     instanceCreates: 0,
     instanceReads: 0,
@@ -4081,14 +4797,51 @@ export function createOccurrenceRuntime(options) {
     turnDispositions: 0,
     turnAdmissionReplays: 0,
     turnDispositionReplays: 0,
+    durableOriginalReceiptReplays: 0,
+    durableReceiptArchiveWrites: 0,
+    durableReceiptArchiveFailures: 0,
+    durableRingGrowthEvents: 0,
   };
 
   const docs = hostPorts.docs;
   const sha256 = hostPorts.sha256;
   const clock = hostPorts.clock ?? (() => new Date().toISOString());
 
-  const engine = new WorkflowInstanceEngine(docs, { now: clock, counters });
-  const effectJournal = new KernelDurableEffectJournal(docs, moduleIdentity.moduleSha256, counters);
+  // [v0.10 K02 anchor 5] The runtime's deployment-identity wiring: a wired
+  // deployment scope routes the six durable doc families through the
+  // injective scoped grammar (`v010-k02:<app>:<tenant>:<appId>:<pkg>:<kind>:
+  // <parts>`) and joins the deployment tuple in every turn identity; the
+  // unscoped wiring keeps the historical `v08-kernel:` keys byte-for-byte
+  // (compatibility mode). Key builders are chosen ONCE here — never per call.
+  const deploymentScope = options.deploymentScope === undefined
+    ? undefined
+    : deploymentScopeIdentity(options.deploymentScope);
+  const docKeys = deploymentScope === undefined ? legacyKernelDocKeys() : scopedKernelDocKeys(deploymentScope);
+
+  // [v0.10 K02] The canonical input digest of ONE occurrence input: sha256
+  // over the kernel's own canonical JSON form. An ABSENT input normalizes to
+  // null (the same normalization the Host gateway applies), so the omitted
+  // and the explicit-null forms are one canonical input; any present
+  // non-JSON-representable value refuses typed K02_INPUT_NOT_JSON at the
+  // admission boundary.
+  const canonicalInputDigestK02 = (input) => {
+    try {
+      return `sha256:${sha256.digestUtf8(canonicalJsonStringify(input === undefined ? null : input))}`;
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'K02_INPUT_NOT_JSON',
+        `the occurrence input is not a canonical JSON value; the durable original-receipt identity requires canonical JSON (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+  };
+
+  const engine = new WorkflowInstanceEngine(docs, {
+    now: clock,
+    counters,
+    docKeys,
+    ...(options.durableReceiptRingBound === undefined ? {} : { durableReceiptRingBound: options.durableReceiptRingBound }),
+  });
+  const effectJournal = new KernelDurableEffectJournal(docs, moduleIdentity.moduleSha256, counters, docKeys);
   const pinStore = new KernelGovernancePinStore(docs, sha256, moduleIdentity.moduleSha256);
   const baselines = new KernelBaselineStore(docs);
 
@@ -4585,7 +5338,7 @@ export function createOccurrenceRuntime(options) {
       }),
     };
     counters.decisionReceiptAppends += 1;
-    const key = decisionReceiptDocKey(turnId);
+    const key = docKeys.decisionReceipt(turnId);
     try {
       await docs.put(key, envelope, { mustBeAbsent: true });
       return { status: 'recorded', receiptKey: key, durability: 'observational-optional' };
@@ -4626,6 +5379,82 @@ export function createOccurrenceRuntime(options) {
   }
 
   /**
+   * [v0.10 K02 anchor 3] The same-CAS original-receipt ladder of ONE
+   * occurrence, consulted INSIDE the occurrence lane BEFORE the
+   * history/disposition ladder: ring (THIS snapshot's durableOriginalReceipts
+   * — single-snapshot discipline: adjudication and the later commit CAS share
+   * one snapshot) → independent durable archive → undefined (not admitted;
+   * the caller may admit). An identity match is an idempotent replay of the
+   * EXACT ORIGINAL receipt; a different identity under the same turn id
+   * refuses typed BEFORE any admission activity. A legacy/unreadable envelope
+   * fails closed typed; an archive READ fault fails closed typed for THIS
+   * turn (a faulting store is not a policy wedge).
+   */
+  async function readDurableOriginalReceiptOrReplay(snapshot, turnId, identity, request, target, workflowInstanceId, inputDigest) {
+    const ring = isJsonRecord(snapshot.durableOriginalReceipts) ? snapshot.durableOriginalReceipts : {};
+    const storedRing = ring[turnId];
+    if (storedRing !== undefined) {
+      return adjudicateDurableOriginalReceipt(storedRing, turnId, identity, request, target, workflowInstanceId, inputDigest);
+    }
+    let archive;
+    try {
+      archive = await docs.get(docKeys.receiptArchive(turnId));
+    } catch (error) {
+      throw new CentralAdmissionError(
+        'K02_TURN_RECEIPT_STORE_FAULT',
+        `the archived original receipt of turn ${turnId} is unreadable; fail closed for this turn (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+    if (archive !== null) {
+      return adjudicateDurableOriginalReceipt(archive.value, turnId, identity, request, target, workflowInstanceId, inputDigest);
+    }
+    return undefined;
+  }
+
+  /**
+   * [v0.10 K02] Adjudicate ONE stored original-receipt envelope against this
+   * occurrence's identity: legacy shape → typed fail-closed (no pre-1.0
+   * migration); identity match → idempotent replay of the EXACT ORIGINAL
+   * acknowledged receipt (never a pseudo-receipt re-derived from the newest
+   * snapshot); identity mismatch → typed input/intent conflict. The replay
+   * best-effort HEALS the observational turn-disposition record (the
+   * archive-only role since the splice); the heal never falsifies the
+   * original and never fails the replay ACK.
+   */
+  async function adjudicateDurableOriginalReceipt(envelope, turnId, identity, request, target, workflowInstanceId, inputDigest) {
+    if (!isJsonRecord(envelope)
+      || envelope.carrierVersion !== K02_CARRIER_VERSION
+      || typeof envelope.identity !== 'string'
+      || !isJsonRecord(envelope.receipt)) {
+      throw new CentralAdmissionError(
+        'K02_TURN_RECEIPT_LEGACY_UNREADABLE',
+        `the durable original receipt of turn ${turnId} carries no readable v1 envelope; fail closed, no pre-1.0 migration`,
+      );
+    }
+    if (envelope.identity !== identity) {
+      const changedIntent = typeof envelope.intentType === 'string' && envelope.intentType !== request.intentType;
+      throw new CentralAdmissionError(
+        changedIntent ? 'K02_TURN_RECEIPT_INTENT_CONFLICT' : 'K02_TURN_RECEIPT_INPUT_CONFLICT',
+        `turn ${turnId} is already durably admitted with a different ${changedIntent ? 'intentType' : 'canonical input'}; one source is exactly one turn — the original receipt stands`,
+      );
+    }
+    counters.durableOriginalReceiptReplays += 1;
+    const replayed = { ...envelope.receipt, idempotentReplay: true };
+    const healTurn = isJsonRecord(envelope.turn) ? envelope.turn : undefined;
+    const receipt = { ...replayed };
+    if (healTurn !== undefined) {
+      try {
+        const healedDisposition = await writeTurnDisposition(turnId, healTurn, request, target, replayed, inputDigest);
+        if (healedDisposition !== undefined) receipt.turnDisposition = healedDisposition;
+      } catch {
+        // the observational heal never fails the replay
+      }
+    }
+    safeObserve(receipt);
+    return receipt;
+  }
+
+  /**
    * [#1062 shared seam] Read the turn disposition of ONE non-message turn
    * inside the occurrence lane. An identity-matching record is an
    * idempotent replay of the already-admitted turn (zero new activity); a
@@ -4633,17 +5462,20 @@ export function createOccurrenceRuntime(options) {
    * BEFORE any admission — one source is exactly one turn, whatever intent
    * a later submission claims for it.
    */
-  async function readTurnDispositionOrReplay(turnId, turn, request, target) {
+  async function readTurnDispositionOrReplay(turnId, turn, request, target, inputDigest) {
     let envelope;
     try {
-      envelope = await docs.get(turnDispositionDocKey(turnId));
+      envelope = await docs.get(docKeys.turnDisposition(turnId));
     } catch {
       return undefined; // an unreadable disposition cannot veto the turn
     }
     if (envelope === null || !isJsonRecord(envelope.value)) return undefined;
     const stored = envelope.value;
     if (!isJsonRecord(stored.receipt) || typeof stored.identity !== 'string') return undefined;
-    const identity = turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType);
+    // [v0.10 K02] Identity is input-complete and deployment-scoped; the
+    // disposition record is the ARCHIVE-ONLY observational ladder since the
+    // splice (the same-CAS receipt answers first).
+    const identity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
     if (stored.identity !== identity) {
       throw new CentralAdmissionError(
         'ADMISSION_TURN_DISPOSITION_CONFLICT',
@@ -4664,23 +5496,28 @@ export function createOccurrenceRuntime(options) {
    * INSIDE this boundary (identical identity → idempotent; different →
    * typed conflict observation, the stored record is never overwritten).
    */
-  async function writeTurnDisposition(turnId, turn, request, target, receipt) {
-    const identity = turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType);
+  async function writeTurnDisposition(turnId, turn, request, target, receipt, inputDigest) {
+    // [v0.10 K02] The pinned module SHA rides the envelope as buildIdentity
+    // (identity stable across releases); the disposition record itself is
+    // the ARCHIVE-ONLY observation of the admission (the same-CAS receipt
+    // owns the once-only truth).
+    const identity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
     const envelope = {
       pinVersion: 1,
       identity,
+      ...(deploymentScope === undefined ? {} : { buildIdentity: { kernelModuleSha256: moduleIdentity.moduleSha256 } }),
       turn: snapshotJson(turn),
       intentType: request.intentType,
       receipt: snapshotJson(receipt),
     };
     try {
-      await docs.put(turnDispositionDocKey(turnId), envelope, { mustBeAbsent: true });
+      await docs.put(docKeys.turnDisposition(turnId), envelope, { mustBeAbsent: true });
       counters.turnDispositions += 1;
       return { status: 'recorded' };
     } catch (error) {
       if (typeof error === 'object' && error !== null && error.code === 'HOST_KEY_EXISTS') {
         try {
-          const winner = await docs.get(turnDispositionDocKey(turnId));
+          const winner = await docs.get(docKeys.turnDisposition(turnId));
           const winnerIdentity = winner !== null && isJsonRecord(winner.value)
             && typeof winner.value.identity === 'string' ? winner.value.identity : undefined;
           if (winnerIdentity === identity) {
@@ -4718,11 +5555,11 @@ export function createOccurrenceRuntime(options) {
    * heals the lost disposition observation; the stored receipt is this
    * reconstructed replay truth, never invented business detail.
    */
-  async function admittedControlTurnHistoryReplay(snapshot, turnId, turn, request, target, workflowInstanceId) {
+  async function admittedControlTurnHistoryReplay(snapshot, turnId, turn, request, target, workflowInstanceId, inputDigest) {
     const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
     const admission = history.find((entry) => isJsonRecord(entry) && entry.turnId === turnId);
     if (admission === undefined) return undefined;
-    const identity = turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType);
+    const identity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
     if (admission.identity !== identity) {
       throw new CentralAdmissionError(
         'ADMISSION_TURN_DISPOSITION_CONFLICT',
@@ -4740,7 +5577,7 @@ export function createOccurrenceRuntime(options) {
     };
     // Heal the lost disposition observation (best-effort; the outcome rides
     // the replay receipt as an independent field and never fails it).
-    const healedDisposition = await writeTurnDisposition(turnId, turn, request, target, replay);
+    const healedDisposition = await writeTurnDisposition(turnId, turn, request, target, replay, inputDigest);
     const receipt = { ...replay, ...(healedDisposition === undefined ? {} : { turnDisposition: healedDisposition }) };
     safeObserve(receipt);
     return receipt;
@@ -4792,7 +5629,7 @@ export function createOccurrenceRuntime(options) {
       );
     }
     const turnId = deriveDurableControlTurnId(target, { kind: 'message', sourceMessageId: messageId });
-    const doc = await docs.get(decisionReceiptDocKey(turnId));
+    const doc = await docs.get(docKeys.decisionReceipt(turnId));
     if (doc === null) return null;
     const envelope = doc.value;
     if (!isJsonRecord(envelope) || envelope.kernelModuleSha256 !== moduleIdentity.moduleSha256) {
@@ -4825,11 +5662,134 @@ export function createOccurrenceRuntime(options) {
     resolve(effectType) {
       const binding = businessEndpoint.effectBindings?.[effectType];
       if (binding === undefined) return undefined;
-      return { effectType, effectSemantics: binding.semantics };
+      return {
+        effectType,
+        effectSemantics: binding.semantics,
+        // [v0.10 C01 #1177] The binding's external routing config, validated
+        // here so a malformed declaration refuses at resolve time — before
+        // any journal begin. `resource` rides along so the minted permit is
+        // scoped to the declared capability key and operation set.
+        external: normalizeExternalEffectConfig(binding.external),
+        resource: isJsonRecord(binding.resource) ? binding.resource : null,
+      };
     },
     async execute(request) {
       counters.effectDispatches += 1;
       const binding = businessEndpoint.effectBindings[request.binding.effectType];
+      const externalConfig = normalizeExternalEffectConfig(binding?.external);
+      // [v0.10 C01 #1177 R1 P1-1] The exact per-effect dispatch attempt this
+      // executor call represents (the kernel passes its journaled attempt).
+      const attempt = Number.isSafeInteger(request.attempt) ? request.attempt : 1;
+      // The K-issued ADDRESS CONTEXT of this effect's authority documents: the
+      // gate re-reads exactly these keys - never a hardcoded legacy family -
+      // so a scoped deployment is addressed under its own injective grammar.
+      const authorityContext = externalConfig === null ? null : {
+        effectId: request.effectId,
+        durableControlTurnId: request.durableControlTurnId,
+        businessPackageId: businessEndpoint.packageId,
+        keys: {
+          permit: docKeys.effectPermit(request.effectId),
+          journal: docKeys.journal(request.effectId),
+          fence: docKeys.admissionFence(request.target),
+          dispatchClaim: docKeys.effectDispatchClaim(request.effectId, attempt),
+        },
+        attempt,
+      };
+      // Atomic per-(effectId,attempt) claim: ONE effect grounds at most ONE
+      // adapter invocation, enforced by a physical mustBeAbsent CAS before
+      // any raw resources call. A refusal is fail-closed typed and carries NO
+      // zero-external-effect proof (an earlier invocation may have landed).
+      const claimExternalDispatch = async () => {
+        if (authorityContext === null) return;
+        try {
+          await docs.put(
+            authorityContext.keys.dispatchClaim,
+            {
+              pinVersion: 1,
+              effectId: authorityContext.effectId,
+              durableControlTurnId: authorityContext.durableControlTurnId,
+              businessPackageId: authorityContext.businessPackageId,
+              attempt: authorityContext.attempt,
+              claimedAt: clock(),
+            },
+            { mustBeAbsent: true },
+          );
+          counters.effectDispatchClaims += 1;
+        } catch (error) {
+          counters.effectDispatchClaimRefusals += 1;
+          // The attest stays UNMARKED (preHandlerRefusal remains null): an
+          // ambiguous or repeated dispatch claim proves nothing about the
+          // external world, so the #1108 zero-effect policy must not act on it.
+          if (isHostWriteConflict(error)) {
+            throw new CentralAdmissionError(
+              'ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT',
+              `[ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT] effect ${request.effectId} already grounded an external dispatch attempt ${authorityContext.attempt}; one effect never dispatches twice`,
+            );
+          }
+          throw new CentralAdmissionError(
+            'ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT',
+            `[ADMISSION_EFFECT_DISPATCH_CLAIM_CONFLICT] the external dispatch claim for ${request.effectId} is ambiguous: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      };
+      // [#1108 K01 R1 P1 / R2 P1] The Business handler's ONLY external-mutation
+      // authority is the physical resources port (v0.8 Host contract). The
+      // dispatch probe records whether the handler ever invoked it, and every
+      // invocation carries a fresh kernel-minted ATTESTATION object (an extra
+      // dedicated argument, never part of the payload or the handler
+      // context): the trusted host dispatcher marks it synchronously BEFORE
+      // throwing one of its OWN pre-handler refusals. A thrown error's code
+      // string proves nothing (a post-mutation throw can carry any code), so
+      // the attestation channel is the ONLY dispatcher-side proof. The probe
+      // object itself is created by this kernel's executeEffectIntents —
+      // marking `supported` here is what makes the proof kernel-owned rather
+      // than caller-asserted.
+      const probe = request.externalDispatchProbe;
+      const rawResources = hostPorts.resources;
+      // A missing/non-object resources port passes through VERBATIM: the
+      // Business handler's own port guard (and its typed failure) keeps its
+      // exact pre-existing shape; nothing is wrapped, nothing is invented.
+      const handlerResources = (probe === undefined || probe === null || typeof probe !== 'object'
+        || rawResources === null || typeof rawResources !== 'object')
+        ? rawResources
+          : {
+            call: async (resourceKey, operation, payload) => {
+              // Mint and register the attest BEFORE the call: a synchronous
+              // throw below still leaves the (unmarked) attestation in the
+              // probe, which fails the all-attested proof — fail-closed.
+              const attest = { preHandlerRefusal: null };
+              if (authorityContext !== null) {
+                // [v0.10 C01 #1177] The kernel-issued live permit CLAIM rides
+                // the attest channel — the only channel a trusted host
+                // dispatcher reads. The durable permit document remains the
+                // authority the host gate re-reads; a claim alone proves
+                // nothing and a Business handler can neither mint nor strip
+                // this channel.
+                attest.effectPermit = { ...authorityContext };
+              }
+              probe.dispatchAttests.push(attest);
+              probe.invoked = true;
+              await claimExternalDispatch();
+              return rawResources.call(resourceKey, operation, payload, attest);
+            },
+            ...(typeof rawResources.callScoped === 'function'
+              ? {
+                  callScoped: async (scopeId, resourceKey, operation, payload) => {
+                    const attest = { preHandlerRefusal: null };
+                    if (authorityContext !== null) {
+                      attest.effectPermit = { ...authorityContext };
+                    }
+                    probe.dispatchAttests.push(attest);
+                    probe.invoked = true;
+                    await claimExternalDispatch();
+                    return rawResources.callScoped(scopeId, resourceKey, operation, payload, attest);
+                  },
+                }
+              : {}),
+          };
+      if (probe !== undefined && probe !== null && typeof probe === 'object') {
+        probe.supported = true;
+      }
       return binding.handler({
         input: request.input,
         effectId: request.effectId,
@@ -4838,8 +5798,86 @@ export function createOccurrenceRuntime(options) {
         idempotencyKey: request.idempotencyKey,
         logicalTime: request.logicalTime,
         target: request.target,
-        resources: hostPorts.resources,
+        resources: handlerResources,
       });
+    },
+  };
+
+  // [v0.10 C01 #1177] The K-issued live external Effect Permit — the durable
+  // authority half of the selected K→C external Effect Operation. The kernel
+  // mints ONE permit document per external effect dispatch (mustBeAbsent
+  // create, same-turn identical replay reuses the live original), scoped to
+  // the exact effectId/turn/target/business/capability/operation set with a
+  // bounded logical expiry, and consumes it (exact-revision CAS) as soon as
+  // the dispatch settles. The trusted Host gate re-reads THIS document —
+  // plus the journal `started` record and the held admission fence — before
+  // any adapter invocation: a permit is never a bearer token, and only the
+  // kernel's own attest channel can even CLAIM one.
+  const effectPermitAdmin = {
+    async mint(spec) {
+      const key = docKeys.effectPermit(spec.effectId);
+      const value = {
+        pinVersion: 1,
+        state: 'live',
+        effectId: spec.effectId,
+        durableControlTurnId: spec.turnId,
+        effectType: spec.effectType,
+        effectSemantics: spec.effectSemantics,
+        businessPackageId: businessEndpoint.packageId,
+        target: { workflowId: spec.target.workflowId, instanceKey: spec.target.instanceKey },
+        capabilityKey: spec.resource !== null && typeof spec.resource.key === 'string' ? spec.resource.key : null,
+        operations: [
+          ...(spec.resource !== null && typeof spec.resource.operation === 'string' ? [spec.resource.operation] : []),
+          ...spec.external.operations,
+        ],
+        awaitPolicy: spec.external.awaitPolicy,
+        attempt: spec.attempt,
+        nonce: sha256.digestUtf8(`${spec.effectId}#${spec.attempt}#${spec.issuedAt}`),
+        issuedAt: spec.issuedAt,
+        expiresAt: new Date(Date.parse(spec.issuedAt) + spec.external.permitTtlMs).toISOString(),
+      };
+      let written;
+      try {
+        written = await docs.put(key, value, { mustBeAbsent: true });
+      } catch (error) {
+        if (isHostWriteConflict(error)) {
+          // The same-turn crash-recovery replay of THIS live permit: an
+          // identical live original is reused (its exact revision returned);
+          // anything else (consumed, drifted, foreign) refuses typed.
+          const existing = await docs.get(key);
+          const candidate = existing !== null && isJsonRecord(existing.value) ? existing.value : null;
+          const identical = candidate !== null
+            && candidate.state === 'live'
+            && candidate.durableControlTurnId === spec.turnId
+            && candidate.effectType === spec.effectType
+            && candidate.attempt === spec.attempt;
+          if (!identical) {
+            throw new CentralAdmissionError(
+              'ADMISSION_EFFECT_PERMIT_CONFLICT',
+              `effect permit ${spec.effectId} already exists and is not this dispatch's live original`,
+            );
+          }
+          return { revision: existing.revision };
+        }
+        throw error;
+      }
+      counters.effectPermitsMinted += 1;
+      return { revision: written.revision };
+    },
+    async consume(effectId, revision) {
+      const doc = await docs.get(docKeys.effectPermit(effectId));
+      if (doc === null || !isJsonRecord(doc.value) || doc.value.state !== 'live') {
+        throw new CentralAdmissionError(
+          'ADMISSION_EFFECT_PERMIT_CONFLICT',
+          `effect permit ${effectId} is not live for consumption`,
+        );
+      }
+      await docs.put(
+        docKeys.effectPermit(effectId),
+        { ...doc.value, state: 'consumed' },
+        { mustMatchRevision: revision },
+      );
+      counters.effectPermitsConsumed += 1;
     },
   };
 
@@ -5019,11 +6057,35 @@ export function createOccurrenceRuntime(options) {
       // re-sent denied message is evaluated afresh, exactly as before.
       const turn = occurrenceTurnOf(request);
       const controlTurnId = deriveDurableControlTurnId(target, turn);
+      // [v0.10 K02 anchor 1] The input-complete, deployment-scoped identity
+      // material of THIS occurrence: the canonical input digest is computed
+      // ONCE here (non-JSON input refuses typed BEFORE any admission
+      // activity) and threads every ladder and the commit descriptor.
+      const inputDigest = canonicalInputDigestK02(request.input);
+      const turnIdentity = turnDispositionIdentity(deploymentScope, target, turn, request.intentType, inputDigest);
+      // [v0.10 K02 anchor 3] The same-CAS original-receipt ladder FIRST:
+      // ring (this snapshot) → durable archive → undefined.
+      const receiptReplayed = await readDurableOriginalReceiptOrReplay(
+        snapshot,
+        controlTurnId,
+        turnIdentity,
+        request,
+        target,
+        workflowInstanceId,
+        inputDigest,
+      );
+      if (receiptReplayed !== undefined) {
+        return receiptReplayed;
+      }
+      // The observation ladders follow (archive-only since the splice): the
+      // independent disposition record, then the bounded same-CAS admission
+      // history.
       const replayed = await readTurnDispositionOrReplay(
         controlTurnId,
         turn,
         request,
         target,
+        inputDigest,
       );
       if (replayed !== undefined) {
         return replayed;
@@ -5035,32 +6097,19 @@ export function createOccurrenceRuntime(options) {
         request,
         target,
         workflowInstanceId,
+        inputDigest,
       );
       if (historyReplayed !== undefined) {
         return historyReplayed;
       }
-      // [#1066 R2] The 16-entry SAME-CAS crash backstop may evict an
-      // older turn ONLY if its independent durable disposition exists.
-      // Otherwise a delayed Host recovery could re-admit the evicted
-      // turn. Refuse a NEW turn before any admission/effect until the
-      // older missing disposition is healed by replaying its source.
-      const history = Array.isArray(snapshot.admittedControlTurns) ? snapshot.admittedControlTurns : [];
-      if (history.length >= MAX_ADMITTED_CONTROL_TURN_HISTORY) {
-        const oldest = history[0];
-        if (!isJsonRecord(oldest) || typeof oldest.turnId !== 'string' || typeof oldest.identity !== 'string') {
-          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_INVALID', 'cannot evict an invalid committed control-turn admission');
-        }
-        let disposition;
-        try {
-          disposition = await docs.get(turnDispositionDocKey(oldest.turnId));
-        } catch {
-          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'cannot verify the oldest admitted control turn disposition; fail closed before eviction');
-        }
-        if (disposition === null || !isJsonRecord(disposition.value)
-          || disposition.value.identity !== oldest.identity) {
-          throw new CentralAdmissionError('ADMISSION_TURN_HISTORY_EVICTION_BLOCKED', 'oldest committed control turn has no matching durable disposition; recover it before admitting another turn');
-        }
-      }
+      // [v0.10 K02 anchor 4] The former missing-disposition fail-closed
+      // eviction block is REPLACED by the same-CAS original-receipt ring:
+      // the once-only truth is atomic with the state (the ring rides the
+      // instance document) and its eviction is archive-gated inside the
+      // commit, so a LOST derived disposition can no longer wedge all new
+      // turns (the 17+ liveness repair). MAX_ADMITTED_CONTROL_TURN_HISTORY
+      // stays the bounded crash-backstop history bound; the disposition
+      // records remain observational archive depth.
       const context = {
         ...snapshot.state.context,
         callerRole: caller.role,
@@ -5133,7 +6182,7 @@ export function createOccurrenceRuntime(options) {
           sdkEndpoint,
           latch,
           requestInput: request.input,
-          read: { docs, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
+          read: { docs, docKeys, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
         });
         if (run.terminal !== undefined) {
           return terminatedReceipt(request, workflowInstanceId, run.terminal, run.evidence);
@@ -5204,15 +6253,31 @@ export function createOccurrenceRuntime(options) {
         effectBindings,
         contextProjections,
         trace: counters,
+        // [v0.10 C01 #1177] The K-issued live external Effect Permit admin —
+        // the only component that can mint or consume a permit document.
+        effectPermitAdmin,
         // [v0.8.1 R02] Claimed after every denial gate, before any journal
         // begin/effect dispatch; the commit below requires it still held.
+        // [#1108 K01] The claim result is RETURNED so admitCentralDecision
+        // can apply its zero-ambiguity failure policy to the held fence.
         admissionFence: async (turnId) => {
           admissionFence = await engine.claimAdmissionFence({
             target,
             turnId,
+            turnIdentity,
             expectedTargetSequence: snapshot.stateRevision,
             snapshotFenceRevision,
+            // [#1108 K01 R1] A trusted-seam recovery turn (operator-authorized
+            // poison reconciliation) may supersede a durably all-failed fence
+            // holder at this stateRevision; message turns never carry this.
+            ...(turn.kind === 'recovery' ? { reconcilesHeldFence: true } : {}),
           });
+          return admissionFence;
+        },
+        // [#1108 K01] Zero-ambiguity failure release (all-failed journal);
+        // see admitCentralDecision. Unconditional fence writes do not exist.
+        admissionFenceRelease: async (fence) => {
+          await engine.releaseAdmissionFence(target, fence);
         },
       });
 
@@ -5230,7 +6295,9 @@ export function createOccurrenceRuntime(options) {
       const nextLifecycle = stateKindIsTerminal(definition, outcome.admitted.targetState)
         ? 'completed'
         : 'active';
-      const committed = await engine.commitAcceptedTransitionInLane({
+      let committed;
+      try {
+        committed = await engine.commitAcceptedTransitionInLane({
         target,
         messageId: request.messageId,
         expectedTargetSequence: snapshot.stateRevision,
@@ -5242,7 +6309,23 @@ export function createOccurrenceRuntime(options) {
         // turns ride the same history.
         admittedControlTurn: {
           turnId: controlTurnId,
-          identity: turnDispositionIdentity(moduleIdentity.moduleSha256, target, turn, request.intentType),
+          identity: turnIdentity,
+        },
+        // [v0.10 K02 anchor 2] The immutable ORIGINAL RECEIPT of this turn
+        // rides the SAME authoritative state CAS: the engine composes the
+        // receipt against the NEXT projection BEFORE the put and commits
+        // state + revision + receipt in ONE document write. buildIdentity
+        // (the pinned kernel module SHA) rides the envelope — the identity
+        // itself is build-stable.
+        durableOriginalReceipt: {
+          turnId: controlTurnId,
+          identity: turnIdentity,
+          intentType: request.intentType,
+          inputDigest,
+          turn: snapshotJson(turn),
+          messageId: request.messageId,
+          admitted: outcome.admitted,
+          buildIdentity: { kernelModuleSha256: moduleIdentity.moduleSha256 },
         },
         transition: (current) => ({
           nextState: {
@@ -5259,7 +6342,34 @@ export function createOccurrenceRuntime(options) {
             effects: outcome.admitted.effects,
           },
         }),
-      });
+        });
+      } catch (error) {
+        // [#1108 K01] Commit-phase failure fence policy: while ANY journal
+        // record of this turn exists, the fence stays held (effects may have
+        // dispatched; the same-turn replay reconciles through the journal).
+        // A turn with ZERO begun journal records (effect-free, or failed
+        // before any begin) has nothing durable to protect — the fence is
+        // released so a transient store fault cannot wedge the instance at
+        // this stateRevision. A failed release keeps the fence held.
+        if (admissionFence !== undefined) {
+          try {
+            const effectCount = Array.isArray(outcome.admitted?.effects) ? outcome.admitted.effects.length : 0;
+            let anyRecord = false;
+            for (let ordinal = 1; ordinal <= effectCount; ordinal += 1) {
+              if (await effectJournal.getEffect(`${controlTurnId}/effect/${String(ordinal)}`) !== null) {
+                anyRecord = true;
+                break;
+              }
+            }
+            if (!anyRecord) {
+              await engine.releaseAdmissionFence(target, admissionFence);
+            }
+          } catch {
+            // keep held — fail-closed
+          }
+        }
+        throw error;
+      }
 
       // [#1003 FR08 general] The exact-cache write happens only AFTER the
       // authoritative state commit: a candidate denied by any admission
@@ -5291,6 +6401,10 @@ export function createOccurrenceRuntime(options) {
       // Kernel is the OUTWARD snapshot: the observation window and the
       // control-turn admission history stay internal carrier/replay truth.
       const outwardCommitted = outwardInstanceSnapshot(committed);
+      // [v0.10 K02] The disposition record is the post-commit OBSERVATIONAL
+      // archive of the admission (the same-CAS original receipt, committed
+      // above, owns the once-only truth); a failure here stays a typed
+      // observation that never fails the committed ACK.
       const turnDisposition = await writeTurnDisposition(
         controlTurnId,
         turn,
@@ -5303,6 +6417,7 @@ export function createOccurrenceRuntime(options) {
           occurrence: { messageId: request.messageId, workflowInstanceId },
           attribution: attribution(),
         },
+        inputDigest,
       );
 
       const receipt = {

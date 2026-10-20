@@ -1,0 +1,24 @@
+task: T11
+typed_refusal_cases:
+  - package_file_or_required_dependency_missing_in_clean_install
+  - unwanted_advanced_tiny_package_import
+  - missing_required_Kext_or_Sfeature_actual_module
+  - two_B_state_or_receipt_namespace_collision
+  - unauthorized_hidden_B_read_or_cross_tenant_oracle
+  - model_call_count_misattribution_to_rule_cache_or_fallback
+  - missing_or_invalid_child_CALLBACK_WAIT_RESUME_correlation
+  - missing_K_live_effect_permit_zero_dispatch
+  - accepted_external_reply_falsely_marked_terminal
+  - lost_response_UNKNOWN_not_reconciled_or_fabricated_terminal
+  - lost_optional_disposition_changing_original_receipt
+  - same_turn_changed_input_not_conflicting
+  - old_PINNED_ONLY_build_misdirected_to_current_B
+  - revoked_or_unsigned_new_BUILD_promotion
+  - shadow_attempt_writes_to_production_namespace
+  - fake_clean_install_or_monorepo_module_resolution_leak
+required:
+  actual_physical_evidence: true
+  no_extra_K_effect_authority_to_feature_or_B: true
+  no_false_release_claim: true
+  evidence_for_each_L2_R3_H_item: true
+failure_posture: BLOCKED_OR_FIX_OWNER_CONCERN_NO_SILENT_WAIVER

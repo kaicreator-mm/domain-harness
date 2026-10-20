@@ -1,0 +1,25 @@
+schema: ads/execution-pack-v1
+task: T10
+issue: 1176
+version: v0.10
+branch: task/v0.10-t10-selected-app-query
+base_sha: 7fd21abac0632d57c88b5189866aa1e397cc5c3a
+ads_pin: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: IMPLEMENTED_LOCAL_GATE_PENDING
+previous_slice_pr: 1194
+previous_slice_merge: 99ed293182fc806a62a753470697809c65883a16
+pr: NOT_CREATED
+actual_selected_app_tests: FOCUSED_11_OF_11_PASS_NODE24_SQLITE
+two_process_query: PASS
+stale_k02_kernel_pin: REBOUND_c164f491_TO_1a6a1394_EXACT_BYTE_PROOF
+implementation:
+  facade_query: packages/domain-harness-compiler/src/qualified-package/v10build/activation.ts
+  host_core_reused_read_only: packages/domain-harness/src/host-v8/v010-authorized-multib-query.ts
+  public_types: V10QueryAuthority, V10ScopedQueryTarget, V10ScopedSnapshotQuery, V10ScopedSnapshotAnswer
+  public_target_declared_structurally: no_host_deep_type_graph_in_compiler_d.ts
+  fail_closed_codes: QUERY_AUTHORIZATION_REQUIRED, QUERY_DEPLOYMENT_REQUIRED, QUERY_NOT_FOUND, QUERY_AMBIGUOUS, QUERY_SELECTOR_INVALID, QUERY_READ_FAILED, QUERY_AUTHORIZATION_UNAVAILABLE
+tests:
+  selected_app_physical: tests/hosts/node/v010-t10-selected-app-query.test.ts
+  fixture: tests/hosts/node/v010-t10-selected-app-fixture.ts
+  two_process_child: tests/hosts/node/v010-t10-selected-app-query-child.ts
+  merged_host_core_rebind: packages/domain-harness/tests/v08-host/t10-multib-query-physical.test.ts

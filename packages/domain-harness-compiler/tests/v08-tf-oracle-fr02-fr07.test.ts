@@ -118,7 +118,22 @@ const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 // FR11/HF24 adds the selected SDK compiled-data READ endpoint; FR02/FR07 semantics unchanged.
 // CI #1304 executed all prior affected oracle behavior but found the stale exact S pin.
 const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
-const V08_K_BLOB = 'fa30e1204d47c12f3f5842c497a83a08501d515b';
+// K_BLOB_PIN_REBOUND_AFTER_1108_R2: #1108 R2 P1 — the zero-external-effect
+// proof no longer trusts thrown error codes at all; only the trusted host
+// dispatcher's own per-call pre-handler attestation (kernel-minted,
+// dispatcher-marked, never adapter-visible) proves it; FR02/FR07 semantics
+// unchanged.
+// K_BLOB_PIN_REBOUND_AFTER_1168_PHASE2: the K02 durable original-receipt
+// carrier spliced into the selected kernel (input-complete deployment-scoped
+// turn identity, same-CAS original receipts, scoped key grammar, ring-backed
+// disposition liveness); FR02/FR07 semantics unchanged.
+// K_BLOB_PIN_REBOUND_AFTER_1177_C01: the C01 kernel-issued live external
+// Effect Permit carrier spliced in (external binding config validation,
+// effectPermitAdmin mint/consume on external bindings only, attest-channel
+// permit claim, additive effect-permit doc kind and counters);
+// FR02/FR07 semantics unchanged.
+// Exact selected Kernel re-pin after approved R01 K01 #1205; previous C01/K02 blob 1a6a1394a505f4727306208d588fcab841e72980.
+const V08_K_BLOB = 'db7a8f16de2b26d2fdb10e6ca7f8e90b3f1daf30';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

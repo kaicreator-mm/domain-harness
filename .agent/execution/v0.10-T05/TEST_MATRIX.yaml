@@ -1,0 +1,18 @@
+schema: dh010/t05-tests
+positive:
+  - deterministic-context-order-and-budget            # v010-t05-context-feature T05-P1
+  - source-and-provenance-at-every-context-entry      # context-feature T05-P1/P2; agent P0 provenance asserts
+  - selected-rich-app-feature-and-tiny-omission       # context-feature T05-P0; agent P3
+  - ordinary-business-agent-turn-through-real-K       # agent P0 (4 turns, one Business runtime)
+  - scoped-memory-read-and-trusted-tool-advice        # agent P0/N2 (real K effects -> sealed C handlers)
+  - bounded-no-model-agent-path                       # agent P0 turn 0/2 (Rule), turn 3 (pinned procedure)
+  - original-K02-receipt-replay                       # agent P1/P2 (idempotentReplay, zero duplicate rows)
+negative:
+  - cross-tenant-context-rejected-with-zero-memory-read  # context-feature T05-N1; agent N2(a)
+  - over-budget-or-duplicate-entry-typed-refusal         # context-feature T05-N2
+  - forged-effect-permit-or-kernel-receipt-refused       # context-feature T05-N3; agent N2(a)
+  - external-Model-unavailable-typed-not-false-success   # agent N2(c)
+  - unbounded-agent-cycle-typed-denial                   # agent N2(d planner, e Business guard)
+  - changed-input-same-turn-typed-conflict               # agent P1
+  - denied-foreign-memory-zero-physical-rows             # agent N2(b)
+environment: changed-risk Node24 SQLite physical selected App, CI review, no extra per-substep CI

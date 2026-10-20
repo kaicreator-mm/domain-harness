@@ -1,0 +1,27 @@
+schema: dh010/t02-test-matrix
+test_first:
+  - id: rule-priority
+    kind: positive
+    assertion: exact ordered rule wins, no model/tool
+  - id: reuse-exact
+    kind: positive
+    assertion: schema/revision/provenance match reuses original, no external call
+  - id: reuse-mismatch
+    kind: negative
+    assertion: schema/revision/provenance mismatch does not reuse
+  - id: procedure-pinned
+    kind: positive
+    assertion: declared pinned procedure only, no model
+  - id: fallback-budget
+    kind: negative
+    assertion: model/tool fallback bounded by steps and deadline
+  - id: denied-effect
+    kind: negative
+    assertion: effect-shaped semantic output grants no Kernel permission
+  - id: no-model
+    kind: positive
+    assertion: no-model policy returns honest unavailable/typed result
+  - id: evidence
+    kind: positive
+    assertion: measured and unmeasured counters never fabricated
+execution: focused Node24 unit plus configured CI; no per-subtask standalone pipeline

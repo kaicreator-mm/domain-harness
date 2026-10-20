@@ -1,0 +1,3 @@
+# Candidate file-level map – bind at Builder claim
+READ: payload/standard-sdk-v1.mjs, v09/workflow-router.mjs (pure routing substrate), v10build/activation.ts currently edited by T02 PR #1188, selected K02 Kernel and scoped receipt identity, existing Host durable-controls.ts.
+PROPOSED NEW: isolated selected Standard workflow feature module + focused test cases, smallest necessary scoped public wiring to runtime after T02 completes or single-writer coordination. No new runtime core or independent K State. If v10build/activation.ts is still owned by T02, do not write to it until T02 merges, but nonoverlapping NEW modules/tests can proceed. Exact file write set and accepted Claim precede source mutation; preserve current version branch.

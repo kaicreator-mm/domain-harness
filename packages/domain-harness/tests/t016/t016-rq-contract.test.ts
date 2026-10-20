@@ -5,7 +5,7 @@
  * `packages/domain-harness/tests/t016/t016-divergence-audit.md` and
  * `t016-rq-record.md` to landed reality so drift goes red:
  *   - a carried v0.6 freeze doc disappears -> red;
- *   - the v0.7 successor governance record loses the candidate binding, the
+ *   - the v0.7 archived successor governance record loses the candidate binding, the
  *     frozen tree, or any of the four quadruple-proven pack digests -> red;
  *   - README currentness stops naming v0.7 -> red;
  *   - the RQ record stops covering any #733 dimension, or silently drops the
@@ -24,7 +24,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(HERE, '..', '..');
 const REPO_ROOT = join(PACKAGE_ROOT, '..', '..');
 
-const GOVERNANCE = readFileSync(join(REPO_ROOT, '.dev-standard', 'PROJECT_OVERRIDES.md'), 'utf8');
+// v0.7 historical RQ facts moved out of the *active* ADS profile on 2026-10-18.
+// Assert the preserved immutable historical record, not today's effective overrides.
+const GOVERNANCE = readFileSync(join(REPO_ROOT, 'docs', 'governance', 'archive', 'PROJECT_OVERRIDES_HISTORICAL_20261018.md'), 'utf8');
 const README = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
 const AUDIT = readFileSync(join(HERE, 't016-divergence-audit.md'), 'utf8');
 const RQ = readFileSync(join(HERE, 't016-rq-record.md'), 'utf8');
@@ -75,12 +77,12 @@ test('t016: carried v0.6 freeze docs exist at their frozen paths', () => {
   }
 });
 
-test('t016: governance record binds the v0.7 closure candidate, tree, and all pack digests', () => {
-  assert.ok(GOVERNANCE.includes(CANDIDATE_SHA), 'PROJECT_OVERRIDES must bind candidate SHA');
-  assert.ok(GOVERNANCE.includes(CANDIDATE_TREE), 'PROJECT_OVERRIDES must bind candidate tree');
-  assert.ok(GOVERNANCE.includes('**`v0.7`**'), 'PROJECT_OVERRIDES must name v0.7');
+test('t016: archived governance record binds the v0.7 closure candidate, tree, and all pack digests', () => {
+  assert.ok(GOVERNANCE.includes(CANDIDATE_SHA), 'historical governance archive must bind candidate SHA');
+  assert.ok(GOVERNANCE.includes(CANDIDATE_TREE), 'historical governance archive must bind candidate tree');
+  assert.ok(GOVERNANCE.includes('**`v0.7`**'), 'historical governance archive must name v0.7');
   for (const d of PACK_DIGESTS) {
-    assert.ok(GOVERNANCE.includes(d), `PROJECT_OVERRIDES must carry pack digest ${d.slice(0, 12)}…`);
+    assert.ok(GOVERNANCE.includes(d), `historical governance archive must carry pack digest ${d.slice(0, 12)}…`);
   }
 });
 

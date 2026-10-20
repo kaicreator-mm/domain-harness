@@ -1,0 +1,15 @@
+schema: dh010/t03-tests
+positive:
+  - finite-loop-exits-under-budget
+  - child-correlation-parent-waits-for-exact-child
+  - wait-checkpoint-persisted-through-SQLite-restart
+  - resume-once-with-legitimate-callback
+  - deadline-exit-bounded
+negative:
+  - recursive-or-loop-unbounded-denied
+  - cross-B-or-foreign-child-callback-denied
+  - duplicate-and-stale-callback-zero-new-effect
+  - callback-after-deadline-typed
+  - forged-Std-only-effect-request-cannot-mint-K-permit
+  - repeated-callback-after-lost-disposition-original-receipt
+required: focused Node24 SQLite restart+real selected Kernel test, configured PR CI, independent high-risk review

@@ -1,0 +1,4 @@
+# T10 JIT source map
+ALLOWED MINIMUM: packages/domain-harness-compiler/src/qualified-package/v10build/activation.ts selected Facade/Host activation; corresponding generated dist/qualified-package/v10build/activation.*; NEW selected-App two-B Node24 SQLite tests under tests/assembly or tests/hosts/node (match collection); .agent/execution/v0.10-T10-integration/**.
+READ ONLY: packages/domain-harness/src/host-v8/v010-authorized-multib-query.ts + compiled package, C01 selected Kernel payload, external-effect.ts, T02/T03/T04/T05/T06 modules.
+No edits while a conflicting active Builder claim writes activation.ts. C01 has now CLOSED. A fresh exact-file Claim should precede actual code. If compiler owns no direct runtime import to Host package, resolve through already declared capability/npm seams, never add hidden undeclared native import.

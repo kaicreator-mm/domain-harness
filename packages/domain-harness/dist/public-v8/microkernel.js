@@ -1002,12 +1002,15 @@ async function loadScopedFacade(packageRoot) {
         const runtimeHostPorts = Object.freeze({
             docs: hostPorts.docs,
             sha256: hostPorts.sha256,
+            // [#1108 K01 R2 P1]: the kernel-minted per-call attestation rides the
+            // dedicated trailing argument through BOTH branches verbatim — the
+            // trusted dispatcher stays the only writer of `preHandlerRefusal`.
             resources: Object.freeze({
                 call: claimedResourceKeys.size === 0
                     ? hostPorts.resources.call
-                    : (resourceKey, operation, payload) => claimedResourceKeys.has(resourceKey)
-                        ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload)
-                        : hostPorts.resources.call(resourceKey, operation, payload),
+                    : (resourceKey, operation, payload, attest) => claimedResourceKeys.has(resourceKey)
+                        ? hostPorts.resources.callScoped(resourceScopeId, resourceKey, operation, payload, attest)
+                        : hostPorts.resources.call(resourceKey, operation, payload, attest),
             }),
             clock: hostPorts.clock,
         });

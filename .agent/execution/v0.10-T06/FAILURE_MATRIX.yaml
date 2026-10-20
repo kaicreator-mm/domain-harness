@@ -1,0 +1,10 @@
+schema: dh010/t06-failure
+invalid-source: typed-refusal
+invalid-dependency: typed-refusal
+unauthorized-effect-shape: typed-refusal
+unknown-model-counter: record-unmeasured
+optional-storage-failure: primary-return-preserved-observation-failed
+optional-storage-unavailable: primary-return-preserved-observation-skipped
+K-receipt-missing: never-pretend-admitted
+CI-red: cannot-merge
+missing-local-tests: NOT_RUN

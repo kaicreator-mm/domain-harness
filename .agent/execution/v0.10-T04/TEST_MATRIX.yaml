@@ -1,0 +1,17 @@
+schema: dh010/t04-validation
+positive:
+  - scoped-put-get-revision
+  - matching-CAS-update
+  - prefix-search-and-provenance
+  - TTL-expiry-visible-as-absent
+  - physical-file-SQLite-restart
+  - Tiny-without-memory
+negative:
+  - unauthorized-put-zero-write
+  - unauthorized-get-search-delete-no-leak
+  - mismatched-B-and-tenant-isolation
+  - stale-CAS-update-delete-rejected
+  - malformed-scope-key-and-expiry-rejected
+  - no-K-State-Journal-effect-permit
+host: Node24 SQLite clean process, physical restart when available
+ci: existing required Woodpecker only, changed-concern tests

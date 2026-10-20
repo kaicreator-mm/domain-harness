@@ -1,0 +1,9 @@
+schema: dh010/t07-failures
+candidate-unapproved: TYPED_REFUSAL
+candidate-pin-mismatch: TYPED_REFUSAL
+baseline-not-approved: TYPED_NO_FALLBACK
+compare-fault: SHADOW_FAILED_WITH_ZERO_WRITE
+shadow-over-budget: BOUNDED_NO_PROMOTION
+effect-proposal: REFUSE_NO_K_PERMIT
+host-shadow-read-only-interface-missing: STOP_WITH_EVIDENCE
+no-physical-sqlite-proof: NOT_RUN_CANNOT_CLOSE

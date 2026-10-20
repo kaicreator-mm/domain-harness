@@ -1,0 +1,11 @@
+schema: dh010/c01-failure
+unpermitted: typed-refusal-and-zero-dispatch
+expired-or-revoked: live-K-denial-zero-dispatch
+after-dispatch-no-ack: UNKNOWN-hold-fence-and-reconcile
+retry-without-confirmation: deny-no-blind-redispatch
+conflicting-callback: typed-conflict
+terminal-only-accepted-or-running: never-acknowledged-final
+K-journal-store-fault: fail-closed-no-lying-receipt
+reconcile-not-possible: retain-UNKNOWN-and-report
+missing-test-runtime: NOT_RUN-not-PASS
+file-claim-conflict: stop-coordinate-one-writer

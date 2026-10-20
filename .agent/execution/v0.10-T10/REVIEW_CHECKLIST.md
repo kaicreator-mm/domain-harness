@@ -1,0 +1,2 @@
+# T10 exact-HEAD security review
+Verify authorization BEFORE all existence/candidate/snapshot/Journals read; two Business packages with identical workflowId/instanceKey must remain disjoint using K02 injected scoped identity. No hidden-B enumeration or first-match. Unscoped ambiguity depends only on authorized-visible B. No Kernel state or effect modification during query. File ownership synchronized with T02 selected facade; actual Node24 SQLite 2-B witness, CI + risk selected independent review. PR targets v0.10 only; no claimed release closure.

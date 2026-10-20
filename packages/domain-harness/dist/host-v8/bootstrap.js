@@ -117,15 +117,18 @@ export async function bootstrapTrustedHost(input) {
     // #1013 (I01): the COMPLETE protected Kernel Host ports over the probed
     // physical storage. The physically selected Kernel mechanism consumes
     // exactly this bounded contract (kernel-mechanism-v1.mjs): true-CAS docs
-    // get/put/list over the SAME probed physical store (conditions forwarded
-    // verbatim — the store's refusal of unconditional writes stays
-    // authoritative), a trusted sha256 digest, the physical resource dispatch
-    // port for Business effect handlers, and the trusted clock.
+    // get/put/remove/list over the SAME probed physical store (conditions
+    // forwarded verbatim — the store's refusal of unconditional writes and
+    // unconditional deletes stays authoritative; [#1108 K01] remove is the
+    // conditional admission-fence release path), a trusted sha256 digest, the
+    // physical resource dispatch port for Business effect handlers, and the
+    // trusted clock.
     const kernelPorts = {
         docs: Object.freeze({
             get: (key) => store.get(key),
             put: (key, value, conditions) => store.put(key, value, conditions),
             list: (prefix) => store.list(prefix),
+            remove: (key, conditions) => store.remove(key, conditions),
         }),
         sha256: Object.freeze({
             // Trusted digest (same construction as the compiler/verifier digest).
@@ -143,8 +146,12 @@ export async function bootstrapTrustedHost(input) {
             // loader hands the Kernel mechanism forwards NEITHER this privileged
             // member nor any scope: a Business package or caller can never present
             // a scope, only its own closure's claimed logical keys.
-            call: (resourceKey, operation, payload) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
-            callScoped: (scopeId, resourceKey, operation, payload) => resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }),
+            // [#1108 K01 R2 P1]: the kernel-minted per-call attestation rides a
+            // DEDICATED trailing argument straight into the dispatcher — the only
+            // writer of `preHandlerRefusal` is the trusted dispatcher itself,
+            // before its own pre-handler refusals throw.
+            call: (resourceKey, operation, payload, attest) => resources.call(resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
+            callScoped: (scopeId, resourceKey, operation, payload, attest) => resources.callScoped(scopeId, resourceKey, operation, payload, { principal: KERNEL_EFFECT_SERVICE_PRINCIPAL }, attest),
         }),
         clock: () => now().toISOString(),
     };

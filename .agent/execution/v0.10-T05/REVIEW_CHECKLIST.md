@@ -1,0 +1,2 @@
+# T05 exact-HEAD concern review
+Check real selected S Context module and ordinary B Agent policy, neither is an independent Kernel nor a shadow runtime. Bounded context size/count, proven source, revision, scope and ordering; no cross-B/tenant disclosure; optional Model and unavailable remain honest; Host-only Memory authorization. Demonstrate actual v0.10 BUILD→activation→K original receipt path, replay and no unauthorized Effect, Node24 SQLite. CI exact SHA and risk-selected review. T11 packed consumer still separate.

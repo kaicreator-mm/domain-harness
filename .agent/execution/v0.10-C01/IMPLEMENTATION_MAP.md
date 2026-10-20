@@ -1,0 +1,5 @@
+# Candidate file ownership – re-read JIT on branch SHA
+READ: selected K kernel-mechanism-v1.mjs (K01+K02 integrated), v10build/activation.ts T00 + in-flight T02 selected S method, packages/domain-harness/src/host-v8/dispatcher.ts, durable-controls.ts, existing tests.
+PROPOSED OWNED: NEW v0.10 external C Operation/permit bridge module(s) under packages/domain-harness-node or packages/domain-harness Host; NEW separate job-shaped and unrelated-provider adapter fixtures; NEW integration tests in tests/hosts/node or tests/assembly (actual test collection pattern). Minimal targeted exports/generated dist when source TS changes.
+DO NOT overwrite selected K01/K02 or T02 facade new work without a fresh exact write-set coordination comment and single writer; no edits to Product/L2/DAG/standard, no runx or Tally business logic in generic adapter, no direct route from B/S to privileged C effect.
+Before source code, Builder must resolve exact present files and record a serialized accepted DISPATCH_CLAIMED with current v0.10 SHA, concrete write set and review policy. This planning branch alone is NOT execution authorization.

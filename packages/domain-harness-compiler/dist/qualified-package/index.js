@@ -13,3 +13,10 @@ export { buildQualifiedPackage, BuildError } from './build.js';
 // carries no approval; governance attaches it at the protected install.
 export { buildV09QualifiedRoot, V09BuildError } from './v09build/index.js';
 export { assertVendoredParserBytes, assertZeroImportBuildModule, canonicalV9Json, computeV09SealedRootSubjectDigest, computeV9QualifiedRootSubjectDigest, V09_BUNDLER_REVISION, V09_HOST_ABI, V09_IMPORT_POLICY_REVISION, V09_RUNTIME_ABI, V09_SEALED_ROOT_FORMAT, V09_SUBJECT_DOMAIN, V09_BUILD_PARSER_PIN, } from './v09build/index.js';
+// v0.10 T00 (#1166): closed-world Node24 BUILD composition — the once-only
+// static BUILD over one target profile + one K/S/B/C graph with sealed
+// ordinary node/npm/native imports (accepted Product A01 successor of the
+// v0.9 zero-import policy; the v0.9 gate above stays frozen for v0.9), and
+// the trusted-activation counterpart that consumes the built App as plain
+// data without re-attesting static facts.
+export { V10ActivationError, V10AppFacade, V10BuildError, V10DeploymentError, V10PortDeniedError, V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_KEXT_ABI, V10_RUNTIME_ABI, V10_SFEATURE_ABI, V10_TARGET_PROFILE, V10_SELECTED_ROLE_ABI, activateGovernedV10Build, activateV10App, assertSealedImportClosure, buildV10App, canonicalJson, collectModuleEdges, emptyExternalImports, freshV10Counters, readV10DeploymentActivationRecord, readV10OccurrenceBuildPin, sha256Canonical, sha256Hex, v10BuildActivationDecisionDigest, v10BuildPackageClosureDigest, v10DeploymentActivationKey, v10OccurrenceBuildPinKey, } from './v10build/index.js';

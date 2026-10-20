@@ -24,6 +24,7 @@ function fullPorts(): Record<string, unknown> {
       get: async () => null,
       put: async () => ({ revision: 0 }),
       list: async () => [],
+      remove: async () => undefined,
     },
     sha256: { digestUtf8: () => 'ab'.repeat(32) },
     clock: () => '2026-10-12T00:00:00.000Z',

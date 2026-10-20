@@ -1,0 +1,21 @@
+task: T01
+profile: SOURCE_ONLY
+cases:
+  - id: T01-P1
+    assertion: exactly 44 unique historic manifest IDs have one output row each
+    method: source manifest/table comparison
+  - id: T01-P2
+    assertion: selected-v9 witness classification cites actual public route and P/N source or explicit ABSENT
+    method: source path and exact blob inspection
+  - id: T01-P3
+    assertion: semantic/Tool READ/Tool EFFECT/Kernel/BUILD owner mapping is complete and consistent with frozen A01/L2
+    method: source-only scope classification
+  - id: T01-N1
+    assertion: legacy v08 module/test existence is never a selected-v9 public P+N PASS
+    method: negative evidence rules
+  - id: T01-N2
+    assertion: A01 does not reintroduce SDK runtime Package AST/hash/currentness checks
+    method: frozen contract negative
+execution_claim: NOT_RUN
+physical_host_needed: false
+full_regression: release_R01_only

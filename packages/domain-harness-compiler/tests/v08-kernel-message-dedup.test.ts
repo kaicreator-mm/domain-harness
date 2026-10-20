@@ -184,9 +184,13 @@ test('R01-P1 a re-sent messageId on a legal self-loop replays its receipt: zero 
 test('R01-N1 the same messageId under a different intentType refuses typed before admission', async () => {
   const { rt, send } = await harness();
   await send('addItem', 'msg-1', { sku: 'A' });
+  // [v0.10 K02 #1168 splice] The changed-intent conflict is detected by the
+  // same-CAS original-receipt ladder, which answers before the disposition
+  // ladder (its identity is now input-complete, so a changed INPUT refuses
+  // typed as well — see the TEST_MATRIX combined coverage).
   await assert.rejects(send('closeCart', 'msg-1', {}), (error: unknown) => {
     const typed = error as { name?: string; code?: string };
-    return typed.name === 'CentralAdmissionError' && typed.code === 'ADMISSION_TURN_DISPOSITION_CONFLICT';
+    return typed.name === 'CentralAdmissionError' && typed.code === 'K02_TURN_RECEIPT_INTENT_CONFLICT';
   });
   const snapshot = await rt.getSnapshot(TARGET);
   assert.equal(snapshot.stateRevision, 1);
@@ -218,7 +222,12 @@ test('R01-P3 a disposition lost to the crash window is answered by the same-CAS 
   const recovered = await send('addItem', 'msg-1', { sku: 'A' });
   assert.equal(recovered.status, 'admitted');
   assert.equal(recovered.idempotentReplay, true);
-  assert.equal(recovered.turnAdmission.admittedAtStateRevision, 1);
+  // [v0.10 K02 #1168 splice] The replay answers from the same-CAS ORIGINAL
+  // receipt: it carries the EXACT original acknowledged projection (the
+  // stateRevision as it stood at the original admission), never a
+  // pseudo-receipt re-derived from the newest snapshot.
+  assert.ok(String(recovered.turnId).endsWith(':message:msg-1'), 'the replay carries the original turn id');
+  assert.equal(recovered.instance.stateRevision, 1, 'the replay carries the ORIGINAL admitted projection');
   assert.equal(recovered.turnDisposition.status, 'recorded', 'the replay heals the lost disposition');
   assert.equal((await rt.getSnapshot(TARGET)).stateRevision, 1);
   assert.equal(dispatches.length, 1);

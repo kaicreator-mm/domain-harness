@@ -105,6 +105,51 @@ const N06_V09_BUILD_VALUES = [
   'V09BuildError',
 ] as const;
 
+/** v0.10 T00 (#1166): closed-world Node24 BUILD composition (additive group). */
+const T00_V10BUILD_VALUES = [
+  // string consts (8)
+  'V10_BUILD_FORMAT',
+  'V10_BUNDLER_REVISION',
+  'V10_HOST_ABI',
+  'V10_IMPORT_POLICY_REVISION',
+  'V10_KEXT_ABI',
+  'V10_RUNTIME_ABI',
+  'V10_SFEATURE_ABI',
+  'V10_TARGET_PROFILE',
+  // object const (1)
+  'V10_SELECTED_ROLE_ABI',
+  // functions (9)
+  'activateV10App',
+  'assertSealedImportClosure',
+  'buildV10App',
+  'canonicalJson',
+  'collectModuleEdges',
+  'emptyExternalImports',
+  'freshV10Counters',
+  'sha256Canonical',
+  'sha256Hex',
+  // error classes (3)
+  'V10ActivationError',
+  'V10BuildError',
+  'V10PortDeniedError',
+  // facade class (1)
+  'V10AppFacade',
+] as const;
+
+/** v0.10 T08/T10B (#1175/#1179): governed BUILD selection and deployment activation (additive group). */
+const T08_T10B_V10GOVERNED_VALUES = [
+  // functions (7)
+  'activateGovernedV10Build',
+  'readV10DeploymentActivationRecord',
+  'readV10OccurrenceBuildPin',
+  'v10BuildActivationDecisionDigest',
+  'v10BuildPackageClosureDigest',
+  'v10DeploymentActivationKey',
+  'v10OccurrenceBuildPinKey',
+  // error classes (1)
+  'V10DeploymentError',
+] as const;
+
 /** The complete T008C-promised runtime inventory (legacy + additive markers). */
 const COMMITTED_RUNTIME_VALUES = [
   ...LEGACY_RUNTIME_VALUES,
@@ -112,6 +157,8 @@ const COMMITTED_RUNTIME_VALUES = [
   ...TA_QUALIFIED_PACKAGE_VALUES,
   ...HF25_APP_CONTRACT_VALUES,
   ...N06_V09_BUILD_VALUES,
+  ...T00_V10BUILD_VALUES,
+  ...T08_T10B_V10GOVERNED_VALUES,
 ];
 
 const COMMITTED_RUNTIME_SORTED = [...COMMITTED_RUNTIME_VALUES].sort((left, right) =>
@@ -129,9 +176,20 @@ const STRING_CONST_NAMES = new Set<string>([
   'V09_RUNTIME_ABI',
   'V09_HOST_ABI',
   'V09_BUNDLER_REVISION',
+  // v0.10 T00 string constants
+  'V10_BUILD_FORMAT',
+  'V10_BUNDLER_REVISION',
+  'V10_HOST_ABI',
+  'V10_IMPORT_POLICY_REVISION',
+  'V10_KEXT_ABI',
+  'V10_RUNTIME_ABI',
+  'V10_SFEATURE_ABI',
+  'V10_TARGET_PROFILE',
 ]);
-const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE']);
+const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_SELECTED_ROLE_ABI']);
 const PARSER_PIN_CONST_NAMES = new Set<string>(['V09_BUILD_PARSER_PIN']);
+/** Non-error public classes (constructors that are not Error subclasses). */
+const PLAIN_CLASS_NAMES = new Set<string>(['V10AppFacade']);
 const FUNCTION_NAMES = new Set<string>([
   'loadRawDomainPackage',
   'compileDomainPackage',
@@ -153,6 +211,24 @@ const FUNCTION_NAMES = new Set<string>([
   'canonicalV9Json',
   'computeV09SealedRootSubjectDigest',
   'computeV9QualifiedRootSubjectDigest',
+  // v0.10 T00 functions
+  'activateV10App',
+  'assertSealedImportClosure',
+  'buildV10App',
+  'canonicalJson',
+  'collectModuleEdges',
+  'emptyExternalImports',
+  'freshV10Counters',
+  'sha256Canonical',
+  'sha256Hex',
+  // v0.10 T08/T10B functions
+  'activateGovernedV10Build',
+  'readV10DeploymentActivationRecord',
+  'readV10OccurrenceBuildPin',
+  'v10BuildActivationDecisionDigest',
+  'v10BuildPackageClosureDigest',
+  'v10DeploymentActivationKey',
+  'v10OccurrenceBuildPinKey',
 ]);
 const ERROR_CLASS_NAMES = new Set<string>([
   'SemanticDecisionCompileError',
@@ -166,6 +242,12 @@ const ERROR_CLASS_NAMES = new Set<string>([
   'QualificationError',
   'AppContractGenerationError',
   'V09BuildError',
+  // v0.10 T00 error classes
+  'V10ActivationError',
+  'V10BuildError',
+  'V10PortDeniedError',
+  // v0.10 T10B error classes
+  'V10DeploymentError',
 ]);
 
 /** The exactly-15 successor `/v7` runtime names owned by the core package. */
@@ -265,6 +347,10 @@ test('T008C: every committed runtime binding has the promised kind', () => {
     }
     if (FUNCTION_NAMES.has(name!)) {
       assert.equal(typeof value, 'function', `${name} must be a function`);
+      continue;
+    }
+    if (PLAIN_CLASS_NAMES.has(name!)) {
+      assert.equal(typeof value, 'function', `${name} must be a class constructor`);
       continue;
     }
     if (ERROR_CLASS_NAMES.has(name!)) {

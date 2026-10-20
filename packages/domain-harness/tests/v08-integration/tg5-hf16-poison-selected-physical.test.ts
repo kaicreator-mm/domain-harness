@@ -6,7 +6,11 @@
  * The R3 witness composed the LEGACY PoisonMessageRecoveryCoordinator +
  * MailboxDrainScheduler over the shared deterministic store fake — useful,
  * but not the selected v0.8 K path. This file proves what the selected
- * Kernel physically guarantees today:
+ * Kernel physically guarantees today, under the R2 P1 attestation contract
+ * (review #6258041474: an error CODE thrown by a resource adapter proves
+ * nothing — the physical mutation may have landed before the throw; ONLY the
+ * trusted host dispatcher's own pre-handler refusal, attested on a
+ * kernel-minted per-call object, is zero-external-effect proof):
  *
  *   HF16-N (executed here, physical):
  *     - a failing effect is DURABLY recorded as 'failed' (poison) and the
@@ -15,17 +19,23 @@
  *       ADMISSION_EFFECT_FAILED ("operator recovery owns any retry") with
  *       ZERO double dispatch — in the live host AND after a genuine
  *       fresh-process reopen of the same physical SQLite store;
- *     - an unresolved poison never yields illicit/double effects;
- *     - followers on the same instance still process IN ORDER (the drain
- *       ordering the selected architecture actually provides).
+ *     - the DRAIN journey rides a TRUSTED DISPATCHER refusal seam: with the
+ *       resource key unprovisioned, the dispatcher refuses pre-handler
+ *       (HOST_RESOURCE_UNKNOWN), marks the kernel-minted attestation, the
+ *       failed turn PROVABLY released its admission fence and a follower
+ *       occurrence drains in order;
+ *     - the UNCERTAIN legs keep the fence held (fail-closed): an
+ *       adapter-thrown HOST_RESOURCE_PRE_DISPATCH — the historical
+ *       adapter-declared "zero-effect" class — is no longer proof, and a
+ *       competing occurrence is refused typed at the held fence;
+ *     - physical dispatch accounting is the DISPATCHER-side call ledger
+ *       (ResourceDispatcher.callCount), which observes refused pre-handler
+ *       dispatches an adapter-side counter can never see.
  *
  *   HF16-P gap (NOT claimed): the frozen positive — "verified
  *   Business/DAC-authorized poison recovery then K drains ordered queue" —
- *   has NO wired seam in the selected runtime: the kernel payload accepts
- *   a 'recovery' turn-source id shape but the trusted Host seam explicitly
- *   refuses it ("no recovery source is wired",
- *   kernel-mechanism-v1.mjs strictTurnSource). Authorized recovery is a
- *   reported minimal-fix gap, not a test artifact.
+ *   is proven in hf16-authorized-recovery-physical.test.ts (the trusted
+ *   recovery turnSource supersedes a durably-all-failed holder).
  */
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,13 +43,15 @@ import { rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootstrapTrustedHost, createKernelGateway } from '../../src/host-v8/index.js';
+import { bootstrapTrustedHost, createKernelGateway, HostBoundaryError } from '../../src/host-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sealRealApp, sqliteTempPath } from './helpers.js';
 
 const AUDIENCE = 'dh-tg5-hf16';
 const TENANT = 't1';
 const APP_ID = 'order-approval';
+const WORKFLOW_KEY = 'order-quote';
 const JOURNAL_PREFIX = 'v08-kernel:effect-journal:';
+const fenceDocKey = (instanceKey: string) => `v08-kernel:admission-fence:${WORKFLOW_KEY}:${TENANT}:${APP_ID}:${instanceKey}`;
 
 const sqlitePath = sqliteTempPath('tg5-hf16');
 const handle = await bootstrapTrustedHost({
@@ -47,16 +59,29 @@ const handle = await bootstrapTrustedHost({
   audience: AUDIENCE,
   storage: { path: sqlitePath },
 });
-const dispatches: string[] = [];
-handle.host.resources.provision('ledger', (_operation: string, payload: unknown) => {
+
+// The adapter's OWN dispatch log (only calls that reached a resource handler)
+// and the DISPATCHER's physical call ledger (every accounted dispatch,
+// including pre-handler refusals no handler ever saw).
+const adapterDispatches: string[] = [];
+const physicalDispatchCount = (): number => handle.host.resources.callCount();
+const ledgerAdapter = (_operation: string, payload: unknown): unknown => {
   const record = payload as { requestId?: unknown };
   const requestId = String(record?.requestId ?? '?');
-  dispatches.push(requestId);
+  adapterDispatches.push(requestId);
   if (requestId.startsWith('POISON')) {
-    throw new Error(`physical ledger outage for ${requestId}`);
+    // [#1108 K01 R2 P1] The adapter STILL declares the truthful class it
+    // declared under R1 (an outage that never reached the ledger) — but an
+    // adapter-thrown code is NO LONGER zero-effect proof: any post-mutation
+    // throw could carry the same name as an honest collision. The failed
+    // turn keeps its admission fence held; this leg is the physical
+    // materialization of the new fail-closed semantics.
+    throw new HostBoundaryError('HOST_RESOURCE_PRE_DISPATCH', `physical ledger outage for ${requestId}`);
   }
   return { reserved: true, ledgerEntryId: `ledger:${requestId}` };
-});
+};
+const provisionLedger = (): void => { handle.host.resources.provision('ledger', ledgerAdapter); };
+provisionLedger();
 const gateway = createKernelGateway({ host: handle.host, gatewaySessionCap: handle.gatewaySessionCap });
 await gateway.registerApp({ appId: APP_ID, packageRoot: await sealRealApp('approval'), genesisRoles: ['platform-operator'], authorityClass: 'PRODUCTION' });
 
@@ -78,10 +103,12 @@ after(async () => {
   await rm(sqlitePath, { force: true });
 });
 
-test('HF16-N poison is durably recorded, retried zero-double, followers drain in order, and the refusal survives a real fresh-process reopen', { timeout: 300_000 }, async () => {
+test('HF16-N poison is durably recorded, retried zero-double, the attested dispatcher refusal releases the fence for the follower drain, and the refusal survives a real fresh-process reopen', { timeout: 300_000 }, async () => {
   await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: 'q-poison' });
 
-  // ---- 1. the poisoning message: typed failure + durable failed row + no commit
+  // ---- 1. the poisoning message: typed failure + durable failed row + no
+  // commit + FENCE HELD (R2 P1: an adapter-thrown PRE_DISPATCH code is not
+  // zero-effect proof — fail-closed).
   await assert.rejects(
     () => send('m-poison-1', { amount: 30, requestId: 'POISON-1' }, 'q-poison'),
     (error: unknown) => {
@@ -95,11 +122,13 @@ test('HF16-N poison is durably recorded, retried zero-double, followers drain in
   assert.ok(poisonRow !== undefined);
   assert.equal(poisonRow.status, 'failed', 'the poison outcome is DURABLY recorded');
   assert.deepEqual((poisonRow.error as { message: string }).message, 'physical ledger outage for POISON-1');
+  assert.notEqual((poisonRow.error as { zeroExternalEffect?: unknown }).zeroExternalEffect, true, 'an adapter-thrown code carries NO zero-external-effect proof (R2 P1)');
   let snapshot = await gateway.queryInstance(requester, target('q-poison')) as { stateRevision: number; state: { stateKey: string }; lifecycle: string };
   assert.equal(snapshot.stateRevision, 0, 'the poisoned turn committed nothing');
   assert.equal(snapshot.state.stateKey, 'review');
   assert.equal(snapshot.lifecycle, 'active');
-  assert.equal(dispatches.filter((id) => id === 'POISON-1').length, 1, 'exactly one physical dispatch');
+  assert.equal(adapterDispatches.filter((id) => id === 'POISON-1').length, 1, 'exactly one physical dispatch reached the adapter');
+  assert.notEqual(await handle.host.docs.get(fenceDocKey('q-poison')), null, 'the fence stays held (fail-closed without a trusted attestation)');
 
   // ---- 2. re-send the same messageId: typed refusal, zero double effect
   await assert.rejects(
@@ -109,20 +138,36 @@ test('HF16-N poison is durably recorded, retried zero-double, followers drain in
       return typed.code === 'ADMISSION_EFFECT_FAILED' && String(typed.message).includes('operator recovery owns any retry');
     },
   );
-  assert.equal(dispatches.filter((id) => id === 'POISON-1').length, 1, 'the retry dispatched nothing new');
+  assert.equal(adapterDispatches.filter((id) => id === 'POISON-1').length, 1, 'the retry dispatched nothing new');
   assert.equal((await journalRows()).length, 1, 'the retry wrote no second journal row');
 
-  // ---- 3. follower ordering on a SECOND instance: poison first, then the
-  // follower message on the SAME instance drains and commits. The poisoned
+  // ---- 3. follower ordering on a SECOND instance, through the TRUSTED
+  // DISPATCHER refusal seam (R2 P1): with 'ledger' unprovisioned the
+  // dispatcher refuses pre-handler (HOST_RESOURCE_UNKNOWN), marks the
+  // kernel-minted attestation, and the failed turn PROVABLY releases its
+  // fence — so the follower occurrence drains and commits. The poisoned
   // instance q-poison itself stays in 'review' so the reopen leg below can
   // witness the poison refusal on a state where the transition still admits.
   await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: 'q-drain' });
+  handle.host.resources.unprovision('ledger');
+  const beforeRefusedDispatch = physicalDispatchCount();
   await assert.rejects(
     () => send('m-drain-1', { amount: 30, requestId: 'POISON-DRAIN' }, 'q-drain'),
-    (error: unknown) => (error as { code?: string }).code === 'ADMISSION_EFFECT_FAILED',
+    (error: unknown) => {
+      const typed = error as { code?: string; message?: string };
+      return typed.code === 'ADMISSION_EFFECT_FAILED' && String(typed.message).includes('is not provisioned on this host');
+    },
   );
+  assert.equal(physicalDispatchCount() - beforeRefusedDispatch, 1, 'the dispatcher accounted the refused dispatch (pre-handler, physically observed)');
+  assert.equal(adapterDispatches.filter((id) => id === 'POISON-DRAIN').length, 0, 'the pre-handler refusal never reached any resource handler');
+  const drainRow = (await journalRows()).find((row) => row.idempotencyKey === 'reserve:quote:POISON-DRAIN');
+  assert.ok(drainRow !== undefined);
+  assert.equal(drainRow.status, 'failed');
+  assert.equal((drainRow.error as { zeroExternalEffect?: unknown }).zeroExternalEffect, true, 'the attested dispatcher pre-handler refusal IS the durable zero-effect proof');
+  assert.equal(await handle.host.docs.get(fenceDocKey('q-drain')), null, 'the attested refusal released the fence');
+  provisionLedger();
   const follower = await send('m-follow-1', { amount: 30, requestId: 'FOLLOW-1' }, 'q-drain') as { status: string };
-  assert.equal(follower.status, 'admitted', 'the follower occurrence drains after the poisoned one');
+  assert.equal(follower.status, 'admitted', 'the follower occurrence drains after the attested-poisoned one');
   rows = await journalRows();
   assert.equal(rows.length, 3, 'two failed poison rows + one completed follower row');
   assert.equal(rows.filter((row) => row.status === 'failed').length, 2);
@@ -134,7 +179,30 @@ test('HF16-N poison is durably recorded, retried zero-double, followers drain in
   assert.equal(poisoned.stateRevision, 0, 'the poisoned instance committed nothing');
   assert.equal(poisoned.state.stateKey, 'review');
 
-  // ---- 4. genuine fresh-process reopen: the poison refusal survives restart
+  // ---- 4. the R2 P1 fail-closed leg: an adapter INVOKED and THEN throwing
+  // HOST_RESOURCE_PRE_DISPATCH keeps the fence held — a follower occurrence
+  // (different messageId, same stateRevision) is refused typed before any
+  // journal or effect activity.
+  await gateway.activateGenesis(operator, { appId: APP_ID, instanceKey: 'q-uncertain' });
+  await assert.rejects(
+    () => send('m-keep-1', { amount: 30, requestId: 'POISON-KEEP' }, 'q-uncertain'),
+    (error: unknown) => {
+      const typed = error as { code?: string; message?: string };
+      return typed.code === 'ADMISSION_EFFECT_FAILED' && String(typed.message).includes('physical ledger outage');
+    },
+  );
+  assert.notEqual(await handle.host.docs.get(fenceDocKey('q-uncertain')), null, 'the adapter-thrown code keeps the fence held (fail-closed)');
+  await assert.rejects(
+    () => send('m-keep-2', { amount: 30, requestId: 'FOLLOW-KEEP' }, 'q-uncertain'),
+    (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
+  );
+  assert.equal(adapterDispatches.filter((id) => id === 'FOLLOW-KEEP').length, 0, 'the follower dispatched nothing (refused at the held fence)');
+  assert.equal((await journalRows()).length, 4, 'the refused follower wrote no journal row');
+  const uncertain = await gateway.queryInstance(requester, target('q-uncertain')) as { stateRevision: number; state: { stateKey: string } };
+  assert.equal(uncertain.stateRevision, 0, 'neither the poisoned turn nor the refused follower committed anything');
+  assert.equal(uncertain.state.stateKey, 'review');
+
+  // ---- 5. genuine fresh-process reopen: the poison refusal survives restart
   closed = true;
   await handle.host.close();
   const child = spawn(process.execPath, [
