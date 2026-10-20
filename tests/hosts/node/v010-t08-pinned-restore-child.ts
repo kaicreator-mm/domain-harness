@@ -112,7 +112,7 @@ async function main(): Promise<void> {
       oldReplayCoreDigest = t08ReceiptCoreDigest(replay);
       oldPinSubjectDigest = (await restoredA.readPin(T08_OLD_INTENT))?.subjectDigest;
       const oldRow = instanceRowOf(
-        readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+        readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
       );
       oldInstanceRowHash = oldRow === undefined ? 'MISSING' : t08HashText(oldRow.value);
       newPinSubjectDigest = (await restoredA.readPin(T08_NEW_INTENT))?.subjectDigest;
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
     }));
 
     const finalRow = instanceRowOf(
-      readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+      readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
     );
     result = {
       ok: true,

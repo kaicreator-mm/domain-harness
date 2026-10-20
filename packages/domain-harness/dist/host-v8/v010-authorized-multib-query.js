@@ -98,40 +98,31 @@ export class V10AuthorizedMultiBQuery {
             reject('QUERY_AUTHORIZATION_UNAVAILABLE', 'cannot verify scoped query authorization');
         }
     }
-    async query(selector) {
-        if (!selector || typeof selector !== 'object' || Array.isArray(selector)) {
-            reject('QUERY_SELECTOR_INVALID', 'query requires an explicit workflow and instance');
-        }
-        const workflowId = ident(selector.workflowId, 'workflowId');
-        const instanceKey = ident(selector.instanceKey, 'instanceKey');
-        const businessPackageId = selector.businessPackageId === undefined
-            ? undefined : ident(selector.businessPackageId, 'businessPackageId');
-        // All candidates are BUILD-selected identities. No physical K lookups
-        // happen during enumeration, and unselected B identities are invisible.
+    /**
+     * Single authorization + read path used by query and queryMany. Re-verify
+     * authorization immediately before the only physical read; only visible
+     * selected identities participate in ambiguity.
+     */
+    async #resolveOne(selector) {
         const visible = [];
         for (const route of this.#routes) {
-            if (route.workflowId !== workflowId
-                || (businessPackageId !== undefined && route.businessPackageId !== businessPackageId))
+            if (route.workflowId !== selector.workflowId
+                || (selector.businessPackageId !== undefined && route.businessPackageId !== selector.businessPackageId))
                 continue;
             const target = Object.freeze({
                 ...this.#host.deployment,
                 businessPackageId: route.businessPackageId,
-                workflowId,
-                instanceKey,
+                workflowId: selector.workflowId,
+                instanceKey: selector.instanceKey,
             });
             if (await this.#authorized(target))
                 visible.push(target);
         }
-        // Denied/unselected/absent all collapse into one non-oracle result.
         if (visible.length === 0)
             reject('QUERY_NOT_FOUND', 'no visible query target');
-        // Ambiguity is determined by VISIBLE candidates only, never by storage
-        // existence or the number of hidden/denied Business identities.
         if (visible.length !== 1)
             reject('QUERY_AMBIGUOUS', 'multiple visible Business targets; specify businessPackageId');
         const target = visible[0];
-        // Recheck authorization immediately before the only physical read; a
-        // capability revoked during prior selection must not yield a snapshot.
         if (!await this.#authorized(target))
             reject('QUERY_NOT_FOUND', 'no visible query target');
         let snapshot;
@@ -145,6 +136,16 @@ export class V10AuthorizedMultiBQuery {
             reject('QUERY_NOT_FOUND', 'no visible query target');
         }
         return { target, snapshot };
+    }
+    async query(selector) {
+        if (!selector || typeof selector !== 'object' || Array.isArray(selector)) {
+            reject('QUERY_SELECTOR_INVALID', 'query requires an explicit workflow and instance');
+        }
+        const workflowId = ident(selector.workflowId, 'workflowId');
+        const instanceKey = ident(selector.instanceKey, 'instanceKey');
+        const businessPackageId = selector.businessPackageId === undefined
+            ? undefined : ident(selector.businessPackageId, 'businessPackageId');
+        return await this.#resolveOne(businessPackageId === undefined ? { workflowId, instanceKey } : { workflowId, instanceKey, businessPackageId });
     }
     /**
      * Explicit multi-target variant: every requested selector is authorized and
@@ -171,60 +172,19 @@ export class V10AuthorizedMultiBQuery {
     async #queryManyOne(raw, index) {
         const selector = manySelector(raw);
         if (selector === null) {
-            // One generic message for every malformed field: the refusal itself
-            // must not become a shape oracle.
             return refused(index, 'QUERY_SELECTOR_INVALID', 'query selector is invalid');
         }
-        // All candidates are BUILD-selected identities; no physical K lookup
-        // happens during enumeration, and unselected B identities are invisible.
-        const visible = [];
-        for (const route of this.#routes) {
-            if (route.workflowId !== selector.workflowId
-                || (selector.businessPackageId !== undefined && route.businessPackageId !== selector.businessPackageId))
-                continue;
-            const target = Object.freeze({
-                ...this.#host.deployment,
-                businessPackageId: route.businessPackageId,
-                workflowId: selector.workflowId,
-                instanceKey: selector.instanceKey,
-            });
-            let authorized;
-            try {
-                authorized = await this.#authorized(target);
-            }
-            catch {
-                return refused(index, 'QUERY_AUTHORIZATION_UNAVAILABLE', 'cannot verify scoped query authorization');
-            }
-            if (authorized)
-                visible.push(target);
-        }
-        // Denied/unselected/absent all collapse into one non-oracle result for
-        // THIS entry only.
-        if (visible.length === 0)
-            return refused(index, 'QUERY_NOT_FOUND', 'no visible query target');
-        if (visible.length !== 1) {
-            return refused(index, 'QUERY_AMBIGUOUS', 'multiple visible Business targets; specify businessPackageId');
-        }
-        const target = visible[0];
-        // Recheck authorization immediately before this entry's only read.
         try {
-            if (!await this.#authorized(target))
-                return refused(index, 'QUERY_NOT_FOUND', 'no visible query target');
+            const { target, snapshot } = await this.#resolveOne(selector);
+            return Object.freeze({ status: 'answered', index, target, snapshot });
         }
-        catch {
-            return refused(index, 'QUERY_AUTHORIZATION_UNAVAILABLE', 'cannot verify scoped query authorization');
-        }
-        let snapshot;
-        try {
-            snapshot = await this.#host.readSnapshot(target);
-        }
-        catch {
+        catch (error) {
+            if (error instanceof V10MultiBQueryError) {
+                return refused(index, error.code, error.message);
+            }
+            // Never expose unknown infrastructure details from this entry.
             return refused(index, 'QUERY_READ_FAILED', 'the scoped snapshot reader failed');
         }
-        if (snapshot === null || snapshot === undefined) {
-            return refused(index, 'QUERY_NOT_FOUND', 'no visible query target');
-        }
-        return Object.freeze({ status: 'answered', index, target, snapshot });
     }
 }
 export function createV10AuthorizedMultiBQuery(host) {

@@ -85,6 +85,41 @@ test('P-ACT-BASIC-LIFECYCLE: sealed modules load/connect/execute/dispose; one ad
   assert.deepEqual(evalLog(), []);
 });
 
+test('P-I1217: stable deployedAppId preserves K02 physical records across BUILD revisions', async () => {
+  const originalComposition = await basicComposition();
+  const firstApp = buildV10App(originalComposition);
+  const successorApp = buildV10App({ ...originalComposition, buildId: 't00-basic-successor' });
+  assert.notEqual(firstApp.subjectDigest, successorApp.subjectDigest,
+    'regression must span two actual distinct BUILD digests');
+  const store = new PlainCasDocStore();
+  const deploymentIdentity = {
+    deployedAppId: 'deployment:v010-stable', tenantId: TENANT, appId: firstApp.appId,
+  };
+  const queryAuthority = { principal: { role: 'reader' }, authorize: () => true };
+  const first = await activateV10App(firstApp, {
+    store, deploymentIdentity, now: tickingClock().now, queryAuthority,
+  });
+  const receipt = await first.facade.send({ ...INTENT });
+  assert.equal(receipt.status, 'admitted');
+  const originalPrefixes = first.facade.selectedShadowBinding.k02DocumentPrefixes;
+  first.dispose();
+
+  const second = await activateV10App(successorApp, {
+    store, deploymentIdentity, now: tickingClock().now, queryAuthority,
+  });
+  assert.deepEqual(second.facade.selectedShadowBinding.k02DocumentPrefixes, originalPrefixes,
+    'shadow and K docs physical prefixes must be stable across BUILD digests');
+  const target = second.facade.resolveIntentTarget(INTENT.intentType);
+  const snapshot = await second.facade.queryScopedSnapshot({
+    businessPackageId: target.businessPackageId,
+    workflowId: target.workflowId,
+    instanceKey: INTENT.instanceKey,
+  });
+  assert.equal(snapshot.target.instanceKey, INTENT.instanceKey);
+  assert.ok(snapshot.snapshot !== null, 'a successor BUILD must not misreport the pinned predecessor as NOT_FOUND');
+  second.dispose();
+});
+
 test('P-ACT-BASIC-SKIPS-ADVANCED: absent optional advisory modules are skipped, advanced bytes never evaluated', async () => {
   clearEvalLog();
   const optionalAbsent = await extensionEntry({ fixture: 'kext-eval-sentinel.mjs', hookExport: 'observeSentinel', optional: true, bytesOnly: true });
@@ -331,6 +366,27 @@ test('N-ACT-FORGED-INIT-RETURN: authority-shaped init data refuses typed with re
   const initialized = counters.initCalls.filter((packageId) => packageId !== forged.packageId);
   const disposable = new Set(['sfeature-validation@v010.1.0.0', 'sfeature-formatting@v010.1.0.0', 'kext-advisory-alpha@v010.1.0.0']);
   assert.deepEqual(disposalLog(), [...initialized].reverse().filter((packageId) => disposable.has(packageId)));
+});
+
+test('N-ACT-ASYNC-INIT-RETURN: non-plain Promise rejects typed and disposes previously initialized advisories', async () => {
+  clearDisposalLog();
+  const asyncReturn = await extensionEntry({ fixture: 'kext-init-async-return.mjs', hookExport: 'observeAsyncReturn' });
+  const options = await richComposition();
+  const app = buildV10App({ ...options, appId: 'app:v010-t00-async-init', modules: [...options.modules, asyncReturn] });
+  const counters = freshV10Counters();
+  const store = new PlainCasDocStore();
+  await assert.rejects(
+    activateV10App(app, { store, tenantId: TENANT, now: tickingClock().now, counters }),
+    (error: unknown) => activationCode(error) === 'V10_INIT_CONTRACT_REFUSED',
+  );
+  const failing = asyncReturn.packageId as string;
+  const previouslyInitialized = counters.initCalls.filter((id) => id !== failing);
+  assert.ok(previouslyInitialized.length > 0, 'must exercise reverse disposal after prior successful init');
+  assert.equal(counters.initFailures.length, 1, 'contract rejection is recorded as an init failure');
+  assert.equal(counters.initFailures[0]?.packageId, failing);
+  const disposable = new Set(['sfeature-validation@v010.1.0.0', 'sfeature-formatting@v010.1.0.0', 'kext-advisory-alpha@v010.1.0.0']);
+  assert.deepEqual(disposalLog(), [...previouslyInitialized].reverse().filter((id) => disposable.has(id)));
+  assert.equal(store.size(), 0, 'late init refusal cannot write K documents');
 });
 
 test('N-ACT-PORT-PROBE-DENIED: probing a protected K port denies-and-records, activation fails closed', async () => {

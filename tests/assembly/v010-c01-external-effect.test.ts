@@ -667,6 +667,43 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
       (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_SCOPE'); return true; },
     );
 
+    // #1223: even a live permit, started journal and held fence cannot
+    // dispatch without the exact K-owned attempt claim at its sealed address.
+    const liveKeys = {
+      permit: `v08-kernel:effect-permit:${liveEffectId}`,
+      journal: `v08-kernel:effect-journal:${liveEffectId}`,
+      fence: 'v08-kernel:admission-fence:external-jobs:instance:synthetic',
+      dispatchClaim: `v08-kernel:effect-dispatch-claim:${liveEffectId}/attempt/1`,
+    };
+    await docs.put(liveKeys.journal, {
+      record: { effectId: liveEffectId, status: 'started' },
+    }, { mustBeAbsent: true });
+    await docs.put(liveKeys.fence, { turnId: 'turn:synthetic' }, { mustBeAbsent: true });
+    const liveRequest = {
+      capabilityId: 'extjob', operationId: 'job.submit',
+      payload: { requestId: 'R-CLAIM-NEGATIVE' },
+      attest: { effectPermit: {
+        effectId: liveEffectId, durableControlTurnId: 'turn:synthetic',
+        businessPackageId: BUSINESS_ID, keys: liveKeys,
+      } },
+      invoke,
+    };
+    const gateDocs = { get: async (_bp: string, key: string) => await docs.get(key) };
+    await assert.rejects(
+      dispatchThroughExternalEffectGate({ docs: gateDocs, nowIso: () => new Date(clock.now()).toISOString() }, liveRequest),
+      (error: unknown) => (error as { code?: string }).code === 'V10_EFFECT_DISPATCH_CLAIM_INVALID',
+      'a missing dispatch claim must prevent physical adapter call',
+    );
+    await docs.put(liveKeys.dispatchClaim, {
+      effectId: liveEffectId, durableControlTurnId: 'turn:synthetic',
+      businessPackageId: BUSINESS_ID, attempt: 2, claimedAt: new Date(clock.now()).toISOString(),
+    }, { mustBeAbsent: true });
+    await assert.rejects(
+      dispatchThroughExternalEffectGate({ docs: gateDocs, nowIso: () => new Date(clock.now()).toISOString() }, liveRequest),
+      (error: unknown) => (error as { code?: string }).code === 'V10_EFFECT_DISPATCH_CLAIM_INVALID',
+      'a dispatch claim belonging to a different attempt must prevent adapter call',
+    );
+
     assert.equal(invoked, 0, 'the invoker never ran');
   } finally {
     clearPins();
