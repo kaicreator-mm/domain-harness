@@ -4,8 +4,10 @@
 red (5 deterministic failures) and the T11 clean-packed Tiny/Rich gate passed only
 2 of 3 official runs. The K01 same-turn repair removed the R1 zero-winner symptom
 in every passing run, but the merged repair did not re-baseline the repository's
-frozen selected-kernel witnesses and one direct-engine replay test. No
-`v0.10 → main` merge, tag or release is authorised.**
+frozen selected-kernel witnesses and one direct-engine replay test. The Source/DAG
+frozen-input gate and the independent Hidden gate (pack rev 2, 31/31 × 2) PASS at
+this exact candidate; they do not waive the red gates. No `v0.10 → main` merge,
+tag or release is authorised.**
 
 | Field | Value |
 |---|---|
@@ -16,6 +18,7 @@ frozen selected-kernel witnesses and one direct-engine replay test. No
 | R2 run head | `32812b5afee523f9b1df168777bc56f5b25b3f5d` (evidence tree `5b62907c0a007b668388d4212df12586dc4e49fb`) |
 | Evidence-head delta vs candidate | `.agent/execution/v0.10-R01/**` and `docs/validation/v0.10/**` only; `git diff --quiet 7cbfaf5a..HEAD -- packages examples scripts tests package-lock.json` = 0 |
 | Implementation scope | 16/16 (14 P0 + T09 #1178 + T10B #1179), K01 repair #1205 / PR #1206 merged at the candidate |
+| Independently reviewed K01 repair head | `828966e4c2520eb698cf939b66a3ff325d7f9217` (PR #1206) |
 | Previous candidate (archived, not transferred) | `dcf4b31306e1a33b85782ada0507f7b53aee3b0f` — [R01_PRE_K01_REPAIR_CANDIDATE_dcf4b313.md](./R01_PRE_K01_REPAIR_CANDIDATE_dcf4b313.md) |
 | Host | Windows 11 (10.0.26300) x64, Git Bash/MSYS, LOCAL_AGENT |
 | Runtime | Node `v24.21.0`, npm `11.19.0`, Node ABI `137` |
@@ -29,7 +32,8 @@ frozen selected-kernel witnesses and one direct-engine replay test. No
 | T10B queryMany | **PASS** — 8 assertions, 0 fail (included in the 84) |
 | Security negatives | **FAIL** — 59-assertion suite: 56 pass, 1 test fail + 1 file abort (2 tests not run) |
 | Fresh Tiny/Rich clean-pack consumers | **FAIL** — official 3/3 requirement; run1 PASS, run2 FAIL, run3 PASS (2/3); 2 extra diagnostic runs PASS (4/5 total) |
-| Hidden Validation R2 | **NOT_RUN by this agent** — private [hidden-validation #66](https://github.com/kaicreator-mm/hidden-validation/issues/66) is open with no result comment yet |
+| Hidden Validation R2 | **PASS** — private pack `DH010-HIDDEN-FP-1181-01` rev 2, 31/31 × 2 clean-room runs at the exact candidate; private [hidden-validation #66](https://github.com/kaicreator-mm/hidden-validation/issues/66) CLOSED, pack commit `48467d119255a4afdd8f6dc962fcd10ca540925d` (§4) |
+| Source/DAG frozen inputs | **PASS** — direct exact-SHA readback; five frozen blobs match, 16/16 implementation issues CLOSED `state:done` (§3) |
 | Independent R01 review at R2 | **NOT_RUN** — this report is builder evidence, not an approval |
 | P0 / P1 / P2 | 0 / **2** / 4 |
 | `RELEASE_QUALIFIED` | **NO** |
@@ -61,28 +65,54 @@ transport only and was not used as an identity gate.
 ## 2. Gate results at the exact candidate
 
 All commands executed at worktree HEAD `32812b5a` with the candidate diff at zero.
-Raw logs are retained at `C:\xDev\kAiCreator\_tmp\r01-final-r2-20261020\`; §7
+Raw logs are retained at `C:\xDev\kAiCreator\_tmp\r01-final-r2-20261020\`; §9
 binds every quoted result to its SHA256. The R1 log directory
 `C:\xDev\kAiCreator\_tmp\r01-final-20261020\` was not modified.
 
 | Gate | Command | Exit | Observed result |
 |---|---|---|---|
+| Source/DAG frozen-input readback | GitHub exact-SHA API readback | — | **PASS** — five frozen blobs MATCH; 16/16 implementation issues CLOSED `state:done` (§3) |
+| Hidden Validation rev 2 (private pack) | private clean-room runner ×2 | 0 / 0 | **31/31 PASS ×2** at the exact candidate (§4) |
 | Build + committed-dist freshness | `npm run build` | 0 | all workspaces built; `check-committed-dist: shipped dist trees present, tracked and fresh` |
 | Lint | `npm run lint` | 0 | 0 errors, 1 pre-existing unused-disable warning in `t012r/consumer-src/fixture-toolplane.mjs` |
 | Typecheck | `npm run typecheck` | 0 | all workspace `tsc --noEmit` clean |
-| Full regression | `npm test` | **1** | **5 deterministic failures** — see §3. Main 3313 (3309 pass / 4 fail), compiler 430 (429 pass / 1 fail), node 227 (227 pass / 0 fail). The `&&` chain did not reach `test:root`; it was run separately. |
+| Full regression | `npm test` | **1** | **5 deterministic failures** — see §5. Main 3313 (3309 pass / 4 fail), compiler 430 (429 pass / 1 fail), node 227 (227 pass / 0 fail). The `&&` chain did not reach `test:root`; it was run separately. |
 | Root suite (separate) | `npm run test:root` | 0 | 244 pass + 9 pass, 0 fail, 0 skip |
-| Critical journeys (12 files) | per-file `node --import tsx --test` | 0 | **84 assertions, 0 fail** (K01 increased from 8 to 10; §5) |
+| Critical journeys (12 files) | per-file `node --import tsx --test` | 0 | **84 assertions, 0 fail** (K01 increased from 8 to 10; §7) |
 | T09 Meta Feedback (3 files) | per-file `node --import tsx --test` | 0 | **15 assertions, 0 fail**, including the clean packed compiler consumer |
 | T10B queryMany (1 file) | `node --import tsx --test` | 0 | **8 assertions, 0 fail** (also part of the 84) |
-| Security negatives (7 files) | per-file `node --import tsx --test` | **1** | **56 pass, 1 test fail + 1 file abort (2 tests not run)**; see §5 |
-| Fresh Tiny/Rich clean packed consumers | `node --import tsx --test tests/integration/v010-clean-consumers/clean-consumers.test.ts` ×3 official runs | 0 / **1** / 0 | **2/3 PASS**; run2 failed at the losing-writer typed assertion (§4) |
+| Security negatives (7 files) | per-file `node --import tsx --test` | **1** | **56 pass, 1 test fail + 1 file abort (2 tests not run)**; see §7 |
+| Fresh Tiny/Rich clean packed consumers | `node --import tsx --test tests/integration/v010-clean-consumers/clean-consumers.test.ts` ×3 official runs | 0 / **1** / 0 | **2/3 PASS**; run2 failed at the losing-writer typed assertion (§6) |
 | Extra diagnostic Tiny/Rich runs (not the official gate) | same command ×2 | 0 / 0 | both PASS; total 4/5 runs PASS |
 
 Every gate log begins with `node -v` (v24.21.0) or is covered by `env.txt`; the
 focused per-file logs use the same Node binary resolved on `PATH`.
 
-## 3. Full-regression failures — deterministic, release-blocking
+## 3. Source/DAG gate — direct exact-candidate PASS
+
+Direct readback of GitHub contents at the exact `v0.10@7cbfaf5a` candidate verified frozen input blob identities:
+
+| Frozen source file | Exact Git blob | Result |
+|---|---|---|
+| `docs/implementation/DomainHarness_v0.10_TASK_DAG_FREEZE_CANDIDATE.md` | `f375bb0acd1099da76f0849a1929ad11831b12f7` | MATCH |
+| `docs/product/DomainHarness_v0.10_PRD_CANDIDATE.md` | `673da42ad90acde5ef942beb8ac63b58836a649f` | MATCH |
+| `docs/product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_ACCEPTANCE.md` | `6777acf013a24229e7aa28b4c5b7768e6070b350` | MATCH |
+| `docs/architecture/DomainHarness_v0.10_L2_ARCHITECTURE_R0.md` | `9e58c629b0a2074617ca3d38ac85d9527f284aab` | MATCH |
+| `docs/architecture/DomainHarness_v0.10_L2_FREEZE.md` | `b7712055debbd8d36762e0a721cf69ab1a38516e` | MATCH |
+
+Each of the 16 implementation Issue numbers 1165–1180 was independently read from GitHub and was CLOSED with the `state:done` label. `#1205` K01 P1 repair was also CLOSED, merge #1206 included at the selected SHA. Source/DAG gate is PASS; this **does not substitute for Host execution** or final Release approval.
+
+## 4. Hidden Validation — independent exact-candidate PASS (rev 2)
+
+- **Result:** 31/31 PASS, 0 FAIL and 0 flake, in **two** independent clean-room runs on Node 24.21.0 + file-backed SQLite 3.53.2 / better-sqlite3 12.11.1 (Windows x64).
+- **Candidate:** `7cbfaf5ab8e21a0e2ff0e98625694132d7d21bb4`; tree `30c8ab6328543d8ffc0a4581c4d44aa35b3293f3`; all 16 Tasks included.
+- **Private pack:** `DH010-HIDDEN-FP-1181-01`, rev 2, exact private commit `48467d119255a4afdd8f6dc962fcd10ca540925d`, [hidden-validation #66](https://github.com/kaicreator-mm/hidden-validation/issues/66) CLOSED.
+- **Pins:** core `662dd2f688aeb0e598f792cb1d00f7b801921601ddce0c004c33ffc116c1def2`, compiler `b5616621e71663ecbd122b0548177a40b0a9414367f9da11a5a23fbfa6920c63`.
+- **Manifest SHA256:** `ccc06600d738fe077d82c87a6749f2067ffeddc9ac291043e4a56cf0e4e78726`; scenario manifest unchanged `7fa7348962d9ef2c75876ba89e8c6267b365e3f26619e05ee78a294ff6e84338`.
+- **Public redacted summary:** [Issue #1181 comment](https://github.com/kaicreator-mm/domain-harness/issues/1181#issuecomment-6285120521). Private assertions/fixture logic remain private.
+- **This is Hidden PASS only**, not final R01 PASS; it does not waive the red gates in §5 and §6.
+
+## 5. Full-regression failures — deterministic, release-blocking
 
 The five failures reproduce individually at the exact candidate; they are not
 load-dependent flakes.
@@ -119,7 +149,7 @@ The release gate cannot be waived: the repository's own full regression is red a
 the exact candidate, including the compiler's physically selected v0.8 K/S blob
 rebind oracle.
 
-## 4. T11 clean-packed Tiny/Rich — official gate FAIL (2/3)
+## 6. T11 clean-packed Tiny/Rich — official gate FAIL (2/3)
 
 The focused suite packs the runtime and compiler from the candidate, builds Tiny v1,
 Rich v1 and Rich v2 in a third isolated installation, and executes each App from a
@@ -148,7 +178,7 @@ whose exact cause was not captured because the suite cleans its temp root in
 `finally`. The gate still fails its 3/3 requirement and must be re-run at the next
 candidate after the full-regression repair.
 
-## 5. Positive witnesses and the security exceptions
+## 7. Positive witnesses and the security exceptions
 
 ### Critical journeys — 84 assertions, all EXIT 0
 
@@ -169,7 +199,7 @@ candidate after the full-regression repair.
 
 The K01 physical file now includes the new `K01-R01-P1` live same-turn retry and
 `K01-R01-N1` changed-input cases and passes 10/10. This confirms the repaired
-runtime path in isolation; it does not override the full-regression failures in §3.
+runtime path in isolation; it does not override the full-regression failures in §5.
 
 ### T09 Meta Feedback — 15 assertions, all EXIT 0
 
@@ -187,15 +217,15 @@ runtime path in isolation; it does not override the full-regression failures in 
 | Admission effects / fabrication and receipt negatives | `packages/domain-harness/tests/admission/effects.test.ts` | 12/12 PASS |
 | Admission (stale/missing/cross-scope) | `packages/domain-harness/tests/admission/admission.test.ts` | 19/19 PASS |
 | Bootstrap fail-closed on occupied kernel | `packages/domain-harness/tests/v08-integration/i01-bootstrap-failclosed-occupied-kernel.test.ts` | 1/1 PASS |
-| Stale admission CAS | `packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts` | **5/6 PASS — 1 FAIL** (same-turn replay without `turnIdentity`, §3 item 5) |
-| Cross-B namespace isolation / no oracle | `packages/domain-harness/tests/v08-host/k02-namespace-two-b-physical.test.ts` | **FAIL at import** (frozen blob pin, §3 item 2; 2 tests not run) |
+| Stale admission CAS | `packages/domain-harness/tests/v08-integration/r02-stale-admission-cas-physical.test.ts` | **5/6 PASS — 1 FAIL** (same-turn replay without `turnIdentity`, §5 item 5) |
+| Cross-B namespace isolation / no oracle | `packages/domain-harness/tests/v08-host/k02-namespace-two-b-physical.test.ts` | **FAIL at import** (frozen blob pin, §5 item 2; 2 tests not run) |
 | Authorized recovery / poison refusal | `packages/domain-harness/tests/v08-integration/hf16-authorized-recovery-physical.test.ts` | 4/4 PASS |
 
 The functional negatives that did run remain green (effect permit, fabrication,
 admission scope, bootstrap fail-closed, authorized recovery). No blanket JavaScript
 network-sandbox claim is made.
 
-## 6. Disposition
+## 8. Disposition
 
 | Item | Result |
 |---|---|
@@ -207,7 +237,7 @@ network-sandbox claim is made.
 | Critical journeys | PASS (84, including K01 10/10) |
 | T09 / T10B | PASS (15 / 8) |
 | Security negatives | **FAIL** (2 files red of 7; 56/59 assertions pass) |
-| Hidden Validation R2 | **NOT_RUN** — private #66 open, no result comment; not a PASS |
+| Hidden Validation R2 | **PASS** — pack rev 2, 31/31 × 2 at the exact candidate (§4); exact-SHA bound, not transferable to a successor candidate |
 | Independent R01 review | **NOT_RUN** at R2 |
 | `RELEASE_QUALIFIED` | **NO** |
 | `v0.10 → main` | **NOT MERGED** |
@@ -220,10 +250,11 @@ without weakening the fence/effect journal). Do not edit core K/CAS/Effect code 
 this evidence branch. After that repair merges, select a new candidate SHA, re-run
 the full regression, CJ/T09/T10B, security, T11 3/3 and Hidden R2, then request an
 independent exact-SHA release review. Only then can `RELEASE_QUALIFIED=YES` be
-considered. Hidden R2 result from private #66 must be posted on Issue #1181 before a
-final qualification decision.
+considered. The Hidden R2 PASS recorded here (§4) is bound to `7cbfaf5a`; it
+satisfies the hidden requirement for this candidate only and must be re-pinned and
+re-run at any successor candidate, exactly as private #66 did for this round.
 
-## 7. Evidence log manifest
+## 9. Evidence log manifest
 
 Logs are retained on the Build Host at
 `C:\xDev\kAiCreator\_tmp\r01-final-r2-20261020\`; these SHA256 values bind the
