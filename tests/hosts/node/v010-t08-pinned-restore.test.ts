@@ -96,7 +96,7 @@ test('T08-R1: ordinary approval expiry restores the pinned A BUILD across a real
     assert.equal(oldReplayAtT0.idempotentReplay, true, 'T0 re-submission replays the original receipt');
     const originalCoreDigest = t08ReceiptCoreDigest(oldReplayAtT0);
     const oldRow = instanceRowOf(
-      readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+      readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
     );
     assert.ok(oldRow !== undefined, 'T0 leaves a physical A instance row');
     const originalRowHash = t08HashText(oldRow.value);
@@ -163,7 +163,7 @@ test('T08-R1: ordinary approval expiry restores the pinned A BUILD across a real
     inner = await openSqliteCasStore({ path: kPath });
     const rows = readT08Rows(kPath);
     assert.equal(
-      instanceRowOf(rows, T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
+      instanceRowOf(rows, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
       oldRow.value,
       'the old A instance row is byte-identical after the T2 process',
     );
