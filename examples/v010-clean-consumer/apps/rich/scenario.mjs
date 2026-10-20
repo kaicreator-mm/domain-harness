@@ -915,7 +915,12 @@ async function race({ steps, step, workdir, app, manifest, log, args }) {
       const receipt = await send(facade, 'submitExternalJob', 'race-inst-1', 'race/msg/1', {
         requestId: 'R-RACE', jobSpec: { kind: 'race' },
       });
-      outcome = { ok: true, status: receipt.status, idempotentReplay: receipt.idempotentReplay ?? false, effectId: firstEffect(receipt).effectId, code: null };
+      outcome = receipt.status === 'admitted'
+        ? { ok: true, status: receipt.status, idempotentReplay: receipt.idempotentReplay ?? false, effectId: firstEffect(receipt).effectId, code: null }
+        // A same-turn rival attached to the live fence reaches the existing
+        // journal and fails typed UNKNOWN (never a thrown error): keep the
+        // kernel's honest code instead of reporting the fixture's NO_CODE.
+        : { ok: false, status: receipt.status, code: receipt.code ?? 'NO_CODE', message: JSON.stringify(receipt).slice(0, 500) };
     } catch (error) {
       outcome = { ok: false, status: 'refused', code: error?.code ?? 'NO_CODE', message: error?.message ?? String(error) };
     }
