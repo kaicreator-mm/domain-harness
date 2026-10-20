@@ -161,9 +161,21 @@ export async function dispatchThroughExternalEffectGate(deps, request) {
     if (fence === null || fence.turnId !== claim.durableControlTurnId) {
         refuseGate(attest, deps.onRefusal, 'V10_EFFECT_PERMIT_FENCE', `the admission fence of ${target.workflowId}/${target.instanceKey} is not held by turn ${claim.durableControlTurnId}; no live admission authority, zero dispatch`);
     }
-    // Every authority check held: dispatch to the sealed adapter.
-    deps.onDispatch?.(request.capabilityId, request.operationId);
+    // (5) The physical dispatch claim is the final durable link. A key
+    // appearing in the attest is only an address, not proof that K wrote a
+    // claim for THIS effect/turn/attempt before the adapter was reached.
     const attempt = typeof permit.attempt === 'number' ? permit.attempt : 1;
+    const claimDoc = await deps.docs.get(claim.businessPackageId, keys.dispatchClaim);
+    const dispatchClaim = claimDoc !== null && isPlainRecord(claimDoc.value) ? claimDoc.value : null;
+    if (dispatchClaim === null
+        || dispatchClaim.effectId !== claim.effectId
+        || dispatchClaim.durableControlTurnId !== claim.durableControlTurnId
+        || dispatchClaim.businessPackageId !== claim.businessPackageId
+        || dispatchClaim.attempt !== attempt) {
+        refuseGate(attest, deps.onRefusal, 'V10_EFFECT_DISPATCH_CLAIM_INVALID', `no matching K dispatch claim exists for effect ${claim.effectId} attempt ${attempt}; zero external dispatch`);
+    }
+    // Every durable authority check held: dispatch to the sealed adapter.
+    deps.onDispatch?.(request.capabilityId, request.operationId);
     const raw = await request.invoke(request.payload, {
         capabilityId: request.capabilityId,
         operationId: request.operationId,
