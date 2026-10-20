@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.15.0"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present && node scripts/check-committed-dist.mjs",

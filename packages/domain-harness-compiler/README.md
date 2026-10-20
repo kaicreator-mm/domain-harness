@@ -19,6 +19,22 @@ pnpm add "github:kaicreator-mm/domain-harness#<exact-sha>&path:packages/domain-h
 
 The subdirectory (`&path:`) form is required because this package lives in a monorepo; pnpm supports it (npm does not resolve git subdirectory dependencies).
 
+## Runtime requirements and lifecycle
+
+v0.10 App activation with declared npm/native imports uses Node's
+`node:module.registerHooks`, introduced in **Node 22.15.0**. The workspace and
+compiler declare `node >=22.15.0`; using Node 22.0–22.14 is unsupported even
+when installation happens to succeed. Node 24 is recommended for packed-app
+qualification; run the minimum supported Node 22.15.x variant when verifying
+compatibility.
+
+The v0.10 declared-import resolver is process-scoped. Applications must call
+`activation.dispose()` in a `finally` block, including on exceptions, to
+release their import allowances. Forgetting to dispose is a Host lifecycle bug:
+the shared process hook may retain allowances; garbage collection is **not** a
+reliable cleanup mechanism. This is a trusted same-process loader, not an
+untrusted module sandbox.
+
 ## Usage
 
 ```ts
