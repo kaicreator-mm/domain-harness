@@ -200,6 +200,18 @@ export declare function createV10DocsPort(deps: {
     assertOpen: () => void;
 }): V10DocsPort;
 /**
+ * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
+ * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
+ * binding and the Shadow L4 verifier's independent re-derivation — the three
+ * must never drift apart.
+ */
+export declare function v10DeploymentDocsPrefix(deployment: {
+    deployedAppId: string;
+    tenantId: string;
+    appId: string;
+}): string;
+/**
  * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`

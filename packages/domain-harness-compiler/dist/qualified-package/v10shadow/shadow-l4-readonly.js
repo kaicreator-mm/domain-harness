@@ -48,7 +48,7 @@
  * unchanged; the report is evidence, not an activation request.
  */
 import * as vm from 'node:vm';
-import { V10AppFacade, v10K02DocumentPrefix } from '../v10build/activation.js';
+import { V10AppFacade, v10DeploymentDocsPrefix, v10K02DocumentPrefix } from '../v10build/activation.js';
 import { canonicalJson, sha256Canonical, sha256Hex } from '../v10build/digest.js';
 export const SHADOW_L4_ABI = 'dh.v10.shadow-l4-readonly/1';
 export const SHADOW_L4_EVIDENCE_KIND = 'shadow-l4-evidence';
@@ -614,7 +614,9 @@ function assertFacadeMatchesApp(facade, app, tenantId) {
     // Re-derive the exact per-B physical prefixes from the binding's deployment
     // tuple and require the facade to report exactly those. This is an integrity
     // agreement of two independently produced values, never a caller claim.
-    const namespace = `${SHADOW_K_DOCS_PREFIX}${binding.subjectDigest}/${binding.tenantId}/`;
+    // [#1217] The outer namespace is the stable deployment tuple (never the
+    // BUILD subjectDigest) — the same single derivation the writer uses.
+    const namespace = v10DeploymentDocsPrefix({ deployedAppId, tenantId: binding.tenantId, appId: app.appId });
     const expectedPrefixes = expectedBusinesses.map((businessPackageId) => `${namespace}${v10K02DocumentPrefix({
         deployedAppId,
         tenantId: binding.tenantId,
