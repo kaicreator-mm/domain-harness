@@ -1,6 +1,6 @@
 # DomainHarness v0.10 — R01 final candidate after bounded R2 repairs
 
-**CURRENT RELEASE POSTURE: NOT_YET_QUALIFIED.** Exact-SHA private Hidden R3 **PASS 31/31 ×2**. Local R01 Host full regression/CJ/security/Tiny/Rich and independent Release Review still **NOT_RUN/NO_POSTED_COMPLETION** on this candidate.
+**CURRENT RELEASE POSTURE: NOT_YET_QUALIFIED.** All dispatched R01-R3 exact-candidate gates now **EXECUTED and PASS** (build/lint/typecheck 0/0/0; bounded full regression 4236/4236; CJ 84/84; T09 15/15; T10B 8/8; security 59/59; clean-packed Tiny/Rich 3/3 consecutive; Hidden 31/31 ×2) — full evidence in [R01_R3_FINAL_EXECUTION_fed515be.md](./R01_R3_FINAL_EXECUTION_fed515be.md). One pre-existing deterministic Tier-3 test-assertion staleness (package-versioning G29, predates v0.10) is reported **not waived**. Independent Release review submitted on PR #1202; `RELEASE_QUALIFIED` stays **NO** pending review acceptance and G29 disposition.
 
 | Exact field | Value |
 |---|---|
@@ -13,13 +13,14 @@
 | R01-R2 T11 concurrent WAL-open | #1209 / PR #1212 MERGED at `7df8398b` |
 | R01 C01 PH-R1 receipt classification | #1211 / PR #1213 MERGED at `fed515be45c4e48233f20dcbc76d6f3410780f34` |
 | Frozen DAG / Product PRD / A01 / L2 architecture / L2 freeze | **PASS**; each of five exact pinned Git blobs matches current candidate |
-| Build / lint / typecheck (R01 release) | **NOT_RUN** on `fed515be45c4e48233f20dcbc76d6f3410780f34` (Task-level evidence separately green) |
-| Full repository regression (R01 release) | **NOT_RUN** on `fed515be45c4e48233f20dcbc76d6f3410780f34` |
-| Critical journeys / security negatives (R01 release) | **NOT_RUN** on `fed515be45c4e48233f20dcbc76d6f3410780f34` |
-| Clean installed Tiny/Rich 3× (R01 release) | **NOT_RUN** on `fed515be45c4e48233f20dcbc76d6f3410780f34` (T11 repair Task passed 3× at earlier reviewed Task SHA) |
-| Independent private Hidden (R01 release) | **PASS — 31/31 ×2** at `fed515be45c4e48233f20dcbc76d6f3410780f34`, [private #67](https://github.com/kaicreator-mm/hidden-validation/issues/67) CLOSED; source rev3 `fe12c8a9115d38a8c6878275e85182411ba09115` |
-| Independent Release R01 exact-SHA review | **NOT_RUN** |
-| `RELEASE_QUALIFIED` / Main merge / Tag | **NO / NO / NO** |
+| Build / lint / typecheck (R01 release) | **PASS** on `fed515be45c4e48233f20dcbc76d6f3410780f34` — exit 0/0/0 incl. tests-dir `tsconfig.test.json` typecheck ([R3-FINAL](./R01_R3_FINAL_EXECUTION_fed515be.md) §2) |
+| Full repository regression (R01 release) | **PASS with recorded caveat** — vanilla `npm test` exit 1 from host resource exhaustion (16-way unbounded tsx children OOM; zero assertion failures; 14/14 affected files green solo); bounded `--test-concurrency=4` equivalent **4236/4236 PASS**, exit 0 each ([R3-FINAL](./R01_R3_FINAL_EXECUTION_fed515be.md) §3) |
+| Critical journeys / security negatives (R01 release) | **PASS** — CJ 84/84, T09 15/15, T10B 8/8, security negatives 59/59, all exit 0 ([R3-FINAL](./R01_R3_FINAL_EXECUTION_fed515be.md) §4–§6) |
+| Clean installed Tiny/Rich 3× (R01 release) | **PASS 3/3 consecutive** at `fed515be45c4e48233f20dcbc76d6f3410780f34`, identical `T11_SUMMARY` shape ([R3-FINAL](./R01_R3_FINAL_EXECUTION_fed515be.md) §7) |
+| Independent private Hidden (R01 release) | **PASS 31/31 ×2** at `fed515be45c4e48233f20dcbc76d6f3410780f34`, pack rev 3, [hidden-validation #67](https://github.com/kaicreator-mm/hidden-validation/issues/67) CLOSED, public summary [comment 6289864495](https://github.com/kaicreator-mm/domain-harness/issues/1181#issuecomment-6289864495) |
+| Tier-3 extras discovered at R3 | `sqlite-open-retry` 4/4 PASS; `package-versioning` 3/4 with one **pre-existing deterministic stale message assertion (G29)** — predates v0.10 (v0.7 bridge `8b9142f7` restored pre-`7c367188` blob; `origin/main` identical); product behavior verified fail-closed correct; repair route in [R3-FINAL](./R01_R3_FINAL_EXECUTION_fed515be.md) §7b, **not waived** |
+| Independent Release R01 exact-SHA review | **SUBMITTED** on PR #1202 at evidence head (P0/P1 assessment incl. G29 disposition deferred to reviewer/controller) |
+| `RELEASE_QUALIFIED` / Main merge / Tag | **NO / NO / NO** — pending review acceptance and G29 disposition |
 
 ## 1. Current source and bounded repair evidence
 

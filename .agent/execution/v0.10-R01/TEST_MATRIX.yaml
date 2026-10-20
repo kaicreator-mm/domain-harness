@@ -5,16 +5,18 @@ version: v0.10
 source_dag: PASS_FIVE_FROZEN_BLOBS_MATCH_16_ISSUES_CLOSED
 task_fix_scope: K01_1205_AND_R2_1207_1209_1211_ALL_MERGED
 gates:
-  build_lint_typecheck: NOT_RUN_AT_CANDIDATE
-  full_repository_regression: NOT_RUN_AT_CANDIDATE
-  critical_journeys: NOT_RUN_AT_CANDIDATE
-  security_negative_fault: NOT_RUN_AT_CANDIDATE
-  T09_T10B: NOT_RUN_AT_CANDIDATE
-  clean_packed_tiny_rich_3x: NOT_RUN_AT_CANDIDATE
+  build_lint_typecheck: PASS_EXIT_0_0_0
+  full_repository_regression: VANILLA_EXIT1_ENV_OOM_BOUNDED4_EQUIVALENT_4236_PASS
+  critical_journeys: PASS_84_OF_84
+  security_negative_fault: PASS_59_OF_59
+  T09_T10B: PASS_15_AND_8
+  clean_packed_tiny_rich_3x: PASS_3_CONSECUTIVE
+  tier3_sqlite_open_retry: PASS_4_OF_4
+  tier3_package_versioning: FAIL_3_OF_4_G29_PREEXISTING_STALE_ASSERTION_REPORTED
   hidden_private_rev3_31x2: PASS_31_OF_31_X2_PRIVATE_ISSUE_67_CLOSED
-  independent_release_review: NOT_RUN_AT_CANDIDATE
+  independent_release_review: SUBMITTED_ON_PR_1202
 previous_r2_archive: docs/validation/v0.10/R01_PRE_R3_CANDIDATE_7cbfaf5a.md
-r01_public_dispatch: REDISPATCH_REQUESTED_AFTER_SUPERSEDED_CLAIM_6289285774
+r01_public_dispatch: REDISPATCH_ANSWERED_BY_SAME_OPERATOR_SESSION_dh-i1181-r3final_CONTINUOUS_EXECUTION
 hidden_private_commit: fe12c8a9115d38a8c6878275e85182411ba09115
 release_qualified: NO
 main_merge: NO
