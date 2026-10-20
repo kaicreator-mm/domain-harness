@@ -9,17 +9,17 @@ No `v0.10 → main` merge, tag or release is authorised by this record.**
 | Candidate commit | `dcf4b31306e1a33b85782ada0507f7b53aee3b0f` |
 | Candidate tree | `3d2a29c79709388b5990e01b522da02f3bce2d38` |
 | Version branch | `v0.10` (`origin/v0.10` = candidate) |
-| Evidence branch / head | `task/v0.10-r01-release-closure` / `4f7036413ff53871a5cbcd0995dcf36d7559971c` |
+| Evidence branch / run head | `task/v0.10-r01-release-closure` / `4f7036413ff53871a5cbcd0995dcf36d7559971c` (final evidence commit = PR #1202 head) |
 | Evidence-head delta vs candidate | `.agent/execution/v0.10-R01/**` and `docs/validation/v0.10/**` only; `packages/`, `examples/`, `scripts/`, `tests/` are byte-identical (`git diff --quiet dcf4b313..HEAD -- packages examples scripts tests` = 0) |
 | Integrated Tasks | **16/16** (14 P0 + optional T09 #1178 / PR #1200 merged at `dcf4b313` + T10B #1179 / PR #1201 merged at `ce794fe1`) |
-| Host | Windows 10.0.26300 x64 (Git Bash/MSYS), LOCAL_AGENT |
+| Host | Windows 11 (10.0.26300) x64, Git Bash/MSYS, LOCAL_AGENT |
 | Runtime | Node `v24.21.0`, npm `11.19.0`, Node ABI `137` |
 | SQLite | `better-sqlite3` 12.11.1, SQLite `3.53.2`, file-backed runs |
 | Registry for clean installs | local Verdaccio `http://localhost:14873` |
 | Full regression | **PASS** — 4234 tests, 0 fail, 0 skipped |
 | Critical journeys | **PASS** — 82 assertions + T09 15 = 97, 0 fail |
 | Security negatives | **PASS** — 59 assertions, 0 fail |
-| Fresh Tiny/Rich clean-pack consumers | **FAIL** — 3/3 runs rejected at the K01 same-turn race; no winner admitted |
+| Fresh Tiny/Rich clean-pack consumers | **FAIL** — 3/3 official runs rejected at the K01 same-turn race; no winner admitted; one external job dispatched and journaled with no turn disposition |
 | v0.10 independent Hidden Validation | **NOT_RUN / BLOCKED** — no real pack; [hidden-validation #65](https://github.com/kaicreator-mm/hidden-validation/issues/65) |
 | P0 / P1 / P2 | 0 / **1 (T11 K01 race liveness)** / 3 observations |
 | Final R01 independent review | **PENDING** (submitted as a separate exact-head review) |
@@ -55,9 +55,11 @@ as an identity gate.
 
 ## 2. Gate results at the exact candidate
 
-All commands were executed in the evidence worktree whose source/test/example tree is
-byte-identical to `dcf4b313` (see the delta row above). Raw logs are retained on the
-Build Host; §7 binds the quoted results to their SHA256 values.
+All official gate commands were executed at worktree HEAD `4f703641`; at that HEAD
+`git diff --quiet dcf4b313..HEAD -- packages examples scripts tests` = 0, so the tested
+source/test/example tree is the candidate tree `3d2a29c7`. The final evidence commit
+adds only this report and `.agent/execution/v0.10-R01/**` metadata. Raw logs are
+retained on the Build Host; §7 binds the quoted results to their SHA256 values.
 
 | Gate | Command | Exit | Observed result |
 |---|---|---|---|
@@ -65,7 +67,7 @@ Build Host; §7 binds the quoted results to their SHA256 values.
 | Lint | `npm run lint` | 0 | `scripts/lint.mjs` + `eslint .`; 0 errors, 1 pre-existing unused-disable warning in a test fixture |
 | Typecheck | `npm run typecheck` | 0 | all workspace `tsc --noEmit` clean |
 | Full regression | `npm test` | 0 | **4234 tests, 0 fail, 0 skipped** — main 3324, compiler 430, node 227, root 244+9; expo test is its typecheck (exit 0) |
-| Critical journeys | 12 focused files | 0 | **82 assertions, 0 fail** |
+| Critical journeys (non-T11) | 12 focused files | 0 | **82 assertions, 0 fail**; T11 is the separate P5 row and did not pass |
 | T09 Meta Feedback | 3 focused files | 0 | **15 assertions, 0 fail**, including the clean packed compiler consumer |
 | T10B queryMany | focused file | 0 | **8 assertions, 0 fail** (also part of the 82 above) |
 | Security negatives | 7 focused files | 0 | **59 assertions, 0 fail** |
@@ -108,9 +110,17 @@ Three independent runs on the same candidate produced the same result:
 | 3 | 1 | 51,964 ms | zero winners (CAS conflict + UNKNOWN) |
 
 Because the suite aborts before its evidence-record block, no T11 evidence JSON was
-emitted in these runs. No provider dispatch or job row was created; this is **not** a
-double-dispatch or permit-bypass finding. It is a liveness/currentness finding: neither
-writer admitted, so the logical turn did not advance.
+emitted in these official runs. A separate diagnostic replica at the same source tree
+(winner assertion removed only to expose post-race state; `diag/` under the evidence
+directory) caught the failing interleaving and counted the physical state: **one**
+`job.submit` dispatch and **one** provider job row, the non-idempotent effect journal
+record `completed`, one K effect permit, but `wf-instance` stateRevision `0` and **no
+turn-disposition**. The commit-losing writer therefore dispatched and accepted the
+external job before losing its fence; the turn never committed. This is **not** a
+double dispatch (there is exactly one) and not a permit bypass. It is a release-blocking
+liveness/reconciliation defect with an orphaned but durably journaled external effect.
+Two other diagnostic runs resolved with one winner and the expected disposition, so the
+success path is correct; the defect is the timing-dependent zero-winner interleaving.
 
 ### P1 diagnosis
 
@@ -129,6 +139,15 @@ writer admitted, so the logical turn did not advance.
   displaced by a competing claim before protected dispatch. The existing K01-N1 test
   covers a **killed** holder followed by a new-process replay; it does not cover a live
   same-turn concurrent writer, which is the T11 `rich-race` case.
+- The commit-losing writer has already executed and durably journaled a non-idempotent
+  external effect before `#requireHeldAdmissionFence` rejects it. The captured
+  interleaving has one provider job, one `job.submit` dispatch, journal `completed`, and
+  no turn disposition. The effect is durably accounted in the effect journal and can be
+  reconciled by a same-turn replay, but the first submission reports failure/UNKNOWN and
+  the instance stays at revision 0. If the Release review treats this orphaned
+  non-idempotent effect as an "unaccounted effect", the finding escalates to P0; this
+  record classifies it as P1 because there is exactly one dispatch and a durable journal
+  record, not a duplicate.
 - The kernel and admission sources are unchanged between `df3dc4bb` and `dcf4b313`
   (`git diff --quiet` = 0), so this is pre-existing. The prior R01 report observed the
   same assertion once and recorded it as a P2 timing observation after a passing rerun;
@@ -210,7 +229,7 @@ refusal with unchanged K state. No blanket JavaScript network-sandbox claim is m
 | Item | Result |
 |---|---|
 | P0 findings | **0** |
-| P1 findings | **1** — T11/K01 live same-turn fence re-claim allows both concurrent writers to fail (fail-closed, no double dispatch) |
+| P1 findings | **1** — T11/K01 live same-turn fence re-claim allows both concurrent writers to fail after one non-idempotent external job was dispatched and journaled; no double dispatch; `wf-instance` stays at revision 0 with no turn disposition. Possible P0 escalation if the orphaned effect is adjudicated unaccounted. |
 | P2 observations | (1) lint emits one pre-existing unused eslint-disable warning in a test fixture; (2) Windows concurrent node-suite timing sensitivity remains possible under load; (3) Ubuntu Build Host remains NOT_RUN (Windows evidence only) |
 | Full regression | PASS at `dcf4b313` (4234 / 0 fail / 0 skip) |
 | Critical journeys | PASS at `dcf4b313` (82, plus T09 15) |
@@ -266,3 +285,10 @@ results to those artifacts.
 | security stale CAS | `e0c777ab8c3fb67b4e3be558c160f32217d2cabbca898136dd61130c1cbaa707` |
 | security two-B namespace | `9b3339286ebc5822f38004c71046bb98dd5c435fb38d4edf5aaacf0f646009c4` |
 | security authorized recovery | `336efbd72c944f50914d763f72f81f845cdc8275590aece788b0c4c820faaa01` |
+| T11 official gate summary (3× EXIT 1) | `e7ab08d881e76b8df6f99441648fb590e77fea578c3818533aeb6f22b895475b` |
+| diagnostic failing-race log (`DIAG_RACE`) | `5cea9bc239e448dc15160c46d00f673649098428d346949039904ba09939da04` |
+| diagnostic race evidence note | `dcaad651cb410e3290c117ecdea0dc270acf1a8e382b233074336a785be57526` |
+| failing race `rich-k.sqlite` | `cf013324f89527abc6207036a9194efd54a28c0ef29de22ebec69f41095ff417` |
+| failing race `extjob.sqlite` | `c0bbb22fe8fba932c54c86ace71a9ea85dff581e73d0f370a269a6c610c7d0f1` |
+| failing race report A | `0e528dd8055c140726534edd8a4c95657ee8ff77dac5075afbc96f9b6cf3f833` |
+| failing race report B | `61f1357dc015a88f40bfda20bc96bbec5c9e35f6f83c5f4f7865d71a6ab8c9b6` |
