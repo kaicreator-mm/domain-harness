@@ -1,8 +1,9 @@
 # DomainHarness v0.10 — R01 exact-SHA release qualification (current candidate)
 
 **STATUS: EXECUTED / RELEASE_QUALIFIED=NO — one P1 release blocker (T11 K01
-same-message concurrent-writer liveness) and Hidden Validation still BLOCKED.
-No `v0.10 → main` merge, tag or release is authorised by this record.**
+same-message concurrent-writer liveness). Hidden Validation PASSED independently
+(31/31 ×2 at this exact candidate). No `v0.10 → main` merge, tag or release is
+authorised while the P1 is open.**
 
 | Field | Current exact value |
 |---|---|
@@ -20,10 +21,10 @@ No `v0.10 → main` merge, tag or release is authorised by this record.**
 | Critical journeys | **PASS** — 82 assertions + T09 15 = 97, 0 fail |
 | Security negatives | **PASS** — 59 assertions, 0 fail |
 | Fresh Tiny/Rich clean-pack consumers | **FAIL** — 3/3 official runs rejected at the K01 same-turn race; no winner admitted; one external job dispatched and journaled with no turn disposition |
-| v0.10 independent Hidden Validation | **NOT_RUN / BLOCKED** — no real pack; [hidden-validation #65](https://github.com/kaicreator-mm/hidden-validation/issues/65) |
+| v0.10 independent Hidden Validation | **PASS** — `DH010-HIDDEN-FP-1181-01` rev 1, **31/31 ×2** at this exact candidate; [redacted PASS](https://github.com/kaicreator-mm/domain-harness/issues/1181#issuecomment-6283429789) |
 | P0 / P1 / P2 | 0 / **1 (T11 K01 race liveness)** / 3 observations |
-| Final R01 independent review | **PENDING** (submitted as a separate exact-head review) |
-| `RELEASE_QUALIFIED` | **NO** |
+| Final R01 independent review | **SUBMITTED** — separate exact-head review on PR #1202; verdict P0=0 / P1=1 / P2=3 |
+| `RELEASE_QUALIFIED` | **NO** — T11 P1 open |
 | main merge / tag | **NO / NO** |
 
 ## 1. Candidate, scope and frozen inputs
@@ -72,7 +73,7 @@ retained on the Build Host; §7 binds the quoted results to their SHA256 values.
 | T10B queryMany | focused file | 0 | **8 assertions, 0 fail** (also part of the 82 above) |
 | Security negatives | 7 focused files | 0 | **59 assertions, 0 fail** |
 | Fresh Tiny/Rich clean packed consumers | `tests/integration/v010-clean-consumers/clean-consumers.test.ts` | **1** | **FAIL — 3/3 runs, no competing writer admitted; see §3** |
-| Hidden Validation | owner-held pack lookup | **NOT_RUN** | **BLOCKED — no v0.10 pack; see §4** |
+| Hidden Validation | private pack `DH010-HIDDEN-FP-1181-01` | 0 | **PASS — 31/31 ×2 at the exact candidate; see §4** |
 | Independent review | separate exact-head review | — | **PENDING** at this commit; no release approval is implied |
 
 `npm test` composition note: the root `test` script runs the four workspace suites plus
@@ -111,8 +112,10 @@ Three independent official runs on the same candidate source tree produced the s
 
 Because the suite aborts before its evidence-record block, no T11 evidence JSON was
 emitted in these official runs. A separate diagnostic replica at the same source tree
-(winner assertion removed only to expose post-race state; `diag/` under the evidence
-directory) caught the failing interleaving and counted the physical state: **one**
+(the winner and post-race dispatch/job/permit assertions removed and a cleanup
+bypass added only to expose state; it is explicitly non-qualifying and its own
+`PASS`/`race:true` summary must not be cited as a T11 PASS; `diag/` under the
+evidence directory) caught the failing interleaving and counted the physical state: **one**
 `job.submit` dispatch and **one** provider job row, the non-idempotent effect journal
 record `completed`, one K effect permit, but `wf-instance` stateRevision `0` and **no
 turn-disposition**. The commit-losing writer therefore dispatched and accepted the
@@ -160,20 +163,41 @@ live process without weakening the fence or effect journal), then re-pin the can
 and rerun the T11 suite plus the affected K01 gates. Do not edit core K/CAS/effect code
 on this closure branch.
 
-## 4. Hidden Validation — NOT_RUN / BLOCKED
+## 4. Hidden Validation — PASS (independent private pack)
 
-There is no v0.10 owner-held hidden pack. The private
-`kaicreator-mm/hidden-validation` repository has no `v010`/`v0.10`/`DH10` branch or
-artifact; the latest DomainHarness pack is the v0.9 `DH09-FP-1037-01` (PR #64). Issue #65
-is OPEN with status `PLANNED / PACK_MISSING / NOT_RUN`. No source review or Task CI
-result is substituted for hidden validation.
+The private `kaicreator-mm/hidden-validation` pack `DH010-HIDDEN-FP-1181-01`
+revision 1 executed the independent v0.10 hidden suite at the exact candidate
+`dcf4b313` / tree `3d2a29c7`, including T09 and T10B. The pack is committed on
+`task/hv-i65-v010-zcode` at `607fbdf5404d8a2e941fafc5a6a51060be9caf13`; issue #65 is
+CLOSED/COMPLETED. The redacted PASS is on issue #1181
+([comment 6283429789](https://github.com/kaicreator-mm/domain-harness/issues/1181#issuecomment-6283429789)).
 
-- `HIDDEN_VALIDATION=NOT_RUN`
-- `HIDDEN_VALIDATION_STATUS=BLOCKED`
-- `HIDDEN_PACK=v0.10:NOT_AVAILABLE`
-- Required action: the release owner must provide or authorise a genuine v0.10 hidden
-  pack bound to `dcf4b313` (or explicitly adjudicate the gap in the Release review).
-  This evidence does not claim a hidden PASS.
+- Two consecutive clean-room runs: `2026-10-20T04-29-04-160Z-hidden-r1` and
+  `2026-10-20T04-29-38-197Z-hidden-r1`, both **31 PASS / 0 FAIL**.
+- Environment: Node 24.21.0, `better-sqlite3` 12.11.1, SQLite 3.53.2, Windows x64;
+  each run used a fresh clean-room `npm install` of only the pinned core/compiler
+  tarballs plus the native driver; no product-worktree resolution.
+- Packed artifacts verified locally against the private pack:
+  core `sha256:662dd2f688aeb0e598f792cb1d00f7b801921601ddce0c004c33ffc116c1def2`,
+  compiler `sha256:772b2271200c3f0e4cadec9c6cf0a8d4d1da4364a2346cb0702a0027a4afd851`.
+- Scenario manifest SHA-256: `7fa7348962d9ef2c75876ba89e8c6267b365e3f26619e05ee78a294ff6e84338`;
+  `result.private.json` hashes and adapter digest are in the redacted comment.
+- Coverage (redacted): Kernel/Effect 11, K02 4, T03 4, T07 2, T08 2, T09 4,
+  T10/T10B 2, clean-packed Tiny/Rich 2; all PASS. The exact assertions, fixtures and
+  fault recipes remain private and are not reproduced here.
+
+**Reconciliation with the T11 failure:** the hidden pack's Kernel/Effect family also
+exercises two-process same-message races and reports exactly one physical dispatch with
+the loser typed or the survivor honestly `UNKNOWN`; it passed 31/31. The official T11
+clean-consumer gate additionally requires **at least one writer to admit** in its
+`rich-race` scenario, and that assertion failed 3/3 in §3. The results are not
+contradictory: both agree there is exactly one provider dispatch and no duplicate; the
+T11 liveness assertion is the open P1. Hidden PASS does not waive that P1.
+
+- `HIDDEN_VALIDATION=PASS`
+- `HIDDEN_PACK=DH010-HIDDEN-FP-1181-01@607fbdf5404d8a2e941fafc5a6a51060be9caf13`
+- `HIDDEN_RUNS=31/31_PASS_X2`
+- `HIDDEN_SCOPE=EXACT_CANDIDATE_INCL_T09_T10B`
 
 ## 5. Detailed positive / negative witnesses
 
@@ -235,13 +259,13 @@ refusal with unchanged K state. No blanket JavaScript network-sandbox claim is m
 | Critical journeys | PASS at run head `4f703641` / candidate tree `3d2a29c7` (82 non-T11, plus T09 15) |
 | Security negatives | PASS at run head `4f703641` / candidate tree `3d2a29c7` (59) |
 | Independent packaging | **FAIL** at run head `4f703641` / candidate tree `3d2a29c7` (T11 3/3 race rejection) |
-| Hidden Validation | **BLOCKED — no v0.10 pack** |
-| `RELEASE_QUALIFIED` | **NO** — P1 open and hidden gate blocked |
+| Hidden Validation | **PASS — 31/31 ×2, exact candidate, private pack `DH010-HIDDEN-FP-1181-01`** |
+| `RELEASE_QUALIFIED` | **NO** — T11 P1 open |
 | `v0.10 → main` | **NOT MERGED** |
 | Tag / Release | **NOT DONE** |
 
 Release review must independently verify the exact head, the candidate/tree binding,
-the T11 failure logs, and the blocked Hidden Validation status before any
+the T11 failure logs, and the private hidden-pack PASS binding before any
 `v0.10 → main` decision. A source repair must land through a separate bounded Task PR
 into `v0.10`; this closure branch does not carry core K/CAS/effect changes.
 
@@ -286,8 +310,13 @@ results to those artifacts.
 | security two-B namespace | `9b3339286ebc5822f38004c71046bb98dd5c435fb38d4edf5aaacf0f646009c4` |
 | security authorized recovery | `336efbd72c944f50914d763f72f81f845cdc8275590aece788b0c4c820faaa01` |
 | T11 official gate summary (3× EXIT 1) | `e7ab08d881e76b8df6f99441648fb590e77fea578c3818533aeb6f22b895475b` |
+| hidden pack `manifest.json` (private, redacted) | `cdf57408331868316bf8204e1d045941fe29279bd22695f5edc94a09707334f3` |
+| hidden core artifact `core.tgz` | `662dd2f688aeb0e598f792cb1d00f7b801921601ddce0c004c33ffc116c1def2` |
+| hidden compiler artifact `compiler.tgz` | `772b2271200c3f0e4cadec9c6cf0a8d4d1da4364a2346cb0702a0027a4afd851` |
+| hidden run 1 `summary.public.json` | `1a48a28e9210d4362e46971934273b934b4378969b379e4254d8a84149629436` |
+| hidden run 2 `summary.public.json` | `584c02c78004f5b861ee39cbe240cda51e6d15cee16d7e1d5355b87e6680a223` |
 | diagnostic failing-race log (`DIAG_RACE`) | `5cea9bc239e448dc15160c46d00f673649098428d346949039904ba09939da04` |
-| diagnostic race evidence note | `dcaad651cb410e3290c117ecdea0dc270acf1a8e382b233074336a785be57526` |
+| diagnostic race evidence note | `81d6b2579a2f217c06a8244f3e6323e1dbff388269f4319233e9f3b8ac44adc8` |
 | failing race `rich-k.sqlite` | `cf013324f89527abc6207036a9194efd54a28c0ef29de22ebec69f41095ff417` |
 | failing race `extjob.sqlite` | `c0bbb22fe8fba932c54c86ace71a9ea85dff581e73d0f370a269a6c610c7d0f1` |
 | failing race report A | `0e528dd8055c140726534edd8a4c95657ee8ff77dac5075afbc96f9b6cf3f833` |
