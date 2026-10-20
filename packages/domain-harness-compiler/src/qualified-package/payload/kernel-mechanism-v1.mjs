@@ -3154,6 +3154,28 @@ export class WorkflowInstanceEngine {
   async claimAdmissionFence(request) {
     const { target, turnId, expectedTargetSequence, snapshotFenceRevision } = request;
     const held = await this.#docs.get(this.#docKeys.admissionFence(target));
+    // R01-RACE-01 #1205: same canonical turn may attach to its existing
+    // fence, NEVER CAS-replacing a live claimant's revision after dispatch.
+    if (held !== null && isJsonRecord(held.value)
+      && held.value.turnId === turnId && held.value.stateRevision === expectedTargetSequence) {
+      if (!Number.isSafeInteger(held.revision)
+        || typeof request.turnIdentity !== 'string'
+        || held.value.turnIdentity !== request.turnIdentity) {
+        throw admissionStateCasConflict('same-turn held fence does not match canonical intent/input identity');
+      }
+      const current = await this.#instances.require(target);
+      if (current.stateRevision !== expectedTargetSequence) {
+        throw admissionStateCasConflict('same-turn fence stateRevision changed');
+      }
+      const recheck = await this.#docs.get(this.#docKeys.admissionFence(target));
+      if (recheck === null || !isJsonRecord(recheck.value)
+        || recheck.revision !== held.revision || recheck.value.turnId !== turnId
+        || recheck.value.turnIdentity !== request.turnIdentity
+        || recheck.value.stateRevision !== expectedTargetSequence) {
+        throw admissionStateCasConflict('same-turn fence changed during read-only attachment');
+      }
+      return { turnId, stateRevision: expectedTargetSequence, revision: held.revision };
+    }
     if (held !== null && isJsonRecord(held.value)
       && typeof held.value.turnId === 'string'
       && held.value.turnId !== turnId
@@ -3179,7 +3201,7 @@ export class WorkflowInstanceEngine {
     try {
       written = await this.#docs.put(
         this.#docKeys.admissionFence(target),
-        { pinVersion: 1, stateRevision: expectedTargetSequence, turnId, claimedAt: this.#now() },
+        { pinVersion: 1, stateRevision: expectedTargetSequence, turnId, turnIdentity: request.turnIdentity, claimedAt: this.#now() },
         snapshotFenceRevision === null ? { mustBeAbsent: true } : { mustMatchRevision: snapshotFenceRevision },
       );
     } catch (error) {
@@ -6242,6 +6264,7 @@ export function createOccurrenceRuntime(options) {
           admissionFence = await engine.claimAdmissionFence({
             target,
             turnId,
+            turnIdentity,
             expectedTargetSequence: snapshot.stateRevision,
             snapshotFenceRevision,
             // [#1108 K01 R1] A trusted-seam recovery turn (operator-authorized
