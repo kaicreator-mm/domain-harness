@@ -250,14 +250,25 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
       runScenarioAsync(richEntry, 'rich-race', raceWork, raceReports[0]!, ['--arg', 'worker=A']),
       runScenarioAsync(richEntry, 'rich-race', raceWork, raceReports[1]!, ['--arg', 'worker=B']),
     ]);
+    // R01-R2 #1209: an outcome-less report is NOT a Kernel receipt.
+    // Preserve the original 3/3 T11 gate and show the first physical failure
+    // (including failures before race() reaches its K01 step).
+    const childForensics = { exits: [raceA.code, raceB.code], stderr: [raceA.stderr.slice(-2000), raceB.stderr.slice(-2000)] };
+    for (const path of raceReports) {
+      assert.ok(existsSync(path), 'race child emitted no report: ' + path + ' ' + JSON.stringify(childForensics));
+    }
     const races = raceReports.map((path) => JSON.parse(readFileSync(path, 'utf8')) as ScenarioReport);
+    const raceForensics = JSON.stringify({
+      children: childForensics,
+      reports: races.map((report) => ({ ok: report.ok, failure: report.failure, steps: report.steps, outcome: report.outcome })),
+    });
     const winners = races.filter((report) => report.outcome?.ok === true);
-    assert.ok(winners.length >= 1, `at least one competing writer must admit: ${JSON.stringify(races.map((report) => report.outcome))} ${raceA.stderr} ${raceB.stderr}`);
+    assert.ok(winners.length >= 1, `at least one competing writer must admit: ${raceForensics}`);
     if (winners.length === 2) {
       assert.equal(winners[0]!.outcome.effectId, winners[1]!.outcome.effectId, 'two identical competing writers must resolve the SAME logical turn');
     } else {
       const loser = races.find((report) => report.outcome?.ok !== true);
-      assert.match(String(loser?.outcome?.code), /ADMISSION_|K02_/u, `the losing writer must fail closed typed: ${JSON.stringify(loser?.outcome)}`);
+      assert.match(String(loser?.outcome?.code), /ADMISSION_|K02_/u, `the losing writer must fail closed typed: ${raceForensics}`);
     }
     const raceJobDb = join(raceWork, 'extjob.sqlite');
     const raceDispatches = queryRows(raceJobDb, "SELECT COUNT(*) AS n FROM job_dispatch_log WHERE op = 'job.submit'")[0]!.n as number;
