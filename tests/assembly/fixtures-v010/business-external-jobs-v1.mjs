@@ -21,6 +21,12 @@
  * `effect:job-submit-expiring` carries a 1s permit TTL for the expiry
  * witness; `effect:notify-send` is bound await:'terminal' so an accepted-only
  * provider ACK can never become success.
+ *
+ * `effect:read-then-submit-probe` (#1222) is the POSITIVE witness of the
+ * permitted-claim scoping: its handler performs an ordinary read Tool call
+ * (the non-external `directory` capability) BEFORE the one authorized
+ * external dispatch. The read must not consume the effect's durable dispatch
+ * claim — the subsequent job.submit must still dispatch exactly once.
  */
 export const MODULE_ID = 'business-external-jobs@v010.1.0.0';
 export const PACKAGE_KIND = 'business';
@@ -33,11 +39,13 @@ export const INTENT_TYPES = [
   'submitExternalJob', 'checkExternalJob', 'reconcileExternalJob',
   'sendNotification', 'submitUnpermittedJobProbe', 'submitCrossCapabilityProbe',
   'submitExpiringJob', 'submitDoubleDispatchProbe', 'submitConcurrentDispatchProbe',
+  'submitReadThenExternalProbe',
 ];
 export const EFFECT_TYPES = [
   'effect:job-submit', 'effect:job-status', 'effect:job-reconcile',
   'effect:notify-send', 'effect:unpermitted-probe', 'effect:cross-capability-probe',
   'effect:job-submit-expiring', 'effect:double-dispatch-probe', 'effect:concurrent-dispatch-probe',
+  'effect:read-then-submit-probe',
 ];
 
 const JOB_INPUT_FROM = {
@@ -127,6 +135,16 @@ function makeDefinition() {
             targetState: 'open',
             effectIntents: [{ effectType: 'effect:concurrent-dispatch-probe', inputFrom: JOB_INPUT_FROM }],
           },
+          {
+            // [#1222 P-witness] ONE effect whose handler FIRST performs an
+            // ordinary read Tool call (non-external directory lookup) and only
+            // THEN the authorized external dispatch: the read never consumes
+            // the effect's one durable claim.
+            transitionKey: 'probe-read-then-external',
+            trigger: { kind: 'event', eventType: 'READ_THEN_EXTERNAL_PROBED' },
+            targetState: 'open',
+            effectIntents: [{ effectType: 'effect:read-then-submit-probe', inputFrom: JOB_INPUT_FROM }],
+          },
         ],
       },
       { stateKey: 'closed', kind: 'final' },
@@ -181,6 +199,7 @@ export function getPolicy() {
       'rule:cross-capability-probe': { ruleId: 'rule:cross-capability-probe', eventType: 'CROSS_CAPABILITY_PROBED', ...JOB_RULE_FIELDS },
       'rule:double-dispatch-probe': { ruleId: 'rule:double-dispatch-probe', eventType: 'DOUBLE_DISPATCH_PROBED', ...JOB_RULE_FIELDS },
       'rule:concurrent-dispatch-probe': { ruleId: 'rule:concurrent-dispatch-probe', eventType: 'CONCURRENT_DISPATCH_PROBED', ...JOB_RULE_FIELDS },
+      'rule:read-then-submit-probe': { ruleId: 'rule:read-then-submit-probe', eventType: 'READ_THEN_EXTERNAL_PROBED', ...JOB_RULE_FIELDS },
     },
     intentBindings: {
       submitExternalJob: { trigger: { kind: 'event', eventType: 'JOB_SUBMITTED' }, ruleId: 'rule:job-submit', roles: ['requester'] },
@@ -192,6 +211,7 @@ export function getPolicy() {
       submitCrossCapabilityProbe: { trigger: { kind: 'event', eventType: 'CROSS_CAPABILITY_PROBED' }, ruleId: 'rule:cross-capability-probe', roles: ['requester'] },
       submitDoubleDispatchProbe: { trigger: { kind: 'event', eventType: 'DOUBLE_DISPATCH_PROBED' }, ruleId: 'rule:double-dispatch-probe', roles: ['requester'] },
       submitConcurrentDispatchProbe: { trigger: { kind: 'event', eventType: 'CONCURRENT_DISPATCH_PROBED' }, ruleId: 'rule:concurrent-dispatch-probe', roles: ['requester'] },
+      submitReadThenExternalProbe: { trigger: { kind: 'event', eventType: 'READ_THEN_EXTERNAL_PROBED' }, ruleId: 'rule:read-then-submit-probe', roles: ['requester'] },
     },
     effectBindings: {
       'effect:job-submit': {
@@ -282,6 +302,26 @@ export function getPolicy() {
             throw new Error('the concurrent probe grounded no dispatch');
           }
           return fulfilled.value;
+        },
+      },
+      'effect:read-then-submit-probe': {
+        semantics: 'non-idempotent',
+        resource: { key: 'extjob', operation: 'job.submit' },
+        external: { permitTtlMs: 3_600_000, await: 'phase' },
+        // [#1222 P-witness] An ordinary read Tool call (the non-external
+        // `directory` capability) runs BEFORE the one authorized external
+        // dispatch. The read is outside this effect's permit scope, so it must
+        // not take the durable dispatch claim: job.submit still lands once.
+        handler: async ({ input, effectId, resources }) => {
+          const lookedUp = await resources.call('directory', 'directory.lookup', {
+            key: `lookup:${String(input.requestId)}`,
+          });
+          if (lookedUp === null || typeof lookedUp !== 'object' || lookedUp.found !== true) {
+            throw new Error('the preceding read Tool call did not answer its contract');
+          }
+          return await resources.call('extjob', 'job.submit', {
+            requestId: input.requestId, jobSpec: input.jobSpec ?? null, effectId,
+          });
         },
       },
     },
