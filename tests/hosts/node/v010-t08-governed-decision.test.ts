@@ -37,7 +37,9 @@ import {
   T08CountingStore,
   buildT08GovernedApp,
   createT08AuthorizationAuthority,
+  deploymentKPrefix,
   instanceRowOf,
+  instanceRowsOf,
   kRowsOf,
   readT08Rows,
   t08Decision,
@@ -210,6 +212,7 @@ test('T08-F01: duplicate retry of the same accepted decision is idempotent; a co
         approvalRef: 'approval:t08:reuse-conflict',
       });
       authority.grant(reused);
+      const kRowsBeforeReuse = kRowsOf(readT08Rows(kPath), T08_DEPLOYMENT);
       await t08Refusal(
         activateGovernedV10Build(buildB, {
           store, deployment: T08_DEPLOYMENT, decision: reused, authorization: authority, now: () => T08_NOW,
@@ -219,7 +222,9 @@ test('T08-F01: duplicate retry of the same accepted decision is idempotent; a co
       const afterConflict = await readV10DeploymentActivationRecord(store, T08_DEPLOYMENT.deployedAppId, decisionA.decisionId);
       assert.ok(afterConflict !== null);
       assert.equal(afterConflict.subjectDigest, buildA.subjectDigest, 'the accepted A decision is not rewritten');
-      assert.equal(kRowsOf(readT08Rows(kPath), buildB.subjectDigest).length, 0, 'the refused reuse wrote no B K rows');
+      // #1217: A/B share one deployment K namespace; "no B rows" is honestly
+      // "the refusal added no K row at all".
+      assert.deepEqual(kRowsOf(readT08Rows(kPath), T08_DEPLOYMENT), kRowsBeforeReuse, 'the refused reuse wrote no K rows');
     } finally {
       await inner.close();
     }
@@ -251,7 +256,7 @@ test('T08-N05: two Bs sharing workflowId+instanceKey and two tenants keep indepe
       const oldReceipt = await activationA.send(T08_OLD_INTENT);
       assert.equal(oldReceipt.status, 'admitted');
       const oldRowT1 = instanceRowOf(
-        readT08Rows(kPath), T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+        readT08Rows(kPath), T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
       );
       assert.ok(oldRowT1 !== undefined);
 
@@ -260,6 +265,10 @@ test('T08-N05: two Bs sharing workflowId+instanceKey and two tenants keep indepe
       });
       await activationB.send(T08_NEW_INTENT);
       await activationB.send(T08_SECOND_B_INTENT);
+
+      // Tenant isolation witness (#1217 addressing): nothing may exist under
+      // the other tenant's namespace before that tenant's own activation.
+      assert.equal(kRowsOf(readT08Rows(kPath), T08_OTHER_TENANT).length, 0, 'no T1 row leaked into the other tenant namespace');
 
       const activationBOther = await activateGovernedV10Build(buildB, {
         store, deployment: T08_OTHER_TENANT, decision: decisionBOtherTenant, authorization: authority, now: () => T08_NOW,
@@ -279,22 +288,19 @@ test('T08-N05: two Bs sharing workflowId+instanceKey and two tenants keep indepe
 
       const rows = readT08Rows(kPath);
       assert.ok(instanceRowOf(
-        rows, T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+        rows, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
       ) !== undefined, 'T1 old A row remains');
       assert.ok(instanceRowOf(
-        rows, T08_DEPLOYMENT, buildB.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_NEW_INTENT.instanceKey,
-      ) !== undefined, 'T1 new B alpha row exists');
+        rows, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_NEW_INTENT.instanceKey,
+      ) !== undefined, 'T1 new B alpha row exists (BUILD attribution is the pin, asserted above)');
       assert.ok(instanceRowOf(
-        rows, T08_DEPLOYMENT, buildB.subjectDigest, T08_BUSINESS_BETA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+        rows, T08_DEPLOYMENT, T08_BUSINESS_BETA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
       ) !== undefined, 'T1 B beta row shares the logical key without aliasing A alpha');
       assert.ok(instanceRowOf(
-        rows, T08_OTHER_TENANT, buildB.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
+        rows, T08_OTHER_TENANT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
       ) !== undefined, 'T2 B alpha row exists under the other tenant scope');
-      assert.equal(instanceRowOf(
-        rows, T08_OTHER_TENANT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey,
-      ), undefined, 'no A row leaked into the other tenant');
       assert.equal(
-        instanceRowOf(rows, T08_DEPLOYMENT, buildA.subjectDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
+        instanceRowOf(rows, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, T08_OLD_INTENT.instanceKey)?.value,
         oldRowT1.value,
         'B and the other tenant leave the old A row byte-identical',
       );
@@ -353,18 +359,17 @@ test('T08-F01-race: concurrent A/B first admissions for one new occurrence admit
       const pinB = await activationB.readPin(intent);
       assert.ok(pinA !== null && pinB !== null);
       assert.equal(pinA.subjectDigest, pinB.subjectDigest, 'both activations observe the SAME immutable pin');
-      const winnerDigest = pinA.subjectDigest === buildA.subjectDigest ? buildA.subjectDigest : buildB.subjectDigest;
-      const loserDigest = winnerDigest === buildA.subjectDigest ? buildB.subjectDigest : buildA.subjectDigest;
       const rows = readT08Rows(kPath);
-      assert.ok(instanceRowOf(
-        rows, T08_DEPLOYMENT, winnerDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, intent.instanceKey,
-      ) !== undefined, 'the winning BUILD owns the admitted occurrence');
-      assert.equal(instanceRowOf(
-        rows, T08_DEPLOYMENT, loserDigest, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, intent.instanceKey,
-      ), undefined, 'the losing BUILD owns no occurrence row');
-      assert.equal(kRowsOf(rows, loserDigest).length, 0, 'the losing BUILD wrote no K row at all');
+      // #1217: winner and loser share the one deployment namespace; the
+      // physical witness of "exactly one BUILD admitted" is exactly one
+      // occurrence row (its BUILD attribution is the shared pin above).
       assert.equal(
-        rows.filter((row) => row.key.startsWith(`v10/k/${winnerDigest}/`) && row.key.includes(':effect-journal:')).length,
+        instanceRowsOf(rows, T08_DEPLOYMENT, T08_BUSINESS_ALPHA, T08_WORKFLOW_ID, intent.instanceKey).length,
+        1,
+        'exactly one physical occurrence row exists — the concurrent loser wrote none',
+      );
+      assert.equal(
+        rows.filter((row) => row.key.startsWith(deploymentKPrefix(T08_DEPLOYMENT)) && row.key.includes(':effect-journal:')).length,
         1,
         'the single admitted occurrence dispatched exactly one effect journal entry',
       );

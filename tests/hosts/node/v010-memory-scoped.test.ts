@@ -87,6 +87,47 @@ test('T04-P3/N3: controlled TTL hides expired values in get and search', async (
   await store.close();
 });
 
+test('T04-I1218-P: expired key can be recreated with increasing revision; live key refuses create', async () => {
+  const store = new InMemoryCasStore();
+  let tick = 10;
+  const memory = createV10ScopedMemory({ store, authorize: allow, now: () => tick });
+  const first = await memory.put({ scope, key: 'ephemeral', value: 1, provenance,
+    expiresAtMs: 20, condition: { mustBeAbsent: true } });
+  assert.equal(first.revision, 0);
+  await assert.rejects(memory.put({ scope, key: 'ephemeral', value: 2, provenance,
+    condition: { mustBeAbsent: true } }), code('HOST_KEY_EXISTS'));
+  tick = 20;
+  assert.equal(await memory.get(scope, 'ephemeral'), null);
+  const second = await memory.put({ scope, key: 'ephemeral', value: 3, provenance,
+    condition: { mustBeAbsent: true } });
+  assert.equal(second.revision, 1);
+  assert.equal((await memory.get(scope, 'ephemeral'))?.value, 3);
+  await assert.rejects(memory.put({ scope, key: 'ephemeral', value: 4, provenance,
+    condition: { mustBeAbsent: true } }), code('HOST_KEY_EXISTS'));
+  await store.close();
+});
+
+test('T04-I1218-N: competing expired-key creators perform single winning CAS', async () => {
+  const store = new InMemoryCasStore();
+  let tick = 10;
+  const a = createV10ScopedMemory({ store, authorize: allow, now: () => tick });
+  const b = createV10ScopedMemory({ store, authorize: allow, now: () => tick });
+  await a.put({ scope, key: 'race', value: 'old', provenance,
+    expiresAtMs: 20, condition: { mustBeAbsent: true } });
+  tick = 20;
+  const results = await Promise.allSettled([
+    a.put({ scope, key: 'race', value: 'A', provenance, condition: { mustBeAbsent: true } }),
+    b.put({ scope, key: 'race', value: 'B', provenance, condition: { mustBeAbsent: true } }),
+  ]);
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+  assert.equal(results.filter(result => result.status === 'rejected').length, 1);
+  const failure = results.find(result => result.status === 'rejected');
+  assert.ok(failure && failure.status === 'rejected');
+  assert.equal((failure.reason as { code?: string }).code, 'HOST_CAS_CONFLICT');
+  assert.equal((await a.get(scope, 'race'))?.revision, 1);
+  await store.close();
+});
+
 test('T04-N4: mandatory CAS, complete scope and Host gate reject malformed calls', async () => {
   assert.throws(() => createV10ScopedMemory({
     store: new InMemoryCasStore(), authorize: null as unknown as typeof allow,

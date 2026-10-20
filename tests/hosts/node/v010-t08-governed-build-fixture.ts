@@ -364,27 +364,55 @@ export function readT08Rows(kPath: string): readonly T08SqliteRow[] {
   }
 }
 
-export function kRowsOf(rows: readonly T08SqliteRow[], subjectDigest: string): readonly T08SqliteRow[] {
-  return rows.filter((row) => row.key.startsWith(`v10/k/${subjectDigest}/`));
+/** Escape one physical key component exactly like the writer's encodeK02Component. */
+function encKeyComponent(value: string): string {
+  return value.replace(/%/g, '%25').replace(/:/g, '%3A');
 }
 
-export function instanceRowOf(
+/**
+ * The ONE governed K-docs outer prefix (#1217): the stable
+ * `deployment:<deployedAppId>:<tenantId>:<appId>` tuple. A BUILD subjectDigest
+ * is a revision OF the deployment, never a physical address component — A and
+ * B share this namespace, and BUILD attribution is the occurrence pin, not a
+ * key prefix.
+ */
+export function deploymentKPrefix(deployment: V10DeploymentIdentity): string {
+  return `v10/k/deployment:${encKeyComponent(deployment.deployedAppId)}:${encKeyComponent(deployment.tenantId)}:${encKeyComponent(deployment.appId)}/`;
+}
+
+/** All physical K rows of one governed deployment (every BUILD revision shares it). */
+export function kRowsOf(rows: readonly T08SqliteRow[], deployment: V10DeploymentIdentity): readonly T08SqliteRow[] {
+  return rows.filter((row) => row.key.startsWith(deploymentKPrefix(deployment)));
+}
+
+/** Every physical instance row of one occurrence inside one B's K02 scope. */
+export function instanceRowsOf(
   rows: readonly T08SqliteRow[],
   deployment: V10DeploymentIdentity,
-  subjectDigest: string,
   businessPackageId: string,
   workflowId: string,
   instanceKey: string,
-): T08SqliteRow | undefined {
+): readonly T08SqliteRow[] {
   const scope = `v010-k02:${[
     deployment.deployedAppId,
     deployment.tenantId,
     deployment.appId,
     businessPackageId,
-  ].map((value) => value.replace(/%/g, '%25').replace(/:/g, '%3A')).join(':')}:`;
+  ].map(encKeyComponent).join(':')}:`;
   const suffix = `v08-kernel:wf-instance:${workflowId}:${instanceKey}`;
-  return rows.find((row) => row.key.startsWith(`v10/k/${subjectDigest}/`)
+  return rows.filter((row) => row.key.startsWith(deploymentKPrefix(deployment))
     && row.key.includes(scope)
     && row.key.endsWith(suffix));
+}
+
+/** The physical instance row of one occurrence (first match), or undefined. */
+export function instanceRowOf(
+  rows: readonly T08SqliteRow[],
+  deployment: V10DeploymentIdentity,
+  businessPackageId: string,
+  workflowId: string,
+  instanceKey: string,
+): T08SqliteRow | undefined {
+  return instanceRowsOf(rows, deployment, businessPackageId, workflowId, instanceKey)[0];
 }
 
