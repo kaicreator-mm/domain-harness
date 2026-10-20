@@ -40,6 +40,7 @@
  * object handed back is a frozen snapshot (the receipt digest allows the
  * caller to re-verify the exact receipt bytes the outcome was read from).
  */
+import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import type { V10PublicIntent } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
@@ -62,11 +63,6 @@ function refuse(code: string, message: string, options?: { cause?: unknown }): n
   throw new DecisionEvidenceObserverError(code, message, options);
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
