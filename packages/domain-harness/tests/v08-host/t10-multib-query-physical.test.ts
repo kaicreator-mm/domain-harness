@@ -56,7 +56,8 @@ const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLen
 // C01-integrated blob is 1a6a1394 and the K02 physical suite already pins
 // exactly that post-C01 byte identity. T10 composes over it and never edits
 // kernel bytes; the blob assertion below is the byte proof of this rebind.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = '1a6a1394a505f4727306208d588fcab841e72980';
+// Current selected Kernel includes R01 K01 live same-turn fence guard (#1205); previous C01 blob 1a6a1394a505f4727306208d588fcab841e72980.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = 'db7a8f16de2b26d2fdb10e6ca7f8e90b3f1daf30';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the selected kernel payload is byte-identical to the K02-spliced integration blob');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);

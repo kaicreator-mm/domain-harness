@@ -257,7 +257,8 @@ test('R02-b/K01 a same-revision competing fence claim refuses (#1108); same-turn
   await engine.createInstance({ address, correlationId: 'c', packageId: 'biz:quote@1.0.0', initialState: { stateKey: 'review', context: {} } });
 
   assert.equal(await engine.readAdmissionFenceRevision(address), null);
-  await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: null });
+  const turnIdentity = 'r02-direct:turn-x:canonical-empty';
+  const original = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', turnIdentity, expectedTargetSequence: 0, snapshotFenceRevision: null });
   // A claim whose own snapshot predates the holder's claim (stale
   // snapshotFenceRevision) still refuses — pre-existing #1100 discipline.
   await assert.rejects(
@@ -274,8 +275,9 @@ test('R02-b/K01 a same-revision competing fence claim refuses (#1108); same-turn
     engineB.claimAdmissionFence({ target: address, turnId: 'turn:y', expectedTargetSequence: 0, snapshotFenceRevision: observed }),
     (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
   );
-  // The SAME turn re-claiming its own fence is the crash-recovery replay path.
-  const reclaimed = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) });
+  // Same canonical turn attaches read-only; an in-flight holder must retain its CAS revision.
+  const reclaimed = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', turnIdentity, expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) });
+  assert.equal(reclaimed.revision, original.revision, 'same-turn attach must not steal the CAS revision');
 
   const transition = () => ({ nextState: { stateKey: 'approved', context: {} } });
   // A commit whose fence document was displaced (simulated directly on the
@@ -290,14 +292,14 @@ test('R02-b/K01 a same-revision competing fence claim refuses (#1108); same-turn
   // different turn now holds at the same stateRevision — the corrupted/
   // displaced fence is fail-closed for everyone until reconciliation.
   await assert.rejects(
-    engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) }),
+    engine.claimAdmissionFence({ target: address, turnId: 'turn:x', turnIdentity, expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) }),
     (error: unknown) => (error as { code?: string }).code === 'ADMISSION_STATE_CAS_CONFLICT',
   );
   // Operator reconciliation of the simulated corruption restores the holder's
   // fence document; the holder re-claims its own turn and commits.
   const displaced = await storeB.get(fenceKey);
-  await storeB.put(fenceKey, { pinVersion: 1, stateRevision: 0, turnId: 'turn:x', claimedAt: NOW }, { mustMatchRevision: (displaced?.revision ?? 0) as number });
-  const healed = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) });
+  await storeB.put(fenceKey, { pinVersion: 1, stateRevision: 0, turnId: 'turn:x', turnIdentity, claimedAt: NOW }, { mustMatchRevision: (displaced?.revision ?? 0) as number });
+  const healed = await engine.claimAdmissionFence({ target: address, turnId: 'turn:x', turnIdentity, expectedTargetSequence: 0, snapshotFenceRevision: await engine.readAdmissionFenceRevision(address) });
   const committed = await engine.processAcceptedTransition({ target: address, messageId: 'mx', expectedTargetSequence: 0, admissionFence: healed, transition });
   assert.equal(committed.stateRevision, 1);
   assert.equal(committed.lastMessageId, 'mx');

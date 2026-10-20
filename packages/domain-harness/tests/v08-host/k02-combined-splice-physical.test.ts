@@ -56,7 +56,8 @@ const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadD
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
 // The POST-SPLICE integrated kernel blob (recorded at the K02 phase-2 splice
 // on top of K01 R2 36f068e3). Any further kernel drift fails this import.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = '1a6a1394a505f4727306208d588fcab841e72980';
+// Re-pinned after accepted R01 K01 live same-turn repair #1205; previous selected C01/K02 blob 1a6a1394a505f4727306208d588fcab841e72980.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = 'db7a8f16de2b26d2fdb10e6ca7f8e90b3f1daf30';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the combined test runs the exact spliced integration kernel bytes');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
@@ -565,63 +566,51 @@ async function raceFixture(name: string): Promise<RaceFixture> {
   };
 }
 
-test('CB-R1 two real processes race the SAME turn over ONE SQLite file: exactly-once effect, the in-flight holder honestly loses its stolen fence, the reconciling retry lands the ORIGINAL receipt', { timeout: 300_000 }, async () => {
+test('CB-R1 two live processes sharing a canonical turn preserve the holder fence, commit original receipt and never double-dispatch', { timeout: 300_000 }, async () => {
   const fx = await raceFixture('r1');
   const instance = 'race-1';
   const opened = await runWorker(fx.workerArgs(['--mode', 'open', '--instance', instance, '--worker', 'opener']));
-  assert.equal(opened.result?.status, 'ok', `open failed: ${opened.stdout}\n${opened.stderr}`);
+  assert.equal(opened.result?.status, 'ok', 'open failed: ' + opened.stdout + opened.stderr);
 
-  // A parks inside the effect handler AFTER its fence claim; B — a REAL
-  // second process — carries the SAME messageId. By identity B is the SAME
-  // turn re-entered in-flight: the same-turnId re-claim is the kernel's
-  // crash-recovery path (a slow holder is indistinguishable from a crashed
-  // one), so B takes the fence and hits the durable 'started' +
-  // non-idempotent journal record — the honest typed UNKNOWN (K01-N1), never
-  // a second dispatch, never a fabricated ACK.
+  // A is parked AFTER its actual held-fence claim and journal start.
+  // A live same-turn B must not CAS-replace the holder's revision.
   const pendingA = startWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-race', '--worker', 'a', '--park', 'r1-entered:r1-go']));
   await fx.waitForCtrl('r1-entered');
+  const fenceKey = RACE_SCOPE_PREFIX + ':admission-fence:' + enc(WORKFLOW_ID) + ':' + enc(instance);
+  const originalFence = await fx.store.get(fenceKey);
+  assert.ok(originalFence !== null);
   const b = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-race', '--worker', 'b']));
-  assert.equal(b.result?.status, 'error', `B outcome: ${b.stdout}\n${b.stderr}`);
-  assert.equal(b.result?.error_code, 'ADMISSION_EFFECT_AMBIGUOUS', 'the concurrent same-turn duplicate is an honest typed UNKNOWN while the journal row is started');
-  assert.equal((await fx.ledgerLines()).length, 0, 'B dispatched nothing');
+  assert.equal(b.result?.status, 'error', 'B outcome: ' + b.stdout + b.stderr);
+  assert.equal(b.result?.error_code, 'ADMISSION_EFFECT_AMBIGUOUS', 'B refuses honest in-flight non-idempotent journal replay');
+  assert.equal((await fx.store.get(fenceKey))?.revision, originalFence.revision, 'B may not displace the active same-turn holder');
+  assert.equal((await fx.ledgerLines()).length, 0, 'B dispatched no external effect');
 
-  // A resumes: its handler lands the ONE real external dispatch, the journal
-  // completes — and its COMMIT honestly loses (#requireHeldAdmissionFence:
-  // B's re-claim moved the fence), zero durable state move.
   await fx.putCtrl('r1-go');
   const a = await pendingA.done;
-  assert.equal(a.result?.status, 'error', `A outcome: ${a.stdout}\n${a.stderr}`);
-  assert.equal(a.result?.error_code, 'ADMISSION_STATE_CAS_CONFLICT', 'the in-flight holder loses its commit honestly after the same-turn re-claim');
-  assert.equal((await fx.ledgerLines()).length, 1, 'exactly ONE real external dispatch (accounted by the journal)');
+  assert.equal(a.result?.status, 'admitted', 'A must commit after its real dispatch: ' + a.stdout + a.stderr);
+  assert.equal(a.result?.stateRevision, 1);
+  assert.equal((await fx.ledgerLines()).length, 1, 'exactly one external dispatch');
   let doc = await fx.instanceDoc(instance);
-  assert.equal(doc.stateRevision, 0, 'no state moved yet');
-
-  // The reconciling retry (a third process): the journal 'completed' record
-  // is REPLAYED (no second dispatch — K01-N2 semantics) and the commit
-  // lands — with the ORIGINAL receipt riding the same state CAS.
-  const retry = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-race', '--worker', 'c']));
-  assert.equal(retry.result?.status, 'admitted', `retry outcome: ${retry.stdout}\n${retry.stderr}`);
-  assert.equal(retry.result?.stateRevision, 1);
-  assert.equal((await fx.ledgerLines()).length, 1, 'still exactly one real external dispatch — the completed journal is replayed, never re-executed');
-
-  // The ORIGINAL receipt is in the scoped instance document: exactly one
-  // admitted turn, exactly one state revision.
-  const ring = await fx.ringOf(instance);
-  const envelope = ring[`turn:${enc(WORKFLOW_ID)}:${enc(instance)}:message:${enc('m-race')}`];
-  assert.ok(envelope !== undefined, 'the original receipt rode the reconciling state CAS');
-  assert.equal(envelope?.receipt?.instance?.stateRevision, 1);
-  doc = await fx.instanceDoc(instance);
-  assert.equal(doc.stateRevision, 1, 'the state moved exactly once');
+  assert.equal(doc.stateRevision, 1, 'original holder commits once');
   assert.equal(doc.state.stateKey, 'approved');
 
-  // A changed-input re-send of the SAME messageId from yet another process
-  // refuses typed (root-cause-1 repair, cross-process).
+  // A third process must replay the ORIGINAL durable K02 receipt and
+  // perform zero new State/Journal/external Effect activity.
+  const retry = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-race', '--worker', 'c']));
+  assert.equal(retry.result?.status, 'admitted', 'retry outcome: ' + retry.stdout + retry.stderr);
+  assert.equal(retry.result?.stateRevision, 1);
+  assert.equal((await fx.ledgerLines()).length, 1, 'the original receipt replay never re-dispatches');
+  const ring = await fx.ringOf(instance);
+  const envelope = ring['turn:' + enc(WORKFLOW_ID) + ':' + enc(instance) + ':message:' + enc('m-race')];
+  assert.ok(envelope !== undefined, 'original receipt is durably committed');
+  assert.equal(envelope?.receipt?.instance?.stateRevision, 1);
+
   const changed = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'm-race', '--input-json', '{"sku":"CHANGED"}', '--worker', 'd']));
-  assert.equal(changed.result?.status, 'error', `changed-input outcome: ${changed.stdout}\n${changed.stderr}`);
-  assert.equal(changed.result?.error_code, 'K02_TURN_RECEIPT_INPUT_CONFLICT', 'the changed canonical input refuses typed across processes');
-  assert.equal((await fx.ledgerLines()).length, 1, 'the conflict dispatched nothing');
+  assert.equal(changed.result?.status, 'error', 'changed input outcome: ' + changed.stdout + changed.stderr);
+  assert.equal(changed.result?.error_code, 'K02_TURN_RECEIPT_INPUT_CONFLICT', 'different canonical input refuses typed');
+  assert.equal((await fx.ledgerLines()).length, 1);
   const finalRing = await fx.ringOf(instance);
-  assert.equal(Object.keys(finalRing).length, 1, 'the ring holds exactly the single admitted turn');
+  assert.equal(Object.keys(finalRing).length, 1);
 });
 
 // ---------------------------------------------------------------------------
