@@ -284,6 +284,16 @@ function encodeK02Component(value) {
     return value.replace(/%/g, '%25').replace(/:/g, '%3A');
 }
 /**
+ * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
+ * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
+ * binding and the Shadow L4 verifier's independent re-derivation — the three
+ * must never drift apart.
+ */
+export function v10DeploymentDocsPrefix(deployment) {
+    return `${K_DOCS_PREFIX}deployment:${encodeK02Component(deployment.deployedAppId)}:${encodeK02Component(deployment.tenantId)}:${encodeK02Component(deployment.appId)}/`;
+}
+/**
  * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
@@ -368,12 +378,9 @@ export class V10AppFacade {
     #namespaces;
     #now;
     #counters;
-    // Key-namespace handoff (review 6254726674, P2): the docs key namespace
-    // derives its deployment identity from the BUILD subjectDigest, which is
-    // not the stable deployedAppId + B-domain identity Product/L2 require.
-    // The key-shape repair belongs to K02/T10/T08 — the concrete handoff is
-    // recorded in .agent/execution/v0.10-T00/HANDOFFS.md — and is deliberately
-    // NOT changed here in T00.
+    // In governed deployments the outer K namespace is derived solely from
+    // the stable deployment tuple, not from subjectDigest (a BUILD revision).
+    // K02 applies the per-B scoped prefix inside this outer namespace.
     #docsPrefix;
     #activatedTenantId;
     #docs;
@@ -391,7 +398,9 @@ export class V10AppFacade {
         this.#deploymentIdentity = deps.deploymentIdentity;
         this.#queryAuthority = deps.queryAuthority;
         this.#activatedTenantId = deps.tenantId;
-        this.#docsPrefix = `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`;
+        this.#docsPrefix = deps.deploymentIdentity === undefined
+            ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
+            : v10DeploymentDocsPrefix(deps.deploymentIdentity);
         this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
     }
     get selectedExtensions() {
@@ -425,7 +434,7 @@ export class V10AppFacade {
             .filter((module) => module.role === 'business')
             .map((module) => module.packageId)
             .sort();
-        const namespace = `${K_DOCS_PREFIX}${this.#app.subjectDigest}/${this.#activatedTenantId}/`;
+        const namespace = this.#docsPrefix;
         return Object.freeze({
             subjectDigest: this.#app.subjectDigest,
             appId: this.#app.appId,

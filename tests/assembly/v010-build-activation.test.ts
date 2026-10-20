@@ -85,6 +85,41 @@ test('P-ACT-BASIC-LIFECYCLE: sealed modules load/connect/execute/dispose; one ad
   assert.deepEqual(evalLog(), []);
 });
 
+test('P-I1217: stable deployedAppId preserves K02 physical records across BUILD revisions', async () => {
+  const originalComposition = await basicComposition();
+  const firstApp = buildV10App(originalComposition);
+  const successorApp = buildV10App({ ...originalComposition, buildId: 't00-basic-successor' });
+  assert.notEqual(firstApp.subjectDigest, successorApp.subjectDigest,
+    'regression must span two actual distinct BUILD digests');
+  const store = new PlainCasDocStore();
+  const deploymentIdentity = {
+    deployedAppId: 'deployment:v010-stable', tenantId: TENANT, appId: firstApp.appId,
+  };
+  const queryAuthority = { principal: { role: 'reader' }, authorize: () => true };
+  const first = await activateV10App(firstApp, {
+    store, deploymentIdentity, now: tickingClock().now, queryAuthority,
+  });
+  const receipt = await first.facade.send({ ...INTENT });
+  assert.equal(receipt.status, 'admitted');
+  const originalPrefixes = first.facade.selectedShadowBinding.k02DocumentPrefixes;
+  first.dispose();
+
+  const second = await activateV10App(successorApp, {
+    store, deploymentIdentity, now: tickingClock().now, queryAuthority,
+  });
+  assert.deepEqual(second.facade.selectedShadowBinding.k02DocumentPrefixes, originalPrefixes,
+    'shadow and K docs physical prefixes must be stable across BUILD digests');
+  const target = second.facade.resolveIntentTarget(INTENT.intentType);
+  const snapshot = await second.facade.queryScopedSnapshot({
+    businessPackageId: target.businessPackageId,
+    workflowId: target.workflowId,
+    instanceKey: INTENT.instanceKey,
+  });
+  assert.equal(snapshot.target.instanceKey, INTENT.instanceKey);
+  assert.ok(snapshot.snapshot !== null, 'a successor BUILD must not misreport the pinned predecessor as NOT_FOUND');
+  second.dispose();
+});
+
 test('P-ACT-BASIC-SKIPS-ADVANCED: absent optional advisory modules are skipped, advanced bytes never evaluated', async () => {
   clearEvalLog();
   const optionalAbsent = await extensionEntry({ fixture: 'kext-eval-sentinel.mjs', hookExport: 'observeSentinel', optional: true, bytesOnly: true });
