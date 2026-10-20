@@ -17,13 +17,15 @@
  *
  *  - any module edge whose specifier is NOT declared in that module's
  *    sealed allowance (`node:*`, bare npm/native specifiers alike) —
- *    undeclared ordinary imports are a BUILD failure, so the sealed graph
- *    is the whole graph;
+ *    undeclared ordinary imports are a BUILD failure. Declared literal
+ *    edges are sealed, but static analysis is not a complete JS sandbox;
  *  - computed (non-literal) dynamic `import()` — a non-deterministic edge
  *    is a discovery edge, and BUILD enables no unselected discovery;
- *  - `require(...)`, `eval(...)` and `Function`-family code-string
- *    constructors — code-string evaluation is not an ordinary import and
- *    would hide graph edges from this one-pass static closure;
+ *  - direct/indirect references to `require`, `eval` and `Function`-family
+ *    constructors, plus explicit `.constructor` access — code-string
+ *    evaluation and CommonJS discovery are not ordinary module imports;
+ *    this bounded AST hygiene does NOT prove that all dynamic aliases,
+ *    computed properties, or global capabilities are unreachable;
  *  - relative/absolute file edges and `data:` edges — the sealed-bytes
  *    composition wires modules through the SDK connect step, not through
  *    filesystem edges inside sealed bytes (packed-app file layout belongs
@@ -40,6 +42,7 @@
  * (byte pin asserted before any parse, fail closed), so the two gates
  * share one parser identity while their POLICIES differ per version.
  */
+import { isBuiltin } from 'node:module';
 import { parse } from '../v09build/generated/acorn.mjs';
 import type { AcornNode } from '../v09build/generated/acorn.mjs';
 import { assertVendoredParserBytes, V09_BUILD_PARSER_PIN } from '../v09build/parser.js';
@@ -48,6 +51,21 @@ import { V10BuildError } from './errors.js';
 const MAX_AST_DEPTH = 2_000;
 
 const CODE_STRING_CONSTRUCTORS = new Set(['Function', 'GeneratorFunction', 'AsyncFunction', 'AsyncGeneratorFunction']);
+const CODE_STRING_GLOBALS = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'require']);
+
+/**
+ * This is static hygiene, NOT a sandbox: trusted closed-world code can still
+ * compute a property name or obtain an evaluator through arbitrary aliases.
+ * These explicit spellings must not bypass the BUILD diagnostic, however.
+ */
+function forbiddenMemberName(node: AcornNode): string | null {
+  if (node.type !== 'MemberExpression') return null;
+  const member = node as { computed?: boolean; property?: AcornNode };
+  const property = member.property;
+  if (property === undefined) return null;
+  const name = member.computed ? specifierOf(property) : property.type === 'Identifier' ? nodeName(property) : null;
+  return name !== null && (CODE_STRING_GLOBALS.has(name) || name === 'constructor') ? name : null;
+}
 
 /** The sealed per-module allowance of ordinary external imports. */
 export interface V10ExternalImports {
@@ -112,7 +130,18 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
     if (depth > MAX_AST_DEPTH) {
       throw denied(moduleLabel, `AST depth exceeds the bounded walk limit (${String(MAX_AST_DEPTH)})`);
     }
+    const forbiddenMember = forbiddenMemberName(node);
+    if (forbiddenMember !== null) {
+      throw denied(moduleLabel, `member access to '${forbiddenMember}' can alias code-string evaluation or CommonJS discovery`);
+    }
     switch (node.type) {
+      case 'Identifier': {
+        const name = nodeName(node);
+        if (CODE_STRING_GLOBALS.has(name)) {
+          throw denied(moduleLabel, `reference to '${name}' can alias code-string evaluation or CommonJS discovery`);
+        }
+        break;
+      }
       case 'ImportDeclaration': {
         edges.push({ kind: 'static-import', specifier: specifierOf(node.source) });
         if (specifierOf(node.source) === null) {
@@ -199,6 +228,11 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
 
 function classify(specifier: string, moduleLabel: string): 'node' | 'npm-or-native' {
   if (specifier.startsWith('node:')) return 'node';
+  // Node also resolves bare builtins (e.g. 'fs' and 'fs/promises'). Do not
+  // misclassify these as npm/native entries even if the caller lists them.
+  if (isBuiltin(specifier)) {
+    throw denied(moduleLabel, `bare Node builtin '${specifier}' must use its explicit 'node:' specifier and node allowance`);
+  }
   if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('data:') || specifier.startsWith('file:')) {
     throw denied(moduleLabel, `import edge '${specifier}' is a file/data edge; sealed module bytes wire through the SDK connect step, not filesystem edges (packed file layout belongs to deployment)`);
   }
