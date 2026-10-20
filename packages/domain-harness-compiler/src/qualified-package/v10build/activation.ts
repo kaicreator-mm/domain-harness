@@ -1293,7 +1293,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       advisories,
       store: options.store,
       tenantId: deploymentIdentity?.tenantId ?? options.tenantId ?? 'tenant:v010-default',
-      now: options.now ?? (() => 0),
+      now: options.now ?? Date.now,
       counters,
       ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
       ...(queryAuthority === undefined ? {} : { queryAuthority }),
