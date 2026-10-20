@@ -25,7 +25,15 @@
     "./v10payload/sfeature-workflow-control": "./src/qualified-package/payload/sfeature-workflow-control-v1.mjs",
     "./v10payload/sfeature-context-assembly": "./src/qualified-package/payload/sfeature-context-assembly-v1.mjs",
     "./v10payload/sfeature-decision-evidence": "./src/qualified-package/payload/sfeature-decision-evidence-v1.mjs",
-    "./v10payload/sfeature-candidate-validation": "./src/qualified-package/payload/sfeature-candidate-validation-v1.mjs"
+    "./v10payload/sfeature-candidate-validation": "./src/qualified-package/payload/sfeature-candidate-validation-v1.mjs",
+    "./v10meta": {
+      "types": "./dist/qualified-package/v10meta/index.d.ts",
+      "import": "./dist/qualified-package/v10meta/index.js"
+    },
+    "./payload/business-meta-feedback-v1": "./src/qualified-package/payload/business-meta-feedback-v1.mjs",
+    "./payload/sfeature-meta-feedback-v1": "./src/qualified-package/payload/sfeature-meta-feedback-v1.mjs",
+    "./payload/kernel-mechanism-v1": "./src/qualified-package/payload/kernel-mechanism-v1.mjs",
+    "./payload/standard-sdk-v1": "./src/qualified-package/payload/standard-sdk-v1.mjs"
   },
   "files": [
     "dist",
