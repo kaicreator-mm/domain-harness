@@ -960,7 +960,11 @@ export async function activateV10App(app, options) {
             ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
             ...(queryAuthority === undefined ? {} : { queryAuthority }),
         });
-        const failActivation = (code, failedPackageId, message) => {
+        // A `function` declaration (not a const arrow) so the explicit `never`
+        // return is on the referenced declaration itself: TypeScript only treats
+        // the call as a control-flow terminator that way, which is what narrows
+        // `initReturn` to a plain record after the guard below.
+        function failActivation(code, failedPackageId, message) {
             for (let index = initialized.length - 1; index >= 0; index -= 1) {
                 const advisory = initialized[index];
                 counters.disposals.push(advisory.packageId);
@@ -975,7 +979,7 @@ export async function activateV10App(app, options) {
             facade.close();
             counters.initFailures.push({ packageId: failedPackageId, message });
             refuse(code, message);
-        };
+        }
         for (const advisory of advisories) {
             const namespace = namespaces.get(advisory.packageId);
             const init = namespace.init;
@@ -987,7 +991,12 @@ export async function activateV10App(app, options) {
             catch (error) {
                 failActivation('V10_EXTENSION_INIT_FAILED', advisory.packageId, `advisory module ${advisory.packageId} init threw: ${error instanceof Error ? error.message : String(error)}`);
             }
-            const initRecord = assertPlainRecord(initReturn, `advisory module ${advisory.packageId} init return`);
+            // Contract rejection is a late init failure: run the SAME reverse
+            // teardown path as a thrown init, never bypass the initialized stack.
+            if (!isPlainRecord(initReturn)) {
+                failActivation('V10_INIT_CONTRACT_REFUSED', advisory.packageId, `advisory module ${advisory.packageId} init return must be a plain record`);
+            }
+            const initRecord = initReturn;
             const fields = Object.keys(initRecord);
             if (fields.some((field) => !INIT_RETURN_FIELDS.has(field))) {
                 // A forged createOccurrenceRuntime / effectPermit / principal rides

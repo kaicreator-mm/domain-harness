@@ -368,6 +368,27 @@ test('N-ACT-FORGED-INIT-RETURN: authority-shaped init data refuses typed with re
   assert.deepEqual(disposalLog(), [...initialized].reverse().filter((packageId) => disposable.has(packageId)));
 });
 
+test('N-ACT-ASYNC-INIT-RETURN: non-plain Promise rejects typed and disposes previously initialized advisories', async () => {
+  clearDisposalLog();
+  const asyncReturn = await extensionEntry({ fixture: 'kext-init-async-return.mjs', hookExport: 'observeAsyncReturn' });
+  const options = await richComposition();
+  const app = buildV10App({ ...options, appId: 'app:v010-t00-async-init', modules: [...options.modules, asyncReturn] });
+  const counters = freshV10Counters();
+  const store = new PlainCasDocStore();
+  await assert.rejects(
+    activateV10App(app, { store, tenantId: TENANT, now: tickingClock().now, counters }),
+    (error: unknown) => activationCode(error) === 'V10_INIT_CONTRACT_REFUSED',
+  );
+  const failing = asyncReturn.packageId as string;
+  const previouslyInitialized = counters.initCalls.filter((id) => id !== failing);
+  assert.ok(previouslyInitialized.length > 0, 'must exercise reverse disposal after prior successful init');
+  assert.equal(counters.initFailures.length, 1, 'contract rejection is recorded as an init failure');
+  assert.equal(counters.initFailures[0]?.packageId, failing);
+  const disposable = new Set(['sfeature-validation@v010.1.0.0', 'sfeature-formatting@v010.1.0.0', 'kext-advisory-alpha@v010.1.0.0']);
+  assert.deepEqual(disposalLog(), [...previouslyInitialized].reverse().filter((id) => disposable.has(id)));
+  assert.equal(store.size(), 0, 'late init refusal cannot write K documents');
+});
+
 test('N-ACT-PORT-PROBE-DENIED: probing a protected K port denies-and-records, activation fails closed', async () => {
   const prober = await extensionEntry({ fixture: 'kext-init-probes-ports.mjs', hookExport: 'observePorts' });
   const options = await richComposition();
