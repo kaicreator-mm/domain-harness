@@ -501,6 +501,17 @@ function encodeK02Component(value: string): string {
 }
 
 /**
+ * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
+ * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
+ * binding and the Shadow L4 verifier's independent re-derivation — the three
+ * must never drift apart.
+ */
+export function v10DeploymentDocsPrefix(deployment: { deployedAppId: string; tenantId: string; appId: string }): string {
+  return `${K_DOCS_PREFIX}deployment:${encodeK02Component(deployment.deployedAppId)}:${encodeK02Component(deployment.tenantId)}:${encodeK02Component(deployment.appId)}/`;
+}
+
+/**
  * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
@@ -676,7 +687,7 @@ export class V10AppFacade {
     this.#activatedTenantId = deps.tenantId;
     this.#docsPrefix = deps.deploymentIdentity === undefined
       ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
-      : `${K_DOCS_PREFIX}deployment:${encodeK02Component(deps.deploymentIdentity.deployedAppId)}:${encodeK02Component(deps.deploymentIdentity.tenantId)}:${encodeK02Component(deps.deploymentIdentity.appId)}/`;
+      : v10DeploymentDocsPrefix(deps.deploymentIdentity);
     this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
   }
 
