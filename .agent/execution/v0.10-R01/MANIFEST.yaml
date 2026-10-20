@@ -7,30 +7,25 @@ task_branch: task/v0.10-r01-release-closure
 ads_version: 4.13.1
 ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
 implementation_tasks: 16_OF_16_DONE
-p0: 14_OF_14_DONE
-p1_optional: 2_OF_2_INCLUDED
-r01_k01_repair_issue: 1205_CLOSED
-r01_k01_repair_pr: 1206_MERGED
-r01_k01_repair_head: 828966e4c2520eb698cf939b66a3ff325d7f9217
-candidate_release_sha: 7cbfaf5ab8e21a0e2ff0e98625694132d7d21bb4
-candidate_tree: 30c8ab6328543d8ffc0a4581c4d44aa35b3293f3
-previous_candidate_sha: dcf4b31306e1a33b85782ada0507f7b53aee3b0f
-previous_r01_evidence: docs/validation/v0.10/R01_PRE_K01_REPAIR_CANDIDATE_dcf4b313.md
-older_r01_evidence: docs/validation/v0.10/R01_PRE_T09_CANDIDATE_df3dc4bb.md
-r01_r2_executed_at: 2026-10-20
-r01_r2_run_head: 32812b5afee523f9b1df168777bc56f5b25b3f5d
-r01_r2_log_dir: C:\xDev\kAiCreator\_tmp\r01-final-r2-20261020
-source_dag_gate: PASS_16_OF_16_CLOSED_FIVE_FROZEN_BLOBS_MATCH
-builder_claim_current: BUILDER_EXECUTED_AT_7CBFAF5A_R2
-full_regression_at_candidate: FAIL_5_DETERMINISTIC_MAIN_4_COMPILER_1
-critical_journeys_at_candidate: PASS_84
-security_at_candidate: FAIL_2_FILES_56_OF_59_ASSERTIONS
-clean_packed_tiny_rich_at_candidate: FAIL_2_OF_3_OFFICIAL_RUNS
-hidden_validation_at_candidate: PASS_DH010_HIDDEN_FP_1181_01_REV2_31_OF_31_X2
-hidden_repin_issue: kaicreator-mm/hidden-validation#66_CLOSED_PASS
-hidden_pack_commit: 48467d119255a4afdd8f6dc962fcd10ca540925d
-hidden_pack_manifest_sha256: ccc06600d738fe077d82c87a6749f2067ffeddc9ac291043e4a56cf0e4e78726
-independent_release_review: NOT_RUN_AT_R2
-r01_r2_p1_findings: 2
-release_qualification: NO
+p0_tasks: 14_OF_14_DONE
+p1_optional_tasks: 2_OF_2_DONE
+r01_prior_repairs:
+  K01_1205: MERGED
+  witness_1207: MERGED_2752943b
+  T11_WAL_1209: MERGED_7df8398b
+  C01_1211: MERGED_fed515be45c4e48233f20dcbc76d6f3410780f34
+candidate_release_sha: fed515be45c4e48233f20dcbc76d6f3410780f34
+candidate_tree: 97f7fb51c76d244be9070511922851223130f5da
+source_dag_frozen_inputs: PASS_5_EXACT_BLOBS_MATCH
+predecessor_r2_evidence: docs/validation/v0.10/R01_PRE_R3_CANDIDATE_7cbfaf5a.md
+r01_r3_builder_claim: NOT_YET_ACCEPTED
+build_lint_typecheck_at_candidate: NOT_RUN
+full_regression_at_candidate: NOT_RUN
+critical_journeys_at_candidate: NOT_RUN
+security_at_candidate: NOT_RUN
+fresh_clean_packed_tiny_rich_at_candidate: NOT_RUN
+hidden_at_candidate: NOT_RUN
+hidden_repin_issue: kaicreator-mm/hidden-validation#67_OPEN
+independent_release_review: NOT_RUN
+release_qualified: NO
 main_merge: NO

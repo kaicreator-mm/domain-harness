@@ -120,6 +120,7 @@ function buildDefinition(definition, appDir, payloads, runtimeDir) {
   }
   cpSync(join(runtimeDir, 'app.mjs'), join(definition.outDir, 'app.mjs'));
   cpSync(join(runtimeDir, 'runtime-core.mjs'), join(definition.outDir, 'runtime-core.mjs'));
+  cpSync(join(runtimeDir, 'sqlite-open.mjs'), join(definition.outDir, 'sqlite-open.mjs'));
   cpSync(join(runtimeDir, 'resolution-log.mjs'), join(definition.outDir, 'resolution-log.mjs'));
   cpSync(join(appDir, 'scenario.mjs'), join(definition.outDir, 'scenario.mjs'));
   const packageJson = {
@@ -129,7 +130,7 @@ function buildDefinition(definition, appDir, payloads, runtimeDir) {
     description: definition.description,
     type: 'module',
     main: 'app.mjs',
-    files: ['app.mjs', 'runtime-core.mjs', 'resolution-log.mjs', 'scenario.mjs', 'app.build.json', 'manifest.json', 'modules', 'candidates'],
+    files: ['app.mjs', 'runtime-core.mjs', 'sqlite-open.mjs', 'resolution-log.mjs', 'scenario.mjs', 'app.build.json', 'manifest.json', 'modules', 'candidates'],
   };
   writeFileSync(join(definition.outDir, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`);
   writeFileSync(join(definition.outDir, 'app.build.json'), `${JSON.stringify(built, null, 2)}\n`);
