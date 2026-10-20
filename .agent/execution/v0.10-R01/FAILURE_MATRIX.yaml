@@ -1,0 +1,18 @@
+task: R01
+fail_closed_when:
+  - candidate_sha_drift_during_or_after_full_qualification
+  - unreviewed_required_P0_task_or_source_commit
+  - missing_or_stale_exact_head_ci
+  - failed_or_not_run_required_full_regression
+  - absent_unexecuted_hidden_pack_misrepresented_as_PASS
+  - no_real_clean_packed_Tiny_Rich_or_native_SQLite_evidence
+  - two_writers_double_dispatch_or_K_live_permit_bypass
+  - original_receipt_nonimmutable_or_changed_input_replayed
+  - Shadow_production_write_or_candidate_auto_approval
+  - old_PINNED_only_occurrence_migrated_to_new_BUILD
+  - hidden_B_tenant_memory_existence_or_cross_scope_oracle
+  - wrong_optional_scope_assumption_or_branch_head_drift
+  - nonreviewed_P0_P1_release_contradiction
+posture: RELEASE_QUALIFIED_NO_until_real_evidence
+repair_route: separate_scoped_Task_PR_into_v0.10_then_repin_release_candidate
+never: unverified_release_pass_or_premature_main_merge
