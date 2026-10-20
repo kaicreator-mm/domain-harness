@@ -240,6 +240,52 @@ test('K01-P1 two real processes: the rival cannot displace an in-flight fence at
   assert.equal(doc.lifecycle, 'completed');
 });
 
+// [R01-RACE-01 #1205] Exactly one physical original receipt with TWO
+// concurrently LIVE workers and the SAME canonical turn.
+test('K01-R01-P1 a LIVE same-turn retry cannot steal the fence of a dispatching holder', async () => {
+  const fx = await namedFixture('r01-live-sameturn');
+  const instance = 't:a:r01-live-sameturn';
+  await openInstance(fx, instance);
+  const a = startWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'same', '--worker', 'a', '--park', 'r01-entered:r01-go']));
+  await fx.waitForCtrl('r01-entered');
+  const before = await fx.fenceDoc(instance);
+  assert.ok(before !== null);
+  assert.equal(typeof before.value.turnIdentity, 'string');
+  const b = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'same', '--worker', 'b']));
+  assert.equal(b.result?.status, 'error', `second worker: ${b.stdout}\n${b.stderr}`);
+  assert.equal(b.result?.error_code, 'ADMISSION_EFFECT_AMBIGUOUS');
+  assert.equal((await fx.fenceDoc(instance))?.revision, before.revision, 'same-turn replay overwrote held fence');
+  assert.equal((await fx.ledgerLines()).length, 0);
+  await fx.putCtrl('r01-go');
+  const result = await a.done;
+  assert.equal(result.result?.status, 'admitted', `original holder: ${result.stdout}\n${result.stderr}`);
+  assert.equal((await fx.ledgerLines()).length, 1);
+  assert.deepEqual((await fx.journalRecords(instance)).map((r) => r.status), ['completed']);
+  const snapshot = await fx.instanceDoc(instance);
+  assert.equal(snapshot.stateRevision, 1);
+  assert.equal(snapshot.state.stateKey, 'approved');
+  assert.equal(Object.keys(snapshot.durableOriginalReceipts ?? {}).length, 1);
+});
+
+test('K01-R01-N1 same messageId but different canonical input cannot attach a live held fence', async () => {
+  const fx = await namedFixture('r01-input-conflict');
+  const instance = 't:a:r01-input-conflict';
+  await openInstance(fx, instance);
+  const a = startWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'same', '--worker', 'a', '--park', 'r01-n-entered:r01-n-go']));
+  await fx.waitForCtrl('r01-n-entered');
+  const before = await fx.fenceDoc(instance);
+  const b = await runWorker(fx.workerArgs(['--instance', instance, '--intent', 'approve', '--message', 'same', '--input-tag', 'changed', '--worker', 'b']));
+  assert.equal(b.result?.status, 'error');
+  assert.equal(b.result?.error_code, 'ADMISSION_STATE_CAS_CONFLICT');
+  assert.equal((await fx.fenceDoc(instance))?.revision, before?.revision);
+  assert.equal((await fx.ledgerLines()).length, 0);
+  await fx.putCtrl('r01-n-go');
+  const result = await a.done;
+  assert.equal(result.result?.status, 'admitted');
+  assert.equal((await fx.ledgerLines()).length, 1);
+  assert.equal((await fx.instanceDoc(instance)).stateRevision, 1);
+});
+
 test('K01-N1 killed in-flight holder: rivals fail closed; same-turn replay is honestly AMBIGUOUS; zero external dispatch', async () => {
   const fx = await namedFixture('n1');
   const instance = 't:a:n1';
