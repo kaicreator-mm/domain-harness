@@ -1,0 +1,12 @@
+task: T09
+fail_closed_on:
+  - invalid_or_oversized_input
+  - unauthorized_or_hidden_B_target
+  - missing_selected_runtime_or_real_physical_evidence
+  - attempted_K_Effect_or_deployment_promotion_bypass
+  - partial_failure_without_truthful_outcome
+failure_rules:
+  preserve_original_K_receipt_and_CAS: true
+  no_fabricated_effect_dispatch: true
+  do_not_block_T11_R01_if_optional_is_incomplete: true
+status: NOT_RUN

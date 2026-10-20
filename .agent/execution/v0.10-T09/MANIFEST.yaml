@@ -1,0 +1,13 @@
+schema: ads/execution-pack-v1
+task: T09
+issue: 1178
+version: v0.10
+version_base_sha: a420807413c33f8dfb9cbc4c1f6628f8f47eb385
+branch: task/v0.10-t09-meta-feedback-workflow
+priority: P1_optional
+dependency: T07#1174_CLOSED
+ads_sha: f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd
+status: JIT_PREPARED_NOT_IMPLEMENTED
+builder_claim: NOT_YET_ACCEPTED
+node24_tests: NOT_RUN
+release_r01_dependency: false
