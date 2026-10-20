@@ -1313,7 +1313,13 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       } catch (error) {
         failActivation('V10_EXTENSION_INIT_FAILED', advisory.packageId, `advisory module ${advisory.packageId} init threw: ${error instanceof Error ? error.message : String(error)}`);
       }
-      const initRecord = assertPlainRecord(initReturn, `advisory module ${advisory.packageId} init return`);
+      // Contract rejection is a late init failure: run the SAME reverse
+      // teardown path as a thrown init, never bypass the initialized stack.
+      if (!isPlainRecord(initReturn)) {
+        failActivation('V10_INIT_CONTRACT_REFUSED', advisory.packageId,
+          `advisory module ${advisory.packageId} init return must be a plain record`);
+      }
+      const initRecord = initReturn;
       const fields = Object.keys(initRecord);
       if (fields.some((field) => !INIT_RETURN_FIELDS.has(field))) {
         // A forged createOccurrenceRuntime / effectPermit / principal rides
