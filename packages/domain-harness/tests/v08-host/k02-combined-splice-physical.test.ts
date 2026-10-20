@@ -590,7 +590,7 @@ test('CB-R1 two live processes sharing a canonical turn preserve the holder fenc
   assert.equal(a.result?.status, 'admitted', 'A must commit after its real dispatch: ' + a.stdout + a.stderr);
   assert.equal(a.result?.stateRevision, 1);
   assert.equal((await fx.ledgerLines()).length, 1, 'exactly one external dispatch');
-  let doc = await fx.instanceDoc(instance);
+  const doc = await fx.instanceDoc(instance);
   assert.equal(doc.stateRevision, 1, 'original holder commits once');
   assert.equal(doc.state.stateKey, 'approved');
 
