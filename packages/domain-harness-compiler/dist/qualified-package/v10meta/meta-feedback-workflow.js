@@ -37,6 +37,7 @@
  * reservation/ledger write. K State/Journal/Effect, the K02 fence and the
  * immutable original receipt remain exclusively the selected Kernel's.
  */
+import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
 export const META_FEEDBACK_ABI = 'dh.v10.meta-feedback-workflow/2';
@@ -84,12 +85,6 @@ export class MetaFeedbackError extends Error {
 }
 function refuse(code, message, detail) {
     throw new MetaFeedbackError(code, message, detail);
-}
-function isPlainRecord(value) {
-    if (value === null || typeof value !== 'object' || Array.isArray(value))
-        return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
 }
 function deepFreeze(value) {
     if (value !== null && typeof value === 'object') {

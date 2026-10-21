@@ -45,6 +45,7 @@
  * initializing and disposing advisory modules is composition scope; their
  * participation in turns belongs to the K-side successors (#1167/#1169).
  */
+import { isPlainRecord } from './guards.js';
 import { randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { registerHooks } from 'node:module';
@@ -96,12 +97,6 @@ const KEXT_EXPORT_BASE = ['MODULE_ID', 'PACKAGE_KIND', 'EXTENSION_ABI', 'PROVIDE
 const SFEATURE_EXPORT_BASE = ['MODULE_ID', 'PACKAGE_KIND', 'FEATURE_ABI', 'FEATURE_KEY', 'init'];
 const INIT_RETURN_FIELDS = new Set(['ok', 'providerId', 'hook', 'featureKey', 'observedContext']);
 const K_DOCS_PREFIX = 'v10/k/';
-function isPlainRecord(value) {
-    if (value === null || typeof value !== 'object' || Array.isArray(value))
-        return false;
-    const proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
-}
 function assertPlainRecord(value, label) {
     if (!isPlainRecord(value)) {
         refuse('V10_APP_INVALID', `${label} must be a plain record`);
