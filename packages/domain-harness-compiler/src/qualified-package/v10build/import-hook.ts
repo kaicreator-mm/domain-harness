@@ -45,6 +45,23 @@ interface DeclaredBareImportAllowance {
   readonly activationModuleUrl: string;
 }
 
+/**
+ * A separate, injectable registry is exposed only by this INTERNAL module
+ * for deterministic hook tests. Every registry owns independent allowances,
+ * refcounts and deregistration. The production registry is never reset by
+ * tests, and the public compiler barrels do not export this symbol.
+ */
+export interface V10ImportHookRegistry {
+  registerDeclaredBareImports(deps: {
+    activationModuleUrl: string;
+    activationNonce: string;
+    appView: V10AppView;
+    deploymentRoot: string | undefined;
+  }): () => void;
+  snapshot(): Readonly<{ users: number; allowances: number; registered: boolean }>;
+}
+
+function createImportHookRegistry(registerHook: typeof registerHooks): V10ImportHookRegistry {
 /** Minted parent-URL fragment -> the declared bare specifiers it may resolve. */
 const declaredBareImportAllowances = new Map<string, DeclaredBareImportAllowance>();
 let importHookHandle: ModuleHooksHandle | null = null;
@@ -54,9 +71,9 @@ let importHookUsers = 0;
 // Activation URL is supplied from the original activation module, never this helper.
 
 function ensureImportResolveHook(): ModuleHooksHandle | null {
-  if (typeof registerHooks !== 'function') return null;
+  if (typeof registerHook !== 'function') return null;
   if (importHookHandle === null) {
-    importHookHandle = registerHooks({
+    importHookHandle = registerHook({
       resolve(specifier, context, nextResolve) {
         const parentURL = context.parentURL;
         // The fragment carries this machinery's per-activation nonce; the
@@ -114,7 +131,7 @@ function declaredBareImportsOf(module: V10AppView['modules'][number]): readonly 
  * unregisters the allowances (and the process hook when this was its last
  * user). Refuses typed when the runtime cannot host the resolve hook.
  */
-export function registerDeclaredBareImports(deps: {
+function registerDeclaredBareImports(deps: {
   activationModuleUrl: string;
   activationNonce: string;
   appView: V10AppView;
@@ -133,7 +150,15 @@ export function registerDeclaredBareImports(deps: {
     }
   }
   if (!hasDeclaredBareImports) return () => {};
-  const handle = ensureImportResolveHook();
+  let handle: ModuleHooksHandle | null;
+  try {
+    handle = ensureImportResolveHook();
+  } catch (error) {
+    // An experimental Node registerHooks failure must never leave a stale
+    // allowance in the process-global map.
+    for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
+    throw error;
+  }
   if (handle === null) {
     for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
     throw new V10ActivationError(
@@ -148,4 +173,28 @@ export function registerDeclaredBareImports(deps: {
     for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
     releaseImportResolveHook();
   };
+}
+
+  return {
+    registerDeclaredBareImports,
+    snapshot: () => Object.freeze({
+      users: importHookUsers,
+      allowances: declaredBareImportAllowances.size,
+      registered: importHookHandle !== null,
+    }),
+  };
+}
+
+/** Test-only: injected registries never mutate production registration state. */
+export function createV10ImportHookRegistryForTests(registerHook: typeof registerHooks): V10ImportHookRegistry {
+  return createImportHookRegistry(registerHook);
+}
+
+const productionImportHookRegistry = createImportHookRegistry(registerHooks);
+
+/** The single process-scoped production import registry. */
+export function registerDeclaredBareImports(
+  deps: Parameters<V10ImportHookRegistry['registerDeclaredBareImports']>[0],
+): () => void {
+  return productionImportHookRegistry.registerDeclaredBareImports(deps);
 }
