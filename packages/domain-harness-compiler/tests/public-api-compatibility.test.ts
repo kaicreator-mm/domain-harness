@@ -305,6 +305,9 @@ test('T008C: every legacy runtime commitment is still present (full inventory co
 // Pack test 2: the versioned compatibility commitment itself.
 // ---------------------------------------------------------------------------
 
+// Pre-1.0 window: the v0.10 additive group may be intentionally narrowed
+// (see #1227/#1248 — internal seams removed from the curated barrel); the
+// legacy inventory below stays additive-only.
 test('T008C: COMPILER_PUBLIC_API_VERSION is the frozen v1 compatibility level', () => {
   assert.equal(COMPILER_PUBLIC_API_VERSION, 'compiler-public-api.v1');
   assert.equal(
