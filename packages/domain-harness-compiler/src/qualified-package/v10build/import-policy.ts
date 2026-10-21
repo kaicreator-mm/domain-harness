@@ -52,6 +52,31 @@ const MAX_AST_DEPTH = 2_000;
 
 const CODE_STRING_CONSTRUCTORS = new Set(['Function', 'GeneratorFunction', 'AsyncFunction', 'AsyncGeneratorFunction']);
 const CODE_STRING_GLOBALS = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'require']);
+/**
+ * Evaluator spellings refused as explicit property/KEY names. `require` is
+ * deliberately absent: sealed ESM bytes have no reachable CommonJS global
+ * (the CommonJS seam stays covered by the bare-identifier checks below),
+ * while ordinary method names — including the vendored kernel's own
+ * instance-registry `require(address)` — must stay sealable.
+ */
+const EVALUATOR_PROPERTY_NAMES = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'constructor']);
+
+/**
+ * Non-computed object/class keys and `obj.prop` property names are spellings
+ * the module DEFINES or selects, not references to global evaluators; their
+ * specific dangers have dedicated checks (forbiddenMemberName, ObjectPattern
+ * destructuring). Computed keys stay walked as ordinary expressions.
+ */
+function isDefinitionKeyName(container: AcornNode, key: string): boolean {
+  if (container.type === 'MemberExpression') {
+    return key === 'property' && !(container as { computed?: boolean }).computed;
+  }
+  if (key !== 'key') return false;
+  if (container.type === 'Property' || container.type === 'MethodDefinition' || container.type === 'PropertyDefinition') {
+    return !(container as { computed?: boolean }).computed;
+  }
+  return false;
+}
 
 /**
  * This is static hygiene, NOT a sandbox: trusted closed-world code can still
@@ -64,7 +89,7 @@ function forbiddenMemberName(node: AcornNode): string | null {
   const property = member.property;
   if (property === undefined) return null;
   const name = member.computed ? specifierOf(property) : property.type === 'Identifier' ? nodeName(property) : null;
-  return name !== null && (CODE_STRING_GLOBALS.has(name) || name === 'constructor') ? name : null;
+  return name !== null && EVALUATOR_PROPERTY_NAMES.has(name) ? name : null;
 }
 
 /** The sealed per-module allowance of ordinary external imports. */
@@ -142,6 +167,19 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
         }
         break;
       }
+      case 'ObjectPattern': {
+        // Destructuring is property access by another spelling: pulling an
+        // evaluator-named key off any object aliases code-string evaluation.
+        for (const property of (node as { properties?: readonly AcornNode[] }).properties ?? []) {
+          if (property.type !== 'Property' || (property as { computed?: boolean }).computed) continue;
+          const key = (property as { key?: AcornNode }).key;
+          const name = key !== undefined && key.type === 'Identifier' ? nodeName(key) : null;
+          if (name !== null && EVALUATOR_PROPERTY_NAMES.has(name)) {
+            throw denied(moduleLabel, `destructuring '${name}' can alias code-string evaluation`);
+          }
+        }
+        break;
+      }
       case 'ImportDeclaration': {
         edges.push({ kind: 'static-import', specifier: specifierOf(node.source) });
         if (specifierOf(node.source) === null) {
@@ -202,6 +240,9 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
     }
     for (const key of Object.keys(node)) {
       if (key === 'type' || key === 'start' || key === 'end') {
+        continue;
+      }
+      if (isDefinitionKeyName(node, key)) {
         continue;
       }
       const value = node[key];

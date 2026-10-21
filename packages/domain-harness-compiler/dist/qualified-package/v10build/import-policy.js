@@ -50,6 +50,31 @@ const MAX_AST_DEPTH = 2_000;
 const CODE_STRING_CONSTRUCTORS = new Set(['Function', 'GeneratorFunction', 'AsyncFunction', 'AsyncGeneratorFunction']);
 const CODE_STRING_GLOBALS = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'require']);
 /**
+ * Evaluator spellings refused as explicit property/KEY names. `require` is
+ * deliberately absent: sealed ESM bytes have no reachable CommonJS global
+ * (the CommonJS seam stays covered by the bare-identifier checks below),
+ * while ordinary method names — including the vendored kernel's own
+ * instance-registry `require(address)` — must stay sealable.
+ */
+const EVALUATOR_PROPERTY_NAMES = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'constructor']);
+/**
+ * Non-computed object/class keys and `obj.prop` property names are spellings
+ * the module DEFINES or selects, not references to global evaluators; their
+ * specific dangers have dedicated checks (forbiddenMemberName, ObjectPattern
+ * destructuring). Computed keys stay walked as ordinary expressions.
+ */
+function isDefinitionKeyName(container, key) {
+    if (container.type === 'MemberExpression') {
+        return key === 'property' && !container.computed;
+    }
+    if (key !== 'key')
+        return false;
+    if (container.type === 'Property' || container.type === 'MethodDefinition' || container.type === 'PropertyDefinition') {
+        return !container.computed;
+    }
+    return false;
+}
+/**
  * This is static hygiene, NOT a sandbox: trusted closed-world code can still
  * compute a property name or obtain an evaluator through arbitrary aliases.
  * These explicit spellings must not bypass the BUILD diagnostic, however.
@@ -62,7 +87,7 @@ function forbiddenMemberName(node) {
     if (property === undefined)
         return null;
     const name = member.computed ? specifierOf(property) : property.type === 'Identifier' ? nodeName(property) : null;
-    return name !== null && (CODE_STRING_GLOBALS.has(name) || name === 'constructor') ? name : null;
+    return name !== null && EVALUATOR_PROPERTY_NAMES.has(name) ? name : null;
 }
 export function emptyExternalImports() {
     return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
@@ -116,6 +141,20 @@ export function collectModuleEdges(moduleLabel, source) {
                 const name = nodeName(node);
                 if (CODE_STRING_GLOBALS.has(name)) {
                     throw denied(moduleLabel, `reference to '${name}' can alias code-string evaluation or CommonJS discovery`);
+                }
+                break;
+            }
+            case 'ObjectPattern': {
+                // Destructuring is property access by another spelling: pulling an
+                // evaluator-named key off any object aliases code-string evaluation.
+                for (const property of node.properties ?? []) {
+                    if (property.type !== 'Property' || property.computed)
+                        continue;
+                    const key = property.key;
+                    const name = key !== undefined && key.type === 'Identifier' ? nodeName(key) : null;
+                    if (name !== null && EVALUATOR_PROPERTY_NAMES.has(name)) {
+                        throw denied(moduleLabel, `destructuring '${name}' can alias code-string evaluation`);
+                    }
                 }
                 break;
             }
@@ -179,6 +218,9 @@ export function collectModuleEdges(moduleLabel, source) {
         }
         for (const key of Object.keys(node)) {
             if (key === 'type' || key === 'start' || key === 'end') {
+                continue;
+            }
+            if (isDefinitionKeyName(node, key)) {
                 continue;
             }
             const value = node[key];

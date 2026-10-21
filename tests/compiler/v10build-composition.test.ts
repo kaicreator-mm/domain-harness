@@ -237,8 +237,16 @@ test('N-BUILD import-closure refusals (undeclared/computed/code-string/edges)', 
 
 test('N-I1221: reject statically visible indirect code-string evaluators and bare Node builtins', async () => {
   // The gate is bounded AST hygiene, not a sandbox or dynamic JS proof.
+  // The gate module and its error class load through the SAME dynamic-import
+  // graph: under tsx a static import of the barrel and a dynamic import of
+  // the gate module produce separate module instances, so an instanceof
+  // against the statically imported V10BuildError would be false even for
+  // a genuine gate refusal.
   const { assertSealedImportClosure } = await import(
     '../../packages/domain-harness-compiler/src/qualified-package/v10build/import-policy.js'
+  );
+  const { V10BuildError: V10BuildErrorFromGateModule } = await import(
+    '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js'
   );
   const empty = { node: [], npm: [], native: [] };
   const rejected = [
@@ -255,13 +263,22 @@ test('N-I1221: reject statically visible indirect code-string evaluators and bar
   for (const source of rejected) {
     assert.throws(
       () => assertSealedImportClosure('probe', source, { ...empty, npm: ['fs', 'fs/promises'] }, new Set()),
-      (error: unknown) => error instanceof V10BuildError && error.code === 'V10_IMPORT_POLICY_DENIED',
+      (error: unknown) => error instanceof V10BuildErrorFromGateModule && error.code === 'V10_IMPORT_POLICY_DENIED',
       `expected BUILD policy refusal for ${source}`,
     );
   }
   assert.doesNotThrow(() => assertSealedImportClosure(
     'probe', "import { readFileSync } from 'node:fs'; export const read = readFileSync;",
     { ...empty, node: ['node:fs'] }, new Set(),
+  ));
+  // Ordinary `require`-named members (the vendored kernel's instance-registry
+  // method) must stay sealable: only the bare CommonJS identifier is refused.
+  assert.doesNotThrow(() => assertSealedImportClosure(
+    'probe',
+    'class Registry { async require(address) { return address; } }\n'
+    + 'const registry = { require(address) { return address; } };\n'
+    + 'export const probe = (self, instances) => [self.require("a"), instances.require("b"), registry.require("c")];',
+    { ...empty }, new Set(),
   ));
 });
 
