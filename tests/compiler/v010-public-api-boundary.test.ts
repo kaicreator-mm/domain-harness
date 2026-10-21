@@ -33,3 +33,14 @@ test('N-I1227: public barrels never export trusted Host effect/AST internals', (
     }
   }
 });
+
+test('P-I1227: all v10 BUILD exports are identity-equal across all three public entrypoints', () => {
+  const names = Object.keys(v10) as (keyof typeof v10)[];
+  assert.ok(names.length > 20, 'canonical BUILD barrel must not silently go empty');
+  for (const name of names) {
+    assert.ok(name in root, `root is missing the canonical v10 binding ${name}`);
+    assert.ok(name in qualified, `qualified barrel is missing the canonical v10 binding ${name}`);
+    assert.equal(root[name as keyof typeof root], v10[name], `root export drift: ${name}`);
+    assert.equal(qualified[name as keyof typeof qualified], v10[name], `qualified export drift: ${name}`);
+  }
+});
