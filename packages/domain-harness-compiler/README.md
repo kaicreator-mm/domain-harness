@@ -35,6 +35,24 @@ the shared process hook may retain allowances; garbage collection is **not** a
 reliable cleanup mechanism. This is a trusted same-process loader, not an
 untrusted module sandbox.
 
+### Compatibility and fallback
+
+`registerHooks` remains an experimental Node API; `engines >=22.15.0`
+states the supported minimum, **not** a guarantee that every Node build
+exposes the required hook behavior. Validate the actual deployment runtime,
+including simultaneous activations, declared npm/native resolution, and
+cleanup of process-wide hook users. On a missing/broken hook, activation
+must refuse typed `V10_IMPORT_HOOK_UNAVAILABLE` (or report import failure);
+it must **never** silently allow undeclared imports, drop BUILD allowances,
+re-evaluate substituted bytes, or switch to an unsafe evaluator.
+
+For deployments where the hook is unavailable or unsuitable, use a supported
+Node 24 build with verified hook behavior **or** build a self-contained,
+static ESM closure in the trusted BUILD phase so there are no declared bare
+npm/native specifiers to resolve at activation. Recompute and qualify the
+BUILD subject/package byte digests; do not rewrite sealed bytes at runtime.
+The imported code is a trusted, preapproved Domain Package, not a sandbox.
+
 ## Usage
 
 ```ts

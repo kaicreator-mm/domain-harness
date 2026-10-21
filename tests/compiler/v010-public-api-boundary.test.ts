@@ -21,6 +21,10 @@ test('N-I1227: public barrels never export trusted Host effect/AST internals', (
       'normalizeExternalEffectEnvelope',
       'collectModuleEdges',
       'assertSealedImportClosure',
+      // #1228: the test-only registry factory and the minted-fragment seam
+      // stay internal to import-hook.ts; `export *` chains would leak them.
+      'createV10ImportHookRegistryForTests',
+      'privateModuleFragment',
     ]) {
       assert.equal(name in surface, false, `${name} must not be publicly reachable`);
     }
