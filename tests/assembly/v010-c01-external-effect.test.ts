@@ -50,10 +50,12 @@ import {
   V10_TARGET_PROFILE,
   activateV10App,
   buildV10App,
-  dispatchThroughExternalEffectGate,
   freshV10Counters,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { createV10DocsPort } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+// The trusted gate seam is internal (#1227): tests wire it through the module
+// path, never through the curated public barrel.
+import { dispatchThroughExternalEffectGate } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.js';
 import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { PlainCasDocStore, sha256HexSource } from './helpers-v010.js';
 import * as extjobConsole from './fixtures-v010/capability-extjob-runx-v1.mjs';
