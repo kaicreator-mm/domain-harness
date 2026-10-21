@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import {
   SqliteDocStore,
   activateV10App,
-  freshV10Counters,
 } from './runtime-core.mjs';
 
 /** Advanced PACKAGE identities Tiny must never select, install or import. */
@@ -56,14 +55,12 @@ export async function run({ scenario, workdir, app, manifest, log }) {
   };
 
   let store = new SqliteDocStore(dbPath);
-  let counters = freshV10Counters();
   let activation = await activateV10App(app, {
     store,
     tenantId: deployment.tenantId,
     deploymentIdentity: deployment,
     queryAuthority: authority,
     now: () => Date.UTC(2026, 9, 20, 0, 0, 0),
-    counters,
     deploymentRoot: log.deploymentRoot,
   });
 
@@ -141,14 +138,12 @@ export async function run({ scenario, workdir, app, manifest, log }) {
     return { rows: store.count('%'), journalRows: store.count('%effect-journal%') };
   });
 
-  counters = freshV10Counters();
   activation = await activateV10App(app, {
     store,
     tenantId: deployment.tenantId,
     deploymentIdentity: deployment,
     queryAuthority: authority,
     now: () => Date.UTC(2026, 9, 20, 0, 0, 1),
-    counters,
     deploymentRoot: log.deploymentRoot,
   });
 

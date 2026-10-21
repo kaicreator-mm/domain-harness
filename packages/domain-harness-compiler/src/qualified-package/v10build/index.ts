@@ -36,13 +36,10 @@ export {
   V10AppFacade,
   V10PortDeniedError,
   activateV10App,
-  freshV10Counters,
 } from './activation.js';
 export type {
   ActivateV10AppOptions,
   V10Activation,
-  V10AppView,
-  V10Counters,
   V10DocStore,
   V10DocWriteCondition,
   V10PublicIntent,
@@ -52,6 +49,10 @@ export type {
   V10ScopedSnapshotManyAnswer,
   V10ScopedSnapshotQuery,
 } from './activation.js';
+// V10Counters/freshV10Counters/V10AppView are compiler-internal diagnostics
+// and activation wiring types, importable only by internal relative modules.
+// Curated public consumers use activateV10App()/V10Activation rather than
+// supplying or forging diagnostic probe objects.
 // The trusted Host external gate is wired only by activation.ts; exporting
 // it would let untrusted consumers supply counterfeit docs and attest ports.
 export type { ExternalEffectEnvelope } from './external-effect.js';

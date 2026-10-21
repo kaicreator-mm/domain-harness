@@ -7,6 +7,7 @@
  * two-process SQLite, packed npm consumers and hidden validation belong to
  * K01/K02/T11/R01 and are NOT claimed here.
  */
+import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -14,7 +15,6 @@ import {
   V10ActivationError,
   activateV10App,
   buildV10App,
-  freshV10Counters,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import type { V10DocStore } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { createV10DocsPort } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';

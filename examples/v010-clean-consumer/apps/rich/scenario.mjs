@@ -27,7 +27,6 @@ import {
   V10_TARGET_PROFILE,
   activateGovernedV10Build,
   activateV10App,
-  freshV10Counters,
   readOnlyStore,
 } from './runtime-core.mjs';
 import {
@@ -155,14 +154,13 @@ function queryAuthority(deployment, visible) {
   };
 }
 
-async function activate({ store, app, manifest, log, authority, counters, now = () => NOW }) {
+async function activate({ store, app, manifest, log, authority, now = () => NOW }) {
   return await activateV10App(app, {
     store,
     tenantId: manifest.deployment.tenantId,
     deploymentIdentity: manifest.deployment,
     queryAuthority: authority,
     now,
-    counters: counters ?? freshV10Counters(),
     deploymentRoot: log.deploymentRoot,
   });
 }
@@ -219,9 +217,9 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
   let store = new SqliteDocStore(dbPath);
   const visible = new Set([B1, B2, B3, B4]);
   const { authority, probes } = queryAuthority(manifest.deployment, visible);
-  let counters = freshV10Counters();
   const now = () => NOW;
-  let activation = await activate({ store, app, manifest, log, authority, counters, now });
+  let activation = await activate({ store, app, manifest, log, authority, now });
+  let counters = activation.counters;
   let facade = activation.facade;
 
   await step('RICH_P1.selection', () => {
@@ -533,8 +531,8 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
   activation.dispose();
   store.close();
   store = new SqliteDocStore(dbPath);
-  counters = freshV10Counters();
-  activation = await activate({ store, app, manifest, log, authority, counters, now });
+  activation = await activate({ store, app, manifest, log, authority, now });
+  counters = activation.counters;
   facade = activation.facade;
 
   await step('RICH_P2.restart', async () => {

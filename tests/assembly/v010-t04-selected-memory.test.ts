@@ -20,6 +20,7 @@
  * store under `v10/k/**` and Memory never writes there; a denied Memory op
  * surfaces as an honest Kernel effect failure, never a forged receipt.
  */
+import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
@@ -33,7 +34,6 @@ import {
   V10_TARGET_PROFILE,
   activateV10App,
   buildV10App,
-  freshV10Counters,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import {

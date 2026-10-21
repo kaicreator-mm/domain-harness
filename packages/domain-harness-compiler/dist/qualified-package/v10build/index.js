@@ -9,5 +9,5 @@ export { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY
 // BUILD internal AST tooling remains in import-policy.ts (not the public API).
 export { emptyExternalImports } from './import-policy.js';
 export { buildV10App } from './build.js';
-export { V10ActivationError, V10AppFacade, V10PortDeniedError, activateV10App, freshV10Counters, } from './activation.js';
+export { V10ActivationError, V10AppFacade, V10PortDeniedError, activateV10App, } from './activation.js';
 export { V10DeploymentError, activateGovernedV10Build, readV10DeploymentActivationRecord, readV10OccurrenceBuildPin, v10BuildActivationDecisionDigest, v10BuildPackageClosureDigest, v10DeploymentActivationKey, v10OccurrenceBuildPinKey, } from './deployment.js';
