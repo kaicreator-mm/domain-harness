@@ -1,44 +1,11 @@
-/**
- * DomainHarness v0.10 T08 (#1175) — governed new BUILD version activation.
- * ======================================================================
- *
- * A BUILD is a static, already-qualified executable App (`buildV10App`).
- * Selecting a *new* BUILD for a stable deployment is therefore a
- * BUILD/deployment decision, never an SDK package hot swap. This module is
- * the Host-owned deployment seam that makes that decision explicit and
- * durable:
- *
- *  - an EXACT immutable activation decision names the stable
- *    `deployedAppId`/tenant/appId, the selected BUILD's `subjectDigest`,
- *    its exact package-closure digest, the build id and an external
- *    `approvalRef`;
- *  - a trusted Host authorization authority (`verify`) must bind that very
- *    decision digest/approval reference/subject/closure to a current,
- *    unrevoked external approval. Candidate/Shadow/model material is plain
- *    data and can never stand in for that authority or authorize itself;
- *  - the accepted decision is recorded once in a durable activation ledger
- *    (idempotent retry of the same decision; a conflicting reuse refuses);
- *  - every admitted occurrence is bound to the ORIGINAL BUILD through an
- *    immutable occurrence→BUILD pin in the same CAS store. A later BUILD
- *    activation can serve new occurrences but can never re-route, replay
- *    through, rewrite or silently migrate an occurrence pinned to the old
- *    BUILD. A restored process must activate the exact pinned BUILD (the
- *    pin is never a floating "latest" pointer).
- *
- * The selected Kernel/K02 admission, CAS, Effect, UNKNOWN and original
- * receipt semantics are untouched: this layer only decides WHICH already
- * built App a caller may activate and whether a particular occurrence may
- * use that App. The physical K namespaces remain K02's own scoped tuples;
- * this module adds a separate immutable occurrence pin dimension.
- */
+import { V10Error } from './errors.js';
 import type { V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
 import { V10AppFacade } from './activation.js';
 import type { V10BuiltApp } from './build.js';
 declare const DECISION_KIND: "v10/build-activation-decision";
 declare const PIN_KIND: "v10/occurrence-build-pin";
 declare const RECORD_KIND: "v10/deployment-activation";
-export declare class V10DeploymentError extends Error {
-    readonly code: string;
+export declare class V10DeploymentError extends V10Error {
     readonly detail: Readonly<Record<string, unknown>> | undefined;
     constructor(code: string, message: string, detail?: Record<string, unknown>);
 }
