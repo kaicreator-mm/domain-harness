@@ -1067,7 +1067,10 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     if (typeof messageId !== 'string' || messageId.length === 0 || messageId.length > MAX_STRING) {
       refuse('OCCURRENCE_BUILD_PIN_INVALID', 'a governed send requires a bounded non-empty messageId; the reservation protocol binds admission to it');
     }
-    const inputDigest = sha256Canonical(intent.input ?? {});
+    if (!isPlainRecord(intent.input)) {
+      refuse('OCCURRENCE_BUILD_PIN_INVALID', 'a governed send requires a plain record input; the reservation digest and the Kernel witness must bind the exact same canonical bytes');
+    }
+    const inputDigest = sha256Canonical(intent.input);
     const attemptId = randomUUID();
     const now = new Date(this.#now()).toISOString();
     for (let round = 0; round < 5; round += 1) {
@@ -1181,9 +1184,13 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
       refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the Kernel durably admitted this reservation while returning a non-admitted receipt; the pin is settled ADMITTED and the caller reconciles through the original messageId', { receiptStatus: status });
     }
     if (attempt.mode === 'owner') {
-      // The claimed writer slot proves no second submit of this reservation
-      // is in flight, and the concluded receipt + absent witness mean this
-      // exact attempt can never admit: guarded exact-revision compensation.
+      // The claimed writer slot proves no second OWNER submit of this
+      // reservation exists; a same-message adopter is still possible, but K02
+      // same-turn determinism ((target, messageId, input) => one turnId; a
+      // deny mutates no state) means a concluded deny and a committed admit
+      // of this exact turn cannot both be true. With the witness absent and
+      // the receipt concluded, this attempt can never admit: guarded
+      // exact-revision compensation.
       await this.#reclaimReservation(attempt, status);
     } else {
       await this.#releaseWriterSlot(attempt);

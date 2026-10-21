@@ -94,8 +94,12 @@ exist without a real admission — a crash between `openInstance` and
        the receipt; reconcile via the original messageId);
      - witness absent and this attempt holds the slot (`owner`) → **guarded
        compensation**: exact-revision `remove` of its own RESERVED pin. The
-       held slot proves no concurrent submit; the concluded receipt plus the
-       absent witness prove this attempt can never admit. A CAS conflict
+       held slot excludes a second OWNER submit; a same-message adopter
+       remains possible, but K02 same-turn determinism (one turnId per
+       (target, messageId, input); a deny mutates no state) means a concluded
+       deny and a committed admission of this exact turn cannot both be true.
+       The concluded receipt plus the absent witness therefore prove this
+       attempt can never admit. A CAS conflict
        retains the pin and refuses typed INDETERMINATE; a store without the
        conditional-remove seam refuses typed INDETERMINATE and retains the
        pin (fail-closed, never a fake success);
@@ -124,7 +128,12 @@ K02 replay reconciles the outcome.
   pinned (conservative, auditable via `readPin`).
 - The governed layer is the only writer this protocol fences; a raw
   (ungoverned) `activateV10App` facade over the same store is outside its
-  authority, as before.
+  authority, as before. Should that assumption be broken anyway (raw-facade
+  writes or a non-deterministic policy racing the reservation), the worst
+  reachable end state is a compensation deleting a pin an adopter's admission
+  then settles typed `OCCURRENCE_RESERVATION_INDETERMINATE` (auditable, never
+  silent) — the redirect guard for that one occurrence is weakened until the
+  owner's same-messageId reconciliation re-pins it.
 
 ## 6. Verification matrix (Node24, physical SQLite; two real processes where marked)
 
