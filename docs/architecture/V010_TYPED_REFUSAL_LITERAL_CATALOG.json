@@ -1,9 +1,10 @@
 {
   "format": "dh.v010.typed-refusal-literals/1",
-  "scope": "direct source literal error arguments only; excludes dynamic codes and sealed payloads",
+  "scope": "direct literal refusal arguments and object-literal code properties; excludes dynamic codes and sealed payloads",
   "sourceFiles": {
     "packages/domain-harness-compiler/src/qualified-package/v10build/activation.ts": [
       "FACADE_CLOSED",
+      "HOST_CAS_CONFLICT",
       "INTENT_UNSEALED",
       "K_DOC_CONDITION_REQUIRED",
       "K_RECEIPT_INVALID",
@@ -116,6 +117,7 @@
       "SHADOW_CANDIDATE_REVOKED",
       "SHADOW_CANDIDATE_SOURCE_MISMATCH",
       "SHADOW_DEPLOYMENT_BINDING_MISSING",
+      "SHADOW_EVALUATOR_COMPILE_FAILED",
       "SHADOW_EVALUATOR_EXPORT_INVALID",
       "SHADOW_EVALUATOR_IMPORT_FORBIDDEN",
       "SHADOW_EVALUATOR_MISSING",
