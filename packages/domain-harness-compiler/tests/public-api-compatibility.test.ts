@@ -118,12 +118,10 @@ const T00_V10BUILD_VALUES = [
   'V10_TARGET_PROFILE',
   // object const (1)
   'V10_SELECTED_ROLE_ABI',
-  // functions (9)
+  // functions (7)
   'activateV10App',
-  'assertSealedImportClosure',
   'buildV10App',
   'canonicalJson',
-  'collectModuleEdges',
   'emptyExternalImports',
   'freshV10Counters',
   'sha256Canonical',
@@ -213,10 +211,8 @@ const FUNCTION_NAMES = new Set<string>([
   'computeV9QualifiedRootSubjectDigest',
   // v0.10 T00 functions
   'activateV10App',
-  'assertSealedImportClosure',
   'buildV10App',
   'canonicalJson',
-  'collectModuleEdges',
   'emptyExternalImports',
   'freshV10Counters',
   'sha256Canonical',
