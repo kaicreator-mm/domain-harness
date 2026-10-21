@@ -19,12 +19,11 @@ import {
   V10_TARGET_PROFILE,
   activateV10App,
   activateGovernedV10Build,
-  freshV10Counters,
 } from '@kaicreator/domain-harness-compiler/v10build';
 
 import { openSharedSqliteDatabase } from './sqlite-open.mjs';
 
-export { V10_TARGET_PROFILE, activateV10App, activateGovernedV10Build, freshV10Counters };
+export { V10_TARGET_PROFILE, activateV10App, activateGovernedV10Build };
 
 export const APP_DIR = dirname(fileURLToPath(import.meta.url));
 

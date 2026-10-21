@@ -119,12 +119,11 @@ const T00_V10BUILD_VALUES = [
   // object consts (2)
   'V10_ACTIVATION_FAILURE_CODES',
   'V10_SELECTED_ROLE_ABI',
-  // functions (7)
+  // functions (6)
   'activateV10App',
   'buildV10App',
   'canonicalJson',
   'emptyExternalImports',
-  'freshV10Counters',
   'sha256Canonical',
   'sha256Hex',
   // error classes (5)
@@ -217,7 +216,6 @@ const FUNCTION_NAMES = new Set<string>([
   'buildV10App',
   'canonicalJson',
   'emptyExternalImports',
-  'freshV10Counters',
   'sha256Canonical',
   'sha256Hex',
   // v0.10 T08/T10B functions
