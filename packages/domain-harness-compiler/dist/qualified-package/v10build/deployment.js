@@ -621,6 +621,11 @@ class GovernedBuildActivation {
     async send(intent) {
         this.#assertOpen();
         const target = this.#targetFor(intent);
+        // The selected Standard Router is pure: reject missing/ambiguous/forged
+        // route outcomes before creating any durable occurrence BUILD pin.
+        // K input/admission failure still needs the durable reserved/admitted
+        // recovery protocol (#1219); do NOT attempt unsafe post-failure deletes.
+        this.#activation.facade.preflightIntentRouting(intent.intentType);
         await ensureOccurrencePin(this.#store, this.#deployment, target, this.#build, this.#selection, new Date(this.#now()).toISOString());
         return await this.#activation.facade.send(intent);
     }

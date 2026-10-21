@@ -718,13 +718,16 @@ export class V10AppFacade {
         }
         return workflowKey;
     }
-    /** One public intent through the sealed route and the real kernel. */
-    async send(intent) {
+    /**
+     * Deterministic, read-only Standard Router preflight. It cannot confer K
+     * admission; governed deployment uses it BEFORE minting a durable BUILD pin
+     * so a rejected/ambiguous route cannot orphan an unadmitted occurrence.
+     * No K/runtime/docs/effect port is touched by this method.
+     */
+    preflightIntentRouting(intentType) {
         this.#assertOpen();
-        const { intentType, instanceKey, messageId } = intent;
         const businessPackageId = this.#businessFor(intentType);
         const workflowId = this.#policyWorkflowId(businessPackageId);
-        const target = { workflowId, instanceKey };
         // Pure Standard Router over the sealed route rows (real selected module).
         const rows = this.#app.routes.filter((row) => row.intentId === intentType);
         if (rows.length === 0) {
@@ -745,6 +748,14 @@ export class V10AppFacade {
         if (!matched || routed.basisDigest !== basisDigest) {
             refuse('ROUTING_BINDING_UNMATCHED', 'the Router result does not exactly match a sealed route row of this App');
         }
+        return Object.freeze({ businessPackageId, workflowId });
+    }
+    /** One public intent through the sealed route and the real kernel. */
+    async send(intent) {
+        this.#assertOpen();
+        const { intentType, instanceKey, messageId } = intent;
+        const { businessPackageId, workflowId } = this.preflightIntentRouting(intentType);
+        const target = { workflowId, instanceKey };
         const runtime = this.#runtimeFor(businessPackageId);
         const existing = await runtime.getSnapshot(target);
         if (existing === null || existing === undefined) {

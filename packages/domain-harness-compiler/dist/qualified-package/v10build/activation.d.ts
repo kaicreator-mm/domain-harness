@@ -370,6 +370,16 @@ export declare class V10AppFacade {
      * introduced, and no query path writes K state or dispatches an Effect.
      */
     queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
+    /**
+     * Deterministic, read-only Standard Router preflight. It cannot confer K
+     * admission; governed deployment uses it BEFORE minting a durable BUILD pin
+     * so a rejected/ambiguous route cannot orphan an unadmitted occurrence.
+     * No K/runtime/docs/effect port is touched by this method.
+     */
+    preflightIntentRouting(intentType: string): Readonly<{
+        businessPackageId: string;
+        workflowId: string;
+    }>;
     /** One public intent through the sealed route and the real kernel. */
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
 }
