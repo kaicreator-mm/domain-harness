@@ -5,6 +5,7 @@
  * the trusted-activation counterpart (`activateV10App`).
  */
 export { V10BuildError, V10Error, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES } from './errors.js';
+export type { V10CodedFailure, V10ErrorCode, V10KnownErrorCode } from './known-error-codes.js';
 export { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_KEXT_ABI, V10_RUNTIME_ABI, V10_SFEATURE_ABI, V10_TARGET_PROFILE, V10_SELECTED_ROLE_ABI, canonicalJson, sha256Canonical, sha256Hex, } from './digest.js';
 export type { V10ModuleRole } from './digest.js';
 export { emptyExternalImports } from './import-policy.js';

@@ -1,10 +1,52 @@
+/**
+ * DomainHarness v0.10 T06 (#1173) — Host-origin read-only DecisionEvidence
+ * observation bridge.
+ * ====================================================================
+ *
+ * The selected Standard `decision-evidence` feature is deliberately a pure
+ * normalizer: a public caller invoking it through
+ * `facade.invokeSelectedStandardFeature(..., trustedDeps)` can never turn its
+ * own claims into a Kernel admission observation — the trace stays
+ * `kernelOutcome: 'unobserved'` on that path, and no caller callback is ever
+ * treated as a trusted Host receipt.
+ *
+ * This module is the deployment-owned trusted counterpart. It closes the loop
+ * over REAL selected surfaces only:
+ *
+ *   (1) the Kernel outcome is read from the actual `facade.send(intent)`
+ *       return — the immutable K original receipt of the real selected
+ *       kernel-primary (admission, denial or honest UNKNOWN pass through
+ *       unchanged; a Kernel refusal is surfaced typed, never invented as an
+ *       observation);
+ *   (2) the decision result is produced by an actual invocation of the
+ *       selected T02 semantic-decision feature whose model/tool boundary the
+ *       deployment pinned HERE (closure-private), so the resolver outcome and
+ *       its reported counters are the selected module's own output, not a
+ *       caller's retelling;
+ *   (3) the Host wraps the model/tool endpoints with a transparent counter,
+ *       so the trace records Host-measured call counts next to the resolver's
+ *       self-reported ones and marks agreement or mismatch honestly;
+ *   (4) the evidence feature itself is still invoked through the real facade
+ *       (with NO persistence side effect) and stays the author of the base
+ *       trace; this bridge annotates the outcome/provenance facts it observed
+ *       itself, freezes the result, and only THEN hands the final attested
+ *       trace to the optional Host-owned sink under a bounded timeout — the
+ *       sink stores the real evidence, and its failure or timeout cannot veto
+ *       or rewrite the already-issued immutable K receipt.
+ *
+ * The bridge grants no authority: no K State/Journal/Fence/Effect/Permit is
+ * read or written beyond the public send receipt, the optional observation
+ * sink failure cannot veto or alter the already-issued K receipt, and every
+ * object handed back is a frozen snapshot (the receipt digest allows the
+ * caller to re-verify the exact receipt bytes the outcome was read from).
+ */
+import { V10Error } from '../v10build/errors.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import type { V10PublicIntent } from '../v10build/activation.js';
 export declare const OBSERVER_ABI = "dh.v10.decision-evidence-observer/1";
 /** Kernel outcomes a real receipt can honestly yield. */
 export type HostKernelOutcome = 'admitted' | 'denied' | 'terminated' | 'unknown';
-export declare class DecisionEvidenceObserverError extends Error {
-    readonly code: string;
+export declare class DecisionEvidenceObserverError extends V10Error {
     constructor(code: string, message: string, options?: {
         cause?: unknown;
     });

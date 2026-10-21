@@ -1,11 +1,7 @@
-/**
- * v0.10 typed error lineage. Error code strings remain stable wire values
- * unless a distinct option/policy failure is intentionally added.
- */
 export class V10Error extends Error {
     code;
-    constructor(code, message) {
-        super(message);
+    constructor(code, message, options) {
+        super(message, options);
         this.name = 'V10Error';
         this.code = code;
     }

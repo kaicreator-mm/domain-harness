@@ -37,6 +37,7 @@
  * reservation/ledger write. K State/Journal/Effect, the K02 fence and the
  * immutable original receipt remain exclusively the selected Kernel's.
  */
+import { V10Error } from '../v10build/errors.js';
 import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
@@ -73,13 +74,11 @@ const TURN_INPUT_FIELDS = new Set([
     'disposition', 'effectCount', 'proposalId', 'proposalDigest', 'evidenceDigest',
     'candidateDigest', 'shadowDigest',
 ]);
-export class MetaFeedbackError extends Error {
-    code;
+export class MetaFeedbackError extends V10Error {
     detail;
     constructor(code, message, detail) {
-        super(message);
+        super(code, message);
         this.name = 'MetaFeedbackError';
-        this.code = code;
         this.detail = detail === undefined ? undefined : Object.freeze({ ...detail });
     }
 }
