@@ -1023,25 +1023,32 @@ export async function activateV10App(app, options) {
             });
         }
         // ---- (5)+(6) the facade is the execute surface; dispose closes in reverse ----
+        // Explicit cleanup is authoritative; GC/FinalizationRegistry are not
+        // reliable security or process-global hook cleanup mechanisms.
+        let disposed = false;
+        const dispose = () => {
+            if (disposed)
+                return;
+            disposed = true;
+            // Stop honoring this activation's bare imports before any other teardown.
+            releaseDeclaredImports?.();
+            facade.close();
+            for (let index = initialized.length - 1; index >= 0; index -= 1) {
+                const advisory = initialized[index];
+                counters.disposals.push(advisory.packageId);
+                try {
+                    advisory.dispose?.();
+                }
+                catch {
+                    // bounded best-effort teardown
+                }
+            }
+        };
         return {
             facade,
             counters,
-            dispose: () => {
-                // Close the declared-import resolution seam first: after activation
-                // close, this App's allowances stop being honored (fail-closed).
-                releaseDeclaredImports?.();
-                facade.close();
-                for (let index = initialized.length - 1; index >= 0; index -= 1) {
-                    const advisory = initialized[index];
-                    counters.disposals.push(advisory.packageId);
-                    try {
-                        advisory.dispose?.();
-                    }
-                    catch {
-                        // bounded best-effort teardown
-                    }
-                }
-            },
+            dispose,
+            [Symbol.dispose]: dispose,
         };
     }
     catch (error) {

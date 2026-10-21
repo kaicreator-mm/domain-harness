@@ -267,8 +267,10 @@ export interface ActivateV10AppOptions {
 export interface V10Activation {
     readonly facade: V10AppFacade;
     readonly counters: V10Counters;
-    /** Dispose: facade closes first, then advisory modules in reverse init order. */
+    /** Explicit, idempotent cleanup: closes facade and all import allowances. */
     dispose(): void;
+    /** Node >=22.15: permits `using activation = await activateV10App(...)`. */
+    [Symbol.dispose](): void;
 }
 /**
  * The composed App facade: the ONE composition-owned boundary over the
