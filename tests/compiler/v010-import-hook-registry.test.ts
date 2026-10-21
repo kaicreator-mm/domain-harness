@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import type { registerHooks } from 'node:module';
 import type { V10AppView } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import { createV10ImportHookRegistryForTests, privateModuleFragment } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/import-hook.js';
+import { V10ActivationError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
 
 const view = {
   modules: [{
@@ -65,4 +66,20 @@ test('N-I1228: failed hook registration rolls back all minted allowances', () =>
   }), /synthetic registerHooks failure/);
   assert.deepEqual(registry.snapshot(), { users: 0, allowances: 0, registered: false },
     'failed registration must not leave a process-global allowance behind');
+});
+
+test('N-I1228: runtime without registerHooks refuses typed fail-closed and rolls back', () => {
+  const registry = createV10ImportHookRegistryForTests(undefined as unknown as typeof registerHooks);
+  assert.throws(() => registry.registerDeclaredBareImports({
+    activationNonce: 'no-hook',
+    activationModuleUrl: 'file:///activation.mjs',
+    appView: view,
+    deploymentRoot: undefined,
+  }), (error: unknown) => {
+    assert.ok(error instanceof V10ActivationError, 'must refuse with the typed activation error');
+    assert.equal((error as V10ActivationError).code, 'V10_IMPORT_HOOK_UNAVAILABLE');
+    return true;
+  });
+  assert.deepEqual(registry.snapshot(), { users: 0, allowances: 0, registered: false },
+    'a runtime lacking the hook seam must not mint or retain any allowance');
 });
