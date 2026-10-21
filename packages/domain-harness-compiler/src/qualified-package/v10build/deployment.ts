@@ -938,6 +938,11 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
   async send(intent: V10PublicIntent): Promise<Record<string, unknown>> {
     this.#assertOpen();
     const target = this.#targetFor(intent);
+    // The selected Standard Router is pure: reject missing/ambiguous/forged
+    // route outcomes before creating any durable occurrence BUILD pin.
+    // K input/admission failure still needs the durable reserved/admitted
+    // recovery protocol (#1219); do NOT attempt unsafe post-failure deletes.
+    this.#activation.facade.preflightIntentRouting(intent.intentType);
     await ensureOccurrencePin(
       this.#store,
       this.#deployment,
