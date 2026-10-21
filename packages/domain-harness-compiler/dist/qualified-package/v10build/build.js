@@ -52,6 +52,7 @@ import { canonicalSnapshot } from '@kaicreator/domain-harness/v8';
 import { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_RUNTIME_ABI, V10_SELECTED_ROLE_ABI, V10_TARGET_PROFILE, sha256Canonical, sha256Hex, } from './digest.js';
 import { assertSealedImportClosure } from './import-policy.js';
 import { V10BuildError } from './errors.js';
+import { resolveV10SelectedClosure } from './selected-closure.js';
 const HEX64 = /^[0-9a-f]{64}$/;
 const PACKAGE_ID_RE = /^[A-Za-z][A-Za-z0-9._:@-]{0,127}$/;
 /** Feature/hook key grammar: `name/version` or `namespace:name/version` (e.g. `advisory-alpha-observation/v1`, `standard:validation/1`). */
@@ -66,14 +67,6 @@ const MODULE_FIELDS = new Set([
 ]);
 const HANDLER_FIELDS = new Set(['operationId', 'handler']);
 const EXTERNAL_IMPORT_FIELDS = new Set(['node', 'npm', 'native']);
-const ROLE_RANK = {
-    'kernel-primary': 0,
-    'standard-primary': 1,
-    'standard-feature': 2,
-    business: 3,
-    capability: 4,
-    'kernel-extension': 5,
-};
 const MAX_ITEMS = 256;
 const MAX_STRING = 512;
 /** Sealed module bytes bound (chars): real selected payload modules are tens of KB. */
@@ -412,45 +405,8 @@ export function buildV10App(options) {
         }
         selected.push(module);
     }
-    const selectedIds = new Set(selected.map((module) => module.packageId));
-    // ---- Dependency completeness + acyclic deterministic load order ----
-    for (const module of selected) {
-        for (const dependency of module.dependencies) {
-            if (!selectedIds.has(dependency)) {
-                fail('V10_DEPENDENCY_MISSING', `${module.packageId} declares a dependency on ${dependency} which is not part of the selected closure`);
-            }
-        }
-    }
-    const byId = new Map(selected.map((module) => [module.packageId, module]));
-    const loadOrder = [];
-    const state = new Map();
-    const visit = (module) => {
-        const status = state.get(module.packageId);
-        if (status === 'done')
-            return;
-        if (status === 'visiting') {
-            fail('V10_DEPENDENCY_CYCLE', `the declared dependency graph reaches ${module.packageId} twice; the composition contains a cycle`);
-        }
-        state.set(module.packageId, 'visiting');
-        for (const dependency of module.dependencies) {
-            const target = byId.get(dependency);
-            if (target !== undefined)
-                visit(target);
-        }
-        state.set(module.packageId, 'done');
-        loadOrder.push(module.packageId);
-    };
-    for (const module of [...selected].sort((left, right) => ROLE_RANK[left.role] - ROLE_RANK[right.role]))
-        visit(module);
-    // ---- Required features are provided by the SELECTED closure only ----
-    const provided = new Set(selected.flatMap((module) => [...module.provides]));
-    for (const module of selected) {
-        for (const feature of module.requires) {
-            if (!provided.has(feature)) {
-                fail('V10_FEATURE_MISSING', `${module.packageId} requires feature ${feature} which no selected package provides`);
-            }
-        }
-    }
+    // ---- One private, deterministic selected-closure owner ----
+    const { selectedIds, byId, loadOrder } = resolveV10SelectedClosure(selected);
     // ---- Byte pinning + once-only sealed import closure (zero evaluation) ----
     const sealed = [];
     for (const packageId of loadOrder) {
