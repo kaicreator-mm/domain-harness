@@ -350,10 +350,15 @@ test('T08-F01-race: concurrent A/B first admissions for one new occurrence admit
         (fulfilled[0] as PromiseFulfilledResult<Record<string, unknown>>).value.status,
         'admitted',
       );
-      assert.equal(
-        (rejected[0] as PromiseRejectedResult).reason.code,
-        'OCCURRENCE_REDIRECTED_TO_NEW_BUILD',
-        'the losing BUILD is refused by the immutable pin CAS',
+      // [#1219 v2] The loser refuses on the immutable pin either way: while
+      // the winner's reservation is still unresolved it is the typed
+      // RESERVATION_PENDING of the unresolved RESERVED pin; if it lost after
+      // settlement it is the classic REDIRECTED refusal. Both prove exactly
+      // one BUILD owns the occurrence; neither may take it over.
+      const loserCode = String((rejected[0] as PromiseRejectedResult).reason.code);
+      assert.ok(
+        loserCode === 'OCCURRENCE_REDIRECTED_TO_NEW_BUILD' || loserCode === 'OCCURRENCE_RESERVATION_PENDING',
+        `the losing BUILD is refused by the immutable pin (got ${loserCode})`,
       );
       const pinA = await activationA.readPin(intent);
       const pinB = await activationB.readPin(intent);

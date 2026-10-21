@@ -52,6 +52,8 @@
       "OCCURRENCE_BUILD_PIN_INVALID",
       "OCCURRENCE_BUILD_PIN_MISSING",
       "OCCURRENCE_REDIRECTED_TO_NEW_BUILD",
+      "OCCURRENCE_RESERVATION_INDETERMINATE",
+      "OCCURRENCE_RESERVATION_PENDING",
       "UNAUTHORIZED_PROMOTION"
     ],
     "packages/domain-harness-compiler/src/qualified-package/v10build/digest.ts": [],

@@ -112,6 +112,30 @@ export interface V10OccurrenceBuildPin {
     readonly decisionId: string;
     readonly approvalRef: string;
     readonly pinnedAt: string;
+    /**
+     * [v0.10 #1219] `RESERVED` from pin mint until the Kernel's own durable
+     * admission evidence settles it; `ADMITTED` after. Absent on pre-#1219
+     * pins, which normalize to `ADMITTED` (conservative: the historical
+     * orphan window stays pinned rather than risk deleting live state).
+     */
+    readonly phase?: 'RESERVED' | 'ADMITTED';
+    /** Present iff `phase === 'RESERVED'`: the exact logical attempt guarded. */
+    readonly reservation?: {
+        readonly messageId: string;
+        readonly inputDigest: string;
+        readonly reservedAt: string;
+    } | undefined;
+    /**
+     * The in-flight writer fence slot of one RESERVED pin (`null` while no
+     * submit holds it). A non-null foreign slot means a possibly-live Kernel
+     * submit exists: reclaimers can never delete under it.
+     */
+    readonly activeAttempt?: {
+        readonly attemptId: string;
+        readonly holder: 'writer';
+    } | null | undefined;
+    /** ISO instant of the RESERVED→ADMITTED settlement. */
+    readonly admittedAt?: string;
 }
 /** One durable accepted activation decision. */
 export interface V10DeploymentActivationRecord {
@@ -178,6 +202,16 @@ export interface V10GovernedBuildActivation {
         workflowId: string;
     }>;
     readPin(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<V10OccurrenceBuildPin | null>;
+    /**
+     * [#1219 recovery protocol] Settle one occurrence's RESERVED pin using
+     * ONLY Kernel-owned durable admission evidence (the same-CAS original
+     * receipt, keyed by the reserved messageId + input digest — never
+     * instance-snapshot existence). Returns `'ADMITTED'` (including the
+     * crash-after-admission heal), `'ABSENT'`, or `'PENDING'`. `PENDING`
+     * never deletes: a possibly-live writer or an unwitnessed outcome keeps
+     * the pin fail-closed, and no time-based takeover exists.
+     */
+    recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
     close(): void;
 }
 /**
