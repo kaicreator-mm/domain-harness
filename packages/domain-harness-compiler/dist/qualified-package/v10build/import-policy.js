@@ -17,13 +17,15 @@
  *
  *  - any module edge whose specifier is NOT declared in that module's
  *    sealed allowance (`node:*`, bare npm/native specifiers alike) —
- *    undeclared ordinary imports are a BUILD failure, so the sealed graph
- *    is the whole graph;
+ *    undeclared ordinary imports are a BUILD failure. Declared literal
+ *    edges are sealed, but static analysis is not a complete JS sandbox;
  *  - computed (non-literal) dynamic `import()` — a non-deterministic edge
  *    is a discovery edge, and BUILD enables no unselected discovery;
- *  - `require(...)`, `eval(...)` and `Function`-family code-string
- *    constructors — code-string evaluation is not an ordinary import and
- *    would hide graph edges from this one-pass static closure;
+ *  - direct/indirect references to `require`, `eval` and `Function`-family
+ *    constructors, plus explicit `.constructor` access — code-string
+ *    evaluation and CommonJS discovery are not ordinary module imports;
+ *    this bounded AST hygiene does NOT prove that all dynamic aliases,
+ *    computed properties, or global capabilities are unreachable;
  *  - relative/absolute file edges and `data:` edges — the sealed-bytes
  *    composition wires modules through the SDK connect step, not through
  *    filesystem edges inside sealed bytes (packed-app file layout belongs
@@ -40,16 +42,56 @@
  * (byte pin asserted before any parse, fail closed), so the two gates
  * share one parser identity while their POLICIES differ per version.
  */
+import { isBuiltin } from 'node:module';
+import { isObjectRecord } from './guards.js';
 import { parse } from '../v09build/generated/acorn.mjs';
 import { assertVendoredParserBytes, V09_BUILD_PARSER_PIN } from '../v09build/parser.js';
 import { V10BuildError } from './errors.js';
 const MAX_AST_DEPTH = 2_000;
 const CODE_STRING_CONSTRUCTORS = new Set(['Function', 'GeneratorFunction', 'AsyncFunction', 'AsyncGeneratorFunction']);
+const CODE_STRING_GLOBALS = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'require']);
+/**
+ * Evaluator spellings refused as explicit property/KEY names. `require` is
+ * deliberately absent: sealed ESM bytes have no reachable CommonJS global
+ * (the CommonJS seam stays covered by the bare-identifier checks below),
+ * while ordinary method names — including the vendored kernel's own
+ * instance-registry `require(address)` — must stay sealable.
+ */
+const EVALUATOR_PROPERTY_NAMES = new Set([...CODE_STRING_CONSTRUCTORS, 'eval', 'constructor']);
+/**
+ * Non-computed object/class keys and `obj.prop` property names are spellings
+ * the module DEFINES or selects, not references to global evaluators; their
+ * specific dangers have dedicated checks (forbiddenMemberName, ObjectPattern
+ * destructuring). Computed keys stay walked as ordinary expressions.
+ */
+function isDefinitionKeyName(container, key) {
+    if (container.type === 'MemberExpression') {
+        return key === 'property' && !container.computed;
+    }
+    if (key !== 'key')
+        return false;
+    if (container.type === 'Property' || container.type === 'MethodDefinition' || container.type === 'PropertyDefinition') {
+        return !container.computed;
+    }
+    return false;
+}
+/**
+ * This is static hygiene, NOT a sandbox: trusted closed-world code can still
+ * compute a property name or obtain an evaluator through arbitrary aliases.
+ * These explicit spellings must not bypass the BUILD diagnostic, however.
+ */
+function forbiddenMemberName(node) {
+    if (node.type !== 'MemberExpression')
+        return null;
+    const member = node;
+    const property = member.property;
+    if (property === undefined)
+        return null;
+    const name = member.computed ? specifierOf(property) : property.type === 'Identifier' ? nodeName(property) : null;
+    return name !== null && EVALUATOR_PROPERTY_NAMES.has(name) ? name : null;
+}
 export function emptyExternalImports() {
     return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
-}
-function isRecord(value) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function denied(moduleLabel, reason) {
     return new V10BuildError('V10_IMPORT_POLICY_DENIED', `sealed module ${moduleLabel} is refused by the v0.10 import-closure gate (parser acorn@${V09_BUILD_PARSER_PIN.version}): ${reason}`);
@@ -88,7 +130,32 @@ export function collectModuleEdges(moduleLabel, source) {
         if (depth > MAX_AST_DEPTH) {
             throw denied(moduleLabel, `AST depth exceeds the bounded walk limit (${String(MAX_AST_DEPTH)})`);
         }
+        const forbiddenMember = forbiddenMemberName(node);
+        if (forbiddenMember !== null) {
+            throw denied(moduleLabel, `member access to '${forbiddenMember}' can alias code-string evaluation or CommonJS discovery`);
+        }
         switch (node.type) {
+            case 'Identifier': {
+                const name = nodeName(node);
+                if (CODE_STRING_GLOBALS.has(name)) {
+                    throw denied(moduleLabel, `reference to '${name}' can alias code-string evaluation or CommonJS discovery`);
+                }
+                break;
+            }
+            case 'ObjectPattern': {
+                // Destructuring is property access by another spelling: pulling an
+                // evaluator-named key off any object aliases code-string evaluation.
+                for (const property of node.properties ?? []) {
+                    if (property.type !== 'Property' || property.computed)
+                        continue;
+                    const key = property.key;
+                    const name = key !== undefined && key.type === 'Identifier' ? nodeName(key) : null;
+                    if (name !== null && EVALUATOR_PROPERTY_NAMES.has(name)) {
+                        throw denied(moduleLabel, `destructuring '${name}' can alias code-string evaluation`);
+                    }
+                }
+                break;
+            }
             case 'ImportDeclaration': {
                 edges.push({ kind: 'static-import', specifier: specifierOf(node.source) });
                 if (specifierOf(node.source) === null) {
@@ -151,8 +218,11 @@ export function collectModuleEdges(moduleLabel, source) {
             if (key === 'type' || key === 'start' || key === 'end') {
                 continue;
             }
+            if (isDefinitionKeyName(node, key)) {
+                continue;
+            }
             const value = node[key];
-            if (isRecord(value)) {
+            if (isObjectRecord(value)) {
                 if (typeof value.type === 'string') {
                     visit(value, depth + 1);
                 }
@@ -160,7 +230,7 @@ export function collectModuleEdges(moduleLabel, source) {
             }
             if (Array.isArray(value)) {
                 for (const item of value) {
-                    if (isRecord(item) && typeof item.type === 'string') {
+                    if (isObjectRecord(item) && typeof item.type === 'string') {
                         visit(item, depth + 1);
                     }
                 }
@@ -175,6 +245,11 @@ export function collectModuleEdges(moduleLabel, source) {
 function classify(specifier, moduleLabel) {
     if (specifier.startsWith('node:'))
         return 'node';
+    // Node also resolves bare builtins (e.g. 'fs' and 'fs/promises'). Do not
+    // misclassify these as npm/native entries even if the caller lists them.
+    if (isBuiltin(specifier)) {
+        throw denied(moduleLabel, `bare Node builtin '${specifier}' must use its explicit 'node:' specifier and node allowance`);
+    }
     if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('data:') || specifier.startsWith('file:')) {
         throw denied(moduleLabel, `import edge '${specifier}' is a file/data edge; sealed module bytes wire through the SDK connect step, not filesystem edges (packed file layout belongs to deployment)`);
     }

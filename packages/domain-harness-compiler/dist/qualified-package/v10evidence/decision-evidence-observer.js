@@ -40,6 +40,7 @@
  * object handed back is a frozen snapshot (the receipt digest allows the
  * caller to re-verify the exact receipt bytes the outcome was read from).
  */
+import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
 export const OBSERVER_ABI = 'dh.v10.decision-evidence-observer/1';
@@ -53,12 +54,6 @@ export class DecisionEvidenceObserverError extends Error {
 }
 function refuse(code, message, options) {
     throw new DecisionEvidenceObserverError(code, message, options);
-}
-function isPlainRecord(value) {
-    if (value === null || typeof value !== 'object' || Array.isArray(value))
-        return false;
-    const proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
 }
 function deepFreeze(value) {
     if (value !== null && typeof value === 'object') {

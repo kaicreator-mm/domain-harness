@@ -2,7 +2,7 @@ import { V10AppFacade } from '../v10build/activation.js';
 import type { V10AppView } from '../v10build/activation.js';
 export declare const SHADOW_L4_ABI = "dh.v10.shadow-l4-readonly/1";
 export declare const SHADOW_L4_EVIDENCE_KIND = "shadow-l4-evidence";
-/** The exact facade-owned K namespace: `<prefix><subjectDigest>/<tenantId>/`. */
+/** Physical K docs root; the governed outer namespace is the stable deployment tuple. */
 export declare const SHADOW_K_DOCS_PREFIX = "v10/k/";
 export type ShadowL4Kind = 'Rule' | 'Skill' | 'DecisionProcedure' | 'Workflow';
 export type ShadowL4ApprovalState = 'candidate' | 'approved' | 'revoked';
