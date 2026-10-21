@@ -25,6 +25,9 @@ test('N-I1227: public barrels never export trusted Host effect/AST internals', (
       // stay internal to import-hook.ts; `export *` chains would leak them.
       'createV10ImportHookRegistryForTests',
       'privateModuleFragment',
+      // #1227: internal activation counter probes must not be publicly
+      // reachable either.
+      'freshV10Counters',
     ]) {
       assert.equal(name in surface, false, `${name} must not be publicly reachable`);
     }
