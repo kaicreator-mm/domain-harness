@@ -457,6 +457,11 @@ export interface ActivateV10AppOptions {
   readonly store: V10DocStore;
   readonly tenantId?: string;
   readonly now?: () => number;
+  /**
+   * Optional diagnostic sink for trusted Host/first-party test harnesses.
+   * Counters are observations, never an authorization or admission input;
+   * the constructor/shape is intentionally not exported by public barrels.
+   */
   readonly counters?: V10Counters;
   /**
    * The stable deployment identity of this App
@@ -494,6 +499,7 @@ export interface ActivateV10AppOptions {
 
 export interface V10Activation {
   readonly facade: V10AppFacade;
+  /** Observability only: no permit, K state or admission authority. */
   readonly counters: V10Counters;
   /** Explicit, idempotent cleanup: closes facade and all import allowances. */
   dispose(): void;
