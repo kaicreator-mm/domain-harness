@@ -40,6 +40,7 @@
  *   P-KEYSPACE          every K document stays under v10/k/** — the adapters
  *                       never write the Kernel's namespace.
  */
+import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
@@ -50,7 +51,6 @@ import {
   V10_TARGET_PROFILE,
   activateV10App,
   buildV10App,
-  freshV10Counters,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { createV10DocsPort } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 // The trusted gate seam is internal (#1227): tests wire it through the module
