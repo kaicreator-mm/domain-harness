@@ -41,13 +41,9 @@ export { bundleScriptTool, ScriptCompileError, SCRIPT_EXECUTION_CAPABILITY, } fr
 // The emitted root carries no approval; governance attaches it at the
 // protected host-v9 install. Public `./v9` SDK surface stays with #1035.
 export { assertVendoredParserBytes, assertZeroImportBuildModule, buildV09QualifiedRoot, canonicalV9Json, computeV09SealedRootSubjectDigest, computeV9QualifiedRootSubjectDigest, V09BuildError, V09_BUNDLER_REVISION, V09_HOST_ABI, V09_IMPORT_POLICY_REVISION, V09_RUNTIME_ABI, V09_SEALED_ROOT_FORMAT, V09_SUBJECT_DOMAIN, V09_BUILD_PARSER_PIN, } from './qualified-package/index.js';
-// v0.10 T00 (#1166): closed-world Node24 BUILD composition — once-only
-// static composition preflight (one target profile, one K/S/B/C graph,
-// sealed ordinary node/npm/native imports) plus its trusted-activation
-// counterpart (load → connect → init → execute → dispose, no runtime
-// static re-attestation under accepted Product A01). Additive to the
-// COMPILER_PUBLIC_API_VERSION inventory.
-export { V10ActivationError, V10AppFacade, V10BuildError, V10DeploymentError, V10PortDeniedError, V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_KEXT_ABI, V10_RUNTIME_ABI, V10_SFEATURE_ABI, V10_TARGET_PROFILE, V10_SELECTED_ROLE_ABI, activateGovernedV10Build, activateV10App, assertSealedImportClosure, buildV10App, canonicalJson, collectModuleEdges, emptyExternalImports, freshV10Counters, readV10DeploymentActivationRecord, readV10OccurrenceBuildPin, sha256Canonical, sha256Hex, v10BuildActivationDecisionDigest, v10BuildPackageClosureDigest, v10DeploymentActivationKey, v10OccurrenceBuildPinKey, } from './qualified-package/index.js';
+// Forward the one curated v0.10 BUILD public barrel (no copied export roster).
+// Internal import policy/Host effect gate modules remain private.
+export * from './qualified-package/v10build/index.js';
 // v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
 // external approval + sealed-root producer over the public core /v8 ABI.
 export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';

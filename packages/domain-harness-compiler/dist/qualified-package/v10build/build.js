@@ -34,7 +34,7 @@
  *    with no discovery edge (no second engine, no dynamic install);
  *  - routes: the intent→operation table is admitted against the sealed
  *    graph's OWN business intents and capability handler maps (no
- *    caller-supplied intent authority — v0.9 N01 R0 P1 lineage).
+ *    caller-supplied intent authority).
  *
  * Determinism is a product property: no clock, no randomness, no locale —
  * the same input builds the byte-identical plain-data output and digest.
@@ -47,10 +47,12 @@
  * BUILD never evaluates module source (purely static analysis) and performs
  * no I/O.
  */
+import { isObjectRecord } from './guards.js';
 import { canonicalSnapshot } from '@kaicreator/domain-harness/v8';
 import { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_RUNTIME_ABI, V10_SELECTED_ROLE_ABI, V10_TARGET_PROFILE, sha256Canonical, sha256Hex, } from './digest.js';
 import { assertSealedImportClosure } from './import-policy.js';
 import { V10BuildError } from './errors.js';
+import { resolveV10SelectedClosure } from './selected-closure.js';
 const HEX64 = /^[0-9a-f]{64}$/;
 const PACKAGE_ID_RE = /^[A-Za-z][A-Za-z0-9._:@-]{0,127}$/;
 /** Feature/hook key grammar: `name/version` or `namespace:name/version` (e.g. `advisory-alpha-observation/v1`, `standard:validation/1`). */
@@ -65,23 +67,12 @@ const MODULE_FIELDS = new Set([
 ]);
 const HANDLER_FIELDS = new Set(['operationId', 'handler']);
 const EXTERNAL_IMPORT_FIELDS = new Set(['node', 'npm', 'native']);
-const ROLE_RANK = {
-    'kernel-primary': 0,
-    'standard-primary': 1,
-    'standard-feature': 2,
-    business: 3,
-    capability: 4,
-    'kernel-extension': 5,
-};
 const MAX_ITEMS = 256;
 const MAX_STRING = 512;
 /** Sealed module bytes bound (chars): real selected payload modules are tens of KB. */
 const MAX_MODULE_CHARS = 8_388_608;
 function fail(code, message) {
     throw new V10BuildError(code, message);
-}
-function isRecord(value) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function boundedString(value, label) {
     if (typeof value !== 'string' || value.length === 0 || value.length > MAX_STRING) {
@@ -121,7 +112,7 @@ function snapshotOrThrow(value, label) {
         const detail = error instanceof Error ? error.message : String(error);
         fail('BUILD_INPUT_INVALID', `${label} is not strict canonical plain data: ${detail}`);
     }
-    if (!isRecord(snapshot)) {
+    if (!isObjectRecord(snapshot)) {
         fail('BUILD_INPUT_INVALID', `${label} must be a record`);
     }
     return snapshot;
@@ -130,7 +121,7 @@ function parseExternalImports(raw, packageId) {
     if (raw === undefined) {
         return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
     }
-    if (!isRecord(raw)) {
+    if (!isObjectRecord(raw)) {
         fail('BUILD_INPUT_INVALID', `module ${packageId} externalImports must be a record`);
     }
     strictFields(raw, EXTERNAL_IMPORT_FIELDS, `module ${packageId} externalImports`);
@@ -154,7 +145,7 @@ function parseHandlers(raw, packageId) {
     const operations = new Set();
     const handlers = [];
     for (const handlerRaw of raw) {
-        if (!isRecord(handlerRaw)) {
+        if (!isObjectRecord(handlerRaw)) {
             fail('BUILD_GRAPH_INVALID', `capability ${packageId} handler entry must be a record`);
         }
         strictFields(handlerRaw, HANDLER_FIELDS, `capability ${packageId} handler`);
@@ -175,7 +166,7 @@ function parseModules(rawModules) {
     const parsed = [];
     const seenIds = new Set();
     for (const raw of rawModules) {
-        if (!isRecord(raw)) {
+        if (!isObjectRecord(raw)) {
             fail('BUILD_GRAPH_INVALID', 'each composition module must be a record');
         }
         strictFields(raw, MODULE_FIELDS, 'composition module');
@@ -265,7 +256,7 @@ export function buildV10App(options) {
         fail('V10_TARGET_UNSUPPORTED', `target profile ${String(snap.targetProfile)} is not the selected Node24 ESM profile ${V10_TARGET_PROFILE}; a composition pins exactly one target runtime`);
     }
     const hardBudgetRaw = snap.hardBudget ?? { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 };
-    if (!isRecord(hardBudgetRaw)) {
+    if (!isObjectRecord(hardBudgetRaw)) {
         fail('BUILD_INPUT_INVALID', 'hardBudget must be a record');
     }
     const stepsRaw = hardBudgetRaw.maxStepsPerTurn;
@@ -414,45 +405,8 @@ export function buildV10App(options) {
         }
         selected.push(module);
     }
-    const selectedIds = new Set(selected.map((module) => module.packageId));
-    // ---- Dependency completeness + acyclic deterministic load order ----
-    for (const module of selected) {
-        for (const dependency of module.dependencies) {
-            if (!selectedIds.has(dependency)) {
-                fail('V10_DEPENDENCY_MISSING', `${module.packageId} declares a dependency on ${dependency} which is not part of the selected closure`);
-            }
-        }
-    }
-    const byId = new Map(selected.map((module) => [module.packageId, module]));
-    const loadOrder = [];
-    const state = new Map();
-    const visit = (module) => {
-        const status = state.get(module.packageId);
-        if (status === 'done')
-            return;
-        if (status === 'visiting') {
-            fail('V10_DEPENDENCY_CYCLE', `the declared dependency graph reaches ${module.packageId} twice; the composition contains a cycle`);
-        }
-        state.set(module.packageId, 'visiting');
-        for (const dependency of module.dependencies) {
-            const target = byId.get(dependency);
-            if (target !== undefined)
-                visit(target);
-        }
-        state.set(module.packageId, 'done');
-        loadOrder.push(module.packageId);
-    };
-    for (const module of [...selected].sort((left, right) => ROLE_RANK[left.role] - ROLE_RANK[right.role]))
-        visit(module);
-    // ---- Required features are provided by the SELECTED closure only ----
-    const provided = new Set(selected.flatMap((module) => [...module.provides]));
-    for (const module of selected) {
-        for (const feature of module.requires) {
-            if (!provided.has(feature)) {
-                fail('V10_FEATURE_MISSING', `${module.packageId} requires feature ${feature} which no selected package provides`);
-            }
-        }
-    }
+    // ---- One private, deterministic selected-closure owner ----
+    const { selectedIds, byId, loadOrder } = resolveV10SelectedClosure(selected);
     // ---- Byte pinning + once-only sealed import closure (zero evaluation) ----
     const sealed = [];
     for (const packageId of loadOrder) {
@@ -491,7 +445,7 @@ export function buildV10App(options) {
     const routes = [];
     const routeKeys = new Set();
     for (const raw of routesRaw) {
-        if (!isRecord(raw)) {
+        if (!isObjectRecord(raw)) {
             fail('BUILD_GRAPH_INVALID', 'each route row must be a record');
         }
         strictFields(raw, ROUTE_FIELDS, 'route row');

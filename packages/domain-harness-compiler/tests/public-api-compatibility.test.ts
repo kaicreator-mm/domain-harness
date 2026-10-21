@@ -116,21 +116,22 @@ const T00_V10BUILD_VALUES = [
   'V10_RUNTIME_ABI',
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
-  // object const (1)
+  // object consts (2)
+  'V10_ACTIVATION_FAILURE_CODES',
   'V10_SELECTED_ROLE_ABI',
-  // functions (9)
+  // functions (7)
   'activateV10App',
-  'assertSealedImportClosure',
   'buildV10App',
   'canonicalJson',
-  'collectModuleEdges',
   'emptyExternalImports',
   'freshV10Counters',
   'sha256Canonical',
   'sha256Hex',
-  // error classes (3)
+  // error classes (5)
   'V10ActivationError',
   'V10BuildError',
+  'V10Error',
+  'V10ExternalEffectError',
   'V10PortDeniedError',
   // facade class (1)
   'V10AppFacade',
@@ -186,7 +187,7 @@ const STRING_CONST_NAMES = new Set<string>([
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
 ]);
-const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_SELECTED_ROLE_ABI']);
+const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_ACTIVATION_FAILURE_CODES', 'V10_SELECTED_ROLE_ABI']);
 const PARSER_PIN_CONST_NAMES = new Set<string>(['V09_BUILD_PARSER_PIN']);
 /** Non-error public classes (constructors that are not Error subclasses). */
 const PLAIN_CLASS_NAMES = new Set<string>(['V10AppFacade']);
@@ -213,10 +214,8 @@ const FUNCTION_NAMES = new Set<string>([
   'computeV9QualifiedRootSubjectDigest',
   // v0.10 T00 functions
   'activateV10App',
-  'assertSealedImportClosure',
   'buildV10App',
   'canonicalJson',
-  'collectModuleEdges',
   'emptyExternalImports',
   'freshV10Counters',
   'sha256Canonical',
@@ -245,6 +244,8 @@ const ERROR_CLASS_NAMES = new Set<string>([
   // v0.10 T00 error classes
   'V10ActivationError',
   'V10BuildError',
+  'V10Error',
+  'V10ExternalEffectError',
   'V10PortDeniedError',
   // v0.10 T10B error classes
   'V10DeploymentError',
@@ -309,6 +310,9 @@ test('T008C: every legacy runtime commitment is still present (full inventory co
 // Pack test 2: the versioned compatibility commitment itself.
 // ---------------------------------------------------------------------------
 
+// Pre-1.0 window: the v0.10 additive group may be intentionally narrowed
+// (see #1227/#1248 — internal seams removed from the curated barrel); the
+// legacy inventory below stays additive-only.
 test('T008C: COMPILER_PUBLIC_API_VERSION is the frozen v1 compatibility level', () => {
   assert.equal(COMPILER_PUBLIC_API_VERSION, 'compiler-public-api.v1');
   assert.equal(

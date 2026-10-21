@@ -85,6 +85,26 @@ test('P-ACT-BASIC-LIFECYCLE: sealed modules load/connect/execute/dispose; one ad
   assert.deepEqual(evalLog(), []);
 });
 
+
+test('P-I1228: Symbol.dispose and dispose share one idempotent teardown', async () => {
+  clearDisposalLog();
+  const app = buildV10App(await richComposition());
+  const counters = freshV10Counters();
+  const activation = await activateV10App(app, {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
+  });
+  const expected = app.modules.filter((module) =>
+    module.role === 'kernel-extension' || module.role === 'standard-feature').length;
+  assert.equal(counters.disposals.length, 0);
+  activation[Symbol.dispose]();
+  assert.equal(activation.facade.isClosed(), true);
+  assert.equal(counters.disposals.length, expected);
+  activation.dispose();
+  activation[Symbol.dispose]();
+  assert.equal(counters.disposals.length, expected, 'repeated explicit cleanup must not re-run advisory destructors');
+});
+
+
 test('P-I1217: stable deployedAppId preserves K02 physical records across BUILD revisions', async () => {
   const originalComposition = await basicComposition();
   const firstApp = buildV10App(originalComposition);

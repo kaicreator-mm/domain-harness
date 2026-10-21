@@ -1,3 +1,38 @@
+/**
+ * DomainHarness v0.10 T08 (#1175) — governed new BUILD version activation.
+ * ======================================================================
+ *
+ * A BUILD is a static, already-qualified executable App (`buildV10App`).
+ * Selecting a *new* BUILD for a stable deployment is therefore a
+ * BUILD/deployment decision, never an SDK package hot swap. This module is
+ * the Host-owned deployment seam that makes that decision explicit and
+ * durable:
+ *
+ *  - an EXACT immutable activation decision names the stable
+ *    `deployedAppId`/tenant/appId, the selected BUILD's `subjectDigest`,
+ *    its exact package-closure digest, the build id and an external
+ *    `approvalRef`;
+ *  - a trusted Host authorization authority (`verify`) must bind that very
+ *    decision digest/approval reference/subject/closure to a current,
+ *    unrevoked external approval. Candidate/Shadow/model material is plain
+ *    data and can never stand in for that authority or authorize itself;
+ *  - the accepted decision is recorded once in a durable activation ledger
+ *    (idempotent retry of the same decision; a conflicting reuse refuses);
+ *  - every admitted occurrence is bound to the ORIGINAL BUILD through an
+ *    immutable occurrence→BUILD pin in the same CAS store. A later BUILD
+ *    activation can serve new occurrences but can never re-route, replay
+ *    through, rewrite or silently migrate an occurrence pinned to the old
+ *    BUILD. A restored process must activate the exact pinned BUILD (the
+ *    pin is never a floating "latest" pointer).
+ *
+ * The selected Kernel/K02 admission, CAS, Effect, UNKNOWN and original
+ * receipt semantics are untouched: this layer only decides WHICH already
+ * built App a caller may activate and whether a particular occurrence may
+ * use that App. The physical K namespaces remain K02's own scoped tuples;
+ * this module adds a separate immutable occurrence pin dimension.
+ */
+import { isPlainRecord } from './guards.js';
+import { V10Error } from './errors.js';
 import { activateV10App, V10AppFacade } from './activation.js';
 import { V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Canonical, } from './digest.js';
 const MAX_STRING = 512;
@@ -23,13 +58,11 @@ const RECORD_FIELDS = new Set([
     'subjectDigest', 'packageClosureDigest', 'buildId', 'approvalRef',
     'authorizedAt', 'expiresAt', 'activatedAt',
 ]);
-export class V10DeploymentError extends Error {
-    code;
+export class V10DeploymentError extends V10Error {
     detail;
     constructor(code, message, detail) {
-        super(message);
+        super(code, message);
         this.name = 'V10DeploymentError';
-        this.code = code;
         this.detail = detail === undefined ? undefined : Object.freeze({ ...detail });
     }
 }
@@ -53,12 +86,6 @@ function reclassify(code, build) {
         }
         throw error;
     }
-}
-function isPlainRecord(value) {
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-        return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
 }
 function bounded(value, label, max = MAX_STRING) {
     if (typeof value !== 'string' || value.length === 0 || value.length > max) {

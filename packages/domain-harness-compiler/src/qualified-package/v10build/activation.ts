@@ -45,6 +45,7 @@
  * initializing and disposing advisory modules is composition scope; their
  * participation in turns belongs to the K-side successors (#1167/#1169).
  */
+import { isPlainRecord } from './guards.js';
 import { randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { registerHooks } from 'node:module';
@@ -58,22 +59,18 @@ import {
   type V10SelectedBusinessQueryRoute,
 } from '@kaicreator/domain-harness/v8/host';
 
-import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
+import {
+  V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE,
+  V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE,
+  V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, sha256Hex,
+} from './digest.js';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
+import { V10Error, V10ActivationError } from './errors.js';
+export { V10ActivationError } from './errors.js';
 
-export class V10ActivationError extends Error {
-  readonly code: string;
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = 'V10ActivationError';
-    this.code = code;
-  }
-}
-
-export class V10PortDeniedError extends Error {
-  readonly code = 'KEXT_PORT_DENIED';
+export class V10PortDeniedError extends V10Error {
   constructor(name: string) {
-    super(`advisory init context exposes no protected port '${name}'; the probe is denied`);
+    super('KEXT_PORT_DENIED', `advisory init context exposes no protected port '${name}'; the probe is denied`);
     this.name = 'V10PortDeniedError';
   }
 }
@@ -258,11 +255,6 @@ interface SelectedAdvisory {
   readonly dispose: (() => void) | undefined;
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
 
 function assertPlainRecord(value: unknown, label: string): Record<string, unknown> {
   if (!isPlainRecord(value)) {
@@ -281,7 +273,7 @@ function privateModuleUrl(source: string, activationNonce: string, packageId: st
 }
 
 // ---------------------------------------------------------------------------
-// Declared bare-import resolution (review 6254726674, P1-1).
+// Declared bare-import resolution for sealed npm/native allowances.
 //
 // A sealed module imported through a `data:` URL has no package hierarchy,
 // so a bare npm/native specifier inside it cannot resolve through the
@@ -414,7 +406,7 @@ function registerDeclaredBareImports(deps: {
 /**
  * The kernel-facing K docs port: prefix-bounded physical CAS conditionals
  * only. `remove` is exposed when — and only when — the physical store
- * implements it (review 6254726674, P1-2).
+ * implements it; unsupported stores expose no removal capability.
  */
 export interface V10DocsPort {
   get(key: string): Promise<{ value: unknown; revision: number } | null>;
@@ -501,7 +493,7 @@ function encodeK02Component(value: string): string {
 }
 
 /**
- * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * The ONE governed K-docs outer prefix of a deployment: the stable,
  * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
  * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
  * binding and the Shadow L4 verifier's independent re-derivation — the three
@@ -512,7 +504,7 @@ export function v10DeploymentDocsPrefix(deployment: { deployedAppId: string; ten
 }
 
 /**
- * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
+ * The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
  * component the Host docs port prepends. This is the ONE derivation both the
@@ -532,7 +524,7 @@ export function v10K02DocumentPrefix(scope: {
 }
 
 /**
- * [v0.10 C01 #1177 R1 P1-2] The K02 SCOPED document-store composition: the
+ * The K02 SCOPED document-store composition: the
  * exact two-B namespace mechanism the K02 physical witness exercises. Every
  * key of one deployment tuple — instance, fence, journal, permit, dispatch
  * claim, disposition, governance pin, receipt archive — is addressed under
@@ -603,7 +595,7 @@ export interface ActivateV10AppOptions {
   readonly now?: () => number;
   readonly counters?: V10Counters;
   /**
-   * [v0.10 C01 #1177 R1 P1-2] The stable deployment identity of this App
+   * The stable deployment identity of this App
    * (deployedAppId/tenantId/appId). When present, EVERY business runtime is
    * created under the K02 SCOPED document grammar with its own
    * businessPackageId appended — the exact injective tuple the K02 selected
@@ -639,8 +631,10 @@ export interface ActivateV10AppOptions {
 export interface V10Activation {
   readonly facade: V10AppFacade;
   readonly counters: V10Counters;
-  /** Dispose: facade closes first, then advisory modules in reverse init order. */
+  /** Explicit, idempotent cleanup: closes facade and all import allowances. */
   dispose(): void;
+  /** Node >=22.15: permits `using activation = await activateV10App(...)`. */
+  [Symbol.dispose](): void;
 }
 
 /**
@@ -708,7 +702,7 @@ export class V10AppFacade {
    * Shadow L4 verifier. Derived exclusively from private activated state,
    * never a caller-provided digest or a user-supplied matching claim.
    *
-   * [T07 R2 P1] `deployedAppId` and `k02DocumentPrefixes` are the exact
+   * `deployedAppId` and `k02DocumentPrefixes` are the exact
    * deployment instance and its per-B physical document prefixes. They are
    * derived here from the same private deployment identity the write path
    * uses (`v10K02DocumentPrefix`), so a shadow can select one deployment's K
@@ -913,7 +907,7 @@ export class V10AppFacade {
   }
 
   /**
-   * [R1 P1-2] The docs view ONE business runtime (and its external-effect
+   * The docs view ONE business runtime (and its external-effect
    * gate) must use: the plain K port for the historical unscoped wiring, or
    * the per-B K02 scoped view of a deployment-identity activation. The view
    * is cached per business package — one B, one namespace.
@@ -964,7 +958,7 @@ export class V10AppFacade {
         // (the trusted pre-handler-refusal discipline of #1108 K01).
         return await dispatchThroughExternalEffectGate(
           {
-            // [R1 P1-2] The gate reads through the DISPATCHING business's own
+            // The gate reads through the DISPATCHING business's own
             // K docs view: a scoped deployment resolves the kernel-issued
             // addresses inside that B's namespace only (no legacy fallback).
             docs: {
@@ -1010,7 +1004,7 @@ export class V10AppFacade {
     const businessNamespace = this.#namespaces.get(businessPackageId) as Namespace;
     const policy = (businessNamespace.getPolicy as () => unknown)();
     if (!isPlainRecord(policy)) {
-      refuse('V10_APP_INVALID', `Business ${businessPackageId} policy is not a record`);
+      refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} policy is not a record`);
     }
     this.#counters.runtimeFactoryInvocations += 1;
     const runtime = createRuntime({
@@ -1053,7 +1047,7 @@ export class V10AppFacade {
       ? policy.workflowDefinition.workflowKey
       : undefined;
     if (typeof workflowKey !== 'string' || workflowKey.length === 0) {
-      refuse('V10_APP_INVALID', `Business ${businessPackageId} declares no workflowKey`);
+      refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} declares no workflowKey`);
     }
     return workflowKey;
   }
@@ -1074,9 +1068,9 @@ export class V10AppFacade {
     if (rows.length === 0) {
       refuse('INTENT_UNSEALED', `intent ${intentType} carries no sealed route rows in this App`);
     }
-    const basisDigest = `sha256:${this.#app.subjectDigest}`;
+    const basisDigest = v10RouterBasisDigest(this.#app.subjectDigest);
     const bindings = rows.map((row) => ({ intentId: row.intentId, operationId: row.operationId, capabilityId: row.capabilityId, handlerId: row.handlerId }));
-    const candidates = rows.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId, priority: 1, eligibility: 'eligible' }));
+    const candidates = rows.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId, priority: V10_ROUTER_PRIORITY, eligibility: V10_ROUTER_ELIGIBILITY }));
     const standardEntry = this.#app.modules.find((module) => module.role === 'standard-primary');
     const router = this.#namespaces.get((standardEntry as { packageId: string }).packageId)?.routeWorkflowIntent as (request: unknown) => Record<string, unknown>;
     const routed = router({ intentId: intentType, basisDigest, bindings, candidates });
@@ -1104,7 +1098,7 @@ export class V10AppFacade {
     const existing = await runtime.getSnapshot(target);
     if (existing === null || existing === undefined) {
       try {
-        await runtime.openInstance({ target, correlationId: `corr:${messageId}`, authorityClass: 'PRODUCTION' });
+        await runtime.openInstance({ target, correlationId: `corr:${messageId}`, authorityClass: V10_KERNEL_AUTHORITY_CLASS });
       } catch (error) {
         const code = (error as { code?: string }).code;
         if (code !== 'HOST_CAS_CONFLICT' && code !== 'HOST_KEY_EXISTS') throw error;
@@ -1112,8 +1106,8 @@ export class V10AppFacade {
     }
     try {
       const receipt = await runtime.submitOccurrence({
-        kind: 'v08/tc-intent', intentType, target, messageId, input: intent.input,
-        caller: { role: 'requester' },
+        kind: V10_KERNEL_INTENT_KIND, intentType, target, messageId, input: intent.input,
+        caller: { role: V10_KERNEL_CALLER_ROLE },
       });
       if (!isPlainRecord(receipt)) {
         refuse('K_RECEIPT_INVALID', 'the Kernel admission receipt is not a record');
@@ -1262,24 +1256,24 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
         dispose: undefined,
       });
     }
-    // [v0.10 C01 #1177 R1 P1-2] Optional deployment identity: validated here
+    // Optional deployment identity: validated here
     // once, then carried into every business runtime's K02 scoped namespace.
     let deploymentIdentity: { deployedAppId: string; tenantId: string; appId: string } | undefined;
     if (options.deploymentIdentity !== undefined) {
       const raw = options.deploymentIdentity as unknown;
       if (!isPlainRecord(raw)) {
-        refuse('V10_APP_INVALID', 'deploymentIdentity must be a plain record');
+        refuse('V10_ACTIVATION_OPTIONS_INVALID', 'deploymentIdentity must be a plain record');
       }
       const identity = { deployedAppId: '', tenantId: '', appId: '' };
       for (const field of ['deployedAppId', 'tenantId', 'appId'] as const) {
         const value = raw[field];
         if (typeof value !== 'string' || value.length === 0 || value.length > 256) {
-          refuse('V10_APP_INVALID', `deploymentIdentity.${field} must be a bounded non-empty string`);
+          refuse('V10_ACTIVATION_OPTIONS_INVALID', `deploymentIdentity.${field} must be a bounded non-empty string`);
         }
         identity[field] = value;
       }
       if (options.tenantId !== undefined && options.tenantId !== identity.tenantId) {
-        refuse('V10_APP_INVALID', 'options.tenantId and deploymentIdentity.tenantId disagree; one deployment owns one tenant identity');
+        refuse('V10_ACTIVATION_OPTIONS_INVALID', 'options.tenantId and deploymentIdentity.tenantId disagree; one deployment owns one tenant identity');
       }
       deploymentIdentity = identity;
     }
@@ -1291,7 +1285,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       const raw = options.queryAuthority as unknown;
       if (!isPlainRecord(raw) || raw.principal === null || raw.principal === undefined
         || typeof raw.authorize !== 'function') {
-        refuse('V10_APP_INVALID', 'queryAuthority must be Host-owned wiring carrying a verified principal and an authorize(principal, target) function');
+        refuse('V10_ACTIVATION_OPTIONS_INVALID', 'queryAuthority must be Host-owned wiring carrying a verified principal and an authorize(principal, target) function');
       }
       const authorize = raw.authorize as V10QueryAuthority['authorize'];
       queryAuthority = Object.freeze({
@@ -1374,24 +1368,30 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
     }
 
     // ---- (5)+(6) the facade is the execute surface; dispose closes in reverse ----
+    // Explicit cleanup is authoritative; GC/FinalizationRegistry are not
+    // reliable security or process-global hook cleanup mechanisms.
+    let disposed = false;
+    const dispose = (): void => {
+      if (disposed) return;
+      disposed = true;
+      // Stop honoring this activation's bare imports before any other teardown.
+      releaseDeclaredImports?.();
+      facade.close();
+      for (let index = initialized.length - 1; index >= 0; index -= 1) {
+        const advisory = initialized[index] as SelectedAdvisory;
+        counters.disposals.push(advisory.packageId);
+        try {
+          advisory.dispose?.();
+        } catch {
+          // bounded best-effort teardown
+        }
+      }
+    };
     return {
       facade,
       counters,
-      dispose: (): void => {
-        // Close the declared-import resolution seam first: after activation
-        // close, this App's allowances stop being honored (fail-closed).
-        releaseDeclaredImports?.();
-        facade.close();
-        for (let index = initialized.length - 1; index >= 0; index -= 1) {
-          const advisory = initialized[index] as SelectedAdvisory;
-          counters.disposals.push(advisory.packageId);
-          try {
-            advisory.dispose?.();
-          } catch {
-            // bounded best-effort teardown
-          }
-        }
-      },
+      dispose,
+      [Symbol.dispose]: dispose,
     };
   } catch (error) {
     releaseDeclaredImports?.();

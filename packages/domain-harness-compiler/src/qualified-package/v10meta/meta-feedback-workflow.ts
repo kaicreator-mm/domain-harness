@@ -37,6 +37,7 @@
  * reservation/ledger write. K State/Journal/Effect, the K02 fence and the
  * immutable original receipt remain exclusively the selected Kernel's.
  */
+import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import type { V10DocStore } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
@@ -91,11 +92,6 @@ function refuse(code: string, message: string, detail?: Record<string, unknown>)
   throw new MetaFeedbackError(code, message, detail);
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const prototype: unknown = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object') {

@@ -4,7 +4,7 @@
  * ordinary-import closure gate, the canonical digest/profile constants, and
  * the trusted-activation counterpart (`activateV10App`).
  */
-export { V10BuildError } from './errors.js';
+export { V10BuildError, V10Error, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES } from './errors.js';
 export {
   V10_BUILD_FORMAT,
   V10_BUNDLER_REVISION,
@@ -20,12 +20,9 @@ export {
   sha256Hex,
 } from './digest.js';
 export type { V10ModuleRole } from './digest.js';
-export {
-  assertSealedImportClosure,
-  collectModuleEdges,
-  emptyExternalImports,
-} from './import-policy.js';
-export type { V10ExternalImports, V10ModuleEdge } from './import-policy.js';
+// BUILD internal AST tooling remains in import-policy.ts (not the public API).
+export { emptyExternalImports } from './import-policy.js';
+export type { V10ExternalImports } from './import-policy.js';
 export { buildV10App } from './build.js';
 export type {
   BuildV10AppOptions,
@@ -55,16 +52,9 @@ export type {
   V10ScopedSnapshotManyAnswer,
   V10ScopedSnapshotQuery,
 } from './activation.js';
-export {
-  dispatchThroughExternalEffectGate,
-  normalizeExternalEffectEnvelope,
-} from './external-effect.js';
-export type {
-  ExternalEffectAuthorityKeys,
-  ExternalEffectEnvelope,
-  ExternalEffectDispatchRequest,
-  ExternalEffectGateDeps,
-} from './external-effect.js';
+// The trusted Host external gate is wired only by activation.ts; exporting
+// it would let untrusted consumers supply counterfeit docs and attest ports.
+export type { ExternalEffectEnvelope } from './external-effect.js';
 export {
   V10DeploymentError,
   activateGovernedV10Build,
