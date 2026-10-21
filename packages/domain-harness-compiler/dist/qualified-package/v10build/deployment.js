@@ -32,6 +32,7 @@
  * this module adds a separate immutable occurrence pin dimension.
  */
 import { isPlainRecord } from './guards.js';
+import { V10Error } from './errors.js';
 import { activateV10App, V10AppFacade } from './activation.js';
 import { V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Canonical, } from './digest.js';
 const MAX_STRING = 512;
@@ -57,13 +58,11 @@ const RECORD_FIELDS = new Set([
     'subjectDigest', 'packageClosureDigest', 'buildId', 'approvalRef',
     'authorizedAt', 'expiresAt', 'activatedAt',
 ]);
-export class V10DeploymentError extends Error {
-    code;
+export class V10DeploymentError extends V10Error {
     detail;
     constructor(code, message, detail) {
-        super(message);
+        super(code, message);
         this.name = 'V10DeploymentError';
-        this.code = code;
         this.detail = detail === undefined ? undefined : Object.freeze({ ...detail });
     }
 }

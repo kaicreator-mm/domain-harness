@@ -30,7 +30,7 @@
  * business semantics — two unrelated adapters share exactly this contract.
  */
 import { isPlainRecord } from './guards.js';
-import { V10ActivationError } from './activation.js';
+import { V10ExternalEffectError } from './errors.js';
 
 /**
  * The K-issued address context of ONE external effect dispatch (review R1
@@ -62,23 +62,23 @@ export type ExternalEffectEnvelope =
 /** Typed normalization of ONE adapter return into the phase envelope. */
 export function normalizeExternalEffectEnvelope(raw: unknown): ExternalEffectEnvelope {
   if (!isPlainRecord(raw)) {
-    throw new V10ActivationError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] an external effect adapter must return a plain phase-envelope record');
+    throw new V10ExternalEffectError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] an external effect adapter must return a plain phase-envelope record');
   }
   if (raw.phase !== 'accepted' && raw.phase !== 'running' && raw.phase !== 'terminal') {
-    throw new V10ActivationError(
+    throw new V10ExternalEffectError(
       'V10_EXTERNAL_ENVELOPE_INVALID',
       `an external effect adapter returned the unknown phase ${JSON.stringify(String(raw.phase))}; the grammar is accepted|running|terminal`,
     );
   }
   if (typeof raw.externalRef !== 'string' || raw.externalRef.length === 0 || raw.externalRef.length > 256) {
-    throw new V10ActivationError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] an external effect envelope carries a bounded non-empty externalRef');
+    throw new V10ExternalEffectError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] an external effect envelope carries a bounded non-empty externalRef');
   }
   if (raw.phase !== 'terminal') {
     // Accepted/running are honest NON-terminal phases: an outcome riding a
     // non-terminal envelope is exactly the false-terminal-success shape this
     // contract forbids.
     if (raw.outcome !== undefined) {
-      throw new V10ActivationError(
+      throw new V10ExternalEffectError(
         'V10_EXTERNAL_ENVELOPE_INVALID',
         `[V10_EXTERNAL_ENVELOPE_INVALID] a ${String(raw.phase)} envelope must not carry an outcome; only terminal envelopes settle`,
       );
@@ -87,14 +87,14 @@ export function normalizeExternalEffectEnvelope(raw: unknown): ExternalEffectEnv
   }
   const outcome = raw.outcome;
   if (!isPlainRecord(outcome) || typeof outcome.ok !== 'boolean') {
-    throw new V10ActivationError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] a terminal envelope carries an {ok, ...} outcome record');
+    throw new V10ExternalEffectError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] a terminal envelope carries an {ok, ...} outcome record');
   }
   if (outcome.ok === true) {
     return { phase: 'terminal', externalRef: raw.externalRef, outcome: { ok: true, output: outcome.output } };
   }
   const error = outcome.error;
   if (!isPlainRecord(error) || typeof error.code !== 'string' || typeof error.message !== 'string') {
-    throw new V10ActivationError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] a failed terminal outcome carries a typed {code, message} error');
+    throw new V10ExternalEffectError('V10_EXTERNAL_ENVELOPE_INVALID', '[V10_EXTERNAL_ENVELOPE_INVALID] a failed terminal outcome carries a typed {code, message} error');
   }
   return { phase: 'terminal', externalRef: raw.externalRef, outcome: { ok: false, error: { code: error.code, message: error.message } } };
 }
@@ -139,7 +139,7 @@ function refuseGate(attest: unknown, onRefusal: ((code: string) => void) | undef
   onRefusal?.(code);
   // The typed code rides IN the message too: the kernel's effect-failure
   // wrapper carries only the message text into the journal record.
-  throw new V10ActivationError(code, `[${code}] ${message}`);
+  throw new V10ExternalEffectError(code, `[${code}] ${message}`);
 }
 
 /**
@@ -284,7 +284,7 @@ export async function dispatchThroughExternalEffectGate(
     // Fail closed: the executor surfaces this as an honest effect failure —
     // a fake accepted/running ACK can never become terminal success.
     deps.onRefusal?.('V10_EXTERNAL_PENDING');
-    throw new V10ActivationError(
+    throw new V10ExternalEffectError(
       'V10_EXTERNAL_PENDING',
       `[V10_EXTERNAL_PENDING] external effect ${claim.effectId} is bound await:terminal but the adapter reported phase '${envelope.phase}' (externalRef ${envelope.externalRef}); pending is not success`,
     );

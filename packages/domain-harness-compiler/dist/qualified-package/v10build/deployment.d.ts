@@ -1,11 +1,11 @@
+import { V10Error } from './errors.js';
 import type { V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
 import { V10AppFacade } from './activation.js';
 import type { V10BuiltApp } from './build.js';
 declare const DECISION_KIND: "v10/build-activation-decision";
 declare const PIN_KIND: "v10/occurrence-build-pin";
 declare const RECORD_KIND: "v10/deployment-activation";
-export declare class V10DeploymentError extends Error {
-    readonly code: string;
+export declare class V10DeploymentError extends V10Error {
     readonly detail: Readonly<Record<string, unknown>> | undefined;
     constructor(code: string, message: string, detail?: Record<string, unknown>);
 }

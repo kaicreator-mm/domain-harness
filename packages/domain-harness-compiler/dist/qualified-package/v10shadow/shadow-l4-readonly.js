@@ -18,9 +18,9 @@
  *   (2) READ-ONLY OBSERVATION — the actual selected K documents are read
  *       through a narrow `get`/`keys` view of the production store under the
  *       EXACT K02 physical prefixes of this activated deployment: the
- *       `v10/k/<subjectDigest>/<tenantId>/v010-k02:<deployedAppId>:<tenantId>:
- *       <appId>:<businessPackageId>:` prefixes of the selected Business
- *       packages, derived from the facade's private deployment identity. The
+ *       stable `v10/k/deployment:<deployedAppId>:<tenantId>:<appId>/` outer
+ *       namespace plus each selected Business's injective `v010-k02:`
+ *       tuple prefix, derived from the facade's private deployment identity. The
  *       BUILD/tenant arguments are only cross-checked against that binding;
  *       they never widen or define the observed prefix set. A nil deployment
  *       binding is a typed refusal, never a fallback to the whole App/Tenant
@@ -53,7 +53,7 @@ import { V10AppFacade, v10DeploymentDocsPrefix, v10K02DocumentPrefix } from '../
 import { canonicalJson, sha256Canonical, sha256Hex } from '../v10build/digest.js';
 export const SHADOW_L4_ABI = 'dh.v10.shadow-l4-readonly/1';
 export const SHADOW_L4_EVIDENCE_KIND = 'shadow-l4-evidence';
-/** The exact facade-owned K namespace: `<prefix><subjectDigest>/<tenantId>/`. */
+/** Physical K docs root; the governed outer namespace is the stable deployment tuple. */
 export const SHADOW_K_DOCS_PREFIX = 'v10/k/';
 const KINDS = new Set(['Rule', 'Skill', 'DecisionProcedure', 'Workflow']);
 const APPROVAL_STATES = new Set(['candidate', 'approved', 'revoked']);
