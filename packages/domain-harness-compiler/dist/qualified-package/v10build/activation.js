@@ -46,11 +46,9 @@
  * participation in turns belongs to the K-side successors (#1167/#1169).
  */
 import { isPlainRecord } from './guards.js';
+import { privateModuleFragment, registerDeclaredBareImports } from './import-hook.js';
 import { randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
-import { registerHooks } from 'node:module';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { createV10AuthorizedMultiBQuery, } from '@kaicreator/domain-harness/v8/host';
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE, V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, sha256Hex, } from './digest.js';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
@@ -96,111 +94,9 @@ function assertPlainRecord(value, label) {
     }
     return value;
 }
-function privateModuleFragment(activationNonce, packageId) {
-    return `#v10-${activationNonce}-${encodeURIComponent(packageId)}`;
-}
 function privateModuleUrl(source, activationNonce, packageId) {
     const bytes = Buffer.from(source, 'utf8').toString('base64');
     return `data:text/javascript;base64,${bytes}${privateModuleFragment(activationNonce, packageId)}`;
-}
-/** Minted parent-URL fragment -> the declared bare specifiers it may resolve. */
-const declaredBareImportAllowances = new Map();
-let importHookHandle = null;
-let importHookUsers = 0;
-/** The default deployment anchor: this activation module's own resolution context. */
-const ACTIVATION_MODULE_URL = import.meta.url;
-function ensureImportResolveHook() {
-    if (typeof registerHooks !== 'function')
-        return null;
-    if (importHookHandle === null) {
-        importHookHandle = registerHooks({
-            resolve(specifier, context, nextResolve) {
-                const parentURL = context.parentURL;
-                // The fragment carries this machinery's per-activation nonce; the
-                // keyed lookup is the authority (a foreign URL is never keyed).
-                if (typeof parentURL === 'string' && parentURL.startsWith('data:text/javascript;base64,') && parentURL.includes('#v10-')) {
-                    const allowance = declaredBareImportAllowances.get(parentURL.slice(parentURL.indexOf('#')));
-                    if (allowance !== undefined && allowance.specifiers.has(specifier)) {
-                        // Resolve through the REAL default ESM resolver against a
-                        // synthetic file: parent inside the deployment context (the
-                        // legitimately deployed node_modules lookup), instead of the
-                        // hierarchy-less data: parent. Everything unsealed keeps going
-                        // to the next resolver, which refuses bare specifiers from a
-                        // data: parent — the fail-closed default.
-                        const anchorParentURL = allowance.deploymentRoot === undefined
-                            ? ACTIVATION_MODULE_URL
-                            : pathToFileURL(join(allowance.deploymentRoot, 'package.json')).href;
-                        return nextResolve(specifier, { parentURL: anchorParentURL });
-                    }
-                }
-                return nextResolve(specifier, context);
-            },
-        });
-    }
-    importHookUsers += 1;
-    return importHookHandle;
-}
-function releaseImportResolveHook() {
-    importHookUsers -= 1;
-    if (importHookUsers === 0 && importHookHandle !== null) {
-        importHookHandle.deregister();
-        importHookHandle = null;
-    }
-}
-/** The npm/native specifiers a consumed module record declares (defensive plain-data read). */
-function declaredBareImportsOf(module) {
-    const external = module.externalImports;
-    if (!isPlainRecord(external))
-        return [];
-    const declared = [];
-    for (const kind of ['npm', 'native']) {
-        const list = external[kind];
-        if (Array.isArray(list)) {
-            for (const item of list) {
-                if (typeof item === 'string' && item.length > 0)
-                    declared.push(item);
-            }
-        }
-    }
-    return declared;
-}
-/**
- * Honor the consumed record's declared npm/native allowances for the `data:`
- * URLs this activation is about to import. Returns the release closure that
- * unregisters the allowances (and the process hook when this was its last
- * user). Refuses typed when the runtime cannot host the resolve hook.
- */
-function registerDeclaredBareImports(deps) {
-    const mintedFragments = [];
-    let hasDeclaredBareImports = false;
-    for (const module of deps.appView.modules) {
-        if (typeof module.moduleSource !== 'string' || module.moduleSource.length === 0)
-            continue;
-        const declared = declaredBareImportsOf(module);
-        const fragment = privateModuleFragment(deps.activationNonce, module.packageId);
-        mintedFragments.push(fragment);
-        if (declared.length > 0) {
-            declaredBareImportAllowances.set(fragment, { specifiers: new Set(declared), deploymentRoot: deps.deploymentRoot });
-            hasDeclaredBareImports = true;
-        }
-    }
-    if (!hasDeclaredBareImports)
-        return () => { };
-    const handle = ensureImportResolveHook();
-    if (handle === null) {
-        for (const fragment of mintedFragments)
-            declaredBareImportAllowances.delete(fragment);
-        refuse('V10_IMPORT_HOOK_UNAVAILABLE', 'this Node runtime lacks the node:module registerHooks resolve seam; an App declaring npm/native external imports refuses fail-closed instead of importing without its declared resolution context');
-    }
-    let released = false;
-    return () => {
-        if (released)
-            return;
-        released = true;
-        for (const fragment of mintedFragments)
-            declaredBareImportAllowances.delete(fragment);
-        releaseImportResolveHook();
-    };
 }
 /** Map the kernel-side condition shape onto the physical store condition. */
 function mapDocCondition(key, condition) {
@@ -816,6 +712,7 @@ export async function activateV10App(app, options) {
         releaseDeclaredImports = registerDeclaredBareImports({
             activationNonce,
             appView,
+            activationModuleUrl: import.meta.url,
             deploymentRoot: options.deploymentRoot,
         });
         // ---- (2) import the sealed modules in the SEALED order ----
