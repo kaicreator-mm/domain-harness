@@ -57,6 +57,7 @@
       "UNAUTHORIZED_PROMOTION"
     ],
     "packages/domain-harness-compiler/src/qualified-package/v10build/digest.ts": [],
+    "packages/domain-harness-compiler/src/qualified-package/v10build/error-type-parity.ts": [],
     "packages/domain-harness-compiler/src/qualified-package/v10build/errors.ts": [],
     "packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.ts": [
       "V10_EXTERNAL_ENVELOPE_INVALID",
