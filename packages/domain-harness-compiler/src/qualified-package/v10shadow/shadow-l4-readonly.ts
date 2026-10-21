@@ -406,7 +406,7 @@ async function captureSelectedKSnapshot(
     if (error instanceof ShadowL4Error) throw error;
     refuse('SHADOW_READ_INTERFACE_MISSING', `the Host read-only store view cannot list keys: ${errorMessage(error)}`, { cause: error });
   }
-  // [T07 R2 P1] Selection is the UNION of this deployment's exact K02 per-B
+  // Selection is the UNION of this deployment's exact K02 per-B
   // prefixes only. A sibling deployment of the same BUILD/Tenant shares the
   // parent namespace but never one of these prefixes, so its keys cannot
   // consume the case budget or masquerade as this deployment's observations.
@@ -838,7 +838,7 @@ function assertFacadeMatchesApp(facade: V10AppFacade, app: V10AppView, tenantId:
     || sha256Canonical(binding.businessPackageIds) !== sha256Canonical(expectedBusinesses)) {
     refuse('SHADOW_APP_FACADE_MISMATCH', 'BUILD digest, App, tenant or selected Business identity differs from the activated facade');
   }
-  // [T07 R2 P1] An activation without a deployment identity has no K02 scoped
+  // An activation without a deployment identity has no K02 scoped
   // namespace: its K rows cannot be attributed to one deployment instance, so
   // there is no honest narrow observation set. STOP typed instead of silently
   // widening to the whole App/Tenant namespace.
