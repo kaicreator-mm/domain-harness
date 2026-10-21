@@ -4,8 +4,8 @@
  */
 export class V10Error extends Error {
   readonly code: string;
-  constructor(code: string, message: string) {
-    super(message);
+  constructor(code: string, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'V10Error';
     this.code = code;
   }
