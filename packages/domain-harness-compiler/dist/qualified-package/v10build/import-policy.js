@@ -40,6 +40,7 @@
  * (byte pin asserted before any parse, fail closed), so the two gates
  * share one parser identity while their POLICIES differ per version.
  */
+import { isObjectRecord } from './guards.js';
 import { parse } from '../v09build/generated/acorn.mjs';
 import { assertVendoredParserBytes, V09_BUILD_PARSER_PIN } from '../v09build/parser.js';
 import { V10BuildError } from './errors.js';
@@ -47,9 +48,6 @@ const MAX_AST_DEPTH = 2_000;
 const CODE_STRING_CONSTRUCTORS = new Set(['Function', 'GeneratorFunction', 'AsyncFunction', 'AsyncGeneratorFunction']);
 export function emptyExternalImports() {
     return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
-}
-function isRecord(value) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function denied(moduleLabel, reason) {
     return new V10BuildError('V10_IMPORT_POLICY_DENIED', `sealed module ${moduleLabel} is refused by the v0.10 import-closure gate (parser acorn@${V09_BUILD_PARSER_PIN.version}): ${reason}`);
@@ -152,7 +150,7 @@ export function collectModuleEdges(moduleLabel, source) {
                 continue;
             }
             const value = node[key];
-            if (isRecord(value)) {
+            if (isObjectRecord(value)) {
                 if (typeof value.type === 'string') {
                     visit(value, depth + 1);
                 }
@@ -160,7 +158,7 @@ export function collectModuleEdges(moduleLabel, source) {
             }
             if (Array.isArray(value)) {
                 for (const item of value) {
-                    if (isRecord(item) && typeof item.type === 'string') {
+                    if (isObjectRecord(item) && typeof item.type === 'string') {
                         visit(item, depth + 1);
                     }
                 }

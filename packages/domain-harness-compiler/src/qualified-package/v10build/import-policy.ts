@@ -40,6 +40,7 @@
  * (byte pin asserted before any parse, fail closed), so the two gates
  * share one parser identity while their POLICIES differ per version.
  */
+import { isObjectRecord } from './guards.js';
 import { parse } from '../v09build/generated/acorn.mjs';
 import type { AcornNode } from '../v09build/generated/acorn.mjs';
 import { assertVendoredParserBytes, V09_BUILD_PARSER_PIN } from '../v09build/parser.js';
@@ -60,9 +61,6 @@ export function emptyExternalImports(): V10ExternalImports {
   return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function denied(moduleLabel: string, reason: string): V10BuildError {
   return new V10BuildError(
@@ -176,7 +174,7 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
         continue;
       }
       const value = node[key];
-      if (isRecord(value)) {
+      if (isObjectRecord(value)) {
         if (typeof value.type === 'string') {
           visit(value as AcornNode, depth + 1);
         }
@@ -184,7 +182,7 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
       }
       if (Array.isArray(value)) {
         for (const item of value) {
-          if (isRecord(item) && typeof item.type === 'string') {
+          if (isObjectRecord(item) && typeof item.type === 'string') {
             visit(item as AcornNode, depth + 1);
           }
         }

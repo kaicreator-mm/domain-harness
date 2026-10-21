@@ -29,6 +29,7 @@
  * adapter; they are never authority. This module embeds no runx/Tally
  * business semantics — two unrelated adapters share exactly this contract.
  */
+import { isPlainRecord } from './guards.js';
 import { V10ExternalEffectError } from './errors.js';
 
 /**
@@ -57,11 +58,6 @@ export type ExternalEffectEnvelope =
     readonly outcome: { readonly ok: true; readonly output: unknown } | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } };
   };
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
 
 /** Typed normalization of ONE adapter return into the phase envelope. */
 export function normalizeExternalEffectEnvelope(raw: unknown): ExternalEffectEnvelope {

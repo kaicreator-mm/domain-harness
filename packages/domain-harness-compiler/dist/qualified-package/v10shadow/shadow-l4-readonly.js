@@ -47,6 +47,7 @@
  * the exact approved fallback untouched and the production snapshot
  * unchanged; the report is evidence, not an activation request.
  */
+import { isPlainRecord } from '../v10build/guards.js';
 import * as vm from 'node:vm';
 import { V10AppFacade, v10DeploymentDocsPrefix, v10K02DocumentPrefix } from '../v10build/activation.js';
 import { canonicalJson, sha256Canonical, sha256Hex } from '../v10build/digest.js';
@@ -85,12 +86,6 @@ export class ShadowL4Error extends Error {
 }
 function refuse(code, message, options) {
     throw new ShadowL4Error(code, message, options);
-}
-function isPlainRecord(value) {
-    if (value === null || typeof value !== 'object' || Array.isArray(value))
-        return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
 }
 function boundedString(value, label, max = 256) {
     if (typeof value !== 'string' || value.length === 0 || value.length > max) {

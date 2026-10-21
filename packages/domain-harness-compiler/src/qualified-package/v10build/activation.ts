@@ -45,6 +45,7 @@
  * initializing and disposing advisory modules is composition scope; their
  * participation in turns belongs to the K-side successors (#1167/#1169).
  */
+import { isPlainRecord } from './guards.js';
 import { randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { registerHooks } from 'node:module';
@@ -254,11 +255,6 @@ interface SelectedAdvisory {
   readonly dispose: (() => void) | undefined;
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
 
 function assertPlainRecord(value: unknown, label: string): Record<string, unknown> {
   if (!isPlainRecord(value)) {

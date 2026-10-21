@@ -31,6 +31,7 @@
  * use that App. The physical K namespaces remain K02's own scoped tuples;
  * this module adds a separate immutable occurrence pin dimension.
  */
+import { isPlainRecord } from './guards.js';
 import { V10Error } from './errors.js';
 import type { V10Activation, V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
 import { activateV10App, V10AppFacade } from './activation.js';
@@ -97,11 +98,6 @@ function reclassify<T>(code: string, build: () => T): T {
   }
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const prototype: unknown = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
 
 function bounded(value: unknown, label: string, max = MAX_STRING): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > max) {
