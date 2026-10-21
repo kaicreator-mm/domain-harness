@@ -51,7 +51,7 @@ import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createV10AuthorizedMultiBQuery, } from '@kaicreator/domain-harness/v8/host';
-import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
+import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE, V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, sha256Hex, } from './digest.js';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
 export class V10ActivationError extends Error {
     code;
@@ -284,7 +284,7 @@ function encodeK02Component(value) {
     return value.replace(/%/g, '%25').replace(/:/g, '%3A');
 }
 /**
- * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * The ONE governed K-docs outer prefix of a deployment: the stable,
  * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
  * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
  * binding and the Shadow L4 verifier's independent re-derivation — the three
@@ -294,7 +294,7 @@ export function v10DeploymentDocsPrefix(deployment) {
     return `${K_DOCS_PREFIX}deployment:${encodeK02Component(deployment.deployedAppId)}:${encodeK02Component(deployment.tenantId)}:${encodeK02Component(deployment.appId)}/`;
 }
 /**
- * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
+ * The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
  * component the Host docs port prepends. This is the ONE derivation both the
@@ -311,7 +311,7 @@ export function v10K02DocumentPrefix(scope) {
     ].join(':') + ':';
 }
 /**
- * [v0.10 C01 #1177 R1 P1-2] The K02 SCOPED document-store composition: the
+ * The K02 SCOPED document-store composition: the
  * exact two-B namespace mechanism the K02 physical witness exercises. Every
  * key of one deployment tuple — instance, fence, journal, permit, dispatch
  * claim, disposition, governance pin, receipt archive — is addressed under
@@ -418,7 +418,7 @@ export class V10AppFacade {
      * Shadow L4 verifier. Derived exclusively from private activated state,
      * never a caller-provided digest or a user-supplied matching claim.
      *
-     * [T07 R2 P1] `deployedAppId` and `k02DocumentPrefixes` are the exact
+     * `deployedAppId` and `k02DocumentPrefixes` are the exact
      * deployment instance and its per-B physical document prefixes. They are
      * derived here from the same private deployment identity the write path
      * uses (`v10K02DocumentPrefix`), so a shadow can select one deployment's K
@@ -582,7 +582,7 @@ export class V10AppFacade {
         }
     }
     /**
-     * [R1 P1-2] The docs view ONE business runtime (and its external-effect
+     * The docs view ONE business runtime (and its external-effect
      * gate) must use: the plain K port for the historical unscoped wiring, or
      * the per-B K02 scoped view of a deployment-identity activation. The view
      * is cached per business package — one B, one namespace.
@@ -633,7 +633,7 @@ export class V10AppFacade {
                 // with ZERO adapter dispatch, marked into the kernel-minted attest
                 // (the trusted pre-handler-refusal discipline of #1108 K01).
                 return await dispatchThroughExternalEffectGate({
-                    // [R1 P1-2] The gate reads through the DISPATCHING business's own
+                    // The gate reads through the DISPATCHING business's own
                     // K docs view: a scoped deployment resolves the kernel-issued
                     // addresses inside that B's namespace only (no legacy fallback).
                     docs: {
@@ -730,9 +730,9 @@ export class V10AppFacade {
         if (rows.length === 0) {
             refuse('INTENT_UNSEALED', `intent ${intentType} carries no sealed route rows in this App`);
         }
-        const basisDigest = `sha256:${this.#app.subjectDigest}`;
+        const basisDigest = v10RouterBasisDigest(this.#app.subjectDigest);
         const bindings = rows.map((row) => ({ intentId: row.intentId, operationId: row.operationId, capabilityId: row.capabilityId, handlerId: row.handlerId }));
-        const candidates = rows.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId, priority: 1, eligibility: 'eligible' }));
+        const candidates = rows.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId, priority: V10_ROUTER_PRIORITY, eligibility: V10_ROUTER_ELIGIBILITY }));
         const standardEntry = this.#app.modules.find((module) => module.role === 'standard-primary');
         const router = this.#namespaces.get(standardEntry.packageId)?.routeWorkflowIntent;
         const routed = router({ intentId: intentType, basisDigest, bindings, candidates });
@@ -749,7 +749,7 @@ export class V10AppFacade {
         const existing = await runtime.getSnapshot(target);
         if (existing === null || existing === undefined) {
             try {
-                await runtime.openInstance({ target, correlationId: `corr:${messageId}`, authorityClass: 'PRODUCTION' });
+                await runtime.openInstance({ target, correlationId: `corr:${messageId}`, authorityClass: V10_KERNEL_AUTHORITY_CLASS });
             }
             catch (error) {
                 const code = error.code;
@@ -759,8 +759,8 @@ export class V10AppFacade {
         }
         try {
             const receipt = await runtime.submitOccurrence({
-                kind: 'v08/tc-intent', intentType, target, messageId, input: intent.input,
-                caller: { role: 'requester' },
+                kind: V10_KERNEL_INTENT_KIND, intentType, target, messageId, input: intent.input,
+                caller: { role: V10_KERNEL_CALLER_ROLE },
             });
             if (!isPlainRecord(receipt)) {
                 refuse('K_RECEIPT_INVALID', 'the Kernel admission receipt is not a record');
@@ -912,7 +912,7 @@ export async function activateV10App(app, options) {
                 dispose: undefined,
             });
         }
-        // [v0.10 C01 #1177 R1 P1-2] Optional deployment identity: validated here
+        // Optional deployment identity: validated here
         // once, then carried into every business runtime's K02 scoped namespace.
         let deploymentIdentity;
         if (options.deploymentIdentity !== undefined) {
