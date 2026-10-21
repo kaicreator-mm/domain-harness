@@ -193,6 +193,15 @@ export interface V10GovernedBuildActivation {
     readonly build: V10GovernedBuildIdentity;
     readonly selection: 'CURRENT' | 'PINNED_ONLY';
     readonly selectedShadowBinding: V10AppFacade['selectedShadowBinding'];
+    /**
+     * Governed admission. While an occurrence's first message is RESERVED, a
+     * different message (or another BUILD) for the same instance refuses
+     * `OCCURRENCE_RESERVATION_PENDING` with `detail.retryable === true`: it is
+     * a transient serialization of first admission, not a terminal refusal —
+     * retry after the reserved message settles (or after `recoverReservation`).
+     * The reserved messageId re-sent with a DIFFERENT input carries
+     * `retryable: false` (a caller conflict).
+     */
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
     queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
     queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
@@ -210,8 +219,17 @@ export interface V10GovernedBuildActivation {
      * crash-after-admission heal), `'ABSENT'`, or `'PENDING'`. `PENDING`
      * never deletes: a possibly-live writer or an unwitnessed outcome keeps
      * the pin fail-closed, and no time-based takeover exists.
+     *
+     * `priorWriterTerminated: true` is the Host's trusted assertion that no
+     * process which could still hold this reservation's writer slot is alive
+     * (e.g. the single writer process restarted). With no admission witness,
+     * it frees the stale slot (exact-revision CAS, never a delete) and still
+     * returns `'PENDING'`: the next same-message send then runs as owner, so a
+     * concluded deny compensates the pin instead of leaving it RESERVED.
      */
-    recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
+    recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>, options?: {
+        readonly priorWriterTerminated?: boolean;
+    }): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
     close(): void;
 }
 /**

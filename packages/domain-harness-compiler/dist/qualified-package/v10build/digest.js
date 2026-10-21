@@ -38,6 +38,19 @@ export const V10_ROUTER_ELIGIBILITY = 'eligible';
 export function v10RouterBasisDigest(subjectDigest) {
     return `sha256:${subjectDigest}`;
 }
+/**
+ * The selected kernel's legacy (host-prefixed) durable doc keys that hold
+ * the same-CAS original admission receipt. They mirror the kernel's own
+ * `legacyKernelDocKeys().instance` / `.receiptArchive` builders, which the
+ * sealed payload does not export; the governed reservation witness test
+ * (RES4) is the drift fence for these two literals.
+ */
+export function v10KernelInstanceDocKey(workflowId, instanceKey) {
+    return `v08-kernel:wf-instance:${workflowId}:${instanceKey}`;
+}
+export function v10KernelReceiptArchiveDocKey(turnId) {
+    return `v08-kernel:receipt-archive:${turnId}`;
+}
 /** Selected per-role ABI rows of the v0.10 Node24 profile. */
 export const V10_SELECTED_ROLE_ABI = Object.freeze({
     'kernel-primary': 'v08-kernel-abi/1',

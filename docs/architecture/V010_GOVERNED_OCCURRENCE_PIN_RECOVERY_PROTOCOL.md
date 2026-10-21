@@ -69,6 +69,11 @@ same-CAS original receipt (K02 anchor 2), read back from the physical store:
 - the envelope counts iff `receipt.status === 'admitted'` **and** the
   receipt's `occurrence.messageId` and `inputDigest` match the reservation
   byte-for-byte.
+- both the turn id and the reservation `inputDigest` come from the
+  **selected kernel's own** exported `deriveDurableControlTurnId` and
+  `canonicalJsonStringify` — never a compiler re-implementation (the
+  compiler's sorted `canonicalJson` orders integer-like keys differently, so a
+  re-implemented digest silently never matches; RES7 fences this).
 
 Because the original receipt is composed before and committed inside the
 same physical row write as the admitted state transition, the witness cannot
@@ -115,13 +120,33 @@ witness — the crash-after-admission-before-commit window) | `PENDING`.
 (correction (d)); the owner continues the exact reserved messageId and the
 K02 replay reconciles the outcome.
 
+`recoverReservation(intent, { priorWriterTerminated: true })` is the one
+explicit exit for a crashed owner. It is the Host's trusted assertion that no
+process which could hold the writer slot is alive (e.g. the single writer
+process restarted); the protocol cannot prove liveness itself. With no
+matching witness it frees the held slot by exact-revision CAS — never a
+delete — and still returns `PENDING`. The next same-message send then runs as
+**owner**, so a concluded deny compensates the pin through the normal guarded
+path instead of leaving an adopter's deny stranded RESERVED forever (RES8).
+A false Host assertion only re-enables the owner compensation path that a
+live writer would otherwise hold; it can never fabricate an admission.
+
+`OCCURRENCE_RESERVATION_PENDING` refusals of `send` (different message, or
+another BUILD, under an unresolved RESERVED pin) carry
+`detail.retryable === true`: first admission of one occurrence is serialized,
+so concurrent distinct messages to a brand-new instance get this transient
+refusal and should be retried after the reserved message settles. The
+reserved messageId re-sent with a different input is a caller conflict and
+carries `retryable: false`.
+
 ## 5. Honest residuals
 
 - A writer that crashes mid-`submitOccurrence` with an outcome the witness
   can never show (e.g. the Kernel itself lost the race and admitted nothing)
-  leaves the pin RESERVED with a held slot forever **by design**. No
-  protocol-visible takeover exists; resolution is the owner re-sending the
-  exact reserved messageId (K02 replay is idempotent) or a future Product
+  leaves the pin RESERVED with a held slot until resolved. No
+  protocol-visible (time-based) takeover exists; resolution is the owner
+  re-sending the exact reserved messageId (K02 replay is idempotent), the
+  Host's explicit `priorWriterTerminated` slot release (§4), or a future Product
   amendment introducing a store-level transaction covering reservation
   release and admission impossibility in ONE physical transaction.
 - Pre-v2 pins normalize to ADMITTED: the historical orphan window stays
@@ -155,5 +180,10 @@ K02 replay reconciles the outcome.
    admission.
 7. Store without the conditional-remove seam ⇒ typed INDETERMINATE, pin
    retained.
+8a. Integer-like input keys: the crash heal still matches (kernel digest
+   parity, RES7).
+8b. Crashed owner + adopter deny stays RESERVED; after the Host's
+   `priorWriterTerminated` release the same-message owner deny compensates
+   and the instanceKey is free again (RES8).
 8. Regressions: the T08 governed trio (activation/decision/pinned-restore),
    T00/C01 assembly witnesses and the packed consumers stay green.

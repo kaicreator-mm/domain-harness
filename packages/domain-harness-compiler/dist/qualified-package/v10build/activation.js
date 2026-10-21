@@ -251,6 +251,34 @@ function advisoryContext(app, counters, packageId) {
         },
     });
 }
+const selectedKernelIdentities = new WeakMap();
+export function v10SelectedKernelIdentity(facade) {
+    const identity = selectedKernelIdentities.get(facade);
+    if (identity === undefined) {
+        refuse('V10_APP_INVALID', 'the facade carries no selected kernel identity');
+    }
+    return identity;
+}
+function selectedKernelIdentityOf(app, namespaces) {
+    const kernelEntry = app.modules.find((module) => module.role === 'kernel-primary');
+    const kernel = kernelEntry === undefined ? undefined : namespaces.get(kernelEntry.packageId);
+    const canonical = kernel?.canonicalJsonStringify;
+    const deriveTurnId = kernel?.deriveDurableControlTurnId;
+    return Object.freeze({
+        inputDigest: (input) => {
+            if (typeof canonical !== 'function') {
+                refuse('V10_EXPORT_CONTRACT_REFUSED', 'the selected kernel-primary does not export canonicalJsonStringify');
+            }
+            return sha256Hex(canonical(input === undefined ? null : input));
+        },
+        messageTurnId: (target, messageId) => {
+            if (typeof deriveTurnId !== 'function') {
+                refuse('V10_EXPORT_CONTRACT_REFUSED', 'the selected kernel-primary does not export deriveDurableControlTurnId');
+            }
+            return deriveTurnId({ workflowId: target.workflowId, instanceKey: target.instanceKey }, { kind: 'message', sourceMessageId: messageId });
+        },
+    });
+}
 /**
  * The composed App facade: the ONE composition-owned boundary over the
  * selected kernel primary. `send` runs a public intent through the sealed
@@ -286,6 +314,7 @@ export class V10AppFacade {
             ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
             : v10DeploymentDocsPrefix(deps.deploymentIdentity);
         this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
+        selectedKernelIdentities.set(this, selectedKernelIdentityOf(deps.app, deps.namespaces));
     }
     get selectedExtensions() {
         return this.#app.modules

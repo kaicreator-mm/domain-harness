@@ -35,13 +35,15 @@ import { randomUUID } from 'node:crypto';
 import { isPlainRecord } from './guards.js';
 import { V10Error } from './errors.js';
 import type { V10Activation, V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
-import { activateV10App, v10DeploymentDocsPrefix, v10K02DocumentPrefix, V10AppFacade } from './activation.js';
+import { activateV10App, v10DeploymentDocsPrefix, v10K02DocumentPrefix, v10SelectedKernelIdentity, V10AppFacade } from './activation.js';
 import type { V10BuiltApp } from './build.js';
 import {
   V10_HOST_ABI,
   V10_RUNTIME_ABI,
   V10_TARGET_PROFILE,
   sha256Canonical,
+  v10KernelInstanceDocKey,
+  v10KernelReceiptArchiveDocKey,
 } from './digest.js';
 
 const MAX_STRING = 512;
@@ -923,6 +925,15 @@ export interface V10GovernedBuildActivation {
   readonly build: V10GovernedBuildIdentity;
   readonly selection: 'CURRENT' | 'PINNED_ONLY';
   readonly selectedShadowBinding: V10AppFacade['selectedShadowBinding'];
+  /**
+   * Governed admission. While an occurrence's first message is RESERVED, a
+   * different message (or another BUILD) for the same instance refuses
+   * `OCCURRENCE_RESERVATION_PENDING` with `detail.retryable === true`: it is
+   * a transient serialization of first admission, not a terminal refusal —
+   * retry after the reserved message settles (or after `recoverReservation`).
+   * The reserved messageId re-sent with a DIFFERENT input carries
+   * `retryable: false` (a caller conflict).
+   */
   send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
   queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
   queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
@@ -937,8 +948,18 @@ export interface V10GovernedBuildActivation {
    * crash-after-admission heal), `'ABSENT'`, or `'PENDING'`. `PENDING`
    * never deletes: a possibly-live writer or an unwitnessed outcome keeps
    * the pin fail-closed, and no time-based takeover exists.
+   *
+   * `priorWriterTerminated: true` is the Host's trusted assertion that no
+   * process which could still hold this reservation's writer slot is alive
+   * (e.g. the single writer process restarted). With no admission witness,
+   * it frees the stale slot (exact-revision CAS, never a delete) and still
+   * returns `'PENDING'`: the next same-message send then runs as owner, so a
+   * concluded deny compensates the pin instead of leaving it RESERVED.
    */
-  recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
+  recoverReservation(
+    intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>,
+    options?: { readonly priorWriterTerminated?: boolean },
+  ): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
   close(): void;
 }
 
@@ -1010,7 +1031,10 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     return await this.#settleOccurrenceAttempt(attempt, receipt);
   }
 
-  async recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'> {
+  async recoverReservation(
+    intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>,
+    options?: { readonly priorWriterTerminated?: boolean },
+  ): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'> {
     this.#assertOpen();
     const target = this.#targetFor(intent);
     const doc = await this.#readPinDoc(target);
@@ -1044,6 +1068,20 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     // nothing (F1 — openInstance durability is not admission), and a
     // possibly-live Kernel writer can never be fenced from here (F2). The
     // RESERVED pin stays; the owner continues the exact reserved messageId.
+    // Only the Host's explicit dead-writer assertion frees a held slot, so a
+    // crashed owner cannot leave adopters unable to compensate a deny.
+    if (options?.priorWriterTerminated === true && doc.value.activeAttempt !== null && doc.value.activeAttempt !== undefined) {
+      try {
+        await this.#store.put(
+          v10OccurrenceBuildPinKey(this.#deployment, target),
+          pinStoreValue({ ...doc.value, activeAttempt: null }),
+          { kind: 'cas', revision: doc.revision },
+        );
+      } catch (error) {
+        if (!isCasConflict(error)) throw error;
+        refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the reservation changed while its stale writer slot was being freed; nothing was deleted (fail-closed)');
+      }
+    }
     return 'PENDING';
   }
 
@@ -1070,7 +1108,10 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     if (!isPlainRecord(intent.input)) {
       refuse('OCCURRENCE_BUILD_PIN_INVALID', 'a governed send requires a plain record input; the reservation digest and the Kernel witness must bind the exact same canonical bytes');
     }
-    const inputDigest = sha256Canonical(intent.input);
+    // The SELECTED kernel's own canonical digest: the witness compares it
+    // byte-for-byte with the receipt's inputDigest (compiler canonicalJson
+    // differs on integer-like keys).
+    const inputDigest = v10SelectedKernelIdentity(this.#activation.facade).inputDigest(intent.input);
     const attemptId = randomUUID();
     const now = new Date(this.#now()).toISOString();
     for (let round = 0; round < 5; round += 1) {
@@ -1113,6 +1154,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
       if (!pinMatches(pin, this.#build)) {
         if (pin.phase === 'RESERVED') {
           refuse('OCCURRENCE_RESERVATION_PENDING', 'this occurrence has an unresolved RESERVED pin of another BUILD; no takeover exists — its owning BUILD continues or recovers it', {
+            retryable: true,
             pinnedBuildId: pin.buildId,
             activatedBuildId: this.#build.buildId,
             businessPackageId: target.businessPackageId,
@@ -1134,6 +1176,9 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
       const reservation = pin.reservation as NonNullable<V10OccurrenceBuildPin['reservation']>;
       if (reservation.messageId !== messageId || reservation.inputDigest !== inputDigest) {
         refuse('OCCURRENCE_RESERVATION_PENDING', 'this occurrence has an unresolved RESERVED pin for a different message; only its exact (messageId, input) owner may continue it', {
+          // A different message waits its turn; the SAME messageId with a
+          // different input is a caller conflict that no retry resolves.
+          retryable: reservation.messageId !== messageId,
           reservedMessageId: reservation.messageId,
           requestedMessageId: messageId,
           businessPackageId: target.businessPackageId,
@@ -1283,10 +1328,9 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
    * openInstance survives crashes that never admitted anything.
    */
   async #readAdmissionWitness(target: V10OccurrenceTarget, messageId: string): Promise<{ inputDigest: string; messageId: string } | null> {
-    // The Kernel derives durable turn identities with URI-encoded components
-    // (kernel requireComponent discipline); the witness must match exactly.
-    const component = (value: string): string => encodeURIComponent(value);
-    const turnId = `turn:${component(target.workflowId)}:${component(target.instanceKey)}:message:${component(messageId)}`;
+    // The selected kernel derives the durable turn id itself; the witness
+    // never re-implements its component encoding.
+    const turnId = v10SelectedKernelIdentity(this.#activation.facade).messageTurnId(target, messageId);
     const prefix = v10DeploymentDocsPrefix(this.#deployment) + v10K02DocumentPrefix({
       deployedAppId: this.#deployment.deployedAppId,
       tenantId: this.#deployment.tenantId,
@@ -1299,14 +1343,14 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
       if (receipt === null || receipt.status !== 'admitted') return null;
       const occurrence = isPlainRecord(receipt.occurrence) ? receipt.occurrence : null;
       // The Kernel persists its digest in `sha256:<hex>` wire form; normalize
-      // to the compiler's bare hex so the reservation binding compares
-      // like-for-like (sha256Canonical output).
+      // to bare hex so it compares like-for-like with the reservation digest
+      // (the same kernel canonical form, see v10SelectedKernelIdentity).
       const wireDigest = typeof receipt.inputDigest === 'string' ? receipt.inputDigest : '';
       const inputDigest = wireDigest.startsWith('sha256:') ? wireDigest.slice('sha256:'.length) : wireDigest;
       if (!HEX64.test(inputDigest) || occurrence === null || typeof occurrence.messageId !== 'string') return null;
       return { inputDigest, messageId: occurrence.messageId };
     };
-    const ringDoc = await this.#store.get(`${prefix}v08-kernel:wf-instance:${target.workflowId}:${target.instanceKey}`);
+    const ringDoc = await this.#store.get(`${prefix}${v10KernelInstanceDocKey(target.workflowId, target.instanceKey)}`);
     if (ringDoc !== null && isPlainRecord(ringDoc.value)) {
       const ring = isPlainRecord(ringDoc.value.durableOriginalReceipts) ? ringDoc.value.durableOriginalReceipts : null;
       if (ring !== null) {
@@ -1314,7 +1358,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
         if (ringWitness !== null) return ringWitness;
       }
     }
-    const archiveDoc = await this.#store.get(`${prefix}v08-kernel:receipt-archive:${turnId}`);
+    const archiveDoc = await this.#store.get(`${prefix}${v10KernelReceiptArchiveDocKey(turnId)}`);
     if (archiveDoc !== null) {
       const archiveWitness = envelopeWitness(archiveDoc.value);
       if (archiveWitness !== null) return archiveWitness;

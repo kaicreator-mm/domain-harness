@@ -22,6 +22,11 @@
  *         footprint of a stalled writer) survives another process's
  *         recovery attempt (PENDING, no delete); the same-message send in
  *         the second process then admits and settles ADMITTED.
+ *   RES7  the heal binds the kernel's own canonical input digest, also for
+ *         integer-like keys where the compiler canonicalJson differs.
+ *   RES8  a crashed owner + adopter deny stays RESERVED until the Host
+ *         asserts the prior writer is dead; the freed slot lets the
+ *         same-message owner deny compensate the pin.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -36,9 +41,11 @@ import {
   buildV10App,
   readV10OccurrenceBuildPin,
   sha256Canonical,
+  sha256Hex,
   v10BuildPackageClosureDigest,
   v10OccurrenceBuildPinKey,
 } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { canonicalJsonStringify } from '../../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs';
 import type {
   V10BuildActivationDecision,
   V10BuiltApp,
@@ -109,6 +116,21 @@ const RESTRICTED_INTENT = (instanceKey: string, messageId: string) => Object.fre
   input: { amount: 5, requestId: `R-${messageId}` },
 });
 
+/** The kernel's own canonical input digest (bare hex), as the receipt stores it. */
+function kernelInputDigest(input: unknown): string {
+  return sha256Hex(canonicalJsonStringify(input));
+}
+
+async function refusalError(operation: () => Promise<unknown>): Promise<{ code: string; detail?: Record<string, unknown> }> {
+  try {
+    await operation();
+  } catch (error) {
+    const typed = error as { code?: unknown; detail?: Record<string, unknown> };
+    return { code: String(typed.code ?? 'NO_CODE'), ...(typed.detail === undefined ? {} : { detail: typed.detail }) };
+  }
+  return { code: 'NO_REFUSAL' };
+}
+
 async function refusalCode(operation: () => Promise<unknown>): Promise<string> {
   try {
     await operation();
@@ -156,7 +178,8 @@ async function craftReservedCrashState(
     phase: 'RESERVED',
     reservation: {
       messageId: crafted.messageId,
-      inputDigest: sha256Canonical(crafted.input),
+      // The reservation binds the SELECTED kernel's canonical digest.
+      inputDigest: kernelInputDigest(crafted.input),
       reservedAt: new Date(T08_NOW).toISOString(),
     },
     ...(crafted.held ? { activeAttempt: { attemptId: crafted.attemptId, holder: 'writer' } } : {}),
@@ -297,11 +320,13 @@ test('RES3: an unresolved RESERVED pin refuses other messages, other inputs and 
       messageId: 'msg:res:pending:9', input: stalledInput, attemptId: 'attempt-stalled-1', held: true,
     });
 
-    assert.equal(await refusalCode(() => activationA.send(NORMAL_INTENT('inst-pending', 'msg:res:other:1', 30))),
-      'OCCURRENCE_RESERVATION_PENDING', 'a different message under the unresolved reservation refuses typed');
+    const otherMessage = await refusalError(() => activationA.send(NORMAL_INTENT('inst-pending', 'msg:res:other:1', 30)));
+    assert.equal(otherMessage.code, 'OCCURRENCE_RESERVATION_PENDING', 'a different message under the unresolved reservation refuses typed');
+    assert.equal(otherMessage.detail?.retryable, true, 'the first-admission serialization refusal is marked retryable');
     const sameIdDifferentInput = { ...NORMAL_INTENT('inst-pending', 'msg:res:pending:9', 45), input: { ...stalledInput, amount: 46 } };
-    assert.equal(await refusalCode(() => activationA.send(sameIdDifferentInput)),
-      'OCCURRENCE_RESERVATION_PENDING', 'the same messageId with different input is a different logical attempt');
+    const conflicting = await refusalError(() => activationA.send(sameIdDifferentInput));
+    assert.equal(conflicting.code, 'OCCURRENCE_RESERVATION_PENDING', 'the same messageId with different input is a different logical attempt');
+    assert.equal(conflicting.detail?.retryable, false, 'a same-messageId input conflict is NOT retryable');
 
     const appB = await buildReservationApp('t08-reservation-b');
     const decisionB = t08Decision(appB, 'B', T08_DEPLOYMENT, { buildId: appB.buildId, approvalRef: 'approval:res:b' });
@@ -438,6 +463,97 @@ test('RES6: F2 — recovery of a stalled writer never deletes; the second proces
 
     const finalPin = await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target);
     assert.equal(finalPin?.phase, 'ADMITTED', 'the parent observes the settled pin');
+    activationA.close();
+    inner.close();
+  } finally {
+    // Best-effort: Windows may keep SQLite WAL handles briefly after close.
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES7: the crash heal binds the KERNEL canonical digest, including integer-like input keys', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res7-'));
+  const kPath = join(dir, 'k.sqlite');
+  try {
+    const inner = await openSqliteCasStore({ path: kPath });
+    const store = new T08CountingStore(inner);
+    const appA = await buildReservationApp('t08-reservation-a');
+    const decisionA = t08Decision(appA, 'A', T08_DEPLOYMENT, { buildId: appA.buildId, approvalRef: 'approval:res:a' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decisionA);
+    const activationA = await activateGovernedV10Build(appA, {
+      store, deployment: T08_DEPLOYMENT, decision: decisionA, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const target = { ...activationA.resolveIntentTarget('submitQuoteDecisionDynamic'), instanceKey: 'inst-intkeys' };
+
+    // Integer-like keys are where the compiler's sorted canonicalJson and the
+    // kernel's JSON.stringify form diverge; this input exercises exactly that.
+    const intKeyInput = { amount: 37, requestId: 'R-msg:res:intkeys:1', tags: { '2': 'b', '10': 'a' } };
+    assert.notEqual(sha256Canonical(intKeyInput), kernelInputDigest(intKeyInput),
+      'precondition: the two canonical forms really differ for this input');
+    const admitted = await activationA.send({ ...NORMAL_INTENT('inst-intkeys', 'msg:res:intkeys:1', 37), input: intKeyInput });
+    assert.equal(admitted.status, 'admitted', `the integer-keyed occurrence must admit: ${JSON.stringify(admitted).slice(0, 400)}`);
+
+    await craftReservedCrashState(store, appA, decisionA, target, {
+      messageId: 'msg:res:intkeys:1', input: intKeyInput, attemptId: 'attempt-intkeys-1', held: true,
+    });
+    assert.equal(await activationA.recoverReservation({ intentType: 'submitQuoteDecisionDynamic', instanceKey: 'inst-intkeys' }),
+      'ADMITTED', 'the witness matches the reservation digest for integer-like keys');
+    assert.equal((await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target))?.phase, 'ADMITTED');
+    activationA.close();
+    inner.close();
+  } finally {
+    // Best-effort: Windows may keep SQLite WAL handles briefly after close.
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES8: a crashed owner cannot strand an adopter deny; the Host dead-writer assertion frees the slot', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res8-'));
+  const kPath = join(dir, 'k.sqlite');
+  try {
+    const inner = await openSqliteCasStore({ path: kPath });
+    const store = new T08CountingStore(inner);
+    const appA = await buildReservationApp('t08-reservation-a');
+    const decisionA = t08Decision(appA, 'A', T08_DEPLOYMENT, { buildId: appA.buildId, approvalRef: 'approval:res:a' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decisionA);
+    const activationA = await activateGovernedV10Build(appA, {
+      store, deployment: T08_DEPLOYMENT, decision: decisionA, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const intent = { intentType: 'submitRestrictedDecision', instanceKey: 'inst-stranded' } as const;
+    const target = { ...activationA.resolveIntentTarget('submitRestrictedDecision'), instanceKey: 'inst-stranded' };
+    const crashed = RESTRICTED_INTENT('inst-stranded', 'msg:res:stranded:1');
+
+    // The owner crashed mid-submit: RESERVED, writer slot held by a dead attempt.
+    await craftReservedCrashState(store, appA, decisionA, target, {
+      messageId: crashed.messageId, input: crashed.input, attemptId: 'attempt-crashed-owner', held: true,
+    });
+
+    // Same-message continuation runs as ADOPTER (slot held) and concludes deny:
+    // an adopter never compensates, so the pin stays RESERVED.
+    const adopted = await activationA.send(crashed);
+    assert.equal(adopted.status, 'denied');
+    assert.equal((await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target))?.phase, 'RESERVED',
+      'an adopter deny keeps the pin fail-closed');
+
+    // Without the Host assertion recovery still never touches the held slot.
+    assert.equal(await activationA.recoverReservation(intent), 'PENDING');
+    assert.equal((await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target))?.activeAttempt?.attemptId, 'attempt-crashed-owner');
+
+    // The Host asserts the prior writer is dead: the slot is freed, nothing deleted.
+    assert.equal(await activationA.recoverReservation(intent, { priorWriterTerminated: true }), 'PENDING');
+    const freed = await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target);
+    assert.equal(freed?.phase, 'RESERVED', 'freeing the slot never deletes the reservation');
+    assert.equal(freed?.activeAttempt ?? null, null, 'the stale writer slot is released');
+
+    // The same message now runs as OWNER: its concluded deny compensates the pin,
+    // and the instanceKey is free for any other message again.
+    const owned = await activationA.send(crashed);
+    assert.equal(owned.status, 'denied');
+    assert.equal(await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target), null, 'the owner deny compensated the pin');
+    const next = await activationA.send(RESTRICTED_INTENT('inst-stranded', 'msg:res:stranded:2'));
+    assert.equal(next.status, 'denied', 'a different message reaches the Kernel: the instanceKey is not stranded');
     activationA.close();
     inner.close();
   } finally {
