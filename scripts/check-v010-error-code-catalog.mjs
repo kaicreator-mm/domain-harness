@@ -38,7 +38,7 @@ for (const filename of sourceFiles) {
 }
 const catalog = JSON.stringify({
   format: 'dh.v010.typed-refusal-literals/1',
-  scope: 'direct source literal error arguments only; excludes dynamic codes and sealed payloads',
+  scope: 'direct literal refusal arguments and object-literal code properties; excludes dynamic codes and sealed payloads',
   sourceFiles: entries,
 }, null, 2) + '\n';
 
