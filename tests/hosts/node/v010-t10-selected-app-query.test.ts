@@ -373,7 +373,9 @@ test('T10S-N6 malformed Host query wiring refuses activation', async () => {
     (thrown: unknown) => thrown,
   );
   assert.ok(error instanceof V10ActivationError);
-  assert.equal(refusalCode(error), 'V10_APP_INVALID');
+  // #1231 split: malformed Host queryAuthority wiring is an activation-OPTIONS
+  // refusal, no longer the overloaded V10_APP_INVALID code.
+  assert.equal(refusalCode(error), 'V10_ACTIVATION_OPTIONS_INVALID');
 });
 
 test('T10S-N7 every query path leaves K state and effect dispatch unwritten', async () => {

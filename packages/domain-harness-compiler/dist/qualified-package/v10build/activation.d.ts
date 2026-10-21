@@ -1,9 +1,6 @@
-export declare class V10ActivationError extends Error {
-    readonly code: string;
-    constructor(code: string, message: string);
-}
-export declare class V10PortDeniedError extends Error {
-    readonly code = "KEXT_PORT_DENIED";
+import { V10Error } from './errors.js';
+export { V10ActivationError } from './errors.js';
+export declare class V10PortDeniedError extends V10Error {
     constructor(name: string);
 }
 /** Structural view of one built App (plain data; no compiler import). */
@@ -380,4 +377,3 @@ export declare class V10AppFacade {
  * re-attestation) and performs the ordinary module lifecycle only.
  */
 export declare function activateV10App(app: unknown, options: ActivateV10AppOptions): Promise<V10Activation>;
-export {};

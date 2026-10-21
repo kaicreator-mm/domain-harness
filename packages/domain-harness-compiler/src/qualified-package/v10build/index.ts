@@ -4,7 +4,7 @@
  * ordinary-import closure gate, the canonical digest/profile constants, and
  * the trusted-activation counterpart (`activateV10App`).
  */
-export { V10BuildError } from './errors.js';
+export { V10BuildError, V10Error, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES } from './errors.js';
 export {
   V10_BUILD_FORMAT,
   V10_BUNDLER_REVISION,

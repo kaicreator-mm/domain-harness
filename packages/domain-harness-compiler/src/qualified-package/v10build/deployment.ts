@@ -31,6 +31,7 @@
  * use that App. The physical K namespaces remain K02's own scoped tuples;
  * this module adds a separate immutable occurrence pin dimension.
  */
+import { V10Error } from './errors.js';
 import type { V10Activation, V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
 import { activateV10App, V10AppFacade } from './activation.js';
 import type { V10BuiltApp } from './build.js';
@@ -66,13 +67,11 @@ const RECORD_FIELDS = new Set([
   'authorizedAt', 'expiresAt', 'activatedAt',
 ]);
 
-export class V10DeploymentError extends Error {
-  readonly code: string;
+export class V10DeploymentError extends V10Error {
   readonly detail: Readonly<Record<string, unknown>> | undefined;
   constructor(code: string, message: string, detail?: Record<string, unknown>) {
-    super(message);
+    super(code, message);
     this.name = 'V10DeploymentError';
-    this.code = code;
     this.detail = detail === undefined ? undefined : Object.freeze({ ...detail });
   }
 }
