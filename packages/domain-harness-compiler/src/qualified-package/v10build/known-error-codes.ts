@@ -133,3 +133,15 @@ export type V10KnownErrorCode = (typeof V10_KNOWN_ERROR_CODES)[number];
 
 /** Extensible typed error.code until all protocol producers share one ABI. */
 export type V10ErrorCode = V10KnownErrorCode | (string & {});
+
+/**
+ * Structural diagnostic contract across compiler and Host/Core boundaries.
+ * Core error subclasses cannot inherit Compiler's V10Error without creating
+ * a core→compiler dependency cycle; matching this shape conveys NO authority.
+ */
+export interface V10CodedFailure {
+  readonly name: string;
+  readonly message: string;
+  readonly code: V10ErrorCode;
+}
+
