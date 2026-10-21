@@ -87,11 +87,16 @@ export type T08BuildVersion = 'A' | 'B';
  */
 export async function buildT08GovernedApp(
   version: T08BuildVersion,
-  overrides: { readonly buildId?: string } = {},
+  overrides: { readonly buildId?: string; readonly ambiguousAlphaRoute?: boolean } = {},
 ): Promise<V10BuiltApp> {
   const composition = await basicComposition({
     routes: [
       { intentId: 'submitQuoteDecisionDynamic', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' },
+      // An authorized BUILD can still have a deterministically ambiguous
+      // Standard route; governed send must refuse it BEFORE pin minting.
+      ...(overrides.ambiguousAlphaRoute === true
+        ? [{ intentId: 'submitQuoteDecisionDynamic', operationId: 'preview', capabilityId: 'ledger', handlerId: 'previewTotal' }]
+        : []),
       { intentId: 'submitQuoteDecisionStrict', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' },
     ],
   });
