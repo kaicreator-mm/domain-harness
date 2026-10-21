@@ -4,7 +4,7 @@
  *
  * Uses the existing code-string shape without rewriting error classes.
  * The scan is intentionally bounded to direct literal arguments to
- * fail/refuse/reject/denied/new XxxError. Indirect computed codes and K
+ * fail/refuse/reject/denied/new XxxError **and object-valued code properties**.\n * Indirect computed codes and K
  * sealed payloads are not captured; it is a drift gate, NOT a claim to
  * describe the complete cross-version error protocol.
  */
@@ -18,6 +18,8 @@ const compilerRoot = join(root, 'packages/domain-harness-compiler/src/qualified-
 const compilerDirs = ['v10build', 'v10evidence', 'v10meta', 'v10shadow'];
 const hostDir = join(root, 'packages/domain-harness/src/host-v8');
 const codeCall = /\b(?:fail|refuse|reject|denied|new\s+[A-Za-z_$][A-Za-z0-9_$]*Error)\s*\(\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g;
+/** Object-shaped typed failures also carry literal error codes. */
+const codeProperty = /\bcode:\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g;
 
 const sourceFiles = [];
 for (const dir of compilerDirs) {
@@ -31,7 +33,7 @@ for (const name of (await readdir(hostDir)).sort()) {
 const entries = {};
 for (const filename of sourceFiles) {
   const source = await readFile(filename, 'utf8');
-  const codes = [...new Set([...source.matchAll(codeCall)].map((m) => m[1]))].sort();
+  const codes = [...new Set([...source.matchAll(codeCall), ...source.matchAll(codeProperty)].map((m) => m[1]))].sort();
   entries[relative(root, filename).replaceAll('\\', '/')] = codes;
 }
 const catalog = JSON.stringify({
