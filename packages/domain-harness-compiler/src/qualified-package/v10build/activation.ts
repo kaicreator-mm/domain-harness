@@ -46,11 +46,9 @@
  * participation in turns belongs to the K-side successors (#1167/#1169).
  */
 import { isPlainRecord } from './guards.js';
+import { privateModuleFragment, registerDeclaredBareImports } from './import-hook.js';
 import { randomUUID } from 'node:crypto';
 import { Buffer } from 'node:buffer';
-import { registerHooks } from 'node:module';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import {
   createV10AuthorizedMultiBQuery,
@@ -263,145 +261,11 @@ function assertPlainRecord(value: unknown, label: string): Record<string, unknow
   return value;
 }
 
-function privateModuleFragment(activationNonce: string, packageId: string): string {
-  return `#v10-${activationNonce}-${encodeURIComponent(packageId)}`;
-}
-
 function privateModuleUrl(source: string, activationNonce: string, packageId: string): string {
   const bytes = Buffer.from(source, 'utf8').toString('base64');
   return `data:text/javascript;base64,${bytes}${privateModuleFragment(activationNonce, packageId)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Declared bare-import resolution for sealed npm/native allowances.
-//
-// A sealed module imported through a `data:` URL has no package hierarchy,
-// so a bare npm/native specifier inside it cannot resolve through the
-// default resolver (`ERR_UNSUPPORTED_RESOLVE_REQUEST`). BUILD seals each
-// module's declared npm/native allowance statically; this activation side
-// honors exactly that allowance with ONE process-wide synchronous resolve
-// hook (`node:module registerHooks`, Node >= 22.15): when the parent URL is
-// a `data:` module this activation minted AND the specifier is in THAT
-// module's sealed allowance, the specifier resolves against the deployment
-// context's actually installed packages and short-circuits; every other
-// request falls through to the default resolver, which fail-closed refuses
-// it. Sealed bytes are never rewritten — hooking resolve is the only
-// intervention. The hook is reference-counted across concurrent activations
-// and deregistered when the last one closes; a runtime without the hook
-// refuses allowances-bearing activations typed instead of silently dropping
-// their declared resolution context.
-// ---------------------------------------------------------------------------
-
-type ModuleHooksHandle = ReturnType<typeof registerHooks>;
-
-interface DeclaredBareImportAllowance {
-  readonly specifiers: ReadonlySet<string>;
-  readonly deploymentRoot: string | undefined;
-}
-
-/** Minted parent-URL fragment -> the declared bare specifiers it may resolve. */
-const declaredBareImportAllowances = new Map<string, DeclaredBareImportAllowance>();
-let importHookHandle: ModuleHooksHandle | null = null;
-let importHookUsers = 0;
-
-/** The default deployment anchor: this activation module's own resolution context. */
-const ACTIVATION_MODULE_URL = import.meta.url;
-
-function ensureImportResolveHook(): ModuleHooksHandle | null {
-  if (typeof registerHooks !== 'function') return null;
-  if (importHookHandle === null) {
-    importHookHandle = registerHooks({
-      resolve(specifier, context, nextResolve) {
-        const parentURL = context.parentURL;
-        // The fragment carries this machinery's per-activation nonce; the
-        // keyed lookup is the authority (a foreign URL is never keyed).
-        if (typeof parentURL === 'string' && parentURL.startsWith('data:text/javascript;base64,') && parentURL.includes('#v10-')) {
-          const allowance = declaredBareImportAllowances.get(parentURL.slice(parentURL.indexOf('#')));
-          if (allowance !== undefined && allowance.specifiers.has(specifier)) {
-            // Resolve through the REAL default ESM resolver against a
-            // synthetic file: parent inside the deployment context (the
-            // legitimately deployed node_modules lookup), instead of the
-            // hierarchy-less data: parent. Everything unsealed keeps going
-            // to the next resolver, which refuses bare specifiers from a
-            // data: parent — the fail-closed default.
-            const anchorParentURL = allowance.deploymentRoot === undefined
-              ? ACTIVATION_MODULE_URL
-              : pathToFileURL(join(allowance.deploymentRoot, 'package.json')).href;
-            return nextResolve(specifier, { parentURL: anchorParentURL });
-          }
-        }
-        return nextResolve(specifier, context);
-      },
-    });
-  }
-  importHookUsers += 1;
-  return importHookHandle;
-}
-
-function releaseImportResolveHook(): void {
-  importHookUsers -= 1;
-  if (importHookUsers === 0 && importHookHandle !== null) {
-    importHookHandle.deregister();
-    importHookHandle = null;
-  }
-}
-
-/** The npm/native specifiers a consumed module record declares (defensive plain-data read). */
-function declaredBareImportsOf(module: V10AppView['modules'][number]): readonly string[] {
-  const external = (module as { externalImports?: unknown }).externalImports;
-  if (!isPlainRecord(external)) return [];
-  const declared: string[] = [];
-  for (const kind of ['npm', 'native'] as const) {
-    const list = external[kind];
-    if (Array.isArray(list)) {
-      for (const item of list) {
-        if (typeof item === 'string' && item.length > 0) declared.push(item);
-      }
-    }
-  }
-  return declared;
-}
-
-/**
- * Honor the consumed record's declared npm/native allowances for the `data:`
- * URLs this activation is about to import. Returns the release closure that
- * unregisters the allowances (and the process hook when this was its last
- * user). Refuses typed when the runtime cannot host the resolve hook.
- */
-function registerDeclaredBareImports(deps: {
-  activationNonce: string;
-  appView: V10AppView;
-  deploymentRoot: string | undefined;
-}): () => void {
-  const mintedFragments: string[] = [];
-  let hasDeclaredBareImports = false;
-  for (const module of deps.appView.modules) {
-    if (typeof module.moduleSource !== 'string' || module.moduleSource.length === 0) continue;
-    const declared = declaredBareImportsOf(module);
-    const fragment = privateModuleFragment(deps.activationNonce, module.packageId);
-    mintedFragments.push(fragment);
-    if (declared.length > 0) {
-      declaredBareImportAllowances.set(fragment, { specifiers: new Set(declared), deploymentRoot: deps.deploymentRoot });
-      hasDeclaredBareImports = true;
-    }
-  }
-  if (!hasDeclaredBareImports) return () => {};
-  const handle = ensureImportResolveHook();
-  if (handle === null) {
-    for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
-    refuse(
-      'V10_IMPORT_HOOK_UNAVAILABLE',
-      'this Node runtime lacks the node:module registerHooks resolve seam; an App declaring npm/native external imports refuses fail-closed instead of importing without its declared resolution context',
-    );
-  }
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    for (const fragment of mintedFragments) declaredBareImportAllowances.delete(fragment);
-    releaseImportResolveHook();
-  };
-}
 
 /**
  * The kernel-facing K docs port: prefix-bounded physical CAS conditionals
@@ -1165,6 +1029,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
     releaseDeclaredImports = registerDeclaredBareImports({
       activationNonce,
       appView,
+      activationModuleUrl: import.meta.url,
       deploymentRoot: options.deploymentRoot,
     });
 

@@ -242,6 +242,29 @@ test('P-ACT-REAL-NPM-IMPORT: a sealed npm-declared feature really evaluates agai
   clearDeclaredImportEvidence();
 });
 
+test('P-I1230-HOOK: overlapping sealed npm activations preserve the shared hook until the last disposer', async () => {
+  const npmFeature = await featureEntry({ ...NPM_FEATURE });
+  const app = buildV10App(await basicComposition({ features: [npmFeature] }));
+  const opts = () => ({ store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now });
+  clearDeclaredImportEvidence();
+  const a = await activateV10App(app, opts());
+  const b = await activateV10App(app, opts());
+  try {
+    assert.equal(declaredImportEvidence().length, 2, 'both independent data: modules resolved their sealed yaml import');
+    a.dispose();
+    const c = await activateV10App(app, opts());
+    try {
+      assert.equal(declaredImportEvidence().length, 3, 'a third activation remains permitted while B owns the hook');
+    } finally {
+      c.dispose();
+    }
+  } finally {
+    a.dispose();
+    b.dispose();
+    clearDeclaredImportEvidence();
+  }
+});
+
 test('P-ACT-REAL-NATIVE-IMPORT: a sealed native-declared feature really evaluates the installed better-sqlite3 binary', async () => {
   clearDeclaredImportEvidence();
   const nativeFeature = await featureEntry({ ...NATIVE_FEATURE });
