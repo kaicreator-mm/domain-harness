@@ -40,6 +40,7 @@
  * object handed back is a frozen snapshot (the receipt digest allows the
  * caller to re-verify the exact receipt bytes the outcome was read from).
  */
+import { V10Error } from '../v10build/errors.js';
 import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import type { V10PublicIntent } from '../v10build/activation.js';
@@ -50,12 +51,10 @@ export const OBSERVER_ABI = 'dh.v10.decision-evidence-observer/1';
 /** Kernel outcomes a real receipt can honestly yield. */
 export type HostKernelOutcome = 'admitted' | 'denied' | 'terminated' | 'unknown';
 
-export class DecisionEvidenceObserverError extends Error {
-  readonly code: string;
+export class DecisionEvidenceObserverError extends V10Error {
   constructor(code: string, message: string, options?: { cause?: unknown }) {
-    super(message, options);
+    super(code, message, options);
     this.name = 'DecisionEvidenceObserverError';
-    this.code = code;
   }
 }
 
