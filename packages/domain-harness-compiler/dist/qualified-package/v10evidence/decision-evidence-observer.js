@@ -40,16 +40,15 @@
  * object handed back is a frozen snapshot (the receipt digest allows the
  * caller to re-verify the exact receipt bytes the outcome was read from).
  */
+import { V10Error } from '../v10build/errors.js';
 import { isPlainRecord } from '../v10build/guards.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import { sha256Canonical } from '../v10build/digest.js';
 export const OBSERVER_ABI = 'dh.v10.decision-evidence-observer/1';
-export class DecisionEvidenceObserverError extends Error {
-    code;
+export class DecisionEvidenceObserverError extends V10Error {
     constructor(code, message, options) {
-        super(message, options);
+        super(code, message, options);
         this.name = 'DecisionEvidenceObserverError';
-        this.code = code;
     }
 }
 function refuse(code, message, options) {

@@ -2,10 +2,12 @@
  * v0.10 typed error lineage. Error code strings remain stable wire values
  * unless a distinct option/policy failure is intentionally added.
  */
+import type { V10ErrorCode } from './known-error-codes.js';
+
 export class V10Error extends Error {
-  readonly code: string;
-  constructor(code: string, message: string) {
-    super(message);
+  readonly code: V10ErrorCode;
+  constructor(code: V10ErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'V10Error';
     this.code = code;
   }

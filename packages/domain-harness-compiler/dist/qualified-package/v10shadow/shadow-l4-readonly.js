@@ -47,6 +47,7 @@
  * the exact approved fallback untouched and the production snapshot
  * unchanged; the report is evidence, not an activation request.
  */
+import { V10Error } from '../v10build/errors.js';
 import { isPlainRecord } from '../v10build/guards.js';
 import * as vm from 'node:vm';
 import { V10AppFacade, v10DeploymentDocsPrefix, v10K02DocumentPrefix } from '../v10build/activation.js';
@@ -76,12 +77,10 @@ const FORBIDDEN_AUTHORITY_KEYS = new Set([
     'kernelReceipt', 'hostPorts', 'resources', 'write', 'activate',
     'selfApprove', 'promote',
 ]);
-export class ShadowL4Error extends Error {
-    code;
+export class ShadowL4Error extends V10Error {
     constructor(code, message, options) {
-        super(message, options);
+        super(code, message, options);
         this.name = 'ShadowL4Error';
-        this.code = code;
     }
 }
 function refuse(code, message, options) {

@@ -47,6 +47,7 @@
  * the exact approved fallback untouched and the production snapshot
  * unchanged; the report is evidence, not an activation request.
  */
+import { V10Error } from '../v10build/errors.js';
 import { isPlainRecord } from '../v10build/guards.js';
 import * as vm from 'node:vm';
 
@@ -84,12 +85,10 @@ const FORBIDDEN_AUTHORITY_KEYS = new Set([
 export type ShadowL4Kind = 'Rule' | 'Skill' | 'DecisionProcedure' | 'Workflow';
 export type ShadowL4ApprovalState = 'candidate' | 'approved' | 'revoked';
 
-export class ShadowL4Error extends Error {
-  readonly code: string;
+export class ShadowL4Error extends V10Error {
   constructor(code: string, message: string, options?: { cause?: unknown }) {
-    super(message, options);
+    super(code, message, options);
     this.name = 'ShadowL4Error';
-    this.code = code;
   }
 }
 

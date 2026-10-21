@@ -1,3 +1,53 @@
+/**
+ * DomainHarness v0.10 T07 (#1174) — Host-owned read-only Shadow L4 runner.
+ * =====================================================================
+ *
+ * The pure Standard candidate feature
+ * (`payload/sfeature-candidate-validation-v1.mjs`) validates *reported*
+ * counterexamples and deliberately reports `productionWritesVerifiedZero:
+ * false`: a selected feature invoked by a business caller can never prove
+ * what the Host did or did not write. This module is the Host-owned trusted
+ * counterpart that closes that gap for the T07 evidence:
+ *
+ *   (1) IDENTITY — the candidate is an exact byte-pinned source (the runner
+ *       hashes the bytes itself) and the approved fallback is the ACTUAL
+ *       selected module of the real built App: its package identity, exact
+ *       `moduleSha256`, and the selected subject digest must all match. A
+ *       missing, revoked or unpinned identity is a typed refusal, never a
+ *       "latest" fallback.
+ *   (2) READ-ONLY OBSERVATION — the actual selected K documents are read
+ *       through a narrow `get`/`keys` view of the production store under the
+ *       EXACT K02 physical prefixes of this activated deployment: the
+ *       stable `v10/k/deployment:<deployedAppId>:<tenantId>:<appId>/` outer
+ *       namespace plus each selected Business's injective `v010-k02:`
+ *       tuple prefix, derived from the facade's private deployment identity. The
+ *       BUILD/tenant arguments are only cross-checked against that binding;
+ *       they never widen or define the observed prefix set. A nil deployment
+ *       binding is a typed refusal, never a fallback to the whole App/Tenant
+ *       namespace (two deployments of one BUILD/Tenant must stay disjoint).
+ *       The runner never receives `put`, `remove`, `resources`, Memory, cache
+ *       or the facade dispatcher. The observations are canonicalized, bounded
+ *       and deep-frozen before any evaluator sees them.
+ *   (3) ISOLATED EVALUATION — candidate and fallback source bytes are
+ *       compiled and executed in a fresh `node:vm` context per evaluator
+ *       with no process/network/module access, code generation disabled,
+ *       non-determinism (`Math.random`, `Date.now`) refused, and a
+ *       synchronous wall-clock budget. The evaluator receives only the
+ *       frozen observation snapshot and App identity.
+ *   (4) ZERO-WRITE WITNESS — before and after the evaluation the runner
+ *       re-reads the selected K snapshot and a Host-supplied physical witness
+ *       (for example SQLite file/WAL digests and `total_changes()`), then
+ *       reports whether both are unchanged. `productionWritesVerifiedZero` is
+ *       true only when the physical witness was captured on both sides and
+ *       the snapshots agree.
+ *
+ * The runner grants no authority: it cannot approve or promote a candidate,
+ * cannot activate a new BUILD, cannot mint a K Effect permit, and has no
+ * effect/capability port. Candidate disagreement or evaluator failure leaves
+ * the exact approved fallback untouched and the production snapshot
+ * unchanged; the report is evidence, not an activation request.
+ */
+import { V10Error } from '../v10build/errors.js';
 import { V10AppFacade } from '../v10build/activation.js';
 import type { V10AppView } from '../v10build/activation.js';
 export declare const SHADOW_L4_ABI = "dh.v10.shadow-l4-readonly/1";
@@ -6,8 +56,7 @@ export declare const SHADOW_L4_EVIDENCE_KIND = "shadow-l4-evidence";
 export declare const SHADOW_K_DOCS_PREFIX = "v10/k/";
 export type ShadowL4Kind = 'Rule' | 'Skill' | 'DecisionProcedure' | 'Workflow';
 export type ShadowL4ApprovalState = 'candidate' | 'approved' | 'revoked';
-export declare class ShadowL4Error extends Error {
-    readonly code: string;
+export declare class ShadowL4Error extends V10Error {
     constructor(code: string, message: string, options?: {
         cause?: unknown;
     });

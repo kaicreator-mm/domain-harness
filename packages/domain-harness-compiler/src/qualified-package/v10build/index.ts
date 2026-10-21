@@ -5,6 +5,7 @@
  * the trusted-activation counterpart (`activateV10App`).
  */
 export { V10BuildError, V10Error, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES } from './errors.js';
+export type { V10CodedFailure, V10ErrorCode, V10KnownErrorCode } from './known-error-codes.js';
 export {
   V10_BUILD_FORMAT,
   V10_BUNDLER_REVISION,
