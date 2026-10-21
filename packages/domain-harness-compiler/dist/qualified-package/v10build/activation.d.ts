@@ -172,7 +172,7 @@ interface SelectedAdvisory {
 /**
  * The kernel-facing K docs port: prefix-bounded physical CAS conditionals
  * only. `remove` is exposed when — and only when — the physical store
- * implements it (review 6254726674, P1-2).
+ * implements it; unsupported stores expose no removal capability.
  */
 export interface V10DocsPort {
     get(key: string): Promise<{
@@ -200,7 +200,7 @@ export declare function createV10DocsPort(deps: {
     assertOpen: () => void;
 }): V10DocsPort;
 /**
- * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * The ONE governed K-docs outer prefix of a deployment: the stable,
  * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
  * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
  * binding and the Shadow L4 verifier's independent re-derivation — the three
@@ -212,7 +212,7 @@ export declare function v10DeploymentDocsPrefix(deployment: {
     appId: string;
 }): string;
 /**
- * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
+ * The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
  * component the Host docs port prepends. This is the ONE derivation both the
@@ -232,7 +232,7 @@ export interface ActivateV10AppOptions {
     readonly now?: () => number;
     readonly counters?: V10Counters;
     /**
-     * [v0.10 C01 #1177 R1 P1-2] The stable deployment identity of this App
+     * The stable deployment identity of this App
      * (deployedAppId/tenantId/appId). When present, EVERY business runtime is
      * created under the K02 SCOPED document grammar with its own
      * businessPackageId appended — the exact injective tuple the K02 selected
@@ -307,7 +307,7 @@ export declare class V10AppFacade {
      * Shadow L4 verifier. Derived exclusively from private activated state,
      * never a caller-provided digest or a user-supplied matching claim.
      *
-     * [T07 R2 P1] `deployedAppId` and `k02DocumentPrefixes` are the exact
+     * `deployedAppId` and `k02DocumentPrefixes` are the exact
      * deployment instance and its per-B physical document prefixes. They are
      * derived here from the same private deployment identity the write path
      * uses (`v10K02DocumentPrefix`), so a shadow can select one deployment's K

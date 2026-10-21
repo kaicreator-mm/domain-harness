@@ -34,7 +34,7 @@
  *    with no discovery edge (no second engine, no dynamic install);
  *  - routes: the intent→operation table is admitted against the sealed
  *    graph's OWN business intents and capability handler maps (no
- *    caller-supplied intent authority — v0.9 N01 R0 P1 lineage).
+ *    caller-supplied intent authority).
  *
  * Determinism is a product property: no clock, no randomness, no locale —
  * the same input builds the byte-identical plain-data output and digest.
