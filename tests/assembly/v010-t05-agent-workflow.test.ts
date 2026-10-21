@@ -28,6 +28,7 @@
  *   - unbounded Agent step denied by the Business guard and the T03 planner,
  *   - Tiny BUILD neither selects nor imports any advanced T05 module.
  */
+import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -43,7 +44,6 @@ import {
   V10_SFEATURE_ABI,
   activateV10App,
   buildV10App,
-  freshV10Counters,
 } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import type {
   V10DocStore,
