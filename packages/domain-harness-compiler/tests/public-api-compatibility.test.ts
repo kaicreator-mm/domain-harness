@@ -116,7 +116,8 @@ const T00_V10BUILD_VALUES = [
   'V10_RUNTIME_ABI',
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
-  // object const (1)
+  // object consts (2)
+  'V10_ACTIVATION_FAILURE_CODES',
   'V10_SELECTED_ROLE_ABI',
   // functions (7)
   'activateV10App',
@@ -126,9 +127,11 @@ const T00_V10BUILD_VALUES = [
   'freshV10Counters',
   'sha256Canonical',
   'sha256Hex',
-  // error classes (3)
+  // error classes (5)
   'V10ActivationError',
   'V10BuildError',
+  'V10Error',
+  'V10ExternalEffectError',
   'V10PortDeniedError',
   // facade class (1)
   'V10AppFacade',
