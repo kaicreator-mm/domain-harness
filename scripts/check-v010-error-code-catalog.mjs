@@ -4,7 +4,8 @@
  *
  * Uses the existing code-string shape without rewriting error classes.
  * The scan is intentionally bounded to direct literal arguments to
- * fail/refuse/reject/denied/new XxxError **and object-valued code properties**.\n * Indirect computed codes and K
+ * fail/refuse/reject/denied/new XxxError and object-valued code properties.
+ * Indirect computed codes and K
  * sealed payloads are not captured; it is a drift gate, NOT a claim to
  * describe the complete cross-version error protocol.
  */
