@@ -296,7 +296,7 @@ export function clearDisposalLog(): void {
 /**
  * Physical-evidence log for DECLARED npm/native imports really evaluating
  * inside sealed module bytes (`<MODULE_ID>:<fact>` entries, pushed by the
- * fixtures themselves at module-evaluation time — review 6254726674 P1-1).
+ * fixtures themselves at module-evaluation time).
  */
 export function declaredImportEvidence(): readonly string[] {
   const log = (globalThis as { __v010DeclaredImportEvidence?: string[] }).__v010DeclaredImportEvidence;
