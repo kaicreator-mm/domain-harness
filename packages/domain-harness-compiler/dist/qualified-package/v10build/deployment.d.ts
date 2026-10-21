@@ -122,6 +122,8 @@ export interface V10OccurrenceBuildPin {
     /** Present iff `phase === 'RESERVED'`: the exact logical attempt guarded. */
     readonly reservation?: {
         readonly messageId: string;
+        /** Absent on older pins; those pins are never compensated after a deny. */
+        readonly intentType?: string;
         readonly inputDigest: string;
         readonly reservedAt: string;
     } | undefined;
@@ -199,7 +201,7 @@ export interface V10GovernedBuildActivation {
      * `OCCURRENCE_RESERVATION_PENDING` with `detail.retryable === true`: it is
      * a transient serialization of first admission, not a terminal refusal —
      * retry after the reserved message settles (or after `recoverReservation`).
-     * The reserved messageId re-sent with a DIFFERENT input carries
+     * The reserved messageId re-sent with a DIFFERENT input or bound intent carries
      * `retryable: false` (a caller conflict).
      */
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
@@ -224,8 +226,10 @@ export interface V10GovernedBuildActivation {
      * process which could still hold this reservation's writer slot is alive
      * (e.g. the single writer process restarted). With no admission witness,
      * it frees the stale slot (exact-revision CAS, never a delete) and still
-     * returns `'PENDING'`: the next same-message send then runs as owner, so a
-     * concluded deny compensates the pin instead of leaving it RESERVED.
+     * returns `'PENDING'`: the next same-message send then runs as owner.
+     * Only a fixed caller-role denial of an intent-bound reservation can
+     * compensate its pin. Other non-admitted outcomes keep RESERVED because
+     * a concurrent adopter may still admit, even after the slot owner died.
      */
     recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>, options?: {
         readonly priorWriterTerminated?: boolean;

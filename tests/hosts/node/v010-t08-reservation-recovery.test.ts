@@ -27,6 +27,11 @@
  *   RES8  a crashed owner + adopter deny stays RESERVED until the Host
  *         asserts the prior writer is dead; the freed slot lets the
  *         same-message owner deny compensate the pin.
+ *   RES9  live owner/adopter + competing dynamic non-admission never loses
+ *         its pin, even across an explicit Host slot release.
+ *   RES10 legacy compiler-digest mismatch is not silently migrated.
+ *   RES11 legacy intent-unbound pins cannot authorize compensation.
+ *   RES12 a same-message input cannot switch between sealed intents.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -51,6 +56,7 @@ import type {
   V10BuiltApp,
   V10DocStore,
   V10ModuleInput,
+  V10GovernedBuildActivation,
 } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { basicComposition, sha256HexSource } from '../../assembly/helpers-v010.js';
@@ -80,7 +86,7 @@ const RESTRICTED_BUSINESS = 'business-restricted-approval@v010.1.0.0';
 /** One BUILD whose App carries BOTH a normally admitting Business and the
  * role-restricted Business whose REAL kernel role gate answers an honest
  * `denied` receipt before any admission/journal/effect activity. */
-async function buildReservationApp(buildId: string): Promise<V10BuiltApp> {
+async function buildReservationApp(buildId: string, transformStandard?: (source: string) => string): Promise<V10BuiltApp> {
   const composition = await basicComposition({
     routes: [
       { intentId: 'submitQuoteDecisionDynamic', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' },
@@ -88,7 +94,11 @@ async function buildReservationApp(buildId: string): Promise<V10BuiltApp> {
     ],
   });
   const restrictedSource = await readFile(new URL('../../assembly/fixtures-v010/business-restricted-approval-v1.mjs', import.meta.url), 'utf8');
-  const modules: V10ModuleInput[] = composition.modules.map((module) => ({ ...module }));
+  const modules: V10ModuleInput[] = composition.modules.map((module) => {
+    if (module.role !== 'standard-primary' || transformStandard === undefined) return { ...module };
+    const source = transformStandard(module.moduleSource as string);
+    return { ...module, moduleSource: source, moduleSha256: sha256HexSource(source) };
+  });
   modules.push({
     packageId: RESTRICTED_BUSINESS,
     role: 'business',
@@ -142,6 +152,8 @@ async function refusalCode(operation: () => Promise<unknown>): Promise<string> {
 
 interface CraftedReservation {
   readonly messageId: string;
+  readonly intentType?: string;
+  readonly legacyDigest?: boolean;
   readonly input: Record<string, unknown>;
   readonly attemptId: string;
   readonly held: boolean;
@@ -178,8 +190,9 @@ async function craftReservedCrashState(
     phase: 'RESERVED',
     reservation: {
       messageId: crafted.messageId,
+      ...(crafted.intentType === undefined ? {} : { intentType: crafted.intentType }),
       // The reservation binds the SELECTED kernel's canonical digest.
-      inputDigest: kernelInputDigest(crafted.input),
+      inputDigest: crafted.legacyDigest ? sha256Canonical(crafted.input) : kernelInputDigest(crafted.input),
       reservedAt: new Date(T08_NOW).toISOString(),
     },
     ...(crafted.held ? { activeAttempt: { attemptId: crafted.attemptId, holder: 'writer' } } : {}),
@@ -317,7 +330,7 @@ test('RES3: an unresolved RESERVED pin refuses other messages, other inputs and 
     assert.equal(earlier.status, 'admitted');
     const stalledInput = { amount: 44, requestId: 'R-msg:res:pending:9' };
     await craftReservedCrashState(store, appA, decisionA, target, {
-      messageId: 'msg:res:pending:9', input: stalledInput, attemptId: 'attempt-stalled-1', held: true,
+      messageId: 'msg:res:pending:9', intentType: 'submitQuoteDecisionDynamic', input: stalledInput, attemptId: 'attempt-stalled-1', held: true,
     });
 
     const otherMessage = await refusalError(() => activationA.send(NORMAL_INTENT('inst-pending', 'msg:res:other:1', 30)));
@@ -336,8 +349,9 @@ test('RES3: an unresolved RESERVED pin refuses other messages, other inputs and 
     });
     assert.equal(await refusalCode(() => activationB.send(NORMAL_INTENT('inst-pending', 'msg:res:pending:9', 44))),
       'OCCURRENCE_RESERVATION_PENDING', 'another BUILD never takes an unresolved reservation over');
-    assert.equal(await refusalCode(() => activationB.recoverReservation({ intentType: 'submitQuoteDecisionDynamic', instanceKey: 'inst-pending' })),
-      'OCCURRENCE_RESERVATION_PENDING', 'another BUILD never recovers a foreign reservation');
+    const foreignRecovery = await refusalError(() => activationB.recoverReservation({ intentType: 'submitQuoteDecisionDynamic', instanceKey: 'inst-pending' }));
+    assert.equal(foreignRecovery.code, 'OCCURRENCE_RESERVATION_PENDING', 'another BUILD never recovers a foreign reservation');
+    assert.equal(foreignRecovery.detail?.retryable, true, 'foreign recovery uses the same retryability contract as send');
 
     // The owning BUILD's own recovery stays fail-closed: the stalled message
     // has no Kernel admission witness, and the existing instance state from
@@ -377,7 +391,7 @@ test('RES4: crash-after-admission-before-commit heals to ADMITTED through the Ke
     // leaves: the Kernel already holds the same-CAS original receipt, the
     // pin still says RESERVED with a held writer slot.
     await craftReservedCrashState(store, appA, decisionA, target, {
-      messageId: 'msg:res:heal:7', input: healInput, attemptId: 'attempt-heal-1', held: true,
+      messageId: 'msg:res:heal:7', intentType: 'submitQuoteDecisionDynamic', input: healInput, attemptId: 'attempt-heal-1', held: true,
     });
     assert.equal((await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target))?.phase, 'RESERVED');
 
@@ -433,7 +447,7 @@ test('RES6: F2 — recovery of a stalled writer never deletes; the second proces
     // the FIRST (admitting) turn of the instance.
     const f2Input = { amount: 36, requestId: 'R-msg:res:f2:1' };
     await craftReservedCrashState(store, appA, decisionA, target, {
-      messageId: 'msg:res:f2:1', input: f2Input, attemptId: 'attempt-f2-stalled', held: true,
+      messageId: 'msg:res:f2:1', intentType: 'submitQuoteDecisionDynamic', input: f2Input, attemptId: 'attempt-f2-stalled', held: true,
     });
 
     // Process 1 recovery: PENDING, and the pin must survive it (no delete
@@ -495,7 +509,7 @@ test('RES7: the crash heal binds the KERNEL canonical digest, including integer-
     assert.equal(admitted.status, 'admitted', `the integer-keyed occurrence must admit: ${JSON.stringify(admitted).slice(0, 400)}`);
 
     await craftReservedCrashState(store, appA, decisionA, target, {
-      messageId: 'msg:res:intkeys:1', input: intKeyInput, attemptId: 'attempt-intkeys-1', held: true,
+      messageId: 'msg:res:intkeys:1', intentType: 'submitQuoteDecisionDynamic', input: intKeyInput, attemptId: 'attempt-intkeys-1', held: true,
     });
     assert.equal(await activationA.recoverReservation({ intentType: 'submitQuoteDecisionDynamic', instanceKey: 'inst-intkeys' }),
       'ADMITTED', 'the witness matches the reservation digest for integer-like keys');
@@ -527,7 +541,7 @@ test('RES8: a crashed owner cannot strand an adopter deny; the Host dead-writer 
 
     // The owner crashed mid-submit: RESERVED, writer slot held by a dead attempt.
     await craftReservedCrashState(store, appA, decisionA, target, {
-      messageId: crashed.messageId, input: crashed.input, attemptId: 'attempt-crashed-owner', held: true,
+      messageId: crashed.messageId, intentType: crashed.intentType, input: crashed.input, attemptId: 'attempt-crashed-owner', held: true,
     });
 
     // Same-message continuation runs as ADOPTER (slot held) and concludes deny:
@@ -558,6 +572,210 @@ test('RES8: a crashed owner cannot strand an adopter deny; the Host dead-writer 
     inner.close();
   } finally {
     // Best-effort: Windows may keep SQLite WAL handles briefly after close.
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+type ReservationInterpreter = (...args: unknown[]) => unknown;
+const reservationTestHost = globalThis as typeof globalThis & {
+  __dhReservationInterpret?: (original: ReservationInterpreter, args: unknown[]) => Promise<unknown>;
+};
+
+for (const crashedOwner of [false, true]) {
+  for (const outcome of ['unavailable', 'denied'] as const) {
+    test(`RES9: ${crashedOwner ? 'live adopter after owner death' : 'false dead-writer assertion'} + ${outcome} retry preserves the admitting submit's pin`, async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'dh-res9-'));
+      const kPath = join(dir, 'k.sqlite');
+      const inner = await openSqliteCasStore({ path: kPath });
+      const store = new T08CountingStore(inner);
+      let release!: () => void;
+      let started!: () => void;
+      const wait = new Promise<void>((resolve) => { release = resolve; });
+      const entered = new Promise<void>((resolve) => { started = resolve; });
+      let calls = 0;
+      // Only the selected Standard dependency response/timing is controlled.
+      // Both submits use the actual Kernel, receipts and physical SQLite CAS.
+      reservationTestHost.__dhReservationInterpret = async (original, args) => {
+        calls += 1;
+        if (calls === 1) {
+          started();
+          await wait;
+          return original(...args);
+        }
+        if (outcome === 'unavailable') {
+          return {
+            semanticStatus: 'unavailable', source: 'rule', llmAvoided: true,
+            modelCallEvidence: { status: 'unmeasured' }, cacheDisposition: { read: 'not-applicable' }, telemetry: [],
+          };
+        }
+        const resolved = await original(...args) as { structuredDecision: { event: { payload: Record<string, unknown> } } };
+        // A different semantic answer fails the selected Business amount guard;
+        // the real Kernel, not this wrapper, decides the resulting denial.
+        return { ...resolved, structuredDecision: {
+          ...resolved.structuredDecision, event: {
+            ...resolved.structuredDecision.event, payload: { ...resolved.structuredDecision.event.payload, amount: 75 },
+          },
+        } };
+      };
+      let activationA: V10GovernedBuildActivation | undefined;
+      let activationB: V10GovernedBuildActivation | undefined;
+      let live: Promise<Record<string, unknown>> | undefined;
+      try {
+        const app = await buildReservationApp('t08-reservation-race', (source) => {
+          const anchor = 'export function interpret(';
+          assert.equal(source.split(anchor).length, 2, 'wrap exactly the selected Standard interpreter');
+          return source.replace(anchor, 'function __reservationInterpret(')
+            + '\nexport async function interpret(...args) { return globalThis.__dhReservationInterpret(__reservationInterpret, args); }\n';
+        });
+        const decision = t08Decision(app, 'A', T08_DEPLOYMENT, { buildId: app.buildId, approvalRef: 'approval:res:race' });
+        const authority = createT08AuthorizationAuthority();
+        authority.grant(decision);
+        activationA = await activateGovernedV10Build(app, {
+          store, deployment: T08_DEPLOYMENT, decision, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+        });
+        activationB = await activateGovernedV10Build(app, {
+          store, deployment: T08_DEPLOYMENT, decision, authorization: authority, selection: 'PINNED_ONLY', now: () => T08_NOW,
+        });
+        const intent = NORMAL_INTENT('inst-race', 'msg:res:race:1', 37);
+        const target = { ...activationA.resolveIntentTarget(intent.intentType), instanceKey: intent.instanceKey };
+        if (crashedOwner) {
+          await craftReservedCrashState(store, app, decision, target, {
+            messageId: intent.messageId, intentType: intent.intentType, input: intent.input, attemptId: 'dead-owner', held: true,
+          });
+        }
+        live = activationA.send(intent);
+        await Promise.race([entered, live.then(() => { assert.fail('first submit must pause before admission'); })]);
+        assert.equal(await activationB.recoverReservation(intent, { priorWriterTerminated: true }), 'PENDING');
+        const retry = await activationB.send(intent);
+        assert.equal(retry.status, outcome === 'unavailable' ? 'terminated' : 'denied');
+        assert.equal((await activationB.readPin(intent))?.phase, 'RESERVED', 'non-admission cannot delete under a live evaluator');
+        assert.equal(store.removeKeys.includes(v10OccurrenceBuildPinKey(T08_DEPLOYMENT, target)), false);
+
+        release();
+        assert.equal((await live).status, 'admitted', 'the first submit still owns its genuine K admission');
+        assert.equal((await activationA.readPin(intent))?.phase, 'ADMITTED', 'admission settles the surviving pin');
+        const rows = instanceRowsOf(readT08Rows(kPath), T08_DEPLOYMENT, target.businessPackageId, target.workflowId, intent.instanceKey);
+        assert.equal(rows.length, 1);
+        const document = JSON.parse(rows[0]!.value) as { durableOriginalReceipts: Record<string, { receipt: { status: string; occurrence: { messageId: string } } }> };
+        assert.ok(Object.values(document.durableOriginalReceipts).some(({ receipt }) =>
+          receipt.status === 'admitted' && receipt.occurrence.messageId === intent.messageId), 'real same-CAS original receipt is durable');
+      } finally {
+        release();
+        await live?.catch(() => {});
+        activationA?.close();
+        activationB?.close();
+        inner.close();
+        delete reservationTestHost.__dhReservationInterpret;
+        await rm(dir, { recursive: true, force: true }).catch(() => {});
+      }
+    });
+  }
+}
+
+test('RES10: legacy compiler-digest pins stay fail-closed through resend and Host slot release', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res10-'));
+  const inner = await openSqliteCasStore({ path: join(dir, 'k.sqlite') });
+  const store = new T08CountingStore(inner);
+  let activation: V10GovernedBuildActivation | undefined;
+  try {
+    const app = await buildReservationApp('t08-reservation-legacy');
+    const decision = t08Decision(app, 'A', T08_DEPLOYMENT, { buildId: app.buildId, approvalRef: 'approval:res:legacy' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decision);
+    activation = await activateGovernedV10Build(app, {
+      store, deployment: T08_DEPLOYMENT, decision, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const intent = { ...NORMAL_INTENT('inst-legacy', 'msg:res:legacy:1', 37), input: { amount: 37, requestId: 'R-legacy', tags: { '2': 'b', '10': 'a' } } };
+    const target = { ...activation.resolveIntentTarget(intent.intentType), instanceKey: intent.instanceKey };
+    assert.equal((await activation.send(intent)).status, 'admitted');
+    await craftReservedCrashState(store, app, decision, target, {
+      messageId: intent.messageId, input: intent.input, legacyDigest: true, attemptId: 'legacy-owner', held: true,
+    });
+    assert.equal(await activation.recoverReservation(intent), 'PENDING');
+    const active = activation;
+    for (const releaseSlot of [false, true]) {
+      if (releaseSlot) assert.equal(await active.recoverReservation(intent, { priorWriterTerminated: true }), 'PENDING');
+      const error = await refusalError(() => active.send(intent));
+      assert.equal(error.code, 'OCCURRENCE_RESERVATION_PENDING');
+      assert.equal(error.detail?.retryable, false);
+      const pin = await active.readPin(intent);
+      assert.equal(pin?.phase, 'RESERVED');
+      assert.equal(pin?.reservation?.inputDigest, sha256Canonical(intent.input), 'neither API migrates stored digest bytes');
+    }
+  } finally {
+    activation?.close(); inner.close();
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES11: an old reservation without intent binding cannot authorize compensation of a role denial', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res11-'));
+  const inner = await openSqliteCasStore({ path: join(dir, 'k.sqlite') });
+  const store = new T08CountingStore(inner);
+  let activation: V10GovernedBuildActivation | undefined;
+  try {
+    const app = await buildReservationApp('t08-reservation-unbound');
+    const decision = t08Decision(app, 'A', T08_DEPLOYMENT, { buildId: app.buildId, approvalRef: 'approval:res:unbound' });
+    const authority = createT08AuthorizationAuthority(); authority.grant(decision);
+    activation = await activateGovernedV10Build(app, {
+      store, deployment: T08_DEPLOYMENT, decision, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const intent = RESTRICTED_INTENT('inst-unbound', 'msg:res:unbound:1');
+    const target = { ...activation.resolveIntentTarget(intent.intentType), instanceKey: intent.instanceKey };
+    await craftReservedCrashState(store, app, decision, target, {
+      messageId: intent.messageId, input: intent.input, attemptId: 'legacy-owner', held: true,
+    });
+    await activation.recoverReservation(intent, { priorWriterTerminated: true });
+    assert.equal((await activation.send(intent)).status, 'denied');
+    assert.equal((await activation.readPin(intent))?.phase, 'RESERVED', 'unknown original intent cannot prove all submits incapable of admission');
+    assert.equal(store.removes, 0);
+  } finally {
+    activation?.close(); inner.close();
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES12: reservation intent binding rejects a different sealed intent on the same Business/workflow', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res12-'));
+  const inner = await openSqliteCasStore({ path: join(dir, 'k.sqlite') });
+  const store = new T08CountingStore(inner);
+  let activation: V10GovernedBuildActivation | undefined;
+  try {
+    const composition = await basicComposition({ routes: [
+      { intentId: 'submitQuoteDecisionDynamic', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' },
+      { intentId: 'submitQuoteDecisionStrict', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' },
+    ] });
+    const modules = composition.modules.map((module) => module.role === 'business'
+      ? { ...module, provides: [...module.provides, 'intent:submitQuoteDecisionStrict'] } : module);
+    const app = await buildV10App({ ...composition, modules, appId: T08_APP_ID, buildId: 't08-reservation-intent' });
+    const decision = t08Decision(app, 'A', T08_DEPLOYMENT, { buildId: app.buildId, approvalRef: 'approval:res:intent' });
+    const authority = createT08AuthorizationAuthority(); authority.grant(decision);
+    activation = await activateGovernedV10Build(app, {
+      store, deployment: T08_DEPLOYMENT, decision, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const intent = NORMAL_INTENT('inst-intent', 'msg:res:intent:1', 37);
+    const strict = { ...intent, intentType: 'submitQuoteDecisionStrict' };
+    const target = { ...activation.resolveIntentTarget(intent.intentType), instanceKey: intent.instanceKey };
+    assert.deepEqual(activation.resolveIntentTarget(strict.intentType), activation.resolveIntentTarget(intent.intentType));
+    await craftReservedCrashState(store, app, decision, target, {
+      messageId: intent.messageId, intentType: strict.intentType, input: intent.input, attemptId: 'strict-owner', held: false,
+    });
+    const active = activation;
+    const error = await refusalError(() => active.send(intent));
+    assert.equal(error.code, 'OCCURRENCE_RESERVATION_PENDING');
+    assert.equal(error.detail?.retryable, false);
+    assert.equal(store.kPuts(), 0, 'intent mismatch refuses before Kernel I/O');
+    assert.equal((await activation.readPin(intent))?.reservation?.intentType, strict.intentType);
+    assert.equal((await activation.send(strict)).status, 'admitted', 'the actual reserved intent can continue');
+
+    // An old pin without the new field is still readable and healable when
+    // the existing message/input witness matches; no intent is backfilled.
+    await craftReservedCrashState(store, app, decision, target, {
+      messageId: intent.messageId, input: intent.input, attemptId: 'legacy-admitted-owner', held: true,
+    });
+    assert.equal(await activation.recoverReservation(strict), 'ADMITTED');
+  } finally {
+    activation?.close(); inner.close();
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 });
