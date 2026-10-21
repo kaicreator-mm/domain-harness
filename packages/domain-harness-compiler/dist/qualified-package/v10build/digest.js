@@ -25,6 +25,19 @@ export const V10_KEXT_ABI = 'dh.v10.k-extension/1';
 export const V10_SFEATURE_ABI = 'dh.v10.standard-feature/1';
 export const V10_IMPORT_POLICY_REVISION = 'dh.v10.import-policy/1';
 export const V10_BUNDLER_REVISION = 'dh.v10.bundler/1';
+/**
+ * Kernel/Standard Router adapter literals selected by this v0.10 ABI.
+ * These historical v08 field values are wire-contract pins, NOT reasons
+ * to rename frozen implementation directories.
+ */
+export const V10_KERNEL_INTENT_KIND = 'v08/tc-intent';
+export const V10_KERNEL_AUTHORITY_CLASS = 'PRODUCTION';
+export const V10_KERNEL_CALLER_ROLE = 'requester';
+export const V10_ROUTER_PRIORITY = 1;
+export const V10_ROUTER_ELIGIBILITY = 'eligible';
+export function v10RouterBasisDigest(subjectDigest) {
+    return `sha256:${subjectDigest}`;
+}
 /** Selected per-role ABI rows of the v0.10 Node24 profile. */
 export const V10_SELECTED_ROLE_ABI = Object.freeze({
     'kernel-primary': 'v08-kernel-abi/1',
