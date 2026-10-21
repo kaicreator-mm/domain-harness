@@ -72,6 +72,7 @@
     ],
     "packages/domain-harness-compiler/src/qualified-package/v10build/index.ts": [],
     "packages/domain-harness-compiler/src/qualified-package/v10build/known-error-codes.ts": [],
+    "packages/domain-harness-compiler/src/qualified-package/v10build/query-type-parity.ts": [],
     "packages/domain-harness-compiler/src/qualified-package/v10build/selected-closure.ts": [
       "V10_DEPENDENCY_CYCLE",
       "V10_DEPENDENCY_MISSING",
