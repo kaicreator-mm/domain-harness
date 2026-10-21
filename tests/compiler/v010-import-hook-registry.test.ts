@@ -16,8 +16,8 @@ const view = {
 test('P-I1228: independent injected registry pins only the declaring data URL and refcounts all activations', () => {
   let installed = 0;
   let deregistered = 0;
-  let resolveHook: (...args: any[]) => unknown = () => { throw new Error('hook not installed'); };
-  const fakeRegister = ((hooks: { resolve: (...args: any[]) => unknown }) => {
+  let resolveHook: (...args: unknown[]) => unknown = () => { throw new Error('hook not installed'); };
+  const fakeRegister = ((hooks: { resolve: (...args: unknown[]) => unknown }) => {
     installed += 1;
     resolveHook = hooks.resolve;
     return { deregister: () => { deregistered += 1; } };
