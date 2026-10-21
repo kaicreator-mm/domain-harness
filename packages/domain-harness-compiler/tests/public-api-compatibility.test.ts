@@ -187,7 +187,7 @@ const STRING_CONST_NAMES = new Set<string>([
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
 ]);
-const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_SELECTED_ROLE_ABI']);
+const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_ACTIVATION_FAILURE_CODES', 'V10_SELECTED_ROLE_ABI']);
 const PARSER_PIN_CONST_NAMES = new Set<string>(['V09_BUILD_PARSER_PIN']);
 /** Non-error public classes (constructors that are not Error subclasses). */
 const PLAIN_CLASS_NAMES = new Set<string>(['V10AppFacade']);
@@ -244,6 +244,8 @@ const ERROR_CLASS_NAMES = new Set<string>([
   // v0.10 T00 error classes
   'V10ActivationError',
   'V10BuildError',
+  'V10Error',
+  'V10ExternalEffectError',
   'V10PortDeniedError',
   // v0.10 T10B error classes
   'V10DeploymentError',
