@@ -79,6 +79,58 @@ function journalRows(rows: readonly { key: string }[]): readonly { key: string }
   return rows.filter((row) => row.key.includes(':effect-journal:'));
 }
 
+
+test('N-I1219: refused Standard route leaves no pin; successor BUILD admits same instance', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-v010-i1219-route-'));
+  const path = join(dir, 'k.sqlite');
+  let db: SqliteCasStore | undefined;
+  try {
+    db = await openSqliteCasStore({ path });
+    const store = new T08CountingStore(db);
+    const buildA = await buildT08GovernedApp('A', { ambiguousAlphaRoute: true });
+    const buildB = await buildT08GovernedApp('B');
+    assert.notEqual(buildA.subjectDigest, buildB.subjectDigest);
+    const authority = createT08AuthorizationAuthority();
+    const decisionA = t08Decision(buildA, 'A');
+    const decisionB = t08Decision(buildB, 'B');
+    authority.grant(decisionA);
+    authority.grant(decisionB);
+
+    const activationA = await activateGovernedV10Build(buildA, {
+      store, deployment: T08_DEPLOYMENT, decision: decisionA,
+      authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const intent = { ...T08_OLD_INTENT, instanceKey: 'inst-route-refused', messageId: 'msg:i1219:route' };
+    try {
+      await t08Refusal(activationA.send(intent), 'ROUTING_OUTCOME_UNSELECTED');
+      assert.equal(await activationA.readPin(intent), null,
+        'an ambiguous Standard route cannot create an authoritative occurrence pin');
+      assert.deepEqual(kRowsOf(readT08Rows(path), T08_DEPLOYMENT), [],
+        'a pre-admission route refusal must write zero physical K rows');
+    } finally {
+      activationA.close();
+    }
+
+    const activationB = await activateGovernedV10Build(buildB, {
+      store, deployment: T08_DEPLOYMENT, decision: decisionB,
+      authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    try {
+      const receipt = await activationB.send(intent);
+      assert.equal(receipt.status, 'admitted', 'same unadmitted instance must remain available to newer BUILD');
+      const pinB = await activationB.readPin(intent);
+      assert.equal(pinB?.subjectDigest, buildB.subjectDigest,
+        'only B creates the first admitted occurrence pin');
+    } finally {
+      activationB.close();
+    }
+  } finally {
+    if (db !== undefined) await db.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+
 test('T08-P01/P02/P03/P04/N03/N04: governed A/B activation, immutable old pin, replay and real restart', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dh-v010-t08-phys-'));
   const kPath = join(dir, 'k.sqlite');
