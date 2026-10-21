@@ -285,7 +285,7 @@ function privateModuleUrl(source: string, activationNonce: string, packageId: st
 }
 
 // ---------------------------------------------------------------------------
-// Declared bare-import resolution (review 6254726674, P1-1).
+// Declared bare-import resolution for sealed npm/native allowances.
 //
 // A sealed module imported through a `data:` URL has no package hierarchy,
 // so a bare npm/native specifier inside it cannot resolve through the
@@ -418,7 +418,7 @@ function registerDeclaredBareImports(deps: {
 /**
  * The kernel-facing K docs port: prefix-bounded physical CAS conditionals
  * only. `remove` is exposed when — and only when — the physical store
- * implements it (review 6254726674, P1-2).
+ * implements it; unsupported stores expose no removal capability.
  */
 export interface V10DocsPort {
   get(key: string): Promise<{ value: unknown; revision: number } | null>;
@@ -505,7 +505,7 @@ function encodeK02Component(value: string): string {
 }
 
 /**
- * [#1217] The ONE governed K-docs outer prefix of a deployment: the stable,
+ * The ONE governed K-docs outer prefix of a deployment: the stable,
  * delimiter-escaped `deployment:<deployedAppId>:<tenantId>:<appId>` tuple.
  * Shared by the writer (V10AppFacade.#docsPrefix), the reported shadow
  * binding and the Shadow L4 verifier's independent re-derivation — the three
@@ -516,7 +516,7 @@ export function v10DeploymentDocsPrefix(deployment: { deployedAppId: string; ten
 }
 
 /**
- * [v0.10 T07 #1174 R2 P1] The exact K02 physical prefix of ONE deployment
+ * The exact K02 physical prefix of ONE deployment
  * and ONE selected Business: the injective
  * `v010-k02:<deployedAppId>:<tenantId>:<appId>:<businessPackageId>:`
  * component the Host docs port prepends. This is the ONE derivation both the
@@ -536,7 +536,7 @@ export function v10K02DocumentPrefix(scope: {
 }
 
 /**
- * [v0.10 C01 #1177 R1 P1-2] The K02 SCOPED document-store composition: the
+ * The K02 SCOPED document-store composition: the
  * exact two-B namespace mechanism the K02 physical witness exercises. Every
  * key of one deployment tuple — instance, fence, journal, permit, dispatch
  * claim, disposition, governance pin, receipt archive — is addressed under
@@ -607,7 +607,7 @@ export interface ActivateV10AppOptions {
   readonly now?: () => number;
   readonly counters?: V10Counters;
   /**
-   * [v0.10 C01 #1177 R1 P1-2] The stable deployment identity of this App
+   * The stable deployment identity of this App
    * (deployedAppId/tenantId/appId). When present, EVERY business runtime is
    * created under the K02 SCOPED document grammar with its own
    * businessPackageId appended — the exact injective tuple the K02 selected
@@ -712,7 +712,7 @@ export class V10AppFacade {
    * Shadow L4 verifier. Derived exclusively from private activated state,
    * never a caller-provided digest or a user-supplied matching claim.
    *
-   * [T07 R2 P1] `deployedAppId` and `k02DocumentPrefixes` are the exact
+   * `deployedAppId` and `k02DocumentPrefixes` are the exact
    * deployment instance and its per-B physical document prefixes. They are
    * derived here from the same private deployment identity the write path
    * uses (`v10K02DocumentPrefix`), so a shadow can select one deployment's K
@@ -917,7 +917,7 @@ export class V10AppFacade {
   }
 
   /**
-   * [R1 P1-2] The docs view ONE business runtime (and its external-effect
+   * The docs view ONE business runtime (and its external-effect
    * gate) must use: the plain K port for the historical unscoped wiring, or
    * the per-B K02 scoped view of a deployment-identity activation. The view
    * is cached per business package — one B, one namespace.
@@ -968,7 +968,7 @@ export class V10AppFacade {
         // (the trusted pre-handler-refusal discipline of #1108 K01).
         return await dispatchThroughExternalEffectGate(
           {
-            // [R1 P1-2] The gate reads through the DISPATCHING business's own
+            // The gate reads through the DISPATCHING business's own
             // K docs view: a scoped deployment resolves the kernel-issued
             // addresses inside that B's namespace only (no legacy fallback).
             docs: {
@@ -1253,7 +1253,7 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
         dispose: undefined,
       });
     }
-    // [v0.10 C01 #1177 R1 P1-2] Optional deployment identity: validated here
+    // Optional deployment identity: validated here
     // once, then carried into every business runtime's K02 scoped namespace.
     let deploymentIdentity: { deployedAppId: string; tenantId: string; appId: string } | undefined;
     if (options.deploymentIdentity !== undefined) {
