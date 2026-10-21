@@ -1,18 +1,43 @@
 /**
- * DomainHarness v0.10 T00 (#1166) — BUILD typed error.
- *
- * Every deterministic composition refusal (duplicate primary, conflicting
- * provider/feature, missing dependency/feature, wrong ABI/target profile,
- * byte substitution, unsealed import edge, authority forgery, bad route)
- * is a BUILD-time refusal under accepted Product A01 (A01-PC05/PC08): it
- * is raised here, once, from static facts — never deferred to a runtime
- * static attestation pass.
+ * v0.10 typed error lineage. Error code strings remain stable wire values
+ * unless a distinct option/policy failure is intentionally added.
  */
-export class V10BuildError extends Error {
+export class V10Error extends Error {
     code;
     constructor(code, message) {
         super(message);
-        this.name = 'V10BuildError';
+        this.name = 'V10Error';
         this.code = code;
     }
 }
+/** Deterministic BUILD refusal over trusted static composition facts. */
+export class V10BuildError extends V10Error {
+    constructor(code, message) {
+        super(code, message);
+        this.name = 'V10BuildError';
+    }
+}
+/** Activation, selected-K interface and Host wiring errors. */
+export class V10ActivationError extends V10Error {
+    constructor(code, message) {
+        super(code, message);
+        this.name = 'V10ActivationError';
+    }
+}
+/** Runtime external effect gate refusal (still an activation error subtype). */
+export class V10ExternalEffectError extends V10ActivationError {
+    constructor(code, message) {
+        super(code, message);
+        this.name = 'V10ExternalEffectError';
+    }
+}
+/**
+ * Separate diagnostics that were previously collapsed into V10_APP_INVALID.
+ * This is deliberately a bounded catalog, not a claim that all legacy
+ * v0.10 error codes across separate services are globally unique.
+ */
+export const V10_ACTIVATION_FAILURE_CODES = Object.freeze({
+    appInvalid: 'V10_APP_INVALID',
+    optionsInvalid: 'V10_ACTIVATION_OPTIONS_INVALID',
+    businessPolicyInvalid: 'V10_BUSINESS_POLICY_INVALID',
+});

@@ -34,7 +34,7 @@
  *    with no discovery edge (no second engine, no dynamic install);
  *  - routes: the intent→operation table is admitted against the sealed
  *    graph's OWN business intents and capability handler maps (no
- *    caller-supplied intent authority — v0.9 N01 R0 P1 lineage).
+ *    caller-supplied intent authority).
  *
  * Determinism is a product property: no clock, no randomness, no locale —
  * the same input builds the byte-identical plain-data output and digest.
@@ -47,6 +47,7 @@
  * BUILD never evaluates module source (purely static analysis) and performs
  * no I/O.
  */
+import { isObjectRecord } from './guards.js';
 import { canonicalSnapshot } from '@kaicreator/domain-harness/v8';
 import {
   V10_BUILD_FORMAT,
@@ -180,9 +181,6 @@ function fail(code: string, message: string): never {
   throw new V10BuildError(code, message);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function boundedString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_STRING) {
@@ -223,7 +221,7 @@ function snapshotOrThrow(value: unknown, label: string): Record<string, unknown>
     const detail = error instanceof Error ? error.message : String(error);
     fail('BUILD_INPUT_INVALID', `${label} is not strict canonical plain data: ${detail}`);
   }
-  if (!isRecord(snapshot)) {
+  if (!isObjectRecord(snapshot)) {
     fail('BUILD_INPUT_INVALID', `${label} must be a record`);
   }
   return snapshot;
@@ -233,7 +231,7 @@ function parseExternalImports(raw: unknown, packageId: string): V10ExternalImpor
   if (raw === undefined) {
     return Object.freeze({ node: Object.freeze([]), npm: Object.freeze([]), native: Object.freeze([]) });
   }
-  if (!isRecord(raw)) {
+  if (!isObjectRecord(raw)) {
     fail('BUILD_INPUT_INVALID', `module ${packageId} externalImports must be a record`);
   }
   strictFields(raw, EXTERNAL_IMPORT_FIELDS, `module ${packageId} externalImports`);
@@ -278,7 +276,7 @@ function parseHandlers(raw: unknown, packageId: string): { operationId: string; 
   const operations = new Set<string>();
   const handlers: { operationId: string; handler: string }[] = [];
   for (const handlerRaw of raw) {
-    if (!isRecord(handlerRaw)) {
+    if (!isObjectRecord(handlerRaw)) {
       fail('BUILD_GRAPH_INVALID', `capability ${packageId} handler entry must be a record`);
     }
     strictFields(handlerRaw, HANDLER_FIELDS, `capability ${packageId} handler`);
@@ -300,7 +298,7 @@ function parseModules(rawModules: readonly unknown[]): ParsedModule[] {
   const parsed: ParsedModule[] = [];
   const seenIds = new Set<string>();
   for (const raw of rawModules) {
-    if (!isRecord(raw)) {
+    if (!isObjectRecord(raw)) {
       fail('BUILD_GRAPH_INVALID', 'each composition module must be a record');
     }
     strictFields(raw, MODULE_FIELDS, 'composition module');
@@ -392,7 +390,7 @@ export function buildV10App(options: BuildV10AppOptions): V10BuiltApp {
     fail('V10_TARGET_UNSUPPORTED', `target profile ${String(snap.targetProfile)} is not the selected Node24 ESM profile ${V10_TARGET_PROFILE}; a composition pins exactly one target runtime`);
   }
   const hardBudgetRaw = snap.hardBudget ?? { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 };
-  if (!isRecord(hardBudgetRaw)) {
+  if (!isObjectRecord(hardBudgetRaw)) {
     fail('BUILD_INPUT_INVALID', 'hardBudget must be a record');
   }
   const stepsRaw: unknown = hardBudgetRaw.maxStepsPerTurn;
@@ -583,7 +581,7 @@ export function buildV10App(options: BuildV10AppOptions): V10BuiltApp {
   const routes: { intentId: string; operationId: string; capabilityId: string; handlerId: string }[] = [];
   const routeKeys = new Set<string>();
   for (const raw of routesRaw) {
-    if (!isRecord(raw)) {
+    if (!isObjectRecord(raw)) {
       fail('BUILD_GRAPH_INVALID', 'each route row must be a record');
     }
     strictFields(raw, ROUTE_FIELDS, 'route row');
