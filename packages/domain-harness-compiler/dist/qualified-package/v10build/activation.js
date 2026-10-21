@@ -51,7 +51,7 @@ import { registerHooks } from 'node:module';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createV10AuthorizedMultiBQuery, } from '@kaicreator/domain-harness/v8/host';
-import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, sha256Hex } from './digest.js';
+import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE, V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, sha256Hex, } from './digest.js';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
 export class V10ActivationError extends Error {
     code;
@@ -730,9 +730,9 @@ export class V10AppFacade {
         if (rows.length === 0) {
             refuse('INTENT_UNSEALED', `intent ${intentType} carries no sealed route rows in this App`);
         }
-        const basisDigest = `sha256:${this.#app.subjectDigest}`;
+        const basisDigest = v10RouterBasisDigest(this.#app.subjectDigest);
         const bindings = rows.map((row) => ({ intentId: row.intentId, operationId: row.operationId, capabilityId: row.capabilityId, handlerId: row.handlerId }));
-        const candidates = rows.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId, priority: 1, eligibility: 'eligible' }));
+        const candidates = rows.map((row) => ({ operationId: row.operationId, capabilityId: row.capabilityId, priority: V10_ROUTER_PRIORITY, eligibility: V10_ROUTER_ELIGIBILITY }));
         const standardEntry = this.#app.modules.find((module) => module.role === 'standard-primary');
         const router = this.#namespaces.get(standardEntry.packageId)?.routeWorkflowIntent;
         const routed = router({ intentId: intentType, basisDigest, bindings, candidates });
@@ -749,7 +749,7 @@ export class V10AppFacade {
         const existing = await runtime.getSnapshot(target);
         if (existing === null || existing === undefined) {
             try {
-                await runtime.openInstance({ target, correlationId: `corr:${messageId}`, authorityClass: 'PRODUCTION' });
+                await runtime.openInstance({ target, correlationId: `corr:${messageId}`, authorityClass: V10_KERNEL_AUTHORITY_CLASS });
             }
             catch (error) {
                 const code = error.code;
@@ -759,8 +759,8 @@ export class V10AppFacade {
         }
         try {
             const receipt = await runtime.submitOccurrence({
-                kind: 'v08/tc-intent', intentType, target, messageId, input: intent.input,
-                caller: { role: 'requester' },
+                kind: V10_KERNEL_INTENT_KIND, intentType, target, messageId, input: intent.input,
+                caller: { role: V10_KERNEL_CALLER_ROLE },
             });
             if (!isPlainRecord(receipt)) {
                 refuse('K_RECEIPT_INVALID', 'the Kernel admission receipt is not a record');
