@@ -187,12 +187,17 @@ const FEATURE_DECISIONS = {
     outcomeField: 'disposition',
     outcomeEvents: { approved: 'QUOTE_DECIDED' },
     eventPayloadFromInput: { amount: 'amount', requestId: 'requestId' },
+    // [v0.10 #1267 F2] MANDATORY relative per-turn dispatch timeout: the
+    // absolute deadline is computed at each dispatch (never sealed), so a
+    // hanging feature can never hold the K admission lane past this bound.
+    timeoutMs: 1000,
   },
   submitFeatureReview: {
     featureRequest: FEATURE_REQUEST,
     outcomeField: 'disposition',
     outcomeEvents: { review: 'QUOTE_REVIEWED' },
     eventPayloadFromInput: { amount: 'amount', requestId: 'requestId' },
+    timeoutMs: 1000,
   },
 };
 

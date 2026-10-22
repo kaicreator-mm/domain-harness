@@ -253,7 +253,12 @@ test('1267-P4: model fallback with Host-wired deps admits with measured model ca
   assert.deepEqual(payload.input, { amount: 42, requestId: 'R-p4' });
   assert.equal(payload.operationId, 'model:fd-quote');
   assert.deepEqual(payload.schema, { id: 'schema:fd-quote', revision: 'r1', provenanceKey: 'approved:2026-10' });
-  assert.deepEqual(payload.budget, { maxSteps: 8, deadlineEpochMs: null });
+  // [#1267 F2] The per-turn deadline computed from the sealed relative
+  // timeoutMs overrides the feature request: T02's own budget logic races
+  // the same absolute instant and stops its model call.
+  assert.equal(payload.budget.maxSteps, 8);
+  assert.ok(Number.isFinite(payload.budget.deadlineEpochMs) && payload.budget.deadlineEpochMs >= Date.now(),
+    'the feature request carries the computed per-turn deadline');
   for (const forbidden of ['docs', 'store', 'cas', 'resources', 'hostPorts', 'permit', 'submitOccurrence', 'createOccurrenceRuntime']) {
     assert.equal(payload[forbidden], undefined, `no ${forbidden} port may reach the feature/model boundary`);
   }
@@ -519,6 +524,7 @@ async function factoryDispatcher(feature: (request: unknown, deps: unknown) => u
       allowedOutcomes: ['approved'],
       allowedEventTypes: ['EV_OK'],
       inputSelection: { amount: 'amount' },
+      timeoutMs: 250,
     }],
     ...(Object.keys(deps).length === 0 ? {} : { deps }),
   });
@@ -564,38 +570,59 @@ test('1267-F1: factory — throwing getter and hostile Proxy traps are refused w
   }
 });
 
-test('1267-F2: factory — a non-thenable feature return is refused without consumption; a hostile thenable value never enters the mapping', { timeout: 8000 }, async () => {
-  // A feature export returning a FUNCTION (not a thenable): contract
-  // violation, refused before the value is ever consumed.
+test('1267-F2: factory — the feature promise is adopted; the settled value is still snapshotted and the wait is bounded', { timeout: 8000 }, async () => {
+  // [#1267 F4 wording] The feature's promise IS adopted — its `then` runs
+  // (it is the selected Standard feature export, trusted Standard code).
+  // The guarantees are: (a) the settled VALUE is consumed only through the
+  // descriptor-safe snapshot + authority scan; (b) the wait is bounded by
+  // the mandatory per-turn timeoutMs. A feature export returning a FUNCTION
+  // (not a thenable) is a contract violation, refused before the value is
+  // ever consumed.
   const harness = await factoryDispatcher(async () => async () => 'unused');
   const refused = await harness.interpret(boundDeclaration('a'.repeat(64)), { amount: 1 });
   assert.equal(refused.semanticStatus, 'unavailable');
   assert.equal(refused.unavailable.reason, 'feature-result-invalid');
 
-  // An async export whose resolution value is a thenable-shaped record: the
-  // await adopts it (promise semantics), so the DECLARED deadline bounds the
-  // wait; the smuggled value never enters the dispatcher's mapping lane.
-  const thenableValue = await factoryDispatcher(
-    async () => ({
+  // An adopted thenable that resolves hostile authority: the settled value
+  // is still snapshotted — the authority scan refuses it without admission.
+  const adoptedAuthority = await factoryDispatcher(async () => ({
+    then: (resolve: (v: unknown) => void) => resolve({
       kind: 'selected', source: 'rule',
-      decision: { disposition: 'approved' },
+      decision: { disposition: 'approved', permit: { action: 'reserve' } },
       evidence: { modelCallEvidence: 'unmeasured', modelCalls: 0 },
-      then: () => 'smuggled',
     }),
-    { now: () => Date.now() },
+  }));
+  const refusedAuthority = await adoptedAuthority.interpret(boundDeclaration('a'.repeat(64)), { amount: 1 });
+  assert.equal(refusedAuthority.semanticStatus, 'unavailable');
+  assert.equal(refusedAuthority.unavailable.reason, 'feature-authority-refused');
+  assert.equal(refusedAuthority.structuredDecision, undefined);
+
+  // An adopted thenable that settles LATE (after the per-turn timeout): the
+  // deadline wins, the late settlement is never adopted, nothing surfaces
+  // as unhandledRejection.
+  const adoptedLate = await factoryDispatcher(
+    async () => ({
+      then: (resolve: (v: unknown) => void) => {
+        setTimeout(() => resolve({ kind: 'selected', source: 'rule', decision: { disposition: 'approved' }, evidence: { modelCallEvidence: 'unmeasured', modelCalls: 0 } }), 500);
+      },
+    }),
+    {},
     'a'.repeat(64),
-    { limits: { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1, deadlineEpochMs: Date.now() + 60 } },
   );
-  const refusedThenable = await thenableValue.interpret(boundDeclaration('a'.repeat(64)), { amount: 1 });
-  assert.equal(refusedThenable.semanticStatus, 'unavailable');
-  assert.equal(refusedThenable.unavailable.reason, 'deadline-exceeded');
-  assert.equal(JSON.stringify(refusedThenable).includes('smuggled'), false);
-  assert.equal(refusedThenable.structuredDecision, undefined);
-  await new Promise((resolve) => setTimeout(resolve, 120));
+  const started = Date.now();
+  const timedOut = await adoptedLate.interpret(boundDeclaration('a'.repeat(64)), { amount: 1 });
+  const elapsed = Date.now() - started;
+  assert.equal(timedOut.semanticStatus, 'unavailable');
+  assert.equal(timedOut.unavailable.reason, 'deadline-exceeded');
+  assert.equal(timedOut.structuredDecision, undefined);
+  assert.ok(elapsed < 250 + 2000, `the wait is bounded by timeoutMs (elapsed ${String(elapsed)}ms)`);
+  await new Promise((resolve) => setTimeout(resolve, 650));
+  assert.equal(timedOut.semanticStatus, 'unavailable', 'the late adopted settlement is never re-read');
 });
 
-test('1267-F3: factory — a never-settling feature settles at the declared deadline; a late value is never adopted', { timeout: 8000 }, async () => {
+test('1267-F3: factory — a never-settling feature settles deadline-exceeded at the per-turn timeout; a late value is never adopted', { timeout: 8000 }, async () => {
   const sdk = await loadSdk();
+  const started = Date.now();
   const expired = sdk.createFeatureDecisionDispatcher({
     decisions: [{
       declarationDigest: 'd'.repeat(64),
@@ -606,7 +633,7 @@ test('1267-F3: factory — a never-settling feature settles at the declared dead
       }),
       featureRequest: {
         schema: { id: 'schema:x', revision: 'r1', provenanceKey: 'p' },
-        limits: { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1, deadlineEpochMs: Date.now() + 40 },
+        limits: { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1 },
       },
       outcomeField: 'disposition',
       outcomeEvents: { approved: 'EV_OK' },
@@ -614,13 +641,16 @@ test('1267-F3: factory — a never-settling feature settles at the declared dead
       allowedOutcomes: ['approved'],
       allowedEventTypes: ['EV_OK'],
       inputSelection: { amount: 'amount' },
+      timeoutMs: 120,
     }],
     deps: { now: () => Date.now() },
   });
   const result = await expired.interpret(boundDeclaration('d'.repeat(64)), { amount: 1 }) as Record<string, any>;
+  const elapsed = Date.now() - started;
   assert.equal(result.semanticStatus, 'unavailable');
   assert.equal(result.unavailable.reason, 'deadline-exceeded');
   assert.equal(result.structuredDecision, undefined, 'no decision exists for a refused dispatch');
+  assert.ok(elapsed < 120 + 2000, `the per-turn timeout bounds the wait (elapsed ${String(elapsed)}ms)`);
   // The late settlement (500ms) must never be adopted and must not surface
   // as an unhandled rejection: wait past it and re-assert.
   await new Promise((resolve) => setTimeout(resolve, 650));
@@ -643,6 +673,7 @@ test('1267-F4: factory — unbound declarations take the plain interpreter path 
       allowedOutcomes: ['approved'],
       allowedEventTypes: ['EV_OK'],
       inputSelection: { amount: 'amount' },
+      timeoutMs: 250,
     }],
   });
   // A plain (non-semantic) declaration with no matching digest: routed to the
@@ -675,6 +706,7 @@ test('1267-F5: factory — incoherent or forged wiring refuses typed at the trus
     allowedOutcomes: ['approved'],
     allowedEventTypes: ['EV_OK'],
     inputSelection: { amount: 'amount' },
+    timeoutMs: 250,
   };
   const bad = (label: string, mutate: (entry: Record<string, unknown>) => Record<string, unknown>) =>
     ({ decisions: [mutate({ ...goodEntry })] });
@@ -685,6 +717,10 @@ test('1267-F5: factory — incoherent or forged wiring refuses typed at the trus
     ['event type outside the declaration vocabulary', bad('e', (entry) => ({ ...entry, outcomeEvents: { approved: 'EV_OTHER' } }))],
     ['payload key outside the input selection', bad('p', (entry) => ({ ...entry, eventPayloadFromInput: { sku: 'sku' } }))],
     ['non-callable invoke', bad('i', (entry) => ({ ...entry, invoke: 'not-a-function' }))],
+    ['missing timeoutMs', bad('t', (entry) => { const { timeoutMs: _dropped, ...rest } = entry; return rest; })],
+    ['sub-ranging timeoutMs', bad('t0', (entry) => ({ ...entry, timeoutMs: 0 }))],
+    ['oversize timeoutMs', bad('t1', (entry) => ({ ...entry, timeoutMs: 60_001 }))],
+    ['fractional timeoutMs', bad('t2', (entry) => ({ ...entry, timeoutMs: 1.5 }))],
     ['unknown entry field', bad('u', (entry) => ({ ...entry, decisionFallback: 'x' }))],
     ['unbounded limits', bad('l', (entry) => ({ ...entry, featureRequest: { schema: { id: 's', revision: 'r', provenanceKey: 'p' }, limits: { maxSteps: 999 } } }))],
   ];
@@ -699,3 +735,280 @@ test('1267-F5: factory — incoherent or forged wiring refuses typed at the trus
   }), (error: unknown) =>
     typeof error === 'object' && error !== null && (error as { code?: string }).code === 'SDK_DISPATCH_WIRING_INVALID');
 });
+
+// ===========================================================================
+// [#1267 Follow-up 2] F1 liveness (cancellation), F2 liveness (mandatory
+// per-turn timeout), F3 own-property outcome lookup.
+// ===========================================================================
+
+interface MemoryDocsPort {
+  docs: {
+    get(key: string): Promise<{ value: unknown; revision: number } | null>;
+    put(key: string, value: unknown, conditions?: Record<string, unknown>): Promise<{ revision: number }>;
+    list(prefix: string): Promise<readonly string[]>;
+  };
+  effectCalls: unknown[];
+}
+
+function memoryDocs(): MemoryDocsPort {
+  const documents = new Map<string, { value: unknown; revision: number }>();
+  const effectCalls: unknown[] = [];
+  const clone = (value: unknown) => JSON.parse(JSON.stringify(value));
+  return {
+    docs: {
+      async get(key) {
+        const doc = documents.get(key);
+        return doc === undefined ? null : { value: clone(doc.value), revision: doc.revision };
+      },
+      async put(key, value, conditions = {}) {
+        if ((conditions as { mustBeAbsent?: boolean }).mustBeAbsent === true && documents.has(key)) {
+          throw Object.assign(new Error(`host doc ${key} exists`), { code: 'HOST_KEY_EXISTS' });
+        }
+        const expected = (conditions as { mustMatchRevision?: number }).mustMatchRevision;
+        if (expected !== undefined && documents.get(key)?.revision !== expected) {
+          throw Object.assign(new Error(`host doc ${key} CAS conflict`), { code: 'HOST_CAS_CONFLICT' });
+        }
+        const revision = documents.get(key) === undefined ? 0 : (documents.get(key) as { revision: number }).revision + 1;
+        documents.set(key, { value: clone(value), revision });
+        return { revision };
+      },
+      async list(prefix) {
+        return [...documents.keys()].filter((key) => key.startsWith(prefix)).sort();
+      },
+    },
+    effectCalls,
+  };
+}
+
+/** The real selected kernel payload, imported through the installer discipline. */
+let kernelPromise: Promise<Record<string, any>> | undefined;
+const loadKernel = (): Promise<Record<string, any>> =>
+  (kernelPromise ??= (async () => {
+    const source = await readFile(
+      new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url),
+      'utf8',
+    );
+    return await import('data:text/javascript;base64,' + Buffer.from(source, 'utf8').toString('base64')) as Record<string, any>;
+  })());
+
+interface CancelRig {
+  submit(input: Record<string, unknown>, messageId: string, control?: { signal: AbortSignal }): Promise<Record<string, any>>;
+  journalBegins(): number;
+  effectCount(): number;
+}
+
+/**
+ * The KH2 cancellation rig: the REAL selected kernel + the REAL dispatcher
+ * over the REAL T02 feature and the SAME sealed business material, entered
+ * through `runtime.submitOccurrence(request, control)` — the same mechanism
+ * the FR07-KH2 cancellation tests use (the facade's `send` carries no
+ * control surface; it cannot express a mid-turn cancellation).
+ */
+async function cancelRig(model: (payload: unknown) => Promise<unknown>): Promise<CancelRig> {
+  const [kernel, sdk, t02, businessModule] = await Promise.all([
+    loadKernel(),
+    loadSdk(),
+    loadT02(),
+    import(new URL('./fixtures-v010/business-feature-decision-v1.mjs', import.meta.url).href) as Promise<{ getPolicy: () => Record<string, any> }>,
+  ]);
+  const policy = businessModule.getPolicy();
+  const material = policy.featureDecisions.submitFeatureDecision;
+  const rule = policy.rules['rule:fd-approve'];
+  const dispatcher = sdk.createFeatureDecisionDispatcher({
+    decisions: [{
+      declarationDigest: rule.declarationDigest,
+      declarationId: 'rule:fd-approve',
+      featureKey: SEMANTIC_KEY,
+      invoke: t02.resolve,
+      featureRequest: material.featureRequest,
+      outcomeField: material.outcomeField,
+      outcomeEvents: material.outcomeEvents,
+      eventPayloadFromInput: material.eventPayloadFromInput,
+      allowedOutcomes: rule.allowedOutcomes,
+      allowedEventTypes: rule.allowedEventTypes,
+      inputSelection: rule.inputSelection,
+      timeoutMs: material.timeoutMs,
+    }],
+    deps: { model },
+  });
+  const ports = memoryDocs();
+  const kernelSource = await readFile(
+    new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url),
+    'utf8',
+  );
+  const runtime = kernel.createOccurrenceRuntime({
+    moduleIdentity: { packageId: 'v08-kernel-mechanism@1.0.0', moduleSha256: sha256HexSource(kernelSource) },
+    hostPorts: {
+      docs: ports.docs,
+      sha256: { digestUtf8: (value: string) => sha256HexSource(value) },
+      resources: { call: async (_resourceKey: string, _operation: string, payload: unknown) => { ports.effectCalls.push(payload); return { reserved: true }; } },
+      clock: (): string => new Date().toISOString(),
+    },
+    sdkEndpoint: { packageId: 'standard-sdk@v08.1.0.0', interpret: dispatcher.interpret },
+    businessEndpoint: policy,
+  });
+  const target = { workflowId: 'order-quote', instanceKey: 'instance:cancel' };
+  await runtime.openInstance({ target, correlationId: 'corr:f1', authorityClass: 'PRODUCTION' });
+  return {
+    submit: (input, messageId, control) => runtime.submitOccurrence({
+      kind: 'v08/tc-intent', intentType: FD_INTENT, target, messageId, input, caller: { role: 'requester' },
+    }, control),
+    journalBegins: () => runtime.counters.journalBegins as number,
+    effectCount: () => ports.effectCalls.length,
+  };
+}
+
+test('1267-F1: cancelling a bound turn with a hanging Host model terminates CANCELLED, releases the lane, and never adopts the late settlement', { timeout: 15000 }, async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on('unhandledRejection', onUnhandled);
+  let releaseModel: (decision: { disposition: string }) => void = () => {};
+  const modelSettled = new Promise<{ disposition: string }>((resolve) => { releaseModel = resolve; });
+  let modelStarted = 0;
+  const rig = await cancelRig(async () => {
+    modelStarted += 1;
+    return await modelSettled;
+  });
+  try {
+    const controller = new AbortController();
+    const pendingTurn = rig.submit({ amount: 42, requestId: 'R-f1' }, 'msg:f1-cancel', { signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(modelStarted, 1, 'the model fallback started inside the K turn');
+    controller.abort();
+    const receipt = await pendingTurn as Record<string, any>;
+    assert.equal(receipt.status, 'terminated', JSON.stringify(receipt));
+    assert.equal(receipt.terminal.code, 'CANCELLED');
+    assert.equal(receipt.terminal.inFlightTurnDiscarded, true);
+    assert.equal(rig.journalBegins(), 0, 'zero Journal for a cancelled turn');
+    assert.equal(rig.effectCount(), 0, 'zero Effects for a cancelled turn');
+    // The late settlement (a forged decision, after the turn already ended)
+    // is never adopted; it must not surface as an unhandledRejection either.
+    releaseModel({ disposition: 'approved' });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    // The lane is released: a following message on the SAME instance is
+    // processed (the rule path, no model involved).
+    const next = await rig.submit({ amount: 30, requestId: 'R-f1-next' }, 'msg:f1-next') as Record<string, any>;
+    assert.equal(next.status, 'admitted');
+    assert.equal(next.admitted.targetState, 'approved');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(unhandled, [], 'no unhandledRejection from the discarded in-flight turn');
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+});
+
+test('1267-F2: a hanging selected feature on a bound intent ends deadline-exceeded within the bound through a real facade.send; the lane is released', { timeout: 15000 }, async () => {
+  const forgedSource = await readFixture('sfeature-forged-decision-v1.mjs');
+  const forged = await featureEntry({
+    fixture: 'sfeature-validation-v1.mjs', moduleSourceOverride: forgedSource,
+    featureExport: 'resolveSemanticDecision',
+  });
+  const app = await activate(await fdComposition({ featureModule: forged, routes: [boundRoute, boundReviewRoute, plainRoute] }));
+  (globalThis as Record<string, unknown>).__forgedDirective = 'never-settling';
+  try {
+    const started = Date.now();
+    const receipt = await send(app.facade, 'f2-hang', { amount: 42, requestId: 'R-f2' }) as Record<string, any>;
+    const elapsed = Date.now() - started;
+    assert.equal(receipt.status, 'terminated');
+    assert.equal(receipt.terminal.code, 'SEMANTIC_UNAVAILABLE');
+    assert.deepEqual(receipt.resolver.featureDispatch, FEATURE_DISPATCH);
+    assert.ok(elapsed < 1000 + 2000, `the per-turn timeout bounds the facade turn (elapsed ${String(elapsed)}ms)`);
+    assert.equal(journalCount(app.store), 0, 'zero Journal/Effect for the timed-out turn');
+    // The lane is released: the NEXT message on the same instance is processed.
+    (globalThis as Record<string, unknown>).__forgedDirective = 'feature-throws';
+    const next = await send(app.facade, 'f2-hang', { amount: 30, requestId: 'R-f2-next' }) as Record<string, any>;
+    assert.equal(next.status, 'terminated', 'the next turn runs (lane released; this directive is refused, not stuck)');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    delete (globalThis as Record<string, unknown>).__forgedDirective;
+    app.dispose();
+  }
+});
+
+test('1267-F2: two turns at different wall-clock times each get a fresh per-turn deadline', { timeout: 15000 }, async () => {
+  const t02 = await loadT02();
+  let modelCalls = 0;
+  const app = await activate(await fdComposition({ featureModule: t02.entry, routes: [boundRoute, boundReviewRoute, plainRoute] }), {
+    decisionDependencies: { model: async () => { modelCalls += 1; return { disposition: 'approved' }; } },
+  });
+  const first = await send(app.facade, 'f2-a', { amount: 42, requestId: 'R-f2a' }, FD_INTENT, 'msg:f2-a') as Record<string, any>;
+  assert.equal(first.status, 'admitted');
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  const second = await send(app.facade, 'f2-b', { amount: 42, requestId: 'R-f2b' }, FD_INTENT, 'msg:f2-b') as Record<string, any>;
+  assert.equal(second.status, 'admitted', JSON.stringify(second));
+  assert.equal(modelCalls, 2, 'the second turn is NOT pre-expired: its deadline was computed fresh');
+  app.dispose();
+});
+
+test('1267-F2: a missing timeout refuses the wiring typed; an absolute deadlineEpochMs in sealed material is refused at wiring', async () => {
+  const t02 = await loadT02();
+  // Through the REAL composition: the sealed business material without the
+  // mandatory timeoutMs refuses the K turn typed before any admission.
+  const business = await readFixture('business-feature-decision-v1.mjs');
+  const stripped = business.replace(/^(\s*)timeoutMs: 1000,$/gm, '');
+  assert.notEqual(stripped, business, 'the fixture variant must actually drop the timeouts');
+  const app = await fdComposition({ featureModule: t02.entry, routes: [boundRoute, boundReviewRoute, plainRoute] });
+  const businessEntry = app.modules.find((module) => module.role === 'business') as V10ModuleInput & { moduleSource: string };
+  businessEntry.moduleSource = stripped;
+  businessEntry.moduleSha256 = sha256HexSource(stripped);
+  const store = new PlainCasDocStore();
+  const activated = await activateV10App(buildV10App(app), { store, now: () => 0 });
+  await assert.rejects(
+    activated.facade.send({ intentType: FD_INTENT, instanceKey: 'instance:f9', messageId: 'msg:f9', input: { amount: 30, requestId: 'R-f9' } }),
+    errorCode('V10_BUSINESS_POLICY_INVALID'),
+  );
+  activated.dispose();
+  // An absolute deadlineEpochMs in sealed material is meaningless and is
+  // refused at the trusted wiring boundary.
+  const sdk = await loadSdk();
+  assert.throws(() => sdk.createFeatureDecisionDispatcher({
+    decisions: [{
+      declarationDigest: 'f'.repeat(64),
+      declarationId: 'rule:abs',
+      featureKey: SEMANTIC_KEY,
+      invoke: async () => ({ kind: 'selected', source: 'rule', decision: { disposition: 'approved' }, evidence: {} }),
+      featureRequest: { schema: { id: 's', revision: 'r', provenanceKey: 'p' }, limits: { maxSteps: 1, deadlineEpochMs: Date.now() + 60_000 } },
+      outcomeField: 'disposition',
+      outcomeEvents: { approved: 'EV_OK' },
+      eventPayloadFromInput: {},
+      allowedOutcomes: ['approved'],
+      allowedEventTypes: ['EV_OK'],
+      inputSelection: { amount: 'amount' },
+      timeoutMs: 250,
+    }],
+  }), (error: unknown) => typeof error === 'object' && error !== null && (error as { code?: string }).code === 'SDK_DISPATCH_WIRING_INVALID');
+});
+
+test('1267-F3: an inherited-object outcome name resolves to NOTHING — own-property outcome lookup only', async () => {
+  const sdk = await loadSdk();
+  const OUTCOME_FIELD = 'disposition';
+  const hostile = async (outcome: string) => sdk.createFeatureDecisionDispatcher({
+    decisions: [{
+      declarationDigest: '9'.repeat(64),
+      declarationId: 'rule:proto',
+      featureKey: SEMANTIC_KEY,
+      invoke: async () => ({ kind: 'selected', source: 'rule', decision: { [OUTCOME_FIELD]: outcome }, evidence: { modelCallEvidence: 'unmeasured', modelCalls: 0 } }),
+      featureRequest: { schema: { id: 's', revision: 'r', provenanceKey: 'p' } },
+      outcomeField: OUTCOME_FIELD,
+      outcomeEvents: { approved: 'EV_OK' },
+      eventPayloadFromInput: {},
+      allowedOutcomes: ['approved'],
+      allowedEventTypes: ['EV_OK'],
+      inputSelection: { amount: 'amount' },
+      timeoutMs: 250,
+    }],
+  });
+  // `constructor` passes the identifier grammar but must resolve to nothing
+  // (the outcome map is a null-prototype own-property map, never [[Get]]).
+  const constructorResult = await (await hostile('constructor')).interpret(boundDeclaration('9'.repeat(64)), { amount: 1 }) as Record<string, any>;
+  assert.equal(constructorResult.semanticStatus, 'unavailable');
+  assert.equal(constructorResult.unavailable.reason, 'outcome-unmapped');
+  assert.equal(constructorResult.structuredDecision, undefined);
+  assert.equal(JSON.stringify(constructorResult).includes('function'), false, 'no inherited function shape may surface');
+  // `__proto__` is refused by the identifier grammar even earlier.
+  const protoResult = await (await hostile('__proto__')).interpret(boundDeclaration('9'.repeat(64)), { amount: 1 }) as Record<string, any>;
+  assert.equal(protoResult.semanticStatus, 'unavailable');
+  assert.equal(protoResult.unavailable.reason, 'outcome-invalid');
+  assert.equal(protoResult.structuredDecision, undefined);
+});
+

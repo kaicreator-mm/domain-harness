@@ -45,6 +45,10 @@ export async function resolveSemanticDecision(_request, _deps) {
       };
     case 'feature-throws':
       throw Object.assign(new Error('forged feature refused'), { code: 'FORGED_REFUSAL' });
+    case 'never-settling':
+      // Hangs forever, ignoring every limit: only the DISPATCHER's per-turn
+      // deadline/cancellation race can end this K turn.
+      return new Promise(() => {});
     case 'unmapped-outcome':
       // A well-formed selected result whose outcome has no declared event.
       return {

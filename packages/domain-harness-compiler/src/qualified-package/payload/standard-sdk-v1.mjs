@@ -1765,6 +1765,15 @@ const DISPATCH_MAX_DECISIONS = 64;
 const DISPATCH_REASON_MAX_CHARS = 128;
 /** Depth bound of the authority-field scan over one feature result. */
 const DISPATCH_AUTHORITY_SCAN_DEPTH = 32;
+/**
+ * [v0.10 #1267 F2] The per-turn bound-dispatch timeout ceiling (ms), by value.
+ * A bound dispatch is ALWAYS bounded: every entry declares a relative
+ * `timeoutMs` in [1, this ceiling] at the trusted wiring boundary, and the
+ * dispatcher computes the per-turn absolute deadline at each dispatch. An
+ * absolute `deadlineEpochMs` in sealed Business material is meaningless (it
+ * would pre-expire every later turn) and is refused at wiring instead.
+ */
+const DISPATCH_MAX_TIMEOUT_MS = 60_000;
 
 /**
  * Kernel/Host authority fields that must never appear in a feature result —
@@ -1782,7 +1791,7 @@ const DISPATCH_OWNED_AUTHORITY_FIELDS = new Set([
 const DISPATCH_ENTRY_KEYS = new Set([
   'declarationDigest', 'declarationId', 'featureKey', 'invoke',
   'featureRequest', 'outcomeField', 'outcomeEvents', 'eventPayloadFromInput',
-  'allowedOutcomes', 'allowedEventTypes', 'inputSelection',
+  'allowedOutcomes', 'allowedEventTypes', 'inputSelection', 'timeoutMs',
 ]);
 const DISPATCH_WIRING_KEYS = new Set(['decisions', 'deps']);
 const DISPATCH_DEPS_KEYS = new Set(['procedures', 'model', 'tool', 'now', 'createTimeoutSignal']);
@@ -1801,6 +1810,13 @@ function dispatchIdentifier(value, label) {
 function dispatchLimits(value) {
   if (value === undefined) return undefined;
   const limits = record(data(value), 'featureRequest.limits');
+  // [v0.10 #1267 F2] An absolute deadlineEpochMs in SEALED material is
+  // meaningless — it would pre-expire every later turn. The per-turn
+  // deadline is computed at each dispatch from the entry's relative
+  // `timeoutMs` and overrides whatever a sealed material might claim.
+  if (limits.deadlineEpochMs !== undefined) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'featureRequest.limits.deadlineEpochMs is refused in sealed material; the bound dispatch computes the per-turn deadline from the entry timeoutMs');
+  }
   const maxSteps = limits.maxSteps ?? 4;
   const maxModelCalls = limits.maxModelCalls ?? 1;
   const maxToolCalls = limits.maxToolCalls ?? 1;
@@ -1897,6 +1913,13 @@ function dispatchEntry(raw) {
   }
   const featureRequest = dispatchFeatureRequest(raw.featureRequest);
   const outcomeField = dispatchIdentifier(raw.outcomeField, 'dispatch entry outcomeField');
+  // [v0.10 #1267 F2] The relative per-turn dispatch timeout is MANDATORY for
+  // every bound entry: a bound dispatch is always bounded. The absolute
+  // deadline is computed at each dispatch (never sealed).
+  if (!Number.isSafeInteger(raw.timeoutMs) || raw.timeoutMs < 1 || raw.timeoutMs > DISPATCH_MAX_TIMEOUT_MS) {
+    fail('SDK_DISPATCH_WIRING_INVALID', `dispatch entry timeoutMs must be an integer in [1, ${String(DISPATCH_MAX_TIMEOUT_MS)}]; a bound dispatch is always bounded`);
+  }
+  const timeoutMs = raw.timeoutMs;
   const outcomeEvents = record(data(raw.outcomeEvents), 'dispatch entry outcomeEvents');
   const outcomeKeys = Object.keys(outcomeEvents);
   if (outcomeKeys.length === 0 || outcomeKeys.length > SEMANTIC_MAX_LIST) {
@@ -1948,7 +1971,11 @@ function dispatchEntry(raw) {
     invoke: raw.invoke,
     featureRequest,
     outcomeField,
-    outcomeEvents: Object.freeze({ ...outcomeEvents }),
+    timeoutMs,
+    // [v0.10 #1267 F3] Null prototype: an inherited `constructor`/`toString`
+    // outcome can never resolve through [[Get]]; the outcome lookup is
+    // own-property only, by construction.
+    outcomeEvents: Object.freeze(Object.assign(Object.create(null), outcomeEvents)),
     eventPayloadFromInput: Object.freeze({ ...eventPayloadFromInput }),
     allowedOutcomes: Object.freeze([...allowedOutcomes]),
     allowedEventTypes: Object.freeze([...allowedEventTypes]),
@@ -2039,61 +2066,87 @@ export function createFeatureDecisionDispatcher(rawWiring) {
     /**
      * The selected Standard dispatch entry. Synchronous identity resolution
      * first (descriptor-only reads; a hostile or unbound declaration takes
-     * the plain interpreter path unchanged), then the bounded feature
-     * invocation inside ONE isolation guard: every feature-side failure —
-     * throw, hostile value, authority-shaped field, unmapped outcome,
-     * malformed shape, deadline — degrades to the typed zero-effect
-     * unavailable terminal and is never admitted as given.
+     * the plain interpreter path unchanged), then the feature invocation.
+     *
+     * Liveness [#1267 F1/F2]: the adopted feature promise is raced against
+     * BOTH the per-turn dispatch deadline (computed at each dispatch from
+     * the entry's mandatory relative `timeoutMs` — a bound dispatch is
+     * always bounded) AND the Kernel's protected cancellation control
+     * (`{signal}`), so a cancelled turn throws into the Kernel's existing
+     * latch branch (CANCELLED terminal) and a hanging feature can never
+     * hold the instance lane past the timeout. A losing racer is detached
+     * with no-op handlers; a late settlement is never adopted.
+     *
+     * Isolation [#1267 F4]: the feature's promise is ADOPTED (its `then`
+     * runs — it is the selected Standard feature export, trusted Standard
+     * code); the ISOLATION guarantee applies to the settled VALUE, which is
+     * consumed only through the descriptor-safe snapshot (accessors, exotic
+     * prototypes, hostile descriptors, thenable-shaped records, non-finite
+     * values and own `__proto__` keys refuse WITHOUT invoking any getter)
+     * and the authority-field scan. Every feature-side failure — throw,
+     * hostile value, authority-shaped field, unmapped outcome, malformed
+     * shape, deadline — degrades to the typed zero-effect unavailable
+     * terminal and is never admitted as given.
      */
-    async interpret(declaration, rawInput, context, _control) {
-      // `_control` is accepted for endpoint-shape parity with the Kernel's
-      // call; the dispatcher itself never observes cancellation — the
-      // Kernel's own latch owns it around this await.
+    async interpret(declaration, rawInput, context, control) {
       data(context === undefined ? {} : context); // validated but never authority (parity with plain interpret)
       const entry = dispatchEntryFor(declaration);
       if (entry === undefined) {
         // Unbound declaration: the ONE plain interpreter, byte-for-byte.
         return interpret(declaration, rawInput, context);
       }
+      // [#1267 F1] The Kernel's protected cancellation control. An already
+      // aborted signal throws immediately: the Kernel's catch sees
+      // `latch.cancelled` and returns the CANCELLED terminal before any
+      // feature activity is adopted.
+      const signal = dispatchSignalOf(control);
+      if (signal !== undefined && signal.aborted === true) {
+        throw new StandardSdkError('SDK_DISPATCH_CANCELLED', 'the occurrence turn was cancelled before the bound feature started');
+      }
       // Exact input selection first: the feature may read ONLY the declared
       // projection of the occurrence input (hostile input shapes refuse
       // typed here exactly like the plain interpreter).
       const input = data(rawInput);
       const selectedInput = project(entry.inputSelection, input, 'feature decision');
-      const request = { ...entry.featureRequest, input: selectedInput };
-      const deadline = request.limits === undefined ? undefined : request.limits.deadlineEpochMs;
+      // [#1267 F2] The per-turn ABSOLUTE deadline is computed HERE, at each
+      // dispatch, from the entry's mandatory relative timeoutMs, and it
+      // OVERRIDES anything in the request material: T02's own budget logic
+      // races the same deadline and stops its model/tool call.
+      const now = typeof deps.now === 'function' ? deps.now : Date.now;
+      const deadlineEpochMs = now() + entry.timeoutMs;
+      const request = {
+        ...entry.featureRequest,
+        input: selectedInput,
+        limits: { ...(entry.featureRequest.limits ?? {}), deadlineEpochMs },
+      };
+      // [#1267 F1] When the turn carries a cancellation signal, forward it to
+      // the feature's deps through the EXISTING T02 handle ABI
+      // (createTimeoutSignal → { signal, abort }): the signal reaches the
+      // model/tool payload so the Host endpoint can observe the real
+      // request-scoped cancellation. The dispatcher owns no external abort;
+      // `abort` only records the request (the forwarded signal is the real
+      // stop channel).
+      const depsForCall = signal === undefined ? deps : {
+        ...deps,
+        createTimeoutSignal: () => ({ signal, abort: () => {} }),
+      };
       let settled;
       try {
-        const pending = entry.invoke(request, deps);
+        const pending = entry.invoke(request, depsForCall);
         if (pending === null || typeof pending !== 'object' || typeof pending.then !== 'function') {
           // A feature export that does not return a thenable is a contract
           // violation: refuse without consuming the raw value.
           return unavailableResult(entry, 'feature-result-invalid', undefined);
         }
-        if (typeof deadline === 'number' && Number.isFinite(deadline)) {
-          const now = typeof deps.now === 'function' ? deps.now : Date.now;
-          const remainingMs = deadline - now();
-          if (remainingMs <= 0) {
-            discardDispatchThenable(pending);
-            return unavailableResult(entry, 'deadline-exceeded', undefined);
-          }
-          let timer = null;
-          try {
-            settled = await Promise.race([
-              pending,
-              new Promise((_, reject) => {
-                timer = setTimeout(() => reject(new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its declared deadline')), remainingMs);
-              }),
-            ]);
-          } finally {
-            if (timer !== null) clearTimeout(timer);
-          }
-        } else {
-          settled = await pending;
-        }
+        settled = await dispatchWait(pending, { deadlineEpochMs, signal, now });
       } catch (error) {
         if (error instanceof StandardSdkError && error.code === 'SDK_DISPATCH_DEADLINE_EXCEEDED') {
           return unavailableResult(entry, 'deadline-exceeded', undefined);
+        }
+        if (error instanceof StandardSdkError && error.code === 'SDK_DISPATCH_CANCELLED') {
+          // Rethrow: the Kernel's latch branch owns the CANCELLED terminal
+          // (`inFlightTurnDiscarded: true`) and releases the instance lane.
+          throw error;
         }
         // A throwing selected feature (including its own typed authority
         // refusals) is a refused dispatch: typed zero-effect unavailable.
@@ -2180,6 +2233,68 @@ export function createFeatureDecisionDispatcher(rawWiring) {
 /** The feature source carried by an unavailable feature result, when valid. */
 function validDispatchSource(value) {
   return DISPATCH_SOURCES.has(value) ? value : undefined;
+}
+
+/**
+ * [#1267 F1] Extract the Kernel's cancellation signal from the protected
+ * `control` the Kernel passes as the fourth `interpret` argument. Only the
+ * exact latch shape the Kernel itself validates (`{signal}` with a boolean
+ * `aborted` and add/removeEventListener) is honored; anything else degrades
+ * to no-control (the Kernel refuses malformed controls itself before this
+ * seam is ever reached).
+ */
+function dispatchSignalOf(control) {
+  if (control === null || typeof control !== 'object') return undefined;
+  const signal = control.signal;
+  if (signal === null || typeof signal !== 'object'
+    || typeof signal.aborted !== 'boolean'
+    || typeof signal.addEventListener !== 'function'
+    || typeof signal.removeEventListener !== 'function') {
+    return undefined;
+  }
+  return signal;
+}
+
+/**
+ * [#1267 F1/F2] The bounded, cancellable wait over the adopted feature
+ * promise. Racers: the feature itself, the per-turn deadline timer, and —
+ * when the turn carries a cancellation signal — the abort event. The loser
+ * is detached with no-op handlers (its settlement, including a hostile
+ * late resolution, is never adopted and never surfaces as
+ * unhandledRejection); the timer and listener are always cleaned up.
+ */
+async function dispatchWait(pending, { deadlineEpochMs, signal, now }) {
+  const remainingMs = deadlineEpochMs - now();
+  if (!(remainingMs > 0)) {
+    discardDispatchThenable(pending);
+    throw new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its per-turn dispatch timeout');
+  }
+  const racers = [pending];
+  let timer = null;
+  let onAbort = null;
+  let cancelReject = null;
+  racers.push(new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its per-turn dispatch timeout')), remainingMs);
+  }));
+  if (signal !== undefined) {
+    racers.push(new Promise((_, reject) => {
+      cancelReject = reject;
+    }));
+    onAbort = () => cancelReject(new StandardSdkError('SDK_DISPATCH_CANCELLED', 'the occurrence turn was cancelled while the bound feature was pending'));
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+  try {
+    return await Promise.race(racers);
+  } catch (error) {
+    // The feature promise lost the race (deadline or cancellation) or
+    // rejected on its own: detach it either way so no late settlement or
+    // rejection ever surfaces outside this wait.
+    discardDispatchThenable(pending);
+    throw error;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    if (onAbort !== null) signal.removeEventListener('abort', onAbort);
+  }
 }
 
 /**

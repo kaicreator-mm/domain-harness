@@ -12,9 +12,12 @@
     `k02-namespace-two-b-physical.test.ts`, `t10-multib-query-physical.test.ts`
     (`K02_SPLICED_KERNEL_BLOB_SHA1`), `v08-tf-oracle-fr02-fr07.test.ts` (`V08_K_BLOB`).
   - Standard `payload/standard-sdk-v1.mjs`: `9b86835bf12262ef53548e0031550fcecd97a7f2`
-    → `5fb90236acc68d4b6ffadec62dc353972c1834ea` (#1267: `createFeatureDecisionDispatcher`
-    + `DECISION_FEATURE_KEYS` added; plain `interpret` semantics unchanged).
-    Re-pinned witness: `v08-tf-oracle-fr02-fr07.test.ts` (`V08_S_BLOB`).
+    → `8218a7a8c89f46a0f6863eb8c62a6aaf6ff8351f` (#1267: `createFeatureDecisionDispatcher`
+    + `DECISION_FEATURE_KEYS` added; plain `interpret` semantics unchanged)
+    → `773c8d1cb6b39463d51493be5edf7bd1f123d066` (#1267 follow-up 2: the dispatch wait is
+    cancellable through the Kernel's protected control and always bounded by a mandatory
+    relative per-turn `timeoutMs`; null-prototype own-property outcome lookup).
+    Re-pinned witness: `v08-tf-oracle-fr02-fr07.test.ts` (`V08_S_BLOB`, provenance comments).
 
 ## What changed (summary)
 
@@ -39,13 +42,28 @@
   (`decisionDependencies`, analogous to `queryAuthority`; validated typed at activation); absent
   ⇒ no-model mode (rule / exact-reuse / pinned-procedure still work; a model fallback degrades
   to the typed zero-effect `SEMANTIC_UNAVAILABLE` terminal with `unmeasured` evidence).
-- Isolation guard: EVERY feature result is consumed through the sealed payload's
-  descriptor-safe `data()` snapshot — accessors/Proxies/exotic prototypes/thenables/non-finite
-  values/own `__proto__` keys refuse WITHOUT invoking any getter — then scanned (bounded depth)
-  for Kernel/Host authority fields (T02 `OWNED_AUTHORITY_FIELDS` by value). A throwing,
-  lying, unmapped, malformed or deadline-exceeded dispatch degrades to
-  `semanticStatus:'unavailable'`; nothing is awaited beyond the selected feature's own promise,
-  bounded by the declared `limits.deadlineEpochMs` when present (loser detached, never adopted).
+- Liveness and isolation (exact guarantees, follow-up 2):
+  - The feature's returned **promise is adopted** — its `then` runs (it is the selected Standard
+    feature export: trusted Standard code, not a third-party extension). The ISOLATION guarantee
+    applies to the **settled value**: it is consumed only through the descriptor-safe `data()`
+    snapshot (accessors, exotic prototypes, hostile descriptors, thenable-shaped records,
+    non-finite values and own `__proto__` keys refuse WITHOUT invoking any getter) and the
+    bounded authority-field scan. Nothing derived from the settled value is ever awaited.
+  - The wait is **always bounded**: every bound entry declares a mandatory relative `timeoutMs`
+    in [1, 60000] at the trusted wiring boundary (an absolute `deadlineEpochMs` in sealed
+    material is meaningless and is refused at wiring); the dispatcher computes
+    `deadline = now() + timeoutMs` at EACH dispatch, races the feature against it (a loser is
+    detached with no-op handlers; a late settlement is never adopted and never surfaces as
+    unhandledRejection), and passes the same computed deadline into the feature request
+    (`limits.deadlineEpochMs`) so T02's own budget logic stops its model/tool call.
+  - The wait is **cancellable**: the Kernel's protected `control` (`{signal}`) is raced too; a
+    cancelled turn throws into the Kernel's existing latch branch (typed zero-effect `CANCELLED`
+    terminal, `inFlightTurnDiscarded: true`) and the instance lane is released. When the control
+    carries a signal it is forwarded to the feature deps through the EXISTING T02 handle ABI
+    (`createTimeoutSignal → {signal, abort}`) so the Host model/tool endpoint can observe the
+    real request-scoped cancellation; the dispatcher owns no external abort. The Kernel's
+    admission path is unchanged: the dispatcher either returns the exact resolved-record shape
+    the Kernel already admits or throws for cancellation — never a second admission authority.
 - Truthful receipt: `admissionResolverEvidence` carries, additively, the validated
   `featureDispatch { dispatch:'s-primary-feature', featureKey }` next to the decision
   `source` (rule/reuse/procedure/model) and structured `modelCallEvidence`
@@ -87,6 +105,14 @@
   isolation regressions (descriptor-only reads, non-thenable/thenable returns, never-settling
   promise + declared deadline with late settlement never adopted, unbound fall-through, forged
   wiring refusals).
+- Follow-up 2 additions (same file, 24 tests total): F1 KH2-style cancellation rig (real kernel
+  + real dispatcher + real T02, `submitOccurrence(request, control)`) — cancelled bound turn ⇒
+  CANCELLED, zero Journal/Effect, lane released, late settlement never adopted, no
+  unhandledRejection; F2 facade-level hanging-feature turn ⇒ SEMANTIC_UNAVAILABLE
+  `deadline-exceeded` within the bound, lane released; F2 fresh per-turn deadlines (a later turn
+  is not pre-expired); F2 mandatory-`timeoutMs` + absolute-`deadlineEpochMs`-in-material wiring
+  refusals; F3 `constructor`/`__proto__` outcome names resolve to nothing; F4-honest factory
+  rewrites (adoption, settled-value isolation, bounded wait).
 - `tests/assembly/v010-t06-decision-evidence.test.ts` (+4): bound evidence read from the K
   receipt with zero separate calls (poisoned boundary stays at 0), bound measured counts from
   the receipt, bound unavailable terminal, direct path unchanged.
@@ -97,14 +123,14 @@
 
 ## Residual risks
 
-- A hostile forwarding Proxy over genuinely plain data yields a faithful plain snapshot and
-  may admit through the real gates; only descriptor-hostile material (accessors, exotic
-  prototypes, lying/throwing traps) is refused. This is inherent to Proxy undistinguishability
-  and safe: what enters admission is plain JSON captured via descriptors.
-- A bound decision whose material declares NO `deadlineEpochMs` waits unbounded on a hanging
-  selected feature — the same trust level as the Kernel's plain `interpret` await. The declared
-  deadline is the bounded-wait contract (F3 covers the bounded case).
-- The BUILD `featureKey` and the policy `featureDecisions` material are validated at their own
-  seams (BUILD: selection/decision-capability; activation/dispatcher factory: material depth).
-  An App that binds a route but omits the material fails typed at the first K turn (N7),
-  not silently.
+1. A hostile forwarding Proxy over genuinely plain data yields a faithful plain snapshot and
+   may admit through the real gates; only descriptor-hostile material (accessors, exotic
+   prototypes, lying/throwing traps) is refused. This is inherent to Proxy undistinguishability
+   and safe: what enters admission is plain JSON captured via descriptors. Likewise, the
+   adopted feature promise's own `then` runs (trusted selected Standard code); isolation covers
+   the settled value, and the wait is bounded (per-turn timeout) and cancellable (Kernel
+   control).
+2. The BUILD `featureKey` and the policy `featureDecisions` material are validated at their own
+   seams (BUILD: selection/decision-capability; activation/dispatcher factory: material depth).
+   An App that binds a route but omits the material — or the mandatory `timeoutMs` — fails
+   typed at the first K turn (N7 / F2-mandatory), not silently.
