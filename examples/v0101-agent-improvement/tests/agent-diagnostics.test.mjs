@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as actualFeatureNamespace from '../modules/sfeature-agent-diagnostics-v1.mjs';
 import { analyzeAgentRun, FEATURE_KEY, init } from '../modules/sfeature-agent-diagnostics-v1.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -10,6 +11,10 @@ function event(eventId, seq, status, extra = {}) {
 function verifier(verifierRef, status = 'PASS', extra = {}) {
   return { verifierRef, sourceRef: 'github:verifier-1', subjectSha: SHA, status, coverage: 'COMPLETE', ...extra };
 }
+test('v10 activation exact sealed export surface', () => {
+  assert.deepEqual(Object.keys(actualFeatureNamespace).sort(),
+    ['MODULE_ID','PACKAGE_KIND','FEATURE_ABI','FEATURE_KEY','init','analyzeAgentRun'].sort());
+});
 test('selected v10 advisory init return is ABI-conformant', () => {
   const result=init({appId:'app:qualified',audience:'aud:qualified'});
   assert.deepEqual(Object.keys(result).sort(), ['ok','featureKey','observedContext'].sort());
