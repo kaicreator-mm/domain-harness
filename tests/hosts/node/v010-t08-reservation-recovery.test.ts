@@ -157,6 +157,8 @@ interface CraftedReservation {
   readonly input: Record<string, unknown>;
   readonly attemptId: string;
   readonly held: boolean;
+  /** v3 tracked pin: the registered in-flight attempt ids. Absent = pre-v3. */
+  readonly inFlight?: readonly string[];
 }
 
 /**
@@ -196,6 +198,7 @@ async function craftReservedCrashState(
       reservedAt: new Date(T08_NOW).toISOString(),
     },
     ...(crafted.held ? { activeAttempt: { attemptId: crafted.attemptId, holder: 'writer' } } : {}),
+    ...(crafted.inFlight === undefined ? {} : { inFlight: [...crafted.inFlight] }),
   }, doc === null ? { kind: 'create' } : { kind: 'cas', revision: doc.revision });
 }
 
@@ -776,6 +779,91 @@ test('RES12: reservation intent binding rejects a different sealed intent on the
     assert.equal(await activation.recoverReservation(strict), 'ADMITTED');
   } finally {
     activation?.close(); inner.close();
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES13: a lone dynamic Guard denial compensates its pin; the instance accepts the next message', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res13-'));
+  const kPath = join(dir, 'k.sqlite');
+  try {
+    const inner = await openSqliteCasStore({ path: kPath });
+    const store = new T08CountingStore(inner);
+    const appA = await buildReservationApp('t08-reservation-a');
+    const decisionA = t08Decision(appA, 'A', T08_DEPLOYMENT, { buildId: appA.buildId, approvalRef: 'approval:res:a' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decisionA);
+    const activationA = await activateGovernedV10Build(appA, {
+      store, deployment: T08_DEPLOYMENT, decision: decisionA, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const target = { ...activationA.resolveIntentTarget('submitQuoteDecisionDynamic'), instanceKey: 'inst-guard' };
+
+    // amount 75 fails the actual selected Business Guard: a DYNAMIC denial.
+    const denied = await activationA.send(NORMAL_INTENT('inst-guard', 'msg:res:guard:1', 75));
+    assert.equal(denied.status, 'denied');
+    assert.equal((denied.denial as { reason?: unknown }).reason, 'guard', 'precondition: a dynamic Guard denial, not the static role gate');
+    assert.equal(await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target), null,
+      'the last registered in-flight submit concluded non-admitted: nothing can still admit, the pin is compensated');
+
+    const next = await activationA.send(NORMAL_INTENT('inst-guard', 'msg:res:guard:2', 30));
+    assert.equal(next.status, 'admitted', `the instance is not stranded: ${JSON.stringify(next).slice(0, 300)}`);
+    assert.equal((await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target))?.phase, 'ADMITTED');
+    activationA.close();
+    inner.close();
+  } finally {
+    // Best-effort: Windows may keep SQLite WAL handles briefly after close.
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES14: a crashed registered submit blocks compensation until the Host asserts all attempts terminated', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res14-'));
+  const kPath = join(dir, 'k.sqlite');
+  try {
+    const inner = await openSqliteCasStore({ path: kPath });
+    const store = new T08CountingStore(inner);
+    const appA = await buildReservationApp('t08-reservation-a');
+    const decisionA = t08Decision(appA, 'A', T08_DEPLOYMENT, { buildId: appA.buildId, approvalRef: 'approval:res:a' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decisionA);
+    const activationA = await activateGovernedV10Build(appA, {
+      store, deployment: T08_DEPLOYMENT, decision: decisionA, authorization: authority, selection: 'CURRENT', now: () => T08_NOW,
+    });
+    const crashed = NORMAL_INTENT('inst-crash-guard', 'msg:res:crashguard:1', 75);
+    const target = { ...activationA.resolveIntentTarget(crashed.intentType), instanceKey: crashed.instanceKey };
+    await craftReservedCrashState(store, appA, decisionA, target, {
+      messageId: crashed.messageId, intentType: crashed.intentType, input: crashed.input,
+      attemptId: 'dead-owner', held: true, inFlight: ['dead-owner'],
+    });
+
+    // The dead attempt is still registered: a concluded Guard denial of the
+    // retry proves nothing about it, so the pin stays RESERVED.
+    assert.equal((await activationA.send(crashed)).status, 'denied');
+    let pin = await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target);
+    assert.equal(pin?.phase, 'RESERVED', 'a registered (possibly live) submit blocks compensation');
+    assert.deepEqual(pin?.inFlight, ['dead-owner'], 'the retry deregistered itself and nothing else');
+
+    // The slot-only assertion never clears registered submits.
+    assert.equal(await activationA.recoverReservation(crashed, { priorWriterTerminated: true }), 'PENDING');
+    assert.equal((await activationA.send(crashed)).status, 'denied');
+    assert.equal((await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target))?.phase, 'RESERVED',
+      'priorWriterTerminated alone cannot authorize compensation under a registered submit');
+
+    // The Host asserts EVERY registered attempt terminated: the set empties.
+    assert.equal(await activationA.recoverReservation(crashed, { allAttemptsTerminated: true }), 'PENDING');
+    pin = await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target);
+    assert.equal(pin?.phase, 'RESERVED', 'the assertion itself never deletes');
+    assert.deepEqual(pin?.inFlight, [], 'the in-flight set is emptied');
+
+    assert.equal((await activationA.send(crashed)).status, 'denied');
+    assert.equal(await readV10OccurrenceBuildPin(store, T08_DEPLOYMENT, target), null,
+      'the now-last registered submit compensates its concluded denial');
+    const next = await activationA.send(NORMAL_INTENT('inst-crash-guard', 'msg:res:crashguard:2', 30));
+    assert.equal(next.status, 'admitted', 'the instance accepts the next message');
+    activationA.close();
+    inner.close();
+  } finally {
+    // Best-effort: Windows may keep SQLite WAL handles briefly after close.
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 });

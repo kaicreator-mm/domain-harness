@@ -48,6 +48,8 @@ import {
 } from './digest.js';
 
 const MAX_STRING = 512;
+/** Bounded concurrent submits of one RESERVED pin. */
+const MAX_IN_FLIGHT = 64;
 const HEX64 = /^[0-9a-f]{64}$/;
 const ISO_INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 const DECISION_KIND = 'v10/build-activation-decision' as const;
@@ -67,6 +69,8 @@ const PIN_FIELDS = new Set([
   'buildId', 'decisionId', 'approvalRef', 'pinnedAt',
   // v2 (#1219 reservation protocol): phase + ownership + writer fence slot.
   'phase', 'reservation', 'activeAttempt', 'admittedAt',
+  // v3: the set of registered in-flight submits of one RESERVED pin.
+  'inFlight',
 ]);
 const RECORD_FIELDS = new Set([
   'kind', 'decisionId', 'decisionDigest', 'deployedAppId', 'tenantId', 'appId',
@@ -328,6 +332,13 @@ export interface V10OccurrenceBuildPin {
    * submit exists: reclaimers can never delete under it.
    */
   readonly activeAttempt?: { readonly attemptId: string; readonly holder: 'writer' } | null | undefined;
+  /**
+   * Every governed submit (owner or adopter) of this RESERVED pin registers
+   * its attemptId here before entering the Kernel and removes it when its
+   * submit concludes. Absent on older pins, which are never compensated
+   * after a dynamic non-admission (an unregistered submit may be live).
+   */
+  readonly inFlight?: readonly string[] | undefined;
   /** ISO instant of the RESERVED→ADMITTED settlement. */
   readonly admittedAt?: string;
 }
@@ -450,6 +461,7 @@ function assertPinShape(
           : refuse('OCCURRENCE_BUILD_PIN_INVALID', 'a stored occurrence BUILD pin carries an unknown phase');
     let reservation: V10OccurrenceBuildPin['reservation'];
     let activeAttempt: V10OccurrenceBuildPin['activeAttempt'];
+    let inFlight: readonly string[] | undefined;
     let admittedAt: string | undefined;
     if (phase === 'RESERVED') {
       if (!isPlainRecord(value.reservation)) {
@@ -475,7 +487,18 @@ function assertPinShape(
       } else {
         activeAttempt = null;
       }
-    } else if (value.reservation !== undefined || (value.activeAttempt !== undefined && value.activeAttempt !== null)) {
+      if (value.inFlight !== undefined) {
+        if (!Array.isArray(value.inFlight) || value.inFlight.length > MAX_IN_FLIGHT) {
+          refuse('OCCURRENCE_BUILD_PIN_INVALID', 'a RESERVED occurrence BUILD pin carries a malformed in-flight attempt set');
+        }
+        const ids = value.inFlight.map((id: unknown) => bounded(id, 'pin.inFlight[]', 128));
+        if (new Set(ids).size !== ids.length) {
+          refuse('OCCURRENCE_BUILD_PIN_INVALID', 'a RESERVED occurrence BUILD pin repeats an in-flight attempt');
+        }
+        inFlight = Object.freeze(ids);
+      }
+    } else if (value.reservation !== undefined || value.inFlight !== undefined
+      || (value.activeAttempt !== undefined && value.activeAttempt !== null)) {
       refuse('OCCURRENCE_BUILD_PIN_INVALID', 'an ADMITTED occurrence BUILD pin carries no reservation or writer slot');
     } else {
       admittedAt = value.admittedAt === undefined ? undefined : isoInstant(value.admittedAt, 'pin.admittedAt').text;
@@ -485,6 +508,7 @@ function assertPinShape(
       phase,
       ...(reservation !== undefined ? { reservation } : {}),
       ...(activeAttempt !== undefined ? { activeAttempt } : {}),
+      ...(inFlight !== undefined ? { inFlight } : {}),
       ...(admittedAt !== undefined ? { admittedAt } : {}),
     });
   });
@@ -884,17 +908,19 @@ function pinStoreValue(pin: V10OccurrenceBuildPin): Record<string, unknown> {
     ...(pin.phase === undefined ? {} : { phase: pin.phase }),
     ...(pin.reservation === undefined ? {} : { reservation: { ...pin.reservation } }),
     ...(pin.activeAttempt === undefined || pin.activeAttempt === null ? {} : { activeAttempt: { ...pin.activeAttempt } }),
+    ...(pin.inFlight === undefined ? {} : { inFlight: [...pin.inFlight] }),
     ...(pin.admittedAt === undefined ? {} : { admittedAt: pin.admittedAt }),
   };
 }
 
 /**
  * One governed send's reservation bookkeeping. `owner`: this call created or
- * claimed the RESERVED pin's writer slot (it may compensate on a concluded
- * deny). `adopt`: a prior — possibly crashed — attempt holds the slot; the
- * K02 (target, messageId) durable dedup makes continuing the SAME message
- * exactly-once, and an adopter can never reclaim. `admitted`: the pin is
- * already settled; no bookkeeping.
+ * claimed the RESERVED pin's writer slot. `adopt`: a prior — possibly
+ * crashed — attempt holds the slot; K02's (target, messageId) durable dedup
+ * prevents a duplicate committed turn. On a tracked pin both modes are
+ * `registered` in `inFlight` and either may compensate as the last in-flight
+ * submit; only an owner may compensate the fixed caller-role denial.
+ * `admitted`: the pin is already settled; no bookkeeping.
  */
 interface OccurrenceAttempt {
   readonly mode: 'owner' | 'adopt' | 'admitted';
@@ -905,6 +931,8 @@ interface OccurrenceAttempt {
   readonly inputDigest: string;
   readonly attemptId: string;
   readonly revision: number;
+  /** This attempt's id is in the pin's `inFlight` set (tracked pins only). */
+  readonly registered: boolean;
 }
 
 /** Host-owned options of one governed BUILD activation. */
@@ -962,13 +990,25 @@ export interface V10GovernedBuildActivation {
    * (e.g. the single writer process restarted). With no admission witness,
    * it frees the stale slot (exact-revision CAS, never a delete) and still
    * returns `'PENDING'`: the next same-message send then runs as owner.
-   * Only a fixed caller-role denial of an intent-bound reservation can
-   * compensate its pin. Other non-admitted outcomes keep RESERVED because
-   * a concurrent adopter may still admit, even after the slot owner died.
+   * Registered in-flight submits are untouched, so even a false assertion
+   * cannot make a later non-admission delete the pin under a live submit.
+   *
+   * `allAttemptsTerminated: true` is the stronger Host assertion that EVERY
+   * submit ever registered on this reservation has terminated (e.g. all
+   * writer processes restarted). It also empties the in-flight set (and
+   * starts tracking a pre-v3 pin), so the next concluded non-admission of
+   * the reserved message compensates the pin. Its safety rests entirely on
+   * the assertion being true: if a registered submit is in fact still live,
+   * a later compensation may delete the pin before that submit admits.
+   *
+   * Compensation rule: a concluded non-admission (deny/terminated, no
+   * matching witness) deletes the pin only when this attempt was the last
+   * registered in-flight submit, or for the fixed caller-role denial of an
+   * intent-bound reservation (no submit of that intent can ever admit).
    */
   recoverReservation(
     intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>,
-    options?: { readonly priorWriterTerminated?: boolean },
+    options?: { readonly priorWriterTerminated?: boolean; readonly allAttemptsTerminated?: boolean },
   ): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
   close(): void;
 }
@@ -1032,10 +1072,10 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     try {
       receipt = await this.#activation.facade.send(intent);
     } catch (error) {
-      // A thrown failure is never proven pre-write: only the writer slot is
-      // released (so the same-message owner can continue); the RESERVED pin
-      // itself stays fail-closed (#1219 F2 — no blind post-failure delete).
-      await this.#releaseWriterSlot(attempt);
+      // A thrown failure is never proven pre-write: this attempt only
+      // deregisters (slot + in-flight entry); the RESERVED pin itself stays
+      // fail-closed (#1219 F2 — no blind post-failure delete).
+      await this.#concludeAttempt(attempt, null, 'thrown');
       throw error;
     }
     return await this.#settleOccurrenceAttempt(attempt, receipt);
@@ -1043,7 +1083,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
 
   async recoverReservation(
     intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>,
-    options?: { readonly priorWriterTerminated?: boolean },
+    options?: { readonly priorWriterTerminated?: boolean; readonly allAttemptsTerminated?: boolean },
   ): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'> {
     this.#assertOpen();
     const target = this.#targetFor(intent);
@@ -1080,13 +1120,20 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     // nothing (F1 — openInstance durability is not admission), and a
     // possibly-live Kernel writer can never be fenced from here (F2). The
     // RESERVED pin stays; the owner continues the exact reserved messageId.
-    // Only the Host's explicit dead-writer assertion frees a held slot, so a
-    // crashed owner cannot leave adopters unable to compensate a deny.
-    if (options?.priorWriterTerminated === true && doc.value.activeAttempt !== null && doc.value.activeAttempt !== undefined) {
+    // Only the Host's explicit assertions release durable attempt state:
+    // `priorWriterTerminated` frees the writer slot alone (registered
+    // in-flight submits still block compensation, so a false assertion
+    // cannot cause a pin delete); `allAttemptsTerminated` also empties the
+    // in-flight set and is SAFE ONLY IF TRUE — it is the exit for crashed
+    // submits whose stale entries would otherwise block compensation.
+    const clearAll = options?.allAttemptsTerminated === true;
+    const slotHeld = doc.value.activeAttempt !== null && doc.value.activeAttempt !== undefined;
+    const inFlightHeld = doc.value.inFlight === undefined || doc.value.inFlight.length > 0;
+    if ((clearAll && (slotHeld || inFlightHeld)) || (options?.priorWriterTerminated === true && slotHeld)) {
       try {
         await this.#store.put(
           v10OccurrenceBuildPinKey(this.#deployment, target),
-          pinStoreValue({ ...doc.value, activeAttempt: null }),
+          pinStoreValue({ ...doc.value, activeAttempt: null, ...(clearAll ? { inFlight: [] } : {}) }),
           { kind: 'cas', revision: doc.revision },
         );
       } catch (error) {
@@ -1154,10 +1201,11 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
           phase: 'RESERVED',
           reservation: Object.freeze({ messageId, intentType, inputDigest, reservedAt: now }),
           activeAttempt: Object.freeze({ attemptId, holder: 'writer' }),
+          inFlight: Object.freeze([attemptId]),
         });
         try {
           const put = await this.#store.put(v10OccurrenceBuildPinKey(this.#deployment, target), pinStoreValue(reserved), { kind: 'create' });
-          return { mode: 'owner', target, messageId, intentType, intentBound: true, inputDigest, attemptId, revision: put.revision };
+          return { mode: 'owner', target, messageId, intentType, intentBound: true, inputDigest, attemptId, revision: put.revision, registered: true };
         } catch (error) {
           if (!isCasConflict(error)) throw error;
           continue;
@@ -1184,7 +1232,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
         });
       }
       if (pin.phase === 'ADMITTED') {
-        return { mode: 'admitted', target, messageId, intentType, intentBound: false, inputDigest, attemptId, revision: doc.revision };
+        return { mode: 'admitted', target, messageId, intentType, intentBound: false, inputDigest, attemptId, revision: doc.revision, registered: false };
       }
       const reservation = pin.reservation as NonNullable<V10OccurrenceBuildPin['reservation']>;
       if (reservation.messageId !== messageId || reservation.inputDigest !== inputDigest
@@ -1200,25 +1248,39 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
           instanceKey: target.instanceKey,
         });
       }
-      if (pin.activeAttempt === null || pin.activeAttempt === undefined) {
-        try {
-          const claimed = await this.#store.put(
-            v10OccurrenceBuildPinKey(this.#deployment, target),
-            pinStoreValue({ ...pin, activeAttempt: Object.freeze({ attemptId, holder: 'writer' }) }),
-            { kind: 'cas', revision: doc.revision },
-          );
-          return { mode: 'owner', target, messageId, intentType, intentBound: reservation.intentType === intentType, inputDigest, attemptId, revision: claimed.revision };
-        } catch (error) {
-          if (!isCasConflict(error)) throw error;
-          continue;
-        }
+      const intentBound = reservation.intentType === intentType;
+      // Tracked (v3) pins register EVERY submit before it reaches the Kernel;
+      // a pre-v3 pin stays untracked (an unregistered submit may be live).
+      const tracked = pin.inFlight !== undefined;
+      if (tracked && pin.inFlight.length >= MAX_IN_FLIGHT) {
+        refuse('OCCURRENCE_RESERVATION_PENDING', 'too many concurrent submits of this reserved message are in flight', {
+          retryable: true,
+          businessPackageId: target.businessPackageId,
+          workflowId: target.workflowId,
+          instanceKey: target.instanceKey,
+        });
       }
-      // A prior attempt holds the writer slot (a live concurrent submit or a
-      // crashed one — indistinguishable durably). K02's durable
-      // (target, messageId) dedup prevents duplicate committed turns, so a
-      // retry may proceed WITHOUT the slot. Its non-admitted result does
-      // not prove the other evaluation cannot admit; adopters never reclaim.
-      return { mode: 'adopt', target, messageId, intentType, intentBound: reservation.intentType === intentType, inputDigest, attemptId, revision: doc.revision };
+      const inFlight = tracked ? { inFlight: Object.freeze([...pin.inFlight, attemptId]) } : {};
+      const slotFree = pin.activeAttempt === null || pin.activeAttempt === undefined;
+      // A held slot (a live concurrent submit or a crashed one —
+      // indistinguishable durably): K02's durable (target, messageId) dedup
+      // prevents duplicate committed turns, so a retry proceeds as ADOPTER
+      // without the slot. Adopters on an untracked pin cannot be counted and
+      // so never reclaim; on a tracked pin they are registered like owners.
+      if (!slotFree && !tracked) {
+        return { mode: 'adopt', target, messageId, intentType, intentBound, inputDigest, attemptId, revision: doc.revision, registered: false };
+      }
+      try {
+        const joined = await this.#store.put(
+          v10OccurrenceBuildPinKey(this.#deployment, target),
+          pinStoreValue({ ...pin, ...inFlight, ...(slotFree ? { activeAttempt: Object.freeze({ attemptId, holder: 'writer' }) } : {}) }),
+          { kind: 'cas', revision: doc.revision },
+        );
+        return { mode: slotFree ? 'owner' : 'adopt', target, messageId, intentType, intentBound, inputDigest, attemptId, revision: joined.revision, registered: tracked };
+      } catch (error) {
+        if (!isCasConflict(error)) throw error;
+        continue;
+      }
     }
     refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the occurrence reservation kept changing under concurrent writers; nothing was deleted (fail-closed)');
   }
@@ -1232,7 +1294,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     }
     if (status === 'UNKNOWN') {
       // The Kernel's own honest UNKNOWN: never a delete, never a retry.
-      await this.#releaseWriterSlot(attempt);
+      await this.#concludeAttempt(attempt, null, status);
       return receipt;
     }
     // A concluded non-admitted receipt (deny / terminated): the Kernel's
@@ -1244,20 +1306,19 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
       refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the Kernel durably admitted this reservation while returning a non-admitted receipt; the pin is settled ADMITTED and the caller reconciles through the original messageId', { receiptStatus: status });
     }
     const denial = isPlainRecord(receipt.denial) ? receipt.denial : null;
-    if (attempt.mode === 'owner' && attempt.intentBound && status === 'denied'
+    // This selected Kernel gate depends only on the sealed intent's roles
+    // and the facade's fixed caller role, BEFORE interpretation/admission:
+    // every submit of the bound intent fails it, including live adopters.
+    // Legacy pins lack intent binding and cannot establish this proof.
+    const callerRoleDenial = attempt.mode === 'owner' && attempt.intentBound && status === 'denied'
       && denial?.reason === 'business-caller-role'
       && denial.deniedBy === attempt.target.businessPackageId
-      && denial.intentType === attempt.intentType && denial.callerRole === V10_KERNEL_CALLER_ROLE) {
-      // This selected Kernel gate depends only on the sealed intent's roles
-      // and the facade's fixed caller role, BEFORE interpretation/admission.
-      // All submits of the bound intent fail that same gate, including live
-      // adopters. A turnId alone proves no such thing for dynamic denials or
-      // terminated evaluations: those outcomes may race an admitting submit.
-      // Legacy pins lack intent binding and cannot establish this proof.
-      await this.#reclaimReservation(attempt, status);
-    } else {
-      await this.#releaseWriterSlot(attempt);
-    }
+      && denial.intentType === attempt.intentType && denial.callerRole === V10_KERNEL_CALLER_ROLE;
+    // A dynamic deny or `terminated` result proves only that THIS evaluation
+    // did not admit; another registered submit may still admit. So it
+    // compensates only as the last registered in-flight submit (#concludeAttempt).
+    const concluded = status === 'denied' || status === 'terminated';
+    await this.#concludeAttempt(attempt, concluded ? { despiteOthers: callerRoleDenial } : null, status);
     return receipt;
   }
 
@@ -1278,6 +1339,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
           phase: 'ADMITTED',
           reservation: undefined,
           activeAttempt: undefined,
+          inFlight: undefined,
           admittedAt: new Date(this.#now()).toISOString(),
         };
         await this.#store.put(v10OccurrenceBuildPinKey(this.#deployment, target), pinStoreValue(admitted), { kind: 'cas', revision: doc.revision });
@@ -1290,52 +1352,78 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the RESERVED pin kept changing while its ADMITTED settlement was committing (fail-closed)');
   }
 
-  /** Release this attempt's writer slot (owner mode only; never deletes). */
-  async #releaseWriterSlot(attempt: OccurrenceAttempt): Promise<void> {
-    if (attempt.mode !== 'owner') return;
-    const doc = await this.#readPinDoc(attempt.target);
-    if (doc === null || doc.value.phase !== 'RESERVED' || !pinMatches(doc.value, this.#build)) return;
-    if (doc.value.activeAttempt === null || doc.value.activeAttempt === undefined
-      || doc.value.activeAttempt.attemptId !== attempt.attemptId) return;
-    try {
-      await this.#store.put(
-        v10OccurrenceBuildPinKey(this.#deployment, attempt.target),
-        pinStoreValue({ ...doc.value, activeAttempt: null }),
-        { kind: 'cas', revision: doc.revision },
-      );
-    } catch {
-      // Fail-closed: a stale held slot only blocks fresh owner claims; the
-      // same-message adopt path and witness-based recovery still work.
+  /**
+   * Conclude one submit against its RESERVED pin in ONE exact-revision write:
+   * deregister this attempt (in-flight entry + its own writer slot) and —
+   * when `compensate` is given — delete the pin instead if no admission can
+   * follow. Deletion is legal only (a) for the fixed caller-role denial
+   * (`despiteOthers`), or (b) when this registered attempt is the LAST
+   * in-flight submit of a tracked pin with no foreign slot holder: every
+   * other submit already concluded (or was declared terminated by the Host),
+   * so nothing can still admit. The exact revision fences a concurrent
+   * registration. Any doubt keeps the pin; a lost compensation race refuses
+   * typed INDETERMINATE — never a silent delete or fake success.
+   */
+  async #concludeAttempt(
+    attempt: OccurrenceAttempt,
+    compensate: { readonly despiteOthers: boolean } | null,
+    receiptStatus: string,
+  ): Promise<void> {
+    if (attempt.mode === 'admitted') return;
+    const key = v10OccurrenceBuildPinKey(this.#deployment, attempt.target);
+    for (let round = 0; round < 5; round += 1) {
+      const doc = await this.#readPinDoc(attempt.target);
+      if (doc === null || doc.value.phase !== 'RESERVED' || !pinMatches(doc.value, this.#build)) return;
+      const pin = doc.value;
+      const others = pin.inFlight === undefined ? undefined : pin.inFlight.filter((id) => id !== attempt.attemptId);
+      const ownSlot = pin.activeAttempt?.attemptId === attempt.attemptId;
+      const foreignSlot = !ownSlot && pin.activeAttempt !== null && pin.activeAttempt !== undefined;
+      const lastInFlight = attempt.registered && others !== undefined && others.length === 0 && !foreignSlot;
+      if (compensate !== null && (compensate.despiteOthers || lastInFlight)) {
+        if (this.#store.remove === undefined) {
+          // Best-effort deregistration; a lost race only leaves a stale
+          // entry (fail-closed). The typed refusal below is the outcome.
+          await this.#writeDeregistered(key, pin, doc.revision, others, ownSlot).catch(() => {});
+          refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the physical store exposes no conditional remove seam; the RESERVED pin is retained fail-closed and the non-admitted receipt must be reconciled through the same messageId', { receiptStatus });
+        }
+        try {
+          await this.#store.remove(key, { kind: 'cas', revision: doc.revision });
+          return;
+        } catch (error) {
+          if (!isCasConflict(error)) throw error;
+          continue;
+        }
+      }
+      if (!ownSlot && (others === undefined || others.length === (pin.inFlight as readonly string[]).length)) return;
+      try {
+        await this.#writeDeregistered(key, pin, doc.revision, others, ownSlot);
+        return;
+      } catch (error) {
+        if (!isCasConflict(error)) throw error;
+        continue;
+      }
     }
+    if (compensate !== null) {
+      const doc = await this.#readPinDoc(attempt.target);
+      if (doc !== null && pinMatches(doc.value, this.#build) && doc.value.phase === 'ADMITTED') return;
+      refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the guarded reservation compensation kept losing its exact-revision race; the pin is retained fail-closed (never a silent delete)', { receiptStatus });
+    }
+    // Deregistration only: a stale entry merely blocks later compensation
+    // (fail-closed); the Host's allAttemptsTerminated assertion clears it.
   }
 
-  /**
-   * The single guarded reservation release: an exact-revision conditional
-   * delete of this attempt's OWN RESERVED pin, legal only because the
-   * exact intent binding plus the fixed caller-role gate prove no submit
-   * of this reservation can admit. The slot alone is not a submit fence.
-   * Any doubt keeps the pin and surfaces a
-   * typed UNKNOWN-class refusal — never a silent or fake success.
-   */
-  async #reclaimReservation(attempt: OccurrenceAttempt, receiptStatus: string): Promise<void> {
-    if (this.#store.remove === undefined) {
-      refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the physical store exposes no conditional remove seam; the RESERVED pin is retained fail-closed and the deny receipt must be reconciled through the same messageId', { receiptStatus });
-    }
-    try {
-      await this.#store.remove(
-        v10OccurrenceBuildPinKey(this.#deployment, attempt.target),
-        { kind: 'cas', revision: attempt.revision },
-      );
-      return;
-    } catch (error) {
-      if (!isCasConflict(error)) throw error;
-      const doc = await this.#readPinDoc(attempt.target);
-      if (doc !== null && pinMatches(doc.value, this.#build) && doc.value.phase === 'ADMITTED') {
-        // The admission won the race and healed the pin first — not an error.
-        return;
-      }
-      refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the guarded reservation compensation lost its exact-revision race; the pin is retained fail-closed (never a silent delete)', { receiptStatus });
-    }
+  async #writeDeregistered(
+    key: string,
+    pin: V10OccurrenceBuildPin,
+    revision: number,
+    others: readonly string[] | undefined,
+    ownSlot: boolean,
+  ): Promise<void> {
+    await this.#store.put(key, pinStoreValue({
+      ...pin,
+      ...(others === undefined ? {} : { inFlight: Object.freeze([...others]) }),
+      ...(ownSlot ? { activeAttempt: null } : {}),
+    }), { kind: 'cas', revision });
   }
 
   /**

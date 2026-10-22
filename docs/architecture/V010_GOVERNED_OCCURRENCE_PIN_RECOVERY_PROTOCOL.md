@@ -30,6 +30,7 @@ The occurrence→BUILD pin (`v10-occ-pin:<...>`) gains, additively:
 phase:        'RESERVED' | 'ADMITTED'      # absent on pre-v2 pins ⇒ ADMITTED
 reservation:  { messageId, intentType?, inputDigest, reservedAt }   # iff RESERVED
 activeAttempt:{ attemptId, holder:'writer' } | null     # iff RESERVED (slot)
+inFlight:     [attemptId, ...]               # iff RESERVED; absent ⇒ untracked (pre-v3)
 admittedAt:   ISO instant                    # set on RESERVED→ADMITTED
 ```
 
@@ -63,6 +64,14 @@ The slot is an owner marker, **not a fence over all Kernel submits**.
   fresh owner claims are impossible until the holder concludes (or a witness
   heals the pin to ADMITTED). This is honest UNKNOWN, not a leak of the
   redirect guard.
+- **In-flight registration (v3).** Every submit of a tracked pin — owner
+  *and* adopter — adds its attemptId to `inFlight` by exact-revision CAS
+  BEFORE reaching the Kernel, and removes it when its submit concludes
+  (admitted settlement drops the whole set). The set, not the slot, is the
+  fence over Kernel submits: a submit that can still admit is always in it,
+  unless its process crashed (a stale entry, which only blocks compensation).
+  Pre-v3 pins (no `inFlight`) stay untracked; their adopters cannot be
+  counted, so they never authorize a dynamic compensation.
 
 ## 3. Admission witness (correction (c)/(e))
 
@@ -118,12 +127,20 @@ exist without a real admission — a crash between `openInstance` and
        retains the pin and refuses typed INDETERMINATE; a store without the
        conditional-remove seam refuses typed INDETERMINATE and retains the
        pin (fail-closed, never a fake success);
-     - all other non-admitted outcomes (including `terminated`, dynamic
-       Guard/schema/policy denial, legacy reservations without intent binding,
-       and `adopt` mode) → keep RESERVED; release only this attempt's slot if
-       it owns one. Another evaluation may still admit, so no delete is safe.
-   - **thrown** failures → release slot, keep RESERVED, rethrow. A throw is
-     never proven pre-write; no delete ever happens on this path.
+     - witness absent, any other concluded non-admission (`terminated`,
+       dynamic Guard/schema/policy denial), owner or adopter: **last
+       in-flight compensation** — if this registered attempt is the ONLY
+       entry of a tracked pin's `inFlight` set and no foreign slot holder
+       exists, the pin is removed by exact-revision CAS. Every other submit
+       has concluded (or was declared terminated by the Host), so no
+       evaluation remains that could still admit; the exact revision fences a
+       concurrent registration. Otherwise the attempt only deregisters and the
+       pin stays RESERVED: another registered evaluation may still admit
+       (RES9), and it settles or compensates when IT concludes (RES13).
+       Untracked (pre-v3) pins never compensate on this path.
+   - **thrown** failures → deregister (slot + in-flight entry), keep
+     RESERVED, rethrow. A throw is never proven pre-write; no delete ever
+     happens on this path.
 
 `recoverReservation(intent)` (any live activation of the owning BUILD):
 `ABSENT` | `ADMITTED` (directly, or healed from RESERVED via a matching
@@ -143,7 +160,19 @@ can then compensate the pin (RES8); other results keep RESERVED. The Host
 must establish the prior slot holder's death rather than infer it from age.
 Even a false assertion, or a live adopter left after that holder died, must
 not allow a dynamic non-admission to delete the pin of a submit that can
-still admit (RES9). Slot release does not cancel or fence those submits.
+still admit (RES9): slot release leaves every `inFlight` entry in place.
+
+`recoverReservation(intent, { allAttemptsTerminated: true })` is the exit for
+**crashed registered submits**, whose stale `inFlight` entries would
+otherwise block compensation forever. It is the Host's stronger assertion
+that EVERY attempt ever registered on this reservation has terminated (e.g.
+all writer processes restarted). It empties `inFlight` and the slot by
+exact-revision CAS (a pre-v3 pin becomes tracked), never deletes, and
+returns `PENDING`; the next concluded non-admission of the reserved message
+then compensates as the last in-flight submit (RES14). **Its safety rests
+entirely on the assertion being true**: if a registered submit is in fact
+still live, a later compensation may delete the pin before that submit
+admits — the exact P1 interleaving the in-flight set otherwise prevents.
 
 `OCCURRENCE_RESERVATION_PENDING` refusals of `send` (different message, or
 another BUILD, under an unresolved RESERVED pin), and foreign-BUILD refusals
@@ -161,16 +190,20 @@ conflict and carries `retryable: false`.
   leaves the pin RESERVED with a held slot until resolved. No
   protocol-visible (time-based) takeover exists; resolution is the owner
   re-sending the exact reserved messageId (K02 replay is idempotent), the
-  Host's explicit `priorWriterTerminated` slot release (§4), or a future Product
+  Host's explicit `priorWriterTerminated` slot release or
+  `allAttemptsTerminated` in-flight reset (§4), or a future Product
   amendment introducing a store-level transaction covering reservation
   release and admission impossibility in ONE physical transaction.
 - Pre-v2 pins normalize to ADMITTED: the historical orphan window stays
   pinned (conservative, auditable via `readPin`).
-- Dynamic non-admission without a durable witness deliberately retains its
-  RESERVED BUILD pin. A same-message retry can later admit or heal; it cannot
-  free the instanceKey for a different message/BUILD merely because one
-  evaluation denied or terminated. Old unbound-intent pins likewise cannot
-  be compensated; no intent is inferred or migrated from a retry.
+- A dynamic non-admission retains the RESERVED pin while any OTHER
+  registered submit remains in flight; the last one to conclude compensates
+  (or settles ADMITTED). A crashed registered submit therefore blocks
+  compensation until the Host's `allAttemptsTerminated` assertion. Pre-v3
+  (untracked) pins and old unbound-intent pins cannot be compensated after a
+  dynamic non-admission; no intent is inferred or migrated from a retry.
+- `allAttemptsTerminated` is trusted Host input: a false assertion forfeits
+  the no-orphan-admission guarantee for that occurrence (see §4).
 - Legacy compiler-digest RESERVED pins whose canonical bytes differ from
   the Kernel's cannot heal or resend through these APIs. Slot release never
   changes their digest. See the post-release compatibility notes §3.
@@ -213,5 +246,11 @@ conflict and carries `retryable: false`.
 8d. Legacy compiler-digest mismatch stays RESERVED across exact resend and
    Host release (RES10); an old pin without intent binding cannot compensate
    a role denial (RES11).
+8e. A lone dynamic Guard denial (the last in-flight submit) compensates its
+   pin, and the same BUILD then admits a different message on that instance
+   (RES13).
+8f. A crashed registered submit keeps a retry's Guard denial RESERVED, even
+   after `priorWriterTerminated`; after `allAttemptsTerminated` the next
+   denial compensates and the instance admits a new message (RES14).
 8. Regressions: the T08 governed trio (activation/decision/pinned-restore),
    T00/C01 assembly witnesses and the packed consumers stay green.

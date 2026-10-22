@@ -136,6 +136,13 @@ export interface V10OccurrenceBuildPin {
         readonly attemptId: string;
         readonly holder: 'writer';
     } | null | undefined;
+    /**
+     * Every governed submit (owner or adopter) of this RESERVED pin registers
+     * its attemptId here before entering the Kernel and removes it when its
+     * submit concludes. Absent on older pins, which are never compensated
+     * after a dynamic non-admission (an unregistered submit may be live).
+     */
+    readonly inFlight?: readonly string[] | undefined;
     /** ISO instant of the RESERVED→ADMITTED settlement. */
     readonly admittedAt?: string;
 }
@@ -227,12 +234,25 @@ export interface V10GovernedBuildActivation {
      * (e.g. the single writer process restarted). With no admission witness,
      * it frees the stale slot (exact-revision CAS, never a delete) and still
      * returns `'PENDING'`: the next same-message send then runs as owner.
-     * Only a fixed caller-role denial of an intent-bound reservation can
-     * compensate its pin. Other non-admitted outcomes keep RESERVED because
-     * a concurrent adopter may still admit, even after the slot owner died.
+     * Registered in-flight submits are untouched, so even a false assertion
+     * cannot make a later non-admission delete the pin under a live submit.
+     *
+     * `allAttemptsTerminated: true` is the stronger Host assertion that EVERY
+     * submit ever registered on this reservation has terminated (e.g. all
+     * writer processes restarted). It also empties the in-flight set (and
+     * starts tracking a pre-v3 pin), so the next concluded non-admission of
+     * the reserved message compensates the pin. Its safety rests entirely on
+     * the assertion being true: if a registered submit is in fact still live,
+     * a later compensation may delete the pin before that submit admits.
+     *
+     * Compensation rule: a concluded non-admission (deny/terminated, no
+     * matching witness) deletes the pin only when this attempt was the last
+     * registered in-flight submit, or for the fixed caller-role denial of an
+     * intent-bound reservation (no submit of that intent can ever admit).
      */
     recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>, options?: {
         readonly priorWriterTerminated?: boolean;
+        readonly allAttemptsTerminated?: boolean;
     }): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
     close(): void;
 }
