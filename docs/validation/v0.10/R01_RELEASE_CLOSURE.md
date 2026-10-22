@@ -49,3 +49,5 @@ The true Windows Node24.21.0, native SQLite file-backed R01-R3 execution on exac
 - **RELEASE_QUALIFIED=YES** for the production candidate `936749c4f7e334376d600383d8635986d48882f0`; proceed to exact-head evidence-only PR #1202 independent final review/CI, merge that docs-only PR to `v0.10`, compare no source/packaging drift, and create a final `v0.10 → main` PR. Do not insert owner/GitHub-account identity gate. One concern one PR. No tag/release unless requested.
 
 Prior R3 candidate report/closure remains preserved under `R01_PRE_G29_CANDIDATE_fed515be.md`; older negative candidates remain archived.
+
+> **Post-R01 additive note (#1266):** [T01_CLOSURE_LEDGER.md](T01_CLOSURE_LEDGER.md) records, per routed T01 row, whether the owning v0.10 Task closed it, source-inspected at a later HEAD (`53bef033`). It **post-dates this R01 qualification, is not part of its qualification, and does not amend its verdict**; any change it motivates requires its own Product disposition and evidence.
