@@ -3993,13 +3993,6 @@ function isPlainAdvisoryRecord(value) {
   return proto === Object.prototype || proto === null;
 }
 
-/** A result the Primary must never await: consultation stays synchronous. */
-function isThenable(value) {
-  return value !== null
-    && (typeof value === 'object' || typeof value === 'function')
-    && typeof value.then === 'function';
-}
-
 /**
  * Detach a discarded advisory thenable: the Primary never awaits it, and the
  * no-op handlers prevent its eventual fulfillment/rejection from surfacing
@@ -4014,6 +4007,78 @@ function discardThenable(thenable) {
   } catch {
     // a broken `then` is the advisory module's defect, not the Primary's
   }
+}
+
+/** Bounded recursion depth of one advisory-result data snapshot. */
+const ADVISORY_RESULT_MAX_DEPTH = 8;
+/** Sentinel: the inspected value is not advisory plain data. */
+const ADVISORY_REFUSED = Symbol('advisory-result-refused');
+
+/**
+ * [v0.10 #1264 F1] Descriptor-safe plain-data snapshot of one advisory
+ * result. Accepts ONLY ordinary objects/arrays (Object/Array prototype or
+ * null) whose own enumerable properties are ALL ordinary data properties
+ * holding finite JSON values, recursively and depth-bounded. Accessors,
+ * exotic prototypes, functions/symbols and non-finite numbers refuse the
+ * WHOLE result — without invoking any getter, so a throwing getter or a
+ * hostile Proxy trap can never leak into the Primary. Every reflective
+ * operation here can still throw on a hostile Proxy; the caller must run
+ * this inside its isolation guard and treat any throw as a refused result.
+ * Returns ADVISORY_REFUSED for a refused result.
+ */
+function advisoryDataSnapshot(value, depth) {
+  if (value === null) return null;
+  const valueType = typeof value;
+  if (valueType === 'string' || valueType === 'boolean') return value;
+  if (valueType === 'number') return Number.isFinite(value) ? value : ADVISORY_REFUSED;
+  if (valueType !== 'object') return ADVISORY_REFUSED;
+  if (depth >= ADVISORY_RESULT_MAX_DEPTH) return ADVISORY_REFUSED;
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== Array.prototype && proto !== null) {
+    return ADVISORY_REFUSED;
+  }
+  if (Array.isArray(value)) {
+    const entries = [];
+    for (let index = 0; index < value.length; index += 1) {
+      const key = String(index);
+      if (!hasOwn(value, key)) return ADVISORY_REFUSED;
+      // [v0.10 #1264 F4] Elements are read ONLY through their own data
+      // descriptor: an accessor element is refused WITHOUT ever invoking its
+      // getter (a plain `value[index]` read would fire it).
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+        return ADVISORY_REFUSED;
+      }
+      const entry = advisoryDataSnapshot(descriptor.value, depth + 1);
+      if (entry === ADVISORY_REFUSED) return ADVISORY_REFUSED;
+      entries.push(entry);
+    }
+    // Extra non-index own properties are outside the array's snapshot shape
+    // and refuse the result instead of being silently dropped.
+    for (const key of Object.keys(value)) {
+      const index = Number(key);
+      if (!(Number.isSafeInteger(index) && index >= 0 && index < value.length && String(index) === key)) {
+        return ADVISORY_REFUSED;
+      }
+    }
+    return entries;
+  }
+  const record = {};
+  for (const key of Object.keys(value)) {
+    // [v0.10 #1264 F4] An own `__proto__` key (reachable via JSON.parse or
+    // defineProperty) would reshape this snapshot's prototype through a
+    // plain assignment, so it refuses the result outright; the snapshot
+    // stays an ordinary object with no inherited-field exposure.
+    if (key === '__proto__') return ADVISORY_REFUSED;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+      return ADVISORY_REFUSED;
+    }
+    const entry = advisoryDataSnapshot(descriptor.value, depth + 1);
+    if (entry === ADVISORY_REFUSED) return ADVISORY_REFUSED;
+    record[key] = entry;
+  }
+  return record;
 }
 
 /**
@@ -4805,7 +4870,11 @@ async function runModelContinuation(run) {
     modelCallEvidence: aggregateModelCallEvidence(stepEvidence, inFlightTurnDiscarded),
     continuation: {
       maxSteps: policy.maxSteps,
-      turnMaxSteps: maxSteps,
+      // [v0.10 #1264 F3] New budget diagnostics ride the receipt ONLY when a
+      // BUILD hardBudget is wired or honored advice actually tightened the
+      // bound. The legacy path (no hardBudget, no advice) keeps receipts
+      // byte-identical to the pre-#1264 shape.
+      ...(run.budgetDiagnostic === true ? { turnMaxSteps: maxSteps } : {}),
       steps,
       queries,
       dependencies: dependencies.map((dependency) => ({ ...dependency })),
@@ -4952,6 +5021,7 @@ export function createOccurrenceRuntime(options) {
       }
     }
   }
+  const hardBudgetWired = hardBudget !== undefined;
   const hardLimits = Object.freeze({
     maxSteps: Math.min(MAX_FR07_STEPS, hardBudget === undefined ? MAX_FR07_STEPS : hardBudget.maxStepsPerTurn),
     maxWorkUnits: hardBudget === undefined
@@ -6151,43 +6221,57 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return turnBudget;
     }
-    if (isThenable(result)) {
-      // Never awaited, never applied; the discarded promise's eventual
-      // outcome is detached so it cannot surface as an unhandled rejection.
-      discardThenable(result);
-      counters.advisoryRejected += 1;
-      return turnBudget;
-    }
-    if (!isPlainAdvisoryRecord(result)) {
-      counters.advisoryRejected += 1;
-      return turnBudget;
-    }
-    for (const field of Object.keys(result)) {
-      if (!BUDGET_ADVICE_FIELDS.has(field)) {
-        // Smuggled authority-shaped or unknown fields void the whole advice.
+    // [v0.10 #1264 F1] The ENTIRE result handling — thenable detection,
+    // prototype/accessor classification, field checks and normalization —
+    // runs inside ONE guard that cannot leak into the Primary: the hook
+    // result is consumed only through the descriptor-safe snapshot (never a
+    // getter invocation), and any escape (throwing `then` getter, hostile
+    // Proxy trap, broken descriptor shape) is a refused result: dropped,
+    // counted, and the budget falls back to the Kernel's own limits.
+    try {
+      const then = typeof result === 'object' || typeof result === 'function' ? result.then : undefined;
+      if (typeof then === 'function') {
+        // Never awaited, never applied; the discarded promise's eventual
+        // outcome is detached so it cannot surface as an unhandled rejection.
+        discardThenable(result);
         counters.advisoryRejected += 1;
         return turnBudget;
       }
-    }
-    const advice = {};
-    for (const field of BUDGET_ADVICE_FIELDS) {
-      const value = result[field];
-      if (value === undefined) continue;
-      if (!Number.isSafeInteger(value) || value < 1 || value > ADVISORY_ADVICE_VALUE_CEILING) {
-        // Malformed / non-integer / ≤0 / oversize advice is never applied.
+      const snapshot = advisoryDataSnapshot(result, 0);
+      if (snapshot === ADVISORY_REFUSED || !isJsonRecord(snapshot) || !isPlainAdvisoryRecord(snapshot)) {
         counters.advisoryRejected += 1;
         return turnBudget;
       }
-      advice[field] = value;
+      for (const field of Object.keys(snapshot)) {
+        if (!BUDGET_ADVICE_FIELDS.has(field)) {
+          // Smuggled authority-shaped or unknown fields void the whole advice.
+          counters.advisoryRejected += 1;
+          return turnBudget;
+        }
+      }
+      const advice = {};
+      for (const field of BUDGET_ADVICE_FIELDS) {
+        const value = snapshot[field];
+        if (value === undefined) continue;
+        if (!Number.isSafeInteger(value) || value < 1 || value > ADVISORY_ADVICE_VALUE_CEILING) {
+          // Malformed / non-integer / ≤0 / oversize advice is never applied.
+          counters.advisoryRejected += 1;
+          return turnBudget;
+        }
+        advice[field] = value;
+      }
+      const clamped = {
+        maxSteps: advice.maxSteps === undefined ? turnBudget.maxSteps : Math.min(turnBudget.maxSteps, advice.maxSteps),
+        maxWorkUnits: advice.maxWorkUnits === undefined ? turnBudget.maxWorkUnits : Math.min(turnBudget.maxWorkUnits, advice.maxWorkUnits),
+      };
+      if (clamped.maxSteps !== turnBudget.maxSteps || clamped.maxWorkUnits !== turnBudget.maxWorkUnits) {
+        counters.budgetAdviceClamps += 1;
+      }
+      return Object.freeze(clamped);
+    } catch {
+      counters.advisoryRejected += 1;
+      return turnBudget;
     }
-    const clamped = {
-      maxSteps: advice.maxSteps === undefined ? turnBudget.maxSteps : Math.min(turnBudget.maxSteps, advice.maxSteps),
-      maxWorkUnits: advice.maxWorkUnits === undefined ? turnBudget.maxWorkUnits : Math.min(turnBudget.maxWorkUnits, advice.maxWorkUnits),
-    };
-    if (clamped.maxSteps !== turnBudget.maxSteps || clamped.maxWorkUnits !== turnBudget.maxWorkUnits) {
-      counters.budgetAdviceClamps += 1;
-    }
-    return Object.freeze(clamped);
   }
 
   /**
@@ -6216,35 +6300,51 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return;
     }
-    if (isThenable(result)) {
-      discardThenable(result);
-      counters.advisoryRejected += 1;
-      return;
-    }
-    if (!isPlainAdvisoryRecord(result)) {
-      counters.advisoryRejected += 1;
-      return;
-    }
-    let encoded;
+    // [v0.10 #1264 F1] The ENTIRE result handling runs inside one guard that
+    // cannot leak: classification, thenable detection and detaching, and the
+    // descriptor-safe snapshot (never a getter invocation). A fault here —
+    // including AFTER an already-committed turn — is a dropped, counted
+    // result that never affects the decided receipt.
     try {
-      encoded = canonicalJsonStringify(result);
+      const then = typeof result === 'object' || typeof result === 'function' ? result.then : undefined;
+      if (typeof then === 'function') {
+        discardThenable(result);
+        counters.advisoryRejected += 1;
+        return;
+      }
+      const snapshot = advisoryDataSnapshot(result, 0);
+      if (snapshot === ADVISORY_REFUSED || !isJsonRecord(snapshot) || !isPlainAdvisoryRecord(snapshot)) {
+        counters.advisoryRejected += 1;
+        return;
+      }
+      const encoded = canonicalJsonStringify(snapshot);
+      if (encoded.length > ADVISORY_OBSERVATION_MAX_CHARS) {
+        counters.advisoryRejected += 1;
+        return;
+      }
+      // Separate observation record on the existing sink; observer failures
+      // stay swallowed exactly like receipt observations. The Kernel-owned
+      // `identity` envelope carries the occurrence identity of THIS runtime
+      // (B/workflow/instance/turn); the Host activation completes it with
+      // subject/tenant/deployment identity (L2 §C). It never reaches the
+      // hook — the hook still sees exactly the frozen redacted projection.
+      safeObserve({
+        kind: 'advisory-observation',
+        hook: TURN_OBSERVATION_HOOK_KEY,
+        providerId: turnObservationHook.providerId,
+        identity: Object.freeze({
+          businessPackageId: businessEndpoint.packageId,
+          workflowId: target.workflowId,
+          instanceKey: target.instanceKey,
+          turnId,
+        }),
+        turn: projection,
+        observation: snapshot,
+      });
     } catch {
       counters.advisoryRejected += 1;
       return;
     }
-    if (encoded.length > ADVISORY_OBSERVATION_MAX_CHARS) {
-      counters.advisoryRejected += 1;
-      return;
-    }
-    // Separate observation record on the existing sink; observer failures
-    // stay swallowed exactly like receipt observations.
-    safeObserve({
-      kind: 'advisory-observation',
-      hook: TURN_OBSERVATION_HOOK_KEY,
-      providerId: turnObservationHook.providerId,
-      turn: projection,
-      observation: result,
-    });
   }
 
   async function openInstance(request) {
@@ -6557,6 +6657,10 @@ export function createOccurrenceRuntime(options) {
           requestInput: request.input,
           // [v0.10 #1264] The per-turn clamped step budget.
           budget: turnBudget,
+          // [v0.10 #1264 F3] The receipt carries budget diagnostics only
+          // when a hardBudget is wired or advice actually tightened the
+          // step bound — never on the unwired legacy path.
+          budgetDiagnostic: hardBudgetWired || turnBudget.maxSteps !== hardLimits.maxSteps,
           read: { docs, docKeys, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
         });
         if (run.terminal !== undefined) {

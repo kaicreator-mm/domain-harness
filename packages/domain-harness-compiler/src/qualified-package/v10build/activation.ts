@@ -1339,8 +1339,23 @@ export class V10AppFacade {
         // Receipts are returned to the caller; the only records surfaced
         // here are the Kernel's post-disposition advisory observations
         // (#1264) — diagnostics in the counters sink, never an authority.
+        // [#1264 F2] The Host completes the Kernel-owned occurrence
+        // `identity` (B/workflow/instance/turn) with the subject and
+        // deployment/tenant identity this activation owns, so every record
+        // in the shared sink is attributable per L2 §C. The hook itself
+        // still receives only the frozen redacted projection.
         if (isPlainRecord(record) && record.kind === 'advisory-observation') {
-          this.#counters.advisoryObservations.push(record);
+          const kernelIdentity = isPlainRecord(record.identity) ? record.identity : {};
+          this.#counters.advisoryObservations.push({
+            ...record,
+            identity: {
+              subjectDigest: this.#app.subjectDigest,
+              appId: this.#app.appId,
+              tenantId: this.#activatedTenantId,
+              deployedAppId: this.#deploymentIdentity?.deployedAppId ?? null,
+              ...kernelIdentity,
+            },
+          });
           return;
         }
         // [v0.10 #1265] Everything else the Kernel observes on THIS runtime
