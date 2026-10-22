@@ -9,6 +9,14 @@ const base={
   maxProbeCalls:3,maxWallMs:30000,maxCostMicro:1000000,
   verifierRefs:['github:verifier'],effectPolicy:'DENY_EXTERNAL_EFFECTS',
 };
+test('selected v10 advisory init return is ABI-conformant', () => {
+  const result=init({appId:'app:qualified',audience:'aud:qualified'});
+  assert.deepEqual(Object.keys(result).sort(), ['ok','featureKey','observedContext'].sort());
+  assert.equal(result.ok,true);
+  assert.equal(result.featureKey,FEATURE_KEY);
+  assert.equal(result.observedContext.appId,'app:qualified');
+  assert.equal(Object.hasOwn(result,'appId'),false);
+});
 test('valid safe bounded plan is not executed or admitted by K',()=>{
   assert.equal(FEATURE_KEY,'standard:bounded-experiment/1');
   assert.equal(init({appId:'app:sample'}).ok,true);
