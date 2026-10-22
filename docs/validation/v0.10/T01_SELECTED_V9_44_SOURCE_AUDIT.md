@@ -1,6 +1,8 @@
 # DomainHarness v0.10 — T01 retained 44 selected-v9 reachability audit
 
 > **SOURCE_ONLY / NO_NEW_TESTS_RUN / NOT_RELEASE_EVIDENCE.** Owning Task [#1165](https://github.com/kaicreator-mm/domain-harness/issues/1165), revised Task Pack [#6253116633](https://github.com/kaicreator-mm/domain-harness/issues/1165#issuecomment-6253116633), accepted Builder generation 2 [#6253137402](https://github.com/kaicreator-mm/domain-harness/issues/1165#issuecomment-6253137402). Source baseline `v0.10@32b6e776000669014c0384110e0340be59d5fd4b`. This is a **successor evidence file**, not an edit to Product/L1 history.
+>
+> **Closure:** the routed Future-Task outcomes of the rows below are tracked per-row, post-R01, in [T01_CLOSURE_LEDGER.md](T01_CLOSURE_LEDGER.md) (#1266; HEAD `53bef033`) — additive pointer only; the audit rows and baseline are unchanged.
 
 ## 1. Authority and reachable surface
 
