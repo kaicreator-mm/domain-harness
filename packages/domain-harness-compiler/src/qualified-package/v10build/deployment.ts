@@ -974,12 +974,16 @@ export interface V10GovernedBuildActivation {
   queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
   queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
   /**
-   * [v0.10 #1265] Governed receipt subscription over the underlying facade:
-   * only THIS governed deployment's own Kernel turns are ever observed (an
-   * activation physically sees no other deployment's turns), and a Host
-   * `queryAuthority` — when wired — authorizes every delivery against the
-   * exact scoped target tuple through the same authority as scoped queries.
-   * The delivered receipts are the Kernel's own immutable records, never
+   * [v0.10 #1265] Governed receipt subscription over the underlying facade.
+   * A governed activation ALWAYS carries a K02 deployment identity, so it
+   * requires Host `queryAuthority` wiring: without it the underlying facade
+   * refuses typed `QUERY_AUTHORIZATION_REQUIRED` — receipt delivery can
+   * never become an allow-all cross-B read channel (same rule as scoped
+   * queries). With authority, only THIS governed deployment's own Kernel
+   * turns are ever observed (an activation physically sees no other
+   * deployment's turns), and every delivery is authorized against the exact
+   * scoped target tuple through the same authority as scoped queries. The
+   * delivered receipts are the Kernel's own immutable records, never
    * fabricated and never an `advisory-observation` record.
    */
   subscribe(observer: (receipt: unknown) => void): Promise<V10Subscription>;

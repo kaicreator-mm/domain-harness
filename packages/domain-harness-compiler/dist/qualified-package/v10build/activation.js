@@ -524,13 +524,28 @@ export class V10AppFacade {
      * that is a Kernel receipt fans out as one deep-frozen private copy;
      * `advisory-observation` records (#1264) never do.
      *
-     * Scope: an activation physically observes only its own runtimes' turns —
-     * no cross-deployment or cross-tenant delivery can exist. With Host
-     * `queryAuthority` wiring, every delivery is authorized through the SAME
-     * authority as scoped queries over the exact scoped target tuple, so a
+     * Scope and authorization mirror the scoped-query path exactly. A
+     * deployment-identity (K02 scoped, multi-B) activation WITHOUT Host
+     * `queryAuthority` refuses typed `QUERY_AUTHORIZATION_REQUIRED` — there is
+     * deliberately no allow-all default, exactly like `queryScopedSnapshot`, so
+     * receipt delivery can never become a cross-B read channel that bypasses
+     * that authorization. With authority, every delivery is authorized through
+     * the SAME `authorize` over the exact scoped target tuple, so a
      * non-visible Business target is never delivered (a denied delivery and a
-     * denied query are one authorization decision — no oracle). Without
-     * authority wiring the receipts are the caller's own activation's turns.
+     * denied query are one authorization decision — no oracle); authority
+     * without the K02 deployment identity refuses `QUERY_DEPLOYMENT_REQUIRED`
+     * (no unscoped cross-B fallback exists).
+     *
+     * The historical unscoped wiring (no `deploymentIdentity`, where scoped
+     * queries are unavailable anyway) keeps delivering its own activation's
+     * receipts without an authority, and that is safe by construction: the
+     * whole activation shares ONE unscoped K namespace keyed by its own
+     * subjectDigest/tenant, the observe hook physically sees only its own
+     * runtimes' turns (no cross-deployment or cross-tenant record can exist),
+     * and the only holder of this facade is the Host/first-party consumer that
+     * can already `send` — the receipts expose nothing that holder could not
+     * already observe.
+     *
      * A non-cloneable receipt fails closed into non-delivery; an observer
      * exception is isolated — it never affects K state, the receipt or another
      * observer. Refuses typed once the facade is closed/stopped.
@@ -539,6 +554,9 @@ export class V10AppFacade {
         this.#assertOpen();
         if (typeof observer !== 'function') {
             refuse('SUBSCRIBE_OBSERVER_INVALID', 'a facade subscription requires a callable receipt observer');
+        }
+        if (this.#deploymentIdentity !== undefined && this.#queryAuthority === undefined) {
+            refuse('QUERY_AUTHORIZATION_REQUIRED', 'this activation carries no Host-owned query authority; authorized receipt delivery is disabled (no allow-all default exists)');
         }
         if (this.#queryAuthority !== undefined && this.#deploymentIdentity === undefined) {
             refuse('QUERY_DEPLOYMENT_REQUIRED', 'authorized subscription delivery requires the K02 deployment identity; no unscoped cross-B fallback exists');
@@ -789,6 +807,10 @@ export class V10AppFacade {
                 .then((allowed) => allowed === true)
                 .catch(() => false);
         }
+        // Authority-absent delivery is reachable only for the UNSCOPED wiring:
+        // `subscribe` refuses a scoped (deployment-identity) activation without
+        // authority, so a subscriber attached here without an authority is by
+        // construction on a single-namespace activation observing its own turns.
         let immutable;
         try {
             immutable = deepFreeze(structuredClone(receipt));

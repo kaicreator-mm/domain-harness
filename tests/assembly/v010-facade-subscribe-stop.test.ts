@@ -82,6 +82,11 @@ async function settleDeliveries(ms = 100): Promise<void> {
 }
 
 test('P-SUB-RECEIPT: subscribe delivers the exact immutable Kernel receipt — never an advisory-observation record', async () => {
+  // This is the HISTORICAL UNSCOPED wiring (no deploymentIdentity, no
+  // queryAuthority): the follow-up-1 rule keeps own-receipt delivery without
+  // an authority here — safe by construction (one unscoped namespace, the
+  // facade holder is the Host that can already send); a deployment-identity
+  // activation without authority refuses typed (N-SUB-AUTHORITY-REQUIRED).
   // Rich composition selects the #1264 turn-observation beta extension, so
   // this one turn produces BOTH a Kernel receipt and an advisory-observation
   // record on the same observe sink — exactly the confusion subscribe must
@@ -258,6 +263,23 @@ test('N-SUB-AUTHORITY: with queryAuthority, receipts for a non-visible target ar
   activation.dispose();
 });
 
+test('N-SUB-AUTHORITY-REQUIRED: a scoped (deployment-identity) activation without Host authority refuses to subscribe typed', async () => {
+  const app = buildV10App(await basicComposition());
+  const store = new PlainCasDocStore();
+  const deploymentIdentity = { deployedAppId: 'deployment:v010-sub-noauth', tenantId: TENANT, appId: app.appId };
+  const activation = await activateV10App(app, { store, deploymentIdentity, tenantId: TENANT, now: tickingClock().now });
+  await assert.rejects(
+    activation.facade.subscribe(() => {}),
+    (error: unknown) => activationCode(error) === 'QUERY_AUTHORIZATION_REQUIRED',
+    'a K02-scoped multi-B activation has NO allow-all subscription default — same rule as queryScopedSnapshot',
+  );
+  // The activation itself still serves sends; the refusal is only the
+  // un-authorized read channel.
+  const receipt = await activation.facade.send({ ...INTENT });
+  assert.equal(receipt.status, 'admitted');
+  activation.dispose();
+});
+
 // ---- governed (#1265): deployment scoping, authority filtering, stop ------
 
 const GOVERNED_NOW = Date.UTC(2026, 9, 21, 9, 0, 0);
@@ -360,6 +382,14 @@ test('N-SUB-GOVERNED-SCOPE: a governed activation delivers only its own deployme
   assert.equal(otherDeployment.status, 'admitted');
   await settleDeliveries();
   assert.equal(delivered.length, 0, 'no receipt of another deployment is delivered');
+  // A governed activation ALWAYS carries a deployment identity, so `two`
+  // (activated without Host authority) must refuse to subscribe typed —
+  // receipt delivery can never become an allow-all cross-B read channel.
+  await assert.rejects(
+    two.subscribe(() => {}),
+    (error: unknown) => governedCode(error) === 'QUERY_AUTHORIZATION_REQUIRED',
+    'a governed activation without Host authority refuses to subscribe',
+  );
 
   // This deployment's own alpha turn is delivered.
   const own = await one.send({ ...INTENT });
