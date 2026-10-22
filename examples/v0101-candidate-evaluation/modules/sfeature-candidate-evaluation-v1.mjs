@@ -86,7 +86,7 @@ export function evaluateCandidateEvidence(input) {
   obj(input);
   const baselineSha=sha(field(input,'baselineSha'));
   const candidateSha=sha(field(input,'candidateSha'));
-  id(field(input,'verifierRevision'));
+  const verifierRevision=id(field(input,'verifierRevision'));
   const holdoutVisibility=field(input,'holdoutVisibility');
   if (!['ISOLATED','LEAKED','UNKNOWN'].includes(holdoutVisibility))
     err('EVAL_HOLDOUT_INVALID');
@@ -103,7 +103,7 @@ export function evaluateCandidateEvidence(input) {
   const base=cohort(field(input,'baseline'),baselineSha);
   const cand=cohort(field(input,'candidate'),candidateSha);
   const keys=[...new Set([...base.keys(),...cand.keys()])].sort();
-  const differences=[], incomplete=[], failures=[];
+  const differences=[], incomplete=[];
   const totals={baselinePass:0,candidatePass:0,baselineFail:0,candidateFail:0,matched:0};
   for (const caseId of keys) {
     const a=base.get(caseId), b=cand.get(caseId);
@@ -130,12 +130,16 @@ export function evaluateCandidateEvidence(input) {
   if(!keys.length) reasons.push('EMPTY_COHORT');
   if(incomplete.length) reasons.push('COHORT_NOT_COMPARABLE');
   const disposition=reasons.includes('HIDDEN_ORACLE_EXPOSED')
-    || reasons.some(s=>s.startsWith('ORACLE_') && checked.get(s.slice(7,-14))?.status==='FAIL')
+    || [...checked.values()].some(value => value.status==='FAIL')
     ? 'INVALID_EVALUATION'
     : reasons.length ? 'INCONCLUSIVE' : 'PROVISIONALLY_COMPARABLE';
   // Deliberately suppress numerical "wins" if comparability fails.
   return Object.freeze({
     schema:'dh.v0101.candidate-evaluation/1',featureKey:FEATURE_KEY,
+    baselineSha,candidateSha,verifierRevision,holdoutVisibility,
+    oracleEvidence:Object.freeze([...checked.entries()].map(([kind,value]) => Object.freeze({
+      kind,status:value.status,sourceRef:value.sourceRef,
+    }))),
     authority:'ADVISORY_ONLY', taskGateVerdict:'NOT_DETERMINED',
     disposition, cohortSize:keys.length,
     comparedCaseCount:reasons.length?0:totals.matched,
