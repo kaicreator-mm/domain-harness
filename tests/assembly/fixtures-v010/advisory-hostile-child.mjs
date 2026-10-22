@@ -1,39 +1,63 @@
 /**
- * #1264 Follow-up 5 — hostile-result regression CHILD process.
- * =============================================================
+ * #1264 Follow-up 7 — hostile-result regression CHILD process (JSON-string
+ * result ABI).
+ * ================================================================
  * Spawned by `v010-k-advisory-consultation.test.ts` as
  *   node --import tsx advisory-hostile-child.mjs <caseId> <hook>
  * (hook = 'budget' | 'observation'). Runs ONE hostile hook result through a
  * real buildV10App → activateV10App → facade.send with a process-level
  * unhandledRejection listener installed from the first line, asserts the
- * contract in-process, waits out any late async failure, and prints
- * `RESULT {json}` on stdout. Exit 0 = all in-child asserts held; the parent
- * re-asserts the parsed fields.
+ * contract in-process, waits out any late hook-owned async failure, and
+ * prints `RESULT {json}` on stdout. Exit 0 = all in-child asserts held.
  *
- * Contract asserted here for every case:
- *  - send resolves 'admitted';
+ * ABI (owner decision): a hook result must be a JSON text string. The
+ * Kernel's consumption is `typeof`, a pre-parse length bound and JSON.parse
+ * — NOTHING else. For every non-string case the child asserts:
+ *  - send resolves 'admitted' promptly;
+ *  - advisoryRejected is exactly 1, sink empty;
  *  - the receipt is deep-equal to the no-extension receipt for the SAME
- *    identity/clock seed (both runs use the SAME kernel bytes);
- *  - advisoryRejected is exactly the expected count for the case/hook;
- *  - no getter/accessor/then/Proxy-get flag ever fired;
- *  - no unhandledRejection, even for late-rejecting promises.
+ *    identity/clock seed;
+ *  - EVERY spy counter (then accessors, then calls, Proxy get traps,
+ *    getPrototypeOf traps, ownKeys traps, descriptor traps, has traps,
+ *    constructor/species getters) stayed at 0 — the Kernel executed no user
+ *    code and ran no trap;
+ *  - no crash. A later rejection produced by a refused Promise value is the
+ *    HOOK'S OWN undetached rejection (documented contract): cases that
+ *    reject late assert the captured unhandledRejection carries exactly the
+ *    hook's own reason.
  */
 import { setTimeout as delay } from 'node:timers/promises';
+import vm from 'node:vm';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 const [caseId, hook] = process.argv.slice(2);
 const unhandled = [];
-process.on('unhandledRejection', (reason, promise) => {
-  unhandled.push(String(reason) + ' samePromise=' + String(promise === hostilePromiseRef));
-});
+process.on('unhandledRejection', (reason) => { unhandled.push(String(reason)); });
 
-const state = { thenTouches: 0, thenCalls: 0, getTraps: 0, constructorTouches: 0, speciesTouches: 0 };
-let hostilePromiseRef = null;
+const state = {
+  thenTouches: 0, thenCalls: 0, getTraps: 0, prototypeTraps: 0, ownKeysTraps: 0,
+  descriptorTraps: 0, hasTraps: 0, constructorTouches: 0, speciesTouches: 0,
+};
 
 const { buildV10App, activateV10App } = await import('../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js');
 const { freshV10Counters } = await import('../../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js');
 const { basicComposition, PlainCasDocStore, extensionEntry } = await import('../helpers-v010.js');
 
+/** A Proxy whose reflective traps block forever (mutation canary). */
+function infiniteTrapProxy() {
+  const blockForever = () => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0); };
+  return new Proxy({}, {
+    getPrototypeOf: blockForever,
+    ownKeys: blockForever,
+    getOwnPropertyDescriptor: blockForever,
+    get: (target, prop) => { state.getTraps += 1; blockForever(); return Reflect.get(target, prop); },
+    has: () => { state.hasTraps += 1; return false; },
+  });
+}
+
 const cases = {
+  // --- non-string negatives: every spy must stay at 0 ---
   'then-getter-throw': () => ({ get then() { state.thenTouches += 1; throw new Error('then getter fired'); } }),
   'then-getter-nonthrow': () => ({ get then() { state.thenTouches += 1; return undefined; } }),
   'then-getter-slow': () => ({
@@ -43,13 +67,8 @@ const cases = {
       throw new Error('slow then getter fired');
     },
   }),
-  'promise-then-getter-late-reject': () => {
-    // [F6] Own `then` accessor on a native Promise: never read, never
-    // called; the promise RESOLVES late (a rejection would now be the
-    // hook-owned undetached case).
-    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 3000); });
-    hostilePromiseRef = promise;
-    globalThis.__hostileProbe = promise;
+  'promise-then-getter-late-resolve': () => {
+    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 1500); });
     Object.defineProperty(promise, 'then', {
       enumerable: true, configurable: true,
       get() { state.thenTouches += 1; throw new Error('own then getter on a native promise'); },
@@ -57,10 +76,7 @@ const cases = {
     return promise;
   },
   'promise-constructor-accessor': () => {
-    // [F6 case h] Own `constructor` accessor: the intrinsic-then fast path
-    // is skipped (own keys non-empty) BEFORE any species lookup, so the
-    // getter is never invoked. Resolves late on purpose.
-    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 3000); });
+    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 1500); });
     Object.defineProperty(promise, 'constructor', {
       enumerable: true, configurable: true,
       get() { state.constructorTouches += 1; return Promise; },
@@ -68,27 +84,21 @@ const cases = {
     return promise;
   },
   'promise-subclass-species': () => {
-    // [F6 case i] A Promise subclass whose species getter would run under a
-    // naive intrinsic-then call; the exact-prototype precondition skips the
-    // intrinsic call entirely, so the getter is never invoked. Resolves.
     class P extends Promise {
       static get [Symbol.species]() { state.speciesTouches += 1; return Promise; }
     }
     return P.resolve('ok');
   },
-  'plain-promise-late-reject': () => {
-    // [F6 case j] A PLAIN native Promise that rejects late: exact
-    // prototype, no own keys — the intrinsic fast path attaches real noop
-    // handlers, so no unhandledRejection ever fires.
-    const promise = new Promise((_, reject) => { setTimeout(() => reject(new Error('plain native late rejection')), 3000); });
+  'promise-own-keys-data': () => {
+    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 1500); });
+    promise.tag = 'harmless own data key';
     return promise;
   },
-  'then-data-function-derived': () => ({
-    then() {
-      state.thenCalls += 1;
-      return new Promise((_, reject) => { setTimeout(() => reject(new Error('late rejection from then return')), 20); });
-    },
-  }),
+  'cross-realm-promise': () => {
+    return vm.runInNewContext('new Promise((resolve) => { resolve(true); })');
+  },
+  'string-object': () => new String('{"maxSteps":1}'),
+  'function-value': () => function advisoryFn() { return '{"maxSteps":1}'; },
   'proxy-array-get-trap': () => new Proxy([2, 2], {
     get(target, prop) { state.getTraps += 1; return Reflect.get(target, prop); },
   }),
@@ -105,17 +115,61 @@ const cases = {
   'nested-array-nonenumerable-extra': () => ({
     maxSteps: Object.defineProperty([1], 'extra', { value: 1, enumerable: false }),
   }),
+  'nested-slow-ownkeys-proxy': () => ({
+    maxSteps: new Proxy([1], {
+      ownKeys() {
+        state.ownKeysTraps += 1;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+        throw new Error('slow nested ownKeys trap');
+      },
+    }),
+  }),
+  'later-rejecting-promise-then-spy': () => {
+    // R3-F2 contract: a later-rejecting Promise with an own spy `then`.
+    // The Kernel must attach nothing and call nothing; the rejection is the
+    // hook's own (captured and asserted below).
+    const promise = new Promise((_, reject) => { setTimeout(() => reject(new Error('hook-owned late rejection (then-spy)')), 300); });
+    Object.defineProperty(promise, 'then', {
+      enumerable: true, configurable: true,
+      value() { state.thenCalls += 1; },
+    });
+    return promise;
+  },
+  'later-rejecting-promise-proxy': () => {
+    // R3-F2 contract, Proxy-wrapped variant: get-trap counter must stay 0.
+    const promise = new Promise((_, reject) => { setTimeout(() => reject(new Error('hook-owned late rejection (proxy)')), 300); });
+    return new Proxy(promise, {
+      get(target, prop) { state.getTraps += 1; return Reflect.get(target, prop); },
+    });
+  },
+  'infinite-trap': infiniteTrapProxy,
+  'frozen-promise-pre-hooks': () => {
+    // R3-F1 regression: a frozen native Promise created BEFORE async_hooks
+    // tracking is enabled. Under the old intrinsic-then fast path,
+    // Promise.prototype.then made Node add an async id to the non-extensible
+    // object and the process died inside the hook machinery. Under the
+    // JSON-string ABI the Kernel must refuse it with typeof alone.
+    const { createHook } = require('node:async_hooks');
+    const frozen = Object.freeze(new Promise((resolve) => { setTimeout(() => resolve(true), 1500); }));
+    const tracing = createHook({ init() { } });
+    tracing.enable();
+    return frozen;
+  },
+  'plain-promise-late-reject': () => {
+    // R3-F2 contract (clean native variant): refused without attaching any
+    // handler, so its later rejection is the HOOK'S OWN.
+    const promise = new Promise((_, reject) => { setTimeout(() => reject(new Error('hook-owned late rejection (plain native)')), 300); });
+    return promise;
+  },
 };
 
-const hostile = cases[caseId]?.();
+const hostile = (cases[caseId]?.() ?? (() => { throw new Error(`unknown case ${String(caseId)}`); })());
 if (hostile === undefined) {
   console.error(`unknown case ${String(caseId)}`);
   process.exit(1);
 }
 
 const BASE_MS = Date.UTC(2026, 9, 22, 9, 0, 0);
-// Each run gets its OWN seeded ticking clock so reference and hostile
-// receipts carry identical timestamps.
 const makeClock = () => {
   let tick = 0;
   return () => BASE_MS + (tick += 1) * 1000;
@@ -168,30 +222,32 @@ const result = {
 };
 activation.dispose();
 
-// Let any late async failure (80ms/20ms rejections) surface first.
-await delay(3400);
+// Let any late hook-owned rejection surface and CAPTURE it (the contract
+// documents it as hook-owned; the child asserts the reason below).
+await delay(1200);
 result.unhandled = unhandled;
-
-// Case expectations. Every case is refused and counted exactly once. The
-// Proxy-array case is refused with ZERO get traps on both hooks: the budget
-// hook refuses it as advice-shaped data, the observation hook refuses it by
-// the plain-record rule (a top-level array was never an observation
-// record) — either way strictly by the descriptor rules, never by reading
-// a property.
-const expectedRejected = 1;
-const expectedSink = 0;
 
 const failures = [];
 if (result.status !== 'admitted') failures.push(`status ${result.status}`);
 if (!result.receiptIdentical) failures.push('receipt differs from the no-extension receipt');
-if (result.advisoryRejected !== expectedRejected) failures.push(`advisoryRejected ${result.advisoryRejected} != ${expectedRejected}`);
-if (result.sinkCount !== expectedSink) failures.push(`sink ${result.sinkCount} != ${expectedSink}`);
-if (result.flags.thenTouches !== 0) failures.push(`then getter touched ${result.flags.thenTouches}`);
-if (result.flags.thenCalls !== 0) failures.push(`then called ${result.flags.thenCalls}`);
-if (result.flags.getTraps !== 0) failures.push(`proxy get traps ${result.flags.getTraps}`);
+if (result.advisoryRejected !== 1) failures.push(`advisoryRejected ${result.advisoryRejected} != 1`);
+if (result.sinkCount !== 0) failures.push(`sink ${result.sinkCount} != 0`);
+for (const flag of ['thenTouches', 'thenCalls', 'getTraps', 'prototypeTraps', 'ownKeysTraps', 'descriptorTraps', 'hasTraps', 'constructorTouches', 'speciesTouches']) {
+  if (result.flags[flag] !== 0) failures.push(`${flag} = ${String(result.flags[flag])} (Kernel ran user code / a trap)`);
+}
 if (caseId === 'then-getter-slow' && result.elapsedMs >= 250) failures.push(`send delayed by the slow getter: ${result.elapsedMs}ms`);
-if (result.unhandled.length !== 0) failures.push(`unhandledRejection: ${result.unhandled.join(' | ')}`);
-result.detachDebug = globalThis.__detachDebug ?? 'never-called';
+if (caseId === 'nested-slow-ownkeys-proxy' && result.elapsedMs >= 250) failures.push(`send delayed by the nested ownKeys trap: ${result.elapsedMs}ms`);
+const hookOwnedCases = new Set([
+  'later-rejecting-promise-then-spy',
+  'later-rejecting-promise-proxy',
+  'plain-promise-late-reject',
+]);
+if (hookOwnedCases.has(caseId)) {
+  if (result.unhandled.length !== 1) failures.push(`expected exactly 1 hook-owned unhandledRejection, got ${String(result.unhandled.length)}`);
+  else if (!result.unhandled[0].includes('hook-owned late rejection')) failures.push(`the unhandledRejection is not the hook's own reason: ${result.unhandled[0]}`);
+} else if (result.unhandled.length !== 0) {
+  failures.push(`unhandledRejection: ${result.unhandled.join(' | ')}`);
+}
 result.failures = failures;
 
 console.log(`RESULT ${JSON.stringify(result)}`);

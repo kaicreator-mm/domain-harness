@@ -11,6 +11,7 @@
   - Follow-up 4 head (28-test suite): `e522f2cf6591868adff307edd3f89710d8ef30ac83cbc99de65352527a574286` (git blob `aa4382ceeecac3a15e46f4d681e3aa5f85a563d4`)
   - Follow-up 5 head (29-test suite + hostile-matrix child regressions): `fc17cee68c484225df1cf057b4fd36b5941102491d38406ff9d0a91d1a1321e9` (git blob `d9dc7d99825d5f0c6260e5495c9ebce732e494fd`)
   - Follow-up 6 head (29-test suite): `4cec1235cc6025233e9e0a3fdf9fa00c8fea9f7e304cb1c74cdbe3cbd43ae440` (git blob `b4f21ab588ebba343cd5d09c5958834560d6d127`)
+  - Follow-up 7 head (29-test suite, JSON-string result ABI): `f3e955f467fd34b274a03386234632656336ea297566d3681b2f55bb24f00067` (git blob `5af1dc94c87c9385997df1ecbef68d63f9e12968`)
   - Repository-wide search found NO committed test/witness pinning either SHA literal; every
     v0.10 suite computes `moduleSha256`/`subjectDigest` dynamically at runtime. Historical
     evidence receipts under `docs/experiments/**` and `.agent/execution/**` are immutable
@@ -43,6 +44,49 @@
   activation fault tests compose them in beta's slot.
 - Rich consumer scenario: new step `RICH_P1.advisoryConsultation` (both hooks invoked, ≥1
   clamp, ≥1 rejected authority-field advice), pinned in the T11 integration expectations.
+
+## Follow-up 7 (owner decision) — JSON-string hook result ABI
+
+Owner decision after independent review 3 (three P1s, one root cause: the
+Kernel was inspecting arbitrary foreign JS objects, which cannot be done
+user-code-free in one realm):
+
+- **ABI:** BOTH advisory hooks (`admission-budget-advice/v1`,
+  `turn-observation/v1`) return a JSON text STRING (e.g. '{"maxSteps":3}',
+  '{"note":"x"}'). The hook input (the frozen redacted projection) is
+  unchanged. `undefined` is the documented "no advice / nothing to observe"
+  result (skipped, NOT counted); `null` and every other non-string value are
+  refused and counted.
+- **Kernel consumption (the whole of it):** `typeof result === 'string'` →
+  pre-parse length bound (budget: 256 chars; observation:
+  ADVISORY_OBSERVATION_MAX_CHARS) → `JSON.parse(result)` with no reviver,
+  inside the guard. The parsed value is Kernel-created plain data, validated
+  with the existing field/range/authority rules, an own-`__proto__` refusal
+  (JSON.parse materializes it as an own data property) and the depth bound
+  (8). **DELETED:** `detachNativePromise`, the intrinsic-then path, the Node
+  async-symbol whitelist and the reflective snapshot over foreign values
+  (advisoryDataSnapshot) — dead under this ABI.
+- **Contract statement:** an advisory hook's own asynchronous behavior —
+  including a Promise or any other object it returns, which the Kernel
+  refuses without touching — is the extension's same-realm responsibility
+  (per L2 §C: "Same-realm trusted JS is not a hostile plugin sandbox"). The
+  Kernel guarantees only what its own consumption does: for a non-string
+  result it executes no user code and runs no trap, and for a string it only
+  measures the length and runs JSON.parse, so its consumption cannot stall,
+  crash the process or change the decided receipt. NOTHING beyond that is
+  claimed. (The follow-up 5/6 "no [[Get]] / never stall / nothing can throw"
+  wordings are SUPERSEDED by this section.)
+- **Regressions:** the child hostile matrix grew to 19+1 cases × both hooks
+  — including R3-F1 (frozen Promise created before async_hooks tracking),
+  R3-F3 (an infinitely-blocking reflective-trap Proxy in a dedicated
+  child run with a spawn timeout: the ACK returns, zero traps executed; a
+  temporary `Reflect.ownKeys(result)` mutant makes exactly that child time
+  out), R3-F2 (later-rejecting Promise with then-spy / Proxy-wrapped /
+  clean-native variants: the captured unhandledRejection carries the hook's
+  OWN reason — documented hook-owned), cross-realm Promise (vm), String
+  object, function, nested slow ownKeys Proxy (bounded), and the full string
+  negative set (oversize pre-parse, invalid JSON, non-object, authority
+  fields, unknown fields, out-of-range, own `__proto__`, over-deep).
 
 ## Follow-up 6 (controller review) — intrinsic `then` only for exact clean native Promises
 

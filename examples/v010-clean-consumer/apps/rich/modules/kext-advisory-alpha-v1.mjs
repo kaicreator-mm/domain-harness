@@ -1,18 +1,21 @@
 /**
  * T00 fixture — K advisory extension #1 (physically distinct module).
- * [v0.10 #1264] Provides the Kernel's CLOSED `admission-budget-advice/v1`
- * hook: a pure, bounded PRE-ADMISSION budget advice. The Kernel Primary
- * invokes it with a frozen redacted proposal (intentType, workflowId and the
- * Kernel's own effective hard limits — never an instanceKey, input payload
- * or caller data) and revalidates the returned ceiling itself; the advice
- * can only tighten the Kernel's limits and is otherwise ignored for
- * authority. This fixture records every proposal it receives for witness
- * assertions and, absent a test plan, always advises `{ maxSteps: 2 }` — a
- * real deterministic tightening. No authority, no ports, no writes.
+ * [v0.10 #1264 F7 ABI] Provides the Kernel's CLOSED
+ * `admission-budget-advice/v1` hook: a pure, bounded PRE-ADMISSION budget
+ * advice. The Kernel Primary invokes it with a frozen redacted proposal
+ * (intentType, workflowId and the Kernel's own effective hard limits —
+ * never an instanceKey, input payload or caller data) and revalidates the
+ * returned JSON string itself; the advice can only tighten the Kernel's
+ * limits and is otherwise ignored for authority. This fixture records every
+ * proposal it receives for witness assertions and, absent a test plan,
+ * always advises the JSON string '{"maxSteps":2}' — a real deterministic
+ * tightening. No authority, no ports, no writes.
  *
  * Test plan channel (the established fixture-sentinel pattern of this
  * suite): `globalThis.__v010AlphaAdvicePlan` — an ordered array of
- * `{ advice }` / `{ throw: true }` steps consumed one per consultation.
+ * `{ advice: <hook result> }` / `{ throw: true }` steps consumed one per
+ * consultation. Under the JSON-string ABI a consumable advice is a JSON
+ * text string; any other value is a hostile/negative result.
  */
 export const MODULE_ID = 'kext-advisory-alpha@v010.1.0.0';
 export const PACKAGE_KIND = 'kernel-extension';
@@ -39,7 +42,7 @@ export function observeAlpha(proposal) {
   if (step !== null && typeof step === 'object' && Object.hasOwn(step, 'advice')) {
     return step.advice;
   }
-  return { maxSteps: 2 };
+  return '{"maxSteps":2}';
 }
 
 export function dispose() {

@@ -253,7 +253,7 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
       iteration: null, note: null, decisionOutcome: null, decisionData: null, contextDigest: null,
       contextEntries: null, modelCalls: null, modelCallEvidence: null, requestId,
     });
-    globalThis.__v010AlphaAdvicePlan = [{ advice: { maxSteps: 2 } }, { advice: { maxSteps: 3, permit: true } }];
+    globalThis.__v010AlphaAdvicePlan = [{ advice: '{"maxSteps":2}' }, { advice: '{"maxSteps":3,"permit":true}' }];
     try {
       const first = expectAdmitted(await send(facade, 'agentCollectContext', 'agent-advisory-1', 'advisory/collect/0', agentInput('req-advisory-0')), 'advisory turn 1');
       assert(!('advisory' in first) && !('budget' in first), 'the receipt carries no advisory/budget fields');

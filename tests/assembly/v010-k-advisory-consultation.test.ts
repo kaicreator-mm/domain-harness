@@ -126,8 +126,19 @@ async function dualEffectBusiness(): Promise<V10ModuleInput> {
   );
 }
 
+/** The 65-effect Business fixture (#1264 R2): one approve transition, 65 effects. */
+async function manyEffectsBusiness(): Promise<V10ModuleInput> {
+  return businessEntry(
+    './fixtures-v010/business-many-effects-v1.mjs',
+    MANY_EFFECTS_BUSINESS_ID,
+    ['business:policy/1', 'intent:submitManyEffects'],
+  );
+}
+
 const CONTINUATION_ROUTE = { intentId: 'submitContinuationQuote', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' };
 const DUAL_EFFECT_ROUTE = { intentId: 'submitDualEffect', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' };
+const MANY_EFFECTS_BUSINESS_ID = 'business-many-effects@v010.1.0.0';
+const MANY_EFFECTS_ROUTE = { intentId: 'submitManyEffects', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' };
 
 /** A Host ModelPort whose model never converges: every step is a read query. */
 const queryLoopModelPort = {
@@ -287,7 +298,7 @@ test('P-KEXT-CLAMP-NO-LOOSEN: advice beyond the hard limit is clamped; the BUILD
     store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
   });
   try {
-    globals.__v010AlphaAdvicePlan = [{ advice: { maxSteps: 100 } }];
+    globals.__v010AlphaAdvicePlan = [{ advice: '{"maxSteps":100}' }];
     const receipt = await continuationTurn(loose, 'loose-1');
     assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 }, 'oversized advice never loosens the bound');
     assert.equal(continuationBoundOf(receipt).turnMaxSteps, 3);
@@ -327,7 +338,7 @@ test('P-KEXT-CLAMP-NO-LOOSEN: advice beyond the hard limit is clamped; the BUILD
     store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
   });
   try {
-    globals.__v010AlphaAdvicePlan = [{ advice: { maxSteps: 100 } }];
+    globals.__v010AlphaAdvicePlan = [{ advice: '{"maxSteps":100}' }];
     const receipt = await continuationTurn(clamped, 'tight-c-1');
     assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 2 }, 'min(BUILD, advice) — advice larger than the hard limit is clamped');
     assert.equal(continuationBoundOf(receipt).turnMaxSteps, 2);
@@ -344,7 +355,7 @@ test('P-KEXT-WORKUNITS: honored advice bounds effect work units before any dispa
   const base = await basicComposition({ extensions: [alpha], routes: [MAIN_ROUTE, DUAL_EFFECT_ROUTE] });
   const options: BuildV10AppOptions = { ...base, modules: [...base.modules, business] };
   const globals = advisoryGlobals();
-  globals.__v010AlphaAdvicePlan = [{ advice: { maxWorkUnits: 1 } }];
+  globals.__v010AlphaAdvicePlan = [{ advice: '{"maxWorkUnits":1}' }];
   const activation = await activateV10App(buildV10App(options), {
     store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now,
   });
@@ -365,7 +376,7 @@ test('P-KEXT-WORKUNITS: honored advice bounds effect work units before any dispa
     assert.equal(k.advisoryRejected, 0);
 
     // Advice of exactly the required work units admits both dispatches.
-    globals.__v010AlphaAdvicePlan = [{ advice: { maxWorkUnits: 2 } }];
+    globals.__v010AlphaAdvicePlan = [{ advice: '{"maxWorkUnits":2}' }];
     const admitted = await activation.facade.send({
       intentType: 'submitDualEffect', instanceKey: 'instance:wu-2', messageId: 'msg:wu-2',
       input: { amount: 30 },
@@ -595,13 +606,6 @@ function neverSettling(): Promise<never> {
   return new Promise(() => { /* deliberately pending forever */ });
 }
 
-/** A plain native promise that rejects AFTER the turn has settled (and after the Kernel attached its intrinsic handlers). */
-function lateRejection(): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('late advisory rejection witness')), 500);
-  });
-}
-
 /** Race a turn against a short timeout to prove prompt settlement. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -621,7 +625,7 @@ test('N-KEXT-ASYNC-ADVICE: an async hook resolving VALID advice is rejected, cou
     store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
   });
   try {
-    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: Promise.resolve({ maxSteps: 1 }) }];
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: Promise.resolve('{"maxSteps":1}') }];
     const receipt = await continuationTurn(activation, 'async-1');
     assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 },
       'the promise result (even resolving a valid ceiling) is never awaited or applied');
@@ -676,7 +680,7 @@ test('N-KEXT-PENDING-OBSERVATION: a never-settling observation promise cannot de
     store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
   });
   try {
-    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: {} }]; // valid, no tightening
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: '{}' }]; // valid, no tightening
     advisoryGlobals().__v010BetaPlan = [{ garbage: neverSettling() }];
     const receipt = await withTimeout(
       activation.facade.send({ ...INTENT, instanceKey: 'instance:pend-obs', messageId: 'msg:pend-obs' }) as Promise<Record<string, unknown>>,
@@ -693,50 +697,6 @@ test('N-KEXT-PENDING-OBSERVATION: a never-settling observation promise cannot de
     clearAdvisoryWitnesses();
   }
 });
-
-test('N-KEXT-LATE-REJECT-THENABLE: a thenable that later rejects causes no unhandled rejection', async () => {
-  clearAdvisoryWitnesses();
-  const unhandled: unknown[] = [];
-  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
-  process.on('unhandledRejection', onUnhandled);
-  const counters = freshV10Counters();
-  const activation = await activateV10App(buildV10App(await richComposition()), {
-    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
-  });
-  try {
-    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: lateRejection() }];
-    advisoryGlobals().__v010BetaPlan = [{ garbage: lateRejection() }];
-    const first = await activation.facade.send({ ...INTENT, instanceKey: 'instance:late-1', messageId: 'msg:late-1' });
-    assert.equal(first.status, 'admitted');
-    const second = await activation.facade.send({ ...INTENT, instanceKey: 'instance:late-2', messageId: 'msg:late-2' });
-    assert.equal(second.status, 'admitted');
-    // Let the deferred rejections fire against the discarded values.
-    await new Promise((resolve) => { setTimeout(resolve, 800); });
-    assert.deepEqual(unhandled, [], 'the Primary detached both discarded thenables');
-    const k = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
-    assert.ok(k.advisoryRejected >= 2, `both thenables were counted (advisoryRejected=${String(k.advisoryRejected)})`);
-  } finally {
-    process.off('unhandledRejection', onUnhandled);
-    activation.dispose();
-    clearAdvisoryWitnesses();
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Follow-up 2 (R2) — the work-unit bound exists only when a hardBudget is
-// wired or advice tightens it; legacy wiring keeps pre-#1264 behavior.
-// ---------------------------------------------------------------------------
-
-const MANY_EFFECTS_BUSINESS_ID = 'business-many-effects@v010.1.0.0';
-const MANY_EFFECTS_ROUTE = { intentId: 'submitManyEffects', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' };
-
-async function manyEffectsBusiness(): Promise<V10ModuleInput> {
-  return businessEntry(
-    './fixtures-v010/business-many-effects-v1.mjs',
-    MANY_EFFECTS_BUSINESS_ID,
-    ['business:policy/1', 'intent:submitManyEffects'],
-  );
-}
 
 test('P-KEXT-LEGACY-WORKUNITS: with NO wired hardBudget a 65-effect turn admits exactly as before #1264', async () => {
   clearAdvisoryWitnesses();
@@ -1031,7 +991,7 @@ test('P-KEXT-F3-LEGACY-CONTINUATION: base/head FR07 receipts without a budget di
       const receipt = await continuationTurn(activation, 'legacy-f3');
       assert.equal(receipt.status, 'terminated');
       assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 });
-      if (revision === 'HEAD') {
+      if (revision === 'head') {
         const continuation = continuationBoundOf(receipt);
         assert.equal(continuation.turnMaxSteps, undefined, 'the legacy receipt carries no new budget diagnostic');
       }
@@ -1040,7 +1000,9 @@ test('P-KEXT-F3-LEGACY-CONTINUATION: base/head FR07 receipts without a budget di
       activation.dispose();
     }
   }
-  assert.deepEqual(JSON.parse(receipts[1]!), JSON.parse(receipts[0]!), 'the legacy no-budget FR07 receipt drifted beyond kernel identity bytes');
+  // Byte equality of the NORMALIZED receipt JSON strings (not parsed-object
+  // equality): key order and exact serialized bytes must match.
+  assert.equal(receipts[1], receipts[0], 'the legacy no-budget FR07 receipt drifted beyond kernel identity bytes');
 });
 
 // ---------------------------------------------------------------------------
@@ -1175,52 +1137,97 @@ test('N-KEXT-F4-DUNDER-PROTO-OBS: an own __proto__ observation key is refused an
 // review probes, PR #1269).
 // ---------------------------------------------------------------------------
 
-const R2_CASES = [
+// ---------------------------------------------------------------------------
+// Follow-up 7 (owner-decided JSON-string result ABI) — hostile matrix.
+// Every case runs on BOTH hooks through a real facade.send inside a CHILD
+// process with a process-level unhandledRejection listener. Non-string
+// results are refused with `typeof` alone: no getter, no `then`, no
+// reflective trap ever runs (spy counters stay 0), the ACK is prompt, the
+// receipt is byte-identical to the no-extension receipt, and a refused
+// Promise's own late rejection is the HOOK-OWNED one (captured and asserted
+// by its case, never prevented and never pretended away).
+// ---------------------------------------------------------------------------
+
+const F7_CASES = [
   'then-getter-throw',
   'then-getter-nonthrow',
   'then-getter-slow',
-  'promise-then-getter-late-reject',
-  'then-data-function-derived',
+  'promise-then-getter-late-resolve',
+  'promise-constructor-accessor',
+  'promise-subclass-species',
+  'promise-own-keys-data',
+  'cross-realm-promise',
+  'string-object',
+  'function-value',
   'proxy-array-get-trap',
   'dunder-nonenumerable',
   'symbol-key',
   'nested-array-nonenumerable-extra',
-  'promise-constructor-accessor',
-  'promise-subclass-species',
+  'nested-slow-ownkeys-proxy',
+  'later-rejecting-promise-then-spy',
+  'later-rejecting-promise-proxy',
+  'frozen-promise-pre-hooks',
   'plain-promise-late-reject',
 ] as const;
 
-test('N-KEXT-R2-HOSTILE-MATRIX: no [[Get]], no user calls, no unhandledRejection, receipts identical (both hooks)', async () => {
+interface F7ChildResult {
+  status: string;
+  receiptIdentical: boolean;
+  advisoryRejected: number;
+  sinkCount: number;
+  elapsedMs: number;
+  flags: Record<string, number>;
+  unhandled: string[];
+  failures: string[];
+}
+
+async function runHostileChild(caseId: string, hook: 'budget' | 'observation', extra: { timeoutMs?: number } = {}): Promise<F7ChildResult> {
   const { spawnSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
   const childPath = fileURLToPath(new URL('./fixtures-v010/advisory-hostile-child.mjs', import.meta.url));
+  const run = spawnSync(process.execPath, ['--import', 'tsx', childPath, caseId, hook], {
+    encoding: 'utf8', timeout: extra.timeoutMs ?? 90_000, maxBuffer: 16 * 1024 * 1024,
+  });
+  const resultLine = (run.stdout ?? '').split('\n').find((line) => line.startsWith('RESULT '));
+  assert.ok(run.status === 0, `${hook}/${caseId} child exit ${String(run.status)} signal ${String(run.signal)}: ${((run.stderr ?? '').slice(-400) || resultLine || '(no output)')}`);
+  assert.ok(resultLine !== undefined, `${hook}/${caseId} printed no RESULT line`);
+  return JSON.parse(resultLine.slice('RESULT '.length)) as F7ChildResult;
+}
+
+test('N-KEXT-F7-HOSTILE-MATRIX: non-string results are refused with typeof alone — zero user code, zero traps, receipts identical (both hooks)', async () => {
   for (const hook of ['budget', 'observation'] as const) {
-    for (const caseId of R2_CASES) {
-      const run = spawnSync(process.execPath, ['--import', 'tsx', childPath, caseId, hook], {
-        encoding: 'utf8', timeout: 60_000,
-      });
-      const resultLine = (run.stdout ?? '').split('\n').find((line) => line.startsWith('RESULT '));
-      assert.ok(run.status === 0, `${hook}/${caseId} child exit ${String(run.status)}: ${((run.stderr ?? '').slice(0, 400) || resultLine || '')}`);
-      assert.ok(resultLine !== undefined, `${hook}/${caseId} printed no RESULT line`);
-      const result = JSON.parse(resultLine.slice('RESULT '.length)) as {
-        status: string; receiptIdentical: boolean; advisoryRejected: number;
-        sinkCount: number; elapsedMs: number; flags: Record<string, number>;
-        unhandled: string[]; failures: string[];
-      };
+    for (const caseId of F7_CASES) {
+      const result = await runHostileChild(caseId, hook);
       assert.deepEqual(result.failures, [], `${hook}/${caseId} failures: ${JSON.stringify(result)}`);
       assert.equal(result.status, 'admitted');
       assert.equal(result.receiptIdentical, true, `${hook}/${caseId}: the receipt must equal the no-extension receipt`);
       assert.equal(result.advisoryRejected, 1);
       assert.equal(result.sinkCount, 0);
-      assert.equal(result.flags.thenTouches, 0);
-      assert.equal(result.flags.thenCalls, 0);
-      assert.equal(result.flags.getTraps, 0);
-      assert.equal(result.flags.constructorTouches, 0);
-      assert.equal(result.flags.speciesTouches, 0);
-      assert.deepEqual(result.unhandled, []);
-      if (caseId === 'then-getter-slow') {
-        assert.ok(result.elapsedMs < 250, `${hook}/${caseId}: send must not be delayed by the never-invoked slow getter (${String(result.elapsedMs)}ms)`);
+      for (const [flag, value] of Object.entries(result.flags)) {
+        assert.equal(value, 0, `${hook}/${caseId}: spy counter ${flag} = ${String(value)}`);
+      }
+      if (caseId === 'later-rejecting-promise-then-spy' || caseId === 'later-rejecting-promise-proxy' || caseId === 'plain-promise-late-reject') {
+        assert.equal(result.unhandled.length, 1, `${hook}/${caseId}: exactly 1 hook-owned unhandledRejection expected`);
+        assert.match(result.unhandled[0], /hook-owned late rejection/, `${hook}/${caseId}: the captured rejection must be the hook's own reason`);
+      } else {
+        assert.deepEqual(result.unhandled, [], `${hook}/${caseId}: unexpected unhandledRejection`);
+      }
+      if (caseId === 'then-getter-slow' || caseId === 'nested-slow-ownkeys-proxy') {
+        assert.ok(result.elapsedMs < 250, `${hook}/${caseId}: send must not be delayed by a never-invoked trap (${String(result.elapsedMs)}ms)`);
       }
     }
+  }
+});
+
+test('N-KEXT-F7-INFINITE-TRAP: an infinitely-blocking reflective trap proxy can neither stall nor crash the ACK (both hooks)', async () => {
+  for (const hook of ['budget', 'observation'] as const) {
+    const result = await runHostileChild('infinite-trap', hook, { timeoutMs: 45_000 });
+    assert.deepEqual(result.failures, [], `${hook}/infinite-trap failures: ${JSON.stringify(result)}`);
+    assert.equal(result.status, 'admitted', 'the ACK returned with the trap never executed');
+    assert.equal(result.receiptIdentical, true);
+    assert.equal(result.advisoryRejected, 1);
+    assert.equal(result.sinkCount, 0);
+    assert.equal(result.flags.getTraps, 0);
+    assert.equal(result.flags.hasTraps, 0);
   }
 });

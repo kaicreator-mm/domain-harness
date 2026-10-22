@@ -82,3 +82,31 @@
 `V010_TARGETED_L2_ITEMS=R1_RUNTIME_BUILD_CLOSURE,R2_NATIVE_TOOL_PC05_SEAM`.
 
 `V010_ADDITIONAL_RUNTIME_IMPLEMENTATION=NO`, `L2_FREEZE=NOT_PROVEN`, `IMPLEMENTATION_PASS=NOT_CLAIMED`.
+
+## Addendum (2026-10-23, #1264 follow-up 7): advisory hook result ABI — JSON-string contract
+
+> **Status:** implementation addendum to this (non-frozen) audit record. It does not modify the
+> frozen v0.10 PRD, L2 R0 or Task DAG; it records the owner-decided result contract for the two
+> advisory hooks introduced at the K seam (#1264) and states exactly what the Kernel guarantees.
+
+**ABI (owner decision):** both K advisory hooks (`admission-budget-advice/v1`,
+`turn-observation/v1`) return a **JSON text string** (e.g. `'{"maxSteps":3}'`,
+`'{"note":"x"}'`). The hook input — the frozen redacted projection — is unchanged.
+
+**Kernel consumption (the whole of it):** `typeof result === 'string'` → a pre-parse length
+bound → `JSON.parse(result)` with no reviver, inside one isolation guard. The parsed value is
+Kernel-created plain data, validated with the existing field/range/authority rules, an own
+`__proto__` refusal and a bounded nesting depth. **A non-string result (Promise, thenable,
+Proxy, String object, function, `null`, …) is refused and counted with NO other operation on
+it** — no property access, no [[Get]], no reflective trap, no `then`, no String coercion — so
+the Kernel's consumption cannot stall, crash the process or change the decided receipt.
+`undefined` is the documented "no advice / nothing to observe" result and is skipped without
+counting.
+
+**Contract statement:** an advisory hook's own asynchronous behavior — including a Promise or
+any other object it returns, which the Kernel refuses without touching — is the extension's
+same-realm responsibility (per L2 §C: "Same-realm trusted JS is not a hostile plugin sandbox").
+The Kernel guarantees only what its own consumption does, as stated above, and nothing more.
+This wording supersedes the stronger follow-up 5/6 phrasings ("no [[Get]]", "never stall",
+"nothing can throw") recorded in `.agent/execution/v0.10-KEXT-ADVISORY/EVIDENCE.md`, which
+described implementations that were superseded by this owner decision.

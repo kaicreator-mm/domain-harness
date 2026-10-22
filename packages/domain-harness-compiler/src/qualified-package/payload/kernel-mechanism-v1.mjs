@@ -70,19 +70,35 @@
  * turn time, always as the sole authority —
  *   - `admission-budget-advice/v1` (pre-admission, pure, bounded): a frozen
  *     redacted proposal (intentType + workflowId + the Kernel's own effective
- *     hard limits) may return `{maxSteps?, maxWorkUnits?}`; the Primary
- *     applies min(own limit, advice) — advice can only TIGHTEN. Enforced at
- *     the FR07 continuation step bound and the pre-dispatch work-unit check.
+ *     hard limits) may return a JSON text STRING such as '{"maxSteps":3}';
+ *     the Primary applies min(own limit, advice) — advice can only TIGHTEN.
+ *     Enforced at the FR07 continuation step bound and the pre-dispatch
+ *     work-unit check.
  *   - `turn-observation/v1` (post-disposition, observation-only): a frozen
  *     public identity projection after the authoritative disposition; a
- *     bounded result reaches the `observe` sink as a separate record.
- *   - Hooks are invoked SYNCHRONOUSLY and never awaited; a thenable result
- *     is rejected outright (counted, discarded with a no-op catch) so an
- *     advisory module can never stall a lane or withhold a decided receipt
- *     (#1264 R1).
- *   - Any malformed/oversize/extra-field/throwing/thenable result is counted
- *     in `counters.advisoryRejected` and ignored for authority. Replayed
- *     turns consult ZERO hooks. Absent table: Basic behavior byte-for-byte.
+ *     bounded JSON text STRING result is parsed and reaches the `observe`
+ *     sink as a separate record.
+ *   - RESULT ABI (owner decision, #1264 follow-up 7): a hook result MUST be
+ *     a JSON text string. The Kernel's entire consumption is `typeof`, a
+ *     pre-parse length bound and `JSON.parse` (no reviver) inside one guard;
+ *     the parsed value is Kernel-created plain data, validated by the
+ *     existing field/range/authority rules plus an own-`__proto__` refusal
+ *     and the depth bound. A NON-string result (Promise, thenable, object,
+ *     Proxy, String object, function, null, ...) is refused and counted with
+ *     NO other operation on it — no property access, no [[Get]], no
+ *     reflective trap, no `then`, no coercion — so the Kernel's consumption
+ *     cannot stall, crash the process or change the decided receipt.
+ *     `undefined` is the documented "no advice / nothing to observe" result
+ *     and is skipped without counting. An advisory hook's own asynchronous
+ *     behavior — including a Promise or any other object it returns, which
+ *     the Kernel refuses without touching — is the extension's same-realm
+ *     responsibility (L2 §C: "Same-realm trusted JS is not a hostile plugin
+ *     sandbox").
+ *   - Hooks are invoked SYNCHRONOUSLY and never awaited. Any malformed /
+ *     oversize / extra-field / authority-field / own-__proto__ / over-deep /
+ *     non-string (non-undefined) result is counted in
+ *     `counters.advisoryRejected` and ignored for authority. Replayed turns
+ *     consult ZERO hooks. Absent table: Basic behavior byte-for-byte.
  */
 
 export const MODULE_ID = 'v08-kernel-mechanism@1.0.0';
@@ -3994,138 +4010,64 @@ function isPlainAdvisoryRecord(value) {
 }
 
 /**
- * Shared no-op handlers for the intrinsic native-Promise rejection detach.
+ * [v0.10 #1264 F7 — owner-decided JSON-string result ABI] Both advisory
+ * hooks return a JSON text STRING (e.g. '{"maxSteps":3}'). The Kernel's
+ * entire consumption of a result is: (1) `typeof result === 'string'`;
+ * (2) a length bound, checked BEFORE parsing; (3) `JSON.parse(result)` with
+ * no reviver, inside the isolation guard. A non-string result — a Promise,
+ * a Promise subclass, a cross-realm Promise, a String object, a function,
+ * a Proxy, `null`, a number — is refused and counted with NO other
+ * operation on it: no property access, no [[Get]], no reflective trap, no
+ * `then`, no String coercion. The Kernel therefore executes no user code
+ * and runs no trap for any non-string result, and for a string it only
+ * measures the length and runs `JSON.parse`, so its consumption cannot
+ * stall, crash the process or change the decided receipt.
+ *
+ * Contract statement: an advisory hook's own asynchronous behavior —
+ * including a Promise or any other object it returns, which the Kernel
+ * refuses without touching — is the extension's same-realm responsibility
+ * (per L2 §C: "Same-realm trusted JS is not a hostile plugin sandbox"). The
+ * Kernel guarantees ONLY what its own consumption does, nothing more.
+ *
+ * `undefined` is the documented "no advice / nothing to observe" result: it
+ * is skipped silently and NOT counted (the refusal counter means "a result
+ * was produced and was not consumable"). `null` and every other non-string
+ * value ARE refused and counted.
  */
-function advisoryNoop() { }
 
-/**
- * [v0.10 #1264 R2-F1/F6] Classify a hook result's promise-ness WITHOUT any
- * [[Get]] on it and WITHOUT running user code. The intrinsic
- * `Promise.prototype.then` brand-checks its receiver, but per spec it then
- * runs SpeciesConstructor(result) — Get(result, "constructor") and
- * Get(C, @@species) — which would execute user getters on a Promise
- * carrying an own `constructor` accessor or on a subclass instance. The
- * intrinsic `then` is therefore called ONLY when, checked with reflective
- * operations only and in this order:
- *   - Object.getPrototypeOf(result) is EXACTLY Promise.prototype (never
- *     `instanceof`, which can consult user Symbol.hasInstance; also rules
- *     out subclass instances and Proxy-wrapped prototypes), and
- *   - Reflect.ownKeys(result) carries no STRING key and no symbol beyond
- *     Node's own async-tracking stamps (Symbol(async_id_symbol) /
- *     Symbol(trigger_async_id_symbol), which Node adds to promises created
- *     inside tracked async contexts — they are not user data),
- * so the species lookup provably reads only the intrinsic
- * Promise.prototype.constructor and Promise[@@species]; real noop handlers
- * are attached and the caller refuses and counts the value. In EVERY other
- * case `then` is not called at all: the value is classified by the
- * descriptor rules (a native Promise is not plain data, so it refuses) and
- * counted — such a value's own eventual rejection is the hook's own
- * responsibility, because no user code is executed to detach it.
- */
-function detachNativePromise(result) {
-  if (typeof result !== 'object' || Object.getPrototypeOf(result) !== Promise.prototype) {
-    return false;
-  }
-  for (const key of Reflect.ownKeys(result)) {
-    if (typeof key === 'string') return false;
-    const label = key.toString();
-    if (label !== 'Symbol(async_id_symbol)' && label !== 'Symbol(trigger_async_id_symbol)') {
-      return false;
-    }
-  }
-  try {
-    Promise.prototype.then.call(result, advisoryNoop, advisoryNoop);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/** Small fixed ceiling on a budget-advice JSON string (checked pre-parse). */
+const ADVISORY_ADVICE_MAX_CHARS = 256;
 
-/** Bounded recursion depth of one advisory-result data snapshot. */
+/** Bounded nesting depth of one JSON.parsed advisory value. */
 const ADVISORY_RESULT_MAX_DEPTH = 8;
-/** Sentinel: the inspected value is not advisory plain data. */
-const ADVISORY_REFUSED = Symbol('advisory-result-refused');
 
 /**
- * [v0.10 #1264 R2-F1/R2-F2] Descriptor-safe plain-data snapshot of one
- * advisory result, with a strict no-[[Get]] contract:
- *  - the ONLY reflective operations used are Object.getPrototypeOf,
- *    Reflect.ownKeys, Object.getOwnPropertyDescriptor and Array.isArray,
- *    all inside the caller's isolation guard — a [[Get]] on the result (and
- *    therefore any accessor or Proxy `get` trap, e.g. on `length`) NEVER
- *    runs, and no function found on the result is ever called;
- *  - reflective Proxy traps for those four operations may still run —
- *    unavoidable without node:util — but every throw lands in the caller's
- *    guard and counts as a refused result;
- *  - Reflect.ownKeys completeness: ANY Symbol key, ANY non-enumerable key
- *    (arrays excepted for their ordinary `length`), ANY accessor and ANY
- *    own `__proto__` key (enumerable or not) refuse the whole result;
- *  - arrays allow exactly the ordinary non-enumerable data `length` (read
- *    only through its own descriptor) plus dense canonical index keys
- *    0..length-1, each an enumerable data property; any other own key, a
- *    sparse hole or a hostile `length` descriptor refuses;
- *  - values are finite JSON data, recursively, depth-bounded.
- * Returns ADVISORY_REFUSED for a refused result.
+ * Validate ONE freshly JSON.parsed advisory value. The value was created by
+ * THIS module's `JSON.parse` — plain data, string keys, enumerable data
+ * properties, dense arrays, finite numbers: there is no user code to run
+ * and no trap to fire, so ordinary property reads here touch only Kernel-
+ * created objects. Refuses any own `__proto__` key (JSON.parse materializes
+ * it as an own data property) and any nesting deeper than
+ * ADVISORY_RESULT_MAX_DEPTH.
  */
-function advisoryDataSnapshot(value, depth) {
-  if (value === null) return null;
+function isBoundedPlainJsonValue(value, depth) {
+  if (value === null) return true;
   const valueType = typeof value;
-  if (valueType === 'string' || valueType === 'boolean') return value;
-  if (valueType === 'number') return Number.isFinite(value) ? value : ADVISORY_REFUSED;
-  if (valueType !== 'object') return ADVISORY_REFUSED;
-  if (depth >= ADVISORY_RESULT_MAX_DEPTH) return ADVISORY_REFUSED;
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== Array.prototype && proto !== null) {
-    return ADVISORY_REFUSED;
-  }
+  if (valueType === 'string' || valueType === 'boolean') return true;
+  if (valueType === 'number') return Number.isFinite(value);
+  if (valueType !== 'object') return false;
+  if (depth >= ADVISORY_RESULT_MAX_DEPTH) return false;
+  if (Object.hasOwn(value, '__proto__')) return false;
   if (Array.isArray(value)) {
-    let length = -1;
-    const byIndex = new Map();
-    for (const key of Reflect.ownKeys(value)) {
-      if (typeof key === 'symbol' || key === '__proto__') return ADVISORY_REFUSED;
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (descriptor === undefined) return ADVISORY_REFUSED;
-      if (key === 'length') {
-        // Exactly the ordinary non-enumerable data `length` (a frozen
-        // array's non-writable length stays acceptable).
-        if (descriptor.enumerable || !('value' in descriptor)
-          || !Number.isSafeInteger(descriptor.value) || descriptor.value < 0) {
-          return ADVISORY_REFUSED;
-        }
-        length = descriptor.value;
-        continue;
-      }
-      const index = Number(key);
-      if (!(Number.isSafeInteger(index) && index >= 0 && index < 4294967294 && String(index) === key)
-        || !descriptor.enumerable || !('value' in descriptor)) {
-        return ADVISORY_REFUSED;
-      }
-      byIndex.set(index, descriptor.value);
+    for (const entry of value) {
+      if (!isBoundedPlainJsonValue(entry, depth + 1)) return false;
     }
-    if (length === -1 || byIndex.size !== length) {
-      return ADVISORY_REFUSED;
-    }
-    const entries = [];
-    for (let index = 0; index < length; index += 1) {
-      if (!byIndex.has(index)) return ADVISORY_REFUSED;
-      const entry = advisoryDataSnapshot(byIndex.get(index), depth + 1);
-      if (entry === ADVISORY_REFUSED) return ADVISORY_REFUSED;
-      entries.push(entry);
-    }
-    return entries;
+    return true;
   }
-  const record = {};
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key === 'symbol' || key === '__proto__') return ADVISORY_REFUSED;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
-      return ADVISORY_REFUSED;
-    }
-    const entry = advisoryDataSnapshot(descriptor.value, depth + 1);
-    if (entry === ADVISORY_REFUSED) return ADVISORY_REFUSED;
-    record[key] = entry;
+  for (const key of Object.keys(value)) {
+    if (!isBoundedPlainJsonValue(value[key], depth + 1)) return false;
   }
-  return record;
+  return true;
 }
 
 /**
@@ -6268,31 +6210,37 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return turnBudget;
     }
-    // [v0.10 #1264 F1/R2-F1/F6] The ENTIRE result handling — promise
-    // classification, prototype/key/descriptor checks and normalization —
-    // runs inside ONE guard that cannot leak into the Primary, and performs
-    // NO [[Get]] on the result: the native-Promise check calls the
-    // INTRINSIC Promise.prototype.then ONLY on an exact native Promise with
-    // no own keys (prototype check first, then Reflect.ownKeys), so the
-    // species lookup reads only intrinsics and real noop handlers make a
-    // later rejection harmless; every other value is consumed only through
-    // the descriptor-safe snapshot — its `then` is never read and never
-    // called. Any escape (hostile reflective Proxy trap, broken descriptor
-    // shape) is a refused result: dropped, counted, and the budget falls
-    // back to the Kernel's own limits.
+    // [v0.10 #1264 F7 — owner-decided JSON-string result ABI] The ENTIRE
+    // result consumption runs inside ONE guard. On a non-string result the
+    // guard performs `typeof` and NOTHING else — no property access, no
+    // [[Get]], no reflective trap, no `then`, no coercion — so a hostile or
+    // merely-buggy result can neither run user code, stall the turn, crash
+    // the process nor withhold the ACK. On a string it only measures the
+    // length and runs JSON.parse (no reviver); every further check reads
+    // only the freshly parsed Kernel-owned plain data.
     try {
-      if (detachNativePromise(result)) {
-        // A genuine native Promise is never advice; it now carries real
-        // rejection handlers, so nothing can leak asynchronously.
+      if (result === undefined) {
+        // Documented "no advice": an intentional empty result, not a fault
+        // (the refusal counter means "a result was produced and was not
+        // consumable").
+        return turnBudget;
+      }
+      if (typeof result !== 'string') {
         counters.advisoryRejected += 1;
         return turnBudget;
       }
-      const snapshot = advisoryDataSnapshot(result, 0);
-      if (snapshot === ADVISORY_REFUSED || !isJsonRecord(snapshot) || !isPlainAdvisoryRecord(snapshot)) {
+      if (result.length > ADVISORY_ADVICE_MAX_CHARS) {
+        // Oversize advice is refused BEFORE parsing.
         counters.advisoryRejected += 1;
         return turnBudget;
       }
-      for (const field of Object.keys(snapshot)) {
+      const parsed = JSON.parse(result);
+      if (!isJsonRecord(parsed) || !isPlainAdvisoryRecord(parsed) || !isBoundedPlainJsonValue(parsed, 0)) {
+        // Non-object JSON, an own `__proto__` key, or over-deep nesting.
+        counters.advisoryRejected += 1;
+        return turnBudget;
+      }
+      for (const field of Object.keys(parsed)) {
         if (!BUDGET_ADVICE_FIELDS.has(field)) {
           // Smuggled authority-shaped or unknown fields void the whole advice.
           counters.advisoryRejected += 1;
@@ -6301,7 +6249,7 @@ export function createOccurrenceRuntime(options) {
       }
       const advice = {};
       for (const field of BUDGET_ADVICE_FIELDS) {
-        const value = snapshot[field];
+        const value = parsed[field];
         if (value === undefined) continue;
         if (!Number.isSafeInteger(value) || value < 1 || value > ADVISORY_ADVICE_VALUE_CEILING) {
           // Malformed / non-integer / ≤0 / oversize advice is never applied.
@@ -6350,27 +6298,32 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return;
     }
-    // [v0.10 #1264 F1/R2-F1/F6] The ENTIRE result handling runs inside one
-    // guard that cannot leak and performs NO [[Get]] on the result: the
-    // INTRINSIC Promise.prototype.then is called only on an exact native
-    // Promise with no own keys (species lookup provably intrinsic; real
-    // noop handlers attached), everything else is consumed only through the
-    // descriptor-safe snapshot — a non-native thenable's `then` is never
-    // read and never called. A fault here — including AFTER an
-    // already-committed turn — is a dropped, counted result that never
-    // affects the decided receipt.
+    // [v0.10 #1264 F7 — owner-decided JSON-string result ABI] The ENTIRE
+    // result consumption runs inside ONE guard. On a non-string result the
+    // guard performs `typeof` and NOTHING else — no property access, no
+    // [[Get]], no reflective trap, no `then`, no coercion — so a hostile or
+    // merely-buggy result can neither run user code, stall the turn, crash
+    // the process, withhold the already-decided receipt nor alter State,
+    // Journal or Effect. On a string it only measures the length (pre-parse)
+    // and runs JSON.parse (no reviver); every further check reads only the
+    // freshly parsed Kernel-owned plain data.
     try {
-      if (detachNativePromise(result)) {
+      if (result === undefined) {
+        // Documented "nothing to observe": intentional, not a fault.
+        return;
+      }
+      if (typeof result !== 'string') {
         counters.advisoryRejected += 1;
         return;
       }
-      const snapshot = advisoryDataSnapshot(result, 0);
-      if (snapshot === ADVISORY_REFUSED || !isJsonRecord(snapshot) || !isPlainAdvisoryRecord(snapshot)) {
+      if (result.length > ADVISORY_OBSERVATION_MAX_CHARS) {
+        // Oversize observation is refused BEFORE parsing.
         counters.advisoryRejected += 1;
         return;
       }
-      const encoded = canonicalJsonStringify(snapshot);
-      if (encoded.length > ADVISORY_OBSERVATION_MAX_CHARS) {
+      const parsed = JSON.parse(result);
+      if (!isJsonRecord(parsed) || !isPlainAdvisoryRecord(parsed) || !isBoundedPlainJsonValue(parsed, 0)) {
+        // Non-object JSON, an own `__proto__` key, or over-deep nesting.
         counters.advisoryRejected += 1;
         return;
       }
@@ -6391,7 +6344,7 @@ export function createOccurrenceRuntime(options) {
           turnId,
         }),
         turn: projection,
-        observation: snapshot,
+        observation: parsed,
       });
     } catch {
       counters.advisoryRejected += 1;
