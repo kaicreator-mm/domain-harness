@@ -13,7 +13,7 @@ const STATES = new Set(['PASS','FAIL','UNKNOWN','ABORTED','NOT_RUN']);
 const KEY_BAD = new Set(['__proto__','constructor','prototype','permit','effectPermit',
   'kernelState','effectJournal','admissionFence','resources','hostPorts','write',
   'activate','promote','selfApprove']);
-export class EvaluationEvidenceError extends Error {
+class EvaluationEvidenceError extends Error {
   constructor(code) { super(code); this.name='EvaluationEvidenceError'; this.code=code; }
 }
 function err(code) { throw new EvaluationEvidenceError(code); }
