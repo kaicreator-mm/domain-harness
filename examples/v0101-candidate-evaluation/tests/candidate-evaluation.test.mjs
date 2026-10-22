@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as actualFeatureNamespace from '../modules/sfeature-candidate-evaluation-v1.mjs';
 import {evaluateCandidateEvidence,FEATURE_KEY,init} from '../modules/sfeature-candidate-evaluation-v1.mjs';
 const A='a'.repeat(40),B='b'.repeat(40);
 const c=(caseId,subjectSha,status,extras={})=>({
@@ -12,6 +13,10 @@ const item=(extras={})=>({
   baselineSha:A,candidateSha:B,verifierRevision:'r1',holdoutVisibility:'ISOLATED',
   oracleChecks:checks(),baseline:[c('t1',A,'FAIL'),c('t2',A,'PASS')],
   candidate:[c('t1',B,'PASS'),c('t2',B,'PASS')],...extras
+});
+test('v10 activation exact sealed export surface', () => {
+  assert.deepEqual(Object.keys(actualFeatureNamespace).sort(),
+    ['MODULE_ID','PACKAGE_KIND','FEATURE_ABI','FEATURE_KEY','init','evaluateCandidateEvidence'].sort());
 });
 test('selected v10 advisory init return is ABI-conformant', () => {
   const result=init({appId:'app:qualified',audience:'aud:qualified'});
