@@ -42,7 +42,7 @@ function arr(a,max=32){
     if(!d||!Object.hasOwn(d,'value'))fail('EXPERIMENT_LIST_INVALID');}
   return a;
 }
-export function init(context){obj(context);return Object.freeze({ok:true,appId:id(get(context,'appId')),featureKey:FEATURE_KEY});}
+export function init(context){obj(context);return Object.freeze({ok:true,featureKey:FEATURE_KEY,observedContext:Object.freeze({appId:id(get(context,'appId'))})});}
 /**
  * plan schema:
  * proposalId, subjectSha, baselineRef, candidateRef, hypothesisRef,
