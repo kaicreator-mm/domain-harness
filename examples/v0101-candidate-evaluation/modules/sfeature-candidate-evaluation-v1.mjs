@@ -50,7 +50,7 @@ function arr(a,max=128) {
 }
 export function init(context) {
   obj(context);
-  return Object.freeze({ok:true,appId:id(field(context,'appId')),featureKey:FEATURE_KEY});
+  return Object.freeze({ok:true,featureKey:FEATURE_KEY,observedContext:Object.freeze({appId:id(field(context,'appId'))})});
 }
 function cohort(raw, expectedSha) {
   arr(raw);
