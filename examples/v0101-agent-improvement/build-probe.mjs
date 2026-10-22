@@ -73,6 +73,28 @@ assert.throws(() => buildV10App({
   ...buildInput,
   modules:[...selected, {...selected.at(-1),packageId:'sfeature-diagnostic-duplicate@v0101.0.0'}],
 }), /duplicate|conflict|provider|feature/i, 'duplicate Feature must refuse at BUILD');
+// Synthetic negative cases — only the actual v10 BUILD owner can refuse these.
+const feature = selected.at(-1);
+assert.deepEqual(feature.requires, [], 'standalone optional feature has zero BUILD dependencies');
+assert.deepEqual(feature.externalImports, {node:[],npm:[],native:[]},
+  'selected Feature has no declared external imports');
+assert.throws(() => buildV10App({...buildInput,modules:[
+  ...selected.slice(0,-1), {...feature,requires:['standard:missing/1']},
+]}), (error) => typeof error?.code === 'string', 'missing synthetic required feature must refuse');
+assert.throws(() => buildV10App({...buildInput,modules:[
+  ...selected.slice(0,-1), {...feature,abiVersion:'dh.v10.standard-feature/99'},
+]}), {code:'V10_ABI_UNSUPPORTED'});
+assert.throws(() => buildV10App({...buildInput,modules:[
+  ...selected.slice(0,-1), {...feature,moduleSha256:'0'.repeat(64)},
+]}), {code:'V10_DIGEST_MISMATCH'});
+// The source is deliberately changed and REHASHED; this probes the sealed
+// import-policy owner, not the digest mismatch owner.
+const prohibitedSource = "import { readFileSync } from 'node:fs';\n" + feature.moduleSource;
+assert.throws(() => buildV10App({...buildInput,modules:[
+  ...selected.slice(0,-1), {...feature,moduleSource:prohibitedSource,
+    moduleSha256:sha256Hex(prohibitedSource)},
+]}), {code:'V10_IMPORT_POLICY_DENIED'},
+  'forbidden side-effect import must fail before module evaluation');
 console.log(JSON.stringify({
   status:'BUILD_SELECTED_ONLY', subjectDigest:built.subjectDigest,
   selectedFeature:agentDiagnosticsFeature.packageId, totalModules:built.modules.length,
