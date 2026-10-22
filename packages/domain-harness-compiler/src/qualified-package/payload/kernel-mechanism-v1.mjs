@@ -3994,18 +3994,28 @@ function isPlainAdvisoryRecord(value) {
 }
 
 /**
- * Detach a discarded advisory thenable: the Primary never awaits it, and the
- * no-op handlers prevent its eventual fulfillment/rejection from surfacing
- * as an unhandled promise rejection. BOTH handlers must be real functions —
- * `then(undefined, undefined)` is a pass-through that Node still reports as
- * unhandled.
+ * Shared no-op handlers for the intrinsic native-Promise rejection detach.
  */
-function discardThenable(thenable) {
-  const swallow = () => { };
+function advisoryNoop() { }
+
+/**
+ * [v0.10 #1264 R2-F1] Classify a hook result's promise-ness WITHOUT any
+ * [[Get]] on it: the INTRINSIC `Promise.prototype.then` performs a brand
+ * check that never reads `result.then`, so no user getter can run. On a
+ * genuine native Promise (subclass instances included) it attaches REAL
+ * noop fulfillment/rejection handlers, so a later rejection can never
+ * surface as unhandledRejection. Returns true when the value was a native
+ * Promise (the caller treats it as refused advice/observation and counts
+ * it); false when the intrinsic call threw — the value is NOT a native
+ * Promise and its own `then` is never read and never called from here on,
+ * so no derived promise can be created behind the Primary's back.
+ */
+function detachNativePromise(result) {
   try {
-    thenable.then(swallow, swallow);
+    Promise.prototype.then.call(result, advisoryNoop, advisoryNoop);
+    return true;
   } catch {
-    // a broken `then` is the advisory module's defect, not the Primary's
+    return false;
   }
 }
 
@@ -4015,15 +4025,24 @@ const ADVISORY_RESULT_MAX_DEPTH = 8;
 const ADVISORY_REFUSED = Symbol('advisory-result-refused');
 
 /**
- * [v0.10 #1264 F1] Descriptor-safe plain-data snapshot of one advisory
- * result. Accepts ONLY ordinary objects/arrays (Object/Array prototype or
- * null) whose own enumerable properties are ALL ordinary data properties
- * holding finite JSON values, recursively and depth-bounded. Accessors,
- * exotic prototypes, functions/symbols and non-finite numbers refuse the
- * WHOLE result — without invoking any getter, so a throwing getter or a
- * hostile Proxy trap can never leak into the Primary. Every reflective
- * operation here can still throw on a hostile Proxy; the caller must run
- * this inside its isolation guard and treat any throw as a refused result.
+ * [v0.10 #1264 R2-F1/R2-F2] Descriptor-safe plain-data snapshot of one
+ * advisory result, with a strict no-[[Get]] contract:
+ *  - the ONLY reflective operations used are Object.getPrototypeOf,
+ *    Reflect.ownKeys, Object.getOwnPropertyDescriptor and Array.isArray,
+ *    all inside the caller's isolation guard — a [[Get]] on the result (and
+ *    therefore any accessor or Proxy `get` trap, e.g. on `length`) NEVER
+ *    runs, and no function found on the result is ever called;
+ *  - reflective Proxy traps for those four operations may still run —
+ *    unavoidable without node:util — but every throw lands in the caller's
+ *    guard and counts as a refused result;
+ *  - Reflect.ownKeys completeness: ANY Symbol key, ANY non-enumerable key
+ *    (arrays excepted for their ordinary `length`), ANY accessor and ANY
+ *    own `__proto__` key (enumerable or not) refuse the whole result;
+ *  - arrays allow exactly the ordinary non-enumerable data `length` (read
+ *    only through its own descriptor) plus dense canonical index keys
+ *    0..length-1, each an enumerable data property; any other own key, a
+ *    sparse hole or a hostile `length` descriptor refuses;
+ *  - values are finite JSON data, recursively, depth-bounded.
  * Returns ADVISORY_REFUSED for a refused result.
  */
 function advisoryDataSnapshot(value, depth) {
@@ -4038,38 +4057,44 @@ function advisoryDataSnapshot(value, depth) {
     return ADVISORY_REFUSED;
   }
   if (Array.isArray(value)) {
-    const entries = [];
-    for (let index = 0; index < value.length; index += 1) {
-      const key = String(index);
-      if (!hasOwn(value, key)) return ADVISORY_REFUSED;
-      // [v0.10 #1264 F4] Elements are read ONLY through their own data
-      // descriptor: an accessor element is refused WITHOUT ever invoking its
-      // getter (a plain `value[index]` read would fire it).
+    let length = -1;
+    const byIndex = new Map();
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key === 'symbol' || key === '__proto__') return ADVISORY_REFUSED;
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+      if (descriptor === undefined) return ADVISORY_REFUSED;
+      if (key === 'length') {
+        // Exactly the ordinary non-enumerable data `length` (a frozen
+        // array's non-writable length stays acceptable).
+        if (descriptor.enumerable || !('value' in descriptor)
+          || !Number.isSafeInteger(descriptor.value) || descriptor.value < 0) {
+          return ADVISORY_REFUSED;
+        }
+        length = descriptor.value;
+        continue;
+      }
+      const index = Number(key);
+      if (!(Number.isSafeInteger(index) && index >= 0 && index < 4294967294 && String(index) === key)
+        || !descriptor.enumerable || !('value' in descriptor)) {
         return ADVISORY_REFUSED;
       }
-      const entry = advisoryDataSnapshot(descriptor.value, depth + 1);
+      byIndex.set(index, descriptor.value);
+    }
+    if (length === -1 || byIndex.size !== length) {
+      return ADVISORY_REFUSED;
+    }
+    const entries = [];
+    for (let index = 0; index < length; index += 1) {
+      if (!byIndex.has(index)) return ADVISORY_REFUSED;
+      const entry = advisoryDataSnapshot(byIndex.get(index), depth + 1);
       if (entry === ADVISORY_REFUSED) return ADVISORY_REFUSED;
       entries.push(entry);
-    }
-    // Extra non-index own properties are outside the array's snapshot shape
-    // and refuse the result instead of being silently dropped.
-    for (const key of Object.keys(value)) {
-      const index = Number(key);
-      if (!(Number.isSafeInteger(index) && index >= 0 && index < value.length && String(index) === key)) {
-        return ADVISORY_REFUSED;
-      }
     }
     return entries;
   }
   const record = {};
-  for (const key of Object.keys(value)) {
-    // [v0.10 #1264 F4] An own `__proto__` key (reachable via JSON.parse or
-    // defineProperty) would reshape this snapshot's prototype through a
-    // plain assignment, so it refuses the result outright; the snapshot
-    // stays an ordinary object with no inherited-field exposure.
-    if (key === '__proto__') return ADVISORY_REFUSED;
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key === 'symbol' || key === '__proto__') return ADVISORY_REFUSED;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
       return ADVISORY_REFUSED;
@@ -6221,19 +6246,21 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return turnBudget;
     }
-    // [v0.10 #1264 F1] The ENTIRE result handling — thenable detection,
-    // prototype/accessor classification, field checks and normalization —
-    // runs inside ONE guard that cannot leak into the Primary: the hook
-    // result is consumed only through the descriptor-safe snapshot (never a
-    // getter invocation), and any escape (throwing `then` getter, hostile
-    // Proxy trap, broken descriptor shape) is a refused result: dropped,
-    // counted, and the budget falls back to the Kernel's own limits.
+    // [v0.10 #1264 F1/R2-F1] The ENTIRE result handling — promise
+    // classification, prototype/key/descriptor checks and normalization —
+    // runs inside ONE guard that cannot leak into the Primary, and performs
+    // NO [[Get]] on the result: the native-Promise check uses the INTRINSIC
+    // Promise.prototype.then (brand check only, real noop handlers attached
+    // so a later rejection can never surface as unhandledRejection), and a
+    // non-Promise result is consumed only through the descriptor-safe
+    // snapshot — its `then` is never read and never called. Any escape
+    // (hostile reflective Proxy trap, broken descriptor shape) is a refused
+    // result: dropped, counted, and the budget falls back to the Kernel's
+    // own limits.
     try {
-      const then = typeof result === 'object' || typeof result === 'function' ? result.then : undefined;
-      if (typeof then === 'function') {
-        // Never awaited, never applied; the discarded promise's eventual
-        // outcome is detached so it cannot surface as an unhandled rejection.
-        discardThenable(result);
+      if (detachNativePromise(result)) {
+        // A genuine native Promise is never advice; it now carries real
+        // rejection handlers, so nothing can leak asynchronously.
         counters.advisoryRejected += 1;
         return turnBudget;
       }
@@ -6300,15 +6327,16 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return;
     }
-    // [v0.10 #1264 F1] The ENTIRE result handling runs inside one guard that
-    // cannot leak: classification, thenable detection and detaching, and the
-    // descriptor-safe snapshot (never a getter invocation). A fault here —
-    // including AFTER an already-committed turn — is a dropped, counted
-    // result that never affects the decided receipt.
+    // [v0.10 #1264 F1/R2-F1] The ENTIRE result handling runs inside one
+    // guard that cannot leak and performs NO [[Get]] on the result: native
+    // Promises are classified and detached through the INTRINSIC
+    // Promise.prototype.then (brand check; real noop handlers), everything
+    // else is consumed only through the descriptor-safe snapshot — a
+    // non-native thenable's `then` is never read and never called. A fault
+    // here — including AFTER an already-committed turn — is a dropped,
+    // counted result that never affects the decided receipt.
     try {
-      const then = typeof result === 'object' || typeof result === 'function' ? result.then : undefined;
-      if (typeof then === 'function') {
-        discardThenable(result);
+      if (detachNativePromise(result)) {
         counters.advisoryRejected += 1;
         return;
       }

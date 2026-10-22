@@ -9,6 +9,7 @@
   - `6a0d1777` (follow-up 2; 18-test suite): `5a6ab7985cb916a8699b8f1364caf12ff918e149c3a752029a18e81ca034e985` (git blob `7fe178a0f52dc553981c9714f8370682d945ee35`)
   - Follow-up 3 head (25-test suite): `54e8b8e1776d5799ac0b1950032ac839b0a0f641ae889c5404785dbb157b62b7` (git blob `6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d`)
   - Follow-up 4 head (28-test suite): `e522f2cf6591868adff307edd3f89710d8ef30ac83cbc99de65352527a574286` (git blob `aa4382ceeecac3a15e46f4d681e3aa5f85a563d4`)
+  - Follow-up 5 head (29-test suite + hostile-matrix child regressions): `fc17cee68c484225df1cf057b4fd36b5941102491d38406ff9d0a91d1a1321e9` (git blob `d9dc7d99825d5f0c6260e5495c9ebce732e494fd`)
   - Repository-wide search found NO committed test/witness pinning either SHA literal; every
     v0.10 suite computes `moduleSha256`/`subjectDigest` dynamically at runtime. Historical
     evidence receipts under `docs/experiments/**` and `.agent/execution/**` are immutable
@@ -41,6 +42,32 @@
   activation fault tests compose them in beta's slot.
 - Rich consumer scenario: new step `RICH_P1.advisoryConsultation` (both hooks invoked, ≥1
   clamp, ≥1 rejected authority-field advice), pinned in the T11 integration expectations.
+
+## Follow-up 5 (independent re-review PR #1269) — no-[[Get]] result isolation
+
+- **R2-F1 (P1):** advisory result inspection performs NO [[Get]] on a hook
+  result at any depth and never calls user code. The ONLY reflective
+  operations are `Object.getPrototypeOf`, `Reflect.ownKeys`,
+  `Object.getOwnPropertyDescriptor` and `Array.isArray`, all inside the
+  isolation guard (reflective Proxy traps may run and are guarded). Native
+  Promises are classified and detached through the INTRINSIC
+  `Promise.prototype.then` (brand check; real noop handlers attached, so no
+  unhandledRejection is possible); a non-native result's `then` is never
+  read and never called — a non-native thenable is classified purely by the
+  descriptor rules. The slow `then` getter (bounded 400ms `Atomics.wait`)
+  can no longer delay a send because it is never invoked.
+- **R2-F2 (P2):** own-key completeness via `Reflect.ownKeys`: any Symbol
+  key, non-enumerable key (arrays' ordinary `length` excepted), accessor or
+  own `__proto__` key (enumerable or not) refuses the whole result. Arrays
+  allow exactly the ordinary non-enumerable data `length` (read only through
+  its own descriptor) plus dense canonical index keys 0..length-1, each an
+  enumerable data property; anything else refuses.
+- New regressions: `advisory-hostile-child.mjs` (child-process fixture with
+  a process-level unhandledRejection listener) + the `N-KEXT-R2-HOSTILE-MATRIX`
+  test: 9 hostile cases × both hooks through a real `facade.send`, each
+  asserting send admitted, `advisoryRejected` exact, receipt deep-equal to
+  the no-extension receipt, zero flag/then/get-trap touches, prompt
+  settlement for the slow-getter case, and zero unhandledRejections.
 
 ## Follow-up 3 (independent review PR #1269) — F1 isolation, F2 identity, F3 legacy receipts
 

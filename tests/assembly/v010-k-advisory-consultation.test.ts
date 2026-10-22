@@ -1161,3 +1161,61 @@ test('N-KEXT-F4-DUNDER-PROTO-OBS: an own __proto__ observation key is refused an
     clearAdvisoryWitnesses();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 5 (independent re-review R2-F1/R2-F2) — the result inspection
+// performs NO [[Get]] on a hook result and never calls user code: native
+// Promises are classified/detached through the INTRINSIC
+// Promise.prototype.then (brand check, real noop handlers), everything else
+// is consumed only through Reflect.ownKeys + own property DESCRIPTORS
+// (Symbol keys, non-enumerable keys, accessors, own __proto__, exotic array
+// shapes all refuse). Regressions run EVERY case on BOTH hooks through a
+// real facade.send inside a CHILD process with a process-level
+// unhandledRejection listener (setups reused from the independent r2
+// review probes, PR #1269).
+// ---------------------------------------------------------------------------
+
+const R2_CASES = [
+  'then-getter-throw',
+  'then-getter-nonthrow',
+  'then-getter-slow',
+  'promise-then-getter-late-reject',
+  'then-data-function-derived',
+  'proxy-array-get-trap',
+  'dunder-nonenumerable',
+  'symbol-key',
+  'nested-array-nonenumerable-extra',
+] as const;
+
+test('N-KEXT-R2-HOSTILE-MATRIX: no [[Get]], no user calls, no unhandledRejection, receipts identical (both hooks)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const childPath = fileURLToPath(new URL('./fixtures-v010/advisory-hostile-child.mjs', import.meta.url));
+  for (const hook of ['budget', 'observation'] as const) {
+    for (const caseId of R2_CASES) {
+      const run = spawnSync(process.execPath, ['--import', 'tsx', childPath, caseId, hook], {
+        encoding: 'utf8', timeout: 60_000,
+      });
+      const resultLine = (run.stdout ?? '').split('\n').find((line) => line.startsWith('RESULT '));
+      assert.ok(run.status === 0, `${hook}/${caseId} child exit ${String(run.status)}: ${((run.stderr ?? '').slice(0, 400) || resultLine || '')}`);
+      assert.ok(resultLine !== undefined, `${hook}/${caseId} printed no RESULT line`);
+      const result = JSON.parse(resultLine.slice('RESULT '.length)) as {
+        status: string; receiptIdentical: boolean; advisoryRejected: number;
+        sinkCount: number; elapsedMs: number; flags: Record<string, number>;
+        unhandled: string[]; failures: string[];
+      };
+      assert.deepEqual(result.failures, [], `${hook}/${caseId} failures: ${JSON.stringify(result)}`);
+      assert.equal(result.status, 'admitted');
+      assert.equal(result.receiptIdentical, true, `${hook}/${caseId}: the receipt must equal the no-extension receipt`);
+      assert.equal(result.advisoryRejected, 1);
+      assert.equal(result.sinkCount, 0);
+      assert.equal(result.flags.thenTouches, 0);
+      assert.equal(result.flags.thenCalls, 0);
+      assert.equal(result.flags.getTraps, 0);
+      assert.deepEqual(result.unhandled, []);
+      if (caseId === 'then-getter-slow') {
+        assert.ok(result.elapsedMs < 250, `${hook}/${caseId}: send must not be delayed by the never-invoked slow getter (${String(result.elapsedMs)}ms)`);
+      }
+    }
+  }
+});

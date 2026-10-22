@@ -62,7 +62,8 @@ const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLen
 // Re-pinned after #1264 follow-up 2 (synchronous consultation + wired-only work-unit bound); previous blob 64f39cd68c71868adb29a464ed7122497891bfd7.
 // Re-pinned after #1264 follow-up 3 (guarded advisory-result snapshots, observation identity envelope, conditional budget diagnostic); previous blob 7fe178a0f52dc553981c9714f8370682d945ee35.
 // Re-pinned after #1264 follow-up 4 (snapshot array descriptors + __proto__ refusal); previous blob 6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = 'aa4382ceeecac3a15e46f4d681e3aa5f85a563d4';
+// Re-pinned after #1264 follow-up 5 (no-[[Get]] advisory snapshots, intrinsic-Promise detach, Reflect.ownKeys completeness); previous blob aa4382ceeecac3a15e46f4d681e3aa5f85a563d4.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = 'd9dc7d99825d5f0c6260e5495c9ebce732e494fd';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the selected kernel payload is byte-identical to the K02-spliced integration blob');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
