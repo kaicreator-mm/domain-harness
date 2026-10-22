@@ -1731,6 +1731,7 @@ export function checkRetainedEvidenceApplicability(rawRecord, rawExpected) {
   return { kind: 'evidence-applicability', eligibleForHostVerification: true, authority: 'proposal-only' };
 }
 
+/* global AbortController, AbortSignal -- Node 24 globals of the composed dispatch channel (same class as setTimeout) */
 // ===========================================================================
 // [v0.10 #1267 PC-04] BUILD-bound decision-feature dispatch — the S Primary's
 // ONE selected `interpret` entry delegates an intent whose BUILD route row
@@ -2068,14 +2069,19 @@ export function createFeatureDecisionDispatcher(rawWiring) {
      * first (descriptor-only reads; a hostile or unbound declaration takes
      * the plain interpreter path unchanged), then the feature invocation.
      *
-     * Liveness [#1267 F1/F2]: the adopted feature promise is raced against
-     * BOTH the per-turn dispatch deadline (computed at each dispatch from
-     * the entry's mandatory relative `timeoutMs` — a bound dispatch is
-     * always bounded) AND the Kernel's protected cancellation control
-     * (`{signal}`), so a cancelled turn throws into the Kernel's existing
-     * latch branch (CANCELLED terminal) and a hanging feature can never
-     * hold the instance lane past the timeout. A losing racer is detached
-     * with no-op handlers; a late settlement is never adopted.
+     * Liveness [#1267 F1/F2 + follow-up 3]: the adopted feature promise is
+     * raced against BOTH the per-turn dispatch deadline (computed at each
+     * dispatch from the entry's mandatory relative `timeoutMs` — a bound
+     * dispatch is always bounded) AND the Kernel's protected cancellation
+     * control (`{signal}`), so a cancelled turn throws into the Kernel's
+     * existing latch branch (CANCELLED terminal) and a hanging feature can
+     * never hold the instance lane past the timeout. Every wait-ending
+     * event — deadline, Kernel cancellation, or the feature's own
+     * `handle.abort()` — aborts the ONE real per-dispatch cancellation
+     * channel handed to the feature through the existing T02 handle ABI, so
+     * the Host model/tool call underneath is actually told to stop. A
+     * losing racer is detached with no-op handlers; a late settlement is
+     * never adopted.
      *
      * Isolation [#1267 F4]: the feature's promise is ADOPTED (its `then`
      * runs — it is the selected Standard feature export, trusted Standard
@@ -2119,17 +2125,49 @@ export function createFeatureDecisionDispatcher(rawWiring) {
         input: selectedInput,
         limits: { ...(entry.featureRequest.limits ?? {}), deadlineEpochMs },
       };
-      // [#1267 F1] When the turn carries a cancellation signal, forward it to
-      // the feature's deps through the EXISTING T02 handle ABI
-      // (createTimeoutSignal → { signal, abort }): the signal reaches the
-      // model/tool payload so the Host endpoint can observe the real
-      // request-scoped cancellation. The dispatcher owns no external abort;
-      // `abort` only records the request (the forwarded signal is the real
-      // stop channel).
-      const depsForCall = signal === undefined ? deps : {
-        ...deps,
-        createTimeoutSignal: () => ({ signal, abort: () => {} }),
+      // [#1267 follow-up 3] ONE REAL composed cancellation channel per
+      // dispatch. The per-dispatch AbortController is aborted when ANY of:
+      // (a) the Kernel control signal aborts, (b) the per-turn dispatch
+      // deadline fires, (c) the feature calls `abort()` on a handle from
+      // `createTimeoutSignal`. `createTimeoutSignal` is ALWAYS provided
+      // through the EXISTING T02 handle ABI (`{ signal, abort }`): the
+      // handle's signal is the composed controller's signal (merged with a
+      // REAL Host handle signal via AbortSignal.any when the Host wired its
+      // own factory), and its `abort` really aborts the channel — and every
+      // registered Host handle — so the Host model/tool call underneath is
+      // actually told to stop. The dispatcher owns no other external abort.
+      const controller = new AbortController();
+      const hostHandles = new Set();
+      const abortDispatch = (reason) => {
+        if (!controller.signal.aborted) controller.abort(reason);
+        for (const handle of hostHandles) {
+          try { handle.abort(reason); } catch { /* the Host handle's defect is not the dispatcher's */ }
+        }
       };
+      const hostFactory = typeof deps.createTimeoutSignal === 'function' ? deps.createTimeoutSignal : undefined;
+      const createTimeoutSignal = () => {
+        let hostHandle = null;
+        if (hostFactory !== undefined) {
+          try {
+            const candidate = hostFactory();
+            if (candidate !== null && typeof candidate === 'object' && typeof candidate.abort === 'function') {
+              hostHandle = candidate;
+              hostHandles.add(hostHandle);
+            }
+          } catch {
+            hostHandle = null; // a throwing Host factory composes down to the dispatcher channel alone
+          }
+        }
+        return {
+          signal: composedDispatchSignalOf(controller, hostHandle),
+          abort: (reason) => abortDispatch(reason),
+        };
+      };
+      const depsForCall = { ...deps, createTimeoutSignal };
+      // (a) the Kernel control signal feeds the same channel; the listener is
+      // removed on EVERY exit path below.
+      const onKernelAbort = signal === undefined ? null : () => abortDispatch('cancelled');
+      if (onKernelAbort !== null) signal.addEventListener('abort', onKernelAbort, { once: true });
       let settled;
       try {
         const pending = entry.invoke(request, depsForCall);
@@ -2138,7 +2176,7 @@ export function createFeatureDecisionDispatcher(rawWiring) {
           // violation: refuse without consuming the raw value.
           return unavailableResult(entry, 'feature-result-invalid', undefined);
         }
-        settled = await dispatchWait(pending, { deadlineEpochMs, signal, now });
+        settled = await dispatchWait(pending, { deadlineEpochMs, signal, now, abortDispatch });
       } catch (error) {
         if (error instanceof StandardSdkError && error.code === 'SDK_DISPATCH_DEADLINE_EXCEEDED') {
           return unavailableResult(entry, 'deadline-exceeded', undefined);
@@ -2151,6 +2189,8 @@ export function createFeatureDecisionDispatcher(rawWiring) {
         // A throwing selected feature (including its own typed authority
         // refusals) is a refused dispatch: typed zero-effect unavailable.
         return unavailableResult(entry, 'feature-invocation-refused', undefined);
+      } finally {
+        if (onKernelAbort !== null) signal.removeEventListener('abort', onKernelAbort);
       }
       // NEVER await anything derived from the feature result again: the whole
       // mapping below is synchronous over the descriptor-safe snapshot, and
@@ -2256,16 +2296,38 @@ function dispatchSignalOf(control) {
 }
 
 /**
+ * [#1267 follow-up 3] The composed handle signal: the dispatch controller's
+ * real signal, merged with a REAL Host handle signal via AbortSignal.any
+ * when the Host wired its own factory and its signal is a genuine
+ * AbortSignal — so both the Host's signal and the dispatcher's signal reach
+ * the call. A non-AbortSignal Host signal (any object the Host chose) cannot
+ * merge; it is still honored through abort chaining on the handle.
+ */
+function composedDispatchSignalOf(controller, hostHandle) {
+  const own = controller.signal;
+  if (hostHandle === null) return own;
+  const hostSignal = hostHandle.signal;
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function'
+    && hostSignal instanceof AbortSignal) {
+    return AbortSignal.any([own, hostSignal]);
+  }
+  return own;
+}
+
+/**
  * [#1267 F1/F2] The bounded, cancellable wait over the adopted feature
  * promise. Racers: the feature itself, the per-turn deadline timer, and —
  * when the turn carries a cancellation signal — the abort event. The loser
  * is detached with no-op handlers (its settlement, including a hostile
- * late resolution, is never adopted and never surfaces as
- * unhandledRejection); the timer and listener are always cleaned up.
+ * late resolution, is never adopted and never surfaces as an unhandled
+ * rejection); the timer and listener are always cleaned up. The deadline
+ * fire also ABORTS the dispatch cancellation channel (follow-up 3 (b)), so
+ * the Host model/tool call underneath is told to stop.
  */
-async function dispatchWait(pending, { deadlineEpochMs, signal, now }) {
+async function dispatchWait(pending, { deadlineEpochMs, signal, now, abortDispatch }) {
   const remainingMs = deadlineEpochMs - now();
   if (!(remainingMs > 0)) {
+    abortDispatch('deadline-exceeded');
     discardDispatchThenable(pending);
     throw new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its per-turn dispatch timeout');
   }
@@ -2274,7 +2336,10 @@ async function dispatchWait(pending, { deadlineEpochMs, signal, now }) {
   let onAbort = null;
   let cancelReject = null;
   racers.push(new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its per-turn dispatch timeout')), remainingMs);
+    timer = setTimeout(() => {
+      abortDispatch('deadline-exceeded');
+      reject(new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its per-turn dispatch timeout'));
+    }, remainingMs);
   }));
   if (signal !== undefined) {
     racers.push(new Promise((_, reject) => {

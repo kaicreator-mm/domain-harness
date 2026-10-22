@@ -16,7 +16,11 @@
     + `DECISION_FEATURE_KEYS` added; plain `interpret` semantics unchanged)
     → `773c8d1cb6b39463d51493be5edf7bd1f123d066` (#1267 follow-up 2: the dispatch wait is
     cancellable through the Kernel's protected control and always bounded by a mandatory
-    relative per-turn `timeoutMs`; null-prototype own-property outcome lookup).
+    relative per-turn `timeoutMs`; null-prototype own-property outcome lookup)
+    → `ce8eb4b75db412b4ccd1e18cec16ac658903345a` (#1267 follow-up 3: ONE real composed
+    per-dispatch abort channel — kernel control, per-turn deadline and the feature's own
+    `handle.abort()` all abort it; the Host's own `createTimeoutSignal` composes in instead of
+    being dropped).
     Re-pinned witness: `v08-tf-oracle-fr02-fr07.test.ts` (`V08_S_BLOB`, provenance comments).
 
 ## What changed (summary)
@@ -56,12 +60,19 @@
     detached with no-op handlers; a late settlement is never adopted and never surfaces as
     unhandledRejection), and passes the same computed deadline into the feature request
     (`limits.deadlineEpochMs`) so T02's own budget logic stops its model/tool call.
-  - The wait is **cancellable**: the Kernel's protected `control` (`{signal}`) is raced too; a
-    cancelled turn throws into the Kernel's existing latch branch (typed zero-effect `CANCELLED`
-    terminal, `inFlightTurnDiscarded: true`) and the instance lane is released. When the control
-    carries a signal it is forwarded to the feature deps through the EXISTING T02 handle ABI
-    (`createTimeoutSignal → {signal, abort}`) so the Host model/tool endpoint can observe the
-    real request-scoped cancellation; the dispatcher owns no external abort. The Kernel's
+  - The wait is **cancellable and actually aborting** (follow-up 3): ONE real AbortController
+    per dispatch is aborted when ANY of (a) the Kernel control signal aborts, (b) the per-turn
+    dispatch deadline fires, (c) the feature calls `abort()` on a handle from
+    `createTimeoutSignal`. `createTimeoutSignal` is ALWAYS provided through the EXISTING T02
+    handle ABI (`{signal, abort}`): the handle's signal is the composed controller's signal
+    (merged with a REAL Host handle signal via `AbortSignal.any` when the Host wired its own
+    factory — a non-AbortSignal Host signal composes down to the dispatcher channel and is
+    still honored through abort chaining), and its `abort` really aborts the channel and every
+    registered Host handle, so the Host model/tool call underneath is actually told to stop.
+    The wait is ALSO raced on the Kernel control signal; a cancelled turn throws into the
+    Kernel's existing latch branch (typed zero-effect `CANCELLED` terminal,
+    `inFlightTurnDiscarded: true`) and the instance lane is released. Kernel-abort listeners
+    and timers are removed on every exit path; a late settlement is never adopted. The Kernel's
     admission path is unchanged: the dispatcher either returns the exact resolved-record shape
     the Kernel already admits or throws for cancellation — never a second admission authority.
 - Truthful receipt: `admissionResolverEvidence` carries, additively, the validated
@@ -105,6 +116,14 @@
   isolation regressions (descriptor-only reads, non-thenable/thenable returns, never-settling
   promise + declared deadline with late settlement never adopted, unbound fall-through, forged
   wiring refusals).
+- Follow-up 3 additions (26 tests total): the facade-level timeout-abort regression (the model
+  records `signal.aborted === true` from its own abort listener; the turn still ends
+  `deadline-exceeded` with zero Journal/Effect); the Host-factory composition regression (the
+  Host `createTimeoutSignal` is still invoked, its abort honored with reason
+  'deadline-exceeded', and the composed `AbortSignal.any` signal aborts the call); the F1
+  cancellation rig extended with the same model-side observation on Kernel cancellation.
+  Mutation recorded: restoring the pre-follow-up-3 no-op handle shape fails the timeout-abort
+  test (exit 1: model observed `[]` instead of `[true]`); restored exit 0.
 - Follow-up 2 additions (same file, 24 tests total): F1 KH2-style cancellation rig (real kernel
   + real dispatcher + real T02, `submitOccurrence(request, control)`) — cancelled bound turn ⇒
   CANCELLED, zero Journal/Effect, lane released, late settlement never adopted, no

@@ -118,8 +118,8 @@ const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 // FR11/HF24 adds the selected SDK compiled-data READ endpoint; FR02/FR07 semantics unchanged.
 // CI #1304 executed all prior affected oracle behavior but found the stale exact S pin.
 // Re-pinned after #1267 (BUILD-bound decision-feature dispatcher added to the
-// selected SDK; plain interpret semantics unchanged); previous S blob 9b86835bf12262ef53548e0031550fcecd97a7f2 (#1267 follow-up 2: cancellable + per-turn-bounded dispatch, final S blob 773c8d1cb6b39463d51493be5edf7bd1f123d066).
-const V08_S_BLOB = '773c8d1cb6b39463d51493be5edf7bd1f123d066';
+// selected SDK; plain interpret semantics unchanged); previous S blob 9b86835bf12262ef53548e0031550fcecd97a7f2 (#1267 follow-up 2: cancellable + per-turn-bounded dispatch; follow-up 3: real composed per-dispatch abort channel, final S blob ce8eb4b75db412b4ccd1e18cec16ac658903345a).
+const V08_S_BLOB = 'ce8eb4b75db412b4ccd1e18cec16ac658903345a';
 // K_BLOB_PIN_REBOUND_AFTER_1108_R2: #1108 R2 P1 — the zero-external-effect
 // proof no longer trusts thrown error codes at all; only the trusted host
 // dispatcher's own per-call pre-handler attestation (kernel-minted,

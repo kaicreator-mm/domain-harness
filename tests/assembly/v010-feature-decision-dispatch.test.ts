@@ -865,8 +865,12 @@ test('1267-F1: cancelling a bound turn with a hanging Host model terminates CANC
   let releaseModel: (decision: { disposition: string }) => void = () => {};
   const modelSettled = new Promise<{ disposition: string }>((resolve) => { releaseModel = resolve; });
   let modelStarted = 0;
-  const rig = await cancelRig(async () => {
+  // [#1267 follow-up 3] The model records what its forwarded cancellation
+  // signal does: on Kernel cancellation it must be aborted for real.
+  const modelSignalAborted: boolean[] = [];
+  const rig = await cancelRig(async (payload: { signal?: AbortSignal }) => {
     modelStarted += 1;
+    payload.signal?.addEventListener('abort', () => { modelSignalAborted.push(payload.signal!.aborted); });
     return await modelSettled;
   });
   try {
@@ -885,6 +889,8 @@ test('1267-F1: cancelling a bound turn with a hanging Host model terminates CANC
     // is never adopted; it must not surface as an unhandledRejection either.
     releaseModel({ disposition: 'approved' });
     await new Promise((resolve) => setTimeout(resolve, 60));
+    // [#1267 follow-up 3] The model's forwarded signal observed the abort.
+    assert.deepEqual(modelSignalAborted, [true], 'on Kernel cancellation the model signal is aborted for real');
     // The lane is released: a following message on the SAME instance is
     // processed (the rule path, no model involved).
     const next = await rig.submit({ amount: 30, requestId: 'R-f1-next' }, 'msg:f1-next') as Record<string, any>;
@@ -1010,5 +1016,56 @@ test('1267-F3: an inherited-object outcome name resolves to NOTHING — own-prop
   assert.equal(protoResult.semanticStatus, 'unavailable');
   assert.equal(protoResult.unavailable.reason, 'outcome-invalid');
   assert.equal(protoResult.structuredDecision, undefined);
+});
+
+test('1267-F3b: on the per-turn timeout the model is ACTUALLY aborted — it observes signal.aborted === true', { timeout: 15000 }, async () => {
+  const t02 = await loadT02();
+  const modelObserved: boolean[] = [];
+  const app = await activate(await fdComposition({ featureModule: t02.entry, routes: [boundRoute, boundReviewRoute, plainRoute] }), {
+    decisionDependencies: {
+      model: (payload: { signal?: AbortSignal }) => new Promise(() => {
+        payload.signal?.addEventListener('abort', () => { modelObserved.push(payload.signal!.aborted); });
+      }),
+    },
+  });
+  const receipt = await send(app.facade, 'f3-abort', { amount: 42, requestId: 'R-f3' }) as Record<string, any>;
+  assert.equal(receipt.status, 'terminated');
+  assert.equal(receipt.terminal.code, 'SEMANTIC_UNAVAILABLE');
+  assert.deepEqual(receipt.resolver.featureDispatch, FEATURE_DISPATCH);
+  assert.deepEqual(modelObserved, [true], 'the timeout really aborted the model call signal');
+  assert.equal(journalCount(app.store), 0, 'zero Journal/Effect for the timed-out turn');
+  app.dispose();
+});
+
+test('1267-F3c: a Host-wired createTimeoutSignal is still invoked and its abort is honored', { timeout: 15000 }, async () => {
+  const t02 = await loadT02();
+  let hostInvocations = 0;
+  const hostAbortReasons: unknown[] = [];
+  const modelObserved: boolean[] = [];
+  const app = await activate(await fdComposition({ featureModule: t02.entry, routes: [boundRoute, boundReviewRoute, plainRoute] }), {
+    decisionDependencies: {
+      createTimeoutSignal: () => {
+        hostInvocations += 1;
+        const controller = new AbortController();
+        return {
+          signal: controller.signal,
+          abort: (reason: unknown) => { hostAbortReasons.push(reason); controller.abort(reason); },
+        };
+      },
+      model: (payload: { signal?: AbortSignal }) => new Promise(() => {
+        payload.signal?.addEventListener('abort', () => { modelObserved.push(payload.signal!.aborted); });
+      }),
+    },
+  });
+  const receipt = await send(app.facade, 'f3-host', { amount: 42, requestId: 'R-f3h' }) as Record<string, any>;
+  assert.equal(receipt.status, 'terminated');
+  assert.equal(receipt.terminal.code, 'SEMANTIC_UNAVAILABLE');
+  assert.ok(hostInvocations >= 1, 'the Host factory is still invoked (not dropped)');
+  assert.deepEqual(hostAbortReasons, ['deadline-exceeded'], 'the Host handle abort is honored');
+  // The Host signal is a REAL AbortSignal, so the composed call signal
+  // reflects BOTH sources (AbortSignal.any) and still aborts.
+  assert.deepEqual(modelObserved, [true], 'the composed signal reaches the call and aborts');
+  assert.equal(journalCount(app.store), 0);
+  app.dispose();
 });
 
