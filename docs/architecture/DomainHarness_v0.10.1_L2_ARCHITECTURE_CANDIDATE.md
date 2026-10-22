@@ -46,7 +46,17 @@ The selectable Feature set is `F={C01,C02,C03,C04}`; **all 2^4 = 16 subsets**, i
 
 **C05 #1279 disposition: `NO_NEW_PACKAGE` pending public selected ABI reuse confirmation.** The existing T02 SemanticDecision and T03 Workflow Control S Features already define bounded generic semantics; application-specific `CONTINUE/PIVOT/REVISIT` variants are Business intents under the Tally domain, not new universal Standard rules. Source tests must demonstrate this or report precise missing generic predicate to Product owner.
 
-### B1. BUILD/ABI failure ordering
+### B1. Independent package production and distribution
+
+**Product distinction:** The existing Draft PRs #1280–#1283 store prototype sources and private pack recipes under `examples/v0101-*`. That is **not** sufficient for final SDK Package delivery, even if `npm pack` accepts the private producer. Formal accepted implementation must package each C01–C04 as its **own installable ESM artifact**, not four exports hidden in one aggregate library or four unqualified example scripts.
+
+**Selected packaging route:** Each concern's Builder owns one independent package producer under `extensions/agent-improvement/packages/<feature>/` with a unique `@kaicreator/domain-feature-*` package identity, independent source entrypoint, `package.json` exports, module/manifest declaration, source tests, and pinned version. This is **not** a new root workspace requirement: the existing Root workspaces and package-lock remain unchanged unless a specific Builder demonstrates that root registration is needed. Source prototypes may be moved from `examples/v0101-*` to these producer paths in the same concern PR; do not preserve duplicate authoritative code copies.
+
+**Consumer contract:** BUILD consumes the exact installed producer module bytes as `moduleSource`, computes `moduleSha256`, seals feature key/exports/import allowances and writes them into the Domain App artifact. The App's clean installation must contain each selected sealed module physically, and contain none of its unselected counterparts. A producer `npm pack` PASS alone does **not** prove the selected Application package, CT-02 runtime invocation or offline installed behavior. No new generic package loader, runtime plugin marketplace or dynamic import path is introduced.
+
+**Acceptance / traceability:** `npm pack` each selected producer in a clean staging location; install it into a separate isolated BUILD directory using the tarball (not monorepo absolute path); BUILD the selected Tiny and Rich Apps; inspect installed module resolution and manifest byte hashes; exercise all 16 allowed selection sets and at least Tiny/Rich physical execution, negative invalid/duplicate/tamper inputs, teardown and existing v0.10 Effect/Journal regressions. If package-private `private: true` remains, explicitly label distribution as local pack/install rather than publishability; do not assert npm registry publication.
+
+### B2. BUILD/ABI failure ordering
 
 At BUILD, use the existing `buildV10App`:
 1. Check exactly one K Primary and S Primary and >=1 B; every role selected ABI (e.g. `V10_ABI_UNSUPPORTED`).
