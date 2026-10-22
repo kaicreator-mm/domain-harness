@@ -138,7 +138,8 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // Re-pinned after #1264 follow-up 3 (guarded advisory-result snapshots, observation identity envelope, conditional budget diagnostic); previous blob 7fe178a0f52dc553981c9714f8370682d945ee35.
 // Re-pinned after #1264 follow-up 4 (snapshot array descriptors + __proto__ refusal); previous blob 6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d.
 // Re-pinned after #1264 follow-up 5 (no-[[Get]] advisory snapshots, intrinsic-Promise detach, Reflect.ownKeys completeness); previous blob aa4382ceeecac3a15e46f4d681e3aa5f85a563d4.
-const V08_K_BLOB = 'd9dc7d99825d5f0c6260e5495c9ebce732e494fd';
+// Re-pinned after #1264 follow-up 6 (intrinsic then only for exact clean native Promises: exact-prototype + async-symbol-only own keys); previous blob d9dc7d99825d5f0c6260e5495c9ebce732e494fd.
+const V08_K_BLOB = 'b4f21ab588ebba343cd5d09c5958834560d6d127';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

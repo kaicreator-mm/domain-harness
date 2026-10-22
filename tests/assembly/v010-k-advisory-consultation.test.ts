@@ -595,10 +595,10 @@ function neverSettling(): Promise<never> {
   return new Promise(() => { /* deliberately pending forever */ });
 }
 
-/** A promise that rejects asynchronously AFTER the turn has settled. */
+/** A plain native promise that rejects AFTER the turn has settled (and after the Kernel attached its intrinsic handlers). */
 function lateRejection(): Promise<never> {
   return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('late advisory rejection witness')), 20);
+    setTimeout(() => reject(new Error('late advisory rejection witness')), 500);
   });
 }
 
@@ -710,8 +710,8 @@ test('N-KEXT-LATE-REJECT-THENABLE: a thenable that later rejects causes no unhan
     assert.equal(first.status, 'admitted');
     const second = await activation.facade.send({ ...INTENT, instanceKey: 'instance:late-2', messageId: 'msg:late-2' });
     assert.equal(second.status, 'admitted');
-    // Let the deferred rejections fire against the discarded thenables.
-    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    // Let the deferred rejections fire against the discarded values.
+    await new Promise((resolve) => { setTimeout(resolve, 800); });
     assert.deepEqual(unhandled, [], 'the Primary detached both discarded thenables');
     const k = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
     assert.ok(k.advisoryRejected >= 2, `both thenables were counted (advisoryRejected=${String(k.advisoryRejected)})`);
@@ -1185,6 +1185,9 @@ const R2_CASES = [
   'dunder-nonenumerable',
   'symbol-key',
   'nested-array-nonenumerable-extra',
+  'promise-constructor-accessor',
+  'promise-subclass-species',
+  'plain-promise-late-reject',
 ] as const;
 
 test('N-KEXT-R2-HOSTILE-MATRIX: no [[Get]], no user calls, no unhandledRejection, receipts identical (both hooks)', async () => {
@@ -1212,6 +1215,8 @@ test('N-KEXT-R2-HOSTILE-MATRIX: no [[Get]], no user calls, no unhandledRejection
       assert.equal(result.flags.thenTouches, 0);
       assert.equal(result.flags.thenCalls, 0);
       assert.equal(result.flags.getTraps, 0);
+      assert.equal(result.flags.constructorTouches, 0);
+      assert.equal(result.flags.speciesTouches, 0);
       assert.deepEqual(result.unhandled, []);
       if (caseId === 'then-getter-slow') {
         assert.ok(result.elapsedMs < 250, `${hook}/${caseId}: send must not be delayed by the never-invoked slow getter (${String(result.elapsedMs)}ms)`);

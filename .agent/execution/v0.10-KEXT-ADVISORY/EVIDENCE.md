@@ -10,6 +10,7 @@
   - Follow-up 3 head (25-test suite): `54e8b8e1776d5799ac0b1950032ac839b0a0f641ae889c5404785dbb157b62b7` (git blob `6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d`)
   - Follow-up 4 head (28-test suite): `e522f2cf6591868adff307edd3f89710d8ef30ac83cbc99de65352527a574286` (git blob `aa4382ceeecac3a15e46f4d681e3aa5f85a563d4`)
   - Follow-up 5 head (29-test suite + hostile-matrix child regressions): `fc17cee68c484225df1cf057b4fd36b5941102491d38406ff9d0a91d1a1321e9` (git blob `d9dc7d99825d5f0c6260e5495c9ebce732e494fd`)
+  - Follow-up 6 head (29-test suite): `4cec1235cc6025233e9e0a3fdf9fa00c8fea9f7e304cb1c74cdbe3cbd43ae440` (git blob `b4f21ab588ebba343cd5d09c5958834560d6d127`)
   - Repository-wide search found NO committed test/witness pinning either SHA literal; every
     v0.10 suite computes `moduleSha256`/`subjectDigest` dynamically at runtime. Historical
     evidence receipts under `docs/experiments/**` and `.agent/execution/**` are immutable
@@ -42,6 +43,24 @@
   activation fault tests compose them in beta's slot.
 - Rich consumer scenario: new step `RICH_P1.advisoryConsultation` (both hooks invoked, ≥1
   clamp, ≥1 rejected authority-field advice), pinned in the T11 integration expectations.
+
+## Follow-up 6 (controller review) — intrinsic `then` only for exact clean native Promises
+
+Per spec, `Promise.prototype.then.call(p, ...)` runs SpeciesConstructor(p) —
+Get(p, "constructor") and Get(C, @@species) — so user getters could still run
+on a native Promise with an own `constructor` accessor or on a Promise
+subclass with a static species getter. `detachNativePromise` now calls the
+intrinsic `then` ONLY when `Object.getPrototypeOf(result)` is EXACTLY
+Promise.prototype (never `instanceof`) AND Reflect.ownKeys carries no string
+key and no symbol beyond Node's async-tracking stamps
+(Symbol(async_id_symbol)/Symbol(trigger_async_id_symbol), which Node adds to
+promises created inside tracked async contexts — observed under node:test).
+In every other case `then` is not called at all; the value is refused and
+counted by the descriptor rules, and its own eventual rejection is the
+hook's responsibility (no user code is executed to detach it). Regressions:
+child-matrix cases (h) own `constructor` accessor, (i) Promise subclass with
+static species getter (both resolve; flags stay 0), (j) plain native
+late-rejecting Promise (intrinsic handlers attached, no unhandledRejection).
 
 ## Follow-up 5 (independent re-review PR #1269) — no-[[Get]] result isolation
 

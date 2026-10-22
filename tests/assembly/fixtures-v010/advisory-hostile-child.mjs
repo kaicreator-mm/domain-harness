@@ -26,7 +26,7 @@ process.on('unhandledRejection', (reason, promise) => {
   unhandled.push(String(reason) + ' samePromise=' + String(promise === hostilePromiseRef));
 });
 
-const state = { thenTouches: 0, thenCalls: 0, getTraps: 0 };
+const state = { thenTouches: 0, thenCalls: 0, getTraps: 0, constructorTouches: 0, speciesTouches: 0 };
 let hostilePromiseRef = null;
 
 const { buildV10App, activateV10App } = await import('../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js');
@@ -44,13 +44,43 @@ const cases = {
     },
   }),
   'promise-then-getter-late-reject': () => {
-    const promise = new Promise((_, reject) => { setTimeout(() => reject(new Error('late rejection on accessor promise')), 3000); });
+    // [F6] Own `then` accessor on a native Promise: never read, never
+    // called; the promise RESOLVES late (a rejection would now be the
+    // hook-owned undetached case).
+    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 3000); });
     hostilePromiseRef = promise;
     globalThis.__hostileProbe = promise;
     Object.defineProperty(promise, 'then', {
       enumerable: true, configurable: true,
       get() { state.thenTouches += 1; throw new Error('own then getter on a native promise'); },
     });
+    return promise;
+  },
+  'promise-constructor-accessor': () => {
+    // [F6 case h] Own `constructor` accessor: the intrinsic-then fast path
+    // is skipped (own keys non-empty) BEFORE any species lookup, so the
+    // getter is never invoked. Resolves late on purpose.
+    const promise = new Promise((resolve) => { setTimeout(() => resolve(true), 3000); });
+    Object.defineProperty(promise, 'constructor', {
+      enumerable: true, configurable: true,
+      get() { state.constructorTouches += 1; return Promise; },
+    });
+    return promise;
+  },
+  'promise-subclass-species': () => {
+    // [F6 case i] A Promise subclass whose species getter would run under a
+    // naive intrinsic-then call; the exact-prototype precondition skips the
+    // intrinsic call entirely, so the getter is never invoked. Resolves.
+    class P extends Promise {
+      static get [Symbol.species]() { state.speciesTouches += 1; return Promise; }
+    }
+    return P.resolve('ok');
+  },
+  'plain-promise-late-reject': () => {
+    // [F6 case j] A PLAIN native Promise that rejects late: exact
+    // prototype, no own keys — the intrinsic fast path attaches real noop
+    // handlers, so no unhandledRejection ever fires.
+    const promise = new Promise((_, reject) => { setTimeout(() => reject(new Error('plain native late rejection')), 3000); });
     return promise;
   },
   'then-data-function-derived': () => ({

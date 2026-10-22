@@ -3999,18 +3999,40 @@ function isPlainAdvisoryRecord(value) {
 function advisoryNoop() { }
 
 /**
- * [v0.10 #1264 R2-F1] Classify a hook result's promise-ness WITHOUT any
- * [[Get]] on it: the INTRINSIC `Promise.prototype.then` performs a brand
- * check that never reads `result.then`, so no user getter can run. On a
- * genuine native Promise (subclass instances included) it attaches REAL
- * noop fulfillment/rejection handlers, so a later rejection can never
- * surface as unhandledRejection. Returns true when the value was a native
- * Promise (the caller treats it as refused advice/observation and counts
- * it); false when the intrinsic call threw — the value is NOT a native
- * Promise and its own `then` is never read and never called from here on,
- * so no derived promise can be created behind the Primary's back.
+ * [v0.10 #1264 R2-F1/F6] Classify a hook result's promise-ness WITHOUT any
+ * [[Get]] on it and WITHOUT running user code. The intrinsic
+ * `Promise.prototype.then` brand-checks its receiver, but per spec it then
+ * runs SpeciesConstructor(result) — Get(result, "constructor") and
+ * Get(C, @@species) — which would execute user getters on a Promise
+ * carrying an own `constructor` accessor or on a subclass instance. The
+ * intrinsic `then` is therefore called ONLY when, checked with reflective
+ * operations only and in this order:
+ *   - Object.getPrototypeOf(result) is EXACTLY Promise.prototype (never
+ *     `instanceof`, which can consult user Symbol.hasInstance; also rules
+ *     out subclass instances and Proxy-wrapped prototypes), and
+ *   - Reflect.ownKeys(result) carries no STRING key and no symbol beyond
+ *     Node's own async-tracking stamps (Symbol(async_id_symbol) /
+ *     Symbol(trigger_async_id_symbol), which Node adds to promises created
+ *     inside tracked async contexts — they are not user data),
+ * so the species lookup provably reads only the intrinsic
+ * Promise.prototype.constructor and Promise[@@species]; real noop handlers
+ * are attached and the caller refuses and counts the value. In EVERY other
+ * case `then` is not called at all: the value is classified by the
+ * descriptor rules (a native Promise is not plain data, so it refuses) and
+ * counted — such a value's own eventual rejection is the hook's own
+ * responsibility, because no user code is executed to detach it.
  */
 function detachNativePromise(result) {
+  if (typeof result !== 'object' || Object.getPrototypeOf(result) !== Promise.prototype) {
+    return false;
+  }
+  for (const key of Reflect.ownKeys(result)) {
+    if (typeof key === 'string') return false;
+    const label = key.toString();
+    if (label !== 'Symbol(async_id_symbol)' && label !== 'Symbol(trigger_async_id_symbol)') {
+      return false;
+    }
+  }
   try {
     Promise.prototype.then.call(result, advisoryNoop, advisoryNoop);
     return true;
@@ -6246,17 +6268,18 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return turnBudget;
     }
-    // [v0.10 #1264 F1/R2-F1] The ENTIRE result handling — promise
+    // [v0.10 #1264 F1/R2-F1/F6] The ENTIRE result handling — promise
     // classification, prototype/key/descriptor checks and normalization —
     // runs inside ONE guard that cannot leak into the Primary, and performs
-    // NO [[Get]] on the result: the native-Promise check uses the INTRINSIC
-    // Promise.prototype.then (brand check only, real noop handlers attached
-    // so a later rejection can never surface as unhandledRejection), and a
-    // non-Promise result is consumed only through the descriptor-safe
-    // snapshot — its `then` is never read and never called. Any escape
-    // (hostile reflective Proxy trap, broken descriptor shape) is a refused
-    // result: dropped, counted, and the budget falls back to the Kernel's
-    // own limits.
+    // NO [[Get]] on the result: the native-Promise check calls the
+    // INTRINSIC Promise.prototype.then ONLY on an exact native Promise with
+    // no own keys (prototype check first, then Reflect.ownKeys), so the
+    // species lookup reads only intrinsics and real noop handlers make a
+    // later rejection harmless; every other value is consumed only through
+    // the descriptor-safe snapshot — its `then` is never read and never
+    // called. Any escape (hostile reflective Proxy trap, broken descriptor
+    // shape) is a refused result: dropped, counted, and the budget falls
+    // back to the Kernel's own limits.
     try {
       if (detachNativePromise(result)) {
         // A genuine native Promise is never advice; it now carries real
@@ -6327,14 +6350,15 @@ export function createOccurrenceRuntime(options) {
       counters.advisoryRejected += 1;
       return;
     }
-    // [v0.10 #1264 F1/R2-F1] The ENTIRE result handling runs inside one
-    // guard that cannot leak and performs NO [[Get]] on the result: native
-    // Promises are classified and detached through the INTRINSIC
-    // Promise.prototype.then (brand check; real noop handlers), everything
-    // else is consumed only through the descriptor-safe snapshot — a
-    // non-native thenable's `then` is never read and never called. A fault
-    // here — including AFTER an already-committed turn — is a dropped,
-    // counted result that never affects the decided receipt.
+    // [v0.10 #1264 F1/R2-F1/F6] The ENTIRE result handling runs inside one
+    // guard that cannot leak and performs NO [[Get]] on the result: the
+    // INTRINSIC Promise.prototype.then is called only on an exact native
+    // Promise with no own keys (species lookup provably intrinsic; real
+    // noop handlers attached), everything else is consumed only through the
+    // descriptor-safe snapshot — a non-native thenable's `then` is never
+    // read and never called. A fault here — including AFTER an
+    // already-committed turn — is a dropped, counted result that never
+    // affects the decided receipt.
     try {
       if (detachNativePromise(result)) {
         counters.advisoryRejected += 1;
