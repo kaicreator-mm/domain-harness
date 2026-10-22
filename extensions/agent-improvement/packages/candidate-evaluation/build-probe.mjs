@@ -8,11 +8,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { V10_TARGET_PROFILE, buildV10App, sha256Hex } from '@kaicreator/domain-harness-compiler/v10build';
-import { definitionV2 } from '../v010-clean-consumer/apps/rich/app-definition.mjs';
+import { definitionV2 } from '../../../../examples/v010-clean-consumer/apps/rich/app-definition.mjs';
 import { candidateEvaluationFeature } from './feature-manifest.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const RICH = join(HERE, '../v010-clean-consumer/apps/rich');
+const RICH = join(HERE, '../../../../examples/v010-clean-consumer/apps/rich');
 const PAYLOAD = Object.freeze({
   kernel:'@kaicreator/domain-harness-compiler/v10payload/kernel-mechanism',
   sdk:'@kaicreator/domain-harness-compiler/v10payload/standard-sdk',
