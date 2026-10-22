@@ -59,7 +59,8 @@ const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLen
 // Current selected Kernel includes R01 K01 live same-turn fence guard (#1205); previous C01 blob 1a6a1394a505f4727306208d588fcab841e72980.
 // Re-pinned after the #1242 permitted-claim-only kernel change; previous spliced blob db7a8f16de2b26d2fdb10e6ca7f8e90b3f1daf30.
 // Re-pinned after the #1264 K advisory consultation plane landed in the selected kernel; previous spliced blob 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = '64f39cd68c71868adb29a464ed7122497891bfd7';
+// Re-pinned after #1264 follow-up 2 (synchronous consultation + wired-only work-unit bound); previous blob 64f39cd68c71868adb29a464ed7122497891bfd7.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = '7fe178a0f52dc553981c9714f8370682d945ee35';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the selected kernel payload is byte-identical to the K02-spliced integration blob');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
