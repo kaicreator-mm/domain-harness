@@ -251,6 +251,22 @@ export interface V10PublicIntent {
   readonly input: Record<string, unknown>;
 }
 
+/**
+ * [v0.10 #1265] The synchronous receipt callback of one facade subscription.
+ * Like v0.9, the delivered value is the selected Kernel's own receipt —
+ * never an observer- or caller-supplied argument.
+ */
+export type V10ReceiptObserver = (receipt: unknown) => void;
+
+/**
+ * [v0.10 #1265] The public receipt-subscription handle, shaped like the v0.9
+ * `V9PublicSubscription`: unsubscription is asynchronous because the
+ * subscriber's ordered delivery tail is allowed to settle first.
+ */
+export interface V10Subscription {
+  unsubscribe(): Promise<void>;
+}
+
 const PROTECTED_CONTEXT_NAMES = new Set([
   'docs', 'store', 'cas', 'sha256', 'hostPorts', 'principal', 'permit', 'resources',
   'createOccurrenceRuntime', 'effectPermit', 'interpret', 'submitOccurrence', 'openInstance',
@@ -632,6 +648,60 @@ export interface V10SelectedKernelIdentity {
 
 const selectedKernelIdentities = new WeakMap<V10AppFacade, V10SelectedKernelIdentity>();
 
+/**
+ * [v0.10 #1265] The module-private stop hook of one facade: `stop()` runs the
+ * OWNING activation's ordinary dispose (import-allowance release, facade
+ * close, reverse advisory teardown) as the graceful half of its shutdown.
+ * Registered by `activateV10App`; never part of the public surface.
+ */
+const facadeStopHooks = new WeakMap<V10AppFacade, () => void>();
+
+/** v0.9-parity bound on simultaneously attached subscriptions. */
+const MAX_SUBSCRIPTIONS = 128;
+
+interface SubscriberState {
+  readonly observer: V10ReceiptObserver;
+  active: boolean;
+  tail: Promise<void>;
+}
+
+/** The delivery gate of an activation without Host authority wiring. */
+const DELIVERY_ALLOWED: Promise<boolean> = Promise.resolve(true);
+
+/**
+ * [v0.10 #1265] The Kernel's own post-disposition receipt shape: an observe
+ * record that carries a string `status` and a bounded occurrence identity
+ * (`messageId` + `workflowInstanceId`). `advisory-observation` records
+ * (#1264) and anything else never passes — a subscription delivers Kernel
+ * receipts only, and they are never fabricated here.
+ */
+function kernelReceiptOf(record: unknown): Record<string, unknown> | undefined {
+  if (!isPlainRecord(record) || record.kind === 'advisory-observation') return undefined;
+  if (typeof record.status !== 'string') return undefined;
+  const occurrence = record.occurrence;
+  if (!isPlainRecord(occurrence)
+    || typeof occurrence.messageId !== 'string' || occurrence.messageId.length === 0
+    || typeof occurrence.workflowInstanceId !== 'string' || occurrence.workflowInstanceId.length === 0) {
+    return undefined;
+  }
+  return record;
+}
+
+function deepFreeze(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    for (const entry of value) deepFreeze(entry);
+    return Object.freeze(value);
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    for (const key of Object.keys(record)) {
+      deepFreeze(record[key]);
+    }
+    return Object.freeze(value);
+  }
+  return value;
+}
+
 export function v10SelectedKernelIdentity(facade: V10AppFacade): V10SelectedKernelIdentity {
   const identity = selectedKernelIdentities.get(facade);
   if (identity === undefined) {
@@ -687,7 +757,9 @@ export class V10AppFacade {
   readonly #queryAuthority: V10QueryAuthority | undefined;
   readonly #advisoryHooks: V10AdvisoryHookTable | undefined;
   readonly #modelPort: Readonly<{ invoke: (call: { operation: unknown; input: unknown }) => Promise<unknown> }> | undefined;
+  readonly #subscribers = new Set<SubscriberState>();
   #query: V10AuthorizedMultiBQuery<unknown> | undefined;
+  #stopPromise: Promise<void> | undefined;
   #closed = false;
 
   constructor(deps: {
@@ -812,7 +884,78 @@ export class V10AppFacade {
   }
 
   close(): void {
+    // Closing detaches every subscription with it: no delivery can follow a
+    // close, and no refused post-close send can ever produce a receipt.
+    this.#detachAllSubscribers();
     this.#closed = true;
+  }
+
+  /**
+   * [v0.10 #1265] Public receipt subscription (the frozen L2 Tiny contract
+   * verb). Delivers the IMMUTABLE receipts of THIS activation's own Kernel
+   * turns to the observer, in Kernel emission order: every observed record
+   * that is a Kernel receipt fans out as one deep-frozen private copy;
+   * `advisory-observation` records (#1264) never do.
+   *
+   * Scope: an activation physically observes only its own runtimes' turns —
+   * no cross-deployment or cross-tenant delivery can exist. With Host
+   * `queryAuthority` wiring, every delivery is authorized through the SAME
+   * authority as scoped queries over the exact scoped target tuple, so a
+   * non-visible Business target is never delivered (a denied delivery and a
+   * denied query are one authorization decision — no oracle). Without
+   * authority wiring the receipts are the caller's own activation's turns.
+   * A non-cloneable receipt fails closed into non-delivery; an observer
+   * exception is isolated — it never affects K state, the receipt or another
+   * observer. Refuses typed once the facade is closed/stopped.
+   */
+  async subscribe(observer: V10ReceiptObserver): Promise<V10Subscription> {
+    this.#assertOpen();
+    if (typeof observer !== 'function') {
+      refuse('SUBSCRIBE_OBSERVER_INVALID', 'a facade subscription requires a callable receipt observer');
+    }
+    if (this.#queryAuthority !== undefined && this.#deploymentIdentity === undefined) {
+      refuse(
+        'QUERY_DEPLOYMENT_REQUIRED',
+        'authorized subscription delivery requires the K02 deployment identity; no unscoped cross-B fallback exists',
+      );
+    }
+    if (this.#subscribers.size >= MAX_SUBSCRIPTIONS) {
+      refuse('SUBSCRIBE_LIMIT_EXCEEDED', `this facade already holds the bounded maximum of ${String(MAX_SUBSCRIPTIONS)} active subscriptions`);
+    }
+    const state: SubscriberState = { observer, active: true, tail: Promise.resolve() };
+    this.#subscribers.add(state);
+    return Object.freeze({
+      unsubscribe: async (): Promise<void> => {
+        state.active = false;
+        this.#subscribers.delete(state);
+        await state.tail;
+      },
+    });
+  }
+
+  /**
+   * [v0.10 #1265] Graceful, idempotent shutdown — the v0.9 stop semantics
+   * over the v0.10 activation lifecycle: detach every subscription (no
+   * further delivery), refuse all new activity typed (`FACADE_CLOSED`), then
+   * run the owning activation's ordinary dispose (import-allowance release +
+   * reverse advisory teardown). The first call locks the outcome
+   * synchronously; concurrent or later calls share it. `close()` and
+   * `dispose()` remain valid and idempotent afterwards.
+   */
+  stop(): Promise<void> {
+    const existing = this.#stopPromise;
+    if (existing !== undefined) return existing;
+    this.#detachAllSubscribers();
+    this.close();
+    this.#stopPromise = (async (): Promise<void> => {
+      facadeStopHooks.get(this)?.();
+    })();
+    return this.#stopPromise;
+  }
+
+  #detachAllSubscribers(): void {
+    for (const state of this.#subscribers) state.active = false;
+    this.#subscribers.clear();
   }
 
   /** The real kernel's own counters for one business package. */
@@ -1020,6 +1163,84 @@ export class V10AppFacade {
     },
   };
 
+  /**
+   * [v0.10 #1265] The observe-sink fanout of ONE Kernel record observed on
+   * the named Business runtime. `advisory-observation` records keep riding
+   * the diagnostics counters (handled by the caller); a genuine Kernel
+   * receipt fans out to the attached subscriptions as ONE deep-frozen
+   * immutable copy. Delivery is ordered per subscriber and best-effort: it
+   * can never mutate K state and can never fail a turn.
+   */
+  #emitReceipt(record: unknown, businessPackageId: string): void {
+    if (this.#closed || this.#subscribers.size === 0) return;
+    const receipt = kernelReceiptOf(record);
+    if (receipt === undefined) return;
+    let gate = DELIVERY_ALLOWED;
+    const authority = this.#queryAuthority;
+    if (authority !== undefined) {
+      // With authority wiring a receipt whose scoped target cannot be
+      // derived is never delivered (fail-closed); the SAME authorization as
+      // scoped queries decides, so a denied delivery is never an oracle.
+      const target = this.#scopedDeliveryTarget(receipt, businessPackageId);
+      if (target === undefined) return;
+      gate = Promise.resolve()
+        .then(() => authority.authorize(authority.principal, target))
+        .then((allowed) => allowed === true)
+        .catch(() => false);
+    }
+    let immutable: unknown;
+    try {
+      immutable = deepFreeze(structuredClone(receipt));
+    } catch {
+      return; // a non-cloneable record fails closed into non-delivery (v0.9 discipline)
+    }
+    for (const state of [...this.#subscribers]) {
+      state.tail = state.tail.then(async (): Promise<void> => {
+        if (!state.active || this.#closed) return;
+        if (!(await gate)) return; // a non-visible target is silently never delivered
+        if (!state.active || this.#closed) return; // late unsubscribe/stop race
+        try {
+          state.observer(immutable);
+        } catch {
+          // observer exceptions are isolated: no K state, no receipt, no other observer
+        }
+      }).catch((): void => { /* no rejection ever escapes a delivery tail */ });
+    }
+  }
+
+  /**
+   * The exact scoped tuple one receipt delivery is authorized against — the
+   * same `V10ScopedQueryTarget` shape the Host query authority already
+   * decides over. `undefined` = no authorized target can be derived from the
+   * receipt (the delivery then never happens).
+   */
+  #scopedDeliveryTarget(
+    receipt: Record<string, unknown>,
+    businessPackageId: string,
+  ): Readonly<V10ScopedQueryTarget> | undefined {
+    const deployment = this.#deploymentIdentity;
+    if (deployment === undefined) return undefined;
+    let workflowId: string;
+    try {
+      workflowId = this.#policyWorkflowId(businessPackageId);
+    } catch {
+      return undefined;
+    }
+    const occurrence = receipt.occurrence as { workflowInstanceId: string };
+    const instanceKey = occurrence.workflowInstanceId.startsWith(`${workflowId}:`)
+      ? occurrence.workflowInstanceId.slice(workflowId.length + 1)
+      : '';
+    if (instanceKey.length === 0) return undefined;
+    return Object.freeze({
+      deployedAppId: deployment.deployedAppId,
+      tenantId: deployment.tenantId,
+      appId: deployment.appId,
+      businessPackageId,
+      workflowId,
+      instanceKey,
+    });
+  }
+
   /** One runtime factory invocation per business package (real kernel). */
   #runtimeFor(businessPackageId: string): KRuntime {
     this.#assertOpen();
@@ -1095,7 +1316,12 @@ export class V10AppFacade {
         // (#1264) — diagnostics in the counters sink, never an authority.
         if (isPlainRecord(record) && record.kind === 'advisory-observation') {
           this.#counters.advisoryObservations.push(record);
+          return;
         }
+        // [v0.10 #1265] Everything else the Kernel observes on THIS runtime
+        // is one of its own turn receipts: fan it out to the attached
+        // `subscribe` subscriptions (best-effort, never an authority).
+        this.#emitReceipt(record, businessPackageId);
       },
     });
     this.#runtimes.set(businessPackageId, runtime);
@@ -1473,6 +1699,9 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
         }
       }
     };
+    // [v0.10 #1265] `facade.stop()` runs THIS activation's ordinary dispose
+    // as the graceful half of its shutdown (v0.9 stop semantics).
+    facadeStopHooks.set(facade, dispose);
     return {
       facade,
       counters,

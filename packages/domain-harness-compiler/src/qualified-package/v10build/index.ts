@@ -46,10 +46,12 @@ export type {
   V10DocWriteCondition,
   V10PublicIntent,
   V10QueryAuthority,
+  V10ReceiptObserver,
   V10ScopedQueryTarget,
   V10ScopedSnapshotAnswer,
   V10ScopedSnapshotManyAnswer,
   V10ScopedSnapshotQuery,
+  V10Subscription,
 } from './activation.js';
 // V10Counters/freshV10Counters/V10AppView are compiler-internal diagnostics
 // and activation wiring types, importable only by internal relative modules.

@@ -165,6 +165,20 @@ export interface V10PublicIntent {
     readonly messageId: string;
     readonly input: Record<string, unknown>;
 }
+/**
+ * [v0.10 #1265] The synchronous receipt callback of one facade subscription.
+ * Like v0.9, the delivered value is the selected Kernel's own receipt —
+ * never an observer- or caller-supplied argument.
+ */
+export type V10ReceiptObserver = (receipt: unknown) => void;
+/**
+ * [v0.10 #1265] The public receipt-subscription handle, shaped like the v0.9
+ * `V9PublicSubscription`: unsubscription is asynchronous because the
+ * subscriber's ordered delivery tail is allowed to settle first.
+ */
+export interface V10Subscription {
+    unsubscribe(): Promise<void>;
+}
 type Namespace = Record<string, unknown>;
 interface SelectedAdvisory {
     readonly packageId: string;
@@ -400,6 +414,35 @@ export declare class V10AppFacade {
     invokeSelectedStandardFeature(featureKey: string, request: unknown, trustedDependencies?: unknown): Promise<unknown>;
     isClosed(): boolean;
     close(): void;
+    /**
+     * [v0.10 #1265] Public receipt subscription (the frozen L2 Tiny contract
+     * verb). Delivers the IMMUTABLE receipts of THIS activation's own Kernel
+     * turns to the observer, in Kernel emission order: every observed record
+     * that is a Kernel receipt fans out as one deep-frozen private copy;
+     * `advisory-observation` records (#1264) never do.
+     *
+     * Scope: an activation physically observes only its own runtimes' turns —
+     * no cross-deployment or cross-tenant delivery can exist. With Host
+     * `queryAuthority` wiring, every delivery is authorized through the SAME
+     * authority as scoped queries over the exact scoped target tuple, so a
+     * non-visible Business target is never delivered (a denied delivery and a
+     * denied query are one authorization decision — no oracle). Without
+     * authority wiring the receipts are the caller's own activation's turns.
+     * A non-cloneable receipt fails closed into non-delivery; an observer
+     * exception is isolated — it never affects K state, the receipt or another
+     * observer. Refuses typed once the facade is closed/stopped.
+     */
+    subscribe(observer: V10ReceiptObserver): Promise<V10Subscription>;
+    /**
+     * [v0.10 #1265] Graceful, idempotent shutdown — the v0.9 stop semantics
+     * over the v0.10 activation lifecycle: detach every subscription (no
+     * further delivery), refuse all new activity typed (`FACADE_CLOSED`), then
+     * run the owning activation's ordinary dispose (import-allowance release +
+     * reverse advisory teardown). The first call locks the outcome
+     * synchronously; concurrent or later calls share it. `close()` and
+     * `dispose()` remain valid and idempotent afterwards.
+     */
+    stop(): Promise<void>;
     /** The real kernel's own counters for one business package. */
     kCounters(businessPackageId: string): Record<string, number>;
     /**

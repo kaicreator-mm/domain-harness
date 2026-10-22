@@ -1,5 +1,5 @@
 import { V10Error } from './errors.js';
-import type { V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from './activation.js';
+import type { V10Counters, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery, V10Subscription } from './activation.js';
 import { V10AppFacade } from './activation.js';
 import type { V10BuiltApp } from './build.js';
 declare const DECISION_KIND: "v10/build-activation-decision";
@@ -214,6 +214,24 @@ export interface V10GovernedBuildActivation {
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
     queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
     queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
+    /**
+     * [v0.10 #1265] Governed receipt subscription over the underlying facade:
+     * only THIS governed deployment's own Kernel turns are ever observed (an
+     * activation physically sees no other deployment's turns), and a Host
+     * `queryAuthority` — when wired — authorizes every delivery against the
+     * exact scoped target tuple through the same authority as scoped queries.
+     * The delivered receipts are the Kernel's own immutable records, never
+     * fabricated and never an `advisory-observation` record.
+     */
+    subscribe(observer: (receipt: unknown) => void): Promise<V10Subscription>;
+    /**
+     * [v0.10 #1265] Graceful idempotent shutdown: detach every subscription
+     * (no further delivery), refuse all new occurrence activity typed
+     * (`FACADE_CLOSED`), then the ordinary activation dispose. The first call
+     * locks the outcome; later calls share it. `close()` remains valid and
+     * idempotent.
+     */
+    stop(): Promise<void>;
     kCounters(businessPackageId: string): Record<string, number>;
     resolveIntentTarget(intentType: string): Readonly<{
         businessPackageId: string;
