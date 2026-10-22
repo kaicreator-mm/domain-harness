@@ -52,7 +52,7 @@ for (const key of KEYS) {
     let calls=0, got=0;
     const facade={invokeSelectedStandardFeature(){calls++;}};
     const request={events:[]};
-    Object.defineProperty(request,'secret',{enumerable:true,get(){got++;throw Error('secret');}});
+    Object.defineProperty(request,'accessor',{enumerable:true,get(){got++;throw Error('sensitive getter');}});
     await asyncErr(()=>invokeAgentImprovementFeature(facade,key,request,{}),'OBJECT_ACCESSOR_OR_HIDDEN');
     assert.equal(got,0);assert.equal(calls,0);
     const deps={};Object.defineProperty(deps,'revision',{enumerable:true,get(){got++;}});
