@@ -1,0 +1,22 @@
+{
+  "name": "@kaicreator/domain-feature-candidate-evaluation",
+  "version": "0.10.1-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "Draft DomainHarness v0.10.1 BUILD-selectable Standard Feature producer; no runtime authority",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "modules/*.mjs",
+    "feature-manifest.mjs",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./modules/sfeature-candidate-evaluation-v1.mjs",
+    "./manifest": "./feature-manifest.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/candidate-evaluation.test.mjs"
+  }
+}
