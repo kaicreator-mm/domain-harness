@@ -27,12 +27,12 @@ const EXTENSIONS = Object.freeze([
   Object.freeze({
     packageId: 'kext-advisory-alpha@v010.1.0.0', role: 'kernel-extension', abiVersion: 'dh.v10.k-extension/1',
     file: 'kext-advisory-alpha-v1.mjs', endpoint: 'kernel-extension-advisory',
-    provides: ['advisory-alpha-observation/v1'], providerId: 'advisory-alpha', hookExport: 'observeAlpha',
+    provides: ['admission-budget-advice/v1'], providerId: 'advisory-alpha', hookExport: 'observeAlpha',
   }),
   Object.freeze({
     packageId: 'kext-advisory-beta@v010.1.0.0', role: 'kernel-extension', abiVersion: 'dh.v10.k-extension/1',
     file: 'kext-advisory-beta-v1.mjs', endpoint: 'kernel-extension-advisory',
-    provides: ['advisory-beta-observation/v1'], providerId: 'advisory-beta', hookExport: 'observeBeta',
+    provides: ['turn-observation/v1'], providerId: 'advisory-beta', hookExport: 'observeBeta',
   }),
 ]);
 

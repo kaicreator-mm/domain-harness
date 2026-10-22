@@ -61,8 +61,24 @@
  *
  * Kernel ABI (v08-kernel-abi/1) — exported endpoint factory:
  *   createOccurrenceRuntime({ moduleIdentity, hostPorts, sdkEndpoint,
- *   businessEndpoint, observe }) → { openInstance, submitOccurrence,
- *   getSnapshot, getJournalRecords, getMechanismIdentity, counters }
+ *   businessEndpoint, observe, hardBudget?, advisoryHooks? }) →
+ *   { openInstance, submitOccurrence, getSnapshot, getJournalRecords,
+ *   getMechanismIdentity, counters }
+ *
+ * v0.10 K advisory extension plane (#1264, PRD PC-03 / L2 §C): the Primary
+ * exports the CLOSED `ADVISORY_HOOKS` set and consults only those hooks at
+ * turn time, always as the sole authority —
+ *   - `admission-budget-advice/v1` (pre-admission, pure, bounded): a frozen
+ *     redacted proposal (intentType + workflowId + the Kernel's own effective
+ *     hard limits) may return `{maxSteps?, maxWorkUnits?}`; the Primary
+ *     applies min(own limit, advice) — advice can only TIGHTEN. Enforced at
+ *     the FR07 continuation step bound and the pre-dispatch work-unit check.
+ *   - `turn-observation/v1` (post-disposition, observation-only): a frozen
+ *     public identity projection after the authoritative disposition; a
+ *     bounded result reaches the `observe` sink as a separate record.
+ *   - Any malformed/oversize/extra-field/throwing result is counted in
+ *     `counters.advisoryRejected` and ignored for authority. Replayed turns
+ *     consult ZERO hooks. Absent table: Basic behavior byte-for-byte.
  */
 
 export const MODULE_ID = 'v08-kernel-mechanism@1.0.0';
@@ -72,6 +88,24 @@ export const KERNEL_GENERATION = '1';
 export const ENDPOINTS = [
   { endpointId: 'occurrence-runtime', kind: 'occurrence-runtime' },
 ];
+
+// ===========================================================================
+// [v0.10 #1264] The CLOSED set of named typed advisory hooks this Kernel
+// Primary invokes and revalidates (PC-03). It is the ONLY hook grammar the
+// Primary consults: a hook key outside this set is never invoked, and the
+// trusted wiring boundary (createOccurrenceRuntime) refuses a hook table
+// carrying any other key. The v0.10 BUILD mirrors this exact set
+// (`V10_KERNEL_ADVISORY_HOOKS` in v10build/digest.ts; parity is test-pinned)
+// so an extension providing an unknown hook is a BUILD rejection, never a
+// runtime discovery. Hook functions are invoked and revalidated by the
+// Primary; their output is advice/observation data only — it can never
+// become a permit, a denial reason, a terminal, or a State/Journal/Effect
+// record by itself.
+// ===========================================================================
+export const ADVISORY_HOOKS = Object.freeze([
+  'admission-budget-advice/v1',
+  'turn-observation/v1',
+]);
 
 // ===========================================================================
 // v0.7 migrated: contracts/json.ts + contracts/identity.ts (canonical JSON)
@@ -1002,6 +1036,10 @@ function deny(reason, turnId, bindingDigest, resolver, extras = {}) {
       ...(extras.transitionKey === undefined ? {} : { transitionKey: extras.transitionKey }),
       ...(extras.guardId === undefined ? {} : { guardId: extras.guardId }),
       ...(extras.contextField === undefined ? {} : { contextField: extras.contextField }),
+      // [v0.10 #1264] Honest budget-exhaustion evidence: the requested work
+      // units and the per-turn bound that refused them.
+      ...(extras.workUnits === undefined ? {} : { workUnits: extras.workUnits }),
+      ...(extras.maxWorkUnits === undefined ? {} : { maxWorkUnits: extras.maxWorkUnits }),
       resolver,
     },
   };
@@ -1412,6 +1450,20 @@ export async function admitCentralDecision(request, ports) {
     request,
     ports.effectBindings,
   );
+
+  // [v0.10 #1264] The per-turn work-unit bound (Kernel hard limit min BUILD
+  // hardBudget, min any honored budget advice) is enforced HERE: after the
+  // transition's effect intents are resolved, before any production-authority
+  // gate, admission fence, Journal begin or Effect dispatch. A turn whose
+  // admission would dispatch more work units than its budget allows is denied
+  // typed with zero Journal/Effect activity; the budget can only tighten the
+  // Kernel's own limits, never loosen them.
+  if (effectIntents.length > ports.admissionBudget.maxWorkUnits) {
+    return deny('admission-budget-exhausted', turnId, pinned.bindingDigest, resolver, {
+      workUnits: effectIntents.length,
+      maxWorkUnits: ports.admissionBudget.maxWorkUnits,
+    });
+  }
 
   // [#1005 D3-K] Declarative state-context projection: resolved after
   // authorized admission and before any journal write or effect dispatch;
@@ -3910,6 +3962,74 @@ export class KernelBaselineStore {
 /** Immutable K-owned absolute ceiling on model turns per occurrence (B4). */
 export const MAX_FR07_STEPS = 8;
 
+/**
+ * [v0.10 #1264] Immutable K-owned absolute ceiling on effect work units
+ * (dispatched effect intents) per occurrence turn. Together with
+ * MAX_FR07_STEPS it is the Kernel's OWN hard limit that a BUILD `hardBudget`
+ * can only tighten: the effective per-turn limit is min(kernel constant,
+ * BUILD hardBudget), clamped further per turn by honored
+ * `admission-budget-advice/v1` advice. Enforcement points: the FR07
+ * continuation loop step bound (maxSteps) and the pre-dispatch effect-intent
+ * count check inside admitCentralDecision (maxWorkUnits).
+ */
+export const MAX_TURN_WORK_UNITS = 64;
+
+/** Valid advice field bound — mirrors the BUILD hardBudget bound exactly. */
+const ADVISORY_ADVICE_VALUE_CEILING = 1_000_000_000;
+/** Bounded plain-data size of one accepted turn-observation result (chars). */
+const ADVISORY_OBSERVATION_MAX_CHARS = 4096;
+const BUDGET_ADVICE_FIELDS = new Set(['maxSteps', 'maxWorkUnits']);
+const BUDGET_ADVICE_HOOK_KEY = 'admission-budget-advice/v1';
+const TURN_OBSERVATION_HOOK_KEY = 'turn-observation/v1';
+
+/** Plain-record check for advisory results (JSON record, ordinary prototype). */
+function isPlainAdvisoryRecord(value) {
+  if (!isJsonRecord(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * [v0.10 #1264] Validate the scoped advisory hook table ONCE at the trusted
+ * wiring boundary. The table is plain data plus callables:
+ * `{ [hookKey]: { providerId, invoke } }` where every hookKey is in the
+ * Kernel's OWN closed `ADVISORY_HOOKS` set, `providerId` is a bounded
+ * non-empty string and `invoke` is a function. Unknown keys, extra entry
+ * fields, non-plain entries or non-callable invokes refuse the wiring typed
+ * (the same fail-closed class as the hostPorts/Business wiring checks).
+ */
+function wireAdvisoryHookTable(option) {
+  if (option === undefined) return {};
+  if (!isPlainAdvisoryRecord(option)) {
+    throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', 'the wired advisoryHooks option must be a plain record keyed by closed advisory hook keys');
+  }
+  const wired = {};
+  for (const hookKey of Object.keys(option)) {
+    if (!ADVISORY_HOOKS.includes(hookKey)) {
+      throw new CentralAdmissionError(
+        'ADMISSION_EVALUATION_INPUT_INVALID',
+        `advisory hook '${hookKey}' is not in the Kernel's declared closed advisory hook set [${ADVISORY_HOOKS.join(', ')}]; unknown hooks are refused at wiring`,
+      );
+    }
+    const entry = option[hookKey];
+    if (!isPlainAdvisoryRecord(entry)) {
+      throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', `advisory hook '${hookKey}' must be wired as a plain record {providerId, invoke}`);
+    }
+    const fields = Object.keys(entry);
+    if (fields.length !== 2 || !fields.includes('providerId') || !fields.includes('invoke')) {
+      throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', `advisory hook '${hookKey}' must carry exactly {providerId, invoke}`);
+    }
+    if (typeof entry.providerId !== 'string' || entry.providerId.length === 0 || entry.providerId.length > 256) {
+      throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', `advisory hook '${hookKey}' providerId must be a bounded non-empty string`);
+    }
+    if (typeof entry.invoke !== 'function') {
+      throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', `advisory hook '${hookKey}' invoke must be a function`);
+    }
+    wired[hookKey] = entry;
+  }
+  return wired;
+}
+
 const CONTINUATION_IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const CONTINUATION_MAX_CAPABILITIES = 32;
 const CONTINUATION_MAX_FIELDS = 32;
@@ -4639,6 +4759,11 @@ async function executeContinuationRead(descriptor, callInput, read) {
  */
 async function runModelContinuation(run) {
   const { policy, sdkEndpoint, latch, requestInput } = run;
+  // [v0.10 #1264] The per-turn step bound is the stricter of the sealed
+  // policy's own maxSteps (already ≤ MAX_FR07_STEPS at wiring) and this
+  // turn's admission budget (Kernel hard limit min BUILD hardBudget, min any
+  // honored budget advice). Advice can only tighten, never loosen.
+  const maxSteps = Math.min(policy.maxSteps, run.budget.maxSteps);
   const observations = [];
   const dependencies = [];
   const dependencyKeys = new Set();
@@ -4653,6 +4778,7 @@ async function runModelContinuation(run) {
     modelCallEvidence: aggregateModelCallEvidence(stepEvidence, inFlightTurnDiscarded),
     continuation: {
       maxSteps: policy.maxSteps,
+      turnMaxSteps: maxSteps,
       steps,
       queries,
       dependencies: dependencies.map((dependency) => ({ ...dependency })),
@@ -4663,12 +4789,12 @@ async function runModelContinuation(run) {
 
   for (;;) {
     if (latch.cancelled) return terminal('CANCELLED');
-    if (steps >= policy.maxSteps) return terminal('MAX_STEPS_EXHAUSTED');
+    if (steps >= maxSteps) return terminal('MAX_STEPS_EXHAUSTED');
     steps += 1;
     const modelInput = {
       request: requestInput,
       step: steps,
-      maxSteps: policy.maxSteps,
+      maxSteps,
       capabilities: [...policy.advertisedCapabilities],
       observations: observations.map((observation) => canonicalizeJson(observation)),
     };
@@ -4762,6 +4888,8 @@ export function createOccurrenceRuntime(options) {
     sdkEndpoint,
     businessEndpoint,
     observe,
+    hardBudget,
+    advisoryHooks,
   } = options;
 
   if (typeof hostPorts?.docs?.get !== 'function' || typeof hostPorts?.docs?.put !== 'function') {
@@ -4773,6 +4901,40 @@ export function createOccurrenceRuntime(options) {
   if (typeof businessEndpoint?.policyId !== 'string') {
     throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', 'kernel endpoint requires a Business policy endpoint');
   }
+
+  // [v0.10 #1264] The Kernel's OWN effective hard limits, fixed ONCE at this
+  // trusted wiring boundary: the stricter of the immutable Kernel constants
+  // (MAX_FR07_STEPS / MAX_TURN_WORK_UNITS) and the BUILD-sealed `hardBudget`
+  // the Host activation passes through. Absent hardBudget (plain v08 bridge
+  // runs) leaves the Kernel constants alone — Basic behavior is unchanged.
+  // Enforcement: the FR07 continuation loop step bound (maxSteps) and the
+  // pre-dispatch effect-intent count check in admitCentralDecision
+  // (maxWorkUnits); per-turn `admission-budget-advice/v1` advice can tighten
+  // these further and never loosen them.
+  if (hardBudget !== undefined) {
+    if (!isJsonRecord(hardBudget) || !isPlainAdvisoryRecord(hardBudget)) {
+      throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', 'the wired hardBudget must be a plain record {maxStepsPerTurn, maxWorkUnitsPerTurn}');
+    }
+    for (const field of ['maxStepsPerTurn', 'maxWorkUnitsPerTurn']) {
+      const value = hardBudget[field];
+      if (!Number.isSafeInteger(value) || value < 1 || value > ADVISORY_ADVICE_VALUE_CEILING) {
+        throw new CentralAdmissionError('ADMISSION_EVALUATION_INPUT_INVALID', `the wired hardBudget.${field} must be a bounded positive integer`);
+      }
+    }
+  }
+  const hardLimits = Object.freeze({
+    maxSteps: Math.min(MAX_FR07_STEPS, hardBudget === undefined ? MAX_FR07_STEPS : hardBudget.maxStepsPerTurn),
+    maxWorkUnits: Math.min(MAX_TURN_WORK_UNITS, hardBudget === undefined ? MAX_TURN_WORK_UNITS : hardBudget.maxWorkUnitsPerTurn),
+  });
+
+  // [v0.10 #1264] The scoped H→K advisory hook table (PC-07): plain records
+  // `{ providerId, invoke }` keyed by the Kernel's OWN closed hook set.
+  // Module namespaces, protected ports, docs and resources cannot travel
+  // through this option — anything beyond the exact entry shape refuses the
+  // wiring typed. Absent table (Basic / Tiny): zero consultations.
+  const wiredAdvisoryHooks = wireAdvisoryHookTable(advisoryHooks);
+  const budgetAdviceHook = wiredAdvisoryHooks[BUDGET_ADVICE_HOOK_KEY] ?? null;
+  const turnObservationHook = wiredAdvisoryHooks[TURN_OBSERVATION_HOOK_KEY] ?? null;
 
   const counters = {
     admissions: 0,
@@ -4801,6 +4963,14 @@ export function createOccurrenceRuntime(options) {
     durableReceiptArchiveWrites: 0,
     durableReceiptArchiveFailures: 0,
     durableRingGrowthEvents: 0,
+    // [v0.10 #1264] K advisory consultation observability. Consultations are
+    // counters only — never an admission input; a rejected advisory result is
+    // counted and otherwise ignored for authority (never a permit, success,
+    // denial reason or terminal).
+    budgetAdviceConsultations: 0,
+    budgetAdviceClamps: 0,
+    turnObservationConsultations: 0,
+    advisoryRejected: 0,
   };
 
   const docs = hostPorts.docs;
@@ -5902,6 +6072,129 @@ export function createOccurrenceRuntime(options) {
     }
   }
 
+  // =========================================================================
+  // [v0.10 #1264] K advisory turn-time consultation (PC-03: hooks are
+  // "invoked and revalidated by the Primary"). The Primary is the only
+  // authority: advice is applied through min() against the Kernel's OWN hard
+  // limits (tighten only), observations are delivered to the existing
+  // observe sink AFTER the authoritative disposition, and ANY malformed,
+  // out-of-range, non-integer, oversize, extra-field, throwing or
+  // non-plain-record result is ignored for authority and counted in
+  // `advisoryRejected` — it never becomes a permit, a success, a denial
+  // reason or a terminal, and never alters the receipt, State, Journal or
+  // Effect. Replayed turns (idempotentReplay) consult ZERO hooks: every
+  // consultation point below sits after the replay ladders / on genuine
+  // non-replay dispositions only.
+  // =========================================================================
+
+  /**
+   * Pre-admission budget advice (pure, bounded). The proposal is a frozen,
+   * redacted projection: intentType and the target workflowId ONLY — no
+   * instanceKey, no input payload, no caller data — plus the Kernel's own
+   * effective hard limits. Returns the frozen per-turn budget with the
+   * honored advice applied through min(); a rejected advice returns the
+   * unclamped effective limits.
+   */
+  async function consultAdmissionBudgetAdvice(target, request) {
+    const turnBudget = Object.freeze({ maxSteps: hardLimits.maxSteps, maxWorkUnits: hardLimits.maxWorkUnits });
+    if (budgetAdviceHook === null) return turnBudget;
+    counters.budgetAdviceConsultations += 1;
+    const proposal = Object.freeze({
+      hook: BUDGET_ADVICE_HOOK_KEY,
+      intentType: request.intentType,
+      workflowId: target.workflowId,
+      hardLimits: Object.freeze({ maxSteps: hardLimits.maxSteps, maxWorkUnits: hardLimits.maxWorkUnits }),
+    });
+    let result;
+    try {
+      result = await budgetAdviceHook.invoke(proposal);
+    } catch {
+      counters.advisoryRejected += 1;
+      return turnBudget;
+    }
+    if (!isPlainAdvisoryRecord(result)) {
+      counters.advisoryRejected += 1;
+      return turnBudget;
+    }
+    for (const field of Object.keys(result)) {
+      if (!BUDGET_ADVICE_FIELDS.has(field)) {
+        // Smuggled authority-shaped or unknown fields void the whole advice.
+        counters.advisoryRejected += 1;
+        return turnBudget;
+      }
+    }
+    const advice = {};
+    for (const field of BUDGET_ADVICE_FIELDS) {
+      const value = result[field];
+      if (value === undefined) continue;
+      if (!Number.isSafeInteger(value) || value < 1 || value > ADVISORY_ADVICE_VALUE_CEILING) {
+        // Malformed / non-integer / ≤0 / oversize advice is never applied.
+        counters.advisoryRejected += 1;
+        return turnBudget;
+      }
+      advice[field] = value;
+    }
+    const clamped = {
+      maxSteps: advice.maxSteps === undefined ? turnBudget.maxSteps : Math.min(turnBudget.maxSteps, advice.maxSteps),
+      maxWorkUnits: advice.maxWorkUnits === undefined ? turnBudget.maxWorkUnits : Math.min(turnBudget.maxWorkUnits, advice.maxWorkUnits),
+    };
+    if (clamped.maxSteps !== turnBudget.maxSteps || clamped.maxWorkUnits !== turnBudget.maxWorkUnits) {
+      counters.budgetAdviceClamps += 1;
+    }
+    return Object.freeze(clamped);
+  }
+
+  /**
+   * Post-disposition turn observation (observation-only). Invoked ONLY after
+   * the authoritative disposition of a non-replayed turn, with a frozen
+   * public identity projection (turnId, status, intentType, workflowId). A
+   * bounded plain-data result is delivered to the existing observe sink as a
+   * SEPARATE observation; a throw or malformed result is isolated and
+   * counted, and NEVER alters the K receipt, State, Journal or Effect.
+   */
+  async function consultTurnObservation(turnId, status, request, target) {
+    if (turnObservationHook === null) return;
+    counters.turnObservationConsultations += 1;
+    const projection = Object.freeze({
+      hook: TURN_OBSERVATION_HOOK_KEY,
+      turnId,
+      status,
+      intentType: request.intentType,
+      workflowId: target.workflowId,
+    });
+    let result;
+    try {
+      result = await turnObservationHook.invoke(projection);
+    } catch {
+      counters.advisoryRejected += 1;
+      return;
+    }
+    if (!isPlainAdvisoryRecord(result)) {
+      counters.advisoryRejected += 1;
+      return;
+    }
+    let encoded;
+    try {
+      encoded = canonicalJsonStringify(result);
+    } catch {
+      counters.advisoryRejected += 1;
+      return;
+    }
+    if (encoded.length > ADVISORY_OBSERVATION_MAX_CHARS) {
+      counters.advisoryRejected += 1;
+      return;
+    }
+    // Separate observation record on the existing sink; observer failures
+    // stay swallowed exactly like receipt observations.
+    safeObserve({
+      kind: 'advisory-observation',
+      hook: TURN_OBSERVATION_HOOK_KEY,
+      providerId: turnObservationHook.providerId,
+      turn: projection,
+      observation: result,
+    });
+  }
+
   async function openInstance(request) {
     const target = request.target;
     // [#1006 HF21] The authority class reaches the activation boundary ONLY
@@ -5927,8 +6220,11 @@ export function createOccurrenceRuntime(options) {
   /**
    * [#1003 FR07-KH2, B3] A continuation/cancellation terminal: the occurrence
    * stopped BEFORE central admission, so no State, Journal or Effect exists.
+   * [v0.10 #1264] The terminated disposition is authoritative when the
+   * receipt is formed; the turn-observation hook (if selected) is consulted
+   * AFTER it, isolation-guarded, and can never change the receipt.
    */
-  function terminatedReceipt(request, workflowInstanceId, terminal, resolver) {
+  async function terminatedReceipt(request, target, workflowInstanceId, terminal, resolver) {
     const receipt = {
       status: 'terminated',
       terminal,
@@ -5937,6 +6233,7 @@ export function createOccurrenceRuntime(options) {
       attribution: attribution(),
     };
     safeObserve(receipt);
+    await consultTurnObservation(deriveDurableControlTurnId(target, occurrenceTurnOf(request)), 'terminated', request, target);
     return receipt;
   }
 
@@ -5993,6 +6290,11 @@ export function createOccurrenceRuntime(options) {
         attribution: attribution(),
       };
       safeObserve(receipt);
+      // [v0.10 #1264] The denial is an authoritative disposition; the
+      // turn-observation hook runs after it (isolation-guarded) and can
+      // never change the receipt. Budget advice is NOT consulted here: this
+      // turn never reaches the admission plane.
+      await consultTurnObservation(deriveDurableControlTurnId(target, occurrenceTurnOf(request)), 'denied', request, target);
       return receipt;
     }
 
@@ -6026,6 +6328,9 @@ export function createOccurrenceRuntime(options) {
         attribution: attribution(),
       };
       safeObserve(receipt);
+      // [v0.10 #1264] Same post-disposition observation discipline as the
+      // caller-role denial above; no budget consultation before admission.
+      await consultTurnObservation(deriveDurableControlTurnId(target, occurrenceTurnOf(request)), 'denied', request, target);
       return receipt;
     }
 
@@ -6033,7 +6338,7 @@ export function createOccurrenceRuntime(options) {
       const workflowInstanceId = `${target.workflowId}:${target.instanceKey}`;
       // [#1003 FR07-KH2, B3] Cancelled while queued on the lane: nothing read.
       if (latch.cancelled) {
-        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 0 });
+        return terminatedReceipt(request, target, workflowInstanceId, { code: 'CANCELLED', step: 0 });
       }
       const snapshot = await engine.getInstance(target);
       if (snapshot === null) {
@@ -6044,7 +6349,7 @@ export function createOccurrenceRuntime(options) {
       const snapshotFenceRevision = await engine.readAdmissionFenceRevision(target);
       // Cancelled during the lane-start read: no model turn may start.
       if (latch.cancelled) {
-        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 0 });
+        return terminatedReceipt(request, target, workflowInstanceId, { code: 'CANCELLED', step: 0 });
       }
       // [#1062 shared seam] The turn identity of this occurrence, and the
       // disposition gate for non-message durable control turns: a replay of
@@ -6110,6 +6415,14 @@ export function createOccurrenceRuntime(options) {
       if (historyReplayed !== undefined) {
         return historyReplayed;
       }
+      // [v0.10 #1264] Pre-admission budget advice consultation — AFTER the
+      // replay ladders (a replayed identical turn returned above and consults
+      // ZERO hooks) and BEFORE any rule resolution / continuation /
+      // central-admission activity. The Primary owns the authority: the
+      // returned budget is the Kernel's own effective hard limits clamped
+      // (min) by any honored advice; a rejected advice leaves the limits
+      // untouched and only moves the advisoryRejected counter.
+      const turnBudget = await consultAdmissionBudgetAdvice(target, request);
       // [v0.10 K02 anchor 4] The former missing-disposition fail-closed
       // eviction block is REPLACED by the same-CAS original-receipt ring:
       // the once-only truth is atomic with the state (the ring rides the
@@ -6171,7 +6484,7 @@ export function createOccurrenceRuntime(options) {
           latch,
         });
         if (decisionSource.terminal !== undefined) {
-          return terminatedReceipt(request, workflowInstanceId, decisionSource.terminal, decisionSource.evidence);
+          return terminatedReceipt(request, target, workflowInstanceId, decisionSource.terminal, decisionSource.evidence);
         }
         resolved = decisionSource.resolved;
         decisionSourcePendingWrite = decisionSource.pendingWrite;
@@ -6190,10 +6503,12 @@ export function createOccurrenceRuntime(options) {
           sdkEndpoint,
           latch,
           requestInput: request.input,
+          // [v0.10 #1264] The per-turn clamped step budget.
+          budget: turnBudget,
           read: { docs, docKeys, target, workflowInstanceId, stateRevision: snapshot.stateRevision },
         });
         if (run.terminal !== undefined) {
-          return terminatedReceipt(request, workflowInstanceId, run.terminal, run.evidence);
+          return terminatedReceipt(request, target, workflowInstanceId, run.terminal, run.evidence);
         }
         resolved = run.resolved;
       } else {
@@ -6208,7 +6523,7 @@ export function createOccurrenceRuntime(options) {
           resolved = await sdkEndpoint.interpret(declaration, request.input, context, control);
         } catch (error) {
           if (latch.cancelled) {
-            return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', step: 1, inFlightTurnDiscarded: true }, { modelCallEvidence: { status: 'unmeasured' } });
+            return terminatedReceipt(request, target, workflowInstanceId, { code: 'CANCELLED', step: 1, inFlightTurnDiscarded: true }, { modelCallEvidence: { status: 'unmeasured' } });
           }
           throw error;
         }
@@ -6222,7 +6537,7 @@ export function createOccurrenceRuntime(options) {
         const declarationId = isJsonRecord(resolved.provenance) && typeof resolved.provenance.declarationId === 'string'
           ? { declarationId: resolved.provenance.declarationId }
           : {};
-        return terminatedReceipt(request, workflowInstanceId, { code: 'SEMANTIC_UNAVAILABLE', ...declarationId }, admissionResolverEvidence(resolved));
+        return terminatedReceipt(request, target, workflowInstanceId, { code: 'SEMANTIC_UNAVAILABLE', ...declarationId }, admissionResolverEvidence(resolved));
       }
 
       // [#1003 FR07-KH2, B3] The final-result → admission race: the latch is
@@ -6230,7 +6545,7 @@ export function createOccurrenceRuntime(options) {
       // cancel observed now discards the ready result; one arriving after
       // this point can no longer split the authoritative occurrence.
       if (!latch.closeForAdmission()) {
-        return terminatedReceipt(request, workflowInstanceId, { code: 'CANCELLED', lateResultDiscarded: true }, {
+        return terminatedReceipt(request, target, workflowInstanceId, { code: 'CANCELLED', lateResultDiscarded: true }, {
           modelCallEvidence: admissionModelCallEvidence(resolved?.modelCallEvidence),
           ...(resolved?.continuation === undefined ? {} : { continuation: JSON.parse(canonicalJsonStringify(resolved.continuation)) }),
         });
@@ -6261,6 +6576,8 @@ export function createOccurrenceRuntime(options) {
         effectBindings,
         contextProjections,
         trace: counters,
+        // [v0.10 #1264] The per-turn clamped work-unit budget consulted above.
+        admissionBudget: turnBudget,
         // [v0.10 C01 #1177] The K-issued live external Effect Permit admin —
         // the only component that can mint or consume a permit document.
         effectPermitAdmin,
@@ -6297,6 +6614,8 @@ export function createOccurrenceRuntime(options) {
           attribution: attribution(),
         };
         safeObserve(receipt);
+        // [v0.10 #1264] Post-disposition observation on the admission denial.
+        await consultTurnObservation(controlTurnId, 'denied', request, target);
         return receipt;
       }
 
@@ -6438,6 +6757,10 @@ export function createOccurrenceRuntime(options) {
         turnDisposition,
       };
       safeObserve(receipt);
+      // [v0.10 #1264] Post-disposition observation AFTER the authoritative
+      // admission; it is delivered to the observe sink as a separate record
+      // and never rides the receipt.
+      await consultTurnObservation(controlTurnId, 'admitted', request, target);
       return receipt;
     });
   }

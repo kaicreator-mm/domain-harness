@@ -218,7 +218,7 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
     // ---- (5) Rich: the full L2 R3 §H consumer journey --------------------
     const main = runScenario(richEntry, 'rich-main', richWork, join(richWork, 'report-main.json'));
     assertReport(main, 'Rich main', [
-      'RICH_P1.selection', 'RICH_P1.invokeFeatures', 'RICH_P4.modelCallTruth', 'RICH_P5.agentMemoryContext',
+      'RICH_P1.selection', 'RICH_P1.advisoryConsultation', 'RICH_P1.invokeFeatures', 'RICH_P4.modelCallTruth', 'RICH_P5.agentMemoryContext',
       'EX04_P1.twoAdapters', 'RICH_P2.twoBIsolation', 'RICH_P3.queryAuthority', 'K02_P1.eighteenTurnsOriginalReceipt',
       'EX04_F1.duplicateCallbackAndLostAck', 'DENY_N1.permitlessAdapter', 'RICH_P2.restart',
     ]);

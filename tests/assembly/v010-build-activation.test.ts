@@ -377,9 +377,12 @@ test('N-ACT-REFUSE-BEFORE-IMPORT: wrong format / empty load order refuse typed w
 
 test('N-ACT-INIT-FAILURE-REVERSE-DISPOSAL: a late init throw disposes only initialized modules; K documents untouched', async () => {
   clearDisposalLog();
+  // [#1264] Fault fixtures ride the closed hook set: alpha keeps its slot
+  // and the throwing fixture replaces beta (no dispose export either).
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
   const throwing = await extensionEntry({ fixture: 'kext-init-throws.mjs', hookExport: 'observeThrows' });
-  const options = await richComposition();
-  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-fault', modules: [...options.modules, throwing] });
+  const options = await richComposition({ extensions: [alpha, throwing] });
+  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-fault' });
 
   const store = new PlainCasDocStore();
   const counters = freshV10Counters();
@@ -398,9 +401,10 @@ test('N-ACT-INIT-FAILURE-REVERSE-DISPOSAL: a late init throw disposes only initi
 
 test('N-ACT-FORGED-INIT-RETURN: authority-shaped init data refuses typed with reverse disposal', async () => {
   clearDisposalLog();
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
   const forged = await extensionEntry({ fixture: 'kext-init-forged-return.mjs', hookExport: 'observeForged' });
-  const options = await richComposition();
-  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-forged', modules: [...options.modules, forged] });
+  const options = await richComposition({ extensions: [alpha, forged] });
+  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-forged' });
   const counters = freshV10Counters();
   await assert.rejects(
     activateV10App(builtApp, { store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters }),
@@ -413,9 +417,10 @@ test('N-ACT-FORGED-INIT-RETURN: authority-shaped init data refuses typed with re
 
 test('N-ACT-ASYNC-INIT-RETURN: non-plain Promise rejects typed and disposes previously initialized advisories', async () => {
   clearDisposalLog();
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
   const asyncReturn = await extensionEntry({ fixture: 'kext-init-async-return.mjs', hookExport: 'observeAsyncReturn' });
-  const options = await richComposition();
-  const app = buildV10App({ ...options, appId: 'app:v010-t00-async-init', modules: [...options.modules, asyncReturn] });
+  const options = await richComposition({ extensions: [alpha, asyncReturn] });
+  const app = buildV10App({ ...options, appId: 'app:v010-t00-async-init' });
   const counters = freshV10Counters();
   const store = new PlainCasDocStore();
   await assert.rejects(
@@ -433,9 +438,10 @@ test('N-ACT-ASYNC-INIT-RETURN: non-plain Promise rejects typed and disposes prev
 });
 
 test('N-ACT-PORT-PROBE-DENIED: probing a protected K port denies-and-records, activation fails closed', async () => {
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
   const prober = await extensionEntry({ fixture: 'kext-init-probes-ports.mjs', hookExport: 'observePorts' });
-  const options = await richComposition();
-  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-portprobe', modules: [...options.modules, prober] });
+  const options = await richComposition({ extensions: [alpha, prober] });
+  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-portprobe' });
   const counters = freshV10Counters();
   await assert.rejects(
     activateV10App(builtApp, { store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters }),
@@ -446,9 +452,10 @@ test('N-ACT-PORT-PROBE-DENIED: probing a protected K port denies-and-records, ac
 });
 
 test('N-ACT-EXPORT-MISSING: a sealed module missing its sealed surface refuses typed at connect', async () => {
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
   const missing = await extensionEntry({ fixture: 'kext-missing-export.mjs', hookExport: 'observeMissing' });
-  const options = await richComposition();
-  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-missing', modules: [...options.modules, missing] });
+  const options = await richComposition({ extensions: [alpha, missing] });
+  const builtApp = buildV10App({ ...options, appId: 'app:v010-t00-missing' });
   const counters = freshV10Counters();
   await assert.rejects(
     activateV10App(builtApp, { store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters }),

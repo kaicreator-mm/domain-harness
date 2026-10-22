@@ -206,7 +206,7 @@ test('N-BUILD import-closure refusals (undeclared/computed/code-string/edges)', 
       externalImports,
     });
 
-  const base = 'export const MODULE_ID = \'synthetic@1\';\nexport const PACKAGE_KIND = \'kernel-extension\';\nexport const EXTENSION_ABI = \'dh.v10.k-extension/1\';\nexport const PROVIDER_ID = \'synthetic\';\nexport const HOOK = \'synthetic-hook/v1\';\nexport function init() { return { ok: true, providerId: PROVIDER_ID, hook: HOOK }; }\nexport function observeFixture() { return {}; }\n';
+  const base = 'export const MODULE_ID = \'synthetic@1\';\nexport const PACKAGE_KIND = \'kernel-extension\';\nexport const EXTENSION_ABI = \'dh.v10.k-extension/1\';\nexport const PROVIDER_ID = \'synthetic\';\nexport const HOOK = \'admission-budget-advice/v1\';\nexport function init() { return { ok: true, providerId: PROVIDER_ID, hook: HOOK }; }\nexport function observeFixture() { return {}; }\n';
 
   const undeclaredNode = await synthetic(`${base}\nimport { readFileSync } from 'node:fs';\nexport const fs = readFileSync;\n`);
   assert.equal(buildCode(await basicComposition({ extensions: [undeclaredNode] })), 'V10_IMPORT_POLICY_DENIED');

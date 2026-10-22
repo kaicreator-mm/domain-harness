@@ -7,7 +7,7 @@ export const MODULE_ID = 'kext-missing-export@v010.1.0.0';
 export const PACKAGE_KIND = 'kernel-extension';
 export const EXTENSION_ABI = 'dh.v10.k-extension/1';
 export const PROVIDER_ID = 'advisory-missing-export';
-export const HOOK = 'advisory-missing-export-observation/v1';
+export const HOOK = 'turn-observation/v1';
 
 export function init() {
   return { ok: true, providerId: PROVIDER_ID, hook: HOOK };
