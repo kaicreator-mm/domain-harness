@@ -9,7 +9,7 @@ export const MODULE_ID='sfeature-bounded-experiment@v0101.0.0';
 export const PACKAGE_KIND='standard-feature';
 export const FEATURE_ABI='dh.v10.standard-feature/1';
 export const FEATURE_KEY='standard:bounded-experiment/1';
-export class ExperimentPlanError extends Error {
+class ExperimentPlanError extends Error {
   constructor(code){super(code);this.name='ExperimentPlanError';this.code=code;}
 }
 const BAD=new Set(['__proto__','constructor','prototype','permit','effectPermit',
