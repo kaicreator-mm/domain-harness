@@ -3,9 +3,11 @@
 - Task brief: `K Primary must consult and revalidate selected K extension hooks` (worktree
   `dh-i1264-zcode`, branch `task/dh-i1264-zcode`, base `main@53bef033`).
 - Environment: LOCAL Windows Node `v24.21.0` (Node 24 gate satisfied), npm 11, local tooling.
-- Selected kernel payload SHA changes with this task:
-  - OLD (base `53bef033`): `66f19f8968cb58cc59808c9c15cfbb193618a150a61ac00a5b5797bec1250630`
-  - NEW (this task): `b44bed573a1566ec6c8e1767e6218cca20b21b60540aebee4bd0dff0c4246148`
+- Selected kernel payload SHA per revision of this task (content sha256):
+  - Base `53bef033` (pre-task): `66f19f8968cb58cc59808c9c15cfbb193618a150a61ac00a5b5797bec1250630` (git blob `72a886ffca85fc90caea954ee9fb5b3df7b4fcfa`)
+  - `8bf1bcb2` (initial #1264 implementation; 12-test suite): `b44bed573a1566ec6c8e1767e6218cca20b21b60540aebee4bd0dff0c4246148`
+  - `6a0d1777` (follow-up 2; 18-test suite): `5a6ab7985cb916a8699b8f1364caf12ff918e149c3a752029a18e81ca034e985` (git blob `7fe178a0f52dc553981c9714f8370682d945ee35`)
+  - Follow-up 3 head (25-test suite): `54e8b8e1776d5799ac0b1950032ac839b0a0f641ae889c5404785dbb157b62b7` (git blob `6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d`)
   - Repository-wide search found NO committed test/witness pinning either SHA literal; every
     v0.10 suite computes `moduleSha256`/`subjectDigest` dynamically at runtime. Historical
     evidence receipts under `docs/experiments/**` and `.agent/execution/**` are immutable
@@ -39,6 +41,34 @@
 - Rich consumer scenario: new step `RICH_P1.advisoryConsultation` (both hooks invoked, ≥1
   clamp, ≥1 rejected authority-field advice), pinned in the T11 integration expectations.
 
+## Follow-up 3 (independent review PR #1269) — F1 isolation, F2 identity, F3 legacy receipts
+
+- **F1 (P1):** the ENTIRE advisory-result handling (thenable detection and
+  detaching, prototype/accessor classification, field checks, normalization)
+  now runs inside one isolation guard per hook. Results are consumed ONLY
+  through a descriptor-safe snapshot (`advisoryDataSnapshot`): ordinary
+  own enumerable **data** properties of ordinary objects/arrays, finite JSON
+  values, depth-bounded — accessors, exotic prototypes and non-finite values
+  refuse the whole result WITHOUT invoking any getter; hostile Proxy traps
+  surface as a guard-caught throw and count as rejected. Post-disposition
+  faults can never affect a decided receipt.
+- **F2 (P2):** the emitted observation record carries a Kernel-owned
+  `identity` envelope (businessPackageId/workflowId/instanceKey/turnId) that
+  the Host activation completes with subjectDigest/appId/tenantId/
+  deployedAppId — the complete L2 §C identity, separate from the frozen
+  redacted projection the hook receives (the hook receives exactly what it
+  received before).
+- **F3 (P2):** `resolver.continuation.turnMaxSteps` (and any new budget
+  diagnostic) is emitted ONLY when a `hardBudget` is wired or honored advice
+  actually tightened the bound (`budgetDiagnostic`). The no-budget legacy
+  FR07 receipt is base/head deep-equal after normalizing only the kernel
+  moduleSha256 and the governanceBindingDigest derived from it.
+- New regressions (suite now 25 tests): the three review probes (throwing
+  advice getter / throwing observation `then` getter / hostile Proxy
+  prototype trap), tenant-scope and Business-scope distinguishability,
+  admitted-replay zero-record, and the base/head legacy FR07 receipt
+  equivalence.
+
 ## Follow-up 2 (controller review) — consultation liveness + legacy work-unit rule
 
 - **R1 (P1): hooks are invoked SYNCHRONOUSLY and never awaited.** `consultAdmissionBudgetAdvice`
@@ -64,6 +94,11 @@
   `business-many-effects-v1.mjs` (65 static effect intents).
 
 ## Gate receipts (real exit codes, this worktree)
+
+Revision labels: the receipts below were produced at `8bf1bcb2` (12-test
+suite) unless marked otherwise; the Follow-up-2 rows (18-test suite) were
+produced at `6a0d1777`/`decb9680`; the Follow-up-3 rows (25-test suite) at
+the follow-up-3 head.
 
 | Gate | Command | Exit |
 |---|---|---|
