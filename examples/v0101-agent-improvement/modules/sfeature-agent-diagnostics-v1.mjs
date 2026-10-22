@@ -73,7 +73,7 @@ function optionalText(v, code) {
 export function init(context) {
   record(context);
   const appId = text(own(context, 'appId'), 'DIAG_INIT_INVALID');
-  return Object.freeze({ ok: true, appId, featureKey: FEATURE_KEY });
+  return Object.freeze({ ok: true, featureKey: FEATURE_KEY, observedContext: Object.freeze({ appId }) });
 }
 
 /**
