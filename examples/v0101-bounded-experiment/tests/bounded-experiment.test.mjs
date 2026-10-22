@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as actualFeatureNamespace from '../modules/sfeature-bounded-experiment-v1.mjs';
 import {planBoundedExperiment,FEATURE_KEY,init} from '../modules/sfeature-bounded-experiment-v1.mjs';
 const SHA='a'.repeat(40);
 const base={
@@ -9,6 +10,10 @@ const base={
   maxProbeCalls:3,maxWallMs:30000,maxCostMicro:1000000,
   verifierRefs:['github:verifier'],effectPolicy:'DENY_EXTERNAL_EFFECTS',
 };
+test('v10 activation exact sealed export surface', () => {
+  assert.deepEqual(Object.keys(actualFeatureNamespace).sort(),
+    ['MODULE_ID','PACKAGE_KIND','FEATURE_ABI','FEATURE_KEY','init','planBoundedExperiment'].sort());
+});
 test('selected v10 advisory init return is ABI-conformant', () => {
   const result=init({appId:'app:qualified',audience:'aud:qualified'});
   assert.deepEqual(Object.keys(result).sort(), ['ok','featureKey','observedContext'].sort());
