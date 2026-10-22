@@ -7,5 +7,8 @@ Parent #1274 / #1277. This is source-only, pure `dh.v10.standard-feature/1` appl
 - Known negative case, crossed project or rule conflict → not applicable.
 - No hidden source/Tool/effect permissions or credential values accepted.
 
-Run `node --test examples/v0101-experience-reuse/tests/experience-reuse.test.mjs`.
+Run `node --test extensions/agent-improvement/packages/experience-reuse/tests/experience-reuse.test.mjs`.
 Research G-Memory, A-Mem, LongMINT/Compliance Trap. v0.10 standard feature S ABI and v10 BUILD selection must be physically tested on Node24 after Product/L2/DAG freeze. Tests/packaging/release: NOT_RUN.
+
+
+Canonical independent package: `extensions/agent-improvement/packages/experience-reuse`; physical Node24 `npm pack`/clean install/BUILD remains NOT_RUN.
