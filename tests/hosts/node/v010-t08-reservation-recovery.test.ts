@@ -867,3 +867,186 @@ test('RES14: a crashed registered submit blocks compensation until the Host asse
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 });
+
+/** Builds the race App whose selected Standard interpreter is routed through the test hook. */
+async function buildHookedReservationApp(buildId: string): Promise<V10BuiltApp> {
+  return await buildReservationApp(buildId, (source) => {
+    const anchor = 'export function interpret(';
+    assert.equal(source.split(anchor).length, 2, 'wrap exactly the selected Standard interpreter');
+    return source.replace(anchor, 'function __reservationInterpret(')
+      + '\nexport async function interpret(...args) { return globalThis.__dhReservationInterpret(__reservationInterpret, args); }\n';
+  });
+}
+
+/** Rewrites the resolved semantic amount so the actual Business Guard denies. */
+async function guardFailingInterpretation(original: ReservationInterpreter, args: unknown[]): Promise<unknown> {
+  const resolved = await original(...args) as { structuredDecision: { event: { payload: Record<string, unknown> } } };
+  return { ...resolved, structuredDecision: {
+    ...resolved.structuredDecision, event: {
+      ...resolved.structuredDecision.event, payload: { ...resolved.structuredDecision.event.payload, amount: 75 },
+    },
+  } };
+}
+
+test('RES15: a post-commit lost ACK never lets a stale negative witness delete the admitted pin', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res15-'));
+  const kPath = join(dir, 'k.sqlite');
+  const inner = await openSqliteCasStore({ path: kPath });
+  const base = new T08CountingStore(inner);
+  let releaseA!: () => void;
+  let enteredA!: () => void;
+  let releaseB!: () => void;
+  let enteredB!: () => void;
+  const waitA = new Promise<void>((resolve) => { releaseA = resolve; });
+  const startA = new Promise<void>((resolve) => { enteredA = resolve; });
+  const waitB = new Promise<void>((resolve) => { releaseB = resolve; });
+  const startB = new Promise<void>((resolve) => { enteredB = resolve; });
+  let calls = 0;
+  let injected = false;
+  let blockB = false;
+  // Process A's store: the actual SQLite write of the Kernel's admitted
+  // original receipt COMMITS, then the Host wrapper loses the ACK.
+  const storeA: V10DocStore = {
+    get: async (key) => await base.get(key),
+    remove: async (key, condition) => { await base.remove(key, condition); },
+    put: async (key, value, condition) => {
+      const result = await base.put(key, value, condition);
+      const ring = (value as { durableOriginalReceipts?: Record<string, { receipt?: { status?: string } }> } | null)?.durableOriginalReceipts;
+      if (!injected && key.startsWith('v10/k/') && Object.values(ring ?? {}).some((entry) => entry.receipt?.status === 'admitted')) {
+        injected = true;
+        throw Object.assign(new Error('injected post-commit I/O failure'), { code: 'HOST_IO_FAILURE' });
+      }
+      return result;
+    },
+  };
+  // Process B's store: B captures an ABSENT witness, then pauses before concluding.
+  const storeB: V10DocStore = {
+    put: async (key, value, condition) => await base.put(key, value, condition),
+    remove: async (key, condition) => { await base.remove(key, condition); },
+    get: async (key) => {
+      const doc = await base.get(key);
+      if (blockB && key.includes('receipt-archive') && doc === null) {
+        blockB = false;
+        enteredB();
+        await waitB;
+      }
+      return doc;
+    },
+  };
+  reservationTestHost.__dhReservationInterpret = async (original, args) => {
+    calls += 1;
+    if (calls === 1) {
+      enteredA();
+      await waitA;
+      return await original(...args);
+    }
+    blockB = true;
+    return await guardFailingInterpretation(original, args);
+  };
+  let activationA: V10GovernedBuildActivation | undefined;
+  let activationB: V10GovernedBuildActivation | undefined;
+  let live: Promise<{ receipt?: Record<string, unknown>; error?: string }> | undefined;
+  let retry: Promise<Record<string, unknown>> | undefined;
+  try {
+    const app = await buildHookedReservationApp('t08-reservation-lostack');
+    const decision = t08Decision(app, 'A', T08_DEPLOYMENT, { buildId: app.buildId, approvalRef: 'approval:res:lostack' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decision);
+    activationA = await activateGovernedV10Build(app, { store: storeA, deployment: T08_DEPLOYMENT, decision, authorization: authority, now: () => T08_NOW });
+    activationB = await activateGovernedV10Build(app, { store: storeB, deployment: T08_DEPLOYMENT, decision, authorization: authority, selection: 'PINNED_ONLY', now: () => T08_NOW });
+    const intent = NORMAL_INTENT('inst-lostack', 'msg:res:lostack:1', 37);
+    const target = { ...activationA.resolveIntentTarget(intent.intentType), instanceKey: intent.instanceKey };
+
+    live = activationA.send(intent).then((receipt) => ({ receipt }), (error: { code?: string }) => ({ error: String(error.code) }));
+    await startA;
+    retry = activationB.send(intent);
+    await startB; // B saw no admission witness and is paused before concluding.
+
+    releaseA();
+    const a = await live;
+    assert.equal(injected, true, 'precondition: the actual Kernel admission committed, then its ACK was lost');
+    assert.equal(a.error, 'HOST_IO_FAILURE', 'A surfaces its genuine Host failure');
+    assert.equal((await activationA.readPin(intent))?.phase, 'ADMITTED', 'A healed its pin from the durable witness despite the throw');
+
+    releaseB();
+    const b = await retry.then((receipt) => String(receipt.status), (error: { code?: string }) => String(error.code));
+    assert.ok(b === 'denied' || b === 'OCCURRENCE_RESERVATION_INDETERMINATE', `B concludes honestly: ${b}`);
+    const finalPin = await activationA.readPin(intent);
+    assert.equal(finalPin?.phase, 'ADMITTED', 'the admitted occurrence keeps its immutable BUILD pin');
+    assert.equal(base.removeKeys.includes(v10OccurrenceBuildPinKey(T08_DEPLOYMENT, target)), false, 'no pin delete was ever issued');
+    const rows = instanceRowsOf(readT08Rows(kPath), T08_DEPLOYMENT, target.businessPackageId, target.workflowId, intent.instanceKey);
+    const document = JSON.parse(rows[0]!.value) as { durableOriginalReceipts: Record<string, { receipt: { status: string } }> };
+    assert.ok(Object.values(document.durableOriginalReceipts).some(({ receipt }) => receipt.status === 'admitted'), 'the admission is physically durable');
+  } finally {
+    releaseA();
+    releaseB();
+    await live?.catch(() => {});
+    await retry?.catch(() => {});
+    activationA?.close();
+    activationB?.close();
+    inner.close();
+    delete reservationTestHost.__dhReservationInterpret;
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('RES16: an ambiguous throw keeps its in-flight marker; a competing denial cannot delete; the same message then settles', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dh-res16-'));
+  const kPath = join(dir, 'k.sqlite');
+  const inner = await openSqliteCasStore({ path: kPath });
+  const base = new T08CountingStore(inner);
+  let failNextAdmission = true;
+  // The Kernel's admission write fails BEFORE reaching SQLite: the caller
+  // cannot tell whether such a write might still land.
+  const store: V10DocStore = {
+    get: async (key) => await base.get(key),
+    remove: async (key, condition) => { await base.remove(key, condition); },
+    put: async (key, value, condition) => {
+      const ring = (value as { durableOriginalReceipts?: Record<string, unknown> } | null)?.durableOriginalReceipts;
+      if (failNextAdmission && key.startsWith('v10/k/') && Object.keys(ring ?? {}).length > 0) {
+        failNextAdmission = false;
+        throw Object.assign(new Error('injected ambiguous I/O failure'), { code: 'HOST_IO_FAILURE' });
+      }
+      return await base.put(key, value, condition);
+    },
+  };
+  let calls = 0;
+  reservationTestHost.__dhReservationInterpret = async (original, args) => {
+    calls += 1;
+    // The 2nd evaluation (the competing retry) is denied by the actual Guard.
+    return calls === 2 ? await guardFailingInterpretation(original, args) : await original(...args);
+  };
+  let activation: V10GovernedBuildActivation | undefined;
+  try {
+    const app = await buildHookedReservationApp('t08-reservation-ambiguous');
+    const decision = t08Decision(app, 'A', T08_DEPLOYMENT, { buildId: app.buildId, approvalRef: 'approval:res:ambiguous' });
+    const authority = createT08AuthorizationAuthority();
+    authority.grant(decision);
+    const governed = await activateGovernedV10Build(app, { store, deployment: T08_DEPLOYMENT, decision, authorization: authority, now: () => T08_NOW });
+    activation = governed;
+    const intent = NORMAL_INTENT('inst-ambiguous', 'msg:res:ambiguous:1', 37);
+
+    assert.equal(await refusalCode(() => governed.send(intent)), 'HOST_IO_FAILURE');
+    let pin = await governed.readPin(intent);
+    assert.equal(pin?.phase, 'RESERVED');
+    assert.equal(pin?.inFlight?.length, 1, 'the ambiguous attempt stays registered as possibly-admitting');
+    assert.equal(pin?.activeAttempt ?? null, null, 'it releases only its writer slot');
+
+    const denied = await governed.send(intent);
+    assert.equal(denied.status, 'denied', 'the competing evaluation is denied by the actual Guard');
+    pin = await governed.readPin(intent);
+    assert.equal(pin?.phase, 'RESERVED', 'a denial is never the last in-flight submit under an ambiguous marker');
+    assert.equal(pin?.inFlight?.length, 1, 'the denial deregistered only itself');
+
+    const admitted = await governed.send(intent);
+    assert.equal(admitted.status, 'admitted', 'the same reserved message reconciles by admitting');
+    pin = await governed.readPin(intent);
+    assert.equal(pin?.phase, 'ADMITTED', 'admission settles the pin and drops every marker');
+    assert.equal(pin?.inFlight, undefined);
+  } finally {
+    activation?.close();
+    inner.close();
+    delete reservationTestHost.__dhReservationInterpret;
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});

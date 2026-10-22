@@ -38,7 +38,9 @@ Ownership binding (correction (a)): a RESERVED pin names the **exact** BUILD
 (it already carries subject/closure digests) **and the exact logical
 attempt** — `messageId`, sealed `intentType` and `sha256(canon(input))`.
 New reservations always store `intentType`; older reservations without it
-remain readable, but can never authorize compensation after a denial.
+remain readable. Without intent binding they can never use the static
+caller-role proof (§4); the last-in-flight path is available to them only
+once they are tracked (after a truthful `allAttemptsTerminated` reset).
 A different intent cannot continue an intent-bound reservation even if its
 Business/workflow target, messageId and input happen to match.
 
@@ -57,21 +59,24 @@ The slot is an owner marker, **not a fence over all Kernel submits**.
   on input mismatch) prevents duplicate committed turns. It does not make
   non-admitted evaluations deterministic: dynamic semantic/Guard results may
   differ, and denials are evaluated again rather than durably committed.
-  An adopter
-  **can never reclaim** the pin — that power exists only under a slot this
-  attempt itself holds **and** the admission-impossibility proof in §4.
+  On an **untracked** (pre-v3) pin an adopter can never reclaim the pin. On a
+  **tracked** pin an adopter is registered like an owner and may compensate
+  only as the last in-flight submit (§4); the static caller-role proof
+  remains owner-only.
 - A crashed attempt leaves its slot held. Held-slot states are fail-closed:
   fresh owner claims are impossible until the holder concludes (or a witness
   heals the pin to ADMITTED). This is honest UNKNOWN, not a leak of the
   redirect guard.
-- **In-flight registration (v3).** Every submit of a tracked pin — owner
-  *and* adopter — adds its attemptId to `inFlight` by exact-revision CAS
-  BEFORE reaching the Kernel, and removes it when its submit concludes
-  (admitted settlement drops the whole set). The set, not the slot, is the
-  fence over Kernel submits: a submit that can still admit is always in it,
-  unless its process crashed (a stale entry, which only blocks compensation).
-  Pre-v3 pins (no `inFlight`) stay untracked; their adopters cannot be
-  counted, so they never authorize a dynamic compensation.
+- **In-flight registration (v3).** Every submit of a tracked RESERVED pin —
+  owner *and* adopter — adds its attemptId to `inFlight` by exact-revision
+  CAS BEFORE reaching the Kernel. (Sends to an ADMITTED pin and to an
+  untracked pre-v3 pin do not register.) A submit with an **unambiguous**
+  non-admitted result (denied / terminated) removes its entry; a submit with
+  an **ambiguous** result (thrown, or Kernel `UNKNOWN`) heals from a matching
+  witness or else KEEPS its entry as possibly-admitting; admitted settlement
+  drops the whole set. The set, not the slot, is the fence over Kernel
+  submits: any submit that may have admitted, or may still admit, is in it.
+  Stale entries (crashes, ambiguous failures) only block compensation.
 
 ## 3. Admission witness (correction (c)/(e))
 
@@ -109,7 +114,8 @@ exist without a real admission — a crash between `openInstance` and
 3. `facade.send` (Kernel admission, unchanged).
 4. Settlement:
    - receipt `admitted` → CAS the pin to ADMITTED (drop reservation+slot).
-   - receipt `UNKNOWN` → release slot, keep RESERVED (honest UNKNOWN).
+   - receipt `UNKNOWN` (ambiguous) → matching witness settles ADMITTED;
+     otherwise release the slot, KEEP the in-flight entry, keep RESERVED.
    - other **concluded** receipts (deny / terminated) → read the witness:
      - witness present and matching → settle ADMITTED, then surface typed
        `OCCURRENCE_RESERVATION_INDETERMINATE` (durable admission contradicts
@@ -129,18 +135,26 @@ exist without a real admission — a crash between `openInstance` and
        pin (fail-closed, never a fake success);
      - witness absent, any other concluded non-admission (`terminated`,
        dynamic Guard/schema/policy denial), owner or adopter: **last
-       in-flight compensation** — if this registered attempt is the ONLY
-       entry of a tracked pin's `inFlight` set and no foreign slot holder
-       exists, the pin is removed by exact-revision CAS. Every other submit
-       has concluded (or was declared terminated by the Host), so no
-       evaluation remains that could still admit; the exact revision fences a
-       concurrent registration. Otherwise the attempt only deregisters and the
-       pin stays RESERVED: another registered evaluation may still admit
-       (RES9), and it settles or compensates when IT concludes (RES13).
-       Untracked (pre-v3) pins never compensate on this path.
-   - **thrown** failures → deregister (slot + in-flight entry), keep
-     RESERVED, rethrow. A throw is never proven pre-write; no delete ever
-     happens on this path.
+       in-flight compensation** — if this attempt is currently the ONLY entry
+       of a tracked pin's `inFlight` set and no foreign slot holder exists at
+       pin revision *r*, it re-reads the witness AFTER reading *r* and, if
+       still absent, removes the pin conditioned on *r*. Proof: every other
+       submit either concluded unambiguously non-admitted, or (ambiguous)
+       would still be in the set, or was declared terminated by the Host — so
+       no evaluation can still admit; and every submit that deregistered did
+       so after its own Kernel writes, i.e. before *r*, so an admission it
+       already committed is visible to the fresh witness read (a matching
+       witness settles ADMITTED and refuses typed INDETERMINATE instead).
+       The exact revision *r* fences a concurrent registration. Otherwise the
+       attempt only deregisters and the pin stays RESERVED: another
+       registered evaluation may still admit (RES9), and it settles or
+       compensates when IT concludes (RES13). Untracked (pre-v3) pins never
+       compensate on this path.
+   - **thrown** failures (ambiguous: possibly post-write, e.g. a lost ACK)
+     → matching witness settles ADMITTED (RES15); otherwise release the
+     slot, KEEP the in-flight entry, keep RESERVED (RES16), rethrow. No
+     delete ever happens on this path, and the retained entry prevents a
+     competing denial from compensating under a write that may land late.
 
 `recoverReservation(intent)` (any live activation of the owning BUILD):
 `ABSENT` | `ADMITTED` (directly, or healed from RESERVED via a matching
@@ -155,8 +169,10 @@ process which could hold the writer slot is alive (e.g. the single writer
 process restarted); the protocol cannot prove liveness itself. With no
 matching witness it frees the held slot by exact-revision CAS — never a
 delete — and still returns `PENDING`. The next same-message send then runs as
-**owner**. Only the intent-bound fixed caller-role denial described above
-can then compensate the pin (RES8); other results keep RESERVED. The Host
+**owner**. On an untracked pin only the intent-bound fixed caller-role
+denial described above can then compensate the pin (RES8); on a tracked pin
+the last-in-flight rule still applies, and remaining registered entries keep
+it RESERVED. The Host
 must establish the prior slot holder's death rather than infer it from age.
 Even a false assertion, or a live adopter left after that holder died, must
 not allow a dynamic non-admission to delete the pin of a submit that can
@@ -199,11 +215,19 @@ conflict and carries `retryable: false`.
 - A dynamic non-admission retains the RESERVED pin while any OTHER
   registered submit remains in flight; the last one to conclude compensates
   (or settles ADMITTED). A crashed registered submit therefore blocks
-  compensation until the Host's `allAttemptsTerminated` assertion. Pre-v3
-  (untracked) pins and old unbound-intent pins cannot be compensated after a
-  dynamic non-admission; no intent is inferred or migrated from a retry.
+  compensation until the Host's `allAttemptsTerminated` assertion; so does an
+  ambiguous (thrown/UNKNOWN) submit without a witness, until its message is
+  resent and admits. Untracked (pre-v3) pins cannot be compensated after a
+  dynamic non-admission until a truthful reset tracks them; no intent is
+  inferred or migrated from a retry.
 - `allAttemptsTerminated` is trusted Host input: a false assertion forfeits
-  the no-orphan-admission guarantee for that occurrence (see §4).
+  the no-orphan-admission guarantee for that occurrence (see §4). When it
+  promotes a pre-v3 pin, the assertion must also cover that pin's old
+  UNREGISTERED submits (adopters on untracked pins were never recorded).
+- The witness re-read assumes a linearizable store: once a `put` settles
+  (success or a lost ACK), its write is visible to later reads. A store whose
+  rejected write may land LATER is covered by the retained ambiguous entry,
+  not by the witness re-read.
 - Legacy compiler-digest RESERVED pins whose canonical bytes differ from
   the Kernel's cannot heal or resend through these APIs. Slot release never
   changes their digest. See the post-release compatibility notes §3.
@@ -252,5 +276,11 @@ conflict and carries `retryable: false`.
 8f. A crashed registered submit keeps a retry's Guard denial RESERVED, even
    after `priorWriterTerminated`; after `allAttemptsTerminated` the next
    denial compensates and the instance admits a new message (RES14).
+8g. Real K + SQLite: A's admission commits but its write ACK is lost (throw)
+   while B, the same message, already captured an absent witness and paused;
+   A heals the pin ADMITTED from the durable receipt and B's stale negative
+   witness never deletes it (RES15).
+8h. An ambiguous pre-write throw keeps its in-flight entry; a competing Guard
+   denial cannot compensate; the same message then admits and settles (RES16).
 8. Regressions: the T08 governed trio (activation/decision/pinned-restore),
    T00/C01 assembly witnesses and the packed consumers stay green.

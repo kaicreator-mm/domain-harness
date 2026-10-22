@@ -1072,10 +1072,11 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     try {
       receipt = await this.#activation.facade.send(intent);
     } catch (error) {
-      // A thrown failure is never proven pre-write: this attempt only
-      // deregisters (slot + in-flight entry); the RESERVED pin itself stays
-      // fail-closed (#1219 F2 — no blind post-failure delete).
-      await this.#concludeAttempt(attempt, null, 'thrown');
+      // A thrown failure is never proven pre-write (e.g. a lost write ACK
+      // after the Kernel's admission committed). The attempt heals from its
+      // witness, or else stays registered as possibly-admitting; the RESERVED
+      // pin is never deleted on this path (#1219 F2).
+      await this.#concludeAmbiguousAttempt(attempt).catch(() => {});
       throw error;
     }
     return await this.#settleOccurrenceAttempt(attempt, receipt);
@@ -1294,14 +1295,12 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     }
     if (status === 'UNKNOWN') {
       // The Kernel's own honest UNKNOWN: never a delete, never a retry.
-      await this.#concludeAttempt(attempt, null, status);
+      await this.#concludeAmbiguousAttempt(attempt);
       return receipt;
     }
     // A concluded non-admitted receipt (deny / terminated): the Kernel's
     // durable admission evidence decides — the receipt alone never settles.
-    const witness = await this.#readAdmissionWitness(attempt.target, attempt.messageId);
-    if (witness !== null && witness.messageId === attempt.messageId && witness.inputDigest === attempt.inputDigest
-      && (!attempt.intentBound || witness.intentType === attempt.intentType)) {
+    if (await this.#witnessMatches(attempt)) {
       if (attempt.mode !== 'admitted') await this.#commitAdmitted(attempt.target);
       refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the Kernel durably admitted this reservation while returning a non-admitted receipt; the pin is settled ADMITTED and the caller reconciles through the original messageId', { receiptStatus: status });
     }
@@ -1320,6 +1319,32 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
     const concluded = status === 'denied' || status === 'terminated';
     await this.#concludeAttempt(attempt, concluded ? { despiteOthers: callerRoleDenial } : null, status);
     return receipt;
+  }
+
+  /** True iff the Kernel's durable original receipt admitted this exact reservation. */
+  async #witnessMatches(attempt: OccurrenceAttempt): Promise<boolean> {
+    const witness = await this.#readAdmissionWitness(attempt.target, attempt.messageId);
+    return witness !== null && witness.messageId === attempt.messageId && witness.inputDigest === attempt.inputDigest
+      && (!attempt.intentBound || witness.intentType === attempt.intentType);
+  }
+
+  /**
+   * Conclude a submit whose outcome is ambiguous (thrown, or Kernel UNKNOWN):
+   * its admission may already be durable, or — for a store that rejects
+   * before a write lands — may still become durable. A matching witness
+   * settles the pin ADMITTED; otherwise the attempt releases only its writer
+   * slot and KEEPS its in-flight entry, so no competing non-admission can
+   * become the "last" submit and delete the pin under it. The entry is
+   * resolved by a same-message resend that admits, a witness heal in
+   * recoverReservation, or the Host's allAttemptsTerminated assertion.
+   */
+  async #concludeAmbiguousAttempt(attempt: OccurrenceAttempt): Promise<void> {
+    if (attempt.mode === 'admitted') return;
+    if (await this.#witnessMatches(attempt)) {
+      await this.#commitAdmitted(attempt.target);
+      return;
+    }
+    await this.#concludeAttempt(attempt, null, 'ambiguous', { keepInFlight: true });
   }
 
   /** CAS the pin from RESERVED to ADMITTED (idempotent; witness-backed). */
@@ -1359,15 +1384,21 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
    * follow. Deletion is legal only (a) for the fixed caller-role denial
    * (`despiteOthers`), or (b) when this registered attempt is the LAST
    * in-flight submit of a tracked pin with no foreign slot holder: every
-   * other submit already concluded (or was declared terminated by the Host),
-   * so nothing can still admit. The exact revision fences a concurrent
-   * registration. Any doubt keeps the pin; a lost compensation race refuses
-   * typed INDETERMINATE — never a silent delete or fake success.
+   * other submit already concluded unambiguously (ambiguous ones stay
+   * registered) or was declared terminated by the Host, so no evaluation can
+   * still admit. That proves nothing about an admission ALREADY committed by
+   * a submit that has since deregistered, so the witness is re-read AFTER the
+   * pin revision the removal is conditioned on: every deregistration happens
+   * after its own Kernel writes, hence before that revision. The exact
+   * revision fences a concurrent registration. Any doubt keeps the pin; a
+   * lost compensation race refuses typed INDETERMINATE — never a silent
+   * delete or fake success. `keepInFlight` deregisters the slot only.
    */
   async #concludeAttempt(
     attempt: OccurrenceAttempt,
     compensate: { readonly despiteOthers: boolean } | null,
     receiptStatus: string,
+    options: { readonly keepInFlight?: boolean } = {},
   ): Promise<void> {
     if (attempt.mode === 'admitted') return;
     const key = v10OccurrenceBuildPinKey(this.#deployment, attempt.target);
@@ -1375,11 +1406,21 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
       const doc = await this.#readPinDoc(attempt.target);
       if (doc === null || doc.value.phase !== 'RESERVED' || !pinMatches(doc.value, this.#build)) return;
       const pin = doc.value;
-      const others = pin.inFlight === undefined ? undefined : pin.inFlight.filter((id) => id !== attempt.attemptId);
+      const others = pin.inFlight === undefined || options.keepInFlight === true
+        ? pin.inFlight
+        : pin.inFlight.filter((id) => id !== attempt.attemptId);
       const ownSlot = pin.activeAttempt?.attemptId === attempt.attemptId;
       const foreignSlot = !ownSlot && pin.activeAttempt !== null && pin.activeAttempt !== undefined;
-      const lastInFlight = attempt.registered && others !== undefined && others.length === 0 && !foreignSlot;
+      // Current membership, not the historical `registered` flag: an entry
+      // cleared by a Host reset no longer vouches for this attempt.
+      const member = pin.inFlight !== undefined && pin.inFlight.includes(attempt.attemptId);
+      const lastInFlight = attempt.registered && member && others !== undefined && others.length === 0 && !foreignSlot;
       if (compensate !== null && (compensate.despiteOthers || lastInFlight)) {
+        // Fresh negative witness tied to THIS pin revision (see above).
+        if (await this.#witnessMatches(attempt)) {
+          await this.#commitAdmitted(attempt.target);
+          refuse('OCCURRENCE_RESERVATION_INDETERMINATE', 'the Kernel durably admitted this reservation while this submit returned a non-admitted receipt; the pin is settled ADMITTED and the caller reconciles through the original messageId', { receiptStatus });
+        }
         if (this.#store.remove === undefined) {
           // Best-effort deregistration; a lost race only leaves a stale
           // entry (fail-closed). The typed refusal below is the outcome.
@@ -1394,7 +1435,7 @@ class GovernedBuildActivation implements V10GovernedBuildActivation {
           continue;
         }
       }
-      if (!ownSlot && (others === undefined || others.length === (pin.inFlight as readonly string[]).length)) return;
+      if (!ownSlot && (others === undefined || others.length === pin.inFlight?.length)) return;
       try {
         await this.#writeDeregistered(key, pin, doc.revision, others, ownSlot);
         return;
