@@ -13,6 +13,14 @@ const item=(extras={})=>({
   oracleChecks:checks(),baseline:[c('t1',A,'FAIL'),c('t2',A,'PASS')],
   candidate:[c('t1',B,'PASS'),c('t2',B,'PASS')],...extras
 });
+test('selected v10 advisory init return is ABI-conformant', () => {
+  const result=init({appId:'app:qualified',audience:'aud:qualified'});
+  assert.deepEqual(Object.keys(result).sort(), ['ok','featureKey','observedContext'].sort());
+  assert.equal(result.ok,true);
+  assert.equal(result.featureKey,FEATURE_KEY);
+  assert.equal(result.observedContext.appId,'app:qualified');
+  assert.equal(Object.hasOwn(result,'appId'),false);
+});
 test('selected SDK identity and non-authoritative comparison',()=>{
   assert.equal(FEATURE_KEY,'standard:candidate-evaluation/1');
   assert.equal(init({appId:'app:test'}).ok,true);
