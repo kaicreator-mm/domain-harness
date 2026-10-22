@@ -39,6 +39,30 @@
 - Rich consumer scenario: new step `RICH_P1.advisoryConsultation` (both hooks invoked, ≥1
   clamp, ≥1 rejected authority-field advice), pinned in the T11 integration expectations.
 
+## Follow-up 2 (controller review) — consultation liveness + legacy work-unit rule
+
+- **R1 (P1): hooks are invoked SYNCHRONOUSLY and never awaited.** `consultAdmissionBudgetAdvice`
+  and `consultTurnObservation` call `invoke()` without `await`; a thenable result
+  (`typeof then === 'function'`) is rejected outright — counted in `advisoryRejected`, never
+  applied/delivered — and detached with real no-op handlers
+  (`thenable.then(noop, noop)`; `then(undefined, undefined)` is a pass-through that Node still
+  reports as unhandled). An advisory module can therefore never stall an occurrence lane or
+  withhold an already-decided receipt (L2 §C: consultation is pure and bounded, never vetoes or
+  delays K adjudication). The consultation functions and `terminatedReceipt` are plain
+  synchronous functions; every disposition site calls them without `await`.
+- **R2 (P2): the work-unit bound exists only when a `hardBudget` is wired or honored advice
+  tightens one.** Before #1264 there was NO per-turn work-unit limit, so `hardLimits.maxWorkUnits`
+  is `Number.POSITIVE_INFINITY` when `createOccurrenceRuntime` receives no `hardBudget` (plain
+  v08 bridge, spliced-kernel host suites) — the denial check `effectIntents.length >
+  turnBudget.maxWorkUnits` then never fires. The step bound keeps
+  `min(MAX_FR07_STEPS, BUILD.maxStepsPerTurn)` because `MAX_FR07_STEPS` always existed. An
+  unbounded legacy side reports `hardLimits.maxWorkUnits: null` in the budget-advice proposal
+  (Infinity is not JSON); honored advice on that side clamps from Infinity to the advised value
+  and counts a clamp. Witnesses: no-hardBudget 65-effect turn admits with all 65 dispatches;
+  the same turn with `hardBudget {maxWorkUnitsPerTurn: 32}` is denied typed with zero dispatches.
+- New suite total: 18 tests (12 original + 4 R1 + 2 R2); fixture
+  `business-many-effects-v1.mjs` (65 static effect intents).
+
 ## Gate receipts (real exit codes, this worktree)
 
 | Gate | Command | Exit |

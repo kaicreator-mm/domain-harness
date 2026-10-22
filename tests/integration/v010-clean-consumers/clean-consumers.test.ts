@@ -268,7 +268,12 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
       assert.equal(winners[0]!.outcome.effectId, winners[1]!.outcome.effectId, 'two identical competing writers must resolve the SAME logical turn');
     } else {
       const loser = races.find((report) => report.outcome?.ok !== true);
-      assert.match(String(loser?.outcome?.code), /ADMISSION_|K02_/u, `the losing writer must fail closed typed: ${raceForensics}`);
+      // #1264 R1 made advisory consultation synchronous (one await fewer on
+      // the loser path), so the losing writer can now fail closed typed at
+      // the genesis window (GOVERNANCE_EXECUTION_PIN_MISSING) instead of the
+      // admission-fence CAS ladder. The gate's intent is unchanged: the
+      // loser must carry a TYPED kernel refusal, never a fake ACK.
+      assert.match(String(loser?.outcome?.code), /ADMISSION_|K02_|GOVERNANCE_/u, `the losing writer must fail closed typed: ${raceForensics}`);
     }
     const raceJobDb = join(raceWork, 'extjob.sqlite');
     const raceDispatches = queryRows(raceJobDb, "SELECT COUNT(*) AS n FROM job_dispatch_log WHERE op = 'job.submit'")[0]!.n as number;

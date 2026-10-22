@@ -566,3 +566,216 @@ test('N-KEXT-NO-MODELPORT: without a Host ModelPort a harness turn refuses typed
     clearAdvisoryWitnesses();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 2 (R1) — consultation stays synchronous: a thenable result is
+// rejected outright, never awaited, and can never stall a lane, delay a
+// decided receipt or surface as an unhandled rejection.
+// ---------------------------------------------------------------------------
+
+/** A promise that never settles (no timers, no I/O holding the loop). */
+function neverSettling(): Promise<never> {
+  return new Promise(() => { /* deliberately pending forever */ });
+}
+
+/** A promise that rejects asynchronously AFTER the turn has settled. */
+function lateRejection(): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('late advisory rejection witness')), 20);
+  });
+}
+
+/** Race a turn against a short timeout to prove prompt settlement. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} — did not settle within ${String(ms)}ms`)), ms);
+  });
+  timer?.unref();
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+test('N-KEXT-ASYNC-ADVICE: an async hook resolving VALID advice is rejected, counted and never applied', async () => {
+  clearAdvisoryWitnesses();
+  const business = await continuationBusiness();
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
+  const base = await basicComposition({ extensions: [alpha], routes: [MAIN_ROUTE, CONTINUATION_ROUTE] });
+  const activation = await activateV10App(buildV10App({ ...base, modules: [...base.modules, business] }), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
+  });
+  try {
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: Promise.resolve({ maxSteps: 1 }) }];
+    const receipt = await continuationTurn(activation, 'async-1');
+    assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 },
+      'the promise result (even resolving a valid ceiling) is never awaited or applied');
+    const k = activation.facade.kCounters(CONTINUATION_BUSINESS_ID);
+    assert.equal(k.budgetAdviceConsultations, 1);
+    assert.equal(k.advisoryRejected, 1, 'the thenable result is counted as rejected');
+    assert.equal(k.budgetAdviceClamps, 0, 'the async advice tightened nothing');
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+test('N-KEXT-PENDING-ADVICE: a never-settling advice promise cannot stall the lane', async () => {
+  clearAdvisoryWitnesses();
+  const business = await continuationBusiness();
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
+  const base = await basicComposition({ extensions: [alpha], routes: [MAIN_ROUTE, CONTINUATION_ROUTE] });
+  const activation = await activateV10App(buildV10App({ ...base, modules: [...base.modules, business] }), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
+  });
+  try {
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: neverSettling() }];
+    const receipt = await withTimeout(continuationTurn(activation, 'pending-1'), 2_000, 'the turn with a pending advice promise');
+    assert.equal(receipt.status, 'terminated', 'the turn completed promptly despite the pending hook promise');
+    assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 }, 'the unadvised budget bounded the turn');
+    const k = activation.facade.kCounters(CONTINUATION_BUSINESS_ID);
+    assert.equal(k.budgetAdviceConsultations, 1);
+    assert.equal(k.advisoryRejected, 1);
+    assert.equal(k.effectDispatches, 0);
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+test('N-KEXT-PENDING-OBSERVATION: a never-settling observation promise cannot delay or change the decided receipt', async () => {
+  clearAdvisoryWitnesses();
+  // The no-extension reference receipt for the SAME turn/clock seed.
+  const basic = await activateV10App(buildV10App(await basicComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now,
+  });
+  let reference: Record<string, unknown>;
+  try {
+    reference = await basic.facade.send({ ...INTENT, instanceKey: 'instance:pend-obs', messageId: 'msg:pend-obs' }) as Record<string, unknown>;
+  } finally {
+    basic.dispose();
+  }
+
+  const counters = freshV10Counters();
+  const activation = await activateV10App(buildV10App(await richComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
+  });
+  try {
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: {} }]; // valid, no tightening
+    advisoryGlobals().__v010BetaPlan = [{ garbage: neverSettling() }];
+    const receipt = await withTimeout(
+      activation.facade.send({ ...INTENT, instanceKey: 'instance:pend-obs', messageId: 'msg:pend-obs' }) as Promise<Record<string, unknown>>,
+      2_000, 'the send with a pending observation promise',
+    );
+    assert.equal(receipt.status, 'admitted');
+    assert.deepEqual(receipt, reference, 'the decided receipt is returned promptly and unchanged');
+    const k = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
+    assert.equal(k.turnObservationConsultations, 1);
+    assert.equal(k.advisoryRejected, 1, 'the pending observation promise is counted as rejected');
+    assert.deepEqual(counters.advisoryObservations, [], 'nothing reached the sink');
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+test('N-KEXT-LATE-REJECT-THENABLE: a thenable that later rejects causes no unhandled rejection', async () => {
+  clearAdvisoryWitnesses();
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on('unhandledRejection', onUnhandled);
+  const counters = freshV10Counters();
+  const activation = await activateV10App(buildV10App(await richComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
+  });
+  try {
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: lateRejection() }];
+    advisoryGlobals().__v010BetaPlan = [{ garbage: lateRejection() }];
+    const first = await activation.facade.send({ ...INTENT, instanceKey: 'instance:late-1', messageId: 'msg:late-1' });
+    assert.equal(first.status, 'admitted');
+    const second = await activation.facade.send({ ...INTENT, instanceKey: 'instance:late-2', messageId: 'msg:late-2' });
+    assert.equal(second.status, 'admitted');
+    // Let the deferred rejections fire against the discarded thenables.
+    await new Promise((resolve) => { setTimeout(resolve, 100); });
+    assert.deepEqual(unhandled, [], 'the Primary detached both discarded thenables');
+    const k = activation.facade.kCounters(BUSINESS_PACKAGE_ID);
+    assert.ok(k.advisoryRejected >= 2, `both thenables were counted (advisoryRejected=${String(k.advisoryRejected)})`);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Follow-up 2 (R2) — the work-unit bound exists only when a hardBudget is
+// wired or advice tightens it; legacy wiring keeps pre-#1264 behavior.
+// ---------------------------------------------------------------------------
+
+const MANY_EFFECTS_BUSINESS_ID = 'business-many-effects@v010.1.0.0';
+const MANY_EFFECTS_ROUTE = { intentId: 'submitManyEffects', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' };
+
+async function manyEffectsBusiness(): Promise<V10ModuleInput> {
+  return businessEntry(
+    './fixtures-v010/business-many-effects-v1.mjs',
+    MANY_EFFECTS_BUSINESS_ID,
+    ['business:policy/1', 'intent:submitManyEffects'],
+  );
+}
+
+test('P-KEXT-LEGACY-WORKUNITS: with NO wired hardBudget a 65-effect turn admits exactly as before #1264', async () => {
+  clearAdvisoryWitnesses();
+  const business = await manyEffectsBusiness();
+  const base = await basicComposition({ routes: [MAIN_ROUTE, MANY_EFFECTS_ROUTE] });
+  const built = buildV10App({ ...base, modules: [...base.modules, business] });
+  // A malformed hardBudget record is omitted by the activation wiring — the
+  // kernel then runs with no hardBudget, the legacy plain-v08-bridge shape.
+  const legacyWiring = JSON.parse(JSON.stringify(built)) as typeof built;
+  (legacyWiring as { hardBudget: unknown }).hardBudget = { broken: true };
+  const activation = await activateV10App(legacyWiring, {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now,
+  });
+  try {
+    const receipt = await activation.facade.send({
+      intentType: 'submitManyEffects', instanceKey: 'instance:many-1', messageId: 'msg:many-1',
+      input: { amount: 30 },
+    });
+    assert.equal(receipt.status, 'admitted', `65 effects must admit without a wired budget (${JSON.stringify(receipt).slice(0, 300)})`);
+    const denial = receipt.denial as Record<string, unknown> | undefined;
+    assert.notEqual(denial?.reason, 'admission-budget-exhausted', 'the turn was not denied for budget');
+    const k = activation.facade.kCounters(MANY_EFFECTS_BUSINESS_ID);
+    assert.equal(k.effectDispatches, 65, 'all 65 effect intents dispatched');
+    assert.equal(k.journalBegins, 65);
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+test('P-KEXT-WIRED-WORKUNITS: with a wired hardBudget the same 65-effect turn is budget-denied', async () => {
+  clearAdvisoryWitnesses();
+  const business = await manyEffectsBusiness();
+  const base = await basicComposition({ routes: [MAIN_ROUTE, MANY_EFFECTS_ROUTE] });
+  const options: BuildV10AppOptions = {
+    ...base,
+    modules: [...base.modules, business],
+    hardBudget: { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 32 },
+  };
+  const activation = await activateV10App(buildV10App(options), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now,
+  });
+  try {
+    const receipt = await activation.facade.send({
+      intentType: 'submitManyEffects', instanceKey: 'instance:many-2', messageId: 'msg:many-2',
+      input: { amount: 30 },
+    });
+    assert.equal(receipt.status, 'denied');
+    const denial = receipt.denial as Record<string, unknown>;
+    assert.equal(denial.reason, 'admission-budget-exhausted');
+    assert.equal(denial.workUnits, 65);
+    assert.equal(denial.maxWorkUnits, 32);
+    const k = activation.facade.kCounters(MANY_EFFECTS_BUSINESS_ID);
+    assert.equal(k.effectDispatches, 0, 'the wired bound denies with zero dispatches');
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
