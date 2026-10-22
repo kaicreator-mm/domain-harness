@@ -508,6 +508,55 @@ export interface V10Activation {
 }
 
 /**
+ * The selected kernel's OWN identity derivations, read from its sealed
+ * namespace: the canonical input digest it stores on original receipts and
+ * the durable message turn id. Governed deployment binds reservations with
+ * these instead of re-implementing them (the compiler's `canonicalJson`
+ * orders integer-like keys differently from the kernel's JSON.stringify
+ * form). Internal seam: not re-exported by the public barrels.
+ */
+export interface V10SelectedKernelIdentity {
+  /** Bare-hex sha256 of the kernel canonical JSON of `input` (absent → null). */
+  inputDigest(input: unknown): string;
+  /** The kernel's durable turn id of one message on one occurrence. */
+  messageTurnId(target: { workflowId: string; instanceKey: string }, messageId: string): string;
+}
+
+const selectedKernelIdentities = new WeakMap<V10AppFacade, V10SelectedKernelIdentity>();
+
+export function v10SelectedKernelIdentity(facade: V10AppFacade): V10SelectedKernelIdentity {
+  const identity = selectedKernelIdentities.get(facade);
+  if (identity === undefined) {
+    refuse('V10_APP_INVALID', 'the facade carries no selected kernel identity');
+  }
+  return identity;
+}
+
+function selectedKernelIdentityOf(app: V10AppView, namespaces: ReadonlyMap<string, Namespace>): V10SelectedKernelIdentity {
+  const kernelEntry = app.modules.find((module) => module.role === 'kernel-primary');
+  const kernel = kernelEntry === undefined ? undefined : namespaces.get(kernelEntry.packageId);
+  const canonical = kernel?.canonicalJsonStringify;
+  const deriveTurnId = kernel?.deriveDurableControlTurnId;
+  return Object.freeze<V10SelectedKernelIdentity>({
+    inputDigest: (input: unknown): string => {
+      if (typeof canonical !== 'function') {
+        refuse('V10_EXPORT_CONTRACT_REFUSED', 'the selected kernel-primary does not export canonicalJsonStringify');
+      }
+      return sha256Hex((canonical as (value: unknown) => string)(input === undefined ? null : input));
+    },
+    messageTurnId: (target, messageId): string => {
+      if (typeof deriveTurnId !== 'function') {
+        refuse('V10_EXPORT_CONTRACT_REFUSED', 'the selected kernel-primary does not export deriveDurableControlTurnId');
+      }
+      return (deriveTurnId as (t: unknown, s: unknown) => string)(
+        { workflowId: target.workflowId, instanceKey: target.instanceKey },
+        { kind: 'message', sourceMessageId: messageId },
+      );
+    },
+  });
+}
+
+/**
  * The composed App facade: the ONE composition-owned boundary over the
  * selected kernel primary. `send` runs a public intent through the sealed
  * route (Standard Router selection over the real selected modules) and the
@@ -553,6 +602,7 @@ export class V10AppFacade {
       ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
       : v10DeploymentDocsPrefix(deps.deploymentIdentity);
     this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
+    selectedKernelIdentities.set(this, selectedKernelIdentityOf(deps.app, deps.namespaces));
   }
 
   get selectedExtensions(): readonly { packageId: string; providerId: string | null; hook: string | null }[] {

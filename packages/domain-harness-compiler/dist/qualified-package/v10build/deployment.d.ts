@@ -122,6 +122,8 @@ export interface V10OccurrenceBuildPin {
     /** Present iff `phase === 'RESERVED'`: the exact logical attempt guarded. */
     readonly reservation?: {
         readonly messageId: string;
+        /** Absent on older pins; those pins are never compensated after a deny. */
+        readonly intentType?: string;
         readonly inputDigest: string;
         readonly reservedAt: string;
     } | undefined;
@@ -134,6 +136,13 @@ export interface V10OccurrenceBuildPin {
         readonly attemptId: string;
         readonly holder: 'writer';
     } | null | undefined;
+    /**
+     * Every governed submit (owner or adopter) of this RESERVED pin registers
+     * its attemptId here before entering the Kernel and removes it when its
+     * submit concludes. Absent on older pins, which are never compensated
+     * after a dynamic non-admission (an unregistered submit may be live).
+     */
+    readonly inFlight?: readonly string[] | undefined;
     /** ISO instant of the RESERVED→ADMITTED settlement. */
     readonly admittedAt?: string;
 }
@@ -193,6 +202,15 @@ export interface V10GovernedBuildActivation {
     readonly build: V10GovernedBuildIdentity;
     readonly selection: 'CURRENT' | 'PINNED_ONLY';
     readonly selectedShadowBinding: V10AppFacade['selectedShadowBinding'];
+    /**
+     * Governed admission. While an occurrence's first message is RESERVED, a
+     * different message (or another BUILD) for the same instance refuses
+     * `OCCURRENCE_RESERVATION_PENDING` with `detail.retryable === true`: it is
+     * a transient serialization of first admission, not a terminal refusal —
+     * retry after the reserved message settles (or after `recoverReservation`).
+     * The reserved messageId re-sent with a DIFFERENT input or bound intent carries
+     * `retryable: false` (a caller conflict).
+     */
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
     queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
     queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
@@ -210,8 +228,32 @@ export interface V10GovernedBuildActivation {
      * crash-after-admission heal), `'ABSENT'`, or `'PENDING'`. `PENDING`
      * never deletes: a possibly-live writer or an unwitnessed outcome keeps
      * the pin fail-closed, and no time-based takeover exists.
+     *
+     * `priorWriterTerminated: true` is the Host's trusted assertion that no
+     * process which could still hold this reservation's writer slot is alive
+     * (e.g. the single writer process restarted). With no admission witness,
+     * it frees the stale slot (exact-revision CAS, never a delete) and still
+     * returns `'PENDING'`: the next same-message send then runs as owner.
+     * Registered in-flight submits are untouched, so even a false assertion
+     * cannot make a later non-admission delete the pin under a live submit.
+     *
+     * `allAttemptsTerminated: true` is the stronger Host assertion that EVERY
+     * submit ever registered on this reservation has terminated (e.g. all
+     * writer processes restarted). It also empties the in-flight set (and
+     * starts tracking a pre-v3 pin), so the next concluded non-admission of
+     * the reserved message compensates the pin. Its safety rests entirely on
+     * the assertion being true: if a registered submit is in fact still live,
+     * a later compensation may delete the pin before that submit admits.
+     *
+     * Compensation rule: a concluded non-admission (deny/terminated, no
+     * matching witness) deletes the pin only when this attempt was the last
+     * registered in-flight submit, or for the fixed caller-role denial of an
+     * intent-bound reservation (no submit of that intent can ever admit).
      */
-    recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
+    recoverReservation(intent: Pick<V10PublicIntent, 'intentType' | 'instanceKey'>, options?: {
+        readonly priorWriterTerminated?: boolean;
+        readonly allAttemptsTerminated?: boolean;
+    }): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
     close(): void;
 }
 /**

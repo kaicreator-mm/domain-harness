@@ -17,6 +17,15 @@ export declare const V10_KERNEL_CALLER_ROLE: "requester";
 export declare const V10_ROUTER_PRIORITY: 1;
 export declare const V10_ROUTER_ELIGIBILITY: "eligible";
 export declare function v10RouterBasisDigest(subjectDigest: string): string;
+/**
+ * The selected kernel's legacy (host-prefixed) durable doc keys that hold
+ * the same-CAS original admission receipt. They mirror the kernel's own
+ * `legacyKernelDocKeys().instance` / `.receiptArchive` builders, which the
+ * sealed payload does not export; the governed reservation witness test
+ * (RES4) is the drift fence for these two literals.
+ */
+export declare function v10KernelInstanceDocKey(workflowId: string, instanceKey: string): string;
+export declare function v10KernelReceiptArchiveDocKey(turnId: string): string;
 /** Selected per-role ABI rows of the v0.10 Node24 profile. */
 export declare const V10_SELECTED_ROLE_ABI: Readonly<{
     readonly 'kernel-primary': "v08-kernel-abi/1";

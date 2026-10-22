@@ -276,6 +276,24 @@ export interface V10Activation {
     [Symbol.dispose](): void;
 }
 /**
+ * The selected kernel's OWN identity derivations, read from its sealed
+ * namespace: the canonical input digest it stores on original receipts and
+ * the durable message turn id. Governed deployment binds reservations with
+ * these instead of re-implementing them (the compiler's `canonicalJson`
+ * orders integer-like keys differently from the kernel's JSON.stringify
+ * form). Internal seam: not re-exported by the public barrels.
+ */
+export interface V10SelectedKernelIdentity {
+    /** Bare-hex sha256 of the kernel canonical JSON of `input` (absent → null). */
+    inputDigest(input: unknown): string;
+    /** The kernel's durable turn id of one message on one occurrence. */
+    messageTurnId(target: {
+        workflowId: string;
+        instanceKey: string;
+    }, messageId: string): string;
+}
+export declare function v10SelectedKernelIdentity(facade: V10AppFacade): V10SelectedKernelIdentity;
+/**
  * The composed App facade: the ONE composition-owned boundary over the
  * selected kernel primary. `send` runs a public intent through the sealed
  * route (Standard Router selection over the real selected modules) and the

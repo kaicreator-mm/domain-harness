@@ -28,6 +28,7 @@ test('N-I1227: public barrels never export trusted Host effect/AST internals', (
       // #1227: internal activation counter probes must not be publicly
       // reachable either.
       'freshV10Counters',
+      'v10SelectedKernelIdentity',
     ]) {
       assert.equal(name in surface, false, `${name} must not be publicly reachable`);
     }
