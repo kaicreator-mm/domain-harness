@@ -1231,3 +1231,167 @@ test('N-KEXT-F7-INFINITE-TRAP: an infinitely-blocking reflective trap proxy can 
     assert.equal(result.flags.hasTraps, 0);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 8 — string-ABI negatives for BOTH hooks through a real
+// facade.send: oversize (exact ceiling+1, refused by the length rule ALONE),
+// invalid JSON text, over-deep nesting (observation only: every budget field
+// rule already refuses any nested value, so a budget depth case could not
+// isolate the depth rule) and JSON non-object top levels. Each refusal is
+// counted exactly once, applies nothing and leaves the receipt byte-identical
+// to the no-extension receipt of the same turn.
+// ---------------------------------------------------------------------------
+
+const F8_BUDGET_CEILING = 256; // ADVISORY_ADVICE_MAX_CHARS (kernel-mechanism-v1.mjs)
+const F8_OBSERVATION_CEILING = 4096; // ADVISORY_OBSERVATION_MAX_CHARS
+const F8_DEPTH_MAX_CONTAINERS = 8; // ADVISORY_RESULT_MAX_DEPTH: root + 7 nested containers
+
+function paddedTo(length: number, json: string): string {
+  assert.ok(length >= json.length);
+  return ' '.repeat(length - json.length) + json;
+}
+
+interface F8BudgetCase { name: string; text: string; tightens: boolean }
+
+async function runF8BudgetCases(cases: readonly F8BudgetCase[]): Promise<void> {
+  clearAdvisoryWitnesses();
+  const business = await continuationBusiness();
+
+  const controlReceipts: string[] = [];
+  const control = await activateV10App(buildV10App(await compositionWithBusiness(business, CONTINUATION_ROUTE)), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
+  });
+  try {
+    for (let index = 0; index < cases.length; index += 1) {
+      controlReceipts.push(JSON.stringify(await continuationTurn(control, `f8b-${index}`)));
+    }
+  } finally {
+    control.dispose();
+  }
+
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
+  const base = await basicComposition({ extensions: [alpha], routes: [MAIN_ROUTE, CONTINUATION_ROUTE] });
+  const advised = await activateV10App(buildV10App({ ...base, modules: [...base.modules, business] }), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
+  });
+  try {
+    advisoryGlobals().__v010AlphaAdvicePlan = cases.map((entry) => ({ advice: entry.text }));
+    for (let index = 0; index < cases.length; index += 1) {
+      const entry = cases[index];
+      const before = advised.facade.kCounters(CONTINUATION_BUSINESS_ID);
+      const rejectedBefore = before.advisoryRejected;
+      const clampsBefore = before.budgetAdviceClamps;
+      const receipt = await continuationTurn(advised, `f8b-${index}`);
+      const after = advised.facade.kCounters(CONTINUATION_BUSINESS_ID);
+      assert.equal(after.budgetAdviceConsultations, index + 1, `${entry.name}: consulted once per turn`);
+      if (entry.tightens) {
+        assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 2 }, `${entry.name}: accepted advice tightens the bound`);
+        assert.equal(after.advisoryRejected - rejectedBefore, 0, `${entry.name}: not counted as rejected`);
+        assert.equal(after.budgetAdviceClamps - clampsBefore, 1, `${entry.name}: exactly one clamp`);
+      } else {
+        assert.equal(receipt.status, 'terminated', `${entry.name}: the turn still runs to its own bound`);
+        assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 }, `${entry.name}: the bound is NOT tightened`);
+        assert.equal(continuationBoundOf(receipt).turnMaxSteps, 3, `${entry.name}: per-turn budget unchanged`);
+        assert.equal(after.advisoryRejected - rejectedBefore, 1, `${entry.name}: advisoryRejected incremented by exactly 1`);
+        assert.equal(after.budgetAdviceClamps - clampsBefore, 0, `${entry.name}: nothing applied`);
+        assert.equal(JSON.stringify(receipt), controlReceipts[index], `${entry.name}: receipt byte-identical to the no-extension receipt`);
+      }
+    }
+  } finally {
+    advised.dispose();
+    clearAdvisoryWitnesses();
+  }
+}
+
+interface F8ObservationCase { name: string; text: string; delivered: boolean }
+
+async function runF8ObservationCases(cases: readonly F8ObservationCase[]): Promise<void> {
+  clearAdvisoryWitnesses();
+  const basicReceipts: string[] = [];
+  const basic = await activateV10App(buildV10App(await basicComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now,
+  });
+  try {
+    for (let index = 0; index < cases.length; index += 1) {
+      basicReceipts.push(JSON.stringify(await basic.facade.send({
+        ...INTENT, instanceKey: `instance:f8o-${index}`, messageId: `msg:f8o-${index}`,
+      })));
+    }
+  } finally {
+    basic.dispose();
+  }
+
+  const counters = freshV10Counters();
+  const activation = await activateV10App(buildV10App(await richComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
+  });
+  try {
+    advisoryGlobals().__v010BetaPlan = cases.map((entry) => ({ garbage: entry.text }));
+    for (let index = 0; index < cases.length; index += 1) {
+      const entry = cases[index];
+      const rejectedBefore = activation.facade.kCounters(BUSINESS_PACKAGE_ID).advisoryRejected;
+      const sinkBefore = counters.advisoryObservations.length;
+      const receipt = await activation.facade.send({
+        ...INTENT, instanceKey: `instance:f8o-${index}`, messageId: `msg:f8o-${index}`,
+      });
+      assert.equal(receipt.status, 'admitted', `${entry.name}: the turn is still admitted`);
+      const rejectedDelta = activation.facade.kCounters(BUSINESS_PACKAGE_ID).advisoryRejected - rejectedBefore;
+      const sinkDelta = counters.advisoryObservations.length - sinkBefore;
+      if (entry.delivered) {
+        assert.equal(rejectedDelta, 0, `${entry.name}: not counted as rejected`);
+        assert.equal(sinkDelta, 1, `${entry.name}: the accepted observation reached the sink`);
+        assert.deepEqual((counters.advisoryObservations[sinkBefore] as Record<string, unknown>).observation, JSON.parse(entry.text));
+      } else {
+        assert.equal(rejectedDelta, 1, `${entry.name}: advisoryRejected incremented by exactly 1`);
+        assert.equal(sinkDelta, 0, `${entry.name}: the sink got no record`);
+      }
+      assert.equal(JSON.stringify(receipt), basicReceipts[index], `${entry.name}: receipt byte-identical to the no-extension receipt`);
+    }
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+}
+
+test('N-KEXT-F8-BUDGET-OVERSIZE: a valid-but-whitespace-padded advice of ceiling+1 chars is refused by the length rule alone; exactly the ceiling is accepted', async () => {
+  const tight = '{"maxSteps":2}';
+  await runF8BudgetCases([
+    { name: 'budget exactly at ceiling', text: paddedTo(F8_BUDGET_CEILING, tight), tightens: true },
+    { name: 'budget ceiling+1', text: paddedTo(F8_BUDGET_CEILING + 1, tight), tightens: false },
+    { name: 'budget far over ceiling', text: paddedTo(F8_BUDGET_CEILING * 8, tight), tightens: false },
+  ]);
+});
+
+test('N-KEXT-F8-OBSERVATION-OVERSIZE: a valid observation record of ceiling+1 chars is refused by the length rule alone; exactly the ceiling is delivered', async () => {
+  const record = '{"providerId":"advisory-beta","observed":{"ok":true}}';
+  await runF8ObservationCases([
+    { name: 'observation exactly at ceiling', text: paddedTo(F8_OBSERVATION_CEILING, record), delivered: true },
+    { name: 'observation ceiling+1', text: paddedTo(F8_OBSERVATION_CEILING + 1, record), delivered: false },
+  ]);
+});
+
+const F8_INVALID_JSON = ['{maxSteps:2}', '{"maxSteps":2', ''] as const;
+const F8_NON_OBJECT_JSON = ['5', '"x"', '[1]', 'null'] as const;
+
+test('N-KEXT-F8-INVALID-JSON: invalid JSON text is refused, counted and never throws out of the turn (both hooks)', async () => {
+  await runF8BudgetCases(F8_INVALID_JSON.map((text) => ({ name: `budget ${JSON.stringify(text)}`, text, tightens: false })));
+  await runF8ObservationCases(F8_INVALID_JSON.map((text) => ({ name: `observation ${JSON.stringify(text)}`, text, delivered: false })));
+});
+
+test('N-KEXT-F8-NON-OBJECT-JSON: a JSON non-object top level is refused and counted (both hooks)', async () => {
+  await runF8BudgetCases(F8_NON_OBJECT_JSON.map((text) => ({ name: `budget ${text}`, text, tightens: false })));
+  await runF8ObservationCases(F8_NON_OBJECT_JSON.map((text) => ({ name: `observation ${text}`, text, delivered: false })));
+});
+
+test('N-KEXT-F8-DEPTH: an observation nested past ADVISORY_RESULT_MAX_DEPTH is refused; the deepest allowed nesting is delivered', async () => {
+  // Root record + (containers - 1) nested arrays under key "n".
+  const nested = (containers: number): string => {
+    const arrays = containers - 1;
+    return `{"n":${'['.repeat(arrays)}${']'.repeat(arrays)}}`;
+  };
+  await runF8ObservationCases([
+    { name: 'depth at the bound', text: nested(F8_DEPTH_MAX_CONTAINERS), delivered: true },
+    { name: 'depth bound+1', text: nested(F8_DEPTH_MAX_CONTAINERS + 1), delivered: false },
+    { name: 'depth far over the bound', text: nested(F8_DEPTH_MAX_CONTAINERS + 40), delivered: false },
+  ]);
+});
