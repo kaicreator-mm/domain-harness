@@ -8,6 +8,7 @@
   - `8bf1bcb2` (initial #1264 implementation; 12-test suite): `b44bed573a1566ec6c8e1767e6218cca20b21b60540aebee4bd0dff0c4246148`
   - `6a0d1777` (follow-up 2; 18-test suite): `5a6ab7985cb916a8699b8f1364caf12ff918e149c3a752029a18e81ca034e985` (git blob `7fe178a0f52dc553981c9714f8370682d945ee35`)
   - Follow-up 3 head (25-test suite): `54e8b8e1776d5799ac0b1950032ac839b0a0f641ae889c5404785dbb157b62b7` (git blob `6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d`)
+  - Follow-up 4 head (28-test suite): `e522f2cf6591868adff307edd3f89710d8ef30ac83cbc99de65352527a574286` (git blob `aa4382ceeecac3a15e46f4d681e3aa5f85a563d4`)
   - Repository-wide search found NO committed test/witness pinning either SHA literal; every
     v0.10 suite computes `moduleSha256`/`subjectDigest` dynamically at runtime. Historical
     evidence receipts under `docs/experiments/**` and `.agent/execution/**` are immutable

@@ -4040,15 +4040,36 @@ function advisoryDataSnapshot(value, depth) {
   if (Array.isArray(value)) {
     const entries = [];
     for (let index = 0; index < value.length; index += 1) {
-      if (!hasOwn(value, String(index))) return ADVISORY_REFUSED;
-      const entry = advisoryDataSnapshot(value[index], depth + 1);
+      const key = String(index);
+      if (!hasOwn(value, key)) return ADVISORY_REFUSED;
+      // [v0.10 #1264 F4] Elements are read ONLY through their own data
+      // descriptor: an accessor element is refused WITHOUT ever invoking its
+      // getter (a plain `value[index]` read would fire it).
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+        return ADVISORY_REFUSED;
+      }
+      const entry = advisoryDataSnapshot(descriptor.value, depth + 1);
       if (entry === ADVISORY_REFUSED) return ADVISORY_REFUSED;
       entries.push(entry);
+    }
+    // Extra non-index own properties are outside the array's snapshot shape
+    // and refuse the result instead of being silently dropped.
+    for (const key of Object.keys(value)) {
+      const index = Number(key);
+      if (!(Number.isSafeInteger(index) && index >= 0 && index < value.length && String(index) === key)) {
+        return ADVISORY_REFUSED;
+      }
     }
     return entries;
   }
   const record = {};
   for (const key of Object.keys(value)) {
+    // [v0.10 #1264 F4] An own `__proto__` key (reachable via JSON.parse or
+    // defineProperty) would reshape this snapshot's prototype through a
+    // plain assignment, so it refuses the result outright; the snapshot
+    // stays an ordinary object with no inherited-field exposure.
+    if (key === '__proto__') return ADVISORY_REFUSED;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
       return ADVISORY_REFUSED;

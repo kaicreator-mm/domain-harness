@@ -1042,3 +1042,122 @@ test('P-KEXT-F3-LEGACY-CONTINUATION: base/head FR07 receipts without a budget di
   }
   assert.deepEqual(JSON.parse(receipts[1]!), JSON.parse(receipts[0]!), 'the legacy no-budget FR07 receipt drifted beyond kernel identity bytes');
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 4 (controller review) — advisoryDataSnapshot defects:
+// the array branch must read elements only through own data descriptors
+// (never invoke an accessor's getter, never drop extra non-index own
+// properties), and an own `__proto__` key must refuse the result instead of
+// reshaping the snapshot's prototype.
+// ---------------------------------------------------------------------------
+
+test('N-KEXT-F4-ARRAY-GETTER: an accessor array element is refused and its getter is never invoked', async () => {
+  clearAdvisoryWitnesses();
+  let getterInvoked = false;
+  const accessorArray = [2, 2];
+  Object.defineProperty(accessorArray, '0', {
+    enumerable: true,
+    get() { getterInvoked = true; return 1; },
+  });
+  const extraKeyArray = [1];
+  (extraKeyArray as unknown as Record<string, unknown>).extra = 1;
+
+  const business = await continuationBusiness();
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
+  const base = await basicComposition({ extensions: [alpha], routes: [MAIN_ROUTE, CONTINUATION_ROUTE] });
+  const activation = await activateV10App(buildV10App({ ...base, modules: [...base.modules, business] }), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
+  });
+  try {
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: accessorArray }, { advice: extraKeyArray }];
+    const receipt = await continuationTurn(activation, 'f4-arr-1');
+    assert.equal(receipt.status, 'terminated');
+    assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 }, 'the hostile array advice was never applied');
+    const second = await continuationTurn(activation, 'f4-arr-2');
+    assert.equal(second.status, 'terminated');
+    assert.equal(getterInvoked, false, 'the accessor element getter must never be invoked');
+    const k = activation.facade.kCounters(CONTINUATION_BUSINESS_ID);
+    assert.equal(k.advisoryRejected, 2, 'both hostile arrays are counted (accessor element, extra non-index own property)');
+    assert.equal(k.budgetAdviceClamps, 0);
+
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+
+  // Observation side over a beta-wired activation: the same hostile arrays
+  // are refused without getter invocation and nothing reaches the sink.
+  const counters = freshV10Counters();
+  const observed = await activateV10App(buildV10App(await richComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
+  });
+  try {
+    advisoryGlobals().__v010BetaPlan = [{ garbage: accessorArray }, { garbage: extraKeyArray }];
+    const first = await observed.facade.send({ ...INTENT, instanceKey: 'instance:f4-obs', messageId: 'msg:f4-obs' });
+    assert.equal(first.status, 'admitted');
+    const second = await observed.facade.send({ ...INTENT, instanceKey: 'instance:f4-obs2', messageId: 'msg:f4-obs2' });
+    assert.equal(second.status, 'admitted');
+    assert.equal(getterInvoked, false, 'the observation snapshot must not invoke the getter either');
+    const kMain = observed.facade.kCounters(BUSINESS_PACKAGE_ID);
+    assert.equal(kMain.advisoryRejected, 2);
+    assert.equal(kMain.turnObservationConsultations, 2);
+    assert.deepEqual(counters.advisoryObservations, [], 'neither hostile array reached the sink');
+  } finally {
+    observed.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+test('N-KEXT-F4-DUNDER-PROTO-ADVICE: JSON-parsed __proto__ advice is refused and never applied through inheritance', async () => {
+  clearAdvisoryWitnesses();
+  const business = await continuationBusiness();
+  const alpha = await extensionEntry({ fixture: 'kext-advisory-alpha-v1.mjs', hookExport: 'observeAlpha' });
+  const base = await basicComposition({ extensions: [alpha], routes: [MAIN_ROUTE, CONTINUATION_ROUTE] });
+  const activation = await activateV10App(buildV10App({ ...base, modules: [...base.modules, business] }), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, modelPort: queryLoopModelPort,
+  });
+  try {
+    // JSON.parse materializes "__proto__" as an OWN key of the result.
+    const dunder = JSON.parse('{"__proto__":{"maxSteps":1}}') as Record<string, unknown>;
+    assert.ok(Object.hasOwn(dunder, '__proto__'), 'the probe requires an own __proto__ key');
+    advisoryGlobals().__v010AlphaAdvicePlan = [{ advice: dunder }];
+    const receipt = await continuationTurn(activation, 'f4-dunder-1');
+    assert.deepEqual(receipt.terminal, { code: 'MAX_STEPS_EXHAUSTED', step: 3 }, 'the __proto__ advice never clamped the bound');
+    const k = activation.facade.kCounters(CONTINUATION_BUSINESS_ID);
+    assert.equal(k.advisoryRejected, 1, 'the __proto__-shaped result is refused');
+    assert.equal(k.budgetAdviceClamps, 0, 'no inherited field was ever applied');
+    assert.equal(k.budgetAdviceConsultations, 1);
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
+
+test('N-KEXT-F4-DUNDER-PROTO-OBS: an own __proto__ observation key is refused and reshapes nothing', async () => {
+  clearAdvisoryWitnesses();
+  const counters = freshV10Counters();
+  const activation = await activateV10App(buildV10App(await richComposition()), {
+    store: new PlainCasDocStore(), tenantId: TENANT, now: tickingClock().now, counters,
+  });
+  try {
+    const dunder = JSON.parse('{"__proto__":{"injected":true}}') as Record<string, unknown>;
+    advisoryGlobals().__v010BetaPlan = [{ garbage: dunder }];
+    const first = await activation.facade.send({ ...INTENT, instanceKey: 'instance:f4-p1', messageId: 'msg:f4-p1' });
+    assert.equal(first.status, 'admitted');
+    assert.deepEqual(counters.advisoryObservations, [], 'the __proto__-shaped observation never reached the sink');
+    assert.equal(activation.facade.kCounters(BUSINESS_PACKAGE_ID).advisoryRejected, 1);
+
+    // A subsequent benign observation still arrives as an ordinary plain
+    // record — the hostile result reshaped nothing anywhere.
+    const second = await activation.facade.send({ ...INTENT, instanceKey: 'instance:f4-p2', messageId: 'msg:f4-p2' });
+    assert.equal(second.status, 'admitted');
+    assert.equal(counters.advisoryObservations.length, 1);
+    const delivered = counters.advisoryObservations[0] as Record<string, unknown>;
+    assert.equal(Object.getPrototypeOf(delivered), Object.prototype, 'the sink record is an ordinary object');
+    assert.equal(delivered.observation !== null && typeof delivered.observation === 'object', true);
+    assert.equal(Object.getPrototypeOf(delivered.observation), Object.prototype, 'no prototype change anywhere in the snapshot');
+  } finally {
+    activation.dispose();
+    clearAdvisoryWitnesses();
+  }
+});
