@@ -20,7 +20,7 @@ const FORBIDDEN = new Set([
   'kernelReceipt', 'hostPorts', 'resources', 'write', 'activate', 'promote',
 ]);
 
-export class DiagnosticInputError extends Error {
+class DiagnosticInputError extends Error {
   constructor(code) {
     super(code);
     this.name = 'DiagnosticInputError';
