@@ -15,6 +15,7 @@
 | W07 synthetic missing `requires` | `V10_FEATURE_MISSING` in selected closure, not a requirement of the real C01–C04 | existing BUILD |
 | W08 forbidden static Node import | `V10_IMPORT_POLICY_DENIED` with hash recomputed, not confused with W06 | existing BUILD |
 | W09 noncallable `featureExport` | `V10_FEATURE_ABI_INVALID` at selected activation/invocation; do not call this BUILD static validation | existing facade |
+| W09a advisory init-return ABI | All four selected S Feature `init(context)` outputs carry `ok`, `featureKey`, `observedContext` but never undeclared top-level `appId`; intentional invalid init returns `V10_INIT_CONTRACT_REFUSED` during activation | selected activation |
 | W10 C01 normalized event evidence | consistent first observed failure and ambiguity; repeats are *candidates*, never ROOT verified | C01 |
 | W11 C02 oracle validity | matched cases + positive/negative/independent verifier and holdout valid; bad negative and hidden leak -> no winner | C02 |
 | W12 C03 stale memory | current exact rules/scope override stale/correlated historical memory; safe review candidate still possible | C03 |
@@ -27,4 +28,4 @@
 | W19 Claim/governance | not selected/unapproved Feature cannot execute state-changing business operation, #1267 (separate owner) not bypassed | K Primary/Host |
 | W20 source/release | exact SHA, CI/live tests / genuine independent code review, release packaging evidence all truthful | R01 |
 
-**CAUTION:** W01–W20 are *future scenarios*, not current test pass counts. Existing Draft PRs include local `node:test` and source probes but do **not** collectively prove W14–W19 or any Node24 physical result.
+**CAUTION:** W01–W20 plus W09a are *future scenarios*, not current test pass counts. Existing Draft PRs include local `node:test` and source probes but do **not** collectively prove W14–W19 or any Node24 physical result.
