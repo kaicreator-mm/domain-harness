@@ -10,6 +10,14 @@ function event(eventId, seq, status, extra = {}) {
 function verifier(verifierRef, status = 'PASS', extra = {}) {
   return { verifierRef, sourceRef: 'github:verifier-1', subjectSha: SHA, status, coverage: 'COMPLETE', ...extra };
 }
+test('selected v10 advisory init return is ABI-conformant', () => {
+  const result=init({appId:'app:qualified',audience:'aud:qualified'});
+  assert.deepEqual(Object.keys(result).sort(), ['ok','featureKey','observedContext'].sort());
+  assert.equal(result.ok,true);
+  assert.equal(result.featureKey,FEATURE_KEY);
+  assert.equal(result.observedContext.appId,'app:qualified');
+  assert.equal(Object.hasOwn(result,'appId'),false);
+});
 test('qualified Standard Feature identity and no K admission authority', () => {
   assert.equal(FEATURE_KEY, 'standard:agent-diagnostics/1');
   assert.equal(init({appId:'app:sample'}).ok, true);
