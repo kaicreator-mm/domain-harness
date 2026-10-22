@@ -657,6 +657,7 @@ class GovernedBuildActivation {
     #selection;
     #activation;
     #now;
+    #stopPromise;
     #closed = false;
     constructor(deps) {
         this.#store = deps.store;
@@ -1142,6 +1143,25 @@ class GovernedBuildActivation {
     async queryManyScopedSnapshots(selectors) {
         this.#assertOpen();
         return await this.#activation.facade.queryManyScopedSnapshots(selectors);
+    }
+    /** [v0.10 #1265] Governed receipt subscription over the real facade. */
+    async subscribe(observer) {
+        this.#assertOpen();
+        return await this.#activation.facade.subscribe(observer);
+    }
+    /**
+     * [v0.10 #1265] Graceful governed shutdown: this activation refuses new
+     * occurrence activity from now on, and the underlying facade detaches its
+     * subscriptions and runs the ordinary activation dispose. Idempotent —
+     * concurrent and later calls share the first stop's outcome.
+     */
+    stop() {
+        const existing = this.#stopPromise;
+        if (existing !== undefined)
+            return existing;
+        this.#closed = true;
+        this.#stopPromise = this.#activation.facade.stop();
+        return this.#stopPromise;
     }
     kCounters(businessPackageId) {
         this.#assertOpen();

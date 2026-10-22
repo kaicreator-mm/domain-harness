@@ -165,6 +165,20 @@ export interface V10PublicIntent {
     readonly messageId: string;
     readonly input: Record<string, unknown>;
 }
+/**
+ * [v0.10 #1265] The synchronous receipt callback of one facade subscription.
+ * Like v0.9, the delivered value is the selected Kernel's own receipt —
+ * never an observer- or caller-supplied argument.
+ */
+export type V10ReceiptObserver = (receipt: unknown) => void;
+/**
+ * [v0.10 #1265] The public receipt-subscription handle, shaped like the v0.9
+ * `V9PublicSubscription`: unsubscription is asynchronous because the
+ * subscriber's ordered delivery tail is allowed to settle first.
+ */
+export interface V10Subscription {
+    unsubscribe(): Promise<void>;
+}
 type Namespace = Record<string, unknown>;
 interface SelectedAdvisory {
     readonly packageId: string;
@@ -400,6 +414,50 @@ export declare class V10AppFacade {
     invokeSelectedStandardFeature(featureKey: string, request: unknown, trustedDependencies?: unknown): Promise<unknown>;
     isClosed(): boolean;
     close(): void;
+    /**
+     * [v0.10 #1265] Public receipt subscription (the frozen L2 Tiny contract
+     * verb). Delivers the IMMUTABLE receipts of THIS activation's own Kernel
+     * turns to the observer, in Kernel emission order: every observed record
+     * that is a Kernel receipt fans out as one deep-frozen private copy;
+     * `advisory-observation` records (#1264) never do.
+     *
+     * Scope and authorization mirror the scoped-query path exactly. A
+     * deployment-identity (K02 scoped, multi-B) activation WITHOUT Host
+     * `queryAuthority` refuses typed `QUERY_AUTHORIZATION_REQUIRED` — there is
+     * deliberately no allow-all default, exactly like `queryScopedSnapshot`, so
+     * receipt delivery can never become a cross-B read channel that bypasses
+     * that authorization. With authority, every delivery is authorized through
+     * the SAME `authorize` over the exact scoped target tuple, so a
+     * non-visible Business target is never delivered (a denied delivery and a
+     * denied query are one authorization decision — no oracle); authority
+     * without the K02 deployment identity refuses `QUERY_DEPLOYMENT_REQUIRED`
+     * (no unscoped cross-B fallback exists).
+     *
+     * The historical unscoped wiring (no `deploymentIdentity`, where scoped
+     * queries are unavailable anyway) keeps delivering its own activation's
+     * receipts without an authority, and that is safe by construction: the
+     * whole activation shares ONE unscoped K namespace keyed by its own
+     * subjectDigest/tenant, the observe hook physically sees only its own
+     * runtimes' turns (no cross-deployment or cross-tenant record can exist),
+     * and the only holder of this facade is the Host/first-party consumer that
+     * can already `send` — the receipts expose nothing that holder could not
+     * already observe.
+     *
+     * A non-cloneable receipt fails closed into non-delivery; an observer
+     * exception is isolated — it never affects K state, the receipt or another
+     * observer. Refuses typed once the facade is closed/stopped.
+     */
+    subscribe(observer: V10ReceiptObserver): Promise<V10Subscription>;
+    /**
+     * [v0.10 #1265] Graceful, idempotent shutdown — the v0.9 stop semantics
+     * over the v0.10 activation lifecycle: detach every subscription (no
+     * further delivery), refuse all new activity typed (`FACADE_CLOSED`), then
+     * run the owning activation's ordinary dispose (import-allowance release +
+     * reverse advisory teardown). The first call locks the outcome
+     * synchronously; concurrent or later calls share it. `close()` and
+     * `dispose()` remain valid and idempotent afterwards.
+     */
+    stop(): Promise<void>;
     /** The real kernel's own counters for one business package. */
     kCounters(businessPackageId: string): Record<string, number>;
     /**

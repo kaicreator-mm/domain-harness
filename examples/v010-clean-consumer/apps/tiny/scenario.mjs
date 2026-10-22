@@ -10,6 +10,7 @@
  * No advanced package is selected, imported or installed; the resolution log
  * captured by app.mjs is part of the report.
  */
+import { deepStrictEqual } from 'node:assert/strict';
 import { join } from 'node:path';
 
 import {
@@ -38,6 +39,15 @@ const INTENT = {
   messageId: MESSAGE_ID,
   input: { amount: 30 },
 };
+
+/** Bounded wait for the asynchronous subscription delivery tail. */
+async function waitFor(condition, label, timeoutMs = 5000) {
+  const started = Date.now();
+  while (!condition()) {
+    if (Date.now() - started > timeoutMs) throw new Error(`timed out waiting for ${label}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 export async function run({ scenario, workdir, app, manifest, log }) {
   if (scenario !== 'tiny-basic') throw new Error(`unknown tiny scenario ${String(scenario)}`);
@@ -177,6 +187,40 @@ export async function run({ scenario, workdir, app, manifest, log }) {
     return { code };
   });
 
+  // [v0.10 #1265] The frozen L2 Tiny contract's remaining public verbs:
+  // subscribe delivers the exact immutable Kernel receipt of this
+  // activation's own turns; unsubscribe silences delivery; stop is a
+  // graceful typed shutdown.
+  const delivered = [];
+  let subscription = null;
+  await step('subscribe.receipt', async () => {
+    subscription = await activation.facade.subscribe((receipt) => { delivered.push(receipt); });
+    const sent = await activation.facade.send({ ...INTENT, messageId: 'tiny-msg-2', instanceKey: 'tiny-instance-2' });
+    if (sent.status !== 'admitted') {
+      throw new Error(`subscribed send was not admitted: ${JSON.stringify(sent).slice(0, 300)}`);
+    }
+    await waitFor(() => delivered.length >= 1, 'the subscribed receipt delivery');
+    if (delivered.length !== 1) throw new Error(`expected exactly one delivered receipt, got ${String(delivered.length)}`);
+    const receipt = delivered[0];
+    deepStrictEqual(receipt, sent);
+    if (Object.isFrozen(receipt) !== true || Object.isFrozen(receipt.occurrence) !== true) {
+      throw new Error('the delivered receipt is not immutable');
+    }
+    if (receipt === sent) throw new Error('the delivered receipt must be a private copy, not the send value');
+    return { status: receipt.status, messageId: receipt.occurrence.messageId };
+  });
+
+  await step('unsubscribe.quiet', async () => {
+    await subscription.unsubscribe();
+    const after = await activation.facade.send({ ...INTENT, messageId: 'tiny-msg-3', instanceKey: 'tiny-instance-3' });
+    if (after.status !== 'admitted') {
+      throw new Error(`post-unsubscribe send was not admitted: ${JSON.stringify(after).slice(0, 300)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (delivered.length !== 1) throw new Error(`delivery continued after unsubscribe: ${String(delivered.length)} receipts`);
+    return { deliveredReceipts: delivered.length };
+  });
+
   const final = {
     kCounters: activation.facade.kCounters('business-order-approval@v08.1.0.0'),
     journalRows: store.count('%effect-journal%'),
@@ -193,6 +237,29 @@ export async function run({ scenario, workdir, app, manifest, log }) {
       outsideDeploymentRoot: log.fileUrlsOutsideRoot(),
     },
   };
+
+  await step('stop.graceful', async () => {
+    await activation.facade.stop();
+    if (activation.facade.isClosed() !== true) throw new Error('the facade is not closed after stop');
+    let sendCode = null;
+    try {
+      await activation.facade.send({ ...INTENT, messageId: 'tiny-msg-4' });
+    } catch (error) {
+      sendCode = error?.code ?? 'NO_CODE';
+    }
+    if (sendCode !== 'FACADE_CLOSED') throw new Error(`post-stop send refused with ${String(sendCode)}, expected FACADE_CLOSED`);
+    let subscribeCode = null;
+    try {
+      await activation.facade.subscribe(() => {});
+    } catch (error) {
+      subscribeCode = error?.code ?? 'NO_CODE';
+    }
+    if (subscribeCode !== 'FACADE_CLOSED') throw new Error(`post-stop subscribe refused with ${String(subscribeCode)}, expected FACADE_CLOSED`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    if (delivered.length !== 1) throw new Error(`delivery happened after stop: ${String(delivered.length)} receipts`);
+    return { sendCode, subscribeCode, deliveredReceipts: delivered.length };
+  });
+
   activation.dispose();
   store.close();
   return { steps, final, dbPath };

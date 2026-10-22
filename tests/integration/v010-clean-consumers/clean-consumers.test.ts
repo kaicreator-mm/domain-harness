@@ -205,11 +205,12 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
     const tinyEntry = join(tinyDir, 'node_modules', '@kaicreator-example', 'v010-tiny-app', 'app.mjs');
     const richEntry = join(richDir, 'node_modules', '@kaicreator-example', 'v010-rich-app', 'app.mjs');
 
-    // ---- (4) Tiny: execute, query, restart, replay ----------------------
+    // ---- (4) Tiny: execute, query, restart, replay, subscribe, stop ------
     const tinyReport = runScenario(tinyEntry, 'tiny-basic', tinyWork, join(tinyWork, 'report.json'));
     assertReport(tinyReport, 'Tiny', [
       'selection.tiny', 'send.basic', 'query.scoped', 'query.deniedForeignB',
       'restart.reopen', 'replay.originalReceipt', 'replay.changedInputConflict',
+      'subscribe.receipt', 'unsubscribe.quiet', 'stop.graceful',
     ]);
     assert.equal(tinyReport.final?.manifest?.modules?.length, 4, 'Tiny must install exactly K/S/B/C');
     const tinyBare = tinyReport.resolution?.bareSpecifiers ?? [];
