@@ -132,7 +132,7 @@ export function analyzeAgentRun(input) {
     }
     const sha = sourceSha(own(entry, 'subjectSha'));
     const matchingSubject = sha === expected;
-    if (matchingSubject && coverage === 'COMPLETE' && status !== 'NOT_RUN') verifiedRefs.add(ref);
+    if (matchingSubject && coverage === 'COMPLETE' && ['PASS', 'FAIL'].includes(status)) verifiedRefs.add(ref);
     verifierSummary.push(Object.freeze({
       verifierRef: ref,
       sourceRef: text(own(entry, 'sourceRef'), 'DIAG_SOURCE_MISSING'),
