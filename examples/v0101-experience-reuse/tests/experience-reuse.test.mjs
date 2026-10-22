@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as actualFeatureNamespace from '../modules/sfeature-experience-reuse-v1.mjs';
 import {assessExperienceApplicability,FEATURE_KEY,init} from '../modules/sfeature-experience-reuse-v1.mjs';
 const A='a'.repeat(40),B='b'.repeat(40);
 const current={projectId:'project:p',taskClass:'class:repair',subjectSha:A,ruleRevision:'ads@sha123'};
@@ -9,6 +10,10 @@ const candidate=(more={})=>({
   evidence:'INDEPENDENT_PASS',counterexampleRefs:[],...more
 });
 const run=candidates=>assessExperienceApplicability({current,candidates});
+test('v10 activation exact sealed export surface', () => {
+  assert.deepEqual(Object.keys(actualFeatureNamespace).sort(),
+    ['MODULE_ID','PACKAGE_KIND','FEATURE_ABI','FEATURE_KEY','init','assessExperienceApplicability'].sort());
+});
 test('selected v10 advisory init return is ABI-conformant', () => {
   const result=init({appId:'app:qualified',audience:'aud:qualified'});
   assert.deepEqual(Object.keys(result).sort(), ['ok','featureKey','observedContext'].sort());
