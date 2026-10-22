@@ -9,6 +9,7 @@ export type { V10CodedFailure, V10ErrorCode, V10KnownErrorCode } from './known-e
 export {
   V10_BUILD_FORMAT,
   V10_BUNDLER_REVISION,
+  V10_DECISION_FEATURE_KEYS,
   V10_HOST_ABI,
   V10_IMPORT_POLICY_REVISION,
   V10_KEXT_ABI,

@@ -19,6 +19,17 @@ export declare const V10_BUNDLER_REVISION: "dh.v10.bundler/1";
  */
 export declare const V10_KERNEL_ADVISORY_HOOKS: readonly string[];
 /**
+ * [v0.10 #1267] The CLOSED decision-capable S feature key set of the selected
+ * v0.10 Standard Primary dispatcher (PC-04 "named, BUILD-bound"). It mirrors —
+ * byte-for-byte — the `DECISION_FEATURE_KEYS` export of the selected Standard
+ * SDK payload (`payload/standard-sdk-v1.mjs`); a parity test pins the two
+ * together. BUILD rejects a route row whose `featureKey` names a feature
+ * outside this set (not decision-capable) or not selected in the composition
+ * BEFORE any module executes; the S Primary's own dispatcher refuses unknown
+ * feature keys again at its trusted wiring boundary.
+ */
+export declare const V10_DECISION_FEATURE_KEYS: readonly string[];
+/**
  * Kernel/Standard Router adapter literals selected by this v0.10 ABI.
  * These historical v08 field values are wire-contract pins, NOT reasons
  * to rename frozen implementation directories.

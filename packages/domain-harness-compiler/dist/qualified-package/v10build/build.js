@@ -49,7 +49,7 @@
  */
 import { isObjectRecord } from './guards.js';
 import { canonicalSnapshot } from '@kaicreator/domain-harness/v8';
-import { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_KERNEL_ADVISORY_HOOKS, V10_RUNTIME_ABI, V10_SELECTED_ROLE_ABI, V10_TARGET_PROFILE, sha256Canonical, sha256Hex, } from './digest.js';
+import { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_DECISION_FEATURE_KEYS, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_KERNEL_ADVISORY_HOOKS, V10_RUNTIME_ABI, V10_SELECTED_ROLE_ABI, V10_TARGET_PROFILE, sha256Canonical, sha256Hex, } from './digest.js';
 import { assertSealedImportClosure } from './import-policy.js';
 import { V10BuildError } from './errors.js';
 import { resolveV10SelectedClosure } from './selected-closure.js';
@@ -59,7 +59,7 @@ const PACKAGE_ID_RE = /^[A-Za-z][A-Za-z0-9._:@-]{0,127}$/;
 const FEATURE_KEY_RE = /^[a-z][a-z0-9._:-]{0,127}\/[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const INTENT_KEY_RE = /^intent:[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const AUTHORITY_NAMESPACES = ['kernel:', 'cas:', 'admission:', 'journal:', 'effect:'];
-const ROUTE_FIELDS = new Set(['intentId', 'operationId', 'capabilityId', 'handlerId']);
+const ROUTE_FIELDS = new Set(['intentId', 'operationId', 'capabilityId', 'handlerId', 'featureKey']);
 const MODULE_FIELDS = new Set([
     'packageId', 'role', 'abiVersion', 'moduleSource', 'moduleSha256', 'endpoint',
     'dependencies', 'externalImports', 'provides', 'requires', 'optional',
@@ -450,6 +450,9 @@ export function buildV10App(options) {
     if (routesRaw.length === 0 || routesRaw.length > MAX_ITEMS) {
         fail('BUILD_GRAPH_INVALID', `routes must be a non-empty bounded array of route rows`);
     }
+    // [v0.10 #1267] The SELECTED decision-capable feature keys of this
+    // composition: a route row may bind an intent only to one of these.
+    const selectedFeatureKeys = new Set(sealed.filter((module) => module.role === 'standard-feature').map((module) => module.provides[0]));
     const routes = [];
     const routeKeys = new Set();
     for (const raw of routesRaw) {
@@ -461,6 +464,23 @@ export function buildV10App(options) {
         const operationId = boundedString(raw.operationId, 'route operationId');
         const capabilityId = boundedString(raw.capabilityId, 'route capabilityId');
         const handlerId = boundedString(raw.handlerId, 'route handlerId');
+        // [v0.10 #1267 PC-04] Optional BUILD-bound decision feature: the row may
+        // name exactly one SELECTED, decision-capable Standard feature that
+        // interprets this intent inside the K turn. An unknown, unselected or
+        // non-decision-capable key refuses HERE, at BUILD, before any affected
+        // module executes — never discovered at runtime.
+        const featureKey = raw.featureKey === undefined
+            ? undefined
+            : (() => {
+                const key = boundedString(raw.featureKey, 'route featureKey');
+                if (!V10_DECISION_FEATURE_KEYS.includes(key)) {
+                    fail('V10_ROUTE_INVALID', `route intent ${intentId} names feature ${key} which is not a decision-capable Standard feature; the selected dispatcher dispatches [${V10_DECISION_FEATURE_KEYS.join(', ')}] only`);
+                }
+                if (!selectedFeatureKeys.has(key)) {
+                    fail('V10_ROUTE_INVALID', `route intent ${intentId} names feature ${key} which is not selected in this composition; caller input cannot add feature dispatch`);
+                }
+                return key;
+            })();
         const intentKey = `intent:${intentId}`;
         if (!byIntent.has(intentKey)) {
             fail('V10_ROUTE_INVALID', `route intent ${intentId} is not sealed as a business intent of this composition; caller input cannot add intents`);
@@ -481,7 +501,9 @@ export function buildV10App(options) {
             fail('V10_ROUTE_INVALID', `duplicate route for intent ${intentId} → operation ${operationId}`);
         }
         routeKeys.add(key);
-        routes.push({ intentId, operationId, capabilityId, handlerId });
+        routes.push(featureKey === undefined
+            ? { intentId, operationId, capabilityId, handlerId }
+            : { intentId, operationId, capabilityId, handlerId, featureKey });
     }
     // ---- Canonical subject digest over the roster + bindings + policy ----
     const roster = sealed.map((module) => ({

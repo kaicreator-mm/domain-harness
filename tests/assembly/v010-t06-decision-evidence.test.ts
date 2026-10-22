@@ -510,3 +510,160 @@ test('T06-N11: a hanging Host sink reports unknown-timeout without vetoing the o
   assert.equal(observation.kernelReceipt.status, 'admitted');
   rich.dispose();
 });
+
+// ---------------------------------------------------------------------------
+// [v0.10 #1267] BOUND intents: the decision is produced INSIDE the K turn, so
+// the evidence is read from the K receipt's own resolver evidence — never a
+// separately invoked (second, non-authoritative) decision.
+// ---------------------------------------------------------------------------
+
+const FD_INTENT = 'submitFeatureDecision';
+const SEMANTIC_FEATURE_KEY = 'standard:semantic-decision/1';
+
+/** The #1267 feature-decision composition (bound route + selected T02). */
+async function boundComposition(): Promise<ReturnType<typeof buildV10App>> {
+  const [kernel, sdk, router, business, capability] = await Promise.all([
+    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('./fixtures-v010/business-feature-decision-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url), 'utf8'),
+  ]);
+  const routerBody = router.replace(/^export /gm, '');
+  const standard = `${sdk}
+// v0.10 #1267 BUILD-style vendored bundle: the pure Standard WorkflowRouter.
+const __dhv10RouterBundle = (() => {
+${routerBody}
+return { routeWorkflowIntent };
+})();
+export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
+`;
+  const modules: V10ModuleInput[] = [
+    {
+      packageId: 'v08-kernel-mechanism@1.0.0', role: 'kernel-primary', abiVersion: 'v08-kernel-abi/1',
+      moduleSource: kernel, moduleSha256: sha256HexSource(kernel),
+      endpoint: 'occurrence-runtime', dependencies: [], provides: ['kernel:occurrence-runtime/1'], requires: [],
+    },
+    {
+      packageId: 'standard-sdk@v08.1.0.0', role: 'standard-primary', abiVersion: 'v08-standard-sdk-abi/1',
+      moduleSource: standard, moduleSha256: sha256HexSource(standard),
+      endpoint: 'rule-interpreter', dependencies: [], provides: ['standard:interpret/1', 'standard:route/1'], requires: [],
+    },
+    {
+      packageId: 'business-feature-decision@v010.1.0.0', role: 'business', abiVersion: 'v08-business-abi/1',
+      moduleSource: business, moduleSha256: sha256HexSource(business),
+      endpoint: 'business-policy', dependencies: [],
+      provides: ['business:policy/1', `intent:${FD_INTENT}`, 'intent:submitPlainDecision'], requires: [],
+    },
+    {
+      packageId: 'capability-quote-tools@v08.1.0.0', role: 'capability', abiVersion: 'v08-capability-abi/1',
+      moduleSource: capability, moduleSha256: sha256HexSource(capability),
+      endpoint: 'capability-endpoint', dependencies: [], provides: ['capability:ledger/1'], requires: [],
+      capabilityId: 'ledger',
+      handlers: [{ operationId: 'reserve', handler: 'reserveLedger' }, { operationId: 'preview', handler: 'previewTotal' }],
+    },
+    // The selected T02 + T06 features (the observer's keys stay selected even
+    // though the bound path resolves its evidence from the K receipt alone).
+    ...(await selectedFeatureEntries()),
+  ];
+  return buildV10App({
+    appId: 'app:v010-t06-bound',
+    audience: 'aud:v010-t00',
+    targetProfile: V10_TARGET_PROFILE,
+    modules,
+    routes: [
+      { intentId: FD_INTENT, operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger', featureKey: SEMANTIC_FEATURE_KEY },
+      { intentId: 'submitPlainDecision', operationId: 'reserve', capabilityId: 'ledger', handlerId: 'reserveLedger' },
+    ],
+    hardBudget: { maxStepsPerTurn: 8, maxWorkUnitsPerTurn: 64 },
+    buildId: 't06-bound',
+  });
+}
+
+const boundIntentOf = (suffix: string, input: Record<string, unknown>) => ({
+  intentType: FD_INTENT, instanceKey: `instance:t06b-${suffix}`, messageId: `msg:t06b-${suffix}`, input,
+});
+
+test('T06-1267-P1: a bound intent is observed from the K receipt itself with zero separate feature/model calls', async () => {
+  let deploymentModelCalls = 0;
+  const rich = await activateV10App(await boundComposition(), {
+    store: new PlainCasDocStore(), now: () => 0,
+    decisionDependencies: { model: async () => { deploymentModelCalls += 1; return { disposition: 'review' }; } },
+  });
+  const observer = observerFor(rich.facade, {
+    // Even a PINNED deployment boundary must never be invoked: the decision
+    // already happened inside the K turn.
+    semanticDeps: { model: async () => { deploymentModelCalls += 1000; return { disposition: 'forged' }; } },
+  });
+  const observation = await observer.observeAndRecord({
+    intent: boundIntentOf('p1', { amount: 30, requestId: 'R-b1' }),
+    evidence: { observationId: 'obs:t06b-p1', schema },
+    semanticRequest: semanticRuleRequest(30), // ignored on the bound path
+  });
+  assert.equal(observation.kernelReceipt.status, 'admitted');
+  assert.equal(observation.decisionTrace.kernelOutcome, 'admitted');
+  assert.equal(observation.decisionTrace.semanticOutcome, 'selected');
+  // Evidence read from the K receipt's own resolver evidence:
+  assert.equal(observation.decisionTrace.source, 'rule');
+  assert.equal(observation.decisionTrace.evidence.decisionFeature, SEMANTIC_FEATURE_KEY);
+  assert.equal(observation.decisionTrace.evidence.modelCallStatus, 'k-receipt-resolver-evidence');
+  assert.equal(observation.decisionTrace.evidence.modelCalls, null);
+  assert.equal(observation.decisionTrace.evidence.reportedModelCallStatus, 'unmeasured');
+  assert.equal(observation.decisionTrace.evidence.decisionProvenance, 'k-receipt-resolver-evidence');
+  assert.equal(observation.kernelReceipt.admitted.resolver.featureDispatch.featureKey, SEMANTIC_FEATURE_KEY);
+  assert.equal(sha256Canonical(observation.kernelReceipt), observation.decisionTrace.kernelObservation.receiptSha256);
+  assert.equal(deploymentModelCalls, 0, 'the K turn resolved the decision; no separate call may happen');
+  assert.ok(Object.isFrozen(observation.decisionTrace));
+  rich.dispose();
+});
+
+test('T06-1267-P2: a bound model-fallback turn reports the K-receipt measured counts, still with zero separate calls', async () => {
+  const rich = await activateV10App(await boundComposition(), {
+    store: new PlainCasDocStore(), now: () => 0,
+    decisionDependencies: { model: async () => ({ disposition: 'approved' }) },
+  });
+  const observer = observerFor(rich.facade);
+  const observation = await observer.observeAndRecord({
+    intent: boundIntentOf('p2', { amount: 42, requestId: 'R-b2' }),
+    evidence: { observationId: 'obs:t06b-p2', schema },
+    semanticRequest: semanticRuleRequest(42),
+  });
+  assert.equal(observation.kernelReceipt.status, 'admitted');
+  assert.equal(observation.decisionTrace.source, 'model');
+  assert.equal(observation.decisionTrace.semanticOutcome, 'selected');
+  assert.equal(observation.decisionTrace.evidence.modelCalls, 1, 'the K receipt itself carries the measured count');
+  assert.equal(observation.decisionTrace.evidence.reportedModelCallStatus, 'measured');
+  assert.equal(observation.decisionTrace.evidence.decisionFeature, SEMANTIC_FEATURE_KEY);
+  rich.dispose();
+});
+
+test('T06-1267-P3: a bound unavailable turn (no model deps) reports the unavailable terminal from the receipt', async () => {
+  const rich = await activateV10App(await boundComposition(), { store: new PlainCasDocStore(), now: () => 0 });
+  const observer = observerFor(rich.facade);
+  const observation = await observer.observeAndRecord({
+    intent: boundIntentOf('p3', { amount: 42, requestId: 'R-b3' }),
+    evidence: { observationId: 'obs:t06b-p3', schema },
+    semanticRequest: semanticRuleRequest(42),
+  });
+  assert.equal(observation.kernelReceipt.status, 'terminated');
+  assert.equal(observation.decisionTrace.kernelOutcome, 'terminated');
+  assert.equal(observation.decisionTrace.semanticOutcome, 'unavailable');
+  assert.equal(observation.decisionTrace.source, null);
+  assert.equal(observation.decisionTrace.evidence.decisionFeature, SEMANTIC_FEATURE_KEY);
+  rich.dispose();
+});
+
+test('T06-1267-N1: the direct (non-bound) path is unchanged and a lookalike binding cannot be forced', async () => {
+  const rich = await observerApp();
+  const observer = observerFor(rich.facade);
+  // submitQuoteDecisionDynamic has NO bound route in this composition: the
+  // direct invocation path still authors the trace through the feature.
+  const observation = await observer.observeAndRecord({
+    intent: intentOf('bnd-n1'),
+    evidence: { observationId: 'obs:t06-bnd-n1', schema },
+    semanticRequest: semanticRuleRequest(30),
+  });
+  assert.equal(observation.decisionTrace.evidence.decisionProvenance, 'host-invoked-selected-feature');
+  assert.equal(observation.decisionTrace.evidence.decisionFeature, undefined);
+  rich.dispose();
+});

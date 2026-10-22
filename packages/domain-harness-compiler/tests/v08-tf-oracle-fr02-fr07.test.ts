@@ -117,7 +117,9 @@ const V08_K_BLOB_SOURCE_PREP = 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555';
 const V08_REBIND_BASE = '8d7ef905275d4b270ff76206db935cbd6fc70fe0';
 // FR11/HF24 adds the selected SDK compiled-data READ endpoint; FR02/FR07 semantics unchanged.
 // CI #1304 executed all prior affected oracle behavior but found the stale exact S pin.
-const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
+// Re-pinned after #1267 (BUILD-bound decision-feature dispatcher added to the
+// selected SDK; plain interpret semantics unchanged); previous S blob 9b86835bf12262ef53548e0031550fcecd97a7f2 (final #1267 lint form 8218a7a8c89f46a0f6863eb8c62a6aaf6ff8351f).
+const V08_S_BLOB = '8218a7a8c89f46a0f6863eb8c62a6aaf6ff8351f';
 // K_BLOB_PIN_REBOUND_AFTER_1108_R2: #1108 R2 P1 — the zero-external-effect
 // proof no longer trusts thrown error codes at all; only the trusted host
 // dispatcher's own per-call pre-handler attestation (kernel-minted,
@@ -137,7 +139,8 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // Re-pinned after #1264 follow-up 2 (synchronous consultation + wired-only work-unit bound); previous blob 64f39cd68c71868adb29a464ed7122497891bfd7.
 // Re-pinned after #1264 follow-up 3 (guarded advisory-result snapshots, observation identity envelope, conditional budget diagnostic); previous blob 7fe178a0f52dc553981c9714f8370682d945ee35.
 // Re-pinned after #1264 follow-up 4 (snapshot array descriptors + __proto__ refusal); previous blob 6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d.
-const V08_K_BLOB = 'aa4382ceeecac3a15e46f4d681e3aa5f85a563d4';
+// Re-pinned after #1267 (receipt featureDispatch citation + absent-fact tolerance in the selected kernel); previous blob aa4382ceeecac3a15e46f4d681e3aa5f85a563d4.
+const V08_K_BLOB = 'd25670c51aa32faf3993d88417f6771ce62d86d7';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

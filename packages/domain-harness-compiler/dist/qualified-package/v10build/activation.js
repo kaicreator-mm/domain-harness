@@ -420,6 +420,7 @@ export class V10AppFacade {
     #queryAuthority;
     #advisoryHooks;
     #modelPort;
+    #decisionDependencies;
     #subscribers = new Set();
     #query;
     #stopPromise;
@@ -433,6 +434,7 @@ export class V10AppFacade {
         this.#queryAuthority = deps.queryAuthority;
         this.#advisoryHooks = deps.advisoryHooks;
         this.#modelPort = deps.modelPort;
+        this.#decisionDependencies = deps.decisionDependencies;
         this.#activatedTenantId = deps.tenantId;
         this.#docsPrefix = deps.deploymentIdentity === undefined
             ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
@@ -449,6 +451,18 @@ export class V10AppFacade {
         return this.#app.modules
             .filter((module) => module.role === 'standard-feature')
             .map((module) => ({ packageId: module.packageId, featureKey: module.provides[0] ?? null }));
+    }
+    /**
+     * [v0.10 #1267] Read-only BUILD fact: the decision-capable Standard feature
+     * the sealed route row binds to this intent, or `undefined` when the intent
+     * is unbound (the S Primary interpreter owns it as before). Trusted
+     * composition material for the deployment-side evidence bridge — never
+     * caller-settable and never an authority.
+     */
+    boundDecisionFeatureOf(intentType) {
+        this.#assertOpen();
+        const row = this.#app.routes.find((candidate) => candidate.intentId === intentType && typeof candidate.featureKey === 'string');
+        return row === undefined ? undefined : Object.freeze({ featureKey: row.featureKey });
     }
     /**
      * T07: read-only, activation-origin BUILD/tenant identity used by the Host
@@ -898,9 +912,24 @@ export class V10AppFacade {
         if (typeof interpret !== 'function') {
             refuse('V10_EXPORT_CONTRACT_REFUSED', `standard-primary ${standardEntry.packageId} does not export interpret`);
         }
+        // [v0.10 #1267 PC-04] The ONE bound decision dispatch wiring: when any
+        // sealed route row names a decision-capable feature, the S Primary's own
+        // dispatcher entry (never the facade, never a fallback) owns the
+        // delegation to EXACTLY that feature. Every bound row must resolve
+        // against THIS business's sealed policy — the digest-verified
+        // semantic-decision declaration, the Business-declared feature request +
+        // finite outcome→event map, and the selected feature export — or the
+        // activation refuses typed before any K turn can run. No bound rows:
+        // the plain interpret wiring, byte-for-byte.
+        const dispatchWiring = this.#featureDecisionWiring(standardEntry, standardNamespace, businessPackageId, policy);
+        const boundInterpret = dispatchWiring === undefined
+            ? undefined
+            : dispatchWiring.interpret;
         const sdkEndpoint = {
             packageId: standardEntry.packageId,
-            interpret: (declaration, input, context) => interpret(declaration, input, context),
+            interpret: boundInterpret === undefined
+                ? (declaration, input, context) => interpret(declaration, input, context)
+                : (declaration, input, context) => boundInterpret(declaration, input, context, undefined),
         };
         if (this.#modelPort !== undefined) {
             const createResolver = standardNamespace?.createHostBoundModelResolver;
@@ -981,6 +1010,98 @@ export class V10AppFacade {
             refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} declares no workflowKey`);
         }
         return workflowKey;
+    }
+    /**
+     * [v0.10 #1267] Build the ONE S Primary feature-decision dispatch wiring
+     * for ONE business runtime from sealed material only, or `undefined` when
+     * no route row of THIS business binds a decision feature (the caller then
+     * wires the plain interpret, byte-for-byte). Every required fact is
+     * validated here structurally: the BUILD-bound feature must be selected
+     * with a callable export, and the business policy must carry the
+     * digest-verified semantic-decision declaration vocabulary plus the
+     * feature request material and finite outcome→event map for the bound
+     * intent. The S Primary's dispatcher factory re-validates the assembled
+     * wiring deeply at its own trusted boundary.
+     */
+    #featureDecisionWiring(standardEntry, standardNamespace, businessPackageId, policy) {
+        const boundRows = this.#app.routes.filter((row) => typeof row.featureKey === 'string'
+            && this.#businessFor(row.intentId) === businessPackageId);
+        if (boundRows.length === 0)
+            return undefined;
+        const createDispatcher = standardNamespace?.createFeatureDecisionDispatcher;
+        if (typeof createDispatcher !== 'function') {
+            refuse('V10_EXPORT_CONTRACT_REFUSED', `standard-primary ${standardEntry.packageId} does not export createFeatureDecisionDispatcher`);
+        }
+        const featureDecisions = policy.featureDecisions;
+        const intentBindings = isPlainRecord(policy.intentBindings) ? policy.intentBindings : undefined;
+        const rules = isPlainRecord(policy.rules) ? policy.rules : undefined;
+        if (!isPlainRecord(featureDecisions) || intentBindings === undefined || rules === undefined) {
+            refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} carries a BUILD-bound decision route but no featureDecisions/intentBindings/rules policy material`);
+        }
+        const decisions = boundRows.map((row) => {
+            const featureKey = row.featureKey;
+            const feature = this.#app.modules.find((module) => module.role === 'standard-feature' && module.provides[0] === featureKey);
+            const invoke = feature === undefined
+                ? undefined
+                : this.#namespaces.get(feature.packageId)?.[feature.featureExport];
+            if (feature === undefined || typeof invoke !== 'function') {
+                refuse('V10_EXPORT_CONTRACT_REFUSED', `route intent ${row.intentId} binds feature ${featureKey} which is not a selected Standard feature with a callable export`);
+            }
+            const material = featureDecisions[row.intentId];
+            if (!isPlainRecord(material)) {
+                refuse('V10_BUSINESS_POLICY_INVALID', `intent ${row.intentId} binds feature ${featureKey} but the Business policy declares no featureDecisions material for it`);
+            }
+            for (const key of Object.keys(material)) {
+                if (!['featureRequest', 'outcomeField', 'outcomeEvents', 'eventPayloadFromInput'].includes(key)) {
+                    refuse('V10_BUSINESS_POLICY_INVALID', `featureDecisions.${row.intentId} carries the unsupported field '${key}'`);
+                }
+            }
+            if (!isPlainRecord(material.featureRequest)
+                || typeof material.outcomeField !== 'string'
+                || !isPlainRecord(material.outcomeEvents)) {
+                refuse('V10_BUSINESS_POLICY_INVALID', `featureDecisions.${row.intentId} must carry featureRequest, outcomeField and outcomeEvents`);
+            }
+            const binding = intentBindings[row.intentId];
+            const ruleId = isPlainRecord(binding) && typeof binding.ruleId === 'string' ? binding.ruleId : undefined;
+            const rule = ruleId === undefined ? undefined : rules[ruleId];
+            if (ruleId === undefined || !isPlainRecord(rule)
+                || rule.kind !== 'semantic-decision'
+                || typeof rule.declarationDigest !== 'string' || !/^[0-9a-f]{64}$/.test(rule.declarationDigest)
+                || rule.id !== ruleId
+                || !isPlainRecord(rule.inputSelection)
+                || !Array.isArray(rule.allowedOutcomes) || rule.allowedOutcomes.length === 0
+                || !Array.isArray(rule.allowedEventTypes) || rule.allowedEventTypes.length === 0) {
+                refuse('V10_BUSINESS_POLICY_INVALID', `intent ${row.intentId} binds feature ${featureKey} but its policy rule ${String(ruleId)} is not a compiled semantic-decision declaration with vocabulary and inputSelection`);
+            }
+            return Object.freeze({
+                declarationDigest: rule.declarationDigest,
+                declarationId: ruleId,
+                featureKey,
+                invoke,
+                featureRequest: material.featureRequest,
+                outcomeField: material.outcomeField,
+                outcomeEvents: material.outcomeEvents,
+                eventPayloadFromInput: isPlainRecord(material.eventPayloadFromInput) ? material.eventPayloadFromInput : {},
+                allowedOutcomes: rule.allowedOutcomes,
+                allowedEventTypes: rule.allowedEventTypes,
+                inputSelection: rule.inputSelection,
+            });
+        });
+        const deps = this.#decisionDependencies;
+        let dispatcher;
+        try {
+            dispatcher = createDispatcher(Object.freeze({
+                decisions: Object.freeze(decisions),
+                ...(deps === undefined ? {} : { deps }),
+            }));
+        }
+        catch (error) {
+            refuse('V10_BUSINESS_POLICY_INVALID', `the selected Standard dispatcher refused the bound decision wiring: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (dispatcher === null || typeof dispatcher !== 'object' || typeof dispatcher.interpret !== 'function') {
+            refuse('V10_EXPORT_CONTRACT_REFUSED', `standard-primary ${standardEntry.packageId} exposed no bound decision dispatch entry`);
+        }
+        return dispatcher;
     }
     /**
      * Deterministic, read-only Standard Router preflight. It cannot confer K
@@ -1233,6 +1354,25 @@ export async function activateV10App(app, options) {
                 || typeof options.modelPort.invoke !== 'function')) {
             refuse('V10_ACTIVATION_OPTIONS_INVALID', 'modelPort, when present, must be Host-owned wiring of the shape { invoke(call) => Promise }');
         }
+        // [v0.10 #1267] The optional Host decision dependencies are trusted
+        // wiring, not caller data: a malformed option fails the activation typed
+        // instead of silently degrading bound feature dispatches.
+        if (options.decisionDependencies !== undefined) {
+            const raw = options.decisionDependencies;
+            if (!isPlainRecord(raw)) {
+                refuse('V10_ACTIVATION_OPTIONS_INVALID', 'decisionDependencies, when present, must be Host-owned wiring as a plain record');
+            }
+            for (const key of ['model', 'tool', 'now', 'createTimeoutSignal']) {
+                const member = raw[key];
+                if (member !== undefined && typeof member !== 'function') {
+                    refuse('V10_ACTIVATION_OPTIONS_INVALID', `decisionDependencies.${key} must be callable when provided`);
+                }
+            }
+            const procedures = raw.procedures;
+            if (procedures !== undefined && !(procedures instanceof Map)) {
+                refuse('V10_ACTIVATION_OPTIONS_INVALID', 'decisionDependencies.procedures must be a Map when provided');
+            }
+        }
         // [v0.10 #1264] The scoped H→K advisory hook table of the selected K
         // extensions (undefined → the Kernel consults nothing) and the optional
         // Host ModelPort wiring.
@@ -1249,6 +1389,7 @@ export async function activateV10App(app, options) {
             ...(queryAuthority === undefined ? {} : { queryAuthority }),
             ...(advisoryHooks === undefined ? {} : { advisoryHooks }),
             ...(options.modelPort === undefined ? {} : { modelPort: options.modelPort }),
+            ...(options.decisionDependencies === undefined ? {} : { decisionDependencies: options.decisionDependencies }),
         });
         // A `function` declaration (not a const arrow) so the explicit `never`
         // return is on the referenced declaration itself: TypeScript only treats

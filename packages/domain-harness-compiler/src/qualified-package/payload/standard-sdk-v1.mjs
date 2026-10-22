@@ -1719,7 +1719,7 @@ export function coalesceRetainedObservations(rawObservations) {
  */
 export function checkRetainedEvidenceApplicability(rawRecord, rawExpected) {
   const receipt = record(data(rawRecord), 'evidence record');
-  const expected = record(data(rawExpected), 'evidence required provenance');
+  const expected = record(data(rawExpected), 'evidence expected provenance');
   const packageId = ident(expected.packageId, 'expected packageId');
   const baselineDigest = ident(expected.baselineDigest, 'expected baselineDigest');
   if (receipt.packageId !== packageId || receipt.baselineDigest !== baselineDigest) {
@@ -1729,4 +1729,471 @@ export function checkRetainedEvidenceApplicability(rawRecord, rawExpected) {
     fail('SDK_EVIDENCE_DURABILITY_REQUIRED', 'governed evaluation requires durable audit evidence');
   }
   return { kind: 'evidence-applicability', eligibleForHostVerification: true, authority: 'proposal-only' };
+}
+
+// ===========================================================================
+// [v0.10 #1267 PC-04] BUILD-bound decision-feature dispatch — the S Primary's
+// ONE selected `interpret` entry delegates an intent whose BUILD route row
+// names a decision Feature to EXACTLY that feature (no fallback to the S
+// Primary interpreter, no first-match). The trusted Host activation seam wires
+// this factory with sealed plain-data material only: the digest-verified
+// semantic-decision declaration vocabulary, the Business-declared feature
+// request + finite outcome→event map (AW-01), the exactly identified selected
+// feature export, and the optional Host-owned model/tool/procedure boundary
+// (never public input). The Kernel keeps its admission path: this entry
+// returns the SAME resolved-record shape the plain interpreter produces, so
+// `semanticStatus: 'unavailable'` stays the typed zero-effect terminal and
+// only `structuredDecision.event` ever reaches central admission. The feature
+// never receives a K port, and its result can never carry a permit: every
+// result is consumed through the descriptor-safe snapshot (accessors, exotic
+// prototypes, thenables, non-finite values and own `__proto__` keys refuse
+// WITHOUT invoking a getter), authority-shaped fields refuse the WHOLE
+// result, and an unmapped outcome/malformed result/budget or deadline
+// exhaustion degrade to the unavailable terminal — never admitted as given.
+// ===========================================================================
+
+/**
+ * [v0.10 #1267] The closed decision-capable feature key set of THIS selected
+ * Standard Primary. Byte-for-byte mirror of the compiler's
+ * `V10_DECISION_FEATURE_KEYS` (a parity test pins the two together); a
+ * dispatch entry naming any other key refuses at the trusted wiring boundary.
+ */
+export const DECISION_FEATURE_KEYS = Object.freeze(['standard:semantic-decision/1']);
+
+/** Bounded dispatch table size and bounded reason text, by value. */
+const DISPATCH_MAX_DECISIONS = 64;
+const DISPATCH_REASON_MAX_CHARS = 128;
+/** Depth bound of the authority-field scan over one feature result. */
+const DISPATCH_AUTHORITY_SCAN_DEPTH = 32;
+
+/**
+ * Kernel/Host authority fields that must never appear in a feature result —
+ * re-declared by value with the T02 feature's own `OWNED_AUTHORITY_FIELDS`
+ * provenance (a forged feature result carrying a permit, a fence or a K
+ * handle can never be admitted as given).
+ */
+const DISPATCH_OWNED_AUTHORITY_FIELDS = new Set([
+  'effectPermit', 'permit', 'effectIntents', 'admissionFence',
+  'effectJournal', 'journal', 'resources', 'hostPorts', 'kernelState',
+  'createOccurrenceRuntime', 'submitOccurrence',
+]);
+
+/** Exact dispatch-entry field set; anything else refuses the wiring. */
+const DISPATCH_ENTRY_KEYS = new Set([
+  'declarationDigest', 'declarationId', 'featureKey', 'invoke',
+  'featureRequest', 'outcomeField', 'outcomeEvents', 'eventPayloadFromInput',
+  'allowedOutcomes', 'allowedEventTypes', 'inputSelection',
+]);
+const DISPATCH_WIRING_KEYS = new Set(['decisions', 'deps']);
+const DISPATCH_DEPS_KEYS = new Set(['procedures', 'model', 'tool', 'now', 'createTimeoutSignal']);
+const DISPATCH_REQUEST_KEYS = new Set(['schema', 'rules', 'limits', 'reuse', 'procedure', 'fallback']);
+const DISPATCH_SOURCES = new Set(['rule', 'reuse', 'procedure', 'model']);
+
+/** Bounded identifier with the shared grammar of this sealed payload. */
+function dispatchIdentifier(value, label) {
+  if (typeof value !== 'string' || !IDENTIFIER.test(value)) {
+    fail('SDK_DISPATCH_WIRING_INVALID', `${label} must be a bounded identifier`);
+  }
+  return value;
+}
+
+/** Validate ONE declared feature-request budget (T02 `bounds` by value). */
+function dispatchLimits(value) {
+  if (value === undefined) return undefined;
+  const limits = record(data(value), 'featureRequest.limits');
+  const maxSteps = limits.maxSteps ?? 4;
+  const maxModelCalls = limits.maxModelCalls ?? 1;
+  const maxToolCalls = limits.maxToolCalls ?? 1;
+  const deadlineEpochMs = limits.deadlineEpochMs ?? null;
+  if (!Number.isSafeInteger(maxSteps) || maxSteps < 1 || maxSteps > 32
+    || !Number.isSafeInteger(maxModelCalls) || maxModelCalls < 0 || maxModelCalls > 4
+    || !Number.isSafeInteger(maxToolCalls) || maxToolCalls < 0 || maxToolCalls > 4
+    || (deadlineEpochMs !== null && (!Number.isFinite(deadlineEpochMs) || deadlineEpochMs < 0))) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'featureRequest.limits must be explicitly bounded');
+  }
+  return limits;
+}
+
+/** Validate one Business-declared feature request (the T02 request minus input). */
+function dispatchFeatureRequest(value) {
+  const material = record(data(value), 'featureRequest');
+  for (const key of Object.keys(material)) {
+    if (!DISPATCH_REQUEST_KEYS.has(key)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `featureRequest carries the unsupported key ${key}`);
+    }
+  }
+  record(material.schema, 'featureRequest.schema');
+  for (const key of ['id', 'revision', 'provenanceKey']) {
+    ident(material.schema[key], `featureRequest.schema.${key}`);
+  }
+  if (material.rules !== undefined) {
+    if (!Array.isArray(material.rules) || material.rules.length > MAX_CASES) {
+      fail('SDK_DISPATCH_WIRING_INVALID', 'featureRequest.rules must be a bounded array');
+    }
+    for (const rule of material.rules) {
+      record(rule, 'featureRequest.rules entry');
+      ident(rule.id, 'featureRequest.rules entry id');
+      record(rule.when, 'featureRequest.rules entry when');
+      record(rule.decision, 'featureRequest.rules entry decision');
+    }
+  }
+  dispatchLimits(material.limits);
+  return material;
+}
+
+/** Reject Kernel/Host authority fields anywhere in a feature result (bounded). */
+function dispatchAssertNoAuthority(value, depth) {
+  if (depth > DISPATCH_AUTHORITY_SCAN_DEPTH || value === null || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const item of value) dispatchAssertNoAuthority(item, depth + 1);
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (DISPATCH_OWNED_AUTHORITY_FIELDS.has(key)) {
+      fail('SDK_DISPATCH_AUTHORITY_FORBIDDEN', `the feature result carries Kernel or external-effect authority '${key}'; it can never be admitted as given`);
+    }
+    dispatchAssertNoAuthority(value[key], depth + 1);
+  }
+}
+
+/** Truthful structured model-call evidence from the feature's own evidence. */
+function dispatchModelCallEvidence(evidence) {
+  if (evidence === undefined || evidence.modelCallEvidence !== 'measured') {
+    return { status: 'unmeasured' };
+  }
+  const count = evidence.modelCalls;
+  if (!Number.isSafeInteger(count) || count < 0) {
+    fail('SDK_DISPATCH_RESULT_INVALID', 'a measured feature result requires a nonnegative integer model-call count');
+  }
+  return { status: 'measured', count, scope: 'v10-feature-dispatch-model-port' };
+}
+
+/**
+ * Build the ONE bound decision dispatch entry. Wiring-time validation only —
+ * the entry is sealed plain data plus the exactly identified selected feature
+ * export; nothing here evaluates untrusted input. The trusted activation seam
+ * supplies this wiring, so the structural fields are read directly (never
+ * through a getter-firing enumeration of a hostile object) while the pure
+ * plain-data fields go through the descriptor-safe `data()` snapshot.
+ */
+function dispatchEntry(raw) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'dispatch entry must be a record');
+  }
+  for (const key of Object.keys(raw)) {
+    if (!DISPATCH_ENTRY_KEYS.has(key)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `dispatch entry carries the unsupported key ${key}`);
+    }
+  }
+  if (typeof raw.declarationDigest !== 'string' || !/^[0-9a-f]{64}$/.test(raw.declarationDigest)) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'dispatch entry declarationDigest must be a lowercase hex sha-256 digest');
+  }
+  const declarationId = dispatchIdentifier(raw.declarationId, 'dispatch entry declarationId');
+  if (!DECISION_FEATURE_KEYS.includes(raw.featureKey)) {
+    fail('SDK_DISPATCH_WIRING_INVALID', `dispatch entry names feature ${String(raw.featureKey)}; the selected dispatcher dispatches [${DECISION_FEATURE_KEYS.join(', ')}] only`);
+  }
+  if (typeof raw.invoke !== 'function') {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'dispatch entry invoke must be the exactly identified selected feature export');
+  }
+  const featureRequest = dispatchFeatureRequest(raw.featureRequest);
+  const outcomeField = dispatchIdentifier(raw.outcomeField, 'dispatch entry outcomeField');
+  const outcomeEvents = record(data(raw.outcomeEvents), 'dispatch entry outcomeEvents');
+  const outcomeKeys = Object.keys(outcomeEvents);
+  if (outcomeKeys.length === 0 || outcomeKeys.length > SEMANTIC_MAX_LIST) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'outcomeEvents must map 1..N declared outcomes to declared event types');
+  }
+  const allowedOutcomes = identList(raw.allowedOutcomes, 'dispatch entry allowedOutcomes');
+  const allowedEventTypes = identList(raw.allowedEventTypes, 'dispatch entry allowedEventTypes');
+  // AW-01: the finite outcome→event map must stay inside the digest-verified
+  // declaration's finite vocabulary — incoherent wiring refuses at the seam.
+  for (const outcome of outcomeKeys) {
+    dispatchIdentifier(outcome, 'outcomeEvents outcome');
+    if (!allowedOutcomes.includes(outcome)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `outcomeEvents outcome ${outcome} is not a declared allowedOutcome of the bound declaration`);
+    }
+    const eventType = outcomeEvents[outcome];
+    if (typeof eventType !== 'string' || !IDENTIFIER.test(eventType)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `outcomeEvents event type for ${outcome} must be a bounded identifier`);
+    }
+    if (!allowedEventTypes.includes(eventType)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `outcomeEvents event type ${eventType} is not a declared allowedEventType of the bound declaration`);
+    }
+  }
+  const eventPayloadFromInput = record(data(raw.eventPayloadFromInput ?? {}), 'dispatch entry eventPayloadFromInput');
+  if (Object.keys(eventPayloadFromInput).length > SEMANTIC_MAX_FIELDS) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'eventPayloadFromInput is unbounded');
+  }
+  const inputSelection = record(data(raw.inputSelection), 'dispatch entry inputSelection');
+  const selectionEntries = Object.entries(inputSelection);
+  if (selectionEntries.length === 0 || selectionEntries.length > SEMANTIC_MAX_FIELDS) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'inputSelection must map 1..N declared projections');
+  }
+  for (const [outputName, sourceKey] of selectionEntries) {
+    dispatchIdentifier(outputName, 'inputSelection output name');
+    dispatchIdentifier(sourceKey, 'inputSelection source key');
+  }
+  // The declared event payload may draw ONLY from the declared input
+  // selection — the exact NF05 exact-input-selection discipline of the
+  // inline semantic-decision route, applied to the feature dispatch.
+  for (const [field, selectedKey] of Object.entries(eventPayloadFromInput)) {
+    dispatchIdentifier(field, 'eventPayloadFromInput field');
+    if (typeof selectedKey !== 'string' || !Object.hasOwn(inputSelection, selectedKey)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `eventPayloadFromInput.${field} addresses ${String(selectedKey)} outside the declared inputSelection`);
+    }
+  }
+  return Object.freeze({
+    declarationDigest: raw.declarationDigest,
+    declarationId,
+    featureKey: raw.featureKey,
+    invoke: raw.invoke,
+    featureRequest,
+    outcomeField,
+    outcomeEvents: Object.freeze({ ...outcomeEvents }),
+    eventPayloadFromInput: Object.freeze({ ...eventPayloadFromInput }),
+    allowedOutcomes: Object.freeze([...allowedOutcomes]),
+    allowedEventTypes: Object.freeze([...allowedEventTypes]),
+    inputSelection: Object.freeze({ ...inputSelection }),
+  });
+}
+
+/**
+ * Create the bound decision dispatcher over SEALED wiring. Returns
+ * `{ interpret }` — the exact shape the trusted activation seam wires as the
+ * Kernel's `sdkEndpoint.interpret`. A declaration whose verified
+ * `declarationDigest` matches no entry takes the plain interpreter path,
+ * byte-for-byte; a matched entry dispatches to EXACTLY its selected feature.
+ */
+export function createFeatureDecisionDispatcher(rawWiring) {
+  if (rawWiring === null || typeof rawWiring !== 'object' || Array.isArray(rawWiring)) {
+    fail('SDK_DISPATCH_WIRING_INVALID', 'dispatcher wiring must be a record');
+  }
+  for (const key of Object.keys(rawWiring)) {
+    if (!DISPATCH_WIRING_KEYS.has(key)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `dispatcher wiring carries the unsupported key ${key}`);
+    }
+  }
+  if (!Array.isArray(rawWiring.decisions) || rawWiring.decisions.length === 0 || rawWiring.decisions.length > DISPATCH_MAX_DECISIONS) {
+    fail('SDK_DISPATCH_WIRING_INVALID', `dispatcher wiring requires 1..${String(DISPATCH_MAX_DECISIONS)} dispatch entries`);
+  }
+  const byDigest = new Map();
+  for (const raw of rawWiring.decisions) {
+    const entry = dispatchEntry(raw);
+    if (byDigest.has(entry.declarationDigest)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', `dispatch entry digest ${entry.declarationDigest} is bound more than once`);
+    }
+    byDigest.set(entry.declarationDigest, entry);
+  }
+  let deps = {};
+  if (rawWiring.deps !== undefined) {
+    const rawDeps = rawWiring.deps;
+    if (rawDeps === null || typeof rawDeps !== 'object' || Array.isArray(rawDeps)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', 'dispatcher deps must be a record when provided');
+    }
+    for (const key of Object.keys(rawDeps)) {
+      if (!DISPATCH_DEPS_KEYS.has(key)) {
+        fail('SDK_DISPATCH_WIRING_INVALID', `dispatcher deps carries the unsupported key ${key}`);
+      }
+    }
+    deps = rawDeps;
+    if (deps.procedures !== undefined && !(deps.procedures instanceof Map)) {
+      fail('SDK_DISPATCH_WIRING_INVALID', 'dispatcher deps.procedures must be a Map when provided');
+    }
+    for (const key of ['model', 'tool', 'now', 'createTimeoutSignal']) {
+      if (deps[key] !== undefined && typeof deps[key] !== 'function') {
+        fail('SDK_DISPATCH_WIRING_INVALID', `dispatcher deps.${key} must be callable when provided`);
+      }
+    }
+  }
+
+  const unavailableResult = (entry, reason, evidence, source) => {
+    // Truthful, non-throwing evidence for a REFUSED dispatch: a measured
+    // claim with a well-formed count is carried; a malformed or lying claim
+    // degrades to unmeasured (the dispatcher cannot attest it, and nothing
+    // was admitted on it).
+    let modelCallEvidence = { status: 'unmeasured' };
+    let startedModelCalls = false;
+    if (evidence !== undefined && evidence.modelCallEvidence === 'measured') {
+      const count = evidence.modelCalls;
+      if (Number.isSafeInteger(count) && count >= 0) {
+        modelCallEvidence = { status: 'measured', count, scope: 'v10-feature-dispatch-model-port' };
+        startedModelCalls = count > 0;
+      }
+    }
+    return {
+      kind: 'semantic-decision',
+      semanticStatus: 'unavailable',
+      unavailable: { disposition: 'semantic-unavailable', reason },
+      ...(source === undefined ? {} : { source }),
+      // Truthful resolution truth: an unavailable dispatch admitted nothing;
+      // a STARTED model call stays counted (measured), never rewritten.
+      llmAvoided: !startedModelCalls,
+      modelCallEvidence,
+      cacheDisposition: { read: 'disabled' },
+      telemetry: [],
+      provenance: { declarationId: entry.declarationId },
+      featureDispatch: { dispatch: 's-primary-feature', featureKey: entry.featureKey },
+    };
+  };
+
+  return Object.freeze({
+    /**
+     * The selected Standard dispatch entry. Synchronous identity resolution
+     * first (descriptor-only reads; a hostile or unbound declaration takes
+     * the plain interpreter path unchanged), then the bounded feature
+     * invocation inside ONE isolation guard: every feature-side failure —
+     * throw, hostile value, authority-shaped field, unmapped outcome,
+     * malformed shape, deadline — degrades to the typed zero-effect
+     * unavailable terminal and is never admitted as given.
+     */
+    async interpret(declaration, rawInput, context, _control) {
+      // `_control` is accepted for endpoint-shape parity with the Kernel's
+      // call; the dispatcher itself never observes cancellation — the
+      // Kernel's own latch owns it around this await.
+      data(context === undefined ? {} : context); // validated but never authority (parity with plain interpret)
+      const entry = dispatchEntryFor(declaration);
+      if (entry === undefined) {
+        // Unbound declaration: the ONE plain interpreter, byte-for-byte.
+        return interpret(declaration, rawInput, context);
+      }
+      // Exact input selection first: the feature may read ONLY the declared
+      // projection of the occurrence input (hostile input shapes refuse
+      // typed here exactly like the plain interpreter).
+      const input = data(rawInput);
+      const selectedInput = project(entry.inputSelection, input, 'feature decision');
+      const request = { ...entry.featureRequest, input: selectedInput };
+      const deadline = request.limits === undefined ? undefined : request.limits.deadlineEpochMs;
+      let settled;
+      try {
+        const pending = entry.invoke(request, deps);
+        if (pending === null || typeof pending !== 'object' || typeof pending.then !== 'function') {
+          // A feature export that does not return a thenable is a contract
+          // violation: refuse without consuming the raw value.
+          return unavailableResult(entry, 'feature-result-invalid', undefined);
+        }
+        if (typeof deadline === 'number' && Number.isFinite(deadline)) {
+          const now = typeof deps.now === 'function' ? deps.now : Date.now;
+          const remainingMs = deadline - now();
+          if (remainingMs <= 0) {
+            discardDispatchThenable(pending);
+            return unavailableResult(entry, 'deadline-exceeded', undefined);
+          }
+          let timer = null;
+          try {
+            settled = await Promise.race([
+              pending,
+              new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new StandardSdkError('SDK_DISPATCH_DEADLINE_EXCEEDED', 'the bound feature exceeded its declared deadline')), remainingMs);
+              }),
+            ]);
+          } finally {
+            if (timer !== null) clearTimeout(timer);
+          }
+        } else {
+          settled = await pending;
+        }
+      } catch (error) {
+        if (error instanceof StandardSdkError && error.code === 'SDK_DISPATCH_DEADLINE_EXCEEDED') {
+          return unavailableResult(entry, 'deadline-exceeded', undefined);
+        }
+        // A throwing selected feature (including its own typed authority
+        // refusals) is a refused dispatch: typed zero-effect unavailable.
+        return unavailableResult(entry, 'feature-invocation-refused', undefined);
+      }
+      // NEVER await anything derived from the feature result again: the whole
+      // mapping below is synchronous over the descriptor-safe snapshot, and
+      // any refusal degrades to the unavailable terminal.
+      let snapshot;
+      try {
+        snapshot = data(settled);
+      } catch {
+        return unavailableResult(entry, 'feature-result-invalid', undefined);
+      }
+      try {
+        dispatchAssertNoAuthority(snapshot, 0);
+      } catch {
+        return unavailableResult(entry, 'feature-authority-refused', undefined);
+      }
+      if (snapshot.kind === 'unavailable') {
+        const reason = typeof snapshot.reason === 'string' && snapshot.reason.length > 0
+          && snapshot.reason.length <= DISPATCH_REASON_MAX_CHARS
+          ? snapshot.reason
+          : 'feature-unavailable';
+        return unavailableResult(entry, reason, snapshot.evidence,
+          validDispatchSource(snapshot.source));
+      }
+      if (snapshot.kind !== 'selected' || !DISPATCH_SOURCES.has(snapshot.source)) {
+        return unavailableResult(entry, 'feature-result-invalid', snapshot.evidence);
+      }
+      try {
+        const decision = record(snapshot.decision, 'feature decision');
+        const outcome = decision[entry.outcomeField];
+        if (typeof outcome !== 'string' || !IDENTIFIER.test(outcome)) {
+          return unavailableResult(entry, 'outcome-invalid', snapshot.evidence, snapshot.source);
+        }
+        const eventType = entry.outcomeEvents[outcome];
+        if (eventType === undefined) {
+          return unavailableResult(entry, 'outcome-unmapped', snapshot.evidence, snapshot.source);
+        }
+        if (!entry.allowedOutcomes.includes(outcome) || !entry.allowedEventTypes.includes(eventType)) {
+          return unavailableResult(entry, 'vocabulary-violation', snapshot.evidence, snapshot.source);
+        }
+        const payload = project(entry.eventPayloadFromInput, selectedInput, 'feature decision event');
+        return {
+          kind: 'semantic-decision',
+          structuredDecision: {
+            decision: { outcome, data: payload },
+            event: { type: eventType, payload },
+          },
+          source: snapshot.source,
+          llmAvoided: snapshot.source !== 'model',
+          modelCallEvidence: dispatchModelCallEvidence(snapshot.evidence),
+          cacheDisposition: { read: snapshot.source === 'reuse' ? 'hit' : 'disabled' },
+          telemetry: [],
+          provenance: { declarationId: entry.declarationId },
+          featureDispatch: { dispatch: 's-primary-feature', featureKey: entry.featureKey },
+        };
+      } catch {
+        return unavailableResult(entry, 'feature-result-invalid', snapshot.evidence, snapshot.source);
+      }
+    },
+  });
+
+  /** Descriptor-only digest read; undefined = the plain interpreter owns it. */
+  function dispatchEntryFor(rawDeclaration) {
+    try {
+      if (rawDeclaration === null || typeof rawDeclaration !== 'object' || Array.isArray(rawDeclaration)) return undefined;
+      const prototype = Object.getPrototypeOf(rawDeclaration);
+      if (prototype !== Object.prototype && prototype !== null) return undefined;
+      const descriptor = Object.getOwnPropertyDescriptor(rawDeclaration, 'declarationDigest');
+      if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) return undefined;
+      const digest = descriptor.value;
+      if (typeof digest !== 'string') return undefined;
+      return byDigest.get(digest);
+    } catch {
+      // A hostile declaration (e.g. a throwing Proxy trap) is not a dispatch
+      // match; the plain interpreter path below refuses it typed as before.
+      return undefined;
+    }
+  }
+}
+
+/** The feature source carried by an unavailable feature result, when valid. */
+function validDispatchSource(value) {
+  return DISPATCH_SOURCES.has(value) ? value : undefined;
+}
+
+/**
+ * Detach a discarded feature promise (deadline loser or non-thenable
+ * contract violation): the dispatcher never awaits it, and the no-op
+ * handlers keep its eventual settlement from surfacing as an unhandled
+ * rejection. BOTH handlers must be real functions.
+ */
+function discardDispatchThenable(thenable) {
+  try {
+    if (thenable !== null && typeof thenable === 'object' && typeof thenable.then === 'function') {
+      thenable.then(() => { }, () => { });
+    }
+  } catch {
+    // a broken `then` is the feature's defect, not the dispatcher's
+  }
 }

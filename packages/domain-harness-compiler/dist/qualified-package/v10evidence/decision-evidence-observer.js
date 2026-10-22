@@ -13,26 +13,34 @@
  * This module is the deployment-owned trusted counterpart. It closes the loop
  * over REAL selected surfaces only:
  *
- *   (1) the Kernel outcome is read from the actual `facade.send(intent)`
+ *   (1) the decision resolution behind the observation:
+ *       — a BOUND intent (#1267: its sealed route row names a decision
+ *         feature) produced its decision INSIDE the K turn; the evidence is
+ *         read from the actual K receipt's own resolver evidence
+ *         (source / modelCallEvidence / featureDispatch) — a separate feature
+ *         invocation would be a second, non-authoritative resolution;
+ *       — an UNBOUND intent keeps the direct path: an actual invocation of
+ *         the selected T02 semantic-decision feature whose model/tool
+ *         boundary the deployment pinned HERE (closure-private), so the
+ *         resolver outcome and its reported counters are the selected
+ *         module's own output, not a caller's retelling;
+ *   (2) the Kernel outcome is read from the actual `facade.send(intent)`
  *       return — the immutable K original receipt of the real selected
  *       kernel-primary (admission, denial or honest UNKNOWN pass through
  *       unchanged; a Kernel refusal is surfaced typed, never invented as an
  *       observation);
- *   (2) the decision result is produced by an actual invocation of the
- *       selected T02 semantic-decision feature whose model/tool boundary the
- *       deployment pinned HERE (closure-private), so the resolver outcome and
- *       its reported counters are the selected module's own output, not a
- *       caller's retelling;
- *   (3) the Host wraps the model/tool endpoints with a transparent counter,
- *       so the trace records Host-measured call counts next to the resolver's
- *       self-reported ones and marks agreement or mismatch honestly;
+ *   (3) on the direct path the Host wraps the model/tool endpoints with a
+ *       transparent counter, so the trace records Host-measured call counts
+ *       next to the resolver's self-reported ones and marks agreement or
+ *       mismatch honestly;
  *   (4) the evidence feature itself is still invoked through the real facade
- *       (with NO persistence side effect) and stays the author of the base
- *       trace; this bridge annotates the outcome/provenance facts it observed
- *       itself, freezes the result, and only THEN hands the final attested
- *       trace to the optional Host-owned sink under a bounded timeout — the
- *       sink stores the real evidence, and its failure or timeout cannot veto
- *       or rewrite the already-issued immutable K receipt.
+ *       on the direct path (with NO persistence side effect) and stays the
+ *       author of the base trace; this bridge annotates the outcome/
+ *       provenance facts it observed itself, freezes the result, and only
+ *       THEN hands the final attested trace to the optional Host-owned sink
+ *       under a bounded timeout — the sink stores the real evidence, and its
+ *       failure or timeout cannot veto or rewrite the already-issued
+ *       immutable K receipt.
  *
  * The bridge grants no authority: no K State/Journal/Fence/Effect/Permit is
  * read or written beyond the public send receipt, the optional observation
@@ -70,6 +78,33 @@ function kernelOutcomeOf(status) {
     // `UNKNOWN` (the facade's honest pass-through of unresolved admission) and
     // anything unexpected degrade to `unknown` — never to a pretended success.
     return 'unknown';
+}
+const DECISION_RECEIPT_SOURCES = new Set(['rule', 'reuse', 'procedure', 'model']);
+/**
+ * [v0.10 #1267] The honest decision-resolution outcome of a BOUND intent as
+ * carried by its own K receipt resolver evidence: `selected` when a decision
+ * source was resolved (the admission may still have denied it), `unavailable`
+ * on the typed zero-effect SEMANTIC_UNAVAILABLE terminal, else `null` (the
+ * turn never reached resolution — e.g. a caller-role denial).
+ */
+function receiptSemanticOutcome(receipt) {
+    const terminal = isPlainRecord(receipt.terminal) ? receipt.terminal : undefined;
+    if (terminal?.code === 'SEMANTIC_UNAVAILABLE')
+        return 'unavailable';
+    const resolver = receiptResolverEvidence(receipt);
+    if (resolver !== undefined && DECISION_RECEIPT_SOURCES.has(resolver.source))
+        return 'selected';
+    return null;
+}
+/** The resolver evidence of one receipt, wherever its status carries it. */
+function receiptResolverEvidence(receipt) {
+    if (isPlainRecord(receipt.admitted) && isPlainRecord(receipt.admitted.resolver))
+        return receipt.admitted.resolver;
+    if (isPlainRecord(receipt.denial) && isPlainRecord(receipt.denial.resolver))
+        return receipt.denial.resolver;
+    if (isPlainRecord(receipt.resolver))
+        return receipt.resolver;
+    return undefined;
 }
 const SEMANTIC_BOUNDARY_KEYS = new Set(['procedures', 'model', 'tool', 'now', 'createTimeoutSignal']);
 export function createDecisionEvidenceObserver(deps) {
@@ -141,41 +176,15 @@ export function createDecisionEvidenceObserver(deps) {
             if (facade.isClosed()) {
                 refuse('OBSERVER_FACADE_CLOSED', 'the observed App facade is closed; no further observation can start');
             }
-            // (1) The real selected T02 resolution through the same facade. The
-            // Host-measured counters and their wrappers are per-invocation: a count
-            // increments before the call settles, so a failed/timeout call stays
-            // counted exactly like the resolver's own started-call accounting, and a
-            // concurrent observation never touches this invocation's counters.
-            // Errors of the selected feature propagate typed before any occurrence
-            // is sent; the bridge never fabricates a decision result.
-            const hostMeasured = { modelCalls: 0, toolCalls: 0 };
-            const boundary = {};
-            if (semanticDeps.procedures !== undefined)
-                boundary.procedures = semanticDeps.procedures;
-            if (semanticDeps.now !== undefined)
-                boundary.now = semanticDeps.now;
-            if (semanticDeps.createTimeoutSignal !== undefined)
-                boundary.createTimeoutSignal = semanticDeps.createTimeoutSignal;
-            const pinnedModel = semanticDeps.model;
-            if (pinnedModel !== undefined) {
-                const model = pinnedModel;
-                boundary.model = async (payload) => {
-                    hostMeasured.modelCalls += 1;
-                    return await model(payload);
-                };
+            if (typeof intent.intentType !== 'string' || intent.intentType.length === 0) {
+                refuse('OBSERVER_REQUEST_INVALID', 'intent.intentType must be a non-empty sealed intent id');
             }
-            const pinnedTool = semanticDeps.tool;
-            if (pinnedTool !== undefined) {
-                const tool = pinnedTool;
-                boundary.tool = async (payload) => {
-                    hostMeasured.toolCalls += 1;
-                    return await tool(payload);
-                };
-            }
-            const decisionResult = await facade.invokeSelectedStandardFeature(deps.semanticFeatureKey, semanticRequest, Object.freeze(boundary));
-            if (!isPlainRecord(decisionResult)) {
-                refuse('OBSERVER_SEMANTIC_RESULT_INVALID', 'the selected semantic feature did not return a plain record');
-            }
+            // [v0.10 #1267] The BUILD fact decides the observation route: an intent
+            // whose sealed route row binds a decision feature produced its decision
+            // INSIDE the K turn, so the evidence is read from the K receipt's own
+            // resolver evidence — a separate feature invocation would be a SECOND,
+            // non-authoritative resolution (and a second model call).
+            const bound = facade.boundDecisionFeatureOf(intent.intentType);
             // (2) The real Kernel path. A typed Kernel refusal means there is NO
             // receipt to observe — it is surfaced typed and never invented into an
             // observation (never-pretend-admitted).
@@ -194,48 +203,126 @@ export function createDecisionEvidenceObserver(deps) {
             const outcome = kernelOutcomeOf(receipt.status);
             const occurrence = isPlainRecord(receipt.occurrence) ? receipt.occurrence : {};
             const denial = isPlainRecord(receipt.denial) ? receipt.denial : null;
-            // (3) The evidence feature authors the base trace over the actual
-            // resolver output, with NO persistence side effect (review P1-2): the
-            // durable sink must receive the attested trace, not this pre-annotation
-            // base. Only whitelisted identity fields are carried; caller request
-            // fields never reach the feature through this bridge.
-            const base = await facade.invokeSelectedStandardFeature(deps.evidenceFeatureKey, Object.freeze({
-                observationId: evidence.observationId,
-                schema: evidence.schema,
-                decisionResult,
-                ...(evidence.observedDependencies === undefined ? {} : { observedDependencies: evidence.observedDependencies }),
-            }), Object.freeze({}));
-            if (!isPlainRecord(base) || !isPlainRecord(base.decisionTrace) || !isPlainRecord(base.decisionTrace.evidence)) {
-                refuse('OBSERVER_EVIDENCE_RESULT_INVALID', 'the selected evidence feature did not author a trace');
-            }
-            const baseTrace = base.decisionTrace;
-            const baseEvidence = baseTrace.evidence;
-            // Host-measured vs resolver-reported counters: agreement is verified,
-            // disagreement is marked — neither is silently rewritten. (The feature
-            // normalizer reports model calls as `reportedModelCalls` because it
-            // deliberately keeps the attestable `modelCalls` slot null; tool calls
-            // have no attestable slot and are reported as `toolCalls`.)
-            const reportedToolCalls = baseEvidence.toolCalls;
-            const reportedMatch = baseEvidence.reportedModelCalls === hostMeasured.modelCalls
-                && reportedToolCalls === hostMeasured.toolCalls;
-            const decisionTrace = deepFreeze({
-                ...baseTrace,
-                kernelOutcome: outcome,
-                kernelObservation: Object.freeze({
-                    source: 'host-observed-k-receipt',
-                    receiptStatus: receipt.status,
-                    messageId: typeof occurrence.messageId === 'string' ? occurrence.messageId : null,
-                    workflowInstanceId: typeof occurrence.workflowInstanceId === 'string' ? occurrence.workflowInstanceId : null,
-                    denialReason: denial !== null && typeof denial.reason === 'string' ? denial.reason : null,
-                    receiptSha256,
-                }),
-                evidence: Object.freeze({
-                    ...baseEvidence,
-                    hostMeasured: Object.freeze({ ...hostMeasured }),
-                    modelCallStatus: reportedMatch ? 'host-verified' : 'host-mismatch',
-                    decisionProvenance: 'host-invoked-selected-feature',
-                }),
+            const kernelObservation = Object.freeze({
+                source: 'host-observed-k-receipt',
+                receiptStatus: receipt.status,
+                messageId: typeof occurrence.messageId === 'string' ? occurrence.messageId : null,
+                workflowInstanceId: typeof occurrence.workflowInstanceId === 'string' ? occurrence.workflowInstanceId : null,
+                denialReason: denial !== null && typeof denial.reason === 'string' ? denial.reason : null,
+                receiptSha256,
             });
+            let decisionTrace;
+            if (bound !== undefined) {
+                // (1,BOUND) Receipt-authored evidence: the decision facts are read
+                // from the K receipt itself. No T02 feature invocation, no Host
+                // boundary call, no counters to cross-check — the receipt's own
+                // structured resolver evidence is the only source.
+                const resolver = receiptResolverEvidence(receipt);
+                const modelEvidence = isPlainRecord(resolver?.modelCallEvidence) ? resolver.modelCallEvidence : undefined;
+                const measured = modelEvidence?.status === 'measured' && Number.isSafeInteger(modelEvidence.count)
+                    ? modelEvidence.count
+                    : null;
+                const featureDispatch = isPlainRecord(resolver?.featureDispatch) ? resolver.featureDispatch : undefined;
+                const observedDependencies = evidence.observedDependencies ?? [];
+                if (!Array.isArray(observedDependencies)) {
+                    refuse('OBSERVER_REQUEST_INVALID', 'evidence.observedDependencies must be an array when provided');
+                }
+                decisionTrace = deepFreeze({
+                    observationId: evidence.observationId,
+                    schema: deepFreeze(structuredClone(evidence.schema)),
+                    semanticOutcome: receiptSemanticOutcome(receipt),
+                    source: resolver !== undefined && typeof resolver.source === 'string' ? resolver.source : null,
+                    reason: null,
+                    // The K receipt deliberately carries no raw decision payload —
+                    // only K facts. The receipt digest above re-verifies the exact
+                    // bytes the evidence was read from.
+                    decision: null,
+                    evidence: Object.freeze({
+                        modelCalls: measured,
+                        modelCallStatus: 'k-receipt-resolver-evidence',
+                        reportedModelCallStatus: modelEvidence !== undefined && typeof modelEvidence.status === 'string' ? modelEvidence.status : 'unsupported',
+                        reportedModelCalls: measured ?? 0,
+                        decisionFeature: featureDispatch !== undefined && typeof featureDispatch.featureKey === 'string' ? featureDispatch.featureKey : null,
+                        decisionProvenance: 'k-receipt-resolver-evidence',
+                    }),
+                    kernelOutcome: outcome,
+                    kernelObservation,
+                    observedDependencies: deepFreeze(structuredClone(observedDependencies)),
+                });
+            }
+            else {
+                // (1,DIRECT) The existing non-bound path: the real selected T02
+                // resolution through the same facade. The Host-measured counters and
+                // their wrappers are per-invocation: a count increments before the
+                // call settles, so a failed/timeout call stays counted exactly like
+                // the resolver's own started-call accounting, and a concurrent
+                // observation never touches this invocation's counters. Errors of
+                // the selected feature propagate typed before any occurrence is
+                // sent; the bridge never fabricates a decision result.
+                const hostMeasured = { modelCalls: 0, toolCalls: 0 };
+                const boundary = {};
+                if (semanticDeps.procedures !== undefined)
+                    boundary.procedures = semanticDeps.procedures;
+                if (semanticDeps.now !== undefined)
+                    boundary.now = semanticDeps.now;
+                if (semanticDeps.createTimeoutSignal !== undefined)
+                    boundary.createTimeoutSignal = semanticDeps.createTimeoutSignal;
+                const pinnedModel = semanticDeps.model;
+                if (pinnedModel !== undefined) {
+                    const model = pinnedModel;
+                    boundary.model = async (payload) => {
+                        hostMeasured.modelCalls += 1;
+                        return await model(payload);
+                    };
+                }
+                const pinnedTool = semanticDeps.tool;
+                if (pinnedTool !== undefined) {
+                    const tool = pinnedTool;
+                    boundary.tool = async (payload) => {
+                        hostMeasured.toolCalls += 1;
+                        return await tool(payload);
+                    };
+                }
+                const decisionResult = await facade.invokeSelectedStandardFeature(deps.semanticFeatureKey, semanticRequest, Object.freeze(boundary));
+                if (!isPlainRecord(decisionResult)) {
+                    refuse('OBSERVER_SEMANTIC_RESULT_INVALID', 'the selected semantic feature did not return a plain record');
+                }
+                // (3) The evidence feature authors the base trace over the actual
+                // resolver output, with NO persistence side effect (review P1-2): the
+                // durable sink must receive the attested trace, not this pre-annotation
+                // base. Only whitelisted identity fields are carried; caller request
+                // fields never reach the feature through this bridge.
+                const base = await facade.invokeSelectedStandardFeature(deps.evidenceFeatureKey, Object.freeze({
+                    observationId: evidence.observationId,
+                    schema: evidence.schema,
+                    decisionResult,
+                    ...(evidence.observedDependencies === undefined ? {} : { observedDependencies: evidence.observedDependencies }),
+                }), Object.freeze({}));
+                if (!isPlainRecord(base) || !isPlainRecord(base.decisionTrace) || !isPlainRecord(base.decisionTrace.evidence)) {
+                    refuse('OBSERVER_EVIDENCE_RESULT_INVALID', 'the selected evidence feature did not author a trace');
+                }
+                const baseTrace = base.decisionTrace;
+                const baseEvidence = baseTrace.evidence;
+                // Host-measured vs resolver-reported counters: agreement is verified,
+                // disagreement is marked — neither is silently rewritten. (The feature
+                // normalizer reports model calls as `reportedModelCalls` because it
+                // deliberately keeps the attestable `modelCalls` slot null; tool calls
+                // have no attestable slot and are reported as `toolCalls`.)
+                const reportedToolCalls = baseEvidence.toolCalls;
+                const reportedMatch = baseEvidence.reportedModelCalls === hostMeasured.modelCalls
+                    && reportedToolCalls === hostMeasured.toolCalls;
+                decisionTrace = deepFreeze({
+                    ...baseTrace,
+                    kernelOutcome: outcome,
+                    kernelObservation,
+                    evidence: Object.freeze({
+                        ...baseEvidence,
+                        hostMeasured: Object.freeze({ ...hostMeasured }),
+                        modelCallStatus: reportedMatch ? 'host-verified' : 'host-mismatch',
+                        decisionProvenance: 'host-invoked-selected-feature',
+                    }),
+                });
+            }
             // (4) The optional Host-owned sink receives the FINAL attested trace
             // (review P1-2) — the exact frozen evidence handed back, carrying the
             // real K receipt digest and Host-measured counters. Its failure or

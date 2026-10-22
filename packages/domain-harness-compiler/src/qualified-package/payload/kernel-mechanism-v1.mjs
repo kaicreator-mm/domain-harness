@@ -854,21 +854,53 @@ function occurrenceTurnOf(request) {
  * longer read: only the structured trusted `modelCallEvidence` (normalized by
  * admissionModelCallEvidence) and, for a K continuation, the K-built
  * continuation evidence (turns, queries, K-attested dependencies) are carried.
+ * [v0.10 #1267] A BUILD-bound feature dispatch may additionally cite its
+ * trusted identity (`featureDispatch`) — the strictly-required additive
+ * pass-through that lets the admitted/terminated receipt truthfully name the
+ * S Feature that produced the decision. Absent on every legacy path, so the
+ * unbound receipt bytes are unchanged. Only the structured trusted shape is
+ * carried; a malformed structured claim fails closed.
  */
 export function admissionResolverEvidence(resolved) {
   return {
-    source: resolved.source,
-    llmAvoided: resolved.llmAvoided,
+    // [v0.10 #1267] A refused feature dispatch may carry NO source at all
+    // (nothing was resolved); the receipt then omits the fact instead of
+    // materializing a non-canonical `undefined`. Every legacy path always
+    // carries both facts, so those receipt bytes are unchanged.
+    ...(resolved.source === undefined ? {} : { source: resolved.source }),
+    ...(resolved.llmAvoided === undefined ? {} : { llmAvoided: resolved.llmAvoided }),
     modelCallEvidence: admissionModelCallEvidence(resolved.modelCallEvidence),
     cacheRead: resolved.cacheDisposition.read,
     ...(resolved.cacheDisposition.write === undefined
       ? {}
       : { cacheWrite: resolved.cacheDisposition.write }),
     telemetryEventCount: resolved.telemetry.length,
+    ...(resolved.featureDispatch === undefined
+      ? {}
+      : { featureDispatch: admissionFeatureDispatchEvidence(resolved.featureDispatch) }),
     ...(resolved.continuation === undefined
       ? {}
       : { continuation: JSON.parse(canonicalJsonStringify(resolved.continuation)) }),
   };
+}
+
+/** Trust-shaped citation of the bound feature dispatch identity (#1267). */
+function admissionFeatureDispatchEvidence(evidence) {
+  if (isJsonRecord(evidence)) {
+    const keys = Object.keys(evidence).sort().join(',');
+    // The feature key grammar allows `name/version` (e.g.
+    // `standard:semantic-decision/1`), so `/` is a legal key character.
+    if (evidence.dispatch === 's-primary-feature'
+      && typeof evidence.featureKey === 'string'
+      && /^[A-Za-z][A-Za-z0-9._:/-]{0,127}$/.test(evidence.featureKey)
+      && keys === 'dispatch,featureKey') {
+      return { dispatch: evidence.dispatch, featureKey: evidence.featureKey };
+    }
+  }
+  throw new CentralAdmissionError(
+    'ADMISSION_RESOLVER_EVIDENCE_INVALID',
+    'resolver feature dispatch evidence must be the structured {dispatch, featureKey} record; no decision is admitted',
+  );
 }
 
 const PREDICATE_OPS = new Set([

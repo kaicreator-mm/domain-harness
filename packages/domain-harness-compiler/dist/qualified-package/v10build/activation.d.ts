@@ -39,6 +39,7 @@ export interface V10AppView {
         operationId: string;
         capabilityId: string;
         handlerId: string;
+        featureKey?: string;
     }[];
 }
 /** The physical CAS condition of one K document write/removal. */
@@ -315,6 +316,24 @@ export interface ActivateV10AppOptions {
             input: unknown;
         }) => Promise<unknown>;
     };
+    /**
+     * [v0.10 #1267] Optional Host-owned trusted dependencies for BUILD-bound
+     * decision-feature dispatches in the K turn — analogous to `queryAuthority`:
+     * activation wiring only, never public intent input. `model`/`tool` are the
+     * bounded external semantic endpoints a declared fallback may call;
+     * `procedures` is the pinned procedure registry; `now` anchors
+     * declared deadlines; `createTimeoutSignal` is the trusted cancellation
+     * handle. Absent: no-model mode — rule / exact-reuse / pinned-procedure
+     * paths still work and a declared model fallback degrades to the typed
+     * zero-effect `SEMANTIC_UNAVAILABLE` terminal with `unmeasured` evidence.
+     */
+    readonly decisionDependencies?: {
+        readonly procedures?: ReadonlyMap<unknown, unknown>;
+        readonly model?: (payload: unknown) => unknown;
+        readonly tool?: (payload: unknown) => unknown;
+        readonly now?: () => number;
+        readonly createTimeoutSignal?: () => unknown;
+    };
 }
 export interface V10Activation {
     readonly facade: V10AppFacade;
@@ -372,6 +391,7 @@ export declare class V10AppFacade {
                 input: unknown;
             }) => Promise<unknown>;
         }>;
+        decisionDependencies?: ActivateV10AppOptions['decisionDependencies'];
     });
     get selectedExtensions(): readonly {
         packageId: string;
@@ -382,6 +402,16 @@ export declare class V10AppFacade {
         packageId: string;
         featureKey: string | null;
     }[];
+    /**
+     * [v0.10 #1267] Read-only BUILD fact: the decision-capable Standard feature
+     * the sealed route row binds to this intent, or `undefined` when the intent
+     * is unbound (the S Primary interpreter owns it as before). Trusted
+     * composition material for the deployment-side evidence bridge — never
+     * caller-settable and never an authority.
+     */
+    boundDecisionFeatureOf(intentType: string): Readonly<{
+        featureKey: string;
+    }> | undefined;
     /**
      * T07: read-only, activation-origin BUILD/tenant identity used by the Host
      * Shadow L4 verifier. Derived exclusively from private activated state,

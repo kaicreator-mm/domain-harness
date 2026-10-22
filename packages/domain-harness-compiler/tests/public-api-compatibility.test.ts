@@ -117,6 +117,9 @@ const T00_V10BUILD_VALUES = [
   'V10_RUNTIME_ABI',
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
+  // frozen string-list consts (2; #1264 closed advisory hooks, #1267 closed
+  // decision-capable feature keys)
+  'V10_DECISION_FEATURE_KEYS',
   // object consts (2)
   'V10_ACTIVATION_FAILURE_CODES',
   'V10_SELECTED_ROLE_ABI',
@@ -187,8 +190,8 @@ const STRING_CONST_NAMES = new Set<string>([
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
 ]);
-/** [v0.10 #1264] Frozen readonly string-LIST constants (closed-set advisory hooks). */
-const FROZEN_STRING_LIST_NAMES = new Set<string>(['V10_KERNEL_ADVISORY_HOOKS']);
+/** [v0.10 #1264/#1267] Frozen readonly string-LIST constants (closed sets: advisory hooks, decision-capable feature keys). */
+const FROZEN_STRING_LIST_NAMES = new Set<string>(['V10_KERNEL_ADVISORY_HOOKS', 'V10_DECISION_FEATURE_KEYS']);
 const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_ACTIVATION_FAILURE_CODES', 'V10_SELECTED_ROLE_ABI']);
 const PARSER_PIN_CONST_NAMES = new Set<string>(['V09_BUILD_PARSER_PIN']);
 /** Non-error public classes (constructors that are not Error subclasses). */

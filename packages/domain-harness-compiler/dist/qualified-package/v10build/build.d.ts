@@ -39,11 +39,17 @@ export interface V10ModuleInput {
      */
     readonly externalEffect?: boolean;
 }
+/**
+ * [v0.10 #1267] A route row MAY name the selected decision-capable Standard
+ * Feature that interprets that intent inside the K turn (PC-04 BUILD-bound
+ * feature dispatch). Absent: the historical unbound behavior, byte-for-byte.
+ */
 export interface V10RouteRowInput {
     readonly intentId: string;
     readonly operationId: string;
     readonly capabilityId: string;
     readonly handlerId: string;
+    readonly featureKey?: string;
 }
 export interface BuildV10AppOptions {
     readonly appId: string;
@@ -107,6 +113,7 @@ export interface V10BuiltApp {
         operationId: string;
         capabilityId: string;
         handlerId: string;
+        featureKey?: string;
     }[];
 }
 /**

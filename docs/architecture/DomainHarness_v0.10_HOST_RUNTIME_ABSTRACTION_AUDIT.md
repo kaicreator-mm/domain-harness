@@ -82,3 +82,35 @@
 `V010_TARGETED_L2_ITEMS=R1_RUNTIME_BUILD_CLOSURE,R2_NATIVE_TOOL_PC05_SEAM`.
 
 `V010_ADDITIONAL_RUNTIME_IMPLEMENTATION=NO`, `L2_FREEZE=NOT_PROVEN`, `IMPLEMENTATION_PASS=NOT_CLAIMED`.
+
+## 7. Dated addendum (2026-10-22, #1267): named semantic calls vs BUILD-bound decision dispatch
+
+Implementation fact recorded here (not a new freeze): with #1267, exactly one semantic surface
+produces a K admission from a resolution — the compiled SemanticDecision chain (NF05/NF06).
+When a BUILD route row names a decision-capable Standard Feature (`featureKey`), the S Primary's
+dispatch entry delegates that intent's resolution to EXACTLY that feature inside the K turn and
+maps its selected outcome through the Business-declared finite outcome→event map; the Kernel's
+admission path, replay and receipt semantics are unchanged, and the receipt truthfully cites
+the decision source, the feature key and the model-call evidence.
+
+Everything else remains a **direct CT-02 named semantic call** through
+`facade.invokeSelectedStandardFeature`, deliberately NOT BUILD-bound to the K turn, because none
+of them ever produces an admission:
+
+- **Context Assembly** selects/packs context material — a read-only semantic preparation whose
+  output is observation input, never an admitted event.
+- **Shadow (L4)** runs alternate candidates as non-authoritative counterevidence with zero
+  production mutation (CV-12); binding it into the K turn would let a shadow decide.
+- **Candidate validation** qualifies proposed artifacts for a NEW approved assembly; promotion
+  and deployment stay separate decisions (CV-12), not per-turn admissions.
+- **Evidence normalization (T06)** is read-only observation of an already-decided turn; a bound
+  intent's evidence is read from the K receipt itself precisely because the observer must never
+  re-decide.
+- **Workflow control (T03)** plans SUBSEQUENT submits (loop next-step, child-open, wait-open,
+  control-resume) that the trusted Host durable-controls coordinators execute through the normal
+  one-K-turn seams; it is not a decision about THIS turn's admitted event, so binding it would
+  require a second submission engine inside the K turn (refused; CT-05 one-K-turn authority).
+
+The bounded decision-capable vocabulary of the S Primary dispatch is the closed set
+`DECISION_FEATURE_KEYS` (currently `['standard:semantic-decision/1']`), mirrored by BUILD's
+`V10_DECISION_FEATURE_KEYS`; extending it is a deliberate BUILD/ABI change, not discovery.

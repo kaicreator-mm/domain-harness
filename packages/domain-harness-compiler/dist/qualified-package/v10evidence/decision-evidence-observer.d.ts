@@ -13,26 +13,34 @@
  * This module is the deployment-owned trusted counterpart. It closes the loop
  * over REAL selected surfaces only:
  *
- *   (1) the Kernel outcome is read from the actual `facade.send(intent)`
+ *   (1) the decision resolution behind the observation:
+ *       — a BOUND intent (#1267: its sealed route row names a decision
+ *         feature) produced its decision INSIDE the K turn; the evidence is
+ *         read from the actual K receipt's own resolver evidence
+ *         (source / modelCallEvidence / featureDispatch) — a separate feature
+ *         invocation would be a second, non-authoritative resolution;
+ *       — an UNBOUND intent keeps the direct path: an actual invocation of
+ *         the selected T02 semantic-decision feature whose model/tool
+ *         boundary the deployment pinned HERE (closure-private), so the
+ *         resolver outcome and its reported counters are the selected
+ *         module's own output, not a caller's retelling;
+ *   (2) the Kernel outcome is read from the actual `facade.send(intent)`
  *       return — the immutable K original receipt of the real selected
  *       kernel-primary (admission, denial or honest UNKNOWN pass through
  *       unchanged; a Kernel refusal is surfaced typed, never invented as an
  *       observation);
- *   (2) the decision result is produced by an actual invocation of the
- *       selected T02 semantic-decision feature whose model/tool boundary the
- *       deployment pinned HERE (closure-private), so the resolver outcome and
- *       its reported counters are the selected module's own output, not a
- *       caller's retelling;
- *   (3) the Host wraps the model/tool endpoints with a transparent counter,
- *       so the trace records Host-measured call counts next to the resolver's
- *       self-reported ones and marks agreement or mismatch honestly;
+ *   (3) on the direct path the Host wraps the model/tool endpoints with a
+ *       transparent counter, so the trace records Host-measured call counts
+ *       next to the resolver's self-reported ones and marks agreement or
+ *       mismatch honestly;
  *   (4) the evidence feature itself is still invoked through the real facade
- *       (with NO persistence side effect) and stays the author of the base
- *       trace; this bridge annotates the outcome/provenance facts it observed
- *       itself, freezes the result, and only THEN hands the final attested
- *       trace to the optional Host-owned sink under a bounded timeout — the
- *       sink stores the real evidence, and its failure or timeout cannot veto
- *       or rewrite the already-issued immutable K receipt.
+ *       on the direct path (with NO persistence side effect) and stays the
+ *       author of the base trace; this bridge annotates the outcome/
+ *       provenance facts it observed itself, freezes the result, and only
+ *       THEN hands the final attested trace to the optional Host-owned sink
+ *       under a bounded timeout — the sink stores the real evidence, and its
+ *       failure or timeout cannot veto or rewrite the already-issued
+ *       immutable K receipt.
  *
  * The bridge grants no authority: no K State/Journal/Fence/Effect/Permit is
  * read or written beyond the public send receipt, the optional observation
