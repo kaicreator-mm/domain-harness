@@ -929,7 +929,10 @@ export class V10AppFacade {
             packageId: standardEntry.packageId,
             interpret: boundInterpret === undefined
                 ? (declaration, input, context) => interpret(declaration, input, context)
-                : (declaration, input, context) => boundInterpret(declaration, input, context, undefined),
+                // [#1267 F1] The Kernel's protected cancellation control rides along
+                // so a cancelled bound turn ends through the dispatcher's control
+                // race and the Kernel's own CANCELLED terminal.
+                : (declaration, input, context, control) => boundInterpret(declaration, input, context, control),
         };
         if (this.#modelPort !== undefined) {
             const createResolver = standardNamespace?.createHostBoundModelResolver;
@@ -1052,9 +1055,16 @@ export class V10AppFacade {
                 refuse('V10_BUSINESS_POLICY_INVALID', `intent ${row.intentId} binds feature ${featureKey} but the Business policy declares no featureDecisions material for it`);
             }
             for (const key of Object.keys(material)) {
-                if (!['featureRequest', 'outcomeField', 'outcomeEvents', 'eventPayloadFromInput'].includes(key)) {
+                if (!['featureRequest', 'outcomeField', 'outcomeEvents', 'eventPayloadFromInput', 'timeoutMs'].includes(key)) {
                     refuse('V10_BUSINESS_POLICY_INVALID', `featureDecisions.${row.intentId} carries the unsupported field '${key}'`);
                 }
+            }
+            // [#1267 F2] The mandatory relative per-turn dispatch timeout: a bound
+            // dispatch is always bounded. The absolute deadline is computed at
+            // each dispatch (never sealed); the dispatcher validates the range
+            // deeply at its own trusted boundary.
+            if (!Number.isSafeInteger(material.timeoutMs) || material.timeoutMs < 1) {
+                refuse('V10_BUSINESS_POLICY_INVALID', `featureDecisions.${row.intentId} must declare a positive integer timeoutMs; a bound dispatch is always bounded`);
             }
             if (!isPlainRecord(material.featureRequest)
                 || typeof material.outcomeField !== 'string'
@@ -1085,6 +1095,7 @@ export class V10AppFacade {
                 allowedOutcomes: rule.allowedOutcomes,
                 allowedEventTypes: rule.allowedEventTypes,
                 inputSelection: rule.inputSelection,
+                timeoutMs: material.timeoutMs,
             });
         });
         const deps = this.#decisionDependencies;
