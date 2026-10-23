@@ -160,6 +160,9 @@ test('T07a2: local workspace tarballs resolve minimal dependency closure and fai
     assert.deepEqual(requested([]), [], 'no undeclared package is implicitly installed');
     writeFileSync(packs.contracts.path, 'tampered bytes');
     assert.throws(() => requested(['hostNode']), /sha256 mismatch/u, 'tampered dependency refuses before install');
+    // Restore the earlier corruption so the missing-host case reaches the
+    // intended ENOENT failure, rather than failing on the contracts digest.
+    writeFileSync(packs.contracts.path, 'exact-local-tarball-contracts');
     rmSync(packs.hostNode.path);
     assert.throws(() => requested(['hostNode']), /ENOENT/u, 'missing exact local tarball refuses instead of registry fallback');
   } finally {
