@@ -13,9 +13,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  buildV10App, sha256Hex, V10_TARGET_PROFILE,
+  buildV10App, sha256Hex, V10_TARGET_PROFILE, activateV10App,
 } from '@kaicreator/domain-harness-compiler/v10build';
 import { definitionV2 } from '../../v010-clean-consumer/apps/rich/app-definition.mjs';
+import { invokeAgentImprovementFeature } from '../../../extensions/agent-improvement/host/ct02-data-only-invoker.mjs';
 
 const PRODUCERS = Object.freeze([
   ['@kaicreator/domain-feature-agent-diagnostics', 'agentDiagnosticsFeature'],
@@ -120,7 +121,74 @@ const withSkip=buildV10App({
 });
 assert(withSkip.skippedOptional.includes(absent.packageId));
 assert(withSkip.modules.some(x=>x.packageId===present.packageId));
-console.log(JSON.stringify({ok:true,stage:'T05_FOCUSED_BUILD_ONLY',
+
+// Real selected-module activation + CT-02 invocation: uses source-qualified
+// installed tarball bytes in the BUILD. The backing store intentionally rejects
+// any K write/effect on this *read/evaluation only* smoke path.
+const readonlyStore = {
+  reads:0, writes:0,
+  async get(_key) { this.reads++; return null; },
+  async put() { this.writes++; throw Error('T05_READ_ONLY_UNEXPECTED_K_WRITE'); },
+  async remove() { this.writes++; throw Error('T05_READ_ONLY_UNEXPECTED_K_DELETE'); },
+};
+const allSelected = appFor(15);
+const activation = await activateV10App(allSelected,{store:readonlyStore});
+const SHA='a'.repeat(40), NEXT='b'.repeat(40);
+const evidenceCase=(caseId,subjectSha,status)=>({
+  caseId,subjectSha,status,sourceRef:'verifier:evidence1',
+  verifierRef:'v1',coverage:'COMPLETE',
+});
+const oracleChecks=['POSITIVE','NEGATIVE','INDEPENDENT'].map(kind=>({
+  kind,status:'PASS',sourceRef:'github:oracle:'+kind,
+}));
+const requests = [
+  {subjectSha:SHA,events:[],expectedVerifierRefs:[]},
+  {baselineSha:SHA,candidateSha:NEXT,verifierRevision:'r1',
+   holdoutVisibility:'ISOLATED',oracleChecks,
+   baseline:[evidenceCase('t1',SHA,'FAIL'),evidenceCase('t2',SHA,'PASS')],
+   candidate:[evidenceCase('t1',NEXT,'PASS'),evidenceCase('t2',NEXT,'PASS')]},
+  {current:{projectId:'project:p',taskClass:'class:repair',subjectSha:SHA,
+    ruleRevision:'ads@sha123'},candidates:[]},
+  {proposalId:'experiment:one',subjectSha:SHA,baselineRef:'candidate:base',
+   candidateRef:'candidate:next',hypothesisRef:'github:hypothesis',
+   environment:'SHADOW',risk:'LOW',isolationEvidenceRef:'host:isolated-plan',
+   maxProbeCalls:3,maxWallMs:30000,maxCostMicro:1000000,
+   verifierRefs:['github:verifier'],effectPolicy:'DENY_EXTERNAL_EFFECTS'},
+];
+const invoked=[];
+try {
+  for(let i=0;i<PRODUCERS.length;i++){
+    const featureKey=available[i].provides[0];
+    const result=await invokeAgentImprovementFeature(
+      activation.facade,featureKey,requests[i],{},
+    );
+    assert.equal(typeof result,'object',featureKey+' advisory output');
+    assert.notEqual(result,null,featureKey+' advisory output');
+    // No execution, permit or Gate PASS is inferred from an advisory result.
+    assert.equal(result.taskGateVerdict,'NOT_DETERMINED',featureKey+' no gate authority');
+    invoked.push(featureKey);
+  }
+  // Unselected Features do not dynamically load; test the zero-Feature App.
+  const emptyActivation=await activateV10App(appFor(0),{store:readonlyStore});
+  try{
+    await assert.rejects(
+      () => emptyActivation.facade.invokeSelectedStandardFeature(
+        available[0].provides[0],requests[0],{},
+      ),
+      {code:'V10_FEATURE_NOT_SELECTED'},
+    );
+  }finally{emptyActivation.dispose();}
+}finally{
+  activation.dispose();
+}
+assert.equal(readonlyStore.writes,0,'advisory CT-02 may not write K or effects');
+assert.deepEqual(invoked,available.map(x=>x.provides[0]));
+console.log(JSON.stringify({
+  ok:true,stage:'T05_SELECTED_BUILD_AND_ACTIVATION_SMOKE',
   selectedSubsets:reports.length,featurePackages:available.length,
-  skippedOptionalProbe:'PASS',
-  receipt:reports,cleanInstalledActivation:'NOT_RUN',sqliteEffect:'NOT_RUN'}));
+  selectedInvocations:invoked,skippedOptionalProbe:'PASS',
+  effectWriteCount:readonlyStore.writes,
+  receipt:reports,
+  isolatedCleanInstall:'NOT_ASSERTED_BY_THIS_SCRIPT',
+  sqliteEffectRegression:'NOT_RUN',versionRelease:'NOT_RUN',
+}));
