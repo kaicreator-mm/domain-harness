@@ -1,0 +1,25 @@
+{
+  "name": "@kaicreator/domain-harness-contracts",
+  "version": "0.10.2-rc.0",
+  "description": "Shared ABI constants, types and errors for DomainHarness (zero dependencies)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}
