@@ -92,6 +92,13 @@ export interface V10Counters {
     }[];
     externalEffectDispatches: number;
     externalEffectRefusals: number;
+    /**
+     * [v0.10 #1264] Advisory observations the Kernel Primary delivered to the
+     * `observe` sink after authoritative turn dispositions (hook
+     * `turn-observation/v1`). Diagnostics only: never an authority, permit or
+     * admission input, and never part of any K receipt.
+     */
+    advisoryObservations: Record<string, unknown>[];
 }
 export declare function freshV10Counters(): V10Counters;
 /**
@@ -223,6 +230,18 @@ export declare function v10K02DocumentPrefix(scope: {
     appId: string;
     businessPackageId: string;
 }): string;
+/**
+ * [v0.10 #1264] The scoped H→K advisory hook table (PC-07): one frozen
+ * plain-data record keyed by the KERNEL's own closed advisory hook set, in
+ * sealed order. Each entry carries the extension's sealed provider identity
+ * and its hook function — never a module namespace, protected port, doc or
+ * resource. The Kernel Primary consults and revalidates these hooks itself;
+ * this activation seam only wires them.
+ */
+export type V10AdvisoryHookTable = Readonly<Record<string, Readonly<{
+    providerId: string;
+    invoke: (proposal: unknown) => unknown;
+}>>>;
 export interface ActivateV10AppOptions {
     readonly store: V10DocStore;
     readonly tenantId?: string;
@@ -265,6 +284,23 @@ export interface ActivateV10AppOptions {
      * default resolver, which refuses.
      */
     readonly deploymentRoot?: string;
+    /**
+     * [v0.10 #1264] Optional Host-owned trusted ModelPort (`{ invoke }` — the
+     * exact protected-port shape the selected Standard bundle's
+     * `createHostBoundModelResolver` requires). When present, the bundle's
+     * host-bound resolver wires the `invokeStep` step surface into the kernel
+     * SDK endpoint, enabling the K-owned FR07 continuation harness (multi-step
+     * turns whose step bound is subject to the Kernel's hard limits and
+     * advisory budget advice). Absent (the default): no step surface is wired
+     * and Basic behavior is unchanged. Host wiring only — never caller or
+     * intent data.
+     */
+    readonly modelPort?: {
+        readonly invoke: (call: {
+            operation: unknown;
+            input: unknown;
+        }) => Promise<unknown>;
+    };
 }
 export interface V10Activation {
     readonly facade: V10AppFacade;
@@ -315,6 +351,13 @@ export declare class V10AppFacade {
             appId: string;
         };
         queryAuthority?: V10QueryAuthority;
+        advisoryHooks?: V10AdvisoryHookTable;
+        modelPort?: Readonly<{
+            invoke: (call: {
+                operation: unknown;
+                input: unknown;
+            }) => Promise<unknown>;
+        }>;
     });
     get selectedExtensions(): readonly {
         packageId: string;

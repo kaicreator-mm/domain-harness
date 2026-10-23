@@ -1,14 +1,27 @@
 /**
  * T00 fixture — K advisory extension #1 (physically distinct module).
- * Data-only advisory surface: init confirms its sealed provider/hook
- * identity; the observation hook returns plain data only; dispose records
- * itself for reverse-disposal assertions. No authority, no ports.
+ * [v0.10 #1264 F7 ABI] Provides the Kernel's CLOSED
+ * `admission-budget-advice/v1` hook: a pure, bounded PRE-ADMISSION budget
+ * advice. The Kernel Primary invokes it with a frozen redacted proposal
+ * (intentType, workflowId and the Kernel's own effective hard limits —
+ * never an instanceKey, input payload or caller data) and revalidates the
+ * returned JSON string itself; the advice can only tighten the Kernel's
+ * limits and is otherwise ignored for authority. This fixture records every
+ * proposal it receives for witness assertions and, absent a test plan,
+ * always advises the JSON string '{"maxSteps":2}' — a real deterministic
+ * tightening. No authority, no ports, no writes.
+ *
+ * Test plan channel (the established fixture-sentinel pattern of this
+ * suite): `globalThis.__v010AlphaAdvicePlan` — an ordered array of
+ * `{ advice: <hook result> }` / `{ throw: true }` steps consumed one per
+ * consultation. Under the JSON-string ABI a consumable advice is a JSON
+ * text string; any other value is a hostile/negative result.
  */
 export const MODULE_ID = 'kext-advisory-alpha@v010.1.0.0';
 export const PACKAGE_KIND = 'kernel-extension';
 export const EXTENSION_ABI = 'dh.v10.k-extension/1';
 export const PROVIDER_ID = 'advisory-alpha';
-export const HOOK = 'advisory-alpha-observation/v1';
+export const HOOK = 'admission-budget-advice/v1';
 
 export function init(context) {
   return {
@@ -19,8 +32,17 @@ export function init(context) {
   };
 }
 
-export function observeAlpha(turn) {
-  return { kind: 'observation', providerId: PROVIDER_ID, hook: HOOK, turn };
+export function observeAlpha(proposal) {
+  (globalThis.__v010AlphaProposals ??= []).push(proposal);
+  const plan = globalThis.__v010AlphaAdvicePlan;
+  const step = Array.isArray(plan) && plan.length > 0 ? plan.shift() : undefined;
+  if (step !== null && typeof step === 'object' && step.throw === true) {
+    throw new Error('advisory-alpha planned budget-advice fault');
+  }
+  if (step !== null && typeof step === 'object' && Object.hasOwn(step, 'advice')) {
+    return step.advice;
+  }
+  return '{"maxSteps":2}';
 }
 
 export function dispose() {

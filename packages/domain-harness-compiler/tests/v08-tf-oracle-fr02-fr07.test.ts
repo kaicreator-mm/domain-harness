@@ -133,7 +133,14 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // permit claim, additive effect-permit doc kind and counters);
 // FR02/FR07 semantics unchanged.
 // Exact selected Kernel re-pin after approved R01 K01 #1205; previous C01/K02 blob 1a6a1394a505f4727306208d588fcab841e72980.
-const V08_K_BLOB = '72a886ffca85fc90caea954ee9fb5b3df7b4fcfa';
+// Re-pinned after the #1264 K advisory consultation plane landed in the selected kernel; previous blob 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa.
+// Re-pinned after #1264 follow-up 2 (synchronous consultation + wired-only work-unit bound); previous blob 64f39cd68c71868adb29a464ed7122497891bfd7.
+// Re-pinned after #1264 follow-up 3 (guarded advisory-result snapshots, observation identity envelope, conditional budget diagnostic); previous blob 7fe178a0f52dc553981c9714f8370682d945ee35.
+// Re-pinned after #1264 follow-up 4 (snapshot array descriptors + __proto__ refusal); previous blob 6327507aeeb3a0e739d9fe9ed40ae7a61ad9841d.
+// Re-pinned after #1264 follow-up 5 (no-[[Get]] advisory snapshots, intrinsic-Promise detach, Reflect.ownKeys completeness); previous blob aa4382ceeecac3a15e46f4d681e3aa5f85a563d4.
+// Re-pinned after #1264 follow-up 6 (intrinsic then only for exact clean native Promises: exact-prototype + async-symbol-only own keys); previous blob d9dc7d99825d5f0c6260e5495c9ebce732e494fd.
+// Re-pinned after #1264 follow-up 7 (owner-decided JSON-string result ABI: typeof + pre-parse length bound + JSON.parse only; all reflective inspection deleted); previous blob b4f21ab588ebba343cd5d09c5958834560d6d127.
+const V08_K_BLOB = '5af1dc94c87c9385997df1ecbef68d63f9e12968';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =

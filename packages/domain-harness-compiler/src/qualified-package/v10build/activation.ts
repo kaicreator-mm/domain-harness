@@ -29,7 +29,16 @@
  *   (5) execute through ONE facade over the real selected kernel: one
  *       `createOccurrenceRuntime` per business package, sealed-route
  *       Standard Router selection, honest receipts (kernel UNKNOWN
- *       passes through as UNKNOWN — no invented terminal success);
+ *       passes through as UNKNOWN — no invented terminal success). The
+ *       selected K extensions' advisory hooks are wired to the Kernel
+ *       Primary as a scoped, frozen hook table (`{ [hookKey]:
+ *       { providerId, invoke } }` in sealed order) — the H→K bridge of
+ *       PC-07; the KERNEL alone consults and revalidates the hooks at
+ *       turn time (#1264) and no module namespace, protected port, doc
+ *       or resource travels through the table. The BUILD `hardBudget`
+ *       rides into the Kernel's own hard limits (min with the Kernel
+ *       constants), and an optional Host ModelPort wires the Standard
+ *       bundle's `invokeStep` step surface;
  *   (6) dispose: facade closes first, then advisory disposal in reverse
  *       init order.
  *
@@ -40,10 +49,11 @@
  * block activation — static trust facts are BUILD/deployment facts, and
  * that trust semantics is asserted by tests from this consumer side.
  *
- * Advisory turn-time consultation semantics (budget advice, recovery
- * diagnostics — E2 research #1151) are NOT implemented here: loading,
- * initializing and disposing advisory modules is composition scope; their
- * participation in turns belongs to the K-side successors (#1167/#1169).
+ * Advisory turn-time consultation itself (budget advice before admission,
+ * turn observation after disposition — #1264) is the KERNEL PRIMARY's own
+ * authority path: activation only wires the scoped hook table and the
+ * observation sink; it never consults a hook, never revalidates advice
+ * and never derives authority from an advisory result.
  */
 import { isPlainRecord } from './guards.js';
 import { privateModuleFragment, registerDeclaredBareImports } from './import-hook.js';
@@ -61,8 +71,7 @@ import {
   V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE,
   V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE,
   V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, sha256Hex,
-} from './digest.js';
-import { dispatchThroughExternalEffectGate } from './external-effect.js';
+} from './digest.js';import { dispatchThroughExternalEffectGate } from './external-effect.js';
 import { V10Error, V10ActivationError } from './errors.js';
 export { V10ActivationError } from './errors.js';
 
@@ -139,6 +148,13 @@ export interface V10Counters {
   activationRefusals: { code: string; message: string }[];
   externalEffectDispatches: number;
   externalEffectRefusals: number;
+  /**
+   * [v0.10 #1264] Advisory observations the Kernel Primary delivered to the
+   * `observe` sink after authoritative turn dispositions (hook
+   * `turn-observation/v1`). Diagnostics only: never an authority, permit or
+   * admission input, and never part of any K receipt.
+   */
+  advisoryObservations: Record<string, unknown>[];
 }
 
 export function freshV10Counters(): V10Counters {
@@ -156,6 +172,7 @@ export function freshV10Counters(): V10Counters {
     activationRefusals: [],
     externalEffectDispatches: 0,
     externalEffectRefusals: 0,
+    advisoryObservations: [],
   };
 }
 
@@ -453,6 +470,83 @@ interface KRuntime {
   getSnapshot(target: unknown): Promise<unknown>;
 }
 
+/**
+ * [v0.10 #1264] The scoped H→K advisory hook table (PC-07): one frozen
+ * plain-data record keyed by the KERNEL's own closed advisory hook set, in
+ * sealed order. Each entry carries the extension's sealed provider identity
+ * and its hook function — never a module namespace, protected port, doc or
+ * resource. The Kernel Primary consults and revalidates these hooks itself;
+ * this activation seam only wires them.
+ */
+export type V10AdvisoryHookTable = Readonly<Record<string, Readonly<{
+  providerId: string;
+  invoke: (proposal: unknown) => unknown;
+}>>>;
+
+/**
+ * Build the advisory hook table from the SELECTED kernel-extension modules
+ * of one built App, in the sealed load order. The closed hook set is read
+ * from the selected kernel's own `ADVISORY_HOOKS` export (the Primary owns
+ * the hook grammar, PC-03); an extension outside it is refused typed —
+ * normally unreachable because BUILD already rejects it, kept here as the
+ * consumption-side contract of the same fact. No extensions selected: the
+ * table is undefined and the Kernel runs with zero consultations (Basic /
+ * Tiny behavior byte-for-byte).
+ */
+function advisoryHookTableOf(
+  app: V10AppView,
+  namespaces: ReadonlyMap<string, Namespace>,
+): V10AdvisoryHookTable | undefined {
+  const hasExtensions = app.modules.some(
+    (module) => module.role === 'kernel-extension' && app.loadOrder.includes(module.packageId),
+  );
+  if (!hasExtensions) return undefined;
+  const kernelEntry = app.modules.find((module) => module.role === 'kernel-primary');
+  const kernelNamespace = kernelEntry === undefined ? undefined : namespaces.get(kernelEntry.packageId);
+  const closed = kernelNamespace?.ADVISORY_HOOKS;
+  if (!Array.isArray(closed)) {
+    refuse('V10_EXPORT_CONTRACT_REFUSED', 'the selected kernel-primary does not export its closed ADVISORY_HOOKS set');
+  }
+  const table: Record<string, { providerId: string; invoke: (proposal: unknown) => unknown }> = {};
+  for (const packageId of app.loadOrder) {
+    const module = byIdOf(app).get(packageId);
+    if (module === undefined || module.role !== 'kernel-extension') continue;
+    const hook = module.provides[0] ?? '';
+    if (!(closed as readonly string[]).includes(hook)) {
+      refuse('V10_ADVISORY_HOOK_UNKNOWN', `kernel-extension ${packageId} provides advisory hook '${hook}'; the selected Kernel declares the closed advisory hook set [${(closed as readonly string[]).join(', ')}]`);
+    }
+    const invoke = namespaces.get(packageId)?.[module.hookExport as string];
+    if (typeof invoke !== 'function') {
+      refuse('V10_EXPORT_CONTRACT_REFUSED', `kernel-extension ${packageId} sealed advisory export is not callable`);
+    }
+    table[hook] = Object.freeze({
+      providerId: module.providerId ?? '',
+      invoke: invoke as (proposal: unknown) => unknown,
+    });
+  }
+  return Object.freeze(table);
+}
+
+function byIdOf(app: V10AppView): Map<string, V10AppView['modules'][number]> {
+  return new Map(app.modules.map((module) => [module.packageId, module]));
+}
+
+/**
+ * [v0.10 #1264] The BUILD-sealed hard budget of the consumed App record,
+ * passed through to the Kernel Primary so its own effective hard limits take
+ * the stricter of the Kernel constants and BUILD. Structurally invalid
+ * records are omitted (the Kernel then runs on its own constants) — real
+ * BUILD output always carries a validated hardBudget.
+ */
+function advisoryHardBudgetOf(app: V10AppView): { maxStepsPerTurn: number; maxWorkUnitsPerTurn: number } | undefined {
+  const raw = app.hardBudget as unknown;
+  if (!isPlainRecord(raw)) return undefined;
+  const { maxStepsPerTurn, maxWorkUnitsPerTurn } = raw;
+  if (typeof maxStepsPerTurn !== 'number' || !Number.isSafeInteger(maxStepsPerTurn) || maxStepsPerTurn < 1) return undefined;
+  if (typeof maxWorkUnitsPerTurn !== 'number' || !Number.isSafeInteger(maxWorkUnitsPerTurn) || maxWorkUnitsPerTurn < 1) return undefined;
+  return { maxStepsPerTurn, maxWorkUnitsPerTurn };
+}
+
 export interface ActivateV10AppOptions {
   readonly store: V10DocStore;
   readonly tenantId?: string;
@@ -495,6 +589,20 @@ export interface ActivateV10AppOptions {
    * default resolver, which refuses.
    */
   readonly deploymentRoot?: string;
+  /**
+   * [v0.10 #1264] Optional Host-owned trusted ModelPort (`{ invoke }` — the
+   * exact protected-port shape the selected Standard bundle's
+   * `createHostBoundModelResolver` requires). When present, the bundle's
+   * host-bound resolver wires the `invokeStep` step surface into the kernel
+   * SDK endpoint, enabling the K-owned FR07 continuation harness (multi-step
+   * turns whose step bound is subject to the Kernel's hard limits and
+   * advisory budget advice). Absent (the default): no step surface is wired
+   * and Basic behavior is unchanged. Host wiring only — never caller or
+   * intent data.
+   */
+  readonly modelPort?: {
+    readonly invoke: (call: { operation: unknown; input: unknown }) => Promise<unknown>;
+  };
 }
 
 export interface V10Activation {
@@ -577,6 +685,8 @@ export class V10AppFacade {
   readonly #deploymentIdentity: { deployedAppId: string; tenantId: string; appId: string } | undefined;
   readonly #scopedDocs = new Map<string, V10DocsPort>();
   readonly #queryAuthority: V10QueryAuthority | undefined;
+  readonly #advisoryHooks: V10AdvisoryHookTable | undefined;
+  readonly #modelPort: Readonly<{ invoke: (call: { operation: unknown; input: unknown }) => Promise<unknown> }> | undefined;
   #query: V10AuthorizedMultiBQuery<unknown> | undefined;
   #closed = false;
 
@@ -590,6 +700,8 @@ export class V10AppFacade {
     counters: V10Counters;
     deploymentIdentity?: { deployedAppId: string; tenantId: string; appId: string };
     queryAuthority?: V10QueryAuthority;
+    advisoryHooks?: V10AdvisoryHookTable;
+    modelPort?: Readonly<{ invoke: (call: { operation: unknown; input: unknown }) => Promise<unknown> }>;
   }) {
     this.#app = deps.app;
     this.#namespaces = deps.namespaces;
@@ -597,6 +709,8 @@ export class V10AppFacade {
     this.#counters = deps.counters;
     this.#deploymentIdentity = deps.deploymentIdentity;
     this.#queryAuthority = deps.queryAuthority;
+    this.#advisoryHooks = deps.advisoryHooks;
+    this.#modelPort = deps.modelPort;
     this.#activatedTenantId = deps.tenantId;
     this.#docsPrefix = deps.deploymentIdentity === undefined
       ? `${K_DOCS_PREFIX}${deps.app.subjectDigest}/${deps.tenantId}/`
@@ -927,6 +1041,36 @@ export class V10AppFacade {
       refuse('V10_BUSINESS_POLICY_INVALID', `Business ${businessPackageId} policy is not a record`);
     }
     this.#counters.runtimeFactoryInvocations += 1;
+    // [v0.10 #1264] The Standard SDK endpoint: interpret always; when this
+    // activation carries a Host-owned trusted ModelPort, the selected
+    // bundle's host-bound resolver wires the `invokeStep` step surface the
+    // Kernel's FR07 continuation harness requires.
+    const standardNamespace = this.#namespaces.get(standardEntry.packageId);
+    const interpret = standardNamespace?.interpret as ((d: unknown, i: unknown, c: unknown) => unknown) | undefined;
+    if (typeof interpret !== 'function') {
+      refuse('V10_EXPORT_CONTRACT_REFUSED', `standard-primary ${standardEntry.packageId} does not export interpret`);
+    }
+    const sdkEndpoint: Record<string, unknown> = {
+      packageId: standardEntry.packageId,
+      interpret: (declaration: unknown, input: unknown, context: unknown): unknown =>
+        interpret(declaration, input, context),
+    };
+    if (this.#modelPort !== undefined) {
+      const createResolver = standardNamespace?.createHostBoundModelResolver as
+        | ((port: unknown) => { invokeStep?: unknown })
+        | undefined;
+      if (typeof createResolver !== 'function') {
+        refuse('V10_EXPORT_CONTRACT_REFUSED', `standard-primary ${standardEntry.packageId} does not export createHostBoundModelResolver`);
+      }
+      const resolver = createResolver(this.#modelPort);
+      if (resolver === null || typeof resolver !== 'object' || typeof resolver.invokeStep !== 'function') {
+        refuse('V10_EXPORT_CONTRACT_REFUSED', `standard-primary ${standardEntry.packageId} exposed no host-bound invokeStep resolver`);
+      }
+      const invokeStep = resolver.invokeStep as (d: unknown, i: unknown, c: unknown) => Promise<unknown>;
+      sdkEndpoint.invokeStep = (declaration: unknown, input: unknown, context: unknown): Promise<unknown> =>
+        invokeStep(declaration, input, context);
+    }
+    const hardBudget = advisoryHardBudgetOf(this.#app);
     const runtime = createRuntime({
       moduleIdentity: { packageId: kernelEntry.packageId, moduleSha256: kernelEntry.moduleSha256 ?? null },
       hostPorts: {
@@ -937,14 +1081,36 @@ export class V10AppFacade {
         sha256: { digestUtf8: (value: string): string => sha256Hex(value) },
         clock: (): string => new Date(this.#now()).toISOString(),
       },
-      sdkEndpoint: {
-        packageId: standardEntry.packageId,
-        interpret: (declaration: unknown, input: unknown, context: unknown): unknown =>
-          (this.#namespaces.get(standardEntry.packageId)?.interpret as ((d: unknown, i: unknown, c: unknown) => unknown) | undefined)?.(declaration, input, context),
-      },
+      sdkEndpoint,
       businessEndpoint: policy,
-      observe: (): void => {
-        /* receipts are returned to the caller; no side observation at T00 */
+      // [v0.10 #1264] The BUILD hardBudget feeds the Kernel's OWN effective
+      // hard limits (stricter of Kernel constant and BUILD); the selected K
+      // extensions' advisory hooks ride the scoped frozen table. Basic /
+      // Tiny activations wire neither and consult nothing.
+      ...(hardBudget === undefined ? {} : { hardBudget }),
+      ...(this.#advisoryHooks === undefined ? {} : { advisoryHooks: this.#advisoryHooks }),
+      observe: (record: unknown): void => {
+        // Receipts are returned to the caller; the only records surfaced
+        // here are the Kernel's post-disposition advisory observations
+        // (#1264) — diagnostics in the counters sink, never an authority.
+        // [#1264 F2] The Host completes the Kernel-owned occurrence
+        // `identity` (B/workflow/instance/turn) with the subject and
+        // deployment/tenant identity this activation owns, so every record
+        // in the shared sink is attributable per L2 §C. The hook itself
+        // still receives only the frozen redacted projection.
+        if (isPlainRecord(record) && record.kind === 'advisory-observation') {
+          const kernelIdentity = isPlainRecord(record.identity) ? record.identity : {};
+          this.#counters.advisoryObservations.push({
+            ...record,
+            identity: {
+              subjectDigest: this.#app.subjectDigest,
+              appId: this.#app.appId,
+              tenantId: this.#activatedTenantId,
+              deployedAppId: this.#deploymentIdentity?.deployedAppId ?? null,
+              ...kernelIdentity,
+            },
+          });
+        }
       },
     });
     this.#runtimes.set(businessPackageId, runtime);
@@ -1215,6 +1381,18 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
           authorize.call(raw, principal, target),
       });
     }
+    // [v0.10 #1264] The optional Host ModelPort is trusted wiring, not
+    // caller data: a malformed option fails the activation typed instead of
+    // silently degrading the continuation step surface.
+    if (options.modelPort !== undefined
+      && (typeof options.modelPort !== 'object' || options.modelPort === null
+        || typeof (options.modelPort as { invoke?: unknown }).invoke !== 'function')) {
+      refuse('V10_ACTIVATION_OPTIONS_INVALID', 'modelPort, when present, must be Host-owned wiring of the shape { invoke(call) => Promise }');
+    }
+    // [v0.10 #1264] The scoped H→K advisory hook table of the selected K
+    // extensions (undefined → the Kernel consults nothing) and the optional
+    // Host ModelPort wiring.
+    const advisoryHooks = advisoryHookTableOf(appView, namespaces);
     const facade = new V10AppFacade({
       app: appView,
       namespaces,
@@ -1225,6 +1403,8 @@ export async function activateV10App(app: unknown, options: ActivateV10AppOption
       counters,
       ...(deploymentIdentity === undefined ? {} : { deploymentIdentity }),
       ...(queryAuthority === undefined ? {} : { queryAuthority }),
+      ...(advisoryHooks === undefined ? {} : { advisoryHooks }),
+      ...(options.modelPort === undefined ? {} : { modelPort: options.modelPort }),
     });
     // A `function` declaration (not a const arrow) so the explicit `never`
     // return is on the referenced declaration itself: TypeScript only treats

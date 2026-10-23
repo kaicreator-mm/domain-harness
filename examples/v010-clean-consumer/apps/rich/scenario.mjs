@@ -243,6 +243,52 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
     return { extensions, features: features.map((entry) => entry.featureKey), roles: counters.initCalls };
   });
 
+  // [#1264 PC-03/PC-08] Real consultation evidence: the selected Kernel
+  // Primary invokes BOTH selected advisory hooks at turn time —
+  // `admission-budget-advice/v1` before admission and `turn-observation/v1`
+  // after the authoritative disposition — with at least one honored clamp
+  // and one rejected malformed (authority-field) advice.
+  await step('RICH_P1.advisoryConsultation', async () => {
+    const agentInput = (requestId) => ({
+      iteration: null, note: null, decisionOutcome: null, decisionData: null, contextDigest: null,
+      contextEntries: null, modelCalls: null, modelCallEvidence: null, requestId,
+    });
+    globalThis.__v010AlphaAdvicePlan = [{ advice: '{"maxSteps":2}' }, { advice: '{"maxSteps":3,"permit":true}' }];
+    try {
+      const first = expectAdmitted(await send(facade, 'agentCollectContext', 'agent-advisory-1', 'advisory/collect/0', agentInput('req-advisory-0')), 'advisory turn 1');
+      assert(!('advisory' in first) && !('budget' in first), 'the receipt carries no advisory/budget fields');
+      const second = expectAdmitted(await send(facade, 'agentCollectContext', 'agent-advisory-1', 'advisory/collect/1', agentInput('req-advisory-1')), 'advisory turn 2');
+      assert(!('advisory' in second) && !('budget' in second), 'the rejected advice left the receipt untouched');
+
+      const k = facade.kCounters(B3);
+      assert(k.budgetAdviceConsultations === 2, `budget advice consulted ${String(k.budgetAdviceConsultations)} times, expected 2`);
+      assert(k.budgetAdviceClamps >= 1, `expected at least one honored clamp, got ${String(k.budgetAdviceClamps)}`);
+      assert(k.advisoryRejected >= 1, `expected the malformed authority-field advice to be rejected, got advisoryRejected=${String(k.advisoryRejected)}`);
+      assert(k.turnObservationConsultations === 2, `turn observation consulted ${String(k.turnObservationConsultations)} times, expected 2`);
+      const observations = counters.advisoryObservations;
+      assert(Array.isArray(observations) && observations.length >= 2, `expected >=2 sink observations, got ${String(observations.length)}`);
+      const last = observations[observations.length - 1];
+      assert(last?.hook === 'turn-observation/v1' && last?.providerId === 'advisory-beta', `sink observation ${JSON.stringify(last).slice(0, 200)}`);
+      assert(last?.turn?.status === 'admitted' && last?.turn?.intentType === 'agentCollectContext', `observation identity ${JSON.stringify(last?.turn)}`);
+      const globalBeta = globalThis.__v010BetaProjections ?? [];
+      assert(globalBeta.length >= 2 && globalBeta.every((entry) => entry.status === 'admitted'), 'the Kernel handed both post-disposition projections to the observation hook');
+      const globalAlpha = globalThis.__v010AlphaProposals ?? [];
+      assert(globalAlpha.length === 2, `the Kernel handed ${String(globalAlpha.length)} redacted proposals, expected 2`);
+      assert(globalAlpha.every((entry) => entry.hardLimits?.maxSteps === 8 && entry.hardLimits?.maxWorkUnits === 64),
+        `the Kernel's own effective hard limits must ride the proposal: ${JSON.stringify(globalAlpha[0])}`);
+      return {
+        budgetAdviceConsultations: k.budgetAdviceConsultations,
+        budgetAdviceClamps: k.budgetAdviceClamps,
+        advisoryRejected: k.advisoryRejected,
+        turnObservationConsultations: k.turnObservationConsultations,
+        sinkObservations: observations.length,
+      };
+    } finally {
+      delete globalThis.__v010AlphaAdvicePlan;
+      delete globalThis.__v010BetaPlan;
+    }
+  });
+
   const agentScope = {
     deployedAppId: 'deploy:v010-t05-rich', tenantId: 'tenant:v010-t05-rich', appId: 'app:v010-t05-rich',
     businessPackageId: B3, agentId: 'agent:context-agent', threadId: 'thread:context-main',

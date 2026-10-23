@@ -107,12 +107,13 @@ const N06_V09_BUILD_VALUES = [
 
 /** v0.10 T00 (#1166): closed-world Node24 BUILD composition (additive group). */
 const T00_V10BUILD_VALUES = [
-  // string consts (8)
+  // string consts (9)
   'V10_BUILD_FORMAT',
   'V10_BUNDLER_REVISION',
   'V10_HOST_ABI',
   'V10_IMPORT_POLICY_REVISION',
   'V10_KEXT_ABI',
+  'V10_KERNEL_ADVISORY_HOOKS',
   'V10_RUNTIME_ABI',
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
@@ -186,6 +187,8 @@ const STRING_CONST_NAMES = new Set<string>([
   'V10_SFEATURE_ABI',
   'V10_TARGET_PROFILE',
 ]);
+/** [v0.10 #1264] Frozen readonly string-LIST constants (closed-set advisory hooks). */
+const FROZEN_STRING_LIST_NAMES = new Set<string>(['V10_KERNEL_ADVISORY_HOOKS']);
 const PROFILE_CONST_NAMES = new Set<string>(['PUBLIC_COMPILER_OUTPUT_PROFILE', 'V10_ACTIVATION_FAILURE_CODES', 'V10_SELECTED_ROLE_ABI']);
 const PARSER_PIN_CONST_NAMES = new Set<string>(['V09_BUILD_PARSER_PIN']);
 /** Non-error public classes (constructors that are not Error subclasses). */
@@ -332,6 +335,12 @@ test('T008C: every committed runtime binding has the promised kind', () => {
     if (STRING_CONST_NAMES.has(name!)) {
       assert.equal(typeof value, 'string', `${name} must be a string constant`);
       assert.ok((value as string).length > 0, `${name} must be non-empty`);
+      continue;
+    }
+    if (FROZEN_STRING_LIST_NAMES.has(name!)) {
+      assert.ok(Array.isArray(value), `${name} must be a frozen string-list constant`);
+      assert.ok((value as readonly string[]).length > 0, `${name} must be non-empty`);
+      assert.ok((value as readonly string[]).every((entry) => typeof entry === 'string' && entry.length > 0), `${name} entries must be non-empty strings`);
       continue;
     }
     if (PROFILE_CONST_NAMES.has(name!)) {

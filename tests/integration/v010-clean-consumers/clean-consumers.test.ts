@@ -218,7 +218,7 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
     // ---- (5) Rich: the full L2 R3 §H consumer journey --------------------
     const main = runScenario(richEntry, 'rich-main', richWork, join(richWork, 'report-main.json'));
     assertReport(main, 'Rich main', [
-      'RICH_P1.selection', 'RICH_P1.invokeFeatures', 'RICH_P4.modelCallTruth', 'RICH_P5.agentMemoryContext',
+      'RICH_P1.selection', 'RICH_P1.advisoryConsultation', 'RICH_P1.invokeFeatures', 'RICH_P4.modelCallTruth', 'RICH_P5.agentMemoryContext',
       'EX04_P1.twoAdapters', 'RICH_P2.twoBIsolation', 'RICH_P3.queryAuthority', 'K02_P1.eighteenTurnsOriginalReceipt',
       'EX04_F1.duplicateCallbackAndLostAck', 'DENY_N1.permitlessAdapter', 'RICH_P2.restart',
     ]);
@@ -268,7 +268,16 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
       assert.equal(winners[0]!.outcome.effectId, winners[1]!.outcome.effectId, 'two identical competing writers must resolve the SAME logical turn');
     } else {
       const loser = races.find((report) => report.outcome?.ok !== true);
-      assert.match(String(loser?.outcome?.code), /ADMISSION_|K02_/u, `the losing writer must fail closed typed: ${raceForensics}`);
+      // #1264 R1 made advisory consultation synchronous (one await fewer on
+      // the loser path), so the losing writer can now fail closed typed at
+      // the genesis window INSTEAD of the admission-fence CAS ladder.
+      // GOVERNANCE_EXECUTION_PIN_MISSING is the exact explained code of the
+      // pre-existing genesis atomicity gap tracked in #1270 (instance create
+      // and governance pin bind are two writes; the loser can observe the
+      // instance before the pin) — NOT a fixed gap and not an
+      // advisory-plane defect. The gate's intent is unchanged: the loser
+      // must carry a TYPED kernel refusal, never a fake ACK.
+      assert.match(String(loser?.outcome?.code), /ADMISSION_|K02_|GOVERNANCE_EXECUTION_PIN_MISSING/u, `the losing writer must fail closed typed: ${raceForensics}`);
     }
     const raceJobDb = join(raceWork, 'extjob.sqlite');
     const raceDispatches = queryRows(raceJobDb, "SELECT COUNT(*) AS n FROM job_dispatch_log WHERE op = 'job.submit'")[0]!.n as number;

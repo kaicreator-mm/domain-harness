@@ -49,13 +49,13 @@
  */
 import { isObjectRecord } from './guards.js';
 import { canonicalSnapshot } from '@kaicreator/domain-harness/v8';
-import { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_RUNTIME_ABI, V10_SELECTED_ROLE_ABI, V10_TARGET_PROFILE, sha256Canonical, sha256Hex, } from './digest.js';
+import { V10_BUILD_FORMAT, V10_BUNDLER_REVISION, V10_HOST_ABI, V10_IMPORT_POLICY_REVISION, V10_KERNEL_ADVISORY_HOOKS, V10_RUNTIME_ABI, V10_SELECTED_ROLE_ABI, V10_TARGET_PROFILE, sha256Canonical, sha256Hex, } from './digest.js';
 import { assertSealedImportClosure } from './import-policy.js';
 import { V10BuildError } from './errors.js';
 import { resolveV10SelectedClosure } from './selected-closure.js';
 const HEX64 = /^[0-9a-f]{64}$/;
 const PACKAGE_ID_RE = /^[A-Za-z][A-Za-z0-9._:@-]{0,127}$/;
-/** Feature/hook key grammar: `name/version` or `namespace:name/version` (e.g. `advisory-alpha-observation/v1`, `standard:validation/1`). */
+/** Feature/hook key grammar: `name/version` or `namespace:name/version` (e.g. `admission-budget-advice/v1`, `standard:validation/1`). */
 const FEATURE_KEY_RE = /^[a-z][a-z0-9._:-]{0,127}\/[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const INTENT_KEY_RE = /^intent:[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const AUTHORITY_NAMESPACES = ['kernel:', 'cas:', 'admission:', 'journal:', 'effect:'];
@@ -345,6 +345,14 @@ export function buildV10App(options) {
         }
         if (module.role === 'kernel-extension' && (key.startsWith('standard:') || AUTHORITY_NAMESPACES.some((ns) => key.startsWith(ns)))) {
             fail('V10_AUTHORITY_FORGERY', `kernel-extension ${module.packageId} provides advisory hook '${key}'; advisory hooks may not squat authority or Standard namespaces`);
+        }
+        // [v0.10 #1264 PC-05] The Kernel's declared CLOSED advisory hook set:
+        // an extension whose single hook key is not in it is rejected HERE, at
+        // BUILD, before any affected module executes — never discovered at
+        // runtime. The Kernel re-refuses unknown keys at its own trusted wiring
+        // boundary (defense in depth at the load seam, not a re-attestation).
+        if (module.role === 'kernel-extension' && !V10_KERNEL_ADVISORY_HOOKS.includes(key)) {
+            fail('V10_ADVISORY_HOOK_UNKNOWN', `kernel-extension ${module.packageId} provides advisory hook '${key}'; the selected Kernel declares the closed advisory hook set [${V10_KERNEL_ADVISORY_HOOKS.join(', ')}]`);
         }
     }
     // Collisions and provider authority are properties of the *selected*

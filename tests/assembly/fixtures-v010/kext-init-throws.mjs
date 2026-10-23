@@ -7,7 +7,7 @@ export const MODULE_ID = 'kext-init-throws@v010.1.0.0';
 export const PACKAGE_KIND = 'kernel-extension';
 export const EXTENSION_ABI = 'dh.v10.k-extension/1';
 export const PROVIDER_ID = 'advisory-throws';
-export const HOOK = 'advisory-throws-observation/v1';
+export const HOOK = 'turn-observation/v1';
 
 export function init() {
   throw new Error('fixture: intentional init failure');
