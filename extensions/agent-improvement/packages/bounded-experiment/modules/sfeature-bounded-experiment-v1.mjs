@@ -30,6 +30,7 @@ function obj(value){
 }
 function get(o,k){return Object.getOwnPropertyDescriptor(o,k)?.value;}
 function id(v){if(typeof v!=='string'||!v||v.length>256||
+  // eslint-disable-next-line no-control-regex -- intentional C0 control-character rejection
   /[\u0000-\u001f]/.test(v)||/^(?:latest|head|\*)$/i.test(v))fail('EXPERIMENT_ID_INVALID');return v;}
 function sha(v){if(typeof v!=='string'||!SHA.test(v))fail('EXPERIMENT_SHA_INVALID');return v;}
 function boundedInt(v,min,max){
