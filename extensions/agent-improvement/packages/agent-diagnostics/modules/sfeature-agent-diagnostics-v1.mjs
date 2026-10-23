@@ -149,7 +149,9 @@ export function analyzeAgentRun(input) {
   // Equal seq across distinct events cannot establish a causal first divergence.
   const earliestSeq = observedFailures.length ? observedFailures[0].seq : null;
   const firstAtSeq = observedFailures.filter(event => event.seq === earliestSeq);
-  const firstFailure = firstAtSeq.length === 1
+  // Source-local seq values across different observers are not comparable.
+  const failureSources = new Set(observedFailures.map(event => event.sourceRef));
+  const firstFailure = firstAtSeq.length === 1 && failureSources.size <= 1
     ? Object.freeze({
         eventId: firstAtSeq[0].eventId, seq: earliestSeq,
         sourceRef: firstAtSeq[0].sourceRef, kind: firstAtSeq[0].kind,
@@ -171,7 +173,7 @@ export function analyzeAgentRun(input) {
     .filter(x => x.eventIds.length >= 2)
     .map(x => Object.freeze({ ...x, eventIds: Object.freeze([...x.eventIds]),
       classification: 'REPEATED_FAILURE_CANDIDATE' }));
-  const firstFailureAmbiguous = firstAtSeq.length > 1;
+  const firstFailureAmbiguous = firstAtSeq.length > 1 || failureSources.size > 1;
   const warnings = [];
   if (missingVerifierRefs.length) warnings.push('VERIFIER_COVERAGE_INCOMPLETE');
   if (mismatchedEvents.length || verifierSummary.some(x => !x.subjectMatch)) warnings.push('SUBJECT_MISMATCH');
