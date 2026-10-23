@@ -66,7 +66,8 @@ T05/T06 and Hidden cover the **new** four optional CT-02 read/evaluation feature
 - [x] Explicit known-P2 #1267/#1270 scoped limitation assessment; 0 new P0/P1 observed.
 - [x] PR #1312 exact reviewed HEAD `a065ac4e…` Woodpecker #1836 **SUCCESS/SUCCESS**; prior #1835 incident recorded and bounded retry passed.
 - [x] Independent exact-HEAD full R01 source/pack/Hidden review: P0/P1 source = 0; one temporal CI P1 resolved with exact-same-HEAD #1836 PASS; documented P2 residual risks accepted by Release controller.
-- [x] R01 Release qualification verdict recorded `RELEASE_PASS=YES` for immutable tested source and byte-identical version candidate.\n- [ ] Independent focused final-doc-delta review of this Release PASS amendment, merge to version, verify no executable drift.
+- [x] R01 Release qualification verdict recorded `RELEASE_PASS=YES` for immutable tested source and byte-identical version candidate.
+- [ ] Independent focused final-doc-delta review of this Release PASS amendment, merge to version, verify no executable drift.
 - [ ] `v0.10.1 → main` integration and release tag only after qualified version approval.
 
 **Current decision:** `R01_EVIDENCE_COMPLETE=YES`, `PRIVATE_HIDDEN=PASS`, `R01_CI_AT_REVIEWED_SOURCE_HEAD=PASS`, `CI_P1=RESOLVED`, `R01_RELEASE_QUALIFIED=YES`, `RELEASE_PASS=YES`, `P0=0`, `P1=0`, `P2_KNOWN_OPEN=2`, `FINAL_DOC_DELTA_REVIEW=REQUIRED_BEFORE_MERGE`. The final version merge/tag remains a subsequent source-currentness operation, not implicit in this ledger.
