@@ -64,6 +64,14 @@ const PACKAGE_ROOT = resolve(HERE, '..');
 const REPO_ROOT = resolve(PACKAGE_ROOT, '../..');
 const CORE_PACKAGE_ROOT = join(REPO_ROOT, 'packages', 'domain-harness');
 const NODE_PACKAGE_ROOT = join(REPO_ROOT, 'packages', 'domain-harness-node');
+// A1 #1335: future T00 legacy shims consume unpublished 0.10.2 workspaces.
+// Packing exact local tarballs avoids accidental registry resolution (E404).
+const NEW_WORKSPACE_ROOTS = {
+  contracts: join(REPO_ROOT, 'packages', 'contracts'),
+  microkernel: join(REPO_ROOT, 'packages', 'microkernel'),
+  hostNode: join(REPO_ROOT, 'packages', 'host-node'),
+  build: join(REPO_ROOT, 'tooling', 'build'),
+} as const;
 
 const STAGE_DIRECTORY_PREFIX = 'dh-packed-stage-';
 const STAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -74,12 +82,21 @@ export interface PackedTarball {
   readonly sha256: string;
 }
 
+export interface NewWorkspacePacks {
+  readonly contracts: PackedTarball;
+  readonly microkernel: PackedTarball;
+  readonly hostNode: PackedTarball;
+  readonly build: PackedTarball;
+}
+
 export interface StagedPacks {
   readonly root: string;
   readonly packsDirectory: string;
   readonly coreTarball: PackedTarball;
   readonly compilerTarball: PackedTarball;
   readonly nodeTarball?: PackedTarball;
+  /** Opt-in local 0.10.2-rc.0 tarball closure; never resolved via npm registry. */
+  readonly newWorkspaceTarballs?: NewWorkspacePacks;
 }
 
 function run(command: string, args: readonly string[], cwd: string): string {
@@ -337,7 +354,7 @@ function packStage(stageRoot: string, packsDirectory: string, nameFragment: stri
   return packTarballFrom(stageRoot, packsDirectory, nameFragment, expectedCount);
 }
 
-async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
+async function stageOnce(includeNodePackage: boolean, includeNewWorkspaces: boolean): Promise<StagedPacks> {
   // P2-02: lazily sweep stages orphaned by hard-killed processes first.
   scavengeStaleStages();
   const root = mkdtempSync(join(tmpdir(), STAGE_DIRECTORY_PREFIX));
@@ -399,8 +416,29 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
       nodeTarball = packStage(join(root, 'node'), packsDirectory, 'domain-harness-node', 1);
     }
 
+    // These are exact local tarballs of the four unpublished new workspaces.
+    // Copy the already-built dist read-only; never rebuild the LIVE tree from
+    // inside a parallel test. The canonical source/dist guard remains owned
+    // by the repository build/task-check and T07b delivery tests.
+    let newWorkspaceTarballs: NewWorkspacePacks | undefined;
+    if (includeNewWorkspaces) {
+      const packNew = (kind: keyof typeof NEW_WORKSPACE_ROOTS, fragment: string): PackedTarball => {
+        const source = NEW_WORKSPACE_ROOTS[kind];
+        const stage = join(root, `new-${kind}`);
+        stagePackageSkeleton(source, stage, false);
+        cpSync(join(source, 'dist'), join(stage, 'dist'), { recursive: true });
+        return packStage(stage, packsDirectory, fragment, 1);
+      };
+      newWorkspaceTarballs = {
+        contracts: packNew('contracts', 'domain-harness-contracts'),
+        microkernel: packNew('microkernel', 'domain-harness-microkernel'),
+        hostNode: packNew('hostNode', 'domain-harness-host-node'),
+        build: packNew('build', 'domain-harness-build'),
+      };
+    }
+
     process.once('exit', () => rmSync(root, { recursive: true, force: true }));
-    return { root, packsDirectory, coreTarball, compilerTarball, nodeTarball };
+    return { root, packsDirectory, coreTarball, compilerTarball, nodeTarball, newWorkspaceTarballs };
   } catch (error) {
     rmSync(root, { recursive: true, force: true });
     throw error;
@@ -414,11 +452,14 @@ const stagedCache = new Map<string, Promise<StagedPacks>>();
  * candidate tree. Compiler/public-compatibility fixtures need core+compiler;
  * the node successor-host consumer additionally needs @kaicreator/domain-harness-node.
  */
-export function stagePackedWorkspaces(options: { readonly includeNodePackage?: boolean } = {}): Promise<StagedPacks> {
-  const key = options.includeNodePackage === true ? 'core+node+compiler' : 'core+compiler';
+export function stagePackedWorkspaces(options: {
+  readonly includeNodePackage?: boolean;
+  readonly includeNewWorkspaces?: boolean;
+} = {}): Promise<StagedPacks> {
+  const key = `${options.includeNodePackage === true ? 'node' : 'no-node'}:${options.includeNewWorkspaces === true ? 'new' : 'legacy'}`;
   let staged = stagedCache.get(key);
   if (staged === undefined) {
-    staged = stageOnce(options.includeNodePackage === true);
+    staged = stageOnce(options.includeNodePackage === true, options.includeNewWorkspaces === true);
     stagedCache.set(key, staged);
     staged.catch(() => stagedCache.delete(key));
   }
