@@ -1,7 +1,6 @@
 {
   "name": "@kaicreator/domain-harness-compiler",
   "version": "0.2.0",
-  "private": true,
   "description": "Build-time compiler for DomainHarness Target Compiled Domain Packages",
   "type": "module",
   "main": "./dist/index.js",
@@ -46,17 +45,13 @@
     "node": ">=22.15.0"
   },
   "scripts": {
-    "prebuild": "npm run build -w @kaicreator/domain-harness -w @kaicreator/domain-harness-build",
+    "prebuild": "npm run build -w @kaicreator/domain-harness",
     "build": "tsc -p tsconfig.build.json",
     "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@kaicreator/domain-harness-build": "0.10.2-rc.0",
-    "@kaicreator/domain-harness-contracts": "0.10.2-rc.0",
-    "@kaicreator/domain-harness-host-node": "0.10.2-rc.0",
-    "@kaicreator/domain-harness-microkernel": "0.10.2-rc.0",
     "ajv": "^8.17.1",
     "jsonata": "^2.2.2",
     "typescript": "^5.8.3",

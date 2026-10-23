@@ -45,9 +45,22 @@ async function discoverShipped() {
       // is gitignored). They stay unguarded until a later task marks them
       // private (T07b/T08), at which point this entry becomes redundant.
       if (neverCommittedDist.has(manifest.name)) continue;
-      const entries = [manifest.main, manifest.types]
-        .filter((entry) => typeof entry === 'string')
-        .map((entry) => entry.replace(/^\.\//u, ''));
+      // Entries: main/types plus every dist/ target named by the exports map
+      // (src/ targets such as the compiler's payload .mjs files are not dist).
+      const candidates = [manifest.main, manifest.types];
+      const collect = (value) => {
+        if (typeof value === 'string') candidates.push(value);
+        else if (value !== null && typeof value === 'object') Object.values(value).forEach(collect);
+      };
+      collect(manifest.exports);
+      const entries = [
+        ...new Set(
+          candidates
+            .filter((entry) => typeof entry === 'string')
+            .map((entry) => entry.replace(/^\.\//u, ''))
+            .filter((entry) => entry.startsWith('dist/')),
+        ),
+      ];
       shipped[`${parent}/${dir}`] = entries;
     }
   }
