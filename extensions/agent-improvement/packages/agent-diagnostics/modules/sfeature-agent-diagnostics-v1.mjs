@@ -49,6 +49,7 @@ function own(value, field) {
 }
 function text(value, code, max = 256) {
   if (typeof value !== 'string' || value.length < 1 || value.length > max
+      // eslint-disable-next-line no-control-regex -- intentional C0 control-character rejection
       || /[\u0000-\u001f]/.test(value) || /^(?:head|latest|\*)$/i.test(value)) fail(code);
   return value;
 }
