@@ -15,7 +15,7 @@ import { basicComposition, featureEntry } from '../assembly/helpers-v010.js';
 const SPECS = [
   { fixture: 'sfeature-validation-v1.mjs', packageId: 't05-test-diagnostics@v0101.0.0', featureKey: 'standard:t05-diagnostics/1' },
   { fixture: 'sfeature-aggregation-v1.mjs', packageId: 't05-test-evaluation@v0101.0.0', featureKey: 'standard:t05-evaluation/1' },
-  { fixture: 'sfeature-formatting-v1.mjs', packageId: 't05-test-experience@v0101.0.0', featureKey: 'standard:t05-experience/1' },
+  { fixture: 'sfeature-formatting-v1.mjs', packageId: 't05-test-experience@v0101.0.0', featureKey: 'standard:t05-experience/1', featureExport: 'canonicalDigest', externalImports: { node: ['node:crypto'] } },
   { fixture: 'sfeature-validation-v1.mjs', packageId: 't05-test-experiment@v0101.0.0', featureKey: 'standard:t05-experiment/1' },
 ] as const;
 
