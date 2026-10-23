@@ -3,7 +3,7 @@
 Parent #1274 / #1277. This is source-only, pure `dh.v10.standard-feature/1` application-facing functionality, not a Memory storage engine, retrieval database, promotion manager or Rule authority. Candidate inputs are externally supplied source references and provenance, rather than private task-meta records.
 
 - Valid independent candidate evidence + current project/task/rule/source → `REVIEW_CANDIDATE_ONLY`; still cannot adopt automatically.
-- Stale SHA without an explicit compatibility reference → `uncertain`, not “applicable”.
+- Stale SHA, **even with an arbitrary caller-provided `compatibilityRef`**, → `uncertain`. A ref string is not independent proof; full cross-SHA eligibility requires a separately governed attestation contract (not in this version's C03 inputs).
 - Known negative case, crossed project or rule conflict → not applicable.
 - No hidden source/Tool/effect permissions or credential values accepted.
 
