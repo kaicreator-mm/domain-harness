@@ -4,11 +4,12 @@
  * The sealed K/S/router/feature/Business payload bytes moved (`git mv`) out of
  * `packages/domain-harness-compiler/src/qualified-package/{payload,v09}` and
  * `extensions/agent-improvement/packages` into `domain-packages/**` and
- * `examples/v010-meta-feedback`. Every moved file must keep the exact git
+ * `examples/v010-meta-feedback`. Every moved file keeps the exact git
  * blob id it had at the v0.10.2 pin 91eb3b9a (L2 section 1.1 / INV section 4),
  * and no moved source may remain at its old location. The blob id is
  * recomputed from the file bytes (sha1 of `blob <len>\0<bytes>`), so the test
- * needs no git binary.
+ * needs no git binary. The ONE exception is the K row, re-pinned by T01k
+ * (#1321) to the additive read-only protocol append (see the note at MOVED).
  *
  * NOT asserted here: README.md / build-probe.mjs of the four v0.10.1 features
  * (their old-path text was rewritten on purpose) and the new package.json /
@@ -24,8 +25,16 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** [pre-move git blob id, new repo-relative path, old repo-relative path] */
+/**
+ * [v0.10.2 T01k (#1321)] The kernel row is re-pinned to the post-append blob:
+ * the additive K-owned read-only protocol exports changed K bytes on purpose
+ * (L2 section 2; acceptance `git diff --numstat` 0 removed lines —
+ * `tests/compiler/v0102-kernel-protocol.test.ts` proves the T01 payload is
+ * the exact byte prefix of the appended file). Every other row still keeps
+ * its pre-move git blob id.
+ */
 const MOVED: ReadonlyArray<readonly [string, string, string]> = [
-  ['72a886ffca85fc90caea954ee9fb5b3df7b4fcfa', 'domain-packages/kernel/basic/kernel-mechanism-v1.mjs', 'packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs'],
+  ['68b77d4711a802bc6a3f6f5e73cbc58e769af32f', 'domain-packages/kernel/basic/kernel-mechanism-v1.mjs', 'packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs'],
   ['9b86835bf12262ef53548e0031550fcecd97a7f2', 'domain-packages/standard/basic/standard-sdk-v1.mjs', 'packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs'],
   ['e23694d7076d7ca61cbe0522fc1f54d418b848cc', 'domain-packages/standard/basic/workflow-router.mjs', 'packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs'],
   ['d7ef07f1a5f8b66f8d71b0b72ecf19ce7c7c36cc', 'domain-packages/standard/basic/workflow-router.d.mts', 'packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.d.mts'],
@@ -71,7 +80,9 @@ test('v0.10.2 T01 payload parity: every moved file keeps its pre-move git blob i
 
 test('v0.10.2 T01 payload parity: K, S and router blob ids match the L2 section 1.1 / INV record', () => {
   const byPath = new Map(MOVED.map(([blobId, newPath]) => [newPath, blobId]));
-  assert.equal(byPath.get('domain-packages/kernel/basic/kernel-mechanism-v1.mjs'), '72a886ffca85fc90caea954ee9fb5b3df7b4fcfa');
+  // [v0.10.2 T01k] K re-pinned from 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa
+  // (the additive read-only protocol append of L2 section 2).
+  assert.equal(byPath.get('domain-packages/kernel/basic/kernel-mechanism-v1.mjs'), '68b77d4711a802bc6a3f6f5e73cbc58e769af32f');
   assert.ok(byPath.get('domain-packages/standard/basic/standard-sdk-v1.mjs')?.startsWith('9b86835b'));
   assert.ok(byPath.get('domain-packages/standard/basic/workflow-router.mjs')?.startsWith('e23694d7'));
   assert.ok(byPath.get('examples/v010-meta-feedback/business-meta-feedback-v1.mjs')?.startsWith('c19881f9'));

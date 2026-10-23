@@ -6529,3 +6529,221 @@ export function createOccurrenceRuntime(options) {
     businessPackageId: businessEndpoint.packageId,
   };
 }
+// T01K_ADDITIVE_PROTOCOL_EXPORTS_BEGIN (v0.10.2 T01k #1321, L2 section 2)
+// ===========================================================================
+// [v0.10.2 T01k] The K-owned additive READ-ONLY protocol exports (L2-A, O3).
+// Everything from this marker down to T01K_ADDITIVE_PROTOCOL_EXPORTS_END is
+// a pure append on top of the T01 kernel blob
+// 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa (acceptance: git diff --numstat
+// against it shows 0 removed lines; every byte ABOVE this marker is the
+// exact T01 payload, sha256
+// 66f19f8968cb58cc59808c9c15cfbb193618a150a61ac00a5b5797bec1250630).
+//
+// The three exports are consumed from the SELECTED, LOADED K module
+// instance by the trusted Host Effect gate and the activation seam (L2
+// section 2): they mint nothing, mutate nothing and interpret only the K
+// document grammar and document shapes this module itself defined above.
+// Wire literals and every pre-existing statement are untouched; the
+// structural activation contract still requires only createOccurrenceRuntime
+// and permits extra exports, so adding these changes no Kernel behavior.
+// ===========================================================================
+
+/**
+ * [v0.10.2 T01k] The K doc-key builder family of ONE wiring, exactly as the
+ * runtime itself chose it at its wiring boundary (`createOccurrenceRuntime`):
+ * `scope === undefined` answers the legacy `v08-kernel:` builders; a wired
+ * deployment scope answers the injective `v010-k02:` scoped builders (the
+ * object with instance, admissionFence, journal, journalPrefix,
+ * turnDisposition, decisionReceipt, receiptArchive, effectPermit and
+ * effectDispatchClaim). Pure: reads nothing, writes nothing. The Host never
+ * reconstructs K key grammar on its own again.
+ */
+export function kernelDocKeys(scope) {
+  return scope === undefined ? legacyKernelDocKeys() : scopedKernelDocKeys(scope);
+}
+
+/**
+ * [v0.10.2 T01k] The exact K02 scoped key prefix of ONE deployment tuple:
+ * `K02_SCOPED_KEY_ROOT` plus the four escaped `deploymentScopeIdentity`
+ * fields joined by `:` with a trailing `:` — byte-for-byte the prefix the
+ * Host docs composition applies today (activation.ts:379-388 at the v0.10.2
+ * pin). Pure; an invalid scope refuses exactly like the scoped grammar
+ * itself (`K02_SCOPE_INVALID`).
+ */
+export function k02ScopePrefix(scope) {
+  const frozen = deploymentScopeIdentity(scope);
+  return [
+    K02_SCOPED_KEY_ROOT,
+    encodeK02KeyComponent(frozen.deployedAppId),
+    encodeK02KeyComponent(frozen.tenantId),
+    encodeK02KeyComponent(frozen.appId),
+    encodeK02KeyComponent(frozen.businessPackageId),
+  ].join(':') + ':';
+}
+
+/**
+ * [v0.10.2 T01k] The K-owned read-only Effect authority view: today's
+ * trusted-gate steps 2-5 re-read as a pure function of the durable docs.
+ * Its ONLY port is `get(key)` — the exact K document address the
+ * kernel-minted attest carries; the view never dispatches an adapter, never
+ * mutates a document and never marks an attest (the Host gate keeps the
+ * pre-handler-refusal authority and the external dispatch itself).
+ *
+ * Answers `{ ok: true, effectId, durableControlTurnId, attempt,
+ * awaitPolicy }` when the full durable authority chain holds (live and
+ * unexpired permit of this very turn/business/capability/operation; journal
+ * record `started`; admission fence held by this turn; matching dispatch
+ * claim), else `{ ok: false, code, message }` with today's code strings and
+ * message texts (V10_EFFECT_PERMIT_UNKNOWN / CONSUMED / SCOPE / EXPIRED /
+ * JOURNAL / FENCE, V10_EFFECT_DISPATCH_CLAIM_INVALID; a claim that carries
+ * no permit at all answers V10_EFFECT_PERMIT_REQUIRED like the gate's own
+ * first check).
+ */
+export async function readEffectAuthorityView(options) {
+  const refuse = (code, message) => ({ ok: false, code, message });
+  if (!isJsonRecord(options)) {
+    return refuse(
+      'V10_EFFECT_PERMIT_REQUIRED',
+      'readEffectAuthorityView requires { get, attest, capabilityKey, operationId, nowIso }',
+    );
+  }
+  const { get, attest, capabilityKey, operationId, nowIso } = options;
+  if (typeof get !== 'function') {
+    return refuse(
+      'V10_EFFECT_PERMIT_REQUIRED',
+      'readEffectAuthorityView reads the durable docs through its only port get(key); this call carries none',
+    );
+  }
+  // The kernel-minted claim shape (the gate's own first check, verbatim):
+  // the attest is the only channel that may even CLAIM a K-issued permit.
+  if (!isJsonRecord(attest) || !isJsonRecord(attest.effectPermit)
+    || typeof attest.effectPermit.effectId !== 'string' || attest.effectPermit.effectId.length === 0
+    || typeof attest.effectPermit.durableControlTurnId !== 'string' || attest.effectPermit.durableControlTurnId.length === 0
+    || typeof attest.effectPermit.businessPackageId !== 'string' || attest.effectPermit.businessPackageId.length === 0
+    || !isJsonRecord(attest.effectPermit.keys)) {
+    return refuse(
+      'V10_EFFECT_PERMIT_REQUIRED',
+      `external effect capability ${String(capabilityKey)} dispatches only under a live K-issued effect permit; this call carries none`,
+    );
+  }
+  const claim = attest.effectPermit;
+  const keys = { permit: '', journal: '', fence: '', dispatchClaim: '' };
+  for (const name of ['permit', 'journal', 'fence', 'dispatchClaim']) {
+    const value = claim.keys[name];
+    if (typeof value !== 'string' || value.length === 0) {
+      return refuse(
+        'V10_EFFECT_PERMIT_REQUIRED',
+        `the K-issued permit claim for ${claim.effectId} carries no ${name} document address; the gate refuses an address-less dispatch`,
+      );
+    }
+    keys[name] = value;
+  }
+
+  // (2) The durable permit document is the authority (a claim alone proves
+  // nothing): live, unexpired, this very turn/business, this capability+operation.
+  const permitDoc = await get(keys.permit);
+  if (permitDoc === null) {
+    return refuse(
+      'V10_EFFECT_PERMIT_UNKNOWN',
+      `no K-issued effect permit ${claim.effectId} exists at its kernel-issued address (business ${claim.businessPackageId})`,
+    );
+  }
+  const permit = isJsonRecord(permitDoc.value) ? permitDoc.value : null;
+  if (permit === null || permit.state !== 'live') {
+    return refuse(
+      'V10_EFFECT_PERMIT_CONSUMED',
+      `K-issued effect permit ${claim.effectId} is not live (state ${JSON.stringify(String(permit?.state))}); a settled or foreign permit never dispatches again`,
+    );
+  }
+  if (permit.durableControlTurnId !== claim.durableControlTurnId) {
+    return refuse(
+      'V10_EFFECT_PERMIT_SCOPE',
+      `K-issued effect permit ${claim.effectId} belongs to turn ${JSON.stringify(String(permit.durableControlTurnId))}, not ${claim.durableControlTurnId}`,
+    );
+  }
+  if (permit.businessPackageId !== claim.businessPackageId) {
+    return refuse(
+      'V10_EFFECT_PERMIT_SCOPE',
+      `K-issued effect permit ${claim.effectId} belongs to business ${JSON.stringify(String(permit.businessPackageId))}, not the dispatching ${claim.businessPackageId}`,
+    );
+  }
+  if (permit.capabilityKey !== capabilityKey) {
+    return refuse(
+      'V10_EFFECT_PERMIT_SCOPE',
+      `K-issued effect permit ${claim.effectId} authorizes capability ${JSON.stringify(String(permit.capabilityKey))}, not ${String(capabilityKey)}`,
+    );
+  }
+  const operations = Array.isArray(permit.operations) ? permit.operations : [];
+  if (!operations.includes(operationId)) {
+    return refuse(
+      'V10_EFFECT_PERMIT_SCOPE',
+      `K-issued effect permit ${claim.effectId} does not authorize operation ${String(operationId)}`,
+    );
+  }
+  if (typeof permit.expiresAt !== 'string' || nowIso > permit.expiresAt) {
+    return refuse(
+      'V10_EFFECT_PERMIT_EXPIRED',
+      `K-issued effect permit ${claim.effectId} expired at ${JSON.stringify(String(permit.expiresAt))} (now ${String(nowIso)}); expired live authority dispatches nothing`,
+    );
+  }
+
+  // (3) The journal cross-check: the effect this permit opens must be durably
+  // `started` right now — completed/failed/missing records never dispatch.
+  const journalDoc = await get(keys.journal);
+  const journalRecord = journalDoc !== null && isJsonRecord(journalDoc.value) && isJsonRecord(journalDoc.value.record)
+    ? journalDoc.value.record
+    : null;
+  if (journalRecord === null || journalRecord.effectId !== claim.effectId || journalRecord.status !== 'started') {
+    return refuse(
+      'V10_EFFECT_PERMIT_JOURNAL',
+      `effect journal record for ${claim.effectId} is not an in-flight started record (status ${JSON.stringify(String(journalRecord?.status))}); a replayed or foreign effect never dispatches`,
+    );
+  }
+
+  // (4) The admission-fence cross-check: the turn must still hold the
+  // instance's admission fence — the LIVE K admission authority itself.
+  const target = isJsonRecord(permit.target) ? permit.target : null;
+  if (target === null || typeof target.workflowId !== 'string' || typeof target.instanceKey !== 'string') {
+    return refuse(
+      'V10_EFFECT_PERMIT_SCOPE',
+      `K-issued effect permit ${claim.effectId} carries no scoped target identity`,
+    );
+  }
+  const fenceDoc = await get(keys.fence);
+  const fence = fenceDoc !== null && isJsonRecord(fenceDoc.value) ? fenceDoc.value : null;
+  if (fence === null || fence.turnId !== claim.durableControlTurnId) {
+    return refuse(
+      'V10_EFFECT_PERMIT_FENCE',
+      `the admission fence of ${target.workflowId}/${target.instanceKey} is not held by turn ${claim.durableControlTurnId}; no live admission authority, zero dispatch`,
+    );
+  }
+
+  // (5) The physical dispatch claim is the final durable link: a key riding
+  // the attest is only an address, not proof that K wrote a claim for THIS
+  // effect/turn/attempt.
+  const attempt = typeof permit.attempt === 'number' ? permit.attempt : 1;
+  const claimDoc = await get(keys.dispatchClaim);
+  const dispatchClaim = claimDoc !== null && isJsonRecord(claimDoc.value) ? claimDoc.value : null;
+  if (dispatchClaim === null
+    || dispatchClaim.effectId !== claim.effectId
+    || dispatchClaim.durableControlTurnId !== claim.durableControlTurnId
+    || dispatchClaim.businessPackageId !== claim.businessPackageId
+    || dispatchClaim.attempt !== attempt) {
+    return refuse(
+      'V10_EFFECT_DISPATCH_CLAIM_INVALID',
+      `no matching K dispatch claim exists for effect ${claim.effectId} attempt ${attempt}; zero external dispatch`,
+    );
+  }
+
+  // Every durable authority check held. The Host gate dispatches, normalizes
+  // the phase envelope and enforces this awaitPolicy; the view itself stops
+  // here and answers the read-only authority projection.
+  return {
+    ok: true,
+    effectId: claim.effectId,
+    durableControlTurnId: claim.durableControlTurnId,
+    attempt,
+    awaitPolicy: permit.awaitPolicy,
+  };
+}
+// T01K_ADDITIVE_PROTOCOL_EXPORTS_END

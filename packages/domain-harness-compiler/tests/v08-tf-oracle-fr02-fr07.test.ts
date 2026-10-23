@@ -133,7 +133,8 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // permit claim, additive effect-permit doc kind and counters);
 // FR02/FR07 semantics unchanged.
 // Exact selected Kernel re-pin after approved R01 K01 #1205; previous C01/K02 blob 1a6a1394a505f4727306208d588fcab841e72980.
-const V08_K_BLOB = '72a886ffca85fc90caea954ee9fb5b3df7b4fcfa';
+// Re-pinned after the v0.10.2 T01k (#1321) additive read-only protocol exports; previous blob 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa.
+const V08_K_BLOB = '68b77d4711a802bc6a3f6f5e73cbc58e769af32f';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
