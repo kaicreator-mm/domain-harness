@@ -26,6 +26,7 @@ function obj(value){
 }
 function get(o,key){const d=Object.getOwnPropertyDescriptor(o,key);return d?.value;}
 function str(x){if(typeof x!=='string'||!x||x.length>256||
+  // eslint-disable-next-line no-control-regex -- intentional C0 control-character rejection
   /[\u0000-\u001f]/.test(x)||/^(?:head|latest|\*)$/i.test(x))fail('EXP_ID_INVALID');return x;}
 function sha(x){if(typeof x!=='string'||!SHA.test(x))fail('EXP_SHA_INVALID');return x;}
 function arr(a,max=64){
