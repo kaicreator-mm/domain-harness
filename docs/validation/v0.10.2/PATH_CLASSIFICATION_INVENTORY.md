@@ -7,9 +7,9 @@
 
 | Item | Value |
 | --- | --- |
-| Worktree HEAD | `91eb3b9a84ed46671e92491515c0762808a3ae52` (branch `task/dh-t08a-1322-sonnet`) |
+| Base commit (pin) | `91eb3b9a84ed46671e92491515c0762808a3ae52` (`v0.10.2`; this task's branch `task/dh-t08a-1322-sonnet` adds only the four T08a documents) |
 | Relation to the L2 fact pin | L2/INV facts are pinned at `f49c2a5f9ad79809959d1c5b6f6d8542c8d06f44`; `git diff --stat f49c2a5f 91eb3b9a` lists 4 files, all documents (L2 design, L2 freeze, INV, INV scripts). Source and test paths are therefore identical to the INV pin. |
-| Tracked files classified | 3084 (`git ls-files`), matched by 92 ordered path groups; first match wins; no file is unmatched and no group is empty (checked by the generator). |
+| Tracked files classified | 3084 (`git ls-tree -r` of the pin; the four T08a documents added on top are not counted), matched by 92 ordered path groups; first match wins; no file is unmatched and no group is empty (checked by the generator). |
 | Generator | `C:\xDev\kAiCreator\_tmp\dh-t08a-1322-sonnet\gen-inventory.mjs` with group table `groups.mjs`; both are reproduced in `T08A_SCRIPTS.md`. |
 | Touch scan | Section 5 is a literal-substring scan of test/example/extension sources, not an AST import resolver; it is context for the test-tree rows, not a proof of reachability. |
 | Not run | No build, typecheck, test, pack or install. Classification of subtrees that INV did not measure is marked `NOT_VERIFIED` in the Notes column. |

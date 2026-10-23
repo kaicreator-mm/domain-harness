@@ -1,7 +1,7 @@
 # DomainHarness v0.10.2 - L2 negative-boundary matrix (T08a, #1301)
 
 **Status:** `T08A_DOC_DELIVERABLE / SOURCE_INSPECTED_PLUS_STATIC_SCRIPT / NO_BUILD / NO_TESTS_RUN`. The single collection of every negative constraint of the Product freeze and the frozen L2 design, each mapped to the test that would catch a violation. L2 §13 marks the #1301 matrix row "covered, scattered - T08a must collect it into one matrix document"; this is that document. It adds no constraint and relaxes none.
-**Parent:** [#1300](https://github.com/kaicreator-mm/domain-harness/issues/1300); scope [#1301](https://github.com/kaicreator-mm/domain-harness/issues/1301). Worktree HEAD `91eb3b9a84ed46671e92491515c0762808a3ae52`. **CV-01..12: INHERITED_UNCHANGED.** `INV` = `docs/validation/v0.10.2/L2_SOURCE_INVENTORY.md`; `L2` = `docs/architecture/DomainHarness_v0.10.2_L2_DESIGN_CANDIDATE.md` (blob `68e7dbc591f4c0c694818ec574b8585f95239c8b`).
+**Parent:** [#1300](https://github.com/kaicreator-mm/domain-harness/issues/1300); scope [#1301](https://github.com/kaicreator-mm/domain-harness/issues/1301). Base commit (pin) `91eb3b9a84ed46671e92491515c0762808a3ae52`. **CV-01..12: INHERITED_UNCHANGED.** `INV` = `docs/validation/v0.10.2/L2_SOURCE_INVENTORY.md`; `L2` = `docs/architecture/DomainHarness_v0.10.2_L2_DESIGN_CANDIDATE.md` (blob `68e7dbc591f4c0c694818ec574b8585f95239c8b`).
 
 ## 0. Method and vocabulary
 

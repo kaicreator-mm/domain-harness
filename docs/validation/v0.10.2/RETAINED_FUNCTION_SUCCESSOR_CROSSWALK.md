@@ -7,7 +7,7 @@
 
 | Item | Value |
 | --- | --- |
-| Worktree HEAD | `91eb3b9a84ed46671e92491515c0762808a3ae52` (source identical to the INV pin `f49c2a5f`; the delta is 4 documents) |
+| Base commit (pin) | `91eb3b9a84ed46671e92491515c0762808a3ae52` (source identical to the INV pin `f49c2a5f`; the delta is 4 documents) |
 | Historical inputs (unchanged, blobs verified with `git hash-object`) | v0.8 retained manifest `docs/implementation/DomainHarness_v0.8_RETAINED_FUNCTION_MANIFEST.json` `a9954b82eab6e57e9ac1af1bf7b7d5b268d61c49`; v0.10 historical crosswalk `docs/roadmap/DomainHarness_v0.10_HISTORICAL_CAPABILITY_CROSSWALK.md` `2832ce0b4269737d934b071a6c2e830deefec629`; T01 audit `docs/validation/v0.10/T01_SELECTED_V9_44_SOURCE_AUDIT.md` `23e7c8a7f23fed42d2846f57e4554bfde18f21ca`; closure ledger `docs/validation/v0.10/T01_CLOSURE_LEDGER.md` `d9051735a5cc837f3af74c9f59998fd0e0c4c5a1` (examined `main@53bef033`) |
 | Historical counts | IMPLEMENTED=3, PARTIAL=34, NOT_REQUIRED=5, PRODUCT_DISPOSITION_PENDING=2, DEFERRED=0 (44 rows). **Quoted, not rewritten.** The generator asserts that the "Historic ledger state" column reproduces exactly 3/34/5/2. These are source-audit states of the older snapshot, not current completion percentages and not an order to rebuild 34 functions. |
 | Method | Each row's evidence is the closure ledger's row re-checked against the current tree: every test file exists at the pin and contains the quoted test-name token (checked by the generator), every "absent" claim was grep-checked over the selected test scope. Test **bodies were not re-read**: the mapping is by test title and by the ledger's description of the assertions. |

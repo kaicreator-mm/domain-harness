@@ -22,8 +22,9 @@ export const ROOT = 'C:/xDev/kAiCreator/domain-harness/dh-t08a-1322-sonnet';
 export const OUT = ROOT + '/docs/validation/v0.10.2';
 export const TASKDIR = 'C:/xDev/kAiCreator/_tmp/dh-t08a-1322-sonnet';
 
+export const PIN = '91eb3b9a84ed46671e92491515c0762808a3ae52';
 export function gitFiles() {
-  return execFileSync('git', ['-C', ROOT, 'ls-files', '-z'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  return execFileSync('git', ['-C', ROOT, 'ls-tree', '-r', '--name-only', '-z', PIN], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
     .split('\0').filter(Boolean);
 }
 export const exists = (rel) => { try { return fs.statSync(path.join(ROOT, rel)).isFile(); } catch { return false; } };
@@ -179,15 +180,15 @@ Generates `PATH_CLASSIFICATION_INVENTORY.md`: matches every tracked file to exac
 <details><summary>source</summary>
 
 ```js
-// Generates docs/validation/v0.10.2/PATH_CLASSIFICATION_INVENTORY.md from `git ls-files` and groups.mjs.
+// Generates docs/validation/v0.10.2/PATH_CLASSIFICATION_INVENTORY.md from the pin tree and groups.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ROOT, OUT, gitFiles, table, read } from './lib.mjs';
+import { PIN, ROOT, OUT, gitFiles, table, read } from './lib.mjs';
 import { GROUPS, matches } from './groups.mjs';
 
 const files = gitFiles();
-const head = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const head = PIN;
 const byGroup = new Map(GROUPS.map((g) => [g.id, []]));
 const orphans = [];
 for (const f of files) {
@@ -295,9 +296,9 @@ md.push(`# DomainHarness v0.10.2 - Per-path classification inventory (T08a, #130
 
 | Item | Value |
 | --- | --- |
-| Worktree HEAD | \`${head}\` (branch \`task/dh-t08a-1322-sonnet\`) |
+| Base commit (pin) | \`${head}\` (\`v0.10.2\`; this task's branch \`task/dh-t08a-1322-sonnet\` adds only the four T08a documents) |
 | Relation to the L2 fact pin | L2/INV facts are pinned at \`f49c2a5f9ad79809959d1c5b6f6d8542c8d06f44\`; \`git diff --stat f49c2a5f 91eb3b9a\` lists 4 files, all documents (L2 design, L2 freeze, INV, INV scripts). Source and test paths are therefore identical to the INV pin. |
-| Tracked files classified | ${total} (\`git ls-files\`), matched by ${GROUPS.length} ordered path groups; first match wins; no file is unmatched and no group is empty (checked by the generator). |
+| Tracked files classified | ${total} (\`git ls-tree -r\` of the pin; the four T08a documents added on top are not counted), matched by ${GROUPS.length} ordered path groups; first match wins; no file is unmatched and no group is empty (checked by the generator). |
 | Generator | \`C:\\xDev\\kAiCreator\\_tmp\\dh-t08a-1322-sonnet\\gen-inventory.mjs\` with group table \`groups.mjs\`; both are reproduced in \`T08A_SCRIPTS.md\`. |
 | Touch scan | Section 5 is a literal-substring scan of test/example/extension sources, not an AST import resolver; it is context for the test-tree rows, not a proof of reachability. |
 | Not run | No build, typecheck, test, pack or install. Classification of subtrees that INV did not measure is marked \`NOT_VERIFIED\` in the Notes column. |
