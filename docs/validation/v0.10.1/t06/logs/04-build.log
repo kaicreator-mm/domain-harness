@@ -1,0 +1,45 @@
+
+> domain-harness-monorepo@0.2.0 build
+> npm run build --workspaces --if-present && node scripts/check-committed-dist.mjs
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-compiler@0.2.0 prebuild
+> npm run build -w @kaicreator/domain-harness
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-compiler@0.2.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kaicreator/domain-harness-expo@0.2.0 prebuild
+> npm run build -w @kaicreator/domain-harness
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-expo@0.2.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kaicreator/domain-harness-node@0.2.0 prebuild
+> npm run build -w @kaicreator/domain-harness
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-node@0.2.0 build
+> tsc -p tsconfig.build.json
+
+check-committed-dist: shipped dist trees present, tracked and fresh

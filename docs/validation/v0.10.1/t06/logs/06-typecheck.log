@@ -1,0 +1,44 @@
+
+> domain-harness-monorepo@0.2.0 typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @kaicreator/domain-harness@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @kaicreator/domain-harness-compiler@0.2.0 pretypecheck
+> npm run build -w @kaicreator/domain-harness
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-compiler@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @kaicreator/domain-harness-expo@0.2.0 pretypecheck
+> npm run build -w @kaicreator/domain-harness
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-expo@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit && tsc -p tests/store/tsconfig.json
+
+
+> @kaicreator/domain-harness-node@0.2.0 pretypecheck
+> npm run build -w @kaicreator/domain-harness
+
+
+> @kaicreator/domain-harness@0.2.0 build
+> tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs
+
+
+> @kaicreator/domain-harness-node@0.2.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
