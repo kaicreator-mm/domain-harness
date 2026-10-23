@@ -35,6 +35,7 @@ function field(o,k) {
 }
 function id(v) {
   if (typeof v!=='string' || v.length<1 || v.length>256 ||
+    // eslint-disable-next-line no-control-regex -- intentional C0 control-character rejection
     /[\u0000-\u001f]/.test(v) || /^(?:head|latest|\*)$/i.test(v)) err('EVAL_ID_INVALID');
   return v;
 }
