@@ -42,16 +42,15 @@ export const T10_HOST_PRINCIPAL = Object.freeze({
   tenantId: T10_DEPLOYMENT.tenantId,
 });
 
-const payloadDir = new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-const routerUrl = new URL('../../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url);
+const routerUrl = new URL('../../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url);
 const approvalUrl = new URL('../../../examples/v08-domain-apps/business-approval.mjs', import.meta.url);
 const capabilityUrl = new URL('../../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url);
 
 /** BUILD the selected two-B App over the REAL payload/example bytes. */
 export async function buildT10TwoBApp(): Promise<V10BuiltApp> {
   const [kernel, sdk, router, approval, capability] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(routerUrl, 'utf8'),
     readFile(approvalUrl, 'utf8'),
     readFile(capabilityUrl, 'utf8'),

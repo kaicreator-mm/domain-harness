@@ -48,7 +48,7 @@ import {
 } from '../../src/host-v8/v010-authorized-multib-query.js';
 
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8');
+const KERNEL_SOURCE = await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8');
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
 // Same read-only pin as the K02 physical suite. Rebound after C01 (#1177)
 // legitimately advanced the selected kernel payload with the external-effect

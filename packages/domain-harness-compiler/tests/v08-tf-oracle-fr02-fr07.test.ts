@@ -53,8 +53,8 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import * as kernel from '../src/qualified-package/payload/kernel-mechanism-v1.mjs';
-import * as sdk from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+import * as kernel from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
+import * as sdk from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 
 // Historical WEB-ORACLE-1 source-prep pins (kept verbatim as the record).
 const V08_BASE = '557e8ba53f90309c9d370d32b77d2dff070b8a5b';
@@ -294,11 +294,11 @@ test('WEB-ORACLE-1 META: the rebind is bound to the exact physically selected v0
   assert.equal(V08_K_BLOB_SOURCE_PREP, 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555');
   assert.equal(V08_REBIND_BASE, '8d7ef905275d4b270ff76206db935cbd6fc70fe0');
   assert.equal(
-    await gitBlobSha(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)),
+    await gitBlobSha(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url)),
     V08_S_BLOB,
   );
   assert.equal(
-    await gitBlobSha(new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url)),
+    await gitBlobSha(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url)),
     V08_K_BLOB,
   );
   assert.equal(sdk.MODULE_ID, 'standard-sdk@v08.1.0.0');

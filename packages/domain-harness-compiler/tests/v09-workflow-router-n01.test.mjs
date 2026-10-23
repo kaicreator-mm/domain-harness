@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { routeWorkflowIntent, WorkflowRouterError, WORKFLOW_ROUTER_RESULT_KINDS } from '../src/qualified-package/v09/workflow-router.mjs';
+import { routeWorkflowIntent, WorkflowRouterError, WORKFLOW_ROUTER_RESULT_KINDS } from '../../../domain-packages/standard/basic/workflow-router.mjs';
 
 const DIGEST = `sha256:${'a'.repeat(64)}`;
 const binding = (intentId, operationId, capabilityId = 'cap:notify', handlerId = 'notifyHandler') =>

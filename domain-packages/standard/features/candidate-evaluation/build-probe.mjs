@@ -1,5 +1,5 @@
 /**
- * v0.10.1 C04 actual v10build selected-closure probe.
+ * v0.10.1 C02 actual v10build selected-closure probe.
  * Uses Rich v2's K/S/B/C graph plus one optional selected Feature.
  * This is BUILD selection, NOT Host physical install or Effect execution.
  */
@@ -9,21 +9,21 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { V10_TARGET_PROFILE, buildV10App, sha256Hex } from '@kaicreator/domain-harness-compiler/v10build';
 import { definitionV2 } from '../../../../examples/v010-clean-consumer/apps/rich/app-definition.mjs';
-import { boundedExperimentFeature } from './feature-manifest.mjs';
+import { candidateEvaluationFeature } from './feature-manifest.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RICH = join(HERE, '../../../../examples/v010-clean-consumer/apps/rich');
 const PAYLOAD = Object.freeze({
-  kernel:'@kaicreator/domain-harness-compiler/v10payload/kernel-mechanism',
-  sdk:'@kaicreator/domain-harness-compiler/v10payload/standard-sdk',
-  router:'@kaicreator/domain-harness-compiler/v10payload/workflow-router',
-  'sfeature-semantic-decision':'@kaicreator/domain-harness-compiler/v10payload/sfeature-semantic-decision',
-  'sfeature-workflow-control':'@kaicreator/domain-harness-compiler/v10payload/sfeature-workflow-control',
-  'sfeature-context-assembly':'@kaicreator/domain-harness-compiler/v10payload/sfeature-context-assembly',
-  'sfeature-decision-evidence':'@kaicreator/domain-harness-compiler/v10payload/sfeature-decision-evidence',
+  kernel:new URL('../../../kernel/basic/kernel-mechanism-v1.mjs', import.meta.url),
+  sdk:new URL('../../basic/standard-sdk-v1.mjs', import.meta.url),
+  router:new URL('../../basic/workflow-router.mjs', import.meta.url),
+  'sfeature-semantic-decision':new URL('../semantic-decision/modules/sfeature-semantic-decision-v1.mjs', import.meta.url),
+  'sfeature-workflow-control':new URL('../workflow-control/modules/sfeature-workflow-control-v1.mjs', import.meta.url),
+  'sfeature-context-assembly':new URL('../context-assembly/modules/sfeature-context-assembly-v1.mjs', import.meta.url),
+  'sfeature-decision-evidence':new URL('../decision-evidence/modules/sfeature-decision-evidence-v1.mjs', import.meta.url),
 });
 function readPayload(name) {
-  return readFileSync(fileURLToPath(import.meta.resolve(PAYLOAD[name])), 'utf8');
+  return readFileSync(fileURLToPath(PAYLOAD[name]), 'utf8');
 }
 const payloads = {kernel:readPayload('kernel')};
 const sdk = readPayload('sdk');
@@ -44,7 +44,7 @@ function input(entry) {
   const bytes = entry.role === 'kernel-primary' ? payloads.kernel
     : entry.role === 'standard-primary' ? payloads.standard
       : entry.payload !== undefined ? payloads[entry.payload]
-        : readFileSync(entry === boundedExperimentFeature
+        : readFileSync(entry === candidateEvaluationFeature
           ? join(HERE, entry.file) : join(RICH, 'modules', entry.file), 'utf8');
   const value = {
     packageId: entry.packageId, role: entry.role, abiVersion: entry.abiVersion,
@@ -56,19 +56,19 @@ function input(entry) {
   if (entry.handlers !== undefined) value.handlers = entry.handlers.map(x => ({...x}));
   return value;
 }
-const selected = [...definitionV2.modules, boundedExperimentFeature].map(input);
+const selected = [...definitionV2.modules, candidateEvaluationFeature].map(input);
 const buildInput = {
-  appId:'app:v0101-bounded-experiment-probe',
+  appId:'app:v0101-candidate-evaluation-probe',
   audience:definitionV2.audience,
   targetProfile:V10_TARGET_PROFILE,
   modules:selected,
   routes:definitionV2.routes.map(x => ({...x})),
   hardBudget:{...definitionV2.hardBudget},
-  buildId:'v0101-bounded-experiment-probe',
+  buildId:'v0101-candidate-evaluation-probe',
 };
 const built = buildV10App(buildInput);
-assert(built.modules.some(x => x.packageId === boundedExperimentFeature.packageId));
-assert.equal(built.modules.filter(x => x.provides.includes('standard:bounded-experiment/1')).length, 1);
+assert(built.modules.some(x => x.packageId === candidateEvaluationFeature.packageId));
+assert.equal(built.modules.filter(x => x.provides.includes('standard:candidate-evaluation/1')).length, 1);
 assert.throws(() => buildV10App({
   ...buildInput,
   modules:[...selected, {...selected.at(-1),packageId:'sfeature-diagnostic-duplicate@v0101.0.0'}],
@@ -97,6 +97,6 @@ assert.throws(() => buildV10App({...buildInput,modules:[
   'forbidden side-effect import must fail before module evaluation');
 console.log(JSON.stringify({
   status:'BUILD_SELECTED_ONLY', subjectDigest:built.subjectDigest,
-  selectedFeature:boundedExperimentFeature.packageId, totalModules:built.modules.length,
+  selectedFeature:candidateEvaluationFeature.packageId, totalModules:built.modules.length,
   physicalInstall:'NOT_RUN',
 }));

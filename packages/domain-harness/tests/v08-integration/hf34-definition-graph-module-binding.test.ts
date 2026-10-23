@@ -90,7 +90,6 @@ import {
 } from '../../src/host-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const examplesDir = new URL('../../../../examples/v08-domain-apps/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-hf34';
@@ -288,8 +287,8 @@ let shared: SharedContext;
 before(async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dh1006-hf34-'));
   const [kernel, sdk, business, capability] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-approval.mjs', examplesDir), 'utf8'),
     readFile(new URL('capability-quote-tools.mjs', examplesDir), 'utf8'),
   ]);

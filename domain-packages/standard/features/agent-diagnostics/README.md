@@ -9,7 +9,7 @@ Source studies: 2025 MAST/ABC and 2026 AutoSaddler/AgentLens/AgentForesight. Dom
 ## Local source conformance
 
 \`\`\`sh
-node --test extensions/agent-improvement/packages/agent-diagnostics/tests/agent-diagnostics.test.mjs
+node --test domain-packages/standard/features/agent-diagnostics/tests/agent-diagnostics.test.mjs
 \`\`\`
 
 Full acceptance remains: isolated Node24 \`npm ci && npm run build\`, selected v10 BUILD, packed clean App install and invocation of this feature via selected S primary (the read-only named-feature path), real runner verification (including #1267 revision where state-affecting decisions are integrated), same-module dependency/duplicate-provider negative tests, and independent exact-SHA review.
@@ -22,4 +22,4 @@ Full acceptance remains: isolated Node24 \`npm ci && npm run build\`, selected v
 - Physical Tool effects and source currentness are the consuming App/Kernel/Host's responsibility; missing information remains visible.
 
 
-Producer layout: canonical standalone source package under `extensions/agent-improvement/packages/agent-diagnostics`; installed `npm pack` / real Node24 App BUILD still NOT_RUN. Example prototype path retired; do not import it.
+Producer layout: canonical standalone source package under `domain-packages/standard/features/agent-diagnostics`; installed `npm pack` / real Node24 App BUILD still NOT_RUN. Example prototype path retired; do not import it.

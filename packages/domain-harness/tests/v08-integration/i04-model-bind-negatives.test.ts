@@ -70,15 +70,14 @@ test('F-03 negatives: failed port invocation and stale bind both refuse, zero ac
 
     // ---- Leg 2: STALE bind refuses at load, typed (same bootstrap; the
     // bind validates the resolver shape without invoking the port).
-    const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
     // @ts-expect-error fixture module has no declaration file (negative-only .mjs)
     const stubSdk = await import('./fixtures/sdk-stale-bind.mjs');
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
-    const kernelMeta = await import('../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs');
+    const kernelMeta = await import('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs');
     // @ts-expect-error fixture module has no declaration file (byte-pinned .mjs)
     const businessModule = await import('./fixtures/business-model-port.mjs');
     const sources = await Promise.all([
-      readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
+      readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
       readFile(new URL('./fixtures/sdk-stale-bind.mjs', import.meta.url), 'utf8'),
       readFile(new URL('./fixtures/business-model-port.mjs', import.meta.url), 'utf8'),
     ]);

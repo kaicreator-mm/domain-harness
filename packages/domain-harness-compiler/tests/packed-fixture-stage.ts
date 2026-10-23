@@ -300,9 +300,10 @@ function tscBuildToStage(buildConfigPath: string, stageDistDirectory: string): v
 /**
  * Copy the pack-relevant skeleton of one package into its stage root. The
  * shipped `files` entries are the declared package pack inventory.
- * The compiler also carries a physically selected Standard SDK module
- * source in src/qualified-package/payload/*.mjs; stageOnce copies those
- * bytes separately so P2-01 sees byte-identical live and staged packs.
+ * The compiler also carries a physically selected module source in
+ * src/qualified-package/payload/*.mjs (the durable receipt carrier after the
+ * v0.10.2 T01 move); stageOnce copies those bytes separately so P2-01 sees
+ * byte-identical live and staged packs.
  * No prepack/postpack scripts or a LICENSE are used in these fixtures.
  */
 function stagePackageSkeleton(packageRoot: string, stageRoot: string, readme: boolean): void {
@@ -373,7 +374,7 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
     // The compiler dist ships committed from git (#299) and no test rebuilds
     // it: stage a read-only copy of the live tree.
     cpSync(join(PACKAGE_ROOT, 'dist'), join(root, 'compiler', 'dist'), { recursive: true });
-    // V08-TD: the compiler now ships a sealed Standard SDK source module
+    // V08-TD: the compiler ships sealed payload source modules
     // alongside dist. Copy the exact physical payload bytes into the private
     // immutable staged package as well, otherwise the live-vs-stage P2-01
     // equivalence guard correctly detects a PR-introduced live-only file.
@@ -383,13 +384,10 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
     const stagePayload = join(root, 'compiler', 'src', 'qualified-package', 'payload');
     mkdirSync(dirname(stagePayload), { recursive: true });
     cpSync(livePayload, stagePayload, { recursive: true });
-    // The compiler `files` inventory also declares the selected Standard SDK
-    // WorkflowRouter source module. Stage the exact declared bytes; a missing
-    // source must fail closed here rather than leaving a live-only file.
-    const liveWorkflowRouter = join(PACKAGE_ROOT, 'src', 'qualified-package', 'v09', 'workflow-router.mjs');
-    const stageWorkflowRouter = join(root, 'compiler', 'src', 'qualified-package', 'v09', 'workflow-router.mjs');
-    mkdirSync(dirname(stageWorkflowRouter), { recursive: true });
-    cpSync(liveWorkflowRouter, stageWorkflowRouter);
+    // v0.10.2 T01: the selected K/S/feature/router payload sources moved to
+    // non-workspace Domain Packages (domain-packages/**), so the compiler no
+    // longer ships a WorkflowRouter source module; only the live payload dir
+    // (now the durable receipt carrier) is staged above.
 
     const coreTarball = packStage(join(root, 'core'), packsDirectory, 'domain-harness-0.2.0', 1);
     const compilerTarball = packStage(join(root, 'compiler'), packsDirectory, 'compiler', 1);

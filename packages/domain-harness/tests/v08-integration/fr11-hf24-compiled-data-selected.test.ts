@@ -73,7 +73,6 @@ import { canonicalJsonStringify } from '../../src/contracts/identity.js';
 import { DOMAIN_HARNESS_JSON_SCHEMA_V1 } from '../../src/schema/domainharness-json-schema-v1.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sqliteTempPath } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 const COMPILED_DATA_ANCHOR = '/* @compiledPackageData */ null';
 
@@ -217,8 +216,8 @@ function compileWitness(): {
 /** Seal the K/S/B(fixture) closure through the REAL BUILD path. */
 async function sealCompiledClosure(compoundJson: string): Promise<SealedQualifiedPackageRoot> {
   const [kernelSource, sdkSource, businessTemplate] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-compiled-data.mjs', fixtureDir), 'utf8'),
   ]);
   assert.ok(businessTemplate.includes(COMPILED_DATA_ANCHOR), 'fixture compiled-data anchor drifted');

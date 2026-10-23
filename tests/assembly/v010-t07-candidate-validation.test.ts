@@ -22,7 +22,7 @@ const hasCode=(code:string)=>(err:unknown)=>!!err&&typeof err==='object'&&(err a
 type Report={kind:string;status:string;differingCaseIds:string[];matchingCaseIds:string[];evidenceAuthority:string;productionWritesVerifiedZero:boolean;canSelfApprove:boolean;canPromote:boolean;kernelEffectPermit:boolean};
 let loader: Promise<{source:string,validate:(req:unknown)=>Report}>|undefined;
 const load=()=>loader??=(async()=>{const source=await readFile(new URL(
-  '../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-candidate-validation-v1.mjs',
+  '../../domain-packages/standard/features/candidate-validation/modules/sfeature-candidate-validation-v1.mjs',
   import.meta.url),'utf8');
   const module=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
   return {source,validate:module.validateCandidateReport as (req:unknown)=>Report};})();

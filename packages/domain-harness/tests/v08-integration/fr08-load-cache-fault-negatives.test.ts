@@ -41,7 +41,6 @@ import type { SealedQualifiedPackageRoot } from '../../src/public-v8/index.js';
 import type { SqliteCasStore } from '../../src/host-v8/sqlite-cas-store.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, assertFixtureBytes, mintCredential, sealRealApp, sqliteTempPath } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-fr08-gap';
@@ -78,7 +77,7 @@ test.after(async () => {
  */
 async function sealNoDecisionSourceSdkClosure(): Promise<SealedQualifiedPackageRoot> {
   const [kernelSource, stubSdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('sdk-no-decision-source.mjs', fixtureDir), 'utf8'),
     readFile(new URL('business-decision-source.mjs', fixtureDir), 'utf8'),
   ]);

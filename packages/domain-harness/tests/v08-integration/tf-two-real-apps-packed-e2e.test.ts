@@ -85,7 +85,6 @@ function runNpm(args: readonly string[], cwd: string): string {
 const packageRoot = fileURLToPath(new URL('../..', import.meta.url));
 const nodePackageRoot = fileURLToPath(new URL('../../../domain-harness-node', import.meta.url));
 const examplesDir = fileURLToPath(new URL('../../../../examples/v08-domain-apps/', import.meta.url));
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 
 function sha256Hex(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -104,8 +103,8 @@ async function sealOriginalApp(kind: 'approval' | 'engineering'): Promise<{
 }> {
   // The ORIGINAL app bytes — the examples source, not a test fixture.
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(join(examplesDir, `business-${kind}.mjs`), 'utf8'),
   ]);
   // The business module namespace (identity/endpoints/intents) comes from
@@ -171,7 +170,7 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
   const [d2, d3] = await Promise.all([sealOriginalApp('approval'), sealOriginalApp('engineering')]);
   assert.equal(d2.kernelSha, d3.kernelSha, 'both apps are sealed over the exact same selected Kernel bytes');
   assert.equal(d2.sdkSha, d3.sdkSha, 'both apps are sealed over the exact same selected Standard SDK bytes');
-  assert.equal(d2.kernelSha, sha256Hex(await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8')));
+  assert.equal(d2.kernelSha, sha256Hex(await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8')));
   assert.notEqual(d2.businessSha, d3.businessSha, 'the two Business packages remain genuinely distinct');
 
   // ---- Pack + clean-consumer install (stock Node, no workspace links). ----

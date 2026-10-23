@@ -51,8 +51,7 @@ import { openSqliteCasStore, type CasPutConditions, type SqliteCasStore } from '
 // ---------------------------------------------------------------------------
 // The REAL spliced selected kernel, imported by exact current bytes.
 // ---------------------------------------------------------------------------
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8');
+const KERNEL_SOURCE = await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8');
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
 // The POST-SPLICE integrated kernel blob (recorded at the K02 phase-2 splice
 // on top of K01 R2 36f068e3). Any further kernel drift fails this import.
@@ -623,7 +622,7 @@ test('CB-R1 two live processes sharing a canonical turn preserve the holder fenc
 // repair it threw K02_SCOPE_INVALID on every scoped deployment).
 // ---------------------------------------------------------------------------
 test('CB-Q1 the continuation query reads the SCOPED instance document; a same-address LEGACY document on the same store is unreachable', { timeout: 120_000 }, async () => {
-  const SDK_SOURCE = await readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8');
+  const SDK_SOURCE = await readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8');
   const sdk: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(SDK_SOURCE, 'utf8').toString('base64')}`);
   const q1Dir = await mkdtemp(path.join(tmpdir(), 'dh-k02-cbq1-'));
   const q1Store = await openSqliteCasStore({ path: path.join(q1Dir, 'cbq1.sqlite') });

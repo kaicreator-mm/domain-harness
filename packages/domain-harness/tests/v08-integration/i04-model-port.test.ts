@@ -17,7 +17,7 @@ import { currentHostModelPort, installHostModelPort } from '../../src/public-v8/
 // The selected Standard-SDK payload is a plain self-contained ESM module
 // without a declaration file; its semantics are pinned by T-D tests.
 // @ts-expect-error selected standard-sdk payload has no declaration file (.mjs)
-import { createHostBoundModelResolver, interpret as plainInterpret } from '../../../domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs';
+import { createHostBoundModelResolver, interpret as plainInterpret } from '../../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sealRealApp, sqliteTempPath } from './helpers.js';
 
 const AUDIENCE = 'dh-v08-integration-host';

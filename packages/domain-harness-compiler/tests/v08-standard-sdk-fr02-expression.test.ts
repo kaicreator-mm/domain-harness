@@ -27,7 +27,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
   MODULE_ID, ABI_VERSION, ENDPOINTS, StandardSdkError, interpret,
-} from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+} from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 import { qualifyPackageClosure } from '../src/qualified-package/qualify.js';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
@@ -119,7 +119,7 @@ test('V08-FR02-P4 retained v0.7 outputSchema validation applies to the expressio
 
 test('V08-FR02-P5 the extended payload module still passes sealed BUILD closure qualification', async () => {
   const source = await readFile(
-    fileURLToPath(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)),
+    fileURLToPath(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url)),
     'utf8',
   );
   const business = [

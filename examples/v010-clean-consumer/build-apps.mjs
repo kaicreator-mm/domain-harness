@@ -3,8 +3,9 @@
  *
  * Runs INSIDE an isolated builder directory that has only the packed
  * `@kaicreator/domain-harness` and `@kaicreator/domain-harness-compiler`
- * tarballs installed — no repository source path is imported. For each App it
- * reads the selected payload bytes from the INSTALLED compiler package, the
+ * tarballs plus the packed Domain Package tarballs (`@kaicreator/domain-kernel-basic`,
+ * `-standard-basic`, `-feature-*`) installed — no repository source path is imported.
+ * For each App it reads the selected payload bytes from the INSTALLED Domain Packages, the
  * App-owned Business/Capability/K-extension/S-feature bytes from its own
  * `modules/` directory, calls the once-only static BUILD, and writes a
  * self-contained installable App directory:
@@ -39,13 +40,13 @@ const outRoot = resolve(flagValue('--out', join(HERE, 'out')));
 const sourceSha = flagValue('--source-sha', 'UNRECORDED');
 
 const PAYLOAD_SPECIFIERS = Object.freeze({
-  kernel: '@kaicreator/domain-harness-compiler/v10payload/kernel-mechanism',
-  sdk: '@kaicreator/domain-harness-compiler/v10payload/standard-sdk',
-  router: '@kaicreator/domain-harness-compiler/v10payload/workflow-router',
-  'sfeature-semantic-decision': '@kaicreator/domain-harness-compiler/v10payload/sfeature-semantic-decision',
-  'sfeature-workflow-control': '@kaicreator/domain-harness-compiler/v10payload/sfeature-workflow-control',
-  'sfeature-context-assembly': '@kaicreator/domain-harness-compiler/v10payload/sfeature-context-assembly',
-  'sfeature-decision-evidence': '@kaicreator/domain-harness-compiler/v10payload/sfeature-decision-evidence',
+  kernel: '@kaicreator/domain-kernel-basic',
+  sdk: '@kaicreator/domain-standard-basic',
+  router: '@kaicreator/domain-standard-basic/workflow-router',
+  'sfeature-semantic-decision': '@kaicreator/domain-feature-semantic-decision',
+  'sfeature-workflow-control': '@kaicreator/domain-feature-workflow-control',
+  'sfeature-context-assembly': '@kaicreator/domain-feature-context-assembly',
+  'sfeature-decision-evidence': '@kaicreator/domain-feature-decision-evidence',
 });
 
 function readPayload(name) {

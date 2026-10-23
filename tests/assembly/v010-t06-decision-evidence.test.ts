@@ -12,7 +12,7 @@ type EvidenceRecorder = (request: Record<string, unknown>, deps?: Record<string,
 let evidenceFeature: Promise<{ source: string; record: EvidenceRecorder }> | undefined;
 const loadFeature = () => evidenceFeature ??= (async () => {
   const source = await readFile(new URL(
-    '../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-decision-evidence-v1.mjs',
+    '../../domain-packages/standard/features/decision-evidence/modules/sfeature-decision-evidence-v1.mjs',
     import.meta.url,
   ), 'utf8');
   const feature = await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64')) as {
@@ -193,7 +193,7 @@ const limits = { maxSteps: 8, maxModelCalls: 1, maxToolCalls: 1 };
 let semanticSourcePromise: Promise<string> | undefined;
 const loadSemanticSource = (): Promise<string> =>
   (semanticSourcePromise ??= readFile(new URL(
-    '../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-semantic-decision-v1.mjs',
+    '../../domain-packages/standard/features/semantic-decision/modules/sfeature-semantic-decision-v1.mjs',
     import.meta.url,
   ), 'utf8'));
 
@@ -214,9 +214,9 @@ async function selectedFeatureEntries(): Promise<readonly V10ModuleInput[]> {
 /** T04-style manual composition whose Business restricts its intent to `approver`. */
 async function restrictedComposition(): Promise<ReturnType<typeof buildV10App>> {
   const [kernel, sdk, router, business, capability] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/business-restricted-approval-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url), 'utf8'),
   ]);

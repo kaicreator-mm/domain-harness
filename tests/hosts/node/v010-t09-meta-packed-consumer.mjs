@@ -30,8 +30,10 @@ const NOW = Date.UTC(2026, 9, 20, 4, 0, 0);
 const INSTANCE = 'instance:packed';
 const SCHEDULE = 'schedule:packed';
 
+// v0.10.2 T01: payloads are Domain Package bytes (domain-packages/**, examples/v010-meta-feedback)
+// that the test copies, unchanged, next to this script; the compiler package no longer ships them.
 function payloadPath(name) {
-  return fileURLToPath(import.meta.resolve(`@kaicreator/domain-harness-compiler/payload/${name}`));
+  return fileURLToPath(new URL(`./payload/${name}.mjs`, import.meta.url));
 }
 
 const kernel = readFileSync(payloadPath('kernel-mechanism-v1'), 'utf8');

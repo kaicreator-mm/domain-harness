@@ -17,7 +17,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 function readPayload(name: string): string {
-  return readFileSync(fileURLToPath(new URL(`../src/qualified-package/payload/${name}`, import.meta.url)), 'utf8');
+  const dir = name === 'kernel-mechanism-v1.mjs' ? 'kernel/basic' : 'standard/basic';
+  return readFileSync(fileURLToPath(new URL(`../../../domain-packages/${dir}/${name}`, import.meta.url)), 'utf8');
 }
 
 function sha256Hex(value: string): string {

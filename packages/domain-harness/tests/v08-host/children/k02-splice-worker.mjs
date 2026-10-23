@@ -30,7 +30,7 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { openSqliteCasStore } from '@kaicreator/domain-harness/v8/host';
 
 const KERNEL_URL = new URL(
-  '../../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs',
+  '../../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
   import.meta.url,
 );
 const KERNEL_SOURCE = await readFile(KERNEL_URL, 'utf8');

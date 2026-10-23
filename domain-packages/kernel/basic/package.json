@@ -1,0 +1,17 @@
+{
+  "name": "@kaicreator/domain-kernel-basic",
+  "version": "0.10.2-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "DomainHarness Kernel Primary (K) sealed module source",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "kernel-mechanism-v1.mjs",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./kernel-mechanism-v1.mjs"
+  }
+}

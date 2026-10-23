@@ -40,7 +40,6 @@ import {
 import type { SealedQualifiedPackageRoot } from '../../src/public-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sqliteTempPath } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-hf23-shared-op';
@@ -64,8 +63,8 @@ let reserveOnly: HostCredential;
  */
 async function sealSharedOperationClosure(): Promise<SealedQualifiedPackageRoot> {
   const [kernelSource, sdkSource, businessText, capabilityText] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-agent-surface.mjs', fixtureDir), 'utf8'),
     readFile(new URL('capability-agent-surface.mjs', fixtureDir), 'utf8'),
   ]);

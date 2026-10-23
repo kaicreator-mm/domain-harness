@@ -1,0 +1,17 @@
+{
+  "name": "@kaicreator/domain-feature-context-assembly",
+  "version": "0.10.2-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "DomainHarness v0.10 BUILD-selectable Standard Feature (context-assembly) sealed module source",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "modules/*.mjs",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./modules/sfeature-context-assembly-v1.mjs"
+  }
+}

@@ -88,10 +88,9 @@ const send = (messageId: string, input: Record<string, unknown>, instanceKey: st
 // with the SAME selected K/S payload bytes on the same physical SQLite Host.
 const CONTROLS_APP_ID = 'durable-controls';
 async function sealControlsClosure(): Promise<SealedQualifiedPackageRoot> {
-  const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures/business-durable-controls.mjs', import.meta.url), 'utf8'),
   ]);
   const kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`);

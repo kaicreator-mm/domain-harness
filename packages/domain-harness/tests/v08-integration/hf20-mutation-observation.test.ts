@@ -305,7 +305,6 @@ test('HF20 carrier B1: one CAS put commits state+window atomically; losers and f
 
 // ---- B2: the REAL selected closure through the trusted host gateway ----
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-hf20-carrier';
@@ -326,8 +325,8 @@ let t2Operator: HostCredential;
 
 before(async () => {
   const [kernelSource, sdkSource, businessSource, capabilityText] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-agent-surface.mjs', fixtureDir), 'utf8'),
     readFile(new URL('capability-agent-surface.mjs', fixtureDir), 'utf8'),
   ]);
