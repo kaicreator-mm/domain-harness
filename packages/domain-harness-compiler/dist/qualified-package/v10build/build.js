@@ -347,7 +347,12 @@ export function buildV10App(options) {
             fail('V10_AUTHORITY_FORGERY', `kernel-extension ${module.packageId} provides advisory hook '${key}'; advisory hooks may not squat authority or Standard namespaces`);
         }
     }
-    for (const module of extensions) {
+    // Collisions and provider authority are properties of the *selected*
+    // closure. Absent optional advisories (no bytes/digest) are recorded in
+    // skippedOptional below, and must not reserve a real selected provider key.
+    const selectedExtensions = extensions.filter((module) => !(module.optional && module.moduleSource === null));
+    const selectedFeatures = features.filter((module) => !(module.optional && module.moduleSource === null));
+    for (const module of selectedExtensions) {
         const providerId = module.providerId;
         const hook = module.provides[0];
         const providerOwner = byProvider.get(providerId);
@@ -361,7 +366,7 @@ export function buildV10App(options) {
         byProvider.set(providerId, module);
         byHook.set(hook, module);
     }
-    for (const module of features) {
+    for (const module of selectedFeatures) {
         const feature = module.provides[0];
         const owner = byFeature.get(feature);
         if (owner !== undefined) {
