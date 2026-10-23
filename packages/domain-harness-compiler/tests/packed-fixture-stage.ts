@@ -445,6 +445,41 @@ async function stageOnce(includeNodePackage: boolean, includeNewWorkspaces: bool
   }
 }
 
+
+/**
+ * T07a2: return dependency-complete local tarball paths for a selected legacy packed consumer.
+ * Each requested workspace draws its dependency closure from the local staged
+ * .tgz files, never from unpublished 0.10.2-rc.0 registry versions. Only the
+ * requested runtime/BUILD packages and their transitive dependencies appear:
+ * no accidental BUILD compiler in a Tiny Microkernel install.
+ *
+ * Fail closed if a staged tarball vanished or its bytes changed after pack.
+ * Pass the returned paths in ONE npm install invocation alongside legacy
+ * core/compiler/node tarballs. A list is not a success claim for npm install.
+ */
+export function verifiedLocalWorkspaceTarballs(
+  packs: NewWorkspacePacks,
+  requested: readonly (keyof NewWorkspacePacks)[],
+): readonly string[] {
+  const selected = new Set<keyof NewWorkspacePacks>();
+  const include = (key: keyof NewWorkspacePacks): void => {
+    if (selected.has(key)) return;
+    if (key === 'hostNode') include('microkernel');
+    if (key === 'hostNode' || key === 'microkernel' || key === 'build') include('contracts');
+    selected.add(key);
+  };
+  for (const key of requested) include(key);
+  const order = ['contracts', 'microkernel', 'hostNode', 'build'] as const;
+  return order.filter((key) => selected.has(key)).map((key) => {
+    const tarball = packs[key];
+    const actualSha256 = sha256File(tarball.path);
+    if (actualSha256 !== tarball.sha256) {
+      throw new Error(`local packed workspace ${key} sha256 mismatch: expected ${tarball.sha256}, got ${actualSha256}`);
+    }
+    return tarball.path;
+  });
+}
+
 const stagedCache = new Map<string, Promise<StagedPacks>>();
 
 /**
