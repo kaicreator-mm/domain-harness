@@ -95,6 +95,7 @@ function copyPlain(value, budget, ancestors, depth) {
     const result = Object.create(null);
     for (const key of keys) {
       if (FORBIDDEN_KEYS.has(key) || key.length > 256
+          // eslint-disable-next-line no-control-regex -- intentional C0 control-character rejection
           || /[\u0000-\u001f]/.test(key)) refuse('OBJECT_KEY_NOT_DATA');
       const desc = Object.getOwnPropertyDescriptor(value, key);
       if (!desc || !Object.hasOwn(desc, 'value') || !desc.enumerable) {
