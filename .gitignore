@@ -6,6 +6,11 @@ dist/
 # the committed output always matches a fresh build of the committed sources.
 !packages/domain-harness/dist/
 !packages/domain-harness-compiler/dist/
+# v0.10.2 A1 / T07a2: new independently packed workspaces ship tracked dist
+!packages/contracts/dist/
+!packages/microkernel/dist/
+!packages/host-node/dist/
+!tooling/build/dist/
 coverage/
 *.log
 *.sqlite
