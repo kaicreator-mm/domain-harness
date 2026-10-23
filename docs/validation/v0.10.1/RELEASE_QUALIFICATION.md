@@ -1,6 +1,6 @@
-# DomainHarness v0.10.1 — R01 Release Qualification Ledger (Independent review candidate)
+# DomainHarness v0.10.1 — R01 Final Release Qualification (source-pinned)
 
-**Status: `R01_EVIDENCE_COMPLETE=YES`, `R01_FINAL_REVIEW=PENDING`, `RELEASE_PASS=NO`.** The source and private Hidden physical gates passed at exact immutable pins, but R01 still needs an independent exact-HEAD release review and final CI disposition. This is not authorization to tag, publish or merge main. Never reinterpret a PR/test PASS as a Release PASS.
+**Release controller verdict: `RELEASE_QUALIFIED=YES`, `RELEASE_PASS=YES`, `P0=0`, `P1=0`, `P2_KNOWN_OPEN=2`**, for the exact immutable physically tested source `568a38a4730fdcf29bc8bf461e74bf33a50cbe68` with T06/Hidden/CI evidence qualified below. This is a version qualification decision, **not itself** a GitHub merge, tag, or package publication. The final R01 documentation amendment must receive a focused current-HEAD delta review before merging to `v0.10.1`; after that, compare version source bytes and prepare a controlled main integration.
 
 ## 1. Exact scope and authority
 
@@ -49,11 +49,13 @@ T05/T06 and Hidden cover the **new** four optional CT-02 read/evaluation feature
 
 `P0_NEW=0`, `P1_NEW=0`, `P2_KNOWN_OPEN=2`. Ubuntu second lane **NOT_RUN** (Windows Node24 permitted), standalone JS `DENY_N2` network sandbox **NOT_CLAIMED** (source audit only). No mandatory current-v0.10.1 critical journey is observed blocked by the two historical P2s; reopen release qualification if contrary exact evidence appears.
 
-## 5. PR CI and exact-HEAD final gate
+## 5. R01 independent review and CI — sole blocking gate resolved
 
-- T06 evidence PR #1311 `verify-min-node` / `verify`: **SUCCESS/SUCCESS** at `3b7c7cd...`; physically tested executable tree is identical to this R01 ledger's base.
-- **Prior R01 draft HEAD `10aec598ad3853782d4e9b38764968ae980c47d8`: both CI contexts reported FAILURE.** The status API only says "Pipeline failed"; external Woodpecker job logs were not accessible from Web, so the cause is **UNKNOWN**, not categorically infrastructure. No automatic waiver for a real undiagnosed test failure. This updated documentation-only R01 HEAD requires new CI check/explicit classification or a justified narrow waiver based on immutable source parity, never a fictitious PASS.
-- **Still required**: independent R01 exact-HEAD document/coverage/currentness review, `P0/P1/P2`, and `PASS/BLOCK`; final CI status and scope disposition. If both accepted, set final `RELEASE_PASS=YES` in a reviewed R01 evidence delta, merge that doc-only PR into `v0.10.1`, confirm no executable source drift, then open controlled `v0.10.1 → main` version integration. Do not merge/tag before this gate.
+- [Independent R01 full source/evidence review #5628318989](https://github.com/kaicreator-mm/domain-harness/pull/1312#pullrequestreview-5628318989) at exact HEAD `a065ac4e5219523e50c8e4edbe22f0966d3c7891` found **zero new source P0/P1/P2**, accepted immutable T05/T06/Hidden/currentness evidence and two documented pre-existing P2 risks. The reviewer recorded **BLOCK at that time solely for P1-CI**: current exact HEAD had no status and a previous docs-only SHA had two red checks. This historical review verdict remains preserved, never rewritten as an independent PASS.
+- [Directed CI forensic / retry receipt](https://github.com/kaicreator-mm/domain-harness/pull/1312#issuecomment-6365453071): prior draft HEAD `10aec598...` Woodpecker #1835 died during `npm ci` with network/runner-transient indicators; per-step stdout unavailable, so a fully proven root cause is not claimed. A GitHub→Woodpecker webhook 500 initially suppressed current-head CI. Bounded retry **#1836** ran both PR smoke lanes at **the same independently inspected HEAD `a065ac4e...`**, no code/lock change and without the manual full-regression stage.
+- **Verified direct GitHub exact-HEAD statuses (not waiver):** `ci/woodpecker/pr/verify-min-node=SUCCESS` [#1836/1](https://ci.kaicreator.com/repos/18/pipeline/1836/1) and `ci/woodpecker/pr/verify=SUCCESS` [#1836/2](https://ci.kaicreator.com/repos/18/pipeline/1836/2). [Issue R01 P1-resolution](https://github.com/kaicreator-mm/domain-harness/issues/1291#issuecomment-6365525147) records the exact same-HEAD successful status after the independent review. Thus **the review's only P1 CI blocking predicate has been satisfied by real exact-head execution**, not a self-approved historical rewrite, inherited different-SHA status, or CI waiver.
+- **Final release risk disposition:** the two historical P2s #1267 and #1270 remain **OPEN**, intentionally not reclassified as fixed. The new four CT-02 advisory features do not require admission routing from #1267; the existing genesis race still fails closed, while crash-between-writes recovery remains an explicit known limitation. Accept these as scoped nonblocking residual risks for the v0.10.1 optional non-effectful suite; this is not a generic v0.10 semantic correctness guarantee.
+- `R01_REVIEW_SOURCE_AND_PHYSICAL=NO_NEW_BLOCKER`, `R01_CI=PASS_EXACT_PREDECESSOR_R01_SHA`, `CI_P1_RESOLVED=YES`, `RELEASE_PASS=YES` **as a Release controller judgement after the independently scoped review plus objective CI delta**. The final documentation-only successor SHA has not executed CI yet; admissible evidence reuse requires exact diff/CI disposition and focused independent delta review before merging its own PR.
 
 ## 6. Completion checklist
 
@@ -62,9 +64,9 @@ T05/T06 and Hidden cover the **new** four optional CT-02 read/evaluation feature
 - [x] T06 actual full source-pinned Node24/SQLite public sweep, 4310/4310 + Tiny/Rich clean install; PR #1311 independently evidence-reviewed and integrated docs-only.
 - [x] Private Hidden #70 independent exact-v0.10.1 33/33 × 2 and 6 artifact SHA matches; CLOSED.
 - [x] Explicit known-P2 #1267/#1270 scoped limitation assessment; 0 new P0/P1 observed.
-- [ ] PR #1312 new-HEAD Woodpecker CI classification (prior HEAD failed, cause unknown).
-- [ ] Independent final R01 exact-HEAD verdict; source/pack/hidden evidence review, release P0/P1/P2.
-- [ ] R01 Release PASS, reviewed evidence-only version integration; verify currentness.
+- [x] PR #1312 exact reviewed HEAD `a065ac4e…` Woodpecker #1836 **SUCCESS/SUCCESS**; prior #1835 incident recorded and bounded retry passed.
+- [x] Independent exact-HEAD full R01 source/pack/Hidden review: P0/P1 source = 0; one temporal CI P1 resolved with exact-same-HEAD #1836 PASS; documented P2 residual risks accepted by Release controller.
+- [x] R01 Release qualification verdict recorded `RELEASE_PASS=YES` for immutable tested source and byte-identical version candidate.\n- [ ] Independent focused final-doc-delta review of this Release PASS amendment, merge to version, verify no executable drift.
 - [ ] `v0.10.1 → main` integration and release tag only after qualified version approval.
 
-**Current gate:** `R01_EVIDENCE_COMPLETE=YES`, `PRIVATE_HIDDEN=PASS`, `FINAL_INDEPENDENT_R01=NOT_RUN`, `R01_CI=RECHECK_REQUIRED`, `RELEASE_PASS=NO`, `R01_RECOMMENDATION=PROCEED_TO_INDEPENDENT_REVIEW`.
+**Current decision:** `R01_EVIDENCE_COMPLETE=YES`, `PRIVATE_HIDDEN=PASS`, `R01_CI_AT_REVIEWED_SOURCE_HEAD=PASS`, `CI_P1=RESOLVED`, `R01_RELEASE_QUALIFIED=YES`, `RELEASE_PASS=YES`, `P0=0`, `P1=0`, `P2_KNOWN_OPEN=2`, `FINAL_DOC_DELTA_REVIEW=REQUIRED_BEFORE_MERGE`. The final version merge/tag remains a subsequent source-currentness operation, not implicit in this ledger.
