@@ -423,3 +423,111 @@ console.log('TOTAL', n);
 ```
 
 </details>
+
+## writesets.mjs
+
+Write-set disjointness check of the design DAG (section 12): path-prefix intersection for every pair without an ordering path.
+
+<details><summary>source</summary>
+
+```js
+import fs from 'node:fs';
+const C='packages/domain-harness-compiler/src/qualified-package/', H='packages/domain-harness/src/';
+const ov=fs.readFileSync('overlap.jsonl','utf8').trim().split('\n').map(JSON.parse);
+const pay=ov.filter(x=>x.hit.some(h=>['K','S','ROUTER','SFEAT','BMETA'].includes(h))).map(x=>x.f);
+const frag=ov.filter(x=>x.hit.includes('FRAG')).map(x=>x.f);
+const trio=['scripts/check-v010-error-code-catalog.mjs','docs/architecture/V010_TYPED_REFUSAL_LITERAL_CATALOG.json','tests/compiler/v010-error-code-catalog.test.ts','tests/compiler/v010-comment-invariants.test.ts','tests/compiler/v010-error-lineage-union.test.ts'];
+const newTs=(p)=>[`packages/${p}/`];
+const W={
+ T07a:['package.json','package-lock.json','packages/contracts/package.json','packages/contracts/tsconfig','packages/contracts/src/index.ts','packages/contracts/dist/','packages/microkernel/package.json','packages/microkernel/tsconfig','packages/microkernel/src/index.ts','packages/microkernel/dist/','packages/host-node/package.json','packages/host-node/tsconfig','packages/host-node/src/index.ts','packages/host-node/dist/','tooling/build/package.json','tooling/build/tsconfig','tooling/build/src/index.ts','tooling/build/dist/','packages/domain-harness/package.json','packages/domain-harness/tsconfig','packages/domain-harness-compiler/package.json','packages/domain-harness-compiler/tsconfig','scripts/check-committed-dist.mjs','scripts/lint.mjs','eslint.config.mjs'],
+ T00:['packages/contracts/src/','packages/contracts/tests/','packages/contracts/README.md',C+'v10build/digest.ts',C+'v10build/errors.ts',C+'v10build/guards.ts',C+'v10build/known-error-codes.ts',H+'contracts/identity.ts',H+'contracts/json.ts',H+'public-v8/contracts.ts','tests/compiler/v0102-import-direction.test.ts','tests/compiler/v0102-wire-literals.test.ts',...trio],
+ T01:['domain-packages/','examples/v010-meta-feedback/',C+'payload/',C+'v09/workflow-router','extensions/agent-improvement/packages/',...pay,'examples/v010-clean-consumer/build-apps.mjs','examples/v0101-agent-improvement/integration/selected-subsets-build.mjs','tests/integration/v010-clean-consumers/clean-consumers.test.ts','tests/hosts/node/v0101-feature-suite.test.ts','tests/hosts/node/v0101-build-skipped-optional-provider.test.ts','tests/conformance/v0101-sdk-features.test.ts','tests/compiler/v0102-payload-parity.test.ts'],
+ T01k:['domain-packages/kernel/basic/','packages/domain-harness/tests/v08-host/k02-combined-splice-physical.test.ts','packages/domain-harness/tests/v08-host/k02-namespace-two-b-physical.test.ts','packages/domain-harness/tests/v08-host/t10-multib-query-physical.test.ts','packages/domain-harness-compiler/tests/v08-tf-oracle-fr02-fr07.test.ts','tests/compiler/v0102-payload-parity.test.ts','tests/compiler/v0102-kernel-protocol.test.ts'],
+ T08a:['docs/validation/v0.10.2/'],
+ T05:['tooling/build/src/','tooling/build/tests/','tooling/build/README.md',C+'v10build/build.ts',C+'v10build/selected-closure.ts',C+'v10build/import-policy.ts',...trio],
+ T04:['packages/microkernel/src/','packages/microkernel/tests/','packages/microkernel/README.md',C+'v10build/activation.ts',C+'v10build/import-hook.ts',C+'v10build/external-effect.ts',H+'host-v8/v010-authorized-multib-query.ts',H+'host-v8/index.ts','tests/assembly/v010-public-facade.test.ts','tests/compiler/v010-public-api-boundary.test.ts',...trio],
+ T03:['packages/host-node/src/','packages/host-node/tests/','packages/host-node/README.md',H+'host-v8/sqlite-cas-store.ts',H+'host-v8/cas.ts',H+'host-v8/errors.ts',H+'host-v8/v010-scoped-memory.ts',H+'host-v8/durable-controls.ts',H+'host-v8/index.ts',C+'v10build/deployment.ts',C+'v10build/error-type-parity.ts',C+'v10build/query-type-parity.ts',C+'v10meta/',C+'v10shadow/',C+'v10evidence/','extensions/agent-improvement/host/','tests/hosts/node/v0101-feature-suite.test.ts','examples/v0101-agent-improvement/integration/selected-subsets-build.mjs','examples/v010-clean-consumer/apps/rich/','tests/assembly/fixtures-v010/',...trio],
+ T06:['packages/microkernel/src/','packages/microkernel/tests/','packages/host-node/src/','packages/host-node/tests/','tests/assembly/v010-subscribe-stop.test.ts','tests/hosts/node/v010-t08-governed-subscribe.test.ts'],
+ T11:['tests/','examples/','extensions/',C+'v10build/',C+'v10meta/',C+'v10shadow/',C+'v10evidence/',C+'payload/durable-receipt-carrier-v1.mjs','packages/domain-harness-compiler/src/index.ts',C+'index.ts',...frag,...trio,'scripts/check-v010-error-code-catalog.mjs'],
+};
+const dep={T07a:[],T00:['T07a'],T01:[],T01k:['T01'],T08a:[],T05:['T00','T07a'],T04:['T05','T01k','T00'],T03:['T04','T01'],T06:['T03'],T11:['T06','T08a','T01k','T05']};
+const anc=(t,s=new Set())=>{for(const d of dep[t]){if(!s.has(d)){s.add(d);anc(d,s);}}return s;};
+const ordered=(a,b)=>anc(a).has(b)||anc(b).has(a);
+const hit=(x,y)=>x.startsWith(y)||y.startsWith(x);
+const ids=Object.keys(W);let bad=0,pairs=0;
+for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=ids[i],b=ids[j];if(ordered(a,b))continue;pairs++;const c=[];for(const x of W[a])for(const y of W[b])if(hit(x,y))c.push(x+' ~ '+y);if(c.length){bad++;console.log('OVERLAP',a,b,c.slice(0,5));}}
+console.log('unordered pairs checked',pairs,'overlapping',bad,'T01 payload-reader files',pay.length,'frag files',frag.length);
+```
+
+</details>
+
+## findhash.mjs
+
+Locates the K sha256 / git blob id in tracked files (K digest pins).
+
+<details><summary>source</summary>
+
+```js
+import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto';
+const root='C:/xDev/kAiCreator/domain-harness/dh-i1300-l2-claude';
+const k=fs.readFileSync(root+'/packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs');
+const sha=crypto.createHash('sha256').update(k).digest('hex');
+console.log('K sha256',sha);
+function walk(d,o=[]){for(const e of fs.readdirSync(d,{withFileTypes:true})){if(['node_modules','.git','dist'].includes(e.name))continue;const p=path.join(d,e.name);e.isDirectory()?walk(p,o):o.push(p);}return o;}
+const needles=[sha,sha.slice(0,16),'72a886ffca85fc90caea954ee9fb5b3df7b4fcfa'];
+for(const f of walk(root)){ if(/\.(png|zip|tgz|lock)$/.test(f)||f.endsWith('package-lock.json'))continue; let s; try{s=fs.readFileSync(f,'utf8');}catch{continue;} for(const n of needles) if(s.includes(n)) console.log(f.replace(root+'/',''),n.slice(0,12)); }
+// golden-looking digests in selected tests
+```
+
+</details>
+
+## hex64.mjs
+
+Lists 64-hex string literals in tests/packages/examples (candidate golden digests).
+
+<details><summary>source</summary>
+
+```js
+import fs from 'node:fs'; import path from 'node:path';
+const root='C:/xDev/kAiCreator/domain-harness/dh-i1300-l2-claude';
+function walk(d,o=[]){for(const e of fs.readdirSync(d,{withFileTypes:true})){if(['node_modules','.git','dist','docs','.agent'].includes(e.name))continue;const p=path.join(d,e.name);e.isDirectory()?walk(p,o):o.push(p);}return o;}
+const out={};
+for(const f of [...walk(root+'/tests'),...walk(root+'/packages'),...walk(root+'/examples')]){ if(!/\.(ts|mjs|mts|json)$/.test(f)||f.endsWith('package-lock.json'))continue; if(/\/(t012|t012r|t013|t013s|t014)\//.test(f))continue; const s=fs.readFileSync(f,'utf8'); const m=[...s.matchAll(/['"`]([0-9a-f]{64})['"`]/g)]; if(m.length) out[f.replace(root+'/','')]=m.length; }
+console.log(JSON.stringify(out,null,0));
+```
+
+</details>
+
+## tblcheck.mjs
+
+Markdown table check: each row has the same cell count as its header.
+
+<details><summary>source</summary>
+
+```js
+import fs from 'node:fs';
+function cells(l) {
+  let n = 0, inb = false; const t = l.trim();
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '\\') { i++; continue; }
+    if (c === '`') inb = !inb;
+    else if (c === '|' && !inb) n++;
+  }
+  return n - 1;
+}
+for (const f of process.argv.slice(2)) {
+  const L = fs.readFileSync(f, 'utf8').split('\n');
+  let hdr = null, bad = 0, tables = 0;
+  for (let i = 0; i < L.length; i++) {
+    const l = L[i];
+    if (l.startsWith('|')) {
+      if (hdr === null) { hdr = cells(l); tables++; }
+      else if (cells(l) !== hdr) { bad++; console.log(f.slice(-30), i + 1, 'cells', cells(l), 'expected', hdr, l.slice(0, 70)); }
+    } else hdr = null;
+  }
+  console.log(f.slice(-40), 'tables', tables, 'bad rows', bad);
+}
+```
+
+</details>
