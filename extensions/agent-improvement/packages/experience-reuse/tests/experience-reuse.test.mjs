@@ -33,6 +33,19 @@ test('stale source without compatibility evidence is uncertain',()=>{
   const r=run([candidate({candidateSha:B})]);
   assert.deepEqual(r.uncertain[0].reasons,['SOURCE_COMPATIBILITY_UNKNOWN']);
 });
+test('stale source with arbitrary compatibilityRef remains uncertain (#1297)',()=>{
+  const r=run([candidate({candidateSha:B,compatibilityRef:'arbitrary-string'})]);
+  assert.equal(r.reviewCandidates.length,0);
+  assert.equal(r.uncertain.length,1);
+  assert.deepEqual(r.uncertain[0].reasons,['SOURCE_COMPATIBILITY_UNKNOWN']);
+  assert.equal(r.uncertain[0].compatibilityRef,'arbitrary-string');
+});
+test('stale source with claimed verified ref still needs source-qualified proof (#1297)',()=>{
+  const r=run([candidate({candidateSha:B,compatibilityRef:'github:verified-by-me'})]);
+  assert.equal(r.reviewCandidates.length,0);
+  assert.equal(r.uncertain[0].reasons[0],'SOURCE_COMPATIBILITY_UNKNOWN');
+  assert.equal(r.adoptionVerdict,'NOT_DETERMINED');
+});
 test('cross project, rule conflict, and negative examples reject',()=>{
   const r=run([candidate({candidateId:'one',projectId:'other'}),
     candidate({candidateId:'two',ruleRevision:'stale'}),
