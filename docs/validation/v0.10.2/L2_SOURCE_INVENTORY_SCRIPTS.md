@@ -383,3 +383,43 @@ for (const n of ['core','comp']) {
 
 </details>
 
+## cites.mjs
+
+Citation checker (amendment): prints the cited line(s) for every `file:line[-line]` in a document. Usage: `node cites.mjs <document.md>`. Bare `:NNN` citations that follow a file mention were verified by hand.
+
+<details><summary>source</summary>
+
+```js
+import fs from 'node:fs'; import path from 'node:path';
+const root = 'C:/xDev/kAiCreator/domain-harness/dh-i1300-l2-claude';
+const docFile = process.argv[2];
+function walk(d,o=[]){ for(const e of fs.readdirSync(d,{withFileTypes:true})){ if(['node_modules','dist','.git','docs'].includes(e.name))continue; const p=path.join(d,e.name); e.isDirectory()?walk(p,o):o.push(p);} return o;}
+const all = walk(root).map(p=>p.replace(/\\/g,'/'));
+const byBase = {}; for (const p of all) (byBase[path.basename(p)] ??= []).push(p);
+const text = fs.readFileSync(docFile,'utf8').split('\n');
+const re = /([A-Za-z0-9_\-./]+\.(?:ts|mjs|md|yaml|json)):(\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*)/g;
+let n=0;
+text.forEach((line, i) => {
+  for (const m of line.matchAll(re)) {
+    let f = m[1].replace(/^(C|H)\//, m=>m); let cands;
+    if (f.startsWith('C/')) f = 'packages/domain-harness-compiler/src/qualified-package/' + f.slice(2);
+    else if (f.startsWith('H/')) f = 'packages/domain-harness/src/' + f.slice(2);
+    const full = root + '/' + f;
+    if (fs.existsSync(full) && fs.statSync(full).isFile()) cands = [full];
+    else cands = (byBase[path.basename(f)] ?? []).filter(p => p.endsWith(f.split('/').slice(-2).join('/')) || !f.includes('/'));
+    if (!cands || cands.length === 0) { console.log(`DOC:${i+1} ${m[0]} UNRESOLVED`); n++; continue; }
+    if (cands.length > 1) { const pref=cands.filter(p=>p.includes('/v10build/')); if(pref.length===1) cands=pref; }
+    if (cands.length > 1) { console.log(`DOC:${i+1} ${m[0]} AMBIGUOUS ${cands.length}`); n++; continue; }
+    const src = fs.readFileSync(cands[0],'utf8').split('\n');
+    for (const part of m[2].split(',')) {
+      const [a,b] = part.split('-').map(Number); const hi = b ?? a;
+      const first = (src[a-1]??'<EOF>').trim().slice(0,90);
+      const last = hi!==a ? (src[hi-1]??'<EOF>').trim().slice(0,60) : '';
+      console.log(`DOC:${i+1} ${path.basename(cands[0])}:${part} | ${first}${last?' ... '+last:''}`); n++;
+    }
+  }
+});
+console.log('TOTAL', n);
+```
+
+</details>
