@@ -1,6 +1,7 @@
 {
   "name": "@kaicreator/domain-harness",
   "version": "0.2.0",
+  "private": true,
   "description": "Portable DomainHarness Runtime Core and Contract SDK",
   "type": "module",
   "main": "./dist/index.js",
@@ -69,12 +70,16 @@
     "README.md"
   ],
   "scripts": {
+    "prebuild": "npm run build -w @kaicreator/domain-harness-contracts -w @kaicreator/domain-harness-microkernel -w @kaicreator/domain-harness-host-node",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-vendored-dist-assets.mjs",
     "build:legacy-test": "tsc -p tsconfig.legacy-test.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && npm run build:legacy-test && node --import tsx --test \"tests/**/*.test.ts\" && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
+    "@kaicreator/domain-harness-contracts": "0.10.2-rc.0",
+    "@kaicreator/domain-harness-host-node": "0.10.2-rc.0",
+    "@kaicreator/domain-harness-microkernel": "0.10.2-rc.0",
     "ajv": "^8.17.1",
     "json-schema-library": "11.6.2",
     "xstate": "^5.26.0"

@@ -78,6 +78,10 @@ export default tseslint.config(
       'packages/domain-harness-node/src/**/*.ts',
       'packages/domain-harness-expo/src/**/*.ts',
       'packages/domain-harness-compiler/src/**/*.ts',
+      'packages/contracts/src/**/*.ts',
+      'packages/microkernel/src/**/*.ts',
+      'packages/host-node/src/**/*.ts',
+      'tooling/build/src/**/*.ts',
     ],
     ignores: [
       // Frozen v0.1 regression evidence inside the core package.

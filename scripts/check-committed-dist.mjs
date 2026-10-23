@@ -1,36 +1,65 @@
 import { execFileSync } from 'node:child_process';
-import { access } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-// Issue #299: @kaicreator/domain-harness and @kaicreator/domain-harness-compiler
-// ship their built dist/ trees from git (exact-SHA git installs must deliver a
-// usable package without lifecycle scripts). This guard runs after the normal
-// workspace build and fails whenever a fresh build of the committed sources
-// differs from the committed dist bytes, or a declared entry file is missing —
-// so src changes can never silently ship a stale compiled artifact.
-const shippedEntries = {
-  'packages/domain-harness': [
-    'dist/index.js',
-    'dist/index.d.ts',
-    'dist/public-v2/index.js',
-    'dist/public-v3/index.js',
-    'dist/public-v7/index.js',
-    'dist/public-v9/index.js',
-    'dist/public-v9/deployment.js',
-    'dist/public-v9/runtime-channel.js',
-    'dist/public-v9/operation-bridge.js',
-    'dist/host-v9/generated/acorn.mjs',
-    'dist/workflow/index.js',
-  ],
-  'packages/domain-harness-compiler': [
-    'dist/index.js',
-    'dist/index.d.ts',
-  ],
-};
+// Issue #299 / v0.10.2 L2 section 5 ("Committed dist"): the externally
+// consumed packages ship their built dist/ trees from git (exact-SHA git
+// installs must deliver a usable package without lifecycle scripts). This
+// guard runs after the normal workspace build and fails whenever a fresh build
+// of the committed sources differs from the committed dist bytes, or a
+// declared entry file is missing — so src changes can never silently ship a
+// stale compiled artifact.
+//
+// The roster is derived from the root workspace globs: every NON-private
+// workspace manifest is guarded and its entries are the manifest's own
+// main/types files. Private (legacy) workspaces leave the guard.
+const neverCommittedDist = new Set([
+  '@kaicreator/domain-harness-node',
+  '@kaicreator/domain-harness-expo',
+]);
+
+async function discoverShipped() {
+  const rootManifest = JSON.parse(await readFile(`${root}/package.json`, 'utf8'));
+  const shipped = {};
+  for (const glob of rootManifest.workspaces ?? []) {
+    if (!glob.endsWith('/*')) {
+      throw new Error(`check-committed-dist: unsupported workspace glob ${glob}`);
+    }
+    const parent = glob.slice(0, -2);
+    const dirs = (await readdir(`${root}/${parent}`, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+    for (const dir of dirs) {
+      let manifest;
+      try {
+        manifest = JSON.parse(await readFile(`${root}/${parent}/${dir}/package.json`, 'utf8'));
+      } catch {
+        continue;
+      }
+      if (manifest.private === true) continue;
+      // Legacy host packages that never shipped a committed dist (their dist/
+      // is gitignored). They stay unguarded until a later task marks them
+      // private (T07b/T08), at which point this entry becomes redundant.
+      if (neverCommittedDist.has(manifest.name)) continue;
+      const entries = [manifest.main, manifest.types]
+        .filter((entry) => typeof entry === 'string')
+        .map((entry) => entry.replace(/^\.\//u, ''));
+      shipped[`${parent}/${dir}`] = entries;
+    }
+  }
+  return shipped;
+}
+
+const shippedEntries = await discoverShipped();
 const shippedRoots = Object.keys(shippedEntries);
+if (shippedRoots.length === 0) {
+  console.error('check-committed-dist: no non-private workspace found; roster derivation failed');
+  process.exit(1);
+}
 
 function git(args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' });

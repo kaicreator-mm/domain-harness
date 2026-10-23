@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const roots = ['packages', 'scripts'];
+const roots = ['packages', 'tooling', 'scripts'];
 const extensions = new Set(['.ts', '.mts', '.cts', '.mjs']);
 let failures = 0;
 
