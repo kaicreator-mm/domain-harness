@@ -1,0 +1,11 @@
+
+> domain-harness-monorepo@0.2.0 lint
+> node scripts/lint.mjs && eslint .
+
+
+C:\xDev\kAiCreator\domain-harness\dh-i1290-t06-zcode\packages\domain-harness\tests\t012r\consumer-src\fixture-toolplane.mjs
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+✖ 1 problem (0 errors, 1 warning)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

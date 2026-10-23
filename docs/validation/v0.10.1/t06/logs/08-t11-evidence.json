@@ -1,0 +1,621 @@
+{
+  "schema": "dh.v10.t11.clean-consumer-evidence/1",
+  "sourceSha": "568a38a4730fdcf29bc8bf461e74bf33a50cbe68",
+  "node": "24.21.0",
+  "platform": "win32",
+  "npmRegistry": "http://localhost:14873",
+  "tarballs": {
+    "core": {
+      "file": "kaicreator-domain-harness-0.2.0.tgz",
+      "sha256": "aa069fe7a6c47101c830a1ad74f554c5c8bd0cb3adddb51591470387f5385ad6"
+    },
+    "compiler": {
+      "file": "kaicreator-domain-harness-compiler-0.2.0.tgz",
+      "sha256": "f31f31c2d112d114a564f25c4f8120b6291430767159849b9e10bed5e4d0715f"
+    },
+    "tinyApp": {
+      "file": "kaicreator-example-v010-tiny-app-1.0.0.tgz",
+      "sha256": "3c8bc55a358af5aa5146e2f36c364c2d9d106be59b89bb39c084000a2ec9c00d"
+    },
+    "richV1App": {
+      "file": "kaicreator-example-v010-rich-app-1.0.0.tgz",
+      "sha256": "f8dbb074d2f9d67df227d1dfc9c588485d6e0c22654108f459fd5c0867cae54b"
+    },
+    "richV2App": {
+      "file": "kaicreator-example-v010-rich-app-v2-1.0.0.tgz",
+      "sha256": "ec3b1ae1d1f7e0b9e02a8b727b9069f453c989924a4f4132de0219cdccb66647"
+    }
+  },
+  "builds": [
+    {
+      "outDir": "C:\\Users\\15549\\AppData\\Local\\Temp\\dh-t11-clean-kIjNf5\\builder\\out\\tiny",
+      "app": "app:v010-clean-tiny",
+      "buildId": "tiny-v1",
+      "subjectDigest": "657db54844ccf9e5bd5adf816d3fd66edd6bea1e0431febe861aafbf9d414298",
+      "packageClosureDigest": "b4a986248e4d93925403b216776339213e1ffb588709bfd1bb8bce8f4ac7aca5",
+      "modules": 4
+    },
+    {
+      "outDir": "C:\\Users\\15549\\AppData\\Local\\Temp\\dh-t11-clean-kIjNf5\\builder\\out\\rich-v1",
+      "app": "app:v010-t05-rich",
+      "buildId": "rich-v1",
+      "subjectDigest": "486122135a4d048787b4781243ab8290e2419727c36a4c5d5f31da4960da8911",
+      "packageClosureDigest": "e945fa94bdfaaacbf01bb92341213c4ee6a606b7a5d05c137f5525dd4327e6aa",
+      "modules": 16
+    },
+    {
+      "outDir": "C:\\Users\\15549\\AppData\\Local\\Temp\\dh-t11-clean-kIjNf5\\builder\\out\\rich-v2",
+      "app": "app:v010-t05-rich",
+      "buildId": "rich-v2",
+      "subjectDigest": "63d68e3f675fbf06644d5e2297e63f37340ef7d47514cd54847149b113b58bda",
+      "packageClosureDigest": "a9b40cfe358d176a3afe1ac6f9e5a87a9b8e1a5b6405d2e67375304b59040f2b",
+      "modules": 17
+    }
+  ],
+  "scenarios": {
+    "tiny": {
+      "ok": true,
+      "steps": [
+        "selection.tiny",
+        "send.basic",
+        "query.scoped",
+        "query.deniedForeignB",
+        "restart.reopen",
+        "replay.originalReceipt",
+        "replay.changedInputConflict"
+      ],
+      "final": {
+        "kCounters": {
+          "admissions": 2,
+          "guardEvaluations": 0,
+          "hardInvariantEvaluations": 0,
+          "journalBegins": 0,
+          "journalCompletes": 0,
+          "effectDispatches": 0,
+          "effectPermitsMinted": 0,
+          "effectPermitsConsumed": 0,
+          "effectDispatchClaims": 0,
+          "effectDispatchClaimRefusals": 0,
+          "engineCommits": 0,
+          "instanceCreates": 0,
+          "instanceReads": 6,
+          "decisionReceiptAppends": 0,
+          "decisionCacheWrites": 0,
+          "decisionCacheWriteFailures": 0,
+          "mutationObservationReads": 0,
+          "promotedPins": 0,
+          "turnDispositions": 0,
+          "turnAdmissionReplays": 0,
+          "turnDispositionReplays": 0,
+          "durableOriginalReceiptReplays": 1,
+          "durableReceiptArchiveWrites": 0,
+          "durableReceiptArchiveFailures": 0,
+          "durableRingGrowthEvents": 0
+        },
+        "journalRows": 1,
+        "permitRows": 0,
+        "admissionCounts": {
+          "importsByPackage": {
+            "v08-kernel-mechanism@v0.10.0": 1,
+            "standard-sdk@v08.1.0.0": 1,
+            "business-order-approval@v08.1.0.0": 1,
+            "capability-quote-tools@v08.1.0.0": 1
+          },
+          "extensionImports": 0,
+          "featureImports": 0,
+          "optionalMissing": [],
+          "initCalls": [],
+          "initFailures": [],
+          "disposals": [],
+          "runtimeFactoryInvocations": 1,
+          "portProbes": [],
+          "portDenials": 0,
+          "activationRefusals": [],
+          "externalEffectDispatches": 0,
+          "externalEffectRefusals": 0
+        },
+        "manifest": {
+          "subjectDigest": "657db54844ccf9e5bd5adf816d3fd66edd6bea1e0431febe861aafbf9d414298",
+          "packageClosureDigest": "b4a986248e4d93925403b216776339213e1ffb588709bfd1bb8bce8f4ac7aca5",
+          "buildId": "tiny-v1",
+          "modules": [
+            {
+              "packageId": "v08-kernel-mechanism@v0.10.0",
+              "role": "kernel-primary",
+              "abiVersion": "v08-kernel-abi/1",
+              "moduleSha256": "66f19f8968cb58cc59808c9c15cfbb193618a150a61ac00a5b5797bec1250630",
+              "bytes": 300140,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "standard-sdk@v08.1.0.0",
+              "role": "standard-primary",
+              "abiVersion": "v08-standard-sdk-abi/1",
+              "moduleSha256": "0675778542c856aea78672e40e6c7f7c325434aa508845ed2168a237445f4c2a",
+              "bytes": 86441,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "business-order-approval@v08.1.0.0",
+              "role": "business",
+              "abiVersion": "v08-business-abi/1",
+              "moduleSha256": "fd494e6e91234d983727715cd379635d9951de65b99e240e56923fd21947a7d8",
+              "bytes": 8433,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "capability-quote-tools@v08.1.0.0",
+              "role": "capability",
+              "abiVersion": "v08-capability-abi/1",
+              "moduleSha256": "957ba228767f7ae0450cbcdf0bcfde615ed6595c44c1f96a49688bd9ff506dfa",
+              "bytes": 5599,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            }
+          ]
+        },
+        "resolution": {
+          "bareSpecifiers": [
+            "@kaicreator/domain-harness-compiler/v10build",
+            "@kaicreator/domain-harness/v8",
+            "@kaicreator/domain-harness/v8/host",
+            "@sagold/json-pointer",
+            "C:\\Users\\15549\\AppData\\Local\\Temp\\dh-t11-clean-kIjNf5\\tiny-consumer\\node_modules\\better-sqlite3\\build\\Release\\better_sqlite3.node",
+            "ajv/dist/2020.js",
+            "better-sqlite3",
+            "bindings",
+            "fast-copy",
+            "fast-deep-equal",
+            "fast-uri",
+            "file-uri-to-path",
+            "fs",
+            "json-schema-library",
+            "json-schema-traverse",
+            "path",
+            "uri-js",
+            "util",
+            "valid-url"
+          ],
+          "outsideDeploymentRoot": []
+        }
+      },
+      "resolution": {
+        "deploymentRoot": "C:\\Users\\15549\\AppData\\Local\\Temp\\dh-t11-clean-kIjNf5\\tiny-consumer",
+        "outsideDeploymentRoot": [],
+        "bareSpecifiers": [
+          "@kaicreator/domain-harness-compiler/v10build",
+          "@kaicreator/domain-harness/v8",
+          "@kaicreator/domain-harness/v8/host",
+          "@sagold/json-pointer",
+          "C:\\Users\\15549\\AppData\\Local\\Temp\\dh-t11-clean-kIjNf5\\tiny-consumer\\node_modules\\better-sqlite3\\build\\Release\\better_sqlite3.node",
+          "ajv/dist/2020.js",
+          "better-sqlite3",
+          "bindings",
+          "fast-copy",
+          "fast-deep-equal",
+          "fast-uri",
+          "file-uri-to-path",
+          "fs",
+          "json-schema-library",
+          "json-schema-traverse",
+          "path",
+          "uri-js",
+          "util",
+          "valid-url"
+        ],
+        "count": 382
+      }
+    },
+    "richMain": {
+      "ok": true,
+      "steps": [
+        "RICH_P1.selection",
+        "RICH_P1.invokeFeatures",
+        "RICH_P4.modelCallTruth",
+        "RICH_P5.agentMemoryContext",
+        "EX04_P1.twoAdapters",
+        "RICH_P2.twoBIsolation",
+        "RICH_P3.queryAuthority",
+        "K02_P1.eighteenTurnsOriginalReceipt",
+        "EX04_F1.duplicateCallbackAndLostAck",
+        "DENY_N1.permitlessAdapter",
+        "RICH_P2.restart"
+      ],
+      "final": {
+        "kCounters": {
+          "admissions": 1,
+          "guardEvaluations": 0,
+          "hardInvariantEvaluations": 0,
+          "journalBegins": 0,
+          "journalCompletes": 0,
+          "effectDispatches": 0,
+          "effectPermitsMinted": 0,
+          "effectPermitsConsumed": 0,
+          "effectDispatchClaims": 0,
+          "effectDispatchClaimRefusals": 0,
+          "engineCommits": 0,
+          "instanceCreates": 0,
+          "instanceReads": 5,
+          "decisionReceiptAppends": 0,
+          "decisionCacheWrites": 0,
+          "decisionCacheWriteFailures": 0,
+          "mutationObservationReads": 0,
+          "promotedPins": 0,
+          "turnDispositions": 1,
+          "turnAdmissionReplays": 0,
+          "turnDispositionReplays": 0,
+          "durableOriginalReceiptReplays": 1,
+          "durableReceiptArchiveWrites": 0,
+          "durableReceiptArchiveFailures": 0,
+          "durableRingGrowthEvents": 0
+        },
+        "dispatches": {
+          "extjob": {
+            "job.reconcile": 1,
+            "job.status": 1,
+            "job.submit": 22
+          },
+          "extnotify": {
+            "notify.send": 1
+          }
+        },
+        "rows": {
+          "total": 112,
+          "instances": 9,
+          "permits": 25,
+          "journals": 29,
+          "dispositions": 4
+        },
+        "memoryRows": 1,
+        "counters": {
+          "importsByPackage": {
+            "v08-kernel-mechanism@v0.10.0": 1,
+            "standard-sdk@v08.1.0.0": 1,
+            "sfeature-semantic-decision@v010.1.0.0": 1,
+            "sfeature-workflow-control@v010.1.0.0": 1,
+            "sfeature-context-assembly@v010.1.0.0": 1,
+            "sfeature-shadow-baseline@v010.1.0.0": 1,
+            "business-external-jobs@v010.1.0.0": 1,
+            "business-external-jobs-b@v010.1.0.0": 1,
+            "business-agent-workflow@v010.1.0.0": 1,
+            "business-wait-resume@v010.1.0.0": 1,
+            "capability-extjob-runx@v010.1.0.0": 1,
+            "capability-extnotify-provider@v010.1.0.0": 1,
+            "capability-agent-memory@v010.1.0.0": 1,
+            "capability-agent-tool-read@v010.1.0.0": 1,
+            "kext-advisory-alpha@v010.1.0.0": 1,
+            "kext-advisory-beta@v010.1.0.0": 1
+          },
+          "extensionImports": 2,
+          "featureImports": 4,
+          "optionalMissing": [],
+          "initCalls": [
+            "sfeature-semantic-decision@v010.1.0.0",
+            "sfeature-workflow-control@v010.1.0.0",
+            "sfeature-context-assembly@v010.1.0.0",
+            "sfeature-shadow-baseline@v010.1.0.0",
+            "kext-advisory-alpha@v010.1.0.0",
+            "kext-advisory-beta@v010.1.0.0"
+          ],
+          "initFailures": [],
+          "disposals": [
+            "kext-advisory-beta@v010.1.0.0",
+            "kext-advisory-alpha@v010.1.0.0",
+            "sfeature-shadow-baseline@v010.1.0.0",
+            "sfeature-context-assembly@v010.1.0.0",
+            "sfeature-workflow-control@v010.1.0.0",
+            "sfeature-semantic-decision@v010.1.0.0"
+          ],
+          "runtimeFactoryInvocations": 2,
+          "portProbes": [],
+          "portDenials": 0,
+          "activationRefusals": [],
+          "externalEffectDispatches": 0,
+          "externalEffectRefusals": 0
+        },
+        "manifest": {
+          "subjectDigest": "486122135a4d048787b4781243ab8290e2419727c36a4c5d5f31da4960da8911",
+          "packageClosureDigest": "e945fa94bdfaaacbf01bb92341213c4ee6a606b7a5d05c137f5525dd4327e6aa",
+          "buildId": "rich-v1",
+          "modules": [
+            {
+              "packageId": "v08-kernel-mechanism@v0.10.0",
+              "role": "kernel-primary",
+              "abiVersion": "v08-kernel-abi/1",
+              "moduleSha256": "66f19f8968cb58cc59808c9c15cfbb193618a150a61ac00a5b5797bec1250630",
+              "bytes": 300140,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "standard-sdk@v08.1.0.0",
+              "role": "standard-primary",
+              "abiVersion": "v08-standard-sdk-abi/1",
+              "moduleSha256": "0675778542c856aea78672e40e6c7f7c325434aa508845ed2168a237445f4c2a",
+              "bytes": 86441,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "sfeature-semantic-decision@v010.1.0.0",
+              "role": "standard-feature",
+              "abiVersion": "dh.v10.standard-feature/1",
+              "moduleSha256": "6b72e31fe9be0f52e1fd0f905bd120440aa8f090ff2a5bfc2cfc9587efec742f",
+              "bytes": 12180,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "sfeature-workflow-control@v010.1.0.0",
+              "role": "standard-feature",
+              "abiVersion": "dh.v10.standard-feature/1",
+              "moduleSha256": "79ebd25f67afa266d146957d1b8b99f334be2f76db50bb37fad5e450ec4cc30c",
+              "bytes": 21578,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "sfeature-context-assembly@v010.1.0.0",
+              "role": "standard-feature",
+              "abiVersion": "dh.v10.standard-feature/1",
+              "moduleSha256": "0d389b8930c5ad268317c52c27ec8b623229b1ec23eb51ab6b447fd6da0cbb8d",
+              "bytes": 6332,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "sfeature-shadow-baseline@v010.1.0.0",
+              "role": "standard-feature",
+              "abiVersion": "dh.v10.standard-feature/1",
+              "moduleSha256": "53befb46aa30f13947a165e0c95345313ae9ca95994b1d06035672364b463b78",
+              "bytes": 1138,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "business-external-jobs@v010.1.0.0",
+              "role": "business",
+              "abiVersion": "v08-business-abi/1",
+              "moduleSha256": "3b64e0cd7738b7227d26174ce34e24b156c4ca65027f17c48890a8f429827a1e",
+              "bytes": 16962,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "business-external-jobs-b@v010.1.0.0",
+              "role": "business",
+              "abiVersion": "v08-business-abi/1",
+              "moduleSha256": "105df065f1c39aaf015dd422f271b13d46740273bf957a43b55ff2541dc89480",
+              "bytes": 4104,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "business-agent-workflow@v010.1.0.0",
+              "role": "business",
+              "abiVersion": "v08-business-abi/1",
+              "moduleSha256": "ca0853a85da896214c246114a8cd68642a72a52f5f683ac4c4d47ecb2b68fe42",
+              "bytes": 12711,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "business-wait-resume@v010.1.0.0",
+              "role": "business",
+              "abiVersion": "v08-business-abi/1",
+              "moduleSha256": "555ebb9bcdc8efb18623a02eb9974608b3981ac21b18450dfc2c55250e334fcd",
+              "bytes": 4628,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "capability-extjob-runx@v010.1.0.0",
+              "role": "capability",
+              "abiVersion": "v08-capability-abi/1",
+              "moduleSha256": "380d546571300da56dc40bf093b338ca05dc5eb60c870558dc2aad8c52fc1b9a",
+              "bytes": 9531,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": [
+                  "better-sqlite3"
+                ]
+              },
+              "externalEffect": true
+            },
+            {
+              "packageId": "capability-extnotify-provider@v010.1.0.0",
+              "role": "capability",
+              "abiVersion": "v08-capability-abi/1",
+              "moduleSha256": "8c74a57dd69e697c7a488073b338edf5a1e366af5cc3096e187c1543a6134117",
+              "bytes": 5654,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": [
+                  "better-sqlite3"
+                ]
+              },
+              "externalEffect": true
+            },
+            {
+              "packageId": "capability-agent-memory@v010.1.0.0",
+              "role": "capability",
+              "abiVersion": "v08-capability-abi/1",
+              "moduleSha256": "fa4f929d90148ecfb966cd4f3c0ab788e14103bfba8a921f1389222d159b02c0",
+              "bytes": 5556,
+              "externalImports": {
+                "node": [
+                  "node:path",
+                  "node:os",
+                  "node:fs"
+                ],
+                "npm": [
+                  "@kaicreator/domain-harness/v8/host"
+                ],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "capability-agent-tool-read@v010.1.0.0",
+              "role": "capability",
+              "abiVersion": "v08-capability-abi/1",
+              "moduleSha256": "973e330e369d7f75ea35d9ffe4d53ff69794482aa364096d52cfc484b15ee25e",
+              "bytes": 2516,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "kext-advisory-alpha@v010.1.0.0",
+              "role": "kernel-extension",
+              "abiVersion": "dh.v10.k-extension/1",
+              "moduleSha256": "54fe4702617ad996226a74dfa62ec3739b1871f053e8e3bfd422285bf766b870",
+              "bytes": 971,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            },
+            {
+              "packageId": "kext-advisory-beta@v010.1.0.0",
+              "role": "kernel-extension",
+              "abiVersion": "dh.v10.k-extension/1",
+              "moduleSha256": "3940715f4daacca1a34d8330e8ce5a8f2347964b64fbbfe6dcb84d57d234647f",
+              "bytes": 600,
+              "externalImports": {
+                "node": [],
+                "npm": [],
+                "native": []
+              },
+              "externalEffect": false
+            }
+          ]
+        }
+      }
+    },
+    "wait": {
+      "state": "resumed",
+      "timedOut": "timedOut",
+      "callback": "terminal",
+      "duplicate": true,
+      "childCorrelation": "child:wait-inst-1:wait-child-1:1",
+      "childResume": "submit",
+      "deadline": "WORKFLOW_DEADLINE_EXCEEDED",
+      "notifyDispatches": 2
+    },
+    "t08": {
+      "v1": "486122135a4d048787b4781243ab8290e2419727c36a4c5d5f31da4960da8911",
+      "v2": "63d68e3f675fbf06644d5e2297e63f37340ef7d47514cd54847149b113b58bda",
+      "buildId": "rich-v2"
+    },
+    "shadow": {
+      "match": "match",
+      "difference": "difference",
+      "observations": 140,
+      "cases": 32,
+      "writes": true,
+      "canPromote": false
+    },
+    "race": {
+      "outcomes": [
+        {
+          "ok": true,
+          "status": "admitted",
+          "idempotentReplay": false,
+          "effectId": "turn:external-jobs:race-inst-1:message:race%2Fmsg%2F1/effect/1",
+          "code": null
+        },
+        {
+          "ok": false,
+          "status": "UNKNOWN",
+          "code": "ADMISSION_EFFECT_AMBIGUOUS",
+          "message": "{\"status\":\"UNKNOWN\",\"messageId\":\"race/msg/1\",\"code\":\"ADMISSION_EFFECT_AMBIGUOUS\"}"
+        }
+      ],
+      "dispatches": 1,
+      "jobs": 1,
+      "permits": 1
+    }
+  },
+  "physical": {
+    "richPermits": 28,
+    "richInstances": 13,
+    "richJournals": 32,
+    "jobDispatches": 24,
+    "notifyDispatches": 2
+  },
+  "hiddenNotAvailable": [],
+  "notRun": [
+    "Ubuntu Build Host (this session is a Windows Node24 host with real file-backed SQLite)",
+    "R01 full regression / hidden validation / release qualification",
+    "T09 and T10B optional DAG nodes (not selected)",
+    "a JS network sandbox (deliberately NOT claimed; private npm/HTTP bypass is a code-review violation)"
+  ],
+  "result": "PASS_LOCAL_NODE24_SQLITE_FOCUSED"
+}

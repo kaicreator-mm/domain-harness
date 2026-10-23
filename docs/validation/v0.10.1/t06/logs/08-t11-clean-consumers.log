@@ -1,0 +1,11 @@
+T11_EVIDENCE C:/xDev/kAiCreator/_tmp/dh-i1290-t06/logs/08-t11-evidence.json
+T11_SUMMARY {"tiny":true,"richMain":true,"wait":true,"t08":true,"shadow":true,"race":true,"jobDispatches":24,"notifyDispatches":2,"permits":28}
+✔ T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-installed and physically executed on Node24 + SQLite (68230.646ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69948.571
