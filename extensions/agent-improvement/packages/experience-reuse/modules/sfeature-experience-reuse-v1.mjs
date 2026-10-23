@@ -77,7 +77,11 @@ export function assessExperienceApplicability(input){
     if(c.evidence==='FAIL')reasons.push('KNOWN_FAILED_CANDIDATE');
     const uncertainReasons=[];
     if(c.evidence!=='INDEPENDENT_PASS')uncertainReasons.push('VERIFICATION_NOT_ESTABLISHED');
-    if(c.candidateSha!==currentSha&&!c.compatibilityRef)
+    // A caller-supplied compatibilityRef is only a reference, not an
+    // independently attested current->candidate equivalence proof.
+    // Until a trusted verifier receipt is explicitly contracted, fail closed
+    // for every cross-SHA candidate (even when a ref string is supplied).
+    if(c.candidateSha!==currentSha)
       uncertainReasons.push('SOURCE_COMPATIBILITY_UNKNOWN');
     const result=Object.freeze({
       candidateId:c.candidateId,candidateSha:c.candidateSha,
