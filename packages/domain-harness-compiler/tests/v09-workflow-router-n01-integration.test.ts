@@ -14,8 +14,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { interpret } from '../src/qualified-package/payload/standard-sdk-v1.mjs';
-import { routeWorkflowIntent } from '../src/qualified-package/v09/workflow-router.mjs';
+import { interpret } from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
+import { routeWorkflowIntent } from '../../../domain-packages/standard/basic/workflow-router.mjs';
 import * as approval from '../../../examples/v08-domain-apps/business-approval.mjs';
 import * as engineering from '../../../examples/v08-domain-apps/business-engineering.mjs';
 

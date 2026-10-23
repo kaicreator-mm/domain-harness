@@ -39,7 +39,7 @@ import test, { after, before } from 'node:test';
 import { openSqliteCasStore, type SqliteCasStore } from '../../src/host-v8/index.js';
 
 const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8');
+const KERNEL_SOURCE = await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8');
 // Git blob SHA-1 of the payload file (the frozen identity form used across
 // the v0.10 planning/claim records).
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');

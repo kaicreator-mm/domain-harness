@@ -23,7 +23,6 @@ import test, { after } from 'node:test';
 import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/sqlite-cas-store.js';
 import { ChildInvocationCoordinator, ExternalWorkCoordinator } from '../../../packages/domain-harness/src/host-v8/durable-controls.js';
 
-const payloadDir = new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 // Memoized boot (no top-level await: root tests load as CJS through tsx —
 // the same discipline as the T02/T04 loaders).
 let kernel: Record<string, any>;
@@ -34,10 +33,10 @@ let dbPath = '';
 let booted: Promise<void> | undefined;
 const bootOnce = (): Promise<void> =>
   (booted ??= (async () => {
-    const kernelSource = await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8');
+    const kernelSource = await readFile(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8');
     kernelSha = sha256.digestUtf8(kernelSource);
     kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`) as Record<string, any>;
-    const featureSource = await readFile(new URL('sfeature-workflow-control-v1.mjs', payloadDir), 'utf8');
+    const featureSource = await readFile(new URL('../../../domain-packages/standard/features/workflow-control/modules/sfeature-workflow-control-v1.mjs', import.meta.url), 'utf8');
     const feature = await import(`data:text/javascript;base64,${Buffer.from(featureSource, 'utf8').toString('base64')}`) as Record<string, any>;
     plan = feature.planWorkflowControl as typeof plan;
     dir = await mkdtemp(path.join(tmpdir(), 'dh010-t03-'));

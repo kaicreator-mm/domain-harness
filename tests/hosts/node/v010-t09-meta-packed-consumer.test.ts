@@ -11,9 +11,9 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -33,6 +33,41 @@ const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
 const CONSUMER_SCRIPT = readFileSync(join(HERE, 'v010-t09-meta-packed-consumer.mjs'), 'utf8');
+// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
+const DOMAIN_PACKAGE_PAYLOADS = [
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
+  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
+];
+// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
+const DOMAIN_PACKAGE_PAYLOADS = [
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
+  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
+];
+// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
+const DOMAIN_PACKAGE_PAYLOADS = [
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
+  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
+];
+// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
+const DOMAIN_PACKAGE_PAYLOADS = [
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
+  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
+];
+// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
+const DOMAIN_PACKAGE_PAYLOADS = [
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
+  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
+];
 
 function runNpm(args: readonly string[], cwd: string): string {
   if (process.platform !== 'win32') {
@@ -69,6 +104,26 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
       staged.coreTarball.path, staged.compilerTarball.path,
     ], root);
     writeFileSync(join(root, 'index.mjs'), CONSUMER_SCRIPT, 'utf8');
+    mkdirSync(join(root, 'payload'));
+    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
+      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
+    }
+    mkdirSync(join(root, 'payload'));
+    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
+      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
+    }
+    mkdirSync(join(root, 'payload'));
+    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
+      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
+    }
+    mkdirSync(join(root, 'payload'));
+    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
+      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
+    }
+    mkdirSync(join(root, 'payload'));
+    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
+      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
+    }
     const output = execFileSync(process.execPath, ['index.mjs'], {
       cwd: root,
       encoding: 'utf8',
@@ -99,7 +154,10 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
       `the packed v10meta subpath ships its declaration file next to the runtime: ${resolved}`,
     );
     const payload = resolve(result.payloadResolved as string);
-    assert.ok(payload.includes('node_modules'), `the Business payload comes from the packed package: ${payload}`);
+    assert.ok(
+      !payload.includes('node_modules') && relative(root, payload).startsWith('payload'),
+      `the Business payload is the unchanged Domain Package copy staged in the clean consumer: ${payload}`,
+    );
     assert.ok((result.keys as string[]).some((key) => key.startsWith('v10-meta-feedback:')), 'the packed run wrote the ledger');
   } finally {
     rmSync(root, { recursive: true, force: true });

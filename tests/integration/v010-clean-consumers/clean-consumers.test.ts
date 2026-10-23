@@ -97,6 +97,16 @@ function packWorkspace(name: string, destination: string): { tarball: string; sh
   return { tarball, sha256 };
 }
 
+// The Domain Packages BUILD reads its selected payload bytes from (v0.10.2 L2 section 1.1).
+const DOMAIN_PACKAGE_DIRS = [
+  'domain-packages/kernel/basic',
+  'domain-packages/standard/basic',
+  'domain-packages/standard/features/semantic-decision',
+  'domain-packages/standard/features/workflow-control',
+  'domain-packages/standard/features/context-assembly',
+  'domain-packages/standard/features/decision-evidence',
+] as const;
+
 function writeConsumer(dir: string): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name: `t11-${basename(dir)}`, private: true, type: 'module' }, null, 2)}\n`);
@@ -169,10 +179,12 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
     // ---- (1) pack the exact runtime packages -----------------------------
     const core = packWorkspace('@kaicreator/domain-harness', packDir);
     const compiler = packWorkspace('@kaicreator/domain-harness-compiler', packDir);
+    // v0.10.2 T01: the selected K/S/feature payloads are non-workspace Domain Packages, packed by directory.
+    const domainPackages = DOMAIN_PACKAGE_DIRS.map((dir) => pack(join(REPO_ROOT, dir), packDir));
 
     // ---- (2) BUILD both Apps in an isolated builder installation ---------
     writeConsumer(builderDir);
-    npm(['install', core.tarball, compiler.tarball, '--no-fund', '--no-audit', '--loglevel=error'], builderDir);
+    npm(['install', core.tarball, compiler.tarball, ...domainPackages.map((entry) => entry.tarball), '--no-fund', '--no-audit', '--loglevel=error'], builderDir);
     cpSync(EXAMPLE_DIR, join(builderDir, 'example'), {
       recursive: true,
       filter: (source) => !/[\\/]out([\\/]|$)/u.test(source) && !/[\\/]node_modules([\\/]|$)/u.test(source),

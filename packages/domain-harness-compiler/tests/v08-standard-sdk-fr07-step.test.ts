@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ABI_VERSION, ENDPOINTS, MODULE_ID, STANDARD_KINDS,
   StandardSdkError, interpret, createHostBoundModelResolver,
-} from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+} from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 import { qualifyPackageClosure } from '../src/qualified-package/qualify.js';
 
 const MEASURED_ONE = { status: 'measured', count: 1, scope: 'bound-model-port-invocations' };
@@ -181,7 +181,7 @@ test('V08-FR07-S1-P3 the I04 single-model path (interpret/invokeDecision) is ret
 
 test('V08-FR07-S1-P4 the extended payload module still passes sealed BUILD closure qualification', async () => {
   const source = await readFile(
-    fileURLToPath(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)),
+    fileURLToPath(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url)),
     'utf8',
   );
   const business = [

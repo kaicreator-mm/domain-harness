@@ -56,7 +56,7 @@ import {
   evidenceKeyFor,
   ledgerKeyFor,
   openHarness,
-  payloadDir,
+  metaFeedbackFeatureUrl,
   refusal,
   roundIntent,
   seedEvidence,
@@ -372,7 +372,7 @@ test('T09-N4 invalid rounds and conflicting ledger reuse fail typed before a tur
 });
 
 test('T09-N5 the pure selected feature itself refuses authority-shaped material', async () => {
-  const source = await readFile(new URL('sfeature-meta-feedback-v1.mjs', payloadDir), 'utf8');
+  const source = await readFile(metaFeedbackFeatureUrl, 'utf8');
   const feature = await import(`data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`) as {
     proposeMetaFeedback: (request: unknown) => unknown;
   };

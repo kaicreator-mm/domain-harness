@@ -15,7 +15,7 @@ let selectedFeature: Promise<{ source: string; resolve: ResolveSemanticDecision 
 const loadSelectedFeature = (): Promise<{ source: string; resolve: ResolveSemanticDecision }> =>
   (selectedFeature ??= (async () => {
     const source = await readFile(
-      new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-semantic-decision-v1.mjs', import.meta.url),
+      new URL('../../domain-packages/standard/features/semantic-decision/modules/sfeature-semantic-decision-v1.mjs', import.meta.url),
       'utf8',
     );
     const feature = await import('data:text/javascript;base64,' + Buffer.from(source, 'utf8').toString('base64')) as {

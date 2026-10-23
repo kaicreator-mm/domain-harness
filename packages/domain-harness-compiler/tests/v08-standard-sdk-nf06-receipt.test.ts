@@ -13,7 +13,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // @ts-expect-error selected standard-sdk payload has no declaration file (.mjs)
-import * as sdk from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+import * as sdk from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 
 function code(error: unknown): unknown {
   return typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;

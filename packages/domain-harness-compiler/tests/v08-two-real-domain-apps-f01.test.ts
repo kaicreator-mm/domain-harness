@@ -14,12 +14,12 @@ import { buildQualifiedPackage, BuildError } from '../src/qualified-package/buil
 import { issueApprovalProof } from '../src/qualified-package/approval.js';
 import * as approval from '../../../examples/v08-domain-apps/business-approval.mjs';
 import * as engineering from '../../../examples/v08-domain-apps/business-engineering.mjs';
-import * as sdk from '../src/qualified-package/payload/standard-sdk-v1.mjs';
-import * as kernel from '../src/qualified-package/payload/kernel-mechanism-v1.mjs';
+import * as sdk from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
+import * as kernel from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
 
 const pinnedSources = {
-  kernel: new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url),
-  sdk: new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url),
+  kernel: new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url),
+  sdk: new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url),
   approval: new URL('../../../examples/v08-domain-apps/business-approval.mjs', import.meta.url),
   engineering: new URL('../../../examples/v08-domain-apps/business-engineering.mjs', import.meta.url),
 };

@@ -50,7 +50,7 @@ import {
   v10BuildPackageClosureDigest,
   v10OccurrenceBuildPinKey,
 } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { canonicalJsonStringify } from '../../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs';
+import { canonicalJsonStringify } from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
 import type {
   V10BuildActivationDecision,
   V10BuiltApp,

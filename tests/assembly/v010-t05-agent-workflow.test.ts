@@ -207,8 +207,8 @@ function physicalRows(path: string): number {
 
 async function standardBundle(): Promise<string> {
   const [sdk, router] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
   ]);
   const routerBody = router.replace(/^export /gm, '');
   return `${sdk}
@@ -227,7 +227,7 @@ async function featureModule(
   spec: { packageId: string; featureKey: string; featureExport: string; fixture?: boolean },
 ): Promise<V10ModuleInput> {
   const url = directory === 'payload'
-    ? new URL(`../../packages/domain-harness-compiler/src/qualified-package/payload/${file}`, import.meta.url)
+    ? new URL(`../../domain-packages/standard/features/${file.replace(/^sfeature-/, '').replace(/-v1\.mjs$/, '')}/modules/${file}`, import.meta.url)
     : new URL(`./fixtures-v010/${file}`, import.meta.url);
   const source = await readFile(url, 'utf8');
   return {
@@ -246,7 +246,7 @@ async function featureModule(
 
 async function richAgentModules(): Promise<V10ModuleInput[]> {
   const [kernel, sdk, business, memory, tool, contextFeature, semanticFeature, workflowFeature] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
     standardBundle(),
     readFile(new URL('./fixtures-v010/business-agent-workflow-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/capability-agent-memory-v1.mjs', import.meta.url), 'utf8'),

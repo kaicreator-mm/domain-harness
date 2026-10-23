@@ -21,9 +21,9 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const exampleDir = fileURLToPath(new URL('../../../examples/v09-clean-consumer/', import.meta.url));
 const payloadSources = [
-  'packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs',
-  'packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs',
-  'packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs',
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'domain-packages/standard/basic/workflow-router.mjs',
   'examples/v08-domain-apps/business-approval.mjs',
   'examples/v08-domain-apps/business-engineering.mjs',
   'examples/v08-domain-apps/capability-quote-tools.mjs',

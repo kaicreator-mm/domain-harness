@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ABI_VERSION, ENDPOINTS, MODULE_ID, PACKAGE_KIND, STANDARD_KINDS,
   StandardSdkError, interpret, createHostBoundModelResolver,
-} from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+} from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 import { qualifyPackageClosure } from '../src/qualified-package/qualify.js';
 
 function refused(code: string, execute: () => unknown): void {
@@ -25,7 +25,7 @@ test('V08-ABI-D01-P1 actual module self-describes the selected Standard Package 
   assert.equal(ABI_VERSION, 'v08-standard-sdk-abi/1');
   assert.deepEqual(STANDARD_KINDS, ['schema', 'rule', 'decision', 'workflow', 'operation']);
   assert.deepEqual(ENDPOINTS.map((x: { kind: string }) => x.kind), ['rule-interpreter']);
-  const source = await readFile(fileURLToPath(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)), 'utf8');
+  const source = await readFile(fileURLToPath(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url)), 'utf8');
   // Real BUILD static analyzer must see required ABI exports and no bare
   // imports, calls to eval/Function or transitive dynamic imports.
   const business = (id: string, type: string, abi: string, handler: string) =>
