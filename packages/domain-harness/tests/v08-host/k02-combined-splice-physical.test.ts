@@ -57,7 +57,8 @@ const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLen
 // on top of K01 R2 36f068e3). Any further kernel drift fails this import.
 // Re-pinned after accepted R01 K01 live same-turn repair #1205; previous selected C01/K02 blob 1a6a1394a505f4727306208d588fcab841e72980.
 // Re-pinned after the #1242 permitted-claim-only kernel change; previous spliced blob db7a8f16de2b26d2fdb10e6ca7f8e90b3f1daf30.
-const K02_SPLICED_KERNEL_BLOB_SHA1 = '72a886ffca85fc90caea954ee9fb5b3df7b4fcfa';
+// Re-pinned after the v0.10.2 T01k (#1321) additive read-only protocol exports; previous spliced blob 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa.
+const K02_SPLICED_KERNEL_BLOB_SHA1 = '68b77d4711a802bc6a3f6f5e73cbc58e769af32f';
 assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the combined test runs the exact spliced integration kernel bytes');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
