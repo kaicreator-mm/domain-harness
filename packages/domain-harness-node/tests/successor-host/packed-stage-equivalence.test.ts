@@ -30,7 +30,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { packTarballFrom, stagePackedWorkspaces } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
+import { packTarballFrom, stagePackedWorkspaces, stageNewWorkspaceTarballs } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NODE_PACKAGE_ROOT = resolve(HERE, '../..');
@@ -78,6 +78,12 @@ function rootSegment(relativePath: string): string {
 test('P2-01: staged core/compiler/node tarballs are content-equivalent to clean live npm packs, with the live-only divergence pinned to documented legacy orphans', async () => {
   const staged = await stagePackedWorkspaces({ includeNodePackage: true });
   assert.notEqual(staged.nodeTarball, undefined, 'the node-inclusive stage must produce a node tarball');
+  // #1337 (T07a2): the new-workspace bridge stages (package.json skeleton +
+  // committed-dist copy) must stay content-equivalent to clean live npm
+  // packs of the new v0.10.2-rc.0 workspaces as well — including the
+  // producer-path build workspace — or the bridge would install bytes that
+  // differ from what the workspaces actually ship.
+  const newPacks = await stageNewWorkspaceTarballs();
   const liveBase = mkdtempSync(join(tmpdir(), 'dh-live-packs-'));
   const extractBase = mkdtempSync(join(tmpdir(), 'dh-equiv-extract-'));
   try {
@@ -85,6 +91,10 @@ test('P2-01: staged core/compiler/node tarballs are content-equivalent to clean 
       { label: 'core', stagedTarball: staged.coreTarball, liveRoot: CORE_PACKAGE_ROOT, fragment: 'domain-harness-0.2.0', legacyOrphansAllowed: true },
       { label: 'compiler', stagedTarball: staged.compilerTarball, liveRoot: COMPILER_PACKAGE_ROOT, fragment: 'compiler', legacyOrphansAllowed: false },
       { label: 'node', stagedTarball: staged.nodeTarball!, liveRoot: NODE_PACKAGE_ROOT, fragment: 'domain-harness-node', legacyOrphansAllowed: false },
+      { label: 'contracts', stagedTarball: newPacks.contracts, liveRoot: join(NODE_PACKAGE_ROOT, '../contracts'), fragment: 'contracts', legacyOrphansAllowed: false },
+      { label: 'microkernel', stagedTarball: newPacks.microkernel, liveRoot: join(NODE_PACKAGE_ROOT, '../microkernel'), fragment: 'microkernel', legacyOrphansAllowed: false },
+      { label: 'host-node', stagedTarball: newPacks.hostNode, liveRoot: join(NODE_PACKAGE_ROOT, '../host-node'), fragment: 'host-node', legacyOrphansAllowed: false },
+      { label: 'build', stagedTarball: newPacks.build, liveRoot: join(NODE_PACKAGE_ROOT, '../../tooling/build'), fragment: 'build', legacyOrphansAllowed: false },
     ] as const;
     const orphanReport: string[] = [];
     for (const caseEntry of cases) {
@@ -138,7 +148,12 @@ test('P2-01: staged core/compiler/node tarballs are content-equivalent to clean 
 }, 600_000);
 
 test('P2-01: two independent staging processes produce byte-identical (exact-SHA) tarballs', async () => {
-  const stagedHere = await stagePackedWorkspaces({ includeNodePackage: true });
+  // #1337 (T07a2): the new-workspace bridge tarballs are included — the
+  // bridge install list is pinned by SHA256, so cross-process byte-identity
+  // of the staged new-workspace tarballs is part of the same
+  // reproducibility proof.
+  const stagedHere = await stagePackedWorkspaces({ includeNodePackage: true, includeNewWorkspaces: true });
+  const newPacksHere = stagedHere.newWorkspaceTarballs!;
   // A second, genuinely independent stage: fresh process, fresh mkdtemp root.
   const runner = mkdtempSync(join(tmpdir(), 'dh-stage-probe-'));
   try {
@@ -147,11 +162,15 @@ test('P2-01: two independent staging processes produce byte-identical (exact-SHA
     // No top-level await: the runner lives in tmpdir without a `type: module`
     // package.json, so tsx would compile it as CJS and reject TLA.
     writeFileSync(runnerScript, `import { stagePackedWorkspaces } from '${stageHelperUrl}';
-stagePackedWorkspaces({ includeNodePackage: true }).then((staged) => {
+stagePackedWorkspaces({ includeNodePackage: true, includeNewWorkspaces: true }).then((staged) => {
   console.log(JSON.stringify({
     core: staged.coreTarball.sha256,
     compiler: staged.compilerTarball.sha256,
     node: staged.nodeTarball?.sha256,
+    contracts: staged.newWorkspaceTarballs?.contracts.sha256,
+    microkernel: staged.newWorkspaceTarballs?.microkernel.sha256,
+    hostNode: staged.newWorkspaceTarballs?.hostNode.sha256,
+    build: staged.newWorkspaceTarballs?.build.sha256,
     coreName: staged.coreTarball.fileName,
     compilerName: staged.compilerTarball.fileName,
     nodeName: staged.nodeTarball?.fileName,
@@ -168,10 +187,18 @@ stagePackedWorkspaces({ includeNodePackage: true }).then((staged) => {
     });
     assert.equal(probe.status, 0, `independent stage probe failed: ${probe.stderr?.slice(-2000)}`);
     const lines = probe.stdout.trim().split('\n');
-    const report = JSON.parse(lines[lines.length - 1]!) as { core: string; compiler: string; node?: string; coreName: string; compilerName: string; nodeName?: string };
+    const report = JSON.parse(lines[lines.length - 1]!) as {
+      core: string; compiler: string; node?: string;
+      contracts?: string; microkernel?: string; hostNode?: string; build?: string;
+      coreName: string; compilerName: string; nodeName?: string;
+    };
     assert.equal(report.core, stagedHere.coreTarball.sha256, 'core tarball must be byte-identical across independent stages');
     assert.equal(report.compiler, stagedHere.compilerTarball.sha256, 'compiler tarball must be byte-identical across independent stages');
     assert.equal(report.node, stagedHere.nodeTarball?.sha256, 'node tarball must be byte-identical across independent stages');
+    assert.equal(report.contracts, newPacksHere.contracts.sha256, 'contracts tarball must be byte-identical across independent stages');
+    assert.equal(report.microkernel, newPacksHere.microkernel.sha256, 'microkernel tarball must be byte-identical across independent stages');
+    assert.equal(report.hostNode, newPacksHere.hostNode.sha256, 'host-node tarball must be byte-identical across independent stages');
+    assert.equal(report.build, newPacksHere.build.sha256, 'build tarball must be byte-identical across independent stages');
     assert.equal(report.coreName, stagedHere.coreTarball.fileName);
     assert.equal(report.compilerName, stagedHere.compilerTarball.fileName);
     assert.equal(report.nodeName, stagedHere.nodeTarball?.fileName);

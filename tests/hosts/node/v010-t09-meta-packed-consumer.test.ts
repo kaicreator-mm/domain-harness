@@ -17,7 +17,11 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { stagePackedWorkspaces } from '../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stagePackedWorkspaces,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 function npmRegistryReachable(): boolean {
   const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
@@ -65,7 +69,17 @@ function runNpm(args: readonly string[], cwd: string): string {
 test('T09-R1-P3 packed compiler clean install can actually call the v10meta workflow', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'dh010-t09-packed-consumer-'));
   try {
-    const staged = await stagePackedWorkspaces();
+    // #1337 (T07a2): this fixture explicitly exercises the producer/BUILD
+    // path (it builds and activates a selected App through the packed
+    // compiler), so its bridge install carries the full local new-workspace
+    // closure INCLUDING the build tarball — the one producer-path new
+    // workspace — in the SAME clean npm transaction as the legacy tarballs.
+    // Runtime-only fixtures request only ['hostNode'] (Tiny closure stays
+    // lean).
+    const staged = await stagePackedWorkspaces({ includeNewWorkspaces: true });
+    const newPacks = staged.newWorkspaceTarballs;
+    assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode', 'build']);
     writeFileSync(join(root, 'package.json'), JSON.stringify({
       name: 't09-packed-consumer',
       private: true,
@@ -74,7 +88,9 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
     runNpm([
       'install', '--ignore-scripts', '--no-audit', '--no-fund',
       staged.coreTarball.path, staged.compilerTarball.path,
+      ...bridgePaths,
     ], root);
+    assertNewWorkspacePackagesInstalled(root, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode, newPacks.build]);
     writeFileSync(join(root, 'index.mjs'), CONSUMER_SCRIPT, 'utf8');
     mkdirSync(join(root, 'payload'));
     for (const source of DOMAIN_PACKAGE_PAYLOADS) {

@@ -27,6 +27,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { sealRealApp } from './helpers.js';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 
 /**
  * CI robustness (N18 probe, #953 Controller 090 precedent): this journey
@@ -87,6 +92,15 @@ test('#1013 R2: packed consumer deep-import of the ops seam is refused enforceab
     const coreTgz = tarballs.find((name) => name.startsWith('kaicreator-domain-harness-0'))!;
     const nodeTgz = tarballs.find((name) => name !== coreTgz)!;
 
+    // #1337 (T07a2): this fixture keeps its own isolated legacy pack, and
+    // the exact local new-workspace tarballs from the shared verified stage
+    // join the SAME clean npm install transaction (verified dependency
+    // closure), so the @kaicreator/* closure resolves from local bytes once
+    // the legacy manifests gain their new-workspace dependency edges (T07b)
+    // instead of E404-ing on the unpublished rc.0 registry artifacts.
+    const newPacks = await stageNewWorkspaceTarballs();
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
+
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({
       name: 'domain-harness-gateway-session-negative',
       private: true,
@@ -97,10 +111,11 @@ test('#1013 R2: packed consumer deep-import of the ops seam is refused enforceab
     }, null, 2));
 
     runNpm([
-      'install', join(packs, coreTgz), join(packs, nodeTgz),
+      'install', join(packs, coreTgz), join(packs, nodeTgz), ...bridgePaths,
       '--no-audit', '--no-fund', '--ignore-scripts=false',
       ...(process.env.NPM_REGISTRY ? ['--registry', process.env.NPM_REGISTRY] : []),
     ], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     // The approved root is REAL sealed data built through the compiler path
     // repo-side; the uncredentialed consumer legitimately holds it.
