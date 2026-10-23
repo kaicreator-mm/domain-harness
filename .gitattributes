@@ -3,3 +3,7 @@
 # committed bytes) cannot false-fail on CRLF-normalizing checkouts.
 packages/domain-harness/dist/** -text
 packages/domain-harness-compiler/dist/** -text
+packages/contracts/dist/** -text
+packages/microkernel/dist/** -text
+packages/host-node/dist/** -text
+tooling/build/dist/** -text
