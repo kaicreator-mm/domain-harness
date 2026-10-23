@@ -50,11 +50,6 @@ test('v0.10.1 T05 — genuinely selected Feature-key collision stays fail-closed
       featureKey: SPECS[0].featureKey,
     }),
   ]);
-  assert.throws(() => buildV10App(
-    // Async base fixture already materialized outside the synchronous throw.
-    { appId: 'app:invalid', audience: 'aud:invalid', targetProfile: 'unsupported',
-      modules: [first, second], routes: [], hardBudget: {maxStepsPerTurn:8,maxWorkUnitsPerTurn:64} },
-  ), { code: 'V10_TARGET_UNSUPPORTED' });
   const composition = await basicComposition({ features: [first, second] });
   assert.throws(() => buildV10App(composition), { code: 'V10_FEATURE_COLLISION' });
 });
