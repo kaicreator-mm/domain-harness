@@ -70,16 +70,13 @@ node --import tsx --test tests/integration/v010-clean-consumers/clean-consumers.
 Override the npm registry with `T11_NPM_REGISTRY` when the local Verdaccio
 cache is unavailable.
 
-## PACK recipe
+## PACK recipe (the only non-example build change)
 
 `packages/domain-harness-compiler/package.json` exposes the already-built
-`./v10build` / `./v10shadow` dist as public subpaths. Since v0.10.2 T01 the sealed
-K/S/router/feature payload bytes are no longer compiler subpaths: they ship as the
-non-workspace Domain Packages under `domain-packages/**` (`@kaicreator/domain-kernel-basic`,
-`@kaicreator/domain-standard-basic`, `@kaicreator/domain-feature-*`), packed by directory
-and installed into the builder next to the compiler tarball. Without that, an installed
-consumer cannot BUILD or activate a v0.10 App without a deep `dist/` path. No runtime
-semantics changed.
+`./v10build` / `./v10shadow` dist and the sealed payload bytes as public
+subpaths (`./v10payload/*`), and ships the pure `v09/workflow-router.mjs`.
+Without that, an installed consumer cannot BUILD or activate a v0.10 App
+without a deep `dist/` path. No runtime semantics changed.
 
 ## Honest boundaries
 

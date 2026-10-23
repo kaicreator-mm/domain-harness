@@ -24,7 +24,7 @@ edited relative to its source at T11 claim time.
 `apps/rich/modules/business-wait-resume-v1.mjs` is the one App-owned Business
 added by T11: a WAIT/RESUME policy whose resume effect uses the accepted C01
 `extnotify` adapter. The selected K/S payload bytes are not copied here; the
-BUILD reads them from the installed Domain Packages (`@kaicreator/domain-kernel-basic`, `-standard-basic`, `-feature-*`).
+BUILD reads them from the installed compiler package (`./v10payload/*`).
 
 `apps/rich/candidates/` holds two non-selected Shadow L4 candidate sources
 (match and deliberate difference). They are never part of the BUILD roster.
