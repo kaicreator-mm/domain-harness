@@ -12,11 +12,13 @@
 // packed-stage-equivalence.test.ts, where the package test script guarantees
 // freshly built live core+node dists next to the committed compiler dist.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { compareDirectoryDigests, freshDistProblems, scavengeStaleStages } from './packed-fixture-stage.ts';
+import { compareDirectoryDigests, freshDistProblems, scavengeStaleStages, verifiedLocalWorkspaceTarballs } from './packed-fixture-stage.ts';
+import type { NewWorkspacePacks, PackedTarball } from './packed-fixture-stage.ts';
 
 function writeTree(root: string, files: Readonly<Record<string, string>>): void {
   for (const [relative, contents] of Object.entries(files)) {
@@ -126,5 +128,41 @@ test('P2-02: bounded scavenging removes only aged stage directories', () => {
     assert.ok(existsSync(staleFile), 'non-directory namesakes are never touched');
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('T07a2: local workspace tarballs resolve minimal dependency closure and fail closed on tampering', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dh-t07a2-local-tarballs-'));
+  try {
+    const pack = (name: string): PackedTarball => {
+      const path = join(root, `${name}.tgz`);
+      const bytes = `exact-local-tarball-${name}`;
+      writeFileSync(path, bytes);
+      return {
+        path,
+        fileName: `${name}.tgz`,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      };
+    };
+    const packs: NewWorkspacePacks = {
+      contracts: pack('contracts'),
+      microkernel: pack('microkernel'),
+      hostNode: pack('host-node'),
+      build: pack('build'),
+    };
+    const requested = (keys: readonly (keyof NewWorkspacePacks)[]) => verifiedLocalWorkspaceTarballs(packs, keys);
+    assert.deepEqual(requested(['microkernel']), [packs.contracts.path, packs.microkernel.path], 'Tiny excludes Host and BUILD');
+    assert.deepEqual(requested(['hostNode']), [packs.contracts.path, packs.microkernel.path, packs.hostNode.path], 'Host needs Microkernel and contracts');
+    assert.deepEqual(requested(['build']), [packs.contracts.path, packs.build.path], 'BUILD does not need runtime modules');
+    assert.deepEqual(requested(['hostNode', 'build']), [
+      packs.contracts.path, packs.microkernel.path, packs.hostNode.path, packs.build.path,
+    ], 'joint requested closure is stable and deduplicated');
+    assert.deepEqual(requested([]), [], 'no undeclared package is implicitly installed');
+    writeFileSync(packs.contracts.path, 'tampered bytes');
+    assert.throws(() => requested(['hostNode']), /sha256 mismatch/u, 'tampered dependency refuses before install');
+    rmSync(packs.hostNode.path);
+    assert.throws(() => requested(['hostNode']), /ENOENT/u, 'missing exact local tarball refuses instead of registry fallback');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
