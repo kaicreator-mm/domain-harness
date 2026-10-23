@@ -266,9 +266,9 @@ test('the gate accepts self-contained ESM and does not false-positive on method-
   assertZeroImportBuildModule('positive:clean', CAPABILITY_SOURCE);
   // The real selected v0.8 Kernel payload is a self-contained ESM whose
   // instance method named `require` is NOT a CommonJS import edge.
-  const kernelBytes = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'qualified-package', 'payload', 'kernel-mechanism-v1.mjs'), 'utf8');
+  const kernelBytes = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'domain-packages', 'kernel', 'basic', 'kernel-mechanism-v1.mjs'), 'utf8');
   assertZeroImportBuildModule('positive:real-kernel-payload', kernelBytes);
-  const standardBytes = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'qualified-package', 'payload', 'standard-sdk-v1.mjs'), 'utf8');
+  const standardBytes = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'domain-packages', 'standard', 'basic', 'standard-sdk-v1.mjs'), 'utf8');
   assertZeroImportBuildModule('positive:real-standard-payload', standardBytes);
 });
 

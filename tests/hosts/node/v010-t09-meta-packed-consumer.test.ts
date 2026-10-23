@@ -40,34 +40,6 @@ const DOMAIN_PACKAGE_PAYLOADS = [
   'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
   'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
 ];
-// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
-const DOMAIN_PACKAGE_PAYLOADS = [
-  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
-  'domain-packages/standard/basic/standard-sdk-v1.mjs',
-  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
-  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
-];
-// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
-const DOMAIN_PACKAGE_PAYLOADS = [
-  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
-  'domain-packages/standard/basic/standard-sdk-v1.mjs',
-  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
-  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
-];
-// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
-const DOMAIN_PACKAGE_PAYLOADS = [
-  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
-  'domain-packages/standard/basic/standard-sdk-v1.mjs',
-  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
-  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
-];
-// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
-const DOMAIN_PACKAGE_PAYLOADS = [
-  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
-  'domain-packages/standard/basic/standard-sdk-v1.mjs',
-  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
-  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
-];
 
 function runNpm(args: readonly string[], cwd: string): string {
   if (process.platform !== 'win32') {
@@ -104,22 +76,6 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
       staged.coreTarball.path, staged.compilerTarball.path,
     ], root);
     writeFileSync(join(root, 'index.mjs'), CONSUMER_SCRIPT, 'utf8');
-    mkdirSync(join(root, 'payload'));
-    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
-      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
-    }
-    mkdirSync(join(root, 'payload'));
-    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
-      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
-    }
-    mkdirSync(join(root, 'payload'));
-    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
-      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
-    }
-    mkdirSync(join(root, 'payload'));
-    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
-      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
-    }
     mkdirSync(join(root, 'payload'));
     for (const source of DOMAIN_PACKAGE_PAYLOADS) {
       copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
