@@ -165,7 +165,8 @@ try {
     assert.equal(typeof result,'object',featureKey+' advisory output');
     assert.notEqual(result,null,featureKey+' advisory output');
     // No execution, permit or Gate PASS is inferred from an advisory result.
-    assert.equal(result.taskGateVerdict,'NOT_DETERMINED',featureKey+' no gate authority');
+    assert.equal(i===2 ? result.adoptionVerdict : result.taskGateVerdict,
+      'NOT_DETERMINED',featureKey+' no gate/adoption authority');
     invoked.push(featureKey);
   }
   // Unselected Features do not dynamically load; test the zero-Feature App.
