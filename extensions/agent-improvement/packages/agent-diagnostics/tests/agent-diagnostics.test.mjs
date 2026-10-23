@@ -75,6 +75,16 @@ test('bad inputs, missing source identity, forged authority, accessors and spars
   const sparse = new Array(1);
   assert.throws(()=>analyzeAgentRun({subjectSha:SHA,events:sparse}),{code:'DIAG_EVENTS_INVALID'});
 });
+test('source-local sequence numbers across independent agents are not a total order', () => {
+  const result = analyzeAgentRun({subjectSha:SHA, events:[
+    event('s1',1,'FAIL',{sourceRef:'github:agent-A'}),
+    event('s2',40,'FAIL',{sourceRef:'github:agent-B'}),
+  ]});
+  assert.equal(result.firstFailure,null);
+  assert.equal(result.firstFailureAmbiguous,true);
+  assert(result.warnings.includes('FIRST_FAILURE_ORDER_AMBIGUOUS'));
+  assert.equal(result.taskGateVerdict,'NOT_DETERMINED');
+});
 test('safe observed ACT and unknown/NOT_RUN stay distinct', () => {
   const valid = analyzeAgentRun({subjectSha:SHA,events:[event('good',1,'PASS')],verifiers:[verifier('v')],
     expectedVerifierRefs:['v']});
