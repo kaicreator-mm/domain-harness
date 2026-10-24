@@ -1,1 +1,2 @@
-export declare const isObjectRecord: typeof import("@kaicreator/domain-harness-contracts").isObjectRecord, isPlainRecord: typeof import("@kaicreator/domain-harness-contracts").isPlainRecord;
+/** v0.10.2 T00: shared predicates have exactly one Contracts owner. */
+export { isObjectRecord, isPlainRecord } from '@kaicreator/domain-harness-contracts';
