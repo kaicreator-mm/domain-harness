@@ -317,7 +317,8 @@ test('T04-PUB-8: query isolates forged Host read/authority faults; subscribe ref
   // Ordinary non-typed Host reader exceptions also map to safe query refusals.
   store.poison = new Error('C:\\\\private\\\\tenants\\\\secret.txt', { cause: { apiKey: 'hidden' } });
   const rawFault = await refuseCoded(() => domainApp.query({ workflowId: 'order-quote', instanceKey: INTENT.instanceKey }));
-  assert.ok(rawFault instanceof V10Error);
+  assert.ok(rawFault instanceof Error);
+  assert.equal(rawFault.name, 'V10MultiBQueryError', 'the selected query reader owns its typed refusal');
   assert.equal(rawFault.code, 'QUERY_READ_FAILED');
   assert.equal('cause' in rawFault, false);
   assert.equal(rawFault.message.includes('private'), false);
