@@ -189,10 +189,10 @@ export async function load(app: V10BuiltApp, options: LoadAppOptions): Promise<D
     query: (async (
       selectorOrSelectors: unknown,
     ): Promise<V10ScopedSnapshotAnswer | readonly V10ScopedSnapshotManyAnswer[]> => {
-      const run = Array.isArray(selectorOrSelectors)
-        ? facade.queryManyScopedSnapshots(selectorOrSelectors as readonly V10ScopedSnapshotQuery[])
-        : facade.queryScopedSnapshot(selectorOrSelectors as V10ScopedSnapshotQuery);
       try {
+        const run = Array.isArray(selectorOrSelectors)
+          ? facade.queryManyScopedSnapshots(selectorOrSelectors as readonly V10ScopedSnapshotQuery[])
+          : facade.queryScopedSnapshot(selectorOrSelectors as V10ScopedSnapshotQuery);
         return await run;
       } catch (error) {
         throw publicError(error, 'QUERY_READ_FAILED');
