@@ -25,6 +25,11 @@
  *  - a strict NodeNext consumer `tsc` (skipLibCheck:false) types the minimum
  *    frozen journey with zero private imports (see `src/types.ts`).
  */
+import {
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+  assertNewWorkspacePackagesInstalled,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -76,7 +81,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#930 packed package exposes ./v7/execution and the frozen T010 journey runs from packed public bytes', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
+test('#930 packed package exposes ./v7/execution and the frozen T010 journey runs from packed public bytes', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-public-v7-execution-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
@@ -96,7 +101,14 @@ test('#930 packed package exposes ./v7/execution and the frozen T010 journey run
       type: 'module',
     }, null, 2));
 
-    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
+    // A2 early T07 manifest owner: preserve genuinely packed legacy H from
+    // this isolated consumer, install the exact local SHA-verified Contracts
+    // archive in the SAME npm transaction (never registry RC fallback).
+    const newPacks = await stageNewWorkspaceTarballs();
+    const localContracts = verifiedLocalWorkspaceTarballs(newPacks, ['contracts']);
+    assert.equal(localContracts.length, 1);
+    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball, ...localContracts], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts]);
     const installedPackage = join(consumer, 'node_modules', '@kaicreator', 'domain-harness');
     const installedDist = join(installedPackage, 'dist');
     assert.equal(
@@ -684,6 +696,16 @@ import {
   type ToolExposureAdmissionPolicy,
   type VerifiedToolImplementationBinding,
 } from '@kaicreator/domain-harness/v7/execution';
+// A2 T07a3: verify strict NodeNext resolves the canonical Contracts
+// declarations from an actually installed tarball, not repository source or
+// private deep imports. The T07a skeleton exports no names yet, so the
+// namespace import is the honest declaration-resolution probe; T00's re-run
+// pins the migrated error-class names on top of this same consumer.
+import type * as ContractsModule from '@kaicreator/domain-harness-contracts';
+type ContractsExportName = keyof typeof ContractsModule;
+declare const contractsExportProbe: ContractsExportName[];
+void contractsExportProbe;
+
 import type {
 
   AdmissionDurableEffectJournal,
