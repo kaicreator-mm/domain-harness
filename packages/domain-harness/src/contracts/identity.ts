@@ -1,21 +1,29 @@
 /** v0.10.2 T00: canonical identity is owned by contracts.
  * One identity with `@kaicreator/domain-harness-contracts` in every load
- * context. Native ESM resolves the package entry via `import.meta.resolve`;
- * the CJS-transpiled root test runner requires the sibling dist file (the
- * contracts exports map has no require condition; manifests are frozen to
- * T07a/T07b). Both forms converge on the same module instance through the
- * ESM cache (require(esm)).
+ * context. This file is portable v0.2 core (#165): no static Node built-in
+ * import is allowed, so the ESM branch obtains `createRequire` dynamically
+ * via `process.getBuiltinModule` and resolves the package entry through
+ * `import.meta.resolve` (native Node ESM — worktree and packed installs; the
+ * require(esm) channel there shares the loader cache with imports). The
+ * CJS-transpiled branch covers the root test runner under tsx, where the
+ * bare name cannot resolve (the contracts exports map has no require
+ * condition; manifests are frozen to T07a/T07b) — it requires the sibling
+ * dist file directly. Web-bundler runtimes without `require`/`process` are
+ * T07b debt: once the contracts manifest owns a require condition, this
+ * collapses to a plain bare re-export.
  */
-import { createRequire as contractsCreateRequire } from 'node:module';
-
 declare const require: NodeRequire | undefined;
 
-const contractsSource: typeof import('@kaicreator/domain-harness-contracts') =
+type ContractsModule = typeof import('@kaicreator/domain-harness-contracts');
+
+const contractsSource: ContractsModule =
   typeof require === 'function'
-    ? (require('../../../contracts/dist/index.js') as typeof import('@kaicreator/domain-harness-contracts'))
-    : contractsCreateRequire(import.meta.url)(
+    ? (require('../../../contracts/dist/index.js') as ContractsModule)
+    : ((globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }).process?.getBuiltinModule?.('module') as
+        | { createRequire: (url: string) => NodeRequire }
+        | undefined)?.createRequire(import.meta.url)(
         import.meta.resolve('@kaicreator/domain-harness-contracts'),
-      );
+      ) as ContractsModule;
 
 export const {
   IdentityContractError,

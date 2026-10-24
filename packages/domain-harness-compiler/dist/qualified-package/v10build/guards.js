@@ -3,7 +3,7 @@
  * context — see errors.ts for the dual-branch resolution rationale.
  */
 import { createRequire as contractsCreateRequire } from 'node:module';
-const contractsSource = typeof require === 'function'
+const contractsSource = (typeof require === 'function'
     ? require('../../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts'));
+    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts')));
 export const { isObjectRecord, isPlainRecord } = contractsSource;

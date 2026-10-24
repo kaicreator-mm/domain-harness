@@ -35,12 +35,11 @@ import { createRequire as contractsCreateRequire } from 'node:module';
 // converge on the same module instance through the ESM cache (require(esm)).
 declare const require: NodeRequire | undefined;
 
-const contractsSource: typeof import('@kaicreator/domain-harness-contracts') =
+const contractsSource = (
   typeof require === 'function'
-    ? (require('../../../contracts/dist/index.js') as typeof import('@kaicreator/domain-harness-contracts'))
-    : contractsCreateRequire(import.meta.url)(
-        import.meta.resolve('@kaicreator/domain-harness-contracts'),
-      );
+    ? require('../../../contracts/dist/index.js')
+    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts'))
+) as typeof import('@kaicreator/domain-harness-contracts');
 
 const { QualifiedPackageError, canonicalSnapshot } = contractsSource;
 export { QualifiedPackageError, canonicalSnapshot };

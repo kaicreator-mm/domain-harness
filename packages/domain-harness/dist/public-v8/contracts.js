@@ -25,9 +25,9 @@
  */
 import { createHash } from 'node:crypto';
 import { createRequire as contractsCreateRequire } from 'node:module';
-const contractsSource = typeof require === 'function'
+const contractsSource = (typeof require === 'function'
     ? require('../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts'));
+    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts')));
 const { QualifiedPackageError, canonicalSnapshot } = contractsSource;
 export { QualifiedPackageError, canonicalSnapshot };
 export const V8_QUALIFIED_ROOT_FORMAT = 'dhpkg/v8-qualified-root/1';
