@@ -97,7 +97,6 @@ function deploymentRetryableDetail(error) {
     const retryable = detail.retryable;
     return typeof retryable === 'boolean' ? { retryable } : undefined;
 }
-
 /**
  * Load one trusted prebuilt App and return the frozen public Facade.
  * The activation's structural plain-data refusals (typed, Contracts error
