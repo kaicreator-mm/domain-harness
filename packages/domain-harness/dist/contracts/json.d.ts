@@ -1,9 +1,3 @@
-export type JsonPrimitive = string | number | boolean | null;
-export type JsonArray = JsonValue[];
-export interface JsonObject {
-    [key: string]: JsonValue;
-}
-export type JsonValue = JsonPrimitive | JsonArray | JsonObject;
-/** Portable JSON Schema documents are JSON values at the SDK boundary. */
-export type JsonSchema = JsonObject;
+/** v0.10.2 T00: canonical JSON types are owned by contracts. */
+export type { JsonPrimitive, JsonArray, JsonObject, JsonValue, JsonSchema } from '@kaicreator/domain-harness-contracts';
 //# sourceMappingURL=json.d.ts.map

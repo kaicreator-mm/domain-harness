@@ -112,7 +112,7 @@ export function freshV10Counters(): V10Counters {
 }
 
 
-import type { V10AppView, V10DocWriteCondition, V10DocStore, V10ScopedQueryTarget, V10QueryAuthority, V10ScopedSnapshotQuery, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10PublicIntent } from '@kaicreator/domain-harness-contracts';
+import type { V10AppView, V10DocWriteCondition, V10DocStore, V10QueryAuthority, V10ScopedSnapshotQuery, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10PublicIntent } from '@kaicreator/domain-harness-contracts';
 export type { V10AppView, V10DocWriteCondition, V10DocStore, V10ScopedQueryTarget, V10QueryAuthority, V10ScopedSnapshotQuery, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10PublicIntent } from '@kaicreator/domain-harness-contracts';
 
 const PROTECTED_CONTEXT_NAMES = new Set([

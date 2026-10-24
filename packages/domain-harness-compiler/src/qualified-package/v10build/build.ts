@@ -66,7 +66,7 @@ import { V10BuildError } from './errors.js';
 import { resolveV10SelectedClosure } from './selected-closure.js';
 
 
-import type { V10ModuleInput, V10RouteRowInput, BuildV10AppOptions, V10SealedModule, V10BuiltApp } from '@kaicreator/domain-harness-contracts';
+import type { BuildV10AppOptions, V10SealedModule, V10BuiltApp } from '@kaicreator/domain-harness-contracts';
 export type { V10ModuleInput, V10RouteRowInput, BuildV10AppOptions, V10SealedModule, V10BuiltApp } from '@kaicreator/domain-harness-contracts';
 
 const HEX64 = /^[0-9a-f]{64}$/;

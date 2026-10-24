@@ -6,7 +6,7 @@
  * Not an untrusted-code sandbox; caller MUST dispose the returned closure.
  */
 import { registerHooks } from 'node:module';
-import type { V10AppView } from './activation.js';
+import type { V10AppView } from '@kaicreator/domain-harness-contracts';
 export declare function privateModuleFragment(activationNonce: string, packageId: string): string;
 /**
  * A separate, injectable registry is exposed only by this INTERNAL module
