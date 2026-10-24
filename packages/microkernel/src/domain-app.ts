@@ -29,6 +29,8 @@
 import {
   V10Error,
   V10ActivationError,
+  V10BuildError,
+  V10ExternalEffectError,
 } from '@kaicreator/domain-harness-contracts';
 import type {
   V10BuiltApp,
@@ -41,6 +43,7 @@ import type {
 } from '@kaicreator/domain-harness-contracts';
 import { activateV10App } from './internal/activation.js';
 import type { V10Activation } from './internal/activation.js';
+import { V10MultiBQueryError } from './internal/multib-query.js';
 
 /** The frozen public load options: no `counters` (L2 §3). */
 export interface LoadAppOptions {
@@ -92,59 +95,63 @@ const FORBIDDEN_MESSAGE_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * The public error contract (L2 §3 / O10): EVERY typed error crossing the
- * entry is rebuilt as a fresh same-class instance carrying exactly `name`,
- * `code` and a safe `message` — the thrown instance itself never crosses, so
- * its `cause`, its stack and any own property a Host callback attached to it
- * stay inside. Only the deployment family (`V10DeploymentError`, BUILD-owned
- * and unreachable by import here, hence matched by its frozen wire `name`)
- * additionally keeps a `detail`, reduced to exactly `{ retryable }` when the
- * original carried a boolean `retryable` and dropped otherwise. `code`, class
- * identity and safe messages are preserved; a message that would leak K
- * document keys, K key grammar or absolute Host paths is redacted to its
- * code-only form. The fresh instance's `stack` is the facade's own frame and
- * is not part of the contract.
+ * Only explicitly trusted code constructors cross the public error boundary.
+ * A Host error's prototype, cause, constructor, hidden fields, and message are
+ * not an authority source for picking executable constructors.
  */
-function publicError(error: unknown): unknown {
-  if (!(error instanceof V10Error)) return error;
-  const message = FORBIDDEN_MESSAGE_PATTERNS.some((pattern) => pattern.test(error.message))
-    ? `[${error.code}] the public facade refused this operation; the diagnostic rode a protected key or path grammar`
-    : error.message;
-  // The constructor is taken from the prototype, not from the instance (a
-  // forged own `constructor` must not choose what gets built), and whatever
-  // it builds must still be a real Contracts V10Error — otherwise the facade
-  // falls back to the base class rather than surface an arbitrary product.
-  const Ctor = (Object.getPrototypeOf(error) as {
-    constructor: new (code: string, message: string, detail?: { retryable: boolean }) => V10Error;
-  }).constructor;
-  let normalized: V10Error;
-  try {
-    normalized = new Ctor(error.code, message, deploymentRetryableDetail(error));
-  } catch {
-    normalized = new V10Error(error.code, message);
+function publicError(error: unknown, untypedCode: string): V10Error | V10MultiBQueryError {
+  const genericMessage = 'the public facade refused an internal Host failure';
+  if (!(error instanceof V10Error) && !(error instanceof V10MultiBQueryError)) {
+    return new V10Error(untypedCode, genericMessage);
   }
-  // A Host-supplied V10Error subclass can have a constructor that creates
-  // fresh secret-bearing own fields even when the original instance was
-  // discarded. Preserve the subtype ONLY when its new instance has exactly
-  // the public own-key contract. Symbols, cause and surprise fields fall
-  // back to the Contracts base class instead of crossing the facade.
-  const publicKeys = new Set(['stack', 'message', 'name', 'code',
-    ...(error.name === 'V10DeploymentError' ? ['detail'] : [])]);
-  if (!(normalized instanceof V10Error)
-    || normalized.code !== error.code
-    || normalized.message !== message
-    || Reflect.ownKeys(normalized).some((key) => typeof key !== 'string' || !publicKeys.has(key))) {
-    normalized = new V10Error(error.code, message);
+  // This is the *wire code* of a typed error; it is not an executable class.
+  const code = typeof error.code === 'string' ? error.code : untypedCode;
+  const message = typeof error.message === 'string'
+    && !FORBIDDEN_MESSAGE_PATTERNS.some((pattern) => pattern.test(error.message))
+    ? error.message
+    : `[${code}] the public facade refused this operation; protected diagnostic omitted`;
+  // Use exact trusted prototypes and constructors. Never evaluate
+  // Object.getPrototypeOf(error).constructor or execute untrusted subclasses:
+  // those may recreate secret-bearing own fields *or inherited getters*.
+  const proto: unknown = Object.getPrototypeOf(error);
+  if (proto === V10MultiBQueryError.prototype) {
+    return new V10MultiBQueryError(code, message);
   }
-  return normalized;
+  if (proto === V10ExternalEffectError.prototype) {
+    return new V10ExternalEffectError(code, message);
+  }
+  if (proto === V10ActivationError.prototype) {
+    return new V10ActivationError(code, message);
+  }
+  if (proto === V10BuildError.prototype) {
+    return new V10BuildError(code, message);
+  }
+  // Preserve exact Contracts base identity for an actual base-class error.
+  if (proto === V10Error.prototype) {
+    return new V10Error(code, message);
+  }
+  // Legacy Host's deployment class does not belong to the selected
+  // Microkernel's import graph. Preserve its bounded *wire name* and only
+  // {retryable} data, but NOT its untrusted class/prototype identity.
+  const safe = new V10Error(code, message);
+  if (error instanceof V10Error && error.name === 'V10DeploymentError') {
+    safe.name = 'V10DeploymentError';
+    const detail = deploymentRetryableDetail(error);
+    if (detail !== undefined) {
+      Object.defineProperty(safe, 'detail', {
+        value: detail, enumerable: true, writable: false, configurable: false,
+      });
+    }
+  }
+  return safe;
 }
 
-/** L2 §3: only `V10DeploymentError` may keep a `detail`, as exactly `{ retryable }`. */
+/** L2 §3: only deployment-named errors may keep exactly {retryable}. */
 function deploymentRetryableDetail(error: V10Error): { retryable: boolean } | undefined {
   if (error.name !== 'V10DeploymentError') return undefined;
-  const detail = (error as unknown as { detail?: unknown }).detail;
+  const detail: unknown = (error as unknown as { detail?: unknown }).detail;
   if (typeof detail !== 'object' || detail === null) return undefined;
-  const retryable = (detail as { retryable?: unknown }).retryable;
+  const retryable: unknown = (detail as { retryable?: unknown }).retryable;
   return typeof retryable === 'boolean' ? { retryable } : undefined;
 }
 
@@ -158,7 +165,7 @@ export async function load(app: V10BuiltApp, options: LoadAppOptions): Promise<D
   try {
     activation = await activateV10App(app, options);
   } catch (error) {
-    throw publicError(error);
+    throw publicError(error, 'V10_APP_INVALID');
   }
   const facade = activation.facade;
   const subscriptions = new Map<number, V10Subscription>();
@@ -176,7 +183,7 @@ export async function load(app: V10BuiltApp, options: LoadAppOptions): Promise<D
       try {
         return await facade.send(intent);
       } catch (error) {
-        throw publicError(error);
+        throw publicError(error, 'HOST_DOC_READ_FAILED');
       }
     },
     query: (async (
@@ -188,7 +195,7 @@ export async function load(app: V10BuiltApp, options: LoadAppOptions): Promise<D
       try {
         return await run;
       } catch (error) {
-        throw publicError(error);
+        throw publicError(error, 'QUERY_READ_FAILED');
       }
     }) as DomainApp['query'],
     subscribe: async (
@@ -212,7 +219,7 @@ export async function load(app: V10BuiltApp, options: LoadAppOptions): Promise<D
       try {
         facade.assertQueryPreconditions();
       } catch (error) {
-        throw publicError(error);
+        throw publicError(error, 'QUERY_AUTHORIZATION_UNAVAILABLE');
       }
       const id = nextSubscriptionId;
       nextSubscriptionId += 1;
