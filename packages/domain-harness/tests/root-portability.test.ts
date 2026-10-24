@@ -102,7 +102,7 @@ const fromEsm = await import(name);
 const requiredPath = require.resolve(name);
 const importedUrl = import.meta.resolve(name);
 assert.equal(importedUrl, pathToFileURL(requiredPath).href, 'import and require select one ESM dist/index.js');
-assert.ok(requiredPath.replace(/\\\\/g, '/').endsWith('/dist/index.js'));
+assert.ok(requiredPath.replaceAll(String.fromCharCode(92), '/').endsWith('/dist/index.js'));
 assert.strictEqual(fromCjs.IdentityContractError, fromEsm.IdentityContractError);
 assert.strictEqual(fromCjs.V10BuildError, fromEsm.V10BuildError);
 assert.strictEqual(fromCjs.V10Error, fromEsm.V10Error);
