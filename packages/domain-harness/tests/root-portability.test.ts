@@ -1,3 +1,8 @@
+import {
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+  assertNewWorkspacePackagesInstalled,
+} from '../../domain-harness-compiler/tests/packed-fixture-stage.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -45,7 +50,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#139 packed package root imports as portable v0.2 SDK in a clean consumer', (t) => {
+test('#139 packed package root imports as portable v0.2 SDK in a clean consumer', async (t) => {
   if (!npmRegistryReachable()) {
     t.skip('PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
     return;
@@ -70,12 +75,46 @@ test('#139 packed package root imports as portable v0.2 SDK in a clean consumer'
       type: 'module',
     }, null, 2));
 
-    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
+    // A2 early T07 manifest owner: preserve genuinely packed legacy H from
+    // this isolated consumer, install the exact local SHA-verified Contracts
+    // archive in the SAME npm transaction (never registry RC fallback).
+    const newPacks = await stageNewWorkspaceTarballs();
+    const localContracts = verifiedLocalWorkspaceTarballs(newPacks, ['contracts']);
+    assert.equal(localContracts.length, 1);
+    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball, ...localContracts], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts]);
     assert.equal(
       existsSync(join(consumer, 'node_modules', 'better-sqlite3')),
       false,
       'portable core consumer must not install better-sqlite3',
     );
+
+    // A2 T07a3 (P2-02): one actual installed ESM module, reachable from both
+    // Node24 import and require(esm) — no ERR_REQUIRE_ASYNC_MODULE, no CJS
+    // clone. Contracts is the T07a placeholder until T00 migrates the error
+    // classes, so the honest singleton proof is one identical export surface
+    // where every function/class export is the same object in both loaders.
+    writeFileSync(join(consumer, 'contracts-dual-loader.mjs'), `
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+const name = '@kaicreator/domain-harness-contracts';
+const require = createRequire(import.meta.url);
+const fromCjs = require(name);
+const fromEsm = await import(name);
+const requiredPath = require.resolve(name);
+const importedUrl = import.meta.resolve(name);
+assert.equal(importedUrl, pathToFileURL(requiredPath).href, 'import and require select one ESM dist/index.js');
+assert.ok(requiredPath.replaceAll(String.fromCharCode(92), '/').endsWith('/dist/index.js'));
+const esmKeys = Object.keys(fromEsm).sort();
+assert.deepEqual(Object.keys(fromCjs).sort(), esmKeys, 'both loaders expose one identical export surface');
+for (const key of esmKeys) {
+  if (typeof fromEsm[key] === 'function') {
+    assert.strictEqual(fromCjs[key], fromEsm[key], 'shared class/function object across loaders');
+  }
+}
+`);
+    run(process.execPath, ['contracts-dual-loader.mjs'], consumer);
 
     writeFileSync(join(consumer, 'index.mjs'), `
 import * as sdk from '@kaicreator/domain-harness';

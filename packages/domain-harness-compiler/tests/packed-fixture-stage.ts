@@ -488,8 +488,7 @@ export function verifiedLocalWorkspaceTarballs(
  */
 function stageNewWorkspace(kind: keyof typeof NEW_WORKSPACE_ROOTS, fragment: string, stageRoot: string, packsDirectory: string): StagedWorkspaceTarball {
   const source = NEW_WORKSPACE_ROOTS[kind];
-  // #1319 T00: contracts gained a README.md (inside its write set); stage it
-  // when present so P2-01 live-pack equivalence sees the same packlist.
+  // v0.10.2 A2: mirror the live npm pack inventory when README exists.
   stagePackageSkeleton(source, stageRoot, existsSync(join(source, 'README.md')));
   cpSync(join(source, 'dist'), join(stageRoot, 'dist'), { recursive: true });
   const tarball = packStage(stageRoot, packsDirectory, fragment, 1);
