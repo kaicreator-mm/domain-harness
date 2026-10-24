@@ -130,10 +130,10 @@ export async function load(app, options) {
             }
         },
         query: (async (selectorOrSelectors) => {
-            const run = Array.isArray(selectorOrSelectors)
-                ? facade.queryManyScopedSnapshots(selectorOrSelectors)
-                : facade.queryScopedSnapshot(selectorOrSelectors);
             try {
+                const run = Array.isArray(selectorOrSelectors)
+                    ? facade.queryManyScopedSnapshots(selectorOrSelectors)
+                    : facade.queryScopedSnapshot(selectorOrSelectors);
                 return await run;
             }
             catch (error) {
