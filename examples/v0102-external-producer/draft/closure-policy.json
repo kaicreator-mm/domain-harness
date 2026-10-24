@@ -1,0 +1,49 @@
+{
+  "schema": "dh/v0102/t09-closure-draft-1",
+  "status": "DRAFT_NOT_VERIFIED",
+  "profiles": {
+    "Tiny": {
+      "mustInclude": [
+        "@kaicreator/domain-harness-contracts",
+        "@kaicreator/domain-harness-microkernel"
+      ],
+      "mustExclude": [
+        "@kaicreator/domain-harness-build",
+        "@kaicreator/domain-harness-compiler",
+        "@kaicreator/domain-harness-host-node",
+        "better-sqlite3"
+      ],
+      "requiresPhysicalChecks": [
+        "selected K/S/B/C package files in actual tarballs",
+        "one registered K Basic, one S Basic, real Business/Capability",
+        "send/query",
+        "governed subscribe/stop T06b",
+        "no undeclared deep imports",
+        "no installed legacy compiler"
+      ]
+    },
+    "Rich": {
+      "mustInclude": [
+        "@kaicreator/domain-harness-contracts",
+        "@kaicreator/domain-harness-microkernel",
+        "@kaicreator/domain-harness-host-node"
+      ],
+      "mustExclude": [
+        "@kaicreator/domain-harness-build",
+        "@kaicreator/domain-harness-compiler"
+      ],
+      "requiresPhysicalChecks": [
+        "true SQLite CAS and reopen/restart",
+        "selected optional features and governed external effects",
+        "multi Business unique scoped query",
+        "shadow/meta/evidence",
+        "separate external BUILD producer"
+      ]
+    }
+  },
+  "limitations": [
+    "This fixture checks declared npm dependency edges, not side effects or all physical pack content.",
+    "Source tests do not qualify real Node24 clean installed Tiny/Rich.",
+    "Node24 only; later Node majors untested despite >=24.0.0 package ranges."
+  ]
+}
