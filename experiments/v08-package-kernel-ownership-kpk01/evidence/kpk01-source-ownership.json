@@ -1,0 +1,27 @@
+{
+  "falsifier": "KPK-01",
+  "kernelPackageId": "kernel-vnext@1.1.0",
+  "moduleSha256": "c87b1b7ac5df64734d7c0835a368bbcac84cd3a15294e9e8633407e2b211d756",
+  "executingFunctionsContainedInSealedBytes": [
+    "admitCentralDecision",
+    "executeEffectIntents",
+    "resolveAdmissionEffectIntents",
+    "wireAdmissionEffectBindings",
+    "VolatileAdmissionEffectJournal",
+    "WorkflowInstanceEngine",
+    "deriveDurableControlTurnId"
+  ],
+  "measuredCallCounts": {
+    "admissions": 1,
+    "guardEvaluations": 1,
+    "hardInvariantEvaluations": 1,
+    "journalBegins": 1,
+    "journalCompletes": 1,
+    "effectDispatches": 1,
+    "engineCommits": 1,
+    "instanceCreates": 1,
+    "instanceReads": 1
+  },
+  "receiptTurnId": "turn:order-quote:instance%3A42:message:msg%3A1",
+  "effectId": "turn:order-quote:instance%3A42:message:msg%3A1/effect/1"
+}
