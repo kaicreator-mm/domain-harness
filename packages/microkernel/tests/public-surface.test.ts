@@ -227,6 +227,34 @@ test('T04-PUB-7: a forged Host store error never crosses send as itself (R1 P1-0
   assert.equal(guarded.code, 'HOST_DOC_READ_FAILED');
   assertSafePublicError(guarded);
 
+  // R2 P1-01: inherited prototype accessors are not own properties. An
+  // untrusted Host subclass constructor must NEVER be selected for rebuilding.
+  class PrototypeLeakingError extends V10Error {
+    get cause(): unknown { return { privateToken: 'secret:inherited' }; }
+    get tenantCredential(): string { return 'secret:inherited'; }
+  }
+  store.poison = new PrototypeLeakingError('HOST_DOC_READ_FAILED', 'safe refusal');
+  const inherited = await refuseCode(() => domainApp.send({ ...INTENT }));
+  assert.equal(inherited.constructor, V10Error);
+  assert.equal('cause' in inherited, false, 'inherited Host cause cannot cross');
+  assert.equal('tenantCredential' in inherited, false, 'inherited Host secret cannot cross');
+  assert.equal(inherited.code, 'HOST_DOC_READ_FAILED');
+  assertSafePublicError(inherited);
+
+  // R2 P1-02: an ordinary system/OS error also crosses no private diagnostic.
+  const osError = new Error('/home/private/tenant-credential: access refused', {
+    cause: { apiKey: 'secret:ordinary' },
+  });
+  (osError as unknown as Record<string, unknown>).tenantCredential = 'secret:ordinary';
+  store.poison = osError;
+  const ordinary = await refuseCode(() => domainApp.send({ ...INTENT }));
+  assert.ok(ordinary instanceof V10Error);
+  assert.equal(ordinary.code, 'HOST_DOC_READ_FAILED');
+  assert.notEqual(ordinary, osError);
+  assert.equal(JSON.stringify(ordinary).includes('secret:'), false);
+  assert.equal(ordinary.message.includes('/home/private'), false);
+  assertSafePublicError(ordinary);
+
   // Deployment-shaped forged error: `detail` reduced to exactly `{ retryable }`.
   const deployment = new ForgedDeploymentError(
     'V10_DEPLOYMENT_REFUSED',
@@ -236,7 +264,8 @@ test('T04-PUB-7: a forged Host store error never crosses send as itself (R1 P1-0
   store.poison = deployment;
   const reduced = await refuseCode(() => domainApp.send({ ...INTENT }));
   assert.ok(reduced !== deployment);
-  assert.ok(reduced instanceof ForgedDeploymentError, 'class identity is preserved');
+  assert.equal(reduced.constructor, V10Error, 'untrusted Host subclass is rebuilt as trusted Contracts base');
+  assert.equal(reduced.name, 'V10DeploymentError', 'bounded deployment wire name preserved');
   assert.deepEqual((reduced as ForgedDeploymentError).detail, { retryable: true });
   assertSafePublicError(reduced);
 
@@ -284,6 +313,15 @@ test('T04-PUB-8: query isolates forged Host read/authority faults; subscribe ref
   assert.equal(readFault.name, 'V10MultiBQueryError');
   assert.equal(readFault.code, 'QUERY_READ_FAILED');
   assertSafePublicError(readFault);
+
+  // Ordinary non-typed Host reader exceptions also map to safe query refusals.
+  store.poison = new Error('C:\\\\private\\\\tenants\\\\secret.txt', { cause: { apiKey: 'hidden' } });
+  const rawFault = await refuseCoded(() => domainApp.query({ workflowId: 'order-quote', instanceKey: INTENT.instanceKey }));
+  assert.ok(rawFault instanceof V10Error);
+  assert.equal(rawFault.code, 'QUERY_READ_FAILED');
+  assert.equal('cause' in rawFault, false);
+  assert.equal(rawFault.message.includes('private'), false);
+  assertSafePublicError(rawFault);
 
   // A Host authority callback that throws is isolated the same way.
   const throwing = new V10Error('QUERY_AUTHORIZATION_UNAVAILABLE', 'safe', { cause: { secret: 'x' } });
