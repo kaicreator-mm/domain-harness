@@ -696,6 +696,14 @@ import {
   type ToolExposureAdmissionPolicy,
   type VerifiedToolImplementationBinding,
 } from '@kaicreator/domain-harness/v7/execution';
+// A2 T07a3: verify NodeNext sees the canonical Contracts declarations from
+// an actually installed tarball, not repository source/private deep imports.
+import type { IdentityContractError, V10BuildError } from '@kaicreator/domain-harness-contracts';
+declare const contractsIdentity: IdentityContractError;
+declare const contractsBuildError: V10BuildError;
+void contractsIdentity.code;
+void contractsBuildError.code;
+
 import type {
 
   AdmissionDurableEffectJournal,
