@@ -7,7 +7,7 @@
  * script/manifest mutation. Dist byte SHA must be physically pinned after build.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,17 +15,38 @@ export const BUILD_PARSER_PIN = Object.freeze({
   name: 'acorn',
   version: '8.19.0',
   upstreamSourceSha256: '76254fc76529713b4dfd2532972d17a991ffd9aafeebb1f977445b5506b9fb0b',
-  // Physical Node24 output pending. NEVER promote without replacing this
-  // fail-closed sentinel with the verified dist/generated/acorn.js SHA-256.
-  distSha256: 'PENDING_PHYSICAL_T05_DIST_PIN',
+  // Node v24.21.0 / typescript 5.8.3 (lockfile-pinned) tsc emission of
+  // src/generated/acorn.ts. Physical BUILD1 output, pinned 2026-10-24;
+  // re-derive only with the same toolchain and re-pin deliberately.
+  distSha256: 'fcc0f872458c16ec224c202de4bdf49c01be03f707394e3897176084bf4a5373',
   ecmaVersion: 2022,
   sourceType: 'module',
 } as const);
 
 let verified = false;
+
+/**
+ * The pinned bytes are the EMITTED `dist/generated/acorn.js` — the artifact
+ * this package ships. Resolution covers both execution layouts: running from
+ * `dist/` (installed/packed package, path sits beside the module) and running
+ * from `src/` under tsx (tests gate on the same built file one level up).
+ * A missing file fails closed: the pin is meaningless without the build.
+ */
+function resolveEmittedAcornPath(): string {
+  const selfDir = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(selfDir, 'generated', 'acorn.js'),
+    join(selfDir, '..', 'dist', 'generated', 'acorn.js'),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`VENDORED_PARSER_UNREADABLE: emitted Acorn bytes not found; looked in ${candidates.join(', ')}`);
+}
+
 export function assertVendoredParserBytes(): void {
   if (verified) return;
-  const file = join(dirname(fileURLToPath(import.meta.url)), 'generated', 'acorn.js');
+  const file = resolveEmittedAcornPath();
   let actual: string;
   try {
     actual = createHash('sha256').update(readFileSync(file)).digest('hex');

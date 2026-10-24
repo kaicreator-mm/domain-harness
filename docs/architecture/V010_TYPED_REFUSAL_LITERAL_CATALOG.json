@@ -169,6 +169,29 @@
     "packages/contracts/src/known-error-codes.ts": [],
     "packages/microkernel/src/index.ts": [],
     "packages/host-node/src/index.ts": [],
-    "tooling/build/src/index.ts": []
+    "tooling/build/src/build.ts": [
+      "BUILD_GRAPH_INVALID",
+      "BUILD_INPUT_INVALID",
+      "V10_ABI_UNSUPPORTED",
+      "V10_AUTHORITY_FORGERY",
+      "V10_DIGEST_MISMATCH",
+      "V10_FEATURE_COLLISION",
+      "V10_INTENT_CONFLICT",
+      "V10_PROVIDER_COLLISION",
+      "V10_ROLE_CARDINALITY",
+      "V10_ROUTE_INVALID",
+      "V10_TARGET_UNSUPPORTED"
+    ],
+    "tooling/build/src/generated/acorn.ts": [],
+    "tooling/build/src/import-policy.ts": [
+      "V10_IMPORT_POLICY_DENIED"
+    ],
+    "tooling/build/src/index.ts": [],
+    "tooling/build/src/parser.ts": [],
+    "tooling/build/src/selected-closure.ts": [
+      "V10_DEPENDENCY_CYCLE",
+      "V10_DEPENDENCY_MISSING",
+      "V10_FEATURE_MISSING"
+    ]
   }
 }

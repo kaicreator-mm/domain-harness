@@ -46,7 +46,6 @@
 import { isBuiltin } from 'node:module';
 import { isObjectRecord } from '@kaicreator/domain-harness-contracts';
 import { parse } from './generated/acorn.js';
-import type { AcornNode } from '../v09build/generated/acorn.mjs';
 import { assertVendoredParserBytes, BUILD_PARSER_PIN } from './parser.js';
 import { V10BuildError } from '@kaicreator/domain-harness-contracts';
 
@@ -109,7 +108,7 @@ export function emptyExternalImports(): V10ExternalImports {
 function denied(moduleLabel: string, reason: string): V10BuildError {
   return new V10BuildError(
     'V10_IMPORT_POLICY_DENIED',
-    `sealed module ${moduleLabel} is refused by the v0.10 import-closure gate (parser acorn@${V09_BUILD_PARSER_PIN.version}): ${reason}`,
+    `sealed module ${moduleLabel} is refused by the v0.10 import-closure gate (parser acorn@${BUILD_PARSER_PIN.version}): ${reason}`,
   );
 }
 
@@ -140,9 +139,9 @@ export function collectModuleEdges(moduleLabel: string, source: string): readonl
   let program: { type: string; body: readonly AcornNode[] };
   try {
     program = parse(source, {
-      ecmaVersion: V09_BUILD_PARSER_PIN.ecmaVersion,
-      sourceType: V09_BUILD_PARSER_PIN.sourceType,
-    });
+      ecmaVersion: BUILD_PARSER_PIN.ecmaVersion,
+      sourceType: BUILD_PARSER_PIN.sourceType,
+    }) as { type: string; body: readonly AcornNode[] };
   } catch (error) {
     const loc = (error as { loc?: { line?: number; column?: number } }).loc;
     const at = loc ? `${String(loc.line ?? '?')}:${String(loc.column ?? '?')}` : '?';
