@@ -3,3 +3,6 @@ export * from './digest.js';
 export * from './known-error-codes.js';
 export * from './errors.js';
 export * from './guards.js';
+export * from './identity.js';
+export * from './json.js';
+export * from './qualified-canonical.js';
