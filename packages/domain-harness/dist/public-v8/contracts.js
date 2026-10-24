@@ -24,8 +24,12 @@
  * guard/journal/effect/state-transition mechanism or business special case.
  */
 import { createHash } from 'node:crypto';
-import { QualifiedPackageError, canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
-export { QualifiedPackageError, canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
+import { createRequire as contractsCreateRequire } from 'node:module';
+const contractsSource = typeof require === 'function'
+    ? require('../../../contracts/dist/index.js')
+    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts'));
+const { QualifiedPackageError, canonicalSnapshot } = contractsSource;
+export { QualifiedPackageError, canonicalSnapshot };
 export const V8_QUALIFIED_ROOT_FORMAT = 'dhpkg/v8-qualified-root/1';
 export const V8_APPROVAL_PROOF_TYPE = 'v08-external-approval/1';
 export const V8_QUALIFIED_PRODUCER_PREFIX = 'qualified-producer:';

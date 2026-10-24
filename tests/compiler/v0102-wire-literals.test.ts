@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as contracts from '@kaicreator/domain-harness-contracts';
+// Root test files run CJS-transpiled under tsx; the contracts exports map has
+// no require condition (manifest frozen to T07a/T07b), so consume the shipped
+// dist file directly — the same module every package-name import resolves to.
+import * as contracts from '../../packages/contracts/dist/index.js';
 import { V10_BUILD_FORMAT as ShimBuildFormat } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/digest.js';
 import { V10ExternalEffectError as ShimEffectError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
 test('T00: selected ABI, wire literals, and shared identity unchanged', () => {

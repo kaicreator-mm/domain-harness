@@ -23,7 +23,9 @@
  * This module contains — and may never contain — any workflow/admission/
  * guard/journal/effect/state-transition mechanism or business special case.
  */
-export { QualifiedPackageError, canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
+declare const QualifiedPackageError: typeof import("@kaicreator/domain-harness-contracts").QualifiedPackageError, canonicalSnapshot: typeof import("@kaicreator/domain-harness-contracts").canonicalSnapshot;
+export { QualifiedPackageError, canonicalSnapshot };
+export type QualifiedPackageError = import('@kaicreator/domain-harness-contracts').QualifiedPackageError;
 export type { QualifiedCleanupFailure } from '@kaicreator/domain-harness-contracts';
 /**
  * #1023 S03 — the data-only lifecycle context handed to a package's

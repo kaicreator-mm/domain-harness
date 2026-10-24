@@ -163,17 +163,10 @@
     "packages/contracts/src/digest.ts": [],
     "packages/contracts/src/errors.ts": [],
     "packages/contracts/src/guards.ts": [],
-    "packages/contracts/src/identity.ts": [
-      "INVALID_CANONICAL_JSON",
-      "INVALID_CONTENT_DIGEST"
-    ],
     "packages/contracts/src/import-types.ts": [],
     "packages/contracts/src/index.ts": [],
     "packages/contracts/src/json.ts": [],
     "packages/contracts/src/known-error-codes.ts": [],
-    "packages/contracts/src/qualified-canonical.ts": [
-      "ROOT_RECORD_UNSAFE"
-    ],
     "packages/microkernel/src/index.ts": [],
     "packages/host-node/src/index.ts": [],
     "tooling/build/src/index.ts": []

@@ -1,4 +1,4 @@
-/** v0.10.2 T00: canonical identity is owned by contracts. */
-export { IdentityContractError, canonicalizeJson, canonicalJsonStringify, computeCanonicalJsonDigest, isContentDigest } from '@kaicreator/domain-harness-contracts';
+export declare const IdentityContractError: typeof import("@kaicreator/domain-harness-contracts").IdentityContractError, canonicalizeJson: typeof import("@kaicreator/domain-harness-contracts").canonicalizeJson, canonicalJsonStringify: typeof import("@kaicreator/domain-harness-contracts").canonicalJsonStringify, computeCanonicalJsonDigest: typeof import("@kaicreator/domain-harness-contracts").computeCanonicalJsonDigest, isContentDigest: typeof import("@kaicreator/domain-harness-contracts").isContentDigest;
+export type IdentityContractError = import('@kaicreator/domain-harness-contracts').IdentityContractError;
 export type { Sha256Port, ContentDigest, ExactContentIdentity, IdentityContractErrorCode } from '@kaicreator/domain-harness-contracts';
 //# sourceMappingURL=identity.d.ts.map

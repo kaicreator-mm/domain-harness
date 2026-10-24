@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as contracts from '../src/index.js';
+// Acquire contracts through the same module channel the legacy shims use
+// (createRequire over the resolved package entry). Under tsx the ESM-import
+// cache and the require(esm) cache are distinct, so a bare `import` here
+// would compare against a second instance and defeat the single-identity
+// assertion. The assertion stays real: a shim that redeclared a class would
+// produce a fresh class object that is reference-unequal to this one.
+import { createRequire } from 'node:module';
+const requireFromHere = createRequire(import.meta.url);
+const contracts = requireFromHere(import.meta.resolve('@kaicreator/domain-harness-contracts')) as typeof import('../src/index.js');
 import { V10Error as OldError, V10BuildError as OldBuildError } from '../../domain-harness-compiler/src/qualified-package/v10build/errors.js';
 import { QualifiedPackageError as OldQualifiedError } from '../../domain-harness/src/public-v8/contracts.js';
 import { IdentityContractError as OldIdentityError } from '../../domain-harness/src/contracts/identity.js';
