@@ -29,9 +29,9 @@ test('T03a CAS: strict required conditions, missing keys, fault paths and physic
   await assert.rejects(store.remove('x', {}), { code: 'HOST_PUT_CONDITION_REQUIRED' });
   await assert.rejects(store.put('x', 1, { mustMatchRevision: 0 }), { code: 'HOST_CAS_CONFLICT' });
   store.failNextPutMatching('x');
-  await assert.rejects(store.put('x', 1, { mustBeAbsent: true }), { code: 'HOST_STORAGE_WRITE_FAILED' });
+  await assert.rejects(store.put('x', 1, { mustBeAbsent: true }), { code: 'HOST_FAULT_INJECTED' });
   store.failNextGetMatching('x');
-  await assert.rejects(store.get('x'), { code: 'HOST_STORAGE_READ_FAILED' });
+  await assert.rejects(store.get('x'), { code: 'HOST_FAULT_INJECTED' });
   await probeTrueCasStore(store);
   await store.close();
 });
