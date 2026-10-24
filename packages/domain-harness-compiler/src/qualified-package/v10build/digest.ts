@@ -1,25 +1,8 @@
-/** v0.10.2 T00: canonical ABI/digest functions have one owner in contracts.
- * K-private legacy key mirrors remain transitional for T04 and are NOT exported by contracts.
- * One identity with `@kaicreator/domain-harness-contracts` in every load
- * context (native ESM via `import.meta.resolve`; CJS-transpiled root test
- * runner via the sibling dist file — the contracts exports map has no
- * require condition and manifests are frozen to T07a/T07b). Both forms
- * converge on the same module instance through the ESM cache (require(esm)).
+/** v0.10.2 T00: canonical ABI and digest identities are owned by Contracts.
+ * A2/T07a3 exposes one ESM singleton for import and require on Node24.
+ * K-private document key mirrors remain transitional for T04 only.
  */
-import { createRequire as contractsCreateRequire } from 'node:module';
-import { fileURLToPath as contractsFileURLToPath } from 'node:url';
-
-declare const require: NodeRequire | undefined;
-
-const contractsSource = (
-  typeof require === 'function'
-    ? require('../../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(
-        contractsFileURLToPath(import.meta.resolve('@kaicreator/domain-harness-contracts')),
-      )
-) as typeof import('@kaicreator/domain-harness-contracts');
-
-export const {
+export {
   V10_BUILD_FORMAT,
   V10_TARGET_PROFILE,
   V10_RUNTIME_ABI,
@@ -38,7 +21,7 @@ export const {
   sha256Hex,
   canonicalJson,
   sha256Canonical,
-} = contractsSource;
+} from '@kaicreator/domain-harness-contracts';
 export type { V10ModuleRole } from '@kaicreator/domain-harness-contracts';
 
 export function v10KernelInstanceDocKey(workflowId: string, instanceKey: string): string {
