@@ -9,6 +9,11 @@
  * entry files, the root entry stays additive/identity-stable, and the legacy
  * `./v2` entry remains untouched in both directions.
  */
+import {
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+  assertNewWorkspacePackagesInstalled,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -80,7 +85,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#551 packed package exposes the additive ./v7 successor entry in a clean consumer', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
+test('#551 packed package exposes the additive ./v7 successor entry in a clean consumer', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-public-v7-portable-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
@@ -100,7 +105,14 @@ test('#551 packed package exposes the additive ./v7 successor entry in a clean c
       type: 'module',
     }, null, 2));
 
-    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
+    // A2 early T07 manifest owner: preserve genuinely packed legacy H from
+    // this isolated consumer, install the exact local SHA-verified Contracts
+    // archive in the SAME npm transaction (never registry RC fallback).
+    const newPacks = await stageNewWorkspaceTarballs();
+    const localContracts = verifiedLocalWorkspaceTarballs(newPacks, ['contracts']);
+    assert.equal(localContracts.length, 1);
+    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball, ...localContracts], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts]);
     // The installed tree is the unpacked tarball: these assertions prove the
     // tarball contains the built successor entry files.
     const installedDist = join(

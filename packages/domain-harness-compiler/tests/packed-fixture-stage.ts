@@ -488,7 +488,8 @@ export function verifiedLocalWorkspaceTarballs(
  */
 function stageNewWorkspace(kind: keyof typeof NEW_WORKSPACE_ROOTS, fragment: string, stageRoot: string, packsDirectory: string): StagedWorkspaceTarball {
   const source = NEW_WORKSPACE_ROOTS[kind];
-  stagePackageSkeleton(source, stageRoot, false);
+  // v0.10.2 A2: mirror the live npm pack inventory when README exists.
+  stagePackageSkeleton(source, stageRoot, existsSync(join(source, 'README.md')));
   cpSync(join(source, 'dist'), join(stageRoot, 'dist'), { recursive: true });
   const tarball = packStage(stageRoot, packsDirectory, fragment, 1);
   const manifest = JSON.parse(readFileSync(join(stageRoot, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
