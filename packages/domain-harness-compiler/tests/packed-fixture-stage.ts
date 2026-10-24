@@ -54,7 +54,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -488,7 +488,9 @@ export function verifiedLocalWorkspaceTarballs(
  */
 function stageNewWorkspace(kind: keyof typeof NEW_WORKSPACE_ROOTS, fragment: string, stageRoot: string, packsDirectory: string): StagedWorkspaceTarball {
   const source = NEW_WORKSPACE_ROOTS[kind];
-  stagePackageSkeleton(source, stageRoot, false);
+  // #1319 T00: contracts gained a README.md (inside its write set); stage it
+  // when present so P2-01 live-pack equivalence sees the same packlist.
+  stagePackageSkeleton(source, stageRoot, existsSync(join(source, 'README.md')));
   cpSync(join(source, 'dist'), join(stageRoot, 'dist'), { recursive: true });
   const tarball = packStage(stageRoot, packsDirectory, fragment, 1);
   const manifest = JSON.parse(readFileSync(join(stageRoot, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
