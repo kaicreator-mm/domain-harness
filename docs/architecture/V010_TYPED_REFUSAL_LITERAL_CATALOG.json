@@ -157,6 +157,18 @@
       "MEMORY_SEARCH_INVALID",
       "MEMORY_TTL_INVALID",
       "MEMORY_VALUE_INVALID"
-    ]
+    ],
+    "packages/contracts/src/activation-types.ts": [],
+    "packages/contracts/src/build-types.ts": [],
+    "packages/contracts/src/digest.ts": [],
+    "packages/contracts/src/errors.ts": [],
+    "packages/contracts/src/guards.ts": [],
+    "packages/contracts/src/import-types.ts": [],
+    "packages/contracts/src/index.ts": [],
+    "packages/contracts/src/json.ts": [],
+    "packages/contracts/src/known-error-codes.ts": [],
+    "packages/microkernel/src/index.ts": [],
+    "packages/host-node/src/index.ts": [],
+    "tooling/build/src/index.ts": []
   }
 }

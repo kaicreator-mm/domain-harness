@@ -49,6 +49,9 @@ import type { AcornNode } from '../v09build/generated/acorn.mjs';
 import { assertVendoredParserBytes, V09_BUILD_PARSER_PIN } from '../v09build/parser.js';
 import { V10BuildError } from './errors.js';
 
+import type { V10ExternalImports } from '@kaicreator/domain-harness-contracts';
+export type { V10ExternalImports } from '@kaicreator/domain-harness-contracts';
+
 const MAX_AST_DEPTH = 2_000;
 
 const CODE_STRING_CONSTRUCTORS = new Set(['Function', 'GeneratorFunction', 'AsyncFunction', 'AsyncGeneratorFunction']);
@@ -91,13 +94,6 @@ function forbiddenMemberName(node: AcornNode): string | null {
   if (property === undefined) return null;
   const name = member.computed ? specifierOf(property) : property.type === 'Identifier' ? nodeName(property) : null;
   return name !== null && EVALUATOR_PROPERTY_NAMES.has(name) ? name : null;
-}
-
-/** The sealed per-module allowance of ordinary external imports. */
-export interface V10ExternalImports {
-  readonly node: readonly string[];
-  readonly npm: readonly string[];
-  readonly native: readonly string[];
 }
 
 export function emptyExternalImports(): V10ExternalImports {

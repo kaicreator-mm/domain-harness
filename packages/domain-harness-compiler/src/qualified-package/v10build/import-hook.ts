@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { V10ActivationError } from './errors.js';
 import { isPlainRecord } from './guards.js';
-import type { V10AppView } from './activation.js';
+import type { V10AppView } from '@kaicreator/domain-harness-contracts';
 
 export function privateModuleFragment(activationNonce: string, packageId: string): string {
   return `#v10-${activationNonce}-${encodeURIComponent(packageId)}`;

@@ -1,9 +1,5 @@
-/** The sealed per-module allowance of ordinary external imports. */
-export interface V10ExternalImports {
-    readonly node: readonly string[];
-    readonly npm: readonly string[];
-    readonly native: readonly string[];
-}
+import type { V10ExternalImports } from '@kaicreator/domain-harness-contracts';
+export type { V10ExternalImports } from '@kaicreator/domain-harness-contracts';
 export declare function emptyExternalImports(): V10ExternalImports;
 /** One static module edge collected from the pinned-parser AST walk. */
 export interface V10ModuleEdge {
