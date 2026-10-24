@@ -20,9 +20,11 @@ interface ClosurePolicy {
 }
 
 function lockName(path: string): string | null {
-  const parts = path.split('/node_modules/');
-  const last = parts.at(-1);
-  if (parts.length < 2 || last === undefined || last.length === 0) return null;
+  const marker = 'node_modules/';
+  const start = path.lastIndexOf(marker);
+  if (start < 0) return null;
+  const last = path.slice(start + marker.length);
+  if (last.length === 0) return null;
   const name = last.startsWith('@') ? last.split('/').slice(0, 2).join('/') : last.split('/')[0];
   return name.length === 0 ? null : name;
 }
