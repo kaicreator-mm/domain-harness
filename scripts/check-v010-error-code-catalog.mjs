@@ -31,6 +31,21 @@ for (const dir of compilerDirs) {
 for (const name of (await readdir(hostDir)).sort()) {
   if (/^v010[^/]*\.ts$/.test(name)) sourceFiles.push(join(hostDir, name));
 }
+// T00 selected owner roots, preserving the legacy scan until T03/T04/T05 move sources.
+for (const owner of [
+  'packages/contracts/src', 'packages/microkernel/src',
+  'packages/host-node/src', 'tooling/build/src',
+]) {
+  async function collect(directory) {
+    for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a,b)=>a.name.localeCompare(b.name,'en'))) {
+      const full=join(directory,entry.name);
+      if (entry.isDirectory()) await collect(full);
+      else if (entry.name.endsWith('.ts')) sourceFiles.push(full);
+    }
+  }
+  await collect(join(root,owner));
+}
+
 const entries = {};
 for (const filename of sourceFiles) {
   const source = await readFile(filename, 'utf8');
