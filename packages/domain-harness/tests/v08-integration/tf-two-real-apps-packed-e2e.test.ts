@@ -39,6 +39,11 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 
 import {
   buildQualifiedPackage,
@@ -184,6 +189,14 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
     runNpm(['pack', '--pack-destination', packs], nodePackageRoot);
     const tarballs = readdirSync(packs).filter((name) => name.endsWith('.tgz'));
     assert.equal(tarballs.length, 2, 'core + node packs (the node pack carries the better-sqlite3 dependency)');
+    // #1337 (T07a2): this fixture keeps its own isolated legacy pack, and
+    // the exact local new-workspace tarballs from the shared verified stage
+    // join the SAME clean npm install transaction (verified dependency
+    // closure), so the @kaicreator/* closure resolves from local bytes once
+    // the legacy manifests gain their new-workspace dependency edges (T07b)
+    // instead of E404-ing on the unpublished rc.0 registry artifacts.
+    const newPacks = await stageNewWorkspaceTarballs();
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({
       name: 'dh1005-tf-packed-e2e-consumer',
       private: true,
@@ -191,10 +204,11 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
       allowScripts: { 'better-sqlite3': true },
     }, null, 2));
     runNpm([
-      'install', ...tarballs.map((name) => join(packs, name)),
+      'install', ...tarballs.map((name) => join(packs, name)), ...bridgePaths,
       '--no-audit', '--no-fund', '--ignore-scripts=false',
       ...(process.env.NPM_REGISTRY ? ['--registry', process.env.NPM_REGISTRY] : []),
     ], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     writeFileSync(join(consumer, 'sealed-approval-root.json'), JSON.stringify(d2.root), 'utf8');
     writeFileSync(join(consumer, 'sealed-engineering-root.json'), JSON.stringify(d3.root), 'utf8');

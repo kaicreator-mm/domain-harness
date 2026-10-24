@@ -33,6 +33,12 @@ import test from 'node:test';
 
 import Database from 'better-sqlite3';
 
+import {
+  assertNewWorkspacePackagesInstalled,
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
+
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const EXAMPLE_DIR = join(REPO_ROOT, 'examples', 'v010-clean-consumer');
 const NPM_REGISTRY = process.env.T11_NPM_REGISTRY ?? 'http://localhost:14873';
@@ -112,8 +118,8 @@ function writeConsumer(dir: string): void {
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name: `t11-${basename(dir)}`, private: true, type: 'module' }, null, 2)}\n`);
 }
 
-function installRuntime(consumerDir: string, tarballs: readonly string[], appTarballs: readonly string[]): void {
-  npm(['install', ...tarballs, ...appTarballs, 'better-sqlite3@^12.0.0', '--no-fund', '--no-audit', '--loglevel=error'], consumerDir);
+function installRuntime(consumerDir: string, tarballs: readonly string[], appTarballs: readonly string[], bridgeTarballs: readonly string[] = []): void {
+  npm(['install', ...tarballs, ...appTarballs, ...bridgeTarballs, 'better-sqlite3@^12.0.0', '--no-fund', '--no-audit', '--loglevel=error'], consumerDir);
   npm(['install-scripts', 'approve', 'better-sqlite3'], consumerDir);
   npm(['rebuild', 'better-sqlite3'], consumerDir);
   // The native driver must physically load before any App is executed.
@@ -182,9 +188,24 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
     // v0.10.2 T01: the selected K/S/feature payloads are non-workspace Domain Packages, packed by directory.
     const domainPackages = DOMAIN_PACKAGE_DIRS.map((dir) => pack(join(REPO_ROOT, dir), packDir));
 
+    // #1337 (T07a2) — the packed new-workspace dependency bridge: the exact
+    // LOCAL tarballs (+ SHA256) of the new @kaicreator/domain-harness-
+    // {contracts,microkernel,host-node,build} workspaces join the SAME clean
+    // npm install transactions below (verified dependency closure), so once
+    // the legacy manifests gain their new-workspace dependency edges (T07b)
+    // the whole @kaicreator/* closure resolves from local bytes instead of
+    // E404-ing on the unpublished rc.0 registry artifacts. The builder
+    // (producer/BUILD path) additionally installs the build tarball; the
+    // Tiny and Rich RUNTIME installs request only the host-node closure — a
+    // runtime closure never pulls the build tool in unconditionally.
+    const newPacks = await stageNewWorkspaceTarballs();
+    const runtimeBridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
+    const builderBridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode', 'build']);
+
     // ---- (2) BUILD both Apps in an isolated builder installation ---------
     writeConsumer(builderDir);
-    npm(['install', core.tarball, compiler.tarball, ...domainPackages.map((entry) => entry.tarball), '--no-fund', '--no-audit', '--loglevel=error'], builderDir);
+    npm(['install', core.tarball, compiler.tarball, ...domainPackages.map((entry) => entry.tarball), ...builderBridgePaths, '--no-fund', '--no-audit', '--loglevel=error'], builderDir);
+    assertNewWorkspacePackagesInstalled(builderDir, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode, newPacks.build]);
     cpSync(EXAMPLE_DIR, join(builderDir, 'example'), {
       recursive: true,
       filter: (source) => !/[\\/]out([\\/]|$)/u.test(source) && !/[\\/]node_modules([\\/]|$)/u.test(source),
@@ -203,9 +224,11 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
 
     // ---- (3) two ISOLATED clean installations ---------------------------
     writeConsumer(tinyDir);
-    installRuntime(tinyDir, [core.tarball, compiler.tarball], [tinyApp.tarball]);
+    installRuntime(tinyDir, [core.tarball, compiler.tarball], [tinyApp.tarball], runtimeBridgePaths);
+    assertNewWorkspacePackagesInstalled(tinyDir, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
     writeConsumer(richDir);
-    installRuntime(richDir, [core.tarball, compiler.tarball], [richV1App.tarball, richV2App.tarball]);
+    installRuntime(richDir, [core.tarball, compiler.tarball], [richV1App.tarball, richV2App.tarball], runtimeBridgePaths);
+    assertNewWorkspacePackagesInstalled(richDir, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     // Tiny's installed graph physically contains no advanced package.
     const tinyTopLevel = readdirSync(join(tinyDir, 'node_modules')).flatMap((name) => name.startsWith('@') ? readdirSync(join(tinyDir, 'node_modules', name)).map((child) => `${name}/${child}`) : [name]);
@@ -312,6 +335,13 @@ test('T11-CLEAN-CONSUMERS: Tiny and Rich are independently packed, clean-install
       npmRegistry: NPM_REGISTRY,
       tarballs: Object.fromEntries(Object.entries({ core, compiler, tinyApp, richV1App, richV2App }).map(([key, value]) => [key, {
         file: basename(value.tarball), sha256: value.sha256,
+      }])),
+      // #1337 (T07a2) bridge provenance: the exact local new-workspace
+      // tarballs installed alongside the legacy artifacts
+      // (regression-fixture bridge, NOT a claim of final supported v0.10.2
+      // distribution — T07b/T09 own that proof).
+      bridgeTarballs: Object.fromEntries([newPacks.contracts, newPacks.microkernel, newPacks.hostNode, newPacks.build].map((tarball) => [tarball.packageName, {
+        file: tarball.fileName, sha256: tarball.sha256, version: tarball.version,
       }])),
       builds: buildReport.apps,
       scenarios: {

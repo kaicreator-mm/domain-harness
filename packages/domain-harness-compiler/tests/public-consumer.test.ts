@@ -21,13 +21,14 @@
  *   imports stay closed by the package `exports` map;
  * - the packed dist runtime inventory is exercised by direct evaluation.
  */
+import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { stagePackedWorkspaces } from './packed-fixture-stage.js';
+import { assertNewWorkspacePackagesInstalled, stagePackedWorkspaces, verifiedLocalWorkspaceTarballs } from './packed-fixture-stage.js';
 
 
 /**
@@ -95,8 +96,17 @@ test('packed compiler exposes the stable root build API to a clean consumer', { 
     // (tests/packed-fixture-stage.ts) instead of an in-test rebuild + live-dist
     // pack, which raced the parallel e8a/e8b fixtures on the shared workspace
     // dist (Woodpecker 1083/1 npm pack unexpected EOF).
-    const staged = await stagePackedWorkspaces();
-    const tarballs = [staged.coreTarball.path, staged.compilerTarball.path];
+    // #1337 (T07a2): the exact local new-workspace tarballs join the SAME
+    // clean npm transaction (verified dependency closure), so the whole
+    // @kaicreator/* closure resolves from local bytes — when the legacy
+    // manifests gain their new-workspace dependency edges (T07b), npm must
+    // not try to fetch the unpublished @kaicreator/*@0.10.2-rc.0 artifacts
+    // from a registry (the E404 that made A1 defer those edges).
+    const staged = await stagePackedWorkspaces({ includeNewWorkspaces: true });
+    const newPacks = staged.newWorkspaceTarballs;
+    assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+    const tarballs = [staged.coreTarball, staged.compilerTarball];
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
 
     writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
       name: 'domain-harness-compiler-clean-consumer',
@@ -108,9 +118,12 @@ test('packed compiler exposes the stable root build API to a clean consumer', { 
       // @types/node mirrors the T-016 consumer: the compiler is a Node build-host
       // tool and the authoritative core contracts it re-exports reference
       // AbortSignal, which the consumer typechecks with skipLibCheck: false.
-      ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', ...tarballs],
+      ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', ...tarballs.map((tarball) => tarball.path), ...bridgePaths],
       consumerDirectory,
     );
+    // The bridge packages are physically installed under their exact staged
+    // identities — local-tarball provenance, not a registry resolution.
+    assertNewWorkspacePackagesInstalled(consumerDirectory, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     writeFileSync(join(consumerDirectory, 'index.ts'), `// T008C clean-consumer fixture: the full committed compiler root surface, proven
 // against the packed dist by tsc (skipLibCheck: false) in this clean consumer.

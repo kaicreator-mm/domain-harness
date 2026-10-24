@@ -64,6 +64,14 @@ const PACKAGE_ROOT = resolve(HERE, '..');
 const REPO_ROOT = resolve(PACKAGE_ROOT, '../..');
 const CORE_PACKAGE_ROOT = join(REPO_ROOT, 'packages', 'domain-harness');
 const NODE_PACKAGE_ROOT = join(REPO_ROOT, 'packages', 'domain-harness-node');
+// A1 #1335: future T00 legacy shims consume unpublished 0.10.2 workspaces.
+// Packing exact local tarballs avoids accidental registry resolution (E404).
+const NEW_WORKSPACE_ROOTS = {
+  contracts: join(REPO_ROOT, 'packages', 'contracts'),
+  microkernel: join(REPO_ROOT, 'packages', 'microkernel'),
+  hostNode: join(REPO_ROOT, 'packages', 'host-node'),
+  build: join(REPO_ROOT, 'tooling', 'build'),
+} as const;
 
 const STAGE_DIRECTORY_PREFIX = 'dh-packed-stage-';
 const STAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -74,12 +82,32 @@ export interface PackedTarball {
   readonly sha256: string;
 }
 
+/**
+ * #1337 (T07a2): a packed new-workspace tarball that additionally carries
+ * its manifest identity (the @kaicreator/* name and exact version the
+ * tarball was packed from), so bridge consumers can assert post-install
+ * provenance against the staged — not registry-resolved — bytes.
+ */
+export interface StagedWorkspaceTarball extends PackedTarball {
+  readonly packageName: string;
+  readonly version: string;
+}
+
+export interface NewWorkspacePacks {
+  readonly contracts: StagedWorkspaceTarball;
+  readonly microkernel: StagedWorkspaceTarball;
+  readonly hostNode: StagedWorkspaceTarball;
+  readonly build: StagedWorkspaceTarball;
+}
+
 export interface StagedPacks {
   readonly root: string;
   readonly packsDirectory: string;
   readonly coreTarball: PackedTarball;
   readonly compilerTarball: PackedTarball;
-  readonly nodeTarball?: PackedTarball;
+  readonly nodeTarball?: PackedTarball | undefined;
+  /** Opt-in local 0.10.2-rc.0 tarball closure; never resolved via npm registry. */
+  readonly newWorkspaceTarballs?: NewWorkspacePacks | undefined;
 }
 
 function run(command: string, args: readonly string[], cwd: string): string {
@@ -106,7 +134,7 @@ function runNpm(args: readonly string[], cwd: string): string {
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 16 * 1024 * 1024,
     shell: true,
-  } as Parameters<typeof execFileSync>[1]) as string;
+  });
 }
 
 function sha256File(path: string): string {
@@ -337,7 +365,7 @@ function packStage(stageRoot: string, packsDirectory: string, nameFragment: stri
   return packTarballFrom(stageRoot, packsDirectory, nameFragment, expectedCount);
 }
 
-async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
+async function stageOnce(includeNodePackage: boolean, includeNewWorkspaces: boolean): Promise<StagedPacks> {
   // P2-02: lazily sweep stages orphaned by hard-killed processes first.
   scavengeStaleStages();
   const root = mkdtempSync(join(tmpdir(), STAGE_DIRECTORY_PREFIX));
@@ -399,11 +427,147 @@ async function stageOnce(includeNodePackage: boolean): Promise<StagedPacks> {
       nodeTarball = packStage(join(root, 'node'), packsDirectory, 'domain-harness-node', 1);
     }
 
+    // These are exact local tarballs of the four unpublished new workspaces.
+    // Copy the already-built dist read-only; never rebuild the LIVE tree from
+    // inside a parallel test. The canonical source/dist guard remains owned
+    // by the repository build/task-check and T07b delivery tests.
+    let newWorkspaceTarballs: NewWorkspacePacks | undefined;
+    if (includeNewWorkspaces) {
+      newWorkspaceTarballs = stageAllNewWorkspaces(root, packsDirectory);
+    }
+
     process.once('exit', () => rmSync(root, { recursive: true, force: true }));
-    return { root, packsDirectory, coreTarball, compilerTarball, nodeTarball };
+    return { root, packsDirectory, coreTarball, compilerTarball, nodeTarball, newWorkspaceTarballs };
   } catch (error) {
     rmSync(root, { recursive: true, force: true });
     throw error;
+  }
+}
+
+
+/**
+ * T07a2: return dependency-complete local tarball paths for a selected legacy packed consumer.
+ * Each requested workspace draws its dependency closure from the local staged
+ * .tgz files, never from unpublished 0.10.2-rc.0 registry versions. Only the
+ * requested runtime/BUILD packages and their transitive dependencies appear:
+ * no accidental BUILD compiler in a Tiny Microkernel install.
+ *
+ * Fail closed if a staged tarball vanished or its bytes changed after pack.
+ * Pass the returned paths in ONE npm install invocation alongside legacy
+ * core/compiler/node tarballs. A list is not a success claim for npm install.
+ */
+export function verifiedLocalWorkspaceTarballs(
+  packs: NewWorkspacePacks,
+  requested: readonly (keyof NewWorkspacePacks)[],
+): readonly string[] {
+  const selected = new Set<keyof NewWorkspacePacks>();
+  const include = (key: keyof NewWorkspacePacks): void => {
+    if (selected.has(key)) return;
+    if (key === 'hostNode') include('microkernel');
+    if (key === 'hostNode' || key === 'microkernel' || key === 'build') include('contracts');
+    selected.add(key);
+  };
+  for (const key of requested) include(key);
+  const order = ['contracts', 'microkernel', 'hostNode', 'build'] as const;
+  return order.filter((key) => selected.has(key)).map((key) => {
+    const tarball = packs[key];
+    const actualSha256 = sha256File(tarball.path);
+    if (actualSha256 !== tarball.sha256) {
+      throw new Error(`local packed workspace ${key} sha256 mismatch: expected ${tarball.sha256}, got ${actualSha256}`);
+    }
+    return tarball.path;
+  });
+}
+
+/**
+ * #1337 (T07a2): stage one new workspace as a read-only copy (package.json
+ * skeleton + committed dist) and pack it. The returned record carries the
+ * manifest name@version so bridge consumers can assert post-install
+ * provenance (assertNewWorkspacePackagesInstalled) against the staged — not
+ * registry-resolved — bytes.
+ */
+function stageNewWorkspace(kind: keyof typeof NEW_WORKSPACE_ROOTS, fragment: string, stageRoot: string, packsDirectory: string): StagedWorkspaceTarball {
+  const source = NEW_WORKSPACE_ROOTS[kind];
+  stagePackageSkeleton(source, stageRoot, false);
+  cpSync(join(source, 'dist'), join(stageRoot, 'dist'), { recursive: true });
+  const tarball = packStage(stageRoot, packsDirectory, fragment, 1);
+  const manifest = JSON.parse(readFileSync(join(stageRoot, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
+  if (typeof manifest.name !== 'string' || typeof manifest.version !== 'string' || manifest.name.length === 0 || manifest.version.length === 0) {
+    throw new Error(`staged new workspace ${kind} manifest lacks a usable name/version`);
+  }
+  return { ...tarball, packageName: manifest.name, version: manifest.version };
+}
+
+function stageAllNewWorkspaces(stageRoot: string, packsDirectory: string): NewWorkspacePacks {
+  return {
+    contracts: stageNewWorkspace('contracts', 'domain-harness-contracts', join(stageRoot, 'new-contracts'), packsDirectory),
+    microkernel: stageNewWorkspace('microkernel', 'domain-harness-microkernel', join(stageRoot, 'new-microkernel'), packsDirectory),
+    hostNode: stageNewWorkspace('hostNode', 'domain-harness-host-node', join(stageRoot, 'new-hostNode'), packsDirectory),
+    build: stageNewWorkspace('build', 'domain-harness-build', join(stageRoot, 'new-build'), packsDirectory),
+  };
+}
+
+const newWorkspaceCache = new Map<string, Promise<NewWorkspacePacks>>();
+
+/**
+ * #1337 (T07a2): stage (and memoize per test process) ONLY the exact local
+ * tarballs of the four new workspaces, in a private stage root separate from
+ * the heavier core+compiler stageOnce. Independently packing legacy fixtures
+ * reuse this light staging for their bridge install list — they keep their
+ * own genuine isolated `npm pack` provenance for the legacy artifacts and
+ * must not pay (or race) a full core+compiler stage for the new-workspace
+ * closure. Combined with verifiedLocalWorkspaceTarballs, the caller hands
+ * the exact local .tgz paths to ONE clean npm install transaction so the
+ * whole @kaicreator/* closure resolves from local bytes (no registry E404
+ * for the unpublished rc.0 workspaces, no bundleDependencies symlink
+ * assumption, no published-RC assumption).
+ */
+export function stageNewWorkspaceTarballs(): Promise<NewWorkspacePacks> {
+  let staged = newWorkspaceCache.get('new-workspaces');
+  if (staged === undefined) {
+    staged = (async (): Promise<NewWorkspacePacks> => {
+      scavengeStaleStages();
+      const root = mkdtempSync(join(tmpdir(), STAGE_DIRECTORY_PREFIX));
+      try {
+        const packsDirectory = join(root, 'packs');
+        mkdirSync(packsDirectory, { recursive: true });
+        const packs = stageAllNewWorkspaces(root, packsDirectory);
+        process.once('exit', () => rmSync(root, { recursive: true, force: true }));
+        return packs;
+      } catch (error) {
+        rmSync(root, { recursive: true, force: true });
+        throw error;
+      }
+    })();
+    newWorkspaceCache.set('new-workspaces', staged);
+    staged.catch(() => newWorkspaceCache.delete('new-workspaces'));
+  }
+  return staged;
+}
+
+/**
+ * #1337 (T07a2) post-install provenance assertion: every bridged new
+ * workspace must be physically present in the clean consumer's node_modules
+ * under its exact staged manifest identity (name + version), proving the
+ * install transaction resolved these packages from the staged local
+ * tarballs rather than from any registry. T07b/T09 own the final supported
+ * distribution proof; this is the regression-fixture bridge assertion they
+ * extend, not replace.
+ */
+export function assertNewWorkspacePackagesInstalled(consumerDirectory: string, tarballs: readonly StagedWorkspaceTarball[]): void {
+  for (const tarball of tarballs) {
+    const manifestPath = join(consumerDirectory, 'node_modules', ...tarball.packageName.split('/'), 'package.json');
+    let manifest: { name?: unknown; version?: unknown };
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { name?: unknown; version?: unknown };
+    } catch (error) {
+      throw new Error(`bridge package ${tarball.packageName} is not installed in the clean consumer (expected ${manifestPath}): ${String(error)}`, { cause: error });
+    }
+    if (manifest.name !== tarball.packageName || manifest.version !== tarball.version) {
+      throw new Error(
+        `installed new-workspace provenance mismatch: expected ${tarball.packageName}@${tarball.version} from the staged tarball, found ${String(manifest.name)}@${String(manifest.version)} at ${manifestPath}`,
+      );
+    }
   }
 }
 
@@ -414,11 +578,14 @@ const stagedCache = new Map<string, Promise<StagedPacks>>();
  * candidate tree. Compiler/public-compatibility fixtures need core+compiler;
  * the node successor-host consumer additionally needs @kaicreator/domain-harness-node.
  */
-export function stagePackedWorkspaces(options: { readonly includeNodePackage?: boolean } = {}): Promise<StagedPacks> {
-  const key = options.includeNodePackage === true ? 'core+node+compiler' : 'core+compiler';
+export function stagePackedWorkspaces(options: {
+  readonly includeNodePackage?: boolean;
+  readonly includeNewWorkspaces?: boolean;
+} = {}): Promise<StagedPacks> {
+  const key = `${options.includeNodePackage === true ? 'node' : 'no-node'}:${options.includeNewWorkspaces === true ? 'new' : 'legacy'}`;
   let staged = stagedCache.get(key);
   if (staged === undefined) {
-    staged = stageOnce(options.includeNodePackage === true);
+    staged = stageOnce(options.includeNodePackage === true, options.includeNewWorkspaces === true);
     stagedCache.set(key, staged);
     staged.catch(() => stagedCache.delete(key));
   }

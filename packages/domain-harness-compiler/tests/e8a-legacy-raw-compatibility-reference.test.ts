@@ -66,7 +66,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { stagePackedWorkspaces } from './packed-fixture-stage.js';
+import { assertNewWorkspacePackagesInstalled, stagePackedWorkspaces, verifiedLocalWorkspaceTarballs } from './packed-fixture-stage.js';
 
 
 /**
@@ -1211,7 +1211,16 @@ function consumerFixture(): Promise<ConsumerFixture> {
     const consumerDirectory = join(root, 'consumer');
     try {
       mkdirSync(consumerDirectory, { recursive: true });
-      const staged = await stagePackedWorkspaces();
+      // #1337 (T07a2): the exact local new-workspace tarballs join the same
+      // clean npm transaction as the legacy core+compiler tarballs (verified
+      // dependency closure), so the whole @kaicreator/* closure resolves
+      // from local bytes once the legacy manifests gain their new-workspace
+      // dependency edges (T07b) instead of E404-ing on the unpublished rc.0
+      // registry artifacts.
+      const staged = await stagePackedWorkspaces({ includeNewWorkspaces: true });
+      const newPacks = staged.newWorkspaceTarballs;
+      assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+      const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
       const coreTarballSha256 = staged.coreTarball.sha256;
       const compilerTarballSha256 = staged.compilerTarball.sha256;
 
@@ -1222,9 +1231,10 @@ function consumerFixture(): Promise<ConsumerFixture> {
       }, null, 2));
 
       runNpm(
-        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', staged.coreTarball.path, staged.compilerTarball.path],
+        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '@types/node@^22.0.0', staged.coreTarball.path, staged.compilerTarball.path, ...bridgePaths],
         consumerDirectory,
       );
+      assertNewWorkspacePackagesInstalled(consumerDirectory, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
       console.log('E8A_PACKED_ARTIFACTS', JSON.stringify({
         coreTarball: staged.coreTarball.fileName,

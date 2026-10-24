@@ -10,6 +10,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 
 
 /**
@@ -195,7 +200,7 @@ function DAC_REFERENCE_BASELINE_COMMIT() {
 console.log('dac-bridge-consumer-ok');
 `;
 
-test('#308 packed package delivers the public DAC correlation bridge surface to a clean consumer', (t) => {
+test('#308 packed package delivers the public DAC correlation bridge surface to a clean consumer', async (t) => {
   if (!npmRegistryReachable()) {
     t.skip('PACKED CONSUMER NOT_RUN(NETWORK): npm registry unreachable from this execution environment');
     return;
@@ -214,13 +219,23 @@ test('#308 packed package delivers the public DAC correlation bridge surface to 
     assert.equal(tarballs.length, 1, 'core pack must produce exactly one tarball');
     const tarball = join(packs, tarballs[0]!);
 
+    // #1337 (T07a2): this fixture keeps its own isolated legacy pack, and
+    // the exact local new-workspace tarballs from the shared verified stage
+    // join the SAME clean npm install transaction (verified dependency
+    // closure), so the @kaicreator/* closure resolves from local bytes once
+    // the legacy manifests gain their new-workspace dependency edges (T07b)
+    // instead of E404-ing on the unpublished rc.0 registry artifacts.
+    const newPacks = await stageNewWorkspaceTarballs();
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
+
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({
       name: 'domain-harness-t308-external-consumer',
       private: true,
       type: 'module',
     }, null, 2));
 
-    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
+    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball, ...bridgePaths], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
     assert.equal(
       existsSync(join(consumer, 'node_modules', 'better-sqlite3')),
       false,
