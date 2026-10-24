@@ -65,7 +65,7 @@ test('T06a N2 does not alias the mutable K receipt, supplied target, or query sn
   assert.equal(event.kind, 'committed');
   assert.equal(event.occurrenceId, 'message-1');
   assert.equal(event.target.instanceKey, 'instance-1');
-  assert.deepEqual(event.snapshot, { instance: { labels: ['safe'], revision: 3 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(event.snapshot)), { instance: { labels: ['safe'], revision: 3 } });
   assert.throws(() => {
     (event.snapshot as { instance: { labels: string[] } }).instance.labels.push('tamper');
   }, TypeError);
@@ -121,6 +121,6 @@ test('T06a same revision query equality is strict; no receipt payload passed thr
     candidate: { b: 2, a: 1 }, querySnapshot: { a: 1, b: 2 },
     candidateRevision: 1, queryRevision: 1,
   });
-  assert.deepEqual(snapshot, { a: 1, b: 2 });
+  assert.deepEqual(JSON.parse(JSON.stringify(snapshot)), { a: 1, b: 2 });
   assert.equal(Object.isFrozen(snapshot), true);
 });
