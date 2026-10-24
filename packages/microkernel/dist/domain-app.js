@@ -67,7 +67,17 @@ function publicError(error) {
     catch {
         normalized = new V10Error(error.code, message);
     }
-    if (!(normalized instanceof V10Error)) {
+    // A Host-supplied V10Error subclass can have a constructor that creates
+    // fresh secret-bearing own fields even when the original instance was
+    // discarded. Preserve the subtype ONLY when its new instance has exactly
+    // the public own-key contract. Symbols, cause and surprise fields fall
+    // back to the Contracts base class instead of crossing the facade.
+    const publicKeys = new Set(['stack', 'message', 'name', 'code',
+        ...(error.name === 'V10DeploymentError' ? ['detail'] : [])]);
+    if (!(normalized instanceof V10Error)
+        || normalized.code !== error.code
+        || normalized.message !== message
+        || Reflect.ownKeys(normalized).some((key) => typeof key !== 'string' || !publicKeys.has(key))) {
         normalized = new V10Error(error.code, message);
     }
     return normalized;
