@@ -19,10 +19,12 @@
  * The wrapper adds no authority of its own and hides every internal
  * surface (counters, docs port, effect gate, import-hook registry): the
  * returned object's own keys are exactly [send, query, subscribe, stop],
- * frozen. Typed errors crossing this boundary keep their Contracts class
- * identity, `name` and stable wire `code`; a `message` that would leak K
- * document keys, K key grammar or absolute Host paths is redacted to its
- * code-only form (frozen redaction rule, L2 §3 / O10).
+ * frozen. Typed errors crossing this boundary are REBUILT as fresh
+ * same-class Contracts instances carrying exactly `name`, `code` and a safe
+ * `message` (`cause` and every extra own property of the thrown instance
+ * never cross); a message that would leak K document keys, K key grammar or
+ * absolute Host paths is redacted to its code-only form (frozen redaction
+ * rule, L2 §3 / O10).
  */
 import { V10Error, V10ActivationError, } from '@kaicreator/domain-harness-contracts';
 import { activateV10App } from './internal/activation.js';
@@ -33,18 +35,52 @@ const FORBIDDEN_MESSAGE_PATTERNS = [
     /v10\/k\//u,
     /(?:[A-Za-z]:[\\/]|\/(?:home|Users|root|tmp|var)\/)/u,
 ];
-/** The public error contract (L2 §3 / O10): name, code, safe message only. */
+/**
+ * The public error contract (L2 §3 / O10): EVERY typed error crossing the
+ * entry is rebuilt as a fresh same-class instance carrying exactly `name`,
+ * `code` and a safe `message` — the thrown instance itself never crosses, so
+ * its `cause`, its stack and any own property a Host callback attached to it
+ * stay inside. Only the deployment family (`V10DeploymentError`, BUILD-owned
+ * and unreachable by import here, hence matched by its frozen wire `name`)
+ * additionally keeps a `detail`, reduced to exactly `{ retryable }` when the
+ * original carried a boolean `retryable` and dropped otherwise. `code`, class
+ * identity and safe messages are preserved; a message that would leak K
+ * document keys, K key grammar or absolute Host paths is redacted to its
+ * code-only form. The fresh instance's `stack` is the facade's own frame and
+ * is not part of the contract.
+ */
 function publicError(error) {
     if (!(error instanceof V10Error))
         return error;
-    for (const pattern of FORBIDDEN_MESSAGE_PATTERNS) {
-        if (pattern.test(error.message)) {
-            const redacted = new error.constructor(error.code, `[${error.code}] the public facade refused this operation; the diagnostic rode a protected key or path grammar`);
-            redacted.name = error.name;
-            return redacted;
-        }
+    const message = FORBIDDEN_MESSAGE_PATTERNS.some((pattern) => pattern.test(error.message))
+        ? `[${error.code}] the public facade refused this operation; the diagnostic rode a protected key or path grammar`
+        : error.message;
+    // The constructor is taken from the prototype, not from the instance (a
+    // forged own `constructor` must not choose what gets built), and whatever
+    // it builds must still be a real Contracts V10Error — otherwise the facade
+    // falls back to the base class rather than surface an arbitrary product.
+    const Ctor = Object.getPrototypeOf(error).constructor;
+    let normalized;
+    try {
+        normalized = new Ctor(error.code, message, deploymentRetryableDetail(error));
     }
-    return error;
+    catch {
+        normalized = new V10Error(error.code, message);
+    }
+    if (!(normalized instanceof V10Error)) {
+        normalized = new V10Error(error.code, message);
+    }
+    return normalized;
+}
+/** L2 §3: only `V10DeploymentError` may keep a `detail`, as exactly `{ retryable }`. */
+function deploymentRetryableDetail(error) {
+    if (error.name !== 'V10DeploymentError')
+        return undefined;
+    const detail = error.detail;
+    if (typeof detail !== 'object' || detail === null)
+        return undefined;
+    const retryable = detail.retryable;
+    return typeof retryable === 'boolean' ? { retryable } : undefined;
 }
 /**
  * Load one trusted prebuilt App and return the frozen public Facade.
