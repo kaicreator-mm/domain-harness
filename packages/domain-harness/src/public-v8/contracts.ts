@@ -25,31 +25,10 @@
  */
 
 import { createHash } from 'node:crypto';
-import { createRequire as contractsCreateRequire } from 'node:module';
-import { fileURLToPath as contractsFileURLToPath } from 'node:url';
+import { QualifiedPackageError, canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
 
-// #1319 T00: QualifiedPackageError/canonicalSnapshot keep one identity with
-// `@kaicreator/domain-harness-contracts` in every load context. Native ESM
-// resolves the package entry via `import.meta.resolve` and requires the
-// dist file through its host path (createRequire does not accept URL
-// strings); the CJS-transpiled root test runner requires the sibling dist
-// file directly (the contracts exports map has no require condition;
-// manifests are frozen to T07a/T07b). Both forms converge on the same
-// module instance through the ESM cache (require(esm)).
-declare const require: NodeRequire | undefined;
-
-const contractsSource = (
-  typeof require === 'function'
-    ? require('../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(
-        contractsFileURLToPath(import.meta.resolve('@kaicreator/domain-harness-contracts')),
-      )
-) as typeof import('@kaicreator/domain-harness-contracts');
-
-const { QualifiedPackageError, canonicalSnapshot } = contractsSource;
+// Public compatibility facade: all consumers share the same canonical class.
 export { QualifiedPackageError, canonicalSnapshot };
-// Type-side of the same identity (the const above is value-only).
-export type QualifiedPackageError = import('@kaicreator/domain-harness-contracts').QualifiedPackageError;
 export type { QualifiedCleanupFailure } from '@kaicreator/domain-harness-contracts';
 
 /**
