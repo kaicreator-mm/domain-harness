@@ -89,8 +89,11 @@ test('#139 packed package root imports as portable v0.2 SDK in a clean consumer'
       'portable core consumer must not install better-sqlite3',
     );
 
-    // A2 T07a3: one actual installed ESM module, reachable from both
-    // Node24 import and require(esm), with no duplicate typed error class.
+    // A2 T07a3 (P2-02): one actual installed ESM module, reachable from both
+    // Node24 import and require(esm) — no ERR_REQUIRE_ASYNC_MODULE, no CJS
+    // clone. Contracts is the T07a placeholder until T00 migrates the error
+    // classes, so the honest singleton proof is one identical export surface
+    // where every function/class export is the same object in both loaders.
     writeFileSync(join(consumer, 'contracts-dual-loader.mjs'), `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -103,9 +106,13 @@ const requiredPath = require.resolve(name);
 const importedUrl = import.meta.resolve(name);
 assert.equal(importedUrl, pathToFileURL(requiredPath).href, 'import and require select one ESM dist/index.js');
 assert.ok(requiredPath.replaceAll(String.fromCharCode(92), '/').endsWith('/dist/index.js'));
-assert.strictEqual(fromCjs.IdentityContractError, fromEsm.IdentityContractError);
-assert.strictEqual(fromCjs.V10BuildError, fromEsm.V10BuildError);
-assert.strictEqual(fromCjs.V10Error, fromEsm.V10Error);
+const esmKeys = Object.keys(fromEsm).sort();
+assert.deepEqual(Object.keys(fromCjs).sort(), esmKeys, 'both loaders expose one identical export surface');
+for (const key of esmKeys) {
+  if (typeof fromEsm[key] === 'function') {
+    assert.strictEqual(fromCjs[key], fromEsm[key], 'shared class/function object across loaders');
+  }
+}
 `);
     run(process.execPath, ['contracts-dual-loader.mjs'], consumer);
 
