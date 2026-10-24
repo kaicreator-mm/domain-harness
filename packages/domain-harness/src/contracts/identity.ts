@@ -16,14 +16,28 @@ declare const require: NodeRequire | undefined;
 
 type ContractsModule = typeof import('@kaicreator/domain-harness-contracts');
 
+interface ContractsNodeBuiltins {
+  readonly createRequire?: (url: string) => NodeRequire;
+  readonly fileURLToPath?: (url: string) => string;
+}
+const nodeBuiltin = (globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }).process
+  ?.getBuiltinModule as ((id: 'module' | 'url') => ContractsNodeBuiltins | undefined) | undefined;
+
 const contractsSource: ContractsModule =
   typeof require === 'function'
     ? (require('../../../contracts/dist/index.js') as ContractsModule)
-    : ((globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }).process?.getBuiltinModule?.('module') as
-        | { createRequire: (url: string) => NodeRequire }
-        | undefined)?.createRequire(import.meta.url)(
-        import.meta.resolve('@kaicreator/domain-harness-contracts'),
-      ) as ContractsModule;
+    : (() => {
+        const createRequire = nodeBuiltin?.('module')?.createRequire;
+        const fileURLToPath = nodeBuiltin?.('url')?.fileURLToPath;
+        if (createRequire === undefined || fileURLToPath === undefined) {
+          throw new Error(
+            'contracts identity re-export needs a Node ESM or bundler-CJS host; a plain bare re-export returns once the contracts manifest owns a require condition (T07b)',
+          );
+        }
+        return createRequire(import.meta.url)(
+          fileURLToPath(import.meta.resolve('@kaicreator/domain-harness-contracts')),
+        ) as ContractsModule;
+      })();
 
 export const {
   IdentityContractError,

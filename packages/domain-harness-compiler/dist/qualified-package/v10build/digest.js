@@ -7,9 +7,10 @@
  * converge on the same module instance through the ESM cache (require(esm)).
  */
 import { createRequire as contractsCreateRequire } from 'node:module';
+import { fileURLToPath as contractsFileURLToPath } from 'node:url';
 const contractsSource = (typeof require === 'function'
     ? require('../../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts')));
+    : contractsCreateRequire(import.meta.url)(contractsFileURLToPath(import.meta.resolve('@kaicreator/domain-harness-contracts'))));
 export const { V10_BUILD_FORMAT, V10_TARGET_PROFILE, V10_RUNTIME_ABI, V10_HOST_ABI, V10_KEXT_ABI, V10_SFEATURE_ABI, V10_IMPORT_POLICY_REVISION, V10_BUNDLER_REVISION, V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE, V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, V10_SELECTED_ROLE_ABI, sha256Hex, canonicalJson, sha256Canonical, } = contractsSource;
 export function v10KernelInstanceDocKey(workflowId, instanceKey) {
     return `v08-kernel:wf-instance:${workflowId}:${instanceKey}`;

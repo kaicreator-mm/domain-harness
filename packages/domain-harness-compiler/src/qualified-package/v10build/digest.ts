@@ -7,13 +7,16 @@
  * converge on the same module instance through the ESM cache (require(esm)).
  */
 import { createRequire as contractsCreateRequire } from 'node:module';
+import { fileURLToPath as contractsFileURLToPath } from 'node:url';
 
 declare const require: NodeRequire | undefined;
 
 const contractsSource = (
   typeof require === 'function'
     ? require('../../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts'))
+    : contractsCreateRequire(import.meta.url)(
+        contractsFileURLToPath(import.meta.resolve('@kaicreator/domain-harness-contracts')),
+      )
 ) as typeof import('@kaicreator/domain-harness-contracts');
 
 export const {

@@ -9,7 +9,8 @@
  * require condition.
  */
 import { createRequire as contractsCreateRequire } from 'node:module';
+import { fileURLToPath as contractsFileURLToPath } from 'node:url';
 const contractsSource = (typeof require === 'function'
     ? require('../../../../contracts/dist/index.js')
-    : contractsCreateRequire(import.meta.url)(import.meta.resolve('@kaicreator/domain-harness-contracts')));
+    : contractsCreateRequire(import.meta.url)(contractsFileURLToPath(import.meta.resolve('@kaicreator/domain-harness-contracts'))));
 export const { V10Error, V10BuildError, V10ActivationError, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES, } = contractsSource;
