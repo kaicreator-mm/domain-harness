@@ -6,3 +6,6 @@ export * from './guards.js';
 export * from './identity.js';
 export * from './json.js';
 export * from './qualified-canonical.js';
+export type * from './build-types.js';
+export type * from './activation-types.js';
+export type * from './import-types.js';
