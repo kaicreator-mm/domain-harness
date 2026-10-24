@@ -81,7 +81,10 @@ test('T06a N1/N2 refuses unverifiable snapshot, keeps only three safe projection
     { candidate: { a: undefined }, querySnapshot: { a: undefined }, candidateRevision: 4, queryRevision: 4 },
   ];
   for (const evidence of evidenceCases) {
-    const event = projectV10SubscriptionEvent({ receipt: makeReceipt(), target, snapshotEvidence: evidence });
+    const event = projectV10SubscriptionEvent({
+      receipt: makeReceipt(), target,
+      ...(evidence === undefined ? {} : { snapshotEvidence: evidence }),
+    });
     assert.ok(event);
     assert.deepEqual(Object.keys(event).sort(), [...publicKeys].sort());
   }
