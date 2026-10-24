@@ -531,6 +531,19 @@ export function assertQualifiedRoot(root: unknown): SealedQualifiedPackageRoot {
       );
     }
   }
+
+  // v0.8.1 #1102: refuse a sealed multi-B closure BEFORE module import.
+  // load() calls this validator before trusted installation, so approved
+  // legacy roots cannot execute B2 top-level code while the facade would
+  // still route its intents through B1. Reject unbound B modules too.
+  if (businessBound.length > 1 || snapshot.packages.filter((pkg) => pkg.kind === 'business').length > 1) {
+    throw new QualifiedPackageError(
+      'LOAD_MULTI_BUSINESS_UNSUPPORTED',
+      'v0.8.1 supports exactly one Business package per closure; per-intent multi-B routing is not available',
+    );
+  }
+
+
   // ---- Optional capability-owned packages (#1023 S02a) ----
   // Every capability binding is an exact keyed declaration: unique
   // capabilityId, one well-kinded capability-endpoint target, and a

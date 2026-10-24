@@ -279,6 +279,18 @@ export function qualifyPackageClosure(submission: unknown): UnsignedQualificatio
     }
   }
 
+
+  // v0.8.1 #1102 safety fence: the shipped Kernel/facade wires ONE
+  // Business policy endpoint. Until per-intent multi-B routing is a
+  // Product-approved feature, qualification must not seal a closure
+  // whose second Business policy would be silently ignored.
+  // Validate both selected bindings and submitted descriptors to refuse
+  // an unbound extra Business module before producing approval material.
+  if (businessBound.length > 1 || snapshot.packages.filter((pkg) => pkg.kind === 'business').length > 1) {
+    fail('QUALIFY_MULTI_BUSINESS_UNSUPPORTED', 'v0.8.1 supports exactly one Business package per closure; per-intent multi-B routing is not available');
+  }
+
+
   // ---- Optional BUILD-selected capability packages (#1023 S02a) ----
   // A capability package is admitted ONLY through an exact keyed
   // capabilityId/packageId/endpointId binding with a non-empty, injective
