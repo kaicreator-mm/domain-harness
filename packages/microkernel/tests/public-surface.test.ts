@@ -203,6 +203,30 @@ test('T04-PUB-7: a forged Host store error never crosses send as itself (R1 P1-0
   assert.match(redacted.message, /^\[HOST_DOC_READ_FAILED\] the public facade refused/u);
   assertSafePublicError(redacted);
 
+  // A hostile typed subclass can reintroduce a *fresh* cause and private
+  // own properties in its constructor, after the facade discarded the old
+  // instance. The rebuilt instance must not escape merely due to instanceof.
+  class SecretBearingError extends V10Error {
+    constructor(code: string, message: string) {
+      super(code, message);
+      this.name = 'SecretBearingError';
+      Object.defineProperty(this, 'cause', {
+        value: { credential: 'secret:v0102' }, enumerable: true, configurable: false,
+      });
+      Object.defineProperty(this, 'tenantCredential', {
+        value: 'secret:v0102', enumerable: false, configurable: false,
+      });
+    }
+  }
+  const malicious = new SecretBearingError('HOST_DOC_READ_FAILED', 'safe refusal');
+  store.poison = malicious;
+  const guarded = await refuseCode(() => domainApp.send({ ...INTENT }));
+  assert.ok(guarded !== malicious);
+  assert.equal(guarded.constructor, V10Error,
+    'a typed subclass with secret-bearing own fields is downgraded to the safe Contracts base');
+  assert.equal(guarded.code, 'HOST_DOC_READ_FAILED');
+  assertSafePublicError(guarded);
+
   // Deployment-shaped forged error: `detail` reduced to exactly `{ retryable }`.
   const deployment = new ForgedDeploymentError(
     'V10_DEPLOYMENT_REFUSED',
