@@ -212,6 +212,7 @@
       "QUERY_SELECTORS_INVALID",
       "QUERY_SELECTOR_INVALID"
     ],
+    "packages/microkernel/src/subscription-projection.ts": [],
     "packages/host-node/src/ct02-invoker.ts": [
       "ARRAY_ACCESSOR_OR_HOLE",
       "ARRAY_INVALID",
