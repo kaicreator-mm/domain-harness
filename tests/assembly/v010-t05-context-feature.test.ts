@@ -3,7 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { buildV10App, activateV10App } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { buildV10App } from '@kaicreator/domain-harness-build';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
 import { featureEntry, basicComposition, PlainCasDocStore } from './helpers-v010.js';
 
 const scope = {

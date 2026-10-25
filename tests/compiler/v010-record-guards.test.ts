@@ -1,7 +1,7 @@
 /** Stable v0.10 record predicate semantics (not a security/authority check). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isObjectRecord, isPlainRecord } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/guards.js';
+import { isObjectRecord, isPlainRecord } from '@kaicreator/domain-harness-contracts';
 
 test('P-I1229: plain records include null prototype but not arrays/classes', () => {
   const nullPrototype = Object.create(null) as Record<string, unknown>;
