@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import {
   activateGovernedV10Build,
   readV10DeploymentActivationRecord,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '@kaicreator/domain-harness-host-node';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import type { SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
