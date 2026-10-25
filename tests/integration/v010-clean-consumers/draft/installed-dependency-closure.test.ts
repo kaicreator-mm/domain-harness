@@ -7,7 +7,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
 interface ClosurePolicy {
@@ -48,8 +48,16 @@ test('T09 draft: verify installed package-lock closure in a separate Tiny or Ric
   const lockNames = new Set(Object.keys(lock.packages ?? {})
     .map(lockName)
     .filter((name): name is string => name !== null));
-  for (const name of rules.mustInclude) assert.equal(lockNames.has(name), true, 'required installed package missing: ' + name);
-  for (const name of rules.mustExclude) assert.equal(lockNames.has(name), false, 'forbidden installed dependency: ' + name);
+  for (const name of rules.mustInclude) {
+    assert.equal(lockNames.has(name), true, 'required npm lock entry missing: ' + name);
+    assert.equal(existsSync(join(resolved, 'node_modules', name)), true,
+      'required package is not physically installed in the clean consumer: ' + name);
+  }
+  for (const name of rules.mustExclude) {
+    assert.equal(lockNames.has(name), false, 'forbidden package appears in npm lock: ' + name);
+    assert.equal(existsSync(join(resolved, 'node_modules', name)), false,
+      'forbidden package is physically present despite an allowed-looking lock: ' + name);
+  }
   assert.ok(rules.requiresPhysicalChecks.length > 0,
     'this source-only lock closure test is NOT final installed behavioural qualification');
 });
