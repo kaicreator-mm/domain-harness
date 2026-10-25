@@ -255,6 +255,54 @@ test('T04-PUB-7: a forged Host store error never crosses send as itself (R1 P1-0
   assert.equal(ordinary.message.includes('/home/private'), false);
   assertSafePublicError(ordinary);
 
+  // R3 P1-01: properties of a typed Host error are not trusted data
+  // until their *own descriptors* are verified; never execute their getters.
+  let evilGetterCalls = 0;
+  const maliciousCode = new V10Error('HOST_DOC_READ_FAILED', 'safe refusal');
+  Object.defineProperty(maliciousCode, 'code', {
+    configurable: true, get(): string {
+      evilGetterCalls += 1;
+      throw new Error('C:\\\\private\\\\credential: leaked through code getter');
+    },
+  });
+  store.poison = maliciousCode;
+  const codeGetter = await refuseCode(() => domainApp.send({ ...INTENT }));
+  assert.equal(codeGetter.constructor, V10Error);
+  assert.equal(codeGetter.code, 'HOST_DOC_READ_FAILED');
+  assert.equal(codeGetter.message.includes('credential'), false);
+  assert.equal(evilGetterCalls, 0, 'an untrusted code accessor is not invoked');
+  assertSafePublicError(codeGetter);
+
+  const maliciousDetail = new ForgedDeploymentError(
+    'HOST_DOC_READ_FAILED', 'safe deployment refusal',
+  );
+  Object.defineProperty(maliciousDetail, 'detail', {
+    configurable: true, get(): never {
+      evilGetterCalls += 1;
+      throw new Error('/home/private/tenant-secret: leaked through detail getter');
+    },
+  });
+  store.poison = maliciousDetail;
+  const detailGetter = await refuseCode(() => domainApp.send({ ...INTENT }));
+  assert.equal(detailGetter.constructor, V10Error);
+  assert.equal(detailGetter.code, 'HOST_DOC_READ_FAILED');
+  assert.equal(detailGetter.name, 'V10Error');
+  assert.equal('detail' in detailGetter, false);
+  assert.equal(evilGetterCalls, 0, 'untrusted detail accessor is not invoked');
+  assertSafePublicError(detailGetter);
+
+  const throwingProxy = new Proxy(new V10Error('HOST_DOC_READ_FAILED', 'safe'), {
+    getPrototypeOf(): never {
+      throw new Error('/home/private/proxy-secret: leaked from getPrototypeOf');
+    },
+  });
+  store.poison = throwingProxy;
+  const proxyFault = await refuseCode(() => domainApp.send({ ...INTENT }));
+  assert.equal(proxyFault.constructor, V10Error);
+  assert.equal(proxyFault.code, 'HOST_DOC_READ_FAILED');
+  assert.equal(proxyFault.message.includes('proxy-secret'), false);
+  assertSafePublicError(proxyFault);
+
   // Deployment-shaped forged error: `detail` reduced to exactly `{ retryable }`.
   const deployment = new ForgedDeploymentError(
     'V10_DEPLOYMENT_REFUSED',
