@@ -156,7 +156,7 @@ function publicError(error: unknown, untypedCode: string): V10Error | V10MultiBQ
           if (!Object.hasOwn(retryableDescriptor, 'value')) return safeFallback();
           if (typeof retryableDescriptor.value === 'boolean') {
             Object.defineProperty(safe, 'detail', {
-              value: Object.freeze({ retryable: retryableDescriptor.value as boolean }),
+              value: Object.freeze({ retryable: retryableDescriptor.value }),
               enumerable: true, writable: false, configurable: false,
             });
           }
