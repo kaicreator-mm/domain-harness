@@ -26,14 +26,18 @@ Runtime: optional Host ports -> Microkernel.load(App) -> public Facade
 
 ## Public SDK surface (current v0.10.2 candidate)
 
+**Producer process only — BUILD is never imported by Tiny/Rich runtime:**
+
+```ts
+import { buildV10App } from '@kaicreator/domain-harness-build';
+const prebuiltApp = buildV10App(buildOptions); // emit as trusted plain-data App
+```
+
+**A different runtime process, consuming the prebuilt App:**
+
 ```ts
 import { load } from '@kaicreator/domain-harness-microkernel';
-import { buildV10App, projectSelectedComponents } from '@kaicreator/domain-harness-build';
-
-// BUILD executes separately, with already-authorized selected modules:
-const app = buildV10App(buildOptions);
-// Runtime receives only the trusted prebuilt App and an approved document store:
-const runtime = await load(app, { store, queryAuthority });
+const runtime = await load(prebuiltApp, { store, queryAuthority });
 const receipt = await runtime.send(intent);
 const answer = await runtime.query(selector);
 const subscription = await runtime.subscribe(selector, event => observe(event));
@@ -41,7 +45,7 @@ subscription.unsubscribe();
 runtime.stop();
 ```
 
-`buildOptions`, `store`, `queryAuthority`, `intent` and `selector` above are explicitly supplied application inputs, not globals supplied by the SDK. `subscribe` is async and returns an object with `unsubscribe()`; `stop()` is synchronous and idempotent. Never supply a caller-forged principal/grant as runtime authority. Only the Kernel Primary decides admission/effect eligibility.
+`buildOptions`, `store`, `queryAuthority`, `intent`, `selector` and transfer of `prebuiltApp` between producer and runtime above are explicitly supplied application inputs, not globals supplied by the SDK. `subscribe` is async and returns an object with `unsubscribe()`; `stop()` is synchronous and idempotent. Never supply a caller-forged principal/grant as runtime authority. Only the Kernel Primary decides admission/effect eligibility.
 
 Only these package roots are distributable. The four old `domain-harness{,-compiler,-node,-expo}` workspaces are private legacy test shims; retired Compiler `/v10*` public exports have been removed. Deep `src/` or `dist/` imports are not an SDK contract.
 
