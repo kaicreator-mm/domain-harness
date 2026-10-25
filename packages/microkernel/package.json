@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./host-seam": {
+      "types": "./dist/host-seam.d.ts",
+      "import": "./dist/host-seam.js"
     }
   },
   "files": [
