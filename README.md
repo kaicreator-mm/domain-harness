@@ -1,254 +1,67 @@
 # DomainHarness
 
-DomainHarness is a portable TypeScript **Domain Runtime SDK** for target-compiled Domain Packages. The current development line is **v0.7** (source closure at candidate `version/v0.7@86110c61`, tree `dd4e4596d02be7012468a475db8f6fcc6c756542`; T016 Release Qualification in execution on #943, integration to `main` only after RQ gates accept); v0.1–v0.6 remain historical frozen baselines.
+DomainHarness is a **Domain Package runtime SDK** with a minimal Microkernel and package-owned domain behavior. This is the **v0.10.2 development candidate**, **not** a qualified release or a claim that `main` already contains it.
+
+## v0.10.2 ownership
+
+| Public npm workspace | Owns | Does not own |
+| --- | --- | --- |
+| `@kaicreator/domain-harness-contracts` | Shared ABI, canonical hashes and typed contracts | Business admission or external effects |
+| `@kaicreator/domain-harness-build` | Offline BUILD, static sealed K/S/B/C selection, Component producer projection | Runtime/Host execution |
+| `@kaicreator/domain-harness-microkernel` | `load(app, options)`, public `send/query/subscribe/stop` and trusted `./host-seam` | K state, journal, replay or effect policy |
+| `@kaicreator/domain-harness-host-node` | Optional Node Host CAS/SQLite and governed adapters | BUILD or K-owned policy |
+
+The Kernel Primary, Standard Primary and their extensions are **Domain Packages**, not implementation code that belongs to the Microkernel. A trusted producer seals the selected App **before** loading it; runtime never discovers packages or recompiles them.
 
 ```text
-Build / CI:
-Raw Domain Package + Target Host Profile
-        -> DomainHarness Compiler
-        -> Target Compiled Domain Package
-
-Runtime:
-Target Compiled Domain Package
-+ RuntimeStore
-+ RuntimeHostBindings
-+ Runtime Resources
-        -> DomainRuntime
+External producer: selected Domain Packages -> BUILD -> sealed plain-data App
+                                                      |
+Runtime: optional Host ports -> Microkernel.load(App) -> public Facade
+                                                      |
+                         Kernel Primary owns state/admission/journal/effects
+                         Standard Primary and Business Packages own domain logic
 ```
 
-The v0.2 Runtime startup path never discovers or recompiles a Raw Domain Package.
+**v0.10.2 Node policy:** package `engines.node >=24.0.0`; Node24 is the only physically qualified lane. These are a monorepo's development artifacts, not published registry dependencies by assumption.
 
-## v0.2 package layout
-
-This repository is a Git monorepo:
-
-- `@kaicreator/domain-harness` — portable Runtime Core + public contracts;
-- `@kaicreator/domain-harness-compiler` — Node/build-time compiler;
-- `@kaicreator/domain-harness-node` — Node SQLite/host bindings;
-- `@kaicreator/domain-harness-expo` — Expo SQLite/Hermes host bindings.
-
-Runtime Core remains platform-independent TypeScript. Node-specific filesystem, SQLite-driver and Worker behavior belongs in build tooling or the Node host package, not in the portable core.
-
-## v0.2 public Runtime API
-
-Import the portable Runtime contract from the explicit v0.2 entry point:
+## Public SDK surface (current v0.10.2 candidate)
 
 ```ts
-import {
-  createDomainRuntime,
-  StaticPackageRegistry,
-  type DomainRuntime,
-  type RuntimeHostBindings,
-  type RuntimeResources,
-  type RuntimeStore,
-  type TargetCompiledDomainPackage,
-} from '@kaicreator/domain-harness/v2';
+import { load } from '@kaicreator/domain-harness-microkernel';
+import { buildV10App, projectSelectedComponents } from '@kaicreator/domain-harness-build';
+
+// BUILD executes separately, with already-authorized selected modules:
+const app = buildV10App(buildOptions);
+// Runtime receives only the trusted prebuilt App and an approved document store:
+const runtime = await load(app, { store, queryAuthority });
+const receipt = await runtime.send(intent);
+const answer = await runtime.query(selector);
+const subscription = await runtime.subscribe(selector, event => observe(event));
+subscription.unsubscribe();
+runtime.stop();
 ```
 
-`DomainRuntime` exposes:
+`buildOptions`, `store`, `queryAuthority`, `intent` and `selector` above are explicitly supplied application inputs, not globals supplied by the SDK. `subscribe` is async and returns an object with `unsubscribe()`; `stop()` is synchronous and idempotent. Never supply a caller-forged principal/grant as runtime authority. Only the Kernel Primary decides admission/effect eligibility.
 
-```text
-openInstance
-send
-query
-subscribe
-recover
-invalidateBusinessSnapshot
-```
+Only these package roots are distributable. The four old `domain-harness{,-compiler,-node,-expo}` workspaces are private legacy test shims; retired Compiler `/v10*` public exports have been removed. Deep `src/` or `dist/` imports are not an SDK contract.
 
-A minimal activation starts from an **already generated** Target Compiled Domain Package:
+## Start here
 
-```ts
-import compiledPackage from './generated/domain-package.js';
-import {
-  StaticPackageRegistry,
-  createDomainRuntime,
-  type RuntimeHostBindings,
-  type RuntimeResources,
-  type RuntimeStore,
-  type TargetCompiledDomainPackage,
-} from '@kaicreator/domain-harness/v2';
+- [Public API, package/ABI and Component map](docs/sdk/V0102_PUBLIC_API.md)
+- [Tiny/Rich and external producer guide](docs/guides/V0102_TINY_RICH.md)
+- [v0.10.1 → v0.10.2 migration](docs/migration/MIGRATING_V0101_TO_V0102.md)
+- [Version candidate command/acceptance inventory](docs/validation/v0.10.2/T08B_R01_DOC_COMMANDS.md)
+- [Cross-version architecture constraints](docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md)
+- [Existing clean-consumer fixture](examples/v010-clean-consumer/README.md) (T09 is re-qualifying it against the new public package graph)
 
-const targetPackage = compiledPackage as TargetCompiledDomainPackage;
-const packageRegistry = new StaticPackageRegistry(
-  [targetPackage],
-  targetPackage.manifest.packageId,
-);
+**Local scoped preflight, from the monorepo root on Node24:**
 
-declare const store: RuntimeStore;
-declare const bindings: RuntimeHostBindings;
-const resources: RuntimeResources = {};
-
-const runtime = await createDomainRuntime({
-  packageRegistry,
-  store,
-  bindings,
-  resources,
-});
-```
-
-Do **not** replace this with a Raw Package path, loader, or runtime compiler.
-
-## App/UI interaction model
-
-Use one primitive per intent:
-
-```text
-state-changing interaction -> Durable Domain Message
-read                       -> Query
-continuous read            -> Subscription + re-Query
-```
-
-Example:
-
-```ts
-const target = {
-  workflowId: 'order_review',
-  instanceKey: 'order:ORD-1001',
-};
-
-await runtime.openInstance({
-  address: target,
-  correlationId: 'order:ORD-1001',
-  input: { orderId: 'ORD-1001' },
-});
-
-const ack = await runtime.send({
-  messageId: 'ui:approve:ORD-1001:1',
-  target,
-  type: 'APPROVE',
-  payload: { actorId: 'user-42' },
-});
-
-const disposition = await runtime.query({
-  kind: 'message-disposition',
-  target,
-  messageId: ack.messageId,
-});
-
-const unsubscribe = runtime.subscribe(
-  { kind: 'instance', target },
-  () => {
-    void runtime.query({ kind: 'instance', target }).then(console.log);
-  },
-);
-```
-
-A message ACK means durable acceptance/ordering, not successful processing. A Subscription is a change signal, not a durable event log.
-
-## v0.2 integration documentation
-
-Start here:
-
-- `docs/technical/DomainHarness_v0.2_SDK_AND_COMPILER.md` — exact merged SDK/compiler boundary, build workflow, Target Compiled Package, Runtime API examples;
-- `docs/integration/DomainHarness_v0.2_HOST_INTEGRATION.md` — Node and Expo host startup, stores/bindings, App/UI Message/Query/Subscription patterns;
-- `docs/migration/DomainHarness_v0.1_TO_v0.2.md` — v0.1 API migration plus expression/Script migration rules;
-- `docs/product/DomainHarness_v0.2_PRD_FROZEN.md` — frozen product authority;
-- `docs/architecture/DomainHarness_v0.2_L2_ARCHITECTURE_EVIDENCE.md` + `docs/architecture/DomainHarness_v0.2_L2_AMENDMENT_A2_RUNTIME_ENGINE.md` — frozen architecture authority plus the shipped-v0.2 Runtime-engine amendment;
-- `docs/implementation/DomainHarness_v0.2_TASK_DAG.md` — executable task authority.
-
-### Compiler build-time API
-
-Use the compiler package root. The merged public package explicitly exports the Raw Package loader, compiler, module emitter, and their public authoring/target/result types:
-
-```ts
-import {
-  loadRawDomainPackage,
-  compileDomainPackage,
-  emitTargetCompiledPackageModule,
-} from '@kaicreator/domain-harness-compiler';
-```
-
-Compiler deep paths such as `src/**` or `dist/**` are not the external API. Compilation stays in build/CI; application Runtime startup consumes only the generated Target Compiled Domain Package plus Runtime Resources.
-
-## Node and Expo hosts
-
-Node:
-
-```ts
-import {
-  createNodeDomainRuntime,
-  NodeSqliteRuntimeStore,
-} from '@kaicreator/domain-harness-node';
-```
-
-Expo:
-
-```ts
-import {
-  createExpoDomainRuntime,
-  openExpoSqliteRuntimeStore,
-} from '@kaicreator/domain-harness-expo';
-```
-
-Both host packages assemble the same portable Runtime contract. Host-specific SQLite, Script execution, hashing, random, transport, and other bindings must preserve the compiled package capability contract; unsupported capabilities fail closed rather than being semantically substituted.
-
-## Business/domain authority boundary
-
-DomainHarness owns generic execution mechanics:
-
-- persistent Workflow Instances;
-- durable Domain Message acceptance/disposition;
-- deterministic serialized mutation per Workflow Instance;
-- durable Domain Tool/effect recovery facts;
-- Query/Subscription;
-- deterministic declared-input Projection;
-- package pinning and recovery mechanics.
-
-The application/domain project remains authoritative for:
-
-- business entities and business database state;
-- authentication/authorization;
-- credentials and live sessions;
-- external systems/clients;
-- domain-specific business models;
-- AI provider/model routing.
-
-Projection is derived/non-authoritative. Runtime Resources are runtime-only values/handles, not a place to move business truth into DomainHarness.
-
-## Explicit non-goals
-
-v0.2 is not a distributed actor platform, generic event bus, distributed transaction coordinator, ORM/business database, generic query engine/materialized-view platform, generic UI framework, AI Gateway/model router, or generic autonomous agent loop.
-
-Workflow-to-workflow messaging stays inside one logical Domain Runtime.
-
-## v0.1 migration warning
-
-Do not assume the v0.1 Run API maps 1:1 to v0.2.
-
-Notable changes:
-
-- `runId` -> stable `WorkflowAddress` (`workflowId` + `instanceKey`);
-- `start()` -> `openInstance()`;
-- v0.1 `send(runId, event)` -> durable `send(DomainMessage)` with stable `messageId`;
-- `wait()/get()` observation -> Query and Subscription + re-Query;
-- no generic public v0.2 `listRuns`, arbitrary `resume`, or arbitrary `cancel` equivalent;
-- v0.1 expression scope must be audited against the new persistent Instance scope;
-- top-level v0.1 Script invokes must be migrated to target-compiled Script Domain Tools.
-
-See `docs/migration/DomainHarness_v0.1_TO_v0.2.md` before porting a downstream project.
-
-## Canonical development commands
-
-```bash
+```sh
 npm ci
+npm run build
 npm run lint
 npm run typecheck
-npm test
-npm run build
+node --import tsx --test tests/compiler/v0102-tarball-inventory.test.ts
 ```
 
-Task/PR CI is concern-local. A green task PR is not a version Release Qualification; expensive cross-host/Hidden Validation and release closure remain version-level gates.
-
-## v0.1 historical documentation
-
-v0.1 remains available as historical frozen authority and migration input:
-
-- `docs/DomainHarness_v0.1_INDEX.md`;
-- `docs/product/DomainHarness_v0.1_PRD_FROZEN.md`;
-- `docs/architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`;
-- `docs/sdk/DomainHarness_v0.1_SDK_USAGE.md`;
-- `docs/sdk/DomainHarness_v0.1_SDK_REFERENCE.md`;
-- `docs/sdk/DomainHarness_v0.1_AGENT_MIGRATION_GUIDE.md`.
-
-v0.2 does not retroactively redefine v0.1 behavior, and it does not require arbitrary active v0.1 Run state to become active v0.2 Workflow Instance state.
+These commands are an **execution recipe**, not evidence they have all run at the final version SHA. Real Tiny/Rich clean install, external producer, docs command execution and full/hidden/critical regression belong to T09/R01. `PR PASS != Release PASS`. No `main` integration or tag is authorized until release qualification.
