@@ -18,15 +18,15 @@ steps:
     commands:
       - git --version && node --version && npm --version
       - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
-      - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major < 22) { console.error("Node >=22 required"); process.exit(1); }'
+      - node -e 'const major = Number(process.versions.node.split(".")[0]); if (major !== 24) { console.error("v0.10.2 requires Node24, actual " + process.version); process.exit(1); }'
       - npm ci
       # Fast, cross-workspace static/packaging gates (includes committed-dist check).
       - npm run build
       - npm run lint
       - npm run typecheck
-      # Stable, bounded v0.9 trust/ABI smoke; NOT the whole workspace test suite.
-      # Task-specific changed-risk P/N remains a separate, required Task receipt.
-      - node --import tsx --test packages/domain-harness/tests/v09-host-registry-n06.test.ts packages/domain-harness/tests/v09-private-principal.test.ts packages/domain-harness-compiler/tests/v09-build-zero-import-n06.test.ts
+      # Selected Node24 API, bare-import/hygiene and tarball-inventory smoke (T07b).
+      # T09 owns the separate real Tiny/Rich fresh-installed and external-producer journeys.
+      - node --import tsx --test tests/compiler/v010-import-hook-registry.test.ts tests/compiler/v010-public-api-boundary.test.ts tests/compiler/v0102-import-direction.test.ts tests/compiler/v0102-tarball-inventory.test.ts
 
   # Trigger this workflow MANUALLY on the pinned final release-candidate ref.
   # Do not run full regression automatically on every PR or main push.

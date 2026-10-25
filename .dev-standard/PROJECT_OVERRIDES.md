@@ -182,8 +182,8 @@ Execution evidence identifies the **actual** OS/runtime/engine/device and exact 
 ## CI Profile
 
 - CI profile: custom
-- Required CI checks: ci/woodpecker/pr/verify (predeclared Woodpecker PR verify status; informational nonselected statuses do not override it; full manual release-candidate suite is independently governed, not an automatic PR check)
-- CI checks (for `custom`): single stable-status Woodpecker workflow `.woodpecker/verify.yaml` — **automatic on PR and selected main/legacy pushes:** exact-SHA checkout assertion, Node major-version 22+ gate, `npm ci`, `npm run build` (includes committed-dist byte-identity check), `npm run lint`, `npm run typecheck`, and three bounded v0.9 Host/private-principal/BUILD test files. **Manual event only on a frozen #1037 release-candidate SHA:** the same preflight plus `npm test` (all workspaces/root). Profile semantics are `minimal-per-task + concentrated-host-validation + version-closure-full`: Task-specific changed-risk P/N, real physical Node24/SQLite/security tests and independent review remain necessary when intrinsic; the auto-smoke is not a replacement. Full/Hidden/Critical Journeys are version-closure concerns; Hidden validation remains separate from the CI job. Never claim the manual full job ran from the PR green check.
+- Legacy `verify-min-node` CI context temporarily retained under actual Node24 until protected-branch required-status can be audited; NOT a Node22 compatibility result.\n- Required CI checks: ci/woodpecker/pr/verify (predeclared Woodpecker PR verify status; informational nonselected statuses do not override it; full manual release-candidate suite is independently governed, not an automatic PR check)
+- CI checks (for `custom`): single stable-status Woodpecker workflow `.woodpecker/verify.yaml` — **automatic on PR and selected main/legacy pushes:** exact-SHA checkout assertion, Node 24 exact major gate, `npm ci`, `npm run build` (includes committed-dist byte-identity check), `npm run lint`, `npm run typecheck`, and bounded v0.10.2 API/import-hook/packlist canaries. **Manual event only on a frozen #1037 release-candidate SHA:** the same preflight plus `npm test` (all workspaces/root). Profile semantics are `minimal-per-task + concentrated-host-validation + version-closure-full`: Task-specific changed-risk P/N, real physical Node24/SQLite/security tests and independent review remain necessary when intrinsic; the auto-smoke is not a replacement. Full/Hidden/Critical Journeys are version-closure concerns; Hidden validation remains separate from the CI job. Never claim the manual full job ran from the PR green check.
 - Disabled reason (for `disabled`): NOT_APPLICABLE — CI is enabled
 - Exact-SHA clean-validation fallback: every CI run checks out the event's exact `$CI_COMMIT_SHA` via the provider-managed clone and the verify step explicitly asserts `git rev-parse HEAD` equals it, and a new source SHA always requires a fresh run; when Woodpecker CI is unavailable, the **applicable** scoped PR/Task or release-candidate validation profile may fall back to equivalent exact-SHA clean local execution (clean tracked checkout at the exact SHA plus the actual required commands, not automatically the full root `npm test`) recorded as local exact-SHA evidence — CI/service unavailability may be recorded through the authorized waiver path, but unavailable CI is never reported as PASS.
 
@@ -197,7 +197,7 @@ Interpret provider-specific workflow syntax only after declaring the real execut
 - Workflow config: repository path `.woodpecker/verify.yaml`
 - Workflow config source: PR HEAD for `pull_request` events (exact `$CI_COMMIT_SHA` checkout), exact pushed SHA for `push` events on `main`/`v0.2`/`v0.3`/`v0.4`, and a user-selected **manual** event against the frozen candidate ref for complete root regression; in every case assert checked-out HEAD = `$CI_COMMIT_SHA`
 - Execution shell / entrypoint model: worker-VM host shell; bash step commands with git/bash/node/npm resolved from worker-VM host PATH (no container entrypoint)
-- Runtime source: worker-VM host-managed (git, bash, Node.js, npm from the ECF elastic worker VM host; the pipeline itself gates Node major version 22 or higher)
+- Runtime source: worker-VM host-managed (git, bash, Node.js, npm from the ECF elastic worker VM host; the pipeline gates the selected Node 24 major version)
 - Clone / checkout model: provider-managed checkout (default clone step; no `skip_clone` manual `git init`/`git fetch`); the verify step explicitly asserts `git rev-parse HEAD` equals `$CI_COMMIT_SHA`
 - Partial clone policy: disabled — no blob/tree-filter partial clone is used; clone depth is provider-managed by the default clone step
 - Submodule policy: disabled — the repository declares no `.gitmodules`; submodules are out of scope without a governance change
@@ -221,7 +221,7 @@ Rules:
 - Integration: NOT_APPLICABLE — real-host integration truth is owned by the dedicated Node/Expo host-validation waves, not by a standing repository command
 - Critical Journey: NOT_APPLICABLE — Critical Journeys are version-closure concerns executed in dedicated host environments, not a standing repository command
 - Hidden Validation: owner-held by design; never a repository/public command
-- Production Build / Package: `npm pack -w @kaicreator/domain-harness`
+- Production Build / Package: `npm pack --dry-run --json -w @kaicreator/domain-harness-microkernel`
 
 Repository-root baseline command set:
 
@@ -237,7 +237,7 @@ Task packs may define a narrower focused command set, but may not weaken require
 
 ## Runtime / Platform Requirements
 
-- **Repository development/CI:** Node.js `>=22` remains the existing workspace/CI toolchain floor; see actual `engines` and `.woodpecker/verify.yaml` for executable enforcement. This is **not** a claim of every Runtime target being supported.
+- **Repository development/CI:** Node.js `>=24.0.0` is the selected v0.10.2 root workspace engine floor; see actual `engines` and `.woodpecker/verify.yaml` for executable enforcement. This is **not** a claim of every Runtime target being supported.
 - **Selected v0.10 Domain App execution target:** TS→JS on **Node.js 24**; BUILD selects compatible SDK+Package implementations and dependencies. Future runtimes use their own implementations only when a specific Product version admits them. The selected App is trusted prebuilt code; SDK startup is not an AST/hash/dependency certification phase. **v0.10 A01 is ACCEPTED** as the scoped successor to historical frozen PC-05/related Host mechanism, via [Product acceptance checkpoint](../docs/product/DomainHarness_v0.10_PRODUCT_AMENDMENT_A01_ACCEPTANCE.md); the untouched original Product snapshot still governs unmodified requirements.
 - **Historical targets:** Expo/Hermes/Android and mandatory Node-built-in-neutral Core belong to the owning v0.3 and other frozen legacy Product/L2/host-test subjects, **not** to v0.10 by inheritance. Required services/real devices always follow the current Task/accepted Product scope, not a permanent universal matrix.
 
