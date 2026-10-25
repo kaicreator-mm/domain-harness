@@ -20,4 +20,4 @@ This is a requested T09 executable test, **not** a claimed PASS at the final SHA
 
 T09 must save actual packed artifact hashes, isolated `node_modules` and lockfile closure, Tiny send/query/replay/conflict and governed subscribe/stop, Rich file-backed SQLite/restart/UNKNOWN/effect negatives, two-B scoped refusal, and external producer evidence. T08b owns all example README files, including the separate external-producer README. R01 owns the **one-time** final docs-command replay and full/hidden/critical regression.
 
-See [Tiny/Rich guide](../../docs/guides/V0102_TINY_RICH.md) and [R01 docs command inventory](../../docs/validation/v0.10.2/T08B_R01_DOC_COMMANDS.md). `main` stays HOLD.
+See [Tiny/Rich guide](../../docs/guides/V0102_TINY_RICH.md) and [R01 docs command inventory](../../docs/guides/V0102_R01_DOC_COMMANDS.md). `main` stays HOLD.

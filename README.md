@@ -50,7 +50,7 @@ Only these package roots are distributable. The four old `domain-harness{,-compi
 - [Public API, package/ABI and Component map](docs/sdk/V0102_PUBLIC_API.md)
 - [Tiny/Rich and external producer guide](docs/guides/V0102_TINY_RICH.md)
 - [v0.10.1 → v0.10.2 migration](docs/migration/MIGRATING_V0101_TO_V0102.md)
-- [Version candidate command/acceptance inventory](docs/validation/v0.10.2/T08B_R01_DOC_COMMANDS.md)
+- [Version candidate command/acceptance inventory](docs/guides/V0102_R01_DOC_COMMANDS.md)
 - [Cross-version architecture constraints](docs/architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md)
 - [Existing clean-consumer fixture](examples/v010-clean-consumer/README.md) (T09 is re-qualifying it against the new public package graph)
 
