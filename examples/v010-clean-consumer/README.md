@@ -1,89 +1,23 @@
-# v0.10 clean-consumer example — Tiny and Rich independently packed Apps
+# v0.10.2 clean-consumer integration fixture
 
-This is the T11 (#1180) physical acceptance recipe: two Domain Apps are
-statically BUILT, packed as installable tarballs, installed into separate
-clean directories outside the repository, and actually executed as Node24
-processes over file-backed SQLite. The monorepo is on the BUILD/review edge
-only; no installed process resolves a repository path.
+This folder contains the historical T11 Tiny/Rich physical scenario: BUILD a sealed K/S/B/C App, pack, clean-install separate consumers, execute real SQLite/CAS/receipt/replay cases, and inspect the ESM resolution graph.
 
-## What is proven
+**Important version boundary:** The old T11 hand-run instructions used the now-private `@kaicreator/domain-harness-compiler` `/v10build` and old `@kaicreator/domain-harness` tarball graph. T07b #1328 retired those public exports in favor of four selected packages. **Do not copy the old install recipe into a v0.10.2 consumer.**
 
-| App | Selected modules | Journey |
-|---|---|---|
-| **Tiny** | K Primary Basic, S Primary Basic, one Business (`business-order-approval`), its necessary Capability (`capability-quote-tools`) | load → send → authorized scoped query → denied foreign B → restart over the same SQLite file → immutable original-receipt replay (zero new effect) → changed-input typed conflict. Zero K extension / S feature / Agent / model module installed or imported. |
-| **Rich** | one K Primary + two physical advisory K extensions, one S Primary + four (v1) / five (v2) physical S features, three C01/Agent Businesses + a WAIT/RESUME Business, four Capabilities (`extjob`, `extnotify`, scoped `memory`, read-only `tool`) | selection and feature invocation, truthful Rule/cache/promoted/Model counts, Agent/Memory/Context with foreign-scope denial, two unrelated external Effect adapters on one K permit contract, permitless typed refusal, duplicate callback, lost-ACK → UNKNOWN → reconcile, 18 turns with a destroyed derived disposition and original-receipt replay, changed-input conflict, two B sharing workflowId+instanceKey with disjoint K02 namespaces and restart, scoped/ambiguous/hidden-B query authority, WAIT across a process restart with single resume and duplicate replay, T08 v2 promotion with the old v1 occurrence pin unchanged, T07 read-only Shadow with zero production writes. |
+The fixture code has since begun migrating to `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build`, `@kaicreator/domain-harness-microkernel/host-seam` and `@kaicreator/domain-harness-host-node`; T09 #1330 owns the final *real installed* conformance and can make required code-only corrections without changing this README. In particular the old Compiler/Runtime compatibility install closure is **not** by itself a valid Tiny release product.
 
-`rich-race` is the K01 two-real-process competing-writer scenario over ONE
-SQLite file: exactly one provider dispatch and one job row.
+## Version candidate execution entry
 
-## Reproducible command list
+From the exact candidate repo root, on Node24 with installed dependencies:
 
 ```sh
-# 0. Node 24 + a built repository (npm ci && npm run build)
-node --version    # v24.x
-
-# 1. Pack the exact runtime packages (from the repository root)
-npm pack -w @kaicreator/domain-harness --pack-destination /tmp/t11-pack
-npm pack -w @kaicreator/domain-harness-compiler --pack-destination /tmp/t11-pack
-
-# 2. Isolated BUILD installation (no repository path is imported)
-mkdir /tmp/t11-builder && cd /tmp/t11-builder
-printf '{"name":"t11-builder","private":true,"type":"module"}\n' > package.json
-npm install /tmp/t11-pack/kaicreator-domain-harness-*.tgz \
-            /tmp/t11-pack/kaicreator-domain-harness-compiler-*.tgz \
-            --registry=http://localhost:14873
-cp -r <repo>/examples/v010-clean-consumer ./example   # excluding ./out
-node example/build-apps.mjs --out out --source-sha <exact SHA>
-npm pack out/tiny --pack-destination /tmp/t11-pack
-npm pack out/rich-v1 --pack-destination /tmp/t11-pack
-npm pack out/rich-v2 --pack-destination /tmp/t11-pack
-
-# 3. Two ISOLATED clean installations
-mkdir /tmp/t11-tiny && cd /tmp/t11-tiny
-printf '{"name":"t11-tiny","private":true,"type":"module"}\n' > package.json
-npm install <runtime tarballs> <tiny app tarball> better-sqlite3@^12 \
-            --registry=http://localhost:14873
-npm install-scripts approve better-sqlite3 && npm rebuild better-sqlite3
-
-mkdir /tmp/t11-rich && cd /tmp/t11-rich
-printf '{"name":"t11-rich","private":true,"type":"module"}\n' > package.json
-npm install <runtime tarballs> <rich v1 tarball> <rich v2 tarball> better-sqlite3@^12 \
-            --registry=http://localhost:14873
-npm install-scripts approve better-sqlite3 && npm rebuild better-sqlite3
-
-# 4. Execute the App-owned scenarios (each writes a JSON report)
-node node_modules/@kaicreator-example/v010-tiny-app/app.mjs \
-  --scenario tiny-basic --workdir /tmp/t11-tiny-work
-node node_modules/@kaicreator-example/v010-rich-app/app.mjs \
-  --scenario rich-main --workdir /tmp/t11-rich-work
-# rich-wait-a → rich-wait-b, rich-t08-a → rich-t08-b, rich-shadow,
-# and two concurrent rich-race processes complete the suite.
-```
-
-The automated equivalent is
-`tests/integration/v010-clean-consumers/clean-consumers.test.ts`; run it with
-
-```sh
+npm ci
+npm run build
 node --import tsx --test tests/integration/v010-clean-consumers/clean-consumers.test.ts
 ```
 
-Override the npm registry with `T11_NPM_REGISTRY` when the local Verdaccio
-cache is unavailable.
+This is a requested T09 executable test, **not** a claimed PASS at the final SHA. If this suite still assumes the retired Compiler public exports, it must fail and be repaired in T09; never bypass the assertion, silently skip a consumer, import a private `dist` path, or assume a registry has unpublished `0.10.2-rc.0` packages.
 
-## PACK recipe (the only non-example build change)
+T09 must save actual packed artifact hashes, isolated `node_modules` and lockfile closure, Tiny send/query/replay/conflict and governed subscribe/stop, Rich file-backed SQLite/restart/UNKNOWN/effect negatives, two-B scoped refusal, and external producer evidence. T08b owns all example README files, including the separate external-producer README. R01 owns the **one-time** final docs-command replay and full/hidden/critical regression.
 
-`packages/domain-harness-compiler/package.json` exposes the already-built
-`./v10build` / `./v10shadow` dist and the sealed payload bytes as public
-subpaths (`./v10payload/*`), and ships the pure `v09/workflow-router.mjs`.
-Without that, an installed consumer cannot BUILD or activate a v0.10 App
-without a deep `dist/` path. No runtime semantics changed.
-
-## Honest boundaries
-
-- The focused suite ran on the LOCAL Windows Node24 host with real
-  `better-sqlite3`-backed SQLite; the Ubuntu Build Host lane is `NOT_RUN`.
-- `PR_PASS != RELEASE_PASS`. R01 alone runs the complete regression, hidden
-  validation, security and release packaging at one fixed version SHA.
-- No JavaScript network sandbox is claimed. The permitless-adapter refusal is
-  executable evidence; a private npm/HTTP business-effect bypass remains a
-  contract/BUILD/code-review violation (L2 Freeze §3 P2-2).
+See [Tiny/Rich guide](../../docs/guides/V0102_TINY_RICH.md) and [R01 docs command inventory](../../docs/guides/V0102_R01_DOC_COMMANDS.md). `main` stays HOLD.
