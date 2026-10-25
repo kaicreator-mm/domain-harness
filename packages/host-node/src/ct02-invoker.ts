@@ -1,5 +1,8 @@
 /**
  * DomainHarness v0.10.1 — T05 CT-02 read-only Agent Improvement Feature caller.
+ * Host-owned since v0.10.2 T03b (#1325): moved byte-faithfully in behavior from
+ * `extensions/agent-improvement/host/ct02-data-only-invoker.mjs` (deleted by
+ * the same move; both of its importers were re-pointed in the same task).
  *
  * A narrowly scoped, HOST-OWNED data boundary for four new Standard Feature
  * keys. This is NOT the global v10 selected facade, a Node/JS sandbox or a
@@ -11,6 +14,21 @@
  * introspection; no arbitrary hostile Proxy object can be safely introspected
  * with a universal "zero code execution" guarantee.
  */
+
+interface CopyBudget {
+  nodes: number;
+  chars: number;
+}
+
+/** The minimal trusted facade surface this invoker depends on. */
+export interface Ct02FeatureFacade {
+  invokeSelectedStandardFeature(
+    featureKey: string,
+    request: unknown,
+    trustedDependencies: unknown,
+  ): Promise<unknown>;
+}
+
 const FEATURE_KEYS = new Set([
   'standard:agent-diagnostics/1',
   'standard:candidate-evaluation/1',
@@ -35,7 +53,10 @@ const MAX_STRING_CHARS = 8192;
 const MAX_JSON_BYTES = 65536;
 
 export class FeatureInputNotPlainDataError extends Error {
-  constructor(reason) {
+  /** Own enumerable fields, exactly as the moved v0.10.1 source shaped them. */
+  readonly code: string;
+  readonly reason: string;
+  constructor(reason: string) {
     super('FEATURE_INPUT_NOT_PLAIN_DATA');
     this.name = 'FeatureInputNotPlainDataError';
     this.code = 'FEATURE_INPUT_NOT_PLAIN_DATA';
@@ -44,18 +65,18 @@ export class FeatureInputNotPlainDataError extends Error {
   }
 }
 
-function refuse(reason) {
+function refuse(reason: string): never {
   throw new FeatureInputNotPlainDataError(reason);
 }
 
-function checkString(value, budget) {
+function checkString(value: string, budget: CopyBudget): string {
   if (value.length > MAX_STRING_CHARS) refuse('STRING_LIMIT');
   budget.chars += value.length;
   if (budget.chars > MAX_JSON_BYTES) refuse('TOTAL_TEXT_LIMIT');
   return value;
 }
 
-function copyPlain(value, budget, ancestors, depth) {
+function copyPlain(value: unknown, budget: CopyBudget, ancestors: WeakSet<object>, depth: number): unknown {
   budget.nodes++;
   if (budget.nodes > MAX_NODES || depth > MAX_DEPTH) refuse('BOUNDS_EXCEEDED');
   if (value === null || typeof value === 'boolean') return value;
@@ -70,14 +91,14 @@ function copyPlain(value, budget, ancestors, depth) {
   try {
     // getPrototypeOf/ownKeys/descriptor operations CAN trigger Proxy traps.
     // This gate is intentionally for trusted-Host projected object graphs.
-    const proto = Object.getPrototypeOf(value);
+    const proto: unknown = Object.getPrototypeOf(value);
     if (Array.isArray(value)) {
       if (proto !== Array.prototype || value.length > MAX_ARRAY) refuse('ARRAY_INVALID');
       const keys = Reflect.ownKeys(value);
       if (keys.length !== value.length + 1
           || keys.some((key, i) => i < value.length
             ? key !== String(i) : key !== 'length')) refuse('ARRAY_PROPERTIES_INVALID');
-      const result = [];
+      const result: unknown[] = [];
       for (let i = 0; i < value.length; i++) {
         const desc = Object.getOwnPropertyDescriptor(value, String(i));
         if (!desc || !Object.hasOwn(desc, 'value') || !desc.enumerable) {
@@ -89,11 +110,11 @@ function copyPlain(value, budget, ancestors, depth) {
     }
     if (proto !== Object.prototype && proto !== null) refuse('OBJECT_PROTOTYPE_INVALID');
     const keys = Reflect.ownKeys(value);
-    if (keys.length > MAX_KEYS || keys.some(x => typeof x !== 'string')) {
+    if (keys.length > MAX_KEYS || keys.some((x) => typeof x !== 'string')) {
       refuse('OBJECT_KEYS_INVALID');
     }
-    const result = Object.create(null);
-    for (const key of keys) {
+    const result = Object.create(null) as Record<string, unknown>;
+    for (const key of keys as string[]) {
       if (FORBIDDEN_KEYS.has(key) || key.length > 256
           // eslint-disable-next-line no-control-regex -- intentional C0 control-character rejection
           || /[\u0000-\u001f]/.test(key)) refuse('OBJECT_KEY_NOT_DATA');
@@ -118,8 +139,8 @@ function copyPlain(value, budget, ancestors, depth) {
   }
 }
 
-function snapshot(value) {
-  const budget = { nodes: 0, chars: 0 };
+function snapshot(value: unknown): unknown {
+  const budget: CopyBudget = { nodes: 0, chars: 0 };
   const safe = copyPlain(value, budget, new WeakSet(), 0);
   // No getter/side-effect execution after the checked snapshot is built.
   const serialized = JSON.stringify(safe);
@@ -135,8 +156,11 @@ function snapshot(value) {
  * arbitrary serialized request data and never serialized through snapshot().
  */
 export async function invokeAgentImprovementFeature(
-  facade, featureKey, request, trustedDependencies = {},
-) {
+  facade: Ct02FeatureFacade | null | undefined,
+  featureKey: string,
+  request: unknown,
+  trustedDependencies: unknown = {},
+): Promise<unknown> {
   if (!FEATURE_KEYS.has(featureKey)) refuse('FEATURE_NOT_IN_ALLOWLIST');
   const safeRequest = snapshot(request);
   const safeDependencies = snapshot(trustedDependencies);

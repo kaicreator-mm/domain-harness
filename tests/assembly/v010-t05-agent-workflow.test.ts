@@ -321,7 +321,7 @@ async function richAgentModules(): Promise<V10ModuleInput[]> {
       requires: [],
       externalImports: {
         node: ['node:path', 'node:os', 'node:fs'],
-        npm: ['@kaicreator/domain-harness/v8/host'],
+        npm: ['@kaicreator/domain-harness-host-node'],
         native: [],
       },
       capabilityId: 'memory',

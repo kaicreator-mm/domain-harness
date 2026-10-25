@@ -120,7 +120,7 @@ const CAPABILITIES = Object.freeze([
     capabilityId: 'memory',
     externalImports: Object.freeze({
       node: Object.freeze(['node:path', 'node:os', 'node:fs']),
-      npm: Object.freeze(['@kaicreator/domain-harness/v8/host']),
+      npm: Object.freeze(['@kaicreator/domain-harness-host-node']),
       native: Object.freeze([]),
     }),
     handlers: Object.freeze([
