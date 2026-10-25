@@ -100,59 +100,75 @@ const FORBIDDEN_MESSAGE_PATTERNS: readonly RegExp[] = [
  * not an authority source for picking executable constructors.
  */
 function publicError(error: unknown, untypedCode: string): V10Error | V10MultiBQueryError {
-  const genericMessage = 'the public facade refused an internal Host failure';
-  if (!(error instanceof V10Error) && !(error instanceof V10MultiBQueryError)) {
-    return new V10Error(untypedCode, genericMessage);
-  }
-  // This is the *wire code* of a typed error; it is not an executable class.
-  const code = typeof error.code === 'string' ? error.code : untypedCode;
-  const message = typeof error.message === 'string'
-    && !FORBIDDEN_MESSAGE_PATTERNS.some((pattern) => pattern.test(error.message))
-    ? error.message
-    : `[${code}] the public facade refused this operation; protected diagnostic omitted`;
-  // Use exact trusted prototypes and constructors. Never evaluate
-  // Object.getPrototypeOf(error).constructor or execute untrusted subclasses:
-  // those may recreate secret-bearing own fields *or inherited getters*.
-  const proto: unknown = Object.getPrototypeOf(error);
-  if (proto === V10MultiBQueryError.prototype) {
-    return new V10MultiBQueryError(code, message);
-  }
-  if (proto === V10ExternalEffectError.prototype) {
-    return new V10ExternalEffectError(code, message);
-  }
-  if (proto === V10ActivationError.prototype) {
-    return new V10ActivationError(code, message);
-  }
-  if (proto === V10BuildError.prototype) {
-    return new V10BuildError(code, message);
-  }
-  // Preserve exact Contracts base identity for an actual base-class error.
-  if (proto === V10Error.prototype) {
-    return new V10Error(code, message);
-  }
-  // Legacy Host's deployment class does not belong to the selected
-  // Microkernel's import graph. Preserve its bounded *wire name* and only
-  // {retryable} data, but NOT its untrusted class/prototype identity.
-  const safe = new V10Error(code, message);
-  if (error instanceof V10Error && error.name === 'V10DeploymentError') {
-    safe.name = 'V10DeploymentError';
-    const detail = deploymentRetryableDetail(error);
-    if (detail !== undefined) {
-      Object.defineProperty(safe, 'detail', {
-        value: detail, enumerable: true, writable: false, configurable: false,
-      });
+  // This fallback must depend only on a trusted call-site code: even reading
+  // properties of a forged Error/Proxy may throw with sensitive diagnostics.
+  const safeFallback = (): V10Error =>
+    new V10Error(untypedCode, 'the public facade refused an internal Host failure');
+  try {
+    if (!(error instanceof V10Error) && !(error instanceof V10MultiBQueryError)) {
+      return safeFallback();
     }
-  }
-  return safe;
-}
 
-/** L2 §3: only deployment-named errors may keep exactly {retryable}. */
-function deploymentRetryableDetail(error: V10Error): { retryable: boolean } | undefined {
-  if (error.name !== 'V10DeploymentError') return undefined;
-  const detail: unknown = (error as unknown as { detail?: unknown }).detail;
-  if (typeof detail !== 'object' || detail === null) return undefined;
-  const retryable: unknown = (detail as { retryable?: unknown }).retryable;
-  return typeof retryable === 'boolean' ? { retryable } : undefined;
+    // Inspect ONLY own data descriptors. Accessors and throwing Proxy traps
+    // are not evaluated, and any unsafe shape fails closed to a fixed reply.
+    const ownData = (value: object, key: string): unknown => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) {
+        throw new TypeError('not a trusted plain error data field');
+      }
+      return descriptor.value;
+    };
+    const rawCode = ownData(error, 'code');
+    const rawMessage = ownData(error, 'message');
+    if (typeof rawCode !== 'string' || typeof rawMessage !== 'string') {
+      return safeFallback();
+    }
+    const code = rawCode;
+    const message = FORBIDDEN_MESSAGE_PATTERNS.some((pattern) => pattern.test(rawMessage))
+      ? `[${code}] the public facade refused this operation; protected diagnostic omitted`
+      : rawMessage;
+
+    // Never execute a Host-subclass constructor. The prototype is compared by
+    // object identity only, inside this catch-all inspection boundary.
+    const proto: unknown = Object.getPrototypeOf(error);
+    if (proto === V10MultiBQueryError.prototype) return new V10MultiBQueryError(code, message);
+    if (proto === V10ExternalEffectError.prototype) return new V10ExternalEffectError(code, message);
+    if (proto === V10ActivationError.prototype) return new V10ActivationError(code, message);
+    if (proto === V10BuildError.prototype) return new V10BuildError(code, message);
+    if (proto === V10Error.prototype) return new V10Error(code, message);
+
+    // Historical deployment subclasses are untrusted as constructors; only
+    // their frozen *wire name* and an own, plain-data boolean may be copied.
+    const safe = new V10Error(code, message);
+    if (error instanceof V10Error && ownData(error, 'name') === 'V10DeploymentError') {
+      safe.name = 'V10DeploymentError';
+      const detailDescriptor = Object.getOwnPropertyDescriptor(error, 'detail');
+      if (detailDescriptor !== undefined) {
+        if (!Object.hasOwn(detailDescriptor, 'value')) return safeFallback();
+        const detail = detailDescriptor.value as unknown;
+        if (typeof detail !== 'object' || detail === null || Array.isArray(detail)) {
+          return safe;
+        }
+        const detailProto: unknown = Object.getPrototypeOf(detail);
+        if (detailProto !== Object.prototype && detailProto !== null) return safeFallback();
+        const retryableDescriptor = Object.getOwnPropertyDescriptor(detail, 'retryable');
+        if (retryableDescriptor !== undefined) {
+          if (!Object.hasOwn(retryableDescriptor, 'value')) return safeFallback();
+          if (typeof retryableDescriptor.value === 'boolean') {
+            Object.defineProperty(safe, 'detail', {
+              value: Object.freeze({ retryable: retryableDescriptor.value as boolean }),
+              enumerable: true, writable: false, configurable: false,
+            });
+          }
+        }
+      }
+    }
+    return safe;
+  } catch {
+    // Never forward the inspection failure itself, even when it was raised by
+    // a hostile getter or Proxy: it can contain arbitrary paths/credentials.
+    return safeFallback();
+  }
 }
 
 /**
