@@ -39,7 +39,15 @@ node examples/v0102-package-authoring/projection-smoke.mjs
 node --import tsx --test tooling/build/tests/component-view.test.ts
 ```
 
-**Probe boundary:** this covers semantic/advisory/Tool projection, two distinct C modules and typed *static* negatives. It does not install/execute a third-party Domain App or prove effect/UNKNOWN. That independent clean-pack/Node24 check remains mandatory before this issue can PASS. For a physical running example, invoke the existing T09 external producer/clean consumer test on the final SHA and add the new authoring-template positive/negative witness; never rely only on a monorepo source import.
+**Probe boundary:** this covers semantic/advisory/Tool projection, two distinct C modules and typed *static* negatives. It does not install/execute a third-party Domain App or prove effect/UNKNOWN by itself.
+
+## Physical public-tarball authoring acceptance (Node24, one command)
+
+```sh
+node examples/v0102-package-authoring/authoring-template-check.mjs --evidence <file.json>
+```
+
+`examples/v0102-package-authoring/authoring-app/` is the minimal #1305 authoring App source (S non-Tool Feature + B with a private helper + read-only and external-effect C modules) and `authoring-producer.mjs` seals it inside an isolated public-tarball root through exactly this guide's path — `projectSelectedComponents` then `buildV10App` — before the sealed App is packed, clean-installed and executed with the governed permitted dispatch, the permitless typed refusal (zero adapter dispatch) and six typed binding/route negatives. The check records literal exit codes and digests in its evidence JSON. Never rely only on a monorepo source import for this proof; the existing T09 Tiny/Rich suite (`tests/integration/v010-clean-consumers/clean-consumers.test.ts`) remains the separate producer/consumer evidence.
 
 ## Release checks
 

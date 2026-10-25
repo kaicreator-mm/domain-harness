@@ -4,35 +4,38 @@
  * prove any K permit, Host CAS, subscriber or physical installed consumer.
  *
  * Requires Node24 + local selected BUILD workspace after npm ci/build.
+ * The declaration/module shapes mirror the physically executed template in
+ * authoring-app/ + authoring-producer.mjs (same feature payload package,
+ * featureExport and capability identities).
  */
 import assert from 'node:assert/strict';
 import { projectSelectedComponents } from '@kaicreator/domain-harness-build';
 
 assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Node24 is the selected physical authoring lane');
 const feature = Object.freeze({
-  packageId: 'feature.rule', role: 'standard-feature',
+  packageId: 'sfeature-semantic-decision@v010.1.0.0', role: 'standard-feature',
   abiVersion: 'dh.v10.standard-feature/1', endpoint: 'standard-feature',
-  featureExport: 'evaluateRule',
+  featureExport: 'resolveSemanticDecision',
 });
 const read = Object.freeze({
-  packageId: 'capability.inventory', role: 'capability',
+  packageId: 'capability-inventory-readonly@v0102.1.0.0', role: 'capability',
   abiVersion: 'v08-capability-abi/1', endpoint: 'capability-endpoint',
   capabilityId: 'inventory', externalEffect: false,
   handlers: [{ operationId: 'inventory.get', handler: 'getInventory' }],
 });
 const effect = Object.freeze({
-  packageId: 'capability.jobs', role: 'capability',
+  packageId: 'capability-jobs-effect@v0102.1.0.0', role: 'capability',
   abiVersion: 'v08-capability-abi/1', endpoint: 'capability-endpoint',
   capabilityId: 'jobs', externalEffect: true,
   handlers: [{ operationId: 'jobs.submit', handler: 'submitJob' }],
 });
 const declarations = [
-  { class: 'semantic', kind: 'rule', componentId: 'semantic.quality',
-    modulePackageId: feature.packageId, entry: 'evaluateRule' },
-  { class: 'tool', kind: 'package-operation', componentId: 'tool.inventory',
+  { class: 'semantic', kind: 'decision', componentId: 'semantic.authoring-decision',
+    modulePackageId: feature.packageId, entry: feature.featureExport },
+  { class: 'tool', kind: 'package-operation', componentId: 'tool.inventory-read',
     modulePackageId: read.packageId, operationId: 'inventory.get',
     handler: 'getInventory', externalEffect: false },
-  { class: 'tool', kind: 'package-operation', componentId: 'tool.jobs',
+  { class: 'tool', kind: 'package-operation', componentId: 'tool.jobs-submit',
     modulePackageId: effect.packageId, operationId: 'jobs.submit',
     handler: 'submitJob', externalEffect: true },
 ];
