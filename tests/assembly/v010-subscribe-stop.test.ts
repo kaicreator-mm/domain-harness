@@ -322,7 +322,7 @@ test('T06b-N3-LATE: revoke during the snapshot query never delivers metadata and
 
     // A failed final authorization must destroy the subscription, not merely
     // defer it until some future Host authority change.
-    authority.state.denyFromCall = undefined;
+    delete authority.state.denyFromCall;
     await domainApp.send(intentOf(instanceKey, messageId));
     await settle(300);
     assert.equal(events.length, 0, 'revoked subscription cannot resurrect after reauthorization');
