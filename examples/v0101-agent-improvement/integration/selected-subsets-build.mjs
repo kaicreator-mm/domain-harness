@@ -17,7 +17,7 @@ import {
   buildV10App, sha256Hex, V10_TARGET_PROFILE, activateV10App,
 } from '@kaicreator/domain-harness-compiler/v10build';
 import { definitionV2 } from '../../v010-clean-consumer/apps/rich/app-definition.mjs';
-import { invokeAgentImprovementFeature } from '../../../extensions/agent-improvement/host/ct02-data-only-invoker.mjs';
+import { invokeAgentImprovementFeature } from '@kaicreator/domain-harness-host-node';
 
 const PRODUCERS = Object.freeze([
   ['@kaicreator/domain-feature-agent-diagnostics', 'agentDiagnosticsFeature'],

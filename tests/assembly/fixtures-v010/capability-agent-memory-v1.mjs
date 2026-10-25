@@ -5,8 +5,9 @@
  *
  * This is the SAME product adapter T04 delivered
  * (`createV10ScopedMemory` + `openSqliteCasStore` from the installed
- * `@kaicreator/domain-harness/v8/host` package, reached through this
- * module's DECLARED npm allowance), re-scoped for the T05 Agent Business:
+ * `@kaicreator/domain-harness-host-node` package since v0.10.2 T03b,
+ * reached through this module's DECLARED npm allowance), re-scoped for the
+ * T05 Agent Business:
  * the sealed authorization allowlist names exactly the deployment tenant
  * and Business package the T05 BUILD composes. It owns only typed
  * put/get/search/delete over its own SQLite document store; it holds no
@@ -20,7 +21,7 @@ import { mkdirSync } from 'node:fs';
 import {
   createV10ScopedMemory,
   openSqliteCasStore,
-} from '@kaicreator/domain-harness/v8/host';
+} from '@kaicreator/domain-harness-host-node';
 
 export const MODULE_ID = 'capability-agent-memory@v010.1.0.0';
 export const PACKAGE_KIND = 'capability';
