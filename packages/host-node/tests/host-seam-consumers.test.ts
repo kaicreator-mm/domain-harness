@@ -163,7 +163,7 @@ test('T03b-BRAND-2: a real branded facade passes the brand gates of all three co
   } finally {
     bare.dispose();
   }
-  assert.equal(seam.isV10AppFacade(bare.facade) || true, true, 'sanity: seam module loaded');
+  assert.equal(seam.isV10AppFacade(bare.facade), true, 'the activated facade retains its genuine Microkernel identity');
 });
 
 test('T03b-BRAND-3: the activation-origin binding ignores an own-property override; copies are not branded', { timeout: 120_000 }, async () => {
