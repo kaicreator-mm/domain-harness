@@ -1,0 +1,29 @@
+{
+  "schema": "dh.v0102.external-producer.apps/1",
+  "apps": [
+    {
+      "name": "tiny",
+      "definitionEntry": "definition",
+      "profile": "Tiny",
+      "packageName": "@kaicreator-example/v010-tiny-app",
+      "outDir": "tiny",
+      "description": "v0.10.2 T09 Tiny clean-packed Domain App (K/S Basic + one B + its necessary C)"
+    },
+    {
+      "name": "rich",
+      "definitionEntry": "definitionV1",
+      "profile": "Rich",
+      "packageName": "@kaicreator-example/v010-rich-app",
+      "outDir": "rich-v1",
+      "description": "v0.10.2 T09 Rich clean-packed Domain App BUILD v1"
+    },
+    {
+      "name": "rich",
+      "definitionEntry": "definitionV2",
+      "profile": "Rich",
+      "packageName": "@kaicreator-example/v010-rich-app-v2",
+      "outDir": "rich-v2",
+      "description": "v0.10.2 T09 Rich clean-packed Domain App BUILD v2 (new approved version)"
+    }
+  ]
+}
