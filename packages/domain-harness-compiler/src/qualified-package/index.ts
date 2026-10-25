@@ -40,6 +40,3 @@ export {
 } from './v09build/index.js';
 export type { V09BuildParserPin } from './v09build/index.js';
 
-// One canonical v0.10 public surface; keep internal AST/gate seams private.
-// All other barrels forward this curated export inventory without copying it.
-export * from './v10build/index.js';

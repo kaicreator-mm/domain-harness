@@ -41,9 +41,6 @@ export { bundleScriptTool, ScriptCompileError, SCRIPT_EXECUTION_CAPABILITY, } fr
 // The emitted root carries no approval; governance attaches it at the
 // protected host-v9 install. Public `./v9` SDK surface stays with #1035.
 export { assertVendoredParserBytes, assertZeroImportBuildModule, buildV09QualifiedRoot, canonicalV9Json, computeV09SealedRootSubjectDigest, computeV9QualifiedRootSubjectDigest, V09BuildError, V09_BUNDLER_REVISION, V09_HOST_ABI, V09_IMPORT_POLICY_REVISION, V09_RUNTIME_ABI, V09_SEALED_ROOT_FORMAT, V09_SUBJECT_DOMAIN, V09_BUILD_PARSER_PIN, } from './qualified-package/index.js';
-// Forward the one curated v0.10 BUILD public barrel (no copied export roster).
-// Internal import policy/Host effect gate modules remain private.
-export * from './qualified-package/v10build/index.js';
 // v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
 // external approval + sealed-root producer over the public core /v8 ABI.
 export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';

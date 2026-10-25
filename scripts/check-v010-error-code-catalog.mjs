@@ -15,19 +15,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const catalogPath = join(root, 'docs', 'architecture', 'V010_TYPED_REFUSAL_LITERAL_CATALOG.json');
-const compilerRoot = join(root, 'packages/domain-harness-compiler/src/qualified-package');
-const compilerDirs = ['v10build', 'v10evidence', 'v10meta', 'v10shadow'];
+// v0.10.2 T11 cutover: the compiler-side v10build/v10evidence/v10meta/
+// v10shadow directories are deleted; the final roots are the canonical
+// package sources below plus the still-shipped host-v8 v010* files.
 const hostDir = join(root, 'packages/domain-harness/src/host-v8');
 const codeCall = /\b(?:fail|refuse|reject|denied|new\s+[A-Za-z_$][A-Za-z0-9_$]*Error)\s*\(\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g;
 /** Object-shaped typed failures also carry literal error codes. */
 const codeProperty = /\bcode:\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g;
 
 const sourceFiles = [];
-for (const dir of compilerDirs) {
-  for (const name of (await readdir(join(compilerRoot, dir))).sort()) {
-    if (name.endsWith('.ts')) sourceFiles.push(join(compilerRoot, dir, name));
-  }
-}
 for (const name of (await readdir(hostDir)).sort()) {
   if (/^v010[^/]*\.ts$/.test(name)) sourceFiles.push(join(hostDir, name));
 }

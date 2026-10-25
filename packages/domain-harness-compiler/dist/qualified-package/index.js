@@ -13,6 +13,3 @@ export { buildQualifiedPackage, BuildError } from './build.js';
 // carries no approval; governance attaches it at the protected install.
 export { buildV09QualifiedRoot, V09BuildError } from './v09build/index.js';
 export { assertVendoredParserBytes, assertZeroImportBuildModule, canonicalV9Json, computeV09SealedRootSubjectDigest, computeV9QualifiedRootSubjectDigest, V09_BUNDLER_REVISION, V09_HOST_ABI, V09_IMPORT_POLICY_REVISION, V09_RUNTIME_ABI, V09_SEALED_ROOT_FORMAT, V09_SUBJECT_DOMAIN, V09_BUILD_PARSER_PIN, } from './v09build/index.js';
-// One canonical v0.10 public surface; keep internal AST/gate seams private.
-// All other barrels forward this curated export inventory without copying it.
-export * from './v10build/index.js';
