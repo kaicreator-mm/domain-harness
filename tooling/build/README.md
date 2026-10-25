@@ -14,3 +14,34 @@ The parser is a vendored Acorn 8.19.0 migration from the previously pinned compi
 - Independent exact-head review P0/P1/P2 before merge to v0.10.2. No premature main merge.
 
 **Status**: Physical build + pin + scoped tests + independent packing verified on Node v24.21.0 (evidence logs on the PR). Dist SHA pinned; still NOT merge-ready until the independent exact-head review P0/P1/P2 and controller `task-check` pass. This document is operational source handoff, not a new design authority.
+
+## v0.10.2 A8b — published BUILD Component authoring adapter
+
+The published BUILD workspace exposes `projectSelectedComponents` and type-only `ComponentDeclaration`, `ComponentProjection`, `SemanticKind`, `ToolPlacement`. These are **producer descriptions, not a second runtime, selected manifest, a Tool/Hook dispatcher, or an authority source**. This function takes declarations plus an already selected `V10ModuleInput[]` and returns only the original selected module objects needed by these declarations (and an informational bindings map); it does not import or execute module source. The producer then calls the unchanged `buildV10App` with its required K/S/B core modules and any selected Component modules. Original source/digest/ABI and dependencies are checked once by BUILD.
+
+Supported v0.10.2 mapping:
+- `semantic:rule|skill|workflow|decision|context|validator|schema|diagnostics|knowledge|evidence` — only if the declared `entry` exactly equals the already selected Standard Feature module's `featureExport`. A knowledge/prompt asset without an entry can stay a private Package asset.
+- `hook:kernel-advisory` — only the already selected Kernel advisory extension `hookExport`; lifecycle/event/observer Business hooks are unsupported and refused, not silently executed.
+- `tool:package-operation` — only a declared selected Capability `operationId→handler`; `externalEffect` must match its sealed **module-wide** flag. Ordinary local, package-shared and operation-private helper functions are not Tools. `system-operation` and `remote-operation` are provider-location labels, not evidence of an installed transport/Host provider; without a separately selected supported adapter they are currently typed UNSUPPORTED, regardless of effect type. No per-handler effect waiver.
+
+Producer example (use real sealed modules and existing routes, never invent module bytes):
+
+```ts
+import { buildV10App, projectSelectedComponents } from '@kaicreator/domain-harness-build';
+
+const selected = projectSelectedComponents([
+  {
+    class: 'tool', kind: 'package-operation', componentId: 'inventory.get',
+    modulePackageId: inventoryCapability.packageId, operationId: 'inventory.get',
+    handler: 'getInventory', externalEffect: false,
+  },
+], alreadySelectedModules);
+
+const app = buildV10App({
+  ...baseOptions,
+  modules: [...coreKernelStandardBusinessModules, ...selected.modules],
+  // Keep only routes that refer to explicitly selected Capability operations.
+});
+```
+
+One logical Domain Package may author several independent selected module boundaries; two Tool Operations can share a Package-private helper but a private helper itself has no BUILD/Tool registration. BUILD still enforces the original role cardinalities, selected digest and dependency closure, import restrictions, duplicate provider IDs, effect/route bindings and typed refusals. No new `package.json` export-map entry, Node major matrix, package manifest authority or Microkernel/Host import is introduced by this adapter. Exact A8b scope: only `src/component-view.ts`, `src/index.ts`, `tests/component-view.test.ts`, `README.md`, and Node24-generated `dist/{component-view,index}.{js,d.ts}`. T07b owns later final tarball packaging; T09 owns external clean-installed consumer proof. Generated output must be a real Node24 TypeScript `tsc` emit, not handwritten.
