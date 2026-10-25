@@ -87,6 +87,15 @@ function validateKeys(raw: object, allowed: readonly string[]): void {
 const BASE_KEYS = ['class', 'componentId', 'modulePackageId', 'kind'] as const;
 
 /**
+ * Array.isArray alone narrows a readonly T[] parameter to any[] (every
+ * subsequent access would be unchecked), so list guards go through an
+ * unknown-typed predicate that preserves the original element types.
+ */
+function isNonEmptyList(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value) && value.length > 0;
+}
+
+/**
  * Map explicitly selected declarations onto already selected V10 BUILD inputs.
  * Never loads/evaluates an ESM module and never registers a Tool or Hook.
  * Unsupported semantics fail closed; BUILD must still seal modules and routes.
@@ -95,8 +104,8 @@ export function projectSelectedComponents(
   declarations: readonly ComponentDeclaration[],
   selectedModules: readonly V10ModuleInput[],
 ): ComponentProjection {
-  if (!Array.isArray(declarations) || declarations.length === 0 || declarations.length > MAX_COMPONENTS ||
-      !Array.isArray(selectedModules) || selectedModules.length === 0) {
+  if (!isNonEmptyList(declarations) || declarations.length > MAX_COMPONENTS ||
+      !isNonEmptyList(selectedModules)) {
     refuse('BUILD_INPUT_INVALID', 'Component selection requires bounded declarations and selected modules');
   }
 
