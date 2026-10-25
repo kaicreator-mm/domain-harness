@@ -511,6 +511,10 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
 
   await step('DENY_N1.permitlessAdapter', async () => {
     const before = extjob.dispatchCounts()['job.submit'] ?? 0;
+    // The v0.10.2 cutover removed the activation-level diagnostic counters
+    // object from the installed surface (host-seam): the per-B K counters
+    // are the durable public witness of the gate's refusal discipline.
+    const denyBefore = facade.kCounters(B1);
     const denied = await refusalOf(send(facade, 'submitUnpermittedJobProbe', 'inst-deny', 'deny/1', {
       requestId: 'R-DENY', jobSpec: { kind: 'probe' },
     }));
@@ -519,7 +523,10 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
     assert(/V10_EFFECT_PERMIT/.test(String(denied.message)), `permitless refusal did not name the missing K permit: ${String(denied.message).slice(0, 200)}`);
     assert((extjob.dispatchCounts()['job.submit'] ?? 0) === before, 'the permitless adapter physically dispatched');
     assert(extjob.jobByKey('R-DENY') === undefined, 'the permitless probe created a provider job');
-    assert(counters.externalEffectDispatches === 0 || counters.externalEffectRefusals >= 1, 'the gate did not record the typed refusal');
+    const denyAfter = facade.kCounters(B1);
+    assert(denyAfter.effectDispatches === denyBefore.effectDispatches + 1, 'the permitless probe did not reach the effect executor');
+    assert(denyAfter.effectPermitsMinted === denyBefore.effectPermitsMinted, 'the permitless probe minted an effect permit');
+    assert((denyAfter.effectPermitsConsumed ?? 0) === (denyBefore.effectPermitsConsumed ?? 0), 'the permitless probe consumed an effect permit');
     return { code: denied.code, message: String(denied.message).slice(0, 160), dispatchBefore: before, dispatchAfter: extjob.dispatchCounts()['job.submit'] };
   });
 
@@ -531,7 +538,6 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
   store.close();
   store = new SqliteDocStore(dbPath);
   activation = await activate({ store, app, manifest, log, authority, now });
-  counters = activation.counters;
   facade = activation.facade;
 
   await step('RICH_P2.restart', async () => {
@@ -558,7 +564,6 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
       dispositions: store.count('%turn-disposition%'),
     },
     memoryRows: memoryRows().length,
-    counters,
     manifest: {
       subjectDigest: manifest.subjectDigest,
       packageClosureDigest: manifest.packageClosureDigest,

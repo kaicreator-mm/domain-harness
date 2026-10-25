@@ -11,8 +11,8 @@
  * anywhere in this file. Every physical SQLite statement is explicit so the
  * scenarios can witness true CAS, restart durability and row surgery.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
@@ -22,6 +22,7 @@ import { activateGovernedV10Build } from '@kaicreator/domain-harness-host-node';
 import { openSharedSqliteDatabase } from './sqlite-open.mjs';
 
 export { V10_TARGET_PROFILE, activateV10App, activateGovernedV10Build };
+export { loadBuiltApp, loadManifest, writeReport, readJson } from './runtime-shared.mjs';
 
 export const APP_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -137,20 +138,4 @@ export function readOnlyStore(store) {
     get: async (key) => await store.get(key),
     keys: () => store.keys(),
   };
-}
-
-export function loadBuiltApp(appDir = APP_DIR) {
-  return JSON.parse(readFileSync(join(appDir, 'app.build.json'), 'utf8'));
-}
-
-export function loadManifest(appDir = APP_DIR) {
-  return JSON.parse(readFileSync(join(appDir, 'manifest.json'), 'utf8'));
-}
-
-export function writeReport(path, report) {
-  writeFileSync(path, JSON.stringify(report, null, 2));
-}
-
-export function readJson(path) {
-  return JSON.parse(readFileSync(path, 'utf8'));
 }

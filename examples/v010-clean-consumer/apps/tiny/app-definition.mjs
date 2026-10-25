@@ -6,7 +6,7 @@
  *
  * Module bytes are app-owned copies of the accepted v0.8/v0.9 public example
  * sources (see ../PROVENANCE.md); the selected K/S payload bytes come from the
- * installed compiler package, never from this repository.
+ * installed Domain Packages, never from this repository.
  */
 export const definition = Object.freeze({
   appId: 'app:v010-clean-tiny',
