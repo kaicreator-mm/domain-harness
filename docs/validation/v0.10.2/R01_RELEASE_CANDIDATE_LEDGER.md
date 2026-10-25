@@ -30,7 +30,7 @@ The frozen PRD's §3 has **eight P0** and **two P1 release deliverables**. Every
 | #1302 Physical package ownership and Host | P0 | T00/T01/T03/T07b | Selected owner/reachability and packlist; no legacy runtime included |
 | #1303 Current docs and evidence | P0 | T08a/T08b PR #1376 | Exact public Package/ABI links, preserved archive pointers, final doc commands |
 | #1304 Domain Package Manifest/ABI and Tool classes | P0 | T05 + A8b + selected Contracts | Declared Tool/Hook/semantic/refusal and module effect model, typed negatives |
-| #1305 Author guides and package templates | P1 | T08b docs and earlier fixtures | **Inspect** runnable S non-Tool, B private helper, two-C mixed Tool, K extension/Host authoring examples and SUPPORTED_EXTENSION_POINTS; no invented working example |
+| #1305 Author guides and package templates | P1 | T08b docs and earlier fixtures | **BLOCKED at source candidate**: #1379 (draft PR #1380) — missing supported extension index + checked authoring guides/templates; subsequently verify runnable S non-Tool, B private helper, two-C mixed Tool, K extension/Host authoring examples and SUPPORTED_EXTENSION_POINTS; no invented working example |
 | #1306 Tiny/Rich installed Domain Apps | P0 | T09 #1330 PR #1377 | Real Node24 clean Tiny/Rich and SQLite CAS/effect/UNKNOWN; source-tree-matched reuse with honest provenance |
 | #1307 Public production SDK | P0 | T04/T06b/T11/T07b | Exact exported `load/send/query/subscribe/stop`, typed redaction, N3-LATE reuse; private Host/gate hidden |
 | #1308 Source→artifact→install | P0 | T07b/T09 | Node24 `npm ci/build`; four selected tarballs; installed Tiny excludes Compiler/BUILD/`typescript`/`jsonata`/`yaml` |
@@ -87,6 +87,8 @@ If the frozen-branch manual Woodpecker candidate runs `npm test`, do **not** rep
 
 ## 5. Candidate decisions awaiting evidence
 
+**Preflight finding (2026-10-26):** Source candidate tree 9defe150 has no SUPPORTED_EXTENSION_POINTS or independently checked #1305 authoring guide/template. R01 P1 release blocker [#1379](https://github.com/kaicreator-mm/domain-harness/issues/1379), source-draft [PR #1380](https://github.com/kaicreator-mm/domain-harness/pull/1380). Until its code/docs are independently reviewed, actually Node24 qualified and merged to the version, the frozen source SHA above must not be used as RELEASE_READY; repin and reassess impact afterward. All R01 full/hidden/CJ/packaging remain NOT_RUN. This gap does not imply a known runtime P1 defect.
+
 ```ini
 R01_ADMITTED=YES_DEPENDENCIES_CLOSED
 CANDIDATE_PREPARED=YES
@@ -97,7 +99,7 @@ EXACT_SHA_CRITICAL_JOURNEYS=NOT_RUN_RELEASE_GATE
 EXACT_SHA_PACKAGING=NOT_RUN_RELEASE_GATE
 DOC_COMMAND_EXECUTION=NOT_RUN
 PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN
-RELEASE_QUALIFICATION=NOT_RUN
+RELEASE_QUALIFICATION=BLOCKED_ON_PRODUCT_P1_1305_AND_REMAINING_GATES_NOT_RUN
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
