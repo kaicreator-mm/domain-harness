@@ -31,7 +31,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after, before } from 'node:test';
 
-import { sha256Canonical, type V10BuiltApp } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { sha256Canonical, type V10BuiltApp } from '@kaicreator/domain-harness-contracts';
 import {
   META_FEEDBACK_ABI,
   META_FEEDBACK_CLAIM_STATE,
@@ -39,7 +39,7 @@ import {
   META_FEEDBACK_LEDGER_STATE,
   runMetaFeedbackWorkflow,
   type MetaFeedbackResult,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
+} from '@kaicreator/domain-harness-host-node';
 import {
   BUSINESS_ID,
   CANDIDATE_KEY,
