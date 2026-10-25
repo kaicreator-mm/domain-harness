@@ -24,3 +24,35 @@ Adopted DAG ONLY AFTER independent A8 freeze: `A8a` runs in parallel with existi
 ## Admission
 
 Independent Product/L2 exact SHA review must return P0/P1/P2, A8_FREEZE_READY, no overlapping write sets, acyclic DAG, scoped test plan, ABI compatibility. Do not merge candidate document into version branch or begin A8 implementation until gate PASS. No separate v0.10.3 is planned.
+
+
+## Proposed Package function visibility and ownership (2026-10-25)
+
+**Scope decision:** A Package owns executable functions in two broad sets: (1) **declared, bindable Component entry points** and (2) **ordinary private implementation functions**. Within (2), distinguish **package-shared** and **owner-private**. This is a *visibility/ownership* axis, independent of Semantic/Hook/Tool Component class or the selected K/S/B/C role.
+
+| Scope | Access semantics | BUILD/ABI/manifest |
+| --- | --- | --- |
+| Declared entry | Selected Component interface, bound by explicit identity: Semantic has semantic/Kind entry, Hook has trigger/handler entry, Tool has Operation ID/handler entry. A Tool Operation's visibility may be package-only vs selected Domain App vs externally exposed if a future selected ABI truly supports this. | Only declared entries participate in provides/requires, exported binding, identity and selected module hash. **Do not turn all Semantic/Hook entries into Tools simply because they are callable.** |
+| Package-shared helper | Ordinary function reused by multiple Components/Operations of **the same Package**, not directly exposed to other Packages, Agent or Domain App Tool registry. | Private source/import, no additional Tool/Operation manifest registration; internal dependency can be in BUILD-sealed module bytes or allowed trusted imports. |
+| Component-private helper | Ordinary implementation owned by one specific Component or Tool Operation; no sibling Component/Operation import. Within Tool, the owner is the explicit Operation ID. | Prefer lexical closure/unexported binding or owner-local module. If separate files are needed, use structure and scoped compile/lint/static import restrictions; do not invent per-function runtime authorization gates. |
+
+**Names matter:** Package-shared is **internal shared**, *not* external public API. An Operation-private helper is an implementation restriction, not a new Component kind. K/Host still govern real effects; it is not safe to equate JS module visibility with a security sandbox.
+
+**Simple suggested authoring layout** (not a mandated directory hierarchy or new runtime): \`src/shared/*\`, \`src/operations/<operationId>/entry.ts\`, \`src/operations/<operationId>/internal/*\`, \`src/semantics/*\`, \`src/hooks/*\`. Package export/import maps expose only selected declared entries, never \`shared/*\` or \`internal/*\`. For a trusted closed-world Package this prevents accidental API coupling, not hostile source access through absolute paths, reflection or Node capabilities. BUILD/static lint can enforce own source-import boundaries when valuable; it should not enumerate every private function in the manifest.
+
+**Critical distinction:** Declared *Component entry* does not equal a Tool Operation:
+- An exposed Semantic entry is selected by semantic/Kind contract; no automatic Tool registration.
+- A Hook handler is bound to an event/lifecycle trigger; no automatic Tool registration.
+- Only a Tool's explicitly declared Operation becomes a Tool Operation. Calling a private function from any of the above never creates a second Tool call.
+
+### Hook vs Tool — separate contracts, shared ordinary implementation is allowed
+
+Hook is an independently declared Component class because **event/lifecycle-triggered execution** differs from the **explicitly invoked Tool Operation** protocol: trigger, ordering, listener lifetime/unsubscribe, failure isolation and effect constraints have different semantics. A Hook's handler may internally call shared/private ordinary functions without a Tool wrapper. A Hook that needs a governed external/business effect must invoke an already declared, selected Tool Operation on the K-authorized path; the Hook itself must never mint a permit, bypass a K gate or silently claim original receipt completion. A Tool may optionally call the same shared functions; implementations can reuse a thin common dispatcher **without collapsing their contracts**. Current v0.10.2 selected K-extension \`hookExport\` is the only established Hook role and does not authorize arbitrary Business event bus behavior by renaming.
+
+**Alternative rejected:** Reclassifying all Hooks as Tools makes every lifecycle callback a discoverable/invokable Operation, duplicates Tool privileges/binding and confuses listener cancellation/order with request/response success. A generic event handler can *delegate* to Tool but is not *itself* a Tool.
+
+### A8 implementation bounded acceptance
+
+A8a: a docs/producer mapping that recognizes three Component classes, declares entry/shared/owner-private distinction, and maps **only existing** S Feature, K advisory Hook and C Operation ABIs. Reject undeclared Tool, a sibling importing an owner-private helper (when static source files are in scope), and treating shared helpers as publicly selected operations. No new runtime check for private functions.
+
+A8b: implement only the mapping/selection that can be independently tested within approved write sets. Check one Package with two Tool Operations sharing one internal helper, each with one operation-private helper; a Semantic and a supported Hook may reuse package-shared code but cannot import the other Operation's private code. Clean installed Node24 tarball prohibits undeclared exports. Do not claim native per-export component selection within one ESM module, generic Host lifecycle hook, or per-handler effect ABI unless independently frozen and implemented.
