@@ -10,11 +10,13 @@
  *     real kernel admission path; the K original receipt is returned as is;
  *   - `query(selector | selectors[])` — the authorized explicit scoped
  *     snapshot query (single or correlated multi-target);
- *   - `subscribe(selector, listener)` — the frozen §8 SHAPE only at this
- *     pin: the exact query preconditions are enforced and the registration
- *     is accepted, but real (asynchronous, projected, frozen-copy) delivery
- *     belongs to T06b and is NOT claimed here — no listener ever fires;
- *   - `stop()` — idempotent explicit teardown.
+ *   - `subscribe(selector, listener)` — [v0.10.2 T06b #1326 / L2 §8] the
+ *     live subscription seam: the exact query preconditions and the same
+ *     multi-B target resolution, then asynchronous delivery of the frozen
+ *     T06a projection (`{kind, occurrenceId, target, snapshot?}`) through
+ *     the per-activation registry and its authorize/re-check pump;
+ *   - `stop()` — idempotent explicit teardown (every subscription inactive,
+ *     queues cleared, before the reverse disposal).
  *
  * The wrapper adds no authority of its own and hides every internal
  * surface (counters, docs port, effect gate, import-hook registry): the
@@ -131,8 +133,6 @@ export async function load(app, options) {
         throw publicError(error, 'V10_APP_INVALID');
     }
     const facade = activation.facade;
-    const subscriptions = new Map();
-    let nextSubscriptionId = 1;
     let stopped = false;
     const assertNotStopped = () => {
         if (stopped || facade.isClosed()) {
@@ -167,36 +167,28 @@ export async function load(app, options) {
             // The exact scoped-query preconditions of L2 §8 (open facade, Host
             // query authority, K02 deployment identity — same typed refusals as
             // query), plus the explicit selector shape. Real projected delivery
-            // is T06b and never claimed here: the registration is accepted and
-            // simply never fires at this pin.
+            // is T06b (#1326): the facade resolves + authorizes the exact target
+            // through the same multi-B selector and registers the live pump.
             if (selector === null || typeof selector !== 'object' || Array.isArray(selector)
                 || typeof selector.workflowId !== 'string'
                 || typeof selector.instanceKey !== 'string') {
                 throw new V10ActivationError('QUERY_SELECTOR_INVALID', 'subscribe requires an explicit workflow and instance');
             }
             try {
-                facade.assertQueryPreconditions();
+                return await facade.subscribe(selector, (event) => {
+                    listener(event);
+                });
             }
             catch (error) {
-                throw publicError(error, 'QUERY_AUTHORIZATION_UNAVAILABLE');
+                throw publicError(error, 'QUERY_READ_FAILED');
             }
-            const id = nextSubscriptionId;
-            nextSubscriptionId += 1;
-            const subscription = {
-                unsubscribe: () => {
-                    subscriptions.delete(id);
-                },
-            };
-            subscriptions.set(id, subscription);
-            return subscription;
         },
         stop: () => {
             if (stopped)
                 return;
             stopped = true;
-            for (const subscription of subscriptions.values())
-                subscription.unsubscribe();
-            subscriptions.clear();
+            // facade.close() first: every subscription inactive, registry and
+            // queues cleared BEFORE the reverse advisory disposal (L2 §8).
             activation.dispose();
         },
     };

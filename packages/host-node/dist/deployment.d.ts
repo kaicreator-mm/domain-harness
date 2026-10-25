@@ -195,6 +195,29 @@ export interface ActivateGovernedV10BuildOptions {
     readonly queryAuthority?: V10QueryAuthority;
     readonly deploymentRoot?: string;
 }
+/**
+ * [v0.10.2 T06b #1326 / L2 §8] the frozen governed subscription event
+ * projection, declared structurally here (the same discipline as
+ * `V10ScopedQueryTarget` in Contracts): the Host package's public surface
+ * must not pull the Microkernel's deep internal type graph.
+ */
+export interface V10GovernedSubscriptionEvent {
+    readonly kind: string;
+    readonly occurrenceId: string;
+    readonly target: Readonly<{
+        deployedAppId: string;
+        tenantId: string;
+        appId: string;
+        businessPackageId: string;
+        workflowId: string;
+        instanceKey: string;
+    }>;
+    readonly snapshot?: unknown;
+}
+/** One governed subscription handle: `unsubscribe()` removes exactly it. */
+export interface V10GovernedSubscription {
+    unsubscribe(): void;
+}
 /** The governed surface: no raw facade that could bypass pin enforcement. */
 export interface V10GovernedBuildActivation {
     readonly build: V10GovernedBuildIdentity;
@@ -212,6 +235,15 @@ export interface V10GovernedBuildActivation {
     send(intent: V10PublicIntent): Promise<Record<string, unknown>>;
     queryScopedSnapshot(selector: V10ScopedSnapshotQuery): Promise<V10ScopedSnapshotAnswer>;
     queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
+    /**
+     * [v0.10.2 T06b #1326 / L2 §8] governed subscription: delegates to the
+     * internal facade's live registry/pump. Read-only like the governed
+     * queries (which also delegate without a pin check): events originate
+     * only from receipts of `send`s that went through THIS governed send —
+     * the per-activation registry and the occurrence-pin reservation/recovery
+     * paths are untouched, and the raw facade is never exposed.
+     */
+    subscribe(selector: V10ScopedSnapshotQuery, listener: (event: V10GovernedSubscriptionEvent) => void): Promise<V10GovernedSubscription>;
     kCounters(businessPackageId: string): Record<string, number>;
     resolveIntentTarget(intentType: string): Readonly<{
         businessPackageId: string;
@@ -252,6 +284,12 @@ export interface V10GovernedBuildActivation {
         readonly priorWriterTerminated?: boolean;
         readonly allAttemptsTerminated?: boolean;
     }): Promise<'ABSENT' | 'ADMITTED' | 'PENDING'>;
+    /**
+     * [v0.10.2 T06b #1326 / L2 §8] the public name of `close()`: ends every
+     * subscription of this activation before the reverse disposal. `close()`
+     * stays as an alias (identical behavior, one teardown path).
+     */
+    stop(): void;
     close(): void;
 }
 /**
