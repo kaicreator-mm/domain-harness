@@ -55,6 +55,10 @@ export interface ComponentProjection {
 
 const COMPONENT_ID = /^[A-Za-z][A-Za-z0-9._:@/-]{0,127}$/;
 const MAX_COMPONENTS = 256;
+const SEMANTIC_KINDS = new Set<SemanticKind>([
+  'skill', 'rule', 'workflow', 'decision', 'context',
+  'validator', 'schema', 'diagnostics', 'knowledge', 'evidence',
+]);
 
 function refuse(code: 'BUILD_INPUT_INVALID' | 'BUILD_GRAPH_INVALID' | 'V10_EXPORT_CONTRACT_REFUSED', message: string): never {
   throw new V10BuildError(code, message);
@@ -115,6 +119,8 @@ export function projectSelectedComponents(
     if (!declaration || typeof declaration !== 'object') {
       refuse('BUILD_INPUT_INVALID', 'Component declaration must be a record');
     }
+    // Inspect own data properties before reading any user-supplied identity/getter.
+    validateKeys(declaration, [...BASE_KEYS, 'entry', 'operationId', 'handler', 'externalEffect']);
     const componentId = id(declaration.componentId, 'componentId');
     const moduleId = id(declaration.modulePackageId, 'modulePackageId');
     if (seenComponents.has(componentId)) {
@@ -129,7 +135,8 @@ export function projectSelectedComponents(
     let entry: string;
     if (declaration.class === 'semantic') {
       validateKeys(declaration, [...BASE_KEYS, 'entry']);
-      if (selected.role !== 'standard-feature' || selected.featureExport !== declaration.entry) {
+      if (!SEMANTIC_KINDS.has(declaration.kind) ||
+          selected.role !== 'standard-feature' || selected.featureExport !== declaration.entry) {
         refuse('V10_EXPORT_CONTRACT_REFUSED', 'Semantic Component needs an existing selected S Feature export');
       }
       entry = id(declaration.entry, 'semantic.entry');
