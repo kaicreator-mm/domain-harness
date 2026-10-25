@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { openSqliteCasStore } from '@kaicreator/domain-harness/v8/host';
 import {
   ReceiptCarryingEngine,
-} from '../../../../domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs';
+} from '../../../../../tests/fixtures/k02-fragment/durable-receipt-carrier-v1.mjs';
 
 const sha256 = { digestUtf8: (value) => createHash('sha256').update(value, 'utf8').digest('hex') };
 const SCOPE = { deployedAppId: 'app-k02-mp', tenantId: 'tenant-1', appId: 'app-1', businessPackageId: 'pkg-quote-1.0.0' };

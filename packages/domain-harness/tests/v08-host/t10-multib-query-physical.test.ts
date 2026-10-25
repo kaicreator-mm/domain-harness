@@ -47,7 +47,6 @@ import {
   type V10MultiBQueryTarget,
 } from '../../src/host-v8/v010-authorized-multib-query.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const KERNEL_SOURCE = await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8');
 const KERNEL_BLOB_SHA1 = createHash('sha1').update(`blob ${String(Buffer.byteLength(KERNEL_SOURCE, 'utf8'))}\u0000${KERNEL_SOURCE}`, 'utf8').digest('hex');
 // Same read-only pin as the K02 physical suite. Rebound after C01 (#1177)
@@ -64,7 +63,7 @@ assert.equal(KERNEL_BLOB_SHA1, K02_SPLICED_KERNEL_BLOB_SHA1, 'the selected kerne
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
 
-const CARRIER_SOURCE = await readFile(new URL('durable-receipt-carrier-v1.mjs', payloadDir), 'utf8');
+const CARRIER_SOURCE = await readFile(new URL('../../../../tests/fixtures/k02-fragment/durable-receipt-carrier-v1.mjs', import.meta.url), 'utf8');
 const carrier: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(CARRIER_SOURCE, 'utf8').toString('base64')}`);
 const { createScopedDocumentStore, scopedNamespacePrefix } = carrier;
 
