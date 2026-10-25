@@ -1137,7 +1137,7 @@ class GovernedBuildActivation {
             }
             return String(build(...args));
         };
-        const ringDoc = await this.#store.get(`${prefix}${kernelDocKey('instance', target.workflowId, target.instanceKey)}`);
+        const ringDoc = await this.#store.get(`${prefix}${kernelDocKey('instance', { workflowId: target.workflowId, instanceKey: target.instanceKey })}`);
         if (ringDoc !== null && isPlainRecord(ringDoc.value)) {
             const ring = isPlainRecord(ringDoc.value.durableOriginalReceipts) ? ringDoc.value.durableOriginalReceipts : null;
             if (ring !== null) {
