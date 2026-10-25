@@ -67,7 +67,7 @@ test('T07b retired legacy workspaces are private and cannot advertise old v10 Ru
 });
 
 test('T07b npm pack dry-run shows clean selected tarballs, no retired Compiler / K02 fragment', { timeout: 120_000 }, () => {
-  const forbidden = /(^|\\/)(qualified-package|legacy-v[0-9]+|durable-receipt-carrier-v1\\.mjs)(\\/|$)/u;
+  const forbidden = /qualified-package|legacy-v[0-9]+|durable-receipt-carrier-v1[.]mjs/u;
   for (const selected of SELECTED) {
     // Actual npm pack computed on the physical current checkout, with no write.
     const stdout = execFileSync(
