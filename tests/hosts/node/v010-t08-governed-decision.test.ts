@@ -12,6 +12,7 @@
  *   N05 two Businesses sharing workflowId+instanceKey and two tenants
  *       sharing the logical instance key keep independent pins/namespaces.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,7 +23,7 @@ import {
   activateGovernedV10Build,
   readV10DeploymentActivationRecord,
   v10OccurrenceBuildPinKey,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   T08_BUSINESS_ALPHA,

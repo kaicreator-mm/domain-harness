@@ -6,19 +6,15 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import {
-  V10_SFEATURE_ABI,
-  V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-  sha256Hex,
-} from '@kaicreator/domain-harness-compiler';
+import { V10_SFEATURE_ABI, V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '@kaicreator/domain-harness-build';
+import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
 import {
   metaFeedbackClaimKey,
   metaFeedbackEvidencePrefix,
   metaFeedbackLedgerKey,
   runMetaFeedbackWorkflow,
-} from '@kaicreator/domain-harness-compiler/v10meta';
+} from '@kaicreator/domain-harness-host-node';
 
 const DEPLOYMENT = Object.freeze({
   deployedAppId: 'deploy:packed-t09',
@@ -178,7 +174,7 @@ async function main() {
     }
     return {
       ok: true,
-      resolved: import.meta.resolve('@kaicreator/domain-harness-compiler/v10meta'),
+      resolved: import.meta.resolve('@kaicreator/domain-harness-host-node'),
       payloadResolved: payloadPath('business-meta-feedback-v1'),
       status: first.status,
       replayed: replay.replayed,

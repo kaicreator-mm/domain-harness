@@ -63,8 +63,9 @@ const MOVED: ReadonlyArray<readonly [string, string, string]> = [
   ['639e9f0c6fa194520449e4ed2dac223c991ef63f', 'domain-packages/standard/features/experience-reuse/tests/experience-reuse.test.mjs', 'extensions/agent-improvement/packages/experience-reuse/tests/experience-reuse.test.mjs'],
 ];
 
-/** The only payload source that intentionally stays in the compiler package (T11). */
-const STAYING = 'packages/domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs';
+/** The K02 carrier fragment, relocated byte-identically by T11 to the test fixtures. */
+const CARRIER = 'tests/fixtures/k02-fragment/durable-receipt-carrier-v1.mjs';
+const CARRIER_BLOB = 'df9732acacb7d3c2e447363e550da2e1bdf5e46b';
 
 function gitBlobId(bytes: Buffer): string {
   return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
@@ -88,9 +89,11 @@ test('v0.10.2 T01 payload parity: K, S and router blob ids match the L2 section 
   assert.ok(byPath.get('examples/v010-meta-feedback/business-meta-feedback-v1.mjs')?.startsWith('c19881f9'));
 });
 
-test('v0.10.2 T01 payload parity: no moved source remains at its old location; the carrier stays', () => {
+test('v0.10.2 T01 payload parity: no moved source remains at its old location; the T11 carrier fixture keeps its blob', () => {
   for (const [, , oldPath] of MOVED) {
     assert.equal(existsSync(join(REPO_ROOT, oldPath)), false, `${oldPath} must be removed by the move`);
   }
-  assert.equal(existsSync(join(REPO_ROOT, STAYING)), true);
+  assert.equal(existsSync(join(REPO_ROOT, 'packages/domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs')), false, 'the carrier left the compiler package at the T11 cutover');
+  assert.equal(existsSync(join(REPO_ROOT, CARRIER)), true);
+  assert.equal(gitBlobId(readFileSync(join(REPO_ROOT, CARRIER))), CARRIER_BLOB, 'the relocated carrier is byte-identical (blob parity)');
 });

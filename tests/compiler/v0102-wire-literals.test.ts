@@ -4,8 +4,6 @@ import assert from 'node:assert/strict';
 // no require condition (manifest frozen to T07a/T07b), so consume the shipped
 // dist file directly — the same module every package-name import resolves to.
 import * as contracts from '../../packages/contracts/dist/index.js';
-import { V10_BUILD_FORMAT as ShimBuildFormat } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/digest.js';
-import { V10ExternalEffectError as ShimEffectError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
 test('T00: selected ABI, wire literals, and shared identity unchanged', () => {
   const expected = {
     V10_BUILD_FORMAT:'dh.v10.build/1',
@@ -21,8 +19,6 @@ test('T00: selected ABI, wire literals, and shared identity unchanged', () => {
   for (const [key, literal] of Object.entries(expected)) {
     assert.equal(contracts[key as keyof typeof expected], literal, key);
   }
-  assert.strictEqual(ShimBuildFormat, contracts.V10_BUILD_FORMAT);
-  assert.strictEqual(ShimEffectError, contracts.V10ExternalEffectError);
   assert.equal(Object.hasOwn(contracts, 'v10KernelInstanceDocKey'), false, 'no second K document key authority');
   assert.equal(Object.hasOwn(contracts, 'v10KernelReceiptArchiveDocKey'), false);
 });

@@ -33,6 +33,7 @@
  *   RES11 legacy intent-unbound pins cannot authorize compensation.
  *   RES12 a same-message input cannot switch between sealed intents.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -41,23 +42,24 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { sha256Canonical, sha256Hex } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
 import {
   activateGovernedV10Build,
-  buildV10App,
   readV10OccurrenceBuildPin,
-  sha256Canonical,
-  sha256Hex,
   v10BuildPackageClosureDigest,
   v10OccurrenceBuildPinKey,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import { canonicalJsonStringify } from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
 import type {
   V10BuildActivationDecision,
+  V10GovernedBuildActivation,
+} from '../../../packages/host-node/dist/index.js';
+import type {
   V10BuiltApp,
   V10DocStore,
   V10ModuleInput,
-  V10GovernedBuildActivation,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '@kaicreator/domain-harness-contracts';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { basicComposition, sha256HexSource } from '../../assembly/helpers-v010.js';
 import {
@@ -207,7 +209,7 @@ class RemovelessStoreView {
   readonly #inner: V10DocStore;
   constructor(inner: V10DocStore) { this.#inner = inner; }
   async get(key: string) { return await this.#inner.get(key); }
-  async put(key: string, value: unknown, condition: import('../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js').V10DocWriteCondition) {
+  async put(key: string, value: unknown, condition: import('@kaicreator/domain-harness-contracts').V10DocWriteCondition) {
     return await this.#inner.put(key, value, condition);
   }
 }

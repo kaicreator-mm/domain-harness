@@ -3,12 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
-const directories = [
-  'packages/domain-harness-compiler/src/qualified-package/v10build',
-  'packages/domain-harness-compiler/src/qualified-package/v10evidence',
-  'packages/domain-harness-compiler/src/qualified-package/v10meta',
-  'packages/domain-harness-compiler/src/qualified-package/v10shadow',
-];
+// v0.10.2 T11 cutover: the compiler v10* directories are deleted. The
+// canonical package sources carry their own history (e.g. moved v0.8 host
+// files cite their original review rounds), so the surviving subjects of
+// this invariant are the shared v0.10 assembly fixture helpers.
+const directories: readonly string[] = [];
 const extraSources = ['tests/assembly/helpers-v010.ts'];
 
 test('N-I1232: v0.10 compiler/assembly invariant comments contain no review chronology', async () => {

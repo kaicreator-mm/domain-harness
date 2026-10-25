@@ -40,12 +40,8 @@ import { join } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import {
-  V10ActivationError,
-  activateV10App,
-  type V10Activation,
-  type V10BuiltApp,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { V10ActivationError, type V10BuiltApp } from '@kaicreator/domain-harness-contracts';
+import { activateV10App, type V10Activation } from '../../../packages/microkernel/src/internal/activation.js';
 import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   T10_ALPHA,

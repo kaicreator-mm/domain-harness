@@ -3,8 +3,8 @@
  *
  * Imported by an INSTALLED App package (see ../README.md). It only names the
  * public installed surfaces:
- *   - `@kaicreator/domain-harness-compiler/v10build` for the trusted
- *     activation of the sealed BUILD output,
+ *   - `@kaicreator/domain-harness-microkernel/host-seam` and Host for trusted
+ *     selected activation of the sealed BUILD output,
  *   - `better-sqlite3` for the physical CAS document store.
  *
  * There is no repository-relative import and no monorepo resolution fallback
@@ -15,11 +15,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  V10_TARGET_PROFILE,
-  activateV10App,
-  activateGovernedV10Build,
-} from '@kaicreator/domain-harness-compiler/v10build';
+import { V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
+import { activateV10App } from '@kaicreator/domain-harness-microkernel/host-seam';
+import { activateGovernedV10Build } from '@kaicreator/domain-harness-host-node';
 
 import { openSharedSqliteDatabase } from './sqlite-open.mjs';
 

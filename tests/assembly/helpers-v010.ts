@@ -11,9 +11,8 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-import type { BuildV10AppOptions, V10DocWriteCondition, V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { V10_KEXT_ABI, V10_RUNTIME_ABI, V10_HOST_ABI, V10_SFEATURE_ABI, V10_TARGET_PROFILE } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import type { V10DocStore } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import type { BuildV10AppOptions, V10DocWriteCondition, V10ModuleInput, V10DocStore } from '@kaicreator/domain-harness-contracts';
+import { V10_KEXT_ABI, V10_RUNTIME_ABI, V10_HOST_ABI, V10_SFEATURE_ABI, V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
 
 export const KERNEL_PACKAGE_ID = 'v08-kernel-mechanism@1.0.0';
 export const STANDARD_PACKAGE_ID = 'standard-sdk@v08.1.0.0';

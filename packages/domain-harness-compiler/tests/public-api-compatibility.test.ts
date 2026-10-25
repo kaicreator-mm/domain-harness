@@ -105,50 +105,12 @@ const N06_V09_BUILD_VALUES = [
   'V09BuildError',
 ] as const;
 
-/** v0.10 T00 (#1166): closed-world Node24 BUILD composition (additive group). */
-const T00_V10BUILD_VALUES = [
-  // string consts (8)
-  'V10_BUILD_FORMAT',
-  'V10_BUNDLER_REVISION',
-  'V10_HOST_ABI',
-  'V10_IMPORT_POLICY_REVISION',
-  'V10_KEXT_ABI',
-  'V10_RUNTIME_ABI',
-  'V10_SFEATURE_ABI',
-  'V10_TARGET_PROFILE',
-  // object consts (2)
-  'V10_ACTIVATION_FAILURE_CODES',
-  'V10_SELECTED_ROLE_ABI',
-  // functions (6)
-  'activateV10App',
-  'buildV10App',
-  'canonicalJson',
-  'emptyExternalImports',
-  'sha256Canonical',
-  'sha256Hex',
-  // error classes (5)
-  'V10ActivationError',
-  'V10BuildError',
-  'V10Error',
-  'V10ExternalEffectError',
-  'V10PortDeniedError',
-  // facade class (1)
-  'V10AppFacade',
-] as const;
-
-/** v0.10 T08/T10B (#1175/#1179): governed BUILD selection and deployment activation (additive group). */
-const T08_T10B_V10GOVERNED_VALUES = [
-  // functions (7)
-  'activateGovernedV10Build',
-  'readV10DeploymentActivationRecord',
-  'readV10OccurrenceBuildPin',
-  'v10BuildActivationDecisionDigest',
-  'v10BuildPackageClosureDigest',
-  'v10DeploymentActivationKey',
-  'v10OccurrenceBuildPinKey',
-  // error classes (1)
-  'V10DeploymentError',
-] as const;
+// v0.10.2 T11 cutover: the curated v0.10 BUILD/runtime roster moved to its
+// canonical owners (@kaicreator/domain-harness-build, -microkernel,
+// -host-node, -contracts) and the legacy compiler barrel no longer re-exports
+// it. The T00/T08-T10B additive groups are therefore absent from this
+// barrel's committed inventory below; their single definitions are guarded
+// by tests/compiler/v010-public-api-boundary.test.ts (P1/P3).
 
 /** The complete T008C-promised runtime inventory (legacy + additive markers). */
 const COMMITTED_RUNTIME_VALUES = [
@@ -157,8 +119,6 @@ const COMMITTED_RUNTIME_VALUES = [
   ...TA_QUALIFIED_PACKAGE_VALUES,
   ...HF25_APP_CONTRACT_VALUES,
   ...N06_V09_BUILD_VALUES,
-  ...T00_V10BUILD_VALUES,
-  ...T08_T10B_V10GOVERNED_VALUES,
 ];
 
 const COMMITTED_RUNTIME_SORTED = [...COMMITTED_RUNTIME_VALUES].sort((left, right) =>

@@ -12,26 +12,31 @@
  * `(workflowId, instanceKey)` collision and per-B separation physically
  * observable instead of an artifact of different instance keys.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import type {
   V10BuiltApp,
-  V10BuildActivationDecision,
-  V10DeploymentAuthorizationRequest,
-  V10DeploymentAuthorizationVerdict,
-  V10DeploymentIdentity,
   V10ModuleInput,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import type { V10DocStore, V10DocWriteCondition } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '@kaicreator/domain-harness-contracts';
+import type { V10DocStore, V10DocWriteCondition } from '@kaicreator/domain-harness-contracts';
 import {
   V10_BUILD_FORMAT,
   V10_HOST_ABI,
   V10_RUNTIME_ABI,
   V10_TARGET_PROFILE,
-  buildV10App,
   sha256Canonical,
   sha256Hex,
+} from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
+import type {
+  V10BuildActivationDecision,
+  V10DeploymentAuthorizationRequest,
+  V10DeploymentAuthorizationVerdict,
+  V10DeploymentIdentity,
+} from '../../../packages/host-node/dist/index.js';
+import {
   v10BuildActivationDecisionDigest,
   v10BuildPackageClosureDigest,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import type { SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { basicComposition } from '../../assembly/helpers-v010.js';
 import Database from 'better-sqlite3';

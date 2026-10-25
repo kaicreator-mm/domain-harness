@@ -16,9 +16,11 @@ const [kStorePath, jobStorePath, messageId, requestId, outcomeFile] = process.ar
 globalThis.__c01JobStorePath = jobStorePath;
 globalThis.__c01NotifyStorePath = `${jobStorePath}.notify-unused`;
 
-const { V10_TARGET_PROFILE, activateV10App, buildV10App, sha256Hex } = await import(
-  '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js'
-);
+const [{ V10_TARGET_PROFILE, sha256Hex }, { buildV10App }, { activateV10App }] = await Promise.all([
+  import('@kaicreator/domain-harness-contracts'),
+  import('@kaicreator/domain-harness-build'),
+  import('../../../packages/microkernel/src/internal/activation.js'),
+]);
 
 const { readFile } = await import('node:fs/promises');
 

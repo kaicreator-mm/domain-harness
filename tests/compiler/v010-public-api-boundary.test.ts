@@ -13,9 +13,9 @@
  *   N2  host-seam internals do not leak: no gate, docs port, counters
  *       factory or import-hook registry symbol on any consumer surface,
  *       and deep `internal/*` imports are denied by the exports map;
- *   P3  the legacy compiler barrels still expose the curated v0.10 BUILD
- *       surface identity-equal across root/qualified/v10build entries
- *       (LEGACY_COMPAT_ONLY until T11).
+ *   P3  after the T11 cutover the legacy compiler barrels carry NO v0.10
+ *       binding anymore; the canonical owners (BUILD, Microkernel seam,
+ *       Contracts) hold the single definitions.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,9 +26,9 @@ import { fileURLToPath } from 'node:url';
 import * as microkernel from '../../packages/microkernel/src/index.js';
 import * as hostSeam from '../../packages/microkernel/src/host-seam.js';
 import * as contracts from '@kaicreator/domain-harness-contracts';
+import * as build from '../../tooling/build/dist/index.js';
 import * as root from '../../packages/domain-harness-compiler/src/index.js';
 import * as qualified from '../../packages/domain-harness-compiler/src/qualified-package/index.js';
-import * as v10 from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -101,17 +101,34 @@ test('N2: host-seam internals are absent from every consumer surface and deep in
   );
 });
 
-test('P3: the legacy compiler barrels keep the curated v0.10 BUILD surface identity-equal (LEGACY_COMPAT_ONLY until T11)', () => {
-  for (const surface of [root, qualified]) {
-    assert.equal(surface.buildV10App, v10.buildV10App);
-    assert.equal(surface.activateV10App, v10.activateV10App);
-    assert.equal(surface.V10BuildError, v10.V10BuildError);
-  }
-  const names = Object.keys(v10);
-  assert.ok(names.length > 20, 'canonical legacy BUILD barrel must not silently go empty');
-  for (const name of names) {
-    assert.ok(name in root, `root is missing the canonical v0.10 binding ${name}`);
-    assert.equal(root[name as keyof typeof root], v10[name], `root export drift: ${name}`);
-    assert.equal(qualified[name as keyof typeof qualified], v10[name], `qualified export drift: ${name}`);
+test('P3: after the T11 cutover the legacy compiler barrels carry no v0.10 binding; the canonical owners do', () => {
+  // The curated v0.10 roster has exactly one home per binding (L2 §1.1):
+  // BUILD owns buildV10App, the Microkernel seam owns activateV10App and
+  // Contracts owns the typed error identity. The legacy compiler barrels
+  // (root entry and qualified-package entry) must not re-export any of it.
+  assert.equal(typeof build.buildV10App, 'function');
+  assert.equal(typeof hostSeam.activateV10App, 'function');
+  assert.equal(contracts.V10BuildError, microkernel.V10BuildError);
+  const legacySurfaces: ReadonlyArray<Record<string, unknown>> = [root, qualified];
+  const v10Roster = [
+    'buildV10App',
+    'activateV10App',
+    'activateGovernedV10Build',
+    'V10BuildError',
+    'V10Error',
+    'V10ActivationError',
+    'V10ExternalEffectError',
+    'V10PortDeniedError',
+    'V10DeploymentError',
+    'V10_BUILD_FORMAT',
+    'V10_TARGET_PROFILE',
+    'canonicalJson',
+    'sha256Canonical',
+    'sha256Hex',
+  ] as const;
+  for (const surface of legacySurfaces) {
+    for (const name of v10Roster) {
+      assert.equal(name in surface, false, `the legacy compiler barrel must not carry ${name} after the cutover`);
+    }
   }
 });

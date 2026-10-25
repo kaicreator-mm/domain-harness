@@ -9,10 +9,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  V10BuildError,
-  buildV10App,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { V10BuildError } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../tooling/build/dist/index.js';
 import {
   basicComposition,
   clearEvalLog,
@@ -243,10 +241,10 @@ test('N-I1221: reject statically visible indirect code-string evaluators and bar
   // against the statically imported V10BuildError would be false even for
   // a genuine gate refusal.
   const { assertSealedImportClosure } = await import(
-    '../../packages/domain-harness-compiler/src/qualified-package/v10build/import-policy.js'
+    '../../tooling/build/src/import-policy.js'
   );
   const { V10BuildError: V10BuildErrorFromGateModule } = await import(
-    '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js'
+    '@kaicreator/domain-harness-contracts'
   );
   const empty = { node: [], npm: [], native: [] };
   const rejected = [

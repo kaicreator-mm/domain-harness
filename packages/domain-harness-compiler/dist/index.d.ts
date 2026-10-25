@@ -15,7 +15,6 @@ export type { CompiledPackageManifest } from './package/manifest.js';
 export type { CompiledSemanticDecisionDescriptor, SemanticDecisionCacheBypassReason, SemanticDecisionCachePolicy, SemanticDecisionContractVersion, SemanticDecisionPromotedReference, SemanticDecisionUnavailableDisposition, } from '@kaicreator/domain-harness/v2';
 export { assertVendoredParserBytes, assertZeroImportBuildModule, buildV09QualifiedRoot, canonicalV9Json, computeV09SealedRootSubjectDigest, computeV9QualifiedRootSubjectDigest, V09BuildError, V09_BUNDLER_REVISION, V09_HOST_ABI, V09_IMPORT_POLICY_REVISION, V09_RUNTIME_ABI, V09_SEALED_ROOT_FORMAT, V09_SUBJECT_DOMAIN, V09_BUILD_PARSER_PIN, } from './qualified-package/index.js';
 export type { BuildV09QualifiedRootOptions, V09BindingRecord, V09BuildParserPin, V09SealedPackage, V09SealedQualifiedRoot, } from './qualified-package/index.js';
-export * from './qualified-package/v10build/index.js';
 export { analyzeModuleClosure, assertDeclaredExports, buildQualifiedPackage, BuildError, ClosureError, issueApprovalProof, qualifyPackageClosure, qualifiedKey, QualificationError, verifyApprovalProof, ApprovalError, } from './qualified-package/index.js';
 export type { BuildQualifiedPackageOptions, ModuleClosureReport, QualifiedPackageSubmission, QualificationSubmission, TrustedIssuers, UnsignedQualification, } from './qualified-package/index.js';
 export { APP_CONTRACT_SOURCE_FORMAT, AppContractGenerationError, generateTypedAppContracts, } from './app-contracts/app-contracts.js';

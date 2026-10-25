@@ -22,6 +22,7 @@
  * all fail typed; PINNED_ONLY still refuses every unpinned new occurrence and
  * cannot route the old A occurrence through the accepted B.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -33,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import {
   activateGovernedV10Build,
   readV10OccurrenceBuildPin,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import type { SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {

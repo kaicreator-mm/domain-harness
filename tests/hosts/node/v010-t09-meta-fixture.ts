@@ -6,29 +6,29 @@
  * install); the separate packed-consumer test proves the public package
  * delivery story.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 import {
   V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-  type V10Activation,
   type V10BuiltApp,
-  type V10DeploymentIdentity,
   type V10DocStore,
   type V10DocWriteCondition,
   type V10ModuleInput,
   type V10QueryAuthority,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { createDecisionEvidenceObserver } from '../../../packages/domain-harness-compiler/src/qualified-package/v10evidence/decision-evidence-observer.js';
+} from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
+import { activateV10App, type V10Activation } from '../../../packages/microkernel/src/internal/activation.js';
 import {
+  createDecisionEvidenceObserver,
   MetaFeedbackError,
   metaFeedbackClaimKey,
   metaFeedbackEvidencePrefix,
   metaFeedbackLedgerKey,
   type MetaFeedbackScope,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
+  type V10DeploymentIdentity,
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { featureEntry, sha256HexSource } from '../../assembly/helpers-v010.js';
 

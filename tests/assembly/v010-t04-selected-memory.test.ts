@@ -20,7 +20,7 @@
  * store under `v10/k/**` and Memory never writes there; a denied Memory op
  * surfaces as an honest Kernel effect failure, never a forged receipt.
  */
-import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+import { freshV10Counters } from '../../packages/microkernel/src/internal/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
@@ -29,13 +29,10 @@ import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import {
-  V10BuildError,
-  V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { V10BuildError, V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../tooling/build/dist/index.js';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
+import type { V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import {
   INTENT as TINY_INTENT,
   PlainCasDocStore,
