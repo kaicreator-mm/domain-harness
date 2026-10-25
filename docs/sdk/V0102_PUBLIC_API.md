@@ -62,6 +62,6 @@ K Primary uniquely owns State, Admission, Journal, Effect, UNKNOWN and Replay. S
 
 ## Type/physical evidence boundary
 
-Type imports must resolve from the published roots and the single public `./host-seam` export. Compile-time acceptance of a symbol is not proof of tarball or execution behavior. The final version must run exact Node24 clean-installed producer/Tiny/Rich journeys and a deep-import rejection; see `docs/validation/v0.10.2/T08B_R01_DOC_COMMANDS.md`.
+Type imports must resolve from the published roots and the single public `./host-seam` export. Compile-time acceptance of a symbol is not proof of tarball or execution behavior. The final version must run exact Node24 clean-installed producer/Tiny/Rich journeys and a deep-import rejection; see `docs/guides/V0102_R01_DOC_COMMANDS.md`.
 
 **No source/deep-distribution import, unpublished registry install claim, Node22 promise, R01 PASS or `main` release claim is made by this document.**
