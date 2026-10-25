@@ -20,7 +20,7 @@
   },
   "scripts": {
     "prebuild": "npm run build -w @kaicreator/domain-harness",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"const fs=require('node:fs'); const root='qualified-package/v09build/generated/'; fs.mkdirSync('dist/'+root,{recursive:true}); for (const name of ['acorn.mjs','acorn.d.mts']) fs.copyFileSync('src/'+root+name,'dist/'+root+name)\"",
     "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --import tsx --test tests/*.test.ts"
