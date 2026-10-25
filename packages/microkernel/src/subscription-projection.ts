@@ -112,7 +112,7 @@ function canonicalJson(value: unknown): string | null {
 /** A snapshot is publishable ONLY with independent equal-revision query evidence. */
 export function verifiedSameRevisionSnapshot(
   evidence: V10SnapshotProjectionEvidence | undefined,
-): unknown | undefined {
+): unknown {
   if (evidence === undefined) return undefined;
   if (!Number.isSafeInteger(evidence.candidateRevision) ||
       !Number.isSafeInteger(evidence.queryRevision) ||
