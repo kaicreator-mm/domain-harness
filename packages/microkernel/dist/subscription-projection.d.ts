@@ -35,7 +35,7 @@ export interface V10ProjectionInput {
     readonly snapshotEvidence?: V10SnapshotProjectionEvidence;
 }
 /** A snapshot is publishable ONLY with independent equal-revision query evidence. */
-export declare function verifiedSameRevisionSnapshot(evidence: V10SnapshotProjectionEvidence | undefined): unknown | undefined;
+export declare function verifiedSameRevisionSnapshot(evidence: V10SnapshotProjectionEvidence | undefined): unknown;
 /**
  * Project precisely {kind, occurrenceId, target, snapshot?}; no receipt metadata.
  * A null result means invalid raw receipt / trusted-target tuple; it is never
