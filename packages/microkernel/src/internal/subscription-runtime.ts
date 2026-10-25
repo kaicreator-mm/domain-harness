@@ -262,17 +262,6 @@ export class V10SubscriptionRegistry {
     try {
       while (registration.active && !this.#stopped && !this.#host.isClosed() && registration.queue.length > 0) {
         const pending = registration.queue.shift() as PendingObservation;
-        let verdict: boolean;
-        try {
-          verdict = (await this.#host.authorize(registration.target)) === true;
-        } catch {
-          this.#endRegistration(registration, false);
-          return;
-        }
-        if (verdict !== true) {
-          this.#endRegistration(registration, false);
-          return;
-        }
         // Best-effort same-revision snapshot evidence through the SAME
         // authorized selector read: any refusal drops only the snapshot.
         let snapshotEvidence: V10SnapshotProjectionEvidence | undefined;
@@ -289,6 +278,23 @@ export class V10SubscriptionRegistry {
           }
         } catch {
           snapshotEvidence = undefined;
+        }
+        // [T06b R2 / L2 §8(ii)] A best-effort snapshot read can itself
+        // await a fresh multi-B authorization. If permission is revoked in
+        // that await, dropping only the snapshot and carrying forward the
+        // OLD verdict leaks event metadata. The final explicit authorization
+        // MUST run after every optional read, and failure must terminate
+        // this subscription before any listener invocation.
+        let verdict: boolean;
+        try {
+          verdict = (await this.#host.authorize(registration.target)) === true;
+        } catch {
+          this.#endRegistration(registration, false);
+          return;
+        }
+        if (verdict !== true) {
+          this.#endRegistration(registration, false);
+          return;
         }
         // The §8(ii)/N4 race guard: re-check liveness AFTER every await,
         // immediately before the listener call.
