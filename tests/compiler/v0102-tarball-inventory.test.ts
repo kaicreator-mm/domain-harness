@@ -66,6 +66,15 @@ test('T07b retired legacy workspaces are private and cannot advertise old v10 Ru
     'the retired compiler may remain a private in-monorepo test helper, but v10 public aliases must be gone');
 });
 
+test('T07b Compiler build restores vendored parser assets byte-identically', () => {
+  for (const name of ['acorn.mjs', 'acorn.d.mts']) {
+    const relative = 'qualified-package/v09build/generated/' + name;
+    const source = readFileSync(join(ROOT, 'packages/domain-harness-compiler/src', relative));
+    const emitted = readFileSync(join(ROOT, 'packages/domain-harness-compiler/dist', relative));
+    assert.deepEqual(emitted, source, 'vendored Compiler parser asset must survive a clean build: ' + name);
+  }
+});
+
 test('T07b npm pack dry-run shows clean selected tarballs, no retired Compiler / K02 fragment', { timeout: 120_000 }, () => {
   const forbidden = /qualified-package|legacy-v[0-9]+|durable-receipt-carrier-v1[.]mjs/u;
   for (const selected of SELECTED) {
