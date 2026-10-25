@@ -1,0 +1,48 @@
+{
+  "schema": "dh/v0102/t09-installed-closure/1",
+  "status": "SOURCE_CANDIDATE_UNQUALIFIED",
+  "nodeMajor": 24,
+  "profiles": {
+    "Tiny": {
+      "mustInclude": [
+        "@kaicreator/domain-harness-contracts",
+        "@kaicreator/domain-harness-microkernel"
+      ],
+      "mustExclude": [
+        "@kaicreator/domain-harness-build",
+        "@kaicreator/domain-harness-compiler",
+        "@kaicreator/domain-harness-host-node",
+        "better-sqlite3"
+      ],
+      "requiresPhysicalChecks": [
+        "real sealed K/S/B/C BUILD by isolated external producer",
+        "Tiny load/send/query and same-messageId replay/refusal",
+        "governed async subscribe/unsubscribe/stop with post-await revocation",
+        "physical installed Domain Package payload bytes/sha256"
+      ]
+    },
+    "Rich": {
+      "mustInclude": [
+        "@kaicreator/domain-harness-contracts",
+        "@kaicreator/domain-harness-microkernel",
+        "@kaicreator/domain-harness-host-node",
+        "better-sqlite3"
+      ],
+      "mustExclude": [
+        "@kaicreator/domain-harness-build",
+        "@kaicreator/domain-harness-compiler"
+      ],
+      "requiresPhysicalChecks": [
+        "real SQLite CAS/conflicting writers and restart",
+        "K UNKNOWN/effect permission, idempotent replay and multi Business query",
+        "installed external BUILD producer and selected Domain Packages",
+        "all file: runtime resolutions stay inside external deployment"
+      ]
+    }
+  },
+  "limitations": [
+    "Closure and export smoke are only admission preconditions, not complete runtime integration.",
+    "A real isolated consumer must be supplied explicitly; missing root is a test failure, not a skip.",
+    "Node24 only qualifies this release; later Node majors are not tested merely because engines >=24."
+  ]
+}
