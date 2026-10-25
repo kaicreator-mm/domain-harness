@@ -2,11 +2,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  V10Error, V10BuildError, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
-import { V10ActivationError, V10PortDeniedError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
-import { V10DeploymentError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/deployment.js';
-import { normalizeExternalEffectEnvelope } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.js';
+  V10Error, V10BuildError, V10ExternalEffectError, V10_ACTIVATION_FAILURE_CODES, V10ActivationError,
+} from '@kaicreator/domain-harness-contracts';
+import { V10PortDeniedError } from '../../packages/microkernel/src/internal/activation.js';
+import { V10DeploymentError } from '@kaicreator/domain-harness-host-node';
+import { normalizeExternalEffectEnvelope } from '../../packages/microkernel/src/internal/external-effect.js';
 
 test('P-I1231: BUILD, deployment and external-effect errors share a typed base', () => {
   const errors = [

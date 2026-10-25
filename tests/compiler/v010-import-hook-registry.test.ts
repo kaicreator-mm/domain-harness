@@ -2,9 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { registerHooks } from 'node:module';
-import type { V10AppView } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
-import { createV10ImportHookRegistryForTests, privateModuleFragment } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/import-hook.js';
-import { V10ActivationError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
+import type { V10AppView } from '@kaicreator/domain-harness-contracts';
+import { createV10ImportHookRegistryForTests, privateModuleFragment } from '../../packages/microkernel/src/internal/import-hook.js';
+import { V10ActivationError } from '@kaicreator/domain-harness-contracts';
 
 const view = {
   modules: [{
