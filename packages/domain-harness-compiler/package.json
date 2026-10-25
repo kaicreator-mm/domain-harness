@@ -9,44 +9,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./v10build": {
-      "types": "./dist/qualified-package/v10build/index.d.ts",
-      "import": "./dist/qualified-package/v10build/index.js"
-    },
-    "./v10shadow": {
-      "types": "./dist/qualified-package/v10shadow/index.d.ts",
-      "import": "./dist/qualified-package/v10shadow/index.js"
-    },
-    "./v10payload/kernel-mechanism": "./src/qualified-package/payload/kernel-mechanism-v1.mjs",
-    "./v10payload/standard-sdk": "./src/qualified-package/payload/standard-sdk-v1.mjs",
-    "./v10payload/workflow-router": "./src/qualified-package/v09/workflow-router.mjs",
-    "./v10payload/sfeature-semantic-decision": "./src/qualified-package/payload/sfeature-semantic-decision-v1.mjs",
-    "./v10payload/sfeature-workflow-control": "./src/qualified-package/payload/sfeature-workflow-control-v1.mjs",
-    "./v10payload/sfeature-context-assembly": "./src/qualified-package/payload/sfeature-context-assembly-v1.mjs",
-    "./v10payload/sfeature-decision-evidence": "./src/qualified-package/payload/sfeature-decision-evidence-v1.mjs",
-    "./v10payload/sfeature-candidate-validation": "./src/qualified-package/payload/sfeature-candidate-validation-v1.mjs",
-    "./v10meta": {
-      "types": "./dist/qualified-package/v10meta/index.d.ts",
-      "import": "./dist/qualified-package/v10meta/index.js"
-    },
-    "./payload/business-meta-feedback-v1": "./src/qualified-package/payload/business-meta-feedback-v1.mjs",
-    "./payload/sfeature-meta-feedback-v1": "./src/qualified-package/payload/sfeature-meta-feedback-v1.mjs",
-    "./payload/kernel-mechanism-v1": "./src/qualified-package/payload/kernel-mechanism-v1.mjs",
-    "./payload/standard-sdk-v1": "./src/qualified-package/payload/standard-sdk-v1.mjs"
+    }
   },
   "files": [
     "dist",
-    "README.md",
-    "src/qualified-package/payload/*.mjs",
-    "src/qualified-package/v09/workflow-router.mjs"
+    "README.md"
   ],
   "engines": {
-    "node": ">=22.15.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "prebuild": "npm run build -w @kaicreator/domain-harness",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"const fs=require('node:fs'); const root='qualified-package/v09build/generated/'; fs.mkdirSync('dist/'+root,{recursive:true}); for (const name of ['acorn.mjs','acorn.d.mts']) fs.copyFileSync('src/'+root+name,'dist/'+root+name)\"",
     "pretypecheck": "npm run build -w @kaicreator/domain-harness",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --import tsx --test tests/*.test.ts"
@@ -59,5 +33,6 @@
   },
   "peerDependencies": {
     "@kaicreator/domain-harness": "0.2.0"
-  }
+  },
+  "private": true
 }

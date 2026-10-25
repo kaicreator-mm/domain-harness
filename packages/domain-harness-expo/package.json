@@ -5,7 +5,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "prebuild": "npm run build -w @kaicreator/domain-harness",
     "build": "tsc -p tsconfig.build.json",
@@ -15,5 +17,6 @@
   },
   "dependencies": {
     "@kaicreator/domain-harness": "0.2.0"
-  }
+  },
+  "private": true
 }

@@ -7,7 +7,7 @@
     "tooling/*"
   ],
   "engines": {
-    "node": ">=22.15.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present && node scripts/check-committed-dist.mjs",

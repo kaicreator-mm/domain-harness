@@ -1,11 +1,8 @@
 node_modules/
 dist/
-# Issue #299: the two externally consumed packages ship their built dist/
-# trees from git so an exact-SHA git install delivers a usable package
-# without lifecycle scripts. scripts/check-committed-dist.mjs enforces that
-# the committed output always matches a fresh build of the committed sources.
-!packages/domain-harness/dist/
-!packages/domain-harness-compiler/dist/
+# v0.10.2 T07b: legacy Compiler/DomainHarness dist is untracked and ignored.
+# Only independently distributed Contracts/Microkernel/Host/BUILD have tracked
+# dist, checked after build by scripts/check-committed-dist.mjs.
 # v0.10.2 A1 / T07a2: new independently packed workspaces ship tracked dist
 !packages/contracts/dist/
 !packages/microkernel/dist/
