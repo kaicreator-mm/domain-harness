@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '../../tooling/build/dist/index.js';
 import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
 import { basicComposition, featureEntry, PlainCasDocStore } from './helpers-v010.js';
 

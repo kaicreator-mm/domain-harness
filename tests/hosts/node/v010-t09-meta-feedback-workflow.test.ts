@@ -25,6 +25,7 @@
  *   T09-N4  invalid rounds, foreign-scope evidence and conflicting ledger
  *           reuse fail typed.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -39,7 +40,7 @@ import {
   META_FEEDBACK_LEDGER_STATE,
   runMetaFeedbackWorkflow,
   type MetaFeedbackResult,
-} from '@kaicreator/domain-harness-host-node';
+} from '../../../packages/host-node/dist/index.js';
 import {
   BUSINESS_ID,
   CANDIDATE_KEY,

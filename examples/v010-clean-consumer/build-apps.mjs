@@ -2,8 +2,8 @@
  * v0.10 clean-consumer BUILD recipe (#1180 T11).
  *
  * Runs INSIDE an isolated builder directory that has only the packed
- * `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build`,\n * `@kaicreator/domain-harness-microkernel` and `@kaicreator/domain-harness-host-node`
- * tarballs plus the packed Domain Package tarballs (`@kaicreator/domain-kernel-basic`,
+ * `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build`,
+ * `@kaicreator/domain-harness-microkernel` and `@kaicreator/domain-harness-host-node` tarballs plus the packed Domain Package tarballs (`@kaicreator/domain-kernel-basic`,
  * `-standard-basic`, `-feature-*`) installed — no repository source path is imported.
  * For each App it reads the selected payload bytes from the INSTALLED Domain Packages, the
  * App-owned Business/Capability/K-extension/S-feature bytes from its own

@@ -22,12 +22,13 @@
  *   - a wrong BUILD version, an explicit revocation, and a missing/corrupt
  *     durable activation record all fail typed and leave the old A row intact.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { writeFile } from 'node:fs/promises';
 
 import {
   activateGovernedV10Build,
   v10DeploymentActivationKey,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   T08_BUSINESS_ALPHA,

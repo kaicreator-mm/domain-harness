@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '../../tooling/build/dist/index.js';
 import { V10_TARGET_PROFILE, sha256Canonical, type V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import { activateV10App } from '../../packages/microkernel/src/host-seam.js';
-import { createDecisionEvidenceObserver } from '@kaicreator/domain-harness-host-node';
+import './cjs-package-bridge.ts';
+import { createDecisionEvidenceObserver } from '../../packages/host-node/dist/index.js';
 import { featureEntry, basicComposition, PlainCasDocStore, sha256HexSource } from './helpers-v010.js';
 
 type EvidenceRecorder = (request: Record<string, unknown>, deps?: Record<string, unknown>) => Promise<any>;

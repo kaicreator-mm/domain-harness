@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { V10ActivationError, type V10DocStore } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '../../tooling/build/dist/index.js';
 import {
   BUSINESS_PACKAGE_ID,
   CAPABILITY_PACKAGE_ID,

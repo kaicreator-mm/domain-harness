@@ -5,9 +5,10 @@ import test from 'node:test';
 
 import { V10Error } from '@kaicreator/domain-harness-contracts';
 import { V10_KNOWN_ERROR_CODES } from '@kaicreator/domain-harness-contracts';
-import { ShadowL4Error } from '@kaicreator/domain-harness-host-node';
-import { MetaFeedbackError } from '@kaicreator/domain-harness-host-node';
-import { DecisionEvidenceObserverError } from '@kaicreator/domain-harness-host-node';
+import '../assembly/cjs-package-bridge.ts';
+import { ShadowL4Error } from '../../packages/host-node/dist/index.js';
+import { MetaFeedbackError } from '../../packages/host-node/dist/index.js';
+import { DecisionEvidenceObserverError } from '../../packages/host-node/dist/index.js';
 
 test('P-I1231: known literal code union stays byte-accurate with reviewed source catalog', async () => {
   const path = new URL('../../docs/architecture/V010_TYPED_REFUSAL_LITERAL_CATALOG.json', import.meta.url);

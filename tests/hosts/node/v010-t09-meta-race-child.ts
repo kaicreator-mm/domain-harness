@@ -11,6 +11,7 @@
  *   node --import tsx v010-t09-meta-race-child.ts <kPath> <outFile> \
  *     <evidenceKey> <barrierDir> <tag> <peerTag>
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { existsSync, writeFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -18,7 +19,7 @@ import { join } from 'node:path';
 import {
   META_FEEDBACK_LEDGER_PREFIX,
   runMetaFeedbackWorkflow,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   activateApp,

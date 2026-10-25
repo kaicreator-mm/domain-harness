@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildV10App } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { buildV10App } from '../../tooling/build/dist/index.js';
 import { basicComposition, featureEntry } from '../assembly/helpers-v010.js';
 
 const SPECS = [

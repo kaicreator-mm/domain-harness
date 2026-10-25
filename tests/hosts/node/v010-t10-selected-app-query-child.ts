@@ -11,7 +11,7 @@
  */
 import { writeFile } from 'node:fs/promises';
 
-import { activateV10App } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { activateV10App } from '../../../packages/microkernel/src/internal/activation.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   T10_ALPHA,

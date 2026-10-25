@@ -38,7 +38,6 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { InMemoryCasStore } from '../../packages/domain-harness/src/host-v8/index.js';
-import { v10K02DocumentPrefix } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
 
 // ---------------------------------------------------------------------------
 // The REAL selected kernel, imported by exact current bytes (the pin-test
@@ -69,7 +68,7 @@ const loadKernel = async (): Promise<Record<string, any>> => {
 const PROTOCOL_EXPORTS = ['kernelDocKeys', 'k02ScopePrefix', 'readEffectAuthorityView'] as const;
 const MARKER_BEGIN = '// T01K_ADDITIVE_PROTOCOL_EXPORTS_BEGIN';
 const MARKER_END = '// T01K_ADDITIVE_PROTOCOL_EXPORTS_END';
-const GATE_PATH = new URL('../../packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.ts', import.meta.url);
+const GATE_PATH = new URL('../../packages/microkernel/src/internal/external-effect.ts', import.meta.url);
 
 test('META: the selected kernel bytes are the re-pinned T01k payload', () => {
   assert.equal(KERNEL_BLOB, T01K_KERNEL_BLOB);
@@ -457,8 +456,8 @@ test('negative 3 K02 scoped wiring: every K-written key equals kernelDocKeys(sco
     assert.ok(held.store.writtenKeys.has(key), `the scoped family of ${JSON.stringify(key)} was physically written`);
   }
 
-  // The recorded vectors of the Host derivation at the v0.10.2 pin
-  // (activation.ts:379-388) — byte-for-byte, separators escaped.
+  // The recorded vectors of the K02 scope-prefix derivation at the v0.10.2
+  // pin (the K-owned `k02ScopePrefix`, T01k) — byte-for-byte, escaped.
   const vectors: ReadonlyArray<readonly [Record<string, string>, string]> = [
     [{ deployedAppId: 'dep:loy', tenantId: 'tenant:x', appId: 'app:y', businessPackageId: 'pkg:quote@1' }, 'v010-k02:dep%3Aloy:tenant%3Ax:app%3Ay:pkg%3Aquote@1:'],
     [{ deployedAppId: 'a%b', tenantId: 't:1', appId: 'app:z', businessPackageId: 'pkg:colon:value' }, 'v010-k02:a%25b:t%3A1:app%3Az:pkg%3Acolon%3Avalue:'],
@@ -466,7 +465,6 @@ test('negative 3 K02 scoped wiring: every K-written key equals kernelDocKeys(sco
   ];
   for (const [scope, vector] of vectors) {
     assert.equal(kernel.k02ScopePrefix(scope), vector, 'the recorded K02 vector');
-    assert.equal(v10K02DocumentPrefix(scope as never), vector, 'the Host derivation at HEAD answers the same vector');
   }
 });
 

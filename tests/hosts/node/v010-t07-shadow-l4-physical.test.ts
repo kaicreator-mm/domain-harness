@@ -42,6 +42,7 @@
  * dispatch occurs. The original selected K02 receipt therefore remains the
  * only authority; the shadow never re-activates, promotes or dispatches.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -52,24 +53,22 @@ import test from 'node:test';
 
 import Database from 'better-sqlite3';
 
-import {
-  activateV10App,
-  buildV10App,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import type { V10BuiltApp, V10DocStore, V10DocWriteCondition, V10ModuleInput } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
+import { activateV10App } from '../../../packages/microkernel/src/internal/activation.js';
+import type { V10BuiltApp, V10DocStore, V10DocWriteCondition, V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import {
   SHADOW_K_DOCS_PREFIX,
   ShadowL4Error,
   pinCandidateSource,
   runShadowL4,
   selectedFallbackPin,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10shadow/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import type {
   ShadowKReadStore,
   ShadowL4Report,
   ShadowL4RunnerOptions,
   ShadowL4VersionPin,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10shadow/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { createV10ScopedMemory } from '../../../packages/domain-harness/src/host-v8/v010-scoped-memory.js';
 import { basicComposition, featureEntry, INTENT } from '../../assembly/helpers-v010.js';

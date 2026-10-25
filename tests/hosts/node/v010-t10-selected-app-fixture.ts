@@ -15,12 +15,9 @@ import type {
   V10DocWriteCondition,
   V10ModuleInput,
   V10QueryAuthority,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import {
-  V10_TARGET_PROFILE,
-  buildV10App,
-  sha256Hex,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '@kaicreator/domain-harness-contracts';
+import { V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
 import type { SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import type { V10MultiBQueryTarget } from '../../../packages/domain-harness/src/host-v8/v010-authorized-multib-query.js';
 

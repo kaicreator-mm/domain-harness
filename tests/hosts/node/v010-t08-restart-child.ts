@@ -13,9 +13,10 @@
  * old occurrence cannot be routed through B and that B's new pin still
  * points at B across the process boundary.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { writeFile } from 'node:fs/promises';
 
-import { activateGovernedV10Build } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { activateGovernedV10Build } from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   T08_BUSINESS_ALPHA,

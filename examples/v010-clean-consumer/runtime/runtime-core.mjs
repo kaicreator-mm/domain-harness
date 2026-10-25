@@ -3,8 +3,8 @@
  *
  * Imported by an INSTALLED App package (see ../README.md). It only names the
  * public installed surfaces:
- *   - `@kaicreator/domain-harness-microkernel/host-seam` and Host for trusted\n *     selected
- *     activation of the sealed BUILD output,
+ *   - `@kaicreator/domain-harness-microkernel/host-seam` and Host for trusted
+ *     selected activation of the sealed BUILD output,
  *   - `better-sqlite3` for the physical CAS document store.
  *
  * There is no repository-relative import and no monorepo resolution fallback

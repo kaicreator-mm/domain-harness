@@ -11,14 +11,15 @@
  * Usage:
  *   node --import tsx v010-t09-meta-crash-child.ts <kPath> <outFile> <mode> <evidenceKey>
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { writeFileSync } from 'node:fs';
 
 import {
   META_FEEDBACK_CLAIM_PREFIX,
   META_FEEDBACK_LEDGER_PREFIX,
   runMetaFeedbackWorkflow,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
-import type { V10DocWriteCondition } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
+import type { V10DocWriteCondition } from '@kaicreator/domain-harness-contracts';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {
   activateApp,

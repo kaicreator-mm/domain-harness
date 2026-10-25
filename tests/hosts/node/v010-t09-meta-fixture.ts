@@ -6,6 +6,7 @@
  * install); the separate packed-consumer test proves the public package
  * delivery story.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
@@ -17,7 +18,7 @@ import {
   type V10ModuleInput,
   type V10QueryAuthority,
 } from '@kaicreator/domain-harness-contracts';
-import { buildV10App } from '@kaicreator/domain-harness-build';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
 import { activateV10App, type V10Activation } from '../../../packages/microkernel/src/internal/activation.js';
 import {
   createDecisionEvidenceObserver,
@@ -27,7 +28,7 @@ import {
   metaFeedbackLedgerKey,
   type MetaFeedbackScope,
   type V10DeploymentIdentity,
-} from '@kaicreator/domain-harness-host-node';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { featureEntry, sha256HexSource } from '../../assembly/helpers-v010.js';
 

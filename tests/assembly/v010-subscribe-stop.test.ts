@@ -38,7 +38,7 @@ import type {
   V10QueryAuthority,
   V10ScopedSnapshotQuery,
 } from '@kaicreator/domain-harness-contracts';
-import type { V10ScopedSubscriptionEvent } from '@kaicreator/domain-harness-microkernel';
+import type { V10ScopedSubscriptionEvent } from '../../packages/microkernel/dist/index.js';
 
 import { BUSINESS_PACKAGE_ID, PlainCasDocStore, basicComposition } from './helpers-v010.js';
 

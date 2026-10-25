@@ -118,12 +118,12 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
     const fromRepo = relative(REPO_ROOT, resolved);
     assert.ok(
       fromRepo.startsWith('..') || isAbsolute(fromRepo),
-      `the v10meta import resolved from the clean consumer, not the monorepo: ${resolved}`,
+      `the canonical meta-feedback owner resolved from the clean consumer, not the monorepo: ${resolved}`,
     );
-    assert.ok(resolved.includes('node_modules'), `the v10meta import comes from an installed package: ${resolved}`);
+    assert.ok(resolved.includes('node_modules'), `the meta-feedback owner comes from an installed package: ${resolved}`);
     assert.ok(
       existsSync(resolved.replace(/\.js$/, '.d.ts')),
-      `the packed v10meta subpath ships its declaration file next to the runtime: ${resolved}`,
+      `the packed host-node entry ships its declaration file next to the runtime: ${resolved}`,
     );
     const payload = resolve(result.payloadResolved as string);
     assert.ok(

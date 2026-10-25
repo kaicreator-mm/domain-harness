@@ -25,6 +25,7 @@
  * same SQLite file, BUILDs the same A/B bytes, activates A from the durable
  * pin and proves the original receipt survives.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -36,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import {
   activateGovernedV10Build,
   readV10DeploymentActivationRecord,
-} from '@kaicreator/domain-harness-host-node';
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import type { SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import {

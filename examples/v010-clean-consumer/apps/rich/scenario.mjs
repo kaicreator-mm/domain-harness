@@ -34,13 +34,12 @@ import {
   pinCandidateSource,
   runShadowL4,
   selectedFallbackPin,
-} from '@kaicreator/domain-harness-compiler/v10shadow';
+} from '@kaicreator/domain-harness-host-node';
 import {
   v10BuildActivationDecisionDigest,
   v10BuildPackageClosureDigest,
-  V10_HOST_ABI,
-  V10_RUNTIME_ABI,
-} from '@kaicreator/domain-harness-compiler/v10build';
+} from '@kaicreator/domain-harness-host-node';
+import { V10_HOST_ABI, V10_RUNTIME_ABI } from '@kaicreator/domain-harness-contracts';
 import Database from 'better-sqlite3';
 import * as extjob from './modules/capability-extjob-runx-v1.mjs';
 import * as extnotify from './modules/capability-extnotify-provider-v1.mjs';
@@ -219,7 +218,6 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
   const { authority, probes } = queryAuthority(manifest.deployment, visible);
   const now = () => NOW;
   let activation = await activate({ store, app, manifest, log, authority, now });
-  let counters = activation.counters;
   let facade = activation.facade;
 
   await step('RICH_P1.selection', () => {
@@ -230,17 +228,18 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
     assert(new Set(extensions.map((entry) => entry.hook)).size === 2, 'K extension hooks are not distinct');
     assert(features.length >= 3, `expected >=3 S features, got ${features.length}`);
     assert(new Set(features.map((entry) => entry.featureKey)).size === features.length, 'S feature keys are not distinct');
-    assert(counters.extensionImports === 2, `extensionImports=${String(counters.extensionImports)}`);
-    assert(counters.featureImports === features.length, `featureImports=${String(counters.featureImports)}`);
     for (const entry of [...extensions, ...features]) {
       const module = app.modules.find((candidate) => candidate.packageId === entry.packageId);
       assert(module?.moduleSource?.length > 0, `${entry.packageId} carries no sealed bytes`);
-      assert(counters.importsByPackage[entry.packageId] === 1, `${entry.packageId} was not imported exactly once`);
-      assert(counters.initCalls.includes(entry.packageId), `${entry.packageId} init did not run`);
     }
     const roles = app.modules.filter((module) => module.role === 'business').length;
     assert(roles === 4, `expected 4 selected Businesses, got ${roles}`);
-    return { extensions, features: features.map((entry) => entry.featureKey), roles: counters.initCalls };
+    // The v0.10.2 cutover narrows the installed activation (host-seam): the
+    // import/init diagnostic counters are no longer a public installed
+    // surface. Each selected module's sealed bytes prove composition here;
+    // the once-only import/init discipline is the sealed-graph BUILD
+    // property, and the feature behaviors below prove the modules ran.
+    return { extensions, features: features.map((entry) => entry.featureKey), roles };
   });
 
   const agentScope = {
