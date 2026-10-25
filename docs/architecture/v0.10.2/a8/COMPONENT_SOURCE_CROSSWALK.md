@@ -27,3 +27,8 @@ Existing other roles and honest adapter mappings:
 **A8a boundary decision:** The first producer adapter maps only cases already expressible by current public BUILD roles and fails closed otherwise. No pre-approval for a universal Component `components[]` ABI, independent selection of two exports in one module, per-handler effect field, generic Event Hook or new system/remote runtime.
 
 **A8b sequencing:** Proposed late issue #1364 after T11 #1327, before T07b #1328, then T08b/T09/R01. Preserve Tiny no-unselected-import and real clean installed Node24 evidence when integrating; one actual selected module has its own immutable hash/identity, logical Package grouping may contain multiple independently selected sealed modules.
+
+
+## A8 R2 physical boundary clarification
+
+The 10 existing `standard-feature` source modules remain in their already accepted distinct sealed source directories. A8b **does not edit or merge any of those source files**, nor Kernel/Standard/Business/Capability payload, Host or Contracts; it only exposes an optional BUILD-only typed Component view from `tooling/build/src/component-view.ts` and current `tooling/build/src/index.ts` with Node24 generated dist and a scoped test. Kind metadata never changes the actual module role/ABI or effect classification. `semantic/hook/tool` examples that current selected ABI cannot represent get a typed refusal; no new Tool or Hook runtime. A8a earlier docs/new `tooling/component-bridge` source-only two paths (no `package.json`) do not become shipped runtime files.
