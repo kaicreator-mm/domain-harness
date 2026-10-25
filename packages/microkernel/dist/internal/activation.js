@@ -60,6 +60,7 @@ import { createV10AuthorizedMultiBQuery, } from './multib-query.js';
 import { V10_BUILD_FORMAT, V10_HOST_ABI, V10_RUNTIME_ABI, V10_TARGET_PROFILE, V10_KERNEL_INTENT_KIND, V10_KERNEL_AUTHORITY_CLASS, V10_KERNEL_CALLER_ROLE, V10_ROUTER_PRIORITY, V10_ROUTER_ELIGIBILITY, v10RouterBasisDigest, sha256Hex, V10Error, V10ActivationError, isPlainRecord, } from '@kaicreator/domain-harness-contracts';
 export { V10ActivationError } from '@kaicreator/domain-harness-contracts';
 import { dispatchThroughExternalEffectGate } from './external-effect.js';
+import { createV10SubscriptionRegistry } from './subscription-runtime.js';
 export class V10PortDeniedError extends V10Error {
     constructor(name) {
         super('KEXT_PORT_DENIED', `advisory init context exposes no protected port '${name}'; the probe is denied`);
@@ -307,6 +308,7 @@ export class V10AppFacade {
     #scopedDocs = new Map();
     #queryAuthority;
     #identity;
+    #subscriptions;
     #query;
     #closed = false;
     constructor(deps) {
@@ -322,6 +324,27 @@ export class V10AppFacade {
             : v10DeploymentDocsPrefix(deps.deploymentIdentity);
         this.#docs = createV10DocsPort({ store: deps.store, docsPrefix: this.#docsPrefix, assertOpen: () => this.#assertOpen() });
         this.#identity = selectedKernelIdentityOf(deps.app, deps.namespaces);
+        // [v0.10.2 T06b #1326 / L2 §8] the per-activation subscription registry:
+        // the kernel's best-effort `observe` side-channel fans out into bounded
+        // per-subscription queues; delivery is the registry's async pump.
+        this.#subscriptions = createV10SubscriptionRegistry({
+            isClosed: () => this.#closed,
+            authorize: (target) => {
+                const authority = this.#queryAuthority;
+                if (authority === undefined)
+                    return false;
+                return authority.authorize(authority.principal, target);
+            },
+            readAuthorizedSnapshot: async (selector) => {
+                const { deployment, authority } = this.#queryPreconditions();
+                const answer = await this.#querySelector(deployment, authority).query({
+                    workflowId: selector.workflowId,
+                    instanceKey: selector.instanceKey,
+                    ...(selector.businessPackageId === undefined ? {} : { businessPackageId: selector.businessPackageId }),
+                });
+                return { snapshot: answer.snapshot };
+            },
+        });
         selectedKernelIdentities.set(this, this.#identity);
         brandedV10AppFacades.add(this);
     }
@@ -397,6 +420,11 @@ export class V10AppFacade {
         return this.#closed;
     }
     close() {
+        // [v0.10.2 T06b / L2 §8] teardown order: every subscription inactive and
+        // the registry + queues cleared BEFORE the reverse disposal — the
+        // activation's dispose closes this facade first, then disposes advisory
+        // modules; a subscribe after close refuses FACADE_CLOSED.
+        this.#subscriptions.stopAll();
         this.#closed = true;
     }
     /** The real kernel's own counters for one business package. */
@@ -469,6 +497,39 @@ export class V10AppFacade {
     /** [v0.10.2 T04] the public subscribe seam shares the exact query preconditions. */
     assertQueryPreconditions() {
         this.#queryPreconditions();
+    }
+    /**
+     * [v0.10.2 T06b #1326 / L2 §8] public `subscribe`: the exact scoped-query
+     * preconditions, then resolution + authorization of the ONE exact target
+     * through the same multi-B selector `query` uses — an unselected, foreign
+     * or hidden B refuses identically (non-oracle). The registration lives in
+     * this activation's registry keyed by the receiving business runtime and
+     * K's own `workflowInstanceId` join; delivery is the registry's
+     * asynchronous authorize/re-check pump over the frozen T06a projection.
+     * Read-only like the queries: no K write, no pin check, no effect.
+     */
+    async subscribe(selector, listener) {
+        this.#assertOpen();
+        if (typeof listener !== 'function') {
+            refuse('V10_ACTIVATION_OPTIONS_INVALID', 'subscribe requires a listener function');
+        }
+        if (selector === null || typeof selector !== 'object' || Array.isArray(selector)
+            || typeof selector.workflowId !== 'string'
+            || typeof selector.instanceKey !== 'string') {
+            refuse('QUERY_SELECTOR_INVALID', 'subscribe requires an explicit workflow and instance');
+        }
+        const { deployment, authority } = this.#queryPreconditions();
+        const resolved = await this.#querySelector(deployment, authority).query(selector);
+        this.#assertOpen();
+        return this.#subscriptions.register({
+            target: resolved.target,
+            selector: {
+                workflowId: selector.workflowId,
+                instanceKey: selector.instanceKey,
+                ...(selector.businessPackageId === undefined ? {} : { businessPackageId: selector.businessPackageId }),
+            },
+            listener,
+        });
     }
     /**
      * The ONE Host composition of the reviewed Multi-B selector: BUILD-selected
@@ -630,8 +691,11 @@ export class V10AppFacade {
                 interpret: (declaration, input, context) => this.#namespaces.get(standardEntry.packageId)?.interpret?.(declaration, input, context),
             },
             businessEndpoint: policy,
-            observe: () => {
-                /* receipts are returned to the caller; no side observation at T00 */
+            observe: (receipt) => {
+                // [v0.10.2 T06b #1326 / L2 §8] the per-activation registry fan-out:
+                // synchronous, non-throwing enqueue only — authorization re-check
+                // and delivery belong to the registry's asynchronous pump.
+                this.#subscriptions.observe(businessPackageId, receipt);
             },
         });
         this.#runtimes.set(businessPackageId, runtime);

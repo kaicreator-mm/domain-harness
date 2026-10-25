@@ -1162,9 +1162,21 @@ class GovernedBuildActivation {
         this.#assertOpen();
         return await this.#activation.facade.queryManyScopedSnapshots(selectors);
     }
+    async subscribe(selector, listener) {
+        this.#assertOpen();
+        // Delegation only, exactly like the governed queries: the facade owns
+        // the preconditions, the multi-B target resolution/authorization and
+        // the live registry/pump; no pin check exists on this read-only path.
+        return await this.#activation.facade.subscribe(selector, listener);
+    }
     kCounters(businessPackageId) {
         this.#assertOpen();
         return this.#activation.facade.kCounters(businessPackageId);
+    }
+    stop() {
+        // The public name of close() (L2 §8 F04): one teardown path — the
+        // facade clears every subscription/queue before the reverse disposal.
+        this.close();
     }
     close() {
         if (this.#closed)

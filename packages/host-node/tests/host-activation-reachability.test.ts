@@ -119,7 +119,9 @@ test('T03b-REACH-1: no counters object, docs port, gate or import-hook registry 
   assert.deepEqual(Object.keys(governed), []);
   assert.deepEqual(
     Object.getOwnPropertyNames(Object.getPrototypeOf(governed)).filter((name) => name !== 'constructor').sort(),
-    ['build', 'close', 'kCounters', 'queryManyScopedSnapshots', 'queryScopedSnapshot', 'readPin', 'recoverReservation', 'resolveIntentTarget', 'selectedShadowBinding', 'selection', 'send'],
+    // [v0.10.2 T06b #1326 / L2 §8 F04] the governed surface gains the live
+    // `subscribe` delegation and `stop` (the public name of `close()`).
+    ['build', 'close', 'kCounters', 'queryManyScopedSnapshots', 'queryScopedSnapshot', 'readPin', 'recoverReservation', 'resolveIntentTarget', 'selectedShadowBinding', 'selection', 'send', 'stop', 'subscribe'],
     'the governed surface is exactly the documented delegation',
   );
   // kCounters returns a fresh copy, never the live counters object.

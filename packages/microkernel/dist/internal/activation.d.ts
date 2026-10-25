@@ -1,6 +1,8 @@
 import { V10Error } from '@kaicreator/domain-harness-contracts';
 export { V10ActivationError } from '@kaicreator/domain-harness-contracts';
 import type { V10EffectAuthorityView } from './external-effect.js';
+import type { V10SubscriptionHandle } from './subscription-runtime.js';
+import type { V10ProjectedSubscriptionEvent } from '../subscription-projection.js';
 export declare class V10PortDeniedError extends V10Error {
     constructor(name: string);
 }
@@ -287,6 +289,17 @@ export declare class V10AppFacade {
     queryManyScopedSnapshots(selectors: readonly V10ScopedSnapshotQuery[]): Promise<readonly V10ScopedSnapshotManyAnswer[]>;
     /** [v0.10.2 T04] the public subscribe seam shares the exact query preconditions. */
     assertQueryPreconditions(): void;
+    /**
+     * [v0.10.2 T06b #1326 / L2 §8] public `subscribe`: the exact scoped-query
+     * preconditions, then resolution + authorization of the ONE exact target
+     * through the same multi-B selector `query` uses — an unselected, foreign
+     * or hidden B refuses identically (non-oracle). The registration lives in
+     * this activation's registry keyed by the receiving business runtime and
+     * K's own `workflowInstanceId` join; delivery is the registry's
+     * asynchronous authorize/re-check pump over the frozen T06a projection.
+     * Read-only like the queries: no K write, no pin check, no effect.
+     */
+    subscribe(selector: V10ScopedSnapshotQuery, listener: (event: Readonly<V10ProjectedSubscriptionEvent>) => void): Promise<V10SubscriptionHandle>;
     /**
      * Deterministic, read-only Standard Router preflight. It cannot confer K
      * admission; governed deployment uses it BEFORE minting a durable BUILD pin

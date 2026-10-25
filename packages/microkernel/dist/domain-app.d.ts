@@ -13,9 +13,10 @@ export interface LoadAppOptions {
     readonly now?: () => number;
 }
 /**
- * The frozen event projection SHAPE of L2 §8. Real delivery (asynchronous
- * authorize/re-check pump, deep-frozen snapshot copy) is T06b; at this pin
- * `subscribe` enforces the query preconditions and registers only.
+ * The frozen public event projection of L2 §8 (the T06a shape, delivered
+ * live by the T06b registry/pump): `kind` is the receipt status,
+ * `occurrenceId` its occurrence message id, `target` the authorized scoped
+ * query tuple, `snapshot` only with same-revision query evidence.
  */
 export interface V10ScopedSubscriptionEvent {
     readonly kind: string;
