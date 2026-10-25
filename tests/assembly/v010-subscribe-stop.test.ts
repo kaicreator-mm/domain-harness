@@ -66,6 +66,8 @@ interface AuthorityState {
   mode: 'allow' | 'deny' | 'reject' | 'throw';
   gate: Promise<boolean> | undefined;
   calls: number;
+  /** Deterministic late authorization revocation by call index (T06b R2). */
+  denyFromCall?: number;
 }
 
 /** Host-owned query authority whose verdict the test controls step by step. */
@@ -77,6 +79,7 @@ function controllableAuthority(): { state: AuthorityState; queryAuthority: V10Qu
       principal: { role: 'reader' },
       authorize: (_principal: unknown): boolean | Promise<boolean> => {
         state.calls += 1;
+        if (state.denyFromCall !== undefined && state.calls >= state.denyFromCall) return false;
         if (state.gate !== undefined) return state.gate;
         if (state.mode === 'deny') return false;
         if (state.mode === 'reject') return Promise.reject(new Error('authority unavailable (T06b fixture)'));
@@ -288,6 +291,41 @@ test('T06b-N3: authorize flip/reject/throw during delivery ends the subscription
       await settle();
       assert.equal(events.length, 0, `the ended subscription stays ended (${instanceKey})`);
     }
+  } finally {
+    domainApp.stop();
+  }
+});
+
+test('T06b-N3-LATE: revoke during the snapshot query never delivers metadata and ends the subscription', { timeout: 120_000 }, async () => {
+  const { buildV10App } = await buildModule;
+  const app = buildV10App(await basicComposition());
+  const authority = controllableAuthority();
+  const domainApp = await loadApp(app, authority.queryAuthority);
+  try {
+    const instanceKey = 'inst:t06b-n3-late';
+    const messageId = 'msg:t06b-n3-late-1';
+    const { events, listener } = collector();
+    await domainApp.send(intentOf(instanceKey, messageId));
+    await domainApp.subscribe({ workflowId: WORKFLOW, instanceKey }, listener);
+    const previousAuthCalls = authority.state.calls;
+
+    // This fires AFTER the first pump authorization on the old implementation,
+    // during #querySelector's asynchronous snapshot authorization. The old
+    // code discarded the rejected snapshot yet delivered three-field metadata
+    // using its stale initial verdict. The R2 code must reauthorize LAST.
+    authority.state.denyFromCall = previousAuthCalls + 2;
+    const replay = await domainApp.send(intentOf(instanceKey, messageId));
+    assert.equal(replay.status, 'admitted', 'observation cannot influence the admitted send');
+    await settle(300);
+    assert.ok(authority.state.calls >= previousAuthCalls + 2, 'late authorization was actually exercised');
+    assert.equal(events.length, 0, 'revocation during async snapshot authorization never leaks metadata');
+
+    // A failed final authorization must destroy the subscription, not merely
+    // defer it until some future Host authority change.
+    authority.state.denyFromCall = undefined;
+    await domainApp.send(intentOf(instanceKey, messageId));
+    await settle(300);
+    assert.equal(events.length, 0, 'revoked subscription cannot resurrect after reauthorization');
   } finally {
     domainApp.stop();
   }
