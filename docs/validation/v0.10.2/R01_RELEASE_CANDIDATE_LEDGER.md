@@ -43,17 +43,17 @@ The frozen PRD's §3 has **eight P0** and **two P1 release deliverables**. Every
 
 | Mandatory check | Source/owner | R01 state | Reuse / next action |
 | --- | --- | --- | --- |
-| Exact SHA, clean Node24 checkout and tracked-tree status | R01 Build Host | **NOT_RUN** | Record Node/npm, SHA/tree, clean status and commands |
-| Post-T09 #1379 authoring | PR #1380 source R1 PASS, reported real Node24 producer+consumer EXIT0 | **TASK_PASS / RELEASE_NOT_RUN** | Re-run docs-command or explicitly reuse identical executed bytes with R01 impact decision |
-| #1381 T016 archived README regression | PR #1383 5/5 Node24 EXIT0 | **TASK_PASS / FULL_NOT_RUN** | Current v0.10.2 candidate wording and preserved archived v0.7 facts |
-| #1382 typed literal catalog regression | PR #1384 Node24 scanner + 2/2 EXIT0 | **TASK_PASS / FULL_NOT_RUN** | 3 BUILD Component refusal literals, one JSON artifact change |
-| `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck` | README + R01 guide | **NOT_RUN** on final candidate | Run once, capture exit codes; exact-SHA T09/CI passes do not by themselves execute docs commands |
-| Entire workspace/root `npm test` | R01 Full Regression | **NOT_RUN** | **One** release candidate full-run channel (manual Woodpecker **or** equivalent approved clean Node24 local validator), not redundant simultaneous full runs |
-| Tiny/Rich external packed producer and consumer command | `tests/integration/v010-clean-consumers/clean-consumers.test.ts` | **REUSE_CANDIDATE_ONLY** | T09 Node24 local EXIT 0 reported twice on all 14 unchanged T09 source blobs; R01 may execute once to prove literal docs command at frozen candidate / verify unchanged image and record actual exit |
-| Scoped public tarball inventory | `tests/compiler/v0102-tarball-inventory.test.ts` | **NOT_RUN** on final candidate | Run once in R01 doc inventory and inspect actual `npm pack` JSON four selected packages |
-| Critical Journeys, including K replay/conflict, multi-B, governed effects, subscribe N3-LATE, Rich CAS race | R01 CJ | **NOT_RUN AS RELEASE GATE** | Reuse unchanged reviewed T06b 8/8 and T09 Node24 physical source evidence only where exact tree/source/test/host materially unchanged; enumerate assertion IDs, run missing critical combinations |
-| Owner-held Hidden Validation | Separate owner/independent validator | **NOT_RUN** | Dispatch to owner; no command invented and no implementer-made self-test substitutes |
-| Actual fresh production pack/install and forbidden old exports | R01 Packaging | **NOT_RUN AS RELEASE GATE** | Four selected packages, 0 legacy compiler/build in Tiny runtime closure; save tarball SHA256/exports/version/Node24/wire digest |
+| Exact SHA, clean Node24 checkout and tracked-tree status | R01-A Windows Node24.21.0 | **EXECUTED PASS / CLEAN TRACKED SOURCE** | `git HEAD=11ab7954`, tree `36a6b1d5`; pre-clean, only untracked generated JSON after command; see #1331 comment 6408550517 |
+| Post-T09 #1379 authoring | PR #1380 source R1 PASS and real R01-C Node24 authoring command | **R01-C EXECUTED EXIT0** | `projection-smoke.mjs` and independent authoring-template CHECK real sealed BUILD+installed consumer; 6 binding negatives, 9 producer probes |
+| #1381 T016 archived README regression | PR #1383 and fresh R01-C Node24 | **R01-C EXECUTED 5/5 EXIT0** | Final-candidate T016 source and archived v0.7 pinned inventory remain proven |
+| #1382 typed literal catalog regression | PR #1384 + final-candidate R01-C | **R01-C SCANNER EXIT0** | 166 distinct typed refusal literal codes across 39 files |
+| `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck` | README + R01-A Windows Node24.21.0 | **ALL FOUR EXECUTED EXIT0** | 162 installed packages; build committed-dist PASS; lint and typecheck PASS; see #6408550517 |
+| Entire workspace/root `npm test` | R01-A Full Regression + targeted diagnosis | **EXECUTED LITERAL EXIT1 — N08b SQLITE DISK I/O; ADJUDICATION PENDING** | Actual 4,344 cases across main run + independently completed root phase; 4,343 pass, 1 N08b out-of-gate failure, 1 intentional skip. Isolated N08b file 4/4 EXIT0; no second full run. RQ must explicitly decide transient evidence, no automatic Full PASS |
+| Tiny/Rich external packed producer and consumer command | `tests/integration/v010-clean-consumers/clean-consumers.test.ts` | **R01-C CURRENT SOURCE EXECUTED 1/1 EXIT0** | 13 fresh real tarballs and installed Tiny/Rich, external producer 7 fail-closed deep-import probes; evidence sha256 `04708c9698...7895f43` |
+| Scoped public tarball inventory | `tests/compiler/v0102-tarball-inventory.test.ts` | **R01-C CURRENT SOURCE EXECUTED 4/4 EXIT0** | Four selected public workspaces and real package identity/closure; `npm pack --dry-run` all four EXIT0 |
+| Critical Journeys, including K replay/conflict, multi-B, governed effects, subscribe N3-LATE, Rich CAS race | R01-C fresh + unchanged T09/T06b evidence | **PHYSICAL EXECUTED / REUSE SOURCES QUALIFIED BY DIFF; INDEPENDENT RQ PENDING** | Current Tiny/Rich pack/install and authoring fixture passed; T09 K02/Rich physical and T06b late-revoke evidence re-used with source/10-of-10 tarball-byte parity; independent final Product row adjudication still needed |
+| Owner-held Hidden Validation | Private #74 / PR #75 | **BLOCKED NOT_RUN (0 CASES EXECUTED)** | Original validator Node22/missing pack; private PR #75 current HEAD `e5be9fb8` reduces 38 legacy-ported scenario obligation to 7 selected high-risk new cases; 2 source-only unreviewed, 5 missing. Real Node24 execution, tarball pins and independent pack review all outstanding |
+| Actual fresh production pack/install and forbidden old exports | R01-C Packaging Node24 | **PHYSICAL EXECUTED EXIT0; INDEPENDENT RQ PENDING** | Four public `npm pack --dry-run` EXIT0, 13 actual tarballs and clean installed producer/Tiny/Rich, forbidden import negatives EXIT0; 10/10 distributed artifact SHA256 byte-identical vs T09 historical receipt |
 | Release qualification / independent decision | Independent reviewer | **NOT_RUN** | Check Product P0/required P1, candidate tree, evidence, exceptions; output READY / CONDITIONAL / BLOCKED / FAIL and main-authorization separately |
 
 ### Known P2 and provenance disclosures
@@ -92,21 +92,32 @@ git status --porcelain
 
 If the frozen-branch manual Woodpecker candidate runs `npm test`, do **not** repeat the same full root command locally solely to generate another green check. For the physical Tiny/Rich install and true external producer, reuse valid T09 evidence after exact impact check, or execute the one listed command once if needed for mandatory R01 docs-command execution. Run Hidden Validation through its owner-held procedure separately and attach the exact trace. Any command that fails must be reported as `FAIL` with actual output, not removed from the list. Packaging JSON alone is dry-run inventory, not proof of running fresh installed apps.
 
+### R01-A+C actual physical receipt (2026-10-26) — source SHA only; independent RQ outstanding
+
+Local validator reported [#1331 comment 6408550517](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6408550517), and cross-posted PR #1378. Windows x64 / **Node24.21.0**, npm 11.19.0, tracked checkout HEAD `11ab7954f547fde44c003e2b227d672dc8af0a79`, tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b`; zero tracked source edits. `npm ci`, `npm run build` (including committed-dist), `npm run lint`, `npm run typecheck`: **all EXIT0**. One `npm test` = **EXIT1** from one N08b SQLite `disk I/O error` during worker `Database.pragma`, before expected same-key conflict check; separate root phase EXIT0. Combined 4,344 tests with 4,343 PASS, one failure and one intentional skip per report; targeted `n08-n10-provisioning.test.ts` rerun **4/4 EXIT0**. This does NOT silently convert full process EXIT1 into PASS; an independent risk/CI adjudication is still required.
+
+R01-C documented commands passed, including literal clean-consumer fixture **1/1 EXIT0** (13 actual tarballs, Tiny/Rich/external producer and seven deep-import negatives), authoring template producer/install/execute **EXIT0** (S non-Tool, two C modules, K admission/effect negatives), inventory **4/4 EXIT0**, error-catalog **EXIT0**, historical T016 **5/5 EXIT0**, and four `npm pack --dry-run` command exits **0**. Ten public/distributed tarballs match T09 digests byte-for-byte; three changed example-App test tarball hashes compared to intermediate T09 receipt are explicitly disclosed and independently built from unchanged final example sources. T09/T06b reuse based on 19-path source-only diff and byte parity; this is not a fresh hidden run.
+
+### R01-B private Hidden disposition — current incomplete source, NOT_RUN
+
+Original independent validator [#1331 comment 6408420172](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6408420172) had no current pack and Node22: **0 cases actually executed**, not a product FAIL. Private `hidden-validation#74` / draft PR #75 has successor private source. User approved **minimal risk-based Hidden** with no 33-case legacy migration quota. Web controller source amendment private PR #75 HEAD `e5be9fb8ba93fb2e55eede0b0870639c74e973e3` selects seven high-value new current ABI risk IDs, retaining the 33 historical IDs only as inventory; selection must receive independent risk-adequacy approval, not an automatic numeric PASS. As at this ledger update: two provisional source probes authored/unreviewed; five unimplemented; four current archive SHA256 values missing; private independent code/oracle review and physical Node24 execution **NOT_RUN**. Consequently `R01_B_HIDDEN=BLOCKED_NOT_RUN`, no Release qualification or main merge is authorized.
+
 ## 5. Candidate decisions awaiting evidence
 
-**Preflight resolution (2026-10-26):** The old 3a2ad3b8 candidate lacked Product #1305 authoring. #1379/PR #1380 was independently source-reviewed PASS and physically Node24 authoring-tested (reported EXIT0), merged to version at `7c24f2ad0f75929e2dffbe256afb4ce9d42c49a7`. The two baseline Full failures were repaired by #1381/PR #1383 (T016 Node24 5/5 PASS, merged at `ecee68c9d1b972a3aebf5a46c4844aded440dad0`) and #1382/PR #1384 (Node24 literal catalog scanner EXIT0 + tests 2/2, version merge `11ab7954f547fde44c003e2b227d672dc8af0a79`), all separately reviewed with exact-head dual CI PASS. Final **source candidate** is `11ab7954f547fde44c003e2b227d672dc8af0a79`, Git tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b`. Those are **Task/PR gates**; every R01 Full/Hidden/Critical/Packaging and complete Product qualification gate remains NOT_RUN. No main integration is authorized.
+**Preflight resolution (2026-10-26):** The old 3a2ad3b8 candidate lacked Product #1305 authoring. #1379/PR #1380 was independently source-reviewed PASS and physically Node24 authoring-tested (reported EXIT0), merged to version at `7c24f2ad0f75929e2dffbe256afb4ce9d42c49a7`. The two baseline Full failures were repaired by #1381/PR #1383 (T016 Node24 5/5 PASS, merged at `ecee68c9d1b972a3aebf5a46c4844aded440dad0`) and #1382/PR #1384 (Node24 literal catalog scanner EXIT0 + tests 2/2, version merge `11ab7954f547fde44c003e2b227d672dc8af0a79`), all separately reviewed with exact-head dual CI PASS. Final **source candidate** is `11ab7954f547fde44c003e2b227d672dc8af0a79`, Git tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b`. Those are **Task/PR gates**. Since this draft, actual A+C physical evidence at source `11ab7954` has arrived; Full was executed with literal `npm test EXIT=1` (N08b physical SQLite error, targeted 4/4 EXIT0), Critical/Packaging/doc commands are physically executed/reuse-qualified, while Hidden remains unexecuted and independent Product/RQ terminal is outstanding. No main integration is authorized.
 
 ```ini
 R01_ADMITTED=YES_DEPENDENCIES_CLOSED
 CANDIDATE_PREPARED=YES
-CANDIDATE_FROZEN=NO
-EXACT_SHA_FULL_REGRESSION=NOT_RUN
-EXACT_SHA_HIDDEN_VALIDATION=NOT_RUN
-EXACT_SHA_CRITICAL_JOURNEYS=NOT_RUN_RELEASE_GATE
-EXACT_SHA_PACKAGING=NOT_RUN_RELEASE_GATE
-DOC_COMMAND_EXECUTION=NOT_RUN
-PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN
-RELEASE_QUALIFICATION=NOT_RUN_PENDING_FULL_HIDDEN_CRITICAL_PACKAGING_AND_PRODUCT_QA
+CANDIDATE_FROZEN=NO_PENDING_INDEPENDENT_TERMINAL
+EXACT_SHA_FULL_REGRESSION=EXECUTED_NPM_TEST_EXIT1_N08B_ENV_TRANSIENT_ADJUDICATION_PENDING
+EXACT_SHA_N08B_ISOLATED=4_OF_4_PASS_EXIT0
+EXACT_SHA_HIDDEN_VALIDATION=BLOCKED_NOT_RUN_ZERO_CASES_PRIVATE_PR75_PREPACK
+EXACT_SHA_CRITICAL_JOURNEYS=PHYSICAL_REPORTED_R01C_EXIT0_PLUS_REVIEWED_T09_T06B_REUSE_RQ_PENDING
+EXACT_SHA_PACKAGING=PHYSICAL_13_REAL_TARBALLS_CLEAN_INSTALL_EXIT0_RQ_PENDING
+DOC_COMMAND_EXECUTION=EXECUTED_R01C_EXIT0
+PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN_INDEPENDENT_TERMINAL
+RELEASE_QUALIFICATION=NOT_RUN_PENDING_HIDDEN_AND_FULL_N08B_ADJUDICATION
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
