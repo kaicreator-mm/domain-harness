@@ -31,7 +31,7 @@ import {
   durableTurnReceiptIdentity,
   scopedDocKey,
   SCOPED_DOC_KINDS,
-} from '../src/qualified-package/payload/durable-receipt-carrier-v1.mjs';
+} from '../../../tests/fixtures/k02-fragment/durable-receipt-carrier-v1.mjs';
 
 const sha256 = { digestUtf8: (value: string) => createHash('sha256').update(value, 'utf8').digest('hex') };
 

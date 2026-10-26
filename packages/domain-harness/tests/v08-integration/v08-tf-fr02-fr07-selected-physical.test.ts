@@ -68,7 +68,6 @@ const SHIFTED_CLOCK = '2027-01-02T03:04:05.678Z';
 // sealRealApp, which is not edited by this PR).
 // ---------------------------------------------------------------------------
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 function firstEndpointId(endpoints: unknown): string {
@@ -81,11 +80,11 @@ function firstEndpointId(endpoints: unknown): string {
 
 async function sealSelectedApp(fixtureFile: string, appId: string): Promise<SealedQualifiedPackageRoot> {
   const businessModule = await import(new URL(fixtureFile, fixtureDir).href) as Record<string, unknown>;
-  const kernelMeta = await import(new URL('kernel-mechanism-v1.mjs', payloadDir).href) as Record<string, unknown>;
-  const sdkMeta = await import(new URL('standard-sdk-v1.mjs', payloadDir).href) as Record<string, unknown>;
+  const kernelMeta = await import(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url).href) as Record<string, unknown>;
+  const sdkMeta = await import(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url).href) as Record<string, unknown>;
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL(fixtureFile, fixtureDir), 'utf8'),
   ]);
   const kernelId = kernelMeta.MODULE_ID as string;

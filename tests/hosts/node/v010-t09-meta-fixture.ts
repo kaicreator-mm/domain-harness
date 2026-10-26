@@ -6,34 +6,34 @@
  * install); the separate packed-consumer test proves the public package
  * delivery story.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 import {
   V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-  type V10Activation,
   type V10BuiltApp,
-  type V10DeploymentIdentity,
   type V10DocStore,
   type V10DocWriteCondition,
   type V10ModuleInput,
   type V10QueryAuthority,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { createDecisionEvidenceObserver } from '../../../packages/domain-harness-compiler/src/qualified-package/v10evidence/decision-evidence-observer.js';
+} from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
+import { activateV10App, type V10Activation } from '../../../packages/microkernel/src/internal/activation.js';
 import {
+  createDecisionEvidenceObserver,
   MetaFeedbackError,
   metaFeedbackClaimKey,
   metaFeedbackEvidencePrefix,
   metaFeedbackLedgerKey,
   type MetaFeedbackScope,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
+  type V10DeploymentIdentity,
+} from '../../../packages/host-node/dist/index.js';
 import { openSqliteCasStore, type SqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { featureEntry, sha256HexSource } from '../../assembly/helpers-v010.js';
 
-export const payloadDir = new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-export const routerUrl = new URL('../../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url);
+export const metaFeedbackFeatureUrl = new URL('../../../domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs', import.meta.url);
+export const routerUrl = new URL('../../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url);
 export const capabilityUrl = new URL('../../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url);
 
 export const TENANT = 'tenant:v010-t09-meta';
@@ -180,15 +180,15 @@ export function shadowReport(
 
 export async function buildT09App(metaSourceOverride?: string): Promise<V10BuiltApp> {
   const [kernel, sdk, router, business, capability, evidenceSource, semanticSource, candidateSource, defaultMetaSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(routerUrl, 'utf8'),
-    readFile(new URL('business-meta-feedback-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../examples/v010-meta-feedback/business-meta-feedback-v1.mjs', import.meta.url), 'utf8'),
     readFile(capabilityUrl, 'utf8'),
-    readFile(new URL('sfeature-decision-evidence-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('sfeature-semantic-decision-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('sfeature-candidate-validation-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('sfeature-meta-feedback-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/features/decision-evidence/modules/sfeature-decision-evidence-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/features/semantic-decision/modules/sfeature-semantic-decision-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/features/candidate-validation/modules/sfeature-candidate-validation-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs', import.meta.url), 'utf8'),
   ]);
   const metaSource = metaSourceOverride ?? defaultMetaSource;
   const routerBody = router.replace(/^export /gm, '');

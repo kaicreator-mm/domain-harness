@@ -12,11 +12,16 @@
 // packed-stage-equivalence.test.ts, where the package test script guarantees
 // freshly built live core+node dists next to the committed compiler dist.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { compareDirectoryDigests, freshDistProblems, scavengeStaleStages } from './packed-fixture-stage.ts';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { compareDirectoryDigests, freshDistProblems, scavengeStaleStages, verifiedLocalWorkspaceTarballs, stageNewWorkspaceTarballs, assertNewWorkspacePackagesInstalled } from './packed-fixture-stage.ts';
+import type { NewWorkspacePacks, StagedWorkspaceTarball } from './packed-fixture-stage.ts';
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 function writeTree(root: string, files: Readonly<Record<string, string>>): void {
   for (const [relative, contents] of Object.entries(files)) {
@@ -126,5 +131,99 @@ test('P2-02: bounded scavenging removes only aged stage directories', () => {
     assert.ok(existsSync(staleFile), 'non-directory namesakes are never touched');
   } finally {
     rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('T07a2: local workspace tarballs resolve minimal dependency closure and fail closed on tampering', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dh-t07a2-local-tarballs-'));
+  try {
+    const pack = (name: string): StagedWorkspaceTarball => {
+      const path = join(root, `${name}.tgz`);
+      const bytes = `exact-local-tarball-${name}`;
+      writeFileSync(path, bytes);
+      return {
+        path,
+        fileName: `${name}.tgz`,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        packageName: `@kaicreator/domain-harness-${name}`,
+        version: '0.10.2-rc.0',
+      };
+    };
+    const packs: NewWorkspacePacks = {
+      contracts: pack('contracts'),
+      microkernel: pack('microkernel'),
+      hostNode: pack('host-node'),
+      build: pack('build'),
+    };
+    const requested = (keys: readonly (keyof NewWorkspacePacks)[]) => verifiedLocalWorkspaceTarballs(packs, keys);
+    assert.deepEqual(requested(['microkernel']), [packs.contracts.path, packs.microkernel.path], 'Tiny excludes Host and BUILD');
+    assert.deepEqual(requested(['hostNode']), [packs.contracts.path, packs.microkernel.path, packs.hostNode.path], 'Host needs Microkernel and contracts');
+    assert.deepEqual(requested(['build']), [packs.contracts.path, packs.build.path], 'BUILD does not need runtime modules');
+    assert.deepEqual(requested(['hostNode', 'build']), [
+      packs.contracts.path, packs.microkernel.path, packs.hostNode.path, packs.build.path,
+    ], 'joint requested closure is stable and deduplicated');
+    assert.deepEqual(requested([]), [], 'no undeclared package is implicitly installed');
+    writeFileSync(packs.contracts.path, 'tampered bytes');
+    assert.throws(() => requested(['hostNode']), /sha256 mismatch/u, 'tampered dependency refuses before install');
+    // Restore the earlier corruption so the missing-host case reaches the
+    // intended ENOENT failure, rather than failing on the contracts digest.
+    writeFileSync(packs.contracts.path, 'exact-local-tarball-contracts');
+    rmSync(packs.hostNode.path);
+    assert.throws(() => requested(['hostNode']), /ENOENT/u, 'missing exact local tarball refuses instead of registry fallback');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('T07a2: stageNewWorkspaceTarballs physically packs the exact local rc.0 tarballs with live manifest identities', { timeout: 240_000 }, async () => {
+  const packs = await stageNewWorkspaceTarballs();
+  const expected = [
+    { key: 'contracts', root: join(REPO_ROOT, 'packages', 'contracts') },
+    { key: 'microkernel', root: join(REPO_ROOT, 'packages', 'microkernel') },
+    { key: 'hostNode', root: join(REPO_ROOT, 'packages', 'host-node') },
+    { key: 'build', root: join(REPO_ROOT, 'tooling', 'build') },
+  ] as const;
+  for (const entry of expected) {
+    const tarball = packs[entry.key];
+    const manifest = JSON.parse(readFileSync(join(entry.root, 'package.json'), 'utf8')) as { name: string; version: string };
+    assert.equal(tarball.packageName, manifest.name, `staged ${entry.key} carries the live workspace name`);
+    assert.equal(tarball.version, manifest.version, `staged ${entry.key} carries the live workspace version`);
+    assert.ok(tarball.fileName.endsWith(`${manifest.version}.tgz`), `staged ${entry.key} tarball name carries the exact version`);
+    assert.ok(existsSync(tarball.path), `staged ${entry.key} tarball exists`);
+    assert.equal(
+      createHash('sha256').update(readFileSync(tarball.path)).digest('hex'),
+      tarball.sha256,
+      `staged ${entry.key} sha256 record matches the packed bytes`,
+    );
+  }
+  // The staged set is dependency-complete for the bridge selectors.
+  assert.deepEqual(
+    verifiedLocalWorkspaceTarballs(packs, ['hostNode']),
+    [packs.contracts.path, packs.microkernel.path, packs.hostNode.path],
+    'the staged pack covers the full runtime-trio closure',
+  );
+}, 240_000);
+
+test('T07a2: assertNewWorkspacePackagesInstalled fails closed on uninstalled and mis-identified packages', async () => {
+  const packs = await stageNewWorkspaceTarballs();
+  const emptyConsumer = mkdtempSync(join(tmpdir(), 'dh-t07a2-provenance-'));
+  try {
+    assert.throws(
+      () => assertNewWorkspacePackagesInstalled(emptyConsumer, [packs.contracts]),
+      /is not installed in the clean consumer/u,
+      'a bridge package absent from node_modules must fail the provenance assertion',
+    );
+    const installedRoot = join(emptyConsumer, 'node_modules', '@kaicreator', 'domain-harness-contracts');
+    mkdirSync(installedRoot, { recursive: true });
+    writeFileSync(join(installedRoot, 'package.json'), JSON.stringify({ name: '@kaicreator/domain-harness-contracts', version: '0.0.0-forged' }));
+    assert.throws(
+      () => assertNewWorkspacePackagesInstalled(emptyConsumer, [packs.contracts]),
+      /provenance mismatch.*0\.0\.0-forged/u,
+      'a registry-forged or wrong-version install must fail the provenance assertion',
+    );
+    writeFileSync(join(installedRoot, 'package.json'), JSON.stringify({ name: packs.contracts.packageName, version: packs.contracts.version }));
+    assertNewWorkspacePackagesInstalled(emptyConsumer, [packs.contracts]);
+  } finally {
+    rmSync(emptyConsumer, { recursive: true, force: true });
   }
 });

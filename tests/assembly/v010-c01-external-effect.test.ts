@@ -40,23 +40,21 @@
  *   P-KEYSPACE          every K document stays under v10/k/** — the adapters
  *                       never write the Kernel's namespace.
  */
-import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+import { freshV10Counters } from '../../packages/microkernel/src/internal/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { createV10DocsPort } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+import { V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../tooling/build/dist/index.js';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
+import { createV10DocsPort } from '../../packages/microkernel/src/internal/activation.js';
 // The trusted gate seam is internal (#1227): tests wire it through the module
 // path, never through the curated public barrel.
-import { dispatchThroughExternalEffectGate } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.js';
-import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { dispatchThroughExternalEffectGate } from '../../packages/microkernel/src/internal/external-effect.js';
+import type { V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import { PlainCasDocStore, sha256HexSource } from './helpers-v010.js';
 import * as extjobConsole from './fixtures-v010/capability-extjob-runx-v1.mjs';
 import * as extnotifyConsole from './fixtures-v010/capability-extnotify-provider-v1.mjs';
@@ -102,8 +100,8 @@ function clearPins(): void {
 
 async function standardBundle(): Promise<string> {
   const [sdk, router] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
   ]);
   const routerBody = router.replace(/^export /gm, '');
   return `${sdk}
@@ -118,7 +116,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 
 async function c01Modules(): Promise<V10ModuleInput[]> {
   const [kernel, sdk, business, extjob, extnotify, directory] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
     standardBundle(),
     readFile(new URL('./fixtures-v010/business-external-jobs-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/capability-extjob-runx-v1.mjs', import.meta.url), 'utf8'),
@@ -263,7 +261,7 @@ class ConsumeFaultStore extends PlainCasDocStore {
     super();
     this.#armed = true;
   }
-  override async put(key: string, value: unknown, condition: import('../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js').V10DocWriteCondition): Promise<{ revision: number }> {
+  override async put(key: string, value: unknown, condition: import('@kaicreator/domain-harness-contracts').V10DocWriteCondition): Promise<{ revision: number }> {
     const record = value as { state?: unknown } | null;
     if (this.#armed && key.includes('effect-permit') && record !== null && typeof record === 'object' && record.state === 'consumed') {
       this.#armed = false;
@@ -570,9 +568,16 @@ test('N-REPLAY: a same-messageId replay answers from the K02 original receipt wi
   }
 });
 
+// The canonical Host gate re-reads durable K authority through the loaded
+// kernel's own read-only protocol export (L2 §2); the direct-gate negatives
+// below wire the same sealed payload every App in this file is built with.
+const kernelReady = import('../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs') as Promise<Record<string, any>>;
+
 test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants) is refused before any invocation', async () => {
   await pinAdapterStores();
   const clock = controlledClock();
+  const kernel = await kernelReady;
+  const readAuthorityView = kernel.readEffectAuthorityView as unknown as NonNullable<Parameters<typeof dispatchThroughExternalEffectGate>[0]['readAuthorityView']>;
   try {
     const kStore = new PlainCasDocStore();
     const app = await buildC01App();
@@ -615,7 +620,7 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
 
     // The settled turn's own permit claim: consumed ⇒ refused, zero invoke.
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, nowIso: () => new Date(clock.now()).toISOString() }, {
+      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, readAuthorityView, nowIso: () => new Date(clock.now()).toISOString() }, {
         capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' }, attest: claim, invoke,
       }),
       (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_CONSUMED'); return true; },
@@ -624,7 +629,7 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
     // A foreign business identity can never consume this permit, even when it
     // names the exact live address: the scoped B is part of the authority tuple.
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, nowIso: () => new Date(clock.now()).toISOString() }, {
+      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, readAuthorityView, nowIso: () => new Date(clock.now()).toISOString() }, {
         capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' },
         attest: { effectPermit: { ...claim.effectPermit, businessPackageId: 'business-foreign@v010.1.0.0' } }, invoke,
       }),
@@ -634,7 +639,7 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
     // A foreign tenant's docs namespace cannot even see the permit.
     const foreignDocs = createV10DocsPort({ store: kStore, docsPrefix: `v10/k/${app.subjectDigest}/tenant:v010-foreign/`, assertOpen: () => {} });
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: foreignDocs, nowIso: () => new Date(clock.now()).toISOString() }, {
+      dispatchThroughExternalEffectGate({ docs: foreignDocs, readAuthorityView, nowIso: () => new Date(clock.now()).toISOString() }, {
         capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-GATE' }, attest: claim, invoke,
       }),
       (error: unknown) => { assert.equal((error as { code?: string }).code, 'V10_EFFECT_PERMIT_UNKNOWN'); return true; },
@@ -650,7 +655,7 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
       target: { workflowId: 'external-jobs', instanceKey: 'instance:synthetic' },
     }, { mustBeAbsent: true });
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, nowIso: () => new Date(clock.now()).toISOString() }, {
+      dispatchThroughExternalEffectGate({ docs: { get: async (_bp: string, key: string) => await docs.get(key) }, readAuthorityView, nowIso: () => new Date(clock.now()).toISOString() }, {
         capabilityId: 'extjob', operationId: 'job.submit', payload: { requestId: 'R-FOREIGN-B' },
         attest: {
           effectPermit: {
@@ -692,7 +697,7 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
     };
     const gateDocs = { get: async (_bp: string, key: string) => await docs.get(key) };
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: gateDocs, nowIso: () => new Date(clock.now()).toISOString() }, liveRequest),
+      dispatchThroughExternalEffectGate({ docs: gateDocs, readAuthorityView, nowIso: () => new Date(clock.now()).toISOString() }, liveRequest),
       (error: unknown) => (error as { code?: string }).code === 'V10_EFFECT_DISPATCH_CLAIM_INVALID',
       'a missing dispatch claim must prevent physical adapter call',
     );
@@ -701,7 +706,7 @@ test('N-GATE-DIRECT: replaying a settled turn permit claim (or crossing tenants)
       businessPackageId: BUSINESS_ID, attempt: 2, claimedAt: new Date(clock.now()).toISOString(),
     }, { mustBeAbsent: true });
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: gateDocs, nowIso: () => new Date(clock.now()).toISOString() }, liveRequest),
+      dispatchThroughExternalEffectGate({ docs: gateDocs, readAuthorityView, nowIso: () => new Date(clock.now()).toISOString() }, liveRequest),
       (error: unknown) => (error as { code?: string }).code === 'V10_EFFECT_DISPATCH_CLAIM_INVALID',
       'a dispatch claim belonging to a different attempt must prevent adapter call',
     );

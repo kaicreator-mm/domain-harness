@@ -6,8 +6,10 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  assertNewWorkspacePackagesInstalled,
   packTarballFrom,
   stagePackedWorkspaces,
+  verifiedLocalWorkspaceTarballs,
 } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -66,10 +68,18 @@ test('T-016 package consumer: packed core/node/expo expose the public v0.2 API t
     // freshness guard), and expo builds the same way through a direct
     // `tsc -p --outDir` call — a workspace-script build is unusable here
     // because expo's own prebuild hook rebuilds the live core dist.
-    const staged = await stagePackedWorkspaces({ includeNodePackage: true });
+    const staged = await stagePackedWorkspaces({ includeNodePackage: true, includeNewWorkspaces: true });
     const coreTarball = staged.coreTarball;
     const nodeTarball = staged.nodeTarball;
     assert.ok(nodeTarball, 'staged node tarball packed');
+    // #1337 (T07a2): the exact local new-workspace tarballs join the same
+    // clean npm transaction below (verified dependency closure), so the
+    // @kaicreator/* closure resolves from local bytes once the legacy
+    // manifests gain their new-workspace dependency edges (T07b) instead of
+    // E404-ing on the unpublished rc.0 registry artifacts.
+    const newPacks = staged.newWorkspaceTarballs;
+    assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
 
     const expoStageRoot = join(root, 'expo-stage');
     mkdirSync(expoStageRoot, { recursive: true });
@@ -105,9 +115,11 @@ test('T-016 package consumer: packed core/node/expo expose the public v0.2 API t
         '--no-fund',
         '@types/node@^22.0.0',
         ...tarballs.map((tarball) => tarball.path),
+        ...bridgePaths,
       ],
       consumerDirectory,
     );
+    assertNewWorkspacePackagesInstalled(consumerDirectory, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     writeFileSync(join(consumerDirectory, 'index.ts'), `
 import {

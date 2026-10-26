@@ -95,11 +95,11 @@ import * as approval from '../../../examples/v08-domain-apps/business-approval.m
 // ---------------------------------------------------------------------------
 
 const KERNEL_SOURCE = readFileSync(
-  fileURLToPath(new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url)),
+  fileURLToPath(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url)),
   'utf8',
 );
 const SDK_SOURCE = readFileSync(
-  fileURLToPath(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)),
+  fileURLToPath(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url)),
   'utf8',
 );
 
@@ -956,8 +956,8 @@ test('V08-TF-D3-SHARED-P01: D2 Approval and D3 Engineering occurrences execute t
 // ---------------------------------------------------------------------------
 
 const pinnedSources = {
-  kernel: new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url),
-  sdk: new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url),
+  kernel: new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url),
+  sdk: new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url),
   approval: new URL('../../../examples/v08-domain-apps/business-approval.mjs', import.meta.url),
   engineering: new URL('../../../examples/v08-domain-apps/business-engineering.mjs', import.meta.url),
 };

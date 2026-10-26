@@ -24,13 +24,14 @@
  *   (`@kaicreator/domain-harness-compiler`). No runtime authority is
  *   inferred from any of this.
  */
+import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { stagePackedWorkspaces } from './packed-fixture-stage.js';
+import { assertNewWorkspacePackagesInstalled, stagePackedWorkspaces, verifiedLocalWorkspaceTarballs } from './packed-fixture-stage.js';
 import {
   orderAppContracts,
   orderManifest,
@@ -116,8 +117,16 @@ test(
       // The generator artifact depends on the authoritative core contracts,
       // so the clean consumer installs both packed tarballs from the shared
       // immutable stage (never a live-dist rebuild).
-      const staged = await stagePackedWorkspaces();
-      const tarballs = [staged.coreTarball.path, staged.compilerTarball.path];
+      // #1337 (T07a2): the exact local new-workspace tarballs join the SAME
+      // clean npm transaction (verified dependency closure), so the
+      // @kaicreator/* closure resolves from local bytes once the legacy
+      // manifests gain their new-workspace dependency edges (T07b) instead
+      // of E404-ing on the unpublished rc.0 registry artifacts.
+      const staged = await stagePackedWorkspaces({ includeNewWorkspaces: true });
+      const newPacks = staged.newWorkspaceTarballs;
+      assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+      const tarballs = [staged.coreTarball, staged.compilerTarball];
+      const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
 
       writeFileSync(join(consumerDirectory, 'package.json'), JSON.stringify({
         name: 'domain-harness-hf25-packed-consumer',
@@ -132,10 +141,11 @@ test(
         [
           'install', '--ignore-scripts', '--no-audit', '--no-fund',
           `--registry=${NPM_REGISTRY}`,
-          '@types/node@^22.0.0', ...tarballs,
+          '@types/node@^22.0.0', ...tarballs.map((tarball) => tarball.path), ...bridgePaths,
         ],
         consumerDirectory,
       );
+      assertNewWorkspacePackagesInstalled(consumerDirectory, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
       // Runtime positive/negative journey, executed from the packed dist.
       // The frozen order-app inputs are the exact #1085 fixtures; the golden

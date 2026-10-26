@@ -32,7 +32,7 @@ import test, { after, before } from 'node:test';
 import { openSqliteCasStore, type SqliteCasStore } from '../../src/host-v8/index.js';
 
 const CARRIER_SOURCE = await readFile(
-  new URL('../../../domain-harness-compiler/src/qualified-package/payload/durable-receipt-carrier-v1.mjs', import.meta.url),
+  new URL('../../../../tests/fixtures/k02-fragment/durable-receipt-carrier-v1.mjs', import.meta.url),
   'utf8',
 );
 const carrier: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(CARRIER_SOURCE, 'utf8').toString('base64')}`);

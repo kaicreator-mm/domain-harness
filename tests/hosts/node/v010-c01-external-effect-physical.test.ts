@@ -36,17 +36,14 @@ import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
 
-import {
-  V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-  sha256Hex,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import { createV10DocsPort } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+import { V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../../tooling/build/dist/index.js';
+import { activateV10App, createV10DocsPort } from '../../../packages/microkernel/src/internal/activation.js';
 // The trusted gate seam is internal (#1227): tests wire it through the module
 // path, never through the curated public barrel.
-import { dispatchThroughExternalEffectGate } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.js';
-import type { V10DocStore, V10DocWriteCondition, V10ModuleInput } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { dispatchThroughExternalEffectGate } from '../../../packages/microkernel/src/internal/external-effect.js';
+const kernelReady = import('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs') as Promise<Record<string, any>>;
+import type { V10DocStore, V10DocWriteCondition, V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import * as extjobConsole from '../../assembly/fixtures-v010/capability-extjob-runx-v1.mjs';
 
@@ -100,9 +97,9 @@ function clearPins(): void {
 
 async function c01Modules(): Promise<V10ModuleInput[]> {
   const [kernel, sdk, router, business, extjob, extnotify] = await Promise.all([
-    readFile(new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../assembly/fixtures-v010/business-external-jobs-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../assembly/fixtures-v010/capability-extjob-runx-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../assembly/fixtures-v010/capability-extnotify-provider-v1.mjs', import.meta.url), 'utf8'),
@@ -511,6 +508,11 @@ test('PH-P2 SCOPED TWO-B (R1 P1-2): two B on one workflow/instance over ONE SQLi
       invoked += 1;
       return { phase: 'terminal', externalRef: 'forged', outcome: { ok: true, output: {} } };
     };
+    // The canonical gate re-reads durable K authority through the loaded
+    // kernel's own read-only protocol export (L2 §2); wire the same sealed
+    // payload the activated App runs for the direct-gate negative below.
+    const kernel = await kernelReady;
+    const readAuthorityView = kernel.readEffectAuthorityView as unknown as NonNullable<Parameters<typeof dispatchThroughExternalEffectGate>[0]['readAuthorityView']>;
 
     // A LIVE permit that exists ONLY in B1's namespace: B2 naming the exact
     // same logical address can never resolve it (zero cross-B reachability).
@@ -526,7 +528,7 @@ test('PH-P2 SCOPED TWO-B (R1 P1-2): two B on one workflow/instance over ONE SQLi
       { mustBeAbsent: true },
     );
     await assert.rejects(
-      dispatchThroughExternalEffectGate({ docs: { get: async (bp: string, key: string) => await docs.get(`${scopePrefix(identity, bp)}${key}`) }, nowIso: () => new Date(BASE_MS).toISOString() }, {
+      dispatchThroughExternalEffectGate({ docs: { get: async (bp: string, key: string) => await docs.get(`${scopePrefix(identity, bp)}${key}`) }, readAuthorityView, nowIso: () => new Date(BASE_MS).toISOString() }, {
         capabilityId: 'extjob',
         operationId: 'job.submit',
         payload: { requestId: 'R-FOREIGN' },

@@ -33,6 +33,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 
 
 
@@ -78,7 +83,7 @@ function runNpm(args: readonly string[], cwd: string): string {
   });
 }
 
-test('#570 packed consumer imports @kaicreator/domain-harness/v7 with repaired #555/#556 semantics', { skip: PACKED_CONSUMER_NET_SKIP }, () => {
+test('#570 packed consumer imports @kaicreator/domain-harness/v7 with repaired #555/#556 semantics', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'domain-harness-public-v7-rebind-consumer-'));
   const packs = join(root, 'packs');
   const consumer = join(root, 'consumer');
@@ -92,13 +97,23 @@ test('#570 packed consumer imports @kaicreator/domain-harness/v7 with repaired #
     assert.equal(tarballs.length, 1, 'core pack must produce exactly one tarball');
     const tarball = join(packs, tarballs[0]!);
 
+    // #1337 (T07a2): this fixture keeps its own isolated legacy pack, and
+    // the exact local new-workspace tarballs from the shared verified stage
+    // join the SAME clean npm install transaction (verified dependency
+    // closure), so the @kaicreator/* closure resolves from local bytes once
+    // the legacy manifests gain their new-workspace dependency edges (T07b)
+    // instead of E404-ing on the unpublished rc.0 registry artifacts.
+    const newPacks = await stageNewWorkspaceTarballs();
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
+
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({
       name: 'domain-harness-public-v7-rebind-consumer',
       private: true,
       type: 'module',
     }, null, 2));
 
-    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
+    runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball, ...bridgePaths], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     const installedPackage = join(consumer, 'node_modules', '@kaicreator', 'domain-harness');
     assert.equal(existsSync(join(installedPackage, 'dist', 'public-v7', 'index.js')), true);

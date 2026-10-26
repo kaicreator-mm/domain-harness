@@ -11,14 +11,15 @@
  * Node24 process, continues the EXACT reserved message (the adopt path),
  * and proves the admission lands on the SURVIVING pin of the original BUILD.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 
+import { buildV10App } from '../../../tooling/build/dist/index.js';
 import {
   activateGovernedV10Build,
-  buildV10App,
   readV10OccurrenceBuildPin,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import type { V10BuiltApp, V10ModuleInput } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '../../../packages/host-node/dist/index.js';
+import type { V10BuiltApp, V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import { openSqliteCasStore } from '../../../packages/domain-harness/src/host-v8/index.js';
 import { basicComposition, sha256HexSource } from '../../assembly/helpers-v010.js';
 import {

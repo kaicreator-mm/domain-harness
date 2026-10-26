@@ -29,7 +29,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const KERNEL_SOURCE = readFileSync(fileURLToPath(new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url)), 'utf8');
+const KERNEL_SOURCE = readFileSync(fileURLToPath(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url)), 'utf8');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import('data:text/javascript;base64,' + Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64'));
 

@@ -15,7 +15,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { buildV10App, activateV10App } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { buildV10App } from '../../tooling/build/dist/index.js';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
 import { basicComposition, featureEntry, PlainCasDocStore } from './helpers-v010.js';
 
 type Plan = (request: Record<string, any>, deps?: Record<string, any>) => any;
@@ -23,7 +24,7 @@ let selectedFeature: Promise<{ source: string; plan: Plan; init: (context: unkno
 const loadSelectedFeature = (): Promise<{ source: string; plan: Plan; init: (context: unknown) => unknown }> =>
   (selectedFeature ??= (async () => {
     const source = await readFile(
-      new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-workflow-control-v1.mjs', import.meta.url),
+      new URL('../../domain-packages/standard/features/workflow-control/modules/sfeature-workflow-control-v1.mjs', import.meta.url),
       'utf8',
     );
     const feature = await import('data:text/javascript;base64,' + Buffer.from(source, 'utf8').toString('base64')) as {

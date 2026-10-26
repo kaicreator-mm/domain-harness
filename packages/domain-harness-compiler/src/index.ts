@@ -135,10 +135,6 @@ export type {
   V09SealedQualifiedRoot,
 } from './qualified-package/index.js';
 
-// Forward the one curated v0.10 BUILD public barrel (no copied export roster).
-// Internal import policy/Host effect gate modules remain private.
-export * from './qualified-package/v10build/index.js';
-
 // v0.8 qualified package BUILD (T-A, #1000): two-phase qualification +
 // external approval + sealed-root producer over the public core /v8 ABI.
 export {

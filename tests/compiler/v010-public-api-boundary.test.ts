@@ -1,47 +1,134 @@
-/** The public v0.10 package surface must not expose Host gate internals. */
+/**
+ * v0.10.2 T04 (#1324) — the public API boundary, semantically rewritten.
+ * ===========================================================================
+ * The old shape (three legacy compiler barrels identity-equal, gate
+ * internals absent) is superseded. This file now asserts:
+ *
+ *   P1  the Microkernel public entry (`.`) equals the frozen L2 §3
+ *       allowlist and its error classes share the Contracts identity;
+ *   P2  the `./host-seam` module equals the exact L2 §3 seam allowlist;
+ *   N1  the SELECTED RUNTIME (microkernel, host-node) never imports BUILD —
+ *       not even type-only — nor the legacy Compiler packages (static scan
+ *       of every source file's import specifiers);
+ *   N2  host-seam internals do not leak: no gate, docs port, counters
+ *       factory or import-hook registry symbol on any consumer surface,
+ *       and deep `internal/*` imports are denied by the exports map;
+ *   P3  after the T11 cutover the legacy compiler barrels carry NO v0.10
+ *       binding anymore; the canonical owners (BUILD, Microkernel seam,
+ *       Contracts) hold the single definitions.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import * as microkernel from '../../packages/microkernel/src/index.js';
+import * as hostSeam from '../../packages/microkernel/src/host-seam.js';
+import * as contracts from '@kaicreator/domain-harness-contracts';
+import * as build from '../../tooling/build/dist/index.js';
 import * as root from '../../packages/domain-harness-compiler/src/index.js';
 import * as qualified from '../../packages/domain-harness-compiler/src/qualified-package/index.js';
-import * as v10 from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
 
-test('P-I1227: root, qualified and v10build resolve the same curated BUILD API', () => {
-  for (const surface of [root, qualified]) {
-    assert.equal(surface.buildV10App, v10.buildV10App);
-    assert.equal(surface.activateV10App, v10.activateV10App);
-    assert.equal(surface.V10BuildError, v10.V10BuildError);
-  }
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+test('P1: the Microkernel `.` namespace equals the frozen L2 §3 allowlist', () => {
+  assert.deepEqual(Object.keys(microkernel).sort(), [
+    'load',
+    'V10Error',
+    'V10BuildError',
+    'V10ActivationError',
+    'V10ExternalEffectError',
+    'V10PortDeniedError',
+    'V10MultiBQueryError',
+  ].sort());
+  // Single class identity: the public errors ARE the Contracts classes.
+  assert.equal(microkernel.V10Error, contracts.V10Error);
+  assert.equal(microkernel.V10BuildError, contracts.V10BuildError);
+  assert.equal(microkernel.V10ActivationError, contracts.V10ActivationError);
+  assert.equal(microkernel.V10ExternalEffectError, contracts.V10ExternalEffectError);
 });
 
-test('N-I1227: public barrels never export trusted Host effect/AST internals', () => {
-  for (const surface of [root, qualified, v10]) {
-    for (const name of [
-      'dispatchThroughExternalEffectGate',
-      'normalizeExternalEffectEnvelope',
-      'collectModuleEdges',
-      'assertSealedImportClosure',
-      // #1228: the test-only registry factory and the minted-fragment seam
-      // stay internal to import-hook.ts; `export *` chains would leak them.
-      'createV10ImportHookRegistryForTests',
-      'privateModuleFragment',
-      // #1227: internal activation counter probes must not be publicly
-      // reachable either.
-      'freshV10Counters',
-      'v10SelectedKernelIdentity',
-    ]) {
-      assert.equal(name in surface, false, `${name} must not be publicly reachable`);
+test('P2: the `./host-seam` namespace equals the exact L2 §3 allowlist', () => {
+  assert.deepEqual(Object.keys(hostSeam).sort(), [
+    'activateV10App',
+    'isV10AppFacade',
+    'readSelectedShadowBinding',
+    'v10SelectedKernelIdentity',
+    'v10DeploymentDocsPrefix',
+  ].sort());
+});
+
+test('N1: the selected runtime imports neither BUILD nor the legacy Compiler packages (not even type-only)', () => {
+  const runtimeRoots = ['packages/microkernel/src', 'packages/host-node/src'];
+  const forbidden = /^@kaicreator\/domain-harness-(build|compiler)(?:\/|$)/u;
+  const violations: string[] = [];
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(join(REPO_ROOT, directory), { withFileTypes: true })) {
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.ts')) {
+        const source = readFileSync(join(REPO_ROOT, full), 'utf8');
+        for (const match of source.matchAll(/(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/gu)) {
+          const specifier = match[1]!;
+          if (forbidden.test(specifier)) violations.push(`${full}: ${specifier}`);
+        }
+      }
     }
-  }
+  };
+  for (const runtimeRoot of runtimeRoots) walk(runtimeRoot);
+  assert.deepEqual(violations, [], 'no runtime→BUILD / runtime→legacy-Compiler import edge may exist');
 });
 
-test('P-I1227: all v10 BUILD exports are identity-equal across all three public entrypoints', () => {
-  const names = Object.keys(v10) as (keyof typeof v10)[];
-  assert.ok(names.length > 20, 'canonical BUILD barrel must not silently go empty');
-  for (const name of names) {
-    assert.ok(name in root, `root is missing the canonical v10 binding ${name}`);
-    assert.ok(name in qualified, `qualified barrel is missing the canonical v10 binding ${name}`);
-    assert.equal(root[name as keyof typeof root], v10[name], `root export drift: ${name}`);
-    assert.equal(qualified[name as keyof typeof qualified], v10[name], `qualified export drift: ${name}`);
+test('N2: host-seam internals are absent from every consumer surface and deep internals deny', async () => {
+  for (const name of [
+    'dispatchThroughExternalEffectGate',
+    'normalizeExternalEffectEnvelope',
+    'createV10DocsPort',
+    'scopedDocsView',
+    'freshV10Counters',
+    'registerDeclaredBareImports',
+    'privateModuleFragment',
+    'createV10ImportHookRegistryForTests',
+    'V10AppFacade',
+  ]) {
+    assert.equal(name in microkernel, false, `the public entry must not expose ${name}`);
+    assert.equal(name in hostSeam, false, `the host seam must not expose ${name}`);
+  }
+  await assert.rejects(
+    () => import('@kaicreator/domain-harness-microkernel/dist/internal/activation.js'),
+    (error: unknown) => (error as NodeJS.ErrnoException).code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+  );
+});
+
+test('P3: after the T11 cutover the legacy compiler barrels carry no v0.10 binding; the canonical owners do', () => {
+  // The curated v0.10 roster has exactly one home per binding (L2 §1.1):
+  // BUILD owns buildV10App, the Microkernel seam owns activateV10App and
+  // Contracts owns the typed error identity. The legacy compiler barrels
+  // (root entry and qualified-package entry) must not re-export any of it.
+  assert.equal(typeof build.buildV10App, 'function');
+  assert.equal(typeof hostSeam.activateV10App, 'function');
+  assert.equal(contracts.V10BuildError, microkernel.V10BuildError);
+  const legacySurfaces: ReadonlyArray<Record<string, unknown>> = [root, qualified];
+  const v10Roster = [
+    'buildV10App',
+    'activateV10App',
+    'activateGovernedV10Build',
+    'V10BuildError',
+    'V10Error',
+    'V10ActivationError',
+    'V10ExternalEffectError',
+    'V10PortDeniedError',
+    'V10DeploymentError',
+    'V10_BUILD_FORMAT',
+    'V10_TARGET_PROFILE',
+    'canonicalJson',
+    'sha256Canonical',
+    'sha256Hex',
+  ] as const;
+  for (const surface of legacySurfaces) {
+    for (const name of v10Roster) {
+      assert.equal(name in surface, false, `the legacy compiler barrel must not carry ${name} after the cutover`);
+    }
   }
 });

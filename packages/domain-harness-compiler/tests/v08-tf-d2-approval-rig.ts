@@ -37,8 +37,8 @@ import assert from 'node:assert/strict';
 import { qualifyPackageClosure } from '../src/qualified-package/qualify.js';
 import { buildQualifiedPackage } from '../src/qualified-package/build.js';
 import { issueApprovalProof } from '../src/qualified-package/approval.js';
-import * as kernelPayload from '../src/qualified-package/payload/kernel-mechanism-v1.mjs';
-import * as sdkPayload from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+import * as kernelPayload from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
+import * as sdkPayload from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 
 // `load` and the protected trust channel must be the SAME physical module
 // instance: both come from the runtime package src tree (exactly what the
@@ -66,8 +66,8 @@ export function sha256Hex(value: string): string {
 // ---------------------------------------------------------------------------
 
 const payloadSources = {
-  kernel: new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url),
-  sdk: new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url),
+  kernel: new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url),
+  sdk: new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url),
   approval: new URL('../../../examples/v08-domain-apps/business-approval.mjs', import.meta.url),
 };
 

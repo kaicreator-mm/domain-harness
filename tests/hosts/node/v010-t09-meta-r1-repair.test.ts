@@ -21,6 +21,7 @@
  *               physical read. An activation without a deployment identity is
  *               refused instead of degrading to a shared namespace.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -29,12 +30,13 @@ import { join } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { sha256Canonical, type V10BuiltApp } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { sha256Canonical } from '@kaicreator/domain-harness-contracts';
+import type { V10BuiltApp } from '@kaicreator/domain-harness-contracts';
 import {
   META_FEEDBACK_CLAIM_PREFIX,
   META_FEEDBACK_LEDGER_PREFIX,
   runMetaFeedbackWorkflow,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import {
   APP_ID,
   BUSINESS_ID,

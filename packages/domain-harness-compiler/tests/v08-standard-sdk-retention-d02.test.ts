@@ -17,7 +17,7 @@ import {
   selectRetainedPromotedChild,
   coalesceRetainedObservations,
   checkRetainedEvidenceApplicability,
-} from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+} from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 
 function refuses(code: string, fn: () => unknown) {
   assert.throws(fn, (error: unknown) => error instanceof StandardSdkError && error.code === code);

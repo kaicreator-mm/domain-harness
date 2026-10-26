@@ -63,7 +63,6 @@ import {
 import type { KernelGateway, KernelGatewayOperationCall } from '../../src/host-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const examplesDir = new URL('../../../../examples/v08-domain-apps/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-s04';
@@ -91,8 +90,8 @@ async function sealS04Closure(options: { capabilityModuleSource?: string; busine
   sdkSha: string;
 }> {
   const [kernelSource, sdkSource, businessSource, capabilityText] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     options.businessModuleSource === undefined ? readFile(new URL('business-approval.mjs', examplesDir), 'utf8') : Promise.resolve(options.businessModuleSource),
     options.capabilityModuleSource === undefined ? capabilitySource() : Promise.resolve(options.capabilityModuleSource),
   ]);
@@ -255,8 +254,8 @@ function invoke(
 test('S04-P1/P2/P3 + negatives: BUILD-fixed OperationCall over the real approval app on real SQLite', { timeout: 240_000 }, async () => {
   const sealed = await sealS04Closure();
   // The SAME exact selected K/S bytes as the two real Apps (payload files).
-  assert.equal(sealed.kernelSha, sha256Hex(await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8')));
-  assert.equal(sealed.sdkSha, sha256Hex(await readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8')));
+  assert.equal(sealed.kernelSha, sha256Hex(await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8')));
+  assert.equal(sealed.sdkSha, sha256Hex(await readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8')));
 
   const harness = await bootstrapHarness(sealed.root);
   sharedHarness = harness;

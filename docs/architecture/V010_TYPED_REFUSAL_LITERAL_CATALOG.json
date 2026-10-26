@@ -2,7 +2,45 @@
   "format": "dh.v010.typed-refusal-literals/1",
   "scope": "direct literal refusal arguments and object-literal code properties; excludes dynamic codes and sealed payloads",
   "sourceFiles": {
-    "packages/domain-harness-compiler/src/qualified-package/v10build/activation.ts": [
+    "packages/domain-harness/src/host-v8/v010-authorized-multib-query.ts": [
+      "QUERY_AMBIGUOUS",
+      "QUERY_AUTHORIZATION_UNAVAILABLE",
+      "QUERY_HOST_INVALID",
+      "QUERY_NOT_FOUND",
+      "QUERY_READ_FAILED",
+      "QUERY_SELECTED_ROUTES_INVALID",
+      "QUERY_SELECTORS_INVALID",
+      "QUERY_SELECTOR_INVALID"
+    ],
+    "packages/domain-harness/src/host-v8/v010-scoped-memory.ts": [
+      "MEMORY_AUTHORIZATION_REQUIRED",
+      "MEMORY_CAS_REQUIRED",
+      "MEMORY_KEY_INVALID",
+      "MEMORY_PROVENANCE_INVALID",
+      "MEMORY_RECORD_INVALID",
+      "MEMORY_SCOPE_DENIED",
+      "MEMORY_SCOPE_INVALID",
+      "MEMORY_SEARCH_INVALID",
+      "MEMORY_TTL_INVALID",
+      "MEMORY_VALUE_INVALID"
+    ],
+    "packages/contracts/src/activation-types.ts": [],
+    "packages/contracts/src/build-types.ts": [],
+    "packages/contracts/src/digest.ts": [],
+    "packages/contracts/src/errors.ts": [],
+    "packages/contracts/src/guards.ts": [],
+    "packages/contracts/src/import-types.ts": [],
+    "packages/contracts/src/index.ts": [],
+    "packages/contracts/src/json.ts": [],
+    "packages/contracts/src/known-error-codes.ts": [],
+    "packages/microkernel/src/domain-app.ts": [
+      "FACADE_CLOSED",
+      "QUERY_SELECTOR_INVALID",
+      "V10_ACTIVATION_OPTIONS_INVALID"
+    ],
+    "packages/microkernel/src/host-seam.ts": [],
+    "packages/microkernel/src/index.ts": [],
+    "packages/microkernel/src/internal/activation.ts": [
       "FACADE_CLOSED",
       "HOST_CAS_CONFLICT",
       "INTENT_UNSEALED",
@@ -10,6 +48,7 @@
       "K_RECEIPT_INVALID",
       "QUERY_AUTHORIZATION_REQUIRED",
       "QUERY_DEPLOYMENT_REQUIRED",
+      "QUERY_SELECTOR_INVALID",
       "RESOURCE_ABI_INVALID",
       "RESOURCE_INPUT_INVALID",
       "RESOURCE_ROUTE_UNSEALED",
@@ -23,20 +62,56 @@
       "V10_FEATURE_NOT_SELECTED",
       "V10_IMPORT_EVAL_FAILED"
     ],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/build.ts": [
-      "BUILD_GRAPH_INVALID",
-      "BUILD_INPUT_INVALID",
-      "V10_ABI_UNSUPPORTED",
-      "V10_AUTHORITY_FORGERY",
-      "V10_DIGEST_MISMATCH",
-      "V10_FEATURE_COLLISION",
-      "V10_INTENT_CONFLICT",
-      "V10_PROVIDER_COLLISION",
-      "V10_ROLE_CARDINALITY",
-      "V10_ROUTE_INVALID",
-      "V10_TARGET_UNSUPPORTED"
+    "packages/microkernel/src/internal/external-effect.ts": [
+      "V10_EXTERNAL_ENVELOPE_INVALID",
+      "V10_EXTERNAL_PENDING"
     ],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/deployment.ts": [
+    "packages/microkernel/src/internal/import-hook.ts": [
+      "V10_IMPORT_HOOK_UNAVAILABLE"
+    ],
+    "packages/microkernel/src/internal/multib-query.ts": [
+      "QUERY_AMBIGUOUS",
+      "QUERY_AUTHORIZATION_UNAVAILABLE",
+      "QUERY_HOST_INVALID",
+      "QUERY_NOT_FOUND",
+      "QUERY_READ_FAILED",
+      "QUERY_SELECTED_ROUTES_INVALID",
+      "QUERY_SELECTORS_INVALID",
+      "QUERY_SELECTOR_INVALID"
+    ],
+    "packages/microkernel/src/internal/subscription-runtime.ts": [
+      "FACADE_CLOSED"
+    ],
+    "packages/microkernel/src/subscription-projection.ts": [],
+    "packages/host-node/src/ct02-invoker.ts": [
+      "ARRAY_ACCESSOR_OR_HOLE",
+      "ARRAY_INVALID",
+      "ARRAY_PROPERTIES_INVALID",
+      "BOUNDS_EXCEEDED",
+      "CYCLIC_INPUT",
+      "FACADE_NOT_AVAILABLE",
+      "FEATURE_NOT_IN_ALLOWLIST",
+      "JSON_BYTE_LIMIT",
+      "NONFINITE_NUMBER",
+      "NON_DATA_VALUE",
+      "OBJECT_ACCESSOR_OR_HIDDEN",
+      "OBJECT_KEYS_INVALID",
+      "OBJECT_KEY_NOT_DATA",
+      "OBJECT_PROTOTYPE_INVALID",
+      "OPAQUE_OR_THROWING_INPUT",
+      "STRING_LIMIT",
+      "TOTAL_TEXT_LIMIT"
+    ],
+    "packages/host-node/src/decision-evidence-observer.ts": [
+      "OBSERVER_DEPS_INVALID",
+      "OBSERVER_EVIDENCE_RESULT_INVALID",
+      "OBSERVER_FACADE_CLOSED",
+      "OBSERVER_KERNEL_ERROR",
+      "OBSERVER_RECEIPT_INVALID",
+      "OBSERVER_REQUEST_INVALID",
+      "OBSERVER_SEMANTIC_RESULT_INVALID"
+    ],
+    "packages/host-node/src/deployment.ts": [
       "BUILD_CLOSURE_MISMATCH",
       "BUILD_SUBJECT_DIGEST_MISMATCH",
       "DEPLOYMENT_ACTIVATION_RECORD_INVALID",
@@ -55,41 +130,31 @@
       "OCCURRENCE_REDIRECTED_TO_NEW_BUILD",
       "OCCURRENCE_RESERVATION_INDETERMINATE",
       "OCCURRENCE_RESERVATION_PENDING",
-      "UNAUTHORIZED_PROMOTION"
+      "UNAUTHORIZED_PROMOTION",
+      "V10_EXPORT_CONTRACT_REFUSED"
     ],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/digest.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/error-type-parity.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/errors.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/external-effect.ts": [
-      "V10_EXTERNAL_ENVELOPE_INVALID",
-      "V10_EXTERNAL_PENDING"
+    "packages/host-node/src/durable-controls.ts": [
+      "CALLBACK_IDENTITY_CONFLICT",
+      "CHILD_DEPTH_EXCEEDED",
+      "CHILD_INVOCATION_NOT_ACCEPTED",
+      "CHILD_INVOCATION_REJECTED",
+      "CHILD_INVOCATION_SETTLED",
+      "CHILD_INVOCATION_UNKNOWN",
+      "CHILD_LINEAGE_FORGERY",
+      "CHILD_LINEAGE_REQUIRED",
+      "DEADLINE_NOT_DUE",
+      "DEADLINE_TIMER_MISMATCH",
+      "DURABLE_CONTROL_CONTENTION",
+      "DURABLE_CONTROL_INVALID",
+      "EXTERNAL_WORK_IDENTITY_CONFLICT",
+      "POISON_RECOVERY_IDENTITY_CONFLICT",
+      "POISON_RECOVERY_INVALID",
+      "POISON_RECOVERY_UNKNOWN",
+      "UNKNOWN_EXTERNAL_CORRELATION"
     ],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/guards.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/import-hook.ts": [
-      "V10_IMPORT_HOOK_UNAVAILABLE"
-    ],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/import-policy.ts": [
-      "V10_IMPORT_POLICY_DENIED"
-    ],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/index.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/known-error-codes.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/query-type-parity.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10build/selected-closure.ts": [
-      "V10_DEPENDENCY_CYCLE",
-      "V10_DEPENDENCY_MISSING",
-      "V10_FEATURE_MISSING"
-    ],
-    "packages/domain-harness-compiler/src/qualified-package/v10evidence/decision-evidence-observer.ts": [
-      "OBSERVER_DEPS_INVALID",
-      "OBSERVER_EVIDENCE_RESULT_INVALID",
-      "OBSERVER_FACADE_CLOSED",
-      "OBSERVER_KERNEL_ERROR",
-      "OBSERVER_RECEIPT_INVALID",
-      "OBSERVER_REQUEST_INVALID",
-      "OBSERVER_SEMANTIC_RESULT_INVALID"
-    ],
-    "packages/domain-harness-compiler/src/qualified-package/v10meta/index.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10meta/meta-feedback-workflow.ts": [
+    "packages/host-node/src/error-type-parity.ts": [],
+    "packages/host-node/src/index.ts": [],
+    "packages/host-node/src/meta-feedback-workflow.ts": [
       "META_AUTHORITY_FORBIDDEN",
       "META_CLAIM_INVALID",
       "META_DEPLOYMENT_REQUIRED",
@@ -106,8 +171,20 @@
       "META_ROUND_IN_PROGRESS",
       "META_WORKFLOW_DENIED"
     ],
-    "packages/domain-harness-compiler/src/qualified-package/v10shadow/index.ts": [],
-    "packages/domain-harness-compiler/src/qualified-package/v10shadow/shadow-l4-readonly.ts": [
+    "packages/host-node/src/query-type-parity.ts": [],
+    "packages/host-node/src/scoped-memory.ts": [
+      "MEMORY_AUTHORIZATION_REQUIRED",
+      "MEMORY_CAS_REQUIRED",
+      "MEMORY_KEY_INVALID",
+      "MEMORY_PROVENANCE_INVALID",
+      "MEMORY_RECORD_INVALID",
+      "MEMORY_SCOPE_DENIED",
+      "MEMORY_SCOPE_INVALID",
+      "MEMORY_SEARCH_INVALID",
+      "MEMORY_TTL_INVALID",
+      "MEMORY_VALUE_INVALID"
+    ],
+    "packages/host-node/src/shadow-l4-readonly.ts": [
       "SHADOW_APPROVAL_UNTRUSTED",
       "SHADOW_APP_FACADE_MISMATCH",
       "SHADOW_APP_INVALID",
@@ -136,27 +213,54 @@
       "SHADOW_READ_INTERFACE_MISSING",
       "SHADOW_WITNESS_FAILED"
     ],
-    "packages/domain-harness/src/host-v8/v010-authorized-multib-query.ts": [
-      "QUERY_AMBIGUOUS",
-      "QUERY_AUTHORIZATION_UNAVAILABLE",
-      "QUERY_HOST_INVALID",
-      "QUERY_NOT_FOUND",
-      "QUERY_READ_FAILED",
-      "QUERY_SELECTED_ROUTES_INVALID",
-      "QUERY_SELECTORS_INVALID",
-      "QUERY_SELECTOR_INVALID"
+    "packages/host-node/src/sqlite-adapter.ts": [
+      "HOST_CAS_CONFLICT",
+      "HOST_FAULT_INJECTED",
+      "HOST_KEY_EXISTS",
+      "HOST_PUT_CONDITION_REQUIRED",
+      "HOST_STORE_CLOSED",
+      "HOST_STORE_DRIVER_UNAVAILABLE",
+      "HOST_VALUE_NOT_JSON"
     ],
-    "packages/domain-harness/src/host-v8/v010-scoped-memory.ts": [
-      "MEMORY_AUTHORIZATION_REQUIRED",
-      "MEMORY_CAS_REQUIRED",
-      "MEMORY_KEY_INVALID",
-      "MEMORY_PROVENANCE_INVALID",
-      "MEMORY_RECORD_INVALID",
-      "MEMORY_SCOPE_DENIED",
-      "MEMORY_SCOPE_INVALID",
-      "MEMORY_SEARCH_INVALID",
-      "MEMORY_TTL_INVALID",
-      "MEMORY_VALUE_INVALID"
+    "packages/host-node/src/sqlite-cas.ts": [
+      "HOST_CAS_CONFLICT",
+      "HOST_CAS_REVISION_MALFORMED",
+      "HOST_FAULT_INJECTED",
+      "HOST_KEY_EXISTS",
+      "HOST_KEY_MALFORMED",
+      "HOST_PUT_CONDITION_AMBIGUOUS",
+      "HOST_PUT_CONDITION_REQUIRED",
+      "HOST_STORAGE_UNSUPPORTED",
+      "HOST_VALUE_NOT_JSON"
+    ],
+    "tooling/build/src/build.ts": [
+      "BUILD_GRAPH_INVALID",
+      "BUILD_INPUT_INVALID",
+      "V10_ABI_UNSUPPORTED",
+      "V10_AUTHORITY_FORGERY",
+      "V10_DIGEST_MISMATCH",
+      "V10_FEATURE_COLLISION",
+      "V10_INTENT_CONFLICT",
+      "V10_PROVIDER_COLLISION",
+      "V10_ROLE_CARDINALITY",
+      "V10_ROUTE_INVALID",
+      "V10_TARGET_UNSUPPORTED"
+    ],
+    "tooling/build/src/component-view.ts": [
+      "BUILD_GRAPH_INVALID",
+      "BUILD_INPUT_INVALID",
+      "V10_EXPORT_CONTRACT_REFUSED"
+    ],
+    "tooling/build/src/generated/acorn.ts": [],
+    "tooling/build/src/import-policy.ts": [
+      "V10_IMPORT_POLICY_DENIED"
+    ],
+    "tooling/build/src/index.ts": [],
+    "tooling/build/src/parser.ts": [],
+    "tooling/build/src/selected-closure.ts": [
+      "V10_DEPENDENCY_CYCLE",
+      "V10_DEPENDENCY_MISSING",
+      "V10_FEATURE_MISSING"
     ]
   }
 }

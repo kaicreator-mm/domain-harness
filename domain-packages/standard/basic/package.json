@@ -1,0 +1,24 @@
+{
+  "name": "@kaicreator/domain-standard-basic",
+  "version": "0.10.2-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "DomainHarness Standard Primary (S) SDK and pure WorkflowRouter sealed module sources",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "standard-sdk-v1.mjs",
+    "workflow-router.mjs",
+    "workflow-router.d.mts",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./standard-sdk-v1.mjs",
+    "./standard-sdk": "./standard-sdk-v1.mjs",
+    "./workflow-router": {
+      "types": "./workflow-router.d.mts",
+      "import": "./workflow-router.mjs"
+    }
+  }
+}

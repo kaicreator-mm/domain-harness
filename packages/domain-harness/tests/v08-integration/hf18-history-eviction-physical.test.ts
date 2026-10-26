@@ -56,7 +56,6 @@ import {
 import type { SealedQualifiedPackageRoot } from '../../src/public-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sqliteTempPath } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-hf18-eviction';
@@ -85,8 +84,8 @@ function callbackTurnId(instanceKey: string, correlationId: string, ordinal: num
 
 async function sealControlsClosure(): Promise<SealedQualifiedPackageRoot> {
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-durable-controls.mjs', fixtureDir), 'utf8'),
   ]);
   const kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`);

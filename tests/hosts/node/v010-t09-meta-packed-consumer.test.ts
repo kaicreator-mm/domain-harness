@@ -11,13 +11,17 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { stagePackedWorkspaces } from '../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stagePackedWorkspaces,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 function npmRegistryReachable(): boolean {
   const probe = spawnSync('npm', ['ping', '--registry', process.env.NPM_REGISTRY ?? 'https://registry.npmjs.org'], {
@@ -33,6 +37,13 @@ const PACKED_CONSUMER_NET_SKIP: string | undefined = npmRegistryReachable()
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
 const CONSUMER_SCRIPT = readFileSync(join(HERE, 'v010-t09-meta-packed-consumer.mjs'), 'utf8');
+// v0.10.2 T01: these sealed payload bytes live in Domain Packages / an example, not in the compiler package.
+const DOMAIN_PACKAGE_PAYLOADS = [
+  'domain-packages/kernel/basic/kernel-mechanism-v1.mjs',
+  'domain-packages/standard/basic/standard-sdk-v1.mjs',
+  'examples/v010-meta-feedback/business-meta-feedback-v1.mjs',
+  'domain-packages/standard/features/meta-feedback/modules/sfeature-meta-feedback-v1.mjs',
+];
 
 function runNpm(args: readonly string[], cwd: string): string {
   if (process.platform !== 'win32') {
@@ -58,7 +69,17 @@ function runNpm(args: readonly string[], cwd: string): string {
 test('T09-R1-P3 packed compiler clean install can actually call the v10meta workflow', { skip: PACKED_CONSUMER_NET_SKIP }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'dh010-t09-packed-consumer-'));
   try {
-    const staged = await stagePackedWorkspaces();
+    // #1337 (T07a2): this fixture explicitly exercises the producer/BUILD
+    // path (it builds and activates a selected App through the packed
+    // compiler), so its bridge install carries the full local new-workspace
+    // closure INCLUDING the build tarball — the one producer-path new
+    // workspace — in the SAME clean npm transaction as the legacy tarballs.
+    // Runtime-only fixtures request only ['hostNode'] (Tiny closure stays
+    // lean).
+    const staged = await stagePackedWorkspaces({ includeNewWorkspaces: true });
+    const newPacks = staged.newWorkspaceTarballs;
+    assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode', 'build']);
     writeFileSync(join(root, 'package.json'), JSON.stringify({
       name: 't09-packed-consumer',
       private: true,
@@ -67,8 +88,14 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
     runNpm([
       'install', '--ignore-scripts', '--no-audit', '--no-fund',
       staged.coreTarball.path, staged.compilerTarball.path,
+      ...bridgePaths,
     ], root);
+    assertNewWorkspacePackagesInstalled(root, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode, newPacks.build]);
     writeFileSync(join(root, 'index.mjs'), CONSUMER_SCRIPT, 'utf8');
+    mkdirSync(join(root, 'payload'));
+    for (const source of DOMAIN_PACKAGE_PAYLOADS) {
+      copyFileSync(join(REPO_ROOT, source), join(root, 'payload', basename(source)));
+    }
     const output = execFileSync(process.execPath, ['index.mjs'], {
       cwd: root,
       encoding: 'utf8',
@@ -91,15 +118,18 @@ test('T09-R1-P3 packed compiler clean install can actually call the v10meta work
     const fromRepo = relative(REPO_ROOT, resolved);
     assert.ok(
       fromRepo.startsWith('..') || isAbsolute(fromRepo),
-      `the v10meta import resolved from the clean consumer, not the monorepo: ${resolved}`,
+      `the canonical meta-feedback owner resolved from the clean consumer, not the monorepo: ${resolved}`,
     );
-    assert.ok(resolved.includes('node_modules'), `the v10meta import comes from an installed package: ${resolved}`);
+    assert.ok(resolved.includes('node_modules'), `the meta-feedback owner comes from an installed package: ${resolved}`);
     assert.ok(
       existsSync(resolved.replace(/\.js$/, '.d.ts')),
-      `the packed v10meta subpath ships its declaration file next to the runtime: ${resolved}`,
+      `the packed host-node entry ships its declaration file next to the runtime: ${resolved}`,
     );
     const payload = resolve(result.payloadResolved as string);
-    assert.ok(payload.includes('node_modules'), `the Business payload comes from the packed package: ${payload}`);
+    assert.ok(
+      !payload.includes('node_modules') && relative(root, payload).startsWith('payload'),
+      `the Business payload is the unchanged Domain Package copy staged in the clean consumer: ${payload}`,
+    );
     assert.ok((result.keys as string[]).some((key) => key.startsWith('v10-meta-feedback:')), 'the packed run wrote the ledger');
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
-import { stagePackedWorkspaces } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
+import { assertNewWorkspacePackagesInstalled, stagePackedWorkspaces, verifiedLocalWorkspaceTarballs } from '../../../../packages/domain-harness-compiler/tests/packed-fixture-stage.js';
 
 function sha256File(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
@@ -41,11 +41,19 @@ test('N18: clean packed consumer — public entries, real SQLite, successor jour
   // packages/domain-harness/dist while the parallel N08 workers were loading
   // modules from that same dist (Woodpecker 1083/1 race family). The stage
   // builds core+node into private outDirs and packs read-only staged copies.
-  const staged = await stagePackedWorkspaces({ includeNodePackage: true });
+  // #1337 (T07a2): the exact local new-workspace tarballs join the SAME
+  // clean npm install transaction below (verified dependency closure), so
+  // the @kaicreator/* closure resolves from local bytes once the legacy
+  // manifests gain their new-workspace dependency edges (T07b) instead of
+  // E404-ing on the unpublished rc.0 registry artifacts.
+  const staged = await stagePackedWorkspaces({ includeNodePackage: true, includeNewWorkspaces: true });
   const coreTgz = staged.coreTarball.path;
   const nodeTgz = staged.nodeTarball?.path;
   const compilerTgz = staged.compilerTarball.path;
   assert.ok(coreTgz && nodeTgz && compilerTgz, 'all three tarballs packed from the tested tree');
+  const newPacks = staged.newWorkspaceTarballs;
+  assert.ok(newPacks, 'new-workspace tarballs staged for the bridge');
+  const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
   const coreSha = sha256File(coreTgz);
   const nodeSha = sha256File(nodeTgz);
 
@@ -55,9 +63,10 @@ test('N18: clean packed consumer — public entries, real SQLite, successor jour
     private: true,
     type: 'module',
   }));
-  execFileSync('npm', ['install', coreTgz, nodeTgz, compilerTgz, '--no-audit', '--no-fund', '--ignore-scripts=false'], {
+  execFileSync('npm', ['install', coreTgz, nodeTgz, compilerTgz, ...bridgePaths, '--no-audit', '--no-fund', '--ignore-scripts=false'], {
     cwd: consumerDir, shell: process.platform === 'win32', stdio: 'pipe',
   });
+  assertNewWorkspacePackagesInstalled(consumerDir, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
   const dbPath = join(consumerDir, 'consumer.sqlite');
   const consumerScript = join(consumerDir, 'consumer.mjs');

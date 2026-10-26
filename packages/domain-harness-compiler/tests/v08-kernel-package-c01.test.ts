@@ -4,7 +4,7 @@
  * =======================================================================
  *
  * Contract tests for the PHYSICAL selected Kernel Domain Package payload
- * `src/qualified-package/payload/kernel-mechanism-v1.mjs`
+ * `domain-packages/kernel/basic/kernel-mechanism-v1.mjs`
  * (`v08-kernel-abi/1`, T-A ABI @a835cab). The tests import the module from
  * its exact sealed BYTES (sha256 + data-URL import — the same discipline a
  * qualified-package installer uses), never from a build artifact.
@@ -82,7 +82,7 @@ import { fileURLToPath } from 'node:url';
 // discipline: the tests execute the exact bytes a sealed package would carry).
 // ---------------------------------------------------------------------------
 
-const KERNEL_SOURCE_PATH = '../src/qualified-package/payload/kernel-mechanism-v1.mjs';
+const KERNEL_SOURCE_PATH = '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
 const KERNEL_SOURCE = readFileSync(fileURLToPath(new URL(KERNEL_SOURCE_PATH, import.meta.url)), 'utf8');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 

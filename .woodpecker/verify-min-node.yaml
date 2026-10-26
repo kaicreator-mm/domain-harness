@@ -1,14 +1,7 @@
-# Minimum-declared-Node compatibility lane (#1228): root and compiler
-# package.json declare engines ">=22.15.0" because activation's declared
-# bare-import resolution needs module.registerHooks (first shipped in
-# v22.15.0 and still experimental). This lane runs the static gates plus
-# the hook-surface tests on that exact minimum so an accidental dependency
-# on newer Node runtime behavior fails here instead of only on user
-# runtimes. Full workspace regression stays on the Node 24 verify lane.
-#
-# ECF workers use Woodpecker's local backend on Alpine/musl with Node 24
-# preinstalled; the pinned musl build of v22.15.0 is fetched once from
-# unofficial-builds and cached under the agent home between runs.
+# T07b transitional retained GitHub required-status CONTEXT only (status rule UNKNOWN).
+# Not a Node22 compatibility claim: selected Domain App and root engines require Node24.
+# Once branch protection verifies this context is not required, delete this file
+# through the reviewed T07b gate; until then preserve exact context name.
 when:
   - event: pull_request
   - event: manual
@@ -20,26 +13,9 @@ steps:
   - name: verify-min-node
     image: bash
     commands:
-      - MIN_NODE=v22.15.0
-      - NODE_ROOT="$HOME/.cache/node-musl/node-$MIN_NODE-linux-x64-musl"
-      - |
-        if [ ! -x "$NODE_ROOT/bin/node" ]; then
-          mkdir -p "$HOME/.cache/node-musl"
-          wget -q -T 180 -O /tmp/node-min.tar.gz "https://unofficial-builds.nodejs.org/download/release/$MIN_NODE/node-$MIN_NODE-linux-x64-musl.tar.gz"
-          tar -xzf /tmp/node-min.tar.gz -C "$HOME/.cache/node-musl"
-          rm -f /tmp/node-min.tar.gz
-        fi
-      - export PATH="$NODE_ROOT/bin:$PATH"
-      - test "$(node --version)" = "$MIN_NODE" && node --version && npm --version
-      # Fail fast when the minimum runtime stops exposing the experimental
-      # hook API the engines floor is pinned to (#1228).
-      - node --input-type=module -e "import { registerHooks } from 'node:module'; if (typeof registerHooks !== 'function') { console.error('module.registerHooks missing on ' + process.version); process.exit(1); }"
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      - node --version && npm --version
+      - node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(1);'
       - npm ci
-      # Same static/packaging gates as the Node 24 verify lane (includes
-      # the committed-dist check), plus hook-contract tests that exercise
-      # the isolated registry and the sealed import-hook boundary.
       - npm run build
-      - npm run lint
-      - npm run typecheck
-      - node --import tsx --test packages/domain-harness/tests/v09-host-registry-n06.test.ts packages/domain-harness/tests/v09-private-principal.test.ts packages/domain-harness-compiler/tests/v09-build-zero-import-n06.test.ts
       - node --import tsx --test tests/compiler/v010-import-hook-registry.test.ts tests/compiler/v010-public-api-boundary.test.ts

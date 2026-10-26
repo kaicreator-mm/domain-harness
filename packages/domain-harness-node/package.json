@@ -9,7 +9,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "prebuild": "npm run build -w @kaicreator/domain-harness",
@@ -21,5 +21,6 @@
   "dependencies": {
     "@kaicreator/domain-harness": "0.2.0",
     "better-sqlite3": "^12.0.0"
-  }
+  },
+  "private": true
 }

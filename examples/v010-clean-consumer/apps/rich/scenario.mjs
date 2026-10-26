@@ -34,13 +34,12 @@ import {
   pinCandidateSource,
   runShadowL4,
   selectedFallbackPin,
-} from '@kaicreator/domain-harness-compiler/v10shadow';
+} from '@kaicreator/domain-harness-host-node';
 import {
   v10BuildActivationDecisionDigest,
   v10BuildPackageClosureDigest,
-  V10_HOST_ABI,
-  V10_RUNTIME_ABI,
-} from '@kaicreator/domain-harness-compiler/v10build';
+} from '@kaicreator/domain-harness-host-node';
+import { V10_HOST_ABI, V10_RUNTIME_ABI } from '@kaicreator/domain-harness-contracts';
 import Database from 'better-sqlite3';
 import * as extjob from './modules/capability-extjob-runx-v1.mjs';
 import * as extnotify from './modules/capability-extnotify-provider-v1.mjs';
@@ -219,7 +218,6 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
   const { authority, probes } = queryAuthority(manifest.deployment, visible);
   const now = () => NOW;
   let activation = await activate({ store, app, manifest, log, authority, now });
-  let counters = activation.counters;
   let facade = activation.facade;
 
   await step('RICH_P1.selection', () => {
@@ -230,17 +228,18 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
     assert(new Set(extensions.map((entry) => entry.hook)).size === 2, 'K extension hooks are not distinct');
     assert(features.length >= 3, `expected >=3 S features, got ${features.length}`);
     assert(new Set(features.map((entry) => entry.featureKey)).size === features.length, 'S feature keys are not distinct');
-    assert(counters.extensionImports === 2, `extensionImports=${String(counters.extensionImports)}`);
-    assert(counters.featureImports === features.length, `featureImports=${String(counters.featureImports)}`);
     for (const entry of [...extensions, ...features]) {
       const module = app.modules.find((candidate) => candidate.packageId === entry.packageId);
       assert(module?.moduleSource?.length > 0, `${entry.packageId} carries no sealed bytes`);
-      assert(counters.importsByPackage[entry.packageId] === 1, `${entry.packageId} was not imported exactly once`);
-      assert(counters.initCalls.includes(entry.packageId), `${entry.packageId} init did not run`);
     }
     const roles = app.modules.filter((module) => module.role === 'business').length;
     assert(roles === 4, `expected 4 selected Businesses, got ${roles}`);
-    return { extensions, features: features.map((entry) => entry.featureKey), roles: counters.initCalls };
+    // The v0.10.2 cutover narrows the installed activation (host-seam): the
+    // import/init diagnostic counters are no longer a public installed
+    // surface. Each selected module's sealed bytes prove composition here;
+    // the once-only import/init discipline is the sealed-graph BUILD
+    // property, and the feature behaviors below prove the modules ran.
+    return { extensions, features: features.map((entry) => entry.featureKey), roles };
   });
 
   const agentScope = {
@@ -512,6 +511,10 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
 
   await step('DENY_N1.permitlessAdapter', async () => {
     const before = extjob.dispatchCounts()['job.submit'] ?? 0;
+    // The v0.10.2 cutover removed the activation-level diagnostic counters
+    // object from the installed surface (host-seam): the per-B K counters
+    // are the durable public witness of the gate's refusal discipline.
+    const denyBefore = facade.kCounters(B1);
     const denied = await refusalOf(send(facade, 'submitUnpermittedJobProbe', 'inst-deny', 'deny/1', {
       requestId: 'R-DENY', jobSpec: { kind: 'probe' },
     }));
@@ -520,7 +523,10 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
     assert(/V10_EFFECT_PERMIT/.test(String(denied.message)), `permitless refusal did not name the missing K permit: ${String(denied.message).slice(0, 200)}`);
     assert((extjob.dispatchCounts()['job.submit'] ?? 0) === before, 'the permitless adapter physically dispatched');
     assert(extjob.jobByKey('R-DENY') === undefined, 'the permitless probe created a provider job');
-    assert(counters.externalEffectDispatches === 0 || counters.externalEffectRefusals >= 1, 'the gate did not record the typed refusal');
+    const denyAfter = facade.kCounters(B1);
+    assert(denyAfter.effectDispatches === denyBefore.effectDispatches + 1, 'the permitless probe did not reach the effect executor');
+    assert(denyAfter.effectPermitsMinted === denyBefore.effectPermitsMinted, 'the permitless probe minted an effect permit');
+    assert((denyAfter.effectPermitsConsumed ?? 0) === (denyBefore.effectPermitsConsumed ?? 0), 'the permitless probe consumed an effect permit');
     return { code: denied.code, message: String(denied.message).slice(0, 160), dispatchBefore: before, dispatchAfter: extjob.dispatchCounts()['job.submit'] };
   });
 
@@ -532,7 +538,6 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
   store.close();
   store = new SqliteDocStore(dbPath);
   activation = await activate({ store, app, manifest, log, authority, now });
-  counters = activation.counters;
   facade = activation.facade;
 
   await step('RICH_P2.restart', async () => {
@@ -559,7 +564,6 @@ async function richMain({ steps, step, workdir, app, manifest, log }) {
       dispositions: store.count('%turn-disposition%'),
     },
     memoryRows: memoryRows().length,
-    counters,
     manifest: {
       subjectDigest: manifest.subjectDigest,
       packageClosureDigest: manifest.packageClosureDigest,

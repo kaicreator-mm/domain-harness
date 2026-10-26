@@ -63,7 +63,6 @@ import {
 } from '../../src/host-v8/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET, mintCredential, sqliteTempPath } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-fr05hf17hf23';
@@ -104,8 +103,8 @@ after(async () => {
 /** Seal the K/S/B(fixture)/capability(fixture) closure through the REAL BUILD path. */
 async function sealSurfaceClosure(capabilityModuleSource?: string): Promise<SealedQualifiedPackageRoot> {
   const [kernelSource, sdkSource, businessSource, capabilityText] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-agent-surface.mjs', fixtureDir), 'utf8'),
     capabilityModuleSource === undefined
       ? readFile(new URL('capability-agent-surface.mjs', fixtureDir), 'utf8')

@@ -15,7 +15,6 @@ test('N-I1231: registered direct typed refusal literals cannot drift silently', 
 test('P-I1231: object-shaped Host and Shadow refusal codes are registered', () => {
   const file = fileURLToPath(new URL('../../docs/architecture/V010_TYPED_REFUSAL_LITERAL_CATALOG.json', import.meta.url));
   const catalog = JSON.parse(readFileSync(file, 'utf8')) as { sourceFiles: Record<string, string[]> };
-  const compiler = 'packages/domain-harness-compiler/src/qualified-package/';
-  assert.ok(catalog.sourceFiles[compiler + 'v10build/activation.ts']?.includes('HOST_CAS_CONFLICT'));
-  assert.ok(catalog.sourceFiles[compiler + 'v10shadow/shadow-l4-readonly.ts']?.includes('SHADOW_EVALUATOR_COMPILE_FAILED'));
+  assert.ok(catalog.sourceFiles['packages/microkernel/src/internal/activation.ts']?.includes('HOST_CAS_CONFLICT'));
+  assert.ok(catalog.sourceFiles['packages/host-node/src/shadow-l4-readonly.ts']?.includes('SHADOW_EVALUATOR_COMPILE_FAILED'));
 });

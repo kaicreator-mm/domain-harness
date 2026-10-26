@@ -31,15 +31,15 @@ import {
   issueApprovalProof,
   qualifyPackageClosure,
 } from '../src/qualified-package/index.js';
-import { routeWorkflowIntent } from '../src/qualified-package/v09/workflow-router.mjs';
+import { routeWorkflowIntent } from '../../../domain-packages/standard/basic/workflow-router.mjs';
 import {
   authorizeSelectedOperation,
   bindSelectedClosure,
   routerRequestFor,
   SelectedAbiError,
 } from '../src/qualified-package/v09/selected-abi.mjs';
-import * as kernel from '../src/qualified-package/payload/kernel-mechanism-v1.mjs';
-import * as sdk from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+import * as kernel from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
+import * as sdk from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 import * as approval from '../../../examples/v08-domain-apps/business-approval.mjs';
 import * as engineering from '../../../examples/v08-domain-apps/business-engineering.mjs';
 import * as capabilityModule from '../../../examples/v08-domain-apps/capability-quote-tools.mjs';
@@ -59,8 +59,8 @@ const refuses = (code: string, fn: () => unknown): void => {
 
 async function realSealedRoot() {
   const [kBytes, sBytes, approvalBytes, engineeringBytes, capabilityBytes] = await Promise.all([
-    readFile(new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../../examples/v08-domain-apps/business-approval.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../../examples/v08-domain-apps/business-engineering.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../../examples/v08-domain-apps/capability-quote-tools.mjs', import.meta.url), 'utf8'),

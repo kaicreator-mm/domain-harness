@@ -2,9 +2,10 @@
  * v0.10 clean-consumer BUILD recipe (#1180 T11).
  *
  * Runs INSIDE an isolated builder directory that has only the packed
- * `@kaicreator/domain-harness` and `@kaicreator/domain-harness-compiler`
- * tarballs installed — no repository source path is imported. For each App it
- * reads the selected payload bytes from the INSTALLED compiler package, the
+ * `@kaicreator/domain-harness-contracts`, `@kaicreator/domain-harness-build`,
+ * `@kaicreator/domain-harness-microkernel` and `@kaicreator/domain-harness-host-node` tarballs plus the packed Domain Package tarballs (`@kaicreator/domain-kernel-basic`,
+ * `-standard-basic`, `-feature-*`) installed — no repository source path is imported.
+ * For each App it reads the selected payload bytes from the INSTALLED Domain Packages, the
  * App-owned Business/Capability/K-extension/S-feature bytes from its own
  * `modules/` directory, calls the once-only static BUILD, and writes a
  * self-contained installable App directory:
@@ -19,12 +20,9 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  V10_TARGET_PROFILE,
-  buildV10App,
-  sha256Hex,
-  v10BuildPackageClosureDigest,
-} from '@kaicreator/domain-harness-compiler/v10build';
+import { V10_TARGET_PROFILE, sha256Hex } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '@kaicreator/domain-harness-build';
+import { v10BuildPackageClosureDigest } from '@kaicreator/domain-harness-host-node';
 
 import { definition as tinyDefinition } from './apps/tiny/app-definition.mjs';
 import { definitionV1 as richV1Definition, definitionV2 as richV2Definition } from './apps/rich/app-definition.mjs';
@@ -39,13 +37,13 @@ const outRoot = resolve(flagValue('--out', join(HERE, 'out')));
 const sourceSha = flagValue('--source-sha', 'UNRECORDED');
 
 const PAYLOAD_SPECIFIERS = Object.freeze({
-  kernel: '@kaicreator/domain-harness-compiler/v10payload/kernel-mechanism',
-  sdk: '@kaicreator/domain-harness-compiler/v10payload/standard-sdk',
-  router: '@kaicreator/domain-harness-compiler/v10payload/workflow-router',
-  'sfeature-semantic-decision': '@kaicreator/domain-harness-compiler/v10payload/sfeature-semantic-decision',
-  'sfeature-workflow-control': '@kaicreator/domain-harness-compiler/v10payload/sfeature-workflow-control',
-  'sfeature-context-assembly': '@kaicreator/domain-harness-compiler/v10payload/sfeature-context-assembly',
-  'sfeature-decision-evidence': '@kaicreator/domain-harness-compiler/v10payload/sfeature-decision-evidence',
+  kernel: '@kaicreator/domain-kernel-basic',
+  sdk: '@kaicreator/domain-standard-basic',
+  router: '@kaicreator/domain-standard-basic/workflow-router',
+  'sfeature-semantic-decision': '@kaicreator/domain-feature-semantic-decision',
+  'sfeature-workflow-control': '@kaicreator/domain-feature-workflow-control',
+  'sfeature-context-assembly': '@kaicreator/domain-feature-context-assembly',
+  'sfeature-decision-evidence': '@kaicreator/domain-feature-decision-evidence',
 });
 
 function readPayload(name) {

@@ -20,7 +20,7 @@
  * store under `v10/k/**` and Memory never writes there; a denied Memory op
  * surfaces as an honest Kernel effect failure, never a forged receipt.
  */
-import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+import { freshV10Counters } from '../../packages/microkernel/src/internal/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
@@ -29,13 +29,10 @@ import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import {
-  V10BuildError,
-  V10_TARGET_PROFILE,
-  activateV10App,
-  buildV10App,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
-import type { V10ModuleInput } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { V10BuildError, V10_TARGET_PROFILE } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../tooling/build/dist/index.js';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
+import type { V10ModuleInput } from '@kaicreator/domain-harness-contracts';
 import {
   INTENT as TINY_INTENT,
   PlainCasDocStore,
@@ -83,8 +80,8 @@ function unpinMemoryClock(): void {
 /** BUILD-style vendored SDK bundle (same strategy as the T00 helpers). */
 async function standardBundle(): Promise<string> {
   const [sdk, router] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
   ]);
   const routerBody = router.replace(/^export /gm, '');
   return `${sdk}
@@ -99,7 +96,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 
 async function richWithMemoryModules(): Promise<V10ModuleInput[]> {
   const [kernel, sdk, business, memory] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
     standardBundle(),
     readFile(new URL('./fixtures-v010/business-memory-notes-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/capability-memory-v1.mjs', import.meta.url), 'utf8'),

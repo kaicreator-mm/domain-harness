@@ -39,7 +39,7 @@ const log = startResolutionLog();
 
 let report;
 try {
-  const runtime = await import('./runtime-core.mjs');
+  const runtime = await import('./runtime-shared.mjs');
   const scenarioModule = await import('./scenario.mjs');
   const app = runtime.loadBuiltApp();
   const manifest = runtime.loadManifest();

@@ -3,7 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { buildV10App, activateV10App } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { buildV10App } from '../../tooling/build/dist/index.js';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
 import { featureEntry, basicComposition, PlainCasDocStore } from './helpers-v010.js';
 
 const scope = {
@@ -25,7 +26,7 @@ type Resolver = (v:Record<string, unknown>)=>ContextResult;
 let memo: Promise<{ source:string; resolve:Resolver }> | undefined;
 const load = () => memo ??= (async () => {
   const source = await readFile(new URL(
-    '../../packages/domain-harness-compiler/src/qualified-package/payload/sfeature-context-assembly-v1.mjs',
+    '../../domain-packages/standard/features/context-assembly/modules/sfeature-context-assembly-v1.mjs',
     import.meta.url,
   ), 'utf8');
   const m = await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64')) as {

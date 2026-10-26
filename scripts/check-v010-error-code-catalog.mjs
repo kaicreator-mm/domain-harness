@@ -15,22 +15,42 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const catalogPath = join(root, 'docs', 'architecture', 'V010_TYPED_REFUSAL_LITERAL_CATALOG.json');
-const compilerRoot = join(root, 'packages/domain-harness-compiler/src/qualified-package');
-const compilerDirs = ['v10build', 'v10evidence', 'v10meta', 'v10shadow'];
+// v0.10.2 T11 cutover: the compiler-side v10build/v10evidence/v10meta/
+// v10shadow directories are deleted; the final roots are the canonical
+// package sources below plus the still-shipped host-v8 v010* files.
 const hostDir = join(root, 'packages/domain-harness/src/host-v8');
 const codeCall = /\b(?:fail|refuse|reject|denied|new\s+[A-Za-z_$][A-Za-z0-9_$]*Error)\s*\(\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g;
 /** Object-shaped typed failures also carry literal error codes. */
 const codeProperty = /\bcode:\s*['"]([A-Z][A-Z0-9_]{2,})['"]/g;
 
 const sourceFiles = [];
-for (const dir of compilerDirs) {
-  for (const name of (await readdir(join(compilerRoot, dir))).sort()) {
-    if (name.endsWith('.ts')) sourceFiles.push(join(compilerRoot, dir, name));
-  }
-}
 for (const name of (await readdir(hostDir)).sort()) {
   if (/^v010[^/]*\.ts$/.test(name)) sourceFiles.push(join(hostDir, name));
 }
+// T00 selected owner roots, preserving the legacy scan until T03/T04/T05 move sources.
+// identity.ts and qualified-canonical.ts are the v8-era content-identity and
+// qualified-package contracts (moved verbatim from packages/domain-harness/src,
+// which the legacy scan never covered); their codes are not part of the v0.10
+// typed-refusal registry, so scanning them here would silently widen
+// V10_KNOWN_ERROR_CODES through the union test.
+const registryForeignFiles = new Set([
+  'packages/contracts/src/identity.ts',
+  'packages/contracts/src/qualified-canonical.ts',
+]);
+for (const owner of [
+  'packages/contracts/src', 'packages/microkernel/src',
+  'packages/host-node/src', 'tooling/build/src',
+]) {
+  async function collect(directory) {
+    for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a,b)=>a.name.localeCompare(b.name,'en'))) {
+      const full=join(directory,entry.name);
+      if (entry.isDirectory()) await collect(full);
+      else if (entry.name.endsWith('.ts') && !registryForeignFiles.has(relative(root, full).replaceAll('\\', '/'))) sourceFiles.push(full);
+    }
+  }
+  await collect(join(root,owner));
+}
+
 const entries = {};
 for (const filename of sourceFiles) {
   const source = await readFile(filename, 'utf8');

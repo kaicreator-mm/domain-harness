@@ -28,7 +28,7 @@
  *   - unbounded Agent step denied by the Business guard and the T03 planner,
  *   - Tiny BUILD neither selects nor imports any advanced T05 module.
  */
-import { freshV10Counters } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/activation.js';
+import { freshV10Counters } from '../../packages/microkernel/src/internal/activation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -39,16 +39,13 @@ import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import {
-  V10_TARGET_PROFILE,
-  V10_SFEATURE_ABI,
-  activateV10App,
-  buildV10App,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { V10_TARGET_PROFILE, V10_SFEATURE_ABI } from '@kaicreator/domain-harness-contracts';
+import { buildV10App } from '../../tooling/build/dist/index.js';
+import { activateV10App } from '../../packages/microkernel/src/internal/activation.js';
 import type {
   V10DocStore,
   V10ModuleInput,
-} from '../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+} from '@kaicreator/domain-harness-contracts';
 import { openSqliteCasStore } from '../../packages/domain-harness/src/host-v8/sqlite-cas-store.js';
 import {
   INTENT as TINY_INTENT,
@@ -207,8 +204,8 @@ function physicalRows(path: string): number {
 
 async function standardBundle(): Promise<string> {
   const [sdk, router] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
   ]);
   const routerBody = router.replace(/^export /gm, '');
   return `${sdk}
@@ -227,7 +224,7 @@ async function featureModule(
   spec: { packageId: string; featureKey: string; featureExport: string; fixture?: boolean },
 ): Promise<V10ModuleInput> {
   const url = directory === 'payload'
-    ? new URL(`../../packages/domain-harness-compiler/src/qualified-package/payload/${file}`, import.meta.url)
+    ? new URL(`../../domain-packages/standard/features/${file.replace(/^sfeature-/, '').replace(/-v1\.mjs$/, '')}/modules/${file}`, import.meta.url)
     : new URL(`./fixtures-v010/${file}`, import.meta.url);
   const source = await readFile(url, 'utf8');
   return {
@@ -246,7 +243,7 @@ async function featureModule(
 
 async function richAgentModules(): Promise<V10ModuleInput[]> {
   const [kernel, sdk, business, memory, tool, contextFeature, semanticFeature, workflowFeature] = await Promise.all([
-    readFile(new URL('../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
     standardBundle(),
     readFile(new URL('./fixtures-v010/business-agent-workflow-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures-v010/capability-agent-memory-v1.mjs', import.meta.url), 'utf8'),
@@ -321,7 +318,7 @@ async function richAgentModules(): Promise<V10ModuleInput[]> {
       requires: [],
       externalImports: {
         node: ['node:path', 'node:os', 'node:fs'],
-        npm: ['@kaicreator/domain-harness/v8/host'],
+        npm: ['@kaicreator/domain-harness-host-node'],
         native: [],
       },
       capabilityId: 'memory',

@@ -39,6 +39,11 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertNewWorkspacePackagesInstalled,
+  stageNewWorkspaceTarballs,
+  verifiedLocalWorkspaceTarballs,
+} from '../../../domain-harness-compiler/tests/packed-fixture-stage.js';
 
 import {
   buildQualifiedPackage,
@@ -85,7 +90,6 @@ function runNpm(args: readonly string[], cwd: string): string {
 const packageRoot = fileURLToPath(new URL('../..', import.meta.url));
 const nodePackageRoot = fileURLToPath(new URL('../../../domain-harness-node', import.meta.url));
 const examplesDir = fileURLToPath(new URL('../../../../examples/v08-domain-apps/', import.meta.url));
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 
 function sha256Hex(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -104,8 +108,8 @@ async function sealOriginalApp(kind: 'approval' | 'engineering'): Promise<{
 }> {
   // The ORIGINAL app bytes — the examples source, not a test fixture.
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(join(examplesDir, `business-${kind}.mjs`), 'utf8'),
   ]);
   // The business module namespace (identity/endpoints/intents) comes from
@@ -171,7 +175,7 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
   const [d2, d3] = await Promise.all([sealOriginalApp('approval'), sealOriginalApp('engineering')]);
   assert.equal(d2.kernelSha, d3.kernelSha, 'both apps are sealed over the exact same selected Kernel bytes');
   assert.equal(d2.sdkSha, d3.sdkSha, 'both apps are sealed over the exact same selected Standard SDK bytes');
-  assert.equal(d2.kernelSha, sha256Hex(await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8')));
+  assert.equal(d2.kernelSha, sha256Hex(await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8')));
   assert.notEqual(d2.businessSha, d3.businessSha, 'the two Business packages remain genuinely distinct');
 
   // ---- Pack + clean-consumer install (stock Node, no workspace links). ----
@@ -185,6 +189,14 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
     runNpm(['pack', '--pack-destination', packs], nodePackageRoot);
     const tarballs = readdirSync(packs).filter((name) => name.endsWith('.tgz'));
     assert.equal(tarballs.length, 2, 'core + node packs (the node pack carries the better-sqlite3 dependency)');
+    // #1337 (T07a2): this fixture keeps its own isolated legacy pack, and
+    // the exact local new-workspace tarballs from the shared verified stage
+    // join the SAME clean npm install transaction (verified dependency
+    // closure), so the @kaicreator/* closure resolves from local bytes once
+    // the legacy manifests gain their new-workspace dependency edges (T07b)
+    // instead of E404-ing on the unpublished rc.0 registry artifacts.
+    const newPacks = await stageNewWorkspaceTarballs();
+    const bridgePaths = verifiedLocalWorkspaceTarballs(newPacks, ['hostNode']);
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({
       name: 'dh1005-tf-packed-e2e-consumer',
       private: true,
@@ -192,10 +204,11 @@ test('T-F E2E: both REAL #1012 Apps on one REAL SQLite via the npm-packed authen
       allowScripts: { 'better-sqlite3': true },
     }, null, 2));
     runNpm([
-      'install', ...tarballs.map((name) => join(packs, name)),
+      'install', ...tarballs.map((name) => join(packs, name)), ...bridgePaths,
       '--no-audit', '--no-fund', '--ignore-scripts=false',
       ...(process.env.NPM_REGISTRY ? ['--registry', process.env.NPM_REGISTRY] : []),
     ], consumer);
+    assertNewWorkspacePackagesInstalled(consumer, [newPacks.contracts, newPacks.microkernel, newPacks.hostNode]);
 
     writeFileSync(join(consumer, 'sealed-approval-root.json'), JSON.stringify(d2.root), 'utf8');
     writeFileSync(join(consumer, 'sealed-engineering-root.json'), JSON.stringify(d3.root), 'utf8');

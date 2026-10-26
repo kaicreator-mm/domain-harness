@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { V10Error } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
-import { V10_KNOWN_ERROR_CODES } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/known-error-codes.js';
-import { ShadowL4Error } from '../../packages/domain-harness-compiler/src/qualified-package/v10shadow/shadow-l4-readonly.js';
-import { MetaFeedbackError } from '../../packages/domain-harness-compiler/src/qualified-package/v10meta/meta-feedback-workflow.js';
-import { DecisionEvidenceObserverError } from '../../packages/domain-harness-compiler/src/qualified-package/v10evidence/decision-evidence-observer.js';
+import { V10Error } from '@kaicreator/domain-harness-contracts';
+import { V10_KNOWN_ERROR_CODES } from '@kaicreator/domain-harness-contracts';
+import '../assembly/cjs-package-bridge.ts';
+import { ShadowL4Error } from '../../packages/host-node/dist/index.js';
+import { MetaFeedbackError } from '../../packages/host-node/dist/index.js';
+import { DecisionEvidenceObserverError } from '../../packages/host-node/dist/index.js';
 
 test('P-I1231: known literal code union stays byte-accurate with reviewed source catalog', async () => {
   const path = new URL('../../docs/architecture/V010_TYPED_REFUSAL_LITERAL_CATALOG.json', import.meta.url);

@@ -25,13 +25,14 @@
  *   T09-N4  invalid rounds, foreign-scope evidence and conflicting ledger
  *           reuse fail typed.
  */
+import '../../assembly/cjs-package-bridge.ts';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after, before } from 'node:test';
 
-import { sha256Canonical, type V10BuiltApp } from '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js';
+import { sha256Canonical, type V10BuiltApp } from '@kaicreator/domain-harness-contracts';
 import {
   META_FEEDBACK_ABI,
   META_FEEDBACK_CLAIM_STATE,
@@ -39,7 +40,7 @@ import {
   META_FEEDBACK_LEDGER_STATE,
   runMetaFeedbackWorkflow,
   type MetaFeedbackResult,
-} from '../../../packages/domain-harness-compiler/src/qualified-package/v10meta/index.js';
+} from '../../../packages/host-node/dist/index.js';
 import {
   BUSINESS_ID,
   CANDIDATE_KEY,
@@ -56,7 +57,7 @@ import {
   evidenceKeyFor,
   ledgerKeyFor,
   openHarness,
-  payloadDir,
+  metaFeedbackFeatureUrl,
   refusal,
   roundIntent,
   seedEvidence,
@@ -372,7 +373,7 @@ test('T09-N4 invalid rounds and conflicting ledger reuse fail typed before a tur
 });
 
 test('T09-N5 the pure selected feature itself refuses authority-shaped material', async () => {
-  const source = await readFile(new URL('sfeature-meta-feedback-v1.mjs', payloadDir), 'utf8');
+  const source = await readFile(metaFeedbackFeatureUrl, 'utf8');
   const feature = await import(`data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`) as {
     proposeMetaFeedback: (request: unknown) => unknown;
   };

@@ -1,9 +1,9 @@
 /** T00 internal phase extraction regression — no selected Kernel runtime. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveV10SelectedClosure } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/selected-closure.js';
-import { V10BuildError } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/errors.js';
-import type { V10ClosureModule } from '../../packages/domain-harness-compiler/src/qualified-package/v10build/selected-closure.js';
+import { resolveV10SelectedClosure } from '../../tooling/build/src/selected-closure.js';
+import { V10BuildError } from '@kaicreator/domain-harness-contracts';
+import type { V10ClosureModule } from '../../tooling/build/src/selected-closure.js';
 
 const mod = (
   packageId: string,

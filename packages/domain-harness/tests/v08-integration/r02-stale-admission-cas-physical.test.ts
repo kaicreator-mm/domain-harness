@@ -36,8 +36,7 @@ import test, { after } from 'node:test';
 
 import { openSqliteCasStore, type SqliteCasStore } from '../../src/host-v8/index.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
-const KERNEL_SOURCE = await readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8');
+const KERNEL_SOURCE = await readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8');
 const KERNEL_SHA256 = createHash('sha256').update(KERNEL_SOURCE, 'utf8').digest('hex');
 const kernel: Record<string, any> = await import(`data:text/javascript;base64,${Buffer.from(KERNEL_SOURCE, 'utf8').toString('base64')}`);
 

@@ -53,8 +53,8 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import * as kernel from '../src/qualified-package/payload/kernel-mechanism-v1.mjs';
-import * as sdk from '../src/qualified-package/payload/standard-sdk-v1.mjs';
+import * as kernel from '../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs';
+import * as sdk from '../../../domain-packages/standard/basic/standard-sdk-v1.mjs';
 
 // Historical WEB-ORACLE-1 source-prep pins (kept verbatim as the record).
 const V08_BASE = '557e8ba53f90309c9d370d32b77d2dff070b8a5b';
@@ -133,7 +133,8 @@ const V08_S_BLOB = '9b86835bf12262ef53548e0031550fcecd97a7f2';
 // permit claim, additive effect-permit doc kind and counters);
 // FR02/FR07 semantics unchanged.
 // Exact selected Kernel re-pin after approved R01 K01 #1205; previous C01/K02 blob 1a6a1394a505f4727306208d588fcab841e72980.
-const V08_K_BLOB = '72a886ffca85fc90caea954ee9fb5b3df7b4fcfa';
+// Re-pinned after the v0.10.2 T01k (#1321) additive read-only protocol exports; previous blob 72a886ffca85fc90caea954ee9fb5b3df7b4fcfa.
+const V08_K_BLOB = '68b77d4711a802bc6a3f6f5e73cbc58e769af32f';
 
 const LEGACY_CLOCK = '2026-09-17T02:00:00.123Z';
 const LEGACY_FR02_EXPRESSION =
@@ -294,11 +295,11 @@ test('WEB-ORACLE-1 META: the rebind is bound to the exact physically selected v0
   assert.equal(V08_K_BLOB_SOURCE_PREP, 'f74f77ba6fbd882f9e4fdf0a6d661ce3fd348555');
   assert.equal(V08_REBIND_BASE, '8d7ef905275d4b270ff76206db935cbd6fc70fe0');
   assert.equal(
-    await gitBlobSha(new URL('../src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url)),
+    await gitBlobSha(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url)),
     V08_S_BLOB,
   );
   assert.equal(
-    await gitBlobSha(new URL('../src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url)),
+    await gitBlobSha(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url)),
     V08_K_BLOB,
   );
   assert.equal(sdk.MODULE_ID, 'standard-sdk@v08.1.0.0');

@@ -377,12 +377,41 @@ export class NodeSqliteRuntimeStore
       throw new RangeError('busyTimeoutMs must be a non-negative safe integer');
     }
 
-    this.#db = new Database(options.path);
-    this.#db.pragma(`busy_timeout = ${busyTimeoutMs}`);
-    this.#db.pragma('foreign_keys = ON');
-    this.#db.pragma('journal_mode = WAL');
-    this.#db.pragma('synchronous = FULL');
-    this.#applyMigrations();
+    // The WAL journal mode is persistent for file-backed SQLite databases.
+    // Reasserting it from every concurrently opening Windows process can
+    // surface SQLITE_IOERR while the -wal/-shm sidecars are being opened.
+    // Reopen only on an I/O error during WAL negotiation; never retry a
+    // migration, provisioning operation, or another SQLite failure.
+    for (let attempt = 0; ; attempt++) {
+      this.#db = new Database(options.path);
+      let negotiatingWal = false;
+      try {
+        this.#db.pragma(`busy_timeout = ${busyTimeoutMs}`);
+        this.#db.pragma('foreign_keys = ON');
+        negotiatingWal = true;
+        // Also preserve :memory: databases, whose journal mode is "memory".
+        // Do not issue a redundant WAL-setting pragma on an existing WAL DB.
+        const currentMode = String(this.#db.pragma('journal_mode', { simple: true })).toLowerCase();
+        if (currentMode !== 'wal') {
+          this.#db.pragma('journal_mode = WAL');
+        }
+        negotiatingWal = false;
+        this.#db.pragma('synchronous = FULL');
+        this.#applyMigrations();
+        break;
+      } catch (error) {
+        // A failed constructor must not leave another connection or WAL
+        // handle open; retry on a FRESH connection, not a failed handle.
+        try { this.#db.close(); } catch { /* preserve the original error */ }
+        const code = (error as { code?: unknown } | null)?.code;
+        if (!negotiatingWal || typeof code !== 'string' || !code.startsWith('SQLITE_IOERR') || attempt >= 2) {
+          throw error;
+        }
+        // Synchronous, tightly bounded 25 + 50 ms backoff (Node24 host).
+        // A persistent storage fault is still surfaced after attempt 3.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
+      }
+    }
   }
 
   close(): void {

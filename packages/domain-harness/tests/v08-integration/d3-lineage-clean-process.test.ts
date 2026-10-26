@@ -28,18 +28,17 @@ import {
 } from '../../../domain-harness-compiler/src/qualified-package/index.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 
 async function sealD3App(): Promise<unknown> {
   // @ts-expect-error fixture module has no declaration file (.mjs)
   const business = await import('./fixtures/d3-business-engineering-lineage.mjs') as Record<string, any>;
   // @ts-expect-error selected kernel payload has no declaration file (.mjs)
-  const kernel = await import('../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs') as Record<string, any>;
+  const kernel = await import('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs') as Record<string, any>;
   // @ts-expect-error selected standard-sdk payload has no declaration file (.mjs)
-  const sdk = await import('../../../domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs') as Record<string, any>;
+  const sdk = await import('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs') as Record<string, any>;
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('./fixtures/d3-business-engineering-lineage.mjs', import.meta.url), 'utf8'),
   ]);
   const endpoint = (module: Record<string, any>) => (module.ENDPOINTS as { endpointId: string }[])[0]!.endpointId;

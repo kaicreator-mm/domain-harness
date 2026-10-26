@@ -1,0 +1,32 @@
+{
+  "name": "@kaicreator/domain-harness-microkernel",
+  "version": "0.10.2-rc.0",
+  "description": "DomainHarness Microkernel public SDK",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./host-seam": {
+      "types": "./dist/host-seam.d.ts",
+      "import": "./dist/host-seam.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@kaicreator/domain-harness-contracts": "0.10.2-rc.0"
+  }
+}

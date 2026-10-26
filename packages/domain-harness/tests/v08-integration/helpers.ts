@@ -56,7 +56,6 @@ export const FIXTURE_SHAS = {
   decisionSource: '18c3e07b9525f68a7776061a43dbd0ae9d99934c644c09546d48b9b533b75733',
   decisionSourceBad: '576a4f7c2fb8319d84625b5c0488d1d5c0ecb57988bee58e960cf28eeba78cdb',
 } as const;
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 
 export type AppKind = 'approval' | 'engineering' | 'model' | 'continuation' | 'semantic' | 'semanticBad' | 'decisionSource' | 'decisionSourceBad';
@@ -96,8 +95,8 @@ export async function readModuleSources(kind: AppKind): Promise<{
               ? 'business-semantic-decision-bad'
               : kind === 'decisionSource' ? 'business-decision-source' : 'business-decision-source-bad';
   const [kernel, sdk, business] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL(`${businessFile}.mjs`, fixtureDir), 'utf8'),
   ]);
   return { kernel, sdk, business };
@@ -162,9 +161,9 @@ export async function sealRealApp(kind: AppKind, variantRootPackageId?: string):
     businessModule = await import('./fixtures/business-decision-source-bad.mjs');
   }
   // @ts-expect-error selected kernel payload has no declaration file (.mjs)
-  const kernelMeta = await import('../../../domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs');
+  const kernelMeta = await import('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs');
   // @ts-expect-error selected standard-sdk payload has no declaration file (.mjs)
-  const sdkMeta = await import('../../../domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs');
+  const sdkMeta = await import('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs');
   const sources = await readModuleSources(kind);
   const kernelId = kernelMeta.MODULE_ID as string;
   const sdkId = sdkMeta.MODULE_ID as string;

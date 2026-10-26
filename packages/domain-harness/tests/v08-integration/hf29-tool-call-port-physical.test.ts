@@ -72,7 +72,6 @@ import type { JsonValue } from '../../src/contracts/json.js';
 import { portableUtf8ByteLength } from '../../src/schema/domainharness-json-schema-v1.js';
 import { INTEG_ISSUER, INTEG_ISSUER_SECRET } from './helpers.js';
 
-const payloadDir = new URL('../../../domain-harness-compiler/src/qualified-package/payload/', import.meta.url);
 const examplesDir = new URL('../../../../examples/v08-domain-apps/', import.meta.url);
 
 const AUDIENCE = 'dh-v08-hf29';
@@ -239,8 +238,8 @@ function patchOnce(source: string, anchor: string, replacement: string, label: s
  */
 async function sealHf29Closure(capabilityModuleSource: string = HF29_CAPABILITY_SOURCE): Promise<SealedQualifiedPackageRoot> {
   const [kernelSource, sdkSource, businessSource] = await Promise.all([
-    readFile(new URL('kernel-mechanism-v1.mjs', payloadDir), 'utf8'),
-    readFile(new URL('standard-sdk-v1.mjs', payloadDir), 'utf8'),
+    readFile(new URL('../../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
     readFile(new URL('business-approval.mjs', examplesDir), 'utf8'),
   ]);
   const kernel = await import(`data:text/javascript;base64,${Buffer.from(kernelSource, 'utf8').toString('base64')}`) as Record<string, any>;

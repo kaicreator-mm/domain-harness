@@ -16,16 +16,18 @@ const [kStorePath, jobStorePath, messageId, requestId, outcomeFile] = process.ar
 globalThis.__c01JobStorePath = jobStorePath;
 globalThis.__c01NotifyStorePath = `${jobStorePath}.notify-unused`;
 
-const { V10_TARGET_PROFILE, activateV10App, buildV10App, sha256Hex } = await import(
-  '../../../packages/domain-harness-compiler/src/qualified-package/v10build/index.js'
-);
+const [{ V10_TARGET_PROFILE, sha256Hex }, { buildV10App }, { activateV10App }] = await Promise.all([
+  import('@kaicreator/domain-harness-contracts'),
+  import('@kaicreator/domain-harness-build'),
+  import('../../../packages/microkernel/src/internal/activation.js'),
+]);
 
 const { readFile } = await import('node:fs/promises');
 
 const [kernel, sdk, router, business, extjob, extnotify] = await Promise.all([
-  readFile(new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
-  readFile(new URL('../../../packages/domain-harness-compiler/src/qualified-package/payload/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
-  readFile(new URL('../../../packages/domain-harness-compiler/src/qualified-package/v09/workflow-router.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../../../domain-packages/kernel/basic/kernel-mechanism-v1.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../../../domain-packages/standard/basic/standard-sdk-v1.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../../../domain-packages/standard/basic/workflow-router.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../../assembly/fixtures-v010/business-external-jobs-v1.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../../assembly/fixtures-v010/capability-extjob-runx-v1.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../../assembly/fixtures-v010/capability-extnotify-provider-v1.mjs', import.meta.url), 'utf8'),
