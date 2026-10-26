@@ -20,7 +20,7 @@ flowchart TB
     M --> K["Single selected K Primary"]
     M --> S["Selected S + B + C modules"]
     K --> H["Physical Host CAS / optional SQLite"]
-    S --> H
+    S -->|"Capability requests governed by K"| K
   end
 ```
 
@@ -35,6 +35,7 @@ flowchart LR
   B --> C["C: declared Tool Operations"]
   K --> H["Host: physical CAS and adapters"]
   C --> G["K-governed effect boundary"]
+  K -.->|"Permit and recheck"| G
   G --> EXT["External system"]
 ```
 

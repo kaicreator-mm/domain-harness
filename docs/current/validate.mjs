@@ -6,8 +6,8 @@
  * balanced fenced code blocks and both index references for every topic.
  * Does NOT prove Chinese/English semantic equivalence or execute embedded code.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { resolve, join, dirname, basename } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { resolve, join, dirname, basename, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +37,8 @@ function checkFile(file, counterpart) {
     const destination = match[1].split('#')[0];
     if (!destination || /^(https?:|mailto:|\/\/)/.test(destination)) continue;
     const absolute = resolve(dirname(file), decodeURIComponent(destination));
-    if (!absolute.startsWith(root + '/') && absolute !== root) {
+    const rel = relative(root, absolute);
+    if (rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) {
       errors.push(file + ': path escapes repository: ' + destination);
       continue;
     }

@@ -20,7 +20,7 @@ flowchart TB
     M --> K["唯一 K Primary"]
     M --> S["S + B + C 包"]
     K --> H["实际 Host CAS／可选 SQLite"]
-    S --> H
+    S -->|"Capability 请求由 K 管理"| K
   end
 ```
 
@@ -35,6 +35,7 @@ flowchart LR
   B --> C["C：已声明的 Tool Operation"]
   K --> H["Host：物理 CAS 与适配器"]
   C --> G["经过 K 许可的副作用边界"]
+  K -.->|"许可与检查"| G
   G --> EXT["外部系统"]
 ```
 
