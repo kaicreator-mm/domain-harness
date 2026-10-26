@@ -1,0 +1,86 @@
+name: "SDK Bug Report / SDK 缺陷"
+description: "Report a reproducible DomainHarness SDK/BUILD/Host product problem with exact SHA and sanitized evidence."
+title: "[SDK Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this only for suspected DomainHarness SDK/product behavior defects. Search existing issues first.
+        Never paste credentials, customer data, K/effect permits, private package bytes or Hidden Validation fixtures.
+        If this is only an OS/CI runner resource failure, use the environment/consumer owner instead.
+  - type: input
+    id: sdk_version
+    attributes:
+      label: "DomainHarness version and exact commit SHA"
+      description: "Example: v0.10.2 / cee14399d9d0af4e20e34b9111861b16a465b690"
+      placeholder: "v0.10.2 / <40-char SHA>"
+    validations:
+      required: true
+  - type: dropdown
+    id: sdk_area
+    attributes:
+      label: "Affected SDK stage"
+      options:
+        - BUILD / selected modules
+        - Microkernel public Facade (load/send/query/subscribe/stop)
+        - Kernel Package governance / replay / effect
+        - Standard / Business / Capability Package
+        - Node Host / physical CAS / SQLite
+        - Package exports / installed distribution
+        - Unknown / need triage
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: "Consumer runtime, Node version and Host mode (safe identifiers only)"
+      placeholder: "Node 24 / Rich SQLite / redacted consumer"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected behavior"
+      description: "Relevant contract, explicit target and expected result"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Actual behavior and impact"
+      description: "Typed error code, concrete observed difference and user impact"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Minimal sanitized reproduction"
+      description: "Exact commands/steps or a small public-safe fixture; avoid proprietary data."
+      placeholder: "1. Pin exact SDK SHA ...\n2. Build sealed App ...\n3. Call public SDK ..."
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Actual test evidence"
+      description: "Literal command, EXIT, failing test IDs, or NOT_RUN (never infer PASS)."
+      placeholder: "node <scoped test>; EXIT=1; failing ID=... / NOT_RUN"
+    validations:
+      required: true
+  - type: input
+    id: duplicate
+    attributes:
+      label: "Existing Issue search / related links (optional)"
+      placeholder: "Issue #... or search terms"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Before publishing"
+      options:
+        - label: "I searched for matching existing SDK Issues."
+          required: true
+        - label: "I removed credentials, private payloads, hidden test data and customer information."
+          required: true
+        - label: "I understand OS-only resource errors are not automatically SDK product defects."
+          required: true
