@@ -2,6 +2,33 @@
 
 > **Independent Release Qualification EXECUTED: BLOCKED**, on a single frozen Full-gate authority exception pending explicit owner approval and third-context re-review. This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
 
+## 0F. Explicit exception Owner APPROVED; independent R3 and integration gates (2026-10-26)
+
+**Owner officially APPROVED** `EX-v0.10.2-R01-FULL-OS-01` in the user conversation, recorded durably in [R01 #1331 comment 6415344825](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6415344825). This is an **explicit, narrow authority decision**, not inferred from OS troubleshooting preference. Its entire scope is `v0.10.2@cee14399d9d0af4e20e34b9111861b16a465b690`, Git tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`. It accepts the independent RQ's composite Full evidence **for this release only**, with historical `npm test EXIT1` and `test:root NOT_RUN` left verbatim; no nonproduct OS repair, replay, future-version precedent or other gate exception.
+
+The **third distinct independent RQ review** is separately dispatched at [R01 #1331 comment 6415400237](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6415400237); as of this ledger update it has **NOT returned a distinct R3 PASS**. The integration controller cannot self-attest this required third independent logical identity. The valid previous independent RQ remains `BLOCKED` as of the earlier comment until that final review and post-exception verdict are recorded.
+
+**Version integration staged:** [PR #1387](https://github.com/kaicreator-mm/domain-harness/pull/1387) is a **DRAFT**, exact HEAD `cee14399` and base `main@fdf6086881cc53b4c03be1b9db837f7c535f5bd2`. GitHub compared `v0.10.2` against `main` at **ahead 68, behind 0**, PR `mergeable=true` (yet `mergeable_state=blocked` while draft/review hold); no main ref changes. No Tag `v0.10.2` exists. After genuine third R3 PASS and explicit `MAIN_INTEGRATION_AUTHORIZED=YES`, the integration controller must recheck exact main/version HEAD, obtain final RQ status, mark PR ready, merge via authorized repo governance, verify resulting main tree equals frozen candidate tree, record immutable tag with qualified source identity and close R01. **No actual merge/tag/closure has been executed yet.**
+
+**Product requirements:** ten L1 scope Issues #1301–#1310 and parent #1300 were CLOSED **as Product-scope complete** based on independent RQ acceptance of 8 P0 + 2 P1. This does not replace version Release PASS or Task DAG R01 closure.
+
+```ini
+EXCEPTION=EX-v0.10.2-R01-FULL-OS-01
+EXCEPTION_OWNER_STATUS=APPROVED_EXPLICIT_COMMENT_6415344825
+TESTED_SOURCE_SHA=cee14399d9d0af4e20e34b9111861b16a465b690
+TESTED_SOURCE_TREE=9618e88b32f16a63164f65b8fbdf4457c96f5e76
+FULL_LITERAL=EXIT1_RETAINED
+ROOT_TEST_AT_CURRENT_SHA=NOT_RUN_RETAINED
+COMPOSITE_COVERAGE=ACCEPTED_BY_OWNER_ONLY_EXACT_SHA
+THIRD_INDEPENDENT_RQ=DISPATCHED_NOT_RETURNED
+PRODUCT_DOMAINS=QUALIFIED_8P0_2P1
+VERSION_TO_MAIN_PR=1387_DRAFT_MERGEABLE_BUT_NOT_AUTHORIZED
+MAIN_INTEGRATION_AUTHORIZED=NO
+TAG_CREATED=NO
+R01_ISSUE=OPEN
+TASK_DAG=19_OF_20
+```
+
 ## 0E. Independent RQ final verdict and exception decision now pending (2026-10-26)
 
 At exact source `v0.10.2@cee14399d9d0af4e20e34b9111861b16a465b690` (tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`), the distinct independent RQ Reviewer published [#1331 comment 6415037798](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6415037798). **RESULT: `RQ=BLOCKED`, `PRODUCT_CODE_READY=YES`, `MAIN_INTEGRATION_AUTHORIZED=NO`.**
@@ -22,8 +49,8 @@ CRITICAL_JOURNEYS=PASS_INDEPENDENT_IMPACT_REUSE
 PACKAGING=PASS_INDEPENDENT_IMPACT_REUSE
 FULL=ACTUAL_EXIT1_7_OS_CAPACITY_FAILS_ROOT_NOT_RUN
 RQ_INDEPENDENT_VERDICT=BLOCKED
-RELEASE_EXCEPTION=EX-v0.10.2-R01-FULL-OS-01_DRAFT_OWNER_NOT_APPROVED
-NEXT=EXPLICIT_OWNER_APPROVAL_THEN_INDEPENDENT_THIRD_REVIEW
+RELEASE_EXCEPTION=EX-v0.10.2-R01-FULL-OS-01_OWNER_APPROVED_THIRD_REVIEW_PENDING
+NEXT=THIRD_INDEPENDENT_REVIEW_THEN_RELEASE_INTEGRATION
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
