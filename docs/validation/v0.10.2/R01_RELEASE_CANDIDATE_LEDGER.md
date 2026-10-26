@@ -2,6 +2,29 @@
 
 > **Release Qualification is NOT RUN.** This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
 
+## 0B. One-shot exclusive Windows Full result and host-capability disposition (2026-10-26)
+
+**Newest independent physical evidence** at exact v0.10.2 source `cee14399d9d0af4e20e34b9111861b16a465b690`, tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`: [#1331 comment 6414232632](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6414232632). The controller-authorized ONE **Windows exclusive** repeat has actually run; `npm ci EXIT0`, `npm run build EXIT0`, **`npm test EXIT1`**. TAP workspace records: `domain-harness 3326/3326 PASS`, `compiler 433/433 PASS`, `domain-harness-node 220/227 PASS (7 FAIL)`, `root NOT_RUN`, totaling **3986 records / 3979 PASS / 7 FAIL / 0 SKIP**. Exact log SHA256 `48c5d219643bc355bfd6c310ac3ca42ef4a4917cf922f3178f020efeaeaf7757`; source worktree clean before and after.
+
+Windows host was exclusive of *competing Domain-Harness test suites*, but had **no system pagefile**, a hard OS commit limit of **55.19 GB**, and only **3.13 GB free commit at peak**. One failing child returned **`0xC000012D STATUS_COMMITMENT_LIMIT`**; another failed `spawn UNKNOWN`, another missed its OS child initialization marker. Seven failures are in spawn-heavy Node Store/Successor Host tests; `test:root` was not reached because `npm test` uses `&&`. The prior windows attempt #2 failed 24 (the extra 17 root/HF spawn failures cleared under exclusivity); this shows a *physical Windows-host capacity dependency*, not proof of seven independent code bugs. **Neither Windows attempt is Full PASS.** Prior physical partial/tactical successes are not substituted.
+
+**Release eligibility judgement:** `R01_FULL=FAIL`, `RELEASE_RQ=BLOCKED`, `MAIN=HOLD`, `TAG=NOT_CREATED`. The one Windows-only bounded reverify authority was **consumed**; do not keep rerunning the same memory-constrained Windows tuple or weaken assertions. Treat a real **Ubuntu 128GB Node24** Build Host as a *separately resourced release validation lane*, if available: preflight exact source SHA/tree, clean git status, `node --version` major 24, functional native SQLite, memory and process limits, no competing tests; run **one unmodified canonical `npm test`** with `NODE_OPTIONS` unset and raw output/exit persisted, ensure it reaches `test:root`; record any actual fail IDs. Alternatively, Windows would need an explicit, verified OS pagefile/commit capacity expansion and a *new authorized* release-gate dispatch before any further Windows run, not an automatic fourth retry.
+
+**Already complete/current-source no re-run:** private successor owner-held Hidden **7/7 PASS EXIT0** at exact `cee14399` (private pack `d1ee9c6...`); repair #1385 independent Windows N08b 15 rounds ×4/4, Store 135/135 and memory 59/59; two scoped Woodpecker CI successes. Existing unaffected physical packaging/CJ/doc commands await explicit independent RQ impact reuse. No product source fix is justified by the recorded Windows 0xC000012D OS capacity failure alone.
+
+```ini
+CURRENT_CANDIDATE_SHA=cee14399d9d0af4e20e34b9111861b16a465b690
+CURRENT_CANDIDATE_TREE=9618e88b32f16a63164f65b8fbdf4457c96f5e76
+FULL_ATTEMPT3_WINDOWS_EXCLUSIVE=FAIL_LITERAL_EXIT1_3986_TOTAL_3979_PASS_7_FAIL_ROOT_NOT_RUN
+FULL_WINDOWS_ROOT_CAUSE=OS_COMMIT_LIMIT_NO_PAGEFILE_0xC000012D
+FULL_WINDOWS_ONE_SHOT_AUTHORIZATION=CONSUMED
+FULL_UBUNTU_128GB_NODE24=NOT_RUN
+HIDDEN_CURRENT_EXACT_SHA=PASS_7_OF_7_EXIT0
+R01_RELEASE_QUALIFICATION=BLOCKED_REQUIRED_FULL_NOT_PASS
+MAIN_INTEGRATION_AUTHORIZED=NO
+TAG=NOT_CREATED
+```
+
 ## 0A. Latest successor receipts and RQ status (2026-10-26; later than §0)
 
 **Actual current source**: `v0.10.2@cee14399d9d0af4e20e34b9111861b16a465b690`, tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`. This supersedes provisional NOT_RUN status in historical sections below; it does **not** rewrite prior physical outcomes.
@@ -162,14 +185,14 @@ The raw TAP logs settle the phase sum: **4,345 total / 4,343 PASS / 1 N08b FAIL 
 R01_ADMITTED=YES_DEPENDENCIES_CLOSED
 CANDIDATE_PREPARED=YES
 CANDIDATE_FROZEN=NO_PENDING_INDEPENDENT_TERMINAL
-EXACT_SHA_FULL_REGRESSION=EXECUTED_EXIT1_3948PASS_24FAIL_0SKIP_ROOT_NOT_RUN_HOST_CONTENTION
+EXACT_SHA_FULL_REGRESSION=ATTEMPT3_EXCLUSIVE_WINDOWS_EXIT1_3979PASS_7FAIL_0SKIP_ROOT_NOT_RUN_OS_COMMIT_LIMIT
 EXACT_SHA_N08B_ISOLATED=15_OF_15_ROUNDS_4_OF_4_PASS_ON_NEW_CODE_TREE_9618E88B
 EXACT_SHA_HIDDEN_VALIDATION=ACTUAL_7_OF_7_PASS_EXIT0_AT_CEE14399_PACK_D1EE9C6
 EXACT_SHA_CRITICAL_JOURNEYS=PHYSICAL_REPORTED_R01C_EXIT0_PLUS_REVIEWED_T09_T06B_REUSE_RQ_PENDING
 EXACT_SHA_PACKAGING=PHYSICAL_13_REAL_TARBALLS_CLEAN_INSTALL_EXIT0_RQ_PENDING
 DOC_COMMAND_EXECUTION=EXECUTED_R01C_EXIT0
 PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN_INDEPENDENT_TERMINAL
-RELEASE_QUALIFICATION=BLOCKED_FULL_EXIT1_EXCLUSIVE_HOST_VERIFICATION_AND_INDEPENDENT_RQ_PENDING
+RELEASE_QUALIFICATION=BLOCKED_FULL_WINDOWS_EXCLUSIVE_EXIT1_SEPARATE_HIGH_CAPACITY_HOST_REQUIRED
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
