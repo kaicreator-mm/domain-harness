@@ -85,3 +85,8 @@ try {
 v0.10.2 **已经发布 Tag、合并 main 并关闭 R01**。发布裁定是 **CONDITIONAL**：产品 8/8 P0 与 2/2 必需 P1 验收合格、Hidden 7/7 PASS，但一次 Full 因操作系统测试子进程资源失败留下 `EXIT1` 和 `test:root NOT_RUN`；仅当前冻结 SHA 经独立审核与 Owner 授权接受替代证据。**不能把 Full 写成 PASS，也不能把该例外直接沿用下个版本。** 详情见 [发布记录](../release/V0102_RELEASE_STATUS.md)。
 
 遇到问题查看 [故障排查](V0102_TROUBLESHOOTING.md)，Agent 集成参照 [操作手册](../agents/V0102_PLAYBOOK.md)。
+## 8. 发现 SDK 问题或使用心得，如何反馈？
+
+在实际项目使用时，如发现可复现的 SDK Bug、文档不准确、Package/Host 集成复杂或能复用的成功实践，优先阅读 [SDK 反馈与 GitHub Issue 提交指南](../feedback/SDK_USAGE_FEEDBACK.md)。先搜索现有 Issue，标明实际 SDK Tag/精确 SHA、公开 API、预期与实际行为、脱敏最小复现和真实测试结果；操作系统自身内存/测试进程故障不应当误报为 SDK 产品问题。Agent 可以帮助分类和生成 Issue，但**发布任何消费项目的代码/日志/信息前必须获得用户同意**，SDK 本身不做自动上报。
+
+使用 Codex/Claude Code 等 Agent 时可先安装 [DomainHarness SDK Skill](../agents/V0102_SDK_SKILL_INSTALL.md)，其使用说明和故障归因与本手册保持一致。

@@ -11,6 +11,8 @@
 - [Authoring guide](../guides/V0102_PACKAGE_AUTHORING.md) · [Extension index](../guides/SUPPORTED_EXTENSION_POINTS.md).
 - [Node Host guide](../guides/V0102_HOST_INTEGRATION.md) · [Tiny/Rich](../guides/V0102_TINY_RICH.md).
 - [Agent migration/implementation playbook](../agents/V0102_PLAYBOOK.md) · [task templates](../agents/V0102_TASK_TEMPLATES.md).
+- [Installable SDK Agent Skill](../agents/V0102_SDK_SKILL_INSTALL.md): self-contained instructions for external consumer Agents.
+- [Report an SDK bug or share usage feedback](../feedback/SDK_USAGE_FEEDBACK.md): voluntary, privacy-safe GitHub Issue forms.
 - [Migration v0.10.1 → v0.10.2](../migration/MIGRATING_V0101_TO_V0102.md).
 
 ## Selected public roots — not historical Compiler API

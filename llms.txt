@@ -13,6 +13,9 @@
 - [Public API](docs/manual/V0102_API_CHEATSHEET.md): buildV10App, load, send/query/subscribe/stop
 - [Package authoring](docs/guides/V0102_PACKAGE_AUTHORING.md): public producer and selected modules
 - [Agent playbook](docs/agents/V0102_PLAYBOOK.md): minimal source-first workflow, validation truth
+- [Installable SDK Agent Skill](.agents/skills/domain-harness-sdk/SKILL.md): Codex / Claude Code SDK integration workflow
+- [Skill installation for consumer repos](docs/agents/V0102_SDK_SKILL_INSTALL.md): local discovery and copy instructions
+- [GitHub issue and usage feedback](docs/feedback/SDK_USAGE_FEEDBACK.md): opt-in, sanitized, reproducible feedback channel
 - [Task prompt templates](docs/agents/V0102_TASK_TEMPLATES.md): read-only audit, integration, review, docs task
 - [Troubleshooting](docs/manual/V0102_TROUBLESHOOTING.md): typed diagnostic categories
 - [Release conditions](docs/release/V0102_RELEASE_STATUS.md): original R01 receipts, approved exception

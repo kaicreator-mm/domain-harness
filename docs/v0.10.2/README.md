@@ -12,6 +12,8 @@
 | Domain Package author | [Supported extension points](../guides/SUPPORTED_EXTENSION_POINTS.md) · [K](../guides/V0102_K_EXTENSION.md) · [S](../guides/V0102_S_FEATURE.md) · [Business/C](../guides/V0102_BUSINESS_CAPABILITY_TOOL.md) |
 | Node Host integrator | [Host integration](../guides/V0102_HOST_INTEGRATION.md) · [Tiny/Rich](../guides/V0102_TINY_RICH.md) |
 | Coding/review Agent | [Agent playbook](../agents/V0102_PLAYBOOK.md) · [Task prompt templates](../agents/V0102_TASK_TEMPLATES.md) · [AGENTS.md](../../AGENTS.md) |
+| Agent adopting SDK in another project | [Install domain-harness-sdk Skill](../agents/V0102_SDK_SKILL_INSTALL.md) · [canonical SKILL.md](../../.agents/skills/domain-harness-sdk/SKILL.md) |
+| SDK bug / feedback reporter | [Usage feedback and Issues](../feedback/SDK_USAGE_FEEDBACK.md) · [Issue triage](../feedback/ISSUE_TRIAGE_PROTOCOL.md) |
 | Troubleshooting / 常见问题 | [Troubleshooting and FAQ](../manual/V0102_TROUBLESHOOTING.md) · [Glossary](../manual/V0102_GLOSSARY.md) |
 | Migrating from v0.10.1 | [Migration guide](../migration/MIGRATING_V0101_TO_V0102.md) |
 | Release auditor | [R01 final closure](https://github.com/kaicreator-mm/domain-harness/issues/1331) · [Product freeze](../product/DomainHarness_v0.10.2_PRODUCT_FREEZE.md) · [L2 freeze](../architecture/DomainHarness_v0.10.2_L2_FREEZE.md) |
