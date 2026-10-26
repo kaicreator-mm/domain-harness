@@ -19,6 +19,7 @@ This is the **canonical English entry point for coding and review Agents** and E
 | Look up terminology | [Glossary](glossary.md) |
 | Check release facts | [Release status](release.md) |
 | Audit Product/L2/Task/validation snapshots | [Historical evidence map](archive.md) |
+| Maintain docs and enforce language pairing | [Maintenance and validator](maintenance.md) |
 
 **Authority order:** actual tagged source and package exports > frozen Product/L2 > real tests/Release Closure > these user/Agent guides > historical candidate prose.
 
