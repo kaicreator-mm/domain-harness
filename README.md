@@ -51,6 +51,7 @@ Only these package roots are distributable. The four old `domain-harness{,-compi
 
 ## Start here
 
+- [Quickstart for external clean consumers](docs/quickstart/v0102/index.md) (中文：[快速上手](docs/quickstart/v0102/index.zh-CN.md))
 - [Public API, package/ABI and Component map](docs/sdk/V0102_PUBLIC_API.md)
 - [Package authoring guide](docs/guides/V0102_PACKAGE_AUTHORING.md) and [supported extension points](docs/guides/SUPPORTED_EXTENSION_POINTS.md)
 - [Tiny/Rich and external producer guide](docs/guides/V0102_TINY_RICH.md)

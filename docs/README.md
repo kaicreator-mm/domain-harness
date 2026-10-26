@@ -1,8 +1,21 @@
 # DomainHarness Documentation
 
-This directory contains the formal product, architecture, Domain Data, Harness, implementation, SDK, validation, operations and release documentation for DomainHarness v0.1.
+This directory contains the formal product, architecture, Domain Data, Harness, implementation, SDK, validation, operations and release documentation for DomainHarness.
 
-## Authority order
+## Current line: v0.10.2 (released)
+
+The released v0.10.2 line is documented in the root `../README.md` "Start here" section. Fast entry:
+
+- Quickstart: `quickstart/v0102/index.md` (中文：`quickstart/v0102/index.zh-CN.md`)
+- Public API and Package/ABI map: `sdk/V0102_PUBLIC_API.md`
+- Authoring guides: `guides/V0102_PACKAGE_AUTHORING.md`, `guides/SUPPORTED_EXTENSION_POINTS.md`, `guides/V0102_TINY_RICH.md` and the K/S/B/C/Host journey guides
+- Migration: `migration/MIGRATING_V0101_TO_V0102.md`
+- Release qualification (CONDITIONAL, tag `v0.10.2` → `cee14399`): `validation/v0.10.2/RELEASE_QUALIFICATION.md`
+- Consumer/Agent SDK entry: `sdk/README.md`
+
+The remainder of this page (authority order, documentation map, reading paths) is the **v0.1-era** navigation retained as historical authority context; it does not describe the v0.10.2 package graph.
+
+## v0.1 authority order (historical)
 
 1. `product/DomainHarness_v0.1_PRD_FROZEN.md`, SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`.
 2. `architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
@@ -106,7 +119,7 @@ A downstream project remains authoritative for its domain/business state, API, d
 
 Until a formal release/tag is authorized, consumers should pin an exact DomainHarness commit/tarball instead of treating a moving branch as a released dependency.
 
-## Current project state
+## Current project state (v0.1 era, historical)
 
 Implementation tasks T-001..T-017 are complete. Quality hardening, canonical test-flow hardening, frozen PRD provenance, dual-OS durability, SDK documentation and repository documentation closure are complete.
 
