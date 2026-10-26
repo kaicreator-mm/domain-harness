@@ -22,3 +22,10 @@ This project follows the immutable `kaicreator-mm/ai-development-standard` revis
 - Never report a required gate as PASS when it was not executed.
 
 Keep this file short. Project-specific detail belongs in `PROJECT_OVERRIDES.md`; product and architecture facts belong in `docs/`.
+
+## Current released-line navigation: v0.10.2
+
+For **users or coding Agents** targeting the already qualified v0.10.2 source, start at [docs/v0.10.2/README.md](docs/v0.10.2/README.md), then [architecture diagrams](docs/architecture/V0102_RUNTIME_DIAGRAMS.md), [public API quick reference](docs/manual/V0102_API_CHEATSHEET.md), [Agent task playbook](docs/agents/V0102_PLAYBOOK.md) and [copyable prompts](docs/agents/V0102_TASK_TEMPLATES.md). Prefer current exported code and real example fixtures over historical v0.1/v0.3 guide text.
+
+**Immutable boundary:** `refs/tags/v0.10.2` pins `cee14399d9d0af4e20e34b9111861b16a465b690`. User/Agent handbook changes are **post-release docs-only PRs**; they do not change tagged source or inherit a new runtime/RQ. Record real command exits; v0.10.2 RQ is **CONDITIONAL** under exact-SHA-only exception (historical Full EXIT1/root NOT_RUN), not a repeatable waiver for future versions. Never infer an npm registry release from the Git tag or the `0.10.2-rc.0` package manifests. Keep product/build/host/agent responsibilities separate; no OS RAM/vendor prerequisites are introduced by release incident logs.
+
