@@ -86,9 +86,14 @@ test('t016: archived governance record binds the v0.7 closure candidate, tree, a
   }
 });
 
-test('t016: README currentness names the v0.7 line at the closure candidate', () => {
-  assert.ok(README.includes('**v0.7**'), 'README must name v0.7');
-  assert.ok(README.includes(CANDIDATE_TREE), 'README must bind the v0.7 tree');
+test('t016: active README identifies v0.10.2 candidate while archived v0.7 release identity is preserved', () => {
+  // Old candidate/tree/digest facts belong to GOVERNANCE, validated above.
+  // The active README must advance with the version rather than assert that
+  // the historic v0.7 release remains the current development line.
+  assert.ok(README.includes('v0.10.2 development candidate'), 'README must identify the active v0.10.2 candidate');
+  assert.ok(README.includes('**not** a qualified release'), 'README must not call the active candidate released');
+  assert.ok(README.includes('docs/sdk/V0102_PUBLIC_API.md'), 'README must link the selected current public SDK');
+  assert.ok(GOVERNANCE.includes(CANDIDATE_TREE), 'archived v0.7 candidate tree must remain preserved');
 });
 
 test('t016: divergence audit carries the (a)/(b)/(c) classification and lane constraint', () => {
