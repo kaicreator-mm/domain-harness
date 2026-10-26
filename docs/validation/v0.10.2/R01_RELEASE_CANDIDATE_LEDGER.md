@@ -7,12 +7,12 @@
 | Field | Actual fact |
 | --- | --- |
 | Repository / candidate branch | `kaicreator-mm/domain-harness` / `v0.10.2` |
-| Immutable source-candidate commit | `3a2ad3b88e149f19b1666bfbf5949420f51295cc` |
-| Source-candidate Git tree | `9defe150e369587b448d3b1c7c7b30e787ddd8ac` |
-| T09 independently R1-reviewed integration source | `59ecb5446e654be20b1763e928f8c5befaa6acd9`, identical Git tree `9defe150e369587b448d3b1c7c7b30e787ddd8ac` |
+| Immutable source-candidate commit | `11ab7954f547fde44c003e2b227d672dc8af0a79` |
+| Source-candidate Git tree | `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b` |
+| T09 independently R1-reviewed integration source | `59ecb5446e654be20b1763e928f8c5befaa6acd9`, original tree `9defe150e369587b448d3b1c7c7b30e787ddd8ac`; final candidate changes only unrelated docs/authoring examples, test and error catalog, T09 physical source preserved |
 | T08b docs source merge | `b5669690f9771caa5c156563dbf5b658080d59d3` |
 | T09 integration merge / Issue closure | PR #1377, `3a2ad3b88e149f19b1666bfbf5949420f51295cc`; #1330 CLOSED |
-| Dependency join | T07b #1328 + T08b #1329 + T09 #1330 all CLOSED and merged into version |
+| Dependency join | T07b #1328 + T08b #1329 + T09 #1330 CLOSED/merged; preflight corrections #1379, #1381 and #1382 CLOSED/merged into version |
 | Frozen Product / L2 anchors | `docs/product/DomainHarness_v0.10.2_PRODUCT_FREEZE.md` and `docs/architecture/DomainHarness_v0.10.2_L2_FREEZE.md` — remain unchanged |
 | ADS pin | `kaicreator-mm/ai-development-standard` 4.13.1 at `f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd` |
 | Release evidence file itself | A later **evidence-only** commit; distinguish its Git SHA from the `tested_sha` above |
@@ -30,7 +30,7 @@ The frozen PRD's §3 has **eight P0** and **two P1 release deliverables**. Every
 | #1302 Physical package ownership and Host | P0 | T00/T01/T03/T07b | Selected owner/reachability and packlist; no legacy runtime included |
 | #1303 Current docs and evidence | P0 | T08a/T08b PR #1376 | Exact public Package/ABI links, preserved archive pointers, final doc commands |
 | #1304 Domain Package Manifest/ABI and Tool classes | P0 | T05 + A8b + selected Contracts | Declared Tool/Hook/semantic/refusal and module effect model, typed negatives |
-| #1305 Author guides and package templates | P1 | T08b docs and earlier fixtures | **BLOCKED at source candidate**: #1379 (draft PR #1380) — missing supported extension index + checked authoring guides/templates; subsequently verify runnable S non-Tool, B private helper, two-C mixed Tool, K extension/Host authoring examples and SUPPORTED_EXTENSION_POINTS; no invented working example |
+| #1305 Author guides and package templates | P1 | T08b docs and earlier fixtures | **TASK-CLOSED, R01 NOT YET QUALIFIED**: #1379 / PR #1380 supplies authoring guides/index and a physically executed public BUILD/pack/install/run S non-Tool, B private helper and two C modules; verify as part of R01 acceptance, B private helper, two-C mixed Tool, K extension/Host authoring examples and SUPPORTED_EXTENSION_POINTS; no invented working example |
 | #1306 Tiny/Rich installed Domain Apps | P0 | T09 #1330 PR #1377 | Real Node24 clean Tiny/Rich and SQLite CAS/effect/UNKNOWN; source-tree-matched reuse with honest provenance |
 | #1307 Public production SDK | P0 | T04/T06b/T11/T07b | Exact exported `load/send/query/subscribe/stop`, typed redaction, N3-LATE reuse; private Host/gate hidden |
 | #1308 Source→artifact→install | P0 | T07b/T09 | Node24 `npm ci/build`; four selected tarballs; installed Tiny excludes Compiler/BUILD/`typescript`/`jsonata`/`yaml` |
@@ -44,6 +44,9 @@ The frozen PRD's §3 has **eight P0** and **two P1 release deliverables**. Every
 | Mandatory check | Source/owner | R01 state | Reuse / next action |
 | --- | --- | --- | --- |
 | Exact SHA, clean Node24 checkout and tracked-tree status | R01 Build Host | **NOT_RUN** | Record Node/npm, SHA/tree, clean status and commands |
+| Post-T09 #1379 authoring | PR #1380 source R1 PASS, reported real Node24 producer+consumer EXIT0 | **TASK_PASS / RELEASE_NOT_RUN** | Re-run docs-command or explicitly reuse identical executed bytes with R01 impact decision |
+| #1381 T016 archived README regression | PR #1383 5/5 Node24 EXIT0 | **TASK_PASS / FULL_NOT_RUN** | Current v0.10.2 candidate wording and preserved archived v0.7 facts |
+| #1382 typed literal catalog regression | PR #1384 Node24 scanner + 2/2 EXIT0 | **TASK_PASS / FULL_NOT_RUN** | 3 BUILD Component refusal literals, one JSON artifact change |
 | `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck` | README + R01 guide | **NOT_RUN** on final candidate | Run once, capture exit codes; exact-SHA T09/CI passes do not by themselves execute docs commands |
 | Entire workspace/root `npm test` | R01 Full Regression | **NOT_RUN** | **One** release candidate full-run channel (manual Woodpecker **or** equivalent approved clean Node24 local validator), not redundant simultaneous full runs |
 | Tiny/Rich external packed producer and consumer command | `tests/integration/v010-clean-consumers/clean-consumers.test.ts` | **REUSE_CANDIDATE_ONLY** | T09 Node24 local EXIT 0 reported twice on all 14 unchanged T09 source blobs; R01 may execute once to prove literal docs command at frozen candidate / verify unchanged image and record actual exit |
@@ -76,6 +79,10 @@ npm run typecheck
 npm test
 node --import tsx --test tests/compiler/v0102-tarball-inventory.test.ts
 node --import tsx --test tests/integration/v010-clean-consumers/clean-consumers.test.ts
+node examples/v0102-package-authoring/projection-smoke.mjs
+node examples/v0102-package-authoring/authoring-template-check.mjs --evidence ./r01-authoring-template-evidence.json
+node scripts/check-v010-error-code-catalog.mjs
+node --import tsx --test packages/domain-harness/tests/t016/t016-rq-contract.test.ts
 npm pack --dry-run --json -w @kaicreator/domain-harness-contracts
 npm pack --dry-run --json -w @kaicreator/domain-harness-microkernel
 npm pack --dry-run --json -w @kaicreator/domain-harness-host-node
@@ -87,7 +94,7 @@ If the frozen-branch manual Woodpecker candidate runs `npm test`, do **not** rep
 
 ## 5. Candidate decisions awaiting evidence
 
-**Preflight finding (2026-10-26):** Source candidate tree 9defe150 has no SUPPORTED_EXTENSION_POINTS or independently checked #1305 authoring guide/template. R01 P1 release blocker [#1379](https://github.com/kaicreator-mm/domain-harness/issues/1379), source-draft [PR #1380](https://github.com/kaicreator-mm/domain-harness/pull/1380). Until its code/docs are independently reviewed, actually Node24 qualified and merged to the version, the frozen source SHA above must not be used as RELEASE_READY; repin and reassess impact afterward. All R01 full/hidden/CJ/packaging remain NOT_RUN. This gap does not imply a known runtime P1 defect.
+**Preflight resolution (2026-10-26):** The old 3a2ad3b8 candidate lacked Product #1305 authoring. #1379/PR #1380 was independently source-reviewed PASS and physically Node24 authoring-tested (reported EXIT0), merged to version at `7c24f2ad0f75929e2dffbe256afb4ce9d42c49a7`. The two baseline Full failures were repaired by #1381/PR #1383 (T016 Node24 5/5 PASS, merged at `ecee68c9d1b972a3aebf5a46c4844aded440dad0`) and #1382/PR #1384 (Node24 literal catalog scanner EXIT0 + tests 2/2, version merge `11ab7954f547fde44c003e2b227d672dc8af0a79`), all separately reviewed with exact-head dual CI PASS. Final **source candidate** is `11ab7954f547fde44c003e2b227d672dc8af0a79`, Git tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b`. Those are **Task/PR gates**; every R01 Full/Hidden/Critical/Packaging and complete Product qualification gate remains NOT_RUN. No main integration is authorized.
 
 ```ini
 R01_ADMITTED=YES_DEPENDENCIES_CLOSED
@@ -99,7 +106,7 @@ EXACT_SHA_CRITICAL_JOURNEYS=NOT_RUN_RELEASE_GATE
 EXACT_SHA_PACKAGING=NOT_RUN_RELEASE_GATE
 DOC_COMMAND_EXECUTION=NOT_RUN
 PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN
-RELEASE_QUALIFICATION=BLOCKED_ON_PRODUCT_P1_1305_AND_REMAINING_GATES_NOT_RUN
+RELEASE_QUALIFICATION=NOT_RUN_PENDING_FULL_HIDDEN_CRITICAL_PACKAGING_AND_PRODUCT_QA
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```

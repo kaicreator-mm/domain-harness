@@ -1,0 +1,21 @@
+# v0.10.2 supported Domain Package extension points
+
+**Candidate authoring contract; Issue #1379.** This index describes the actually published BUILD adapter and selected v0.10.2 ABI. It does not introduce a runtime dispatcher or certify any unrun example.
+
+| Kind | BUILD selection / entry | Owns | Explicitly unsupported |
+| --- | --- | --- | --- |
+| K Primary | one selected `kernel-primary`, `v08-kernel-abi/1` | Admission, State/CAS decisions, Journal, Effect, UNKNOWN, Replay | Second K Primary, K authority in a Hook |
+| K advisory extension | selected `kernel-extension`; `providerId` + `hookExport`, `dh.v10.kernel-extension/1`; Component `hook/kernel-advisory` | Read-only advice/observation | Minting permits, commit/replay, generic lifecycle/event/observer Hook |
+| S Primary | one selected `standard-primary`, `v08-standard-sdk-abi/1` | Semantic interpretation/routing | Effect permission authority |
+| S Feature | selected `standard-feature`, `featureExport`, `dh.v10.standard-feature/1`; Component `semantic` kind skill/rule/workflow/decision/context/validator/schema/diagnostics/knowledge/evidence | An explicitly selected bounded semantic service; can use private pure helpers | Converting every helper/function or data asset into a Tool; calling unselected feature |
+| Business | selected `business`, `v08-business-abi/1`; declares `intent:...` | Domain workflow, scoped policy and Intent | Caller grants, K Journal, bypass effect permit |
+| C Tool / Capability | selected `capability`, `v08-capability-abi/1`; `capabilityId`, `handlers[{operationId,handler}]`, module-wide `externalEffect`; Component `tool/package-operation` | Declared invocation boundary; external Effect requires K permit | Private helper auto-registration, per-handler Effect override, inferred remote/system transport |
+| Node Host | `@kaicreator/domain-harness-host-node` root or trusted `microkernel/host-seam` | Physical CAS/SQLite, durable ports, lifecycle resources | K-owned policy or BUILD-time selection |
+
+**Execution model:** static external `buildV10App` seals only selected K/S/B/C module bytes/digests/ABI/import edges. The runtime consumes the resulting trusted plain App through `@kaicreator/domain-harness-microkernel` `load(app,{store,...})`. `projectSelectedComponents` only projects already selected S/K/C modules; its `bindings` are informational. Other extension classes must refuse with typed errors. Only Node24 has real v0.10.2 physical qualification, despite `engines.node >=24.0.0`.
+
+**Registration / failures:** BUILD rejects unknown module/package IDs, wrong selected `featureExport`, wrong `hookExport`, missing C handler mapping, duplicate Component identity, undeclared effect/import authority, invalid role cardinality and import-closure violations. An Event/Business lifecycle Hook and remote/system Tool placement have no automatic adapter. Use `BUILD_INPUT_INVALID`, `BUILD_GRAPH_INVALID`, `V10_EXPORT_CONTRACT_REFUSED` negative tests from `tooling/build/tests/component-view.test.ts`; do not swallow typed failure or reinterpret unsupported as a warning.
+
+**Dependencies / initialization:** Private pure helpers are ordinary JS in the selected module; their execution is not a separate selected Tool. The selected BUILD checks declared dependencies/import edges; Host owns physical adapter lifecycle, Microkernel load/stop governs binding/disposal and K owns effect approval. No standalone generic `onInit/onDispose` Component ABI is asserted here. Do not import `src/` or `dist/` deep paths.
+
+Authoring journeys: [Package](V0102_PACKAGE_AUTHORING.md), [K extension](V0102_K_EXTENSION.md), [S Feature](V0102_S_FEATURE.md), [Business and C Tool](V0102_BUSINESS_CAPABILITY_TOOL.md), [Node Host](V0102_HOST_INTEGRATION.md). The checked existing projection fixture is `tooling/build/tests/component-view.test.ts`; the real installed App fixture is `tests/integration/v010-clean-consumers/clean-consumers.test.ts` (T09, separately established); the minimal independent authoring-template physical check for this table's S/B/C rows is `examples/v0102-package-authoring/authoring-template-check.mjs`. None of them substitutes for the independent exact-HEAD review Issue #1379 requires before release.

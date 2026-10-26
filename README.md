@@ -52,6 +52,7 @@ Only these package roots are distributable. The four old `domain-harness{,-compi
 ## Start here
 
 - [Public API, package/ABI and Component map](docs/sdk/V0102_PUBLIC_API.md)
+- [Package authoring guide](docs/guides/V0102_PACKAGE_AUTHORING.md) and [supported extension points](docs/guides/SUPPORTED_EXTENSION_POINTS.md)
 - [Tiny/Rich and external producer guide](docs/guides/V0102_TINY_RICH.md)
 - [v0.10.1 → v0.10.2 migration](docs/migration/MIGRATING_V0101_TO_V0102.md)
 - [Version candidate command/acceptance inventory](docs/guides/V0102_R01_DOC_COMMANDS.md)
