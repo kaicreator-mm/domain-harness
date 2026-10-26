@@ -10,7 +10,7 @@
 
 </details>
 
-当前文档的 **14 个主题中英一一对应**：快速开始、架构图、SDK、Package、Host、迁移、Skill、Agent、反馈、排障、发布状态、术语和历史资料导航。维护与反馈入口见 [中文首页](current/zh-CN/index.md)。
+当前文档的 **15 个主题中英一一对应**：快速开始、架构图、SDK、Package、Host、迁移、Skill、Agent、反馈、排障、发布状态、术语和历史资料导航。维护与反馈入口见 [中文首页](current/zh-CN/index.md)。
 
 **旧目录：历史与冻结证据（不删除、不改写）**。例如 `product/` 存 Product，`architecture/` 存 L2，`validation/` 存真实执行证据，`guides/` 与 `sdk/` 存旧实现期间的技术说明。它们原有的 `candidate`、`NOT_RUN` 或 `main HOLD` 记录是**历史事实**，不是当前状态。需要查证时从 [中文归档导航](current/zh-CN/archive.md) 或 [English archive map](current/en/archive.md) 进入。
 
