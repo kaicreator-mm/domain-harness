@@ -2,13 +2,25 @@
 
 > **Release Qualification is NOT RUN.** This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
 
+## 0. Successor-candidate admission after P1 #1385 (2026-10-26)
+
+The old candidate `11ab7954f547fde44c003e2b227d672dc8af0a79` **must not be called the current version branch**. The P1 concurrent WAL setup defect was independently reproduced 4/15 rounds, fixed in scoped [PR #1386](https://github.com/kaicreator-mm/domain-harness/pull/1386) and merged **only into `v0.10.2`** at `cee14399d9d0af4e20e34b9111861b16a465b690`, Git tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`. The diff from the prior candidate is exactly `packages/domain-harness-node/src/store/node-sqlite-runtime-store.ts` (+35/-6); neither public four published package source tree/dist, imported contracts, selected Domain Package source, lockfiles, test fixtures nor current Hidden private oracle were changed.
+
+Independent Windows Node24 validation of PR #1386 exact code tree `9618e88b...`: 15 independent rounds of the four-case N08/N08b/N09/N10 single file, **15/15 rounds EXIT0 and 4/4 PASS** each; scoped Store **135/135 PASS**, :memory: **59/59 effective PASS**, migration/reopen PASS. Two PR CI checks SUCCESS. This adequately qualifies the **changed-risk repair** at the exact new source tree. #1385 CLOSED. It does **not** fabricate a full-suite rerun.
+
+**Strict RQ applicability currentness:** Frozen ADS `RELEASE_STANDARD.md` §§3–6 and `VALIDATION_STANDARD.md` §§7/impact require predecessor execution receipts to retain their predecessor identity; historical PASS/FAIL must not be silently promoted to successor PASS. Accordingly:
+- **Current new-candidate Full (required)** = `NOT_RUN`; old `npm test EXIT1` and old root phase completion remain transparent history. A single clean Node24 `npm test` at exactly `cee14399` is the shortest unambiguous terminal Full proof (reuse pre-existing `npm ci/build` if checkout and dep graph identical; no repeated per-leaf full).
+- **Current new-candidate independent Hidden (required)** = `NOT_RUN`; historical real private 7/7 PASS on `11ab7954` remains valid solely for that candidate. Private owner should **repin and rerun the same seven risk-family oracles once** against `cee14399`, proving exact product HEAD/tree and keeping pack pin/digests/review identities. The historical 33-case inventory remains **NOT required to port**. Public selected distributable tarballs must be re-hashed/verified identical; no oracle rebuild unless candidate-impact evidence demands it.
+- Critical Journeys, installed consumer and docs commands on old `11ab7954` can be considered for **explicit bounded impact reuse** at successor only after frozen RQ authority confirms the one private-node-store constructor delta does not invalidate selected published packages, K/S/CJ binding and doc commands. This is a reuse decision, **not an assertion of fresh execution**.
+- After one exact new source Full PASS + new owner-held Hidden PASS and no new P0/P1, independently evaluate Candidate Freeze and Release Qualification at `cee14399`. This ledger is an evidence-only branch separate from the actual tested candidate; **do not merge it into frozen source ref in a way that silently changes the qualified SHA**.
+
 ## 1. Frozen candidate subject, provenance and admission
 
 | Field | Actual fact |
 | --- | --- |
 | Repository / candidate branch | `kaicreator-mm/domain-harness` / `v0.10.2` |
-| Immutable source-candidate commit | `11ab7954f547fde44c003e2b227d672dc8af0a79` |
-| Source-candidate Git tree | `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b` |
+| **Current version-source candidate** | **`cee14399d9d0af4e20e34b9111861b16a465b690`** (post-#1386, R01 exact-candidate gate still pending) |
+| **Current version-source Git tree** | **`9618e88b32f16a63164f65b8fbdf4457c96f5e76`** |
 | T09 independently R1-reviewed integration source | `59ecb5446e654be20b1763e928f8c5befaa6acd9`, original tree `9defe150e369587b448d3b1c7c7b30e787ddd8ac`; final candidate changes only unrelated docs/authoring examples, test and error catalog, T09 physical source preserved |
 | T08b docs source merge | `b5669690f9771caa5c156563dbf5b658080d59d3` |
 | T09 integration merge / Issue closure | PR #1377, `3a2ad3b88e149f19b1666bfbf5949420f51295cc`; #1330 CLOSED |
@@ -17,6 +29,8 @@
 | ADS pin | `kaicreator-mm/ai-development-standard` 4.13.1 at `f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd` |
 | Release evidence file itself | A later **evidence-only** commit; distinguish its Git SHA from the `tested_sha` above |
 | Main / version tag / release | `MAIN_HOLD / TAG_NOT_CREATED / RELEASE_NOT_QUALIFIED` |
+| Previous physical A+C and Hidden validated subject | `11ab7954f547fde44c003e2b227d672dc8af0a79`, tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b` — **historical exact-subject only**, not current full/hidden PASS |
+| P1 #1385 source repair + physical targeted gate | PR #1386 merged to version-only at `cee14399d9d0af4e20e34b9111861b16a465b690`. R1 source, R2 controller, dual exact-head CI PASS; independent Windows Node24 15/15 rounds ×4/4; store 135/135; memory 59/59 effective. #1385 CLOSED |
 
 **Controller precondition:** before any Release qualification command, verify `git rev-parse HEAD` equals the exact **source-candidate commit** above in a clean checkout. If candidate source changes, repin and assess validation impact. A new evidence-only PR does not redefine the tested code subject.
 
@@ -114,20 +128,20 @@ The raw TAP logs settle the phase sum: **4,345 total / 4,343 PASS / 1 N08b FAIL 
 
 ## 5. Candidate decisions awaiting evidence
 
-**Preflight resolution (2026-10-26):** The old 3a2ad3b8 candidate lacked Product #1305 authoring. #1379/PR #1380 was independently source-reviewed PASS and physically Node24 authoring-tested (reported EXIT0), merged to version at `7c24f2ad0f75929e2dffbe256afb4ce9d42c49a7`. The two baseline Full failures were repaired by #1381/PR #1383 (T016 Node24 5/5 PASS, merged at `ecee68c9d1b972a3aebf5a46c4844aded440dad0`) and #1382/PR #1384 (Node24 literal catalog scanner EXIT0 + tests 2/2, version merge `11ab7954f547fde44c003e2b227d672dc8af0a79`), all separately reviewed with exact-head dual CI PASS. Final **source candidate** is `11ab7954f547fde44c003e2b227d672dc8af0a79`, Git tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b`. Those are **Task/PR gates**. Physical A+C and genuine Hidden 7/7 current-source receipts have arrived at `11ab7954`. Full remains literal `npm test EXIT=1`: independent N08b clean repeat testing reproduced a P1 defect #1385; R01 Full and Release Qualification are blocked until a scoped fix, review and real changed-risk revalidation on the new version candidate. Critical/Packaging/doc commands executed/reuse-qualified. No main integration is authorized.
+**Preflight resolution at previous candidate (2026-10-26), superseded by successor §0 above:** The old 3a2ad3b8 candidate lacked Product #1305 authoring. #1379/PR #1380 was independently source-reviewed PASS and physically Node24 authoring-tested (reported EXIT0), merged to version at `7c24f2ad0f75929e2dffbe256afb4ce9d42c49a7`. The two baseline Full failures were repaired by #1381/PR #1383 (T016 Node24 5/5 PASS, merged at `ecee68c9d1b972a3aebf5a46c4844aded440dad0`) and #1382/PR #1384 (Node24 literal catalog scanner EXIT0 + tests 2/2, version merge `11ab7954f547fde44c003e2b227d672dc8af0a79`), all separately reviewed with exact-head dual CI PASS. Final **source candidate** is `11ab7954f547fde44c003e2b227d672dc8af0a79`, Git tree `36a6b1d57cb7bcc5cee6c2857e1078661f51cd8b`. Those are **Task/PR gates**. Physical A+C and genuine Hidden 7/7 current-source receipts have arrived at `11ab7954`. Full remains literal `npm test EXIT=1`: independent N08b clean repeat testing reproduced a P1 defect #1385; R01 Full and Release Qualification are blocked until a scoped fix, review and real changed-risk revalidation on the new version candidate. Critical/Packaging/doc commands executed/reuse-qualified. No main integration is authorized.
 
 ```ini
 R01_ADMITTED=YES_DEPENDENCIES_CLOSED
 CANDIDATE_PREPARED=YES
 CANDIDATE_FROZEN=NO_PENDING_INDEPENDENT_TERMINAL
-EXACT_SHA_FULL_REGRESSION=EXECUTED_NPM_TEST_EXIT1_N08B_REPRODUCED_P1_1385_OPEN
-EXACT_SHA_N08B_ISOLATED=4_OF_4_PASS_EXIT0
-EXACT_SHA_HIDDEN_VALIDATION=EXECUTED_7_OF_7_PASS_EXIT0_PACK_3e7d0c_AT_11ab7954_RQ_PENDING
+EXACT_SHA_FULL_REGRESSION=NOT_RUN_AT_SUCCESSOR_CEE14399_OLD_EXIT1_HISTORICAL_N08B_FIXED_SCOPED
+EXACT_SHA_N08B_ISOLATED=15_OF_15_ROUNDS_4_OF_4_PASS_ON_NEW_CODE_TREE_9618E88B
+EXACT_SHA_HIDDEN_VALIDATION=NOT_RUN_AT_SUCCESSOR_CEE14399_OLD_SHA_7_OF_7_PASS_HISTORICAL_ONLY
 EXACT_SHA_CRITICAL_JOURNEYS=PHYSICAL_REPORTED_R01C_EXIT0_PLUS_REVIEWED_T09_T06B_REUSE_RQ_PENDING
 EXACT_SHA_PACKAGING=PHYSICAL_13_REAL_TARBALLS_CLEAN_INSTALL_EXIT0_RQ_PENDING
 DOC_COMMAND_EXECUTION=EXECUTED_R01C_EXIT0
 PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN_INDEPENDENT_TERMINAL
-RELEASE_QUALIFICATION=BLOCKED_P1_1385_PENDING_TARGETED_SOURCE_FIX_NEW_CANDIDATE_RQ
+RELEASE_QUALIFICATION=BLOCKED_PENDING_NEW_CANDIDATE_FULL_HIDDEN_AND_INDEPENDENT_RQ
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
