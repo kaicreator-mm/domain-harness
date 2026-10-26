@@ -2,6 +2,34 @@
 
 > **Release Qualification is NOT RUN.** This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
 
+## 0A. Latest successor receipts and RQ status (2026-10-26; later than §0)
+
+**Actual current source**: `v0.10.2@cee14399d9d0af4e20e34b9111861b16a465b690`, tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`. This supersedes provisional NOT_RUN status in historical sections below; it does **not** rewrite prior physical outcomes.
+
+### R01-B successor private Hidden — actual **7/7 PASS / EXIT0**
+
+The **private** `kaicreator-mm/hidden-validation` successor PR #76 was independently reviewed: R1 metadata truthfulness P1 BLOCK corrected; R2 exact private head `f7472729f27fe9a643e047a228bb61d93578799d` PASS (review receipt 5649822283); seven .tgz artifact SHA256 digests recalculated and match; freeze revision 8 HEAD `d1ee9c6aba7d937e0f4c5c21354661a793c56ce1`. Real Windows Node24.21.0 independent installed producer/Tiny/Rich test run `runs/20261026T093459Z-hidden-v0102`: preflight PASS, installs/npm-ls all EXIT0, **7 selected owner-held risk-family cases executed / 7 PASS / 0 FAIL / RUNNER_EXIT=0**. Exact public product SHA/tree verified. Evidence-only private repo HEAD `970184360aa665e6187199d06fd41dab7600f623`; immutable redacted summary blob `f59785f60e2ba2a82dc5a28b4db4c73a0bf08f3f`, exit file blob `29810293908aeaf7ab175c80a7405498de4d46eb`. Public safe receipts [R01 #1331 comment 6412820649](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6412820649) and PR #1378 comment 6412821206. **Hidden 7/7 PASS at the CURRENT source**; older v0.10.1 33 IDs remain inventory only, NOT ported; previous product `11ab7954` Hidden remains a distinct historical record. No self-declared Release PASS.
+
+### R01-A successor Full — **executed literal EXIT1 (environmental contention), must not count PASS**
+
+Windows Node24.21.0 real detached clean current SHA/tree checkout, npm ci/build EXIT0, canonical `npm test` attempt #2 EXIT1, **3,972 recorded workspace test rows / 3,948 PASS / 24 FAIL / 0 SKIP; `test:root` NOT_RUN** (workspace chain short-circuited). Receipt [R01 #1331 comment 6413128125](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6413128125), raw log SHA256 `dbcc7e0f9fc130b6134264f2415472d12a848e9ddf6351349c01238056cf84e6`. All 24 reported failures have concurrent child-spawn/module-loading/resource exhaustion shapes (Node V8 `out of memory allocating heap arena map`, TSX EINVAL, worker exit and fork). **Competing full suite on same Windows host overlapped**, free virtual-memory commit reserve only 5.1GB/55.2GB; prior attempt #1 was impacted by incorrectly injected duplicate `--test-reporter=tap` in nested node tests and likewise EXIT1 (preserve original logs; never relabel either execution). Targeted fail-families verified green once no contention. No confirmed new Product logic P0/P1, but the mandatory exact-candidate Full is **still FAIL** and main is HOLD.
+
+**Required one bounded cure, not new development:** Authorize **one additional canonical plain `npm test` execution on a genuinely exclusive Node24 host window**, without another parallel test session, memory pressure, `NODE_OPTIONS=--test-reporter` or source edits; use Ubuntu 128 GB Build Host if Windows commit headroom cannot be isolated, with exact SHA/tree. Capture authentic EXIT/TAP and ensure `test:root` actually executed. Prior targeted tests, 15 × 4/4 N08 and Hidden 7/7 all remain valid and must NOT be re-executed. On further Full failure, independent RQ must classify actual new failure against exact logs; do not claim PASS or repeatedly retry.
+
+### Release gate, immutable subject
+```ini
+SOURCE_SHA=cee14399d9d0af4e20e34b9111861b16a465b690
+SOURCE_TREE=9618e88b32f16a63164f65b8fbdf4457c96f5e76
+HIDDEN_REAL_7_CASES=PASS_EXIT0_CURRENT_SHA
+FULL_CANONICAL_RUN2=FAIL_EXIT1_RESOURCE_CONTENTION
+FULL_TEST_ROOT=NOT_RUN_IN_CANONICAL_ATTEMPT
+RELEASE_GATE_FULL=FAIL_PENDING_ONE_AUTHORIZED_EXCLUSIVE_HOST_REVERIFY
+CRITICAL_PACKAGING_DOCS=HISTORICAL_PASS_IMPACT_REUSE_PENDING_RQ
+RELEASE_QUALIFICATION=BLOCKED_UNTIL_FULL_GATE_MET
+MAIN_INTEGRATION_AUTHORIZED=NO
+VERSION_TAG=NOT_CREATED
+```
+
 ## 0. Successor-candidate admission after P1 #1385 (2026-10-26)
 
 The old candidate `11ab7954f547fde44c003e2b227d672dc8af0a79` **must not be called the current version branch**. The P1 concurrent WAL setup defect was independently reproduced 4/15 rounds, fixed in scoped [PR #1386](https://github.com/kaicreator-mm/domain-harness/pull/1386) and merged **only into `v0.10.2`** at `cee14399d9d0af4e20e34b9111861b16a465b690`, Git tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`. The diff from the prior candidate is exactly `packages/domain-harness-node/src/store/node-sqlite-runtime-store.ts` (+35/-6); neither public four published package source tree/dist, imported contracts, selected Domain Package source, lockfiles, test fixtures nor current Hidden private oracle were changed.
@@ -9,8 +37,8 @@ The old candidate `11ab7954f547fde44c003e2b227d672dc8af0a79` **must not be calle
 Independent Windows Node24 validation of PR #1386 exact code tree `9618e88b...`: 15 independent rounds of the four-case N08/N08b/N09/N10 single file, **15/15 rounds EXIT0 and 4/4 PASS** each; scoped Store **135/135 PASS**, :memory: **59/59 effective PASS**, migration/reopen PASS. Two PR CI checks SUCCESS. This adequately qualifies the **changed-risk repair** at the exact new source tree. #1385 CLOSED. It does **not** fabricate a full-suite rerun.
 
 **Strict RQ applicability currentness:** Frozen ADS `RELEASE_STANDARD.md` §§3–6 and `VALIDATION_STANDARD.md` §§7/impact require predecessor execution receipts to retain their predecessor identity; historical PASS/FAIL must not be silently promoted to successor PASS. Accordingly:
-- **Current new-candidate Full (required)** = `NOT_RUN`; old `npm test EXIT1` and old root phase completion remain transparent history. A single clean Node24 `npm test` at exactly `cee14399` is the shortest unambiguous terminal Full proof (reuse pre-existing `npm ci/build` if checkout and dep graph identical; no repeated per-leaf full).
-- **Current new-candidate independent Hidden (required)** = `NOT_RUN`; historical real private 7/7 PASS on `11ab7954` remains valid solely for that candidate. Private owner should **repin and rerun the same seven risk-family oracles once** against `cee14399`, proving exact product HEAD/tree and keeping pack pin/digests/review identities. The historical 33-case inventory remains **NOT required to port**. Public selected distributable tarballs must be re-hashed/verified identical; no oracle rebuild unless candidate-impact evidence demands it.
+- **Full was NOT_RUN at the time of original §0 drafting, but is now EXECUTED EXIT1** per §0A; old `npm test EXIT1` and old root phase completion remain transparent history. A single clean Node24 `npm test` at exactly `cee14399` is the shortest unambiguous terminal Full proof (reuse pre-existing `npm ci/build` if checkout and dep graph identical; no repeated per-leaf full).
+- **Current new-candidate independent Hidden (required)** = **EXECUTED 7/7 PASS EXIT0** per later §0A; historical real private 7/7 PASS on `11ab7954` remains valid solely for that candidate. Private owner should **repin and rerun the same seven risk-family oracles once** against `cee14399`, proving exact product HEAD/tree and keeping pack pin/digests/review identities. The historical 33-case inventory remains **NOT required to port**. Public selected distributable tarballs must be re-hashed/verified identical; no oracle rebuild unless candidate-impact evidence demands it.
 - Critical Journeys, installed consumer and docs commands on old `11ab7954` can be considered for **explicit bounded impact reuse** at successor only after frozen RQ authority confirms the one private-node-store constructor delta does not invalidate selected published packages, K/S/CJ binding and doc commands. This is a reuse decision, **not an assertion of fresh execution**.
 - After one exact new source Full PASS + new owner-held Hidden PASS and no new P0/P1, independently evaluate Candidate Freeze and Release Qualification at `cee14399`. This ledger is an evidence-only branch separate from the actual tested candidate; **do not merge it into frozen source ref in a way that silently changes the qualified SHA**.
 
@@ -134,14 +162,14 @@ The raw TAP logs settle the phase sum: **4,345 total / 4,343 PASS / 1 N08b FAIL 
 R01_ADMITTED=YES_DEPENDENCIES_CLOSED
 CANDIDATE_PREPARED=YES
 CANDIDATE_FROZEN=NO_PENDING_INDEPENDENT_TERMINAL
-EXACT_SHA_FULL_REGRESSION=NOT_RUN_AT_SUCCESSOR_CEE14399_OLD_EXIT1_HISTORICAL_N08B_FIXED_SCOPED
+EXACT_SHA_FULL_REGRESSION=EXECUTED_EXIT1_3948PASS_24FAIL_0SKIP_ROOT_NOT_RUN_HOST_CONTENTION
 EXACT_SHA_N08B_ISOLATED=15_OF_15_ROUNDS_4_OF_4_PASS_ON_NEW_CODE_TREE_9618E88B
-EXACT_SHA_HIDDEN_VALIDATION=NOT_RUN_AT_SUCCESSOR_CEE14399_OLD_SHA_7_OF_7_PASS_HISTORICAL_ONLY
+EXACT_SHA_HIDDEN_VALIDATION=ACTUAL_7_OF_7_PASS_EXIT0_AT_CEE14399_PACK_D1EE9C6
 EXACT_SHA_CRITICAL_JOURNEYS=PHYSICAL_REPORTED_R01C_EXIT0_PLUS_REVIEWED_T09_T06B_REUSE_RQ_PENDING
 EXACT_SHA_PACKAGING=PHYSICAL_13_REAL_TARBALLS_CLEAN_INSTALL_EXIT0_RQ_PENDING
 DOC_COMMAND_EXECUTION=EXECUTED_R01C_EXIT0
 PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN_INDEPENDENT_TERMINAL
-RELEASE_QUALIFICATION=BLOCKED_PENDING_NEW_CANDIDATE_FULL_HIDDEN_AND_INDEPENDENT_RQ
+RELEASE_QUALIFICATION=BLOCKED_FULL_EXIT1_EXCLUSIVE_HOST_VERIFICATION_AND_INDEPENDENT_RQ_PENDING
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
