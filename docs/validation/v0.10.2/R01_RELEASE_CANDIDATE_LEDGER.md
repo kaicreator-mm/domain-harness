@@ -2,6 +2,29 @@
 
 > **Release Qualification is NOT RUN.** This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
 
+## 0D. Owner-approved product-only release disposition: OS issues CLOSED AS OUT OF SCOPE, Full still not qualified (2026-10-26)
+
+**Current version candidate remains immutable** `cee14399d9d0af4e20e34b9111861b16a465b690`, tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`. The owner explicitly directed the controller to **ignore/stop handling OS-only environment failures** for Domain-Harness (no OS/paging work, no new RAM/Ubuntu host requirement, no OS matrix, no automated repeated full tests, no product code edits). Controller recorded source-vs-OS disposition [#1331 comment 6414691446](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6414691446).
+
+- **Shipped product/Domain Package P0/P1 from seven remaining Windows Full failures: NONE CONFIRMED.** Direct OS evidence: child `0xC000012D STATUS_COMMITMENT_LIMIT`, `spawn UNKNOWN`, host pagefile disabled, commit headroom 3.13 GB; other four file-level and CAS marker-timeout results have consistent process-starvation attribution, without product functional counterexamples. Environment attribution is probabilistic for file-level errors, not a verified test PASS.
+- **Current exact-source Hidden:** independent private pack `d1ee9c6...`, official Node24 three-profile clean installs, seven independent tests **7/7 PASS EXIT0**. **Current source WAL repair:** P1 #1385 CLOSED, Node24 15 independent rounds ×4/4 PASS, separate Store 135/135; no product patch warranted for OS-only issue. Previously executed source-identical public tarballs and Critical Journeys can be admitted by explicit reviewer impact decision; prior actual run SHAs retained.
+- **Current required Full command:** executed at current SHA on Windows with literal **`npm test EXIT1`**, newest 3,979 PASS / 7 FAIL, 0 SKIP; `test:root NOT_RUN` because workspaces short-circuited. These are **not** `FULL PASS` or `NOT_APPLICABLE`; prior source `11ab7954` root execution and earlier green scoped suites remain accurately attributed to their original source, and may be evaluated as reuse but not silently promoted.
+- **Frozen release contract:** PRD §7 + L2 R01 require Full/Hidden/CJ. Pinned ADS `RELEASE_STANDARD.md` defines READY/CONDITIONAL only when all mandatory gates are satisfied; `VALIDATION_STANDARD.md` forbids labeling unexecuted/failed checks as PASS by convenience. Owner decision is to cease OS remediation, **not to fabricate/waive Full without proper Release authority**.
+
+```ini
+PRODUCT_IMPLEMENTATION_STATUS=COMPLETE_NO_CONFIRMED_P0_P1_FROM_OS_FAILURES
+OS_ENVIRONMENT_ACTION=EXCLUDED_NO_FURTHER_DISPATCH
+CURRENT_HIDDEN=PASS_REAL_7_OF_7_EXIT0
+CURRENT_FULL_LITERAL=FAIL_EXIT1_ROOT_NOT_RUN
+CURRENT_RELEASE_RQ_PREFLIGHT=BLOCKED_BY_FROZEN_FULL_GATE
+INDEPENDENT_RELEASE_PASS=NO
+MAIN_MERGE_AUTHORIZED=NO
+TAG_CREATED=NO
+NEXT_ACTION=AUTHORITY_ONLY_REVIEW_OF_GATE_OR_EVIDENCE_NOT_OS_OR_PRODUCT_FIX
+```
+
+This is **closure of OS failure triage**, not a release qualification or a change to the frozen standard. Evidence-only PR remains DRAFT and detached from the tested source, avoiding an accidental candidate SHA change. No remaining local environment tasks are dispatched.
+
 ## 0B. One-shot exclusive Windows Full result and host-capability disposition (2026-10-26)
 
 **Newest independent physical evidence** at exact v0.10.2 source `cee14399d9d0af4e20e34b9111861b16a465b690`, tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`: [#1331 comment 6414232632](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6414232632). The controller-authorized ONE **Windows exclusive** repeat has actually run; `npm ci EXIT0`, `npm run build EXIT0`, **`npm test EXIT1`**. TAP workspace records: `domain-harness 3326/3326 PASS`, `compiler 433/433 PASS`, `domain-harness-node 220/227 PASS (7 FAIL)`, `root NOT_RUN`, totaling **3986 records / 3979 PASS / 7 FAIL / 0 SKIP**. Exact log SHA256 `48c5d219643bc355bfd6c310ac3ca42ef4a4917cf922f3178f020efeaeaf7757`; source worktree clean before and after.
