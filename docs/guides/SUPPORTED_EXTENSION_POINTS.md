@@ -1,5 +1,7 @@
 # v0.10.2 supported Domain Package extension points
 
+> Language: English. Chinese companion: `SUPPORTED_EXTENSION_POINTS.zh-CN.md`.
+
 **Candidate authoring contract; Issue #1379.** This index describes the actually published BUILD adapter and selected v0.10.2 ABI. It does not introduce a runtime dispatcher or certify any unrun example.
 
 | Kind | BUILD selection / entry | Owns | Explicitly unsupported |

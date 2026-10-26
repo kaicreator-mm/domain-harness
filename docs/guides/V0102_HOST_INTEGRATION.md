@@ -1,5 +1,7 @@
 # v0.10.2 Node Host Integration — optional data-plane ports
 
+> Language: English. Chinese companion: `V0102_HOST_INTEGRATION.zh-CN.md`.
+
 Only the selected Node24 profile is qualified. The public Host package `@kaicreator/domain-harness-host-node` exposes `InMemoryCasStore`, `openSqliteCasStore`, governed deployment/Shadow/Meta/Evidence/CT-02 helpers, durable controls and scoped memory; the optional `better-sqlite3` peer is required only for an actually selected SQLite adapter. The Microkernel exposes the bounded trusted bootstrap subpath `@kaicreator/domain-harness-microkernel/host-seam` with `activateV10App` and narrow Host helpers. This is API organization **not a permission token**.
 
 An integrator supplies actual Host resources, selected deployment identity, a physical `V10DocStore`/CAS implementation and the authenticated caller's scoped query authority. The caller cannot forge a grant by passing data to an unrestricted public method. The selected K Primary independently governs effect permits/admission/journal/replay. A Host storage adapter provides durable physical conditional writes but does not reimplement the K state machine or BUILD qualification.

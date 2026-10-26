@@ -1,5 +1,7 @@
 # v0.10.2 Package Authoring Guide — public producer first
 
+> Language: English. Chinese companion: `V0102_PACKAGE_AUTHORING.zh-CN.md`.
+
 **P1 release-candidate source draft; Issue #1379. Not independently Node24 qualified.** Domain Packages carry independently selected source modules. Do not copy historical Compiler internals or create one Package per tiny private function.
 
 ## Real public surfaces

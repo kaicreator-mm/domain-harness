@@ -1,5 +1,7 @@
 # v0.10.2 docs executable acceptance inventory — T08b → R01
 
+> Language: English. Chinese companion: `V0102_R01_DOC_COMMANDS.zh-CN.md`.
+
 **DRAFT RECEIPT:** T08b writes the command inventory; `DOC_COMMAND_EXECUTION=NOT_RUN` until R01 #1331 on one frozen final SHA **after T08b and T09 are both merged**. Never infer execution from a docs-only CI PASS. Source baseline: `v0.10.2@51dadcbbd31baf612507703ad389a255a8704462`.
 
 | Source | Command or runtime check | Physical owner | Current evidence |

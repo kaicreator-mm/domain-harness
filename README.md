@@ -1,5 +1,7 @@
 # DomainHarness
 
+> Language: English. Chinese companion: `README.zh-CN.md`.
+
 DomainHarness is a **Domain Package runtime SDK** with a minimal Microkernel and package-owned domain behavior. This is the **v0.10.2 development candidate**, **not** a qualified release or a claim that `main` already contains it.
 
 ## v0.10.2 ownership

@@ -1,5 +1,7 @@
 # DomainHarness v0.10.2 — Tiny / Rich and external producer
 
+> Language: English. Chinese companion: `V0102_TINY_RICH.zh-CN.md`.
+
 **T08b source guide, candidate not yet released.** Independent clean-install conformance is T09 #1330; one final execution of mandatory README/SDK/guides commands is R01 #1331.
 
 ## Three processes/closures, not one bundled application

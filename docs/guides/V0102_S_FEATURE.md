@@ -1,5 +1,7 @@
 # v0.10.2 S Feature Guide — semantic, not automatically a Tool
 
+> Language: English. Chinese companion: `V0102_S_FEATURE.zh-CN.md`.
+
 S Primary owns interpretation and route choice; a selected optional S Feature supplies one declared bounded semantic function. Select `role:'standard-feature'` with `abiVersion:'dh.v10.standard-feature/1'`, `featureExport`, source bytes + digest and `provides`. BUILD must include it in the closed module set; Tiny may omit it entirely.
 
 The **pure non-Tool** path is `projectSelectedComponents([{class:'semantic',kind:'rule',componentId:'quality.rule',modulePackageId:feature.packageId,entry:feature.featureExport}], [feature])`. This returns exactly the original selected S module and an informational binding. A private function in its ESM body is not a Tool, and no separate Tool/Operation gets registered. Supported semantic kinds are `skill/rule/workflow/decision/context/validator/schema/diagnostics/knowledge/evidence`, **only when** they bind an already selected S Feature export; prompt/knowledge assets without a callable entry remain private Package data.

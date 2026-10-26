@@ -1,5 +1,7 @@
 # Migrate DomainHarness v0.10.1 → v0.10.2
 
+> Language: English. Chinese companion: `MIGRATING_V0101_TO_V0102.zh-CN.md`.
+
 **Version-candidate guidance, not a release compatibility guarantee.** T08b #1329 source based on `v0.10.2@51dadcbb` after T07b. A final clean-installed Node24 proof is T09; R01 alone can qualify this release.
 
 ## Move responsibilities, not K policy

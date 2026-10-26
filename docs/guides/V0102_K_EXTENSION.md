@@ -1,5 +1,7 @@
 # v0.10.2 K Extension Guide
 
+> Language: English. Chinese companion: `V0102_K_EXTENSION.zh-CN.md`.
+
 K Primary is a **single** separately selected Domain Package and exclusively owns state, admission, journal, effect permits, UNKNOWN and replay. An additional K extension is **advisory only**; it cannot become another Primary or claim K authority by naming a Hook.
 
 Author an ESM module exporting a bounded advisory function, then provide its selected `kernel-extension` BUILD input with the exact `dh.v10.kernel-extension/1`, stable `providerId`, `hookExport`, source bytes and SHA256. The Component authoring declaration uses `class:'hook'`, `kind:'kernel-advisory'`, `modulePackageId`, and `entry` exactly equal to `hookExport`. The builder verifies the selected reference; it never evaluates a module merely to discover it.

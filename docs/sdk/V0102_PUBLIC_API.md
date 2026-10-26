@@ -1,5 +1,7 @@
 # DomainHarness v0.10.2 — selected public API and Package/ABI map
 
+> Language: English. Chinese companion: `V0102_PUBLIC_API.zh-CN.md`.
+
 **T08b #1329 documentation candidate.** Source basis: `v0.10.2@51dadcbbd31baf612507703ad389a255a8704462`, after T07b #1328 R2 PASS/merge. This is not a Release Qualification receipt; T09 external install and R01 documentation command execution are `NOT_RUN` at authoring.
 
 ## Installed/public package exports

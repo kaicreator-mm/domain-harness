@@ -1,5 +1,7 @@
 # v0.10.2 Business, Capability and Tool Authoring
 
+> Language: English. Chinese companion: `V0102_BUSINESS_CAPABILITY_TOOL.zh-CN.md`.
+
 A Business module supplies declared Intent/workflow and calls only selected C Operations. It does not own a caller principal, CAS transition, K journal or Effect permission. A Capability module supplies named `handlers`, an explicit `capabilityId`, and **one module-wide** `externalEffect` classification. Ordinary JS helpers inside B/C may remain private; **do not register them as Tools** merely because they are callable.
 
 ```js
