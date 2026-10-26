@@ -22,6 +22,7 @@ Frozen Product/L2, Task DAG, validation and release evidence stay at their origi
 node docs/current/validate.mjs
 ```
 
+   The existing `npm run lint` lane also invokes this bilingual validator to catch future pairing/navigation regressions.
 3. Independently review **semantic equivalence**, including public API, failed/NOT_RUN evidence, installer/permissions, and source/version pins. The static validator **cannot translate or validate meaning**.
 4. For docs-only PRs, scoped link/format/source checks suffice; do **not** relaunch mandatory Full/Hidden release tests without a source-risk reason. Never invent an execution receipt.
 
