@@ -55,3 +55,7 @@ If user authorized reporting, create the minimal sanitized Issue using the Issue
 - "Use `domain-harness-sdk` to integrate this Domain App, pin the v0.10.2 ABI, and run one safe Critical Journey."
 - "Use `domain-harness-sdk` to inspect this error, determine SDK vs OS responsibility, and draft a safe bug Issue."
 - "Use `domain-harness-sdk` to report what worked and what was painful in our producer/Tiny/Rich integration, with my review before publishing."
+
+## Current bilingual documentation routing
+
+When **consuming the SDK**, Agents should default to the maintained **English** topic suite at [English index](../../../docs/current/en/index.md), not isolated v0.10.2 candidate writeups. For **user-visible explanations**, cite the matching [Chinese index](../../../docs/current/zh-CN/index.md) and Chinese topic. Each current page has a reciprocal language link; functional/API details and literal version/EXIT/NOT_RUN facts must stay equivalent. Machine-readable Skill frontmatter stays in English. If this Skill directory is copied outside DomainHarness, the relative `../../../docs/current` paths may not exist; use the upstream URLs https://github.com/kaicreator-mm/domain-harness/blob/main/docs/current/en/index.md and https://github.com/kaicreator-mm/domain-harness/blob/main/docs/current/zh-CN/index.md instead.

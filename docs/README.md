@@ -1,37 +1,19 @@
-# DomainHarness Documentation — current entry v0.10.2
+# DomainHarness 文档中心
 
-**Recommended starting point:** [v0.10.2 documentation hub](v0.10.2/README.md). This folder contains years of historical Product/L2/Task/Validation assets. Most old documents intentionally retain their **as-of** language and must not be interpreted as the current API or current release state.
+**日常使用请只从下面两个入口开始，不再按历史研发目录逐层寻找：**
 
-## Current v0.10.2 — pick a role
+<details>
+<summary>语言 / Language</summary>
 
-| Role / task | Direct links |
-| --- | --- |
-| Human user / 用户 | [中文用户手册](manual/V0102_USER_GUIDE.zh-CN.md) · [English guide](manual/V0102_USER_GUIDE.en.md) |
-| Architecture | [Mermaid system diagrams](architecture/V0102_RUNTIME_DIAGRAMS.md) · [frozen L2](architecture/DomainHarness_v0.10.2_L2_FREEZE.md) |
-| Developer | [API](manual/V0102_API_CHEATSHEET.md) · [Package authoring](guides/V0102_PACKAGE_AUTHORING.md) · [supported extensions](guides/SUPPORTED_EXTENSION_POINTS.md) |
-| Runtime/Host | [Node Host integration](guides/V0102_HOST_INTEGRATION.md) · [Tiny/Rich](guides/V0102_TINY_RICH.md) |
-| Agent | [Agent playbook](agents/V0102_PLAYBOOK.md) · [task templates](agents/V0102_TASK_TEMPLATES.md) |
-| Agent SDK Skill | [Install and invoke](agents/V0102_SDK_SKILL_INSTALL.md) · [SKILL.md](../.agents/skills/domain-harness-sdk/SKILL.md) |
-| SDK bugs & feedback | [Submitting Issues](feedback/SDK_USAGE_FEEDBACK.md) · [Triage and evolution](feedback/ISSUE_TRIAGE_PROTOCOL.md) |
-| Support | [Troubleshooting](manual/V0102_TROUBLESHOOTING.md) · [Glossary](manual/V0102_GLOSSARY.md) |
-| Migration | [v0.10.1→v0.10.2](migration/MIGRATING_V0101_TO_V0102.md) |
-| Release/evidence | [Status and exact SHA](release/V0102_RELEASE_STATUS.md) · [R01 #1331](https://github.com/kaicreator-mm/domain-harness/issues/1331) |
+- **中文用户文档（默认）：[current/zh-CN/index.md](current/zh-CN/index.md)**
+- **English documentation for Agents and developers: [current/en/index.md](current/en/index.md)**
 
-## Authority and release provenance
+</details>
 
-Tagged source and its actual exported API + frozen Product/L2 + real tests and [R01 final closure](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6416079327) are authoritative. v0.10.2 **is tagged and merged to main**, **RQ CONDITIONAL** with narrowly accepted one-source Full exception. There is no claim of `npm test EXIT0`: recorded `EXIT1` and root `NOT_RUN` remain true. The tag does not imply public npm packages have been published; manifests still declare `0.10.2-rc.0`.
+当前文档的 **15 个主题中英一一对应**：快速开始、架构图、SDK、Package、Host、迁移、Skill、Agent、反馈、排障、发布状态、术语和历史资料导航。维护与反馈入口见 [中文首页](current/zh-CN/index.md)。
 
-For new product or implementation tasks also read [cross-version principles](architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md) and repo [AGENTS.md](../AGENTS.md) with the pinned `.dev-standard` policy.
+**旧目录：历史与冻结证据（不删除、不改写）**。例如 `product/` 存 Product，`architecture/` 存 L2，`validation/` 存真实执行证据，`guides/` 与 `sdk/` 存旧实现期间的技术说明。它们原有的 `candidate`、`NOT_RUN` 或 `main HOLD` 记录是**历史事实**，不是当前状态。需要查证时从 [中文归档导航](current/zh-CN/archive.md) 或 [English archive map](current/en/archive.md) 进入。
 
-## Historical archives — do not delete
+**维护约束：** 新增或修改**当前指南**必须同 PR 提供 `docs/current/zh-CN/<topic>.md` 和 `docs/current/en/<topic>.md`；两者链接、功能、限制与命令含义一致，代码/API 名保持原文。README 给人展示中文，`AGENTS.md` / `llms.txt` 为 Agent 指向英文。冻结版本不能因为翻译被改动。
 
-- `product/`: frozen PRDs and decisions by version.
-- `architecture/`: L2 evidence, negative constraints, source ownership, legacy architecture.
-- `implementation/` and `tasks/`: DAGs, task packs and historical implementation evidence.
-- `sdk/`, `domain-data/`, `harness/`: current SDK v0.10.2 reference **and** older v0.1/v0.3 guides (historical).
-- `validation/`, `release/`: actual exact-SHA receipts/qualification decisions; never silently relabel tests PASS.
-- `experiments/`, `research/`, `roadmap/`: retained research inputs, not necessarily selected production features.
-
-A historical document that says "candidate", "main HOLD" or "Node24 tests NOT_RUN" refers to its **original snapshot**, not the final tagged v0.10.2 state. Use this current index to avoid mixing baselines.
-
-**Documentation maintenance:** docs-only PRs go against active main and preserve the immutable release tag. New Source/ABI features require a new authorized version and scoped Product/L2/DAG; README wording cannot change normative contracts.
+正式发布为 [v0.10.2](https://github.com/kaicreator-mm/domain-harness/tree/v0.10.2)，RQ 是 **CONDITIONAL**，原始 Full `EXIT1` / root `NOT_RUN` 必须保留。
