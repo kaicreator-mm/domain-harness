@@ -246,6 +246,11 @@
       "V10_ROUTE_INVALID",
       "V10_TARGET_UNSUPPORTED"
     ],
+    "tooling/build/src/component-view.ts": [
+      "BUILD_GRAPH_INVALID",
+      "BUILD_INPUT_INVALID",
+      "V10_EXPORT_CONTRACT_REFUSED"
+    ],
     "tooling/build/src/generated/acorn.ts": [],
     "tooling/build/src/import-policy.ts": [
       "V10_IMPORT_POLICY_DENIED"
