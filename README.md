@@ -9,6 +9,7 @@
 - [Architecture diagrams / 架构图](docs/architecture/V0102_RUNTIME_DIAGRAMS.md)
 - [Public API cheat sheet](docs/manual/V0102_API_CHEATSHEET.md) · [Package authoring](docs/guides/V0102_PACKAGE_AUTHORING.md)
 - [Agent playbook](docs/agents/V0102_PLAYBOOK.md) · [Agent task prompts](docs/agents/V0102_TASK_TEMPLATES.md)
+- [**SDK Agent Skill (Codex / Claude)**](docs/agents/V0102_SDK_SKILL_INSTALL.md) · [**SDK bugs & adoption feedback**](docs/feedback/SDK_USAGE_FEEDBACK.md) · [Contributing](CONTRIBUTING.md)
 - [Tiny/Rich](docs/guides/V0102_TINY_RICH.md) · [Host integration](docs/guides/V0102_HOST_INTEGRATION.md) · [Troubleshooting](docs/manual/V0102_TROUBLESHOOTING.md)
 
 ## Runtime model

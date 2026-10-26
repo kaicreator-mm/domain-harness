@@ -11,6 +11,8 @@
 | Developer | [API](manual/V0102_API_CHEATSHEET.md) · [Package authoring](guides/V0102_PACKAGE_AUTHORING.md) · [supported extensions](guides/SUPPORTED_EXTENSION_POINTS.md) |
 | Runtime/Host | [Node Host integration](guides/V0102_HOST_INTEGRATION.md) · [Tiny/Rich](guides/V0102_TINY_RICH.md) |
 | Agent | [Agent playbook](agents/V0102_PLAYBOOK.md) · [task templates](agents/V0102_TASK_TEMPLATES.md) |
+| Agent SDK Skill | [Install and invoke](agents/V0102_SDK_SKILL_INSTALL.md) · [SKILL.md](../.agents/skills/domain-harness-sdk/SKILL.md) |
+| SDK bugs & feedback | [Submitting Issues](feedback/SDK_USAGE_FEEDBACK.md) · [Triage and evolution](feedback/ISSUE_TRIAGE_PROTOCOL.md) |
 | Support | [Troubleshooting](manual/V0102_TROUBLESHOOTING.md) · [Glossary](manual/V0102_GLOSSARY.md) |
 | Migration | [v0.10.1→v0.10.2](migration/MIGRATING_V0101_TO_V0102.md) |
 | Release/evidence | [Status and exact SHA](release/V0102_RELEASE_STATUS.md) · [R01 #1331](https://github.com/kaicreator-mm/domain-harness/issues/1331) |

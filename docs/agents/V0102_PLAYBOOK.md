@@ -48,4 +48,6 @@ After work, write: `tested_sha`, `tree`, real commands and literal exit codes, p
 4. Reviewer-ready short checklist with exact candidate SHA, known P2 and artifacts.
 5. Next trigger only when a separate environment **actually is required by product acceptance**, never because an OS issue was mistaken for a DomainHarness feature.
 
+If a downstream user is integrating the SDK, first activate or copy the [installable domain-harness-sdk Skill](V0102_SDK_SKILL_INSTALL.md). During real usage, record structured [feedback/bugs](../feedback/SDK_USAGE_FEEDBACK.md) after bounded product-vs-environment triage. Draft privacy-safe GitHub Issues and ask permission before publishing cross-project material; no automatic telemetry or duplicate issue storms.
+
 Read [copyable task templates](V0102_TASK_TEMPLATES.md), [human handbook](../manual/V0102_USER_GUIDE.zh-CN.md) and [FAQ](../manual/V0102_TROUBLESHOOTING.md).

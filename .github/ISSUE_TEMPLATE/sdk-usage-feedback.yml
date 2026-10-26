@@ -1,0 +1,75 @@
+name: "SDK Usage Feedback / 使用反馈"
+description: "Share SDK integration friction, docs gaps, enhancement needs or a successful real-world usage pattern."
+title: "[SDK Feedback] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feedback is useful after an actual integration milestone, even when the SDK worked well.
+        Do not attach private consumer source, prompts, credentials, customer information or Hidden Validation data.
+        This form does not automatically enable SDK telemetry or publish data from applications.
+  - type: dropdown
+    id: category
+    attributes:
+      label: "Feedback category"
+      options:
+        - Integration friction / 使用障碍
+        - Documentation gap / 文档改进
+        - Feature request / 新需求
+        - Successful integration / 成功实践
+        - Question / uncertain ownership
+    validations:
+      required: true
+  - type: input
+    id: sdk_version
+    attributes:
+      label: "SDK version and exact source SHA"
+      placeholder: "v0.10.2 / cee14399d9d0af4e20e34b9111861b16a465b690"
+    validations:
+      required: true
+  - type: dropdown
+    id: usage
+    attributes:
+      label: "Where was the SDK used?"
+      options:
+        - External BUILD producer
+        - Domain Package K / S / B / C authoring
+        - Tiny runtime / public Facade
+        - Rich runtime / Node Host SQLite
+        - Integration / migration / testing / docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: "What were you trying to accomplish?"
+      description: "Describe a sanitized real use case and expected benefit, not sensitive business information."
+    validations:
+      required: true
+  - type: textarea
+    id: experience
+    attributes:
+      label: "What worked, what was difficult, and what would help?"
+      description: "Feedback can be positive; avoid reporting a suspected SDK bug here if the Bug form fits better."
+    validations:
+      required: true
+  - type: textarea
+    id: facts
+    attributes:
+      label: "Evidence, references and actual validation (optional)"
+      description: "Public-safe sample, useful metrics, commands with literal EXIT, or NOT_RUN; avoid confidential repo links."
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: "Proposed documentation/example/API improvement (optional)"
+      description: "A requested change is a proposal, not a preapproved v0.10.2 feature."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Privacy and feedback conditions"
+      options:
+        - label: "I reviewed this information for sensitive/private content before posting."
+          required: true
+        - label: "I understand this is a voluntary GitHub Issue, not automatic SDK data collection."
+          required: true

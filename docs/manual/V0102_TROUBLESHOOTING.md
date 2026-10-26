@@ -1,5 +1,7 @@
 # v0.10.2 — troubleshooting, diagnostic matrix and FAQ / 故障排查
 
+**When a focused investigation suggests a genuine SDK issue, use the [GitHub bug report and integration feedback process](../feedback/SDK_USAGE_FEEDBACK.md).** An Agent may prepare an Issue draft from redacted evidence, but should not publish downstream source/logs without consent. Avoid duplicates and don't turn OS-only runner failures into product bugs.
+
 Prefer **error code + exact source SHA + selected package graph + minimal reproducible input**. Do not expose private K documents, credentials, raw effect permits, private Hidden fixtures or personal data. Source of truth is the released v0.10.2 code, not a historical v0.1/v0.3 note.
 
 | Symptom / 现象 | Likely owner / 首先检查 | Safe next step |
