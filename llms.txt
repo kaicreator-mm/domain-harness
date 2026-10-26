@@ -1,35 +1,25 @@
-# DomainHarness v0.10.2 — LLM/Agent reading index
+# DomainHarness — English coding Agent documentation entry
 
-> Immutable tagged source: https://github.com/kaicreator-mm/domain-harness/tree/v0.10.2
-> Tagged Git SHA: cee14399d9d0af4e20e34b9111861b16a465b690
-> RQ: CONDITIONAL, with exact-SHA-only EX-v0.10.2-R01-FULL-OS-01; Full EXIT1 and root NOT_RUN remain true.
-> This index is a post-release documentation addition on main, not a change to the tag.
+**Canonical agent reading path:** [docs/current/en/index.md](docs/current/en/index.md). Human-facing default is **Chinese**: [docs/current/zh-CN/index.md](docs/current/zh-CN/index.md).
 
-## Essential current docs
-- [Current v0.10.2 documentation](docs/v0.10.2/README.md): choose a human/Agent route
-- [Architecture and 4 diagrams](docs/architecture/V0102_RUNTIME_DIAGRAMS.md): BUILD/runtime, K/S/B/C, lifecycle, distribution
-- [Chinese user manual](docs/manual/V0102_USER_GUIDE.zh-CN.md): Node24 local usage, Tiny/Rich, authority
-- [English user manual](docs/manual/V0102_USER_GUIDE.en.md): English end-user guide
-- [Public API](docs/manual/V0102_API_CHEATSHEET.md): buildV10App, load, send/query/subscribe/stop
-- [Package authoring](docs/guides/V0102_PACKAGE_AUTHORING.md): public producer and selected modules
-- [Agent playbook](docs/agents/V0102_PLAYBOOK.md): minimal source-first workflow, validation truth
-- [Installable SDK Agent Skill](.agents/skills/domain-harness-sdk/SKILL.md): Codex / Claude Code SDK integration workflow
-- [Skill installation for consumer repos](docs/agents/V0102_SDK_SKILL_INSTALL.md): local discovery and copy instructions
-- [GitHub issue and usage feedback](docs/feedback/SDK_USAGE_FEEDBACK.md): opt-in, sanitized, reproducible feedback channel
-- [Task prompt templates](docs/agents/V0102_TASK_TEMPLATES.md): read-only audit, integration, review, docs task
-- [Troubleshooting](docs/manual/V0102_TROUBLESHOOTING.md): typed diagnostic categories
-- [Release conditions](docs/release/V0102_RELEASE_STATUS.md): original R01 receipts, approved exception
+Machine/Agent work MUST use the English current tree first and the tagged source contract. Every maintained current topic has a matching Chinese version with the **same basename**.
 
-## Source anchors
-- [Contracts](packages/contracts/src/index.ts)
-- [BUILD](tooling/build/src/index.ts)
-- [Microkernel](packages/microkernel/src/index.ts)
-- [Runtime Facade](packages/microkernel/src/domain-app.ts)
-- [Host](packages/host-node/src/index.ts)
-- [Clean installed Tiny/Rich tests](tests/integration/v010-clean-consumers/clean-consumers.test.ts)
-- [AGENTS.md](AGENTS.md)
+## Recommended Agent reading
 
-## Non-negotiable safety and scope
-A running Domain App consumes trusted sealed plain-data BUILD output. External BUILD never runs inside Microkernel. K Primary alone owns state/admission/journal/effects/replay/UNKNOWN; Host implements physical CAS, not policy. Optional S features / C operations must be selected explicitly. The only physically qualified v0.10.2 lane is Node24; no OS vendor, 128GB memory, npm registry publication or cross-platform matrix is promised. No future version inherits the v0.10.2 one-release Full exception.
+1. [English index](docs/current/en/index.md) — navigation and authority.
+2. [Quickstart](docs/current/en/quickstart.md) — Node24 actual source fixtures.
+3. [Architecture](docs/current/en/architecture.md) — external BUILD, K/S/B/C, Microkernel, Host.
+4. [SDK](docs/current/en/sdk.md) — four package roots, typed public facade.
+5. [Package authoring](docs/current/en/packages.md) / [Host](docs/current/en/host.md).
+6. [Agent workflow](docs/current/en/agent.md) / [Skill install](docs/current/en/skill.md).
+7. [Feedback/Issue workflow](docs/current/en/feedback.md) / [Troubleshooting](docs/current/en/troubleshooting.md).
+8. [Release facts](docs/current/en/release.md) / [History map](docs/current/en/archive.md).
+9. [Glossary](docs/current/en/glossary.md) / [Migration](docs/current/en/migration.md).
 
-All references above are current-document links; old v0.1/v0.3 SDK references are preserved only as history.
+**Canonical Agent Skill:** [.agents/skills/domain-harness-sdk/SKILL.md](.agents/skills/domain-harness-sdk/SKILL.md) with two references. **Project rules:** [AGENTS.md](AGENTS.md); read pinned `.dev-standard/VERSION` and frozen Product/L2 for normative work.
+
+## Fixed release truth
+
+Tag [v0.10.2](https://github.com/kaicreator-mm/domain-harness/tree/v0.10.2) points to `cee14399d9d0af4e20e34b9111861b16a465b690`. Physically qualified Node24. Four public package manifests remain `0.10.2-rc.0`; npm registry publication unproven. RQ **CONDITIONAL** with source-only Owner-approved exception; Full `npm test EXIT1` and `test:root NOT_RUN` remain true. No automatic SDK telemetry or user-consent bypass; don't assume Host or OS vendor requirements.
+
+**Historical tech/release source files are not current tutorials:** follow [history index](docs/current/en/archive.md), keeping PRD/L2/test evidence intact.
