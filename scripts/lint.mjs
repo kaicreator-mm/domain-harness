@@ -75,3 +75,7 @@ async function walk(dir) {
 
 for (const dir of roots) await walk(join(root, dir));
 if (failures > 0) process.exit(1);
+
+// Current user and Agent guides must remain a one-to-one bilingual set.
+// Keep this in the existing lint lane; no separate full regression is needed.
+await import(new URL('../docs/current/validate.mjs', import.meta.url));
