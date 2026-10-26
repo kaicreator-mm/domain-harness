@@ -33,7 +33,7 @@ flowchart TB
     k -->|"physical CAS operations"| ports
     c -->|"governed effect path; K permit required"| ports
   end
-  build -. "NOT imported at runtime" .- mk
+  build -.->|"FORBIDDEN runtime import"| mk
 ~~~
 
 The dashed edge is a **prohibition**, not an actual module dependency. A loaded App is trusted *only after* external producer/build qualification. Runtime does not discover, select, download or compile a package.
@@ -49,7 +49,7 @@ flowchart LR
   b --> c["Capability C\nDeclared Operations / Tool handlers"]
   k --> h["Host physical persistence / CAS"]
   c --> gate["K-governed effect gate / Host adapters"]
-  k -. "permit read-only authority" .-> gate
+  k -.->|"read-only K permit view"| gate
   gate --> outside["External system"]
 ~~~
 
