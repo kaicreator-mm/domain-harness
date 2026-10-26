@@ -1,126 +1,35 @@
-# DomainHarness Documentation
+# DomainHarness Documentation — current entry v0.10.2
 
-This directory contains the formal product, architecture, Domain Data, Harness, implementation, SDK, validation, operations and release documentation for DomainHarness v0.1.
+**Recommended starting point:** [v0.10.2 documentation hub](v0.10.2/README.md). This folder contains years of historical Product/L2/Task/Validation assets. Most old documents intentionally retain their **as-of** language and must not be interpreted as the current API or current release state.
 
-## Authority order
+## Current v0.10.2 — pick a role
 
-1. `product/DomainHarness_v0.1_PRD_FROZEN.md`, SHA-256 `4f19317dc46ae1eb888ff99bd4f50a21246483895fab16086341d0222a60e440`.
-2. `architecture/DomainHarness_v0.1_L2_ARCHITECTURE_EVIDENCE.md`.
-3. `implementation/DomainHarness_v0.1_TASK_DAG.md` plus task-specific L3 evidence.
-4. Public contracts/tests under `packages/domain-harness/`.
-5. Descriptive architecture / Domain Data / Harness / SDK documentation derived from those authorities and current implementation.
-6. Exact-SHA validation evidence in `validation/` and linked GitHub Issues.
-7. `release/DomainHarness_v0.1_CLOSEOUT.md` and Release Closure issue #39 for the release decision.
+| Role / task | Direct links |
+| --- | --- |
+| Human user / 用户 | [中文用户手册](manual/V0102_USER_GUIDE.zh-CN.md) · [English guide](manual/V0102_USER_GUIDE.en.md) |
+| Architecture | [Mermaid system diagrams](architecture/V0102_RUNTIME_DIAGRAMS.md) · [frozen L2](architecture/DomainHarness_v0.10.2_L2_FREEZE.md) |
+| Developer | [API](manual/V0102_API_CHEATSHEET.md) · [Package authoring](guides/V0102_PACKAGE_AUTHORING.md) · [supported extensions](guides/SUPPORTED_EXTENSION_POINTS.md) |
+| Runtime/Host | [Node Host integration](guides/V0102_HOST_INTEGRATION.md) · [Tiny/Rich](guides/V0102_TINY_RICH.md) |
+| Agent | [Agent playbook](agents/V0102_PLAYBOOK.md) · [task templates](agents/V0102_TASK_TEMPLATES.md) |
+| Support | [Troubleshooting](manual/V0102_TROUBLESHOOTING.md) · [Glossary](manual/V0102_GLOSSARY.md) |
+| Migration | [v0.10.1→v0.10.2](migration/MIGRATING_V0101_TO_V0102.md) |
+| Release/evidence | [Status and exact SHA](release/V0102_RELEASE_STATUS.md) · [R01 #1331](https://github.com/kaicreator-mm/domain-harness/issues/1331) |
 
-The frozen PRD was imported byte-for-byte and checksum-verified via #54/#55. Descriptive technical documents do not override the frozen PRD/L2 or executable source/tests.
+## Authority and release provenance
 
-## Documentation map
+Tagged source and its actual exported API + frozen Product/L2 + real tests and [R01 final closure](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6416079327) are authoritative. v0.10.2 **is tagged and merged to main**, **RQ CONDITIONAL** with narrowly accepted one-source Full exception. There is no claim of `npm test EXIT0`: recorded `EXIT1` and root `NOT_RUN` remain true. The tag does not imply public npm packages have been published; manifests still declare `0.10.2-rc.0`.
 
-- `product/` — exact frozen PRD artifact.
-- `architecture/` — frozen L2 evidence plus detailed system architecture and integration model.
-- `domain-data/` — Domain Data specification and authoring guide.
-- `harness/` — Harness technical specification and authoring guide.
-- `implementation/` — terminal Task DAG, L3 evidence and historical task handoff material.
-- `sdk/` — public SDK reference, usage entry point and coding-Agent migration guide.
-- `operations/` — SQLite/storage/recovery operational contract.
-- `validation/` — Critical Journeys, cross-domain evidence, validation state and Hidden Validation preparation.
-- `release/` — Version Closure / Release Qualification decision record.
+For new product or implementation tasks also read [cross-version principles](architecture/DOMAIN_APP_CROSS_VERSION_PRINCIPLES.md) and repo [AGENTS.md](../AGENTS.md) with the pinned `.dev-standard` policy.
 
-`DomainHarness_v0.1_INDEX.md` is the version-specific reading index.
+## Historical archives — do not delete
 
-## Technical documentation — English / 中文
+- `product/`: frozen PRDs and decisions by version.
+- `architecture/`: L2 evidence, negative constraints, source ownership, legacy architecture.
+- `implementation/` and `tasks/`: DAGs, task packs and historical implementation evidence.
+- `sdk/`, `domain-data/`, `harness/`: current SDK v0.10.2 reference **and** older v0.1/v0.3 guides (historical).
+- `validation/`, `release/`: actual exact-SHA receipts/qualification decisions; never silently relabel tests PASS.
+- `experiments/`, `research/`, `roadmap/`: retained research inputs, not necessarily selected production features.
 
-### Architecture / 架构
+A historical document that says "candidate", "main HOLD" or "Node24 tests NOT_RUN" refers to its **original snapshot**, not the final tagged v0.10.2 state. Use this current index to avoid mixing baselines.
 
-- English: `architecture/DomainHarness_ARCHITECTURE.md`
-- 中文：`architecture/DomainHarness_ARCHITECTURE.zh-CN.md`
-- English integration model: `architecture/DOMAINHARNESS_INTEGRATION_MODEL.md`
-- 中文集成模型：`architecture/DOMAINHARNESS_INTEGRATION_MODEL.zh-CN.md`
-
-### Domain Data
-
-Start at `domain-data/README.md`.
-
-- English spec: `domain-data/DOMAIN_DATA_SPEC.md`
-- 中文规范：`domain-data/DOMAIN_DATA_SPEC.zh-CN.md`
-- English authoring guide: `domain-data/DOMAIN_DATA_AUTHORING_GUIDE.md`
-- 中文编写指南：`domain-data/DOMAIN_DATA_AUTHORING_GUIDE.zh-CN.md`
-
-### Harness
-
-Start at `harness/README.md`.
-
-- English technical spec: `harness/HARNESS_TECHNICAL_SPEC.md`
-- 中文技术规范：`harness/HARNESS_TECHNICAL_SPEC.zh-CN.md`
-- English authoring guide: `harness/HARNESS_AUTHORING_GUIDE.md`
-- 中文编写指南：`harness/HARNESS_AUTHORING_GUIDE.zh-CN.md`
-
-## Recommended reading paths
-
-### Runtime implementer
-
-```text
-Frozen PRD
-→ Frozen L2 Architecture Evidence
-→ Detailed System Architecture
-→ Harness Technical Spec
-→ Storage/Recovery Notes
-→ source/tests
-```
-
-### Downstream application engineer
-
-```text
-Detailed System Architecture
-→ Integration Model
-→ SDK Reference
-→ Harness Technical Spec
-→ downstream project authority
-```
-
-### Coding Agent refactoring another project
-
-```text
-Downstream frozen authority
-→ Domain Data Spec
-→ Domain Data Authoring Guide
-→ Integration Model
-→ Harness Authoring Guide
-→ SDK Agent Migration Guide
-→ one Critical Journey
-```
-
-The Agent should produce a migration map and Tool effect classification before implementation. It must not infer domain authority from Runtime internals.
-
-## SDK / downstream project entry point
-
-Start at `sdk/README.md`.
-
-Core SDK documents:
-
-1. `sdk/DomainHarness_v0.1_SDK_REFERENCE.md`;
-2. `sdk/DomainHarness_v0.1_AGENT_MIGRATION_GUIDE.md`;
-3. `sdk/DomainHarness_v0.1_SDK_USAGE.md`.
-
-A downstream project remains authoritative for its domain/business state, API, database, authentication/authorization, credentials, external clients and AI provider/model strategy. DomainHarness provides generic durable execution mechanics only.
-
-Until a formal release/tag is authorized, consumers should pin an exact DomainHarness commit/tarball instead of treating a moving branch as a released dependency.
-
-## Current project state
-
-Implementation tasks T-001..T-017 are complete. Quality hardening, canonical test-flow hardening, frozen PRD provenance, dual-OS durability, SDK documentation and repository documentation closure are complete.
-
-The executable/package tree validated in #60 passed **117/117 tests with 0 skipped**, package/plain-Node consumer validation, focused recovery/Worker/definition-lock suites and Tally + City Atlas external runners. Later documentation-only changes carry that executable/package evidence only when Git diff/tree equivalence proves no Runtime/package/test/dependency change and that disposition is recorded.
-
-The v0.1.0 version line has been integrated to `main` through PR #65. Repository integration does not by itself assert formal Release Qualification.
-
-Repository-process follow-ups remain separate:
-
-- #57 — Woodpecker is connected and the emitted context is known, but execution is infrastructure-blocked because the agent is using a local backend instead of a container backend;
-- #56 — `main` branch protection/ruleset is an administrator follow-up after a green Woodpecker run.
-
-Owner-held Hidden Validation remains the outstanding formal Release Qualification gate tracked by #39. It is not a known Runtime defect.
-
-## Stale evidence policy
-
-Historical prompts/blocker files may describe the state at the time they were created. They do not override the frozen authorities, terminal Task DAG, current source/tests, current Validation Report, GitHub Issue state or Release Closure. Retained historical records must be treated as superseded when current evidence disagrees.
+**Documentation maintenance:** docs-only PRs go against active main and preserve the immutable release tag. New Source/ABI features require a new authorized version and scoped Product/L2/DAG; README wording cannot change normative contracts.
