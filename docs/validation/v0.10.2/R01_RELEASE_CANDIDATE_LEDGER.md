@@ -1,6 +1,32 @@
 # DomainHarness v0.10.2 — R01 Release Candidate Evidence Ledger (PREPARED)
 
-> **Release Qualification is NOT RUN.** This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
+> **Independent Release Qualification EXECUTED: BLOCKED**, on a single frozen Full-gate authority exception pending explicit owner approval and third-context re-review. This file is an **evidence-only handoff** for Issue [#1331](https://github.com/kaicreator-mm/domain-harness/issues/1331), not a source-code amendment, executable result, Candidate Freeze or Release PASS. No main merge/tag is authorized by this ledger.
+
+## 0E. Independent RQ final verdict and exception decision now pending (2026-10-26)
+
+At exact source `v0.10.2@cee14399d9d0af4e20e34b9111861b16a465b690` (tree `9618e88b32f16a63164f65b8fbdf4457c96f5e76`), the distinct independent RQ Reviewer published [#1331 comment 6415037798](https://github.com/kaicreator-mm/domain-harness/issues/1331#issuecomment-6415037798). **RESULT: `RQ=BLOCKED`, `PRODUCT_CODE_READY=YES`, `MAIN_INTEGRATION_AUTHORIZED=NO`.**
+
+- **All ten Product release domains independently QUALIFIED: 8/8 P0 (#1301, #1302, #1303, #1304, #1306, #1307, #1308, #1310) and 2/2 required P1 (#1305, #1309)**. No confirmed source P0/P1 defects. Controller has separately closed these ten L1 intake Issues and parent #1300 as **Product-scope acceptance ONLY**; this does not change the outstanding R01.
+- Independently accepted **current-source Hidden 7/7 real PASS EXIT0**, exact-sha physical WAL P1 repair (#1385/#1386), two source-tree scoped CI checks, and explicit unchanged-risk impact-reuse for already executed Critical Journeys, public packed artifacts/installed consumers and docs receipts. Old-SHA execution is disclosed as historical, not claimed as current fresh execution.
+- The **sole remaining frozen Release gate** is PRD §7 Full: genuine current-source `npm test EXIT1` after `3,979 PASS / 7 FAIL`, and **`test:root NOT_RUN`**. All seven failed assertions are tied to or strongly consistent with Windows child-process OS commit exhaustion; there is no independent product-state counterexample. The owner excluded OS remediation from the DomainHarness product scope; that decision **does not itself convert Full into PASS**. The true literal result remains FAIL.
+- The independent Reviewer drafted the narrow exception **`EX-v0.10.2-R01-FULL-OS-01`**. It applies **only** to the one Full-gate evidence obligation for this **exact SHA/tree**, never to Hidden/CJ/other gates, any future version or ADS generally. Substitute bundle: immutable original `EXIT1 / ROOT NOT_RUN` receipts, per-failure OS-capacity disposition, root-phase predecessor `11ab7954` `EXIT0` admitted by one-file private NodeStore source-impact comparison, 15×4/4 targeted repair, Store 135/135, memory 59/59, current CI, fresh Hidden 7/7, Critical Journeys and packaging impact reuse. Retain P2-RQ-01 root-current execution gap, P2-RQ-02 four file-level failure causality ambiguity, P2-RQ-03 closure bookkeeping, and four inherited P2; no invented PASS.
+- **THIS EXCEPTION IS DRAFT / NOT EFFECTIVE.** Approval requires explicit **Owner/Release Authority acceptance** recorded on #1331, then a **separate third-logical-context independent re-review** that the formally approved substitute satisfies release-intent and frozen authority; only then may a Controller record Candidate Freeze/RQ READY or valid CONDITIONAL and authorize `v0.10.2` → `main` with exact content/identity. In the absence of these required approvals, `RQ=BLOCKED`, **main/tag remain HOLD**. Do not infer consent from the general instruction to stop OS fixes or advance the project.
+
+```ini
+CURRENT_SHA=cee14399d9d0af4e20e34b9111861b16a465b690
+CURRENT_TREE=9618e88b32f16a63164f65b8fbdf4457c96f5e76
+PRODUCT_DOMAINS=QUALIFIED_8P0_2P1
+PRODUCT_L1_INTAKE=11_ISSUES_CLOSED_1300_THROUGH_1310
+HIDDEN=PASS_7_OF_7_EXIT0
+CRITICAL_JOURNEYS=PASS_INDEPENDENT_IMPACT_REUSE
+PACKAGING=PASS_INDEPENDENT_IMPACT_REUSE
+FULL=ACTUAL_EXIT1_7_OS_CAPACITY_FAILS_ROOT_NOT_RUN
+RQ_INDEPENDENT_VERDICT=BLOCKED
+RELEASE_EXCEPTION=EX-v0.10.2-R01-FULL-OS-01_DRAFT_OWNER_NOT_APPROVED
+NEXT=EXPLICIT_OWNER_APPROVAL_THEN_INDEPENDENT_THIRD_REVIEW
+MAIN_INTEGRATION_AUTHORIZED=NO
+TAG=NOT_CREATED
+```
 
 ## 0D. Owner-approved product-only release disposition: OS issues CLOSED AS OUT OF SCOPE, Full still not qualified (2026-10-26)
 
@@ -211,11 +237,11 @@ CANDIDATE_FROZEN=NO_PENDING_INDEPENDENT_TERMINAL
 EXACT_SHA_FULL_REGRESSION=ATTEMPT3_EXCLUSIVE_WINDOWS_EXIT1_3979PASS_7FAIL_0SKIP_ROOT_NOT_RUN_OS_COMMIT_LIMIT
 EXACT_SHA_N08B_ISOLATED=15_OF_15_ROUNDS_4_OF_4_PASS_ON_NEW_CODE_TREE_9618E88B
 EXACT_SHA_HIDDEN_VALIDATION=ACTUAL_7_OF_7_PASS_EXIT0_AT_CEE14399_PACK_D1EE9C6
-EXACT_SHA_CRITICAL_JOURNEYS=PHYSICAL_REPORTED_R01C_EXIT0_PLUS_REVIEWED_T09_T06B_REUSE_RQ_PENDING
-EXACT_SHA_PACKAGING=PHYSICAL_13_REAL_TARBALLS_CLEAN_INSTALL_EXIT0_RQ_PENDING
+EXACT_SHA_CRITICAL_JOURNEYS=PASS_BY_INDEPENDENT_IMPACT_REUSE_AT_CEE14399
+EXACT_SHA_PACKAGING=PASS_BY_INDEPENDENT_IMPACT_REUSE_13_TARBALLS
 DOC_COMMAND_EXECUTION=EXECUTED_R01C_EXIT0
-PRODUCT_P0_RELEASE_QUALIFIED=NOT_RUN_INDEPENDENT_TERMINAL
-RELEASE_QUALIFICATION=BLOCKED_FULL_WINDOWS_EXCLUSIVE_EXIT1_SEPARATE_HIGH_CAPACITY_HOST_REQUIRED
+PRODUCT_P0_RELEASE_QUALIFIED=8_OF_8_QUALIFIED_INDEPENDENT_RQ
+RELEASE_QUALIFICATION=BLOCKED_SINGLE_FROZEN_FULL_GATE_EXCEPTION_OWNER_THIRD_REVIEW_REQUIRED_NO_OS_WORK
 MAIN_INTEGRATION_AUTHORIZED=NO
 TAG=NOT_CREATED
 ```
