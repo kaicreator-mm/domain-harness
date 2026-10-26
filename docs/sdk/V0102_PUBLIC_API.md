@@ -1,5 +1,7 @@
 # DomainHarness v0.10.2 — selected public API and Package/ABI map
 
+> **Post-release status (2026-10-26):** The frozen **v0.10.2** source is now **tagged and merged into main**, with R01 #1331 closed and RQ **CONDITIONAL**. See the [final release status](../release/V0102_RELEASE_STATUS.md). Any wording below such as **candidate**, **NOT_RUN at T08b/T09 authoring**, **main HOLD**, or **not qualified yet** is preserved as an **as-of historical authoring snapshot**, **not the current GitHub state**. Independently reviewed Product 8/8 P0 + 2/2 required P1, exact-SHA Hidden 7/7 PASS and admitted selected CJ/packaging evidence now exist; the actual Full command **EXIT1** and current-source `test:root NOT_RUN` remain disclosed under the exact-SHA-only Owner-approved exception. This note does not rewrite old test receipts or alter the immutable tagged product.
+
 **T08b #1329 documentation candidate.** Source basis: `v0.10.2@51dadcbbd31baf612507703ad389a255a8704462`, after T07b #1328 R2 PASS/merge. This is not a Release Qualification receipt; T09 external install and R01 documentation command execution are `NOT_RUN` at authoring.
 
 ## Installed/public package exports
