@@ -1,7 +1,6 @@
 // R1 small schema-only positive/negative fixture runner. Independent of SDK implementation.
 // Run after npm ci: node docs/product/v0.10.3/contracts/validate-fixtures.mjs
 import {readFileSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 const schema = JSON.parse(readFileSync(new URL('./guided-journey-v1.schema.json', import.meta.url), 'utf8'));
 const validate = new Ajv2020({allErrors:true,strict:false}).compile(schema);
