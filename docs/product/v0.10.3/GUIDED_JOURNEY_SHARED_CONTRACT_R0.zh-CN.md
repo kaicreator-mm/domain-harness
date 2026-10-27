@@ -41,10 +41,12 @@
 
 有限步骤类型：DEVICE_IDENTIFY、CHOOSE_GOAL、ASK、INSPECT、CHOOSE_ROUTE、REFINE_ACTION、REVIEW_EFFECT、VERIFY_OUTCOME、SUMMARY。表单字段类型：CHOICE、MULTI、TEXT、CONFIRM。新增步骤类型需要明确契约版本变更；领域选项、本地化文本及设备规则由下游应用提供。
 
+**R1 有界线协议：** ID、键、reasonCode 长度不超过 128 字符，模板版本不超过 64，目标文本和证据/回执/预览引用不超过 256；SHA-256 digest 固定 64 位十六进制，模型解释不超过 500。数组上限为：每步字段 12、每字段选项 16、允许事件 7、每条消息证据引用 24、目标 8、合格模板 32、所选选项 16；标识/事件/引用字符串列表拒绝完全重复项。这些是**单消息 Schema 限制**，业务 B 仍需验证跨对象 ID 唯一性、真实权限、来源及证据时效。使用已安装项目依赖执行 `node docs/product/v0.10.3/contracts/validate-fixtures.mjs` 验证正反例；不将此等同 Node24 真实下游消费者测试。
+
 ## 4. 步骤决策生命周期及强制约束
 
 1. 获取已授权、未过期的 CaseRef 和真实上一条结果。Business 按权限、证据、设备当前状态筛选**只有符合条件**的 TemplateRef。
-2. 优先复用确定性规则、精确版本的已晋升子流程与适用条件合格的经验。可选 S Feature 根据候选集返回一个下一步决策。无可用路线时返回 NEED_EVIDENCE、WAIT 或 BLOCKED，不自动调用 LLM 猜测。
+2. 默认遵循 v0.3 冻结的 **确定性规则 → 精确语义结果复用 → 符合适用性的已晋升子流程 → 有界模型兜底**；模型未显式选择时零调用。语义缓存复用不同于 K Journal 重放。领域 B 可以显式声明不同的业务优先策略，但不得将其描述成 v0.3 原始默认顺序。可选 S Feature 根据候选集返回一个下一步决策。无可用路线时返回 NEED_EVIDENCE、WAIT 或 BLOCKED，不自动调用 LLM 猜测。
 3. 可选 LLM 仅在经过配置、确实存在新情况/冲突/未知问题时受限调用；必须执行耗时、Token、费用、隐私上限。其 LLMAdvisory 只有通过候选集、证据引用及 CaseRef 校验，才可影响之后的 Business/S 决策。没有 LLM 必须仍能运行主要流程。
 4. UI 显示一个 StepSpec。用户答复构成 StepOutcome。真实读设备/写设备须另经被授权的 Host/Capability 路由执行，收到字面真实回执并更新 CaseRef。
 5. 下一步前重新核验 CaseRef。状态变化则丢弃过期步骤或要求重新检测；BACK 不得悄悄撤销或重放已执行的操作；PAUSE/RESUME 不得重用之前的修改授权。

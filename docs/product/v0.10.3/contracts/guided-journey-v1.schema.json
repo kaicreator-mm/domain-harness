@@ -29,16 +29,19 @@
       "properties": {
         "artifactId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "version": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 64
         },
         "digest": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "maxLength": 64
         }
       },
       "required": [
@@ -53,12 +56,14 @@
       "properties": {
         "snapshotId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "digest": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-f]{64}$",
+          "maxLength": 64
         }
       },
       "required": [
@@ -72,18 +77,21 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "labelKey": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "eligible": {
           "type": "boolean"
         },
         "disabledReasonCode": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
         }
       },
       "required": [
@@ -98,7 +106,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "type": {
           "enum": [
@@ -110,7 +119,8 @@
         },
         "labelKey": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "required": {
           "type": "boolean"
@@ -119,7 +129,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/StepOption"
-          }
+          },
+          "maxItems": 16
         }
       },
       "required": [
@@ -141,11 +152,13 @@
         },
         "journeyId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "stepId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "templateRef": {
           "$ref": "#/$defs/TemplateRef"
@@ -168,13 +181,15 @@
         },
         "titleKey": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "fields": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/StepField"
-          }
+          },
+          "maxItems": 12
         },
         "allowedEvents": {
           "type": "array",
@@ -188,18 +203,24 @@
               "OBSERVATION_RECEIPT",
               "EFFECT_RECEIPT"
             ]
-          }
+          },
+          "maxItems": 7,
+          "uniqueItems": true
         },
         "evidenceRefs": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
-          }
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 24,
+          "uniqueItems": true
         },
         "actionPreviewRef": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
         }
       },
       "required": [
@@ -228,11 +249,13 @@
         },
         "journeyId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "stepId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "event": {
           "enum": [
@@ -249,19 +272,26 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
-          }
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 16,
+          "uniqueItems": true
         },
         "evidenceRefs": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
-          }
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 24,
+          "uniqueItems": true
         },
         "receiptRef": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256
         }
       },
       "required": [
@@ -307,14 +337,18 @@
         },
         "journeyId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "goals": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
-          }
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 8,
+          "uniqueItems": true
         },
         "caseRef": {
           "$ref": "#/$defs/CaseRef"
@@ -326,7 +360,9 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/TemplateRef"
-          }
+          },
+          "maxItems": 32,
+          "uniqueItems": true
         },
         "previousOutcome": {
           "$ref": "#/$defs/StepOutcome"
@@ -354,7 +390,8 @@
         },
         "journeyId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "status": {
           "enum": [
@@ -367,14 +404,18 @@
         },
         "reasonCode": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "evidenceRefs": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
-          }
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 24,
+          "uniqueItems": true
         },
         "step": {
           "$ref": "#/$defs/StepSpec"
@@ -427,7 +468,8 @@
         },
         "journeyId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "caseRef": {
           "$ref": "#/$defs/CaseRef"
@@ -437,14 +479,18 @@
         },
         "reasonCode": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 128
         },
         "evidenceRefs": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
-          }
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "maxItems": 24,
+          "uniqueItems": true
         },
         "explanation": {
           "type": "string",
