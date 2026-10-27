@@ -9,7 +9,7 @@
 满足两个现实用户需求：(a) **Domain App 按需选择独立 LLM 协议、在确定性流程需要时使用模型**；(b) **提前准备可复用的交互步骤、运行时选择下一步骤、在未知情况可选 LLM 候选并形成跨任务演进反馈**。同时修复已有下游实测的公共 SDK 缺口。新功能通过已选 K/S/B/C Domain Packages，而不是将模型、UI 和 Meta 控制器内建到 Microkernel。
 
 实际问题和 Scope Issue：
-- **已证实 P1** [#1393 外部 npm Provider 可执行字节完整性](https://github.com/kaicreator-mm/domain-harness/issues/1393)：独立于模型协议，是 BUILD / Host pre-load 完整性问题。优先最小可验证共享方案，不制造通用 npm 包管理器。
+- **已证实 P1** [#1393 外部 npm Provider 可执行字节完整性](https://github.com/kaicreator-mm/domain-harness/issues/1393)：独立于模型协议，是 BUILD / Host pre-load 完整性问题。需要先在 L2 定义可信部署默认模式与**可选严格完整性模式**，明确独立于可变 `sealed-app.json` 的可信发布/部署摘要锚点以及覆盖实际执行内容的校验闭包；不把自带声明当成信任根，也不制造通用 npm 包管理器。
 - **功能候选** [#1396 LLM 两协议可选 Capability](https://github.com/kaicreator-mm/domain-harness/issues/1396)：OpenAI-compatible Chat Completions 与 Anthropic Messages-compatible 是独立选取的 C Package；Domain App 可选择 **0 / OpenAI / Anthropic / 同时两者**。按 #1396 必须同时定义覆盖两种协议实际已验证交集的**统一 `llm.generate` 逻辑 Operation/Request/Response 契约**；每次统一调用由 B/BUILD 显式绑定一个已获准的具体 C Operation，不引入自动 Provider 网关、默认切换或第三个别名 C Package。Prompt/Response/Context 为可复用纯语义 S Feature 或包内私有 helper；Transport 与凭据属于 Host。协议功能不同必须显式声明，不默认支持特有 API。
 - **功能候选** [#1395 Guided Journey](https://github.com/kaicreator-mm/domain-harness/issues/1395)：**构建前**验证版本化 StepTemplate/FormSchema/ChoiceCatalog、分支规则及恢复路径；**运行时**根据业务事实与 Effect 真正结果只组合一个下一步 StepSpec；**必要时**有界 LLM 仅提供由 #1397 唯一 Schema 定义的 **LLMAdvisory**（`messageType: "llm.advisory"`），经已批准模板/权限/证据校验后，B/S 才能生成符合 #1397 `NextStepDecision` 的状态与 StepSpec；缺证据时用 `NEED_EVIDENCE`，不增加独立候选 wire 类型。已起草具体双语 DTO/Schema [PR #1397](https://github.com/kaicreator-mm/domain-harness/pull/1397)，先复用 v0.10.2 S/B 接口；缺少两个独立真实消费者和可复现公共缺口，不新增泛用表单引擎。
 - **历史能力核对候选** [#1398 任务层/元数据层多级进化](https://github.com/kaicreator-mm/domain-harness/issues/1398)：先重建 v0.3 原始规则→精确缓存→已晋升子流程→有界 LLM 决策优先顺序，以及跨任务 Candidate→验证→显式晋升→下一版本 BUILD 固定的独立成熟度轴。任务 B 执行和元数据/经验生产者是**职责**，不是两个 Kernel。对照 v0.10.2 真实公开路径；具体公共 Package 是否必要按两个消费者验证裁定。
@@ -36,7 +36,7 @@
 - **P-B 请求/输出：** 用受控假服务验证两种真实 wire shape 的 JSON/Tool-use 解析；非法模型结果、已发送但结果不明的请求、取消/超时/额度错误真实分类；无未经批准的 Tool Effect 或盲目收费重试。若没有实际付费凭据，网络 live smoke 为 **NOT_RUN**。
 - **P-C 动态表单：** 同一 GMS 目标，根据 `PRESENT_DISABLED | ABSENT | UNKNOWN` 等已验证状态提供不同**下一步**；离线零 LLM；BACK/RESUME/Effect FAIL/PARTIAL/UNKNOWN 有合法步骤，显示 StepSpec 不触发操作；没有已批准模板时 ASK/WAIT/BLOCKED 而不是生成未声明代码。
 - **P-D Meta 演进：** 一次真实业务输出脱敏可核验证据 → Candidate（无执行权）→ 单独验证/审批 → 新版本/新实例复用；原实例凭 exact pin 保持重放一致。先做历史源可达性证明，未证实公共缺口不制造新 Meta 平台。
-- **P-E 既有 P1/P2：** #1393 原应用攻击夹具在严格配置的已选 Provider 完整性检查下，对替换的真实 npm 代码在执行前拒绝；#1394 public Host CAS→K DocStore 正确例子、错误接线负例真实可运行。
+- **P-E 既有 P1/P2：** #1393 原应用攻击夹具在严格配置的已选 Provider 完整性检查下，覆盖三组真实判别：①合法可信 Provider 正例；②仅替换安装的 Provider；③**同时篡改 Provider 与本地 sealed-app 的内嵌哈希，但仍保留旧 subjectDigest**，后两者均在任何 Provider 代码求值/Kernel Effect 之前拒绝且无凭据泄露。所需信任锚必须独立于攻击者可同时改写的本地 seal；#1394 优先由已验证下游薄适配器+双语例子解决，不要求 Kernel/Host store runtime 重构；仅有重复跨下游证据才考虑公共 Bridge。
 
 **资源/性价比约束：** 两种 Provider 的 Host 客户端复用现有库；上下文首版复用已有 bounded Context（明确字符 ≠ Token）；真正 Token 预算/Streaming/独立 Prompt Registry 必须有实际消费者需求才从候选扩展为正式范围。v0.10.2 高成本的旧 Full/Hidden 不对每片修改重复运行。
 
