@@ -10,8 +10,8 @@
 
 实际问题和 Scope Issue：
 - **已证实 P1** [#1393 外部 npm Provider 可执行字节完整性](https://github.com/kaicreator-mm/domain-harness/issues/1393)：独立于模型协议，是 BUILD / Host pre-load 完整性问题。优先最小可验证共享方案，不制造通用 npm 包管理器。
-- **功能候选** [#1396 LLM 两协议可选 Capability](https://github.com/kaicreator-mm/domain-harness/issues/1396)：OpenAI-compatible Chat Completions 与 Anthropic Messages-compatible 是独立选取的 C Package；Domain App 可选择 **0 / OpenAI / Anthropic / 同时两者**。Prompt/Response/Context 为可复用纯语义 S Feature 或包内私有 helper；Transport 与凭据属于 Host。协议功能不同必须显式声明，不默认支持特有 API。
-- **功能候选** [#1395 Guided Journey](https://github.com/kaicreator-mm/domain-harness/issues/1395)：**构建前**验证版本化 StepTemplate/FormSchema/ChoiceCatalog、分支规则及恢复路径；**运行时**根据业务事实与 Effect 真正结果只组合一个下一步 StepSpec；**必要时**有界 LLM 仅提供 NextStepCandidate，严格校验其已批准模板、权限和证据。已起草具体双语 DTO/Schema [PR #1397](https://github.com/kaicreator-mm/domain-harness/pull/1397)，先复用 v0.10.2 S/B 接口；缺少两个独立真实消费者和可复现公共缺口，不新增泛用表单引擎。
+- **功能候选** [#1396 LLM 两协议可选 Capability](https://github.com/kaicreator-mm/domain-harness/issues/1396)：OpenAI-compatible Chat Completions 与 Anthropic Messages-compatible 是独立选取的 C Package；Domain App 可选择 **0 / OpenAI / Anthropic / 同时两者**。按 #1396 必须同时定义覆盖两种协议实际已验证交集的**统一 `llm.generate` 逻辑 Operation/Request/Response 契约**；每次统一调用由 B/BUILD 显式绑定一个已获准的具体 C Operation，不引入自动 Provider 网关、默认切换或第三个别名 C Package。Prompt/Response/Context 为可复用纯语义 S Feature 或包内私有 helper；Transport 与凭据属于 Host。协议功能不同必须显式声明，不默认支持特有 API。
+- **功能候选** [#1395 Guided Journey](https://github.com/kaicreator-mm/domain-harness/issues/1395)：**构建前**验证版本化 StepTemplate/FormSchema/ChoiceCatalog、分支规则及恢复路径；**运行时**根据业务事实与 Effect 真正结果只组合一个下一步 StepSpec；**必要时**有界 LLM 仅提供由 #1397 唯一 Schema 定义的 **LLMAdvisory**（`messageType: "llm.advisory"`），经已批准模板/权限/证据校验后，B/S 才能生成符合 #1397 `NextStepDecision` 的状态与 StepSpec；缺证据时用 `NEED_EVIDENCE`，不增加独立候选 wire 类型。已起草具体双语 DTO/Schema [PR #1397](https://github.com/kaicreator-mm/domain-harness/pull/1397)，先复用 v0.10.2 S/B 接口；缺少两个独立真实消费者和可复现公共缺口，不新增泛用表单引擎。
 - **历史能力核对候选** [#1398 任务层/元数据层多级进化](https://github.com/kaicreator-mm/domain-harness/issues/1398)：先重建 v0.3 原始规则→精确缓存→已晋升子流程→有界 LLM 决策优先顺序，以及跨任务 Candidate→验证→显式晋升→下一版本 BUILD 固定的独立成熟度轴。任务 B 执行和元数据/经验生产者是**职责**，不是两个 Kernel。对照 v0.10.2 真实公开路径；具体公共 Package 是否必要按两个消费者验证裁定。
 - **已证实 P2** [#1394 V10DocStore ↔ Host CAS 接线易误用](https://github.com/kaicreator-mm/domain-harness/issues/1394)：优先 15–30 行适配样例和实际 clean consumer，不为应用误用重建 Store 抽象。
 
@@ -25,14 +25,14 @@
 | S Primary / 可选 S Features | 重用语义决策、Context；必要时纯 Prompt/Response/Guided Journey Feature | 不导入、不初始化、不依赖不存在的 Feature |
 | C OpenAI 兼容 Provider | 声明独立 `llm.openai.generate` 候选 Operation、真实 Host Client | 缺失时不调用、不偷用 Anthropic |
 | C Anthropic Messages Provider | 声明独立 `llm.anthropic.generate` 候选 Operation、真实 Host Client | 缺失时不调用、不偷用 OpenAI |
-| B 业务策略 | 何时调哪个 Provider、表单下一步合法性、业务规则、工具动作条件 | 纯规则 App 无模型也能完成常见任务 |
+| B 业务策略／统一 Operation | **统一 `llm.generate` Request/Response 契约**，每次由 B/BUILD 显式绑定被允许的具体 C Operation；表单下一步合法性、业务规则、工具动作条件 | 纯规则 App 无模型也能完成常见任务 |
 | BUILD / Host | 精确选取 Module/Package/route；Host 密钥/物理客户端；按适用独立 #1393 检查安装的 npm 源 | 不做动态 Provider/Tool 安装或模型输出授权 |
 
 远程 LLM 请求可能产生费用与数据外送，建议作为独立 effectful C module；当前 v0.10.2 是**模块级** `externalEffect`，不可假设逐 handler 独立。模型的 Function/Tool Call 只是提议，必须由 B/K/Host 正式审查准入。两种协议公开一个**实际可支持的交集**，而非宣称所有服务都实现同一 OpenAI/Claude 功能集。
 
 ## 3. 合格的用户可观察结果
 
-- **P-A 0/1/2 选择：** Node24 外部 clean installed Domain App，分别选择无 Provider、仅 OpenAI、仅 Anthropic、二者同时；源未选择时零导入和零请求；双选时完全显式路由且 Host 密钥不串。
+- **P-A 0/1/2 选择：** Node24 外部 clean installed Domain App，分别选择无 Provider、仅 OpenAI、仅 Anthropic、二者同时；源未选择时零导入和零请求；双选时完全显式路由且 Host 密钥不串。**一份共同中立 Request/Response 夹具**必须通过 OpenAI-only、Anthropic-only 的显式 B/BUILD 路由；双选不得隐式串路由。
 - **P-B 请求/输出：** 用受控假服务验证两种真实 wire shape 的 JSON/Tool-use 解析；非法模型结果、已发送但结果不明的请求、取消/超时/额度错误真实分类；无未经批准的 Tool Effect 或盲目收费重试。若没有实际付费凭据，网络 live smoke 为 **NOT_RUN**。
 - **P-C 动态表单：** 同一 GMS 目标，根据 `PRESENT_DISABLED | ABSENT | UNKNOWN` 等已验证状态提供不同**下一步**；离线零 LLM；BACK/RESUME/Effect FAIL/PARTIAL/UNKNOWN 有合法步骤，显示 StepSpec 不触发操作；没有已批准模板时 ASK/WAIT/BLOCKED 而不是生成未声明代码。
 - **P-D Meta 演进：** 一次真实业务输出脱敏可核验证据 → Candidate（无执行权）→ 单独验证/审批 → 新版本/新实例复用；原实例凭 exact pin 保持重放一致。先做历史源可达性证明，未证实公共缺口不制造新 Meta 平台。
