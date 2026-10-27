@@ -26,6 +26,14 @@ const result = () => ({
   finishReason: 'stop',
   usage: { evidenceMode: 'unavailable' },
 });
+const failure = (status: string, errorCategory: string, reasonCode: string) => ({
+  contractVersion: LLM_GENERATE_CONTRACT_V1,
+  requestId: 'local-run-1',
+  providerKind: 'openai-compatible',
+  modelId: 'approved-model',
+  status, errorCategory, reasonCode,
+  usage: { evidenceMode: 'unavailable' },
+});
 const invalid = (f: () => unknown, label: string) =>
   test(label, () => assert.throws(() => assertLlmGenerateRequestV1(f()), /LLM_CONTRACT_INVALID/));
 const invalidResult = (f: () => unknown, label: string) =>
@@ -42,8 +50,8 @@ test('positive: both provider result variants and unavailable usage', () => {
     status:'completed', finishReason:'tool_proposal',
     toolProposals:[{name:'suggest', argumentsJson:'{"name":"x"}'}]});
   assertLlmGenerateResultV1({...result(), usage:{evidenceMode:'provider-reported',inputTokens:21,outputTokens:5}});
-  assertLlmGenerateResultV1(({ text, finishReason, ...rest }) => ({...rest, status:'unknown', errorCategory:'OUTCOME_UNKNOWN',
-    reasonCode:'REMOTE_AMBIGUOUS', usage:{evidenceMode:'unavailable'}}))((result()));
+  assertLlmGenerateResultV1(failure('unknown', 'OUTCOME_UNKNOWN', 'REMOTE_AMBIGUOUS'));
+  assertLlmGenerateResultV1(failure('refused', 'DEADLINE', 'DEADLINE_BEFORE_DISPATCH'));
 });
 invalid(() => ({...base(), messages:[]}), 'negative: zero messages');
 invalid(() => ({...base(), messages:Array(33).fill({role:'user',content:'x'})}), 'negative: oversized message list');
@@ -61,9 +69,9 @@ invalidResult(() => ({...result(), providerKind:'other'}), 'negative: unknown pr
 invalidResult(() => ({...result(), status:'completed', finishReason:'tool_proposal'}), 'negative: missing tool proposals');
 invalidResult(() => ({...result(), toolProposals:[{name:'x',argumentsJson:'not-json'}]}), 'negative: malformed tool proposal');
 invalidResult(() => ({...result(), toolProposals:Array(9).fill({name:'x',argumentsJson:'{}'})}), 'negative: too many tool proposals');
-invalidResult(() => ({...result(), status:'unknown',errorCategory:'DEADLINE',reasonCode:'REMOTE_TIMEOUT'}), 'negative: ambiguous result not classified OUTCOME_UNKNOWN');
-invalidResult(() => ({...result(), status:'failed',errorCategory:'OUTCOME_UNKNOWN',reasonCode:'REMOTE_FAILED'}), 'negative: OUTCOME_UNKNOWN cannot be terminal failure');
-invalidResult(() => ({...result(), status:'failed',errorCategory:'AUTH_DENIED',reasonCode:'raw sdk: secret'}), 'negative: no raw exception messages');
+invalidResult(() => (failure('unknown', 'DEADLINE', 'REMOTE_TIMEOUT')), 'negative: ambiguous result not classified OUTCOME_UNKNOWN');
+invalidResult(() => (failure('failed', 'OUTCOME_UNKNOWN', 'REMOTE_FAILED')), 'negative: OUTCOME_UNKNOWN cannot be terminal failure');
+invalidResult(() => (failure('failed', 'AUTH_DENIED', 'raw sdk: secret')), 'negative: no raw exception messages');
 test('negative: type guards return false without leaking raw data', () => {
   assert.equal(isLlmGenerateResultV1({...result(), status:'success'}), false);
   assert.equal(isLlmGenerateRequestV1({...base(), requestId:''}), false);
