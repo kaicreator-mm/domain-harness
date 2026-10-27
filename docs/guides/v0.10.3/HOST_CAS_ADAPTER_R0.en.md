@@ -14,19 +14,29 @@
 
 ```ts
 import type { V10DocStore, V10DocWriteCondition } from '@kaicreator/domain-harness-contracts';
+import { InMemoryCasStore } from '@kaicreator/domain-harness-host-node';
 import type { CasDocumentStore, CasPutConditions } from '@kaicreator/domain-harness-host-node';
 
-function hostCondition(condition: V10DocWriteCondition): CasPutConditions {
-  return condition.kind === 'create'
-    ? { mustBeAbsent: true }
-    : { mustMatchRevision: condition.revision };
+function hostCondition(condition: V10DocWriteCondition, forRemove = false): CasPutConditions {
+  if (!condition || typeof condition !== 'object') {
+    throw new TypeError('V10_DOC_CONDITION_INVALID');
+  }
+  if (condition.kind === 'create') {
+    if (forRemove) throw new TypeError('V10_DOC_REMOVE_REQUIRES_CAS');
+    return { mustBeAbsent: true };
+  }
+  if (condition.kind === 'cas'
+      && Number.isSafeInteger(condition.revision) && condition.revision >= 0) {
+    return { mustMatchRevision: condition.revision };
+  }
+  throw new TypeError('V10_DOC_CONDITION_INVALID');
 }
 
 export function asV10DocStore(host: CasDocumentStore): V10DocStore {
   return {
     get: (key) => host.get(key),
     put: (key, value, condition) => host.put(key, value, hostCondition(condition)),
-    remove: (key, condition) => host.remove(key, hostCondition(condition)),
+    remove: (key, condition) => host.remove(key, hostCondition(condition, true)),
   };
 }
 ```
@@ -37,7 +47,7 @@ Use `const store = asV10DocStore(new InMemoryCasStore());` and pass `store` to t
 
 1. Empty-key create returns a revision; duplicate create **must fail**, never degrade into unconditional overwrite.
 2. Exact current-revision CAS succeeds, stale revision fails without blind retry, overwrite or fake success.
-3. Forward `remove` only if the Host physically guarantees a conditional remove. Do not silently impersonate a synchronous `keys()` with Host's asynchronous `list()`.
+3. Host `remove` supports **revision CAS only**: `remove({kind:'create'})` is explicitly refused, as are malformed JavaScript conditions and invalid revisions. Forward `remove` only if the Host physically guarantees a conditional remove. Do not silently impersonate a synchronous `keys()` with Host's asynchronous `list()`.
 4. Preserve the direct-wiring negative and its `HOST_PUT_CONDITION_REQUIRED` rather than treating it as a successful K operation. An in-memory test store is not a multi-process production CAS claim.
 5. A later Node24 packed external consumer should exercise normal path, duplicate create, stale CAS, optional remove and raw-miswire negative. If no new execution happened, mark `NOT_RUN`; reuse the existing ai-rexform receipt and do not require a v0.10.2 Full/Hidden rerun for this guide.
 

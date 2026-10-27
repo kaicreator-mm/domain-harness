@@ -16,19 +16,29 @@ v0.10.2 已有两种合理但不直接兼容的公开 CAS 数据面：
 
 ```ts
 import type { V10DocStore, V10DocWriteCondition } from '@kaicreator/domain-harness-contracts';
+import { InMemoryCasStore } from '@kaicreator/domain-harness-host-node';
 import type { CasDocumentStore, CasPutConditions } from '@kaicreator/domain-harness-host-node';
 
-function hostCondition(condition: V10DocWriteCondition): CasPutConditions {
-  return condition.kind === 'create'
-    ? { mustBeAbsent: true }
-    : { mustMatchRevision: condition.revision };
+function hostCondition(condition: V10DocWriteCondition, forRemove = false): CasPutConditions {
+  if (!condition || typeof condition !== 'object') {
+    throw new TypeError('V10_DOC_CONDITION_INVALID');
+  }
+  if (condition.kind === 'create') {
+    if (forRemove) throw new TypeError('V10_DOC_REMOVE_REQUIRES_CAS');
+    return { mustBeAbsent: true };
+  }
+  if (condition.kind === 'cas'
+      && Number.isSafeInteger(condition.revision) && condition.revision >= 0) {
+    return { mustMatchRevision: condition.revision };
+  }
+  throw new TypeError('V10_DOC_CONDITION_INVALID');
 }
 
 export function asV10DocStore(host: CasDocumentStore): V10DocStore {
   return {
     get: (key) => host.get(key),
     put: (key, value, condition) => host.put(key, value, hostCondition(condition)),
-    remove: (key, condition) => host.remove(key, hostCondition(condition)),
+    remove: (key, condition) => host.remove(key, hostCondition(condition, true)),
   };
 }
 ```
@@ -39,7 +49,7 @@ export function asV10DocStore(host: CasDocumentStore): V10DocStore {
 
 1. **正常 create：** 空 key 写入产生 revision；重复 create 必须拒绝，不能转成无条件写入。
 2. **revision CAS：** 仅 `{kind:'cas',revision:current}` 可成功；过期 revision 必须拒绝，不能自动覆盖、重试或掩盖 CAS 冲突。
-3. **remove：** 只有 Host 真正支持条件化删除时才转发；不需要 `keys()` 的情况下不为异步 Host `list()` 伪造同步 `keys()`。
+3. **remove：** Host 仅支持带当前 revision 的 CAS 删除；`remove({kind:'create'})` 明确拒绝，未知 JS 判别式或无效 revision 也明确拒绝。只有 Host 真正支持条件化删除时才转发；不需要 `keys()` 的情况下不为异步 Host `list()` 伪造同步 `keys()`。
 4. **反例：** 直接传 Host `CasDocumentStore` 的形状不匹配应保留真实错误；不要把 `HOST_PUT_CONDITION_REQUIRED` 伪造为 K 成功。不得将单进程 `InMemoryCasStore` 宣称为跨进程安全。
 5. **测试证据：** 后续用 Node24 的公共 npm tarball/真实外部消费者对正确适配、重复 create、陈旧 CAS、可选 remove 和直接误接负例分别测试；未执行时记录 `NOT_RUN`，复用 ai-rexform 的已存在实测证据，不重复整版 Full/Hidden。
 
