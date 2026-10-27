@@ -11,7 +11,7 @@
 | `capability-llm-openai-compatible` | `llm.openai.generate` | OpenAI-compatible Chat Completions |
 | `capability-llm-anthropic-messages` | `llm.anthropic.generate` | Anthropic Messages |
 
-BUILD must support **0, 1, or 2** selected Provider C packages (zero = offline/rule-only). Each has independent source/package/ABI identity, config and credentials, no cross-provider import. With both selected, B routes by exact operation and selected provider, **never** by last writer, default, runtime surprise or unpinned model-name inference. A logical `llm.generate` alias is optional **only if explicitly statically bound** by B/BUILD, not an automatic dynamic selector.
+BUILD must support **0, 1, or 2** selected Provider C packages (zero = offline/rule-only). Each has independent source/package/ABI identity, config and credentials, no cross-provider import. With both selected, B routes by exact operation and selected provider, **never** by last writer, default, runtime surprise or unpinned model-name inference. The shared **provider-neutral `llm.generate` logical operation/data contract is mandatory** for the verified common intersection (#1396); it is not a third C Package or automatic dispatch gateway. A Business using the neutral contract must **explicitly bind** the call at B/BUILD to one selected concrete C operation (`llm.openai.generate` or `llm.anthropic.generate`) under approved model/endpoint policy. With both providers selected, binding is still explicit per route; provider-specific operations remain available for provider-specific capabilities. With zero selected providers, `llm.generate` is unavailable and no-model paths remain valid; **no default, inferred route or fallback**.
 
 ## Candidate common data projection (mutable until freeze)
 
@@ -27,6 +27,8 @@ BUILD must support **0, 1, or 2** selected Provider C packages (zero = offline/r
 - **Host:** physical provider SDK clients (reuse mature libraries), credentials, endpoint deployment config, cancellation/transport. Not a Microkernel AI provider subsystem or a new generic HTTP/SSE stack.
 - **B/Business:** when to call, which allowed protocol/model, missing-provider offline fallback, validation of any proposed Tool Call.
 - **BUILD:** selected source/route closure before load; no dynamic import of unselected provider at runtime. External npm executable integrity is the independent [#1393](https://github.com/kaicreator-mm/domain-harness/issues/1393) concern.
+
+**Mandatory shared-contract acceptance:** Using the exact same provider-neutral request/response data shape, an explicitly B/BUILD-bound OpenAI-only App and an independently bound Anthropic-only App must each produce the documented normalized result; a dual-selected App must prove both explicit bindings without provider leakage. No auto-router, alias-only C module or new Kernel ABI is implied.
 
 ## Minimal independent clean consumers
 

@@ -19,7 +19,7 @@
 
 1. **构建前准备 / Producer：** 领域 B/设计者预先产出步骤问题、选项、Schema、多语资源键、适用条件、所需证据、错误/恢复路径、复用子流程。经过验证的版本及摘要才可放进选定 Domain App/Domain Data；没有理由每次展示表单都重新 BUILD。需要时可让 LLM *提出*模版候选，但验证/审查/封闭选择在未来部署前完成。
 2. **运行时选择 / B + S：** 使用用户目标、已确认业务事实、实时 Host 观察结果、Effect ACK/FAIL/UNKNOWN、暂停/返回/跳过状态，**只组合当前下一步**的纯数据 StepSpec。S Feature 可统一候选排名、Schema/Context；B 判定业务合法性；K 仍掌管准入、状态、Replay 和 Effect Permit。UI 仅按 StepSpec 显示、收集输入。
-3. **可选 LLM 建议 / C + S：** 所选模板不能解决时，有限预算请求模型，得到 **NextStepCandidate**；检查候选 StepKind/option/refs/版本/来源/当前适用性后才能提出 StepSpec，绝不直接建立 Tool、变更冻结内容、批准副作用或自动升级 Meta 规则。不可用时返回 `ASK_EVIDENCE | WAIT | BLOCKED | HANDOFF` 等由 B 明确定义的分支。
+3. **可选 LLM 建议 / C + S：** 所选模板不能解决时，有限预算请求模型，得到与 #1397 唯一 Schema 对齐的 **LLMAdvisory**（`messageType: "llm.advisory"`）；只有核对已允许的模板/选项/证据引用、版本、来源及当前适用性后，B/S 才能提出包含一个 `StepSpec`、状态为 `STEP` 的 `NextStepDecision`。建议不可用或不合格时，B 使用 #1397 的实际状态 `NEED_EVIDENCE | WAIT | BLOCKED`；人工交接使用 B 定义的 `reasonCode`，**不是独立 wire status**。模型输出不能创建 Tool、改变冻结内容、批准副作用或自动升级 Meta 规则。
 
 详细 StepSpec/Outcome/Advisory 原型由 **#1397 的三文件 DTO/JSON Schema 草案**单独审核与维护；本索引不重做一套互不兼容字段。
 

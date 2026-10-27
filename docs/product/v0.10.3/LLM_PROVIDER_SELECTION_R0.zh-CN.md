@@ -11,7 +11,7 @@
 | `capability-llm-openai-compatible` | `llm.openai.generate` | OpenAI-compatible Chat Completions |
 | `capability-llm-anthropic-messages` | `llm.anthropic.generate` | Anthropic Messages |
 
-Domain App BUILD 必须允许 **0、1 或 2 个**选定 Provider C（0 表示纯规则/离线）。它们是不同 Module/Package、ABI 身份、配置和凭据，互不导入；选择两个时 B/声明路由必须使用明确 Operation ID 和精确所选 Provider，不能最后写入覆盖前者。可选业务别名 `llm.generate` 只有在 B/BUILD **显式静态绑定**后才能出现；绝不自动按模型名、默认值或请求先后选择。
+Domain App BUILD 必须允许 **0、1 或 2 个**选定 Provider C（0 表示纯规则/离线）。它们是不同 Module/Package、ABI 身份、配置和凭据，互不导入；选择两个时 B/声明路由必须使用明确 Operation ID 和精确所选 Provider，不能最后写入覆盖前者。按 #1396，公共支持交集必须定义**统一的 `llm.generate` 逻辑 Operation/数据契约**，它不是第三个 C Package 或自动调用网关。业务 B 使用此统一契约时，必须在 B/BUILD **显式绑定**到已选择的一个具体 C Operation（`llm.openai.generate` 或 `llm.anthropic.generate`），并受批准的模型与 Endpoint 策略约束。即使两个 Provider 同时被选中，每条路由仍须显式指定；具体 Operation 保留处理各自特有功能的能力。不选择任何 Provider 时统一操作不可用，但纯规则流程正常；**不得自动推断默认路由或隐式回退**。
 
 ## 共同数据投影（候选，字段可变）
 
@@ -27,6 +27,8 @@ Domain App BUILD 必须允许 **0、1 或 2 个**选定 Provider C（0 表示纯
 - **Host：** 真实 SDK 客户端（复用成熟库）、模型配置、API 凭据、取消/超时、传输，不放 Microkernel，也不重新写通用 HTTP/SSE。
 - **B/Business：** 选择哪个 Provider/模型及何时允许调用；无 Provider 必须有清晰非模型降级业务路径。模型的 Tool Call 仅是待校验提案。
 - **BUILD：** 提前封闭已选 Package、权限和路由；运行时不能动态下载、装载未选 Provider；外部 npm 字节完整性独立由 [#1393](https://github.com/kaicreator-mm/domain-harness/issues/1393) 治理，不能由本协议名字替代。
+
+**统一契约的强制验收：** OpenAI-only 和 Anthropic-only App 使用同一份中立 Request/Response 数据结构，通过各自明确的 B/BUILD 绑定返回归一化结果；双选 App 验证两种显式路由不串。此约束不要求新增别名专用 C Package、自动路由器或 Kernel ABI。
 
 ## 最小测试与下游对齐
 
