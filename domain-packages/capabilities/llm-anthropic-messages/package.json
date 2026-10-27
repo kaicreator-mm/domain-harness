@@ -1,0 +1,10 @@
+{
+  "name": "@kaicreator/domain-capability-llm-anthropic-messages",
+  "version": "0.10.3-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "Independently selected Anthropic Messages C operation source (no embedded credentials)",
+  "engines": {"node": ">=24.0.0"},
+  "files": ["modules/*.mjs", "README.md"],
+  "exports": {".": "./modules/capability-llm-anthropic-messages.mjs"}
+}
