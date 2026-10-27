@@ -1,6 +1,7 @@
 import { V10Error } from '@kaicreator/domain-harness-contracts';
 import type { V10BuiltApp, V10DocStore, V10PublicIntent, V10QueryAuthority, V10ScopedSnapshotAnswer, V10ScopedSnapshotManyAnswer, V10ScopedSnapshotQuery } from '@kaicreator/domain-harness-contracts';
 import type { V10AppFacade } from '@kaicreator/domain-harness-microkernel/host-seam';
+import type { VerifiedProviderBundlePolicy } from './verified-provider-bundle.js';
 declare const DECISION_KIND: "v10/build-activation-decision";
 declare const PIN_KIND: "v10/occurrence-build-pin";
 declare const RECORD_KIND: "v10/deployment-activation";
@@ -194,6 +195,10 @@ export interface ActivateGovernedV10BuildOptions {
     readonly now?: () => number;
     readonly queryAuthority?: V10QueryAuthority;
     readonly deploymentRoot?: string;
+    /** Host wiring only; absent/TRUSTED_DEPLOYMENT preserves historical behavior. */
+    readonly providerIntegrity?: {
+        readonly profile: 'TRUSTED_DEPLOYMENT';
+    } | VerifiedProviderBundlePolicy;
 }
 /**
  * [v0.10.2 T06b #1326 / L2 §8] the frozen governed subscription event
