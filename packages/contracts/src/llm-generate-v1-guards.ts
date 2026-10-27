@@ -6,7 +6,7 @@ import { LLM_GENERATE_CONTRACT_V1 } from './llm-generate-v1.js';
 import type { LlmGenerateRequestV1, LlmGenerateResultV1 } from './llm-generate-v1.js';
 
 type Plain = Record<string, unknown>;
-const fail = (reason: string): never => { throw new TypeError('LLM_CONTRACT_INVALID_' + reason); };
+function fail(reason: string): never { throw new TypeError('LLM_CONTRACT_INVALID_' + reason); }
 const isObject = (v: unknown): v is Plain =>
   v !== null && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
 const record = (v: unknown): Plain => isObject(v) ? v : fail('OBJECT');
