@@ -63,13 +63,15 @@ export function assertLlmGenerateRequestV1(input: unknown): asserts input is Llm
   if ('temperature' in v && !finiteFloat(v.temperature, 0, 1)) fail('TEMPERATURE');
   optionalString(v, 'outputSchemaRef', 256);
   optionalString(v, 'toolCatalogRef', 256);
-  if (!Array.isArray(v.messages) || v.messages.length < 1 || v.messages.length > 32) fail('MESSAGES');
+  const messages = v.messages;
+  if (!Array.isArray(messages) || messages.length < 1 || messages.length > 32) fail('MESSAGES');
   let total = 0;
-  for (const candidate of v.messages) {
+  for (const candidate of messages) {
     const m = record(candidate);
     only(m, ['role', 'content']);
-    if (!enums(m.role, roles) || !nonempty(m.content, 32768)) fail('MESSAGE');
-    total += m.content.length;
+    const content = m.content;
+    if (!enums(m.role, roles) || !nonempty(content, 32768)) fail('MESSAGE');
+    total += content.length;
     if (total > 65536) fail('MESSAGE_BUDGET');
   }
 }
@@ -94,13 +96,15 @@ export function assertLlmGenerateResultV1(input: unknown): asserts input is LlmG
     if (typeof v.text !== 'string' || v.text.length > 65536 || !enums(v.finishReason, finish))
       fail('COMPLETION');
     if ('toolProposals' in v) {
-      if (!Array.isArray(v.toolProposals) || v.toolProposals.length > 8) fail('TOOL_LIMIT');
-      for (const candidate of v.toolProposals) {
+      const proposals = v.toolProposals;
+      if (!Array.isArray(proposals) || proposals.length > 8) fail('TOOL_LIMIT');
+      for (const candidate of proposals) {
         const p = record(candidate);
         only(p, ['name', 'argumentsJson']);
-        if (!nonempty(p.name, 128) || !nonempty(p.argumentsJson, 16384)) fail('TOOL_PROPOSAL');
+        const argumentsJson = p.argumentsJson;
+        if (!nonempty(p.name, 128) || !nonempty(argumentsJson, 16384)) fail('TOOL_PROPOSAL');
         try {
-          const args: unknown = JSON.parse(p.argumentsJson);
+          const args: unknown = JSON.parse(argumentsJson);
           if (!isObject(args)) fail('TOOL_ARGUMENTS');
         } catch {
           fail('TOOL_ARGUMENTS');
