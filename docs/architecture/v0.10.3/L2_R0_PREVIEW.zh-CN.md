@@ -33,7 +33,7 @@ UI: 只显示 B/S 当前生成的 StepSpec 数据；不是 K 或新 Tool。
 | Prompt/Context/Response | 优先复用 `domain-packages/standard/features/context-assembly`、`semantic-decision`；按实际缺口可选纯 S | 构造 Prompt、当前范围 Context、Schema 解析，模型结果非权限 | 纯语义函数/私有 helper |
 | 预生成表单 / 运行时下一步 | 业务 Producer 维护 `StepTemplate/FormSchema`、版本摘要；B + 可选 S 使用唯一 #1397 `StepSpec/LLMAdvisory/NextStepDecision` | 仅从已批准候选中选一个步骤，UI Render-only | 渲染/组合不是物理 Effect；必要检查由 B/K 掌握 |
 | Task / Meta 经验演化 | 现有 S Evidence/Candidate/Experience 原始源码可达性核对、B 工作流、可选 task-meta 证据适配 | 规则→精确语义复用→已晋升子流程→有界模型是**决策源优先顺序**；Candidate→验证→显式晋升→下次 BUILD 固定是**知识成熟度** | 无第二个 Kernel、自动更新器或自动晋升权威 |
-| npm 外部执行内容完整性 #1393 | BUILD/Contracts/Host 独立安全修复 | 已选外部 npm 真正可执行字节核验，加载前拒绝替换 | **与 LLM Provider wire 协议不同** |
+| npm 外部执行内容完整性 #1393 | BUILD/Contracts/Host **跨层可信闭包**的最小公共方案 | 明确默认 trusted-deployment 与可选 verified-integrity profile；独立可信发布/部署根摘要覆盖实际可执行代码依赖，加载前校验。仅从同一可变 seal 读取 expected hash **不是可信锚点** | **与 LLM Provider wire 协议不同**；不另建供应链平台 |
 | CAS 对接文档 #1394 | docs/examples 独立 | 公共 K `kind:create/cas` 与 Host `mustBeAbsent/mustMatchRevision` 的薄适配器 | 不另造存储或权限边界 |
 
 **要点：** C Provider 物理调用在外部发送信息并可能付费，不可凭 “读模型” 把整个 Module 误标成无 Effect；采用 v0.10.2 模块级 `externalEffect` + K Permit/Journal/UNKNOWN。实际 K 的准入标识、重放规则和 Host 授权仍以当版公开 ABI 为准。未经授权的模型返回 ToolCall 只是 B 校验的提案。 `llm.generate` 为**必须提供的逻辑契约**，但不保证 v0.10.2 已存在的第三个 `operationId` 或运行时别名表；L2 需决定最小静态显式绑定的公开消费者示例和拒绝行为。
@@ -63,7 +63,7 @@ UI: 只显示 B/S 当前生成的 StepSpec 数据；不是 K 或新 Tool。
 2. **必要生产验证：** Node24 installed packed App，Provider **0 / OpenAI-only / Anthropic-only / both** 四组合；统一 `llm.generate` 中立数据与明确绑定；无选中 Package 零 import/dispatch；两 fake endpoints 而非必需付费真调用。
 3. **Journey：** 构建前固化模板；运行时 CaseRef 改变选择不同 StepSpec；LLMAdvisory 禁止非法模板/effect，旧 StepOutcome/Effect UNKNOWN 不伪造成功；零模型路径完整。两个下游实际复用前，不必实现通用 S Guided Journey 包。
 4. **进化：** 由真实脱敏结果建立 Candidate；未晋升无权执行；审核后新版本固定可复用；正在运行的旧实例不热改。
-5. **P1 npm：** 在实际已选严格完整性配置下复现实例替换→加载前拒绝，真实通道验证；安全关键真实负例不能省略。CAS P2 使用一条真实薄适配正反例。
+5. **P1 npm：** 以真实 Node24 部署根摘要为锚，验证正常 Provider 正例、单独替换安装代码负例，以及**同时替换 Provider 和可变 sealed App 内嵌 hash 但保留旧 subjectDigest**的联动篡改负例；必须在首次 Provider 求值/任何 Kernel Effect 之前拒绝，且无日志凭据泄漏。声明覆盖范围、攻击者假设、Node ESM/TOCTOU 限制；无法保证完整可执行闭包时收窄 verified profile 而非虚报 Sandbox。**CAS P2** 先复用 ai-rexform adapter + 双语可运行例子，若消费者复现通过且无其他重复缺口，不要求运行时修改。
 6. **最终：** 不重复执行旧 v0.10.2 Full/Hidden；最后选 exact 版本候选依真实影响集中验证一轮。CI Provider 处于 PENDING 不当 FAIL；只有明确失败步才能定向修复。
 
 **Gate：** `PRE_L2_R0=DOCUMENTED; PRODUCT_L1_FREEZE=NO; L2_FREEZE=NO; DAG_ADMITTED=NO; SOURCE_CHANGE_AUTHORIZED=NO; ADS_V418_ADOPTION=UNDER_REVIEW`。
