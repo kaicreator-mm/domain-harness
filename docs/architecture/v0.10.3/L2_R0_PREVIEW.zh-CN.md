@@ -44,7 +44,7 @@ UI: 只显示 B/S 当前生成的 StepSpec 数据；不是 K 或新 Tool。
 
 | Lane | Concern / 来源 | 起点与对其他 Lane 的依赖 | 独占写集建议 |
 | --- | --- | --- | --- |
-| G | ADS v4.18 固定版本 #1405 | **独立进行**；现有审核已经进行中 | `.dev-standard/VERSION` 和过期 pin 描述 |
+| G（历史 DONE，不建立新 Task） | ADS 升级 #1405 已合并 | 不是新的前置任务 | `.dev-standard/VERSION` 和过期 pin 描述 |
 | I | 真实已复现 npm executable integrity #1393 | Product/L2 通过后可与其它并行 | BUILD/Contracts pre-load 选择与受信校验（不得和 C 的适配器写同一文件） |
 | A | 公共中立 DTO/Operation 契约 #1396 | Product/L2 **最小公共静态契约**获准后先固定接口；B/C 可并行准备本地不冲突方案 | 单一公共协议接口、有限 Capability 概念 |
 | B | OpenAI C+Host | **A 的最小类型面**确定即可单独实现；不等待 Anthropic | OpenAI C Module/Host adapter |

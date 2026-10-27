@@ -21,6 +21,66 @@ v0.10.2 真实可用的公共选择面是外部 `buildV10App`/`projectSelectedCo
 | #1393 **异常泄漏 P2 诊断** | 优先在受信 Host/C 适配层把原生 Provider Error 改为常量化/类型化 UNKNOWN，不默认修改 K 记账机制 | Tally 的 throw/getter 负例不得让 Token 进入 Journal，也不能把失败变成成功 | 只有其它真实现行公开消费者也需要才考虑 Kernel 级错误投影 |
 | #1394 **CAS DX P2** | B/Host 适配器将 K 的 `V10DocStore kind:create/cas` 映射到 Host 的 `CasDocumentStore mustBeAbsent/mustMatchRevision`，双语文档与外部用例 | ai-rexform 真实 CAS 正/冲突例；相同代码复用已有结果 | 多个下游重复遇到才考虑公共 Bridge Factory，不重写 Kernel/Host Store ABI |
 
+## R1 — 具体中立 ABI、真实 BUILD 绑定和写集归属
+
+以下是**v0.10.3 待实现的 Contracts 提议**，不是 v0.10.2 已发布类型。交集只覆盖有界文本／JSON 文本生成；ToolCall、Streaming、Responses 与 Anthropic 特有能力不冒充通用功能。A 独占公共 Contracts 类型和验证；B/C 分别独占 OpenAI、Anthropic Capability+Host 子目录；公共导出、Host 根、Manifest 只由 R 集成单写者。
+
+```ts
+export interface LlmGenerateRequestV1 {
+  readonly contractVersion: 'dh.llm.generate/1';
+  readonly requestId: string; // 非空 <=128；仅关联，不能证明远端幂等
+  readonly messages: readonly {
+    readonly role: 'system' | 'user' | 'assistant';
+    readonly content: string; // 每条 <=32768 字符
+  }[]; // 1..32 条，累计 <=65536 字符
+  readonly maxOutputTokens: number; // 整数 1..8192
+  readonly outputFormat: 'text' | 'json'; // 请求 JSON 文本，未保证服务端强制
+  readonly temperature?: number; // 有限 0..1，不支持则调用前拒绝
+}
+export type LlmGenerateResultV1 =
+  | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
+      readonly status: 'completed'; readonly text: string; // <=65536
+      readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
+      readonly receiptRef?: string }
+  | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
+      readonly status: 'refused' | 'failed' | 'unknown'; readonly reasonCode: string;
+      readonly receiptRef?: string };
+```
+
+`requestId` 不允许因此盲重试。远端已调用但结果不确定时，返回 **unknown**，不能重复扣费；`failed` 是确认失败，`refused` 是已证实拒绝/未发出请求。真实 Provider 没有返回 Token usage 时不可捏造零；`receiptRef` 是 <=256 的 Host 不透明凭据引用而非执行 Permit。SDK 原始异常必须映射为有限、不含密钥的 `reasonCode`，绝不把原始 Error 写入 Journal。模型输出如用于表单，另按**已冻结的 #1397 `LLMAdvisory` Schema**校验，无直接 Tool 权限。
+
+现行 BUILD 真实路由字段是 `{intentId,operationId,capabilityId,handlerId}`，C 有 `handlers[{operationId,handler}]`。公共 `llm.generate` 是**B 逻辑接口**，不是第三个物理 Operation/Provider/Kernel Alias。两个可选 C 的具体 L2 身份：
+
+```ts
+// 可选 OpenAI C：整模块 externalEffect:true
+{ packageId:'capability-llm-openai-compatible',role:'capability',
+  abiVersion:'v08-capability-abi/1',capabilityId:'llm.openai',
+  externalEffect:true,handlers:[{operationId:'llm.openai.generate',handler:'generate'}] }
+// 可选 Anthropic C：独立整模块 externalEffect:true
+{ packageId:'capability-llm-anthropic-messages',role:'capability',
+  abiVersion:'v08-capability-abi/1',capabilityId:'llm.anthropic',
+  externalEffect:true,handlers:[{operationId:'llm.anthropic.generate',handler:'generate'}] }
+// B 已声明两个不同 intent，BUILD 封闭真实路由：
+{ intentId:'llmViaOpenAI',operationId:'llm.openai.generate',
+  capabilityId:'llm.openai',handlerId:'generate' }
+{ intentId:'llmViaAnthropic',operationId:'llm.anthropic.generate',
+  capabilityId:'llm.anthropic',handlerId:'generate' }
+```
+
+**双选**由具权限 B 在 K Permit 前选一个已批准 intent；**单选**完全不含另一 C/路由/导入；**零选**不含两类 Provider，保留其它合法业务路由（现有 BUILD routes 不得空）。企图绑定未选的 capability 使用已有 `V10_ROUTE_INVALID` 拒绝；不能从 LLM 文字临时选 URL、型号或混用密钥。两种真实服务的 Chat Completions/Messages 差异由对应 C/Host 成熟 SDK 明确转换，不支持的功能调用前拒绝。
+
+## R1 — #1393 有边界的严格部署方案，复用已有 Host 准入
+
+保留原 `TRUSTED_DEPLOYMENT` 默认（Host 受信安装，不谎称 npm 密码学完整性）。仅增加**可选** `VERIFIED_PROVIDER_BUNDLE_V1`：一个**自包含静态 ESM Provider 文件**，所有第三方可执行依赖已打入此文件。严格模式只允许列举的 Node 内建静态 import；外部/动态 import、require、native addon、运行时 eval/下载代码、旁置文件**均在首次求值前拒绝**。Host 自带官方 LLM SDK 仍属独立受信 Host 部署，不冒充外部 Provider 包的验证能力。**不造**通用 npm 依赖扫描/沙箱。
+
+独立可信来源是现存 `V10DeploymentAuthorizationAuthority.verify`／Host 受保护部署政策，必须在**可变 sealed-app.json 之外**取得并核验 `subjectDigest`、`packageClosureDigest` 和每个支持 Provider 的 `artifactPath+artifactSha256`。攻击者可改本地 seal 和已安装未受信代码，但不能同时改 Host 受信锚。已有 `v10BuildPackageClosureDigest` 只哈希**声明描述符**，不是实际 npm 字节。Host 在 `activateV10App`、首次 Provider 求值、任何 K Effect **之前**使用既有 `activateGovernedV10Build` 门禁：(a) 真实 BUILD canonical 算法核验 subject 和封闭模块 `sha256(moduleSource)`；(b) 从 Host 受控只读的内容寻址 staging 路径测量**真正将执行的 Provider 文件**；(c) 比较外部可信哈希，保证加载和校验使用**同一不可变快照**。做不到验证/加载同一份字节就先返回 `VERIFIED_PROVIDER_ARTIFACT_UNSUPPORTED`；验证之后拥有完全 Host 根目录写权限的攻击者超出此模式可证明范围，文档必须明确。保留 `CURRENT|PINNED_ONLY` 和旧实例，绝不引入第二个 Kernel。
+
+有限类型拒绝：`VERIFIED_PROVIDER_TRUST_ANCHOR_MISSING`、`VERIFIED_PROVIDER_DIGEST_MISMATCH`、`VERIFIED_PROVIDER_ARTIFACT_UNSUPPORTED`；消息不能带凭据。**真实 Node24 三例**：①合法 Provider 正例；②只改 Provider 字节负例；③Provider + 本地封闭哈希一起改、但可信 subjectDigest 保持旧值负例。②③都要证明 Provider **零求值/K Effect 零执行**；不支持的动态导入也直接拒绝。另通过 Tally throw/getter P2 负例证明原异常被转成类型化 UNKNOWN，SQLite Journal 不含 Token。不无限升级 K 错误框架。
+
+## 复用与并行边界
+
+ADS G 升级 **已经完成，不建立新 Task**。最小 A 中立契约 → B OpenAI ∥ C Anthropic；I 安全、S 纯语义、J **离线**动态表单、M Meta 现有公开 Host 根 `@kaicreator/domain-harness-host-node` 的 `runMetaFeedbackWorkflow` + 已选 S、D CAS 文档在 L2 评审冻结与各自独占写集后并行；R 负责共享 Manifest/导出/Host 根与整版验证。不得 deep-import 私有 `packages/host-node/src/meta-feedback-workflow.ts`，不得把 source-only experience-reuse 当已发布 SDK；无第二 Meta Kernel。#1397 是**唯一** StepSpec/LLMAdvisory 数据契约。L2 R2 PASS 后先记录版本分支 Freeze，才建立 GitHub Native DAG/Claims；本文仍非实施授权。
+
 ## 二、真正并行的 Task DAG 前提（尚未创建可执行 DAG）
 
 - **I 完整性：** 拥有公共 BUILD/Contracts/Host 首次导入前的受信校验边界；P1 独立于 LLM 功能，Product/L2 通过后可并行。

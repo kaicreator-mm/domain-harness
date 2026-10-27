@@ -21,6 +21,64 @@ Current tagged v0.10.2 already supports sealed external `buildV10App` and `proje
 | #1393 error containment (P2) | Prefer trusted Host/selected C boundary constant typed sanitized error mapping, not K core change by default | Tally substituted throw/getter fixture returns no token in Journal/UNKNOWN, with no unreviewed silent error success | Only escalate to central Journal projection if another source-qualified current public consumer needs it |
 | #1394 Store adapter (P2) | B/Host app reference maps K `V10DocStore kind:create/cas` to Host `CasDocumentStore mustBeAbsent/mustMatchRevision`; paired docs/executable example | ai-rexform normal/cas-conflict clean-consumer; reuse existing proof if same bytes | New shared factory only after repeated consumer confusion; **no Kernel/Host Store ABI rewrite** |
 
+## R1 — concrete neutral ABI, actual BUILD binding and ownership
+
+These are **proposed v0.10.3 Contracts types**, not already-shipped v0.10.2 public exports. The sole neutral common intersection is bounded text/JSON-text generation; ToolCalls, streaming, Responses and Anthropic-only features remain explicitly separate. All request/response values are plain JSON. A owns Contracts and validation; OpenAI B and Anthropic C own separate capability modules and Host client directories; Integration R is the **sole writer** of shared export/manifest/Host composition-root files.
+
+```ts
+export interface LlmGenerateRequestV1 {
+  readonly contractVersion: 'dh.llm.generate/1';
+  readonly requestId: string; // nonempty, max 128; CORRELATION not remote idempotency
+  readonly messages: readonly {
+    readonly role: 'system' | 'user' | 'assistant';
+    readonly content: string; // max 32768 characters each
+  }[]; // 1–32 messages; sum content <=65536 characters
+  readonly maxOutputTokens: number; // integer 1–8192
+  readonly outputFormat: 'text' | 'json'; // JSON text requested; not guaranteed
+  readonly temperature?: number; // finite 0–1; reject unsupported before dispatch
+}
+export type LlmGenerateResultV1 =
+  | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
+      readonly status: 'completed'; readonly text: string; // <=65536 chars
+      readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
+      readonly receiptRef?: string }
+  | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
+      readonly status: 'refused' | 'failed' | 'unknown'; readonly reasonCode: string;
+      readonly receiptRef?: string };
+```
+
+`requestId` gives no remote retry guarantee; **unknown after dispatch** is NOT blindly retried/charged twice. `failed` means terminal failure is confirmed, `refused` means pre-dispatch or provable provider refusal, and `unknown` preserves ambiguous effect. No fabricated token usage; `receiptRef` is opaque (<=256), not a Permit. Sanitize SDK exception messages to finite typed reasonCode, keeping secrets out of Journal. If B wants a next Guided Journey step, validate generated JSON separately against the **already frozen #1397 `LLMAdvisory` Schema**; model text never directly authorizes a Tool/Effect.
+
+The neutral `llm.generate` is a **logical typed B contract**, NOT a third capability/operation/auto-router. Actual `buildV10App` has routes `{intentId,operationId,capabilityId,handlerId}` and selected C `handlers[{operationId,handler}]`. The L2-defined C package identities and bindings are:
+
+```ts
+// OpenAI C (only if chosen); module-wide externalEffect:true:
+{ packageId:'capability-llm-openai-compatible',role:'capability',
+  abiVersion:'v08-capability-abi/1',capabilityId:'llm.openai',
+  externalEffect:true,handlers:[{operationId:'llm.openai.generate',handler:'generate'}] }
+// Anthropic C (only if chosen); independent module-wide externalEffect:true:
+{ packageId:'capability-llm-anthropic-messages',role:'capability',
+  abiVersion:'v08-capability-abi/1',capabilityId:'llm.anthropic',
+  externalEffect:true,handlers:[{operationId:'llm.anthropic.generate',handler:'generate'}] }
+// Two independent B-declared intents in BUILD routes; no implicit choice:
+{ intentId:'llmViaOpenAI',operationId:'llm.openai.generate',
+  capabilityId:'llm.openai',handlerId:'generate' }
+{ intentId:'llmViaAnthropic',operationId:'llm.anthropic.generate',
+  capabilityId:'llm.anthropic',handlerId:'generate' }
+```
+
+With both selected, B's authorized policy chooses **one** declared intent before existing K Permit/dispatch; one selected omits the other module and route; zero selected omits all model intents/modules while keeping existing non-LLM routes (BUILD routes must remain nonempty). An attempt to reference an unselected capability is existing `V10_ROUTE_INVALID` at BUILD. No model-text-selected arbitrary endpoint/model, cross-credential leaks, implicit fallback or unselected import. Real Host uses mature OpenAI/Anthropic SDKs and independently maps their actual Chat Completions/Messages wire.
+
+## R1 — #1393 concrete verified deployment profile / existing Host activation
+
+**Keep** default `TRUSTED_DEPLOYMENT` (Host controls installed code, no cryptographic npm-integrity claim). **Add only an opt-in bounded** `VERIFIED_PROVIDER_BUNDLE_V1` profile for a **single self-contained static ESM provider bundle** with all third-party executable dependencies bundled into the same immutable artifact. In strict mode only enumerated Node builtin imports are allowed; remote/external import, dynamic import, require, native addons, runtime eval or executable downloads and sidecar dependencies are **UNSUPPORTED and refused before evaluation**. Official provider SDKs resident in trusted Host are Host/operator dependencies, not untrusted bundle proof. No generic npm graph scanner or sandbox.
+
+Host trusted `V10DeploymentAuthorizationAuthority.verify` / independently protected deploy policy supplies expected `subjectDigest`, `packageClosureDigest`, and exact provider `artifactPath + artifactSha256` **out of band**, inaccessible to adversary who can mutate `sealed-app.json` and installed untrusted Provider artifact. `v10BuildPackageClosureDigest` only digests **declared module descriptors**, NOT actual bytes. Before `activateV10App` / first Provider evaluation / any Kernel Effect, use existing **`activateGovernedV10Build` pre-evaluation seam** to (a) verify canonical BUILD subject and each sealed `sha256(moduleSource)` against independently authorized identity, (b) measure actual immutable provider-bundle bytes resolved inside Host-controlled read-only content-addressed staging root, and (c) match those bytes to independently trusted bundle digest, importing **that same verified immutable snapshot**. If import cannot preserve identity between verification and execution, fail closed `VERIFIED_PROVIDER_ARTIFACT_UNSUPPORTED`; a post-verification arbitrary Host-root writer/TOCTOU adversary is outside the declared assurance. Preserve `CURRENT|PINNED_ONLY` and no new Kernel authority.
+
+Typed non-secret denials: `VERIFIED_PROVIDER_TRUST_ANCHOR_MISSING`, `VERIFIED_PROVIDER_DIGEST_MISMATCH`, `VERIFIED_PROVIDER_ARTIFACT_UNSUPPORTED`. Required real Node24: normal bundle PASS; Provider-only byte tamper DENY; coordinated Provider plus mutable sealed embedded hash tamper with stale approved subjectDigest DENY; before any Provider evaluation/Kernel Effect, including unsupported import graphs. As bounded P2 test, Tally malicious thrown/getter Error must map to sanitized typed UNKNOWN with **zero token strings in Journal**; do not overhaul K error system without a second repro.
+
+**Evidence/parallel controls:** New type owner A → separate OpenAI B ∥ Anthropic C. Independent I security, S Context pure helper, J offline Guided Journey, M **public** `@kaicreator/domain-harness-host-node` root `runMetaFeedbackWorkflow` with selected S (never deep-import source-only), and D CAS docs can proceed in parallel after L2 Freeze. G ADS v4.18 upgrade is HISTORICAL/DONE, not a new Task. R holds all shared root/manifest writes, external Node24 clean consumers and final Q. No second Meta Kernel and no fake v0.10.2 ABI claim.
+
 ## 2. Concrete graph & write-set gate (proposed, NOT admitted)
 
 - **I Security**: trusted envelope/profile design owns common selected BUILD/Contracts/Host pre-load seam. Prepare as parallel L2 source design; source implementation only after L2 Freeze. Risk P1, not contingent on LLM feature work.

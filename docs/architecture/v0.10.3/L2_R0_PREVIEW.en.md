@@ -44,7 +44,7 @@ These concern ownership boundaries are a planning preview only. Exact file write
 
 | Lane | Scope | Genuine predecessor | Disjoint tentative write ownership |
 | --- | --- | --- | --- |
-| G | Independently reviewed ADS pin PR #1405 | Independent from Product work; existing review continues | `.dev-standard/VERSION` + exact current-pin note |
+| G (HISTORICAL DONE; NOT A TASK) | ADS pin #1405 already merged | No new predecessor | `.dev-standard/VERSION` + exact current-pin note |
 | I | Reproduced npm executable integrity P1 #1393 | Accepted Product/L2 | BUILD/Contracts trusted pre-import boundary |
 | A | Neutral model Request/Response contract #1396 | Minimal approved Product/L2 static ABI | One contract owner and reusable DTO/projection |
 | B | OpenAI C/Host adapter | Approved A's minimal type/semantic boundary only; **not** waiting for C | OpenAI-only C/Host implementation |
