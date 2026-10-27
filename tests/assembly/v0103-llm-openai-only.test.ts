@@ -41,7 +41,8 @@ test('OpenAI-only physical SDK/HTTP, typed boundary and selected C/K route', { t
     let raw = ''; for await (const part of req) raw += String(part);
     received = JSON.parse(raw) as Record<string, unknown>;
     observed?.(); observed = undefined;
-    res.setHeader('content-type', 'application/json'); res.setHeader('x-request-id', 'req-observed');
+    res.setHeader('content-type', 'application/json');
+    res.setHeader('x-request-id', mode === 'reflect-secret' ? SECRET : mode === 'reflect-secret-embedded' ? `prefix-${SECRET}-suffix` : 'req-observed');
     if (mode === 'hold') return; // Abort closes connection; no fabricated terminal response.
     if (mode === 'reset') { req.socket.destroy(); return; }
     if (mode.startsWith('http:')) {
@@ -77,6 +78,9 @@ test('OpenAI-only physical SDK/HTTP, typed boundary and selected C/K route', { t
     assert.equal(wirePath, '/v1/chat/completions'); assert.equal(received.model, 'approved-model'); assert.equal(received.stream, false); assert.equal(received.max_tokens, 64);
     assert.equal(auth, `Bearer ${SECRET}`); assert.equal('apiKey' in received, false);
   });
+  for (const wire of ['reflect-secret', 'reflect-secret-embedded']) await t.test(`${wire} successful request identity is omitted without echoing credentials`, async () => {
+    mode = wire; const r = await checked(); assert.equal(r.status, 'completed'); assert.equal(r.providerRequestId, undefined);
+  });
   for (const [wire, expected] of [['length', 'length'], ['private-reason', 'other']]) await t.test(`finish ${wire} remains ${expected}`, async () => {
     mode = wire!; const r = await checked(); assert.equal(r.status, 'completed'); if (r.status === 'completed') assert.equal(r.finishReason, expected);
   });
@@ -99,6 +103,11 @@ test('OpenAI-only physical SDK/HTTP, typed boundary and selected C/K route', { t
   for (const [status, category] of [[401, 'AUTH_DENIED'], [403, 'AUTH_DENIED'], [429, 'RATE_LIMITED'], [400, 'CONTEXT_OVERFLOW'], [500, 'UNAVAILABLE']] as const) await t.test(`terminal HTTP ${status} finite sanitized ${category}, no retry`, async () => {
     mode = `http:${status}`; const before = calls; const r = await checked(); assert.equal(r.status, 'failed');
     assert.equal(r.errorCategory, category); assert.ok(OPENAI_REASON_CODES.includes(r.reasonCode));
+    assert.equal(calls, before + 1);
+  });
+  for (const status of [408, 504] as const) await t.test(`sent HTTP ${status} remains UNKNOWN with no retry`, async () => {
+    mode = `http:${status}`; const before = calls; const r = await checked(); assert.equal(r.status, 'unknown');
+    assert.equal(r.errorCategory, 'OUTCOME_UNKNOWN'); assert.ok(OPENAI_REASON_CODES.includes(r.reasonCode));
     assert.equal(calls, before + 1);
   });
   for (const malformed of ['malformed', 'oversized']) await t.test(`${malformed} terminal response fails without raw data`, async () => {
@@ -165,7 +174,19 @@ const client=createOpenAIHostClient(OpenAI,${JSON.stringify(policy)}); export co
       mode = 'good'; const before = calls; const intent = { intentType: 'llmViaOpenAI', instanceKey: 'instance:openai', messageId: 'message:openai', input: { amount: 30, requestId: 'kernel:one' } };
       assert.equal((await activation.facade.send(intent)).status, 'admitted'); assert.equal(calls, before + 1);
       await activation.facade.send(intent); assert.equal(calls, before + 1, 'actual K replay does not repeat physical model request');
-      mode = 'reset'; await assert.rejects(activation.facade.send({ ...intent, instanceKey: 'instance:unknown', messageId: 'message:unknown' }), { code: 'ADMISSION_EFFECT_FAILED' });
+      for (const [wire, id] of [['reset', 'reset'], ['http:408', 'http-408'], ['http:504', 'http-504']] as const) {
+        mode = wire; const beforeUnknown = calls;
+        await assert.rejects(activation.facade.send({ ...intent, instanceKey: `instance:unknown:${id}`, messageId: `message:unknown:${id}` }), { code: 'ADMISSION_EFFECT_FAILED' });
+        assert.equal(calls, beforeUnknown + 1, `${wire} must not retry inside the actual C/K route`);
+        const unknownRows = JSON.stringify(await Promise.all(store.keys().map(async key => [key, await store.get(key)])));
+        assert.equal(unknownRows.includes(SECRET), false); assert.match(unknownRows, /UNKNOWN|unknown/);
+      }
+      for (const wire of ['reflect-secret', 'reflect-secret-embedded']) {
+        mode = wire;
+        assert.equal((await activation.facade.send({ ...intent, instanceKey: `instance:${wire}`, messageId: `message:${wire}` })).status, 'admitted');
+        const reflectedRows = JSON.stringify(await Promise.all(store.keys().map(async key => [key, await store.get(key)])));
+        assert.equal(reflectedRows.includes(SECRET), false); assert.match(reflectedRows, /local-correlation:kernel:one/);
+      }
       const rows = JSON.stringify(await Promise.all(store.keys().map(async key => [key, await store.get(key)])));
       assert.equal(rows.includes(SECRET), false); assert.match(rows, /UNKNOWN|unknown/);
     } finally { activation.dispose(); await rm(dir, { recursive: true, force: true }); }

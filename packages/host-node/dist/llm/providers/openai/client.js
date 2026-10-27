@@ -9,7 +9,8 @@ const REASONS = Object.freeze({
 });
 export const OPENAI_REASON_CODES = Object.freeze(Object.values(REASONS));
 const record = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const requestId = (v) => typeof v === 'string' && /^[\x21-\x7e]{1,256}$/.test(v) ? v : undefined;
+const requestId = (v, credential) => typeof v === 'string'
+    && /^[\x21-\x7e]{1,256}$/.test(v) && !v.includes(credential) ? v : undefined;
 const count = (v) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 export function createOpenAIHostClient(SDK, inputPolicy) {
     const policy = canonicalSnapshot(inputPolicy);
@@ -71,7 +72,7 @@ export function createOpenAIHostClient(SDK, inputPolicy) {
             terminal = true;
             if (!record(data))
                 return failure('failed', 'MALFORMED_RESPONSE');
-            observedId = requestId(data._request_id);
+            observedId = requestId(data._request_id, policy.apiKey);
             if (!Array.isArray(data.choices) || data.choices.length !== 1 || !record(data.choices[0]))
                 return failure('failed', 'MALFORMED_RESPONSE', observedId);
             const choice = data.choices[0];
@@ -121,8 +122,10 @@ export function createOpenAIHostClient(SDK, inputPolicy) {
                 return failure('failed', 'MALFORMED_RESPONSE', observedId);
             try {
                 if (record(error) && typeof error.status === 'number') {
-                    observedId = requestId(error.request_id);
+                    observedId = requestId(error.request_id, policy.apiKey);
                     const status = error.status;
+                    if (status === 408 || status === 504)
+                        return failure('unknown', 'OUTCOME_UNKNOWN', observedId);
                     const category = status === 401 || status === 403 ? 'AUTH_DENIED' : status === 429 ? 'RATE_LIMITED'
                         : status === 400 && record(error.error) && error.error.code === 'context_length_exceeded' ? 'CONTEXT_OVERFLOW'
                             : status === 400 || status === 422 ? 'UNSUPPORTED_FEATURE' : 'UNAVAILABLE';

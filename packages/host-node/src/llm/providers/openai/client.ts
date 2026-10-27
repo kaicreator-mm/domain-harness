@@ -30,7 +30,8 @@ const REASONS = Object.freeze({
 } satisfies Record<LlmErrorCategoryV1, string>);
 export const OPENAI_REASON_CODES = Object.freeze(Object.values(REASONS));
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-const requestId = (v: unknown): string | undefined => typeof v === 'string' && /^[\x21-\x7e]{1,256}$/.test(v) ? v : undefined;
+const requestId = (v: unknown, credential: string): string | undefined => typeof v === 'string'
+  && /^[\x21-\x7e]{1,256}$/.test(v) && !v.includes(credential) ? v : undefined;
 const count = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 
 export function createOpenAIHostClient(SDK: OpenAISDKConstructor, inputPolicy: OpenAIHostPolicy) {
@@ -86,7 +87,7 @@ export function createOpenAIHostClient(SDK: OpenAISDKConstructor, inputPolicy: O
       const data = await sdk.chat.completions.create(body, { signal: controller.signal, maxRetries: 0, timeout: remaining });
       terminal = true;
       if (!record(data)) return failure('failed', 'MALFORMED_RESPONSE');
-      observedId = requestId(data._request_id);
+      observedId = requestId(data._request_id, policy.apiKey);
       if (!Array.isArray(data.choices) || data.choices.length !== 1 || !record(data.choices[0])) return failure('failed', 'MALFORMED_RESPONSE', observedId);
       const choice = data.choices[0];
       if (!record(choice.message) || typeof choice.finish_reason !== 'string') return failure('failed', 'MALFORMED_RESPONSE', observedId);
@@ -124,8 +125,9 @@ export function createOpenAIHostClient(SDK: OpenAISDKConstructor, inputPolicy: O
       if (terminal) return failure('failed', 'MALFORMED_RESPONSE', observedId);
       try {
         if (record(error) && typeof error.status === 'number') {
-          observedId = requestId(error.request_id);
+          observedId = requestId(error.request_id, policy.apiKey);
           const status = error.status;
+          if (status === 408 || status === 504) return failure('unknown', 'OUTCOME_UNKNOWN', observedId);
           const category = status === 401 || status === 403 ? 'AUTH_DENIED' : status === 429 ? 'RATE_LIMITED'
             : status === 400 && record(error.error) && error.error.code === 'context_length_exceeded' ? 'CONTEXT_OVERFLOW'
             : status === 400 || status === 422 ? 'UNSUPPORTED_FEATURE' : 'UNAVAILABLE';
