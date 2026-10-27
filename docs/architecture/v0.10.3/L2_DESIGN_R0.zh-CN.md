@@ -26,28 +26,53 @@ v0.10.2 真实可用的公共选择面是外部 `buildV10App`/`projectSelectedCo
 以下是**v0.10.3 待实现的 Contracts 提议**，不是 v0.10.2 已发布类型。交集只覆盖有界文本／JSON 文本生成；ToolCall、Streaming、Responses 与 Anthropic 特有能力不冒充通用功能。A 独占公共 Contracts 类型和验证；B/C 分别独占 OpenAI、Anthropic Capability+Host 子目录；公共导出、Host 根、Manifest 只由 R 集成单写者。
 
 ```ts
+export type LlmProviderKindV1 = 'openai-compatible' | 'anthropic-messages';
+export type LlmErrorCategoryV1 =
+  | 'UNAVAILABLE' | 'UNSUPPORTED_FEATURE' | 'RATE_LIMITED' | 'AUTH_DENIED'
+  | 'MALFORMED_RESPONSE' | 'DEADLINE' | 'OUTCOME_UNKNOWN';
+export type LlmFinishReasonV1 =
+  | 'stop' | 'length' | 'tool_proposal' | 'content_filtered' | 'other';
+export type LlmTokenUsageV1 =
+  | { readonly evidenceMode: 'unavailable' }
+  | { readonly evidenceMode: 'provider-reported' | 'measured';
+      readonly inputTokens: number; readonly outputTokens: number };
 export interface LlmGenerateRequestV1 {
   readonly contractVersion: 'dh.llm.generate/1';
-  readonly requestId: string; // 非空 <=128；仅关联，不能证明远端幂等
+  readonly requestId: string; // nonempty <=128; correlation, NOT remote idempotency
+  readonly modelId: string; // 1..128; B/BUILD selected, Host allowlist verified
+  readonly deadlineUnixMs: number; // safe integer epoch ms; bounded by Host policy
   readonly messages: readonly {
     readonly role: 'system' | 'user' | 'assistant';
-    readonly content: string; // 每条 <=32768 字符
-  }[]; // 1..32 条，累计 <=65536 字符
-  readonly maxOutputTokens: number; // 整数 1..8192
-  readonly outputFormat: 'text' | 'json'; // 请求 JSON 文本，未保证服务端强制
-  readonly temperature?: number; // 有限 0..1，不支持则调用前拒绝
+    readonly content: string; // 1..32768 characters
+  }[]; // 1..32 messages; cumulative content <=65536
+  readonly maxOutputTokens: number; // integer 1..8192
+  readonly outputFormat: 'text' | 'json'; // JSON text request, no provider guarantee
+  readonly temperature?: number; // finite 0..1; refuse if unsupported
+  readonly outputSchemaRef?: string; // 1..256, optional, Host-admitted ref only
+  readonly toolCatalogRef?: string; // 1..256, optional, Host-admitted ref only
+}
+export interface LlmToolProposalV1 {
+  readonly name: string; // 1..128, from approved catalog
+  readonly argumentsJson: string; // <=16384; data only, not Tool invocation
 }
 export type LlmGenerateResultV1 =
   | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
+      readonly providerKind: LlmProviderKindV1; readonly modelId: string;
       readonly status: 'completed'; readonly text: string; // <=65536
-      readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
-      readonly receiptRef?: string }
+      readonly finishReason: LlmFinishReasonV1;
+      readonly providerRequestId?: string; // 1..256, only if actually observed
+      readonly usage: LlmTokenUsageV1;
+      readonly toolProposals?: readonly LlmToolProposalV1[]; // <=8, advisory only
+      readonly receiptRef?: string } // <=256; opaque, no execution authority
   | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
-      readonly status: 'refused' | 'failed' | 'unknown'; readonly reasonCode: string;
-      readonly receiptRef?: string };
+      readonly providerKind: LlmProviderKindV1; readonly modelId: string;
+      readonly status: 'refused' | 'failed' | 'unknown';
+      readonly errorCategory: LlmErrorCategoryV1; readonly reasonCode: string;
+      readonly providerRequestId?: string;
+      readonly usage: LlmTokenUsageV1; readonly receiptRef?: string };
 ```
 
-`requestId` 不允许因此盲重试。远端已调用但结果不确定时，返回 **unknown**，不能重复扣费；`failed` 是确认失败，`refused` 是已证实拒绝/未发出请求。真实 Provider 没有返回 Token usage 时不可捏造零；`receiptRef` 是 <=256 的 Host 不透明凭据引用而非执行 Permit。SDK 原始异常必须映射为有限、不含密钥的 `reasonCode`，绝不把原始 Error 写入 Journal。模型输出如用于表单，另按**已冻结的 #1397 `LLMAdvisory` Schema**校验，无直接 Tool 权限。
+`modelId`、`deadlineUnixMs` 是**必填请求数据**，但模型身份只能由 B/BUILD 已批准的固定配置选择，并在真实调用前与 Host 受信 endpoint/model 允许表对账；返回的 `providerKind/modelId` 来自核准的路由与模型身份，不能照抄不受信的 Prompt。`deadlineUnixMs` 是安全整数 Epoch 毫秒，需要符合 Host 当前时钟、最长允许窗口政策。真实取消使用 Host 按 `requestId` 维护的 **AbortSignal/AbortController**，**不放进 JSON DTO**，模型不能自定取消权限。调用前过期/取消且确定未发请求 → `refused/DEADLINE`；调用已发出、取消/超时后远端结果不明 → `unknown/OUTCOME_UNKNOWN`，**不盲重试、不声称远端 exactly-once 扣费**；已证实远端失败 → `failed`。有界 `errorCategory` 是**语义枚举**，非 SDK 的原始错误代码；`reasonCode` 必须为受信有限允许表中的 1..128 字符常量，不能记录原始错误文本。`providerRequestId` 仅在真实观察到时填入且 <=256。用量 `usage.evidenceMode='unavailable'` **不含 Token 计数**，`provider-reported|measured` 必须包含两个非负安全整数，不能捏造零或跨 Provider 等价性。`finishReason` 映射真实观察的结束原因，`length` 为截断、`tool_proposal` 是提议、未知私有原因映射 `other`，不能杜撰 `stop`。`outputSchemaRef/toolCatalogRef` 只有 Host 明确允许、能力已验证才可使用，否则调用前 `UNSUPPORTED_FEATURE` 拒绝。若支持工具提议，`toolProposals` 也**只是有界纯数据建议**，B/S 需检查批准清单、参数和证据，然后由 K 另行批准真实操作；未申请/不支持却收到 ToolCall 时**不得当文本成功**：已知终态 `failed/UNSUPPORTED_FEATURE`，不明则 `unknown/OUTCOME_UNKNOWN`，绝不自行执行工具。转换为表单建议时另按**已冻结 #1397 的唯一 `LLMAdvisory` Schema**校验。`receiptRef` 是不透明引用，不赋权。
 
 现行 BUILD 真实路由字段是 `{intentId,operationId,capabilityId,handlerId}`，C 有 `handlers[{operationId,handler}]`。公共 `llm.generate` 是**B 逻辑接口**，不是第三个物理 Operation/Provider/Kernel Alias。两个可选 C 的具体 L2 身份：
 

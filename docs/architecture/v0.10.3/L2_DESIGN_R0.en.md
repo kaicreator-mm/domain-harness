@@ -26,28 +26,53 @@ Current tagged v0.10.2 already supports sealed external `buildV10App` and `proje
 These are **proposed v0.10.3 Contracts types**, not already-shipped v0.10.2 public exports. The sole neutral common intersection is bounded text/JSON-text generation; ToolCalls, streaming, Responses and Anthropic-only features remain explicitly separate. All request/response values are plain JSON. A owns Contracts and validation; OpenAI B and Anthropic C own separate capability modules and Host client directories; Integration R is the **sole writer** of shared export/manifest/Host composition-root files.
 
 ```ts
+export type LlmProviderKindV1 = 'openai-compatible' | 'anthropic-messages';
+export type LlmErrorCategoryV1 =
+  | 'UNAVAILABLE' | 'UNSUPPORTED_FEATURE' | 'RATE_LIMITED' | 'AUTH_DENIED'
+  | 'MALFORMED_RESPONSE' | 'DEADLINE' | 'OUTCOME_UNKNOWN';
+export type LlmFinishReasonV1 =
+  | 'stop' | 'length' | 'tool_proposal' | 'content_filtered' | 'other';
+export type LlmTokenUsageV1 =
+  | { readonly evidenceMode: 'unavailable' }
+  | { readonly evidenceMode: 'provider-reported' | 'measured';
+      readonly inputTokens: number; readonly outputTokens: number };
 export interface LlmGenerateRequestV1 {
   readonly contractVersion: 'dh.llm.generate/1';
-  readonly requestId: string; // nonempty, max 128; CORRELATION not remote idempotency
+  readonly requestId: string; // nonempty <=128; correlation, NOT remote idempotency
+  readonly modelId: string; // 1..128; B/BUILD selected, Host allowlist verified
+  readonly deadlineUnixMs: number; // safe integer epoch ms; bounded by Host policy
   readonly messages: readonly {
     readonly role: 'system' | 'user' | 'assistant';
-    readonly content: string; // max 32768 characters each
-  }[]; // 1–32 messages; sum content <=65536 characters
-  readonly maxOutputTokens: number; // integer 1–8192
-  readonly outputFormat: 'text' | 'json'; // JSON text requested; not guaranteed
-  readonly temperature?: number; // finite 0–1; reject unsupported before dispatch
+    readonly content: string; // 1..32768 characters
+  }[]; // 1..32 messages; cumulative content <=65536
+  readonly maxOutputTokens: number; // integer 1..8192
+  readonly outputFormat: 'text' | 'json'; // JSON text request, no provider guarantee
+  readonly temperature?: number; // finite 0..1; refuse if unsupported
+  readonly outputSchemaRef?: string; // 1..256, optional, Host-admitted ref only
+  readonly toolCatalogRef?: string; // 1..256, optional, Host-admitted ref only
+}
+export interface LlmToolProposalV1 {
+  readonly name: string; // 1..128, from approved catalog
+  readonly argumentsJson: string; // <=16384; data only, not Tool invocation
 }
 export type LlmGenerateResultV1 =
   | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
-      readonly status: 'completed'; readonly text: string; // <=65536 chars
-      readonly usage?: { readonly inputTokens: number; readonly outputTokens: number };
-      readonly receiptRef?: string }
+      readonly providerKind: LlmProviderKindV1; readonly modelId: string;
+      readonly status: 'completed'; readonly text: string; // <=65536
+      readonly finishReason: LlmFinishReasonV1;
+      readonly providerRequestId?: string; // 1..256, only if actually observed
+      readonly usage: LlmTokenUsageV1;
+      readonly toolProposals?: readonly LlmToolProposalV1[]; // <=8, advisory only
+      readonly receiptRef?: string } // <=256; opaque, no execution authority
   | { readonly contractVersion: 'dh.llm.generate/1'; readonly requestId: string;
-      readonly status: 'refused' | 'failed' | 'unknown'; readonly reasonCode: string;
-      readonly receiptRef?: string };
+      readonly providerKind: LlmProviderKindV1; readonly modelId: string;
+      readonly status: 'refused' | 'failed' | 'unknown';
+      readonly errorCategory: LlmErrorCategoryV1; readonly reasonCode: string;
+      readonly providerRequestId?: string;
+      readonly usage: LlmTokenUsageV1; readonly receiptRef?: string };
 ```
 
-`requestId` gives no remote retry guarantee; **unknown after dispatch** is NOT blindly retried/charged twice. `failed` means terminal failure is confirmed, `refused` means pre-dispatch or provable provider refusal, and `unknown` preserves ambiguous effect. No fabricated token usage; `receiptRef` is opaque (<=256), not a Permit. Sanitize SDK exception messages to finite typed reasonCode, keeping secrets out of Journal. If B wants a next Guided Journey step, validate generated JSON separately against the **already frozen #1397 `LLMAdvisory` Schema**; model text never directly authorizes a Tool/Effect.
+`modelId` and `deadlineUnixMs` are required **request data**, but model identity is selected from an immutable B/BUILD-approved model profile and checked against Host's trusted endpoint/model allowlist before dispatch; returned `providerKind/modelId` come from that verified selected route/model, not from untrusted prompt text. `deadlineUnixMs` is an epoch-millisecond safe integer bounded by Host policy (future and within configured maximum window). Physical cancellation uses a **Host-only AbortSignal/AbortController keyed by `requestId`**; it is NEVER serialized into JSON or injected by a model. Pre-dispatch deadline/cancel = `refused/DEADLINE` with evidence no external call; a sent call whose cancellation/timeout leaves remote outcome uncertain = `unknown/OUTCOME_UNKNOWN`, not a false unexecuted refusal; a confirmed terminal remote failure = `failed`. **No blind re-dispatch or exactly-once charging guarantee.** The `errorCategory` enum is a bounded **semantic classification** (not SDK exception-code parity); sanitized `reasonCode` is a finite allowlisted value, 1..128 characters, never raw SDK/Host exception text. `providerRequestId` only when actually observed, <=256. `usage.evidenceMode='unavailable'` has no token counts; `provider-reported|measured` requires two nonnegative safe integer counts (not invented zero); no cross-provider equivalence claim. `finishReason` records the mapped observed terminal disposition, including `length` truncation and `tool_proposal` where applicable; unknown private reasons map to `other`, not fabricated stop. `outputSchemaRef` and `toolCatalogRef` require an explicitly approved Host binding; otherwise typed **pre-dispatch `UNSUPPORTED_FEATURE`**. When an approved tool proposal is supported, `toolProposals` are **bounded plain-data suggestions only** and require B/S allowlist, arguments and evidence checks plus separate K Permit to act. If provider emits unrequested/unsupported tool calls, **do not** return them as plain text success: `failed/UNSUPPORTED_FEATURE` if terminal outcome confirmed, otherwise `unknown/OUTCOME_UNKNOWN`; no automatic Tool invocation. A future consumer may map validated text/JSON to the **already frozen #1397 `LLMAdvisory` Schema**. `receiptRef` is opaque, not execution authority.
 
 The neutral `llm.generate` is a **logical typed B contract**, NOT a third capability/operation/auto-router. Actual `buildV10App` has routes `{intentId,operationId,capabilityId,handlerId}` and selected C `handlers[{operationId,handler}]`. The L2-defined C package identities and bindings are:
 
