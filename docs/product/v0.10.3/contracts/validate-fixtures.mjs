@@ -12,7 +12,7 @@ const step = {...base,messageType:'step.spec',stepId:'step-1',templateRef:templa
 const outcome = {...base,messageType:'step.outcome',stepId:'step-1',event:'USER_SUBMIT',evidenceRefs:[]};
 const decision = {...base,messageType:'next-step.decision',status:'STEP',reasonCode:'MATCH',evidenceRefs:[],step};
 const advisory = {...base,messageType:'llm.advisory',caseRef,suggestedTemplateRef:template,reasonCode:'REVIEW',evidenceRefs:[]};
-const clone = x => structuredClone(x);
+const clone = x => globalThis.structuredClone(x);
 const cases = [
  ['valid request',request,true],['valid spec',step,true],['valid outcome',outcome,true],['valid decision',decision,true],['valid advisory',advisory,true],
  ['oversized goals',{...request,goals:Array(9).fill('goal')},false],
