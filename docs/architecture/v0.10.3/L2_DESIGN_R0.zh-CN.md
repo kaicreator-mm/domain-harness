@@ -1,6 +1,6 @@
 # DomainHarness v0.10.3 — L2 架构/接口候选 R0（未冻结）
 
-[English](L2_DESIGN_R0.en.md) · [Product Freeze](../../product/v0.10.3/PRODUCT_FREEZE.md) · [Contract Freeze](../../product/v0.10.3/CONTRACT_FREEZE.md) · [并行工作概览](L2_R0_PREVIEW.zh-CN.md)
+[English](L2_DESIGN_R0.en.md) · [Product Freeze](https://github.com/kaicreator-mm/domain-harness/blob/version/v0.10.3/docs/product/v0.10.3/PRODUCT_FREEZE.md) · [Contract Freeze](https://github.com/kaicreator-mm/domain-harness/blob/version/v0.10.3/docs/product/v0.10.3/CONTRACT_FREEZE.md) · [并行工作概览](L2_R0_PREVIEW.zh-CN.md)
 
 **权威来源：** `version/v0.10.3` 从已合法采用 **ADS v4.18.0** 的 `main@c6972db58b833940fabda25cac22c32f9cb1680e` 建立；Product #1402 和契约 #1397/#1400 已经评审并仅合入版本分支，具有确切冻结记录。**本文件仍是待独立审核的 L2 草案**，不表示 L2 Freeze、正式 npm SDK ABI、Task DAG 准入或 L3 实施授权。CV-01..12 保持不变。
 

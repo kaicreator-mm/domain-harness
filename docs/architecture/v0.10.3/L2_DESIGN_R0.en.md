@@ -1,6 +1,6 @@
 # DomainHarness v0.10.3 — L2 Architecture/ABI Candidate R0 (not frozen)
 
-[中文](L2_DESIGN_R0.zh-CN.md) · [Product Freeze](../../product/v0.10.3/PRODUCT_FREEZE.md) · [Contract Freeze](../../product/v0.10.3/CONTRACT_FREEZE.md) · [Parallel workfront overview](L2_R0_PREVIEW.en.md)
+[中文](L2_DESIGN_R0.zh-CN.md) · [Product Freeze](https://github.com/kaicreator-mm/domain-harness/blob/version/v0.10.3/docs/product/v0.10.3/PRODUCT_FREEZE.md) · [Contract Freeze](https://github.com/kaicreator-mm/domain-harness/blob/version/v0.10.3/docs/product/v0.10.3/CONTRACT_FREEZE.md) · [Parallel workfront overview](L2_R0_PREVIEW.en.md)
 
 **Authority:** `version/v0.10.3` started at integrated `main@c6972db58b833940fabda25cac22c32f9cb1680e` with **ADS v4.18.0**; Product PR #1402 and contract PRs #1397/#1400 are merged to VERSION only with actual freeze records. This document is an **unreviewed L2 design candidate**, NOT L2 Freeze, public npm ABI, Task DAG approval or implementation authorization. Existing CV-01..12 are inherited unchanged.
 

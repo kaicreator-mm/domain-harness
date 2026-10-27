@@ -2,7 +2,7 @@
 
 [English](L2_R0_PREVIEW.en.md) · [Product R0 PR #1402](https://github.com/kaicreator-mm/domain-harness/pull/1402) · [契约 PR #1397](https://github.com/kaicreator-mm/domain-harness/pull/1397) · [契约 PR #1400](https://github.com/kaicreator-mm/domain-harness/pull/1400) · [版本总控 #1392](https://github.com/kaicreator-mm/domain-harness/issues/1392)
 
-> **并行架构概览，仅 L2 的工作前沿参考，不是 L2 Freeze、可执行 Task DAG、源码实施许可或已发布 SDK。** 三项 R0 曾经 BLOCK，但 #1397、#1400、#1402 已按各自确切 SHA 独立 R2 PASS，且已经**仅合入** `version/v0.10.3`。Product/L1 与纯数据契约分别由 [Product Freeze](../../product/v0.10.3/PRODUCT_FREEZE.md)、[Contract Freeze](../../product/v0.10.3/CONTRACT_FREEZE.md) 固定。ADS #1405 已合并到 main 和版本基线，**v4.18.0 现在生效**。具体 ABI 决策见 [L2 详细 R0 候选](L2_DESIGN_R0.zh-CN.md)，仍待独立 L2 审核；CV-01..12 保持不变。
+> **并行架构概览，仅 L2 的工作前沿参考，不是 L2 Freeze、可执行 Task DAG、源码实施许可或已发布 SDK。** 三项 R0 曾经 BLOCK，但 #1397、#1400、#1402 已按各自确切 SHA 独立 R2 PASS，且已经**仅合入** `version/v0.10.3`。Product/L1 与纯数据契约分别由 [Product Freeze](https://github.com/kaicreator-mm/domain-harness/blob/version/v0.10.3/docs/product/v0.10.3/PRODUCT_FREEZE.md)、[Contract Freeze](https://github.com/kaicreator-mm/domain-harness/blob/version/v0.10.3/docs/product/v0.10.3/CONTRACT_FREEZE.md) 固定。ADS #1405 已合并到 main 和版本基线，**v4.18.0 现在生效**。具体 ABI 决策见 [L2 详细 R0 候选](L2_DESIGN_R0.zh-CN.md)，仍待独立 L2 审核；CV-01..12 保持不变。
 
 ## 一、组合架构（保留当前已选语义）
 
