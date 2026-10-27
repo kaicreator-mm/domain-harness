@@ -1,25 +1,21 @@
-# DomainHarness v0.10.2 · Historical evidence archive
+# DomainHarness v0.10.2 — Historical material and governing evidence
 
-[Index](index.md) · [中文版](../zh-CN/archive.md)
+[Documentation index](index.md) · [中文版](../zh-CN/archive.md)
 
-## Why historical documents remain in place
+## Which source should an Agent use?
 
-The repository contains years of Product/PRD/L2/Task DAG/validation records from v0.1 through v0.10.2. Some correctly say “candidate,” “main HOLD,” or “tests NOT_RUN” **as of their original authored dates**. They are archival evidence and must not be silently deleted, rewritten as green, or used as current consumer instructions.
+**Routine SDK integration should not start from old development folders.** There are two different evidence routes:
 
-**Active entries:** [English index](index.md) for Agents; [Chinese index](../zh-CN/index.md) for human users.
-
-| Need | Original historical sources |
+| What you need | Canonical entry |
 | --- | --- |
-| Version Product/PRD and freeze scope | [`docs/product/`](../../product/) |
-| L2 candidates/freeze/architectural decisions | [`docs/architecture/`](../../architecture/) |
-| Task DAG and L3 records | [`docs/implementation/`](../../implementation/) |
-| Exact validation/CI/Release evidence | [`docs/validation/`](../../validation/) · [`docs/release/`](../../release/) |
-| Original v0.10.2 engineering authoring notes | [`docs/guides/`](../../guides/) · [`docs/sdk/`](../../sdk/) |
-| Research, experiments and older versions | [`docs/research/`](../../research/) · [`docs/experiments/`](../../experiments/) |
-| Final release decision | [R01 #1331](https://github.com/kaicreator-mm/domain-harness/issues/1331) |
+| Still-applicable cross-version principles, Product/L2 freezes, R01 decision and pinned source | [Governing references](../../reference/index.en.md) |
+| v0.1–v0.10.2 older candidates, experiments, migrations, guide drafts and test snapshots | [Historical archive](../../archive/index.en.md) |
+| Current API, Domain Package authoring, Host and Agent Skill | [Current English handbook](index.md) |
 
-**Maintenance:** ordinary current user/Agent topics must be updated **in matching Chinese/English pairs** under `docs/current/{zh-CN,en}/`. Do not add another floating "current" guide to historical roots. Frozen Product/L2, signed evidence and release tags are immutable; normative translation requires its own review/authority and never silently supersedes the original.
+## Why not mass-move old files?
 
----
+Old GitHub Issues, PRs, source references and reviews depend on original paths and sometimes exact Blob SHAs. A bulk move/rewrite would create broken links and could obscure real as-of `candidate`, `HOLD`, `FAIL` and `NOT_RUN` evidence. The archive provides a unified discovery interface **without changing original records**.
 
-**Authority:** tagged source `cee14399d9d0af4e20e34b9111861b16a465b690`; v0.10.2 was qualified **CONDITIONALLY**. Post-release docs do not alter that SHA or authority.
+**Policy:** actively maintained explanations belong only in `docs/current/{zh-CN,en}/`. Historical does not automatically mean invalid: frozen normative rules remain governed by their approved source and version.
+
+**Pin:** v0.10.2 Tag `cee14399d9d0af4e20e34b9111861b16a465b690`; RQ **CONDITIONAL**, historical Full `EXIT1` and root `NOT_RUN` unchanged.
