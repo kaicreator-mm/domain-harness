@@ -34,7 +34,7 @@
 
 - **P-A 0/1/2 选择：** Node24 外部 clean installed Domain App，分别选择无 Provider、仅 OpenAI、仅 Anthropic、二者同时；源未选择时零导入和零请求；双选时完全显式路由且 Host 密钥不串。
 - **P-B 请求/输出：** 用受控假服务验证两种真实 wire shape 的 JSON/Tool-use 解析；非法模型结果、已发送但结果不明的请求、取消/超时/额度错误真实分类；无未经批准的 Tool Effect 或盲目收费重试。若没有实际付费凭据，网络 live smoke 为 **NOT_RUN**。
-- **P-C 动态表单：** 同一 GMS 目标，根据 `PRESENT_DISABLED | ABSENT | UNKNOWN` 等已验证状态提供不同**下一步**；离线零 LLM；BACK/RESUME/Effect FAIL/PARTIAL/UNKNOWN 有合法步骤，显示 StepSpec 不触发操作；没有已批准模板时 ASK/WAIТ/BLOCKED 而不是生成未声明代码。
+- **P-C 动态表单：** 同一 GMS 目标，根据 `PRESENT_DISABLED | ABSENT | UNKNOWN` 等已验证状态提供不同**下一步**；离线零 LLM；BACK/RESUME/Effect FAIL/PARTIAL/UNKNOWN 有合法步骤，显示 StepSpec 不触发操作；没有已批准模板时 ASK/WAIT/BLOCKED 而不是生成未声明代码。
 - **P-D Meta 演进：** 一次真实业务输出脱敏可核验证据 → Candidate（无执行权）→ 单独验证/审批 → 新版本/新实例复用；原实例凭 exact pin 保持重放一致。先做历史源可达性证明，未证实公共缺口不制造新 Meta 平台。
 - **P-E 既有 P1/P2：** #1393 原应用攻击夹具在严格配置的已选 Provider 完整性检查下，对替换的真实 npm 代码在执行前拒绝；#1394 public Host CAS→K DocStore 正确例子、错误接线负例真实可运行。
 
