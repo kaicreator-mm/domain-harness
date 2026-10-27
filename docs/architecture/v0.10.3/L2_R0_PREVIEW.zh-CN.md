@@ -2,7 +2,7 @@
 
 [English](L2_R0_PREVIEW.en.md) · [Product R0 PR #1402](https://github.com/kaicreator-mm/domain-harness/pull/1402) · [契约 PR #1397](https://github.com/kaicreator-mm/domain-harness/pull/1397) · [契约 PR #1400](https://github.com/kaicreator-mm/domain-harness/pull/1400) · [版本总控 #1392](https://github.com/kaicreator-mm/domain-harness/issues/1392)
 
-> **PRE_L2_DESIGN_ONLY；不是 L2 Freeze、可执行 Task DAG、源码实施许可或已发布 SDK。** 三项 R0 审核原判均为 BLOCK（#1397 P1×1/P2×2、#1400 P1×2、#1402 P1×1/P2×1），当前已提交定向 R1 修复，必须取得新 exact-HEAD 独立差异审核和 Product 授权后才可冻结本方案。ADS 升级 PR #1405 审核中；现行 main 固定 4.13.1，不提前宣称 v4.18 生效。CV-01..12 INHERITED_UNCHANGED。
+> **并行架构概览，仅 L2 的工作前沿参考，不是 L2 Freeze、可执行 Task DAG、源码实施许可或已发布 SDK。** 三项 R0 曾经 BLOCK，但 #1397、#1400、#1402 已按各自确切 SHA 独立 R2 PASS，且已经**仅合入** `version/v0.10.3`。Product/L1 与纯数据契约分别由 [Product Freeze](../../product/v0.10.3/PRODUCT_FREEZE.md)、[Contract Freeze](../../product/v0.10.3/CONTRACT_FREEZE.md) 固定。ADS #1405 已合并到 main 和版本基线，**v4.18.0 现在生效**。具体 ABI 决策见 [L2 详细 R0 候选](L2_DESIGN_R0.zh-CN.md)，仍待独立 L2 审核；CV-01..12 保持不变。
 
 ## 一、组合架构（保留当前已选语义）
 
@@ -66,4 +66,4 @@ UI: 只显示 B/S 当前生成的 StepSpec 数据；不是 K 或新 Tool。
 5. **P1 npm：** 以真实 Node24 部署根摘要为锚，验证正常 Provider 正例、单独替换安装代码负例，以及**同时替换 Provider 和可变 sealed App 内嵌 hash 但保留旧 subjectDigest**的联动篡改负例；必须在首次 Provider 求值/任何 Kernel Effect 之前拒绝，且无日志凭据泄漏。声明覆盖范围、攻击者假设、Node ESM/TOCTOU 限制；无法保证完整可执行闭包时收窄 verified profile 而非虚报 Sandbox。**CAS P2** 先复用 ai-rexform adapter + 双语可运行例子，若消费者复现通过且无其他重复缺口，不要求运行时修改。
 6. **最终：** 不重复执行旧 v0.10.2 Full/Hidden；最后选 exact 版本候选依真实影响集中验证一轮。CI Provider 处于 PENDING 不当 FAIL；只有明确失败步才能定向修复。
 
-**Gate：** `PRE_L2_R0=DOCUMENTED; PRODUCT_L1_FREEZE=NO; L2_FREEZE=NO; DAG_ADMITTED=NO; SOURCE_CHANGE_AUTHORIZED=NO; ADS_V418_ADOPTION=UNDER_REVIEW`。
+**Gate：** `PRODUCT_L1_FREEZE=YES; DATA_CONTRACT_FREEZE=YES; ADS_V418_ADOPTION=MERGED; L2_R0=REVIEW_PENDING; L2_FREEZE=NO; DAG_ADMITTED=NO; SOURCE_CHANGE_AUTHORIZED=NO`。

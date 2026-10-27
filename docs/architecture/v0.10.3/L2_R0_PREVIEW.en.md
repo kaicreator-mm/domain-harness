@@ -2,7 +2,7 @@
 
 [中文](L2_R0_PREVIEW.zh-CN.md) · [Product R0 PR #1402](https://github.com/kaicreator-mm/domain-harness/pull/1402) · [Journey schema PR #1397](https://github.com/kaicreator-mm/domain-harness/pull/1397) · [provider/evolution PR #1400](https://github.com/kaicreator-mm/domain-harness/pull/1400) · [master #1392](https://github.com/kaicreator-mm/domain-harness/issues/1392)
 
-> **PRE-L2 DESIGN ONLY.** NOT an L2 Freeze, admitted native Task DAG, implementation grant or deployed SDK. Three R0 independent reviews each returned **BLOCK** (#1397 P1×1/P2×2, #1400 P1×2, #1402 P1×1/P2×1); focused R1 source repairs are pending new exact-SHA independent review and Product disposition. ADS pin #1405 remains under review; current main effective ADS is 4.13.1, NOT 4.18. CV-01..12 INHERITED_UNCHANGED.
+> **Parallel architecture overview only**: NOT L2 Freeze, admitted native Task DAG, implementation authorization or deployed SDK. Original R0 independent reviews BLOCKED, but exact-head #1397/#1400/#1402 R2 reviews now **PASS**, and the reviewed source is merged to `version/v0.10.3` only. [Product Freeze](../../product/v0.10.3/PRODUCT_FREEZE.md) and [Data Contract Freeze](../../product/v0.10.3/CONTRACT_FREEZE.md) were recorded independently. ADS #1405 was lawfully merged, **v4.18.0 is now effective**. The detailed [L2 R0 Design candidate](L2_DESIGN_R0.en.md) requires its own new independent L2 review; CV-01..12 unchanged.
 
 ## 1. One selected closed-world composition
 
@@ -66,4 +66,4 @@ If I and B/C share a real Host composition-root path, **I owns the shared admiss
 5. #1393 integrity acceptance has **three real Node24 cases**: legitimate Provider, installed-provider replacement, and **provider + mutable sealed-App matching embedded-hash joint tamper with stale subjectDigest**. Anchor must be independently trusted outside the shared mutable surface, and denial precedes Provider evaluation / K Effects with no credentials in logs. State attacker model, transitive executable coverage, Node ESM/TOCTOU limits; narrow verified profile if it cannot prove all dependency closure, rather than pretend sandbox isolation. #1394 P2 prefers real ai-rexform adapter plus paired runnable docs; no runtime store rewrite unless another proven consumer need exists.
 6. One final exact-candidate Full/Hidden/Host scope as actually required. Existing v0.10.2 historic Full EXIT1/root NOT_RUN facts stay immutable; PR CI PENDING is not FAIL, terminal failures trigger specific impacted checks.
 
-**Gates:** `PRE_L2_R0=DOCUMENTED; PRODUCT_L1_FREEZE=NO; L2_FREEZE=NO; DAG_ADMITTED=NO; SOURCE_CHANGE_AUTHORIZED=NO; ADS_V418_ADOPTION=UNDER_REVIEW`.
+**Gates:** `PRODUCT_L1_FREEZE=YES; DATA_CONTRACT_FREEZE=YES; ADS_V418_ADOPTION=MERGED; L2_R0=REVIEW_PENDING; L2_FREEZE=NO; DAG_ADMITTED=NO; SOURCE_CHANGE_AUTHORIZED=NO`.
