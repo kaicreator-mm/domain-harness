@@ -29,7 +29,7 @@ v0.10.2 真实可用的公共选择面是外部 `buildV10App`/`projectSelectedCo
 export type LlmProviderKindV1 = 'openai-compatible' | 'anthropic-messages';
 export type LlmErrorCategoryV1 =
   | 'UNAVAILABLE' | 'UNSUPPORTED_FEATURE' | 'RATE_LIMITED' | 'AUTH_DENIED'
-  | 'MALFORMED_RESPONSE' | 'DEADLINE' | 'OUTCOME_UNKNOWN';
+  | 'MALFORMED_RESPONSE' | 'CONTEXT_OVERFLOW' | 'CANCELLED' | 'DEADLINE' | 'OUTCOME_UNKNOWN';
 export type LlmFinishReasonV1 =
   | 'stop' | 'length' | 'tool_proposal' | 'content_filtered' | 'other';
 export type LlmTokenUsageV1 =
@@ -72,7 +72,7 @@ export type LlmGenerateResultV1 =
       readonly usage: LlmTokenUsageV1; readonly receiptRef?: string };
 ```
 
-`modelId`、`deadlineUnixMs` 是**必填请求数据**，但模型身份只能由 B/BUILD 已批准的固定配置选择，并在真实调用前与 Host 受信 endpoint/model 允许表对账；返回的 `providerKind/modelId` 来自核准的路由与模型身份，不能照抄不受信的 Prompt。`deadlineUnixMs` 是安全整数 Epoch 毫秒，需要符合 Host 当前时钟、最长允许窗口政策。真实取消使用 Host 按 `requestId` 维护的 **AbortSignal/AbortController**，**不放进 JSON DTO**，模型不能自定取消权限。调用前过期/取消且确定未发请求 → `refused/DEADLINE`；调用已发出、取消/超时后远端结果不明 → `unknown/OUTCOME_UNKNOWN`，**不盲重试、不声称远端 exactly-once 扣费**；已证实远端失败 → `failed`。有界 `errorCategory` 是**语义枚举**，非 SDK 的原始错误代码；`reasonCode` 必须为受信有限允许表中的 1..128 字符常量，不能记录原始错误文本。`providerRequestId` 仅在真实观察到时填入且 <=256。用量 `usage.evidenceMode='unavailable'` **不含 Token 计数**，`provider-reported|measured` 必须包含两个非负安全整数，不能捏造零或跨 Provider 等价性。`finishReason` 映射真实观察的结束原因，`length` 为截断、`tool_proposal` 是提议、未知私有原因映射 `other`，不能杜撰 `stop`。`outputSchemaRef/toolCatalogRef` 只有 Host 明确允许、能力已验证才可使用，否则调用前 `UNSUPPORTED_FEATURE` 拒绝。若支持工具提议，`toolProposals` 也**只是有界纯数据建议**，B/S 需检查批准清单、参数和证据，然后由 K 另行批准真实操作；未申请/不支持却收到 ToolCall 时**不得当文本成功**：已知终态 `failed/UNSUPPORTED_FEATURE`，不明则 `unknown/OUTCOME_UNKNOWN`，绝不自行执行工具。转换为表单建议时另按**已冻结 #1397 的唯一 `LLMAdvisory` Schema**校验。`receiptRef` 是不透明引用，不赋权。
+`modelId`、`deadlineUnixMs` 是**必填请求数据**，但模型身份只能由 B/BUILD 已批准的固定配置选择，并在真实调用前与 Host 受信 endpoint/model 允许表对账；返回的 `providerKind/modelId` 来自核准的路由与模型身份，不能照抄不受信的 Prompt。`deadlineUnixMs` 是安全整数 Epoch 毫秒，需要符合 Host 当前时钟、最长允许窗口政策。真实取消使用 Host 按 `requestId` 维护的 **AbortSignal/AbortController**，**不放进 JSON DTO**，模型不能自定取消权限。调用前截止时间已过期、确定未调用 → `refused/DEADLINE`；Host 授权的调用前取消、确定未调用 → `refused/CANCELLED`；输入上下文超限时归类 `CONTEXT_OVERFLOW`，不得伪造成功；调用已发出、取消/超时后远端结果不明 → `unknown/OUTCOME_UNKNOWN`，**不盲重试、不声称远端 exactly-once 扣费**；已证实远端失败 → `failed`。有界 `errorCategory` 是**语义枚举**，非 SDK 的原始错误代码；`reasonCode` 必须为受信有限允许表中的 1..128 字符常量，不能记录原始错误文本。`providerRequestId` 仅在真实观察到时填入且 <=256。用量 `usage.evidenceMode='unavailable'` **不含 Token 计数**，`provider-reported|measured` 必须包含两个非负安全整数，不能捏造零或跨 Provider 等价性。`finishReason` 映射真实观察的结束原因，`length` 为截断、`tool_proposal` 是提议、未知私有原因映射 `other`，不能杜撰 `stop`。`outputSchemaRef/toolCatalogRef` 只有 Host 明确允许、能力已验证才可使用，否则调用前 `UNSUPPORTED_FEATURE` 拒绝。若支持工具提议，`toolProposals` 也**只是有界纯数据建议**，B/S 需检查批准清单、参数和证据，然后由 K 另行批准真实操作；未申请/不支持却收到 ToolCall 时**不得当文本成功**：已知终态 `failed/UNSUPPORTED_FEATURE`，不明则 `unknown/OUTCOME_UNKNOWN`，绝不自行执行工具。转换为表单建议时另按**已冻结 #1397 的唯一 `LLMAdvisory` Schema**校验。`receiptRef` 是不透明引用，不赋权。
 
 现行 BUILD 真实路由字段是 `{intentId,operationId,capabilityId,handlerId}`，C 有 `handlers[{operationId,handler}]`。公共 `llm.generate` 是**B 逻辑接口**，不是第三个物理 Operation/Provider/Kernel Alias。两个可选 C 的具体 L2 身份：
 
