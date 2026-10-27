@@ -9,7 +9,13 @@
 * **必须双语：** 每个现行主题在两个目录使用**相同文件名**，章节覆盖相同的 SDK 能力、版本限制、命令和失败语义，两个版本页顶都有对方的切换链接。
 * API 标识符、Git SHA、实际 EXIT、TypeScript 代码、导入路径等**保持原样**；只翻译说明、提示、示意图标签。不能用空页面或“请阅读英文版”冒充中文手册。
 
-## 2. 历史原始证据不翻译、不迁移
+## 2. 当前说明、生效冻结规范、历史记录分层
+
+* 当前可操作说明：仅维护在 `docs/current/{zh-CN,en}/`，必须中英成对。
+* 生效冻结规范：统一从 [reference/ 中文索引](../../reference/index.zh-CN.md) 检索。规范可能很早创建，但不能当成失效的旧手册。
+* 历史开发资料：统一从 [archive/ 中文索引](../../archive/index.zh-CN.md) 查找。归档索引不搬迁或复制原文件。
+
+### 历史原始证据不翻译、不迁移
 
 `docs/product/`、`docs/architecture/`、`docs/validation/`、`docs/implementation/` 以及较早的 `docs/guides/`、`docs/sdk/` 仍保留原路径、原文件和历史状态。避免修改冻结证据、破坏 GitHub Issue 精确 Blob 引用。任何新用户说明只在 `docs/current/` 更新中英成对文件。
 

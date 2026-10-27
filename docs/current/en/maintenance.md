@@ -9,7 +9,13 @@
 * **Paired topics are mandatory:** the same Markdown basenames must exist in both trees, cover the same supported API, commands, limitations and release facts, and link to the reciprocal language version.
 * Keep typed identifiers, Git SHAs, literal EXIT codes, package specifiers, TypeScript snippets and public ABI unchanged; translate the explanatory text and diagram labels. A stub saying "see the other language" **does not qualify as a translation**.
 
-## 2. Historical evidence remains immutable
+## 2. Separate current guidance, binding references and history
+
+* Current usage: `docs/current/{zh-CN,en}/` only, with real paired content.
+* Still-binding frozen Product/L2/architecture rules: discover via the [reference index](../../reference/index.en.md), even when physically stored in older folders.
+* Superseded candidates, research and as-of evidence: discover via the [archive map](../../archive/index.en.md); the map does not mass-move source records.
+
+### Historical evidence remains immutable
 
 Frozen Product/L2, Task DAG, validation and release evidence stay at their original paths. Do not move hundreds of historical technical records, rewrite their candidate-era `NOT_RUN` results, or break issue/blob references merely to rebrand a doc directory. New current user/Agent topics belong **only** to the language-paired `docs/current/` tree.
 

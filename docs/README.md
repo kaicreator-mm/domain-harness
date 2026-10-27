@@ -1,19 +1,20 @@
-# DomainHarness 文档中心
+# DomainHarness 文档中心 / Documentation hub
 
-**日常使用请只从下面两个入口开始，不再按历史研发目录逐层寻找：**
+> **中文用户请阅读 [最新中文文档](current/zh-CN/index.md)；Coding Agent 请阅读 [English current docs](current/en/index.md)。**
+>
+> **For current SDK integration, use the maintained language-specific guides below, not an old candidate or release evidence file.**
 
-<details>
-<summary>语言 / Language</summary>
+| 文档类型 / Source type | 中文入口 | English entry | 性质 / Purpose |
+| --- | --- | --- | --- |
+| **当前使用说明 / Current guides** | [中文用户手册](current/zh-CN/index.md) | [English Agent docs](current/en/index.md) | 15 个主题中英一一对应；current supported behavior |
+| **生效的约束 / Governing references** | [冻结规范与证据](reference/index.zh-CN.md) | [Governing references](reference/index.en.md) | Version-pinned source, freezes, authoritative decisions |
+| **旧版记录 / Historical records** | [历史归档导航](archive/index.zh-CN.md) | [Historical archive map](archive/index.en.md) | Provenance-only, not today's usage instructions |
 
-- **中文用户文档（默认）：[current/zh-CN/index.md](current/zh-CN/index.md)**
-- **English documentation for Agents and developers: [current/en/index.md](current/en/index.md)**
+## 目录规则 / Directory rules
 
-</details>
+- **Current:** `docs/current/{zh-CN,en}/` is the **only maintained user/Agent handbook**. Every active topic is bilingual, with the same basename and reciprocal links. `README.md` defaults to Chinese, `AGENTS.md` / `llms.txt` / canonical `SKILL.md` to English.
+- **Reference:** `docs/reference/` indexes version-pinned Product/L2/architecture authority. **Some older, frozen documents remain binding**; “historical file” does not automatically mean “invalid contract.”
+- **Archive:** `docs/archive/` indexes obsolete candidate drafts, research, older version docs and as-of test evidence. **This is an index, not a mass move:** source files remain at their original paths so issue links, SHA-pinned reviews and internal references keep working.
+- Existing `docs/product/`, `docs/architecture/`, `docs/implementation/`, `docs/validation/`, etc. are **source/evidence storage**, not a competing current handbook. Future public-facing guidance belongs in `docs/current/` only.
 
-当前文档的 **15 个主题中英一一对应**：快速开始、架构图、SDK、Package、Host、迁移、Skill、Agent、反馈、排障、发布状态、术语和历史资料导航。维护与反馈入口见 [中文首页](current/zh-CN/index.md)。
-
-**旧目录：历史与冻结证据（不删除、不改写）**。例如 `product/` 存 Product，`architecture/` 存 L2，`validation/` 存真实执行证据，`guides/` 与 `sdk/` 存旧实现期间的技术说明。它们原有的 `candidate`、`NOT_RUN` 或 `main HOLD` 记录是**历史事实**，不是当前状态。需要查证时从 [中文归档导航](current/zh-CN/archive.md) 或 [English archive map](current/en/archive.md) 进入。
-
-**维护约束：** 新增或修改**当前指南**必须同 PR 提供 `docs/current/zh-CN/<topic>.md` 和 `docs/current/en/<topic>.md`；两者链接、功能、限制与命令含义一致，代码/API 名保持原文。README 给人展示中文，`AGENTS.md` / `llms.txt` 为 Agent 指向英文。冻结版本不能因为翻译被改动。
-
-正式发布为 [v0.10.2](https://github.com/kaicreator-mm/domain-harness/tree/v0.10.2)，RQ 是 **CONDITIONAL**，原始 Full `EXIT1` / root `NOT_RUN` 必须保留。
+**Release facts / 发布事实:** v0.10.2 tag `cee14399d9d0af4e20e34b9111861b16a465b690` is unchanged; RQ remains **CONDITIONAL** with historical Full `EXIT1` and root `NOT_RUN`. Organizing navigation does not rewrite those results or qualify a new release.
