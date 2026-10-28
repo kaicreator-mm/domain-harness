@@ -1,7 +1,6 @@
 /** Trusted Host binding; no SDK, credential or endpoint comes from model JSON. */
-import { canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
-import { assertLlmGenerateRequestV1, assertLlmGenerateResultV1 } from '../../../../../contracts/dist/llm-generate-v1-guards.js';
-import type { LlmGenerateRequestV1, LlmGenerateResultV1, LlmErrorCategoryV1 } from '../../../../../contracts/dist/llm-generate-v1.js';
+import { canonicalSnapshot, assertLlmGenerateRequestV1, assertLlmGenerateResultV1 } from '@kaicreator/domain-harness-contracts';
+import type { LlmGenerateRequestV1, LlmGenerateResultV1, LlmErrorCategoryV1 } from '@kaicreator/domain-harness-contracts';
 
 export interface OpenAISDK {
   readonly chat: { readonly completions: { create(body: Record<string, unknown>, options: {

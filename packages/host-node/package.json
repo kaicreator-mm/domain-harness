@@ -9,6 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./llm/openai": {
+      "types": "./dist/llm/providers/openai/client.d.ts",
+      "import": "./dist/llm/providers/openai/client.js"
+    },
+    "./llm/anthropic": {
+      "types": "./dist/llm/providers/anthropic/client.d.ts",
+      "import": "./dist/llm/providers/anthropic/client.js"
     }
   },
   "files": [
