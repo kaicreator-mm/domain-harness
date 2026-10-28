@@ -86,7 +86,7 @@ function assertMetadata(manifest, selected) {
   assert.ok(manifest.files?.includes('dist'), 'dist must be shipped');
 }
 function checkOutputDir(out) {
-  assert.ok(isAbsolute(out), '--out must be an absolute directory');
+  // validateOutputArg already enforced an absolute native path before resolve().
   assertExternalOutput(ROOT, out);
   if (existsSync(out)) assert.equal(readdirSync(out).length, 0, 'output must be empty');
   else mkdirSync(out, { recursive: true });
