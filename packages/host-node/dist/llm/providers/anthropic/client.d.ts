@@ -11,7 +11,7 @@ export type AnthropicToolDefinition = Readonly<{
 export type TrustedAnthropicHost = Readonly<{
     modelId: string;
     apiKey: string;
-    /** The production endpoint is fixed; loopback is solely for a controlled fake endpoint. */
+    /** Trusted production endpoint is exact-allowlisted; loopback is for controlled tests only. */
     endpoint?: string;
     allowLoopbackForTest?: boolean;
     now: () => number;
