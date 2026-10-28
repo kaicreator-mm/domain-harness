@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
+import { assertExternalOutput, validateOutputArg } from './path-safety.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const TAG = 'v0.10.3';
@@ -86,18 +87,17 @@ function assertMetadata(manifest, selected) {
 }
 function checkOutputDir(out) {
   assert.ok(isAbsolute(out), '--out must be an absolute directory');
-  assert.ok(!out.startsWith(ROOT + sep) && out !== ROOT,
-    'output must be outside distribution source checkout');
+  assertExternalOutput(ROOT, out);
   if (existsSync(out)) assert.equal(readdirSync(out).length, 0, 'output must be empty');
   else mkdirSync(out, { recursive: true });
+  // Resolve again after creation to catch pre-existing junctions/reparse paths.
+  assertExternalOutput(ROOT, out);
 }
 function main() {
   assert.ok(Number(process.versions.node.split('.')[0]) >= 24, 'Node >=24 required');
   assert.equal(process.argv[2], '--out', 'usage: node scripts/distribution/pack-sdk-v0103.mjs --out ABSOLUTE_EMPTY_DIR');
   assert.equal(process.argv.length, 4, 'exactly one --out argument required');
-  assert.ok(isAbsolute(process.argv[3]), '--out must be an absolute path');
-  assert.ok(!/[\s"&|<>^%!]/u.test(process.argv[3]),
-    '--out must not contain spaces or shell metacharacters (Windows npm.cmd safety)');
+  validateOutputArg(process.argv[3]);
   const out = resolve(process.argv[3]);
   checkOutputDir(out);
   // Fail before side effects if the immutable tag has ever moved.
@@ -148,6 +148,8 @@ function main() {
 
     const artifacts = [];
     for (const selected of PACKAGES) {
+      // Defend against a changed junction or output symlink before writing tarballs.
+      assertExternalOutput(ROOT, out);
       const packs = JSON.parse(npm(['pack', '--json', '--ignore-scripts',
         '--pack-destination', out, '--workspace', selected.name], checkout));
       assert.equal(packs.length, 1);
@@ -183,6 +185,7 @@ function main() {
       ") { const mod = await import(name); if (!mod || Object.keys(mod).length === 0) throw new Error('missing exports: ' + name); }\n");
     run('node', ['smoke.mjs'], consumer);
 
+    assertExternalOutput(ROOT, out);
     const sums = artifacts.map((a) => a.sha256 + '  ' + a.filename).join('\n') + '\n';
     writeFileSync(join(out, 'SHA256SUMS'), sums);
     const receipt = {
