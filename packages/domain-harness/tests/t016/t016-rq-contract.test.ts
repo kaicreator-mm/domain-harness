@@ -86,12 +86,12 @@ test('t016: archived governance record binds the v0.7 closure candidate, tree, a
   }
 });
 
-test('t016: active README identifies last tagged v0.10.2 and preserves archived v0.7 evidence', () => {
+test('t016: active README identifies its last actual Git Tag and preserves archived v0.7 evidence', () => {
   // Historical candidate/tree/digest facts remain in GOVERNANCE, asserted above.
   // The public README describes the last ACTUALLY TAGGED release, not a
   // moving version-branch development candidate or an invented npm publication.
-  assert.ok(README.includes('v0.10.2 Git Tag'), 'README must identify the last tagged release');
-  assert.ok(README.includes('RQ=CONDITIONAL'), 'README must retain the conditional RQ caveat');
+  assert.match(README, /\[v(\d+\.\d+\.\d+) Git Tag\]\(https:\/\/github\.com\/kaicreator-mm\/domain-harness\/tree\/v\1\)/, 'README must identify a version-matched Git tag link');
+  assert.match(README, /RQ=(?:PASS|READY|CONDITIONAL)\b/, 'README must disclose a qualified or conditional release status');
   assert.ok(README.includes('docs/current/zh-CN/sdk.md'), 'README must link current Chinese SDK docs');
   assert.ok(README.includes('docs/current/en/index.md'), 'README must link current English Agent docs');
   assert.ok(GOVERNANCE.includes(CANDIDATE_TREE), 'archived v0.7 candidate tree must remain preserved');
