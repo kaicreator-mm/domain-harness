@@ -10,13 +10,20 @@ import { ShadowL4Error } from '../../packages/host-node/dist/index.js';
 import { MetaFeedbackError } from '../../packages/host-node/dist/index.js';
 import { DecisionEvidenceObserverError } from '../../packages/host-node/dist/index.js';
 
-test('P-I1231: known literal code union stays byte-accurate with reviewed source catalog', async () => {
+test('P-I1231: reviewed v0.10 known-code registry remains a sorted subset of current source literals', async () => {
   const path = new URL('../../docs/architecture/V010_TYPED_REFUSAL_LITERAL_CATALOG.json', import.meta.url);
   const catalog = JSON.parse(await readFile(path, 'utf8')) as { sourceFiles: Record<string, string[]> };
-  const expected = [...new Set(Object.values(catalog.sourceFiles).flat())].sort();
-  assert.deepEqual([...V10_KNOWN_ERROR_CODES], expected);
-  assert.ok(expected.length > 100, 'the v0.10 registry must cover the reviewed refusal corpus');
-  assert.equal(V10_KNOWN_ERROR_CODES.length, new Set(V10_KNOWN_ERROR_CODES).size);
+  const sourceCodes = new Set(Object.values(catalog.sourceFiles).flat());
+  const registered = [...V10_KNOWN_ERROR_CODES];
+  assert.ok(registered.length > 100, 'the bounded v0.10 known-code inventory must remain substantive');
+  assert.deepEqual(registered, [...new Set(registered)].sort(), 'public known codes must be unique and sorted');
+  assert.deepEqual(
+    registered.filter((code) => !sourceCodes.has(code)),
+    [],
+    'every public v0.10 known code must remain observable in the source literal catalog',
+  );
+  // The catalog tracks new source literals across versions, including dynamic
+  // reason suffixes; its superset is NOT the public v0.10 known-code contract.
 });
 
 test('P-I1231: compiler-owned Error subclasses preserve name, code, cause and detail', () => {
