@@ -19,7 +19,7 @@ export type AnthropicToolDefinition = Readonly<{
 export type TrustedAnthropicHost = Readonly<{
   modelId: string;
   apiKey: string;
-  /** The production endpoint is fixed; loopback is solely for a controlled fake endpoint. */
+  /** Trusted production endpoint is exact-allowlisted; loopback is for controlled tests only. */
   endpoint?: string;
   allowLoopbackForTest?: boolean;
   now: () => number;
@@ -43,6 +43,8 @@ export interface AnthropicMessagesSDKConstructor {
 
 const VERSION = 'dh.llm.generate/1' as const;
 const ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/anthropic/v1/messages';
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
 const MAX_DEADLINE_MS = 120_000;
 type Category = 'UNAVAILABLE' | 'UNSUPPORTED_FEATURE' | 'RATE_LIMITED' | 'AUTH_DENIED' |
   'MALFORMED_RESPONSE' | 'CONTEXT_OVERFLOW' | 'CANCELLED' | 'DEADLINE' | 'OUTCOME_UNKNOWN';
@@ -85,14 +87,15 @@ export function createTrustedAnthropicMessagesClient(SDK: AnthropicMessagesSDKCo
   const url = new URL(endpoint);
   const loopback = config.allowLoopbackForTest && url.protocol === 'http:' &&
     (url.hostname === '127.0.0.1' || url.hostname === '[::1]') && url.pathname === '/v1/messages';
-  if (!(endpoint === ENDPOINT || loopback) || url.username || url.password || url.search || url.hash)
+  if (!(endpoint === ENDPOINT || endpoint === DEEPSEEK_ENDPOINT || loopback) || url.username || url.password || url.search || url.hash)
     throw new TypeError('ANTHROPIC_ENDPOINT_UNAPPROVED');
   const windowMs = config.maxDeadlineWindowMs ?? MAX_DEADLINE_MS;
   if (!Number.isSafeInteger(windowMs) || windowMs < 1 || windowMs > MAX_DEADLINE_MS)
     throw new TypeError('ANTHROPIC_DEADLINE_CONFIG');
   // The SDK owns the real Messages wire (auth/version headers, serialization,
   // typed APIError). No retry: once sent the remote outcome may be charged.
-  const sdk = new SDK({ apiKey: config.apiKey, baseURL: url.origin, maxRetries: 0,
+  const baseURL = endpoint === DEEPSEEK_ENDPOINT ? DEEPSEEK_BASE_URL : url.origin;
+  const sdk = new SDK({ apiKey: config.apiKey, baseURL, maxRetries: 0,
     timeout: windowMs,
     fetch: (resource: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
       transport(resource, { ...init, redirect: 'error' }) });
