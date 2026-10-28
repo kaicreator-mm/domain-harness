@@ -1,7 +1,3 @@
-/** v0.10.3 T-C — selected, trusted Host transport for Anthropic Messages.
- * No BUILD selection or K permit is minted here. The caller must first traverse
- * the existing selected C operation and K external-effect admission.
- */
 import type { LlmGenerateResultV1 } from '../../../../../contracts/dist/llm-generate-v1.js';
 export type AnthropicToolDefinition = Readonly<{
     name: string;
@@ -26,4 +22,22 @@ export type TrustedAnthropicHost = Readonly<{
     resolveTools?: (ref: string) => readonly AnthropicToolDefinition[] | undefined;
     maxDeadlineWindowMs?: number;
 }>;
-export declare function createTrustedAnthropicMessagesClient(host: TrustedAnthropicHost): (raw: unknown, signal?: AbortSignal) => Promise<LlmGenerateResultV1>;
+/** Minimal Messages surface the trusted Host may bind; the official SDK satisfies it. */
+export interface AnthropicMessagesSDK {
+    readonly messages: {
+        readonly create: (body: Record<string, unknown>, options: {
+            readonly signal: AbortSignal;
+            readonly timeout: number;
+        }) => Promise<unknown>;
+    };
+}
+export interface AnthropicMessagesSDKConstructor {
+    new (options: {
+        apiKey: string;
+        baseURL: string;
+        maxRetries: number;
+        timeout: number;
+        fetch: typeof fetch;
+    }): AnthropicMessagesSDK;
+}
+export declare function createTrustedAnthropicMessagesClient(SDK: AnthropicMessagesSDKConstructor, host: TrustedAnthropicHost): (raw: unknown, signal?: AbortSignal) => Promise<LlmGenerateResultV1>;
