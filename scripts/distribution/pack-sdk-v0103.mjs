@@ -95,6 +95,9 @@ function main() {
   assert.ok(Number(process.versions.node.split('.')[0]) >= 24, 'Node >=24 required');
   assert.equal(process.argv[2], '--out', 'usage: node scripts/distribution/pack-sdk-v0103.mjs --out ABSOLUTE_EMPTY_DIR');
   assert.equal(process.argv.length, 4, 'exactly one --out argument required');
+  assert.ok(isAbsolute(process.argv[3]), '--out must be an absolute path');
+  assert.ok(!/[\s"&|<>^%!]/u.test(process.argv[3]),
+    '--out must not contain spaces or shell metacharacters (Windows npm.cmd safety)');
   const out = resolve(process.argv[3]);
   checkOutputDir(out);
   // Fail before side effects if the immutable tag has ever moved.
