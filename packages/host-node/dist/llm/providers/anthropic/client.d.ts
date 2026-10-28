@@ -1,4 +1,4 @@
-import type { LlmGenerateResultV1 } from '../../../../../contracts/dist/llm-generate-v1.js';
+import type { LlmGenerateResultV1 } from '@kaicreator/domain-harness-contracts';
 export type AnthropicToolDefinition = Readonly<{
     name: string;
     description: string;

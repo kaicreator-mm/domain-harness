@@ -1,6 +1,5 @@
 /** Trusted Host binding; no SDK, credential or endpoint comes from model JSON. */
-import { canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
-import { assertLlmGenerateRequestV1, assertLlmGenerateResultV1 } from '../../../../../contracts/dist/llm-generate-v1-guards.js';
+import { canonicalSnapshot, assertLlmGenerateRequestV1, assertLlmGenerateResultV1 } from '@kaicreator/domain-harness-contracts';
 const REASONS = Object.freeze({
     UNAVAILABLE: 'OPENAI_UNAVAILABLE', UNSUPPORTED_FEATURE: 'OPENAI_UNSUPPORTED_FEATURE',
     RATE_LIMITED: 'OPENAI_RATE_LIMITED', AUTH_DENIED: 'OPENAI_AUTH_DENIED',
