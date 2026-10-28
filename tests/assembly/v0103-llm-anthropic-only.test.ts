@@ -139,6 +139,48 @@ function nonEmptyVersion(value: unknown): boolean {
   return typeof value === 'string' && /^20\d\d-\d\d-\d\d$/u.test(value);
 }
 
+test('thinking stays enabled; valid reasoning blocks are private while final text is normalized', async () => {
+  for (const signature of [undefined, '', 'SYNTHETIC_PRIVATE_SIGNATURE']) {
+    const thinking = { type: 'thinking', thinking: 'SYNTHETIC_PRIVATE_THINKING',
+      ...(signature === undefined ? {} : { signature }) };
+    const f = await fixture({ body: response({ content: [thinking, { type: 'text', text: 'final answer' }] }) });
+    try {
+      const r = await createTrustedAnthropicMessagesClient(SDK, f.host)(request());
+      assert.equal(r.status, 'completed');
+      if (r.status !== 'completed') throw new Error('expected final text');
+      assert.equal(r.text, 'final answer');
+      assert.equal(JSON.stringify(r).includes('SYNTHETIC_PRIVATE_'), false);
+      const body = f.seen[0]!.body as Record<string, unknown>;
+      assert.equal(body.thinking, undefined, 'Host must not disable provider thinking');
+      assert.equal(body.stream, false);
+      assert.equal(f.seen.length, 1);
+    } finally { await f.close(); }
+  }
+});
+
+test('thinking normalization preserves malformed, unknown, tool and empty-output refusals', async () => {
+  for (const [content, reason] of [
+    [[{ type: 'thinking' }, { type: 'text', text: 'ok' }], 'MALFORMED_CONTENT_BLOCK'],
+    [[{ type: 'thinking', thinking: 7 }], 'MALFORMED_CONTENT_BLOCK'],
+    [[{ type: 'thinking', thinking: 'private', signature: {} }], 'MALFORMED_CONTENT_BLOCK'],
+    [[{ type: 'thinking', thinking: 'x'.repeat(65537) }], 'MALFORMED_CONTENT_BLOCK'],
+    [[{ type: 'thinking', thinking: 'private', signature: 'x'.repeat(65537) }], 'MALFORMED_CONTENT_BLOCK'],
+    [[{ type: 'thinking', thinking: 'private' }], 'EMPTY_OR_OVERSIZED_OUTPUT'],
+    [[{ type: 'thinking', thinking: 'private' }, { type: 'tool_use', name: 'shell', input: {} }], 'UNAPPROVED_TOOL_PROPOSAL'],
+    [[{ type: 'redacted_thinking', data: 'private' }], 'UNSUPPORTED_CONTENT_BLOCK'],
+    [[{ type: 'unknown', text: 'private' }, { type: 'text', text: 'ok' }], 'UNSUPPORTED_CONTENT_BLOCK'],
+  ] as const) {
+    const f = await fixture({ body: response({ content }) });
+    try {
+      const r = await createTrustedAnthropicMessagesClient(SDK, f.host)(request());
+      assert.equal(r.status, 'failed');
+      if (r.status !== 'completed') assert.equal(r.reasonCode, reason);
+      assert.equal(JSON.stringify(r).includes('private'), false);
+      assert.equal(f.seen.length, 1);
+    } finally { await f.close(); }
+  }
+});
+
 test('before-send security refusals send zero requests', async () => {
   const f = await fixture();
   try {
@@ -233,6 +275,12 @@ test('official SDK durability, private stop reasons, snapshot and selected K rou
       res.end(JSON.stringify({ type: 'error', error: { type: 'provider_error', message: SECRET } })); return;
     }
     if (mode === 'malformed') { res.end(JSON.stringify({ raw: 'secret-never-leak' })); return; }
+    if (mode === 'thinking-good') {
+      res.end(JSON.stringify(response({ content: [
+        { type: 'thinking', thinking: 'SYNTHETIC_PRIVATE_THINKING', signature: 'SYNTHETIC_PRIVATE_SIGNATURE' },
+        { type: 'text', text: 'hello back' },
+      ] }))); return;
+    }
     if (mode === 'missing-stop') { const body: Record<string, unknown> = response(); delete body.stop_reason; res.end(JSON.stringify(body)); return; }
     if (mode === 'nonstring-stop') { res.end(JSON.stringify(response({ stop_reason: null }))); return; }
     if (mode === 'reflect-secret' || mode === 'reflect-secret-embedded') {
@@ -447,8 +495,11 @@ test('official SDK durability, private stop reasons, snapshot and selected K rou
     assert.throws(() => buildV10App({ ...composition, routes: [{ intentId: 'llmViaOpenAI', operationId: 'llm.openai.generate', capabilityId: 'llm.openai', handlerId: 'generate' }] }), { code: 'V10_ROUTE_INVALID' });
     const store = new PlainCasDocStore(); const activation = await activateV10App(app, { store, deploymentRoot: dir });
     try {
-      mode = 'good'; const before = calls; const intent = { intentType: 'llmViaAnthropic', instanceKey: 'instance:anthropic', messageId: 'message:anthropic', input: { amount: 30, requestId: 'kernel:one' } };
-      assert.equal((await activation.facade.send(intent)).status, 'admitted'); assert.equal(calls, before + 1);
+      mode = 'thinking-good'; const before = calls; const intent = { intentType: 'llmViaAnthropic', instanceKey: 'instance:anthropic', messageId: 'message:anthropic', input: { amount: 30, requestId: 'kernel:one' } };
+      const completed = await activation.facade.send(intent);
+      assert.equal(completed.status, 'admitted'); assert.equal(calls, before + 1);
+      assert.match(JSON.stringify(completed), /hello back/);
+      assert.equal(JSON.stringify(completed).includes('SYNTHETIC_PRIVATE_'), false);
       await activation.facade.send(intent); assert.equal(calls, before + 1, 'actual K replay does not repeat physical model request');
       for (const [wire, id] of [['reset', 'reset'], ['http:408', 'http-408'], ['http:504', 'http-504']] as const) {
         mode = wire; const beforeUnknown = calls;
@@ -465,6 +516,7 @@ test('official SDK durability, private stop reasons, snapshot and selected K rou
       }
       const rows = JSON.stringify(await Promise.all(store.keys().map(async key => [key, await store.get(key)])));
       assert.equal(rows.includes(SECRET), false);
+      assert.equal(rows.includes('SYNTHETIC_PRIVATE_'), false, 'thinking/signature must not enter K Journal');
     } finally { activation.dispose(); await rm(dir, { recursive: true, force: true }); }
   });
 });

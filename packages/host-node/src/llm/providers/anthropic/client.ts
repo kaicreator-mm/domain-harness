@@ -193,6 +193,16 @@ export function createTrustedAnthropicMessagesClient(SDK: AnthropicMessagesSDKCo
     const proposals: { name: string; argumentsJson: string }[] = [];
     for (const block of payload.content) {
       if (!plain(block)) return error('failed', 'MALFORMED_RESPONSE', 'MALFORMED_CONTENT_BLOCK', providerRequestId, usage);
+      if (block.type === 'thinking') {
+        // Reasoning is provider-private data, never final output or authority.
+        // Some compatible providers omit the opaque signature. Do not retain
+        // either field in the DTO that can enter the K Journal.
+        if (typeof block.thinking !== 'string' || block.thinking.length > 65536 ||
+            (block.signature !== undefined &&
+              (typeof block.signature !== 'string' || block.signature.length > 65536)))
+          return error('failed', 'MALFORMED_RESPONSE', 'MALFORMED_CONTENT_BLOCK', providerRequestId, usage);
+        continue;
+      }
       if (block.type === 'text' && typeof block.text === 'string') text.push(block.text);
       else if (block.type === 'tool_use') {
         if (!nonempty(block.name, 128) || !plain(block.input) ||
