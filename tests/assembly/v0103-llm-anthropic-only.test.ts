@@ -98,6 +98,43 @@ test('real official SDK Messages wire system/text blocks and provenance, no impl
   } finally { await f.close(); }
 });
 
+test('DeepSeek Anthropic-compatible endpoint preserves /anthropic using real SDK wire and blocks unapproved URLs', async () => {
+  const seen: string[] = [];
+  const transport: typeof fetch = async (resource, init) => {
+    const url = typeof resource === 'string' ? resource : resource instanceof URL ? resource.href : resource.url;
+    seen.push(url);
+    assert.equal(init?.redirect, 'error', 'no redirects can forward Host credentials');
+    return new Response(JSON.stringify(response()), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    });
+  };
+  const host: TrustedAnthropicHost = {
+    modelId, apiKey: SECRET, endpoint: 'https://api.deepseek.com/anthropic/v1/messages',
+    now: () => now, fetchTransport: transport,
+    assertRequest: assertLlmGenerateRequestV1, assertResult: assertLlmGenerateResultV1,
+  };
+  const result = await createTrustedAnthropicMessagesClient(SDK, host)(request());
+  assert.equal(result.status, 'completed');
+  if (result.status === 'completed') {
+    assert.equal(result.providerKind, 'anthropic-messages');
+    assert.equal(result.text, 'hello back');
+    assert.deepEqual(result.usage, { evidenceMode: 'provider-reported', inputTokens: 15, outputTokens: 7 });
+  }
+  assert.deepEqual(seen, ['https://api.deepseek.com/anthropic/v1/messages']);
+  assert.equal(JSON.stringify(result).includes(SECRET), false);
+  for (const bad of [
+    'http://api.deepseek.com/anthropic/v1/messages',
+    'https://api.deepseek.com/v1/messages',
+    'https://api.deepseek.com/anthropic/v1/messages/',
+    'https://api.deepseek.com/anthropic/v1/messages?key=secret',
+    'https://api.deepseek.com.evil.invalid/anthropic/v1/messages',
+  ]) {
+    assert.throws(() => createTrustedAnthropicMessagesClient(SDK, { ...host, endpoint: bad }),
+      /ANTHROPIC_ENDPOINT_UNAPPROVED/);
+  }
+  assert.equal(seen.length, 1, 'invalid endpoint configuration must send zero HTTP');
+});
+
 function nonEmptyVersion(value: unknown): boolean {
   return typeof value === 'string' && /^20\d\d-\d\d-\d\d$/u.test(value);
 }
