@@ -7,7 +7,7 @@
  *   - a carried v0.6 freeze doc disappears -> red;
  *   - the v0.7 archived successor governance record loses the candidate binding, the
  *     frozen tree, or any of the four quadruple-proven pack digests -> red;
- *   - README currentness stops naming v0.7 -> red;
+ *   - README stops identifying the last actual tag and current SDK docs -> red;
  *   - the RQ record stops covering any #733 dimension, or silently drops the
  *     P0/P1-zero posture -> red.
  *
@@ -86,13 +86,14 @@ test('t016: archived governance record binds the v0.7 closure candidate, tree, a
   }
 });
 
-test('t016: active README identifies v0.10.2 candidate while archived v0.7 release identity is preserved', () => {
-  // Old candidate/tree/digest facts belong to GOVERNANCE, validated above.
-  // The active README must advance with the version rather than assert that
-  // the historic v0.7 release remains the current development line.
-  assert.ok(README.includes('v0.10.2 development candidate'), 'README must identify the active v0.10.2 candidate');
-  assert.ok(README.includes('**not** a qualified release'), 'README must not call the active candidate released');
-  assert.ok(README.includes('docs/sdk/V0102_PUBLIC_API.md'), 'README must link the selected current public SDK');
+test('t016: active README identifies last tagged v0.10.2 and preserves archived v0.7 evidence', () => {
+  // Historical candidate/tree/digest facts remain in GOVERNANCE, asserted above.
+  // The public README describes the last ACTUALLY TAGGED release, not a
+  // moving version-branch development candidate or an invented npm publication.
+  assert.ok(README.includes('v0.10.2 Git Tag'), 'README must identify the last tagged release');
+  assert.ok(README.includes('RQ=CONDITIONAL'), 'README must retain the conditional RQ caveat');
+  assert.ok(README.includes('docs/current/zh-CN/sdk.md'), 'README must link current Chinese SDK docs');
+  assert.ok(README.includes('docs/current/en/index.md'), 'README must link current English Agent docs');
   assert.ok(GOVERNANCE.includes(CANDIDATE_TREE), 'archived v0.7 candidate tree must remain preserved');
 });
 
