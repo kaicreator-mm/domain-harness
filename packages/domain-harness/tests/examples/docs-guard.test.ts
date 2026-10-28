@@ -11,7 +11,7 @@
 //   4. the host integration doc states that durability claims are established
 //      ONLY by dedicated validation evidence, citing the executed task
 //      evidence anchors (T-022/T-023/T-024);
-//   5. docs/sdk/README.md read order includes both new SDK docs;
+//   5. docs/sdk/README.md links bilingual current SDK and historical navigation;
 //   6. the examples import the compiled package by its published name (never
 //      internal src/ paths) and the boot example consumes a compiled Domain
 //      Package at startup.
@@ -96,10 +96,15 @@ test('docs-guard: the host integration doc binds durability claims to executed v
   }
 });
 
-test('docs-guard: the SDK README read order includes both new SDK docs', async () => {
+test('docs-guard: the SDK index prioritizes bilingual current API and preserves historical navigation', async () => {
   const readme = await readDoc(SDK_README);
-  assert.ok(readme.includes('DomainHarness_v0.3_SDK_USAGE.md'));
-  assert.ok(readme.includes('DomainHarness_v0.3_SDK_REFERENCE.md'));
+  for (const link of [
+    '../current/zh-CN/sdk.md', '../current/en/sdk.md',
+    '../current/zh-CN/archive.md', '../current/en/archive.md',
+  ]) {
+    assert.ok(readme.includes(link), `SDK index must link ${link}`);
+  }
+  // The historical v0.3 docs remain covered by the substantive NEW_DOCS assertions above.
 });
 
 test('docs-guard: the integration baseline states its non-claims explicitly', async () => {

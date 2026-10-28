@@ -33,6 +33,35 @@
     "packages/contracts/src/index.ts": [],
     "packages/contracts/src/json.ts": [],
     "packages/contracts/src/known-error-codes.ts": [],
+    "packages/contracts/src/llm-generate-v1-guards.ts": [
+      "COMPLETION",
+      "DEADLINE",
+      "FAILURE_CODE",
+      "LLM_CONTRACT_INVALID_",
+      "MESSAGE",
+      "MESSAGES",
+      "MESSAGE_BUDGET",
+      "MISSING_TOOL_PROPOSAL",
+      "MODEL",
+      "OBJECT",
+      "OUTPUT_FORMAT",
+      "OUTPUT_LIMIT",
+      "PROVIDER",
+      "REQUEST_ID",
+      "STATUS",
+      "STRING",
+      "TEMPERATURE",
+      "TOOL_ARGUMENTS",
+      "TOOL_LIMIT",
+      "TOOL_PROPOSAL",
+      "UNKNOWN_CLASS",
+      "UNKNOWN_KEY",
+      "UNKNOWN_OUTCOME",
+      "USAGE_COUNT",
+      "USAGE_MODE",
+      "VERSION"
+    ],
+    "packages/contracts/src/llm-generate-v1.ts": [],
     "packages/microkernel/src/domain-app.ts": [
       "FACADE_CLOSED",
       "QUERY_SELECTOR_INVALID",
@@ -131,7 +160,8 @@
       "OCCURRENCE_RESERVATION_INDETERMINATE",
       "OCCURRENCE_RESERVATION_PENDING",
       "UNAUTHORIZED_PROMOTION",
-      "V10_EXPORT_CONTRACT_REFUSED"
+      "V10_EXPORT_CONTRACT_REFUSED",
+      "VERIFIED_PROVIDER_ARTIFACT_UNSUPPORTED"
     ],
     "packages/host-node/src/durable-controls.ts": [
       "CALLBACK_IDENTITY_CONFLICT",
@@ -154,6 +184,12 @@
     ],
     "packages/host-node/src/error-type-parity.ts": [],
     "packages/host-node/src/index.ts": [],
+    "packages/host-node/src/llm/providers/anthropic/client.ts": [
+      "ANTHROPIC_DEADLINE_CONFIG",
+      "ANTHROPIC_ENDPOINT_UNAPPROVED",
+      "ANTHROPIC_HOST_CONFIGURATION"
+    ],
+    "packages/host-node/src/llm/providers/openai/client.ts": [],
     "packages/host-node/src/meta-feedback-workflow.ts": [
       "META_AUTHORITY_FORBIDDEN",
       "META_CLAIM_INVALID",
@@ -232,6 +268,9 @@
       "HOST_PUT_CONDITION_REQUIRED",
       "HOST_STORAGE_UNSUPPORTED",
       "HOST_VALUE_NOT_JSON"
+    ],
+    "packages/host-node/src/verified-provider-bundle.ts": [
+      "VERIFIED_PROVIDER_TRUST_ANCHOR_MISSING"
     ],
     "tooling/build/src/build.ts": [
       "BUILD_GRAPH_INVALID",
