@@ -11,6 +11,8 @@
 import { canonicalSnapshot } from '@kaicreator/domain-harness-contracts';
 const VERSION = 'dh.llm.generate/1';
 const ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/anthropic/v1/messages';
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
 const MAX_DEADLINE_MS = 120_000;
 const plain = (x) => x !== null && typeof x === 'object' && !Array.isArray(x) && Object.getPrototypeOf(x) === Object.prototype;
 const objectish = (x) => x !== null && typeof x === 'object';
@@ -43,14 +45,15 @@ export function createTrustedAnthropicMessagesClient(SDK, host) {
     const url = new URL(endpoint);
     const loopback = config.allowLoopbackForTest && url.protocol === 'http:' &&
         (url.hostname === '127.0.0.1' || url.hostname === '[::1]') && url.pathname === '/v1/messages';
-    if (!(endpoint === ENDPOINT || loopback) || url.username || url.password || url.search || url.hash)
+    if (!(endpoint === ENDPOINT || endpoint === DEEPSEEK_ENDPOINT || loopback) || url.username || url.password || url.search || url.hash)
         throw new TypeError('ANTHROPIC_ENDPOINT_UNAPPROVED');
     const windowMs = config.maxDeadlineWindowMs ?? MAX_DEADLINE_MS;
     if (!Number.isSafeInteger(windowMs) || windowMs < 1 || windowMs > MAX_DEADLINE_MS)
         throw new TypeError('ANTHROPIC_DEADLINE_CONFIG');
     // The SDK owns the real Messages wire (auth/version headers, serialization,
     // typed APIError). No retry: once sent the remote outcome may be charged.
-    const sdk = new SDK({ apiKey: config.apiKey, baseURL: url.origin, maxRetries: 0,
+    const baseURL = endpoint === DEEPSEEK_ENDPOINT ? DEEPSEEK_BASE_URL : url.origin;
+    const sdk = new SDK({ apiKey: config.apiKey, baseURL, maxRetries: 0,
         timeout: windowMs,
         fetch: (resource, init) => transport(resource, { ...init, redirect: 'error' }) });
     return async (raw, signal) => {
