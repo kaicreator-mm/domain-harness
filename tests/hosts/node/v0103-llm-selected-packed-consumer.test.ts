@@ -29,9 +29,11 @@ import { parse } from 'acorn';
 const selected = process.argv.slice(2);
 const [kernel, sdk, router, business, ledger, openaiSource, anthropicSource] = JSON.parse(await readFile('payload.json', 'utf8'));
 const secrets = { openai: 'SYNTHETIC_OPENAI_CREDENTIAL', anthropic: 'SYNTHETIC_ANTHROPIC_CREDENTIAL' };
+const rawError = 'SYNTHETIC_PROVIDER_RAW_ERROR';
 const calls = { openai: 0, anthropic: 0 };
 let mode = 'good';
 let observed;
+let hostSignal;
 const server = createServer(async (req, res) => {
   const kind = req.url.includes('chat/completions') ? 'openai' : 'anthropic';
   calls[kind]++;
@@ -41,9 +43,10 @@ const server = createServer(async (req, res) => {
   observed?.(); observed = undefined;
   res.setHeader('content-type', 'application/json');
   res.setHeader('x-request-id', mode === 'reflect' ? secrets[kind] : 'request-' + kind);
-  if (mode === 'hold') return;
+  if (mode.startsWith('hold')) return;
+  if (mode === 'reset') { req.socket.destroy(); return; }
   if (mode === '408' || mode === '504' || mode === '401') {
-    res.statusCode = Number(mode); res.end(JSON.stringify({ error: { type: 'authentication_error', message: secrets[kind] } })); return;
+    res.statusCode = Number(mode); res.end(JSON.stringify({ error: { type: 'authentication_error', message: rawError + secrets[kind] } })); return;
   }
   if (kind === 'openai') res.end(JSON.stringify({ id: 'openai-id', model: 'model',
     choices: [mode === 'tools' ? { message: { role: 'assistant', content: null,
@@ -59,14 +62,20 @@ const port = server.address().port;
 const dto = { contractVersion: 'dh.llm.generate/1', requestId: 'packed-request', modelId: 'model',
   deadlineUnixMs: Date.now() + 25000, messages: [{ role: 'user', content: 'hello' }], maxOutputTokens: 32, outputFormat: 'text' };
 const clients = {};
+const errorClients = {};
+const hostDispatch = kind => input => clients[kind](mode === 'hold-deadline'
+  ? { ...input, deadlineUnixMs: Date.now() + 300 } : input, hostSignal);
 try {
   if (selected.includes('openai')) {
     const { default: OpenAI } = await import('openai');
     const { createOpenAIHostClient } = await import('@kaicreator/domain-harness-host-node/llm/openai');
-    clients.openai = createOpenAIHostClient(OpenAI, { baseURL: 'http://127.0.0.1:' + port + '/v1',
+    const policy = { baseURL: 'http://127.0.0.1:' + port + '/v1',
       apiKey: secrets.openai, modelId: 'model', maxDeadlineMs: 30000, allowLoopbackHttp: true,
-      toolCatalog: { ref: 'tools', functions: [{ name: 'lookup', description: 'proposal only', parameters: { type: 'object' } }] } }).generate;
-    Object.defineProperty(globalThis, '__rOpenai', { value: clients.openai });
+      toolCatalog: { ref: 'tools', functions: [{ name: 'lookup', description: 'proposal only', parameters: { type: 'object' } }] } };
+    clients.openai = createOpenAIHostClient(OpenAI, policy).generate;
+    class BrokenOpenAI { chat = { completions: { create: async () => { throw Object.assign(new Error(rawError + secrets.openai), { status: 401, request_id: secrets.openai }); } } }; }
+    errorClients.openai = createOpenAIHostClient(BrokenOpenAI, policy).generate;
+    Object.defineProperty(globalThis, '__rOpenai', { value: hostDispatch('openai') });
     const p = join('node_modules', 'domain-harness-openai-host'); await mkdir(p, { recursive: true });
     await writeFile(join(p, 'package.json'), JSON.stringify({ type: 'module', exports: './index.mjs' }));
     await writeFile(join(p, 'index.mjs'), 'export const generate = globalThis.__rOpenai;');
@@ -74,11 +83,14 @@ try {
   if (selected.includes('anthropic')) {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const { createTrustedAnthropicMessagesClient } = await import('@kaicreator/domain-harness-host-node/llm/anthropic');
-    clients.anthropic = createTrustedAnthropicMessagesClient(Anthropic, { modelId: 'model', apiKey: secrets.anthropic,
+    const policy = { modelId: 'model', apiKey: secrets.anthropic,
       endpoint: 'http://127.0.0.1:' + port + '/v1/messages', allowLoopbackForTest: true,
       now: Date.now, fetchTransport: fetch, assertRequest: assertLlmGenerateRequestV1, assertResult: assertLlmGenerateResultV1,
-      resolveTools: ref => ref === 'tools' ? [{ name: 'lookup', description: 'proposal only', input_schema: { type: 'object' } }] : undefined });
-    Object.defineProperty(globalThis, '__dhV0103AnthropicHostGenerate', { value: clients.anthropic, writable: false, configurable: false });
+      resolveTools: ref => ref === 'tools' ? [{ name: 'lookup', description: 'proposal only', input_schema: { type: 'object' } }] : undefined };
+    clients.anthropic = createTrustedAnthropicMessagesClient(Anthropic, policy);
+    class BrokenAnthropic { messages = { create: async () => { throw Object.assign(new Error(rawError + secrets.anthropic), { status: 401, requestID: secrets.anthropic }); } }; }
+    errorClients.anthropic = createTrustedAnthropicMessagesClient(BrokenAnthropic, policy);
+    Object.defineProperty(globalThis, '__dhV0103AnthropicHostGenerate', { value: hostDispatch('anthropic'), writable: false, configurable: false });
   }
   const standard = sdk + '\nconst __dhv10RouterBundle = (() => {\n' + router.replace(/^export /gm, '') +
     '\nreturn { routeWorkflowIntent };\n})();\nexport const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;\n';
@@ -129,7 +141,7 @@ try {
   if (selected.length === 1 && selected[0] === 'openai') {
     const artifact = join(process.cwd(), 'node_modules', 'domain-harness-openai-host', 'index.mjs');
     const ordinary = await readFile(artifact, 'utf8');
-    const bundle = "export async function generate(input) { return {contractVersion:'dh.llm.generate/1',requestId:input.requestId,providerKind:'openai-compatible',modelId:'model',status:'completed',text:'verified',finishReason:'stop',usage:{evidenceMode:'unavailable'}}; }";
+    const bundle = "globalThis.__rSealEvals = (globalThis.__rSealEvals || 0) + 1; export async function generate(input) { return {contractVersion:'dh.llm.generate/1',requestId:input.requestId,providerKind:'openai-compatible',modelId:'model',status:'completed',text:'verified',finishReason:'stop',usage:{evidenceMode:'unavailable'}}; }";
     const stage = await mkdtemp(join(tmpdir(), 'dh-r-protected-'));
     try {
       await writeFile(artifact, bundle);
@@ -156,12 +168,18 @@ try {
       const verified = await activateGovernedV10Build(app, options);
       try { assert.equal((await verified.send({ intentType: 'llmViaOpenAI', instanceKey: 'seal:good', messageId: 'seal:good', input: { amount: 30, requestId: 'seal' } })).status, 'admitted'); }
       finally { verified.close(); }
-      await writeFile(artifact, bundle + '\n// tampered');
+      const evals = globalThis.__rSealEvals, writes = docs.size, tampered = bundle + '\n// tampered';
+      await writeFile(artifact, tampered);
       await assert.rejects(activateGovernedV10Build(app, options), { code: 'VERIFIED_PROVIDER_DIGEST_MISMATCH' });
+      assert.equal(globalThis.__rSealEvals, evals); assert.equal(docs.size, writes);
       const changed = structuredClone(app);
       const sealed = changed.modules.find(m => m.capabilityId === 'llm.openai');
       sealed.moduleSource += '\n// altered seal'; sealed.moduleSha256 = sha256Hex(sealed.moduleSource);
-      await assert.rejects(activateGovernedV10Build(changed, options), { code: 'BUILD_CLOSURE_MISMATCH' });
+      // Provider digest lives in the Host policy, not in the sealed module.
+      // Updating that mutable candidate and the module hash cannot alter the protected decision.
+      const alteredPolicy = { ...policy, provider: { ...policy.provider, artifactSha256: sha256Hex(tampered) } };
+      await assert.rejects(activateGovernedV10Build(changed, { ...options, providerIntegrity: alteredPolicy }), { code: 'BUILD_CLOSURE_MISMATCH' });
+      assert.equal(globalThis.__rSealEvals, evals); assert.equal(docs.size, writes);
     } finally { await writeFile(artifact, ordinary); await rm(stage, { recursive: true, force: true }); }
   }
   const active = await activateV10App(app, { store, deploymentRoot: process.cwd() });
@@ -205,6 +223,46 @@ try {
       const failed = await clients[kind](dto); assert.equal(failed.status, 'failed'); assert.equal(failed.errorCategory, 'AUTH_DENIED');
       assert.equal(failed.reasonCode, kind === 'openai' ? 'OPENAI_AUTH_DENIED' : 'PROVIDER_AUTH_DENIED');
       assert.equal(calls[kind], before + 1);
+      before = calls[kind];
+      const routedFailure = await send(intent, 'auth-' + kind);
+      assert.equal(routedFailure.status, 'admitted'); assert.equal(calls[kind], before + 1);
+      assert.match(JSON.stringify(routedFailure), /AUTH_DENIED/);
+      assert.match(JSON.stringify(routedFailure), /externalRef/);
+      const actualClient = clients[kind];
+      let sdkFailure;
+      before = calls[kind];
+      try {
+        clients[kind] = errorClients[kind];
+        sdkFailure = await send(intent, 'sdk-error-' + kind);
+      } finally { clients[kind] = actualClient; }
+      assert.equal(sdkFailure.status, 'admitted'); assert.match(JSON.stringify(sdkFailure), /AUTH_DENIED/);
+      assert.match(JSON.stringify(sdkFailure), /local-correlation:packed-request/);
+      assert.equal(calls[kind], before);
+      for (const id of ['auth-' + kind, 'sdk-error-' + kind]) {
+        const row = [...docs].find(([key]) => key.includes('effect-journal') && key.includes(id));
+        assert.equal(row?.[1].value.record.status, 'completed');
+        assert.match(JSON.stringify(row), /AUTH_DENIED/); assert.match(JSON.stringify(row), /externalRef/);
+      }
+      const checkHeld = async (id, count) => {
+        const journal = [...docs].find(([key]) => key.includes('effect-journal') && key.includes(id));
+        assert.equal(journal?.[1].value.record.status, 'failed');
+        assert.equal(journal?.[1].value.record.error.zeroExternalEffect, undefined);
+        assert.ok([...docs.keys()].some(key => key.includes('admission-fence') && key.includes(id)));
+        await assert.rejects(send(intent, id));
+        assert.equal(calls[kind], count, 'held uncertain effect must not retry');
+      };
+      for (const method of ['cancel', 'deadline']) {
+        const id = kind + '-k-' + method;
+        mode = 'hold-' + method; before = calls[kind];
+        const seen = new Promise(resolve => { observed = resolve; });
+        const controller = new AbortController(); hostSignal = controller.signal;
+        const pending = send(intent, id);
+        await seen; if (method === 'cancel') controller.abort();
+        await assert.rejects(pending, { code: 'ADMISSION_EFFECT_FAILED' });
+        hostSignal = undefined;
+        assert.equal(calls[kind], before + 1);
+        await checkHeld(id, before + 1);
+      }
       for (const status of ['408', '504']) {
         mode = status; before = calls[kind];
         const ambiguous = await clients[kind](dto);
@@ -213,15 +271,10 @@ try {
         before = calls[kind]; otherBefore = calls[other];
         await assert.rejects(send(intent, kind + '-' + status), { code: 'ADMISSION_EFFECT_FAILED' });
         assert.equal(calls[kind], before + 1); assert.equal(calls[other], otherBefore);
-        const journal = [...docs].find(([key]) => key.includes('effect-journal') && key.includes(kind + '-' + status));
-        assert.equal(journal?.[1].value.record.status, 'failed');
-        assert.equal(journal?.[1].value.record.error.zeroExternalEffect, undefined);
-        assert.ok([...docs.keys()].some(key => key.includes('admission-fence') && key.includes(kind + '-' + status)));
-        await assert.rejects(send(intent, kind + '-' + status));
-        assert.equal(calls[kind], before + 1, 'held uncertain effect must not retry');
+        await checkHeld(kind + '-' + status, before + 1);
       }
-      const publicData = JSON.stringify([first, failed, [...docs]]);
-      assert.equal(publicData.includes(secrets.openai) || publicData.includes(secrets.anthropic), false);
+      const publicData = JSON.stringify([first, failed, routedFailure, sdkFailure, [...docs]]);
+      assert.equal(publicData.includes(secrets.openai) || publicData.includes(secrets.anthropic) || publicData.includes(rawError), false);
     }
   } finally { active.dispose(); }
 } finally { server.closeAllConnections(); server.close(); }
@@ -297,7 +350,7 @@ void [request, result, selected, unselected, createOpenAIHostClient, createTrust
     for (const selection of [[], ['openai'], ['anthropic'], ['openai', 'anthropic']]) {
       const result = spawnSync(process.execPath, ['physical.mjs', ...selection], { cwd: dir, encoding: 'utf8', timeout: 30_000 });
       assert.equal(result.status, 0, result.stderr || String(result.error));
-      assert.doesNotMatch(result.stdout + result.stderr, /SYNTHETIC_(OPENAI|ANTHROPIC)_CREDENTIAL/);
+      assert.doesNotMatch(result.stdout + result.stderr, /SYNTHETIC_(OPENAI|ANTHROPIC)_CREDENTIAL|SYNTHETIC_PROVIDER_RAW_ERROR/);
     }
   } finally {
     await rm(dir, { recursive: true, force: true });
