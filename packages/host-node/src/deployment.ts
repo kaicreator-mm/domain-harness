@@ -67,6 +67,8 @@ import type {
   HostActivation,
   V10AppFacade,
 } from '@kaicreator/domain-harness-microkernel/host-seam';
+import { prepareVerifiedProviderBundle, snapshotVerifiedProviderApp } from './verified-provider-bundle.js';
+import type { VerifiedProviderBundlePolicy } from './verified-provider-bundle.js';
 
 const MAX_STRING = 512;
 /** Bounded concurrent submits of one RESERVED pin. */
@@ -974,6 +976,8 @@ export interface ActivateGovernedV10BuildOptions {
   readonly now?: () => number;
   readonly queryAuthority?: V10QueryAuthority;
   readonly deploymentRoot?: string;
+  /** Host wiring only; absent/TRUSTED_DEPLOYMENT preserves historical behavior. */
+  readonly providerIntegrity?: { readonly profile: 'TRUSTED_DEPLOYMENT' } | VerifiedProviderBundlePolicy;
 }
 
 /**
@@ -1667,6 +1671,11 @@ export async function activateGovernedV10Build(
   if (!isPlainRecord(app)) {
     refuse('INVALID_BUILD_VERSION', 'a governed activation requires the plain-data BUILD output');
   }
+  const integrity = options.providerIntegrity;
+  if (integrity !== undefined && integrity.profile !== 'TRUSTED_DEPLOYMENT' && integrity.profile !== 'VERIFIED_PROVIDER_BUNDLE_V1') {
+    refuse('VERIFIED_PROVIDER_ARTIFACT_UNSUPPORTED', 'unknown Host provider integrity profile');
+  }
+  if (integrity?.profile === 'VERIFIED_PROVIDER_BUNDLE_V1') app = snapshotVerifiedProviderApp(app, refuse);
   const deployment = snapshotDeployment(options.deployment);
   const now = options.now ?? Date.now;
   const selection = options.selection ?? 'CURRENT';
@@ -1680,14 +1689,24 @@ export async function activateGovernedV10Build(
   const verified: VerifiedBuildDecision = current !== null
     ? current
     : await verifyPinnedRestoration(app, deployment, options.decision, options.authorization, options.store, nowMs);
-  const activation = await activateV10App(app, {
-    store: options.store,
-    tenantId: deployment.tenantId,
-    now,
-    ...(options.queryAuthority === undefined ? {} : { queryAuthority: options.queryAuthority }),
-    ...(options.deploymentRoot === undefined ? {} : { deploymentRoot: options.deploymentRoot }),
-    deploymentIdentity: deployment,
-  });
+  const snapshot = integrity?.profile === 'VERIFIED_PROVIDER_BUNDLE_V1'
+    ? await prepareVerifiedProviderBundle(app, integrity, options.deploymentRoot, verified.closureDigest, refuse)
+    : undefined;
+  let activation: Awaited<ReturnType<typeof activateV10App>>;
+  try {
+    activation = await activateV10App(app, {
+      store: options.store,
+      tenantId: deployment.tenantId,
+      now,
+      ...(options.queryAuthority === undefined ? {} : { queryAuthority: options.queryAuthority }),
+      ...((snapshot?.deploymentRoot ?? options.deploymentRoot) === undefined ? {} : { deploymentRoot: snapshot?.deploymentRoot ?? options.deploymentRoot }),
+      deploymentIdentity: deployment,
+    });
+  } finally {
+    // All supported imports are static: Node has evaluated/cached the sealed
+    // closure before returning. No future import from this stage is supported.
+    await snapshot?.dispose();
+  }
   const build: V10GovernedBuildIdentity = Object.freeze({
     deployedAppId: deployment.deployedAppId,
     tenantId: deployment.tenantId,

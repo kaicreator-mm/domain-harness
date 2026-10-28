@@ -9,3 +9,5 @@ export * from './qualified-canonical.js';
 export type * from './build-types.js';
 export type * from './activation-types.js';
 export type * from './import-types.js';
+export * from './llm-generate-v1.js';
+export * from './llm-generate-v1-guards.js';

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -103,9 +103,7 @@ test('N19: regression binding — this branch carries the full historical suites
   }
   // Actual per-suite counts for the terminal record.
   const successorDir = join(repoRoot, 'packages/domain-harness-node/tests/successor-host');
-  const files = execSync(`ls ${JSON.stringify(successorDir)}`, { encoding: 'utf8' })
-    .split(/\r?\n/)
-    .filter((name) => name.endsWith('.test.ts'));
+  const files = readdirSync(successorDir).filter((name) => name.endsWith('.test.ts'));
   console.log(`N19 successor suites: ${files.join(', ')}`);
   assert.ok(files.length >= 5);
 }, 60_000);

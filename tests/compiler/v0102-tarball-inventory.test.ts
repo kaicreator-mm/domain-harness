@@ -51,7 +51,8 @@ test('T07b selected workspace engines and export identities are the Node24-only 
     assert.equal(manifest.main, './dist/index.js');
     assert.equal(manifest.types, './dist/index.d.ts');
     assert.deepEqual(Object.keys(manifest.exports ?? {}).sort(),
-      selected.name === '@kaicreator/domain-harness-microkernel' ? ['.', './host-seam'] : ['.']);
+      selected.name === '@kaicreator/domain-harness-microkernel' ? ['.', './host-seam'] :
+        selected.name === '@kaicreator/domain-harness-host-node' ? ['.', './llm/anthropic', './llm/openai'] : ['.']);
     assert.ok(manifest.files?.includes('dist'), 'selected runtime/build must ship dist');
   }
 });

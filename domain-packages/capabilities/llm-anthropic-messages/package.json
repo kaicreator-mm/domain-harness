@@ -1,0 +1,8 @@
+{
+  "name": "domain-harness-anthropic-authoring-fixture",
+  "private": true,
+  "type": "module",
+  "version": "0.10.3",
+  "engines": { "node": ">=24" },
+  "devDependencies": { "@anthropic-ai/sdk": "1.3.0" }
+}
