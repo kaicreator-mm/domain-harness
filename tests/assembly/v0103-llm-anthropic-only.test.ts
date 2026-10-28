@@ -196,6 +196,8 @@ test('official SDK durability, private stop reasons, snapshot and selected K rou
       res.end(JSON.stringify({ type: 'error', error: { type: 'provider_error', message: SECRET } })); return;
     }
     if (mode === 'malformed') { res.end(JSON.stringify({ raw: 'secret-never-leak' })); return; }
+    if (mode === 'missing-stop') { const body: Record<string, unknown> = response(); delete body.stop_reason; res.end(JSON.stringify(body)); return; }
+    if (mode === 'nonstring-stop') { res.end(JSON.stringify(response({ stop_reason: null }))); return; }
     if (mode === 'reflect-secret' || mode === 'reflect-secret-embedded') {
       res.end(JSON.stringify(response({ id: mode === 'reflect-secret' ? SECRET : `prefix-${SECRET}-suffix` }))); return;
     }
@@ -273,11 +275,13 @@ test('official SDK durability, private stop reasons, snapshot and selected K rou
       assert.equal(calls, before + 1);
     }
   });
-  await t.test('malformed terminal body fails without echoing raw data', async () => {
-    mode = 'malformed'; const r = await checked();
-    assert.deepEqual({ status: r.status, category: r.status === 'completed' ? null : r.errorCategory },
-      { status: 'failed', category: 'MALFORMED_RESPONSE' });
-    assert.equal(JSON.stringify(r).includes('secret-never-leak'), false);
+  await t.test('malformed terminal body or missing/non-string stop_reason fails without raw data', async () => {
+    for (const wire of ['malformed', 'missing-stop', 'nonstring-stop']) {
+      mode = wire; const r = await checked();
+      assert.deepEqual({ status: r.status, category: r.status === 'completed' ? null : r.errorCategory },
+        { status: 'failed', category: 'MALFORMED_RESPONSE' });
+      assert.equal(JSON.stringify(r).includes('secret-never-leak'), false);
+    }
   });
 
   await t.test('max-deadline window refuses pre-send with zero HTTP', async () => {

@@ -146,7 +146,7 @@ export function createTrustedAnthropicMessagesClient(SDK, host) {
         if (combined.aborted)
             return error('unknown', 'OUTCOME_UNKNOWN', 'SENT_OUTCOME_UNKNOWN');
         if (!plain(payload) || payload.type !== 'message' || payload.role !== 'assistant' ||
-            !Array.isArray(payload.content) || !nonempty(payload.id, 256))
+            !Array.isArray(payload.content) || !nonempty(payload.id, 256) || !nonempty(payload.stop_reason, 128))
             return error('failed', 'MALFORMED_RESPONSE', 'MALFORMED_PROVIDER_RESPONSE');
         const providerRequestId = observedId(payload.id, config.apiKey);
         const u = plain(payload.usage) ? payload.usage : null;
