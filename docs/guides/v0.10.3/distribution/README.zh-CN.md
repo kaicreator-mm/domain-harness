@@ -28,6 +28,15 @@
 
 ## 构建／验证（授权本地 Agent）
 
+**Windows 必须使用 `core.autocrlf=false` 的干净检出。** 构建会把部分源码模板字符串的字节嵌入生成产物；仓库的 dist 一致性检查会拒绝因换行符变化产生的构建差异。Git for Windows 默认的 `core.autocrlf=true` 可能把 LF 源码检出为 CRLF，导致错误的产物不一致失败。请在首次检出文件前设置：
+
+    git clone --config core.autocrlf=false https://github.com/kaicreator-mm/domain-harness.git
+    cd domain-harness
+    git checkout distribution/v0.10.3-sdk-tgz
+    git config --get core.autocrlf
+
+最后一条命令必须输出 `false`。请使用干净检出；不要通过修改受跟踪源码或手工修补 dist 来绕过一致性检查。
+
 在 distribution/v0.10.3-sdk-tgz 分支，Node24，向仓库之外的绝对空目录输出：
 
     node scripts/distribution/pack-sdk-v0103.mjs --out C:\xDev\_artifacts\domain-harness-v0103
