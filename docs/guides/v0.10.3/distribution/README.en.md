@@ -26,6 +26,15 @@ Do **not** use ^0.10.3 npm Registry dependency specs: no such npmjs.com publicat
 
 ## Publisher / authorized local Agent
 
+On Windows, use a clean checkout with **`core.autocrlf=false`**. The build embeds some source template-literal bytes into generated output, and the committed-dist identity check intentionally rejects a line-ending-altered rebuild. Git for Windows' default `core.autocrlf=true` can turn LF source into CRLF and cause a false build mismatch. Set the option before checkout, for example:
+
+    git clone --config core.autocrlf=false https://github.com/kaicreator-mm/domain-harness.git
+    cd domain-harness
+    git checkout distribution/v0.10.3-sdk-tgz
+    git config --get core.autocrlf
+
+The last command must print `false`. Start from a fresh checkout; do not patch generated dist or tracked source to work around this mismatch.
+
 On distribution/v0.10.3-sdk-tgz with Node24, choose an **empty absolute directory outside the checkout**:
 
     node scripts/distribution/pack-sdk-v0103.mjs --out C:\xDev\_artifacts\domain-harness-v0103
