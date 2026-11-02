@@ -43,7 +43,6 @@ function run(command, args, cwd) {
 
 function git(args, cwd = ROOT) { return run('git', args, cwd); }
 function npm(args, cwd) { return run('npm', args, cwd); }
-function readJson(path) { return JSON.parse(readFileSync(path, 'utf8')); }
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
 
 function packageManifestFromTgz(tgzPath) {

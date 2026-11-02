@@ -30,7 +30,7 @@ function fixture() {
     manifests.set(item.dir, manifest);
     mkdirSync(join(root, item.dir), { recursive: true });
     writeFileSync(join(root, item.dir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
-    lockPackages[item.dir] = structuredClone(manifest);
+    lockPackages[item.dir] = globalThis.structuredClone(manifest);
   }
 
   const consumer = {
@@ -40,7 +40,7 @@ function fixture() {
   };
   mkdirSync(join(root, CONSUMER_DIR), { recursive: true });
   writeFileSync(join(root, CONSUMER_DIR, 'package.json'), JSON.stringify(consumer, null, 2) + '\n');
-  lockPackages[CONSUMER_DIR] = structuredClone(consumer);
+  lockPackages[CONSUMER_DIR] = globalThis.structuredClone(consumer);
   writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
     name: 'fixture',
     version: '0.2.0',
