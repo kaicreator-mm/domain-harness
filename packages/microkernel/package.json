@@ -1,6 +1,6 @@
 {
   "name": "@kaicreator/domain-harness-microkernel",
-  "version": "0.10.2-rc.0",
+  "version": "0.10.3",
   "description": "DomainHarness Microkernel public SDK",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,6 +27,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@kaicreator/domain-harness-contracts": "0.10.2-rc.0"
+    "@kaicreator/domain-harness-contracts": "0.10.3"
   }
 }

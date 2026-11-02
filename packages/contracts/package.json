@@ -1,6 +1,6 @@
 {
   "name": "@kaicreator/domain-harness-contracts",
-  "version": "0.10.2-rc.0",
+  "version": "0.10.3",
   "description": "Shared ABI constants, types and errors for DomainHarness (zero dependencies)",
   "type": "module",
   "main": "./dist/index.js",
