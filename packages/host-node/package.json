@@ -1,6 +1,6 @@
 {
   "name": "@kaicreator/domain-harness-host-node",
-  "version": "0.10.2-rc.0",
+  "version": "0.10.4",
   "description": "DomainHarness Node host bindings",
   "type": "module",
   "main": "./dist/index.js",
@@ -31,8 +31,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@kaicreator/domain-harness-contracts": "0.10.2-rc.0",
-    "@kaicreator/domain-harness-microkernel": "0.10.2-rc.0"
+    "@kaicreator/domain-harness-contracts": "0.10.4",
+    "@kaicreator/domain-harness-microkernel": "0.10.4"
   },
   "peerDependencies": {
     "better-sqlite3": "^12.0.0"
