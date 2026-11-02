@@ -89,7 +89,7 @@ function parseArgs(args) {
 function main() {
   assert.ok(Number(process.versions.node.split('.')[0]) >= 24, 'Node >=24 required');
   const { tag, out: outArg } = parseArgs(process.argv.slice(2));
-  assert.match(tag || '', /^v\d+\.\d+\.\d+(?:\+source-repair\.\d+)?$/u, 'usage: pack-sdk-from-tag.mjs --tag vX.Y.Z --out ABSOLUTE_EMPTY_DIR');
+  assert.match(tag || '', /^v\d+\.\d+\.\d+(?:\+source-repair\.\d+)?$/u, 'usage: pack-sdk-from-tag.mjs --tag vX.Y.Z[+source-repair.N] --out ABSOLUTE_EMPTY_DIR');
   assert.ok(outArg, 'missing --out');
   validateOutputArg(outArg);
   const version = tag.slice(1).split('+')[0];

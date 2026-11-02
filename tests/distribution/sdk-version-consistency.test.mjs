@@ -83,7 +83,7 @@ test('rejects an internal SDK dependency edge that drifts from the release versi
     const manifest = manifests.get('packages/host-node');
     manifest.dependencies[CONTRACTS] = '0.10.2-rc.0';
     writeFileSync(join(root, 'packages/host-node/package.json'), JSON.stringify(manifest));
-    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.10\.4/);
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /must equal 0\.10\.3/);
   });
 });
 
