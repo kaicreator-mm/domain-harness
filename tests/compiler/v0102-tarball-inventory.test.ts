@@ -45,7 +45,7 @@ test('T07b selected workspace engines and export identities are the Node24-only 
   for (const selected of SELECTED) {
     const manifest = readManifest(selected.dir);
     assert.equal(manifest.name, selected.name);
-    assert.equal(manifest.version, '0.10.2-rc.0');
+    assert.equal(manifest.version, '0.10.3');
     assert.notEqual(manifest.private, true, selected.name + ' must remain distributable');
     assert.equal(manifest.engines?.node, '>=24.0.0');
     assert.equal(manifest.main, './dist/index.js');
