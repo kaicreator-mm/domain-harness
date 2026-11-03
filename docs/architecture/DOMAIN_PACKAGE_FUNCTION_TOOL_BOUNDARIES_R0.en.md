@@ -80,7 +80,7 @@ A Business Intent describes what the business actor wants to happen, for example
 - `proposeReplan`
 - `approveReplan`
 - `approveFeedback`
-- `requestTaskAttemptRead`
+
 
 The request enters the selected Domain App/K Workflow, where K owns Admission, identity, idempotency, state, and Effect governance. An Intent name is not a Capability Operation and grants no Provider authority.
 
