@@ -119,6 +119,26 @@ Business/domain rule (pure helper, Schema, Pattern, Workflow Definition)
 [DH #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) 中，Tally 使用过 `DPB-011..DPB-018`，而 xDownload 的另一条独立经验评论也使用 `DPB-011..DPB-014`。**原先声称的稳定 Lesson ID 事实上并不全局唯一。** 这是经验追踪协议缺口，而非 Kernel 缺陷。不要改写历史证据；从此采用 `DPB-TALLY-<序号>`、`DPB-XDOWNLOAD-<序号>`、`DPB-SHUN-<序号>` 等项目命名空间，并在 #1392 以原评论 URL + 新 ID 建立别名交叉引用。下游经验从“已记录”不应直接推导“可自动关联唯一知识资产”。
 
 ## 8. 本 R1 的验收状态
+### 7.2 V8 Business ABI 命名与 V10 BUILD/Runtime 的关系
+
+Tally 消费者使一个版本坐标歧义变得具体；但目前还不能称为 ABI 缺陷：
+
+- DomainHarness v0.10.3 的 `packages/domain-harness/src/public-v8/contracts.ts` 将 `v08-business-abi/1` 列入 `V8_QUALIFIED_ABI`。
+- Tally 的 selected producer 同时导入 `V10_TARGET_PROFILE` / `buildV10App()`，并选择 `ABI_VERSION='v08-business-abi/1'` 的 Business 模块。ABI 代际与 BUILD/Runtime Profile 是不同坐标。
+- Tally 应用版本是 v2；DomainHarness 源码 tag 是 v0.10.3；不能从 ABI 前缀推断二者。不得机械重命名为 `v010-business-abi/1`。
+- 专项命名/兼容策略调查已建立 [DH #1469](https://github.com/kaicreator-mm/domain-harness/issues/1469)，隶属于更广泛的 [#1467](https://github.com/kaicreator-mm/domain-harness/issues/1467)。最终可能是补充文档、增加兼容别名或规划未来迁移；在证据与 Product/L2 决策完成前保留现有 ABI。
+
+### 7.3 Tally Business 源码清单：已证明与未证明的边界
+
+在 Tally `version/v2@7ebb1cdd0a79fc82cc938e35f852a80dd8e15332`：
+
+- `packages/tally-engineering-business/src/` 有 12 个 MJS 文件，约 2,654 行；根入口 `index.mjs` 为 1,646 行且没有 import，另外 11 个模块合计 1,008 行。
+- Package exports 仅暴露 `.` → `./src/index.mjs`。虽然有 13 个独立测试文件，但 helper 的单元测试不能证明 sealed B 已通过 BUILD 导入或执行这些模块。
+- README 仍描述单个 Task-readiness advisory Intent，而 `index.mjs` 已声明 10 个 Intent / 10 个 Effect 并导出多组 assess/project 函数。这是文档漂移，不代表十条路径都已接通。
+- 拆分文件之前，必须建立跨 B、C、Host、UI、selected producer 的 source-to-call-site / BUILD-closure 映射；按真实职责和选中路由分类 helper。不能仅按行数拆分，也不能假设 BUILD 自动发现同目录文件。
+
+这些是下游 Package 作者体验与实现边界问题，不是已证实的 DomainHarness 通用缺陷。详细证据见 [#1465](https://github.com/kaicreator-mm/domain-harness) 与 [Tally PR #277](https://github.com/kaicreator-mm/tally/pull/277)。
+
 
 `SCOPE=DOCS_ONLY`；`SOURCE_STATIC_CROSSCHECK=DONE`；`SELF_ADVERSARIAL=DONE`；`INDEPENDENT_REVIEW=NOT_RUN`；`EXTERNAL_CLEAN_CONSUMER=NOT_RUN`；`NODE24_TEST=NOT_RUN`；`WOODPECKER=NOT_RUN`；`PRODUCT_L2_ADMISSION=NO`；`NEXT_RELEASE=UNASSIGNED`。
 
