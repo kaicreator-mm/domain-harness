@@ -224,5 +224,5 @@ Tally 领域知识的归属默认是 Tally Engineering Domain Package。只有�
 - [Domain Data Spec](../domain-data/DOMAIN_DATA_SPEC.zh-CN.md) 与 [Authoring Guide](../domain-data/DOMAIN_DATA_AUTHORING_GUIDE.zh-CN.md)：领域项目知识提取与治理参考。
 - [S Feature Guide](../guides/V0102_S_FEATURE.md)：selected S Feature 是有界非 Tool 入口。
 - [Package Authoring Guide](../guides/V0102_PACKAGE_AUTHORING.md)：public Package / BUILD / C module 选择与装配。
-- [Tally #147](https://github.com/kaicreator-mm/tally/pull/147) · [#152](https://github.com/kaicreator-mm/tally/pull/152) · [#60](https://github.com/kaicreator-mm/tally/issues/60) · [#273](https://github.com/kaicreator-mm/tally/issues/273) · [#274](https://github.com/kaicreator-mm/tally/issues/274) · [#275](https://github.com/kaicreator-mm/tally/issues/275)
+- [Tally #147](https://github.com/kaicreator-mm/tally/pull/147) · [#152](https://github.com/kaicreator-mm/tally/pull/152) · [#60](https://github.com/kaicreator-mm/tally/issues/60) · [#273](https://github.com/kaicreator-mm/tally/issues/273) · [#274](https://github.com/kaicreator-mm/tally/issues/274) · [#275](https://github.com/kaicreator-mm/tally/issues/275) · [#276 Domain Knowledge/Workflow refactor](https://github.com/kaicreator-mm/tally/issues/276)
 - [DomainHarness #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) · [#1392](https://github.com/kaicreator-mm/domain-harness/issues/1392)
