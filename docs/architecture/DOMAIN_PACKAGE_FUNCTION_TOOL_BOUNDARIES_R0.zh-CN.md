@@ -2,7 +2,7 @@
 
 [English](DOMAIN_PACKAGE_FUNCTION_TOOL_BOUNDARIES_R0.en.md) · [跟踪 Issue #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465)
 
-> **状态：** Post-v0.10.3 架构实施参考，R0 / 待评审，不是冻结 L2、正式 ABI 或源码实施授权。本文档提交为文档提案，不修改 Runtime、Kernel、SDK 或 v0.10.3 发布产物。下一版本归属保持 **UNASSIGNED**，须另行 Product/L2 决策。
+> **状态：** Post-v0.10.3 架构实施参考，R0 / 待评审，不是冻结 L2、正式 ABI 或源码实施授权。领域知识与 Workflow 资产分类、提取和执行边界见配套文档 [DOMAIN_PACKAGE_KNOWLEDGE_AND_WORKFLOW_R0.zh-CN.md](DOMAIN_PACKAGE_KNOWLEDGE_AND_WORKFLOW_R0.zh-CN.md)。本文档提交为文档提案，不修改 Runtime、Kernel、SDK 或 v0.10.3 发布产物。下一版本归属保持 **UNASSIGNED**，须另行 Product/L2 决策。
 
 ## 1. 目的与核心原则
 
