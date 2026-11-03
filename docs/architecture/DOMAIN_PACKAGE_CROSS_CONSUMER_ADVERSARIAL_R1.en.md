@@ -107,6 +107,10 @@ The following P1/P2 tags indicate **design risk priority**, not independent find
 
 Tally [#276](https://github.com/kaicreator-mm/tally/issues/276) owns Engineering Domain Data and bounded Workflows, and #273/#274/#275 own governed Replan/Feedback/Attempt. Those are **not** changes to DomainHarness's core implementation.
 
+### 6.1 Adversarial finding: lesson ID collision
+
+[DH #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) contains Tally lessons labeled `DPB-011..DPB-018` and a separate xDownload comment also labeled `DPB-011..DPB-014`. The previously asserted “stable Lesson ID” was therefore not globally unique. This is a feedback-governance gap, **not** a Kernel defect. Preserve original comment provenance; going forward use consumer namespaces such as `DPB-TALLY-###`, `DPB-XDOWNLOAD-###` and `DPB-SHUN-###`. Link old comment URLs and namespaced IDs in #1392. Recorded experience is not automatically a uniquely addressable production asset.
+
 ## 7. Gate and provenance
 
 `SCOPE=DOCS_ONLY` · `SOURCE_STATIC_CROSSCHECK=DONE` · `SELF_ADVERSARIAL=DONE` · `INDEPENDENT_REVIEW=NOT_RUN` · `CLEAN_CONSUMER=NOT_RUN` · `NODE24_TEST=NOT_RUN` · `WOODPECKER=NOT_RUN` · `PRODUCT_L2_ADMISSION=NO` · `NEXT_RELEASE=UNASSIGNED`.
