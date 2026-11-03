@@ -2,6 +2,18 @@
 
 [中文](DOMAIN_PACKAGE_KNOWLEDGE_AND_WORKFLOW_R0.zh-CN.md) · [Function and Tool Boundaries](DOMAIN_PACKAGE_FUNCTION_TOOL_BOUNDARIES_R0.en.md) · [Tracking Issue #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465)
 
+> **READ FIRST — document authority: NON-NORMATIVE IMPLEMENTATION REFERENCE**
+>
+> This document is optional architecture guidance for downstream Domain Apps. It is **not** a DomainHarness SDK/Kernel/Runtime/public-API/ABI specification, feature announcement, Product/L2 decision, freeze baseline, release plan, or implementation authorization.
+>
+> - **SDK capability authority:** for a consumer pinned to DomainHarness v0.10.3, use the exact released tag/source, actual public exports and ABI, and evidence from that consumer's selected BUILD/Host/clean-consumer path. This document cannot add an API, make an unimplemented feature available, or override the released contract. Verify again when using another SDK version.
+> - **Downstream authority:** each project owns its Product/L1/L2 scope, architecture decisions, implementation plan and acceptance gates. This document is not a prerequisite, blocker, native dependency, Task requirement or acceptance gate for any downstream project.
+> - **Optional adoption:** adopt, adapt or skip each recommendation according to the downstream project's needs. Do not wait for this PR to be reviewed, marked Ready, or merged. GitHub Draft describes only this document PR's review state; it says nothing about SDK capability or downstream readiness.
+> - **Interpret MUST / MUST NOT:** when a statement describes an exact existing released contract, it means consumers must use that existing contract correctly; when it describes a proposed pattern, example or safety recommendation, it is guidance for adopters. Neither use creates a new SDK obligation or capability.
+> - **SDK-gap threshold:** propose a missing SDK capability only after a minimal, reproducible failure against the exact released public package/ABI in a clean external consumer, with consumer logic, Host wiring and BUILD selection ruled out. Product/L2/DAG and release qualification remain separate decisions.
+>
+> `DOC_KIND=NON_NORMATIVE_DOWNSTREAM_REFERENCE` · `ADOPTION=OPTIONAL` · `DOWNSTREAM_PREREQUISITE=NO` · `SDK_CAPABILITY_DELTA=NONE` · `RELEASE_AUTHORITY=NONE`
+
 > **Status:** Post-v0.10.3 architecture reference / R0 pending review. This is not a frozen L2, public ABI, Runtime feature, or source implementation authorization. It uses Tally v2 as a real downstream Domain Package consumer to clarify how domain knowledge is represented and how workflows are defined and executed. It does not retroactively modify immutable v0.10.3 tag `061376f4a023070f215f9feffad5c24d96d503cb`. A future version remains UNASSIGNED pending a separate Product/L2 decision.
 
 ## 1. Core conclusion: a Domain Package is more than code and Tools
