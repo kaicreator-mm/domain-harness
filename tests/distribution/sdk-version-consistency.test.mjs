@@ -100,7 +100,7 @@ test('rejects a lockfile that disagrees with the source workspace manifest', () 
   withFixture(({ root, lockPackages }) => {
     lockPackages['packages/host-node'].version = '0.10.2-rc.0';
     writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
-      name: 'fixture',
+      name: 'domain-harness-monorepo',
       version: '0.2.0',
       lockfileVersion: 3,
       requires: true,
