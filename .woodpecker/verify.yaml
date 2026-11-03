@@ -27,6 +27,8 @@ steps:
       # Selected Node24 API, bare-import/hygiene and tarball-inventory smoke (T07b).
       # T09 owns the separate real Tiny/Rich fresh-installed and external-producer journeys.
       - node --import tsx --test tests/compiler/v010-import-hook-registry.test.ts tests/compiler/v010-public-api-boundary.test.ts tests/compiler/v0102-import-direction.test.ts tests/compiler/v0102-tarball-inventory.test.ts
+      # Distribution-only output isolation/CMD negatives, no npm publish/pack/upload.
+      - node --test scripts/distribution/path-safety.test.mjs
 
   # Trigger this workflow MANUALLY on the pinned final release-candidate ref.
   # Do not run full regression automatically on every PR or main push.
