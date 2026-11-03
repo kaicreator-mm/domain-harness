@@ -99,8 +99,12 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
   const lock = readJson(root, 'package-lock.json');
   assert.equal(lock.version, ROOT_PRODUCT_VERSION,
     'package-lock.json root product version must remain 0.2.0');
+  assert.equal(lock.name, rootManifest.name,
+    'package-lock.json root name must match package.json');
   const lockedRoot = lock.packages?.[''];
   assert.ok(lockedRoot, 'package-lock.json: missing root package record');
+  assert.equal(lockedRoot.name, rootManifest.name,
+    'package-lock.json root workspace name must match package.json');
   assert.equal(lockedRoot.version, rootManifest.version,
     'package-lock.json root package version must match package.json');
 
@@ -117,6 +121,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
 
   const lockedConsumer = lock.packages?.[CONSUMER_DIR];
   assert.ok(lockedConsumer, `package-lock.json: missing workspace ${CONSUMER_DIR}`);
+  assert.equal(lockedConsumer.name, consumer.name,
+    `${CONSUMER_DIR}: lock package name must match package.json`);
   assert.equal(lockedConsumer.version, CONSUMER_PRODUCT_VERSION,
     `${CONSUMER_DIR}: lock product version must remain 0.2.0`);
   assert.equal(lockedConsumer.version, consumer.version,

@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { redactAbsoluteCommandArgs } from '../../scripts/distribution/pack-sdk-from-tag.mjs';
+
 import {
   SDK_PACKAGES,
   verifySdkVersionConsistency,
@@ -146,5 +148,62 @@ test('rejects a root lockfile product version drift', () => {
       packages: lockPackages,
     }));
     assert.throws(() => verifySdkVersionConsistency(root, VERSION), /root package version must match/);
+  });
+});
+
+test('redacts absolute Windows and POSIX paths from public command provenance', () => {
+  const args = [
+    '--pack-destination',
+    'C:\\Users\\Private User\\AppData\\Local\\Temp\\sdk-output',
+    '--tag',
+    'v0.10.3+source-repair.1',
+    '/tmp/private-checkout',
+    'smoke.mjs',
+  ];
+  assert.deepEqual(redactAbsoluteCommandArgs(args), [
+    '--pack-destination',
+    '<ABSOLUTE_PATH>',
+    '--tag',
+    'v0.10.3+source-repair.1',
+    '<ABSOLUTE_PATH>',
+    'smoke.mjs',
+  ]);
+});
+
+test('rejects a root package-lock name that drifts from package.json', () => {
+  withFixture(({ root }) => {
+    const path = join(root, 'package-lock.json');
+    const lock = JSON.parse(readFileSync(path, 'utf8'));
+    lock.name = 'wrong-root-name';
+    writeFileSync(path, JSON.stringify(lock));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /root name must match/);
+  });
+});
+
+test('rejects a root lock workspace name that drifts from package.json', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages[''].name = 'wrong-root-name';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.2.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /root workspace name must match/);
+  });
+});
+
+test('rejects a consumer lock workspace name that drifts from package.json', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages[CONSUMER_DIR].name = 'wrong-consumer-name';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.2.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /lock package name must match/);
   });
 });

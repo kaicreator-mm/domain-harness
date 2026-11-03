@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 
@@ -25,6 +25,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PACKAGE_NAMES = new Set(SDK_PACKAGES.map((item) => item.name));
 const FORBIDDEN = /(^src\/|qualified-package|legacy-v[0-9]+|durable-receipt-carrier-v1[.]mjs|\.env|\.npmrc)/u;
 const COMMAND_RESULTS = [];
+
+export function redactAbsoluteCommandArgs(args) {
+  return args.map((arg) => (
+    isAbsolute(arg) || win32.isAbsolute(arg) ? '<ABSOLUTE_PATH>' : arg
+  ));
+}
+
 
 function run(command, args, cwd) {
   const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
@@ -38,7 +45,8 @@ function run(command, args, cwd) {
   COMMAND_RESULTS.push({
     command,
     executable,
-    args: [...args],
+    args: redactAbsoluteCommandArgs(args),
+    absolutePathArgsRedacted: args.some((arg) => isAbsolute(arg) || win32.isAbsolute(arg)),
     exitCode: result.status,
     signal: result.signal || null,
     errorCode: result.error?.code || null,
