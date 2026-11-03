@@ -112,6 +112,26 @@ Tally [#276](https://github.com/kaicreator-mm/tally/issues/276) owns Engineering
 [DH #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) contains Tally lessons labeled `DPB-011..DPB-018` and a separate xDownload comment also labeled `DPB-011..DPB-014`. The previously asserted “stable Lesson ID” was therefore not globally unique. This is a feedback-governance gap, **not** a Kernel defect. Preserve original comment provenance; going forward use consumer namespaces such as `DPB-TALLY-###`, `DPB-XDOWNLOAD-###` and `DPB-SHUN-###`. Link old comment URLs and namespaced IDs in #1392. Recorded experience is not automatically a uniquely addressable production asset.
 
 ## 7. Gate and provenance
+### 6.2 V8 Business ABI naming versus V10 BUILD/Runtime
+
+The Tally consumer made one version-coordinate ambiguity concrete; it is not yet a proven ABI defect:
+
+- DomainHarness v0.10.3 source `packages/domain-harness/src/public-v8/contracts.ts` lists `v08-business-abi/1` in `V8_QUALIFIED_ABI`.
+- Tally's selected producer imports `V10_TARGET_PROFILE` and `buildV10App()` while selecting a Business module whose `ABI_VERSION` remains `v08-business-abi/1`. The ABI generation and BUILD/Runtime profile are separate coordinates.
+- Tally v2 is the app version; DomainHarness v0.10.3 is the immutable Git source tag; neither should be inferred from the ABI prefix. Do not mechanically rename the ABI to `v010-business-abi/1`.
+- A focused naming/compatibility investigation is tracked in [DH #1469](https://github.com/kaicreator-mm/domain-harness/issues/1469), under the broader [#1467](https://github.com/kaicreator-mm/domain-harness/issues/1467). The outcome may be clearer documentation, an additive semantic alias, or a future migration; retain the current ABI until evidence and Product/L2 decide otherwise.
+
+### 6.3 Tally Business source inventory — what is and is not proven
+
+At Tally `version/v2@7ebb1cdd0a79fc82cc938e35f852a80dd8e15332`:
+
+- `packages/tally-engineering-business/src/` contains 12 MJS files / about 2,654 lines. The root `index.mjs` is 1,646 lines with zero imports; 11 sibling modules total 1,008 lines.
+- The package export map exposes only `.` → `./src/index.mjs`. Thirteen sibling test files exist, but direct unit tests for helpers do not prove that the selected sealed B imports or executes those modules.
+- The README still describes a single advisory Task-readiness Intent, while `index.mjs` declares 10 Intents / 10 Effects and exports multiple assess/project functions. This is documentation drift, not proof that every path is wired.
+- Before splitting files, build a source-to-call-site / BUILD-closure map across B, C, Host, UI and the selected producer. Classify each helper by actual owner and selected route; do not split by line count or assume arbitrary sibling-file discovery.
+
+These are downstream Package-authoring observations, not generic DomainHarness defects. Detailed provenance and next steps are in [#1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) and [Tally PR #277](https://github.com/kaicreator-mm/tally/pull/277).
+
 
 `SCOPE=DOCS_ONLY` · `SOURCE_STATIC_CROSSCHECK=DONE` · `SELF_ADVERSARIAL=DONE` · `INDEPENDENT_REVIEW=NOT_RUN` · `CLEAN_CONSUMER=NOT_RUN` · `NODE24_TEST=NOT_RUN` · `WOODPECKER=NOT_RUN` · `PRODUCT_L2_ADMISSION=NO` · `NEXT_RELEASE=UNASSIGNED`.
 
