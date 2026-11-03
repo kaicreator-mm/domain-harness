@@ -67,6 +67,9 @@ A Package exposes only the entry points and data types defined by its ABI. In th
 
 A Package ABI should specify version, entry point, export path, input/output schema, module identity, dependencies, and compatibility. Do not treat all of `src/**` as an implicit public API.
 
+
+**Version coordinates must remain distinct.** A Package ABI identifier (for example `v08-business-abi/1`) is not the DomainHarness SDK Git tag/semver, the Domain App version, the BUILD target profile, the Runtime ABI, or the Host ABI. Tally v2 demonstrates that a V10 producer (`V10_TARGET_PROFILE` / `buildV10App()`) can select a Business module declaring the V8 Qualified Package ABI. Do not mechanically rename ABI identifiers to match the SDK release or BUILD generation. The specific V8 Business ABI naming/compatibility investigation is [DomainHarness #1469](https://github.com/kaicreator-mm/domain-harness/issues/1469), related to [#1467](https://github.com/kaicreator-mm/domain-harness/issues/1467).
+
 ### 3.3 S Standard Feature (non-Tool by default)
 
 An S Feature is an explicitly selected standard semantic capability, such as a Rule, Workflow, Context, or Decision Feature. It may have a Feature Entry invoked by BUILD/Runtime, but an export does not automatically make it an external Tool.
