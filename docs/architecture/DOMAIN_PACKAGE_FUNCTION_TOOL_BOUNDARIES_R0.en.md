@@ -22,7 +22,7 @@ DomainHarness provides reusable mechanisms. Business semantics remain owned by t
 | S Standard Feature entry | Selected standard semantic/workflow feature entry | No; non-Tool by default |
 | Business Intent | Business operation submitted to K | No; it is a business command boundary |
 | K Query / Subscription | Snapshot or event observation through the Microkernel Facade | No |
-| C Capability Operation | Explicit `operationId → handler` declaration | Yes; a Domain App Tool/capability operation |
+| C Capability Operation | Explicit `operationId → handler` declaration | A selected Domain App capability operation; not automatically an Agent-facing Tool |
 | Host Port / Host function | Trusted infrastructure or Provider adapter seam | No; not an Agent Tool |
 | Agent-facing Tool | Optional outer tool protocol for an Agent/model | Yes, as an outer interface; it must map to bounded Business Intents |
 
@@ -90,7 +90,14 @@ Use the public Microkernel Facade `query()` for authorized snapshots and `subscr
 
 If historical observation is needed, first verify whether the existing public Query/Subscription/Host seam is sufficient. Propose a minimal read-only public API only after a real consumer demonstrates a reusable gap.
 
-### 3.6 C Capability Operation (Domain App Tool)
+**Exact v0.10.3 invocation-boundary clarification (from the Shun Assistant consumer):**
+
+- K Facade send() follows the sealed intent route, preflightIntentRouting(), and K submitOccurrence(). queryAuthority participates in query()/subscribe() snapshot/event authorization only; it is not consulted by send(). Never use queryAuthority as an access-control mechanism for Business Intents or send().
+- A Host-global / cross-Case Business Intent must use an explicit BUILD-selected Intent route. The Host validates its own one-time requestRef and the trusted Gateway constrains the entry point. K continues to own Admission, Journal, Effect Permit, and UNKNOWN semantics. Do not use the currently selected Guided Case as the authority source for a global Provider operation.
+- K Query / Subscription remains limited to K-managed snapshots and events. A domain-owned query over cross-Case Host data may be represented as a read-only Business read intent through send() → B → externalEffect:false read-only C → Host read port. This is not a K Snapshot Query and not an arbitrary SQL Tool.
+
+
+### 3.6 C Capability Operation (Domain App capability operation)
 
 A C Operation must satisfy all of the following:
 
@@ -216,7 +223,7 @@ For each Package ABI Entry, Business Intent, Capability Operation, Host Port, an
 
 Private helpers need not each be registered as public API, but should be covered by module tests. Every public boundary needs an explicit inventory and positive/negative proof.
 
-## 8. Tally v2 downstream examples (not built-in DomainHarness business features)
+## 8. Downstream case studies (not built-in DomainHarness business features)
 
 These examples are for validating architecture boundaries only:
 
@@ -234,6 +241,34 @@ These examples are for validating architecture boundaries only:
 - Do not scan SQLite or private Journal directly just because historical Attempt data is needed.
 - Whether the public API lacks a particular read-only historical observation capability must be proven using the exact v0.10.3 installed package, public exports, and a minimal clean-consumer reproduction.
 - Tally's ADS schema, Replan rules, Attempt lifecycle, and telemetry definitions remain Tally Engineering Domain Package concerns.
+
+
+### 8.2 Shun Assistant v0.3.0 R03C (real downstream implementation)
+
+Baseline: immutable DomainHarness v0.10.3 tag / source SHA `061376f4a023070f215f9feffad5c24d96d503cb`; Shun integration baseline `be2e81722a70ee3d0bd5634bc83d97d733c20b78`.
+
+The following downstream Host tasks completed and passed their corresponding exact-SHA Woodpecker pipelines:
+
+| Shun task | Exact delivery SHA | CI | Proven behavior |
+|---|---|---|---|
+| #285 Meta Consent / SQLite | `542066dbe3330f716f2fa466b21cadf3c8dc0808` | Push #219 / PR #220 SUCCESS | Durable declaration_seq; opt-out/re-opt-in does not resurrect old experience; snapshot-consistent cross-Case query |
+| #287 Provider Host-global | `2f4ca411e21f62e1cb9df0659cb8d4c137256825` | Push #221 / PR #222 SUCCESS | requestRef-only Host ledger; raw stdout/stderr excluded from returned envelope and SQLite; closed-world Preview/Receipt schemas |
+| #289 Signed privilege contract | `593140928caf5a797abb89d799799fc54796a3aa` | Push #201 / PR #203 SUCCESS | requiredPrivilege is part of the signed descriptor; omission defaults to USER; ELEVATED is allowed only for signed CLI |
+
+These are downstream implementation/CI facts. They are not real Windows UAC/Provider installation validation, do not mean Shun R03C production integration is complete, and do not establish a DomainHarness SDK defect.
+
+#### Reusable implementation lessons
+
+1. **Separate send from queryAuthority:** v0.10.3 queryAuthority governs K Query/Subscription, not send(). Shun #288 initially proposed using queryAuthority as the send() Business-route ACL for Provider-global; the Owner amendment corrected this to Host requestRef plus a BUILD-selected Business Intent route.
+2. **Host-global Provider:** Host prepare/confirm issues and consumes a one-time requestRef; the K payload contains only requestRef. Provider privilege must come from curator-signed requiredPrivilege and cannot be overridden by Host configuration.
+3. **Separate Meta reads from writes:** Feedback writes and shared-experience queries use different C Modules; the query C must be externalEffect:false. A cross-Case domain query enters the same K through an explicit read-only Business read intent and then a read-only Host port; it is not a generic K Query, direct SQLite access, or SQL Tool.
+4. **Match the actual Store contract:** #285 currently accepts targetCaseRef, capabilityId, optional taskClass, and bounded limit. The original tags filter in #288 had no corresponding Store API; remove it or explicitly extend and verify the Store contract rather than guessing in the Integrator.
+5. **Consent currentness:** revision is an opaque identifier, not an ordering primitive. #285 exposed a lexical-order bug where consent-rev-2 opt-in could outrank a later consent-rev-10 opt-out. The repair uses a durable transactional declaration_seq shared by every write/authorization/query path.
+6. **Host output privacy:** Provider-controlled stdout/stderr must not be returned or persisted. Retain only a strictly parsed version token and bounded canary enum. Preview, elevatedAction, and durable receipts use exact-key/allowlist schemas, with equivalent validation on SQLite decode.
+7. **Converge the Package ABI:** Shun's public @shun/domain-app root exported both the trusted gateway and legacy composeDomainBuild. The latter contains old structural mirrors and placeholder K/S bytes; it is not the production path. Shun #303 is restricting it to internal/test-preview use. Production uses composeTrustedRuntimeBuild plus the real public v0.10.3 buildV10App/activateV10App path.
+8. **Prove package provenance:** Shun's clean consumer uses local SDK tarballs and SHA256SUMS. Record the source tag/SHA separately from each package's package.json version. Do not judge the v0.10.3 Git source solely by its embedded 0.10.2-rc.0 package version. A packed consumer test is not equivalent to real Windows Host/UAC validation.
+
+Shun tracking: [#280](https://github.com/kaicreator-mm/shun-assistant/issues/280), [#285](https://github.com/kaicreator-mm/shun-assistant/issues/285), [#287](https://github.com/kaicreator-mm/shun-assistant/issues/287), [#288](https://github.com/kaicreator-mm/shun-assistant/issues/288), [#289](https://github.com/kaicreator-mm/shun-assistant/issues/289), [#303](https://github.com/kaicreator-mm/shun-assistant/issues/303); PRs [#300](https://github.com/kaicreator-mm/shun-assistant/pull/300), [#301](https://github.com/kaicreator-mm/shun-assistant/pull/301), [#302](https://github.com/kaicreator-mm/shun-assistant/pull/302).
 
 ## 9. Implementation verification requirements
 
