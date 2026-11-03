@@ -80,7 +80,7 @@ Business Intent 描述“业务方希望发生什么”，例如：
 - `proposeReplan`
 - `approveReplan`
 - `approveFeedback`
-- `requestTaskAttemptRead`
+
 
 调用应进入选中的 Domain App / K Workflow，由 K 负责 Admission、身份、幂等、状态和 Effect 治理。Intent 的名字不是 Capability Operation，也不授予 Provider 权限。
 
