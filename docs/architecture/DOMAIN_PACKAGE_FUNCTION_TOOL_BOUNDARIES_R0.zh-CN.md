@@ -22,7 +22,7 @@ DomainHarness 应提供通用机制；具体业务规则仍由相应 Domain Pack
 | S Standard Feature entry | BUILD 选中的标准语义/Workflow Feature 入口 | 否，默认是非 Tool |
 | Business Intent | 由业务应用提交给 K 的业务意图 | 否；它是业务命令边界 |
 | K Query / Subscription | 通过 Microkernel Facade 读取快照或订阅事件 | 否 |
-| C Capability Operation | 明确声明的 `operationId → handler` | 是，属于 Domain App 的 Tool/能力操作 |
+| C Capability Operation | 明确声明的 `operationId → handler` | 是 Domain App 选中的能力操作；不自动成为 Agent-facing Tool |
 | Host Port / Host function | Host 提供的可信物理设施或 Provider 适配端口 | 否，不是 Agent Tool |
 | Agent-facing Tool | 面向 Agent/模型的可选外层工具协议 | 是外层接口，但必须映射到受限 Business Intent |
 
@@ -90,7 +90,14 @@ Business Intent 描述“业务方希望发生什么”，例如：
 
 如需历史观察能力，应先确认现有公开 Query/Subscription/Host seam 是否足够；只有真实消费者证明通用缺口后，才提出最小只读公共接口。
 
-### 3.6 C Capability Operation（Domain App Tool）
+**v0.10.3 精确调用边界补充（来自 Shun Assistant 实际集成）：**
+
+- K Facade 的 send() 走 sealed intent route、preflightIntentRouting() 和 K submitOccurrence()；queryAuthority 只参与 query() / subscribe() 的快照与事件授权，不参与 send()。因此绝不能把 queryAuthority 当作 Business Intent / send() 的访问控制器。
+- Host-global / 跨 Case Business Intent 应使用 BUILD 选中的明确 Intent route；Host 先校验其签发的一次性 requestRef，并由可信 Gateway 限定入口。K 继续负责 Admission、Journal、Effect Permit 和 UNKNOWN。不要借用当前 Guided Case 作为全局 Provider 的授权来源。
+- K Query / Subscription 仍只代表 K 管理的快照和事件。Domain-owned 的跨 Case Host 数据查询可以建模为只读 Business read intent，经 send() → B → externalEffect:false 的 read-only C → Host read port；这不是 K Snapshot Query，也不是任意 SQL Tool。
+
+
+### 3.6 C Capability Operation（Domain App 能力操作）
 
 C Operation 需要同时满足：
 
@@ -216,7 +223,7 @@ woodpecker.execute(anything)
 
 Private helper 不必逐个注册成公共 API，但应由模块测试覆盖；公共边界必须有显式清单和正反例。
 
-## 8. Tally v2 下游案例（非 DomainHarness 内置业务）
+## 8. 下游案例（非 DomainHarness 内置业务）
 
 以下仅用于验证架构边界：
 
@@ -234,6 +241,34 @@ Private helper 不必逐个注册成公共 API，但应由模块测试覆盖；�
 - 不得因需要历史 Attempt 就直接扫描 SQLite 或私有 Journal。
 - 当前公开 API 是否缺少某种只读历史观察能力，必须用精确 v0.10.3 安装包、公开导出和最小 clean-consumer 复现证明。
 - Tally 的 ADS Schema、Replan 规则、Attempt 状态和遥测口径仍属于 Tally Engineering Domain Package。
+
+
+### 8.2 Shun Assistant v0.3.0 R03C（真实下游实施案例）
+
+基线：DomainHarness immutable v0.10.3 tag / source SHA `061376f4a023070f215f9feffad5c24d96d503cb`；Shun integration baseline `be2e81722a70ee3d0bd5634bc83d97d733c20b78`。
+
+已完成并通过对应 Exact-SHA Woodpecker 的下游 Host 任务：
+
+| Shun 任务 | Exact delivery SHA | CI | 已证明的行为 |
+|---|---|---|---|
+| #285 Meta Consent / SQLite | `542066dbe3330f716f2fa466b21cadf3c8dc0808` | Push #219 / PR #220 SUCCESS | 持久 declaration_seq；撤销/重新 opt-in 不恢复历史经验；跨 Case 查询快照一致 |
+| #287 Provider Host-global | `2f4ca411e21f62e1cb9df0659cb8d4c137256825` | Push #221 / PR #222 SUCCESS | requestRef-only Host ledger；原始 stdout/stderr 不进入返回 envelope 或 SQLite；Preview/Receipt 闭世界 Schema |
+| #289 Signed privilege contract | `593140928caf5a797abb89d799799fc54796a3aa` | Push #201 / PR #203 SUCCESS | requiredPrivilege 纳入签名描述符；省略值默认为 USER；ELEVATED 仅允许签名 CLI |
+
+这些是消费者端的实现/CI 证据，不是 Windows 真实 UAC/Provider 安装验证，也不代表 Shun R03C 生产集成已完成或 DomainHarness SDK 有缺陷。
+
+#### 可复用的实现经验
+
+1. **send 与 queryAuthority 分离：** v0.10.3 queryAuthority 只控制 K Query/Subscription，不控制 send()。Shun #288 的初始 Provider-global 方案曾误把 queryAuthority 当作 send() 的 B 路由 ACL；已由 Owner 修订为 Host requestRef + BUILD-selected Business Intent route。
+2. **Host-global Provider：** Host prepare/confirm 产生并消费一次性 requestRef；K payload 仅含 requestRef。Provider privilege 必须来自 curator-signed requiredPrivilege，不能由 Host config 覆盖。
+3. **Meta 读写分离：** Feedback 写入与共享经验查询使用不同 C Module；查询 C 必须 externalEffect:false。跨 Case 业务查询通过明确的只读 Business read intent 进入同一 K，再访问只读 Host port；不使用通用 K Query、直连 SQLite 或 SQL Tool。
+4. **查询契约与 Store 一致：** #285 当前查询契约为 targetCaseRef、capabilityId、可选 taskClass、bounded limit；#288 原提案中的 tags 过滤没有对应 Store 接口，必须删去或另行扩展并验证，不能由 Integrator 猜测。
+5. **Consent 当前性：** revision 是 opaque identifier，不是可排序时间。#285 曾出现 consent-rev-2 opt-in 被 consent-rev-10 opt-out 的字典序错误；修复为事务化持久 declaration_seq，并由所有写/授权/查询路径共用当前 Consent selector。
+6. **Host 输出隐私：** Provider-controlled stdout/stderr 不得返回或持久化；仅保留严格解析的 version token 和有限 canary enum。Preview、elevatedAction、durable receipt 均采用 exact-key/allowlist Schema，并对 SQLite decode 做同样校验。
+7. **Package ABI 收敛：** Shun 的 public @shun/domain-app root 曾同时导出 trusted gateway 和旧 composeDomainBuild；后者包含旧版结构镜像与 placeholder K/S bytes，不是生产路径。Shun #303 正在将其限制为 internal/test-preview，仅生产链使用 composeTrustedRuntimeBuild + 真实 public v0.10.3 buildV10App/activateV10App。
+8. **打包来源证明：** Shun clean consumer 使用本地 SDK tarballs 与 SHA256SUMS；源码 tag/SHA 与包内 package.json 版本必须分开记录。v0.10.3 Git source SHA 不应仅凭 package.json 的 0.10.2-rc.0 字段判断。打包消费者测试不等同于真实 Windows Host/UAC 验证。
+
+Shun 的跟踪入口：[#280](https://github.com/kaicreator-mm/shun-assistant/issues/280)、[#285](https://github.com/kaicreator-mm/shun-assistant/issues/285)、[#287](https://github.com/kaicreator-mm/shun-assistant/issues/287)、[#288](https://github.com/kaicreator-mm/shun-assistant/issues/288)、[#289](https://github.com/kaicreator-mm/shun-assistant/issues/289)、[#303](https://github.com/kaicreator-mm/shun-assistant/issues/303)；PR [#300](https://github.com/kaicreator-mm/shun-assistant/pull/300)、[#301](https://github.com/kaicreator-mm/shun-assistant/pull/301)、[#302](https://github.com/kaicreator-mm/shun-assistant/pull/302)。
 
 ## 9. 实施验证要求
 
