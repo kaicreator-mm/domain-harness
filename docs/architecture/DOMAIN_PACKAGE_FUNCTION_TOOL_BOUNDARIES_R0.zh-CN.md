@@ -67,6 +67,9 @@ Package 对外只暴露契约规定的入口和数据类型。以 v0.10.3 Busine
 
 Package ABI 应明确版本、入口、导出路径、输入/输出 Schema、模块身份、依赖与兼容性。不要把整个 `src/**` 当作隐式公共 API。
 
+
+**不同版本坐标必须分开记录。** Package ABI 标识（例如 `v08-business-abi/1`）不等于 DomainHarness SDK Git tag/semver、Domain App 版本、BUILD Target Profile、Runtime ABI 或 Host ABI。Tally v2 已展示 V10 producer（`V10_TARGET_PROFILE` / `buildV10App()`）可以选择声明 V8 Qualified Package ABI 的 Business 模块。不得为了匹配 SDK 发布号或 BUILD 代际而机械重命名 ABI。V8 Business ABI 的具体命名/兼容策略调查见 [DomainHarness #1469](https://github.com/kaicreator-mm/domain-harness/issues/1469)，并关联 [#1467](https://github.com/kaicreator-mm/domain-harness/issues/1467)。
+
 ### 3.3 S Standard Feature（默认非 Tool）
 
 S Feature 是显式选择的标准语义能力，例如 Rule/Workflow/Context/Decision Feature。它可以有被 BUILD/Runtime 调用的 Feature Entry，但不会因为有 export 就自动成为外部 Tool。
