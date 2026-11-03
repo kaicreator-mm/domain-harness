@@ -33,6 +33,8 @@ export const SDK_PACKAGES = Object.freeze([
 const INTERNAL_PREFIX = '@kaicreator/domain-harness-';
 const CONSUMER_DIR = 'packages/domain-harness';
 const CONSUMER_NAME = '@kaicreator/domain-harness';
+const ROOT_PRODUCT_VERSION = '0.2.0';
+const CONSUMER_PRODUCT_VERSION = '0.2.0';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function readJson(root, relativePath) {
@@ -60,6 +62,10 @@ function assertInternalEdges(manifest, expected, label) {
 }
 
 export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
+  const rootManifest = readJson(root, 'package.json');
+  assert.equal(rootManifest.version, ROOT_PRODUCT_VERSION,
+    'root monorepo product version must remain 0.2.0');
+
   const manifests = SDK_PACKAGES.map((item) => ({
     ...item,
     manifest: readJson(root, `${item.dir}/package.json`),
@@ -85,10 +91,19 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
 
   const consumer = readJson(root, `${CONSUMER_DIR}/package.json`);
   assert.equal(consumer.name, CONSUMER_NAME, 'DomainHarness consumer package name');
+  assert.equal(consumer.version, CONSUMER_PRODUCT_VERSION,
+    `${CONSUMER_DIR}: product version must remain 0.2.0`);
   assert.equal(consumer.dependencies?.['@kaicreator/domain-harness-contracts'], expected,
     `${CONSUMER_DIR}: contracts dependency must equal ${expected}`);
 
   const lock = readJson(root, 'package-lock.json');
+  assert.equal(lock.version, ROOT_PRODUCT_VERSION,
+    'package-lock.json root product version must remain 0.2.0');
+  const lockedRoot = lock.packages?.[''];
+  assert.ok(lockedRoot, 'package-lock.json: missing root package record');
+  assert.equal(lockedRoot.version, rootManifest.version,
+    'package-lock.json root package version must match package.json');
+
   for (const item of manifests) {
     const locked = lock.packages?.[item.dir];
     assert.ok(locked, `package-lock.json: missing workspace ${item.dir}`);
@@ -102,6 +117,8 @@ export function verifySdkVersionConsistency(root = ROOT, expectedVersion) {
 
   const lockedConsumer = lock.packages?.[CONSUMER_DIR];
   assert.ok(lockedConsumer, `package-lock.json: missing workspace ${CONSUMER_DIR}`);
+  assert.equal(lockedConsumer.version, CONSUMER_PRODUCT_VERSION,
+    `${CONSUMER_DIR}: lock product version must remain 0.2.0`);
   assert.equal(lockedConsumer.version, consumer.version,
     `${CONSUMER_DIR}: lock package version`);
   assert.equal(

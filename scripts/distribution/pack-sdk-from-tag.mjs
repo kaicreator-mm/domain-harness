@@ -24,6 +24,7 @@ import { SDK_PACKAGES, verifySdkVersionConsistency } from './verify-sdk-version-
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PACKAGE_NAMES = new Set(SDK_PACKAGES.map((item) => item.name));
 const FORBIDDEN = /(^src\/|qualified-package|legacy-v[0-9]+|durable-receipt-carrier-v1[.]mjs|\.env|\.npmrc)/u;
+const COMMAND_RESULTS = [];
 
 function run(command, args, cwd) {
   const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
@@ -33,6 +34,14 @@ function run(command, args, cwd) {
     maxBuffer: 64 * 1024 * 1024,
     shell: process.platform === 'win32' && command === 'npm',
     windowsHide: true,
+  });
+  COMMAND_RESULTS.push({
+    command,
+    executable,
+    args: [...args],
+    exitCode: result.status,
+    signal: result.signal || null,
+    errorCode: result.error?.code || null,
   });
   if (result.error || result.status !== 0) {
     throw new Error(`${command} ${args.slice(0, 3).join(' ')} failed; exit=${String(result.status)}${result.error ? `; error=${result.error.code}` : ''}`);
@@ -216,6 +225,7 @@ function main() {
       metadataOverlay: false,
       npmRegistryPublished: false,
       node: process.version,
+      commandResults: COMMAND_RESULTS,
       verifier: 'PASS_EXIT0',
       buildTypecheckLintAndInventory: 'PASS_EXIT0',
       sourceManifestParity: 'BYTE_IDENTICAL',

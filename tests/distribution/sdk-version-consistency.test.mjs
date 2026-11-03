@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -15,8 +15,15 @@ const CONTRACTS = '@kaicreator/domain-harness-contracts';
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'dh-sdk-version-consistency-'));
-  const lockPackages = {};
+  const lockPackages = {
+    '': { name: 'domain-harness-monorepo', version: '0.2.0' },
+  };
   const manifests = new Map();
+  writeFileSync(join(root, 'package.json'), JSON.stringify({
+    name: 'domain-harness-monorepo',
+    private: true,
+    version: '0.2.0',
+  }, null, 2) + '\n');
   for (const item of SDK_PACKAGES) {
     const dependencies = Object.fromEntries(item.internal.map((name) => [name, VERSION]));
     const manifest = {
@@ -42,13 +49,13 @@ function fixture() {
   writeFileSync(join(root, CONSUMER_DIR, 'package.json'), JSON.stringify(consumer, null, 2) + '\n');
   lockPackages[CONSUMER_DIR] = globalThis.structuredClone(consumer);
   writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
-    name: 'fixture',
+    name: 'domain-harness-monorepo',
     version: '0.2.0',
     lockfileVersion: 3,
     requires: true,
     packages: lockPackages,
   }, null, 2) + '\n');
-  return { root, lockPackages, manifests };
+  return { root, lockPackages, manifests, consumer };
 }
 
 function withFixture(run) {
@@ -104,5 +111,40 @@ test('rejects a lockfile that disagrees with the source workspace manifest', () 
 test('rejects prerelease or malformed expected release versions', () => {
   withFixture(({ root }) => {
     assert.throws(() => verifySdkVersionConsistency(root, '0.10.3-rc.0'), /stable x\.y\.z/);
+  });
+});
+
+test('rejects a root monorepo product version change', () => {
+  withFixture(({ root }) => {
+    writeFileSync(join(root, 'package.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      private: true,
+      version: '0.2.1',
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /root monorepo product version/);
+  });
+});
+
+test('rejects a consumer product version change', () => {
+  withFixture(({ root }) => {
+    const path = join(root, CONSUMER_DIR, 'package.json');
+    const consumer = JSON.parse(readFileSync(path, 'utf8'));
+    consumer.version = '0.2.1';
+    writeFileSync(path, JSON.stringify(consumer));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /product version must remain 0\.2\.0/);
+  });
+});
+
+test('rejects a root lockfile product version drift', () => {
+  withFixture(({ root, lockPackages }) => {
+    lockPackages[''].version = '0.2.1';
+    writeFileSync(join(root, 'package-lock.json'), JSON.stringify({
+      name: 'domain-harness-monorepo',
+      version: '0.2.0',
+      lockfileVersion: 3,
+      requires: true,
+      packages: lockPackages,
+    }));
+    assert.throws(() => verifySdkVersionConsistency(root, VERSION), /root package version must match/);
   });
 });
