@@ -270,6 +270,61 @@ Private helper 不必逐个注册成公共 API，但应由模块测试覆盖；�
 
 Shun 的跟踪入口：[#280](https://github.com/kaicreator-mm/shun-assistant/issues/280)、[#285](https://github.com/kaicreator-mm/shun-assistant/issues/285)、[#287](https://github.com/kaicreator-mm/shun-assistant/issues/287)、[#288](https://github.com/kaicreator-mm/shun-assistant/issues/288)、[#289](https://github.com/kaicreator-mm/shun-assistant/issues/289)、[#303](https://github.com/kaicreator-mm/shun-assistant/issues/303)；PR [#300](https://github.com/kaicreator-mm/shun-assistant/pull/300)、[#301](https://github.com/kaicreator-mm/shun-assistant/pull/301)、[#302](https://github.com/kaicreator-mm/shun-assistant/pull/302)。
 
+
+## 8.2 xDownload v0.2：真实 SDK PoC 与生产包分层经验
+
+本节是下游真实实现案例，不是 SDK 缺陷清单，也不追溯改变 v0.10.3 ABI。
+
+**证据基线：** DomainHarness v0.10.3@061376f4a023070f215f9feffad5c24d96d503cb（Tree 099cdc831aef63befd62aaede7e7a853d1be468f）。xDownload #183 使用 Node 24.21.0 从该 Git tag 构建并打包 4 个公开 SDK 包；独立复核确认 4/4 Tarball SHA256 与 tag 重新打包字节一致，矩阵 17/17 通过，结论 DOMAIN_APP_POC=PASS、SDK_GAP=NO。该证据只覆盖限定 clean-consumer / K / C / Host PoC，不证明完整安装旅程、旧 Core 迁移等价或多进程 SQLite CAS。当前下游源码观察为 xDownload WIP 9e3ccd382311619e60b8d2a7373e8a7d34733334。见 [#183](https://github.com/kaicreator-mm/xDownload/issues/183)、[PoC PR #199](https://github.com/kaicreator-mm/xDownload/pull/199) 和 [SDK pack evidence](https://github.com/kaicreator-mm/xDownload/blob/experiment/ads-v418-poc/experiments/domain-app-download/evidence/e01-sdk-pack/PACK_EVIDENCE.md)。
+
+### 正向模式：K 控制面与下载数据面分离
+
+xDownload 以 confirmDownload Business Intent 进入 SDK buildV10App / load；acquisition.acquire 是 BUILD 选中的 effect C Operation。HTTP 获取、targetRef 解析、预算、摘要校验和原子文件物化由可信 Host Bridge 执行。K 管理 Admission、Effect Journal、Permit、Replay 和 UNKNOWN；下载字节不经过 K。无 Permit 时 Host 必须零网络/文件副作用，UI/Agent 不直接调用 Provider。公开打包消费者测试与 Monorepo 测试属于不同证据类别。
+
+### 已确认的下游问题：App / Host 依赖环
+
+当前 xDownload 包存在双向依赖：download-domain-app 依赖 download-domain-host，Host 又依赖 App。App 的 composition/runtime.ts 导入 DirectAcquisitionBridge / CanonicalBudgetLedger 并实现物理 FileCasDocStore；integrations/s4-hls-vod.ts 导入 Host HLS bridge；App 根导出暴露 FileCasDocStore、assembleDownloadRuntime 等 Host/运行时装配入口；Host 又从 App 深层源码导入校验器和类型。
+
+这是下游 Package/Host wiring 问题，不是 SDK 缺陷。目标依赖方向：
+
+| Package | 责任与依赖 |
+|---|---|
+| domain-contracts | 中立稳定的跨层 DTO / 业务契约 |
+| download-domain-app | K/S/B/C 声明、Intent、Schema；依赖中立契约与公开 SDK，不依赖 Host |
+| download-domain-host | C Handler、CAS、Provider/物理 Port；依赖中立契约，不依赖 App 深层源码 |
+| core-runtime | 唯一生产组合根；组合 App、Host、SDK，负责 BUILD、Host 注入、K load 和 Seam |
+| CLI/Desktop/Browser | 通过 Core Seam 使用能力，不直接调用 App 内部或 Host 物理设施 |
+
+App 不得导入 Host 实现；Host 不得依赖 App 深层路径；共享契约仅在确属共享时放入 domain-contracts。物理 V10DocStore/CAS 属于 Host。assembleDownloadRuntime、assembleS4HlsRuntime 属于 Core/Host 组合层；独立 K Fixture 放入测试 Fixture，不从 App 根包导出。保持单一生产 K/业务 Writer。
+
+### 持久化与权威边界
+
+不同日志可以共存，但必须明确事实所有权，不能混称为重复数据库：
+
+| 机制 | 正确职责 | 不应承担 |
+|---|---|---|
+| K V10DocStore、Effect Journal、Effect Permit | K Admission/Effect 权威与 Replay | 任意 UI/Transport 投影 |
+| FileBackedSeamJournal | Core Seam 命令传输幂等/重放 | 下载业务终态或 K Permit 权威 |
+| FileBackedDomainAppRouteLog | Core CLAIM/ATTEMPT/OUTCOME 与产品 Job Projection | 第二套 K Journal/Effect 状态机 |
+| T09 LineageLedger | old-core/new-k 所有权分区、迁移准入、UNKNOWN 处置 | 复制 K Effect Journal/完整下载生命周期 |
+
+必须核实 RouteLog.CLAIM 与 T09 LineageLedger 在生产路径中的实际使用，再指定唯一权威 Owner；不得让两个系统分别批准同一 Lineage。由 K Receipt 派生的 OUTCOME 应明确为可重建读模型，K Effect Journal 仍是 K 效果状态权威。无法证明的崩溃中执行保持 UNKNOWN，重试前做权威读回。FileCasDocStore 目前只声称单进程安全；未验证的多进程 SQLite CAS 必须标记 NOT_PROVEN。
+
+### Query / Subscription 与产品 Projection
+
+当前 CLI Facade 将 query() 映射到 Core Seam READ_JOB_PROJECTION；subscribe() 因当前 Seam 无订阅帧而 typed-refuse。Core Job Projection 由路由事实和 K Receipt 构造。这是下游产品适配边界，不代表 SDK K Query/Subscription 已被该 Facade 使用，也不证明 SDK 缺少通用 API。产品 Projection 可以继续通过 Core Seam 暴露，但必须标明来源、UNKNOWN 规则和与 K Journal 的关系。订阅不支持时明确拒绝，不伪造事件，不扫描私有 SQLite/Journal 代替公开 Query。只有多个 clean-consumer 证明相同观察能力缺口后，才提出公共 SDK API。
+
+### 分类与处置
+
+| Lesson | 分类 | 结论 |
+|---|---|---|
+| Node24 packed SDK + K/C/Host PoC | 正向模式 | SDK_GAP=NO；复用 v0.10.3 |
+| App↔Host 依赖环、Host 装配暴露在 App | 下游架构/Host wiring | 下游重构，不创建 SDK API |
+| K Store、Seam Journal、Route Log、T09 Ledger | 权威边界/读模型待收敛 | 核实生产调用图与恢复，不盲目合并 |
+| Core Projection 与 K Query/Subscription | 下游适配/文档边界 | 明确命名，不推断 SDK 缺陷 |
+
+这些经验已同步至 [#1465](https://github.com/kaicreator-mm/domain-harness/issues/1465)，并通过 [#1392](https://github.com/kaicreator-mm/domain-harness/issues/1392) 保留为下游反馈。它们不改变 v0.10.3、不自动分配下一版本，也不授权 SDK 实施。
+
 ## 9. 实施验证要求
 
 在新增/修改公共机制前，至少完成：
