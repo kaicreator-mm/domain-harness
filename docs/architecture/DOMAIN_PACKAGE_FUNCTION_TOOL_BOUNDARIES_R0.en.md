@@ -270,6 +270,61 @@ These are downstream implementation/CI facts. They are not real Windows UAC/Prov
 
 Shun tracking: [#280](https://github.com/kaicreator-mm/shun-assistant/issues/280), [#285](https://github.com/kaicreator-mm/shun-assistant/issues/285), [#287](https://github.com/kaicreator-mm/shun-assistant/issues/287), [#288](https://github.com/kaicreator-mm/shun-assistant/issues/288), [#289](https://github.com/kaicreator-mm/shun-assistant/issues/289), [#303](https://github.com/kaicreator-mm/shun-assistant/issues/303); PRs [#300](https://github.com/kaicreator-mm/shun-assistant/pull/300), [#301](https://github.com/kaicreator-mm/shun-assistant/pull/301), [#302](https://github.com/kaicreator-mm/shun-assistant/pull/302).
 
+
+## 8.2 xDownload v0.2: real SDK PoC and production package-layering lessons
+
+This is a downstream implementation case study, not an SDK defect list and not a retroactive change to the v0.10.3 ABI.
+
+**Evidence baseline:** DomainHarness v0.10.3@061376f4a023070f215f9feffad5c24d96d503cb (tree 099cdc831aef63befd62aaede7e7a853d1be468f). xDownload #183 used Node 24.21.0 to build and pack four public SDK packages from that Git tag; independent review confirmed 4/4 tarball SHA256 matches against a fresh tag pack and 17/17 matrix checks passed, with DOMAIN_APP_POC=PASS and SDK_GAP=NO. This proves only the bounded clean-consumer / K / C / Host PoC, not installed user journeys, legacy-Core migration equivalence, or multi-process SQLite CAS. Current downstream source snapshot: xDownload WIP 9e3ccd382311619e60b8d2a7373e8a7d34733334. See [#183](https://github.com/kaicreator-mm/xDownload/issues/183), [PoC PR #199](https://github.com/kaicreator-mm/xDownload/pull/199), and [SDK pack evidence](https://github.com/kaicreator-mm/xDownload/blob/experiment/ads-v418-poc/experiments/domain-app-download/evidence/e01-sdk-pack/PACK_EVIDENCE.md).
+
+### Positive pattern: separate the K control plane from the download data plane
+
+xDownload submits confirmDownload as a Business Intent through SDK buildV10App / load; acquisition.acquire is a BUILD-selected effect C Operation. Trusted Host Bridges perform HTTP acquisition, targetRef resolution, budgeting, digest verification, and atomic file materialization. K owns Admission, Effect Journal, Permit, Replay, and UNKNOWN; download bytes do not pass through K. Without a Permit, Host performs zero network/file effects; UI/Agent callers do not invoke Providers directly. Packed public-consumer tests and Monorepo tests are different evidence classes.
+
+### Confirmed downstream issue: App / Host dependency cycle
+
+The current xDownload packages depend on each other in both directions: download-domain-app depends on download-domain-host, while Host also depends on App. App composition/runtime.ts imports DirectAcquisitionBridge / CanonicalBudgetLedger and implements the physical FileCasDocStore; integrations/s4-hls-vod.ts imports the Host HLS bridge; App root exports expose FileCasDocStore and assembleDownloadRuntime; the Host Bridge imports validators/types through deep App source paths.
+
+This is a downstream Package/Host wiring issue, not an SDK defect. Target dependency direction:
+
+| Package | Responsibility and dependencies |
+|---|---|
+| domain-contracts | Neutral, stable cross-layer DTOs/business contracts |
+| download-domain-app | K/S/B/C declarations, Intents, Schemas; depends on neutral contracts and public SDK, not Host |
+| download-domain-host | C handlers, CAS, Provider/physical ports; depends on neutral contracts, not deep App source |
+| core-runtime | Sole production composition root; composes App, Host, and SDK; owns BUILD, Host injection, K load, and Seam |
+| CLI/Desktop/Browser | Consume through Core Seam, not App internals or physical Host ports |
+
+The App must not import Host implementations; Host must not depend on deep App paths; shared contracts move to domain-contracts only when genuinely shared. Physical V10DocStore/CAS belongs to Host. assembleDownloadRuntime and assembleS4HlsRuntime belong to Core/Host composition; standalone K fixtures belong in test fixtures, not App root exports. Keep one production K/business Writer.
+
+### Persistence and authority boundaries
+
+Distinct logs may coexist, but their fact ownership must be explicit; they are not interchangeable duplicate databases:
+
+| Mechanism | Correct responsibility | Must not become |
+|---|---|---|
+| K V10DocStore, Effect Journal, Effect Permit | K Admission/Effect authority and replay | Arbitrary UI/transport projection |
+| FileBackedSeamJournal | Core Seam command transport idempotency/replay | Download terminal state or K Permit authority |
+| FileBackedDomainAppRouteLog | Core CLAIM/ATTEMPT/OUTCOME facts and product Job Projection | A second K Journal/Effect state machine |
+| T09 LineageLedger | old-core/new-k ownership partition, migration admission, UNKNOWN disposition | A copy of K Effect Journal/full download lifecycle |
+
+Inspect actual production use of RouteLog.CLAIM and T09 LineageLedger before assigning one authoritative Owner; do not let two systems independently approve the same Lineage. If OUTCOME is derived from a K Receipt, identify it as a rebuildable read model; K Effect Journal remains authoritative for K effect state. Unprovable in-flight work after a crash remains UNKNOWN and requires authoritative readback before retry. FileCasDocStore currently claims single-process safety only; unverified multi-process SQLite CAS remains NOT_PROVEN.
+
+### Query / Subscription versus product Projection
+
+The current CLI Facade maps query() to Core Seam READ_JOB_PROJECTION; subscribe() typed-refuses because the current Seam has no subscription frames. The Core Job Projection is constructed from route facts and K Receipts. This is a downstream product-adapter boundary, not proof that the SDK K Query/Subscription is being used by this Facade or that the SDK lacks a generic API. A product Projection may remain exposed through Core Seam, but its source, UNKNOWN rules, and relationship to K Journal must be explicit. Unsupported subscriptions must refuse clearly; do not fake events or scan private SQLite/Journal as a substitute for public Query. Propose a public SDK API only after multiple clean consumers prove the same observation gap.
+
+### Classification and disposition
+
+| Lesson | Classification | Disposition |
+|---|---|---|
+| Node24 packed SDK + K/C/Host PoC | Positive pattern | SDK_GAP=NO; reuse v0.10.3 |
+| App↔Host cycle and Host assembly exported from App | Downstream architecture/Host wiring | Refactor downstream; no SDK API |
+| K Store, Seam Journal, Route Log, T09 Ledger | Authority/read-model boundaries to reconcile | Verify production call graph/recovery; do not blindly merge |
+| Core Projection versus K Query/Subscription | Downstream adapter/documentation boundary | Name accurately; do not infer SDK defect |
+
+These lessons are synchronized to [#1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) and retained through [#1392](https://github.com/kaicreator-mm/domain-harness/issues/1392). They do not change v0.10.3, automatically assign a next version, or authorize SDK implementation.
+
 ## 9. Implementation verification requirements
 
 Before adding or changing public mechanisms, complete at least:
