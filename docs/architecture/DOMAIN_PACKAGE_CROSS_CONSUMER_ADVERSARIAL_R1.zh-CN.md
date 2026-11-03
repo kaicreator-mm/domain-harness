@@ -2,6 +2,18 @@
 
 [English](DOMAIN_PACKAGE_CROSS_CONSUMER_ADVERSARIAL_R1.en.md) · [原有函数/Tool 文档](DOMAIN_PACKAGE_FUNCTION_TOOL_BOUNDARIES_R0.zh-CN.md) · [领域知识/Workflow 文档](DOMAIN_PACKAGE_KNOWLEDGE_AND_WORKFLOW_R0.zh-CN.md)
 
+> **先读：文档权威性——非规范性实施参考**
+>
+> 本文是供下游 Domain App 按需采用的架构分析与实施参考，**不是** DomainHarness SDK/Kernel/Runtime/公开 API/ABI 规范、功能公告、Product/L2 决策、冻结基线、版本发布计划或实施授权。
+>
+> - **SDK 能力的权威依据：** 使用 DomainHarness v0.10.3 时，以精确发布 Tag/源码、实际公开导出与 ABI，以及该消费者自己的 selected BUILD、Host 和 clean-consumer 验证证据为准。本文不能增加 API、让尚未实现的功能变得可用，也不能覆盖已发布契约。使用其他 SDK 版本时，必须重新核对对应版本。
+> - **下游项目的决策权：** 每个项目自行决定 Product/L1/L2 范围、架构、实施计划和验收门槛。本文不是任何下游项目的前置条件、阻塞项、原生依赖、Task 要求或验收门槛。
+> - **按需采用：** 下游项目可以采用、调整或忽略具体建议。**不需要等待本 PR 完成评审、转为 Ready 或合并。** GitHub Draft 仅表示本文档 PR 的审核状态，与 SDK 能力是否存在、下游是否可以实施无关。
+> - **如何理解 MUST / MUST NOT：** 描述已发布契约的语句，是要求消费者正确使用现有契约；描述目标设计、示例或安全建议的语句，是供采用者参考的实施指导。两者都不会因此产生新的 SDK 义务或能力。
+> - **何时才能认定 SDK 缺口：** 必须先在精确发布的 public package/ABI 上，用独立 clean consumer 得到最小、可复现的失败，并排除消费者业务代码、Host 接线和 BUILD 选择问题。之后仍须单独进行 Product/L2/DAG 和版本发布资格决策。
+>
+> `DOC_KIND=NON_NORMATIVE_DOWNSTREAM_REFERENCE` · `ADOPTION=OPTIONAL` · `DOWNSTREAM_PREREQUISITE=NO` · `SDK_CAPABILITY_DELTA=NONE` · `RELEASE_AUTHORITY=NONE`
+
 > **状态**：`SELF_ADVERSARIAL / DESIGN_INTAKE / INDEPENDENT_REVIEW_NOT_RUN`。是对 [Tally v2](https://github.com/kaicreator-mm/tally) 多轮实施分析、[DH #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465)、[#1467](https://github.com/kaicreator-mm/domain-harness/issues/1467)、[#1468](https://github.com/kaicreator-mm/domain-harness/issues/1468) 的综合交叉审查，不是 v0.10.3 运行时 ABI 变更、L2 Freeze、独立 Review PASS 或发布授权。下游经验入口：[DH #1392](https://github.com/kaicreator-mm/domain-harness/issues/1392)。
 
 ## 0. 证据和时间边界
