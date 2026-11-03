@@ -308,7 +308,7 @@ App 不得导入 Host 实现；Host 不得依赖 App 深层路径；共享契约
 | FileBackedDomainAppRouteLog | Core CLAIM/ATTEMPT/OUTCOME 与产品 Job Projection | 第二套 K Journal/Effect 状态机 |
 | T09 LineageLedger | old-core/new-k 所有权分区、迁移准入、UNKNOWN 处置 | 复制 K Effect Journal/完整下载生命周期 |
 
-必须核实 RouteLog.CLAIM 与 T09 LineageLedger 在生产路径中的实际使用，再指定唯一权威 Owner；不得让两个系统分别批准同一 Lineage。由 K Receipt 派生的 OUTCOME 应明确为可重建读模型，K Effect Journal 仍是 K 效果状态权威。无法证明的崩溃中执行保持 UNKNOWN，重试前做权威读回。FileCasDocStore 目前只声称单进程安全；未验证的多进程 SQLite CAS 必须标记 NOT_PROVEN。
+必须核实 RouteLog.CLAIM 与 T09 LineageLedger 在生产路径中的实际使用，再指定唯一权威 Owner；不得让两个系统分别批准同一 Lineage。由 K Receipt 派生的 OUTCOME 应明确为可重建读模型，K Effect Journal 仍是 K 效果状态权威。无法证明的崩溃中执行保持 UNKNOWN，重试前做权威读回。T09 LineageLedger 的 old-core/new-k 所有权策略属于 Domain App；其 PlainFileLineageStore 文件 I/O 实现属于 Host。只迁移物理 Store Adapter，保留领域策略和窄 LineageStore Port，不要把整个 LineageLedger 搬进 Host。\n\nFileCasDocStore 目前只声称单进程安全；未验证的多进程 SQLite CAS 必须标记 NOT_PROVEN。
 
 ### Query / Subscription 与产品 Projection
 
