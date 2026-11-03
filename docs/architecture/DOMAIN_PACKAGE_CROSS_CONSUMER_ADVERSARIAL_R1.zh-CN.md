@@ -114,6 +114,10 @@ Business/domain rule (pure helper, Schema, Pattern, Workflow Definition)
 - 历史进化顺序与 Promotion/BUILD 分离由 DH 提供**参考与必要的通用机制**；Tally 负责具体工程经验和资格策略。
 - 这份文档不修改 `v0.10.3`、不关闭 #1465/#1467/#1468/#1392，不替代现有 PR #1466 的原始四份 R0 文档，**不授权 Kernel/SDK 编码**。
 
+### 7.1 对抗审查发现的反馈 ID 冲突
+
+[DH #1465](https://github.com/kaicreator-mm/domain-harness/issues/1465) 中，Tally 使用过 `DPB-011..DPB-018`，而 xDownload 的另一条独立经验评论也使用 `DPB-011..DPB-014`。**原先声称的稳定 Lesson ID 事实上并不全局唯一。** 这是经验追踪协议缺口，而非 Kernel 缺陷。不要改写历史证据；从此采用 `DPB-TALLY-<序号>`、`DPB-XDOWNLOAD-<序号>`、`DPB-SHUN-<序号>` 等项目命名空间，并在 #1392 以原评论 URL + 新 ID 建立别名交叉引用。下游经验从“已记录”不应直接推导“可自动关联唯一知识资产”。
+
 ## 8. 本 R1 的验收状态
 
 `SCOPE=DOCS_ONLY`；`SOURCE_STATIC_CROSSCHECK=DONE`；`SELF_ADVERSARIAL=DONE`；`INDEPENDENT_REVIEW=NOT_RUN`；`EXTERNAL_CLEAN_CONSUMER=NOT_RUN`；`NODE24_TEST=NOT_RUN`；`WOODPECKER=NOT_RUN`；`PRODUCT_L2_ADMISSION=NO`；`NEXT_RELEASE=UNASSIGNED`。
