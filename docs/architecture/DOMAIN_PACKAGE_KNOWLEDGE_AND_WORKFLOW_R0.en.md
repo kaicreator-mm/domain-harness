@@ -164,6 +164,9 @@ Tally already has conceptual groundwork, but the previous function/Tool analysis
 4. UI Journey, Business Intent, K durable execution state, Agent Skill and C external capability need an explicit mapping to prevent page steps from becoming the domain Workflow.
 5. #273 Replan, #274 ADS Feedback and #275 Attempt Read Model should reuse common domain vocabulary, Evidence/Currentness/UNKNOWN rules and Workflow constraints rather than define conflicting models.
 
+
+**Additional source-structure evidence (Tally v2, read-only inventory):** the Engineering Business package currently has 12 MJS source files / about 2,654 lines. Its 1,646-line `index.mjs` has no imports, and `package.json` exports only the root entry `./src/index.mjs`; the other 11 files are not proven to be in the selected sealed B's BUILD closure merely because they exist. Thirteen unit-test files cover package helpers, but helper tests are not BUILD-selected runtime evidence. The README's single-advisory-Intent description also drifts from the source's 10 declared Intents/10 Effects. Before reorganizing the package, map each helper to actual B/C/Host/UI call sites, selected BUILD source and critical journey. Keep domain asset files as source-controlled knowledge until an explicit producer/validator/selected-module mapping proves runtime consumption.
+
 ### 7.3 Candidate Tally domain assets
 
 | Domain area | Core asset candidates | Authority boundary |
