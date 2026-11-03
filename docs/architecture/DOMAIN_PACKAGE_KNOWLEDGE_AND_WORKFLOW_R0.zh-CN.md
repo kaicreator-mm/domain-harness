@@ -164,6 +164,9 @@ Tally 已有一些概念性设计，但此前的函数/Tool 分析没有把它�
 4. UI Journey、Business Intent、K 持久执行状态、Agent Skill 与 C 外部能力需要有显式映射表，防止把页面步骤当成领域 Workflow。
 5. #273 Replan、#274 ADS Feedback、#275 Attempt Read Model 应复用统一的领域术语、Evidence/Currentness/UNKNOWN 规则和 Workflow 约束，不能各自定义冲突模型。
 
+
+**补充源码结构证据（Tally v2，只读盘点）：** Engineering Business Package 当前有 12 个 MJS 源文件，约 2,654 行。1,646 行的 `index.mjs` 没有 import，`package.json` 仅导出根入口 `./src/index.mjs`；其它 11 个文件不能仅因存在于仓库就视为已进入 sealed B 的 BUILD 闭包。13 个单元测试文件覆盖 Package helpers，但 helper 测试不是 BUILD-selected Runtime 证据。README 中“单个 advisory Intent”的描述也已与源码声明的 10 个 Intent / 10 个 Effect 不一致。重组 Package 前，必须把每个 helper 映射到真实 B/C/Host/UI 调用点、selected BUILD source 和 critical journey。领域资产文件应先作为受版本控制的知识来源，只有存在明确 Producer/Validator/selected-module 映射时才宣称运行时已消费。
+
 ### 7.3 建议的 Tally 领域资产
 
 | 领域组 | 核心资产候选 | 权威边界 |
