@@ -43,6 +43,9 @@ Domain Component
 - **Semantic Component**：定义领域意义、约束、规则、决策或行为。
 - **Tool Component**：具有明确调用与效果契约的有界可执行功能模块；不是 Agent 专属概念。
 - **UX**：独立的用户交互组成部分，不拥有 Runtime 转移或 Effect 权威。
+- **运行权威**：Definition 身份与 Runtime 运行实例、状态、Effect 尝试和持久结果分离；始终保留唯一权威 Domain Runtime / Effect authority。Agent/LLM/UX 意图不是转移权威，Tool 调用成功不等于权威 Domain Outcome。
+- **Capability**：保持为 Component 组合使用的稳定 requires/provides 功能契约身份，不另建平行 Capability Component 层级。
+- **必需语义**：未知、不支持或不兼容的必需行为语义/Capability 契约，必须在受影响的执行或 Effect 权威准入前 fail-closed。
 - **Domain Package**：Domain Definition 及其选定智能、依赖和交付资产的工程化表示、物化、版本化与分发载体；不是 Domain Definition 的本体父级。
 
 **Domain Intelligence 是产品目标与质量评价对象，不是第三种 Component family。** 领域智能可以由多个 Semantic Component、Tool Component 契约、知识/规则/模式/案例/证据共同表达；不要求每条知识资产都成为 Component，也不要求将完整知识库塞入一个 Package。
