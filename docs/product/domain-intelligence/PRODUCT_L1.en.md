@@ -43,6 +43,9 @@ Domain Component
 - **Semantic Component** defines domain meaning, constraints, rules, decisions or behavior.
 - **Tool Component** is a bounded executable functional module with an explicit invocation/effect contract. It is not Agent-specific.
 - **UX** is a separate user-interaction constituent and owns no Runtime transition or Effect authority.
+- **Runtime authority**: Definition identity is distinct from runtime occurrences, state, Effect attempts and durable outcomes; exactly one authoritative Domain Runtime / Effect authority is preserved. Agent/LLM/UX intent is not transition authority, and Tool invocation success is not an authoritative Domain Outcome.
+- **Capability** remains a stable requires/provides functional contract identity used in Component composition; no parallel Capability Component hierarchy is introduced.
+- **Required semantics**: unknown, unsupported or incompatible required behavior semantics/capability contracts fail closed before affected execution or Effect authority is admitted.
 - **Domain Package** is the engineering representation, materialization, versioning and distribution carrier for a Domain Definition and its selected intelligence, dependencies and delivery assets. It is not the ontological parent of Domain Definition.
 
 **Domain Intelligence is the Product objective and quality subject, not a third Component family.** It may be expressed through multiple Semantic Components, Tool contracts, knowledge, rules, patterns, cases and evidence. Not every knowledge asset must become a Component, and the entire corpus need not be placed in one Package.
