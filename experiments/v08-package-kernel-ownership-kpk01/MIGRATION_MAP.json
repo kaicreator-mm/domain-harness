@@ -1,0 +1,166 @@
+{
+  "experiment": "v08-package-kernel-ownership-kpk01",
+  "issue": "kaicreator-mm/domain-harness#993",
+  "pinnedSources": {
+    "main": "3c71b9138056babfafbc7de1349b5924483f2203",
+    "version/v0.7": "86110c616b8cb18c730553e4cdab7ef555214521",
+    "note": "All v0.7 blob pins below were verified against main HEAD == the bridge commit above at claim time (tree-identical for these paths)."
+  },
+  "migrations": [
+    {
+      "v07Source": "packages/domain-harness/src/contracts/json.ts",
+      "v07Blob": "77e3d8fe8d5de7d53869b737cbf398a770c9fa01",
+      "target": "src/producer/payload/kernel-mechanism-v1.mjs (inlined JSON type discipline)",
+      "functions": [
+        "JsonPrimitive/JsonObject/JsonValue shapes"
+      ],
+      "adaptation": "types only; JS runtime does not need them",
+      "authority": "non-authoritative utility"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/contracts/identity.ts",
+      "v07Blob": "1e237a921696d469a245fd7856e4f843098b8f0c",
+      "target": "kernel-mechanism-v1.mjs section 'canonical identity'",
+      "functions": [
+        "canonicalizeJson",
+        "canonicalJsonStringify",
+        "computeCanonicalJsonDigest",
+        "IdentityContractError",
+        "Sha256Port seam"
+      ],
+      "adaptation": "TS types stripped; logic verbatim",
+      "authority": "non-authoritative utility (digest/canonicalization)"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/workflow/predicate.ts",
+      "v07Blob": "e680f12539b2d2a8e08c0155b276fd08afbfe76b",
+      "target": "kernel-mechanism-v1.mjs section 'predicate engine'",
+      "functions": [
+        "prepareDomainPredicate",
+        "prepareDomainWorkflowGuard",
+        "prepareDomainHardInvariantPredicate",
+        "prepareDomainPredicateContext",
+        "prepareDomainPredicateEvent",
+        "createPreparedDomainPredicateEvaluationInput",
+        "evaluateDomainPredicate",
+        "evaluateDomainWorkflowGuard",
+        "evaluateDomainHardInvariantPredicate"
+      ],
+      "adaptation": "TS types stripped; logic verbatim",
+      "authority": "AUTHORITATIVE guard/invariant evaluation mechanism"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/governance/identity.ts",
+      "v07Blob": "e60aa62e1dd2c7a095f7c68d2433fe869639a6a2",
+      "target": "kernel-mechanism-v1.mjs section 'baseline identity'",
+      "functions": [
+        "assertGovernanceBaselineIdentity",
+        "governanceBaselineKey",
+        "sameGovernanceBaselineIdentity",
+        "computeGovernanceBaselineIdentity",
+        "verifyGovernanceBaselineBody"
+      ],
+      "adaptation": "only the baseline-identity subset migrated (the coordinator/pin machinery is replaced by the kernel-owned KernelGovernancePinStore); digest logic verbatim",
+      "authority": "AUTHORITATIVE pinned-baseline verification"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/admission/contracts.ts",
+      "v07Blob": "2b441f1fd4aaa5d0944131283de92153ae878a86",
+      "target": "kernel-mechanism-v1.mjs section 'admission contracts'",
+      "functions": [
+        "CentralAdmissionError (typed taxonomy)",
+        "record shapes consumed by admitCentralDecision"
+      ],
+      "adaptation": "runtime shapes only; port interfaces generalized to the kernel composition",
+      "authority": "AUTHORITATIVE error taxonomy"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/admission/admission.ts",
+      "v07Blob": "955ecf1fcd9e7ceb4478e46a1c2f5f4d0266fa4e",
+      "target": "kernel-mechanism-v1.mjs section 'central admission path'",
+      "functions": [
+        "deriveDurableControlTurnId",
+        "admissionResolverEvidence",
+        "assertDomainPredicateShape",
+        "readPinnedHardInvariants",
+        "requirePinnedBaseline",
+        "selectAdmittedTransition",
+        "executeEffectIntents",
+        "admitCentralDecision"
+      ],
+      "adaptation": "TS types stripped; optional ports.trace counter bump at guard/hard-invariant sites (measurement only); governance port consumed from KernelGovernancePinStore instead of GovernanceExecutionCoordinator — every decision path and error string verbatim",
+      "authority": "AUTHORITATIVE admission mechanism (the experiment's core claim)"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/admission/effect-journal.ts",
+      "v07Blob": "c6ae1f98c1e0c0cb5582df16ff3075c93c1f5fc2",
+      "target": "kernel-mechanism-v1.mjs section 'VolatileAdmissionEffectJournal' (+ KernelDurableEffectJournal adapter)",
+      "functions": [
+        "VolatileAdmissionEffectJournal",
+        "validateRecord",
+        "effectIdentityKey",
+        "sameIdentity",
+        "outcomeKey"
+      ],
+      "adaptation": "journal class verbatim; KernelDurableEffectJournal is a NEW kernel-owned adapter that ports the same begin/complete semantics over the generic Host doc-store port and adds a kernelModuleSha256 envelope (typed code unavailability on cross-version access)",
+      "authority": "AUTHORITATIVE durable effect journal semantics"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/engine/per-instance-serialized-lane.ts",
+      "v07Blob": "d5a94501648f547ef408870c16b0ce6297fc81b5",
+      "target": "kernel-mechanism-v1.mjs section 'serialized lane'",
+      "functions": [
+        "PerInstanceSerializedLane"
+      ],
+      "adaptation": "verbatim (workflowAddressKey inlined)",
+      "authority": "AUTHORITATIVE per-instance occurrence serialization"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/instance/persistent-workflow-instance.ts",
+      "v07Blob": "3e2252967aea56d8ef698001f02dc301f4f5925d",
+      "target": "kernel-mechanism-v1.mjs section 'instance repository'",
+      "functions": [
+        "PersistentWorkflowInstanceRepository",
+        "WorkflowInstanceNotFoundError"
+      ],
+      "adaptation": "RuntimeStore port replaced by the generic Host doc-store port; snapshot discipline verbatim",
+      "authority": "AUTHORITATIVE instance persistence semantics"
+    },
+    {
+      "v07Source": "packages/domain-harness/src/engine/workflow-instance-engine.ts",
+      "v07Blob": "108299995ba1b4be2366becd500fc1cd24d57c44",
+      "target": "kernel-mechanism-v1.mjs section 'instance engine'",
+      "functions": [
+        "WorkflowInstanceEngine.processAcceptedTransition"
+      ],
+      "adaptation": "commitProcessedMessage mapped to a Host-doc CAS write whose expected revision IS expectedTargetSequence; added commitAcceptedTransitionInLane for the kernel occurrence composition (same body, caller holds the lane); post-commit identity/revision assertions verbatim",
+      "authority": "AUTHORITATIVE state-transition commit discipline"
+    }
+  ],
+  "deliberatelyNotMigrated": [
+    {
+      "source": "contracts/effectful-invocation.ts (1094 lines)",
+      "reason": "T004C composition depends on the T002/T003/T005 build-time closure; the experiment's Kernel endpoint owns the equivalent occurrence composition concerns directly (see createOccurrenceRuntime)"
+    },
+    {
+      "source": "contracts/runtime-assembly.ts (1159 lines)",
+      "reason": "build-time static graph verifier — Producer/Host installation ownership per #993 direction"
+    },
+    {
+      "source": "contracts/tool-implementation-binding.ts (1752 lines)",
+      "reason": "build-time handler selection — sealed producer bindings replace it"
+    },
+    {
+      "source": "runtime/create-domain-runtime.ts (1176 lines)",
+      "reason": "monolithic host constructor — replaced by the thin Microkernel"
+    }
+  ],
+  "successor": {
+    "module": "src/producer/payload/kernel-mechanism-v2.mjs",
+    "generatedBy": "src/producer/payload/generate-kernel-v2.mjs",
+    "deltas": [
+      "MODULE_ID 'kernel-vnext@2.0.0', KERNEL_GENERATION '2'",
+      "bindGovernance composes one extra pinned hard invariant inv:gen2-min-10 (event payload amount >= 10)"
+    ]
+  }
+}

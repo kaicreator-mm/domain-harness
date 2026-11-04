@@ -1,0 +1,7 @@
+{
+  "falsifier": "KPK-06b",
+  "verdict": "PASS (migrated v0.7 ambiguous non-idempotent path)",
+  "dispatches": 1,
+  "journalRowStatus": "started",
+  "retryErrorCode": "ADMISSION_EFFECT_AMBIGUOUS"
+}

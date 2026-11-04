@@ -1,0 +1,11 @@
+{
+  "falsifier": "KPK-15d",
+  "denials": [
+    "approval hard-invariant inv:cap-100 (150)",
+    "approval guard:amount-ok (75)",
+    "inventory guard:inv-within-stock (40>10)",
+    "inventory inv:inv-qty-positive (0)"
+  ],
+  "journalRows": 0,
+  "resourceCalls": 0
+}

@@ -1,0 +1,5 @@
+{
+  "falsifier": "KPK-15j1",
+  "tamper": "sealed business module binding template mutated post-seal without digest update",
+  "refusal": "MicrokernelError INSTALL_BYTES_MUTATED at the trusted installation boundary"
+}
