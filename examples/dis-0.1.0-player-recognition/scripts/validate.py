@@ -675,6 +675,11 @@ def resolve_provider_selection(unit: dict, selection_lock: dict, target: str, re
     return candidate
 
 
+def lifecycle_record_digest(record: dict) -> str:
+    payload = {key: value for key, value in record.items() if key != "recordDigest"}
+    return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str):
     records = package_identity.get("lifecycleRecords")
     selection = package_identity.get("selectionLock")
@@ -709,6 +714,8 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
             or not re.fullmatch(r"[a-f0-9]{64}", subject.get("sha256", ""))
         ):
             fail(f"lifecycle subject/closure mismatch: {record_id}")
+        if not re.fullmatch(r"[a-f0-9]{64}", record.get("recordDigest", "")) or lifecycle_record_digest(record) != record.get("recordDigest"):
+            fail(f"lifecycle record digest mismatch: {record_id}")
         by_id[record_id] = record
 
     unit_asset = next((asset for asset in selection["selectedAssets"]
@@ -751,6 +758,8 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         or not validated.get("actor", {}).get("role")
     ):
         fail("Candidate/Validation actor or policy identity missing")
+    if not candidate.get("evidenceRefs"):
+        fail("Candidate evidence is missing")
     for evidence in candidate.get("evidenceRefs", []):
         if resources.get(evidence.get("path")) != evidence.get("sha256"):
             fail(f"Candidate evidence digest mismatch: {evidence.get('path')}")

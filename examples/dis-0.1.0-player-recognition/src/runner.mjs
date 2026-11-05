@@ -182,6 +182,18 @@ export function resolveProviderSelection(unit, selectionLock, target, resources)
   return { candidate, lock };
 }
 
+function canonicalLifecycleValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalLifecycleValue);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalLifecycleValue(value[key])]));
+  return value;
+}
+
+function lifecycleRecordDigest(record) {
+  const payload = { ...record };
+  delete payload.recordDigest;
+  return sha256(Buffer.from(JSON.stringify(canonicalLifecycleValue(payload)), 'utf8'));
+}
+
 export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, resources, closureDigest) {
   const records = packageIdentity.lifecycleRecords;
   const selection = packageIdentity.selectionLock;
@@ -193,6 +205,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   for (const record of records) {
     if (!record.recordId || byId.has(record.recordId) || !['CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
     if (record.dependencyClosureDigest !== closureDigest || record.subject?.kind !== 'unit' || !record.subject?.id || !record.subject?.revision || !/^[a-f0-9]{64}$/.test(record.subject.sha256 || '')) throw new DisExecutionError('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH', record.recordId);
+    if (!/^[a-f0-9]{64}$/.test(record.recordDigest || '') || lifecycleRecordDigest(record) !== record.recordDigest) throw new DisExecutionError('LIFECYCLE_RECORD_DIGEST_MISMATCH', record.recordId);
     byId.set(record.recordId, record);
   }
   const unitAsset = selection.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === 'xdownload.player.recognizer');
@@ -211,7 +224,8 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   }
   if (!candidate.actor?.id || !candidate.actor?.role || !candidate.policy?.id || !candidate.policy?.revision ||
       !validated.actor?.id || !validated.actor?.role) throw new DisExecutionError('INVALID_LIFECYCLE_ACTOR_OR_POLICY', unit.id);
-  for (const evidence of candidate.evidenceRefs || []) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('CANDIDATE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
+  if (!Array.isArray(candidate.evidenceRefs) || candidate.evidenceRefs.length === 0) throw new DisExecutionError('CANDIDATE_EVIDENCE_MISSING', candidate.recordId);
+  for (const evidence of candidate.evidenceRefs) if (resources.get(evidence.path) !== evidence.sha256) throw new DisExecutionError('CANDIDATE_EVIDENCE_DIGEST_MISMATCH', evidence.path);
   const validation = validated.validation;
   if (!validation || validation.result !== 'PASS' || validation.subjectDigest !== unitAsset.sha256 || validation.dependencyClosureDigest !== closureDigest ||
       !validation.profile?.id || !validation.profile?.revision || !validation.validator?.id || !validation.validator?.version ||
