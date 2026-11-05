@@ -798,7 +798,6 @@ export async function runPipeline(input, loaded) {
     const node = graph.nodes.find((item) => item.nodeId === nodeId);
     const unit = unitsById.get(node.unitRef.id);
     const handler = handlers[unit.implementation.ref];
-    validatePreconditions(unit, nodeId === graph.entryNode ? input : (() => { const value = {}; for (const edge of graph.edges.filter((item) => item.kind === 'data' && item.to.node === nodeId)) { if (outputs.has(edge.from.node)) pointerSet(value, edge.to.pointer, pointerGet(outputs.get(edge.from.node), edge.from.pointer)); } return value; })());
     if (!handler) throw new DisExecutionError('NO_TRUSTED_IMPLEMENTATION_BINDING', unit.implementation.ref);
 
     let nodeInput = nodeId === graph.entryNode ? structuredClone(input) : {};
@@ -818,6 +817,7 @@ export async function runPipeline(input, loaded) {
         if (!Object.hasOwn(nodeInput, property)) throw new DisExecutionError('MISSING_RUNTIME_INPUT', nodeId + '/' + property);
       }
     }
+    validatePreconditions(unit, nodeInput);
     const evidence = {};
     const incomingEvidence = graph.edges.filter((edge) => edge.kind === 'evidence' && edge.to.node === nodeId);
     for (const edge of incomingEvidence) {

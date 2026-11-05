@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
+import { loadDemo, runPipeline, resolveSchemaClosure, validateGraph, validateDefinition, validateUnit, validatePreconditions, validateCapabilityContracts, resolveProviderSelection, validateLifecycleRecords, recognizePlayerNormalized, handlers, assertInsidePackage, conditionMatches, DisExecutionError } from '../src/runner.mjs';
 import { loadVerifiedDemo, verifyResourceClosure } from '../src/verified-loader.mjs';
 
 const loadedPromise = loadVerifiedDemo();
@@ -335,4 +335,124 @@ test('unsupported control condition operators fail during Graph validation', asy
   const edge = graph.edges.find((item) => item.kind === 'control' && item.from === 'decide' && item.when);
   edge.when.operator = 'contains';
   assert.throws(() => validateGraph(graph, loaded.unitsById, loaded.schemas), hasCode('UNSUPPORTED_CONDITION_OPERATOR'));
+});
+
+
+test('selected Knowledge/Rule reference is digest-pinned and consumed by the Recognizer', async () => {
+  const loaded = await loadedPromise;
+  const knowledge = loaded.knowledge['xdownload.player-signature-rules'];
+  assert.equal(knowledge.catalogId, 'xdownload.player-signatures');
+  assert.equal(knowledge.revision, '1.0.0');
+  const result = await runPipeline({ url: 'https://example.test/watch', signals: ['jwplayer'] }, loaded);
+  assert.equal(result.outcome.status, 'READY');
+});
+
+test('bounded preconditions are evaluated before a Unit implementation executes', async () => {
+  const loaded = await loadedPromise;
+  const recognizer = loaded.unitsById.get('xdownload.player.recognizer');
+  assert.equal(validatePreconditions(recognizer, { url: 'https://example.test/watch', signals: [] }), true);
+  assert.throws(() => validatePreconditions(recognizer, { signals: [] }), hasCode('PRECONDITION_FAILED'));
+  assert.throws(() => validatePreconditions(recognizer, { url: 'https://example.test/watch' }), hasCode('PRECONDITION_FAILED'));
+});
+
+test('Capability requirements resolve one exact provider contract', async () => {
+  const loaded = await loadedPromise;
+  assert.equal(validateCapabilityContracts(loaded.unitsById), true);
+  const missing = new Map(loaded.unitsById);
+  const recognizer = structuredClone(missing.get('xdownload.player.recognizer'));
+  recognizer.capabilities.provides = [];
+  missing.set(recognizer.id, recognizer);
+  assert.throws(() => validateCapabilityContracts(missing), hasCode('MISSING_CAPABILITY_PROVIDER'));
+
+  const ambiguous = new Map(loaded.unitsById);
+  const duplicate = structuredClone(ambiguous.get('xdownload.player.recognizer'));
+  duplicate.id = 'xdownload.player.recognizer.duplicate';
+  ambiguous.set(duplicate.id, duplicate);
+  assert.throws(() => validateCapabilityContracts(ambiguous), hasCode('AMBIGUOUS_CAPABILITY_PROVIDER'));
+
+  const incompatible = new Map(loaded.unitsById);
+  const decision = structuredClone(incompatible.get('xdownload.player.route-decision'));
+  decision.capabilities.requires[0].compatibility.accepted[0].contractDigest = '0'.repeat(64);
+  incompatible.set(decision.id, decision);
+  assert.throws(() => validateCapabilityContracts(incompatible), hasCode('INCOMPATIBLE_CAPABILITY_PROVIDER'));
+});
+
+test('Package lock deterministically selects one exact implementation candidate independent of array order', async () => {
+  const loaded = await loadedPromise;
+  const unit = loaded.unitsById.get('xdownload.player.recognizer');
+  const selected = resolveProviderSelection(unit, loaded.packageIdentity.selectionLock, 'node24', loaded.resources);
+  assert.equal(selected.candidate.candidateId, 'signature-exact-v1');
+
+  const reordered = structuredClone(unit);
+  reordered.implementation.candidates.reverse();
+  const again = resolveProviderSelection(reordered, loaded.packageIdentity.selectionLock, 'node24', loaded.resources);
+  assert.equal(again.candidate.candidateId, 'signature-exact-v1');
+});
+
+test('provider selection fails closed for missing, ambiguous and incompatible candidates', async () => {
+  const loaded = await loadedPromise;
+  const unit = loaded.unitsById.get('xdownload.player.recognizer');
+  const noLock = structuredClone(loaded.packageIdentity.selectionLock);
+  noLock.selectedCapabilities = [];
+  assert.throws(() => resolveProviderSelection(unit, noLock, 'node24', loaded.resources), hasCode('MISSING_PACKAGE_PROVIDER_SELECTION'));
+
+  const duplicate = structuredClone(unit);
+  duplicate.implementation.candidates[1].candidateId = duplicate.implementation.candidates[0].candidateId;
+  assert.throws(() => resolveProviderSelection(duplicate, loaded.packageIdentity.selectionLock, 'node24', loaded.resources), hasCode('AMBIGUOUS_IMPLEMENTATION_PROVIDER'));
+
+  assert.throws(() => resolveProviderSelection(unit, loaded.packageIdentity.selectionLock, 'node22', loaded.resources), hasCode('INCOMPATIBLE_PROVIDER_TARGET'));
+  const badDigest = structuredClone(unit);
+  badDigest.implementation.candidates[0].artifactDigest = '0'.repeat(64);
+  assert.throws(() => resolveProviderSelection(badDigest, loaded.packageIdentity.selectionLock, 'node24', loaded.resources), hasCode('PACKAGE_PROVIDER_PIN_MISMATCH'));
+});
+
+test('alternative normalized provider is an explicit implementation, not ambient discovery', async () => {
+  const loaded = await loadedPromise;
+  const handler = handlers['registry:xdownload.player.recognizer-normalized@1.0.0'];
+  const result = handler({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, {
+    knowledge: loaded.knowledge,
+    catalogs: loaded.catalogs,
+    evidence: {},
+  });
+  assert.equal(result.status, 'recognized');
+  assert.equal(result.candidates[0], 'jwplayer');
+  assert.equal(recognizePlayerNormalized({ url: 'https://example.test/watch', signals: ['JWPLAYER'] }, { knowledge: loaded.knowledge }).status, 'recognized');
+});
+
+test('Unit failure profile has one canonical handling map and rejects malformed policy values', async () => {
+  const loaded = await loadedPromise;
+  const unit = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
+  assert.equal(validateUnit(unit), true);
+  unit.failure.supported = ['UNKNOWN'];
+  assert.throws(() => validateUnit(unit), hasCode('INVALID_FAILURE_PROFILE'));
+
+  const malformed = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
+  malformed.failure.handling.UNKNOWN = {};
+  assert.throws(() => validateUnit(malformed), hasCode('INVALID_FAILURE_HANDLING_POLICY'));
+
+  const mutable = structuredClone(loaded.unitsById.get('xdownload.player.recognizer'));
+  mutable.qualification.stage = 'PROMOTED';
+  assert.throws(() => validateUnit(mutable), hasCode('MUTABLE_QUALIFICATION_STAGE_FORBIDDEN'));
+});
+
+test('append-only lifecycle chain binds exact Unit digest and dependency closure', async () => {
+  const loaded = await loadedPromise;
+  const unitPaths = new Map(loaded.closureManifest.units.map((item) => [item.id, item.path]));
+  assert.equal(validateLifecycleRecords(loaded.packageIdentity, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), true);
+
+  const missingValidation = structuredClone(loaded.packageIdentity);
+  missingValidation.lifecycleRecords = missingValidation.lifecycleRecords.filter((record) => record.transition !== 'VALIDATED');
+  assert.throws(() => validateLifecycleRecords(missingValidation, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('INCOMPLETE_LIFECYCLE_CHAIN'));
+
+  const unauthorized = structuredClone(loaded.packageIdentity);
+  unauthorized.lifecycleRecords.find((record) => record.transition === 'PROMOTED').actor.authorityRef = '';
+  assert.throws(() => validateLifecycleRecords(unauthorized, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('UNAUTHORIZED_PROMOTION_RECORD'));
+
+  const stale = structuredClone(loaded.packageIdentity);
+  stale.lifecycleRecords[0].dependencyClosureDigest = '0'.repeat(64);
+  assert.throws(() => validateLifecycleRecords(stale, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('LIFECYCLE_SUBJECT_OR_CLOSURE_MISMATCH'));
+
+  const unpromoted = structuredClone(loaded.packageIdentity);
+  unpromoted.selectionLock.selectedAssets.find((asset) => asset.kind === 'unit').promotionRecordId = 'missing-promotion';
+  assert.throws(() => validateLifecycleRecords(unpromoted, loaded.unitsById, unitPaths, loaded.resources, loaded.packageIdentity.resourceClosureSha256), hasCode('PACKAGE_PROMOTION_PIN_MISMATCH'));
 });
