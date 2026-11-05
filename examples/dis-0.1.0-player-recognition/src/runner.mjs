@@ -137,6 +137,18 @@ export function validateCapabilityContracts(unitsById, resources = null) {
       if (candidates.length === 0) throw new DisExecutionError('MISSING_CAPABILITY_PROVIDER', requirement.capabilityId);
       if (candidates.length !== 1) throw new DisExecutionError('AMBIGUOUS_CAPABILITY_PROVIDER', requirement.capabilityId);
       const provider = candidates[0].contract;
+      const contractPayload = {
+        capabilityId: provider.capabilityId,
+        owner: provider.owner,
+        authorityRef: provider.authorityRef,
+        version: provider.version,
+        inputSchemaRef: provider.inputSchemaRef,
+        inputSchemaDigest: provider.inputSchemaDigest,
+        outputSchemaRef: provider.outputSchemaRef,
+        outputSchemaDigest: provider.outputSchemaDigest,
+      };
+      const canonicalContract = JSON.stringify(Object.fromEntries(Object.entries(contractPayload).sort(([a], [b]) => a.localeCompare(b))));
+      if (sha256(Buffer.from(canonicalContract, 'utf8')) !== provider.contractDigest) throw new DisExecutionError('CAPABILITY_CONTRACT_DIGEST_MISMATCH', requirement.capabilityId);
       if (resources && (resources.get(provider.inputSchemaRef) !== provider.inputSchemaDigest || resources.get(provider.outputSchemaRef) !== provider.outputSchemaDigest)) throw new DisExecutionError('CAPABILITY_SCHEMA_DIGEST_MISMATCH', requirement.capabilityId);
       const sameIdentity = provider.owner === requirement.owner && provider.authorityRef === requirement.authorityRef &&
         provider.inputSchemaRef === requirement.inputSchemaRef && provider.inputSchemaDigest === requirement.inputSchemaDigest &&
@@ -144,7 +156,7 @@ export function validateCapabilityContracts(unitsById, resources = null) {
       const accepted = requirement.compatibility?.accepted || [];
       const exactAccepted = accepted.some((item) => item.version === provider.version && item.contractDigest === provider.contractDigest);
       const compatible = requirement.compatibility?.policy === 'EXACT'
-        ? provider.version === requirement.version && provider.contractDigest === requirement.contractDigest && exactAccepted
+        ? accepted.length === 1 && accepted[0].version === requirement.version && accepted[0].contractDigest === requirement.contractDigest && provider.version === requirement.version && provider.contractDigest === requirement.contractDigest && exactAccepted
         : requirement.compatibility?.policy === 'EXPLICIT_ALLOWLIST' && exactAccepted;
       if (!sameIdentity || !compatible) throw new DisExecutionError('INCOMPATIBLE_CAPABILITY_PROVIDER', requirement.capabilityId);
     }
@@ -176,6 +188,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   if (!Array.isArray(records) || records.length < 3 || !selection) throw new DisExecutionError('MISSING_LIFECYCLE_OR_SELECTION_LOCK', packageIdentity.packageId);
   if (selection.packageId !== packageIdentity.packageId || selection.packageRevision !== packageIdentity.revision || selection.standardVersion !== packageIdentity.standardVersion) throw new DisExecutionError('SELECTION_PACKAGE_IDENTITY_MISMATCH', packageIdentity.packageId);
   if (!selection.consumerProfile?.id || !selection.consumerProfile?.revision || !selection.target || !Array.isArray(selection.selectedAssets) || !Array.isArray(selection.selectedCapabilities)) throw new DisExecutionError('INVALID_PACKAGE_SELECTION_LOCK', packageIdentity.packageId);
+  if (selection.selectedCapabilities.length !== 1 || selection.selectedAssets.length !== 2) throw new DisExecutionError('PACKAGE_SELECTION_CARDINALITY_INVALID', packageIdentity.packageId);
   const byId = new Map();
   for (const record of records) {
     if (!record.recordId || byId.has(record.recordId) || !['CANDIDATE', 'VALIDATED', 'PROMOTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'SUPERSEDED'].includes(record.transition)) throw new DisExecutionError('INVALID_LIFECYCLE_RECORD', record.recordId || 'missing');
@@ -185,6 +198,7 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   const unitAsset = selection.selectedAssets.find((asset) => asset.kind === 'unit' && asset.id === 'xdownload.player.recognizer');
   if (!unitAsset) throw new DisExecutionError('SELECTED_RECOGNIZER_ASSET_MISSING', packageIdentity.packageId);
   const unit = unitsById.get(unitAsset.id), unitPath = unitPaths.get(unitAsset.id);
+  if (selection.consumerProfile.id !== unit.implementation?.selectionPolicy?.consumerProfileId || selection.target !== unit.implementation?.selectionPolicy?.target) throw new DisExecutionError('PACKAGE_CONSUMER_PROFILE_OR_TARGET_MISMATCH', unit.id);
   if (!unit || unit.revision !== unitAsset.revision || resources.get(unitPath) !== unitAsset.sha256) throw new DisExecutionError('SELECTED_ASSET_DIGEST_MISMATCH', unitAsset.id);
   const chain = records.filter((record) => record.subject.id === unit.id && record.subject.revision === unit.revision && record.subject.sha256 === unitAsset.sha256);
   const candidate = chain.find((record) => record.transition === 'CANDIDATE');
@@ -204,7 +218,11 @@ export function validateLifecycleRecords(packageIdentity, unitsById, unitPaths, 
   if (selectedCapabilities.length !== 1) throw new DisExecutionError('SELECTED_CAPABILITY_PROVIDER_MISSING_OR_AMBIGUOUS', unit.id);
   const selectedCapability = selectedCapabilities[0];
   if (selectedCapability.promotionRecordId !== promoted.recordId || selectedCapability.validationRecordId !== validated.recordId) throw new DisExecutionError('SELECTED_CAPABILITY_LIFECYCLE_PIN_MISMATCH', unit.id);
+  const providedContract = unit.capabilities?.provides?.[0];
+  if (!providedContract || ['owner','authorityRef','version','contractDigest'].some((key) => selectedCapability[key] !== providedContract[key])) throw new DisExecutionError('SELECTED_CAPABILITY_CONTRACT_PIN_MISMATCH', unit.id);
   resolveProviderSelection(unit, selection, selection.target, resources);
+  const selectedRuleAssets = selection.selectedAssets.filter((asset) => asset.kind === 'rule');
+  if (selectedRuleAssets.length !== 1) throw new DisExecutionError('SELECTED_KNOWLEDGE_ASSET_MISSING_OR_AMBIGUOUS', unit.id);
   for (const asset of selection.selectedAssets) {
     if (asset.kind === 'rule') {
       if (!unit.knowledgeRefs?.some((ref) => ref.id === asset.id && ref.revision === asset.revision && ref.path === asset.path && ref.sha256 === asset.sha256)) throw new DisExecutionError('SELECTED_KNOWLEDGE_PIN_MISMATCH', asset.id);

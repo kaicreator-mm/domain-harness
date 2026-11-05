@@ -597,6 +597,15 @@ def validate_capability_contracts(units_by_id: dict, resources: dict | None = No
             if len(candidates) != 1:
                 fail(f"ambiguous Capability provider: {requirement['capabilityId']}")
             provider = candidates[0]
+            contract_payload = {
+                key: provider.get(key) for key in (
+                    "capabilityId", "owner", "authorityRef", "version",
+                    "inputSchemaRef", "inputSchemaDigest", "outputSchemaRef", "outputSchemaDigest",
+                )
+            }
+            contract_digest = sha256(json.dumps(contract_payload, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+            if provider.get("contractDigest") != contract_digest:
+                fail(f"Capability Contract digest is not canonical: {requirement['capabilityId']}")
             if resources is not None and (resources.get(provider.get("inputSchemaRef")) != provider.get("inputSchemaDigest") or resources.get(provider.get("outputSchemaRef")) != provider.get("outputSchemaDigest")):
                 fail(f"Capability Schema digest mismatch: {requirement['capabilityId']}")
             same_identity = all(
@@ -613,7 +622,10 @@ def validate_capability_contracts(units_by_id: dict, resources: dict | None = No
             )
             if compatibility.get("policy") == "EXACT":
                 compatible = (
-                    provider.get("version") == requirement.get("version")
+                    len(accepted) == 1
+                    and accepted[0].get("version") == requirement.get("version")
+                    and accepted[0].get("contractDigest") == requirement.get("contractDigest")
+                    and provider.get("version") == requirement.get("version")
                     and provider.get("contractDigest") == requirement.get("contractDigest")
                     and accepted_match
                 )
@@ -678,6 +690,8 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
         fail("Package selection Consumer Profile missing")
     if not selection.get("target") or not isinstance(selection.get("selectedAssets"), list) or not isinstance(selection.get("selectedCapabilities"), list):
         fail("invalid Package selection lock")
+    if len(selection.get("selectedCapabilities", [])) != 1 or len(selection.get("selectedAssets", [])) != 2:
+        fail("Package selection cardinality is invalid")
     by_id = {}
     for record in records:
         record_id = record.get("recordId")
@@ -700,6 +714,8 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     unit_path = unit_paths.get(unit_asset["id"])
     if not unit or unit.get("revision") != unit_asset.get("revision") or resources.get(unit_path) != unit_asset.get("sha256"):
         fail("selected Unit digest/revision mismatch")
+    if selection["consumerProfile"].get("id") != unit.get("implementation", {}).get("selectionPolicy", {}).get("consumerProfileId") or selection.get("target") != unit.get("implementation", {}).get("selectionPolicy", {}).get("target"):
+        fail("Package Consumer Profile/target mismatch")
     chain = [
         record for record in records
         if record.get("subject", {}).get("id") == unit["id"]
@@ -762,8 +778,14 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
     capability_lock = selected_capabilities[0]
     if capability_lock.get("promotionRecordId") != promoted.get("recordId") or capability_lock.get("validationRecordId") != validated.get("recordId"):
         fail("selected Capability Promotion/Validation pin mismatch")
+    provided_contract = (unit.get("capabilities", {}).get("provides") or [{}])[0]
+    if any(capability_lock.get(key) != provided_contract.get(key) for key in ("owner", "authorityRef", "version", "contractDigest")):
+        fail("selected Capability Contract pin mismatch")
     resolve_provider_selection(unit, selection, selection.get("target"), resources)
 
+    selected_rule_assets = [asset for asset in selection["selectedAssets"] if asset.get("kind") == "rule"]
+    if len(selected_rule_assets) != 1:
+        fail("selected Knowledge asset is missing or ambiguous")
     for asset in selection["selectedAssets"]:
         if asset.get("kind") == "rule":
             if not any(
