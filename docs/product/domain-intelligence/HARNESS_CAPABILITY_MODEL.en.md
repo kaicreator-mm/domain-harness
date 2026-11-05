@@ -62,7 +62,7 @@ Preserve the exact frozen v0.3 decision-source precedence:
 3. Applicable Promoted Reusable Subworkflow;
 4. Bounded HarnessMachine / LLM Fallback.
 
-Do not reorder Exact Reuse and Promoted Subworkflow. Applicability, Schema/Revision/Provenance and exact version mismatches must not produce fuzzy hits. If no qualified intelligence applies, the Harness may return unavailable, clarification, refusal or bounded fallback; it must not call an LLM merely to produce an answer.
+Do not reorder Exact Reuse and Promoted Subworkflow. Applicability, Schema/Revision/Provenance and exact version mismatches must not produce fuzzy hits. The current Semantic Decision feature pins a Procedure by exact id/revision, but that pin alone does not prove that the Procedure was promoted; the selected Registry / Consumer must guarantee that it is applicable and promoted. If no qualified intelligence applies, the Harness may return unavailable, clarification, refusal or bounded fallback; it must not call an LLM merely to produce an answer.
 
 ### 3.3 Context Engine — planning, acquisition and assembly
 
@@ -74,7 +74,7 @@ The Context Engine organizes authorized source observations into the smallest in
 - refresh context in a bounded way when new observations arrive instead of accumulating unbounded history;
 - minimize sensitive data and never require full private history or hidden chain-of-thought as necessary input.
 
-Retrieval and physical reads are performed by the Host / declared Tools. A Context Feature must not impersonate Host authorization or a real Memory read. This Product/L1 does not prescribe a storage technology.
+Retrieval and physical reads are performed by the Host / declared Tools. A Context Feature must not impersonate Host authorization or a real Memory read. The current Feature sorts by observation id rather than semantic relevance; Host Memory search is authorized key-prefix search, not semantic retrieval. This Product/L1 does not prescribe a storage technology.
 
 ### 3.4 Bounded Reasoning Episode
 
@@ -132,7 +132,7 @@ Evaluation is not equivalent to “JSON parses” or “the LLM returned complet
 
 Models are optional bounded fallbacks, not Harness control authorities. Provider Host owns credentials, endpoints, model allowlists, deadlines, protocol adaptation, error classification and UNKNOWN semantics. Domain Intelligence and Business Policy should not depend on provider-private fields.
 
-Provider connectivity, structured output, Tool Proposal, streaming, provider fallback and token/cost budgets are distinct capabilities that must be verified individually. An LLM adapter does not prove complete Harness Reasoning.
+Provider connectivity, structured output, Tool Proposal, streaming, provider fallback and token/cost budgets are distinct capabilities that must be verified individually. Current Providers make one non-streaming request; OpenAI supports JSON object but refuses outputSchemaRef, while Anthropic currently refuses JSON, temperature and outputSchemaRef. Neither provides implicit Provider Fallback. Semantic Decision permits a declared maxModelCalls value of 0..4, but one resolve invocation currently performs at most one fallback; this does not implement a multi-round model loop. An LLM adapter does not prove complete Harness Reasoning.
 
 ### 3.9 Evidence / Meta Feedback
 
@@ -147,9 +147,9 @@ Classification reuses #1478: SUPPORTED / PARTIAL / MISSING / CONSUMER_OWNED / KE
 | Capability | Current classification | v0.10.3 fact and boundary |
 |---|---|---|
 | Domain / Goal Understanding | MISSING (generic public Harness capability); CONSUMER_OWNED (business intent) | The public SDK has no generic natural-language Goal/Domain Recognizer product interface; Business Intent, Domain Scope and domain semantics are supplied by the consumer. |
-| Context Assembly | PARTIAL | The selected Context Assembly handles caller-supplied observations only; it validates Scope and Provenance shape, sorts and budgets them. It performs no Memory/Tool/Model read, does not prove Host authorization and labels verification caller-reported. |
-| Scoped Memory | SUPPORTED (Host-owned) | Host-Node provides deployment/tenant/app/B/agent/thread-scoped put/get/search/delete, Host authorization, Provenance, TTL and CAS; it is not automatically integrated with Context Assembly retrieval/refresh. |
-| Semantic Decision | PARTIAL | The selected Feature supports Rule → Exact Reuse → exact-pinned Procedure → one Model/Tool fallback, with step/call/deadline limits and authority-field rejection. It is not a general multi-round Reasoning Runtime. |
+| Context Assembly | PARTIAL | The selected Context Assembly handles caller-supplied observations only; it validates Scope and Provenance shape, sorts by ID and budgets them, but does not rank by semantic relevance. It performs no Memory/Tool/Model read, does not prove Host authorization and labels verification caller-reported. |
+| Scoped Memory | SUPPORTED (Host-owned) | Host-Node provides deployment/tenant/app/B/agent/thread-scoped put/get/search/delete, Host authorization, Provenance, TTL and CAS; search is key-prefix based and is not automatically integrated with Context Assembly semantic retrieval/refresh. |
+| Semantic Decision | PARTIAL | The selected Feature supports Rule → Exact Reuse → exact-pinned Procedure → one Model/Tool fallback, with step/call/deadline limits and authority-field rejection. An exact Procedure pin does not itself prove Promotion, and one invocation performs at most one fallback; this is not a general multi-round Reasoning Runtime. |
 | Public multi-round HarnessMachine | MISSING (public consumer path) | The monorepo private package contains HarnessMachine source that loops Model + prebound read-only Query Capabilities under a step limit; Mutation Capabilities are refused. The package is private and absent from the four public Tarballs, so this is not a released public capability. |
 | Tool Proposal | SUPPORTED (data contract) | OpenAI / Anthropic Host can return bounded Tool Proposal data; a Proposal carries no Permit or execution authority. |
 | Proposal → Tool → Observation → Model loop | MISSING (generic public loop) | Provider C wraps one Host result as a K External Effect terminal; it does not automatically execute a model-proposed Tool or feed Tool results back into the model. |
@@ -157,7 +157,7 @@ Classification reuses #1478: SUPPORTED / PARTIAL / MISSING / CONSUMER_OWNED / KE
 | Workflow / WAIT / RESUME / Child | PARTIAL | Workflow Control is a pure Proposal Planner; Host Durable Controls + K provide CAS, Callback/Deadline, Child, Replay/Recovery. This is business-workflow continuity, not a general Reasoning Loop Scheduler. |
 | Outcome Evaluation | PARTIAL / CONSUMER_OWNED | Schema, Feature Guards, B Policy and K Invariants validate structure and business transitions; evidence sufficiency, domain correctness and final acceptance criteria remain declared by the Domain Consumer. |
 | State / Effect / Journal / Replay | KERNEL_OWNED | One K/Microkernel authority; never duplicate it in Harness, Feature, Host or LLM. |
-| Provider Transport | SUPPORTED (Node Host) | OpenAI-compatible and Anthropic Messages Host subpaths, neutral LLM DTO, selected C route and K Effect path exist; Node >=24, non-streaming single request, no implicit Provider Fallback. |
+| Provider Transport | SUPPORTED (Node Host) | OpenAI-compatible and Anthropic Messages Host subpaths, neutral LLM DTO, selected C route and K Effect path exist; Node >=24, non-streaming single request. OpenAI/Anthropic structured-output capabilities differ and Schema Ref is currently unsupported; no implicit Provider Fallback. |
 | Context/Provider Cost Policy | PARTIAL | DTO/Host support deadlines, token usage and error categories; a unified Harness product for cost policy, dynamic model selection, cross-provider fallback and streaming does not exist. |
 | Decision Evidence | SUPPORTED (Host bridge) | DecisionEvidenceObserver can invoke a selected Semantic Feature, read the real K Receipt, Host-measure Model/Tool calls and emit immutable Trace; it is not a general domain-outcome evaluator. |
 | Meta Feedback | SUPPORTED (proposal-only) | Host Workflow reads bounded Evidence/Candidate/Shadow, invokes a selected Feature to create bounded Proposals and records them with CAS/stable message identity; no automatic approval, Promotion, Activation or Effect. |
