@@ -1,6 +1,6 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
-状态：L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN\
+状态：L2_ARCHITECTURE_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
 L2 Issue：#1481\
 Product/L1：#1477 — FROZEN\
 Product Freeze Commit：b8135aa801eb38fcae2fa1fce3bada541178d5b9\
@@ -121,7 +121,7 @@ Unit 是可描述、可引用、可资格确认和可组合的逻辑单元，不
 - Pipeline 是该 Workflow 的具体执行组织，描述节点、顺序、分支和终态。
 - Composition Graph 是 DIS 对 Pipeline 的结构化、可验证表示。
 - Workflow Unit 可暴露为 Semantic Component；Graph 是其实现/组合制品，二者通过精确引用绑定。
-- Pipeline 不是 Scheduler；Node 执行仍由冻结的 DomainHarness v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约管理。#1480 KDP 尚未冻结，对 DIS 0.1.0 不具规范效力。
+- Pipeline 不是 Scheduler；Node 执行仍由冻结的 DomainHarness v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约管理。successor authority 服从 #1484 的 Boot 最小引导 → KDP Primary checkpoint；已发布 v0.10.3 源码基线仍保留历史 v0.7 Microkernel 权威。
 - Workflow 可组合 Procedure、Tool、Recognizer、Decision 和 Validator，不因此创建新的 Component family。
 
 ### 3.4 Identity / Qualification / Execution
@@ -145,9 +145,15 @@ implementation.ref 是有类型的逻辑绑定键，不是源码路径或任意�
 
 禁止根据未经验证的 Unit 字符串执行动态 import；禁止模型输出直接指定可执行路径；禁止绕过冻结的 Kernel/Host admission、Effect Permit 或既有 Tool 契约。Reference Consumer 可使用 allow-listed handler registry，但必须记录映射，不能宣称它证明生产 Package 任意代码加载能力。
 
+### 4.2 Capability Contract 与 Provider 解析
+
+Capability Contract 附着于既有 Unit，不创建新 Component family 或 Runtime primitive。provides Contract 固定 capabilityId、owner、authorityRef、精确 version 和 contractDigest；requires Contract 固定相同身份，并声明 EXACT 或逐项精确 version/digest 的 allowlist。SemVer 本身不构成兼容证据。
+
+Build/Package 物化阶段必须为每个 required Capability 解析出且仅解析出一个 Provider，其 Contract identity/digest、target 和 qualification 必须满足 requirement。Provider 缺失、歧义、不兼容或资格不足时 fail-closed。一个 Unit 可以声明多个 implementation candidate，每个 candidate 固定 candidateId、implementation ref、artifact path/digest、target 和 contract digest。不可变 Package selection lock 选定一个精确 candidate。Runtime 验证 candidate、Unit revision、implementation ref、artifact digest 和 target 一致；不得动态发现或按名称选择。
+
 ## 5. Recognizer / Dynamic Form Profile
 
-Recognizer 输出必须区分 normalized intent、confirmed values、inferred values、candidates、missing fields、ambiguities、conflicts、uncertainty、evidence/provenance 和 out-of-scope/invalid-input status。每个值保留来源，例如 USER_CONFIRMED、SYSTEM_OBSERVED、MODEL_INFERRED 或 DERIVED。模型置信度不得替代来源或用户确认。
+Recognizer 输出必须区分 normalized intent、confirmed values、inferred values、candidates、missing fields、ambiguities、conflicts、uncertainty、evidence/provenance 和 out-of-scope/invalid-input status。每个值保留来源，例如 USER_CONFIRMED、SYSTEM_OBSERVED、MODEL_INFERRED 或 DERIVED。模型置信度不得替代来源或用户确认。可执行 Unit 可以声明绑定 input Schema 的 typed preconditions；DIS 0.1.0 仅允许 top-level JSON Pointer 的 exists/equals/notEquals，拒绝任意代码或模型生成谓词。Unit 还可以通过 knowledgeRefs 绑定结构化 Knowledge/Rule 资源，固定 stable id/revision/kind/Package-relative path/SHA-256。这些可消费资源不同于 Evidence.sources provenance，必须由 Consumer 实际加载并纳入 Resource Closure。
 
 Dynamic Form 是 UI-agnostic Interaction Contract，不是新的 Component family 或独立表单 Runtime。可选 Form Profile 描述 form identity/revision、target input Schema、question/step、target field、response type、required/optional、options/constraints、适用条件、澄清原因和完成/取消结果。UX 负责渲染，Harness 协调澄清和重识别。用户确认、系统观察和模型推导必须分别保留；表单不授予 Tool、状态转移或 Effect 权限。未声明 Form Profile 的 Consumer 仍可使用结构化 API 输入。
 
@@ -186,7 +192,7 @@ Package Resource Closure 不等于 Schema Closure。闭合范围覆盖选定智�
 
 Resource Manifest 至少记录 package-relative normalized path、resource kind、content digest、owner references 和 required/optional status。闭合范围 MUST 覆盖全部必需 Unit descriptor、Graph、Definition、输入/输出/嵌套 Schema、Fixture/参考资源、实现制品及被引用的符合性资源。必须拒绝绝对路径、路径穿越、空段、点段、反斜线、未授权远程 URI、重复路径、缺失资源、Digest 不匹配、未声明的必需引用，以及 realpath 解析后逃出 Package 根目录的符号链接。外层 Package descriptor/lock MUST 固定 Resource Manifest 的精确 SHA-256；Manifest 不递归包含自身 Digest。
 
-Package materialization 必须精确 pin DIS standard version、Package identity/revision、Definition identity/revision/digest、selected Unit identity/revision/artifact digest、Graph identity/revision/artifact digest、全部必需资源路径/digest、trusted implementation binding 和 required Capability Contract。该逻辑锁定可由现有 Manifest/BUILD/lock artifact 承载；DIS 不创建平行 Package Manifest 或替换 ABI。
+Package materialization 必须精确 pin DIS standard version、Package identity/revision、Definition identity/revision/digest、选定 Unit/Knowledge/Rule/Graph identity 与 digest、selected Capability/provider implementation、target/Consumer Profile、Promotion Decision 和 validation evidence refs、全部必需资源路径/digest 及 trusted implementation binding。唯一不可变的 consumer-specific Package selection lock 是 Selection 权威；Unit/Graph/Trace 只能通过 exact identity 引用，不得重复创建 provider-selection 权威。该逻辑锁定可由现有 Manifest/BUILD/lock artifact 承载；DIS 不创建平行 Package Manifest 或替换 ABI。
 
 ### 7.4 Storage-neutral Knowledge Access
 
@@ -201,9 +207,9 @@ DIS 0.1.0 保持 files-first 和领域资产所有权。嵌入式 SQLite、图�
 
 ## 8. Qualification / Promotion / LLM Fallback / Evolution
 
-Qualification 证据深度依智能类型、风险和范围决定。结构验证、领域语义验证、行为验证、人工裁定和 Package Build Validity 不得合并为一个 PASS。
+Qualification 通过 append-only lifecycle records 表达，并绑定 exact subject 与 dependency-closure digest。Unit/Knowledge/Rule/Graph asset 保持不可变。Candidate、Validation、Promotion、拒绝/撤回/过期/取代是独立转移，记录 actor/authority、policy revision、前序记录、evidence refs 和时间。有效 maturity 通过重放记录推导；缺失、冲突、未授权或过期转移必须 fail-closed。
 
-Promotion、Selection 和 Activation 是独立治理决策。Simulator PASS 不自动 Promotion；Promotion 不自动 Selection；Selection 不静默改变活动实例的 pin。
+Validation 绑定精确 candidate/dependency digest、profile/revision、validator identity/version、baseline、coverage、结果/发现/限制和可复现环境。PASS 是证据，不是 Promotion 权威。Promotion 必须单独授权；Package Selection 是 Consumer 专属，引用精确 Promotion/Validation records 和一个 selected implementation/provider；Activation 是既有 Runtime 发生记录，Execution 是 Journal/Trace 证据。两者都不修改 Unit 或 Package。Simulator PASS 不自动 Promotion；Promotion 不自动 Selection；Selection 不自动 Activation。
 
 LLM 仅在已选确定性智能、精确语义结果复用和适用已晋升 Subworkflow 无法充分解决问题时作为有界后备。LLM 输出不自动成为权威事实，不自动取得 Tool/Effect 权限，不自动修改 Package。要固化为可复用 Unit，必须回到 Candidate → Validation/Adjudication → Explicit Promotion。
 
@@ -229,7 +235,7 @@ DIS standard version 独立于 DomainHarness SDK version。Unit、Graph、Defini
 DIS-L2-F001..F012 是统一的 L2 架构审核编号，与初始 Demo 的 DIS-F-001..F006 不同：
 
 - **F001（P1）：** 两个相连的生命周期平面：设计期生产/资格确认与运行期消费。
-- **F002（P1）：** 保留冻结的 v0.7 Kernel/Microkernel、唯一 Domain Runtime 和 Host/Effect 权威；#1480 KDP 仍是未冻结、非规范性候选。
+- **F002（P1）：** 已发布历史 v0.7/v0.10.3 源码仍由原 Microkernel 权威管理；在研 successor 服从 #1484 的 Boot 最小引导 → KDP Primary checkpoint（一个 Kernel Core + 内部 Package System），保持唯一 post-bootstrap Runtime 与 Host 物理 Effect 边界。不得声称 v0.10.3 已采用 KDP。
 - **F003（P1）：** Consumer Trace 携带每个实际 Node 的输入、证据和输出；独立 Conformance 根据 Graph Edge 和实际控制路径重算并核对。
 - **F004（P1）：** Definition 固定 Workflow Unit 与 Graph 的 identity/revision/path；每个 Graph Node Unit 必须恰好声明一次。
 - **F005（P1）：** 完整 Package Resource Closure 覆盖 Unit、Graph、Definition、Schema、Fixture、实现制品和 Conformance 资源；Package descriptor 固定 Manifest Digest。
@@ -243,7 +249,7 @@ DIS-L2-F001..F012 是统一的 L2 架构审核编号，与初始 Demo 的 DIS-F-
 
 R2 代码修复记录在 commit 3ca5f9d 和 f842fac。R3 进一步统一 Reference Consumer、独立 Python Conformance 与规范文本中的 optional control-condition 语义，并在 Graph 静态验证阶段拒绝不支持的 operator。中文架构文档已补齐英文版中的 Workflow / Pipeline / Composition Graph 契约。
 
-F001-F011 已在 L2 候选的 R4 快照 `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5` 关闭：该精确 HEAD 的 LOCAL_VALIDATION 回执 #6666234171 已通过 Node、Demo、Python Conformance、16/16 实际执行输入/输出校验、16 项条件语义向量、optional data binding、实际 Trace 校验、25/25 Resource Closure 哈希、Package Digest，以及两项仓库 Woodpecker 检查。全量快照源码审核 #5788712224 与四路径修复增量审核 #5789678159 合并覆盖该 R4 快照，结论为 P0=0/P1=0/P2=0；审核 #5790281099 覆盖其后的 R5 双文档增量。这些历史审核和验证回执分别绑定各自的快照，不能替代后续变更的审核或验证。F012 仍保持 OPEN，并明确推迟到 Release Qualification 前置门禁：发布资格确认前必须使用第二个实质不同的 Domain Profile 验证泛化能力，xDownload 单独不足以证明泛化。d8c516e 的历史 Demo PASS 仅保留为历史证据，不作为当前候选验证依据。
+F001-F011 已在 L2 候选的 R4 快照 `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5` 关闭：该精确 HEAD 的 LOCAL_VALIDATION 回执 #6666234171 已通过 Node、Demo、Python Conformance、16/16 实际执行输入/输出校验、16 项条件语义向量、optional data binding、实际 Trace 校验、25/25 Resource Closure 哈希、Package Digest，以及两项仓库 Woodpecker 检查。全量快照源码审核 #5788712224 与四路径修复增量审核 #5789678159 合并覆盖该 R4 快照，结论为 P0=0/P1=0/P2=0；审核 #5790281099 覆盖其后的 R5 双文档增量。这些历史审核和验证回执分别绑定各自的快照，不能替代后续变更的审核或验证。当前集成 R6 批次还在原 46-path 写集内同步 #1484 权威、#1485 Capability/Recognizer/Pipeline 契约和 #1487 生命周期契约；最终 exact-HEAD 验证与独立审核仍待完成，必须绑定最终 commit 后才能 L2 Freeze。F012 仍保持 OPEN，并明确推迟到 Release Qualification 前置门禁：发布资格确认前必须使用第二个实质不同的 Domain Profile 验证泛化能力，xDownload 单独不足以证明泛化。d8c516e 的历史 Demo PASS 仅保留为历史证据，不作为当前候选验证依据。
 
 
 ## 12. L2 Freeze Gate

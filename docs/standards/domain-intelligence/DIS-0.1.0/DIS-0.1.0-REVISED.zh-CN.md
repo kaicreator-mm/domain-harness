@@ -1,6 +1,6 @@
 # Domain Intelligence Standard（DIS）0.1.0 — Demo Revised Candidate
 
-状态：L2_STANDARD_CANDIDATE / NOT_FROZEN
+状态：L2_STANDARD_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
 分支：dis/0.1.0-l2-candidate
 L2 Issue：#1481
 冻结 Product/L1：#1477 @ b8135aa801eb38fcae2fa1fce3bada541178d5b9
@@ -63,17 +63,39 @@ Intelligence Unit 是逻辑描述和组合单元，不是新的 Runtime primitiv
 
 每个 Unit 的公共 Envelope 必须包含：schemaVersion、稳定 id、精确 revision、role、purpose、scope、owner、authority、qualification、evidence 和 failure。可执行 Profile 还必须声明类型化 input/output Schema；按需声明 capabilities、implementation 和 validation。
 
-Authority 与 Qualification 独立。OBSERVED/CANDIDATE/VALIDATED/PROMOTED/SELECTED 是资格/成熟度阶段；EXECUTED 是一次运行发生记录，不是 Unit qualification stage。它不得修改不可变 Unit 的资格。FROZEN/CONTROLLED/REFERENCE/EXAMPLE/DERIVED 是资产权威类别，不能与上述阶段混为一谈。
+Asset Authority 与 Qualification 独立。OBSERVED、CANDIDATE、VALIDATED、PROMOTED、REJECTED、WITHDRAWN、EXPIRED、SUPERSEDED 是由 append-only、exact-subject 生命周期记录推导出的成熟度，不是 digest-bound Unit 内的可变字段。SELECTED 是 Consumer/Package 专属状态，只存在于不可变 Package selection lock。ACTIVATED 是 Runtime/Package 发生记录；EXECUTED 是每次运行的 Journal/Trace 发生记录。二者都不修改 Unit maturity。FROZEN、CONTROLLED、REFERENCE、EXAMPLE、DERIVED 仍是资产权威类别，不是成熟度阶段。
 
 可执行 Unit 必须表达输入输出语义。Recognizer 需要区分已知、推导、候选、缺失、歧义、冲突和未知，并保留来源。每个值必须分别记录来源（`USER_CONFIRMED`、`SYSTEM_OBSERVED`、`MODEL_INFERRED`、`DERIVED`）和状态（`CONFIRMED`、`INFERRED`、`CANDIDATE`、`UNKNOWN`）；模型置信度不能升级来源权威。运行观察不自动成为可复用知识。
 
-Unit failure profile 至少考虑 UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、INVALID_INPUT、PARTIAL、FAILED、NEEDS_INPUT、NEEDS_REVIEW；不适用的结果应显式标明，不得静默折叠为成功。
+Unit 只声明一个规范的 failure.handling map。其枚举约束的 key 集合即为支持的 failure status；每个 key 对应有类型的处理策略（action，以及可选的有界 retryLimit/reason）。不再并列维护 failure.supported 数组。未知 key 或缺少处理策略必须 fail-closed。UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、INVALID_INPUT、PARTIAL、FAILED、NEEDS_INPUT 和 NEEDS_REVIEW 必须显式保留，不得静默折叠为成功。
 
 ## 3.1 Trusted implementation 与 Workflow 绑定
 
 `implementation.ref` 是有类型的逻辑绑定键，不是可执行路径。`registry:<unit-id>@<revision>` 只能解析到 Host 自身维护的 allow-list registry，并配对由 Digest 固定的 `artifactRef`；`graph:<graph-id>@<revision>` 将 Workflow Unit 绑定到 Graph；`tool:<capability-id>@<version>` 标识既有 Tool/Host 契约，但不授予权限。禁止任意动态导入。Domain Definition 同时绑定 `workflowRef.unitRef` 与 `workflowRef.graphRef`（ID、revision、package-relative path），并且必须与 Workflow Unit 和加载的 Graph 一致。
 
 每个 Graph Node 的精确 Unit ID/revision MUST 在 Definition 的 Semantic/Tool Component 集合或 private Unit 集合中恰好声明一次。未声明、revision 不匹配或同时出现在 component/private 集合中的 Node Unit 均无效。
+
+## 3.2 Capability Contract 与确定性 Provider 解析
+
+Capability Contract 是附着于既有 Unit 的稳定、版本化承诺，不是新的 Unit role、Component family、Package dependency、Graph Edge、Tool authorization 或 Effect Permit。
+
+- provides Contract 固定 capabilityId、owner、authorityRef、精确 version 和 contractDigest。
+- requires Contract 固定相同身份，并声明显式兼容策略。EXACT 只接受相同 version 与 digest；EXPLICIT_ALLOWLIST 只接受逐项列出的精确 version/digest。SemVer 范围本身不证明兼容。
+- Provider 只有在 owner/authority、Contract identity/digest、target 和 qualification 均满足 requirement 时才有效。
+- Build/Package materialization 必须为每个 required Capability 解析出且仅解析出一个 Provider。零 Provider、未消解的多 Provider、Contract/target 不兼容、制品缺失或资格不足均 fail-closed。
+- Runtime 只消费不可变 Package selection lock 中的精确 Provider，不得按目录顺序、模型建议、名称相似度或环境动态发现选择。
+
+一个逻辑 Capability 可以有多个 implementation candidate。每个 candidate 声明稳定 candidateId、implementation ref、artifact path/digest、target 和 Contract digest。Package lock 选择一个精确 candidate；其 candidateId、Unit revision、implementation ref、artifact digest 和 target 必须与 Unit 的 selected implementation binding 一致。即使 candidate 数组重排，最终选择也必须确定。
+
+## 3.3 Preconditions 与结构化 Knowledge / Rule 引用
+
+可执行 Unit 可以声明绑定其 input Schema 的有界 preconditions。DIS 0.1.0 仅支持 top-level JSON Pointer 的声明式 exists、equals、notEquals 检查；禁止任意代码、模型生成谓词和隐式类型转换。Precondition 不满足时返回声明的 failure outcome，不执行 implementation。
+
+Unit 可以声明 knowledgeRefs，引用独立可寻址的 Knowledge/Rule 资产。每个引用固定稳定 id、revision、kind、Package-relative path 和 SHA-256 digest。这些是可消费领域数据，不是 provenance claim。evidence.sources 仍只表示来源/主张元数据，不能代替 Knowledge/Rule binding。每个选定 Knowledge/Rule resource 都必须进入 Resource Closure，Consumer 必须实际加载并使用精确选定引用。
+
+## 3.4 规范 Failure Handling
+
+failure.handling 是支持状态的唯一来源。Key 限定为 DIS failure-status enum；每个 value 必须符合有类型的 handling policy（声明的 action，以及可选有界 retryLimit/reason）。JSON Schema 和独立 Consumer 必须拒绝未知 key、非法 action 和不支持的 retry policy。没有 policy 的 status 不得被声明为 supported。
 
 ## 4. Component 和 Capability 映射
 
@@ -148,17 +170,19 @@ Dynamic Form 是 UX 呈现的 UI-agnostic 结构化交互契约。Package 声明
 
 ## 8. Qualification、消费和演进
 
-`EXECUTED` 是运行发生记录/证据事实，不是 Unit qualification 或 maturity stage。运行使用不得改变不可变 Unit 的资格；执行事实进入 Journal/Outcome/Evidence。
+Qualification 是 append-only 生命周期，不是 Unit 内可变字段。Candidate、Validation、Promotion、拒绝/撤回/过期/取代及其证据必须绑定精确 subject digest 与 dependency-closure digest。每次转移记录前序事件、actor/authority、policy revision、evidence refs 和时间。冲突、缺失、未授权或过期转移必须 fail-closed。
 
-保持四条独立轴：
-- Asset Authority；
-- Intelligence Maturity；
-- Runtime Resolver Precedence；
-- Execution Authority（由冻结的 v0.7 Kernel/Microkernel、Domain Runtime 和 Host/Effect 契约决定；#1480 KDP 尚未冻结且不具规范效力）。
+各轴必须分离：
+- Asset Authority 是资产上的不可变权威类别。
+- Maturity 由 append-only OBSERVED/CANDIDATE/VALIDATED/PROMOTED 或终态处置记录推导。
+- Selection 是 Consumer/Package 专属的不可变 selection lock，固定精确 promoted asset、Unit/Capability/Provider、target/profile、Promotion Decision 和 validation evidence。
+- Activation 是既有 Runtime/Package 发生记录；Execution 是 Journal/Trace 发生记录。二者都不改变 Unit maturity 或 Package identity。
 
-Simulator 验证成功不自动 Promotion；Promotion、Selection、Activation 必须显式治理。LLM 生成内容默认为 Candidate。运行结果形成 Evidence/Candidate，不直接修改活动 Definition 或 Package。
+Validation Evidence 必须绑定精确 candidate 与 dependency digest、validation profile/revision、validator identity/version、baseline、coverage、结果/发现/限制和可复现环境。Candidate 或 dependency closure 变化会使旧验证失效。PASS 是证据，不是 Promotion 权威。Promotion 是独立且明确授权的决策，不自动 Selection；Selection 不自动 Activation。
 
-Package Build Validity、Intelligence Qualification、End-to-End App Validation 是三个独立门禁。安装后的 Definition/Assembly 必须精确 pin，不得静默替换。
+Forge 负责候选生产；Simulator 负责模拟证据和演进提案；单独指定的 governance authority 负责 Promotion；Package BUILD 负责精确 Selection/物化；唯一 Runtime authority 负责 Activation/Execution。Runtime feedback 是进入未来周期且保留 provenance 的输入，不得修改活动 pins。LLM 生成内容默认是 Candidate。
+
+Package Build Validity、Intelligence Qualification 和 End-to-End App Validation 仍是三个独立门禁。已安装 Definition/Package 保持精确 pin，不得静默替换。
 
 ## 9. Conformance
 
@@ -166,7 +190,7 @@ Consumer Trace MUST 记录每个实际执行 Node 的精确 Unit identity、真�
 
 独立 Conformance Suite 还必须将 Trace 与 Graph 对照：从实际执行的 Data Edge 重算每个 Node 的输入，从实际执行的 Evidence Edge 重算 evidence inputs，并根据源 Node 输出核对实际控制路径；同时独立验证 Graph 静态路径绑定以及 Definition/Unit/Workflow 引用。必须按 Unit Schema 验证 Trace 的输入/输出，不得把 Reference Consumer 内部校验结果直接当作符合性证明。
 
-分为 Structural、Behavioral、Consumer 三层。至少验证：known/ambiguous/unknown/invalid 输入；Decision 分支；control/data/evidence 独立性；必需输入绑定；Schema Closure 和嵌套引用；路径穿越/缺失资源拒绝；Digest tampering；私有 Procedure 不成为 Tool；精确 Unit/Package pins；未知必需语义 Fail-Closed。
+分为 Structural、Behavioral、Consumer 三层。至少验证：known/ambiguous/unknown/invalid/out-of-scope 输入；Decision 分支；control/data/evidence 独立性；required input 绑定；Schema Closure；路径穿越/缺失资源拒绝；Digest tampering；私有 Procedure 不成为 Tool；精确 Unit/Package pins；Capability provider 缺失/歧义/不兼容；两个 candidate implementation 的确定性 Package-lock 选择；precondition 失败；结构化 Knowledge/Rule 消费；failure map 未知 key/缺失 policy 拒绝；验证 digest 过期；未授权 Promotion；未 Promotion 的 Candidate/Validated 资产被拒绝 Selection；Package selection pin 不匹配；证据丢失；无隐式 pass-through；不自动 Activation。
 
 ## 10. Demo 和修订依据
 

@@ -1,6 +1,6 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
-Status: L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN\
+Status: L2_ARCHITECTURE_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
 L2 Issue: #1481\
 Product/L1: #1477 — FROZEN\
 Product Freeze Commit: b8135aa801eb38fcae2fa1fce3bada541178d5b9\
@@ -121,7 +121,7 @@ A Unit need not be exposed as a Component; one Component may be implemented by s
 - Pipeline is the concrete execution organization of that Workflow: nodes, ordering, branches and terminal outcomes.
 - Composition Graph is DIS's structured, verifiable representation of a Pipeline.
 - A Workflow Unit may be exposed as a Semantic Component; the Graph is its implementation/composition artifact. They are bound by exact references.
-- Pipeline is not a Scheduler; Node execution remains managed by the frozen DomainHarness v0.7 Kernel/Microkernel, Domain Runtime and Host/Effect contracts. The #1480 KDP proposal is not frozen and is non-normative for DIS 0.1.0.
+- Pipeline is not a Scheduler; Node execution remains managed by the frozen DomainHarness v0.7 Kernel/Microkernel, Domain Runtime and Host/Effect contracts. The successor authority is the #1484 Boot-minimal → KDP Primary checkpoint; the released v0.10.3 source baseline remains on its historical v0.7 Microkernel authority.
 - A Workflow may compose Procedures, Tools, Recognizers, Decisions and Validators without creating a new Component family.
 
 ### 3.4 Identity / Qualification / Execution
@@ -147,9 +147,15 @@ A Consumer must use one explicit trusted binding:
 
 Do not dynamically import from an unverified Unit string, let model output specify executable paths, treat function existence as Tool declaration, or bypass frozen Kernel/Host admission, Effect Permit or existing Tool contracts. A Reference Consumer may use an allow-listed handler registry but must record the map and must not claim arbitrary production Package code-loading capability.
 
+### 4.2 Capability Contract and provider resolution
+
+Capability Contract remains attached to the existing Unit model; it does not create a new Component family or Runtime primitive. A provided contract pins capabilityId, owner, authorityRef, exact version and contractDigest. A requirement pins the same identity and declares either EXACT compatibility or an explicit allowlist of exact version/digest pairs. SemVer alone is not compatibility evidence.
+
+At build/materialization time, each required Capability resolves to exactly one provider whose contract identity/digest, target and qualification satisfy the requirement. Missing, ambiguous, incompatible or unqualified providers fail closed. A Unit may list multiple implementation candidates, each with candidateId, exact implementation ref, artifact path/digest, target and contract digest. The immutable Package selection lock selects one exact candidate. Runtime verifies that the selected candidate, Unit revision, implementation ref, artifact digest and target match; it never performs ambient provider discovery or name-based selection.
+
 ## 5. Recognizer / Dynamic Form Profile
 
-Recognizer output must distinguish normalized intent, confirmed values, inferred values, candidates, missing fields, ambiguities, conflicts, uncertainty, evidence/provenance and out-of-scope/invalid-input status. Each value retains its source, such as USER_CONFIRMED, SYSTEM_OBSERVED, MODEL_INFERRED or DERIVED. Model confidence does not replace provenance or user confirmation.
+Recognizer output must distinguish normalized intent, confirmed values, inferred values, candidates, missing fields, ambiguities, conflicts, uncertainty, evidence/provenance and out-of-scope/invalid-input status. Each value retains its source, such as USER_CONFIRMED, SYSTEM_OBSERVED, MODEL_INFERRED or DERIVED. Model confidence does not replace provenance or user confirmation. Executable Units may declare typed preconditions bound to their input Schema; DIS 0.1.0 permits only top-level JSON Pointer exists/equals/notEquals predicates and rejects arbitrary code or model-generated predicates. Units may also bind structured Knowledge/Rule resources through stable id/revision/kind/Package-relative path/SHA-256 knowledgeRefs. These consumable resources are distinct from Evidence.sources provenance and must be loaded by the Consumer and included in Resource Closure.
 
 Dynamic Form is a UI-agnostic Interaction Contract, not a new Component family or independent form Runtime. An optional Form Profile describes form identity/revision, target input Schema, question/step, target field, response type, required/optional, options/constraints, applicability, clarification reason and completion/cancellation result. UX renders; Harness coordinates clarification and re-recognition. User confirmation, system observation and model inference remain distinct. Forms grant no Tool, transition or Effect authority. Consumers without the Profile may use structured API input.
 
@@ -178,7 +184,7 @@ External sources may remain Provenance references but are not implicitly downloa
 
 Resource Manifest records normalized package-relative path, resource kind, content digest, owner references and required/optional status. Closure MUST include every required Unit descriptor, Graph, Definition, input/output/nested Schema, fixture/reference resource, implementation artifact and referenced conformance resource. Reject absolute paths, traversal, empty/dot segments, backslashes, unauthorized remote URIs, duplicate paths, missing resources, digest mismatch, undeclared required references and symlink-resolved paths outside the Package root. The enclosing Package descriptor/lock MUST pin the exact SHA-256 of the Resource Manifest; the manifest does not recursively include its own digest.
 
-Package materialization pins DIS version, Package identity/revision, Definition identity/revision/digest, selected Unit identity/revision/artifact digest, Graph identity/revision/artifact digest, all required resource paths/digests, trusted implementation bindings and required Capability Contracts. Existing Manifest/BUILD/lock artifacts may carry this logical lock; DIS does not create a parallel Package Manifest or replace ABI.
+Package materialization pins DIS version, Package identity/revision, Definition identity/revision/digest, selected Unit/Knowledge/Rule/Graph identities and digests, selected Capability/provider implementation, target/Consumer Profile, Promotion Decision and validation evidence refs, all required resource paths/digests, and trusted implementation bindings. One immutable consumer-specific Package selection lock is the sole selection authority; Unit/Graph/Trace records refer to it by exact identity and must not duplicate provider-selection authority. Existing Manifest/BUILD/lock artifacts may carry this logical lock; DIS does not create a parallel Package Manifest or replace ABI.
 
 ### 7.4 Storage-neutral Knowledge Access
 
@@ -193,9 +199,9 @@ If a Consumer uses a database or index:
 
 ## 8. Qualification / Promotion / LLM Fallback / Evolution
 
-Qualification evidence depth depends on intelligence kind, risk and scope. Structural, domain-semantic, behavioral, human-adjudication and Package Build validity are separate gates.
+Qualification is represented by append-only lifecycle records bound to exact subject and dependency-closure digests. Unit/Knowledge/Rule/Graph assets remain immutable. Candidate, Validation, Promotion and rejection/withdrawal/expiry/supersession are separate transitions with actor/authority, policy revision, prior-record identity, evidence references and time. The effective maturity state is derived by replaying the records; missing, conflicting, unauthorized or stale transitions fail closed.
 
-Promotion, Selection and Activation are independent governance decisions. Simulator PASS does not automatically promote; Promotion does not automatically select; Selection does not silently change active-instance pins.
+Validation binds exact candidate/dependency digests, profile/revision, validator identity/version, baseline, coverage, result/findings/limitations and reproducibility environment. PASS is evidence, not Promotion authority. Promotion is separately authorized; Package selection is consumer-specific and references exact Promotion/Validation records and one selected implementation/provider; Activation is an existing Runtime occurrence and Execution is Journal/Trace evidence. Neither mutates the Unit or Package. Simulator PASS does not automatically promote; Promotion does not automatically select; Selection does not silently activate or replace active pins.
 
 LLM is a bounded fallback only when selected deterministic intelligence, exact semantic-result reuse and applicable promoted subworkflows cannot adequately resolve a case. LLM output is not automatically authoritative, does not gain Tool/Effect authority, and does not modify a Package. Reusable Unit material returns to Candidate → Validation/Adjudication → Explicit Promotion.
 
@@ -221,7 +227,7 @@ DIS version is independent of DomainHarness SDK version. Unit, Graph, Definition
 The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct from the initial Demo findings DIS-F-001..F006:
 
 - **F001 (P1):** Two connected lifecycle planes: design-time production/qualification and runtime consumption.
-- **F002 (P1):** Preserve the frozen v0.7 Kernel/Microkernel, single Domain Runtime, and Host/Effect authority. #1480 KDP remains a non-frozen, non-normative candidate.
+- **F002 (P1):** Preserve historical v0.7/v0.10.3 Microkernel authority for the released source baseline; bind the in-development successor to #1484's minimal Boot → KDP Primary checkpoint (one Kernel Core plus internal Package System), with one post-bootstrap Runtime and Host physical-effect boundary. Do not claim v0.10.3 already adopts KDP.
 - **F003 (P1):** Consumer Trace carries the actual Node input, evidence, and output; independent Conformance reconstructs and checks them against Graph Edges and the selected control path.
 - **F004 (P1):** Definition binds Workflow Unit and Graph identity/revision/path; every Graph Node Unit is declared exactly once.
 - **F005 (P1):** Complete Package Resource Closure covers Units, Graph, Definition, Schemas, fixtures, implementation artifacts, and conformance assets; Package descriptor pins the Manifest digest.
@@ -235,7 +241,7 @@ The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct fro
 
 R2 code repairs are recorded in commits 3ca5f9d and f842fac. R3 additionally aligns optional control-condition semantics across the Reference Consumer, independent Python Conformance, and normative text; unsupported condition operators now fail during Graph validation. The Chinese architecture text now includes the Workflow / Pipeline / Composition Graph contract present in English.
 
-F001-F011 are CLOSED for the L2 candidate at the R4 snapshot `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5`: exact-HEAD LOCAL_VALIDATION receipt #6666234171 passed Node, Demo, Python Conformance, 16/16 executed input/output checks, 16 condition vectors, optional data binding, actual Trace validation, 25/25 Resource Closure hashes, the Package digest, and both repository Woodpecker checks. Full-snapshot source review #5788712224 and four-path repair-delta review #5789678159 cover that R4 snapshot, with P0=0/P1=0/P2=0; review #5790281099 covers the subsequent R5 two-document delta. These historical reviews and validation receipts are bound to their respective snapshots and do not replace review or validation of later changes. F012 remains OPEN and is explicitly deferred to the pre-Release Qualification gate: a second materially different Domain Profile is required before release qualification; xDownload alone is not a generality proof. The historical Demo PASS at d8c516e remains historical evidence only and is not used as current-candidate validation.
+F001-F011 are CLOSED for the L2 candidate at the R4 snapshot `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5`: exact-HEAD LOCAL_VALIDATION receipt #6666234171 passed Node, Demo, Python Conformance, 16/16 executed input/output checks, 16 condition vectors, optional data binding, actual Trace validation, 25/25 Resource Closure hashes, the Package digest, and both repository Woodpecker checks. Full-snapshot source review #5788712224 and four-path repair-delta review #5789678159 cover that R4 snapshot, with P0=0/P1=0/P2=0; review #5790281099 covers the subsequent R5 two-document delta. These historical reviews and validation receipts are bound to their respective snapshots and do not replace review or validation of later changes. The current integrated R6 batch additionally closes #1484 authority synchronization, #1485 Capability/Recognizer/Pipeline contracts and #1487 governed lifecycle contracts in the existing 46-path write set; its final exact-HEAD validation and independent review remain pending and must be recorded against the final commit before L2 Freeze. F012 remains OPEN and is explicitly deferred to the pre-Release Qualification gate: a second materially different Domain Profile is required before release qualification; xDownload alone is not a generality proof. The historical Demo PASS at d8c516e remains historical evidence only and is not used as current-candidate validation.
 
 
 ## 12. L2 Freeze Gate

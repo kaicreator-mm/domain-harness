@@ -1,6 +1,6 @@
 # Domain Intelligence Standard (DIS) 0.1.0 — Demo-Revised Candidate
 
-Status: L2_STANDARD_CANDIDATE_R3 / NOT_FROZEN
+Status: L2_STANDARD_CANDIDATE_R6_INTEGRATED / NOT_FROZEN
 Branch: dis/0.1.0-l2-candidate
 L2 Issue: #1481
 Frozen Product/L1: #1477 @ b8135aa801eb38fcae2fa1fce3bada541178d5b9
@@ -29,7 +29,7 @@ DIS does not define a new Component family, Runtime, Scheduler, KDP, general Age
 4. The six Domain Data classes remain unchanged: Authority; Executable Harness; Knowledge/Reference; Pattern/Recipe; Example/Counterexample; Validation/Evidence.
 5. Understanding, Decision, and Solving/Evaluation are quality dimensions, not new asset classes.
 6. requires/provides expresses Capability Contracts, not data flow, control flow, or Package dependencies.
-7. The single existing DomainHarness Runtime remains authoritative under the frozen Kernel/Microkernel and Host/Effect contracts. Hooks remain bounded by existing contracts. The #1480 KDP candidate is not frozen and has no normative authority in DIS 0.1.0.
+7. Historical v0.10.3 remains governed by its frozen v0.7 Kernel/Microkernel and Host/Effect contracts. The in-development successor authority is the separately checkpointed Boot → KDP Primary model in #1484: Boot performs only minimal bootstrap; KDP Primary owns one Kernel Core plus its internal Package System. This successor checkpoint does not retrofit v0.10.3 or prove current Runtime adoption. DIS defines intelligence contracts, not KDP APIs or implementation. Hooks remain bounded by the applicable frozen/successor contracts.
 8. DIS does not infer a general Event Bus from existing bounded Hook contracts.
 9. Workflow/Pipeline describes a domain-solving process. It is not a Scheduler and does not create a second state authority.
 10. Preserve the existing resolver precedence: deterministic compiled intelligence → exact semantic-result reuse → applicable promoted subworkflow → bounded HarnessMachine/LLM fallback.
@@ -64,11 +64,11 @@ An Intelligence Unit is a logical description and composition unit. It is not a 
 
 Every reusable Unit has a public envelope containing schemaVersion, stable id, exact revision, role, purpose, scope, owner, authority, qualification, evidence, and failure semantics. Executable profiles also declare typed input/output Schema references. Capabilities, implementation, and validation are declared when applicable.
 
-Authority and Qualification are independent. OBSERVED, CANDIDATE, VALIDATED, PROMOTED, and SELECTED are qualification/maturity stages. EXECUTED is an occurrence record for one runtime use; it is not a Unit qualification stage and cannot mutate an immutable Unit. FROZEN, CONTROLLED, REFERENCE, EXAMPLE, and DERIVED are asset-authority classes and must not be conflated with qualification stages.
+Asset Authority and Qualification are independent. OBSERVED, CANDIDATE, VALIDATED, PROMOTED, REJECTED, WITHDRAWN, EXPIRED and SUPERSEDED are derived maturity states reconstructed from append-only, exact-subject lifecycle records; they are not mutable fields in a digest-bound Unit. SELECTED is consumer/Package-specific and exists only in the immutable Package selection lock. ACTIVATED is a Runtime/Package occurrence; EXECUTED is a per-run Journal/Trace occurrence. Neither mutates Unit maturity. FROZEN, CONTROLLED, REFERENCE, EXAMPLE and DERIVED remain asset-authority classes and are not maturity stages.
 
 Recognizers preserve known/inferred distinctions, candidates, evidence, missing fields, ambiguity, conflict, and uncertainty. Each value records provenance (USER_CONFIRMED, SYSTEM_OBSERVED, MODEL_INFERRED, DERIVED) separately from status (CONFIRMED, INFERRED, CANDIDATE, UNKNOWN). Model confidence cannot upgrade provenance. Runtime observations do not automatically become reusable knowledge.
 
-Failure profiles must consider UNKNOWN, AMBIGUOUS, CONFLICT, OUT_OF_SCOPE, INVALID_INPUT, PARTIAL, FAILED, NEEDS_INPUT, and NEEDS_REVIEW. Inapplicable outcomes must be explicit and must not silently collapse into success.
+A Unit declares one canonical failure.handling map. Its enum-constrained keys are the supported failure statuses; each key maps to a typed handling policy (action plus optional bounded retry limit/reason). There is no parallel failure.supported array. Unknown keys and missing handling policies fail closed. UNKNOWN, AMBIGUOUS, CONFLICT, OUT_OF_SCOPE, INVALID_INPUT, PARTIAL, FAILED, NEEDS_INPUT and NEEDS_REVIEW remain explicit and never silently collapse into success.
 
 ## 3.1. Trusted implementation and Workflow binding
 
@@ -81,6 +81,28 @@ implementation.ref is a typed logical binding key, not an executable path.
 Arbitrary dynamic import is forbidden. Domain Definition binds both workflowRef.unitRef and workflowRef.graphRef (ID, revision, and Package-relative path), and they must agree with the Workflow Unit and loaded Graph.
 
 Every Graph Node's exact Unit ID/revision must be declared exactly once in the Definition's Semantic/Tool Component set or private Unit set. An undeclared, revision-mismatched, or component/private-overlapping Node Unit is invalid.
+
+## 3.2 Capability Contract and deterministic provider resolution
+
+A Capability Contract is a stable, versioned promise attached to an existing Unit; it is not a new Unit role, Component family, Package dependency, Graph Edge, Tool authorization or Effect Permit.
+
+- A provided contract binds capabilityId, owner, authorityRef, exact version and contractDigest.
+- A requirement binds the same identity plus an explicit compatibility policy. EXACT accepts only the identical version and digest. EXPLICIT_ALLOWLIST accepts only the enumerated exact version/digest pairs. SemVer ranges alone never establish compatibility.
+- A provider is valid only when its owner/authority, contract identity/digest, target and qualification satisfy the requirement.
+- Build/Package materialization resolves each required Capability to exactly one provider. Zero providers, unresolved multiplicity, incompatible contract/target, missing artifact or insufficient qualification fail closed.
+- Runtime consumes only the exact provider recorded in the immutable Package selection lock. It never chooses by directory order, model suggestion, name similarity or ambient discovery.
+
+One logical Capability may have multiple implementation candidates. Each candidate declares a stable candidateId, implementation ref, artifact path/digest, target and contract digest. The Package lock selects one exact candidate; its candidateId, Unit revision, implementation ref, artifact digest and target must match the Unit's selected implementation binding. The selected provider is deterministic even if candidate ordering changes.
+
+## 3.3 Preconditions and structured Knowledge / Rule references
+
+Executable Units may declare a bounded preconditions profile bound to their input Schema. DIS 0.1.0 supports only declarative top-level JSON Pointer checks with exists, equals and notEquals; arbitrary code, model-generated predicates and implicit coercion are forbidden. A failed precondition yields its declared failure outcome and does not execute the implementation.
+
+A Unit may declare knowledgeRefs for separately addressable Knowledge/Rule assets. Each reference pins stable id, revision, kind, Package-relative path and SHA-256 digest. These are consumable domain data, not provenance claims. Evidence.sources remains provenance/claim metadata and cannot substitute for a Knowledge/Rule binding. Every selected Knowledge/Rule resource enters Resource Closure, and the Consumer must load and use the exact selected reference.
+
+## 3.4 Canonical failure handling
+
+failure.handling is the sole source of supported failure statuses. Keys are restricted to the DIS failure-status enum; each value is a typed policy with a declared action and optional bounded retryLimit/reason. JSON Schema and independent Consumers reject unknown keys, malformed actions and unsupported retry policies. A status cannot be advertised as supported without its policy.
 
 ## 4. Component and Capability mapping
 
@@ -150,17 +172,19 @@ Preserve files-first and the six Domain Data classes. SQLite, graph databases, a
 
 ## 8. Qualification, consumption, and evolution
 
-EXECUTED is a runtime occurrence/evidence fact, not a Unit qualification or maturity stage. Runtime use must not change immutable Unit qualification; execution facts belong in Journal/Outcome/Evidence.
+Qualification is an append-only lifecycle, not a mutable Unit field. Candidate, Validation, Promotion, rejection/withdrawal/expiry/supersession and their evidence bind an exact subject digest and dependency-closure digest. Each transition records its prior event, actor/authority, policy revision, evidence references and time. Conflicting, missing, unauthorized or stale transitions fail closed.
 
-Keep four independent axes:
-- Asset Authority;
-- Intelligence Maturity;
-- Runtime Resolver Precedence;
-- Execution Authority, determined by the frozen v0.7 Kernel/Microkernel, Domain Runtime, and Host/Effect contracts. The #1480 KDP candidate is not frozen and has no normative authority.
+The axes remain separate:
+- Asset Authority is the immutable authority class on an asset.
+- Maturity is derived from append-only OBSERVED/CANDIDATE/VALIDATED/PROMOTED or terminal-disposition records.
+- Selection is consumer/Package-specific and recorded once in the immutable Package lock with exact promoted asset, Unit/Capability/provider, target/profile, Promotion Decision and validation evidence pins.
+- Activation is an existing Runtime/Package occurrence; execution is a Journal/Trace occurrence. Neither changes Unit maturity or Package identity.
 
-Simulator success does not automatically promote. Promotion, Selection, and Activation are separate explicit governance decisions. LLM-generated content defaults to Candidate. Runtime outcomes create Evidence/Candidates; they do not directly mutate active Definitions or Packages.
+Validation evidence binds exact candidate and dependency digests, validation profile/revision, validator identity/version, baseline, coverage, results/findings/limitations and reproducibility environment. A changed candidate or dependency closure invalidates prior validation evidence. PASS is evidence, never Promotion authority. Promotion is a separate, explicitly authorized decision; it does not automatically select. Selection does not automatically activate.
 
-Package Build Validity, Intelligence Qualification, and End-to-End App Validation are three separate gates. Installed Definitions/Assemblies remain exactly pinned and must not be silently replaced.
+Forge owns candidate production; Simulator owns simulation evidence and evolution proposals; a separately designated governance authority owns Promotion; Package BUILD owns exact selection/materialization; the single Runtime authority owns activation and execution. Runtime feedback is provenance-preserving input to a future cycle and cannot mutate active pins. LLM-generated content defaults to Candidate.
+
+Package Build Validity, Intelligence Qualification and End-to-End App Validation remain three separate gates. Installed Definitions/Packages retain exact pins and are never silently replaced.
 
 ## 9. Conformance
 
@@ -173,7 +197,7 @@ Conformance has three levels:
 2. Behavioral Conformance: positive, negative, boundary, unknown, ambiguous, conflict, out-of-scope, failure, and recovery semantics match declarations.
 3. Consumer Conformance: a real Consumer consumes selected intelligence without bypassing Runtime/Host/Effect authority.
 
-At minimum, test known/ambiguous/unknown/invalid/out-of-scope input, Decision branching, independent control/data/evidence Edges, required input bindings, Schema Closure and nested references, traversal/missing-resource rejection, digest tampering, private Procedure boundaries, exact Unit/Package pins, untrusted implementation bindings, missing/lost evidence, no implicit pass-through, and no automatic promotion/activation.
+At minimum, test known/ambiguous/unknown/invalid/out-of-scope input; Decision branching; independent control/data/evidence Edges; required input bindings; Schema Closure; traversal/missing-resource rejection; digest tampering; private Procedure boundaries; exact Unit/Package pins; Capability missing/ambiguous/incompatible providers; two candidate implementations with deterministic Package-lock selection; failed preconditions; structured Knowledge/Rule consumption; failure-map unknown/missing-policy rejection; stale validation digest; unauthorized Promotion; Candidate/Validated-but-not-Promoted selection rejection; Package selection pin mismatch; missing/lost evidence; no implicit pass-through; and no automatic activation.
 
 ## 10. Demo and revision basis
 
