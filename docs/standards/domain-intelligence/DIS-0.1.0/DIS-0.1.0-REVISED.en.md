@@ -196,14 +196,14 @@ DIS 0.1.0 Graph Pointers support only the root output object ("") or one top-lev
 
 The revised Demo Decision emits only route; Procedures emit only their resolution. Recognizer evidence reaches Validator through an independent evidence Edge. Accordingly, Decision Output Schema must not require an echoed recognition object, and Resolution Schema must not require Procedures to copy evidence. Every executed Demo Node input and output is validated against its declared Unit Schema.
 
-### 12.3. Initial Demo findings
+### 12.3. Final validation additional findings and corrections
 
-- DIS-F-001 (P1): one Edge mixed control flow and data flow, coupling downstream Nodes to implicit pass-through.
-- DIS-F-002 (P2): schemaRef was checked only as a string and was not closed over Package resources.
 - DIS-F-003 (P1): Decision/Procedure Output Schemas contradicted the separated data/evidence model.
 - DIS-F-004 (P1): Validation Report Schema contained invalid JSON.
 - DIS-F-005 (P2): prior path patterns accepted empty and dot path segments.
 - DIS-F-006 (P2): Unit Evidence referenced fixture catalogs that the Demo runner did not actually consume.
+
+The historical final validation covered Node behavior tests, Demo branches and a fixture-backed path, five standard Schema self-validations, six Units, Graph, Definition, Resource Closure, and each executed Node input/output Schema. See validation/dis-0.1.0/FINAL_VALIDATION.md; that report applies only to its recorded historical Demo commit.
 
 The corresponding fixes and historical test evidence are recorded in validation/dis-0.1.0/REVISION_LOG.md and FINAL_VALIDATION.md.
 
