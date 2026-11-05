@@ -136,7 +136,7 @@
   },
   "knowledgeRefs": [
     {
-      "id": "xdownload.player-signature-rules",
+      "id": "xdownload.player-signatures",
       "revision": "1.0.0",
       "kind": "rule-set",
       "path": "fixtures/player-signatures.json",
