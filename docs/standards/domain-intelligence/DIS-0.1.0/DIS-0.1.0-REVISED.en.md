@@ -120,6 +120,7 @@ Data Edge source and target JSON Pointers must be valid. Every required target i
 - Node IDs are unique; entry and terminal Nodes exist.
 - DIS 0.1.0 control graphs are strictly DAG-only. All cycles, iterations, and retries are rejected. A later version may define a machine-verifiable bounded-iteration Profile.
 - Required inputs are validated per control path: exactly one source must have executed on every path to the target. Duplicate same-execution bindings and non-ancestor sources are rejected.
+- Optional input properties may receive conditional data bindings only when the target Input Schema declares them optional (not in `required`). Their source must be a strict control ancestor; the binding may be absent on paths where its source Node does not execute, but may occur at most once on any path.
 - Every control path reaches a terminal or explicit wait/failure outcome.
 - Node, Pointer, and Slot references in data/evidence Edges must exist.
 - Every non-entry required input is bound exactly once on every reachable control path. DIS 0.1.0 defines no implicit defaults.

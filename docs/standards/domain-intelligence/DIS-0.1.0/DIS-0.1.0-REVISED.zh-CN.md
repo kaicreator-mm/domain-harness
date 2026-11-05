@@ -113,6 +113,7 @@ data Edge 的源/目标 JSON Pointer 必须有效；目标必需输入必须获�
 - Node ID 唯一，入口/终态存在；
 - DIS 0.1.0 控制图严格为 DAG；拒绝所有循环、迭代和重试。后续标准版本才可定义机器可验证的有界迭代 Profile；
 - required input 必须按控制路径验证：到达目标的每条路径上恰好有一个来源已经执行；拒绝同一执行源重复绑定和非祖先来源；
+- optional input 必须通过目标 Input Schema 中未列入 `required` 的属性显式声明为条件数据绑定。来源必须是目标的严格控制流祖先；来源 Node 未执行的路径允许缺少该绑定，但每条路径最多绑定一次。
 - 每条控制路径到达终态或显式 wait/failure；
 - data/evidence 引用的 Node、Pointer、Slot 必须存在；
 - 非入口 Node 的 required input 必须在每条可达控制路径上恰好绑定一次；DIS 0.1.0 不定义隐式默认值；

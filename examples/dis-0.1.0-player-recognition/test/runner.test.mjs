@@ -264,12 +264,42 @@ test('exists control conditions may inspect declared optional output properties'
 });
 
 
+
+test('optional input data binding may be absent on paths where its source does not execute', async () => {
+  const loaded = await loadedPromise;
+  const graph = structuredClone(loaded.graph);
+  const targetUnit = loaded.unitsById.get('xdownload.player.outcome-validator');
+  const schemas = new Map(loaded.schemas);
+  const targetSchema = structuredClone(schemas.get(targetUnit.input.schemaRef));
+  targetSchema.properties.optionalStatus = { type: 'string' };
+  schemas.set(targetUnit.input.schemaRef, targetSchema);
+  graph.edges.push({
+    kind: 'data',
+    from: { node: 'resolve-known', pointer: '/status' },
+    to: { node: 'validate', pointer: '/optionalStatus' },
+  });
+  assert.equal(validateGraph(graph, loaded.unitsById, schemas), true);
+
+  const duplicate = structuredClone(graph);
+  duplicate.edges.push({
+    kind: 'data',
+    from: { node: 'decide', pointer: '/route' },
+    to: { node: 'validate', pointer: '/optionalStatus' },
+  });
+  assert.throws(
+    () => validateGraph(duplicate, loaded.unitsById, schemas),
+    hasCode('OPTIONAL_INPUT_DUPLICATE_BINDING_ON_PATH'),
+  );
+});
+
 test('control conditions use the same structural JSON value semantics as Python', () => {
   const cases = [
     [{ optionalFlag: true }, { path: '/optionalFlag', operator: 'equals', value: true }, true],
     [{ optionalFlag: 1 }, { path: '/optionalFlag', operator: 'equals', value: true }, false],
     [{ optionalFlag: 1 }, { path: '/optionalFlag', operator: 'notEquals', value: true }, true],
     [{ optionalFlag: true }, { path: '/optionalFlag', operator: 'notEquals', value: 1 }, true],
+    [{ optionalFlag: true }, { path: '/optionalFlag', operator: 'notEquals', value: true }, false],
+    [{ optionalFlag: 1 }, { path: '/optionalFlag', operator: 'equals', value: 1.0 }, true],
     [{}, { path: '/optionalFlag', operator: 'equals', value: null }, false],
     [{}, { path: '/optionalFlag', operator: 'notEquals', value: null }, true],
     [{ optionalFlag: null }, { path: '/optionalFlag', operator: 'exists' }, true],

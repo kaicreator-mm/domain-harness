@@ -167,7 +167,7 @@ Edge 只能有且只有一种 kind：
 - Edge 的 Node / Pointer / Slot 有效；
 - 每个 required input 在每条可达执行路径上恰好有一个有效绑定；必须计算路径上的最小/最大绑定数量，不能只检查边是否存在；
 - 每条 data/evidence 来源必须是目标节点的严格控制流祖先；拒绝同一次源节点执行产生的重复绑定；
-- data source 在目标执行前可用，并在所有适用控制路径上可达；否则必须声明 optional/conditional binding；
+- optional input 通过目标 Input Schema 中未列入 `required` 的属性显式声明为条件绑定；来源必须是 target 的严格控制流祖先，来源 Node 未执行的路径允许缺省，但每条路径最多绑定一次；
 - evidence slot 已声明；
 - 控制图从 entry 可达，所有路径到 terminal 或显式 wait/failure；
 - 拒绝未声明循环、无界 retry 和无法判定的分支。

@@ -437,6 +437,38 @@ def validate_graph_contract(graph: dict, units_by_id: dict, schemas: dict):
             fail(f"terminal Node has a control successor: {node_id}")
 
 
+def validate_optional_data_binding_semantics(graph: dict, units_by_id: dict, schemas: dict):
+    candidate = json.loads(json.dumps(graph))
+    target_unit = units_by_id["xdownload.player.outcome-validator"]
+    target_schema_ref = target_unit["input"]["schemaRef"]
+    target_schema = json.loads(json.dumps(schemas[target_schema_ref]))
+    target_schema.setdefault("properties", {})["optionalStatus"] = {"type": "string"}
+    local_schemas = dict(schemas)
+    local_schemas[target_schema_ref] = target_schema
+    candidate["edges"].append({
+        "kind": "data",
+        "from": {"node": "resolve-known", "pointer": "/status"},
+        "to": {"node": "validate", "pointer": "/optionalStatus"},
+    })
+    # The source executes only on the known-player branch. The target Schema's
+    # optional property makes this an explicit conditional binding.
+    validate_graph_contract(candidate, units_by_id, local_schemas)
+
+    duplicate = json.loads(json.dumps(candidate))
+    duplicate["edges"].append({
+        "kind": "data",
+        "from": {"node": "decide", "pointer": "/route"},
+        "to": {"node": "validate", "pointer": "/optionalStatus"},
+    })
+    try:
+        validate_graph_contract(duplicate, units_by_id, local_schemas)
+    except SystemExit as error:
+        if "optional Graph input has multiple sources on one path" not in str(error):
+            raise
+    else:
+        fail("optional data binding accepted two sources on one control path")
+
+
 def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict):
     trace = result.get("trace")
     if not isinstance(trace, list) or not trace:
@@ -513,6 +545,9 @@ def validate_condition_semantics():
         ({"optionalFlag": 1}, {"path": "/optionalFlag", "operator": "equals", "value": True}, False),
         ({"optionalFlag": 1}, {"path": "/optionalFlag", "operator": "notEquals", "value": True}, True),
         ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "notEquals", "value": 1}, True),
+        ({"optionalFlag": True}, {"path": "/optionalFlag", "operator": "notEquals", "value": True}, False),
+        ({"optionalFlag": 1}, {"path": "/optionalFlag", "operator": "equals", "value": 1.0}, True),
+        ({"actual": {"value": 1}}, {"path": "", "operator": "equals", "value": {"actual": {"value": 1}}}, True),
         ({}, {"path": "/optionalFlag", "operator": "equals", "value": None}, False),
         ({}, {"path": "/optionalFlag", "operator": "notEquals", "value": None}, True),
         ({"optionalFlag": {"a": 1, "b": [True, None]}}, {"path": "/optionalFlag", "operator": "equals", "value": {"b": [True, None], "a": 1}}, True),
@@ -684,6 +719,7 @@ def main():
         registry = registry.with_resource(uri, Resource.from_contents(schema))
 
     validate_graph_contract(graph, units_by_id, demo_schemas)
+    validate_optional_data_binding_semantics(graph, units_by_id, demo_schemas)
 
     node_script = subprocess.run(
         ["node", "./src/emit-conformance-traces.mjs"],
