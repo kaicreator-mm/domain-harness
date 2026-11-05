@@ -117,6 +117,7 @@ Independent review identified two bounded inconsistencies:
 
 - **P2 — optional control-condition semantics:** the Graph schema and runtime condition operators supported `exists`, but JS/Python static validation rejected any non-root condition property not listed as required. This made `exists` unusable for its intended optional-property case. Static validation now requires the property to be declared, not required. Semantics are explicit: `equals` matches present/equal; `notEquals` matches absent/unequal; `exists` matches present. Unsupported operators are rejected during JS Graph validation.
 - **P1 — bilingual architecture gap:** the Chinese L2 architecture omitted the English `Workflow / Pipeline / Composition Graph` contract section. The Chinese section is now added, and the duplicated Chinese Graph rule is removed.
+- **P1 — bilingual normative findings gap:** English section 12.3 mixed initial Demo findings F001/F002 with final-pass findings F003-F006, while Chinese section 12.3 correctly listed only F003-F006. English section 12.3 is now aligned and explicitly marks the final validation report as historical evidence for its recorded Demo commit only.
 
 R3 adds two Node regression tests and an independent Python condition-semantics self-test. The Python Graph validator, JS Reference Consumer, English/Chinese normative text, and English/Chinese L2 architecture are synchronized. Resource Closure SHA-256 entries and the enclosing Package descriptor digest are recalculated.
 
