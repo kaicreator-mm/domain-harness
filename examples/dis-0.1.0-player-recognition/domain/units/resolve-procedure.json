@@ -3,7 +3,7 @@
   "purpose":"Resolve a recognized player into a deterministic extraction strategy descriptor.",
   "scope":{"domain":"web-media","appliesTo":["one-supported-player-candidate"],"excludes":["network-request","media-download","credential-access"]},
   "owner":"xdownload-demo","authority":"CONTROLLED","qualification":{"stage":"CANDIDATE","limitations":["Returns a strategy descriptor only."]},
-  "input":{"schemaRef":"schemas/resolve-input.schema.json"},"output":{"schemaRef":"schemas/resolution.schema.json"},
+  "input":{"schemaRef":"domain/schemas/resolve-input.schema.json"},"output":{"schemaRef":"domain/schemas/resolution.schema.json"},
   "implementation":{"strategy":"function","ref":"src/runner.mjs#resolvePlayer","exposure":"private"},
   "evidence":{"sources":[{"sourceId":"strategy-map","kind":"reference","ref":"fixtures/player-strategies.json","claim":"Maps supported player IDs to local strategy identifiers."}],"absenceReason":null},
   "failure":{"supported":["INVALID_INPUT","UNKNOWN"],"handling":{"INVALID_INPUT":"reject","UNKNOWN":"reject"}},

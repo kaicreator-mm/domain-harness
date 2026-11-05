@@ -3,7 +3,7 @@
   "purpose":"Choose the deterministic resolution path for a recognition result.",
   "scope":{"domain":"web-media","appliesTo":["player-recognition-result"],"excludes":["download-execution","external-side-effects"]},
   "owner":"xdownload-demo","authority":"CONTROLLED","qualification":{"stage":"CANDIDATE","limitations":["Deterministic routing for the three demo statuses."]},
-  "input":{"schemaRef":"schemas/decision-input.schema.json"},"output":{"schemaRef":"schemas/decision-output.schema.json"},
+  "input":{"schemaRef":"domain/schemas/decision-input.schema.json"},"output":{"schemaRef":"domain/schemas/decision-output.schema.json"},
   "implementation":{"strategy":"declarative","ref":"src/runner.mjs#routeRecognition","exposure":"semantic"},
   "evidence":{"sources":[{"sourceId":"recognition-status-contract","kind":"authority","ref":"domain/units/recognizer.json","claim":"Only one recognized candidate enters the known-player procedure."}],"absenceReason":null},
   "failure":{"supported":["UNKNOWN","AMBIGUOUS","INVALID_INPUT"],"handling":{"UNKNOWN":"route-to-bounded-fallback","AMBIGUOUS":"route-to-clarification","INVALID_INPUT":"reject"}},

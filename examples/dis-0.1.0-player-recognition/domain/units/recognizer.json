@@ -3,8 +3,8 @@
   "purpose":"Recognize a supported media player from a bounded page observation and retain match evidence.",
   "scope":{"domain":"web-media","appliesTo":["http-or-https-page-observation"],"excludes":["encrypted-player-decryption","unsupported-player-families"]},
   "owner":"xdownload-demo","authority":"CONTROLLED","qualification":{"stage":"CANDIDATE","limitations":["Small demo signature catalog."]},
-  "input":{"schemaRef":"schemas/page-observation.schema.json"},"output":{"schemaRef":"schemas/recognition-result.schema.json"},
-  "implementation":{"strategy":"hybrid","ref":"src/runner.mjs#recognizePlayer","exposure":"semantic"},
+  "input":{"schemaRef":"domain/schemas/page-observation.schema.json"},"output":{"schemaRef":"domain/schemas/recognition-result.schema.json"},
+  "implementation":{"strategy":"function","ref":"src/runner.mjs#recognizePlayer","exposure":"semantic"},
   "evidence":{"sources":[{"sourceId":"player-signature-fixture","kind":"reference","ref":"fixtures/player-signatures.json","claim":"Known markers identify supported player families."}],"absenceReason":null},
   "failure":{"supported":["UNKNOWN","AMBIGUOUS","INVALID_INPUT","OUT_OF_SCOPE"],"handling":{"UNKNOWN":"return-empty-candidate-set","AMBIGUOUS":"return-all-matching-candidates","INVALID_INPUT":"reject","OUT_OF_SCOPE":"reject"}},
   "validation":{"profile":"player-recognition-conformance/0.1.0","casesRef":"test/runner.test.mjs","lastResult":"NOT_RUN"}

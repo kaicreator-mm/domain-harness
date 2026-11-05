@@ -1,10 +1,11 @@
-import { loadDemo, runPipeline } from "./runner.mjs";
+import { loadVerifiedDemo } from './verified-loader.mjs';
+import { runPipeline } from './runner.mjs';
 
-const loaded = await loadDemo();
+const loaded = await loadVerifiedDemo();
 const examples = [
-  { label: "known", input: { url: "https://example.test/watch", signals: ["jwplayer.setup({})"] } },
-  { label: "ambiguous", input: { url: "https://example.test/watch", signals: ["jwplayer", "videojs"] } },
-  { label: "unknown", input: { url: "https://example.test/watch", signals: ["custom-player"] } }
+  { label: 'known', input: { url: 'https://example.test/watch', signals: ['jwplayer.setup({})'] } },
+  { label: 'ambiguous', input: { url: 'https://example.test/watch', signals: ['jwplayer', 'videojs'] } },
+  { label: 'unknown', input: { url: 'https://example.test/watch', signals: ['custom-player'] } },
 ];
 for (const example of examples) {
   const result = await runPipeline(example.input, loaded);
