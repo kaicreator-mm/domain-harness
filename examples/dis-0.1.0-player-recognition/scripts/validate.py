@@ -208,6 +208,208 @@ def condition_matches(output, condition):
     fail(f"unsupported control condition operator: {operator}")
 
 
+
+def can_reach(source: str, target: str, adjacency: dict) -> bool:
+    if source == target:
+        return False
+    pending = [source]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for child in adjacency.get(current, []):
+            if child == target:
+                return True
+            pending.append(child)
+    return False
+
+
+def path_binding_range(entry_node: str, target_node: str, source_nodes: set, order: list, adjacency: dict):
+    minimum = {node: float("inf") for node in order}
+    maximum = {node: float("-inf") for node in order}
+    initial = 1 if entry_node in source_nodes else 0
+    minimum[entry_node] = initial
+    maximum[entry_node] = initial
+    for current in order:
+        if minimum[current] == float("inf"):
+            continue
+        for child in adjacency.get(current, []):
+            increment = 1 if child in source_nodes else 0
+            minimum[child] = min(minimum[child], minimum[current] + increment)
+            maximum[child] = max(maximum[child], maximum[current] + increment)
+    return minimum[target_node], maximum[target_node]
+
+
+def validate_graph_contract(graph: dict, units_by_id: dict, schemas: dict):
+    node_ids = [node["nodeId"] for node in graph["nodes"]]
+    nodes_by_id = {node["nodeId"]: node for node in graph["nodes"]}
+    if len(nodes_by_id) != len(node_ids):
+        fail("duplicate Graph Node ID")
+    if graph["entryNode"] not in nodes_by_id:
+        fail("Graph entry Node is missing")
+    if any(node not in nodes_by_id for node in graph["terminalNodes"]):
+        fail("Graph terminal Node is missing")
+
+    for node in graph["nodes"]:
+        unit_ref = node["unitRef"]
+        unit = units_by_id.get(unit_ref["id"])
+        if not unit or unit["revision"] != unit_ref["revision"]:
+            fail(f"Graph Node exact Unit identity unresolved: {node['nodeId']}")
+    entry_unit = units_by_id[nodes_by_id[graph["entryNode"]]["unitRef"]["id"]]
+    if entry_unit["input"]["schemaRef"] != graph["inputSchemaRef"]:
+        fail("Graph entry input Schema does not match entry Unit")
+    for terminal_id in graph["terminalNodes"]:
+        terminal_unit = units_by_id[nodes_by_id[terminal_id]["unitRef"]["id"]]
+        if terminal_unit["output"]["schemaRef"] != graph["outputSchemaRef"]:
+            fail(f"Graph terminal output Schema mismatch: {terminal_id}")
+
+    controls = [edge for edge in graph["edges"] if edge["kind"] == "control"]
+    data = [edge for edge in graph["edges"] if edge["kind"] == "data"]
+    evidence = [edge for edge in graph["edges"] if edge["kind"] == "evidence"]
+    if len(controls) + len(data) + len(evidence) != len(graph["edges"]):
+        fail("unsupported Graph Edge kind")
+    adjacency = {node_id: [] for node_id in node_ids}
+
+    for edge in controls:
+        if edge["from"] not in nodes_by_id or edge["to"] not in nodes_by_id:
+            fail("control Edge references unknown Node")
+        condition = edge.get("when")
+        if condition is not None:
+            operator = condition["operator"]
+            if operator not in ("equals", "notEquals", "exists"):
+                fail("unsupported control condition operator")
+            if operator in ("equals", "notEquals") and "value" not in condition:
+                fail("control condition value is required")
+            if operator == "exists" and "value" in condition:
+                fail("exists condition must not declare value")
+            pointer = condition["path"]
+            source_unit = units_by_id[nodes_by_id[edge["from"]]["unitRef"]["id"]]
+            source_schema = schemas[source_unit["output"]["schemaRef"]]
+            if pointer:
+                property_name = pointer_key(pointer)
+                if property_name not in source_schema.get("properties", {}):
+                    fail("control condition references unknown output property")
+                if property_name not in source_schema.get("required", []):
+                    fail("control condition output property must be required")
+        adjacency[edge["from"]].append(edge["to"])
+
+    data_keys = set()
+    for edge in data:
+        source_node = edge["from"]["node"]
+        target_node = edge["to"]["node"]
+        if source_node not in nodes_by_id or target_node not in nodes_by_id:
+            fail("data Edge references unknown Node")
+        source_pointer = edge["from"]["pointer"]
+        target_pointer = edge["to"]["pointer"]
+        if source_pointer:
+            source_property = pointer_key(source_pointer)
+            source_unit = units_by_id[nodes_by_id[source_node]["unitRef"]["id"]]
+            source_schema = schemas[source_unit["output"]["schemaRef"]]
+            if source_property not in source_schema.get("properties", {}):
+                fail("data Edge references unknown source output property")
+            if source_property not in source_schema.get("required", []):
+                fail("data Edge source output property must be required")
+        target_property = pointer_key(target_pointer)
+        target_unit = units_by_id[nodes_by_id[target_node]["unitRef"]["id"]]
+        target_schema = schemas[target_unit["input"]["schemaRef"]]
+        if target_property not in target_schema.get("properties", {}):
+            fail("data Edge references unknown target input property")
+        if target_node == graph["entryNode"]:
+            fail("entry Node cannot receive a data Edge")
+        duplicate_key = (target_node, target_pointer, source_node)
+        if duplicate_key in data_keys:
+            fail("duplicate data binding")
+        data_keys.add(duplicate_key)
+
+    for edge in evidence:
+        source_node = edge["from"]["node"]
+        target_node = edge["to"]["node"]
+        if source_node not in nodes_by_id or target_node not in nodes_by_id:
+            fail("evidence Edge references unknown Node")
+        source_property = pointer_key(edge["from"]["pointer"])
+        source_unit = units_by_id[nodes_by_id[source_node]["unitRef"]["id"]]
+        source_schema = schemas[source_unit["output"]["schemaRef"]]
+        if source_property not in source_schema.get("properties", {}):
+            fail("evidence Edge references unknown source property")
+        if source_property not in source_schema.get("required", []):
+            fail("evidence Edge source property must be required")
+        target_unit = units_by_id[nodes_by_id[target_node]["unitRef"]["id"]]
+        if edge["to"]["slot"] not in target_unit.get("evidence", {}).get("consumes", []):
+            fail("evidence Edge targets an undeclared slot")
+
+    indegree = {node_id: 0 for node_id in node_ids}
+    for source_node, children in adjacency.items():
+        for child in children:
+            indegree[child] += 1
+    pending = [node_id for node_id in node_ids if indegree[node_id] == 0]
+    order = []
+    while pending:
+        current = pending.pop(0)
+        order.append(current)
+        for child in adjacency[current]:
+            indegree[child] -= 1
+            if indegree[child] == 0:
+                pending.append(child)
+    if len(order) != len(node_ids):
+        fail("DIS 0.1.0 Graph must be DAG-only")
+
+    reachable = {graph["entryNode"]}
+    queue = [graph["entryNode"]]
+    while queue:
+        current = queue.pop(0)
+        for child in adjacency[current]:
+            if child not in reachable:
+                reachable.add(child)
+                queue.append(child)
+    if len(reachable) != len(node_ids):
+        fail("Graph contains an unreachable control Node")
+
+    for node_id in node_ids:
+        unit = units_by_id[nodes_by_id[node_id]["unitRef"]["id"]]
+        input_schema = schemas[unit["input"]["schemaRef"]]
+        if node_id != graph["entryNode"]:
+            for property_name in input_schema.get("required", []):
+                target_pointer = "/" + property_name.replace("~", "~0").replace("/", "~1")
+                bindings = [edge for edge in data if edge["to"]["node"] == node_id and edge["to"]["pointer"] == target_pointer]
+                if not bindings:
+                    fail(f"required Graph input has no data binding: {node_id}{target_pointer}")
+                sources = {edge["from"]["node"] for edge in bindings}
+                if any(not can_reach(source, node_id, adjacency) for source in sources):
+                    fail(f"data source is not a control ancestor: {node_id}{target_pointer}")
+                minimum, maximum = path_binding_range(graph["entryNode"], node_id, sources, order, adjacency)
+                if minimum != 1 or maximum != 1:
+                    fail(f"required Graph input is not bound exactly once on every path: {node_id}{target_pointer}")
+            for edge in [item for item in data if item["to"]["node"] == node_id]:
+                property_name = pointer_key(edge["to"]["pointer"])
+                if property_name not in input_schema.get("required", []):
+                    source = edge["from"]["node"]
+                    if not can_reach(source, node_id, adjacency):
+                        fail(f"optional data source is not a control ancestor: {source}->{node_id}")
+                    sources = {item["from"]["node"] for item in data if item["to"]["node"] == node_id and item["to"]["pointer"] == edge["to"]["pointer"]}
+                    _, maximum = path_binding_range(graph["entryNode"], node_id, sources, order, adjacency)
+                    if maximum > 1:
+                        fail(f"optional Graph input has multiple sources on one path: {node_id}{edge['to']['pointer']}")
+        for slot in unit.get("evidence", {}).get("consumes", []):
+            slot_edges = [edge for edge in evidence if edge["to"]["node"] == node_id and edge["to"]["slot"] == slot]
+            if not slot_edges:
+                fail(f"required evidence slot has no source: {node_id}:{slot}")
+            sources = {edge["from"]["node"] for edge in slot_edges}
+            if any(not can_reach(source, node_id, adjacency) for source in sources):
+                fail(f"evidence source is not a control ancestor: {node_id}:{slot}")
+            minimum, _ = path_binding_range(graph["entryNode"], node_id, sources, order, adjacency)
+            if minimum < 1:
+                fail(f"evidence slot is unavailable on a control path: {node_id}:{slot}")
+
+    terminal_nodes = set(graph["terminalNodes"])
+    for node_id in node_ids:
+        if node_id not in terminal_nodes and not adjacency[node_id]:
+            fail(f"non-terminal control path has no successor: {node_id}")
+        if node_id in terminal_nodes and adjacency[node_id]:
+            fail(f"terminal Node has a control successor: {node_id}")
+
+
 def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict):
     trace = result.get("trace")
     if not isinstance(trace, list) or not trace:
@@ -311,9 +513,23 @@ def main():
     graph_schema = standard_schemas["composition-graph.schema.json"]
     definition_schema = standard_schemas["domain-definition.schema.json"]
     closure_schema = standard_schemas["resource-closure.schema.json"]
-    units = [read_json(path) for path in sorted(UNIT_DIR.glob("*.json"))]
-    if len(units) != len(closure["units"]):
-        fail("Unit inventory does not match Resource Closure")
+    declared_unit_paths = set()
+    units = []
+    for unit_ref in closure["units"]:
+        relative = safe_relative(unit_ref["path"])
+        if relative in declared_unit_paths:
+            fail(f"duplicate Unit descriptor path: {relative}")
+        declared_unit_paths.add(relative)
+        unit = read_json(resolve_inside(relative))
+        if unit.get("id") != unit_ref["id"] or unit.get("revision") != unit_ref["revision"]:
+            fail(f"Resource Closure Unit path/identity mismatch: {relative}")
+        units.append(unit)
+    actual_unit_paths = {
+        path.relative_to(PACKAGE_ROOT).as_posix()
+        for path in UNIT_DIR.rglob("*.json")
+    }
+    if actual_unit_paths != declared_unit_paths:
+        fail("Unit descriptor inventory differs from Resource Closure")
     for unit in units:
         Draft202012Validator(unit_schema, format_checker=FormatChecker()).validate(unit)
         for source in unit.get("evidence", {}).get("sources", []):
@@ -322,13 +538,21 @@ def main():
     if len(units_by_id) != len(units):
         fail("duplicate Unit identity")
 
-    graph = read_json(DOMAIN_DIR / "player-recognition.graph.json")
-    definition = read_json(DOMAIN_DIR / "definition.json")
+    graph_path = safe_relative(closure["graphRef"]["path"])
+    definition_path = safe_relative(closure["definitionRef"]["path"])
+    graph = read_json(resolve_inside(graph_path))
+    definition = read_json(resolve_inside(definition_path))
+    if graph.get("id") != closure["graphRef"]["id"] or graph.get("revision") != closure["graphRef"]["revision"]:
+        fail("Resource Closure Graph identity/path mismatch")
+    if definition.get("domainId") != closure["definitionRef"]["id"] or definition.get("revision") != closure["definitionRef"]["revision"]:
+        fail("Resource Closure Definition identity/path mismatch")
     Draft202012Validator(graph_schema).validate(graph)
     Draft202012Validator(definition_schema).validate(definition)
     Draft202012Validator(closure_schema).validate(closure)
 
     nodes_by_id = {node["nodeId"]: node for node in graph["nodes"]}
+    if len(nodes_by_id) != len(graph["nodes"]):
+        fail("duplicate Graph Node ID")
     for node in graph["nodes"]:
         unit = units_by_id.get(node["unitRef"]["id"])
         if not unit or unit["revision"] != node["unitRef"]["revision"]:
@@ -410,6 +634,8 @@ def main():
         demo_schemas[relative] = schema
         registry = registry.with_resource(uri, Resource.from_contents(schema))
 
+    validate_graph_contract(graph, units_by_id, demo_schemas)
+
     node_script = subprocess.run(
         ["node", "./src/emit-conformance-traces.mjs"],
         cwd=PACKAGE_ROOT,
@@ -457,6 +683,8 @@ def main():
         "validatedNodeOutputs": validated_outputs,
         "cases": [{"label": item["label"], "outcome": item["outcome"]["status"]} for item in results],
         "resourceClosureDigest": manifest_digest,
+        "independentGraphValidation": "PASS",
+        "definitionBindingValidation": "PASS",
     }, indent=2))
 
 

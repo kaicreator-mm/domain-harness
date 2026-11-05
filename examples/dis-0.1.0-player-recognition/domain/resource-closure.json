@@ -227,7 +227,7 @@
     },
     {
       "path": "scripts/validate.py",
-      "sha256": "d5ddf22f3b67078ec265612a82edae3315784217b0929000e1ea045e9251ed64",
+      "sha256": "7a6b467c5daedcca75b7daec75cd8b20dfcc6638a04ddc6a844c877251c396a0",
       "kind": "conformance",
       "owners": [
         "xdownload.web-media"
