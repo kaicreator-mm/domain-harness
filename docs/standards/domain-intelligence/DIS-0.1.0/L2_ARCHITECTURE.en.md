@@ -216,7 +216,7 @@ At minimum test known/ambiguous/unknown/invalid/out-of-scope, missing input, dup
 
 DIS version is independent of DomainHarness SDK version. Unit, Graph, Definition, Package revisions and content digests are distinct identities. The same logical ID does not imply the same Artifact. Compatibility is declared by explicit Contract/Profile and validation, not inferred from SemVer alone. Breaking changes require a new version/migration description; installed Packages retain exact pins. Adding an optional Profile does not make an older Consumer assume support.
 
-## 11. Canonical L2 review ledger and R3 candidate status
+## 11. Canonical L2 review ledger and R4 exact-HEAD status
 
 The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct from the initial Demo findings DIS-F-001..F006:
 
@@ -235,7 +235,7 @@ The canonical L2 review identifiers are DIS-L2-F001..F012. They are distinct fro
 
 R2 code repairs are recorded in commits 3ca5f9d and f842fac. R3 additionally aligns optional control-condition semantics across the Reference Consumer, independent Python Conformance, and normative text; unsupported condition operators now fail during Graph validation. The Chinese architecture text now includes the Workflow / Pipeline / Composition Graph contract present in English.
 
-F001-F011 have candidate contract/implementation coverage, but they are not marked finally closed until exact-HEAD Node/Python execution and Fresh Independent Exact-SHA review pass. F012 remains a pre-release qualification gate. The historical Demo PASS at d8c516e does not validate the current R3 candidate.
+F001-F011 are CLOSED for this L2 candidate at HEAD `ff5f13823dc44fe2ca5e2fc03db4591c3dc319e5`: the exact-HEAD LOCAL_VALIDATION receipt #6666234171 passed Node, Demo, Python Conformance, 16/16 executed input/output checks, 16 condition vectors, optional data binding, actual Trace validation, 25/25 Resource Closure hashes, the Package digest, and both repository Woodpecker checks. The full-snapshot Exact-SHA source review #5788712224 plus the exact four-path repair-delta review #5789678159 cover the current 46-path candidate; combined source findings are P0=0/P1=0/P2=0. F012 remains OPEN and is explicitly deferred to the pre-Release Qualification gate: a second materially different Domain Profile is required before release qualification; xDownload alone is not a generality proof. The historical Demo PASS at d8c516e remains historical evidence only and is not used as current-candidate validation.
 
 
 ## 12. L2 Freeze Gate
