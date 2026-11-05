@@ -470,7 +470,7 @@ def validate_optional_data_binding_semantics(graph: dict, units_by_id: dict, sch
         fail("optional data binding accepted two sources on one control path")
 
 
-def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict):
+def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_by_id: dict, selected_providers: dict):
     trace = result.get("trace")
     if not isinstance(trace, list) or not trace:
         fail(f"missing execution trace: {result.get('label')}")
@@ -498,6 +498,9 @@ def validate_trace_assembly(result: dict, graph: dict, units_by_id: dict, nodes_
             fail(f"trace implementation candidate is not declared: {node_id}")
         if not unit.get("implementation", {}).get("candidates") and selected_candidate is not None:
             fail(f"trace carries an undeclared implementation candidate: {node_id}")
+        expected_selected = selected_providers.get(unit["id"], {}).get("candidateId")
+        if selected_candidate != expected_selected:
+            fail(f"trace implementation candidate differs from Package selection lock: {node_id}")
         if index == 0:
             expected_input = result.get("input")
         else:
@@ -789,6 +792,39 @@ def expect_rejection(callback, label: str):
     fail(f"adversarial negative was accepted: {label}")
 
 
+
+def validate_capability_negatives(units_by_id: dict, package_identity: dict, resources: dict):
+    missing = copy.deepcopy(units_by_id)
+    missing["xdownload.player.recognizer"]["capabilities"]["provides"] = []
+    expect_rejection(lambda: validate_capability_contracts(missing, resources), "missing Capability provider")
+
+    ambiguous = copy.deepcopy(units_by_id)
+    duplicate = copy.deepcopy(ambiguous["xdownload.player.recognizer"])
+    duplicate["id"] = "xdownload.player.recognizer.duplicate"
+    ambiguous[duplicate["id"]] = duplicate
+    expect_rejection(lambda: validate_capability_contracts(ambiguous, resources), "ambiguous Capability provider")
+
+    incompatible = copy.deepcopy(units_by_id)
+    incompatible["xdownload.player.route-decision"]["capabilities"]["requires"][0]["compatibility"]["accepted"][0]["contractDigest"] = "0" * 64
+    expect_rejection(lambda: validate_capability_contracts(incompatible, resources), "incompatible Capability provider")
+
+    unit = units_by_id["xdownload.player.recognizer"]
+    no_lock = copy.deepcopy(package_identity["selectionLock"])
+    no_lock["selectedCapabilities"] = []
+    expect_rejection(lambda: resolve_provider_selection(unit, no_lock, "node24", resources), "missing provider selection")
+
+    duplicate_candidate = copy.deepcopy(unit)
+    duplicate_candidate["implementation"]["candidates"][1]["candidateId"] = duplicate_candidate["implementation"]["candidates"][0]["candidateId"]
+    expect_rejection(lambda: resolve_provider_selection(duplicate_candidate, package_identity["selectionLock"], "node24", resources), "ambiguous implementation candidate")
+
+    expect_rejection(lambda: resolve_provider_selection(unit, package_identity["selectionLock"], "node22", resources), "incompatible provider target")
+
+
+def validate_precondition_negatives(unit: dict):
+    expect_rejection(lambda: validate_preconditions(unit, {"signals": []}), "missing URL precondition")
+    expect_rejection(lambda: validate_preconditions(unit, {"url": "https://example.test"}), "missing signals precondition")
+
+
 def validate_lifecycle_negatives(package_identity: dict, units_by_id: dict, unit_paths: dict, resources: dict, closure_digest: str):
     missing = copy.deepcopy(package_identity)
     missing["lifecycleRecords"] = [item for item in missing["lifecycleRecords"] if item.get("transition") != "VALIDATED"]
@@ -1005,6 +1041,8 @@ def main():
     validate_lifecycle_records(package_identity, units_by_id, unit_paths, resources, manifest_digest)
     validate_lifecycle_negatives(package_identity, units_by_id, unit_paths, resources, manifest_digest)
     validate_failure_profile_negatives(unit_schema, units[0])
+    validate_capability_negatives(units_by_id, package_identity, resources)
+    validate_precondition_negatives(units_by_id["xdownload.player.recognizer"])
 
     knowledge = {}
     for unit in units:
@@ -1045,7 +1083,7 @@ def main():
     results = json.loads(node_script.stdout)
     validated_inputs = validated_outputs = 0
     for result in results:
-        validate_trace_assembly(result, graph, units_by_id, nodes_by_id)
+        validate_trace_assembly(result, graph, units_by_id, nodes_by_id, selected_providers)
         trace = result["trace"]
         if not trace or not json_value_equal(result["outcome"], trace[-1]["output"]):
             fail(f"terminal outcome differs from last trace output: {result['label']}")
