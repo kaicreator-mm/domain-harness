@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import ValidationError
 from referencing import Registry, Resource
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -862,7 +863,7 @@ def validate_lifecycle_records(package_identity: dict, units_by_id: dict, unit_p
 def expect_rejection(callback, label: str):
     try:
         callback()
-    except SystemExit:
+    except (SystemExit, ValidationError):
         return
     fail(f"adversarial negative was accepted: {label}")
 
@@ -1050,6 +1051,8 @@ def main():
         if implementation.get("artifactRef"):
             kind = "graph" if unit["role"] == "workflow" else "implementation"
             add_expected(expected, implementation["artifactRef"], kind, unit["id"])
+        for candidate in implementation.get("candidates", []):
+            add_expected(expected, candidate["artifactRef"], "implementation", unit["id"])
         for source in unit.get("evidence", {}).get("sources", []):
             source_ref = source["ref"]
             if is_external_provenance_ref(source_ref):
@@ -1105,6 +1108,10 @@ def main():
             fail(f"unreferenced required resource: {relative}")
 
     resources = {relative: item["sha256"] for relative, item in declared.items()}
+    for unit in units:
+        for candidate in unit.get("implementation", {}).get("candidates", []):
+            if resources.get(candidate["artifactRef"]) != candidate["artifactDigest"]:
+                fail(f"implementation candidate artifact digest mismatch: {candidate['candidateId']}")
     unit_paths = {item["id"]: item["path"] for item in closure["units"]}
     validate_capability_contracts(units_by_id, resources)
     selected_providers = {}

@@ -105,8 +105,10 @@ export function validateUnit(unit) {
   }
   if (unit.knowledgeRefs !== undefined) {
     if (!Array.isArray(unit.knowledgeRefs)) throw new DisExecutionError('INVALID_KNOWLEDGE_REFS', unit.id);
+    const knowledgeIds = new Set();
     for (const ref of unit.knowledgeRefs) {
-      if (!ref.id || !ref.revision || !ref.kind || !isSafePackageRelativeRef(ref.path) || !/^[a-f0-9]{64}$/.test(ref.sha256 || '')) throw new DisExecutionError('INVALID_KNOWLEDGE_REF', unit.id);
+      if (!ref.id || knowledgeIds.has(ref.id) || !ref.revision || !ref.kind || !isSafePackageRelativeRef(ref.path) || !/^[a-f0-9]{64}$/.test(ref.sha256 || '')) throw new DisExecutionError('INVALID_KNOWLEDGE_REF', unit.id);
+      knowledgeIds.add(ref.id);
     }
   }
   if (unit.evidence.consumes !== undefined && (!Array.isArray(unit.evidence.consumes) || new Set(unit.evidence.consumes).size !== unit.evidence.consumes.length)) throw new DisExecutionError('INVALID_EVIDENCE_SLOTS', unit.id);
@@ -746,6 +748,7 @@ export async function loadDemo() {
   });
   const unitsById = new Map(units.map((unit) => [unit.id, unit]));
   if (unitsById.size !== units.length) throw new DisExecutionError('DUPLICATE_UNIT_ID', 'Unit IDs must be unique');
+  for (const unit of units) for (const candidate of unit.implementation?.candidates || []) if (resources.get(candidate.artifactRef) !== candidate.artifactDigest) throw new DisExecutionError('IMPLEMENTATION_CANDIDATE_ARTIFACT_DIGEST_MISMATCH', candidate.candidateId);
   validateCapabilityContracts(unitsById, resources);
   const unitPaths = new Map(manifest.units.map((item) => [item.id, item.path]));
 
@@ -796,6 +799,7 @@ export async function loadDemo() {
   for (const resourcePath of schemaClosure.resources.keys()) expectResource(resourcePath, 'schema', packageIdentity.packageId);
   for (const unit of units) {
     if (unit.implementation?.artifactRef) expectResource(unit.implementation.artifactRef, unit.role === 'workflow' ? 'graph' : 'implementation', unit.id);
+    for (const candidate of unit.implementation?.candidates || []) expectResource(candidate.artifactRef, 'implementation', unit.id);
     for (const source of unit.evidence.sources || []) {
       const sourcePath = source.ref;
       if (isExternalProvenanceRef(sourcePath)) continue;
