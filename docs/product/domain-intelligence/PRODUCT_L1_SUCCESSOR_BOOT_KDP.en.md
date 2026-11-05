@@ -116,7 +116,7 @@ Domain App descriptor + bootstrap pin
 
 The Package System selects and composes Packages; the Kernel Core authorizes and executes the generic runtime transitions; Business Packages define domain semantics; Host adapters perform physical operations. No layer duplicates another layer's authority.
 
-## 7. Successor adoption and conformance gates
+## 7. Reviewable successor consistency checklist and adoption gates
 
 Before this amendment is accepted as successor Product/L1 authority:
 
@@ -124,8 +124,23 @@ Before this amendment is accepted as successor Product/L1 authority:
 2. A fresh independent Exact-SHA Product/L1 review must bind the exact commit/tree and report P0=0/P1=0.
 3. A formal successor Product/L1 checkpoint must record the exact source commit/tree, its relationship to frozen #1477, and the precise successor scope.
 4. DIS #1481 must bind its normative authority statements to that accepted checkpoint before replacing its current frozen-v0.7 wording.
-5. Consistency checks must reject: old Microkernel as a required separate successor layer; Boot taking Package DAG/Hook/Workflow/Runtime authority; Package System creating a second Runtime/Scheduler/Journal/Effect authority; Business Package or LLM bypassing KDP/Host authority.
+5. Every row in the following reviewable checklist must PASS. The reviewer must also reject the stated prohibited interpretation, not merely confirm that the preferred term appears.
 6. The checkpoint must continue to prohibit unapproved SDK ABI/source changes, release, tag and deployment.
+
+| Check | Required successor interpretation | Prohibited interpretation |
+|---|---|---|
+| Authority lineage | Frozen #1477/v0.7 remains immutable; this amendment applies only after its own successor checkpoint | Silently rewriting v0.7 or treating #1480 / this candidate as already frozen |
+| Boot boundary | Boot initializes the minimum environment, verifies the exact KDP Primary pin, invokes one fixed entry and hands over the descriptor | Boot resolves the Package DAG, loads SDK/Business Packages, binds Hooks, runs Workflows, or owns state/Effects |
+| Kernel Core | One post-bootstrap Kernel Core owns the single Runtime, admission/dispatch, generic state transitions, Effect authority, durable outcomes, Journal and replay/recovery | A second Runtime, state authority, Journal or Effect authority |
+| Package System | KDP-owned Package System resolves exact Package roots/DAG, validates pins/targets, loads Packages, binds Hooks and coordinates Package lifecycle | Package Manager acting as a second Runtime/Scheduler or executing business Workflow semantics |
+| KDP self-bootstrap | KDP Primary can initialize Kernel Core and Package System without SDK, Business or KDP Extension Packages | KDP bootstrap depending on Packages that have not yet been loaded |
+| Host boundary | Trusted Host adapters perform physical operations after KDP/Kernel admission and authorization | Host self-authorizing Effects or a Business/LLM path bypassing KDP |
+| Business boundary | Business Packages own domain-specific state models, rules, guards, events, Workflows and outcomes | Moving domain-specific semantics into generic Kernel Core |
+| Hook boundary | KDP resolves and binds declared Hooks; Hook Owner invokes and selects results | A global Hook Dispatcher or ambient Hook execution authority |
+| Agent/LLM/UX boundary | Agent/LLM/UX may interpret or propose bounded work only | Bypassing admission, mutating authoritative state, authorizing Effects or promoting/re-pinning intelligence |
+| Microkernel successor status | Former Microkernel responsibilities are reorganized inside KDP; old internal implementation compatibility is not required | Retaining the former Microkernel as a separate required successor layer, Package, process or Runtime |
+
+The reviewer must confirm the same ten checks against both language versions. A terminology match without matching authority semantics is a failure.
 
 Until the checkpoint exists, this file remains a candidate and does not supersede #1477.
 

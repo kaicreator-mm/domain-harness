@@ -116,7 +116,7 @@ Domain App Descriptor + Bootstrap Pin
 
 Package System 选择并组合 Package；Kernel Core 授权并执行通用 Runtime 转移；Business Package 定义领域语义；Host Adapter 执行物理操作。任何层都不得重复拥有其他层的权威。
 
-## 7. 后继架构采纳与符合性门禁
+## 7. 可审查的后继架构一致性清单与采纳门禁
 
 在本修订被接受为后继 Product/L1 权威之前：
 
@@ -124,8 +124,23 @@ Package System 选择并组合 Package；Kernel Core 授权并执行通用 Runti
 2. 新的独立 Product/L1 Exact-SHA 审核必须绑定精确 commit/tree，并报告 P0=0、P1=0。
 3. 正式后继 Product/L1 Checkpoint 必须记录精确源码 commit/tree、与冻结 #1477 的关系及准确的后继适用范围。
 4. DIS #1481 必须在替换当前冻结 v0.7 权威表述前，绑定已接受的 Checkpoint。
-5. 一致性检查必须拒绝：把旧 Microkernel 当作后继架构必须独立存在的层；Boot 承担 Package DAG/Hook/Workflow/Runtime 权威；Package System 创建第二个 Runtime/Scheduler/Journal/Effect 权威；Business Package 或 LLM 绕过 KDP/Host 权威。
+5. 下表每一项都必须 PASS；审核者还必须拒绝表中列出的禁止解释，不能只确认期望术语出现。
 6. Checkpoint 必须继续禁止未经授权的 SDK ABI/源码变更、发布、Tag 和部署。
+
+| 检查项 | 后继架构必须表达 | 禁止的解释 |
+|---|---|---|
+| 权威继承 | 冻结的 #1477/v0.7 保持不可变；本修订仅在独立后继 Checkpoint 接受后生效 | 静默改写 v0.7，或将 #1480/本文候选视为已冻结 |
+| Boot 边界 | Boot 初始化最小环境、验证 KDP Primary 精确 Pin、调用唯一固定入口并移交 Descriptor | Boot 解析 Package DAG、加载 SDK/Business Package、绑定 Hook、执行 Workflow，或拥有 State/Effect |
+| Kernel Core | 唯一引导后 Kernel Core 拥有单一 Runtime、准入/分发、通用状态转移、Effect 权威、持久结果、Journal 和 Replay/Recovery | 第二个 Runtime、状态权威、Journal 或 Effect 权威 |
+| Package System | KDP 所有的 Package System 解析精确 Package Root/DAG、验证 Pin/Target、加载 Package、绑定 Hook 并协调 Package 生命周期 | Package Manager 充当第二个 Runtime/Scheduler，或执行业务 Workflow 语义 |
+| KDP 自举 | KDP Primary 无需 SDK、Business 或 KDP Extension Package 即可初始化 Kernel Core 与 Package System | KDP 引导依赖尚未加载的 Package |
+| Host 边界 | 可信 Host Adapter 在 KDP/Kernel 准入与授权后执行物理操作 | Host 自行授权 Effect，或 Business/LLM 路径绕过 KDP |
+| Business 边界 | Business Package 拥有领域专属状态模型、规则、Guard、事件、Workflow 和结果 | 将领域专属语义迁入通用 Kernel Core |
+| Hook 边界 | KDP 解析并绑定声明的 Hook；Hook Owner 负责调用和结果选择 | 全局 Hook Dispatcher 或环境化 Hook 执行权威 |
+| Agent/LLM/UX 边界 | Agent/LLM/UX 仅能在有界范围内解释或提议工作 | 绕过准入、修改权威状态、授权 Effect 或 Promotion/重新 Pin 智能 |
+| Microkernel 后继状态 | 原 Microkernel 职责重组到 KDP 内；不要求兼容旧内部实现 | 将原 Microkernel 保留为后继架构独立必需的层、Package、进程或 Runtime |
+
+审核者必须对中英文两个版本执行相同的十项检查。只有术语相同而权威语义不一致，仍判定失败。
 
 在 Checkpoint 建立前，本文保持候选状态，不取代 #1477。
 
