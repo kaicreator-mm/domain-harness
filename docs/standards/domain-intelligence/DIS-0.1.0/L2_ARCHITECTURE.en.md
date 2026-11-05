@@ -73,6 +73,17 @@ Requirements:
 - UNKNOWN, AMBIGUOUS, CONFLICT, OUT_OF_SCOPE, NEEDS_INPUT, NEEDS_REVIEW, PARTIAL and FAILED are not silently converted into success.
 - State transitions, persistence and external Effects remain under the single existing Runtime/KDP/Host authority.
 
+### 2.3 Fixed resolver precedence
+
+Runtime MUST preserve the exact Product/L1 order; the order must not be changed:
+
+1. Deterministic Compiled Domain Intelligence;
+2. Exact Semantic Result Reuse;
+3. Applicable Promoted Reusable Subworkflow;
+4. Bounded HarnessMachine / LLM Fallback.
+
+LLM is not the default step for every request. It is a bounded fallback only when the applicable preceding sources cannot resolve the current case.
+
 ## 3. Core logical objects
 
 ### 3.1 Domain Scope / Consumer Profile
@@ -104,6 +115,15 @@ A Unit is a describable, referable, qualifiable and composable logical unit, not
 
 A Unit need not be exposed as a Component; one Component may be implemented by several Units. A Workflow Unit is a logical capability description and a Composition Graph is its composition implementation. They are bound by exact references.
 
+### 3.3.1 Workflow / Pipeline / Composition Graph
+
+- Workflow is a reusable domain-solving capability description: goal, applicability, input/output, failure semantics and evidence requirements.
+- Pipeline is the concrete execution organization of that Workflow: nodes, ordering, branches and terminal outcomes.
+- Composition Graph is DIS's structured, verifiable representation of a Pipeline.
+- A Workflow Unit may be exposed as a Semantic Component; the Graph is its implementation/composition artifact. They are bound by exact references.
+- Pipeline is not a Scheduler; Node execution remains managed by the existing Runtime/KDP.
+- A Workflow may compose Procedures, Tools, Recognizers, Decisions and Validators without creating a new Component family.
+
 ### 3.4 Identity / Qualification / Execution
 
 Keep separate: Unit stable ID, semantic revision, materialized artifact digest, asset authority, intelligence qualification/maturity, selected Package pin and runtime execution occurrence.
@@ -113,6 +133,8 @@ In the Product/L1 lifecycle, EXECUTED means that selected intelligence was used 
 ## 4. Component and implementation binding
 
 DIS reuses only existing Component families: Semantic Component and Tool Component. Knowledge, Facts, Evidence and ordinary Procedures do not become Components merely by appearing in a Unit/Package. A Workflow may be selectively exposed through existing Semantic Workflow capability. requires/provides are Capability Contracts, not proof of installation, authorization or data flow.
+
+A Procedure is private processing by default and has no external Effect authority. If it must cross a Host/Package boundary or produce a controlled external Effect, it must use the existing Tool/Host contract. Marking a function as a Procedure must not bypass Tool declaration, Admission or Effect Permit. Hooks remain limited to existing bounded contracts; DIS does not imply a general Event Bus.
 
 ### 4.1 Implementation Binding
 
@@ -155,6 +177,17 @@ External sources may remain Provenance references but are not implicitly downloa
 Resource Manifest records normalized package-relative path, resource kind, content digest, owner references and required/optional status. Reject absolute paths, traversal, empty/dot segments, backslashes, unauthorized remote URIs, duplicate paths, missing resources, digest mismatch and undeclared required references.
 
 Package materialization pins DIS version, Package identity/revision, Definition identity/revision/digest, selected Unit identity/revision/artifact digest, Graph identity/revision/artifact digest, all required resource paths/digests, trusted implementation bindings and required Capability Contracts. Existing Manifest/BUILD/lock artifacts may carry this logical lock; DIS does not create a parallel Package Manifest or replace ABI.
+
+### 7.4 Storage-neutral Knowledge Access
+
+DIS 0.1.0 preserves files-first guidance and domain asset ownership. Embedded SQLite, graph databases, vector indexes or other databases are optional materialization/query resources, not mandatory technologies and do not change the six Domain Data asset classes.
+
+If a Consumer uses a database or index:
+- record source resources, generator/version, digest, applicability and reproducibility;
+- mark indexes as Derived, not an undeclared second authority;
+- deleting/rebuilding an index must not mutate original Knowledge/Authority;
+- Package Lock pins database/index resources and versions required at runtime;
+- query results retain provenance, evidence and freshness information.
 
 ## 8. Qualification / Promotion / LLM Fallback / Evolution
 

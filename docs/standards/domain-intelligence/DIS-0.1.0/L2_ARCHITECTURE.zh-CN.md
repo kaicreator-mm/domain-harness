@@ -73,6 +73,17 @@ User / System Input
 - UNKNOWN、AMBIGUOUS、CONFLICT、OUT_OF_SCOPE、NEEDS_INPUT、NEEDS_REVIEW、PARTIAL 和 FAILED 不得静默变成成功。
 - 状态转移、持久化和外部 Effect 仍由唯一 Runtime/KDP/Host 权威执行。
 
+### 2.3 固定 Resolver Precedence
+
+运行期必须保持 Product/L1 冻结的精确顺序，不得交换：
+
+1. Deterministic Compiled Domain Intelligence；
+2. Exact Semantic Result Reuse；
+3. Applicable Promoted Reusable Subworkflow；
+4. Bounded HarnessMachine / LLM Fallback。
+
+LLM 不是每个请求的默认步骤。只有前面适用来源无法解决当前问题时才进入有界后备。
+
 ## 3. 核心逻辑对象
 
 ### 3.1 Domain Scope / Consumer Profile
@@ -113,6 +124,8 @@ Product/L1 生命周期中的 EXECUTED 表示某个选定智能曾在具体执�
 ## 4. Component 与实现绑定
 
 DIS 只复用既有 Component family：Semantic Component 和 Tool Component。Knowledge、Fact、Evidence 和普通 Procedure 不因出现在 Unit/Package 中就自动成为 Component。Workflow 可通过现有 Semantic Workflow 能力选择性暴露。requires/provides 是 Capability Contract，不是安装、授权或数据流证明。
+
+Procedure 默认是无外部 Effect 的私有处理单元；如需跨 Host/Package 边界调用或产生受控外部 Effect，必须使用现有 Tool/Host 契约。不得通过把函数标记为 Procedure 来绕过 Tool 声明、Admission 或 Effect Permit。Hook 仅按现有受限契约使用，DIS 不推导通用 Event Bus。
 
 ### 4.1 Implementation Binding
 
@@ -163,6 +176,17 @@ Package Resource Closure 不等于 Schema Closure。闭合范围覆盖选定智�
 Resource Manifest 至少记录 package-relative normalized path、resource kind、content digest、owner references 和 required/optional status。必须拒绝绝对路径、路径穿越、空段、点段、反斜线、未授权远程 URI、重复路径、缺失资源、Digest 不匹配和未声明的必需引用。
 
 Package materialization 必须精确 pin DIS standard version、Package identity/revision、Definition identity/revision/digest、selected Unit identity/revision/artifact digest、Graph identity/revision/artifact digest、全部必需资源路径/digest、trusted implementation binding 和 required Capability Contract。该逻辑锁定可由现有 Manifest/BUILD/lock artifact 承载；DIS 不创建平行 Package Manifest 或替换 ABI。
+
+### 7.4 Storage-neutral Knowledge Access
+
+DIS 0.1.0 保持 files-first 和领域资产所有权。嵌入式 SQLite、图数据库、向量索引或其他数据库只是可选的物化/查询资源，不是标准强制技术，也不改变六类 Domain Data 资产模型。
+
+如果 Consumer 使用数据库或索引：
+- 必须记录源资源、生成器/版本、Digest、适用范围和可再生成性；
+- 必须明确索引是 Derived，而不是未经声明的第二权威；
+- 删除/重建索引不得改变原始 Knowledge/Authority；
+- Package Lock 必须绑定运行所需的数据库/索引资源和版本；
+- 查询结果仍需保留来源、证据和时效信息。
 
 ## 8. Qualification / Promotion / LLM Fallback / Evolution
 
