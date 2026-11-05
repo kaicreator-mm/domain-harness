@@ -1,9 +1,9 @@
 # DIS 0.1.0 — L2 Architecture & Conformance Model
 
-状态：L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN  
-L2 Issue：#1481  
-Product/L1：#1477 — FROZEN  
-Product Freeze Commit：b8135aa801eb38fcae2fa1fce3bada541178d5b9  
+状态：L2_ARCHITECTURE_CANDIDATE / NOT_FROZEN\
+L2 Issue：#1481\
+Product/L1：#1477 — FROZEN\
+Product Freeze Commit：b8135aa801eb38fcae2fa1fce3bada541178d5b9\
 候选分支：dis/0.1.0-l2-candidate
 
 本文将冻结的 Domain Intelligence Product/L1 转换为标准边界、逻辑契约、机器可读描述、Consumer 语义和符合性要求。它不是 SDK ABI、Manifest/BUILD ABI、Runtime API 或 DomainForge/DomainHarness 的具体实现设计。DIS 保留已冻结的 v0.7 Kernel/Microkernel、唯一 Domain Runtime 以及 Host/Effect 契约。#1480 中的 KDP 架构提案尚未冻结，在 DIS 0.1.0 中仅作为非规范性背景。
